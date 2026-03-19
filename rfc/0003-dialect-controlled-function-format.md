@@ -166,6 +166,38 @@ specialize @dsp fn @filter(%in: Signal) captures (%coeffs: Vec<f64>) -> Signal {
 }
 ```
 
+### Pretty printing layout
+
+Format strings are whitespace-insensitive for parsing (the lexer normalizes whitespace into token boundaries). But the pretty printer needs structural information to produce well-formatted output with line breaks and indentation.
+
+Two rules handle this without adding layout directives to the format string:
+
+**Rule 1: Literal braces trigger nesting.** When the pretty printer encounters `{` and `}` literal tokens from the format string, it wraps the content between them in a Wadler-Lindig `nest(indent)` + `hardline`. This produces:
+
+```
+fn @bell_pair(%q0: Qubit, %q1: Qubit) -> Qubit, Qubit {
+  digraph {
+    %q0_h = h %q0 -> Qubit;
+    yield %q0_out, %q1_out;
+  }
+}
+```
+
+The format string has no layout hints — just `"fn {function:name}({body:ports}) -> {body:yields} { digraph {body:body} }"`. The `{` `}` tokens tell the printer to indent.
+
+**Rule 2: Projections carry their own layout.** Each `{body:...}` projection knows how to format its content:
+
+| Projection | Layout |
+|-----------|--------|
+| `{body:ports}` | Comma-separated, inline: `%q0: Qubit, %q1: Qubit` |
+| `{body:captures}` | Comma-separated, inline |
+| `{body:yields}` | Comma-separated, inline: `Qubit, Qubit` |
+| `{body:body}` | Statement list, newline-separated with indent |
+| `{body:args}` | Comma-separated, inline |
+| `{body}` | Full body including header, uses its own layout |
+
+The format string is purely about **ordering and surrounding syntax**. Layout decisions are made by the projections and by brace-triggered nesting. No `\n` or `{indent}` tokens in the format DSL.
+
 ### HasSignature trait
 
 The framework needs to extract a `Signature<L::Type>` from the parsed function statement to construct the `SpecializedFunction`. Today this comes from the hard-coded `fn @name(types) -> type` header. With dialect-controlled format, the dialect provides it:
