@@ -93,7 +93,7 @@ impl GenerateEmitIR {
                             <#ast_self_name #ast_self_ty_generics as #crate_path::EmitIR<Language>>::emit(stmt, ctx)
                         },
                     )?;
-                    Ok(ctx.stage.statement().definition(dialect_variant).new())
+                    Ok(ctx.stage.statement(dialect_variant))
                 }
             }
         }

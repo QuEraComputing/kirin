@@ -62,7 +62,7 @@ where
         ctx: &mut kirin_chumsky::EmitContext<'_, Language>,
     ) -> ::core::result::Result<Self::Output, kirin_chumsky::EmitError> {
         let dialect_variant = self.emit_with(ctx, &|_, _| unreachable!())?;
-        Ok(ctx.stage.statement().definition(dialect_variant).new())
+        Ok(ctx.stage.statement(dialect_variant))
     }
 }
 #[automatically_derived]
@@ -82,6 +82,6 @@ where
         let dialect_variant = self.0.emit_with(ctx, &|stmt, ctx| {
             <AddASTSelf<'t, TypeOutput> as kirin_chumsky::EmitIR<Language>>::emit(stmt, ctx)
         })?;
-        Ok(ctx.stage.statement().definition(dialect_variant).new())
+        Ok(ctx.stage.statement(dialect_variant))
     }
 }

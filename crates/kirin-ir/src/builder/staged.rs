@@ -53,21 +53,24 @@ impl<'a, L: Dialect> PlaceholderBuilder<'a, L> {
     }
 }
 
-#[bon::bon]
 impl<L: Dialect> BuilderStageInfo<L> {
     /// Create a new SSA value with a type and kind.
     ///
     /// Usually created implicitly by block/graph builders. Direct use is for
     /// test SSAs or pre-allocated results before their parent statement exists.
-    #[builder(finish_fn = new)]
     pub fn ssa(
         &mut self,
-        #[builder(into)] name: Option<String>,
+        name: Option<impl Into<String>>,
         ty: L::Type,
         kind: BuilderSSAKind,
     ) -> SSAValue {
         let id = self.ssas.next_id();
-        let ssa = BuilderSSAInfo::new(id, name.map(|n| self.symbols.intern(n)), Some(ty), kind);
+        let ssa = BuilderSSAInfo::new(
+            id,
+            name.map(|n| self.symbols.intern(n.into())),
+            Some(ty),
+            kind,
+        );
         self.ssas.alloc(ssa);
         id
     }
@@ -101,8 +104,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
     /// Any `ResultValue` fields in the definition that were created as
     /// `Unresolved(Result(idx))` placeholders are automatically resolved
     /// to point at this statement.
-    #[builder(finish_fn = new)]
-    pub fn statement(&mut self, #[builder(into)] definition: L) -> Statement {
+    pub fn statement(&mut self, definition: impl Into<L>) -> Statement {
+        let definition = definition.into();
         let id = self.statements.next_id();
         let statement = StatementInfo {
             node: LinkedListNode::new(id),
@@ -129,7 +132,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
     }
 
     /// Create a new staged function.
-    #[builder(finish_fn = new)]
     pub fn staged_function(
         &mut self,
         name: Option<GlobalSymbol>,
@@ -203,15 +205,16 @@ impl<L: Dialect> BuilderStageInfo<L> {
         Ok(id)
     }
 
-    #[builder(finish_fn = new)]
+    /// Create a new specialization for a staged function.
     pub fn specialize(
         &mut self,
-        #[builder(name = staged_func)] func: StagedFunction,
+        staged_func: StagedFunction,
         signature: Option<Signature<L::Type>>,
-        #[builder(into)] body: Statement,
+        body: impl Into<Statement>,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Result<SpecializedFunction, SpecializeError<L>> {
-        let staged_function_info = &mut self.staged_functions[func];
+        let body = body.into();
+        let staged_function_info = &mut self.staged_functions[staged_func];
 
         let signature = signature.unwrap_or(staged_function_info.signature.clone());
 
@@ -224,7 +227,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
 
         if !conflicting.is_empty() {
             return Err(SpecializeError {
-                staged_function: func,
+                staged_function: staged_func,
                 signature,
                 conflicting,
                 body,
@@ -232,14 +235,9 @@ impl<L: Dialect> BuilderStageInfo<L> {
             });
         }
 
-        let id = SpecializedFunction(func, staged_function_info.specializations.len());
+        let id = SpecializedFunction(staged_func, staged_function_info.specializations.len());
 
-        let specialized_function = SpecializedFunctionInfo::builder()
-            .id(id)
-            .signature(signature)
-            .body(body)
-            .maybe_backedges(backedges)
-            .new();
+        let specialized_function = SpecializedFunctionInfo::new(id, signature, body, backedges);
         staged_function_info
             .specializations
             .push(specialized_function);

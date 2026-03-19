@@ -79,7 +79,7 @@ where
         ctx: &mut ::kirin::parsers::EmitContext<'_, Language>,
     ) -> ::core::result::Result<Self::Output, ::kirin::parsers::EmitError> {
         let dialect_variant = self.emit_with(ctx, &|_, _| unreachable!())?;
-        Ok(ctx.stage.statement().definition(dialect_variant).new())
+        Ok(ctx.stage.statement(dialect_variant))
     }
 }
 #[automatically_derived]
@@ -100,6 +100,6 @@ where
         let dialect_variant = self.0.emit_with(ctx, &|stmt, ctx| {
             <ArithOpsASTSelf<'t, TypeOutput> as ::kirin::parsers::EmitIR<Language>>::emit(stmt, ctx)
         })?;
-        Ok(ctx.stage.statement().definition(dialect_variant).new())
+        Ok(ctx.stage.statement(dialect_variant))
     }
 }

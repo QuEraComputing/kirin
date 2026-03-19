@@ -539,13 +539,14 @@ where
 
     let staged_function = stage
         .with_builder(|builder| {
-            builder
-                .staged_function()
-                .name(function_symbol)
-                .signature(header.signature.clone())
-                .new()
+            builder.staged_function(
+                Some(function_symbol),
+                Some(header.signature.clone()),
+                None,
+                None,
+            )
         })
-        .map_err(|err| {
+        .map_err(|err: kirin_ir::StagedFunctionError<L>| {
             FunctionParseError::new(
                 FunctionParseErrorKind::EmitFailed,
                 Some(header.span),
@@ -594,12 +595,13 @@ where
         };
 
         builder
-            .specialize()
-            .staged_func(staged_function)
-            .signature(header.signature.clone())
-            .body(body_statement)
-            .new()
-            .map_err(|err| {
+            .specialize(
+                staged_function,
+                Some(header.signature.clone()),
+                body_statement,
+                None,
+            )
+            .map_err(|err: kirin_ir::SpecializeError<L>| {
                 FunctionParseError::new(
                     FunctionParseErrorKind::EmitFailed,
                     Some(span),
@@ -690,9 +692,7 @@ fn get_or_create_function_by_name<S>(
         return existing;
     }
     let function = pipeline
-        .function()
-        .name(name.to_string())
-        .new()
+        .function(Some(name.to_string()))
         .expect("failed to create function in pipeline");
     function_lookup.insert(name.to_string(), function);
     function
@@ -737,11 +737,7 @@ where
         )
     })?;
 
-    Ok(pipeline
-        .add_stage()
-        .stage(stage)
-        .name(stage_symbol.name.to_string())
-        .new())
+    Ok(pipeline.add_stage(stage, Some(stage_symbol.name.to_string())))
 }
 
 fn stage_creation_error_message<S>(

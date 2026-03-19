@@ -41,14 +41,16 @@ fn create_test_function() -> (
     let test_func = gs.intern("test_func".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let staged_function = stage
-        .staged_function()
-        .name(test_func)
-        .signature(kirin_ir::Signature::new(
-            vec![SimpleType::I64],
-            SimpleType::I64,
-            (),
-        ))
-        .new()
+        .staged_function(
+            Some(test_func),
+            Some(kirin_ir::Signature::new(
+                vec![SimpleType::I64],
+                SimpleType::I64,
+                (),
+            )),
+            None,
+            None,
+        )
         .unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1.2);
@@ -79,12 +81,7 @@ fn create_test_function() -> (
 
     let body = stage.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
-    let f = stage
-        .specialize()
-        .staged_func(staged_function)
-        .body(fdef)
-        .new()
-        .unwrap();
+    let f = stage.specialize(staged_function, None, fdef, None).unwrap();
 
     (stage.finalize().unwrap(), gs, f)
 }

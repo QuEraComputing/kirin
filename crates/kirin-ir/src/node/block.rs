@@ -60,21 +60,13 @@ pub struct BlockInfo<L: Dialect> {
     _marker: std::marker::PhantomData<L>,
 }
 
-#[bon::bon]
 impl<L: Dialect> BlockInfo<L> {
-    #[builder(finish_fn = new)]
     pub(crate) fn new(
-        /// The parent region of this block.
         parent: Option<Region>,
-        /// The name of this block.
         name: Option<Symbol>,
-        /// The linked list node for this block.
         node: LinkedListNode<Block>,
-        /// The arguments of this block.
         arguments: Vec<BlockArgument>,
-        /// The statements contained in this block.
         statements: Option<LinkedList<Statement>>,
-        /// The terminator statement of this block, if any.
         terminator: Option<Statement>,
     ) -> Self {
         Self {

@@ -5,10 +5,5 @@ pub fn new_test_ssa<L: Dialect>(
     name: impl Into<String>,
     ty: L::Type,
 ) -> SSAValue {
-    stage
-        .ssa()
-        .name(name.into())
-        .ty(ty)
-        .kind(BuilderSSAKind::Test)
-        .new()
+    stage.ssa(Some(name.into()), ty, BuilderSSAKind::Test)
 }

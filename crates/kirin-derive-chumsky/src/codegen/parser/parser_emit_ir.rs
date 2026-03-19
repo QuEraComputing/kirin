@@ -81,7 +81,7 @@ impl GenerateHasDialectParser {
                             <#original_name #ty_generics as #crate_path::HasParserEmitIR<'t>>::emit_parsed(stmt, ctx)
                         },
                     )?;
-                    Ok(ctx.stage.statement().definition(dialect_variant).new())
+                    Ok(ctx.stage.statement(dialect_variant))
                 }
             }
         };

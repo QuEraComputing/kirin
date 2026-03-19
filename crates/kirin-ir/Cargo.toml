@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bon = "3.8"
 indexmap = "2.13.0"
 kirin-derive-ir = { workspace = true, optional = true }
 petgraph = { workspace = true }

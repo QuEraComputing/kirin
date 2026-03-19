@@ -58,10 +58,9 @@ impl<S> Pipeline<S> {
         }
     }
 
-    /// Add a stage to the pipeline, returning its [`CompileStage`].
+    /// Add a stage to the pipeline without a name, returning its [`CompileStage`].
     ///
-    /// *Non-builder variant.* Prefer the builder form (see [`Pipeline::add_stage`]
-    /// in the `#[bon::bon]` block) when you want to set a stage name.
+    /// Equivalent to `self.add_stage(stage, None::<&str>)`.
     pub fn add_stage_raw(&mut self, stage: S) -> CompileStage {
         let id = CompileStage::new(Id(self.stages.len()));
         self.stages.push(stage);
@@ -192,7 +191,6 @@ impl<S> Pipeline<S> {
     }
 }
 
-#[bon::bon]
 impl<S> Pipeline<S> {
     /// Add a stage to the pipeline, returning its [`CompileStage`].
     ///
@@ -204,18 +202,17 @@ impl<S> Pipeline<S> {
     /// # Examples
     ///
     /// ```ignore
-    /// let id = pipeline.add_stage().stage(ctx).new();                   // unnamed
-    /// let id = pipeline.add_stage().stage(ctx).name("llvm_ir").new();   // named
+    /// let id = pipeline.add_stage(ctx, None::<&str>);         // unnamed
+    /// let id = pipeline.add_stage(ctx, Some("llvm_ir"));      // named
     /// ```
-    #[builder(finish_fn = new)]
-    pub fn add_stage(&mut self, mut stage: S, #[builder(into)] name: Option<String>) -> CompileStage
+    pub fn add_stage(&mut self, mut stage: S, name: Option<impl Into<String>>) -> CompileStage
     where
         S: StageMeta,
     {
         let id = CompileStage::new(Id(self.stages.len()));
         stage.set_stage_id(Some(id));
         if let Some(n) = name {
-            let sym = self.global_symbols.intern(n);
+            let sym = self.global_symbols.intern(n.into());
             stage.set_stage_name(Some(sym));
         }
         self.stages.push(stage);
@@ -235,16 +232,13 @@ impl<S> Pipeline<S> {
     /// # Examples
     ///
     /// ```ignore
-    /// let func = pipeline.function().new()?;               // anonymous
-    /// let func = pipeline.function().name("foo").new()?;   // named
+    /// let func = pipeline.function(None::<&str>)?;           // anonymous
+    /// let func = pipeline.function(Some("foo"))?;            // named
     /// ```
-    #[builder(finish_fn = new)]
-    pub fn function(
-        &mut self,
-        #[builder(into)] name: Option<String>,
-    ) -> Result<Function, PipelineError> {
+    pub fn function(&mut self, name: Option<impl Into<String>>) -> Result<Function, PipelineError> {
         let sym = name
             .map(|n| {
+                let n = n.into();
                 if let Some(existing) = self.global_symbols.lookup(n.as_str())
                     && self.name_index.contains_key(&existing)
                 {
@@ -280,14 +274,8 @@ impl<S> Pipeline<S> {
     /// # Examples
     ///
     /// ```ignore
-    /// let sf = pipeline.staged_function()
-    ///     .func(func)
-    ///     .stage(stage_id)
-    ///     .signature(sig)
-    ///     .new()
-    ///     .unwrap();
+    /// let sf = pipeline.staged_function::<L>(func, stage_id, Some(sig), None, None)?;
     /// ```
-    #[builder(finish_fn = new)]
     pub fn staged_function<L: Dialect>(
         &mut self,
         func: Function,
@@ -315,14 +303,8 @@ impl<S> Pipeline<S> {
             .ok_or(PipelineError::UnknownFunction(func))?;
 
         // Delegate to BuilderStageInfo::staged_function via with_builder.
-        let sf = stage_info.with_builder(|b| {
-            b.staged_function()
-                .maybe_name(name)
-                .maybe_signature(signature)
-                .maybe_specializations(specializations)
-                .maybe_backedges(backedges)
-                .new()
-        })?;
+        let sf = stage_info
+            .with_builder(|b| b.staged_function(name, signature, specializations, backedges))?;
 
         // Auto-link the staged function to the abstract Function.
         self.functions
@@ -348,35 +330,26 @@ impl<S> Pipeline<S> {
     /// # Examples
     ///
     /// ```ignore
-    /// let (func, sf, spec) = pipeline.define_function::<MyDialect>()
-    ///     .stage(stage_id)
-    ///     .body(body_stmt)
-    ///     .name("my_func")
-    ///     .signature(sig)
-    ///     .new()
-    ///     .unwrap();
+    /// let (func, sf, spec) = pipeline.define_function::<MyDialect>(
+    ///     Some("my_func"), stage_id, Some(sig), body_stmt,
+    /// )?;
     /// ```
-    #[builder(finish_fn = new)]
     pub fn define_function<L: Dialect>(
         &mut self,
-        #[builder(into)] name: Option<String>,
+        name: Option<impl Into<String>>,
         stage: CompileStage,
         signature: Option<Signature<L::Type>>,
-        #[builder(into)] body: Statement,
+        body: impl Into<Statement>,
     ) -> Result<(Function, StagedFunction, SpecializedFunction), PipelineStagedError<L>>
     where
         S: HasStageInfo<L>,
         L::Type: crate::Placeholder,
     {
-        let func = self.function().maybe_name(name).new()?;
+        let func = self.function(name)?;
 
-        let sf = self
-            .staged_function::<L>()
-            .func(func)
-            .stage(stage)
-            .maybe_signature(signature)
-            .new()?;
+        let sf = self.staged_function::<L>(func, stage, signature, None, None)?;
 
+        let body = body.into();
         let stage_info = self
             .stages
             .get_mut(Id::from(stage).raw())
@@ -385,7 +358,7 @@ impl<S> Pipeline<S> {
 
         // Omit signature — specialize defaults to the staged function's signature.
         let spec = stage_info
-            .with_builder(|b| b.specialize().staged_func(sf).body(body).new())
+            .with_builder(|b| b.specialize(sf, None, body, None))
             .expect("specialization conflict on newly created staged function");
 
         Ok((func, sf, spec))
@@ -400,8 +373,8 @@ mod tests {
     #[test]
     fn duplicate_function_names_are_forbidden() {
         let mut pipeline: Pipeline<()> = Pipeline::new();
-        let _ = pipeline.function().name("foo").new().unwrap();
-        let result = pipeline.function().name("foo").new();
+        let _ = pipeline.function(Some("foo")).unwrap();
+        let result = pipeline.function(Some("foo"));
         assert!(
             matches!(result, Err(PipelineError::DuplicateFunctionName(_))),
             "expected DuplicateFunctionName, got: {result:?}"
@@ -411,7 +384,7 @@ mod tests {
     #[test]
     fn function_by_name_is_stable_for_unique_names() {
         let mut pipeline: Pipeline<()> = Pipeline::new();
-        let foo = pipeline.function().name("foo").new().unwrap();
+        let foo = pipeline.function(Some("foo")).unwrap();
         let sym = pipeline
             .lookup_symbol("foo")
             .expect("foo symbol should exist");
@@ -436,8 +409,8 @@ mod tests {
     #[test]
     fn pipeline_anonymous_function() {
         let mut pipeline: Pipeline<()> = Pipeline::new();
-        let f1 = pipeline.function().new().unwrap();
-        let f2 = pipeline.function().new().unwrap();
+        let f1 = pipeline.function(None::<&str>).unwrap();
+        let f2 = pipeline.function(None::<&str>).unwrap();
         // Anonymous functions don't conflict
         assert_ne!(f1, f2);
     }
@@ -584,22 +557,14 @@ mod tests {
     #[test]
     fn stage_by_name_returns_matching_stage() {
         let mut pipeline: Pipeline<NamedStage> = Pipeline::new();
-        let id = pipeline
-            .add_stage()
-            .stage(NamedStage::new())
-            .name("source")
-            .new();
+        let id = pipeline.add_stage(NamedStage::new(), Some("source"));
         assert_eq!(pipeline.stage_by_name("source"), Some(id));
     }
 
     #[test]
     fn stage_by_name_returns_none_for_missing() {
         let mut pipeline: Pipeline<NamedStage> = Pipeline::new();
-        pipeline
-            .add_stage()
-            .stage(NamedStage::new())
-            .name("source")
-            .new();
+        pipeline.add_stage(NamedStage::new(), Some("source"));
         assert_eq!(pipeline.stage_by_name("nonexistent"), None);
     }
 
@@ -618,7 +583,7 @@ mod tests {
 
         let mut pipeline: Pipeline<()> = Pipeline::new();
         let stage = pipeline.add_stage_raw(());
-        let func = pipeline.function().name("main").new().unwrap();
+        let func = pipeline.function(Some("main")).unwrap();
         let sf = StagedFunction::from(Id(42));
         pipeline.link(func, stage, sf).unwrap();
 
@@ -638,7 +603,7 @@ mod tests {
         use crate::node::function::CompileStage;
 
         let mut pipeline: Pipeline<()> = Pipeline::new();
-        let _ = pipeline.function().name("main").new().unwrap();
+        let _ = pipeline.function(Some("main")).unwrap();
         let unlinked_stage = CompileStage::new(Id(99));
         assert_eq!(
             pipeline.resolve_staged_function("main", unlinked_stage),
@@ -651,7 +616,7 @@ mod tests {
         let mut pipeline: Pipeline<()> = Pipeline::new();
         let stage_a = pipeline.add_stage_raw(());
         let stage_b = pipeline.add_stage_raw(());
-        let func = pipeline.function().name("foo").new().unwrap();
+        let func = pipeline.function(Some("foo")).unwrap();
         // Link to stage_a only
         use crate::arena::Id;
         use crate::node::function::StagedFunction;
@@ -667,7 +632,7 @@ mod tests {
     fn pipeline_multiple_anonymous_functions_are_distinct() {
         let mut pipeline: Pipeline<()> = Pipeline::new();
         let funcs: Vec<_> = (0..10)
-            .map(|_| pipeline.function().new().unwrap())
+            .map(|_| pipeline.function(None::<&str>).unwrap())
             .collect();
         // All should be distinct
         for i in 0..funcs.len() {

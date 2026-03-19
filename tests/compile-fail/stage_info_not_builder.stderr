@@ -1,7 +1,7 @@
 error[E0277]: `StageInfo<SimpleLanguage>` is not a builder stage — cannot construct IR on finalized `StageInfo`
-  --> tests/compile-fail/stage_info_not_builder.rs:14:28
+  --> tests/compile-fail/stage_info_not_builder.rs:11:28
    |
-14 |     SimpleLanguage::op_add(&mut stage, ssa, ssa);
+11 |     SimpleLanguage::op_add(&mut stage, ssa, ssa);
    |     ---------------------- ^^^^^^^^^^ the trait `AsBuildStage<_>` is not implemented for `StageInfo<SimpleLanguage>`
    |     |
    |     required by a bound introduced by this call

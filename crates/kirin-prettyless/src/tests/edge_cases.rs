@@ -73,7 +73,7 @@ fn test_empty_pipeline_render() {
 #[test]
 fn test_pipeline_function_no_stages() {
     let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("orphan").new().unwrap();
+    let func = pipeline.function(Some("orphan")).unwrap();
 
     // Function exists but has no staged representations
     let output = func.sprint(&pipeline);
@@ -262,7 +262,7 @@ fn test_render_error_display_fmt() {
 fn test_render_error_display_unknown_function() {
     // Create a real function in a pipeline, then check the error variant
     let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("missing").new().unwrap();
+    let func = pipeline.function(Some("missing")).unwrap();
     let err = crate::RenderError::UnknownFunction(func);
     let msg = err.to_string();
     assert!(msg.contains("not found in pipeline"), "got: {}", msg);
@@ -279,7 +279,7 @@ fn test_render_error_source() {
     assert!(fmt_err.source().is_some());
 
     let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("src_test").new().unwrap();
+    let func = pipeline.function(Some("src_test")).unwrap();
     let unk_err = crate::RenderError::UnknownFunction(func);
     assert!(unk_err.source().is_none());
 }
@@ -290,19 +290,11 @@ fn test_render_error_source() {
 fn test_staged_function_unnamed() {
     let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
     // Create function without a name
-    let func = pipeline.function().new().unwrap();
+    let func = pipeline.function(None::<&str>).unwrap();
 
-    let stage_id = pipeline
-        .add_stage()
-        .stage(kirin_ir::StageInfo::default())
-        .name("X")
-        .new();
+    let stage_id = pipeline.add_stage(kirin_ir::StageInfo::default(), Some("X"));
     let sf = pipeline
-        .staged_function()
-        .func(func)
-        .stage(stage_id)
-        .signature(kirin_ir::Signature::new(vec![], SimpleType::I64, ()))
-        .new()
+        .staged_function::<SimpleLanguage>(func, stage_id, Some(kirin_ir::Signature::new(vec![], SimpleType::I64, ())), None, None)
         .unwrap();
 
     pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
@@ -311,7 +303,7 @@ fn test_staged_function_unnamed() {
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.region().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
-        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+        ctx.specialize(sf, None, fdef, None).unwrap();
     });
 
     let output = func.sprint(&pipeline);
@@ -327,10 +319,7 @@ fn test_staged_function_no_params() {
     let test_func = gs.intern("nullary".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let staged_function = stage
-        .staged_function()
-        .name(test_func)
-        .signature(kirin_ir::Signature::new(vec![], SimpleType::I64, ()))
-        .new()
+        .staged_function(Some(test_func), Some(kirin_ir::Signature::new(vec![], SimpleType::I64, ())), None, None)
         .unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 0i64);
@@ -338,12 +327,7 @@ fn test_staged_function_no_params() {
     let block = stage.block().stmt(a).terminator(ret).new();
     let body = stage.region().add_block(block).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
-    let _ = stage
-        .specialize()
-        .staged_func(staged_function)
-        .body(fdef)
-        .new()
-        .unwrap();
+    let _ = stage.specialize(staged_function, None, fdef, None).unwrap();
 
     let stage = stage.finalize().unwrap();
     let output = staged_function.render(&stage).globals(&gs).into_string().unwrap();
@@ -371,19 +355,11 @@ fn test_pipeline_render_builder_write_to() {
     use crate::PipelinePrintExt;
 
     let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("wr").new().unwrap();
+    let func = pipeline.function(Some("wr")).unwrap();
 
-    let stage_id = pipeline
-        .add_stage()
-        .stage(kirin_ir::StageInfo::default())
-        .name("S")
-        .new();
+    let stage_id = pipeline.add_stage(kirin_ir::StageInfo::default(), Some("S"));
     let sf = pipeline
-        .staged_function()
-        .func(func)
-        .stage(stage_id)
-        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ()))
-        .new()
+        .staged_function::<SimpleLanguage>(func, stage_id, Some(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ())), None, None)
         .unwrap();
 
     pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
@@ -392,7 +368,7 @@ fn test_pipeline_render_builder_write_to() {
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.region().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
-        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+        ctx.specialize(sf, None, fdef, None).unwrap();
     });
 
     let mut output = Vec::new();
@@ -407,19 +383,11 @@ fn test_pipeline_render_builder_write_to() {
 #[test]
 fn test_function_render_builder_write_to() {
     let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
-    let func = pipeline.function().name("fwr").new().unwrap();
+    let func = pipeline.function(Some("fwr")).unwrap();
 
-    let stage_id = pipeline
-        .add_stage()
-        .stage(kirin_ir::StageInfo::default())
-        .name("T")
-        .new();
+    let stage_id = pipeline.add_stage(kirin_ir::StageInfo::default(), Some("T"));
     let sf = pipeline
-        .staged_function()
-        .func(func)
-        .stage(stage_id)
-        .signature(kirin_ir::Signature::new(vec![], SimpleType::I64, ()))
-        .new()
+        .staged_function::<SimpleLanguage>(func, stage_id, Some(kirin_ir::Signature::new(vec![], SimpleType::I64, ())), None, None)
         .unwrap();
 
     pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
@@ -428,7 +396,7 @@ fn test_function_render_builder_write_to() {
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.region().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
-        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+        ctx.specialize(sf, None, fdef, None).unwrap();
     });
 
     let mut output = Vec::new();
@@ -446,10 +414,7 @@ fn test_render_very_narrow_width() {
     let test_func = gs.intern("narrow".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let sf = stage
-        .staged_function()
-        .name(test_func)
-        .signature(kirin_ir::Signature::new(vec![SimpleType::I64, SimpleType::F64, SimpleType::I64], SimpleType::F64, ()))
-        .new()
+        .staged_function(Some(test_func), Some(kirin_ir::Signature::new(vec![SimpleType::I64, SimpleType::F64, SimpleType::I64], SimpleType::F64, ())), None, None)
         .unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
@@ -457,12 +422,7 @@ fn test_render_very_narrow_width() {
     let block = stage.block().stmt(a).terminator(ret).new();
     let body = stage.region().add_block(block).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
-    let _ = stage
-        .specialize()
-        .staged_func(sf)
-        .body(fdef)
-        .new()
-        .unwrap();
+    let _ = stage.specialize(sf, None, fdef, None).unwrap();
 
     let stage = stage.finalize().unwrap();
     let output = sf

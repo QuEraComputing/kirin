@@ -18,17 +18,8 @@ pub struct RegionInfo<L: Dialect> {
     _marker: std::marker::PhantomData<L>,
 }
 
-#[bon::bon]
 impl<L: Dialect> RegionInfo<L> {
-    #[builder(finish_fn = new)]
-    pub fn new(
-        /// The unique identifier for this region.
-        id: Region,
-        /// The parent statement of this region, if any.
-        parent: Option<Statement>,
-        /// The blocks contained in this region.
-        blocks: LinkedList<Block>,
-    ) -> Self {
+    pub fn new(id: Region, parent: Option<Statement>, blocks: LinkedList<Block>) -> Self {
         Self {
             id,
             parent,
