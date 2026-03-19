@@ -92,19 +92,53 @@ The operation keyword changes from `{.name}` (looks like field access) to `$name
 | **Type keyword** | Bare literal, no `$`, no `{field}` | literal token(s) | `"Qubit"`, `"i32"` |
 | **Body wrapper** | Only `{field}` refs, no `$` | `{field}...` | `"{body}"` |
 
-Detection combines format syntax with struct context:
+Detection combines the presence of `#[kirin(type = T)]` with format syntax:
 
-1. If the format contains `$identifier` → **statement mode** (validated: struct must have SSA/Result fields or be an operation)
-2. Else if the struct has body fields (Region, DiGraph, UnGraph, Block) → **body wrapper mode** (format must be `{field}` only)
-3. Else if all variants are unit with bare-literal formats → **type keyword mode**
+**Primary split**: `#[kirin(type = T)]` present → dialect IR type. Absent → standalone parseable type.
 
-The `$` prefix is **required** for statements — if a struct has `SSAValue` or `ResultValue` fields but the format lacks `$`, the derive emits a compile error. This eliminates ambiguity: you cannot accidentally write a statement format that looks like a type keyword.
+| `#[kirin(type)]`? | Format syntax | Mode | Generated traits |
+|-------------------|--------------|------|-----------------|
+| **Yes** + `$keyword` | `"$h {qubit} -> {result:type}"` | Statement | HasDialectParser, EmitIR |
+| **Yes** + no `$`, body field | `"{body}"` | Body wrapper | HasDialectParser, EmitIR |
+| **No** + bare literal | `"Qubit"`, `"i32"` | Type keyword | Display, HasParser, DirectlyParsable, PrettyPrintViaDisplay |
+| **No** + has `{field}` | `"Tensor<{elem}>"` | Parameterized type | Display, HasParser, DirectlyParsable, PrettyPrint |
 
-| Struct fields | Format | Mode |
-|--------------|--------|------|
-| Has SSAValue/ResultValue | Must have `$keyword` | Statement |
-| Has Region/DiGraph/UnGraph/Block | `{field}` only | Body wrapper |
-| Unit variants, no IR fields | Bare literal | Type keyword |
+Validation rules:
+- If struct has `SSAValue`/`ResultValue` fields, `$keyword` is **required** — compile error without it
+- If struct has body fields (Region/DiGraph/UnGraph/Block), `$keyword` is **forbidden**
+- Standalone types (no `#[kirin(type)]`) cannot have SSA/Result fields
+
+### Field interpolation and composability
+
+`{field}` in the format string delegates to the field type's `HasParser` implementation. This works uniformly across all modes:
+
+```rust
+// Compile-time value in a statement (delegates to Phase::HasParser)
+#[chumsky(format = "$rz({angle}) {qubit} -> {result:type}")]
+pub struct Rz {
+    pub angle: Phase,        // any type implementing HasParser
+    pub qubit: SSAValue,
+    pub result: ResultValue,
+}
+
+// Recursive type parameter (delegates to MyType::HasParser)
+#[derive(HasParser, PrettyPrint)]
+pub enum MyType {
+    #[chumsky(format = "i32")]
+    I32,
+    #[chumsky(format = "Tensor<{elem}>")]
+    Tensor { elem: Box<MyType> },
+}
+
+// Body field (delegates to DiGraph parser)
+#[kirin(type = QubitType)]
+#[chumsky(format = "{body}")]
+pub struct CircuitFunction {
+    pub body: DiGraph,
+}
+```
+
+The derive doesn't need to know the field's concrete type — it generates a call to `HasParser::parser()` for whatever type the field has. User-defined compile-time values compose into statement and type formats by implementing `HasParser` + `PrettyPrint`.
 
 ### Format DSL changes (complete picture)
 
