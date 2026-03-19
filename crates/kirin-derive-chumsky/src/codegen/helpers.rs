@@ -154,7 +154,6 @@ pub(crate) fn collect_wrapper_types(
     }
 }
 
-
 /// Filters collected fields to only include those needed in the AST.
 pub(crate) fn filter_ast_fields<'a>(
     collected: &'a [FieldInfo<ChumskyLayout>],

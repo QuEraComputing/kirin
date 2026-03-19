@@ -341,10 +341,7 @@ fn test_pipeline_parse_uses_stage_language_dispatch() {
         .next()
         .unwrap()
         .signature();
-    assert_eq!(
-        stage_b_sig,
-        &Signature::new(vec![I32Type], I32Type, ())
-    );
+    assert_eq!(stage_b_sig, &Signature::new(vec![I32Type], I32Type, ()));
 }
 
 // ---------------------------------------------------------------------------

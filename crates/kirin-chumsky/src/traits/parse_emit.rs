@@ -1,6 +1,57 @@
 use kirin_ir::{Dialect, Statement};
 
-use super::{EmitContext, EmitIR, HasParser, ParseError, parse_ast};
+use super::{EmitContext, EmitError, EmitIR, HasParser, ParseError, parse_ast};
+
+/// Error type for combined parse-and-emit operations.
+///
+/// Distinguishes between errors that occurred during parsing (chumsky-level
+/// syntax errors) and errors that occurred during IR emission (e.g., undefined
+/// SSA values or blocks).
+#[derive(Debug, Clone)]
+pub enum ChumskyError {
+    /// One or more syntax errors from the chumsky parser.
+    Parse(Vec<ParseError>),
+    /// An error during IR emission from a successfully parsed AST.
+    Emit(EmitError),
+}
+
+impl std::fmt::Display for ChumskyError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ChumskyError::Parse(errors) => {
+                for (i, e) in errors.iter().enumerate() {
+                    if i > 0 {
+                        write!(f, "; ")?;
+                    }
+                    write!(f, "{e}")?;
+                }
+                Ok(())
+            }
+            ChumskyError::Emit(e) => write!(f, "{e}"),
+        }
+    }
+}
+
+impl std::error::Error for ChumskyError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            ChumskyError::Emit(e) => Some(e),
+            ChumskyError::Parse(_) => None,
+        }
+    }
+}
+
+impl From<Vec<ParseError>> for ChumskyError {
+    fn from(errors: Vec<ParseError>) -> Self {
+        ChumskyError::Parse(errors)
+    }
+}
+
+impl From<EmitError> for ChumskyError {
+    fn from(error: EmitError) -> Self {
+        ChumskyError::Emit(error)
+    }
+}
 
 /// A dialect that can parse text and emit IR in one step.
 ///
@@ -16,10 +67,8 @@ use super::{EmitContext, EmitIR, HasParser, ParseError, parse_ast};
 /// 3. **Manual**: Implement directly for full control over parse+emit.
 pub trait ParseEmit<L: Dialect = Self>: Dialect {
     /// Parse input text and emit a single IR statement.
-    fn parse_and_emit(
-        input: &str,
-        ctx: &mut EmitContext<'_, L>,
-    ) -> Result<Statement, Vec<ParseError>>;
+    fn parse_and_emit(input: &str, ctx: &mut EmitContext<'_, L>)
+    -> Result<Statement, ChumskyError>;
 }
 
 /// Marker trait for dialects whose `HasParser::Output` directly implements `EmitIR`.
@@ -39,13 +88,8 @@ where
     fn parse_and_emit(
         input: &str,
         ctx: &mut EmitContext<'_, L>,
-    ) -> Result<Statement, Vec<ParseError>> {
+    ) -> Result<Statement, ChumskyError> {
         let ast = parse_ast::<L>(input)?;
-        ast.emit(ctx).map_err(|e| {
-            vec![ParseError {
-                message: e.to_string(),
-                span: chumsky::span::SimpleSpan::from(0..0),
-            }]
-        })
+        ast.emit(ctx).map_err(ChumskyError::Emit)
     }
 }

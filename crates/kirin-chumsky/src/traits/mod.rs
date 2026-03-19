@@ -24,5 +24,5 @@ pub use emit_ir::*;
 pub use has_dialect_emit_ir::*;
 pub use has_parser::*;
 pub use has_parser_emit_ir::*;
-pub use parse_emit::*;
+pub use parse_emit::{ChumskyError, ParseEmit, SimpleParseEmit};
 pub use parse_text::*;

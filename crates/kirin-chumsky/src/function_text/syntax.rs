@@ -7,7 +7,7 @@ use crate::ast::SymbolName;
 use crate::parsers::{identifier, symbol};
 use crate::traits::{HasParser, ParserError, TokenInput};
 
-pub(super) type ChumskyError<'src> = Rich<'src, Token<'src>, SimpleSpan>;
+pub(super) type RichError<'src> = Rich<'src, Token<'src>, SimpleSpan>;
 
 #[derive(Debug, Clone)]
 pub(super) struct Header<'src, T> {
@@ -145,7 +145,7 @@ pub(super) fn tokenize<'src>(src: &'src str) -> Vec<(Token<'src>, SimpleSpan)> {
 
 pub(super) fn parse_one_declaration<'src, L>(
     tokens: &[(Token<'src>, SimpleSpan)],
-) -> Result<(Declaration<'src, L::Type>, SimpleSpan), Vec<ChumskyError<'src>>>
+) -> Result<(Declaration<'src, L::Type>, SimpleSpan), Vec<RichError<'src>>>
 where
     L: Dialect + HasParser<'src>,
     L::Type: HasParser<'src, Output = L::Type>,

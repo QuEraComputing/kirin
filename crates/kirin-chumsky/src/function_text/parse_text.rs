@@ -93,7 +93,7 @@ use crate::{EmitContext, HasParser, ParseEmit};
 
 use super::dispatch::ParseDispatch;
 use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
-use super::syntax::{ChumskyError, Declaration, Header, parse_one_declaration, tokenize};
+use super::syntax::{Declaration, Header, RichError, parse_one_declaration, tokenize};
 use crate::ast::SymbolName;
 
 /// Parse function text into a pipeline using stage-driven dialect dispatch.
@@ -576,13 +576,20 @@ where
     stage.with_builder(|builder| {
         let body_statement = {
             let mut emit_ctx = EmitContext::new(builder);
-            L::parse_and_emit(body_text, &mut emit_ctx).map_err(|errs| {
-                let message = errs
-                    .iter()
-                    .map(|e| e.to_string())
-                    .collect::<Vec<_>>()
-                    .join("; ");
-                FunctionParseError::new(FunctionParseErrorKind::EmitFailed, Some(span), message)
+            L::parse_and_emit(body_text, &mut emit_ctx).map_err(|err| {
+                let (kind, message) = match &err {
+                    crate::ChumskyError::Parse(errs) => (
+                        FunctionParseErrorKind::BodyParseFailed,
+                        errs.iter()
+                            .map(|e| e.to_string())
+                            .collect::<Vec<_>>()
+                            .join("; "),
+                    ),
+                    crate::ChumskyError::Emit(e) => {
+                        (FunctionParseErrorKind::EmitFailed, e.to_string())
+                    }
+                };
+                FunctionParseError::new(kind, Some(span), message)
             })?
         };
 
@@ -646,7 +653,7 @@ fn ensure_forward_progress(
     ))
 }
 
-fn parse_error_from_chumsky(errors: Vec<ChumskyError<'_>>) -> FunctionParseError {
+fn parse_error_from_chumsky(errors: Vec<RichError<'_>>) -> FunctionParseError {
     let diagnostics: Vec<String> = errors.iter().map(ToString::to_string).collect();
     let span = errors.first().map(|error| *error.span());
     let message = diagnostics

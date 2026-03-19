@@ -81,9 +81,10 @@ pub mod prelude {
     };
     pub use crate::parsers::*;
     pub use crate::traits::{
-        BoxedParser, DirectlyParsable, EmitContext, EmitError, EmitIR, HasDialectParser, HasParser,
-        ParseEmit, ParseError, ParseStatementText, ParseStatementTextExt, ParserError,
-        RecursiveParser, SimpleParseEmit, TokenInput, parse_ast,
+        BoxedParser, ChumskyError, DirectlyParsable, EmitContext, EmitError, EmitIR,
+        HasDialectParser, HasParser, ParseEmit, ParseError, ParseStatementText,
+        ParseStatementTextExt, ParserError, RecursiveParser, SimpleParseEmit, TokenInput,
+        parse_ast,
     };
     pub use chumsky::prelude::*;
     pub use kirin_lexer::Token;

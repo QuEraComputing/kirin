@@ -113,15 +113,10 @@ where
     fn parse_and_emit(
         input: &str,
         ctx: &mut kirin_chumsky::EmitContext<'_, Self>,
-    ) -> ::core::result::Result<::kirin::ir::Statement, ::std::vec::Vec<kirin_chumsky::ParseError>>
-    {
+    ) -> ::core::result::Result<::kirin::ir::Statement, kirin_chumsky::ChumskyError> {
         let ast = kirin_chumsky::parse_ast::<Self>(input)?;
-        kirin_chumsky::HasParserEmitIR::emit_parsed(&ast, ctx).map_err(|e| {
-            ::std::vec![kirin_chumsky::ParseError {
-                message: e.to_string(),
-                span: kirin_chumsky::chumsky::span::SimpleSpan::from(0..0),
-            }]
-        })
+        kirin_chumsky::HasParserEmitIR::emit_parsed(&ast, ctx)
+            .map_err(kirin_chumsky::ChumskyError::Emit)
     }
 }
 #[automatically_derived]

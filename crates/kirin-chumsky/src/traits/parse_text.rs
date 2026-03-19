@@ -3,7 +3,7 @@ use kirin_ir::{BuilderStageInfo, Dialect, Pipeline, StageInfo};
 
 use super::emit_ir::EmitContext;
 use super::has_parser::ParseError;
-use super::parse_emit::ParseEmit;
+use super::parse_emit::{ChumskyError, ParseEmit};
 
 /// Extension trait for parsing a single statement from text.
 ///
@@ -33,7 +33,7 @@ pub trait ParseStatementText<L: Dialect, Ctx = ()> {
         &mut self,
         ctx: Ctx,
         input: &str,
-    ) -> Result<kirin_ir::Statement, Vec<ParseError>>;
+    ) -> Result<kirin_ir::Statement, ChumskyError>;
 }
 
 /// Blanket convenience: when `Ctx = ()`, allow calling without the unit arg.
@@ -41,7 +41,7 @@ pub trait ParseStatementText<L: Dialect, Ctx = ()> {
 /// This lets `StageInfo<L>` users write `stage.parse_statement(input)` instead
 /// of `stage.parse_statement((), input)`.
 pub trait ParseStatementTextExt<L: Dialect>: ParseStatementText<L, ()> {
-    fn parse_statement(&mut self, input: &str) -> Result<kirin_ir::Statement, Vec<ParseError>>;
+    fn parse_statement(&mut self, input: &str) -> Result<kirin_ir::Statement, ChumskyError>;
 }
 
 impl<T, L> ParseStatementTextExt<L> for T
@@ -49,7 +49,7 @@ where
     L: Dialect,
     T: ParseStatementText<L, ()>,
 {
-    fn parse_statement(&mut self, input: &str) -> Result<kirin_ir::Statement, Vec<ParseError>> {
+    fn parse_statement(&mut self, input: &str) -> Result<kirin_ir::Statement, ChumskyError> {
         <Self as ParseStatementText<L, ()>>::parse_statement(self, (), input)
     }
 }
@@ -74,7 +74,7 @@ fn collect_existing_ssas(
 fn parse_statement_on_builder_stage<L>(
     stage: &mut BuilderStageInfo<L>,
     input: &str,
-) -> Result<kirin_ir::Statement, Vec<ParseError>>
+) -> Result<kirin_ir::Statement, ChumskyError>
 where
     L: Dialect + ParseEmit<L>,
 {
@@ -94,7 +94,7 @@ where
         &mut self,
         (): (),
         input: &str,
-    ) -> Result<kirin_ir::Statement, Vec<ParseError>> {
+    ) -> Result<kirin_ir::Statement, ChumskyError> {
         self.with_builder(|builder| parse_statement_on_builder_stage::<L>(builder, input))
     }
 }
@@ -107,7 +107,7 @@ where
         &mut self,
         (): (),
         input: &str,
-    ) -> Result<kirin_ir::Statement, Vec<ParseError>> {
+    ) -> Result<kirin_ir::Statement, ChumskyError> {
         parse_statement_on_builder_stage::<L>(self, input)
     }
 }
@@ -121,19 +121,19 @@ where
         &mut self,
         stage_id: kirin_ir::CompileStage,
         input: &str,
-    ) -> Result<kirin_ir::Statement, Vec<ParseError>> {
+    ) -> Result<kirin_ir::Statement, ChumskyError> {
         let stage_entry = self.stage_mut(stage_id).ok_or_else(|| {
-            vec![ParseError {
+            ChumskyError::Parse(vec![ParseError {
                 message: format!("stage {stage_id:?} not found in pipeline"),
                 span: SimpleSpan::from(0..0),
-            }]
+            }])
         })?;
         let stage =
             <S as kirin_ir::HasStageInfo<L>>::try_stage_info_mut(stage_entry).ok_or_else(|| {
-                vec![ParseError {
+                ChumskyError::Parse(vec![ParseError {
                     message: "stage does not contain the requested dialect".to_string(),
                     span: SimpleSpan::from(0..0),
-                }]
+                }])
             })?;
         stage.with_builder(|builder| parse_statement_on_builder_stage::<L>(builder, input))
     }

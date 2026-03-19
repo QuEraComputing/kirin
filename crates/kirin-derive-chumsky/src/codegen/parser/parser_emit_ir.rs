@@ -172,12 +172,9 @@ impl GenerateHasDialectParser {
                 fn parse_and_emit(
                     input: &str,
                     ctx: &mut #crate_path::EmitContext<'_, Self>,
-                ) -> ::core::result::Result<#ir_path::Statement, ::std::vec::Vec<#crate_path::ParseError>> {
+                ) -> ::core::result::Result<#ir_path::Statement, #crate_path::ChumskyError> {
                     let ast = #crate_path::parse_ast::<Self>(input)?;
-                    #crate_path::HasParserEmitIR::emit_parsed(&ast, ctx).map_err(|e| ::std::vec![#crate_path::ParseError {
-                        message: e.to_string(),
-                        span: #crate_path::chumsky::span::SimpleSpan::from(0..0),
-                    }])
+                    #crate_path::HasParserEmitIR::emit_parsed(&ast, ctx).map_err(#crate_path::ChumskyError::Emit)
                 }
             }
         }
