@@ -360,7 +360,7 @@ The unified format string approach (main design) is best:
 | `{field:ports}` | Graph port list of `field` | DiGraph/UnGraph only |
 | `{field:captures}` | Graph capture list of `field` | DiGraph/UnGraph only |
 | `{field:yields}` | Graph yield types of `field` | DiGraph/UnGraph only |
-| `{field:args}` | Block argument list of `field` | Region/Block only |
+| `{field:args}` | Block argument list of `field` | Block only (Region is ambiguous — which block?) |
 | `{field:body}` | Inner statements only (no header/braces) | DiGraph/UnGraph/Region/Block |
 | `{field}` | Full body with header (existing behavior) | DiGraph/UnGraph/Region/Block |
 | `{:name}` | Function name from context | Always valid in function format |
