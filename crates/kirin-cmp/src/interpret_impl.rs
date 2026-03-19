@@ -3,36 +3,41 @@ use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterErr
 
 use crate::Cmp;
 
-/// Comparison operations producing a value of the same type.
+/// Comparison operations on values.
 ///
-/// Returns 1 for true, 0 for false in concrete interpreters.
-/// Abstract interpreters may return over-approximations.
+/// The `Bool` associated type is the result domain for comparisons.
+/// For concrete interpreters this is typically the same as `Self` (e.g. `i64`),
+/// while abstract interpreters may use a dedicated boolean domain.
 pub trait CompareValue {
-    fn cmp_eq(&self, other: &Self) -> Self;
-    fn cmp_ne(&self, other: &Self) -> Self;
-    fn cmp_lt(&self, other: &Self) -> Self;
-    fn cmp_le(&self, other: &Self) -> Self;
-    fn cmp_gt(&self, other: &Self) -> Self;
-    fn cmp_ge(&self, other: &Self) -> Self;
+    type Bool;
+
+    fn cmp_eq(&self, other: &Self) -> Self::Bool;
+    fn cmp_ne(&self, other: &Self) -> Self::Bool;
+    fn cmp_lt(&self, other: &Self) -> Self::Bool;
+    fn cmp_le(&self, other: &Self) -> Self::Bool;
+    fn cmp_gt(&self, other: &Self) -> Self::Bool;
+    fn cmp_ge(&self, other: &Self) -> Self::Bool;
 }
 
 impl CompareValue for i64 {
-    fn cmp_eq(&self, other: &Self) -> Self {
+    type Bool = i64;
+
+    fn cmp_eq(&self, other: &Self) -> Self::Bool {
         if self == other { 1 } else { 0 }
     }
-    fn cmp_ne(&self, other: &Self) -> Self {
+    fn cmp_ne(&self, other: &Self) -> Self::Bool {
         if self != other { 1 } else { 0 }
     }
-    fn cmp_lt(&self, other: &Self) -> Self {
+    fn cmp_lt(&self, other: &Self) -> Self::Bool {
         if self < other { 1 } else { 0 }
     }
-    fn cmp_le(&self, other: &Self) -> Self {
+    fn cmp_le(&self, other: &Self) -> Self::Bool {
         if self <= other { 1 } else { 0 }
     }
-    fn cmp_gt(&self, other: &Self) -> Self {
+    fn cmp_gt(&self, other: &Self) -> Self::Bool {
         if self > other { 1 } else { 0 }
     }
-    fn cmp_ge(&self, other: &Self) -> Self {
+    fn cmp_ge(&self, other: &Self) -> Self::Bool {
         if self >= other { 1 } else { 0 }
     }
 }
@@ -224,6 +229,7 @@ impl<'ir, I, T> Interpretable<'ir, I> for Cmp<T>
 where
     I: Interpreter<'ir>,
     I::Value: CompareValue,
+    <I::Value as CompareValue>::Bool: Into<I::Value>,
     T: CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
@@ -238,7 +244,7 @@ where
             } => {
                 let a = interp.read(*lhs)?;
                 let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_eq(&b))?;
+                interp.write(*result, a.cmp_eq(&b).into())?;
                 Ok(Continuation::Continue)
             }
             Cmp::Ne {
@@ -246,7 +252,7 @@ where
             } => {
                 let a = interp.read(*lhs)?;
                 let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_ne(&b))?;
+                interp.write(*result, a.cmp_ne(&b).into())?;
                 Ok(Continuation::Continue)
             }
             Cmp::Lt {
@@ -254,7 +260,7 @@ where
             } => {
                 let a = interp.read(*lhs)?;
                 let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_lt(&b))?;
+                interp.write(*result, a.cmp_lt(&b).into())?;
                 Ok(Continuation::Continue)
             }
             Cmp::Le {
@@ -262,7 +268,7 @@ where
             } => {
                 let a = interp.read(*lhs)?;
                 let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_le(&b))?;
+                interp.write(*result, a.cmp_le(&b).into())?;
                 Ok(Continuation::Continue)
             }
             Cmp::Gt {
@@ -270,7 +276,7 @@ where
             } => {
                 let a = interp.read(*lhs)?;
                 let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_gt(&b))?;
+                interp.write(*result, a.cmp_gt(&b).into())?;
                 Ok(Continuation::Continue)
             }
             Cmp::Ge {
@@ -278,7 +284,7 @@ where
             } => {
                 let a = interp.read(*lhs)?;
                 let b = interp.read(*rhs)?;
-                interp.write(*result, a.cmp_ge(&b))?;
+                interp.write(*result, a.cmp_ge(&b).into())?;
                 Ok(Continuation::Continue)
             }
             Self::__Phantom(..) => unreachable!(),
