@@ -1,0 +1,23 @@
+error[E0277]: `StageInfo<SimpleLanguage>` is not a builder stage — cannot construct IR on finalized `StageInfo`
+  --> tests/compile-fail/stage_info_not_builder.rs:14:28
+   |
+14 |     SimpleLanguage::op_add(&mut stage, ssa, ssa);
+   |     ---------------------- ^^^^^^^^^^ the trait `AsBuildStage<_>` is not implemented for `StageInfo<SimpleLanguage>`
+   |     |
+   |     required by a bound introduced by this call
+   |
+   = note: use `stage.with_builder(|b| { ... })` to get a `&mut BuilderStageInfo` for construction
+help: the trait `AsBuildStage<L>` is implemented for `BuilderStageInfo<L>`
+  --> crates/kirin-ir/src/builder/stage_info.rs
+   |
+   | impl<L: Dialect> AsBuildStage<L> for BuilderStageInfo<L> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+note: required by a bound in `SimpleLanguage::op_add`
+  --> crates/kirin-test-languages/src/simple_language.rs
+   |
+   | #[derive(Clone, Debug, PartialEq, Dialect)]
+   |                                   ^^^^^^^ required by this bound in `SimpleLanguage::op_add`
+...
+   |     Add(
+   |     --- required by a bound in this associated function
+   = note: this error originates in the derive macro `Dialect` (in Nightly builds, run with -Z macro-backtrace for more info)

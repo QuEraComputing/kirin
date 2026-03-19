@@ -46,6 +46,7 @@ strsim = "0.11"
 
 # Testing
 insta = "1.46"
+trybuild = "1"
 
 # Error handling
 thiserror = "2"
@@ -122,6 +123,7 @@ kirin-test-languages = { workspace = true, features = [
   "simple-language",
 ] }
 kirin-test-utils = { workspace = true, features = ["roundtrip"] }
+trybuild = { workspace = true }
 
 [features]
 default = ["interpreter"]
