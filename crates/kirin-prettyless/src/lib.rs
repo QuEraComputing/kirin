@@ -19,7 +19,7 @@
 //! // Render with custom config via builder
 //! let output = statement.render(&context)
 //!     .config(Config::default().with_width(80))
-//!     .to_string();
+//!     .into_string();
 //! ```
 
 mod config;

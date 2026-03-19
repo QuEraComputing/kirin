@@ -7,11 +7,7 @@ fn test_sprint_with_globals() {
     let staged_function = stage
         .staged_function()
         .name(test_func)
-        .signature(kirin_ir::Signature {
-            params: vec![SimpleType::I64],
-            ret: SimpleType::I64,
-            constraints: (),
-        })
+        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ()))
         .new()
         .unwrap();
 
@@ -29,6 +25,6 @@ fn test_sprint_with_globals() {
 
     // render with globals should resolve the function name
     let stage = stage.finalize().unwrap();
-    let output = staged_function.render(&stage).globals(&gs).to_string().unwrap();
+    let output = staged_function.render(&stage).globals(&gs).into_string().unwrap();
     insta::assert_snapshot!(output);
 }

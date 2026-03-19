@@ -334,11 +334,7 @@ fn test_render_builder_config() {
     let sf = stage
         .staged_function()
         .name(test_sym)
-        .signature(kirin_ir::Signature {
-            params: vec![SimpleType::I64],
-            ret: SimpleType::I64,
-            constraints: (),
-        })
+        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ()))
         .new()
         .unwrap();
 
@@ -367,7 +363,7 @@ fn test_render_builder_config() {
     let output = PrettyPrintExt::<SimpleLanguage>::render(&f, &stage)
         .config(Config::default().with_width(30))
         .globals(&gs)
-        .to_string()
+        .into_string()
         .unwrap();
     insta::assert_snapshot!(output);
 }

@@ -133,21 +133,21 @@ impl<'a, S: RenderDispatch> FunctionRenderBuilder<'a, S> {
         self
     }
 
-    /// Render to a string.
-    pub fn to_string(self) -> Result<String, RenderError> {
+    /// Render to a string, consuming the builder.
+    pub fn into_string(self) -> Result<String, RenderError> {
         PipelineDocument::new(self.config, self.pipeline).render_function(self.function)
     }
 
     /// Write to a writer.
     pub fn write_to(self, writer: &mut impl Write) -> Result<(), RenderError> {
-        let output = self.to_string()?;
+        let output = self.into_string()?;
         writer.write_all(output.as_bytes())?;
         Ok(())
     }
 
     /// Print to stdout.
     pub fn print(self) -> Result<(), RenderError> {
-        let output = self.to_string()?;
+        let output = self.into_string()?;
         stdout().write_all(output.as_bytes())?;
         Ok(())
     }
@@ -155,7 +155,7 @@ impl<'a, S: RenderDispatch> FunctionRenderBuilder<'a, S> {
     /// Display with bat pager.
     #[cfg(feature = "bat")]
     pub fn bat(self) -> Result<(), RenderError> {
-        crate::bat::print_str(&self.to_string()?);
+        crate::bat::print_str(&self.into_string()?);
         Ok(())
     }
 }
@@ -173,8 +173,8 @@ impl<'a, S: RenderDispatch> PipelineRenderBuilder<'a, S> {
         self
     }
 
-    /// Render to a string.
-    pub fn to_string(self) -> Result<String, RenderError> {
+    /// Render to a string, consuming the builder.
+    pub fn into_string(self) -> Result<String, RenderError> {
         let doc = PipelineDocument::new(self.config, self.pipeline);
         let mut parts = Vec::new();
         for func_info in self.pipeline.function_arena().iter() {
@@ -188,14 +188,14 @@ impl<'a, S: RenderDispatch> PipelineRenderBuilder<'a, S> {
 
     /// Write to a writer.
     pub fn write_to(self, writer: &mut impl Write) -> Result<(), RenderError> {
-        let output = self.to_string()?;
+        let output = self.into_string()?;
         writer.write_all(output.as_bytes())?;
         Ok(())
     }
 
     /// Print to stdout.
     pub fn print(self) -> Result<(), RenderError> {
-        let output = self.to_string()?;
+        let output = self.into_string()?;
         stdout().write_all(output.as_bytes())?;
         Ok(())
     }
@@ -203,7 +203,7 @@ impl<'a, S: RenderDispatch> PipelineRenderBuilder<'a, S> {
     /// Display with bat pager.
     #[cfg(feature = "bat")]
     pub fn bat(self) -> Result<(), RenderError> {
-        crate::bat::print_str(&self.to_string()?);
+        crate::bat::print_str(&self.into_string()?);
         Ok(())
     }
 }
@@ -218,7 +218,9 @@ pub trait PrintExt {
 
     /// Convenience shorthand: render to string with default config.
     fn sprint<S: RenderDispatch>(&self, pipeline: &Pipeline<S>) -> String {
-        self.render(pipeline).to_string().expect("render failed")
+        self.render(pipeline)
+            .into_string()
+            .unwrap_or_else(|e| panic!("render failed: {e}"))
     }
 }
 
@@ -244,7 +246,9 @@ pub trait PipelinePrintExt {
 
     /// Convenience shorthand: render to string with default config.
     fn sprint(&self) -> String {
-        self.render().to_string().expect("render failed")
+        self.render()
+            .into_string()
+            .unwrap_or_else(|e| panic!("render failed: {e}"))
     }
 }
 

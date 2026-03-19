@@ -14,7 +14,7 @@ fn test_config_zero_width() {
     let v = vec![1i32, 2, 3];
     let output = PrettyPrintExt::<SimpleLanguage>::render(&v, &stage)
         .config(config)
-        .to_string()
+        .into_string()
         .unwrap();
     // Should still contain all values, just possibly wrapped
     assert!(output.contains('1'));
@@ -301,11 +301,7 @@ fn test_staged_function_unnamed() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature {
-            params: vec![],
-            ret: SimpleType::I64,
-            constraints: (),
-        })
+        .signature(kirin_ir::Signature::new(vec![], SimpleType::I64, ()))
         .new()
         .unwrap();
 
@@ -333,11 +329,7 @@ fn test_staged_function_no_params() {
     let staged_function = stage
         .staged_function()
         .name(test_func)
-        .signature(kirin_ir::Signature {
-            params: vec![],
-            ret: SimpleType::I64,
-            constraints: (),
-        })
+        .signature(kirin_ir::Signature::new(vec![], SimpleType::I64, ()))
         .new()
         .unwrap();
 
@@ -354,7 +346,7 @@ fn test_staged_function_no_params() {
         .unwrap();
 
     let stage = stage.finalize().unwrap();
-    let output = staged_function.render(&stage).globals(&gs).to_string().unwrap();
+    let output = staged_function.render(&stage).globals(&gs).into_string().unwrap();
     insta::assert_snapshot!(output);
 }
 
@@ -390,11 +382,7 @@ fn test_pipeline_render_builder_write_to() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature {
-            params: vec![SimpleType::I64],
-            ret: SimpleType::I64,
-            constraints: (),
-        })
+        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ()))
         .new()
         .unwrap();
 
@@ -430,11 +418,7 @@ fn test_function_render_builder_write_to() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature {
-            params: vec![],
-            ret: SimpleType::I64,
-            constraints: (),
-        })
+        .signature(kirin_ir::Signature::new(vec![], SimpleType::I64, ()))
         .new()
         .unwrap();
 
@@ -464,11 +448,7 @@ fn test_render_very_narrow_width() {
     let sf = stage
         .staged_function()
         .name(test_func)
-        .signature(kirin_ir::Signature {
-            params: vec![SimpleType::I64, SimpleType::F64, SimpleType::I64],
-            ret: SimpleType::F64,
-            constraints: (),
-        })
+        .signature(kirin_ir::Signature::new(vec![SimpleType::I64, SimpleType::F64, SimpleType::I64], SimpleType::F64, ()))
         .new()
         .unwrap();
 
@@ -489,7 +469,7 @@ fn test_render_very_narrow_width() {
         .render(&stage)
         .config(Config::default().with_width(10))
         .globals(&gs)
-        .to_string()
+        .into_string()
         .unwrap();
     // Just verify it doesn't panic and produces output
     assert!(!output.is_empty());

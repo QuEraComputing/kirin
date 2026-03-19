@@ -232,42 +232,33 @@ macro_rules! impl_pretty_print_int {
 // Implement for all integer types
 impl_pretty_print_int!(i8, i16, i32, i64, isize, u8, u16, u32, u64, usize);
 
-// Floating point types need special handling to ensure decimal point
-impl PrettyPrint for f32 {
-    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
-        &self,
-        doc: &'a Document<'a, L>,
-        _namespace: &[&str],
-    ) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        // Ensure we always print as a float (with decimal point)
-        if self.fract() == 0.0 {
-            doc.text(format!("{:.1}", self))
-        } else {
-            doc.text(self.to_string())
-        }
-    }
+// Macro to reduce boilerplate for floating point types (need decimal point)
+macro_rules! impl_pretty_print_float {
+    ($($ty:ty),*) => {
+        $(
+            impl PrettyPrint for $ty {
+                fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+                    &self,
+                    doc: &'a Document<'a, L>,
+                    _namespace: &[&str],
+                ) -> ArenaDoc<'a>
+                where
+                    L::Type: std::fmt::Display,
+                {
+                    // Ensure we always print as a float (with decimal point)
+                    if self.fract() == 0.0 {
+                        doc.text(format!("{:.1}", self))
+                    } else {
+                        doc.text(self.to_string())
+                    }
+                }
+            }
+        )*
+    };
 }
 
-impl PrettyPrint for f64 {
-    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
-        &self,
-        doc: &'a Document<'a, L>,
-        _namespace: &[&str],
-    ) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        // Ensure we always print as a float (with decimal point)
-        if self.fract() == 0.0 {
-            doc.text(format!("{:.1}", self))
-        } else {
-            doc.text(self.to_string())
-        }
-    }
-}
+// Implement for all floating point types
+impl_pretty_print_float!(f32, f64);
 
 impl PrettyPrint for bool {
     fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(

@@ -54,7 +54,10 @@ pub trait PrettyPrint {
 
     /// Pretty print only the "name" view of a value.
     ///
-    /// For most types this is identical to [`PrettyPrint::pretty_print`].
+    /// Defaults to [`PrettyPrint::pretty_print`]. Override this when the type
+    /// appears in `{field:name}` format positions in a `#[chumsky(format = "...")]`
+    /// attribute. The derive macro generates overrides automatically; manual impls
+    /// must override this if the type is used in name format positions.
     fn pretty_print_name<'a, L: Dialect + PrettyPrint>(
         &self,
         doc: &'a Document<'a, L>,
@@ -67,7 +70,10 @@ pub trait PrettyPrint {
 
     /// Pretty print only the "type" view of a value.
     ///
-    /// For most types this is identical to [`PrettyPrint::pretty_print`].
+    /// Defaults to [`PrettyPrint::pretty_print`]. Override this when the type
+    /// appears in `{field:type}` format positions in a `#[chumsky(format = "...")]`
+    /// attribute. The derive macro generates overrides automatically; manual impls
+    /// must override this if the type is used in type format positions.
     fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
         &self,
         doc: &'a Document<'a, L>,
@@ -94,7 +100,7 @@ pub trait PrettyPrint {
 /// let output = node.render(&stage)
 ///     .config(Config::default().with_width(80))
 ///     .globals(&global_symbols)
-///     .to_string();
+///     .into_string();
 ///
 /// // Print to stdout
 /// node.render(&stage).print();
@@ -125,8 +131,8 @@ where
         self
     }
 
-    /// Render to a string.
-    pub fn to_string(self) -> Result<String, RenderError> {
+    /// Render to a string, consuming the builder.
+    pub fn into_string(self) -> Result<String, RenderError> {
         let node = self.node;
         let mut doc = self.into_document();
         Ok(doc.render(node)?)
@@ -134,14 +140,14 @@ where
 
     /// Write to a writer.
     pub fn write_to(self, writer: &mut impl Write) -> Result<(), RenderError> {
-        let output = self.to_string()?;
+        let output = self.into_string()?;
         writer.write_all(output.as_bytes())?;
         Ok(())
     }
 
     /// Print to stdout.
     pub fn print(self) -> Result<(), RenderError> {
-        let output = self.to_string()?;
+        let output = self.into_string()?;
         stdout().write_all(output.as_bytes())?;
         Ok(())
     }
@@ -181,7 +187,7 @@ where
 /// let output = statement.render(&stage)
 ///     .config(Config::default().with_width(80))
 ///     .globals(&gs)
-///     .to_string();
+///     .into_string();
 /// ```
 pub trait PrettyPrintExt<L: Dialect + PrettyPrint>: PrettyPrint
 where
@@ -212,7 +218,9 @@ where
     }
 
     fn sprint(&self, stage: &StageInfo<L>) -> String {
-        self.render(stage).to_string().expect("render failed")
+        self.render(stage)
+            .into_string()
+            .unwrap_or_else(|e| panic!("render failed: {e}"))
     }
 }
 

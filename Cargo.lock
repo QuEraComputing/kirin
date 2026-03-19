@@ -1119,7 +1119,6 @@ name = "kirin-prettyless"
 version = "0.1.0"
 dependencies = [
  "bat",
- "bon",
  "insta",
  "kirin-derive-prettyless",
  "kirin-ir",

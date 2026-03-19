@@ -353,11 +353,11 @@ where
         name: Option<GlobalSymbol>,
         sig: &Signature<L::Type>,
     ) -> ArenaDoc<'a> {
-        let params = self.list(sig.params.iter(), ", ", |p| self.text(format!("{}", p)));
+        let params = self.list(sig.params().iter(), ", ", |p| self.text(format!("{}", p)));
         self.text(self.function_symbol_text(name))
             + params.enclose("(", ")")
             + self.text(" -> ")
-            + self.text(format!("{}", sig.ret))
+            + self.text(format!("{}", sig.ret()))
     }
 
     fn function_symbol_text(&self, name: Option<GlobalSymbol>) -> String {
