@@ -16,8 +16,7 @@ fn test_parse_bell_pair() {
         .assert()
         .success()
         .stdout(predicate::str::contains("h %q0"))
-        .stdout(predicate::str::contains("cnot_ctrl"))
-        .stdout(predicate::str::contains("cnot_tgt"));
+        .stdout(predicate::str::contains("cnot %q0_h"));
 }
 
 #[test]
@@ -28,8 +27,7 @@ fn test_parse_ghz() {
         .assert()
         .success()
         .stdout(predicate::str::contains("h %q0"))
-        .stdout(predicate::str::contains("cnot_ctrl"))
-        .stdout(predicate::str::contains("cnot_tgt"));
+        .stdout(predicate::str::contains("cnot %q0_h"));
 }
 
 #[test]

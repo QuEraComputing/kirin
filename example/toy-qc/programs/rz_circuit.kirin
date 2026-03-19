@@ -1,7 +1,6 @@
 stage @circuit fn @rz_test(Qubit) -> Qubit;
-
 specialize @circuit fn @rz_test(Qubit) -> Qubit digraph ^dg0(%q0: Qubit) {
-  %q1 = rz(1.5708) %q0 -> Qubit;
+  %q1 = rz (1.5708) %q0 -> Qubit;
   %q2 = h %q1 -> Qubit;
   yield %q2;
 }

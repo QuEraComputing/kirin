@@ -14,7 +14,7 @@ pub struct ZXFunction {
 /// Wire edge operation — creates an edge SSAValue.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(edge, builders, type = QubitType)]
-#[chumsky(format = "{res:name} = {.wire} -> {res:type}")]
+#[chumsky(format = "$wire -> {res:type}")]
 pub struct Wire {
     pub res: ResultValue,
 }
@@ -22,7 +22,7 @@ pub struct Wire {
 /// Z-spider node (green spider in ZX calculus).
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
-#[chumsky(format = "{.z_spider}({angle}) {legs}")]
+#[chumsky(format = "$z_spider({angle}) {legs}")]
 pub struct ZSpider {
     pub angle: f64,
     pub legs: Vec<SSAValue>,
@@ -31,7 +31,7 @@ pub struct ZSpider {
 /// X-spider node (red spider in ZX calculus).
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
-#[chumsky(format = "{.x_spider}({angle}) {legs}")]
+#[chumsky(format = "$x_spider({angle}) {legs}")]
 pub struct XSpider {
     pub angle: f64,
     pub legs: Vec<SSAValue>,
@@ -40,7 +40,7 @@ pub struct XSpider {
 /// Hadamard box node.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
-#[chumsky(format = "{.h_box} {src}, {dst}")]
+#[chumsky(format = "$h_box {src}, {dst}")]
 pub struct HBox {
     pub src: SSAValue,
     pub dst: SSAValue,
