@@ -80,17 +80,44 @@ The operation keyword changes from `{.name}` (looks like field access) to `$name
 | `{.h}` | `$h` | Simple keyword |
 | `{.z_spider}` | `$z_spider` | Underscore keyword |
 
-`$name` accepts a valid Rust identifier only. It is always the first token in the format string. Namespace prefixes (e.g., `circuit.h`) are added automatically by wrapping dialect enums — individual operations never specify their namespace path in the format string.
+`$name` accepts a valid Rust identifier only. Namespace prefixes (e.g., `circuit.h`) are added automatically by wrapping dialect enums — individual operations never specify their namespace path in the format string.
+
+### Unified format DSL with three auto-detected modes
+
+`#[chumsky(format = "...")]` serves three purposes, distinguished automatically:
+
+| Mode | Detection | Syntax | Example |
+|------|-----------|--------|---------|
+| **Statement** | Starts with `$` | `$keyword [operands...] [-> {result:type}...]` | `"$h {qubit} -> {result:type}"` |
+| **Type keyword** | Bare literal, no `$`, no `{field}` | literal token(s) | `"Qubit"`, `"i32"` |
+| **Body wrapper** | Only `{field}` refs, no `$` | `{field}...` | `"{body}"` |
+
+Detection combines format syntax with struct context:
+
+1. If the format contains `$identifier` → **statement mode** (validated: struct must have SSA/Result fields or be an operation)
+2. Else if the struct has body fields (Region, DiGraph, UnGraph, Block) → **body wrapper mode** (format must be `{field}` only)
+3. Else if all variants are unit with bare-literal formats → **type keyword mode**
+
+The `$` prefix is **required** for statements — if a struct has `SSAValue` or `ResultValue` fields but the format lacks `$`, the derive emits a compile error. This eliminates ambiguity: you cannot accidentally write a statement format that looks like a type keyword.
+
+| Struct fields | Format | Mode |
+|--------------|--------|------|
+| Has SSAValue/ResultValue | Must have `$keyword` | Statement |
+| Has Region/DiGraph/UnGraph/Block | `{field}` only | Body wrapper |
+| Unit variants, no IR fields | Bare literal | Type keyword |
 
 ### Format DSL changes (complete picture)
 
-Two changes: result `:name` removed, keyword syntax changed.
+Three changes: result `:name` removed, keyword uses `$`, three modes auto-detected.
+
+#### Statement mode (`$keyword`)
 
 ```rust
-// Current (single result):
-#[chumsky(format = "{result:name} = {.h} {qubit} -> {result:type}")]
+// Single result (current → new):
+// Old: #[chumsky(format = "{result:name} = {.h} {qubit} -> {result:type}")]
 // New:
 #[chumsky(format = "$h {qubit} -> {result:type}")]
+// Parses: %q_out = h %q -> Qubit
 
 // Multi-result (impossible today, natural after):
 #[chumsky(format = "$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}")]
@@ -100,35 +127,57 @@ pub struct CNOT {
     pub ctrl_out: ResultValue,
     pub tgt_out: ResultValue,
 }
-// Parses: %ctrl_out, %tgt_out = circuit.cnot %ctrl, %tgt -> Qubit, Qubit
+// Parses: %ctrl_out, %tgt_out = cnot %ctrl, %tgt -> Qubit, Qubit
 
 // Type embedded in operation syntax:
 #[chumsky(format = "$cast {input} to {result:type}")]
-pub struct Cast {
-    pub input: SSAValue,
-    pub result: ResultValue,
-}
 // Parses: %y = cast %x to f64
 
-// Type inferred (auto-placeholder, no type in text):
+// No result types (auto-placeholder):
 #[chumsky(format = "$z_spider({angle}) {legs}")]
-pub struct ZSpider {
-    pub angle: f64,
-    pub legs: Vec<SSAValue>,
-}
 // Parses: z_spider(0.0) %a, %b
 
-// Constant with value determining type:
-#[chumsky(format = "$constant {value} -> {result:type}")]
-pub struct Constant {
-    pub value: Value,
-    pub result: ResultValue,
-}
-// Parses: %x = constant 42 -> i64
+// Zero results (void operation):
+#[chumsky(format = "$z_spider({angle}) {legs}")]
+// Parses: z_spider(0.0) %a, %b   (no %result = prefix)
+```
 
-// Type enum (unit variants, no operands):
-#[chumsky(format = "$Qubit")]
-// or just the keyword token
+#### Type keyword mode (bare literal)
+
+```rust
+// Type enum variants — bare literal tokens, no $, no {field}
+#[derive(HasParser, PrettyPrint)]
+pub enum QubitType {
+    #[chumsky(format = "Qubit")]
+    Qubit,
+}
+
+#[derive(HasParser, PrettyPrint)]
+pub enum ArithType {
+    #[chumsky(format = "i32")]
+    I32,
+    #[chumsky(format = "i64")]
+    I64,
+    #[chumsky(format = "f64")]
+    F64,
+}
+// Generates: Display, HasParser, DirectlyParsable, PrettyPrintViaDisplay
+```
+
+#### Body wrapper mode (`{field}` only)
+
+```rust
+// Function body types — only {field} interpolations, no $
+#[chumsky(format = "{body}")]
+pub struct CircuitFunction {
+    pub body: DiGraph,
+}
+
+#[chumsky(format = "{body}")]
+pub struct FunctionBody {
+    pub body: Region,
+}
+// The field's type (DiGraph, Region, etc.) determines the parser
 ```
 
 ### Statement parser (generic layer)
