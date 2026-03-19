@@ -165,7 +165,6 @@ impl GenerateAST {
     }
 
     /// Generates manual Clone, Debug, PartialEq implementations for wrapper enums.
-    #[allow(clippy::too_many_arguments)]
     pub(super) fn generate_manual_trait_impls_for_wrapper_enum(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
@@ -174,7 +173,6 @@ impl GenerateAST {
         ast_generics: &syn::Generics,
         base_bounds: &TokenStream,
         has_parser_bounds: &[TokenStream],
-        _has_dialect_parser_bounds: &[TokenStream],
     ) -> TokenStream {
         use kirin_derive_toolkit::ir::VariantRef;
         let crate_path = &self.config.crate_path;

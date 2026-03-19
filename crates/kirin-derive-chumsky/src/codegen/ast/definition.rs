@@ -138,7 +138,6 @@ impl GenerateAST {
                         &ast_generics,
                         &base_bounds,
                         &has_parser_bounds,
-                        &has_dialect_parser_bounds,
                     );
 
                     quote! {
