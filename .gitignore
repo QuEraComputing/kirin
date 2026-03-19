@@ -2,6 +2,9 @@
 skills-lock.json
 docs/superpowers/
 
+# Claude Code worktrees (temporary agent workspaces)
+.claude/worktrees/
+
 # Managed by ion (all symlinks)
 .agents/skills/*
 .claude/skills/*
