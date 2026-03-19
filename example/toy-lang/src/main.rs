@@ -74,33 +74,12 @@ fn run_program(
 
     // Find the stage by name.
     let stage_id = pipeline
-        .stages()
-        .iter()
-        .find_map(|s| {
-            let sym = s.stage_name()?;
-            let name = pipeline.resolve(sym)?;
-            if name == stage_name {
-                s.stage_id()
-            } else {
-                None
-            }
-        })
+        .stage_by_name(stage_name)
         .ok_or_else(|| anyhow::anyhow!("stage '{}' not found", stage_name))?;
 
-    // Find the function by name.
-    let global_sym = pipeline
-        .lookup_symbol(func_name)
-        .ok_or_else(|| anyhow::anyhow!("function '{}' not found", func_name))?;
-    let function = pipeline
-        .function_by_name(global_sym)
-        .ok_or_else(|| anyhow::anyhow!("function '{}' not found", func_name))?;
-    let func_info = pipeline
-        .function_info(function)
-        .ok_or_else(|| anyhow::anyhow!("function '{}' info not found", func_name))?;
-    let staged_function = func_info
-        .staged_functions()
-        .get(&stage_id)
-        .copied()
+    // Find the function by name at the given stage.
+    let staged_function = pipeline
+        .resolve_staged_function(func_name, stage_id)
         .ok_or_else(|| {
             anyhow::anyhow!(
                 "function '{}' not found in stage '{}'",

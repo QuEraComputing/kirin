@@ -31,6 +31,23 @@ impl<S> Default for Pipeline<S> {
     }
 }
 
+impl<S: StageMeta> Pipeline<S> {
+    /// Look up a stage by its human-readable name, returning its [`CompileStage`].
+    ///
+    /// Returns `None` if no stage has the given name.
+    pub fn stage_by_name(&self, name: &str) -> Option<CompileStage> {
+        self.stages.iter().find_map(|s| {
+            let sym = s.stage_name()?;
+            let resolved = self.global_symbols.resolve(sym)?;
+            if resolved.as_str() == name {
+                s.stage_id()
+            } else {
+                None
+            }
+        })
+    }
+}
+
 impl<S> Pipeline<S> {
     pub fn new() -> Self {
         Self {
@@ -153,6 +170,25 @@ impl<S> Pipeline<S> {
             .ok_or(PipelineError::UnknownFunction(func))?
             .add_staged_function(stage, sf);
         Ok(())
+    }
+
+    /// Resolve a named function at a given stage to its [`StagedFunction`].
+    ///
+    /// Combines [`lookup_symbol`](Self::lookup_symbol) →
+    /// [`function_by_name`](Self::function_by_name) →
+    /// [`function_info`](Self::function_info) → staged function lookup
+    /// into a single call.
+    ///
+    /// Returns `None` if any step in the chain fails.
+    pub fn resolve_staged_function(
+        &self,
+        func_name: &str,
+        stage: CompileStage,
+    ) -> Option<StagedFunction> {
+        let sym = self.lookup_symbol(func_name)?;
+        let func = self.function_by_name(sym)?;
+        let info = self.function_info(func)?;
+        info.staged_functions().get(&stage).copied()
     }
 }
 
@@ -496,6 +532,135 @@ mod tests {
         // GlobalSymbol(42) was never interned
         let invalid_sym = GlobalSymbol::from(42);
         assert_eq!(pipeline.resolve(invalid_sym), None);
+    }
+
+    // --- Minimal StageMeta impl for stage_by_name tests ---
+    use crate::node::function::CompileStage;
+    use crate::node::symbol::GlobalSymbol;
+
+    #[derive(Debug)]
+    struct NamedStage {
+        name: Option<GlobalSymbol>,
+        id: Option<CompileStage>,
+    }
+
+    impl NamedStage {
+        fn new() -> Self {
+            Self {
+                name: None,
+                id: None,
+            }
+        }
+    }
+
+    impl crate::stage::StageMeta for NamedStage {
+        type Languages = ();
+
+        fn stage_name(&self) -> Option<GlobalSymbol> {
+            self.name
+        }
+
+        fn set_stage_name(&mut self, name: Option<GlobalSymbol>) {
+            self.name = name;
+        }
+
+        fn stage_id(&self) -> Option<CompileStage> {
+            self.id
+        }
+
+        fn set_stage_id(&mut self, id: Option<CompileStage>) {
+            self.id = id;
+        }
+
+        fn from_stage_name(_stage_name: &str) -> Result<Self, String> {
+            Ok(NamedStage::new())
+        }
+
+        fn declared_stage_names() -> &'static [&'static str] {
+            &[]
+        }
+    }
+
+    #[test]
+    fn stage_by_name_returns_matching_stage() {
+        let mut pipeline: Pipeline<NamedStage> = Pipeline::new();
+        let id = pipeline
+            .add_stage()
+            .stage(NamedStage::new())
+            .name("source")
+            .new();
+        assert_eq!(pipeline.stage_by_name("source"), Some(id));
+    }
+
+    #[test]
+    fn stage_by_name_returns_none_for_missing() {
+        let mut pipeline: Pipeline<NamedStage> = Pipeline::new();
+        pipeline
+            .add_stage()
+            .stage(NamedStage::new())
+            .name("source")
+            .new();
+        assert_eq!(pipeline.stage_by_name("nonexistent"), None);
+    }
+
+    #[test]
+    fn stage_by_name_returns_none_for_unnamed_stage() {
+        let mut pipeline: Pipeline<NamedStage> = Pipeline::new();
+        // Add an unnamed stage (no name set via builder)
+        pipeline.add_stage_raw(NamedStage::new());
+        assert_eq!(pipeline.stage_by_name("anything"), None);
+    }
+
+    #[test]
+    fn resolve_staged_function_full_chain() {
+        use crate::arena::Id;
+        use crate::node::function::StagedFunction;
+
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let stage = pipeline.add_stage_raw(());
+        let func = pipeline.function().name("main").new().unwrap();
+        let sf = StagedFunction::from(Id(42));
+        pipeline.link(func, stage, sf).unwrap();
+
+        assert_eq!(pipeline.resolve_staged_function("main", stage), Some(sf));
+    }
+
+    #[test]
+    fn resolve_staged_function_missing_name() {
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let stage = pipeline.add_stage_raw(());
+        assert_eq!(pipeline.resolve_staged_function("missing", stage), None);
+    }
+
+    #[test]
+    fn resolve_staged_function_missing_stage() {
+        use crate::arena::Id;
+        use crate::node::function::CompileStage;
+
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let _ = pipeline.function().name("main").new().unwrap();
+        let unlinked_stage = CompileStage::new(Id(99));
+        assert_eq!(
+            pipeline.resolve_staged_function("main", unlinked_stage),
+            None
+        );
+    }
+
+    #[test]
+    fn resolve_staged_function_not_linked_at_stage() {
+        let mut pipeline: Pipeline<()> = Pipeline::new();
+        let stage_a = pipeline.add_stage_raw(());
+        let stage_b = pipeline.add_stage_raw(());
+        let func = pipeline.function().name("foo").new().unwrap();
+        // Link to stage_a only
+        use crate::arena::Id;
+        use crate::node::function::StagedFunction;
+        let sf = StagedFunction::from(Id(0));
+        pipeline.link(func, stage_a, sf).unwrap();
+
+        // Should find at stage_a but not stage_b
+        assert_eq!(pipeline.resolve_staged_function("foo", stage_a), Some(sf));
+        assert_eq!(pipeline.resolve_staged_function("foo", stage_b), None);
     }
 
     #[test]
