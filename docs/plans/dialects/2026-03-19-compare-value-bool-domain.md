@@ -108,7 +108,7 @@ Wait -- Rust does not support associated type defaults on stable. Alternative:
 5. Update `interp.write(*result, a.cmp_eq(&b))` -- if `Bool = Value`, no change needed. If `Bool != Value`, add `.into()`.
 6. Verify all tests pass.
 
-### Phase 2 (future)
+### Phase 2 (implement together with Phase 1)
 
 1. Define `BoolInterval` enum in `kirin-interval`: `True`, `False`, `Unknown`, `Bottom`.
 2. Implement `From<BoolInterval> for Interval`.

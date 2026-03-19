@@ -135,9 +135,9 @@ The `ParseEmit::parse_and_emit` return type changes from `Result<Statement, Vec<
 **Pros:** Clean separation. No zero-span hack.
 **Cons:** Breaking change to `ParseEmit` trait signature. All callers must be updated.
 
-### Recommendation: Option A
+### Recommendation: Option B (user decision)
 
-Option A is less disruptive and addresses the core issue (lost error provenance). The zero-span problem for emit errors is inherent -- the AST-to-IR phase does not have source positions -- and should be addressed separately by threading spans through `EmitIR` (a larger project).
+Option B was chosen for a cleaner separation. The `ParseEmit` trait return type changes from `Result<Statement, Vec<ParseError>>` to `Result<Statement, ChumskyError>`. This is a breaking change but provides proper separation between parse and emit failures without the zero-span hack.
 
 ### Span improvement (future work)
 
