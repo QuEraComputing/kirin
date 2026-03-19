@@ -1,8 +1,5 @@
-use std::fmt::{Display, Formatter};
-
-use kirin::parsers::chumsky::prelude::*;
-use kirin::parsers::{BoxedParser, DirectlyParsable, HasParser, Token, TokenInput};
-use kirin::pretty::PrettyPrintViaDisplay;
+use kirin::parsers::HasParser;
+use kirin::parsers::PrettyPrint;
 
 /// Built-in arithmetic type lattice for `kirin-arith`.
 ///
@@ -22,19 +19,31 @@ use kirin::pretty::PrettyPrintViaDisplay;
 ///
 /// If this built-in lattice is not sufficient, define your own type enum and
 /// use `Arith<YourType>` to preserve your language semantics.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, HasParser, PrettyPrint)]
 pub enum ArithType {
+    #[chumsky(format = "i8")]
     I8,
+    #[chumsky(format = "i16")]
     I16,
+    #[chumsky(format = "i32")]
     I32,
+    #[chumsky(format = "i64")]
     I64,
+    #[chumsky(format = "i128")]
     I128,
+    #[chumsky(format = "u8")]
     U8,
+    #[chumsky(format = "u16")]
     U16,
+    #[chumsky(format = "u32")]
     U32,
+    #[chumsky(format = "u64")]
     U64,
+    #[chumsky(format = "u128")]
     U128,
+    #[chumsky(format = "f32")]
     F32,
+    #[chumsky(format = "f64")]
     F64,
 }
 
@@ -50,54 +59,3 @@ impl kirin::ir::Placeholder for ArithType {
         Self::I64
     }
 }
-
-impl Display for ArithType {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        let name = match self {
-            ArithType::I8 => "i8",
-            ArithType::I16 => "i16",
-            ArithType::I32 => "i32",
-            ArithType::I64 => "i64",
-            ArithType::I128 => "i128",
-            ArithType::U8 => "u8",
-            ArithType::U16 => "u16",
-            ArithType::U32 => "u32",
-            ArithType::U64 => "u64",
-            ArithType::U128 => "u128",
-            ArithType::F32 => "f32",
-            ArithType::F64 => "f64",
-        };
-
-        f.write_str(name)
-    }
-}
-
-impl DirectlyParsable for ArithType {}
-
-impl<'t> HasParser<'t> for ArithType {
-    type Output = ArithType;
-
-    fn parser<I>() -> BoxedParser<'t, I, Self::Output>
-    where
-        I: TokenInput<'t>,
-    {
-        select! {
-            Token::Identifier("i8") => ArithType::I8,
-            Token::Identifier("i16") => ArithType::I16,
-            Token::Identifier("i32") => ArithType::I32,
-            Token::Identifier("i64") => ArithType::I64,
-            Token::Identifier("i128") => ArithType::I128,
-            Token::Identifier("u8") => ArithType::U8,
-            Token::Identifier("u16") => ArithType::U16,
-            Token::Identifier("u32") => ArithType::U32,
-            Token::Identifier("u64") => ArithType::U64,
-            Token::Identifier("u128") => ArithType::U128,
-            Token::Identifier("f32") => ArithType::F32,
-            Token::Identifier("f64") => ArithType::F64,
-        }
-        .labelled("arith type")
-        .boxed()
-    }
-}
-
-impl PrettyPrintViaDisplay for ArithType {}

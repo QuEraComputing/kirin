@@ -7,6 +7,7 @@ mod emit_ir;
 mod helpers;
 mod parser;
 mod pretty_print;
+pub(crate) mod type_enum;
 
 pub(crate) use bounds::{ImplBounds, WhereClauseExt, init_where_clause};
 pub(crate) use config::GeneratorConfig;

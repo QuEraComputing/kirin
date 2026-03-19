@@ -1,0 +1,7 @@
+---
+source: crates/kirin-derive-chumsky/src/codegen/type_enum.rs
+assertion_line: 277
+expression: generate_type_enum_pretty_print_code(input)
+---
+#[automatically_derived]
+impl ::kirin::pretty::PrettyPrintViaDisplay for ArithType {}

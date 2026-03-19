@@ -1,0 +1,31 @@
+---
+source: crates/kirin-derive-chumsky/src/codegen/type_enum.rs
+assertion_line: 261
+expression: generate_type_enum_code(input)
+---
+#[automatically_derived]
+impl ::core::fmt::Display for ArithType {
+    fn fmt(&self, f: &mut ::core::fmt::Formatter<'_>) -> ::core::fmt::Result {
+        match self {
+            ArithType::I8 => f.write_str("i8"),
+            ArithType::I16 => f.write_str("i16"),
+            ArithType::I32 => f.write_str("i32"),
+            ArithType::I64 => f.write_str("i64"),
+            ArithType::F32 => f.write_str("f32"),
+            ArithType::F64 => f.write_str("f64"),
+        }
+    }
+}
+#[automatically_derived]
+impl<'t> ::kirin::parsers::HasParser<'t> for ArithType {
+    type Output = ArithType;
+    fn parser<__I>() -> ::kirin::parsers::BoxedParser<'t, __I, Self::Output>
+    where
+        __I: ::kirin::parsers::TokenInput<'t>,
+    {
+        use kirin::parsers::chumsky::prelude::*;
+        select ! { :: kirin :: parsers :: Token :: Identifier ("i8") => ArithType :: I8 , :: kirin :: parsers :: Token :: Identifier ("i16") => ArithType :: I16 , :: kirin :: parsers :: Token :: Identifier ("i32") => ArithType :: I32 , :: kirin :: parsers :: Token :: Identifier ("i64") => ArithType :: I64 , :: kirin :: parsers :: Token :: Identifier ("f32") => ArithType :: F32 , :: kirin :: parsers :: Token :: Identifier ("f64") => ArithType :: F64 } . labelled ("arith-type") . boxed ()
+    }
+}
+#[automatically_derived]
+impl ::kirin::parsers::DirectlyParsable for ArithType {}

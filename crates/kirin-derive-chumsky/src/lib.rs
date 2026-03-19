@@ -12,6 +12,7 @@ mod validation;
 mod visitor;
 
 use attrs::{ChumskyFieldAttrs, ChumskyGlobalAttrs, ChumskyStatementAttrs, PrettyGlobalAttrs};
+use codegen::type_enum::{GenerateTypeEnum, is_type_enum};
 use codegen::{GenerateAST, GenerateEmitIR, GenerateHasDialectParser, GeneratePrettyPrint};
 use input::{parse_derive_input, parse_pretty_derive_input};
 
@@ -77,6 +78,11 @@ pub fn derive_has_parser(input: TokenStream) -> TokenStream {
         Err(err) => return err.write_errors().into(),
     };
 
+    // Type enums get a simpler codegen path: Display + HasParser + DirectlyParsable
+    if is_type_enum(&ir_input) {
+        return GenerateTypeEnum::generate(&ir_input).into();
+    }
+
     let ast_generator = GenerateAST::new(&ir_input);
     let parser_generator = GenerateHasDialectParser::new(&ir_input);
     let emit_generator = GenerateEmitIR::new(&ir_input);
@@ -102,6 +108,11 @@ pub fn derive_pretty_print(input: TokenStream) -> TokenStream {
         Ok(ir) => ir,
         Err(err) => return err.write_errors().into(),
     };
+
+    // Type enums generate PrettyPrintViaDisplay instead of full PrettyPrint
+    if is_type_enum(&ir_input) {
+        return GenerateTypeEnum::generate_pretty_print_via_display(&ir_input).into();
+    }
 
     let generator = GeneratePrettyPrint::new(&ir_input);
     generator.generate(&ir_input).into()
