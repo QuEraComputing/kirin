@@ -9,7 +9,8 @@ where
     TypeOutput: Clone + PartialEq + 't,
     LanguageOutput: Clone + PartialEq + 't,
 {
-    pub result: kirin_chumsky::SSAValue<'t, <SimpleType as kirin_chumsky::HasParser<'t>>::Output>,
+    pub result:
+        kirin_chumsky::ResultValue<'t, <SimpleType as kirin_chumsky::HasParser<'t>>::Output>,
     pub lhs: <Value as kirin_chumsky::HasParser<'t>>::Output,
     pub rhs: <Value as kirin_chumsky::HasParser<'t>>::Output,
     #[doc(hidden)]

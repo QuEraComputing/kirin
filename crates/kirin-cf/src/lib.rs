@@ -28,13 +28,13 @@ use kirin::prelude::*;
 #[non_exhaustive]
 #[kirin(terminator, builders, type = T)]
 pub enum ControlFlow<T: CompileTimeValue> {
-    #[chumsky(format = "{.br} {target}({args})")]
+    #[chumsky(format = "$br {target}({args})")]
     Branch {
         target: Successor,
         args: Vec<SSAValue>,
     },
     #[chumsky(
-        format = "{.cond_br} {condition} then={true_target}({true_args}) else={false_target}({false_args})"
+        format = "$cond_br {condition} then={true_target}({true_args}) else={false_target}({false_args})"
     )]
     ConditionalBranch {
         condition: SSAValue,

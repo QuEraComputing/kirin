@@ -19,7 +19,7 @@ enum HighLevel {
     #[chumsky(format = "{body}")]
     Function { body: Region },
 
-    #[chumsky(format = "{res:name} = {.lambda} {name} captures({captures}) {body} -> {res:type}")]
+    #[chumsky(format = "$lambda {name} captures({captures}) {body} -> {res:type}")]
     Lambda {
         name: Symbol,
         captures: Vec<SSAValue>,
@@ -28,7 +28,7 @@ enum HighLevel {
         res: ResultValue,
     },
 
-    #[chumsky(format = "{.if} {condition} then {then_body} else {else_body}")]
+    #[chumsky(format = "$if {condition} then {then_body} else {else_body}")]
     If {
         condition: SSAValue,
         then_body: Block,

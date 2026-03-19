@@ -6,7 +6,7 @@ use kirin_test_utils::roundtrip;
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(edge, builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
-#[chumsky(format = "{res:name} = {.wire}")]
+#[chumsky(format = "$wire")]
 struct Wire {
     #[kirin(type = SimpleType::Any)]
     res: ResultValue,
@@ -16,7 +16,7 @@ struct Wire {
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
-#[chumsky(format = "{.node_a}({param}, {port})")]
+#[chumsky(format = "$node_a({param}, {port})")]
 struct NodeA {
     param: SSAValue,
     port: SSAValue,

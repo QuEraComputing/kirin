@@ -12,7 +12,7 @@ enum ConstantLanguage {
     #[chumsky(format = "{body}")]
     Function { body: Region },
     #[kirin(constant, pure)]
-    #[chumsky(format = "{result:name} = {.constant} {value} -> {result:type}")]
+    #[chumsky(format = "$constant {value} -> {result:type}")]
     Constant {
         #[kirin(into)]
         value: ArithValue,

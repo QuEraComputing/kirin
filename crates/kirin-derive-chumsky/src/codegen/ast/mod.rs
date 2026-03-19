@@ -100,9 +100,9 @@ mod tests {
     fn test_ast_struct_definition() {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[kirin(type = SimpleType)]
-            #[chumsky(crate = kirin_chumsky, format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+            #[chumsky(crate = kirin_chumsky, format = "$add {lhs}, {rhs} -> {result:type}")]
             struct Add {
-                result: SSAValue,
+                result: ResultValue,
                 lhs: Value,
                 rhs: Value,
             }
@@ -115,15 +115,15 @@ mod tests {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[kirin(type = SimpleType)]
             enum ArithOps {
-                #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+                #[chumsky(format = "$add {lhs}, {rhs} -> {result:type}")]
                 Add {
-                    result: SSAValue,
+                    result: ResultValue,
                     lhs: Value,
                     rhs: Value,
                 },
-                #[chumsky(format = "{result:name} = {.neg} {operand} -> {result:type}")]
+                #[chumsky(format = "$neg {operand} -> {result:type}")]
                 Neg {
-                    result: SSAValue,
+                    result: ResultValue,
                     operand: Value,
                 },
             }

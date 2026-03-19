@@ -6,7 +6,7 @@ use kirin::prelude::*;
 /// parsing, printing, and interpretation to this type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = T)]
-#[chumsky(format = "{res:name} = {.lambda} {name} captures({captures}) {body} -> {res:type}")]
+#[chumsky(format = "$lambda {name} captures({captures}) {body} -> {res:type}")]
 pub struct Lambda<T: CompileTimeValue> {
     name: Symbol,
     captures: Vec<SSAValue>,

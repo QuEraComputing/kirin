@@ -98,7 +98,7 @@ mod tests {
     #[test]
     fn test_parse_input_without_type_annotation() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[chumsky(format = "{.literal} {value}")]
+            #[chumsky(format = "$literal {value}")]
             struct Literal {
                 value: i64,
             }
@@ -113,7 +113,7 @@ mod tests {
     #[test]
     fn test_parse_input_ssa_without_type_requires_annotation() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+            #[chumsky(format = "$add {lhs}, {rhs} -> {result:type}")]
             struct Add {
                 result: SSAValue,
                 lhs: Value,
@@ -133,7 +133,7 @@ mod tests {
     fn test_parse_input_with_type_annotation() {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[kirin(type = SimpleType)]
-            #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+            #[chumsky(format = "$add {lhs}, {rhs} -> {result:type}")]
             struct Add {
                 result: SSAValue,
                 lhs: Value,

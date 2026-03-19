@@ -533,7 +533,7 @@ mod tests {
     fn test_keyword_struct_pretty_print() {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[kirin(type = SimpleType)]
-            #[chumsky(format = "{.ret} {value}")]
+            #[chumsky(format = "$ret {value}")]
             struct Return {
                 value: Value,
             }
@@ -546,15 +546,15 @@ mod tests {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[kirin(type = SimpleType)]
             enum ArithOps {
-                #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+                #[chumsky(format = "$add {lhs}, {rhs} -> {result:type}")]
                 Add {
-                    result: SSAValue,
+                    result: ResultValue,
                     lhs: Value,
                     rhs: Value,
                 },
-                #[chumsky(format = "{result:name} = {.sub} {lhs}, {rhs} -> {result:type}")]
+                #[chumsky(format = "$sub {lhs}, {rhs} -> {result:type}")]
                 Sub {
-                    result: SSAValue,
+                    result: ResultValue,
                     lhs: Value,
                     rhs: Value,
                 },

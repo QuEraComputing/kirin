@@ -15,42 +15,42 @@ mod tests;
 #[kirin(pure, builders, type = T)]
 pub enum Cmp<T: CompileTimeValue> {
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.eq} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$eq {lhs}, {rhs} -> {result:type}")]
     Eq {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.ne} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$ne {lhs}, {rhs} -> {result:type}")]
     Ne {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.lt} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$lt {lhs}, {rhs} -> {result:type}")]
     Lt {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.le} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$le {lhs}, {rhs} -> {result:type}")]
     Le {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.gt} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$gt {lhs}, {rhs} -> {result:type}")]
     Gt {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.ge} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$ge {lhs}, {rhs} -> {result:type}")]
     Ge {
         lhs: SSAValue,
         rhs: SSAValue,

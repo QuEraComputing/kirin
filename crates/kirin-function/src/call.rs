@@ -2,7 +2,7 @@ use kirin::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = T)]
-#[chumsky(format = "{res:name} = {.call} {target}({args}) -> {res:type}")]
+#[chumsky(format = "$call {target}({args}) -> {res:type}")]
 pub struct Call<T: CompileTimeValue> {
     target: Symbol,
     args: Vec<SSAValue>,

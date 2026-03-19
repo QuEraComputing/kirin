@@ -85,40 +85,40 @@ pub use types::{ArithType, ArithValue};
 #[kirin(pure, builders, type = T)]
 pub enum Arith<T: CompileTimeValue> {
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$add {lhs}, {rhs} -> {result:type}")]
     Add {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.sub} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$sub {lhs}, {rhs} -> {result:type}")]
     Sub {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.mul} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$mul {lhs}, {rhs} -> {result:type}")]
     Mul {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
-    #[chumsky(format = "{result:name} = {.div} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$div {lhs}, {rhs} -> {result:type}")]
     Div {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
-    #[chumsky(format = "{result:name} = {.rem} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$rem {lhs}, {rhs} -> {result:type}")]
     Rem {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.neg} {operand} -> {result:type}")]
+    #[chumsky(format = "$neg {operand} -> {result:type}")]
     Neg {
         operand: SSAValue,
         result: ResultValue,

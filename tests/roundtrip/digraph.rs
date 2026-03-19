@@ -9,18 +9,18 @@ use kirin_test_utils::roundtrip;
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum DiGraphLanguage {
-    #[chumsky(format = "{2:name} = {.add} {0}, {1}")]
+    #[chumsky(format = "$add {0}, {1}")]
     Add(
         SSAValue,
         SSAValue,
         #[kirin(type = SimpleType::F64)] ResultValue,
     ),
-    #[chumsky(format = "{1:name} = {.constant} {0}")]
+    #[chumsky(format = "$constant {0}")]
     Constant(
         #[kirin(into)] kirin_test_languages::Value,
         #[kirin(type = SimpleType::F64)] ResultValue,
     ),
-    #[chumsky(format = "{1:name} = {.graph_func} {0}")]
+    #[chumsky(format = "$graph_func {0}")]
     GraphFunc(DiGraph, #[kirin(type = SimpleType::F64)] ResultValue),
 }
 

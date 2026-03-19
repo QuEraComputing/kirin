@@ -67,10 +67,10 @@ fn test_roundtrip_add() {
         assert_eq!(res_info.ty(), &SimpleType::F64, "Result type should be F64");
     }
 
-    // Pretty print directly using the trait
+    // Pretty print using statement-level printer (handles result name prefix)
     let config = Config::default();
     let doc = Document::new(config, &stage);
-    let arena_doc = dialect.pretty_print(&doc);
+    let arena_doc = doc.print_statement(&statement);
     let mut output = String::new();
     arena_doc
         .render_fmt(80, &mut output)
@@ -83,8 +83,6 @@ fn test_roundtrip_add() {
 /// Test roundtrip for constant instruction.
 #[test]
 fn test_roundtrip_constant() {
-    use kirin::pretty::PrettyPrint as _;
-
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     // Parse - type annotation in input
@@ -107,10 +105,10 @@ fn test_roundtrip_constant() {
         assert_eq!(res_info.ty(), &SimpleType::F64, "Result type should be F64");
     }
 
-    // Pretty print
+    // Pretty print using statement-level printer (handles result name prefix)
     let config = Config::default();
     let doc = Document::new(config, &stage);
-    let arena_doc = dialect.pretty_print(&doc);
+    let arena_doc = doc.print_statement(&statement);
     let mut output = String::new();
     arena_doc
         .render_fmt(80, &mut output)
@@ -123,8 +121,6 @@ fn test_roundtrip_constant() {
 /// Test roundtrip for return instruction.
 #[test]
 fn test_roundtrip_return() {
-    use kirin::pretty::PrettyPrint as _;
-
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     // Create a dummy block so block argument SSAs have a valid owner
@@ -150,13 +146,11 @@ fn test_roundtrip_return() {
 
     // Convert to StageInfo for querying and pretty printing
     let stage = stage.finalize().unwrap();
-    let stmt_info = statement.get_info(&stage).expect("stmt should exist");
-    let dialect = stmt_info.definition();
 
-    // Pretty print
+    // Pretty print using statement-level printer
     let config = Config::default();
     let doc = Document::new(config, &stage);
-    let arena_doc = dialect.pretty_print(&doc);
+    let arena_doc = doc.print_statement(&statement);
     let mut output = String::new();
     arena_doc
         .render_fmt(80, &mut output)
@@ -186,7 +180,7 @@ fn test_roundtrip_function() {
     let mut emit_ctx = EmitContext::new(&mut stage);
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
-    // The function format "{1:name} = {.function} {0}" doesn't include a type
+    // The function format "$function {0}" doesn't include a type
     // annotation, so the emit path leaves the function result SSA untyped.
     // Set missing types before finalize.
     for ssa in stage.ssa_arena_mut().iter_mut() {

@@ -54,39 +54,39 @@ mod tests;
 #[kirin(pure, builders, type = T)]
 pub enum Bitwise<T: CompileTimeValue> {
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.and} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$and {lhs}, {rhs} -> {result:type}")]
     And {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.or} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$or {lhs}, {rhs} -> {result:type}")]
     Or {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.xor} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$xor {lhs}, {rhs} -> {result:type}")]
     Xor {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
     #[kirin(speculatable)]
-    #[chumsky(format = "{result:name} = {.not} {operand} -> {result:type}")]
+    #[chumsky(format = "$not {operand} -> {result:type}")]
     Not {
         operand: SSAValue,
         result: ResultValue,
     },
-    #[chumsky(format = "{result:name} = {.shl} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$shl {lhs}, {rhs} -> {result:type}")]
     Shl {
         lhs: SSAValue,
         rhs: SSAValue,
         result: ResultValue,
     },
-    #[chumsky(format = "{result:name} = {.shr} {lhs}, {rhs} -> {result:type}")]
+    #[chumsky(format = "$shr {lhs}, {rhs} -> {result:type}")]
     Shr {
         lhs: SSAValue,
         rhs: SSAValue,

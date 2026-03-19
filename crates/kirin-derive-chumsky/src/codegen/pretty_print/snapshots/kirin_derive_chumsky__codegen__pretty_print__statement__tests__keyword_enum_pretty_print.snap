@@ -19,17 +19,14 @@ impl ::kirin::pretty::PrettyPrint for ArithOps {
                 lhs: f_lhs,
                 rhs: f_rhs,
             } => {
-                ::kirin::pretty::PrettyPrint::pretty_print_name(f_result, doc)
-                    + doc.text(" = ")
-                    + (if namespace.is_empty() {
-                        doc.text("add")
-                    } else {
-                        let mut __s = namespace.join(".");
-                        __s.push('.');
-                        __s.push_str("add");
-                        doc.text(__s)
-                    })
-                    + doc.text(" ")
+                (if namespace.is_empty() {
+                    doc.text("add")
+                } else {
+                    let mut __s = namespace.join(".");
+                    __s.push('.');
+                    __s.push_str("add");
+                    doc.text(__s)
+                }) + doc.text(" ")
                     + ::kirin::pretty::PrettyPrint::pretty_print(f_lhs, doc)
                     + doc.text(", ")
                     + ::kirin::pretty::PrettyPrint::pretty_print(f_rhs, doc)
@@ -41,17 +38,14 @@ impl ::kirin::pretty::PrettyPrint for ArithOps {
                 lhs: f_lhs,
                 rhs: f_rhs,
             } => {
-                ::kirin::pretty::PrettyPrint::pretty_print_name(f_result, doc)
-                    + doc.text(" = ")
-                    + (if namespace.is_empty() {
-                        doc.text("sub")
-                    } else {
-                        let mut __s = namespace.join(".");
-                        __s.push('.');
-                        __s.push_str("sub");
-                        doc.text(__s)
-                    })
-                    + doc.text(" ")
+                (if namespace.is_empty() {
+                    doc.text("sub")
+                } else {
+                    let mut __s = namespace.join(".");
+                    __s.push('.');
+                    __s.push_str("sub");
+                    doc.text(__s)
+                }) + doc.text(" ")
                     + ::kirin::pretty::PrettyPrint::pretty_print(f_lhs, doc)
                     + doc.text(", ")
                     + ::kirin::pretty::PrettyPrint::pretty_print(f_rhs, doc)

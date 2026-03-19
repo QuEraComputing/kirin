@@ -10,14 +10,18 @@ where
     LanguageOutput: Clone + PartialEq + 't,
 {
     Add {
-        result:
-            ::kirin::parsers::SSAValue<'t, <SimpleType as ::kirin::parsers::HasParser<'t>>::Output>,
+        result: ::kirin::parsers::ResultValue<
+            't,
+            <SimpleType as ::kirin::parsers::HasParser<'t>>::Output,
+        >,
         lhs: <Value as ::kirin::parsers::HasParser<'t>>::Output,
         rhs: <Value as ::kirin::parsers::HasParser<'t>>::Output,
     },
     Neg {
-        result:
-            ::kirin::parsers::SSAValue<'t, <SimpleType as ::kirin::parsers::HasParser<'t>>::Output>,
+        result: ::kirin::parsers::ResultValue<
+            't,
+            <SimpleType as ::kirin::parsers::HasParser<'t>>::Output,
+        >,
         operand: <Value as ::kirin::parsers::HasParser<'t>>::Output,
     },
     #[doc(hidden)]

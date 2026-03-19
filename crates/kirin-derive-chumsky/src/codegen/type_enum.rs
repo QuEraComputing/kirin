@@ -277,7 +277,7 @@ mod tests {
     fn test_not_type_enum_with_fields() {
         let input: syn::DeriveInput = syn::parse_quote! {
             #[kirin(type = SimpleType)]
-            #[chumsky(format = "{.ret} {value}")]
+            #[chumsky(format = "$ret {value}")]
             struct Return {
                 value: Value,
             }

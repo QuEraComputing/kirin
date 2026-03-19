@@ -35,15 +35,10 @@ where
     L: Dialect + PrettyPrint,
     L::Type: Display,
 {
-    let dialect = statement
-        .get_info(stage)
-        .expect("statement should exist")
-        .definition();
-
     let doc = Document::new(Config::default(), stage);
+    let arena_doc = doc.print_statement(&statement);
     let mut output = String::new();
-    dialect
-        .pretty_print(&doc)
+    arena_doc
         .render_fmt(80, &mut output)
         .expect("render should succeed");
     output
