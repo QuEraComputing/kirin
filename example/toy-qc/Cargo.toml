@@ -1,0 +1,20 @@
+[package]
+name = "toy-qc"
+version = "0.1.0"
+edition = "2024"
+
+[[bin]]
+name = "toy-qc"
+path = "src/main.rs"
+
+[dependencies]
+kirin = { workspace = true }
+kirin-ir = { workspace = true, features = ["derive"] }
+kirin-chumsky = { workspace = true }
+kirin-prettyless = { workspace = true }
+clap = { workspace = true }
+anyhow = { workspace = true }
+
+[dev-dependencies]
+assert_cmd = { workspace = true }
+predicates = { workspace = true }

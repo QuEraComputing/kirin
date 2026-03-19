@@ -28,6 +28,7 @@ members = [
   "crates/kirin-test-types",
   "crates/kirin-test-utils",
   "example/toy-lang",
+  "example/toy-qc",
 ]
 
 [workspace.dependencies]
