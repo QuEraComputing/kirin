@@ -84,6 +84,18 @@ pub trait PrettyPrint {
     {
         self.pretty_print(doc)
     }
+
+    /// Whether this type's `pretty_print` output includes result names (`%name =`).
+    ///
+    /// Returns `true` for legacy-format dialects where `{result:name} =` is
+    /// part of the format string. Returns `false` for new-format dialects where
+    /// result names are printed by the statement-level printer.
+    ///
+    /// The derive macro generates the correct value based on format mode.
+    /// The default is `true` for backward compatibility with legacy dialects.
+    fn prints_result_names(&self) -> bool {
+        true
+    }
 }
 
 /// Builder for rendering pretty-printed IR nodes.

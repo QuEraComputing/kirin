@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-chumsky/src/codegen/pretty_print/statement.rs
-assertion_line: 416
 expression: generate_pretty_print_code(input)
 ---
 #[automatically_derived]
@@ -21,6 +20,12 @@ impl ::kirin::pretty::PrettyPrint for MyLanguage {
                 inner.namespaced_pretty_print(doc, &__ns)
             }
             MyLanguage::Cf(inner) => inner.namespaced_pretty_print(doc, namespace),
+        }
+    }
+    fn prints_result_names(&self) -> bool {
+        match self {
+            MyLanguage::Arith(inner) => ::kirin::pretty::PrettyPrint::prints_result_names(inner),
+            MyLanguage::Cf(inner) => ::kirin::pretty::PrettyPrint::prints_result_names(inner),
         }
     }
 }

@@ -38,10 +38,33 @@ where
     }
 
     /// Pretty print a statement by printing its definition.
+    ///
+    /// When the dialect uses new-format mode (where result names are NOT printed
+    /// by the dialect's PrettyPrint), this method prints `%name1, %name2 = `
+    /// before the dialect body.
     pub fn print_statement(&'a self, stmt: &Statement) -> ArenaDoc<'a> {
         let stmt_info = stmt.expect_info(self.stage);
         let def = stmt_info.definition();
-        def.pretty_print(self)
+
+        if !def.prints_result_names() {
+            // New-format mode: print result names at statement level
+            let results: Vec<_> = stmt.results::<L>(self.stage).collect();
+            if results.is_empty() {
+                def.pretty_print(self)
+            } else {
+                let mut result_doc = self.nil();
+                for (i, rv) in results.iter().enumerate() {
+                    if i > 0 {
+                        result_doc += self.text(", ");
+                    }
+                    result_doc += self.print_ssa_ref(**rv);
+                }
+                result_doc + self.text(" = ") + def.pretty_print(self)
+            }
+        } else {
+            // Legacy mode: dialect's PrettyPrint handles result names
+            def.pretty_print(self)
+        }
     }
 
     /// Pretty print a block with its header and statements.

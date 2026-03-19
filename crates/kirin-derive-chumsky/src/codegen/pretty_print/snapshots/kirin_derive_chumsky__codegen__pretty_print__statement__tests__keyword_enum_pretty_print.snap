@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-chumsky/src/codegen/pretty_print/statement.rs
-assertion_line: 401
 expression: generate_pretty_print_code(input)
 ---
 #[automatically_derived]
@@ -60,5 +59,8 @@ impl ::kirin::pretty::PrettyPrint for ArithOps {
                     + ::kirin::pretty::PrettyPrint::pretty_print_type(f_result, doc)
             }
         }
+    }
+    fn prints_result_names(&self) -> bool {
+        false
     }
 }
