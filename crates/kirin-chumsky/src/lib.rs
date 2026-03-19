@@ -63,6 +63,7 @@ pub use parsers::*;
 pub use traits::*;
 
 // Re-export PrettyPrint trait from kirin_prettyless
+#[cfg(feature = "pretty")]
 pub use kirin_prettyless::PrettyPrint;
 
 // When derive feature is enabled, also export derive macros with the same names as traits
@@ -70,7 +71,7 @@ pub use kirin_prettyless::PrettyPrint;
 #[cfg(feature = "derive")]
 pub use kirin_derive_chumsky::HasParser;
 
-#[cfg(feature = "derive")]
+#[cfg(all(feature = "derive", feature = "pretty"))]
 pub use kirin_derive_chumsky::PrettyPrint;
 
 /// Prelude module for convenient imports
@@ -88,10 +89,14 @@ pub mod prelude {
     };
     pub use chumsky::prelude::*;
     pub use kirin_lexer::Token;
+    #[cfg(feature = "pretty")]
     pub use kirin_prettyless::prelude::*;
 
+    #[cfg(all(feature = "derive", feature = "pretty"))]
+    pub use kirin_derive_chumsky::PrettyPrint;
+
     #[cfg(feature = "derive")]
-    pub use kirin_derive_chumsky::{HasParser, PrettyPrint};
+    pub use kirin_derive_chumsky::HasParser;
 }
 
 #[cfg(test)]

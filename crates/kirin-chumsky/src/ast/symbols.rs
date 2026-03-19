@@ -1,6 +1,5 @@
 use chumsky::span::SimpleSpan;
 use kirin_ir::Dialect;
-use kirin_prettyless::{ArenaDoc, DocAllocator, Document, PrettyPrint};
 
 use super::Spanned;
 use crate::traits::{EmitContext, EmitError, EmitIR};
@@ -48,18 +47,26 @@ where
     }
 }
 
-/// Implementation of PrettyPrint for SymbolName AST nodes.
-///
-/// Prints symbols with the `@` prefix: `@main`, `@foo`, etc.
-impl<'src> PrettyPrint for SymbolName<'src> {
-    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
-        &self,
-        doc: &'a Document<'a, L>,
-        _namespace: &[&str],
-    ) -> ArenaDoc<'a>
-    where
-        L::Type: std::fmt::Display,
-    {
-        doc.text(format!("@{}", self.name))
+#[cfg(feature = "pretty")]
+mod pretty_impl {
+    use kirin_ir::Dialect;
+    use kirin_prettyless::{ArenaDoc, DocAllocator, Document, PrettyPrint};
+
+    use super::SymbolName;
+
+    /// Implementation of PrettyPrint for SymbolName AST nodes.
+    ///
+    /// Prints symbols with the `@` prefix: `@main`, `@foo`, etc.
+    impl<'src> PrettyPrint for SymbolName<'src> {
+        fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+            &self,
+            doc: &'a Document<'a, L>,
+            _namespace: &[&str],
+        ) -> ArenaDoc<'a>
+        where
+            L::Type: std::fmt::Display,
+        {
+            doc.text(format!("@{}", self.name))
+        }
     }
 }
