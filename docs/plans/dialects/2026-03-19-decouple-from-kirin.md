@@ -13,12 +13,14 @@ All 7 dialect crates depend on `kirin.workspace = true`, which unconditionally p
 ```toml
 # kirin/Cargo.toml
 [features]
-default = ["parser", "pretty", "derive"]
+default = ["parser", "pretty", "derive", "interpret"]
 parser = ["kirin-chumsky"]
 pretty = ["kirin-prettyless"]
 derive = ["kirin-derive"]
 interpret = ["kirin-interpreter"]
 ```
+
+All four are default because dialect developers must implement text format, pretty print, and interpreter (operational semantics). The features exist so that downstream *consumers* of compiled dialects can opt out of parser/pretty if they only need to run the interpreter.
 
 ### How dialects use it
 
