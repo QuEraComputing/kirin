@@ -38,12 +38,9 @@ fn build_abstract_recursive(
     pipeline: &mut Pipeline<StageInfo<CallLang>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
-    let func = pipeline.function().name("rec").new().unwrap();
+    let func = pipeline.function(Some("rec")).unwrap();
     let staged = pipeline
-        .staged_function::<CallLang>()
-        .func(func)
-        .stage(stage_id)
-        .new()
+        .staged_function::<CallLang>(func, stage_id, None, None, None)
         .unwrap();
 
     pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
@@ -122,7 +119,7 @@ fn build_abstract_recursive(
             .add_block(exit_block)
             .new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize().staged_func(staged).body(body).new().unwrap()
+        b.specialize(staged, None, body, None).unwrap()
     })
 }
 
@@ -133,7 +130,7 @@ fn build_abstract_recursive(
 #[test]
 fn test_abstract_recursive_analysis() {
     let mut pipeline: Pipeline<StageInfo<CallLang>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
     let spec_fn = build_abstract_recursive(&mut pipeline, stage_id);
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -163,11 +160,11 @@ fn test_abstract_recursive_analysis() {
 #[test]
 fn test_summary_cache_tightest_match() {
     let mut pipeline: Pipeline<StageInfo<CallLang>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     // Build a simple add_one style function.
     let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function().new().unwrap();
+        let sf = b.staged_function(None, None, None, None).unwrap();
         let ba_x = b.block_argument().index(0);
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, SSAValue::from(ba_x), c1.result);
@@ -181,7 +178,7 @@ fn test_summary_cache_tightest_match() {
             .new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize().staged_func(sf).body(body).new().unwrap()
+        b.specialize(sf, None, body, None).unwrap()
     });
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -217,10 +214,10 @@ fn test_summary_cache_tightest_match() {
 #[test]
 fn test_summary_seed_refinable() {
     let mut pipeline: Pipeline<StageInfo<CallLang>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function().new().unwrap();
+        let sf = b.staged_function(None, None, None, None).unwrap();
         let ba_x = b.block_argument().index(0);
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, SSAValue::from(ba_x), c1.result);
@@ -234,7 +231,7 @@ fn test_summary_seed_refinable() {
             .new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize().staged_func(sf).body(body).new().unwrap()
+        b.specialize(sf, None, body, None).unwrap()
     });
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -282,7 +279,7 @@ fn test_narrowing_tightens_loop_result() {
     // With widening (AllJoins), the loop result is over-approximated.
     // Adding narrowing iterations should produce a tighter (or equal) result.
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
 
     // Analyze WITHOUT narrowing.
@@ -337,7 +334,7 @@ fn test_narrowing_tightens_loop_result() {
 #[test]
 fn test_narrowing_zero_iterations_same_as_default() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
 
     let mut interp0: AbstractInterpreter<Interval, _> =
@@ -368,7 +365,7 @@ fn test_widening_delayed_threshold_behavior() {
     // With Delayed(0), widening kicks in immediately — like AllJoins.
     // With Delayed(large), it acts like Never for bounded inputs.
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
 
     // Delayed(0) should converge (widening from the start).
@@ -485,7 +482,7 @@ fn test_dispatch_cache_empty_and_is_empty() {
 #[test]
 fn test_dispatch_cache_get_returns_none_for_missing() {
     let mut pipeline: Pipeline<StageInfo<CallLang>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     // Build a cache from the pipeline — the single stage should resolve.
     let cache = kirin_interpreter::dispatch::DispatchCache::<String>::build(

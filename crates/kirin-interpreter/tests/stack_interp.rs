@@ -25,7 +25,7 @@ use kirin_test_utils::ir_fixtures::{
 #[test]
 fn test_select_ir_snapshot() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let spec_func = build_select_program(&mut pipeline, stage_id);
     let ir = dump_function(spec_func, &pipeline, stage_id);
@@ -35,7 +35,7 @@ fn test_select_ir_snapshot() {
 #[test]
 fn test_concrete_select() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let spec_func = build_select_program(&mut pipeline, stage_id);
 
@@ -70,7 +70,7 @@ fn test_concrete_select() {
 #[test]
 fn test_concrete_fuel_exhaustion() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let spec_fn = build_infinite_loop(&mut pipeline, stage_id);
 
@@ -89,7 +89,7 @@ fn test_concrete_fuel_exhaustion() {
 #[test]
 fn test_concrete_breakpoints() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let (spec_fn, add_stmt) = build_linear_program(&mut pipeline, stage_id);
 
@@ -132,7 +132,7 @@ fn test_concrete_breakpoints() {
 #[test]
 fn test_concrete_push_frame_missing_stage_fails_atomically() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
     let (spec_fn, _) = build_linear_program(&mut pipeline, stage_id);
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
@@ -140,8 +140,8 @@ fn test_concrete_push_frame_missing_stage_fails_atomically() {
 
     // Build a stage ID that does not exist in this interpreter's pipeline.
     let mut other_pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let _ = other_pipeline.add_stage().stage(StageInfo::default()).new();
-    let missing_stage = other_pipeline.add_stage().stage(StageInfo::default()).new();
+    let _ = other_pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let missing_stage = other_pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let frame = Frame::new(spec_fn, missing_stage, first_stmt);
     let err = interp.push_frame(frame).unwrap_err();
@@ -160,7 +160,7 @@ fn test_concrete_push_frame_missing_stage_fails_atomically() {
 #[test]
 fn test_concrete_push_pop_frame_public_shape() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
     let (spec_fn, _) = build_linear_program(&mut pipeline, stage_id);
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
@@ -177,7 +177,7 @@ fn test_concrete_push_pop_frame_public_shape() {
 #[test]
 fn test_concrete_manual_push_then_run_dynamic() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
     let (spec_fn, _) = build_linear_program(&mut pipeline, stage_id);
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
@@ -195,7 +195,7 @@ fn test_concrete_manual_push_then_run_dynamic() {
 #[test]
 fn test_concrete_sequential_calls() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let spec_fn = build_add_one(&mut pipeline, stage_id);
 
@@ -226,7 +226,7 @@ fn test_concrete_sequential_calls() {
 #[test]
 fn test_concrete_fuel_sufficient() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let spec_fn = build_add_one(&mut pipeline, stage_id);
 
@@ -248,9 +248,9 @@ fn test_concrete_fuel_sufficient() {
 #[test]
 fn test_session_abstract_interp_with_args() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
     let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function().new().unwrap();
+        let sf = b.staged_function(None, None, None, None).unwrap();
         let ba_x = b.block_argument().index(0);
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, SSAValue::from(ba_x), c1.result);
@@ -265,7 +265,7 @@ fn test_session_abstract_interp_with_args() {
             .new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize().staged_func(sf).body(body).new().unwrap()
+        b.specialize(sf, None, body, None).unwrap()
     });
 
     // Resolve entry info for manual frame setup
@@ -309,7 +309,7 @@ fn test_session_abstract_interp_with_args() {
 #[test]
 fn test_concrete_div_by_zero_returns_error() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let spec_fn = build_div_program(&mut pipeline, stage_id);
 
@@ -339,7 +339,7 @@ fn test_concrete_div_by_zero_returns_error() {
 #[test]
 fn test_concrete_rem_by_zero_returns_error() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 
     let spec_fn = build_rem_program(&mut pipeline, stage_id);
 
