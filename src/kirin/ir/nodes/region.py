@@ -86,7 +86,7 @@ class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
         self.field.append(value)
 
 
-@dataclass
+@dataclass(eq=False)
 class Region(IRNode["Statement"]):
     """Region consist of a list of Blocks
 

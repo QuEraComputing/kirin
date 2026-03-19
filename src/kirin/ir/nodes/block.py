@@ -234,7 +234,7 @@ class BlockStmts(View["Block", "Statement"]):
             raise ValueError("Invalid block, last_stmt is None")
 
 
-@dataclass
+@dataclass(eq=False)
 class Block(IRNode["Region"]):
     """
     Block consist of a list of Statements and optionally input arguments.
