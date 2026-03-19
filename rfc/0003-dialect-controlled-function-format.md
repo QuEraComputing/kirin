@@ -335,17 +335,36 @@ The unified format string approach (main design) is best:
 - Remove hard-coded `fn @name(types) -> type` parsing for `specialize` (keep for `stage`)
 - The `specialize` parser delegates entirely to dialect after `specialize @stage`
 
-## Open Questions
+## Resolved Questions
 
-1. **`{body:yields}` for Region-based bodies**: Regions don't have explicit yields. Should `{body:yields}` be a compile error for Region fields, or return the function's return type?
+1. **`{field:yields}` for Region-based bodies**: **Compile error.** `:yields` is only valid on DiGraph/UnGraph fields.
 
-2. **Multiple body fields**: Can a dialect struct have multiple graph fields? E.g., `input_graph: DiGraph, output_graph: DiGraph`. If so, which one do `{body:...}` projections reference? Probably disallow — one body field per function statement.
+2. **Multiple body fields**: **Allowed.** `{body:ports}` means "ports of the field named `body`". If the struct has `input: DiGraph` and `output: DiGraph`, use `{input:ports}` and `{output:ports}`. The field name IS the projection target — no pseudo-fields.
 
-3. **`stage` declaration format**: Should `stage` declarations also be dialect-controlled? Or keep them framework-controlled (since they're just signatures, no body)?
+3. **`stage` declaration format**: **Framework-controlled.** `stage` declarations keep the current hard-coded `stage @A fn @foo(T) -> T;` format. They provide the broad staged signature for dispatch (may be more general than any specialization). Only `specialize` bodies are dialect-controlled.
 
-4. **`HasSignature` timing**: The trait is called after parsing. But the builder needs the signature to construct `StagedFunction` in pass 1. For forward references, the `stage` declaration still provides the signature. `HasSignature` is only for pass 2 (specialization). Is this sufficient?
+4. **`HasSignature` timing**: **Not an issue.** The two-pass architecture stays unchanged:
+   - Pass 1: Parse `stage` declarations → `StagedFunction` with broad signature (framework-controlled, as today)
+   - Pass 2: Parse `specialize` bodies → dialect format + `HasSignature` for **specialized** (narrow) signature
+   - The staged signature (broad) and specialized signature (narrow) may differ — e.g., `Numeric` vs `i64`
+   - For single-specialization convenience: if no `stage` declaration, auto-create staged function from `HasSignature` result
 
-5. **Capture semantics**: `{body:captures}` references graph captures. For Region bodies, there are no captures. Should `{body:captures}` be empty/forbidden for Region, or should it reference something else (e.g., closure-captured values)?
+5. **`{field:captures}` for Region bodies**: **Compile error.** `:captures` is only valid on DiGraph/UnGraph fields.
+
+6. **Context projections**: `{:name}` (no field name, colon prefix) references the function name from the specialize context. Future context projections can add `{:ident}` for other framework-provided values.
+
+## Projection syntax summary
+
+| Syntax | Meaning | Validated against |
+|--------|---------|-------------------|
+| `{field:ports}` | Graph port list of `field` | DiGraph/UnGraph only |
+| `{field:captures}` | Graph capture list of `field` | DiGraph/UnGraph only |
+| `{field:yields}` | Graph yield types of `field` | DiGraph/UnGraph only |
+| `{field:args}` | Block argument list of `field` | Region/Block only |
+| `{field:body}` | Inner statements only (no header/braces) | DiGraph/UnGraph/Region/Block |
+| `{field}` | Full body with header (existing behavior) | DiGraph/UnGraph/Region/Block |
+| `{:name}` | Function name from context | Always valid in function format |
+| `$keyword` | Operation keyword | Statement mode only |
 
 ## Reference Implementation Plan
 
