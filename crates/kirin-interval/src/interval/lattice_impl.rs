@@ -1,6 +1,9 @@
 use kirin_ir::{HasBottom, HasTop, Lattice};
 
-use super::{Bound, Interval, interval_add, interval_mul, interval_neg, interval_sub};
+use super::{
+    Bound, Interval, interval_add, interval_div, interval_mul, interval_neg, interval_rem,
+    interval_sub,
+};
 
 impl Lattice for Interval {
     fn join(&self, other: &Self) -> Self {
@@ -82,16 +85,16 @@ impl std::ops::Mul for Interval {
 impl std::ops::Div for Interval {
     type Output = Self;
 
-    fn div(self, _rhs: Self) -> Self {
-        Interval::top()
+    fn div(self, rhs: Self) -> Self {
+        interval_div(&self, &rhs)
     }
 }
 
 impl std::ops::Rem for Interval {
     type Output = Self;
 
-    fn rem(self, _rhs: Self) -> Self {
-        Interval::top()
+    fn rem(self, rhs: Self) -> Self {
+        interval_rem(&self, &rhs)
     }
 }
 

@@ -1,16 +1,16 @@
 use kirin_ir::HasTop;
 
-use super::Interval;
+use super::{Interval, interval_div, interval_rem};
 
 impl kirin_arith::CheckedDiv for Interval {
-    fn checked_div(self, _rhs: Self) -> Option<Self> {
-        Some(Interval::top())
+    fn checked_div(self, rhs: Self) -> Option<Self> {
+        Some(interval_div(&self, &rhs))
     }
 }
 
 impl kirin_arith::CheckedRem for Interval {
-    fn checked_rem(self, _rhs: Self) -> Option<Self> {
-        Some(Interval::top())
+    fn checked_rem(self, rhs: Self) -> Option<Self> {
+        Some(interval_rem(&self, &rhs))
     }
 }
 

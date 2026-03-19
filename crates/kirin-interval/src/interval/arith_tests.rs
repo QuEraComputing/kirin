@@ -4,19 +4,19 @@ use kirin_ir::HasTop;
 use super::*;
 
 #[test]
-fn test_checked_div_returns_top() {
-    let a = Interval::new(1, 10);
-    let b = Interval::new(2, 5);
+fn test_checked_div_delegates() {
+    let a = Interval::new(6, 12);
+    let b = Interval::new(2, 3);
     let result = a.checked_div(b);
-    assert_eq!(result, Some(Interval::top()));
+    assert_eq!(result, Some(Interval::new(2, 6)));
 }
 
 #[test]
-fn test_checked_rem_returns_top() {
-    let a = Interval::new(1, 10);
-    let b = Interval::new(2, 5);
+fn test_checked_rem_delegates() {
+    let a = Interval::new(0, 100);
+    let b = Interval::new(3, 3);
     let result = a.checked_rem(b);
-    assert_eq!(result, Some(Interval::top()));
+    assert_eq!(result, Some(Interval::new(0, 2)));
 }
 
 #[test]

@@ -78,6 +78,39 @@ impl Bound {
         }
     }
 
+    /// Saturating division of two bounds.
+    ///
+    /// The divisor must not be `Finite(0)` — callers must exclude zero-spanning
+    /// divisors before calling this. Inf/Inf cases should not arise when the
+    /// divisor does not span zero; we conservatively handle them anyway.
+    pub fn saturating_div(self, other: Self) -> Self {
+        match (self, other) {
+            (Bound::Finite(a), Bound::Finite(b)) => {
+                debug_assert!(b != 0, "saturating_div called with zero divisor");
+                Bound::Finite(a / b)
+            }
+            (Bound::PosInf, Bound::Finite(b)) => {
+                if b > 0 {
+                    Bound::PosInf
+                } else {
+                    Bound::NegInf
+                }
+            }
+            (Bound::NegInf, Bound::Finite(b)) => {
+                if b > 0 {
+                    Bound::NegInf
+                } else {
+                    Bound::PosInf
+                }
+            }
+            // Finite / Inf — anything finite divided by infinity truncates to 0
+            (Bound::Finite(_), Bound::PosInf | Bound::NegInf) => Bound::Finite(0),
+            // Inf / Inf — conservative fallback (same sign → PosInf, opposite → NegInf)
+            (Bound::PosInf, Bound::PosInf) | (Bound::NegInf, Bound::NegInf) => Bound::PosInf,
+            (Bound::PosInf, Bound::NegInf) | (Bound::NegInf, Bound::PosInf) => Bound::NegInf,
+        }
+    }
+
     /// Negate this bound. For `Finite(i64::MIN)`, `checked_neg` fails and we
     /// return `PosInf` as a sound over-approximation since `|i64::MIN| > i64::MAX`.
     pub fn negate(self) -> Self {

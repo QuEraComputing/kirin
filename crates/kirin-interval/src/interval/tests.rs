@@ -521,19 +521,17 @@ fn test_interval_operator_traits() {
 }
 
 #[test]
-fn test_interval_div_returns_top() {
-    let a = Interval::new(1, 10);
-    let b = Interval::new(2, 5);
-    let result = a / b;
-    assert_eq!(result, Interval::top());
+fn test_interval_div_positive_by_positive() {
+    let a = Interval::new(6, 12);
+    let b = Interval::new(2, 3);
+    assert_eq!(a / b, Interval::new(2, 6));
 }
 
 #[test]
-fn test_interval_rem_returns_top() {
-    let a = Interval::new(1, 10);
-    let b = Interval::new(2, 5);
-    let result = a % b;
-    assert_eq!(result, Interval::top());
+fn test_interval_rem_positive_by_positive() {
+    let a = Interval::new(0, 100);
+    let b = Interval::new(3, 3);
+    assert_eq!(a % b, Interval::new(0, 2));
 }
 
 // --- meet/join edge cases ---
@@ -572,4 +570,337 @@ fn test_subseteq_half_bounded() {
     let b = Interval::half_bounded_below(0);
     assert!(a.is_subseteq(&b));
     assert!(!b.is_subseteq(&a));
+}
+
+// --- interval_div tests ---
+
+#[test]
+fn test_interval_div_positive_by_positive_corners() {
+    // [6, 12] / [2, 3] → corners: 6/2=3, 6/3=2, 12/2=6, 12/3=4 → [2, 6]
+    assert_eq!(
+        interval_div(&Interval::new(6, 12), &Interval::new(2, 3)),
+        Interval::new(2, 6)
+    );
+}
+
+#[test]
+fn test_interval_div_negative_by_positive() {
+    // [-12, -6] / [2, 3] → corners: -12/2=-6, -12/3=-4, -6/2=-3, -6/3=-2 → [-6, -2]
+    assert_eq!(
+        interval_div(&Interval::new(-12, -6), &Interval::new(2, 3)),
+        Interval::new(-6, -2)
+    );
+}
+
+#[test]
+fn test_interval_div_mixed_by_positive() {
+    // [-6, 6] / [2, 3] → corners: -6/2=-3, -6/3=-2, 6/2=3, 6/3=2 → [-3, 3]
+    assert_eq!(
+        interval_div(&Interval::new(-6, 6), &Interval::new(2, 3)),
+        Interval::new(-3, 3)
+    );
+}
+
+#[test]
+fn test_interval_div_by_zero_spanning() {
+    // Divisor spans zero → top
+    assert_eq!(
+        interval_div(&Interval::new(1, 10), &Interval::new(-1, 1)),
+        Interval::top()
+    );
+    assert_eq!(
+        interval_div(&Interval::new(1, 10), &Interval::new(0, 5)),
+        Interval::top()
+    );
+    assert_eq!(
+        interval_div(&Interval::new(1, 10), &Interval::new(-5, 0)),
+        Interval::top()
+    );
+}
+
+#[test]
+fn test_interval_div_empty_inputs() {
+    let bot = Interval::bottom_interval();
+    let a = Interval::new(1, 10);
+    assert!(interval_div(&bot, &a).is_empty());
+    assert!(interval_div(&a, &bot).is_empty());
+    assert!(interval_div(&bot, &bot).is_empty());
+}
+
+#[test]
+fn test_interval_div_point_division() {
+    // [5, 5] / [2, 2] → [2, 2] (5/2 = 2 truncated)
+    assert_eq!(
+        interval_div(&Interval::constant(5), &Interval::constant(2)),
+        Interval::constant(2)
+    );
+}
+
+#[test]
+fn test_interval_div_truncation_toward_zero() {
+    // [-7, -7] / [2, 2] → [-3, -3] (Rust truncates toward zero: -7/2 = -3)
+    assert_eq!(
+        interval_div(&Interval::constant(-7), &Interval::constant(2)),
+        Interval::constant(-3)
+    );
+}
+
+#[test]
+fn test_interval_div_by_negative() {
+    // [6, 12] / [-3, -2] → negate both → [-12, -6] / [2, 3] → [-6, -2]
+    // But that's (-a)/(-b), which equals a/b. So [6,12]/[-3,-2] should give [-6, -2]
+    // Actually: 6/(-2)=-3, 6/(-3)=-2, 12/(-2)=-6, 12/(-3)=-4 → [-6, -2]
+    assert_eq!(
+        interval_div(&Interval::new(6, 12), &Interval::new(-3, -2)),
+        Interval::new(-6, -2)
+    );
+}
+
+#[test]
+fn test_interval_div_negative_by_negative() {
+    // [-12, -6] / [-3, -2] → negate both → [6, 12] / [2, 3] → [2, 6]
+    assert_eq!(
+        interval_div(&Interval::new(-12, -6), &Interval::new(-3, -2)),
+        Interval::new(2, 6)
+    );
+}
+
+#[test]
+fn test_interval_div_with_infinity() {
+    // [0, +inf) / [2, 3] → corners: 0/2=0, 0/3=0, +inf/2=+inf, +inf/3=+inf → [0, +inf)
+    assert_eq!(
+        interval_div(&Interval::half_bounded_below(0), &Interval::new(2, 3)),
+        Interval::half_bounded_below(0)
+    );
+
+    // (-inf, 0] / [1, 2] → corners: -inf/1=-inf, -inf/2=-inf, 0/1=0, 0/2=0 → (-inf, 0]
+    assert_eq!(
+        interval_div(&Interval::half_bounded_above(0), &Interval::new(1, 2)),
+        Interval::half_bounded_above(0)
+    );
+}
+
+#[test]
+fn test_interval_div_operator_trait() {
+    let a = Interval::new(6, 12);
+    let b = Interval::new(2, 3);
+    assert_eq!(a.clone() / b.clone(), interval_div(&a, &b));
+}
+
+// --- interval_rem tests ---
+
+#[test]
+fn test_interval_rem_positive_mod() {
+    // [0, 100] % [3, 3] → M = 3 - 1 = 2, a non-neg → [0, min(100, 2)] = [0, 2]
+    assert_eq!(
+        interval_rem(&Interval::new(0, 100), &Interval::constant(3)),
+        Interval::new(0, 2)
+    );
+}
+
+#[test]
+fn test_interval_rem_negative_dividend() {
+    // [-100, 0] % [3, 3] → M = 2, a non-pos → [max(-100, -2), 0] = [-2, 0]
+    assert_eq!(
+        interval_rem(&Interval::new(-100, 0), &Interval::constant(3)),
+        Interval::new(-2, 0)
+    );
+}
+
+#[test]
+fn test_interval_rem_mixed_dividend() {
+    // [-50, 50] % [7, 7] → M = 6, a spans zero → [max(-50, -6), min(50, 6)] = [-6, 6]
+    assert_eq!(
+        interval_rem(&Interval::new(-50, 50), &Interval::constant(7)),
+        Interval::new(-6, 6)
+    );
+}
+
+#[test]
+fn test_interval_rem_small_dividend() {
+    // [0, 2] % [10, 10] → M = 9, a non-neg → [0, min(2, 9)] = [0, 2]
+    assert_eq!(
+        interval_rem(&Interval::new(0, 2), &Interval::constant(10)),
+        Interval::new(0, 2)
+    );
+}
+
+#[test]
+fn test_interval_rem_empty_inputs() {
+    let bot = Interval::bottom_interval();
+    let a = Interval::new(1, 10);
+    assert!(interval_rem(&bot, &a).is_empty());
+    assert!(interval_rem(&a, &bot).is_empty());
+}
+
+#[test]
+fn test_interval_rem_zero_spanning_divisor() {
+    assert_eq!(
+        interval_rem(&Interval::new(1, 10), &Interval::new(-1, 1)),
+        Interval::top()
+    );
+}
+
+#[test]
+fn test_interval_rem_negative_divisor() {
+    // [0, 100] % [-3, -3] → |b.lo| = 3, |b.hi| = 3, M = 2
+    // a non-neg → [0, min(100, 2)] = [0, 2]
+    assert_eq!(
+        interval_rem(&Interval::new(0, 100), &Interval::constant(-3)),
+        Interval::new(0, 2)
+    );
+}
+
+#[test]
+fn test_interval_rem_operator_trait() {
+    let a = Interval::new(0, 100);
+    let b = Interval::constant(7);
+    assert_eq!(a.clone() % b.clone(), interval_rem(&a, &b));
+}
+
+// --- Bound::saturating_div tests ---
+
+#[test]
+fn test_bound_saturating_div_finite() {
+    assert_eq!(
+        Bound::Finite(12).saturating_div(Bound::Finite(3)),
+        Bound::Finite(4)
+    );
+    assert_eq!(
+        Bound::Finite(7).saturating_div(Bound::Finite(2)),
+        Bound::Finite(3)
+    );
+    assert_eq!(
+        Bound::Finite(-7).saturating_div(Bound::Finite(2)),
+        Bound::Finite(-3)
+    );
+    assert_eq!(
+        Bound::Finite(-7).saturating_div(Bound::Finite(-2)),
+        Bound::Finite(3)
+    );
+}
+
+#[test]
+fn test_bound_saturating_div_inf_by_finite() {
+    assert_eq!(
+        Bound::PosInf.saturating_div(Bound::Finite(3)),
+        Bound::PosInf
+    );
+    assert_eq!(
+        Bound::PosInf.saturating_div(Bound::Finite(-3)),
+        Bound::NegInf
+    );
+    assert_eq!(
+        Bound::NegInf.saturating_div(Bound::Finite(3)),
+        Bound::NegInf
+    );
+    assert_eq!(
+        Bound::NegInf.saturating_div(Bound::Finite(-3)),
+        Bound::PosInf
+    );
+}
+
+#[test]
+fn test_bound_saturating_div_finite_by_inf() {
+    assert_eq!(
+        Bound::Finite(42).saturating_div(Bound::PosInf),
+        Bound::Finite(0)
+    );
+    assert_eq!(
+        Bound::Finite(-42).saturating_div(Bound::NegInf),
+        Bound::Finite(0)
+    );
+}
+
+// --- Soundness: concrete values must be within computed interval ---
+
+#[test]
+fn test_interval_div_soundness() {
+    let test_cases: Vec<(Interval, Interval)> = vec![
+        (Interval::new(1, 10), Interval::new(2, 5)),
+        (Interval::new(-10, 10), Interval::new(1, 3)),
+        (Interval::new(-20, -5), Interval::new(2, 4)),
+        (Interval::new(0, 100), Interval::new(7, 13)),
+        (Interval::new(-50, 50), Interval::new(-10, -3)),
+    ];
+
+    for (a_iv, b_iv) in &test_cases {
+        let result = interval_div(a_iv, b_iv);
+        // Check that all concrete a/b values fall within the result
+        let a_lo = match a_iv.lo {
+            Bound::Finite(v) => v,
+            _ => continue,
+        };
+        let a_hi = match a_iv.hi {
+            Bound::Finite(v) => v,
+            _ => continue,
+        };
+        let b_lo = match b_iv.lo {
+            Bound::Finite(v) => v,
+            _ => continue,
+        };
+        let b_hi = match b_iv.hi {
+            Bound::Finite(v) => v,
+            _ => continue,
+        };
+
+        for a in a_lo..=a_hi {
+            for b in b_lo..=b_hi {
+                if b == 0 {
+                    continue;
+                }
+                let concrete = a / b;
+                let concrete_iv = Interval::constant(concrete);
+                assert!(
+                    concrete_iv.is_subseteq(&result),
+                    "{a} / {b} = {concrete} not in {result:?} (from {a_iv:?} / {b_iv:?})"
+                );
+            }
+        }
+    }
+}
+
+#[test]
+fn test_interval_rem_soundness() {
+    let test_cases: Vec<(Interval, Interval)> = vec![
+        (Interval::new(0, 20), Interval::new(3, 7)),
+        (Interval::new(-20, 0), Interval::new(3, 7)),
+        (Interval::new(-10, 10), Interval::new(1, 5)),
+        (Interval::new(0, 5), Interval::new(10, 20)),
+        (Interval::new(-30, 30), Interval::new(-7, -3)),
+    ];
+
+    for (a_iv, b_iv) in &test_cases {
+        let result = interval_rem(a_iv, b_iv);
+        let a_lo = match a_iv.lo {
+            Bound::Finite(v) => v,
+            _ => continue,
+        };
+        let a_hi = match a_iv.hi {
+            Bound::Finite(v) => v,
+            _ => continue,
+        };
+        let b_lo = match b_iv.lo {
+            Bound::Finite(v) => v,
+            _ => continue,
+        };
+        let b_hi = match b_iv.hi {
+            Bound::Finite(v) => v,
+            _ => continue,
+        };
+
+        for a in a_lo..=a_hi {
+            for b in b_lo..=b_hi {
+                if b == 0 {
+                    continue;
+                }
+                let concrete = a % b;
+                let concrete_iv = Interval::constant(concrete);
+                assert!(
+                    concrete_iv.is_subseteq(&result),
+                    "{a} % {b} = {concrete} not in {result:?} (from {a_iv:?} % {b_iv:?})"
+                );
+            }
+        }
+    }
 }
