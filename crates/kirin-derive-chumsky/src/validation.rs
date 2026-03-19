@@ -20,28 +20,11 @@ pub fn validate_format<'ir>(
     ValidationVisitor::new().validate(stmt, format, collected)
 }
 
-/// Whether the format string uses new-format (generic result names) or legacy mode.
-///
-/// Detection: if NO `ResultValue` field has a `:name` occurrence in the format string,
-/// the format is new-format. If any `ResultValue` field has a `:name` or default
-/// occurrence, it is legacy mode (result names are parsed by the dialect).
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FormatMode {
-    /// New format: result names are parsed generically at the statement level.
-    /// ResultValue fields may have `{field:type}` or no occurrence at all.
-    New,
-    /// Legacy format: result names are parsed by the dialect format string.
-    /// At least one ResultValue field has `{field}` or `{field:name}`.
-    Legacy,
-}
-
 /// Result of validation containing field occurrences.
 #[derive(Debug)]
 pub struct ValidationResult<'a> {
     /// Field occurrences in format string order
     pub occurrences: Vec<FieldOccurrence<'a>>,
-    /// Detected format mode (new vs legacy)
-    pub format_mode: FormatMode,
 }
 
 /// Represents an occurrence of a field in the format string.
@@ -96,38 +79,41 @@ impl<'ir> ValidationVisitor<'ir> {
     ) -> syn::Result<ValidationResult<'ir>> {
         crate::visitor::visit_format(&mut self, stmt, format, collected)?;
 
-        // Detect format mode: if no ResultValue field has a name occurrence, use new-format
-        let format_mode = self.detect_format_mode(collected);
+        // Reject legacy result name usage: ResultValue fields must NOT have :name occurrences
+        if !self.result_name_occurrences.is_empty() {
+            self.add_error(
+                "Result names are parsed generically. Remove `{result:name} =` from your \
+                 format string and use `$keyword` syntax. ResultValue fields should only \
+                 have `{field:type}` or no occurrence at all.",
+            );
+        }
 
         // Post-validation: check all required fields are present
         for field in collected {
             let is_result = field.category() == FieldCategory::Result;
-            let is_new_format_result = is_result && format_mode == FormatMode::New;
 
             if !self.referenced_fields.contains(&field.index) && !field.has_default() {
-                // In new-format mode, ResultValue fields are allowed to have no occurrence
+                // ResultValue fields are allowed to have no occurrence
                 // (names are parsed generically, types use auto-placeholder)
-                if !is_new_format_result {
+                if !is_result {
                     self.add_error(format!(
                         "field '{}' is not mentioned in the format string. \
                          All fields must appear in the format string unless they have a default value. \
-                         Use {{{}}} or {{{}:name}}/{{{}:type}} to include this field, \
+                         Use {{{}}} or {{{}:type}} to include this field, \
                          or add #[kirin(default)] or #[kirin(default = expr)] to provide a default value.",
-                        field, field, field, field
+                        field, field, field
                     ));
                 }
             }
 
-            // Validate SSA/Result fields have name occurrence
-            // In new-format mode, ResultValue fields don't need name occurrences
-            // (names are parsed generically at the statement level)
+            // Validate SSA fields have name occurrence (Result fields are handled generically)
             if field.category().is_ssa_like()
+                && !is_result
                 && self.referenced_fields.contains(&field.index)
                 && !self.name_occurrences.contains(&field.index)
-                && !is_new_format_result
             {
                 self.add_error(format!(
-                    "SSA/Result field '{}' must have {{{}}} or {{{}:name}} in the format string. \
+                    "SSA field '{}' must have {{{}}} or {{{}:name}} in the format string. \
                      Using only {{{}:type}} is not sufficient because the name cannot be inferred.",
                     field, field, field, field
                 ));
@@ -137,7 +123,6 @@ impl<'ir> ValidationVisitor<'ir> {
         if self.errors.is_empty() {
             Ok(ValidationResult {
                 occurrences: self.occurrences,
-                format_mode,
             })
         } else {
             // Combine all errors
@@ -166,26 +151,6 @@ impl<'ir> ValidationVisitor<'ir> {
             FormatOption::Default => field.ident.clone().unwrap_or_else(|| {
                 syn::Ident::new(&format!("{}", field), proc_macro2::Span::call_site())
             }),
-        }
-    }
-
-    /// Detects format mode based on whether any ResultValue field has a name occurrence.
-    fn detect_format_mode(&self, collected: &[FieldInfo<ChumskyLayout>]) -> FormatMode {
-        // Check if there are any ResultValue fields at all
-        let has_result_fields = collected
-            .iter()
-            .any(|f| f.category() == FieldCategory::Result);
-
-        if !has_result_fields {
-            // No ResultValue fields — mode doesn't matter, but default to New
-            return FormatMode::New;
-        }
-
-        // If any ResultValue field has a name occurrence (default or :name), it's legacy
-        if self.result_name_occurrences.is_empty() {
-            FormatMode::New
-        } else {
-            FormatMode::Legacy
         }
     }
 
@@ -353,21 +318,20 @@ mod tests {
     }
 
     #[test]
-    fn new_format_detected_when_result_has_only_type() {
+    fn result_with_only_type_is_valid() {
         // Format: "$h {qubit} -> {result:type}"
-        // ResultValue field "result" only has :type occurrence -> new-format
+        // ResultValue field "result" only has :type occurrence -> valid
         let fields = vec![make_argument(0, "qubit"), make_result(1, "result")];
         let stmt = make_stmt(fields.clone());
         let format = Format::parse("$h {qubit} -> {result:type}", None).unwrap();
 
         let result = validate_format(&stmt, &format, &fields).unwrap();
-        assert_eq!(result.format_mode, FormatMode::New);
+        assert_eq!(result.occurrences.len(), 2);
     }
 
     #[test]
-    fn legacy_format_detected_when_result_has_name() {
-        // Format: "{result:name} = {.add} {lhs}, {rhs} -> {result:type}"
-        // ResultValue field "result" has :name occurrence -> legacy
+    fn legacy_result_name_rejected() {
+        // Format uses {result:name} which is now rejected
         let fields = vec![
             make_argument(0, "lhs"),
             make_argument(1, "rhs"),
@@ -375,57 +339,64 @@ mod tests {
         ];
         let stmt = make_stmt(fields.clone());
         let format =
-            Format::parse("{result:name} = {.add} {lhs}, {rhs} -> {result:type}", None).unwrap();
+            Format::parse("$add {lhs}, {rhs} -> {result:name}", None).unwrap();
 
-        let result = validate_format(&stmt, &format, &fields).unwrap();
-        assert_eq!(result.format_mode, FormatMode::Legacy);
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains("Result names are parsed generically"),
+            "Error should reject legacy result:name: {}",
+            err
+        );
     }
 
     #[test]
-    fn legacy_format_detected_when_result_has_default() {
-        // Format: "{result} = {.add} {lhs}, {rhs}"
-        // ResultValue field "result" has default occurrence (which implies name) -> legacy
+    fn legacy_result_default_rejected() {
+        // Format uses {result} (default occurrence for ResultValue implies name) which is now rejected
         let fields = vec![
             make_argument(0, "lhs"),
             make_argument(1, "rhs"),
             make_result(2, "result"),
         ];
         let stmt = make_stmt(fields.clone());
-        let format = Format::parse("{result} = {.add} {lhs}, {rhs}", None).unwrap();
+        let format = Format::parse("$add {result}, {lhs}, {rhs}", None).unwrap();
 
-        let result = validate_format(&stmt, &format, &fields).unwrap();
-        assert_eq!(result.format_mode, FormatMode::Legacy);
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains("Result names are parsed generically"),
+            "Error should reject legacy result default: {}",
+            err
+        );
     }
 
     #[test]
-    fn new_format_no_result_fields() {
+    fn no_result_fields_is_valid() {
         // Format: "$ret {value}"
-        // No ResultValue fields -> defaults to New
+        // No ResultValue fields -> valid
         let fields = vec![make_argument(0, "value")];
         let stmt = make_stmt(fields.clone());
         let format = Format::parse("$ret {value}", None).unwrap();
 
         let result = validate_format(&stmt, &format, &fields).unwrap();
-        assert_eq!(result.format_mode, FormatMode::New);
+        assert_eq!(result.occurrences.len(), 1);
     }
 
     #[test]
-    fn new_format_result_not_in_format_is_valid() {
+    fn result_not_in_format_is_valid() {
         // Format: "$h {qubit}"
-        // ResultValue field "result" has no occurrence at all -> new-format, valid
+        // ResultValue field "result" has no occurrence at all -> valid
         // (auto-placeholder for type, names from generic parser)
         let fields = vec![make_argument(0, "qubit"), make_result(1, "result")];
         let stmt = make_stmt(fields.clone());
         let format = Format::parse("$h {qubit}", None).unwrap();
 
         let result = validate_format(&stmt, &format, &fields).unwrap();
-        assert_eq!(result.format_mode, FormatMode::New);
+        assert_eq!(result.occurrences.len(), 1);
     }
 
     #[test]
-    fn new_format_multi_result_type_only() {
+    fn multi_result_type_only_is_valid() {
         // Format: "$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}"
-        // Two ResultValue fields with only :type -> new-format
+        // Two ResultValue fields with only :type -> valid
         let fields = vec![
             make_argument(0, "ctrl"),
             make_argument(1, "tgt"),
@@ -437,6 +408,6 @@ mod tests {
             Format::parse("$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}", None).unwrap();
 
         let result = validate_format(&stmt, &format, &fields).unwrap();
-        assert_eq!(result.format_mode, FormatMode::New);
+        assert_eq!(result.occurrences.len(), 4);
     }
 }

@@ -3,11 +3,11 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::PrettyPrintLayout;
-use kirin_derive_toolkit::ir::fields::{FieldCategory, FieldInfo};
+use kirin_derive_toolkit::ir::fields::FieldInfo;
 use kirin_lexer::Token;
 
 use crate::field_kind;
-use crate::format::{Format, FormatElement, FormatOption};
+use crate::format::{Format, FormatElement};
 
 use crate::codegen::generate_enum_match;
 
@@ -69,81 +69,6 @@ fn tokens_to_string_with_spacing(
 }
 
 impl GeneratePrettyPrint {
-    /// Detect whether a statement uses new-format mode by checking if any
-    /// ResultValue field has a `:name` or default occurrence in the format string.
-    fn is_new_format(
-        ir_input: &kirin_derive_toolkit::ir::Input<PrettyPrintLayout>,
-        stmt: &kirin_derive_toolkit::ir::Statement<PrettyPrintLayout>,
-    ) -> bool {
-        let collected = stmt.collect_fields();
-        let has_result_fields = collected
-            .iter()
-            .any(|f| f.category() == FieldCategory::Result);
-
-        if !has_result_fields {
-            return true; // No results → new-format by default
-        }
-
-        let format_str = match crate::codegen::format_for_statement(ir_input, stmt) {
-            Some(s) => s,
-            None => return true,
-        };
-        let format = match Format::parse(&format_str, None) {
-            Ok(f) => f,
-            Err(_) => return true,
-        };
-
-        let name_to_index = stmt.field_name_to_index();
-        let result_indices: std::collections::HashSet<usize> = collected
-            .iter()
-            .filter(|f| f.category() == FieldCategory::Result)
-            .map(|f| f.index)
-            .collect();
-
-        // Check if any result field has a :name or default occurrence
-        for elem in format.elements() {
-            if let FormatElement::Field(name, opt) = elem {
-                let index = name
-                    .parse::<usize>()
-                    .ok()
-                    .or_else(|| name_to_index.get(*name).copied());
-                if let Some(idx) = index
-                    && result_indices.contains(&idx)
-                    && matches!(opt, FormatOption::Name | FormatOption::Default)
-                {
-                    return false; // Legacy mode
-                }
-            }
-        }
-
-        true // New-format mode
-    }
-
-    /// Check if all statements in this type use new-format mode.
-    fn all_new_format(
-        ir_input: &kirin_derive_toolkit::ir::Input<PrettyPrintLayout>,
-    ) -> bool {
-        match &ir_input.data {
-            kirin_derive_toolkit::ir::Data::Struct(s) => {
-                if s.0.wraps.is_some() {
-                    // Wrapper struct delegates to inner type
-                    false
-                } else {
-                    Self::is_new_format(ir_input, &s.0)
-                }
-            }
-            kirin_derive_toolkit::ir::Data::Enum(e) => {
-                use kirin_derive_toolkit::ir::VariantRef;
-                e.iter_variants().all(|variant| match variant {
-                    VariantRef::Wrapper { .. } => false, // Wrapper delegates
-                    VariantRef::Regular { stmt, .. } => {
-                        Self::is_new_format(ir_input, stmt)
-                    }
-                })
-            }
-        }
-    }
-
     pub(super) fn generate_pretty_print(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<PrettyPrintLayout>,
@@ -434,12 +359,8 @@ impl GeneratePrettyPrint {
 
     /// Generates the `prints_result_names` method override for the PrettyPrint impl.
     ///
-    /// For structs and enums with only regular (non-wrapper) variants:
-    /// - If all statements use new-format mode, returns `fn prints_result_names() -> false`
-    /// - Otherwise, omits the override (inherits `true` default)
-    ///
-    /// For enums with wrapper variants, generates per-variant dispatch that
-    /// delegates to the inner type's `prints_result_names`.
+    /// All dialects now use new-format mode where result names are printed by the
+    /// statement-level printer. For wrapper types, we delegate to the inner type.
     fn generate_prints_result_names(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<PrettyPrintLayout>,
@@ -456,10 +377,9 @@ impl GeneratePrettyPrint {
                             #prettyless_path::PrettyPrint::prints_result_names(&self.0)
                         }
                     }
-                } else if Self::is_new_format(ir_input, &s.0) {
-                    quote! { fn prints_result_names(&self) -> bool { false } }
                 } else {
-                    quote! {} // Inherit default (true)
+                    // All non-wrapper structs return false (new-format)
+                    quote! { fn prints_result_names(&self) -> bool { false } }
                 }
             }
             kirin_derive_toolkit::ir::Data::Enum(e) => {
@@ -467,11 +387,11 @@ impl GeneratePrettyPrint {
                     .iter_variants()
                     .any(|v| matches!(v, VariantRef::Wrapper { .. }));
 
-                if !has_wrappers && Self::all_new_format(ir_input) {
-                    // All regular variants, all new-format
+                if !has_wrappers {
+                    // All regular variants use new-format
                     quote! { fn prints_result_names(&self) -> bool { false } }
-                } else if has_wrappers {
-                    // Generate per-variant dispatch
+                } else {
+                    // Generate per-variant dispatch for wrapper variants
                     let dialect_name = &ir_input.name;
                     let arms: Vec<_> = e
                         .iter_variants()
@@ -483,18 +403,16 @@ impl GeneratePrettyPrint {
                                     }
                                 }
                             }
-                            VariantRef::Regular { name, stmt } => {
-                                let value = Self::is_new_format(ir_input, stmt);
-                                let value = !value; // New-format => false, legacy => true
+                            VariantRef::Regular { name, .. } => {
                                 quote! {
-                                    #dialect_name::#name { .. } => { #value }
+                                    #dialect_name::#name { .. } => { false }
                                 }
                             }
                         })
                         .collect();
 
                     let wildcard = if e.has_hidden_variants {
-                        quote! { _ => true }
+                        quote! { _ => false }
                     } else {
                         quote! {}
                     };
@@ -507,8 +425,6 @@ impl GeneratePrettyPrint {
                             }
                         }
                     }
-                } else {
-                    quote! {} // Inherit default (true) — some regular variants are legacy
                 }
             }
         }

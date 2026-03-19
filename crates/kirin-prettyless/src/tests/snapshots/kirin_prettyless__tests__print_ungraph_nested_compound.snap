@@ -3,10 +3,10 @@ source: crates/kirin-prettyless/src/tests/graph_snapshot.rs
 expression: buf
 ---
 ungraph ^ug1(%op0: any) capture(%phi: f64) {
-  %5 = compound(%op0) ungraph ^ug0(%ip0: any) {
-    edge %1 = wire;
+  %5 = %5 = compound(%op0) ungraph ^ug0(%ip0: any) {
+    edge %1 = %1 = wire;
     node_b(%ip0, %ip0, %1);
   };
-  edge %6 = wire;
+  edge %6 = %6 = wire;
   node_a(%phi, %6);
 }

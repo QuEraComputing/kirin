@@ -32,7 +32,7 @@ pub enum FormatElement<'src> {
     Token(Vec<Token<'src>>),
     /// A field interpolation like `{name}` or `{name:type}`.
     Field(&'src str, FormatOption),
-    /// A keyword interpolation like `{.add}` that gets namespace-prefixed.
+    /// A keyword interpolation like `$add` that gets namespace-prefixed.
     Keyword(&'src str),
 }
 
@@ -79,13 +79,6 @@ impl<'src> Format<'src> {
             .ignore_then(select! { Token::Identifier(name) => name })
             .map(FormatElement::Keyword);
 
-        // Parse keyword interpolations like {.add}
-        let keyword = just(Token::LBrace)
-            .ignore_then(just(Token::Dot))
-            .ignore_then(select! { Token::Identifier(name) => name })
-            .then_ignore(just(Token::RBrace))
-            .map(FormatElement::Keyword);
-
         // Parse field interpolations like {name} or {name:type}
         let interpolation = just(Token::LBrace)
             .ignore_then(
@@ -119,11 +112,10 @@ impl<'src> Format<'src> {
             .collect()
             .map(FormatElement::Token);
 
-        // Order matters: try escaped braces first, then dollar keyword, then brace keyword, then interpolation, then other
+        // Order matters: try escaped braces first, then dollar keyword, then interpolation, then other
         escaped_lbrace
             .or(escaped_rbrace)
             .or(dollar_keyword)
-            .or(keyword)
             .or(interpolation)
             .or(other)
             .repeated()
@@ -133,6 +125,23 @@ impl<'src> Format<'src> {
 
     /// Parses a format string.
     pub fn parse(input: &'src str, span: Option<Span>) -> syn::Result<Self> {
+        // Check for legacy {.keyword} syntax and produce a helpful error
+        if input.contains("{.") {
+            // Simple heuristic: look for {.identifier} pattern
+            let mut chars = input.chars().peekable();
+            while let Some(c) = chars.next() {
+                if c == '{' {
+                    if let Some(&'.') = chars.peek() {
+                        return Err(syn::Error::new(
+                            span.unwrap_or_else(Span::call_site),
+                            "Legacy `{.keyword}` syntax is no longer supported. \
+                             Use `$keyword` instead of `{.keyword}` in format strings.",
+                        ));
+                    }
+                }
+            }
+        }
+
         let token_iter = Token::lexer(input).spanned().map(|(tok, span)| match tok {
             Ok(tok) => (tok, span.into()),
             Err(()) => (Token::Error, span.into()),
@@ -189,19 +198,25 @@ mod tests {
     }
 
     #[test]
-    fn test_format_parser_keyword() {
+    fn test_legacy_brace_keyword_rejected() {
         let input = "{result:name} = {.add} {lhs}, {rhs} -> {result:type}";
-        let format = Format::parse(input, None).expect("Failed to parse format");
-
-        insta::assert_debug_snapshot!(format);
+        let err = Format::parse(input, None).unwrap_err();
+        assert!(
+            err.to_string().contains("$keyword"),
+            "Error should suggest $keyword syntax: {}",
+            err
+        );
     }
 
     #[test]
-    fn test_format_parser_keyword_only() {
+    fn test_legacy_brace_keyword_only_rejected() {
         let input = "{.ret} {0}";
-        let format = Format::parse(input, None).expect("Failed to parse format");
-
-        insta::assert_debug_snapshot!(format);
+        let err = Format::parse(input, None).unwrap_err();
+        assert!(
+            err.to_string().contains("$keyword"),
+            "Error should suggest $keyword syntax: {}",
+            err
+        );
     }
 
     #[test]

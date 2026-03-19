@@ -3,7 +3,7 @@ source: crates/kirin-prettyless/src/tests/graph_snapshot.rs
 expression: buf
 ---
 ungraph ^my_ug(%p0: any) {
-  edge %1 = wire;
+  edge %1 = %1 = wire;
   node_a(%p0, %1);
   node_a(%p0, %1);
 }

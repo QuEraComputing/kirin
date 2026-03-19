@@ -5,7 +5,7 @@ use kirin_derive_toolkit::ir::fields::FieldCategory;
 
 use crate::ChumskyLayout;
 use crate::format::Format;
-use crate::validation::{FormatMode, validate_format};
+use crate::validation::validate_format;
 
 use crate::codegen::{GeneratorConfig, format_for_statement};
 
@@ -129,7 +129,6 @@ impl GenerateHasDialectParser {
 
         let validation_result = validate_format(stmt, &format, &collected)?;
         let occurrences = validation_result.occurrences;
-        let format_mode = validation_result.format_mode;
 
         let ir_type = &ir_input.attrs.ir_type;
 
@@ -159,14 +158,14 @@ impl GenerateHasDialectParser {
         let return_type =
             self.build_ast_type_reference(ir_input, ast_name, &type_output, &language_output);
 
-        // Count result fields for new-format mode
+        // Count result fields
         let result_field_count = collected
             .iter()
             .filter(|f| f.category() == FieldCategory::Result)
             .count();
 
-        if format_mode == FormatMode::New && result_field_count > 0 {
-            // New-format mode: parse result names generically, then the format body
+        if result_field_count > 0 {
+            // Parse result names generically, then the format body
             let constructor = self.ast_constructor_new_format(
                 ast_name,
                 variant,
@@ -183,7 +182,7 @@ impl GenerateHasDialectParser {
                     .map(|(__result_names, #pattern)| -> #return_type { #constructor })
             }})
         } else {
-            // Legacy mode or zero-result: original behavior
+            // No result fields: original behavior
             let constructor = self.ast_constructor(
                 ast_name,
                 variant,

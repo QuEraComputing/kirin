@@ -16,16 +16,13 @@ impl PrettyPrint for SimpleLanguage {
         L::Type: std::fmt::Display,
     {
         match self {
-            SimpleLanguage::Add(lhs, rhs, res) => {
-                res.pretty_print(doc)
-                    + doc.text(" = add ")
+            SimpleLanguage::Add(lhs, rhs, _res) => {
+                doc.text("add ")
                     + lhs.pretty_print(doc)
                     + doc.text(", ")
                     + rhs.pretty_print(doc)
             }
-            SimpleLanguage::Constant(value, res) => {
-                res.pretty_print(doc) + doc.text(format!(" = constant {}", value))
-            }
+            SimpleLanguage::Constant(value, _res) => doc.text(format!("constant {}", value)),
             SimpleLanguage::Return(retval) => doc.text("return ") + retval.pretty_print(doc),
             SimpleLanguage::Function(region, _) => doc.print_region(region),
         }

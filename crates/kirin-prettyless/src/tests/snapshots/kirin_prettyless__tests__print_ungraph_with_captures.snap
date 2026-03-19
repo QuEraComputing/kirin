@@ -3,8 +3,8 @@ source: crates/kirin-prettyless/src/tests/graph_snapshot.rs
 expression: buf
 ---
 ungraph ^ug0(%p0: any) capture(%theta: f64) {
-  edge %2 = wire;
-  edge %3 = wire;
+  edge %2 = %2 = wire;
+  edge %3 = %3 = wire;
   node_a(%p0, %2, %3);
   node_b(%theta, %p0, %2);
 }

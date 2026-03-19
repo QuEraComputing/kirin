@@ -1,0 +1,10 @@
+{"run_id":"9d06ccea-d9d2-46a2-95d1-2ccf754db3d5","line":33,"new":{"module_name":"kirin_prettyless__tests","snapshot_name":"add_pretty_print","metadata":{"source":"crates/kirin-prettyless/src/tests/pretty_print.rs","assertion_line":33,"expression":"buf"},"snapshot":"%2 = %2 = add %0, %1"},"old":{"module_name":"kirin_prettyless__tests","metadata":{},"snapshot":"%2 = add %0, %1"}}
+{"run_id":"9d06ccea-d9d2-46a2-95d1-2ccf754db3d5","line":14,"new":{"module_name":"kirin_prettyless__tests","snapshot_name":"constant_pretty_print","metadata":{"source":"crates/kirin-prettyless/src/tests/pretty_print.rs","assertion_line":14,"expression":"buf"},"snapshot":"%0 = %0 = constant 42"},"old":{"module_name":"kirin_prettyless__tests","metadata":{},"snapshot":"%0 = constant 42"}}
+{"run_id":"96e0d0e4-a1b9-4ed5-ad94-901e1e251b84","line":33,"new":null,"old":null}
+{"run_id":"96e0d0e4-a1b9-4ed5-ad94-901e1e251b84","line":14,"new":null,"old":null}
+{"run_id":"c17354bc-13c2-4b7d-8cc9-c7a52e077aaa","line":14,"new":null,"old":null}
+{"run_id":"c17354bc-13c2-4b7d-8cc9-c7a52e077aaa","line":33,"new":null,"old":null}
+{"run_id":"76e22ddd-599a-4308-a545-643ff2de0513","line":33,"new":null,"old":null}
+{"run_id":"76e22ddd-599a-4308-a545-643ff2de0513","line":14,"new":null,"old":null}
+{"run_id":"c4d503e2-098a-4f32-bcc1-cd2cf3950cf5","line":33,"new":null,"old":null}
+{"run_id":"c4d503e2-098a-4f32-bcc1-cd2cf3950cf5","line":14,"new":null,"old":null}

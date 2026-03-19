@@ -87,14 +87,11 @@ pub trait PrettyPrint {
 
     /// Whether this type's `pretty_print` output includes result names (`%name =`).
     ///
-    /// Returns `true` for legacy-format dialects where `{result:name} =` is
-    /// part of the format string. Returns `false` for new-format dialects where
-    /// result names are printed by the statement-level printer.
-    ///
-    /// The derive macro generates the correct value based on format mode.
-    /// The default is `true` for backward compatibility with legacy dialects.
+    /// Returns `false` because result names are always printed by the
+    /// statement-level printer. The dialect's `pretty_print` only handles
+    /// the dialect-specific body.
     fn prints_result_names(&self) -> bool {
-        true
+        false
     }
 }
 
