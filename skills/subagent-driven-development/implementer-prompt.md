@@ -97,10 +97,27 @@ Task tool (general-purpose):
 
     If you find issues during self-review, fix them now before reporting.
 
+    ## Deviation Reporting (CRITICAL)
+
+    If you deviate from the plan in ANY way, you MUST report it prominently:
+    - What the plan said to do
+    - What you did instead
+    - Why you deviated
+
+    Common deviations that MUST be reported:
+    - Using a different type/approach than specified (e.g., Region instead of DiGraph)
+    - Splitting an operation into multiple operations due to a limitation
+    - Skipping a feature because it didn't work as expected
+    - Changing the public API shape from what the plan described
+
+    Do NOT silently work around limitations. Flag them so the orchestrator can decide
+    whether to accept the workaround or fix the underlying issue.
+
     ## Report Format
 
     When done, report:
     - **Status:** DONE | DONE_WITH_CONCERNS | BLOCKED | NEEDS_CONTEXT
+    - **Deviations from plan:** (list each deviation and reason, or "None")
     - What you implemented (or what you attempted, if blocked)
     - What you tested and test results
     - Files changed

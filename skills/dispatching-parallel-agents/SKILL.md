@@ -57,9 +57,20 @@ Without worktree isolation, concurrent editing agents cause:
 | Code-editing (fixes, refactors, implementations) | **Yes — use `isolation: "worktree"`** |
 
 **After each worktree agent completes:**
-1. Merge the worktree branch back to the current branch
-2. Commit the changes immediately (keeps a clean record per agent's work)
-3. Then proceed to the next agent's merge
+1. Check if changes auto-merged to the main working directory (some worktrees auto-cleanup)
+2. If NOT auto-merged: check the worktree path returned in the result, copy changed files manually
+3. Verify the build: `cargo build --workspace`
+4. Commit the changes immediately (keeps a clean record per agent's work)
+5. Then proceed to the next agent's merge
+
+**Worktree merge fallback:** Worktree auto-cleanup behavior is inconsistent. Some agents' changes appear in the main working directory automatically; others leave changes only in the worktree directory. Always check both:
+```bash
+# Check if worktree branch has commits
+git log --oneline worktree-agent-XXXX ^HEAD
+
+# If empty, changes may be in working directory already
+# If not empty, merge or copy from worktree path
+```
 
 This ensures each agent's contribution is an atomic commit, making it easy to review, revert, or cherry-pick individual changes. Merge sequentially — resolve conflicts between branches as they arise.
 
