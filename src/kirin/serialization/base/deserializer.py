@@ -102,6 +102,7 @@ class Deserializer:
             out.py_func = None
             out.code = ir.Statement.__new__(ir.Statement)
             out.backedges = set()
+            out.run_passes = None
             self._ctx.Method_Runtime[mangled] = out
 
         out.sym_name = serUnit.data["sym_name"]
@@ -366,6 +367,10 @@ class Deserializer:
         name = serUnit.data["name"]
         if name in self._ctx.Dialect_Lookup:
             return self._ctx.Dialect_Lookup[name]
+        for dialect in self.dialect_group.data:
+            if dialect.name == name:
+                self._ctx.Dialect_Lookup[name] = dialect
+                return dialect
         result = ir.Dialect(name)
         self._ctx.Dialect_Lookup[name] = result
         return result
