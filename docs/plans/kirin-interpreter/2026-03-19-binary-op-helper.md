@@ -104,86 +104,75 @@ Checked ops don't fit the helper cleanly (different return type), so keep them m
 
 ## Proposed Design
 
-### Binary op helper
+### Extension trait on `Interpreter`
 
 ```rust
-// In kirin-interpreter/src/helpers.rs (or similar)
+// In kirin-interpreter/src/ext.rs
 
-use crate::{Continuation, ValueStore};
+use crate::{Continuation, Interpreter};
 use kirin_ir::{ResultValue, SSAValue};
 
-/// Execute a binary operation: read two SSA values, apply `op`, write the result.
+/// Convenience methods for common interpreter patterns.
 ///
-/// This is the most common pattern in arithmetic, bitwise, and comparison
-/// dialect interpreters.
-///
-/// # Example
-/// ```ignore
-/// Arith::Add { lhs, rhs, result, .. } => {
-///     binary_op(interp, *lhs, *rhs, *result, |a, b| a + b)
-/// }
-/// ```
-pub fn binary_op<I, F>(
-    interp: &mut I,
-    lhs: SSAValue,
-    rhs: SSAValue,
-    result: ResultValue,
-    op: F,
-) -> Result<Continuation<I::Value, I::Ext>, I::Error>
-where
-    I: ValueStore,
-    F: FnOnce(I::Value, I::Value) -> I::Value,
-{
-    let a = interp.read(lhs)?;
-    let b = interp.read(rhs)?;
-    interp.write(result, op(a, b))?;
-    Ok(Continuation::Continue)
+/// Blanket-implemented for all `I: Interpreter<'ir>`. Dialect authors
+/// get these methods for free — no extra import beyond the prelude.
+pub trait InterpreterExt<'ir>: Interpreter<'ir> {
+    /// Read two SSA values, apply `op`, write the result, continue.
+    fn binary_op<F>(
+        &mut self, lhs: SSAValue, rhs: SSAValue, result: ResultValue, op: F,
+    ) -> Result<Continuation<Self::Value, Self::Ext>, Self::Error>
+    where F: FnOnce(Self::Value, Self::Value) -> Self::Value;
+
+    /// Read one SSA value, apply `op`, write the result, continue.
+    fn unary_op<F>(
+        &mut self, operand: SSAValue, result: ResultValue, op: F,
+    ) -> Result<Continuation<Self::Value, Self::Ext>, Self::Error>
+    where F: FnOnce(Self::Value) -> Self::Value;
+
+    /// Read two SSA values, apply fallible `op`, write the result, continue.
+    fn try_binary_op<F>(
+        &mut self, lhs: SSAValue, rhs: SSAValue, result: ResultValue, op: F,
+    ) -> Result<Continuation<Self::Value, Self::Ext>, Self::Error>
+    where F: FnOnce(Self::Value, Self::Value) -> Result<Self::Value, Self::Error>;
+}
+
+impl<'ir, I: Interpreter<'ir>> InterpreterExt<'ir> for I {
+    fn binary_op<F>(
+        &mut self, lhs: SSAValue, rhs: SSAValue, result: ResultValue, op: F,
+    ) -> Result<Continuation<Self::Value, Self::Ext>, Self::Error>
+    where F: FnOnce(Self::Value, Self::Value) -> Self::Value,
+    {
+        let a = self.read(lhs)?;
+        let b = self.read(rhs)?;
+        self.write(result, op(a, b))?;
+        Ok(Continuation::Continue)
+    }
+
+    fn unary_op<F>(
+        &mut self, operand: SSAValue, result: ResultValue, op: F,
+    ) -> Result<Continuation<Self::Value, Self::Ext>, Self::Error>
+    where F: FnOnce(Self::Value) -> Self::Value,
+    {
+        let a = self.read(operand)?;
+        self.write(result, op(a))?;
+        Ok(Continuation::Continue)
+    }
+
+    fn try_binary_op<F>(
+        &mut self, lhs: SSAValue, rhs: SSAValue, result: ResultValue, op: F,
+    ) -> Result<Continuation<Self::Value, Self::Ext>, Self::Error>
+    where F: FnOnce(Self::Value, Self::Value) -> Result<Self::Value, Self::Error>,
+    {
+        let a = self.read(lhs)?;
+        let b = self.read(rhs)?;
+        let v = op(a, b)?;
+        self.write(result, v)?;
+        Ok(Continuation::Continue)
+    }
 }
 ```
 
-### Unary op helper
-
-```rust
-/// Execute a unary operation: read one SSA value, apply `op`, write the result.
-pub fn unary_op<I, F>(
-    interp: &mut I,
-    operand: SSAValue,
-    result: ResultValue,
-    op: F,
-) -> Result<Continuation<I::Value, I::Ext>, I::Error>
-where
-    I: ValueStore,
-    F: FnOnce(I::Value) -> I::Value,
-{
-    let a = interp.read(operand)?;
-    interp.write(result, op(a))?;
-    Ok(Continuation::Continue)
-}
-```
-
-### Fallible binary op helper (for checked operations)
-
-```rust
-/// Execute a fallible binary operation: read two values, apply `op` which
-/// may fail, write the result.
-pub fn try_binary_op<I, F>(
-    interp: &mut I,
-    lhs: SSAValue,
-    rhs: SSAValue,
-    result: ResultValue,
-    op: F,
-) -> Result<Continuation<I::Value, I::Ext>, I::Error>
-where
-    I: ValueStore,
-    F: FnOnce(I::Value, I::Value) -> Result<I::Value, I::Error>,
-{
-    let a = interp.read(lhs)?;
-    let b = interp.read(rhs)?;
-    let v = op(a, b)?;
-    interp.write(result, v)?;
-    Ok(Continuation::Continue)
-}
-```
+Re-export `InterpreterExt` from the prelude so dialect authors get it automatically.
 
 ### Usage after migration
 
@@ -230,9 +219,9 @@ Note: for cmp, the closure takes ownership but calls `&b`. This works because `c
 
 ## Implementation Steps
 
-1. **Create `kirin-interpreter/src/helpers.rs`** with `binary_op`, `unary_op`, and `try_binary_op` functions.
-2. **Add `pub mod helpers;`** to `kirin-interpreter/src/lib.rs`.
-3. **Re-export from prelude** (optional -- the helpers module path `kirin_interpreter::helpers::binary_op` is clear enough).
+1. **Create `kirin-interpreter/src/ext.rs`** with `InterpreterExt` trait + blanket impl.
+2. **Add `pub mod ext;`** to `kirin-interpreter/src/lib.rs`.
+3. **Re-export `InterpreterExt` from prelude** so dialect authors get it automatically.
 4. **Migrate `kirin-arith/src/interpret_impl.rs`**: replace 6 match arms.
 5. **Migrate `kirin-bitwise/src/interpret_impl.rs`**: replace 6 match arms.
 6. **Migrate `kirin-cmp/src/interpret_impl.rs`**: replace 6 match arms.
