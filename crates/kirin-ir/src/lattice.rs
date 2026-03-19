@@ -56,4 +56,4 @@ pub trait FiniteLattice: HasBottom + HasTop {}
 
 impl<T: HasBottom + HasTop> FiniteLattice for T {}
 
-pub trait TypeLattice: FiniteLattice + CompileTimeValue + Default {}
+pub trait TypeLattice: FiniteLattice + CompileTimeValue {}
