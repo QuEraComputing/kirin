@@ -188,4 +188,35 @@ mod tests {
         };
         insta::assert_snapshot!(generate_ssa_cfg_region_code(input));
     }
+
+    #[test]
+    fn test_ssa_cfg_region_enum_level_wraps_with_callable() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[wraps]
+            enum Lexical {
+                #[callable]
+                FunctionBody(FunctionBodyOp),
+                #[callable]
+                Lambda(LambdaOp),
+                Call(CallOp),
+                Return(ReturnOp),
+            }
+        };
+        insta::assert_snapshot!(generate_ssa_cfg_region_code(input));
+    }
+
+    #[test]
+    fn test_ssa_cfg_region_enum_level_wraps_all_callable() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[wraps]
+            #[callable]
+            enum AllCallable {
+                A(AOp),
+                B(BOp),
+            }
+        };
+        insta::assert_snapshot!(generate_ssa_cfg_region_code(input));
+    }
 }

@@ -1,0 +1,27 @@
+---
+source: crates/kirin-derive-interpreter/src/interpretable.rs
+assertion_line: 238
+expression: generate_interpretable_code(input)
+---
+#[automatically_derived]
+impl<'__ir, __InterpI> ::kirin_interpreter::Interpretable<'__ir, __InterpI> for Composed
+where
+    __InterpI: ::kirin_interpreter::Interpreter<'__ir>,
+    AOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    BOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+{
+    fn interpret<__InterpL>(
+        &self,
+        interpreter: &mut __InterpI,
+    ) -> Result<::kirin_interpreter::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error>
+    where
+        __InterpI::StageInfo: ::kirin::ir::HasStageInfo<__InterpL>,
+        __InterpI::Error: From<::kirin_interpreter::InterpreterError>,
+        __InterpL: ::kirin_interpreter::Interpretable<'__ir, __InterpI> + '__ir,
+    {
+        match self {
+            Self::A(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::B(field_0) => field_0.interpret::<__InterpL>(interpreter),
+        }
+    }
+}

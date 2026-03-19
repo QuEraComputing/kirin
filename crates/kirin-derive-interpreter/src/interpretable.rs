@@ -224,4 +224,32 @@ mod tests {
         };
         insta::assert_snapshot!(generate_interpretable_code(input));
     }
+
+    #[test]
+    fn test_interpretable_enum_level_wraps() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = SimpleType)]
+            #[wraps]
+            enum Composed {
+                A(AOp),
+                B(BOp),
+            }
+        };
+        insta::assert_snapshot!(generate_interpretable_code(input));
+    }
+
+    #[test]
+    fn test_interpretable_enum_level_wraps_with_generics() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(type = T)]
+            #[wraps]
+            enum Lexical<T: CompileTimeValue> {
+                FunctionBody(FunctionBody<T>),
+                Lambda(Lambda<T>),
+                Call(Call<T>),
+                Return(Return<T>),
+            }
+        };
+        insta::assert_snapshot!(generate_interpretable_code(input));
+    }
 }

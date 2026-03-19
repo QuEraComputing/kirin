@@ -1,0 +1,21 @@
+---
+source: crates/kirin-derive-interpreter/src/ssa_cfg_region/generate.rs
+assertion_line: 220
+expression: generate_ssa_cfg_region_code(input)
+---
+#[automatically_derived]
+impl ::kirin_interpreter::SSACFGRegion for AllCallable
+where
+    AOp: ::kirin_interpreter::SSACFGRegion,
+    BOp: ::kirin_interpreter::SSACFGRegion,
+{
+    fn entry_block<__L: ::kirin::ir::Dialect>(
+        &self,
+        stage: &::kirin::ir::StageInfo<__L>,
+    ) -> Result<::kirin::ir::Block, ::kirin_interpreter::InterpreterError> {
+        match self {
+            Self::A(field_0) => field_0.entry_block(stage),
+            Self::B(field_0) => field_0.entry_block(stage),
+        }
+    }
+}

@@ -1,0 +1,32 @@
+---
+source: crates/kirin-derive-interpreter/src/interpretable.rs
+assertion_line: 253
+expression: generate_interpretable_code(input)
+---
+#[automatically_derived]
+impl<'__ir, T: CompileTimeValue, __InterpI> ::kirin_interpreter::Interpretable<'__ir, __InterpI>
+    for Lexical<T>
+where
+    __InterpI: ::kirin_interpreter::Interpreter<'__ir>,
+    FunctionBody<T>: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    Lambda<T>: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    Call<T>: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+    Return<T>: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
+{
+    fn interpret<__InterpL>(
+        &self,
+        interpreter: &mut __InterpI,
+    ) -> Result<::kirin_interpreter::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error>
+    where
+        __InterpI::StageInfo: ::kirin::ir::HasStageInfo<__InterpL>,
+        __InterpI::Error: From<::kirin_interpreter::InterpreterError>,
+        __InterpL: ::kirin_interpreter::Interpretable<'__ir, __InterpI> + '__ir,
+    {
+        match self {
+            Self::FunctionBody(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::Lambda(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::Call(field_0) => field_0.interpret::<__InterpL>(interpreter),
+            Self::Return(field_0) => field_0.interpret::<__InterpL>(interpreter),
+        }
+    }
+}
