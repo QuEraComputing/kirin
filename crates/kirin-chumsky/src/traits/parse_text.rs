@@ -25,7 +25,7 @@ use super::parse_emit::{ChumskyError, ParseEmit};
 ///
 /// // Pipeline — dialect specified via turbofish, stage ID required:
 /// let mut pipeline: Pipeline<StageInfo<MyLang>> = Pipeline::new();
-/// let id = pipeline.add_stage().stage(StageInfo::default()).new();
+/// let id = pipeline.add_stage(StageInfo::default(), None::<&str>);
 /// let stmt = pipeline.parse_statement::<MyLang>(id, "%res = add %a, %b")?;
 /// ```
 pub trait ParseStatementText<L: Dialect, Ctx = ()> {

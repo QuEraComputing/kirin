@@ -433,16 +433,8 @@ impl StageActionMut<AOnlyStage, LangA> for SetPolicyAOnly {
 #[test]
 fn dispatch_stage_runs_matching_language_action() {
     let mut pipeline: Pipeline<TestStage> = Pipeline::new();
-    let a = pipeline
-        .add_stage()
-        .stage(TestStage::A(StageInfo::default()))
-        .name("a")
-        .new();
-    let b = pipeline
-        .add_stage()
-        .stage(TestStage::B(StageInfo::default()))
-        .name("b")
-        .new();
+    let a = pipeline.add_stage(TestStage::A(StageInfo::default()), Some("a"));
+    let b = pipeline.add_stage(TestStage::B(StageInfo::default()), Some("b"));
 
     let mut action = IdentifyStage;
     assert_eq!(pipeline.dispatch_stage(a, &mut action).unwrap(), Some("A"));
@@ -455,16 +447,8 @@ fn dispatch_stage_runs_matching_language_action() {
 #[test]
 fn dispatch_stage_mut_runs_matching_language_action() {
     let mut pipeline: Pipeline<TestStage> = Pipeline::new();
-    let a = pipeline
-        .add_stage()
-        .stage(TestStage::A(StageInfo::default()))
-        .name("a")
-        .new();
-    let b = pipeline
-        .add_stage()
-        .stage(TestStage::B(StageInfo::default()))
-        .name("b")
-        .new();
+    let a = pipeline.add_stage(TestStage::A(StageInfo::default()), Some("a"));
+    let b = pipeline.add_stage(TestStage::B(StageInfo::default()), Some("b"));
 
     let mut action = SetPolicy;
     assert_eq!(
@@ -498,16 +482,8 @@ fn dispatch_stage_mut_runs_matching_language_action() {
 #[test]
 fn dispatch_stage_or_else_reports_miss_kind() {
     let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
-    let a = pipeline
-        .add_stage()
-        .stage(AOnlyStage::A(StageInfo::default()))
-        .name("a")
-        .new();
-    let b = pipeline
-        .add_stage()
-        .stage(AOnlyStage::B(StageInfo::default()))
-        .name("b")
-        .new();
+    let a = pipeline.add_stage(AOnlyStage::A(StageInfo::default()), Some("a"));
+    let b = pipeline.add_stage(AOnlyStage::B(StageInfo::default()), Some("b"));
 
     let mut action = IdentifyAOnly;
     assert_eq!(
@@ -529,16 +505,8 @@ fn dispatch_stage_or_else_reports_miss_kind() {
 #[test]
 fn dispatch_stage_mut_or_else_reports_miss_kind() {
     let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
-    let a = pipeline
-        .add_stage()
-        .stage(AOnlyStage::A(StageInfo::default()))
-        .name("a")
-        .new();
-    let b = pipeline
-        .add_stage()
-        .stage(AOnlyStage::B(StageInfo::default()))
-        .name("b")
-        .new();
+    let a = pipeline.add_stage(AOnlyStage::A(StageInfo::default()), Some("a"));
+    let b = pipeline.add_stage(AOnlyStage::B(StageInfo::default()), Some("b"));
 
     let mut action = SetPolicyAOnly;
     assert_eq!(
@@ -560,16 +528,8 @@ fn dispatch_stage_mut_or_else_reports_miss_kind() {
 #[test]
 fn dispatch_stage_required_reports_miss_kind() {
     let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
-    let a = pipeline
-        .add_stage()
-        .stage(AOnlyStage::A(StageInfo::default()))
-        .name("a")
-        .new();
-    let b = pipeline
-        .add_stage()
-        .stage(AOnlyStage::B(StageInfo::default()))
-        .name("b")
-        .new();
+    let a = pipeline.add_stage(AOnlyStage::A(StageInfo::default()), Some("a"));
+    let b = pipeline.add_stage(AOnlyStage::B(StageInfo::default()), Some("b"));
 
     let mut action = IdentifyAOnly;
     assert_eq!(pipeline.dispatch_stage_required(a, &mut action), Ok("A"));
@@ -592,16 +552,8 @@ fn dispatch_stage_required_reports_miss_kind() {
 #[test]
 fn dispatch_stage_mut_required_reports_miss_kind() {
     let mut pipeline: Pipeline<AOnlyStage> = Pipeline::new();
-    let a = pipeline
-        .add_stage()
-        .stage(AOnlyStage::A(StageInfo::default()))
-        .name("a")
-        .new();
-    let b = pipeline
-        .add_stage()
-        .stage(AOnlyStage::B(StageInfo::default()))
-        .name("b")
-        .new();
+    let a = pipeline.add_stage(AOnlyStage::A(StageInfo::default()), Some("a"));
+    let b = pipeline.add_stage(AOnlyStage::B(StageInfo::default()), Some("b"));
 
     let mut action = SetPolicyAOnly;
     assert_eq!(

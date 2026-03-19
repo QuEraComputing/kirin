@@ -128,16 +128,16 @@ mod tests {
         kirin_ir::ResultValue,
     ) {
         let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-        let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+        let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
         let (spec, block, c0_result) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-            let sf = b.staged_function().new().unwrap();
+            let sf = b.staged_function(None, None, None, None).unwrap();
             let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
             let c0_result = c0.result;
             let ret = Return::<ArithType>::new(b, c0_result);
             let block = b.block().stmt(c0).terminator(ret).new();
             let region = b.region().add_block(block).new();
             let body = FunctionBody::<ArithType>::new(b, region);
-            let spec = b.specialize().staged_func(sf).body(body).new().unwrap();
+            let spec = b.specialize(sf, None, body, None).unwrap();
             (spec, block, c0_result)
         });
         (pipeline, stage_id, spec, block, c0_result)

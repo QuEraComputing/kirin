@@ -43,15 +43,15 @@ use super::arenas::Arenas;
 /// let stage: &mut StageInfo<MyDialect> = pipeline.stage_mut(stage_id).unwrap();
 /// stage.with_builder(|b| {
 ///     // b is &mut BuilderStageInfo<MyDialect>
-///     let sf = b.staged_function().name(func_name).new().unwrap();
+///     let sf = b.staged_function(Some(func_name), None, None, None).unwrap();
 ///
 ///     let arg = b.block_argument().index(0);
-///     let ret = b.statement().definition(MyDialect::Return(arg)).new();
+///     let ret = b.statement(MyDialect::Return(arg));
 ///     let block = b.block().argument(MyType::I64).terminator(ret).new();
 ///     let region = b.region().add_block(block).new();
-///     let body = b.statement().definition(MyDialect::FuncBody(region)).new();
+///     let body = b.statement(MyDialect::FuncBody(region));
 ///
-///     b.specialize().staged_func(sf).body(body).new().unwrap();
+///     b.specialize(sf, None, body, None).unwrap();
 /// });
 /// // stage is back to StageInfo with the new function added
 /// ```

@@ -81,10 +81,10 @@ impl std::error::Error for FinalizeError {}
 /// let mut stage = BuilderStageInfo::<MyDialect>::default();
 ///
 /// // Create a statement (the dialect enum value is the "definition")
-/// let stmt = stage.statement().definition(MyDialect::Nop).new();
+/// let stmt = stage.statement(MyDialect::Nop);
 ///
 /// // Create a typed SSA value
-/// let ssa = stage.ssa().name("x").ty(MyType::I32).kind(BuilderSSAKind::Result(stmt, 0)).new();
+/// let ssa = stage.ssa(Some("x"), MyType::I32, BuilderSSAKind::Result(stmt, 0));
 /// ```
 ///
 /// Blocks with arguments and placeholder substitution:
@@ -93,8 +93,8 @@ impl std::error::Error for FinalizeError {}
 /// let arg0 = stage.block_argument().index(0);
 /// let arg1 = stage.block_argument().index(1);
 ///
-/// let add = stage.statement().definition(MyDialect::Add(arg0, arg1)).new();
-/// let ret = stage.statement().definition(MyDialect::Return).new();
+/// let add = stage.statement(MyDialect::Add(arg0, arg1));
+/// let ret = stage.statement(MyDialect::Return);
 ///
 /// let block = stage
 ///     .block()

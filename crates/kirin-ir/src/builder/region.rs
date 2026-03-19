@@ -31,11 +31,7 @@ impl<'a, L: Dialect> RegionBuilder<'a, L> {
     #[allow(clippy::wrong_self_convention, clippy::new_ret_no_self)]
     pub fn new(self) -> Region {
         let id = self.stage.regions.next_id();
-        let info = RegionInfo::builder()
-            .id(id)
-            .blocks(self.stage.link_blocks(&self.blocks))
-            .maybe_parent(self.parent)
-            .new();
+        let info = RegionInfo::new(id, self.parent, self.stage.link_blocks(&self.blocks));
         self.stage.regions.alloc(info);
         id
     }
