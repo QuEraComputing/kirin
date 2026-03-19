@@ -91,19 +91,19 @@ path = "example/simple.rs"
 [dependencies]
 kirin-chumsky = { path = "crates/kirin-chumsky", version = "0.1.0", features = [
   "derive"
-] }
+], optional = true }
 kirin-interpreter = { path = "crates/kirin-interpreter", version = "0.1.0", features = [
   "derive"
 ], optional = true }
 kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }
 kirin-prettyless = { path = "crates/kirin-prettyless", version = "0.1.0", features = [
   "derive"
-] }
+], optional = true }
 serde = { version = "1.0.228", optional = true }
 
 # Re-export dependencies needed by derive macros
-chumsky = "0.10"
-kirin-lexer = { path = "crates/kirin-lexer", version = "0.1.0" }
+chumsky = { version = "0.10", optional = true }
+kirin-lexer = { path = "crates/kirin-lexer", version = "0.1.0", optional = true }
 
 [dev-dependencies]
 kirin-arith = { workspace = true }
@@ -126,6 +126,8 @@ kirin-test-utils = { workspace = true, features = ["roundtrip"] }
 trybuild = { workspace = true }
 
 [features]
-default = ["interpreter"]
-interpreter = ["dep:kirin-interpreter"]
+default = ["parser", "pretty", "interpret"]
+parser = ["dep:kirin-chumsky", "dep:kirin-lexer", "dep:chumsky"]
+pretty = ["dep:kirin-prettyless"]
+interpret = ["dep:kirin-interpreter"]
 serde = ["dep:serde"]

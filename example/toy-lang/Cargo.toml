@@ -8,14 +8,14 @@ name = "toy-lang"
 path = "src/main.rs"
 
 [dependencies]
-kirin = { workspace = true, features = ["interpreter"] }
-kirin-arith = { workspace = true, features = ["interpret"] }
-kirin-bitwise = { workspace = true, features = ["interpret"] }
-kirin-cf = { workspace = true, features = ["interpret"] }
-kirin-cmp = { workspace = true, features = ["interpret"] }
-kirin-constant = { workspace = true, features = ["interpret"] }
-kirin-function = { workspace = true, features = ["interpret"] }
-kirin-scf = { workspace = true, features = ["interpret"] }
+kirin = { workspace = true, features = ["interpret"] }
+kirin-arith = { workspace = true }
+kirin-bitwise = { workspace = true }
+kirin-cf = { workspace = true }
+kirin-cmp = { workspace = true }
+kirin-constant = { workspace = true }
+kirin-function = { workspace = true }
+kirin-scf = { workspace = true }
 kirin-interpreter = { workspace = true }
 kirin-derive-interpreter = { workspace = true }
 kirin-chumsky = { workspace = true }

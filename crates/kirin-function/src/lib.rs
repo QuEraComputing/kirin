@@ -28,7 +28,6 @@ pub use call::Call;
 pub use lambda::Lambda;
 pub use ret::Return;
 
-#[cfg(feature = "interpret")]
 mod interpret_impl;
 
 #[cfg(test)]

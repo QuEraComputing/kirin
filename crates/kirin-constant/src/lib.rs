@@ -1,4 +1,3 @@
-#[cfg(feature = "interpret")]
 mod interpret_impl;
 
 use kirin::prelude::*;

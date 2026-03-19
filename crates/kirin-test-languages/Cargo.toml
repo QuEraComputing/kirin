@@ -9,11 +9,11 @@ kirin-test-types = { workspace = true, features = ["parser", "pretty"] }
 kirin-chumsky = { workspace = true, optional = true }
 kirin-lexer = { workspace = true, optional = true }
 kirin-prettyless = { workspace = true, optional = true }
-kirin-arith = { workspace = true, optional = true, features = ["interpret"] }
+kirin-arith = { workspace = true, optional = true }
 kirin-bitwise = { workspace = true, optional = true }
-kirin-cf = { workspace = true, optional = true, features = ["interpret"] }
-kirin-constant = { workspace = true, optional = true, features = ["interpret"] }
-kirin-function = { workspace = true, optional = true, features = ["interpret"] }
+kirin-cf = { workspace = true, optional = true }
+kirin-constant = { workspace = true, optional = true }
+kirin-function = { workspace = true, optional = true }
 kirin-derive-ir = { workspace = true, optional = true }
 kirin-derive-interpreter = { workspace = true, optional = true }
 kirin-derive-chumsky = { workspace = true, optional = true }

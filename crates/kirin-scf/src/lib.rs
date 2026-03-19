@@ -25,9 +25,7 @@
 //! - `For` ↔ `scf.for`
 //! - `Yield` ↔ `scf.yield`
 
-#[cfg(feature = "interpret")]
 mod interpret_impl;
-#[cfg(feature = "interpret")]
 pub use interpret_impl::ForLoopValue;
 
 use kirin::prelude::*;

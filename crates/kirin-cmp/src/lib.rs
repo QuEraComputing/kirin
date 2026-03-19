@@ -1,6 +1,4 @@
-#[cfg(feature = "interpret")]
 mod interpret_impl;
-#[cfg(feature = "interpret")]
 pub use interpret_impl::CompareValue;
 
 use kirin::prelude::*;

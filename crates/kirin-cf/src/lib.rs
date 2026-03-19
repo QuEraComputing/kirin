@@ -47,7 +47,6 @@ pub enum ControlFlow<T: CompileTimeValue> {
     __Phantom(std::marker::PhantomData<T>),
 }
 
-#[cfg(feature = "interpret")]
 mod interpret_impl;
 
 #[cfg(test)]

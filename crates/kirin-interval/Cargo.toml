@@ -7,7 +7,7 @@ edition = "2024"
 kirin-ir = { version = "0.1.0", path = "../kirin-ir", default-features = false }
 kirin-interpreter = { workspace = true, optional = true }
 kirin-arith = { workspace = true, optional = true }
-kirin-cmp = { workspace = true, optional = true, features = ["interpret"] }
+kirin-cmp = { workspace = true, optional = true }
 
 [dev-dependencies]
 kirin-test-utils = { path = "../kirin-test-utils" }

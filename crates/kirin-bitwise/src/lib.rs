@@ -41,7 +41,6 @@
 //! - Verifier passes are expected to enforce type compatibility, including the
 //!   RFC rule that shift count type must match the shifted value type.
 
-#[cfg(feature = "interpret")]
 mod interpret_impl;
 
 use kirin::prelude::*;

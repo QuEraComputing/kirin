@@ -43,7 +43,6 @@
 //! defining your own type/value pair and instantiate `Arith<YourType>`.
 
 mod checked_ops;
-#[cfg(feature = "interpret")]
 mod interpret_impl;
 
 mod types;
