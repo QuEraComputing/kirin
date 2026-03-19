@@ -134,7 +134,11 @@ pub fn lex<'src>(input: &'src str) -> impl Iterator<Item = Result<Token<'src>, S
         .spanned()
         .map(|(token, span)| match token {
             Ok(Token::Error) | Err(_) => {
-                Err(format!("Unexpected token at position {}", span.start))
+                let text = &input[span.start..span.end.min(input.len())];
+                Err(format!(
+                    "Unexpected token '{}' at position {}",
+                    text, span.start
+                ))
             }
             Ok(t) => Ok(t),
         })
