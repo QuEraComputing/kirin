@@ -1,4 +1,4 @@
-# RFC 0002: Multi-Result Statements with Generic Result Names
+# RFC 0002: Statement Format Redesign — Generic Result Names and `$keyword` Syntax
 
 - **Status**: Draft
 - **Authors**: roger, claude
@@ -7,7 +7,13 @@
 
 ## Summary
 
-Separate **result name parsing** from the dialect format string while keeping **result type parsing** dialect-controlled. Following MLIR's design, the result name list (`%a, %b =`) is handled generically by the statement parser. Result types remain in the format DSL because their position is dialect-specific (after `->`, or embedded mid-syntax like `cast %x to f64`). This enables multi-result operations naturally while preserving dialect control over type syntax.
+Three changes to the `#[chumsky(format = "...")]` DSL:
+
+1. **Result names are generic**: `%a, %b =` parsed by the statement parser, not the format string. `{field:name}` for `ResultValue` fields is removed.
+2. **Result types stay dialect-controlled**: `{field:type}` for `ResultValue` fields remains — dialects control where types appear.
+3. **Keyword syntax changes from `{.name}` to `$name`**: The operation symbol uses `$` prefix instead of `{.}` interpolation. `$name` accepts a valid identifier only — namespacing is added by wrapping dialects, not the format string.
+
+Together these simplify the format DSL and enable multi-result operations naturally.
 
 ## Motivation
 
@@ -65,18 +71,29 @@ MLIR separates result names from result types ([LangRef](https://mlir.llvm.org/d
 | Result **types** (`-> T` or `to T` etc.) | Dialect format string | **Yes** — `{field:type}` stays |
 | Operand names/types | Dialect format string | Yes — no change |
 
-### Format DSL changes
+### Keyword syntax: `{.name}` → `$name`
 
-Result `:name` references are removed. Result `:type` references stay:
+The operation keyword changes from `{.name}` (looks like field access) to `$name` (reads as "dialect symbol"):
+
+| Old | New | Meaning |
+|-----|-----|---------|
+| `{.h}` | `$h` | Simple keyword |
+| `{.z_spider}` | `$z_spider` | Underscore keyword |
+
+`$name` accepts a valid Rust identifier only. It is always the first token in the format string. Namespace prefixes (e.g., `circuit.h`) are added automatically by wrapping dialect enums — individual operations never specify their namespace path in the format string.
+
+### Format DSL changes (complete picture)
+
+Two changes: result `:name` removed, keyword syntax changed.
 
 ```rust
 // Current (single result):
 #[chumsky(format = "{result:name} = {.h} {qubit} -> {result:type}")]
 // New:
-#[chumsky(format = "{.h} {qubit} -> {result:type}")]
+#[chumsky(format = "$h {qubit} -> {result:type}")]
 
 // Multi-result (impossible today, natural after):
-#[chumsky(format = "{.cnot} {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}")]
+#[chumsky(format = "$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}")]
 pub struct CNOT {
     pub ctrl: SSAValue,
     pub tgt: SSAValue,
@@ -85,8 +102,8 @@ pub struct CNOT {
 }
 // Parses: %ctrl_out, %tgt_out = circuit.cnot %ctrl, %tgt -> Qubit, Qubit
 
-// Type embedded in operation syntax (cast):
-#[chumsky(format = "{.cast} {input} to {result:type}")]
+// Type embedded in operation syntax:
+#[chumsky(format = "$cast {input} to {result:type}")]
 pub struct Cast {
     pub input: SSAValue,
     pub result: ResultValue,
@@ -94,20 +111,24 @@ pub struct Cast {
 // Parses: %y = cast %x to f64
 
 // Type inferred (auto-placeholder, no type in text):
-#[chumsky(format = "{.z_spider}({angle}) {legs}")]
+#[chumsky(format = "$z_spider({angle}) {legs}")]
 pub struct ZSpider {
     pub angle: f64,
     pub legs: Vec<SSAValue>,
 }
-// Parses: z_spider(0.0) %a, %b   (no results, no types)
+// Parses: z_spider(0.0) %a, %b
 
 // Constant with value determining type:
-#[chumsky(format = "{.constant} {value} -> {result:type}")]
+#[chumsky(format = "$constant {value} -> {result:type}")]
 pub struct Constant {
     pub value: Value,
     pub result: ResultValue,
 }
 // Parses: %x = constant 42 -> i64
+
+// Type enum (unit variants, no operands):
+#[chumsky(format = "$Qubit")]
+// or just the keyword token
 ```
 
 ### Statement parser (generic layer)
@@ -158,14 +179,14 @@ Keep everything in the format string, teach codegen about LHS/RHS:
 #[chumsky(format = "{ctrl_out:name}, {tgt_out:name} = {.cnot} {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}")]
 ```
 
-**Rejected because:** Result names are always `%name` — putting them in the format string is pure boilerplate. The LHS/RHS distinction adds complexity to the format DSL for no benefit.
+**Rejected because:** Result names are always `%name` — putting them in the format string is pure boilerplate. The `{.keyword}` syntax looks like field access. Both issues addressed by the main design.
 
 ### Alternative B: Remove BOTH names and types from format string
 
 Fully generic statement structure — format string is only keyword + operands:
 
 ```rust
-#[chumsky(format = "{.h} {qubit}")]
+#[chumsky(format = "$h {qubit}")]
 // Statement parser handles: %result = ... -> Type
 ```
 
@@ -174,7 +195,7 @@ Fully generic statement structure — format string is only keyword + operands:
 ### Alternative C: `{results}` group directive
 
 ```rust
-#[chumsky(format = "{results:name} = {.cnot} {ctrl}, {tgt} -> {results:type}")]
+#[chumsky(format = "{results:name} = $cnot {ctrl}, {tgt} -> {results:type}")]
 ```
 
 **Rejected because:** `{results:name}` is boilerplate that every format must include. And it still couples names to the format DSL.
@@ -195,9 +216,10 @@ The split approach (main design) is best:
 | `kirin-chumsky` | **Primary** | EmitIR: ResultValue emit with index, pair generic names with dialect-parsed types |
 | `kirin-derive-chumsky` | **Primary** | Validation: detect new-format (no `{field:name}` for results) vs legacy |
 | `kirin-derive-chumsky` | **Primary** | Parser codegen: skip result `:name` in new-format; keep `:type` |
+| `kirin-derive-chumsky` | **Primary** | Format parser: recognize `$name` as keyword (replace `{.name}` handling) |
 | `kirin-prettyless` | **Secondary** | Statement-level result name printing (extract from dialect PrettyPrint) |
 | `kirin-derive-chumsky` | **Secondary** | PrettyPrint codegen: remove result name printing; keep type printing |
-| All dialect crates | **Migration** (Phase 2) | Remove `{result:name} =` from format strings; keep `{result:type}` |
+| All dialect crates | **Migration** (Phase 2) | Remove `{result:name} =` from format strings; keep `{result:type}`; change `{.name}` to `$name` |
 
 ## Migration path
 
@@ -211,7 +233,7 @@ The split approach (main design) is best:
 - Remove `{result:name} =` from all format strings
 - Keep `{result:type}` wherever types appear in the format
 - Each dialect format becomes shorter:
-  - `"{result:name} = {.h} {qubit} -> {result:type}"` → `"{.h} {qubit} -> {result:type}"`
+  - `"{result:name} = {.h} {qubit} -> {result:type}"` → `"$h {qubit} -> {result:type}"`
 - Can be done crate-by-crate
 
 ### Phase 3: Remove legacy format support
@@ -249,10 +271,12 @@ The split approach (main design) is best:
 7. **Snapshot + roundtrip tests** for 0-result, 1-result, 2-result, embedded-type cases
 8. **Migrate toy-qc** — unify CnotCtrl/CnotTgt into single CNOT with 2 results
 
-### Phase 2 (simplify existing dialects)
+### Phase 2 (migrate existing dialects)
 9. **Remove `{result:name} =` from all format strings** across all dialect crates
-10. **Verify roundtrip** — same IR produced with simpler format strings
+10. **Change `{.name}` to `$name`** in all format strings
+11. **Verify roundtrip** — same IR produced with new format strings
 
 ### Phase 3 (remove legacy)
-11. **Make `{field:name}` on ResultValue a compile error** in validation
-12. **Clean up codegen** — remove legacy single-result name handling
+12. **Make `{field:name}` on ResultValue a compile error** in validation
+13. **Make `{.name}` a compile error** in format parser — must use `$name`
+14. **Clean up codegen** — remove legacy handling
