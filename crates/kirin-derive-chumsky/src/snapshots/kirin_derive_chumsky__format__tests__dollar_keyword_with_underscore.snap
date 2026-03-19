@@ -1,0 +1,29 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+expression: format
+---
+Format {
+    elements: [
+        Keyword(
+            "z_spider",
+        ),
+        Token(
+            [
+                LParen,
+            ],
+        ),
+        Field(
+            "angle",
+            Default,
+        ),
+        Token(
+            [
+                RParen,
+            ],
+        ),
+        Field(
+            "legs",
+            Default,
+        ),
+    ],
+}

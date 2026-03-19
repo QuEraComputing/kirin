@@ -74,6 +74,11 @@ impl<'src> Format<'src> {
         let escaped_rbrace =
             just(Token::EscapedRBrace).to(FormatElement::Token(vec![Token::EscapedRBrace]));
 
+        // Parse dollar keyword like $add
+        let dollar_keyword = just(Token::Dollar)
+            .ignore_then(select! { Token::Identifier(name) => name })
+            .map(FormatElement::Keyword);
+
         // Parse keyword interpolations like {.add}
         let keyword = just(Token::LBrace)
             .ignore_then(just(Token::Dot))
@@ -114,9 +119,10 @@ impl<'src> Format<'src> {
             .collect()
             .map(FormatElement::Token);
 
-        // Order matters: try escaped braces first, then keyword, then interpolation, then other
+        // Order matters: try escaped braces first, then dollar keyword, then brace keyword, then interpolation, then other
         escaped_lbrace
             .or(escaped_rbrace)
+            .or(dollar_keyword)
             .or(keyword)
             .or(interpolation)
             .or(other)
@@ -193,6 +199,30 @@ mod tests {
     #[test]
     fn test_format_parser_keyword_only() {
         let input = "{.ret} {0}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_dollar_keyword() {
+        let input = "$h {qubit}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_dollar_keyword_with_underscore() {
+        let input = "$z_spider({angle}) {legs}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_dollar_keyword_cnot() {
+        let input = "$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);

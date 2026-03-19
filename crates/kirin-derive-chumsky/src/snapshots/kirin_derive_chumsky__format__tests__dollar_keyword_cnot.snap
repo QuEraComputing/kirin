@@ -1,24 +1,14 @@
 ---
 source: crates/kirin-derive-chumsky/src/format.rs
-assertion_line: 196
 expression: format
 ---
 Format {
     elements: [
-        Field(
-            "result",
-            Name,
-        ),
-        Token(
-            [
-                Equal,
-            ],
-        ),
         Keyword(
-            "add",
+            "cnot",
         ),
         Field(
-            "lhs",
+            "ctrl",
             Default,
         ),
         Token(
@@ -27,7 +17,7 @@ Format {
             ],
         ),
         Field(
-            "rhs",
+            "tgt",
             Default,
         ),
         Token(
@@ -36,7 +26,16 @@ Format {
             ],
         ),
         Field(
-            "result",
+            "ctrl_out",
+            Type,
+        ),
+        Token(
+            [
+                Comma,
+            ],
+        ),
+        Field(
+            "tgt_out",
             Type,
         ),
     ],

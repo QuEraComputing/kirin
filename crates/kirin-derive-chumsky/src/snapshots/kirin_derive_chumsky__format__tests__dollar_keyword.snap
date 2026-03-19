@@ -1,15 +1,14 @@
 ---
 source: crates/kirin-derive-chumsky/src/format.rs
-assertion_line: 204
 expression: format
 ---
 Format {
     elements: [
         Keyword(
-            "ret",
+            "h",
         ),
         Field(
-            "0",
+            "qubit",
             Default,
         ),
     ],
