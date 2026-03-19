@@ -170,7 +170,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             }
         }
         // Apply replacements and delete placeholder SSAs
-        for (&old, _) in &replacements {
+        for &old in replacements.keys() {
             self.stage.ssas.delete(old);
         }
         for &stmt_id in &self.nodes {

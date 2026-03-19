@@ -12,7 +12,7 @@ use crate::{BlockEvaluator, Interpreter, InterpreterError, StageAccess};
 pub trait CallSemantics<'ir, I: Interpreter<'ir>>: Dialect {
     type Result;
 
-    fn eval_call<L: Dialect>(
+    fn eval_call<L>(
         &self,
         interpreter: &mut I,
         stage: &'ir StageInfo<L>,
@@ -48,7 +48,7 @@ where
 {
     type Result = V;
 
-    fn eval_call<L: Dialect>(
+    fn eval_call<L>(
         &self,
         interp: &mut crate::StackInterpreter<'ir, V, S, E, G>,
         stage: &'ir StageInfo<L>,
@@ -86,7 +86,7 @@ where
 {
     type Result = crate::AnalysisResult<V>;
 
-    fn eval_call<L: Dialect>(
+    fn eval_call<L>(
         &self,
         interp: &mut crate::AbstractInterpreter<'ir, V, S, E, G>,
         stage: &'ir StageInfo<L>,

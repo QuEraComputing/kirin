@@ -1,4 +1,4 @@
-use kirin::prelude::{Dialect, HasStageInfo, SSAValue};
+use kirin::prelude::{HasStageInfo, SSAValue};
 use kirin_interpreter::{
     BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
 };
@@ -12,10 +12,7 @@ where
     I::Value: Clone + BranchCondition,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,

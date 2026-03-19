@@ -134,7 +134,7 @@ pub fn do_derive_eval_call(input: &syn::DeriveInput) -> darling::Result<TokenStr
                     }
                 },
             )),
-            generics: Some(quote! { <__CallSemL: #ir_crate_m::Dialect> }),
+            generics: Some(quote! { <__CallSemL> }),
             method_where_clause: Some(quote! {
                 where
                     __CallSemI::StageInfo: #ir_crate_m::HasStageInfo<__CallSemL>,

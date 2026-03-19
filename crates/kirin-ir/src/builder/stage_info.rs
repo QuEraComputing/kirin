@@ -153,7 +153,7 @@ impl<L: Dialect> From<StageInfo<L>> for BuilderStageInfo<L> {
     fn from(stage: StageInfo<L>) -> Self {
         Self {
             nodes: stage.nodes,
-            ssas: stage.ssas.map(|info| BuilderSSAInfo::from(info)),
+            ssas: stage.ssas.map(BuilderSSAInfo::from),
         }
     }
 }

@@ -26,7 +26,6 @@ pub(crate) struct ImplBounds {
     ir_type: syn::Path,
     value_types: Vec<syn::Type>,
     wrapper_types: Vec<syn::Type>,
-    has_result_fields: bool,
     ir_type_is_param: bool,
 }
 
@@ -53,7 +52,6 @@ impl ImplBounds {
             ir_type: config.ir_type.clone(),
             value_types,
             wrapper_types,
-            has_result_fields: super::has_result_fields(ir_input),
             ir_type_is_param,
         }
     }

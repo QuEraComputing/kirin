@@ -52,7 +52,7 @@ where
 {
     type Result = <FunctionBody<ArithType> as CallSemanticsTrait<'ir, I>>::Result;
 
-    fn eval_call<L: Dialect>(
+    fn eval_call<L>(
         &self,
         interp: &mut I,
         stage: &'ir kirin_ir::StageInfo<L>,

@@ -14,10 +14,7 @@ use kirin_ir::{Dialect, HasStageInfo};
 /// use `L` to call [`Interpreter::active_stage_info`] for the correct
 /// [`kirin_ir::StageInfo`].
 pub trait Interpretable<'ir, I: Interpreter<'ir>>: Dialect {
-    fn interpret<L: Dialect>(
-        &self,
-        interpreter: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interpreter: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,

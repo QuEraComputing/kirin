@@ -26,10 +26,7 @@ where
     I: Interpreter<'ir>,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -65,10 +62,7 @@ where
     I: Interpreter<'ir>,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -106,10 +100,7 @@ where
     I::Value: Clone,
     T: CompileTimeValue,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -129,10 +120,7 @@ where
     I: Interpreter<'ir>,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        _interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -152,10 +140,7 @@ where
     I::Value: Clone,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -268,10 +253,7 @@ where
     I::Value: Clone,
     T: kirin::prelude::CompileTimeValue,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -303,10 +285,7 @@ where
     I::Value: Clone,
     T: CompileTimeValue,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,

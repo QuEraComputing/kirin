@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, Dialect, HasStageInfo};
+use kirin::prelude::{CompileTimeValue, HasStageInfo};
 use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
 
 use crate::Cmp;
@@ -226,10 +226,7 @@ where
     I::Value: CompareValue,
     T: CompileTimeValue,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,

@@ -386,10 +386,7 @@ where
     I: kirin_interpreter::Interpreter<'ir, Ext = ConcreteExt>,
     I::Error: From<InterpreterError>,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        _interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -429,10 +426,7 @@ where
         + From<ArithValue>,
     I::Error: From<InterpreterError>,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,
@@ -522,10 +516,7 @@ where
     I: kirin_interpreter::Interpreter<'ir>,
     I::Error: From<InterpreterError>,
 {
-    fn interpret<L: Dialect>(
-        &self,
-        _interp: &mut I,
-    ) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    fn interpret<L>(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
         I::StageInfo: HasStageInfo<L>,
         I::Error: From<InterpreterError>,

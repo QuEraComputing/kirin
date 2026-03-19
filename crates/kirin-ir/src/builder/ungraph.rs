@@ -168,7 +168,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
                 }
             }
         }
-        for (&old, _) in &replacements {
+        for &old in replacements.keys() {
             self.stage.ssas.delete(old);
         }
         for &stmt_id in &all_stmts {

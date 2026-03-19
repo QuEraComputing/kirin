@@ -10,7 +10,7 @@ where
     CallOp: ::kirin_interpreter::CallSemantics<'__ir, __CallSemI>,
 {
     type Result = <CallOp as ::kirin_interpreter::CallSemantics<'__ir, __CallSemI>>::Result;
-    fn eval_call<__CallSemL: ::kirin::ir::Dialect>(
+    fn eval_call<__CallSemL>(
         &self,
         interpreter: &mut __CallSemI,
         stage: &'__ir ::kirin::ir::StageInfo<__CallSemL>,

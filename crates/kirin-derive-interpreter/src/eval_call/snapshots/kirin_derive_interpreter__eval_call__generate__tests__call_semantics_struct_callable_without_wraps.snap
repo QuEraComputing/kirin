@@ -9,7 +9,7 @@ where
     __CallSemI::Error: From<::kirin_interpreter::InterpreterError>,
 {
     type Result = __CallSemI::Value;
-    fn eval_call<__CallSemL: ::kirin::ir::Dialect>(
+    fn eval_call<__CallSemL>(
         &self,
         interpreter: &mut __CallSemI,
         stage: &'__ir ::kirin::ir::StageInfo<__CallSemL>,

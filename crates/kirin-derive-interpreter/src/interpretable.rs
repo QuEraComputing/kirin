@@ -83,7 +83,7 @@ pub fn do_derive_interpretable(input: &syn::DeriveInput) -> darling::Result<Toke
                     .ok_or_else(|| darling::Error::custom("expected wrapper binding"))?;
                 Ok(quote! { #binding.interpret::<__InterpL>(interpreter) })
             })),
-            generics: Some(quote! { <__InterpL: #ir_crate_m::Dialect> }),
+            generics: Some(quote! { <__InterpL> }),
             method_where_clause: Some(quote! {
                 where
                     __InterpI::StageInfo: #ir_crate_m::HasStageInfo<__InterpL>,

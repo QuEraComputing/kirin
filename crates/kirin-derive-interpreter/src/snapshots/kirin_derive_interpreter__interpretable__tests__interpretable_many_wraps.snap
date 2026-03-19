@@ -12,7 +12,7 @@ where
     DOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
     EOp: ::kirin_interpreter::Interpretable<'__ir, __InterpI>,
 {
-    fn interpret<__InterpL: ::kirin::ir::Dialect>(
+    fn interpret<__InterpL>(
         &self,
         interpreter: &mut __InterpI,
     ) -> Result<::kirin_interpreter::Continuation<__InterpI::Value, __InterpI::Ext>, __InterpI::Error>
