@@ -199,8 +199,15 @@ fn ungraph_stage() -> BSI<UngraphLanguage> {
 
 fn make_edge(stage: &mut BSI<UngraphLanguage>) -> (kirin_ir::Statement, SSAValue) {
     let result_id: ResultValue = stage.ssa_arena().next_id().into();
-    let stmt = stage.statement(UngraphEdge { res: result_id });
-    let wire_ssa = stage.ssa(None::<String>, SimpleType::Any, BuilderSSAKind::Result(stmt, 0));
+    let stmt = stage
+        .statement()
+        .definition(UngraphEdge { res: result_id })
+        .new();
+    let wire_ssa = stage
+        .ssa()
+        .ty(SimpleType::Any)
+        .kind(BuilderSSAKind::Result(stmt, 0))
+        .new();
     (stmt, wire_ssa)
 }
 
@@ -209,7 +216,10 @@ fn make_node_a(
     param: SSAValue,
     ports: Vec<SSAValue>,
 ) -> kirin_ir::Statement {
-    stage.statement(UngraphNodeA { param, ports })
+    stage
+        .statement()
+        .definition(UngraphNodeA { param, ports })
+        .new()
 }
 
 fn make_node_b(
@@ -218,11 +228,14 @@ fn make_node_b(
     param1: SSAValue,
     ports: Vec<SSAValue>,
 ) -> kirin_ir::Statement {
-    stage.statement(UngraphNodeB {
-        param0,
-        param1,
-        ports,
-    })
+    stage
+        .statement()
+        .definition(UngraphNodeB {
+            param0,
+            param1,
+            ports,
+        })
+        .new()
 }
 
 #[test]
@@ -342,12 +355,19 @@ fn print_ungraph_nested_compound() {
 
     // Compound wrapping inner ungraph, takes outer port as arg
     let compound_res: ResultValue = stage.ssa_arena().next_id().into();
-    let compound_stmt = stage.statement(UngraphCompound {
-        args: vec![outer_port_ref],
-        body: inner_ug,
-        res: compound_res,
-    });
-    let _compound_ssa = stage.ssa(None::<String>, SimpleType::Any, BuilderSSAKind::Result(compound_stmt, 0));
+    let compound_stmt = stage
+        .statement()
+        .definition(UngraphCompound {
+            args: vec![outer_port_ref],
+            body: inner_ug,
+            res: compound_res,
+        })
+        .new();
+    let _compound_ssa = stage
+        .ssa()
+        .ty(SimpleType::Any)
+        .kind(BuilderSSAKind::Result(compound_stmt, 0))
+        .new();
 
     // Outer node uses capture and an edge
     let (outer_edge, outer_wire) = make_edge(&mut stage);

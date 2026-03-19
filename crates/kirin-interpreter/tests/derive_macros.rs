@@ -85,7 +85,7 @@ fn build_add_one_eval_call(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
         let x: SSAValue = b.block_arena()[entry].arguments[0].into();
@@ -107,7 +107,7 @@ fn build_add_one_eval_call(
 
         let region = b.region().add_block(entry).add_block(code_block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
 
@@ -117,7 +117,7 @@ fn build_add_one_interpretable(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
         let x: SSAValue = b.block_arena()[entry].arguments[0].into();
@@ -139,7 +139,7 @@ fn build_add_one_interpretable(
 
         let region = b.region().add_block(entry).add_block(code_block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
 
@@ -150,7 +150,7 @@ fn build_add_one_interpretable(
 #[test]
 fn test_derived_eval_call() {
     let mut pipeline: Pipeline<StageInfo<DerivedEvalCallDialect>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let sf = build_add_one_eval_call(&mut pipeline, stage_id);
 
     let mut interp: StackInterpreter<'_, i64, StageInfo<DerivedEvalCallDialect>> =
@@ -165,7 +165,7 @@ fn test_derived_eval_call() {
 #[test]
 fn test_derived_interpretable() {
     let mut pipeline: Pipeline<StageInfo<DerivedInterpretableDialect>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let sf = build_add_one_interpretable(&mut pipeline, stage_id);
 
     let mut interp: StackInterpreter<'_, i64, StageInfo<DerivedInterpretableDialect>> =

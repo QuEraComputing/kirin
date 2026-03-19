@@ -302,7 +302,7 @@ impl GenerateEmitIR {
 
                 fn emit(&self, ctx: &mut #crate_path::EmitContext<'_, Language>) -> ::core::result::Result<Self::Output, #crate_path::EmitError> {
                     let dialect_variant = self.emit_with(ctx, #emit_language_output)?;
-                    Ok(ctx.stage.statement(dialect_variant))
+                    Ok(ctx.stage.statement().definition(dialect_variant).new())
                 }
             }
         }

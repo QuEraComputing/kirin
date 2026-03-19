@@ -226,7 +226,10 @@ fn build_fn_body(
         #(#let_inputs)*
         #let_results
 
-        stage.statement(#constructor);
+        stage
+            .statement()
+            .definition(#constructor)
+            .new();
 
         #build_result_path {
             id: #statement_id,
@@ -278,7 +281,10 @@ fn let_name_eq_result_value(
         result_index += 1;
         results.push(quote! {
             let #name: ResultValue = stage
-                .ssa(None::<String>, Lang::Type::from(#ssa_ty), #crate_path::BuilderSSAKind::Result(#statement_id, #index))
+                .ssa()
+                .kind(#crate_path::BuilderSSAKind::Result(#statement_id, #index))
+                .ty(Lang::Type::from(#ssa_ty))
+                .new()
                 .into();
         });
     }

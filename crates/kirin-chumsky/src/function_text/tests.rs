@@ -239,7 +239,11 @@ fn test_global_symbol_prefix_is_required() {
 #[test]
 fn test_missing_stage_declaration_is_hard_error() {
     let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
-    pipeline.add_stage(StageInfo::default(), Some("A"));
+    pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("A")
+        .new();
     let input = format!("specialize @A fn @foo(()) -> () {BODY}");
     let err = pipeline.parse(&input).unwrap_err();
     assert_eq!(
@@ -261,17 +265,29 @@ fn test_comments_and_whitespace_are_accepted() {
 #[test]
 fn test_pipeline_roundtrip_print_parse_print() {
     let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
-    let stage_a = pipeline.add_stage(StageInfo::default(), Some("A"));
-    let function = pipeline.function(Some("foo")).unwrap();
+    let stage_a = pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("A")
+        .new();
+    let function = pipeline.function().name("foo").new().unwrap();
     let staged_function = pipeline
-        .staged_function::<FunctionBody>(function, stage_a, Some(unit_sig()), None, None)
+        .staged_function()
+        .func(function)
+        .stage(stage_a)
+        .signature(unit_sig())
+        .new()
         .unwrap();
 
     pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
         let block = b.block().new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::new(b, region);
-        b.specialize(staged_function, Some(unit_sig()), body, None)
+        b.specialize()
+            .staged_func(staged_function)
+            .signature(unit_sig())
+            .body(body)
+            .new()
             .unwrap();
     });
 
@@ -363,7 +379,11 @@ fn test_pipeline_parse_numeric_stage_symbol_rejected() {
 fn test_pipeline_numeric_stage_lookup_by_existing_id() {
     // When a stage already exists in the pipeline, @<numeric> can find it by raw ID
     let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), Some("A"));
+    let stage_id = pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("A")
+        .new();
 
     // First parse a normal declaration to set things up
     let input = format!("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY}");

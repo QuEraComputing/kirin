@@ -38,9 +38,9 @@ fn build_recursive_func(
     pipeline: &mut Pipeline<StageInfo<RecursiveLang>>,
     stage_id: CompileStage,
 ) -> SpecializedFunction {
-    let func = pipeline.function(Some("rec")).unwrap();
+    let func = pipeline.function().name("rec").new().unwrap();
     let staged = pipeline
-        .staged_function::<RecursiveLang>(func, stage_id, None, None, None)
+        .staged_function::<RecursiveLang>().func(func).stage(stage_id).new()
         .unwrap();
 
     pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
@@ -120,7 +120,7 @@ fn build_recursive_func(
             .add_block(exit_block)
             .new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(staged, None, body, None).unwrap()
+        b.specialize().staged_func(staged).body(body).new().unwrap()
     })
 }
 
@@ -131,7 +131,7 @@ fn build_recursive_func(
 #[test]
 fn test_max_depth_exceeded() {
     let mut pipeline: Pipeline<StageInfo<RecursiveLang>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_recursive_func(&mut pipeline, stage_id);
 
     // Set max depth to 3 — rec(10) would need 10 frames, so it should fail.
@@ -153,7 +153,7 @@ fn test_max_depth_exceeded() {
 #[test]
 fn test_max_depth_exactly_sufficient() {
     let mut pipeline: Pipeline<StageInfo<RecursiveLang>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_recursive_func(&mut pipeline, stage_id);
 
     // rec(2) needs 3 frames: rec(2) -> rec(1) -> rec(0).
@@ -168,7 +168,7 @@ fn test_max_depth_exactly_sufficient() {
 #[test]
 fn test_max_depth_one_too_few() {
     let mut pipeline: Pipeline<StageInfo<RecursiveLang>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_recursive_func(&mut pipeline, stage_id);
 
     // rec(2) needs 3 frames but max_depth=2 — should fail.
@@ -189,15 +189,15 @@ fn test_max_depth_one_too_few() {
 #[test]
 fn test_unbound_value_in_frame() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
         let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
         let ret = Return::<ArithType>::new(b, c0.result);
         let block = b.block().stmt(c0).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     });
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
@@ -222,9 +222,9 @@ fn test_unbound_value_in_frame() {
 #[test]
 fn test_arity_mismatch_too_few_args() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let (spec_fn, block) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
         let ba_x = b.block_argument().index(0);
         let ret = Return::<ArithType>::new(b, SSAValue::from(ba_x));
         let block = b
@@ -235,7 +235,7 @@ fn test_arity_mismatch_too_few_args() {
             .new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        let spec_fn = b.specialize(sf, None, body, None).unwrap();
+        let spec_fn = b.specialize().staged_func(sf).body(body).new().unwrap();
         (spec_fn, block)
     });
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
@@ -265,15 +265,15 @@ fn test_arity_mismatch_too_few_args() {
 #[test]
 fn test_arity_mismatch_too_many_args() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let (spec_fn, block) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
         let ba_x = b.block_argument().index(0);
         let ret = Return::<ArithType>::new(b, SSAValue::from(ba_x));
         let block = b.block().argument(ArithType::I64).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        let spec_fn = b.specialize(sf, None, body, None).unwrap();
+        let spec_fn = b.specialize().staged_func(sf).body(body).new().unwrap();
         (spec_fn, block)
     });
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
@@ -303,15 +303,15 @@ fn test_arity_mismatch_too_many_args() {
 #[test]
 fn test_arity_mismatch_zero_args_block() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let (spec_fn, block) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
         let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
         let ret = Return::<ArithType>::new(b, c0.result);
         let block = b.block().stmt(c0).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        let spec_fn = b.specialize(sf, None, body, None).unwrap();
+        let spec_fn = b.specialize().staged_func(sf).body(body).new().unwrap();
         (spec_fn, block)
     });
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
@@ -345,7 +345,7 @@ fn test_arity_mismatch_zero_args_block() {
 #[test]
 fn test_arity_mismatch_through_call() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     // build_add_one expects 1 arg.
     let spec_fn = kirin_test_utils::ir_fixtures::build_add_one(&mut pipeline, stage_id);
@@ -442,12 +442,12 @@ where
 #[test]
 fn test_halt_during_nested_call() {
     let mut pipeline: Pipeline<StageInfo<HaltLang>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     // Build callee: a function whose body contains a HaltStmt.
-    let callee_func = pipeline.function(Some("halter")).unwrap();
+    let callee_func = pipeline.function().name("halter").new().unwrap();
     let callee_staged = pipeline
-        .staged_function::<HaltLang>(callee_func, stage_id, None, None, None)
+        .staged_function::<HaltLang>().func(callee_func).stage(stage_id).new()
         .unwrap();
 
     pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
@@ -456,14 +456,14 @@ fn test_halt_during_nested_call() {
         // No terminator — the Halt interrupts before we need one.
         let region = b.region().add_block(block).new();
         let callee_body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(callee_staged, None, callee_body, None)
+        b.specialize().staged_func(callee_staged).body(callee_body).new()
             .unwrap();
     });
 
     // Build caller: calls the callee function by name.
-    let caller_func = pipeline.function(Some("caller")).unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
     let caller_staged = pipeline
-        .staged_function::<HaltLang>(caller_func, stage_id, None, None, None)
+        .staged_function::<HaltLang>().func(caller_func).stage(stage_id).new()
         .unwrap();
 
     let caller_spec = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
@@ -473,7 +473,7 @@ fn test_halt_during_nested_call() {
         let block = b.block().stmt(call).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(caller_staged, None, body, None).unwrap()
+        b.specialize().staged_func(caller_staged).body(body).new().unwrap()
     });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
@@ -532,14 +532,14 @@ enum BadBodyLang {
 #[test]
 fn test_missing_entry_from_bad_body() {
     let mut pipeline: Pipeline<StageInfo<BadBodyLang>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
         let block = b.block().new();
         let region = b.region().add_block(block).new();
         let bad_body = BadBody::new(b, region);
-        b.specialize(sf, None, bad_body, None).unwrap()
+        b.specialize().staged_func(sf).body(bad_body).new().unwrap()
     });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);

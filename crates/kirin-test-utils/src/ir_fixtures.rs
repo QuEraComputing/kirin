@@ -16,7 +16,7 @@ pub fn build_constants(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(10));
         let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(32));
@@ -26,7 +26,7 @@ pub fn build_constants(
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
 
@@ -37,7 +37,7 @@ pub fn build_add_one(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let ba_x = b.block_argument().index(0);
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
@@ -53,7 +53,7 @@ pub fn build_add_one(
             .new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
 
@@ -66,7 +66,7 @@ pub fn build_linear_program(
 ) -> (SpecializedFunction, Statement) {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(5));
         let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(10));
@@ -77,7 +77,12 @@ pub fn build_linear_program(
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let func_body = FunctionBody::<ArithType>::new(b, region);
-        let spec_fn = b.specialize(sf, None, func_body, None).unwrap();
+        let spec_fn = b
+            .specialize()
+            .staged_func(sf)
+            .body(func_body)
+            .new()
+            .unwrap();
         (spec_fn, add_stmt)
     })
 }
@@ -97,7 +102,7 @@ pub fn build_select_program(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
         let x: SSAValue = b.block_arena()[entry].arguments[0].into();
@@ -159,7 +164,7 @@ pub fn build_select_program(
             .add_block(falsy_block)
             .new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
 
@@ -176,7 +181,7 @@ pub fn build_branch_fork_program(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let entry_block_node = b.block().argument(ArithType::I64).new();
         let x: SSAValue = b.block_arena()[entry_block_node].arguments[0].into();
@@ -236,7 +241,7 @@ pub fn build_branch_fork_program(
             .add_block(pos_block)
             .new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
 
@@ -254,7 +259,7 @@ pub fn build_loop_program(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
         let x: SSAValue = b.block_arena()[entry].arguments[0].into();
@@ -342,7 +347,7 @@ pub fn build_loop_program(
             .add_block(loop_exit)
             .new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
 
@@ -360,7 +365,7 @@ pub fn build_infinite_loop(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let entry = b.block().argument(ArithType::I64).new();
         let x: SSAValue = b.block_arena()[entry].arguments[0].into();
@@ -433,7 +438,11 @@ pub fn build_infinite_loop(
             .add_block(exit)
             .new();
         let func_body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, func_body, None).unwrap()
+        b.specialize()
+            .staged_func(sf)
+            .body(func_body)
+            .new()
+            .unwrap()
     })
 }
 
@@ -444,7 +453,7 @@ pub fn build_div_program(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let ba_x = b.block_argument().index(0);
         let ba_y = b.block_argument().index(1);
@@ -461,7 +470,7 @@ pub fn build_div_program(
             .new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
 
@@ -472,7 +481,7 @@ pub fn build_rem_program(
 ) -> SpecializedFunction {
     let stage = pipeline.stage_mut(stage_id).unwrap();
     stage.with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
 
         let ba_x = b.block_argument().index(0);
         let ba_y = b.block_argument().index(1);
@@ -489,7 +498,7 @@ pub fn build_rem_program(
             .new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
 

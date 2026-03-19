@@ -170,15 +170,14 @@ fn specialize_return_const(
     let body = FunctionBody::<ArithType>::new(stage, region);
     if with_arg {
         stage
-            .specialize(
-                staged_function,
-                Some(Signature::new(vec![ArithType::I64], ArithType::I64, ())),
-                body,
-                None,
-            )
+            .specialize()
+            .staged_func(staged_function)
+            .signature(Signature::new(vec![ArithType::I64], ArithType::I64, ()))
+            .body(body)
+            .new()
             .unwrap()
     } else {
-        stage.specialize(staged_function, None, body, None).unwrap()
+        stage.specialize().staged_func(staged_function).body(body).new().unwrap()
     }
 }
 
@@ -265,24 +264,24 @@ fn build_cross_stage_recursive_body(
 #[test]
 fn test_cross_stage_recursive_call() {
     let mut pipeline: Pipeline<StageInfo<StageDynLang>> = Pipeline::new();
-    let stage_a = pipeline.add_stage(StageInfo::default(), None::<&str>);
-    let stage_b = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_a = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_b = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let func = pipeline.function(Some("rec")).unwrap();
+    let func = pipeline.function().name("rec").new().unwrap();
     let staged_a = pipeline
-        .staged_function::<StageDynLang>(func, stage_a, None, None, None)
+        .staged_function::<StageDynLang>().func(func).stage(stage_a).new()
         .unwrap();
     let staged_b = pipeline
-        .staged_function::<StageDynLang>(func, stage_b, None, None, None)
+        .staged_function::<StageDynLang>().func(func).stage(stage_b).new()
         .unwrap();
 
     let spec_a = pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
         let body = build_cross_stage_recursive_body(b, func, stage_b);
-        b.specialize(staged_a, None, body, None).unwrap()
+        b.specialize().staged_func(staged_a).body(body).new().unwrap()
     });
     pipeline.stage_mut(stage_b).unwrap().with_builder(|b| {
         let body = build_cross_stage_recursive_body(b, func, stage_a);
-        b.specialize(staged_b, None, body, None).unwrap();
+        b.specialize().staged_func(staged_b).body(body).new().unwrap();
     });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_a);
@@ -305,17 +304,17 @@ fn build_caller_with_function_call(
 #[test]
 fn test_function_call_missing_stage_mapping_error() {
     let mut pipeline: Pipeline<StageInfo<FunctionCallLang>> = Pipeline::new();
-    let stage_a = pipeline.add_stage(StageInfo::default(), None::<&str>);
-    let stage_b = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_a = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_b = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let callee_func = pipeline.function(Some("callee")).unwrap();
-    let caller_func = pipeline.function(Some("caller")).unwrap();
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
 
     let callee_staged_a = pipeline
-        .staged_function::<FunctionCallLang>(callee_func, stage_a, None, None, None)
+        .staged_function::<FunctionCallLang>().func(callee_func).stage(stage_a).new()
         .unwrap();
     let caller_staged_b = pipeline
-        .staged_function::<FunctionCallLang>(caller_func, stage_b, None, None, None)
+        .staged_function::<FunctionCallLang>().func(caller_func).stage(stage_b).new()
         .unwrap();
 
     {
@@ -326,7 +325,7 @@ fn test_function_call_missing_stage_mapping_error() {
 
     let caller_spec = pipeline.stage_mut(stage_b).unwrap().with_builder(|b| {
         let body = build_caller_with_function_call(b, "callee");
-        b.specialize(caller_staged_b, None, body, None).unwrap()
+        b.specialize().staged_func(caller_staged_b).body(body).new().unwrap()
     });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_b);
@@ -346,21 +345,21 @@ fn test_function_call_missing_stage_mapping_error() {
 #[test]
 fn test_function_call_no_specialization_error() {
     let mut pipeline: Pipeline<StageInfo<FunctionCallLang>> = Pipeline::new();
-    let stage = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let callee_func = pipeline.function(Some("callee")).unwrap();
-    let caller_func = pipeline.function(Some("caller")).unwrap();
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
 
     let _callee_staged = pipeline
-        .staged_function::<FunctionCallLang>(callee_func, stage, None, None, None)
+        .staged_function::<FunctionCallLang>().func(callee_func).stage(stage).new()
         .unwrap();
     let caller_staged = pipeline
-        .staged_function::<FunctionCallLang>(caller_func, stage, None, None, None)
+        .staged_function::<FunctionCallLang>().func(caller_func).stage(stage).new()
         .unwrap();
 
     let caller_spec = pipeline.stage_mut(stage).unwrap().with_builder(|b| {
         let body = build_caller_with_function_call(b, "callee");
-        b.specialize(caller_staged, None, body, None).unwrap()
+        b.specialize().staged_func(caller_staged).body(body).new().unwrap()
     });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage);
@@ -380,16 +379,16 @@ fn test_function_call_no_specialization_error() {
 #[test]
 fn test_function_call_ambiguous_specialization_error() {
     let mut pipeline: Pipeline<StageInfo<FunctionCallLang>> = Pipeline::new();
-    let stage = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let callee_func = pipeline.function(Some("callee")).unwrap();
-    let caller_func = pipeline.function(Some("caller")).unwrap();
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
 
     let callee_staged = pipeline
-        .staged_function::<FunctionCallLang>(callee_func, stage, None, None, None)
+        .staged_function::<FunctionCallLang>().func(callee_func).stage(stage).new()
         .unwrap();
     let caller_staged = pipeline
-        .staged_function::<FunctionCallLang>(caller_func, stage, None, None, None)
+        .staged_function::<FunctionCallLang>().func(caller_func).stage(stage).new()
         .unwrap();
 
     {
@@ -401,7 +400,7 @@ fn test_function_call_ambiguous_specialization_error() {
 
     let caller_spec = pipeline.stage_mut(stage).unwrap().with_builder(|b| {
         let body = build_caller_with_function_call(b, "callee");
-        b.specialize(caller_staged, None, body, None).unwrap()
+        b.specialize().staged_func(caller_staged).body(body).new().unwrap()
     });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage);
@@ -421,16 +420,16 @@ fn test_function_call_ambiguous_specialization_error() {
 #[test]
 fn test_function_call_unique_specialization_success() {
     let mut pipeline: Pipeline<StageInfo<FunctionCallLang>> = Pipeline::new();
-    let stage = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage = pipeline.add_stage().stage(StageInfo::default()).new();
 
-    let callee_func = pipeline.function(Some("callee")).unwrap();
-    let caller_func = pipeline.function(Some("caller")).unwrap();
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
 
     let callee_staged = pipeline
-        .staged_function::<FunctionCallLang>(callee_func, stage, None, None, None)
+        .staged_function::<FunctionCallLang>().func(callee_func).stage(stage).new()
         .unwrap();
     let caller_staged = pipeline
-        .staged_function::<FunctionCallLang>(caller_func, stage, None, None, None)
+        .staged_function::<FunctionCallLang>().func(caller_func).stage(stage).new()
         .unwrap();
 
     {
@@ -441,7 +440,7 @@ fn test_function_call_unique_specialization_success() {
 
     let caller_spec = pipeline.stage_mut(stage).unwrap().with_builder(|b| {
         let body = build_caller_with_function_call(b, "callee");
-        b.specialize(caller_staged, None, body, None).unwrap()
+        b.specialize().staged_func(caller_staged).body(body).new().unwrap()
     });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage);
@@ -543,12 +542,12 @@ impl HasStageInfo<DummyLang> for MixedStage {
 #[should_panic(expected = "active stage does not contain StageInfo for this dialect")]
 fn test_typed_call_reports_stage_mismatch() {
     let mut pipeline: Pipeline<MixedStage> = Pipeline::new();
-    let dyn_stage = pipeline.add_stage(MixedStage::Dyn(StageInfo::default()), None::<&str>);
-    let dummy_stage = pipeline.add_stage(MixedStage::Dummy(StageInfo::default()), None::<&str>);
+    let dyn_stage = pipeline.add_stage().stage(MixedStage::Dyn(StageInfo::default())).new();
+    let dummy_stage = pipeline.add_stage().stage(MixedStage::Dummy(StageInfo::default())).new();
 
-    let func = pipeline.function(Some("f")).unwrap();
+    let func = pipeline.function().name("f").new().unwrap();
     let staged = pipeline
-        .staged_function::<StageDynLang>(func, dyn_stage, None, None, None)
+        .staged_function::<StageDynLang>().func(func).stage(dyn_stage).new()
         .unwrap();
 
     let spec = {
@@ -557,7 +556,7 @@ fn test_typed_call_reports_stage_mismatch() {
         };
         stage.with_builder(|b| {
             let body = build_cross_stage_recursive_body(b, func, dyn_stage);
-            b.specialize(staged, None, body, None).unwrap()
+            b.specialize().staged_func(staged).body(body).new().unwrap()
         })
     };
 

@@ -181,14 +181,14 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
             }
         }
 
-        let block = BlockInfo::new(
-            self.parent,
-            self.name.map(|n| self.stage.symbols.intern(n)),
-            LinkedListNode::new(id),
-            block_args,
-            Some(self.stage.link_statements(&self.statements)),
-            self.terminator,
-        );
+        let block = BlockInfo::builder()
+            .maybe_parent(self.parent)
+            .maybe_name(self.name.map(|n| self.stage.symbols.intern(n)))
+            .node(LinkedListNode::new(id))
+            .arguments(block_args)
+            .statements(self.stage.link_statements(&self.statements))
+            .maybe_terminator(self.terminator)
+            .new();
         self.stage.blocks.alloc(block);
         id
     }

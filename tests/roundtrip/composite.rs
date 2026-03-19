@@ -31,16 +31,18 @@ fn test_roundtrip_add() {
     let _dummy = stage.block().new();
 
     // Create operand SSAs with types
-    let ssa_a = stage.ssa(
-        Some("a".to_string()),
-        SimpleType::I64,
-        test_ssa_kind(_dummy),
-    );
-    let ssa_b = stage.ssa(
-        Some("b".to_string()),
-        SimpleType::I64,
-        test_ssa_kind(_dummy),
-    );
+    let ssa_a = stage
+        .ssa()
+        .name("a".to_string())
+        .ty(SimpleType::I64)
+        .kind(test_ssa_kind(_dummy))
+        .new();
+    let ssa_b = stage
+        .ssa()
+        .name("b".to_string())
+        .ty(SimpleType::I64)
+        .kind(test_ssa_kind(_dummy))
+        .new();
 
     // Parse - type annotation in input
     let input = "%res = add %a, %b -> f64";
@@ -129,11 +131,12 @@ fn test_roundtrip_return() {
     let _dummy = stage.block().new();
 
     // Create operand SSA
-    let ssa_v = stage.ssa(
-        Some("v".to_string()),
-        SimpleType::I64,
-        test_ssa_kind(_dummy),
-    );
+    let ssa_v = stage
+        .ssa()
+        .name("v".to_string())
+        .ty(SimpleType::I64)
+        .kind(test_ssa_kind(_dummy))
+        .new();
 
     // Parse
     let input = "return %v";

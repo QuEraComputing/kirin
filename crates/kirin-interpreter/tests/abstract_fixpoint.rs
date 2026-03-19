@@ -19,7 +19,7 @@ use kirin_test_utils::ir_fixtures::{
 #[test]
 fn test_branch_fork_ir_snapshot() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_branch_fork_program(&mut pipeline, stage_id);
     let ir = dump_function(spec_fn, &pipeline, stage_id);
@@ -29,7 +29,7 @@ fn test_branch_fork_ir_snapshot() {
 #[test]
 fn test_loop_convergence_ir_snapshot() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
     let ir = dump_function(spec_fn, &pipeline, stage_id);
@@ -45,9 +45,9 @@ fn test_loop_convergence_ir_snapshot() {
 #[test]
 fn test_abstract_interp_constants() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(10));
         let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(32));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
@@ -56,7 +56,7 @@ fn test_abstract_interp_constants() {
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     });
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -78,7 +78,7 @@ fn test_abstract_interp_constants() {
 #[test]
 fn test_abstract_interp_branch_fork() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_branch_fork_program(&mut pipeline, stage_id);
 
@@ -109,7 +109,7 @@ fn test_abstract_interp_branch_fork() {
 #[test]
 fn test_abstract_interp_loop_convergence() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
 
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
 
@@ -141,9 +141,9 @@ fn test_abstract_interp_loop_convergence() {
 #[test]
 fn test_abstract_interp_call_caches_summary() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function(None, None, None, None).unwrap();
+        let sf = b.staged_function().new().unwrap();
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(7));
         let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(3));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
@@ -152,7 +152,7 @@ fn test_abstract_interp_call_caches_summary() {
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize(sf, None, body, None).unwrap()
+        b.specialize().staged_func(sf).body(body).new().unwrap()
     });
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -192,7 +192,7 @@ fn test_abstract_interp_call_caches_summary() {
 #[test]
 fn test_abstract_interp_in_stage_chain() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_branch_fork_program(&mut pipeline, stage_id);
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -209,7 +209,7 @@ fn test_abstract_interp_in_stage_chain() {
 #[test]
 fn test_abstract_interp_with_stage_chain() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_branch_fork_program(&mut pipeline, stage_id);
     let stage = pipeline.stage(stage_id).unwrap();
 
@@ -231,7 +231,7 @@ fn test_abstract_interp_with_stage_chain() {
 #[test]
 fn test_abstract_widening_never() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -251,7 +251,7 @@ fn test_abstract_widening_never() {
 #[test]
 fn test_abstract_widening_delayed() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -274,7 +274,7 @@ fn test_abstract_widening_delayed() {
 #[test]
 fn test_abstract_widening_all_joins() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_loop_program(&mut pipeline, stage_id);
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -301,7 +301,7 @@ fn test_abstract_widening_all_joins() {
 #[test]
 fn test_abstract_fixed_summary() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_add_one(&mut pipeline, stage_id);
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -333,7 +333,7 @@ fn test_abstract_fixed_summary() {
 #[test]
 fn test_abstract_summary_invalidation_and_gc() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_add_one(&mut pipeline, stage_id);
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -375,7 +375,7 @@ fn test_abstract_summary_invalidation_and_gc() {
 #[test]
 fn test_abstract_remove_summary() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_add_one(&mut pipeline, stage_id);
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -417,7 +417,7 @@ fn test_abstract_remove_summary() {
 #[test]
 fn test_abstract_analysis_result_queries() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let spec_fn = build_select_program(&mut pipeline, stage_id);
 
     let mut interp: AbstractInterpreter<Interval, _> =
@@ -442,10 +442,10 @@ fn test_abstract_analysis_result_queries() {
 #[test]
 fn test_abstract_analysis_result_ssa_values() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id = pipeline.add_stage(StageInfo::default(), None::<&str>);
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
     let (spec_fn, c1_result, c2_result, add_result) =
         pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-            let sf = b.staged_function(None, None, None, None).unwrap();
+            let sf = b.staged_function().new().unwrap();
             let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(7));
             let c1_result = c1.result;
             let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(3));
@@ -457,7 +457,7 @@ fn test_abstract_analysis_result_ssa_values() {
             let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
             let region = b.region().add_block(block).new();
             let func_body = FunctionBody::<ArithType>::new(b, region);
-            let spec_fn = b.specialize(sf, None, func_body, None).unwrap();
+            let spec_fn = b.specialize().staged_func(sf).body(func_body).new().unwrap();
             (spec_fn, c1_result, c2_result, add_result)
         });
 

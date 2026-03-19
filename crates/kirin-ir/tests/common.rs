@@ -208,12 +208,15 @@ impl Dialect for BuilderDialect {
 #[allow(dead_code)]
 pub fn make_wire(stage: &mut BuilderStageInfo<BuilderDialect>) -> (Statement, SSAValue) {
     let result_id: ResultValue = stage.ssa_arena().next_id().into();
-    let stmt = stage.statement(BuilderDialect::Wire(result_id));
-    let wire_ssa = stage.ssa(
-        None::<String>,
-        TestType::Qubit,
-        BuilderSSAKind::Result(stmt, 0),
-    );
+    let stmt = stage
+        .statement()
+        .definition(BuilderDialect::Wire(result_id))
+        .new();
+    let wire_ssa = stage
+        .ssa()
+        .ty(TestType::Qubit)
+        .kind(BuilderSSAKind::Result(stmt, 0))
+        .new();
     (stmt, wire_ssa)
 }
 

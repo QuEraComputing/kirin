@@ -31,8 +31,12 @@ impl<L: Dialect> BuilderStageInfo<L> {
             error.staged_function,
             staged_function_info.specializations.len(),
         );
-        let specialized_function =
-            SpecializedFunctionInfo::new(id, error.signature, error.body, error.backedges);
+        let specialized_function = SpecializedFunctionInfo::builder()
+            .id(id)
+            .signature(error.signature)
+            .body(error.body)
+            .maybe_backedges(error.backedges)
+            .new();
         staged_function_info
             .specializations
             .push(specialized_function);

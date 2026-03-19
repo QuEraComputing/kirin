@@ -11,10 +11,17 @@ use kirin_ir::*;
 fn digraph_builder_two_node_dag() {
     let mut stage = new_stage();
 
-    let s0 = stage.statement(BuilderDialect::Nop);
-    let result_ssa = stage.ssa(None::<String>, TestType::I32, BuilderSSAKind::Result(s0, 0));
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let result_ssa = stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Result(s0, 0))
+        .new();
 
-    let s1 = stage.statement(BuilderDialect::Add(result_ssa, result_ssa));
+    let s1 = stage
+        .statement()
+        .definition(BuilderDialect::Add(result_ssa, result_ssa))
+        .new();
 
     let dg = stage.digraph().node(s0).node(s1).name("test_dag").new();
 
@@ -71,7 +78,10 @@ fn digraph_builder_resolves_builder_port_placeholders() {
 
     let placeholder = stage.graph_port().index(0);
 
-    let s0 = stage.statement(BuilderDialect::Add(placeholder, placeholder));
+    let s0 = stage
+        .statement()
+        .definition(BuilderDialect::Add(placeholder, placeholder))
+        .new();
 
     let dg = stage
         .digraph()
@@ -105,8 +115,14 @@ fn ungraph_two_nodes_one_edge() {
 
     let (wire_stmt, wire_ssa) = make_wire(&mut stage);
 
-    let n0 = stage.statement(BuilderDialect::Use(wire_ssa));
-    let n1 = stage.statement(BuilderDialect::Use(wire_ssa));
+    let n0 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire_ssa))
+        .new();
+    let n1 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire_ssa))
+        .new();
 
     let ug = stage
         .ungraph()
@@ -142,9 +158,18 @@ fn ungraph_boundary_port_bfs_ordering() {
     // n_far uses wire0 only (not connected to boundary)
     // n_mid uses wire0 and wire1 (bridge)
     // n_near uses wire1 and boundary port (connected to boundary)
-    let n_far = stage.statement(BuilderDialect::Use(wire0_ssa));
-    let n_mid = stage.statement(BuilderDialect::Gate(wire0_ssa, wire1_ssa));
-    let n_near = stage.statement(BuilderDialect::Gate(wire1_ssa, port_placeholder));
+    let n_far = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire0_ssa))
+        .new();
+    let n_mid = stage
+        .statement()
+        .definition(BuilderDialect::Gate(wire0_ssa, wire1_ssa))
+        .new();
+    let n_near = stage
+        .statement()
+        .definition(BuilderDialect::Gate(wire1_ssa, port_placeholder))
+        .new();
 
     // Insert nodes in reverse BFS order: far first, near last
     let ug = stage
@@ -182,9 +207,18 @@ fn ungraph_edge_max_two_uses_validation() {
 
     let (wire_stmt, wire_ssa) = make_wire(&mut stage);
 
-    let n0 = stage.statement(BuilderDialect::Use(wire_ssa));
-    let n1 = stage.statement(BuilderDialect::Use(wire_ssa));
-    let n2 = stage.statement(BuilderDialect::Use(wire_ssa));
+    let n0 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire_ssa))
+        .new();
+    let n1 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire_ssa))
+        .new();
+    let n2 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire_ssa))
+        .new();
 
     // This should panic: 3 nodes using the same wire violates 2-use constraint
     stage
@@ -203,9 +237,18 @@ fn ungraph_interleaved_edge_node_order() {
     let (wire0_stmt, wire0_ssa) = make_wire(&mut stage);
     let (wire1_stmt, wire1_ssa) = make_wire(&mut stage);
 
-    let n0 = stage.statement(BuilderDialect::Gate(wire0_ssa, wire1_ssa));
-    let n1 = stage.statement(BuilderDialect::Use(wire0_ssa));
-    let n2 = stage.statement(BuilderDialect::Use(wire1_ssa));
+    let n0 = stage
+        .statement()
+        .definition(BuilderDialect::Gate(wire0_ssa, wire1_ssa))
+        .new();
+    let n1 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire0_ssa))
+        .new();
+    let n2 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire1_ssa))
+        .new();
 
     // Interleave edges and nodes in insertion order
     let ug = stage
@@ -242,8 +285,14 @@ fn ungraph_port_and_capture_creation() {
 
     let (wire_stmt, wire_ssa) = make_wire(&mut stage);
 
-    let n0 = stage.statement(BuilderDialect::Use(wire_ssa));
-    let n1 = stage.statement(BuilderDialect::Use(wire_ssa));
+    let n0 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire_ssa))
+        .new();
+    let n1 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire_ssa))
+        .new();
 
     let ug = stage
         .ungraph()
@@ -291,19 +340,27 @@ fn ungraph_isolated_node_appended_after_bfs() {
     let mut stage = new_stage();
 
     // Create a boundary port placeholder so BFS has a seed
-    let port_placeholder = stage.ssa(
-        None::<String>,
-        TestType::Qubit,
-        BuilderSSAKind::Unresolved(ResolutionInfo::Port(BuilderKey::Index(0))),
-    );
+    let port_placeholder = stage
+        .ssa()
+        .ty(TestType::Qubit)
+        .kind(BuilderSSAKind::Unresolved(ResolutionInfo::Port(
+            BuilderKey::Index(0),
+        )))
+        .new();
 
     let (wire_stmt, wire_ssa) = make_wire(&mut stage);
     // n0 uses wire + boundary port (BFS seed)
-    let n0 = stage.statement(BuilderDialect::Gate(wire_ssa, port_placeholder));
-    let n1 = stage.statement(BuilderDialect::Use(wire_ssa));
+    let n0 = stage
+        .statement()
+        .definition(BuilderDialect::Gate(wire_ssa, port_placeholder))
+        .new();
+    let n1 = stage
+        .statement()
+        .definition(BuilderDialect::Use(wire_ssa))
+        .new();
 
     // Create an isolated node with no edge connections
-    let n_isolated = stage.statement(BuilderDialect::Isolated);
+    let n_isolated = stage.statement().definition(BuilderDialect::Isolated).new();
 
     // Insert isolated node first — BFS should place it last
     let ug = stage

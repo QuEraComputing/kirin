@@ -8,16 +8,14 @@ fn test_block() {
     let foo = gs.intern("foo".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let staged_function = stage
-        .staged_function(
-            Some(foo),
-            Some(kirin_ir::Signature::new(
-                vec![SimpleType::I64],
-                SimpleType::I64,
-                (),
-            )),
-            None,
-            None,
-        )
+        .staged_function()
+        .name(foo)
+        .signature(kirin_ir::Signature::new(
+            vec![SimpleType::I64],
+            SimpleType::I64,
+            (),
+        ))
+        .new()
         .unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1.2);
@@ -48,7 +46,12 @@ fn test_block() {
 
     let body = stage.region().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
-    let f = stage.specialize(staged_function, None, fdef, None).unwrap();
+    let f = stage
+        .specialize()
+        .staged_func(staged_function)
+        .body(fdef)
+        .new()
+        .unwrap();
 
     // Pretty print the function using the Document method
     let stage = stage.finalize().unwrap();

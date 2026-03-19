@@ -113,11 +113,14 @@ where
         // If no type annotation, create with ty: None (will be resolved later or
         // caught by finalize).
         let ssa = if let Some(ty) = ty {
-            ctx.stage.ssa(
-                Some(self.name.value.to_string()),
-                ty,
-                BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)),
-            )
+            ctx.stage
+                .ssa()
+                .name(self.name.value.to_string())
+                .ty(ty)
+                .kind(BuilderSSAKind::Unresolved(
+                    kirin_ir::ResolutionInfo::Result(0),
+                ))
+                .new()
         } else {
             // No type annotation — create SSA with ty: None directly
             let symbol = ctx

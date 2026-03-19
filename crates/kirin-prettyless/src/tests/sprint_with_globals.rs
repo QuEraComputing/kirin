@@ -5,7 +5,10 @@ fn test_sprint_with_globals() {
 
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let staged_function = stage
-        .staged_function(Some(test_func), Some(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ())), None, None)
+        .staged_function()
+        .name(test_func)
+        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ()))
+        .new()
         .unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 42i64);
@@ -13,7 +16,12 @@ fn test_sprint_with_globals() {
     let block = stage.block().stmt(a).terminator(ret).new();
     let body = stage.region().add_block(block).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
-    let _ = stage.specialize(staged_function, None, fdef, None).unwrap();
+    let _ = stage
+        .specialize()
+        .staged_func(staged_function)
+        .body(fdef)
+        .new()
+        .unwrap();
 
     // render with globals should resolve the function name
     let stage = stage.finalize().unwrap();

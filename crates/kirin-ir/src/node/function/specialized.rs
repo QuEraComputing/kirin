@@ -34,11 +34,17 @@ pub struct SpecializedFunctionInfo<L: Dialect> {
     invalidated: bool,
 }
 
+#[bon::bon]
 impl<L: Dialect> SpecializedFunctionInfo<L> {
+    #[builder(finish_fn = new)]
     pub fn new(
+        /// The unique identifier for this specialized function.
         id: SpecializedFunction,
+        /// The signature of this specialized function.
         signature: Signature<L::Type>,
+        /// The body of this specialized function.
         body: Statement,
+        /// The functions that call this specialized function.
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Self {
         Self {

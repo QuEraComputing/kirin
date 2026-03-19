@@ -3,7 +3,7 @@ fn test_constant_pretty_print() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
-    let _ = stage.staged_function(Some(test_sym), None, None, None).unwrap();
+    let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let const_op = SimpleLanguage::op_constant(&mut stage, 42i64);
     let stage = stage.finalize().unwrap();
@@ -19,7 +19,7 @@ fn test_add_pretty_print() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
-    let _ = stage.staged_function(Some(test_sym), None, None, None).unwrap();
+    let _ = stage.staged_function().name(test_sym).new().unwrap();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
     let b = SimpleLanguage::op_constant(&mut stage, 2i64);

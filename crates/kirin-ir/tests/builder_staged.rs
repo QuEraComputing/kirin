@@ -23,11 +23,17 @@ fn staged_name_policy_defaults_to_single_interface() {
     );
 
     stage
-        .staged_function(Some(foo), Some(sig(TestType::I32)), None, None)
+        .staged_function()
+        .name(foo)
+        .signature(sig(TestType::I32))
+        .new()
         .expect("first staged function should be created");
 
     let err = stage
-        .staged_function(Some(foo), Some(sig(TestType::I64)), None, None)
+        .staged_function()
+        .name(foo)
+        .signature(sig(TestType::I64))
+        .new()
         .expect_err("same name + different signature should fail by default");
 
     assert_eq!(
@@ -44,11 +50,17 @@ fn staged_name_policy_multiple_dispatch_allows_different_signatures() {
     stage.set_staged_name_policy(StagedNamePolicy::MultipleDispatch);
 
     stage
-        .staged_function(Some(foo), Some(sig(TestType::I32)), None, None)
+        .staged_function()
+        .name(foo)
+        .signature(sig(TestType::I32))
+        .new()
         .expect("first staged function should be created");
 
     stage
-        .staged_function(Some(foo), Some(sig(TestType::I64)), None, None)
+        .staged_function()
+        .name(foo)
+        .signature(sig(TestType::I64))
+        .new()
         .expect("same name + different signature should be allowed under MultipleDispatch");
 }
 
@@ -61,11 +73,17 @@ fn duplicate_signature_is_rejected_even_with_multiple_dispatch() {
 
     let i32_sig = sig(TestType::I32);
     stage
-        .staged_function(Some(foo), Some(i32_sig.clone()), None, None)
+        .staged_function()
+        .name(foo)
+        .signature(i32_sig.clone())
+        .new()
         .expect("first staged function should be created");
 
     let err = stage
-        .staged_function(Some(foo), Some(i32_sig), None, None)
+        .staged_function()
+        .name(foo)
+        .signature(i32_sig)
+        .new()
         .expect_err("duplicate (name, signature) should still fail");
 
     assert_eq!(
@@ -80,16 +98,22 @@ fn duplicate_signature_is_rejected_even_with_multiple_dispatch() {
 fn specialize_success_and_duplicate_error() {
     let mut stage = new_stage();
 
-    let sf = stage.staged_function(None, None, None, None).unwrap();
+    let sf = stage.staged_function().new().unwrap();
 
-    let body1 = stage.statement(BuilderDialect::Return);
+    let body1 = stage.statement().definition(BuilderDialect::Return).new();
     let _spec1 = stage
-        .specialize(sf, None, body1, None)
+        .specialize()
+        .staged_func(sf)
+        .body(body1)
+        .new()
         .expect("first specialize should succeed");
 
-    let body2 = stage.statement(BuilderDialect::Return);
+    let body2 = stage.statement().definition(BuilderDialect::Return).new();
     let err = stage
-        .specialize(sf, None, body2, None)
+        .specialize()
+        .staged_func(sf)
+        .body(body2)
+        .new()
         .expect_err("duplicate signature should fail");
 
     assert_eq!(err.conflicting.len(), 1);
@@ -98,14 +122,22 @@ fn specialize_success_and_duplicate_error() {
 #[test]
 fn redefine_specialization_invalidates_and_registers() {
     let mut stage = new_stage();
-    let sf = stage.staged_function(None, None, None, None).unwrap();
+    let sf = stage.staged_function().new().unwrap();
 
-    let body1 = stage.statement(BuilderDialect::Return);
-    let spec1 = stage.specialize(sf, None, body1, None).unwrap();
+    let body1 = stage.statement().definition(BuilderDialect::Return).new();
+    let spec1 = stage
+        .specialize()
+        .staged_func(sf)
+        .body(body1)
+        .new()
+        .unwrap();
 
-    let body2 = stage.statement(BuilderDialect::Return);
+    let body2 = stage.statement().definition(BuilderDialect::Return).new();
     let err = stage
-        .specialize(sf, None, body2, None)
+        .specialize()
+        .staged_func(sf)
+        .body(body2)
+        .new()
         .expect_err("duplicate");
 
     let spec2 = stage.redefine_specialization(err);
@@ -124,10 +156,12 @@ fn redefine_staged_function_invalidates_and_registers() {
     let foo = gs.intern("foo".to_string());
     let mut stage = new_stage();
 
-    let sf1 = stage.staged_function(Some(foo), None, None, None).unwrap();
+    let sf1 = stage.staged_function().name(foo).new().unwrap();
 
     let err = stage
-        .staged_function(Some(foo), None, None, None)
+        .staged_function()
+        .name(foo)
+        .new()
         .expect_err("duplicate signature");
 
     let sf2 = stage.redefine_staged_function(err);
@@ -145,17 +179,27 @@ fn redefine_staged_function_invalidates_and_registers() {
 #[test]
 fn staged_function_all_matching_returns_most_specific() {
     let mut stage = new_stage();
-    let sf = stage.staged_function(None, None, None, None).unwrap();
+    let sf = stage.staged_function().new().unwrap();
 
-    let body1 = stage.statement(BuilderDialect::Return);
+    let body1 = stage.statement().definition(BuilderDialect::Return).new();
     let sig_i32 = Signature::new(vec![TestType::I32], TestType::Any, ());
     let _spec1 = stage
-        .specialize(sf, Some(sig_i32.clone()), body1, None)
+        .specialize()
+        .staged_func(sf)
+        .signature(sig_i32.clone())
+        .body(body1)
+        .new()
         .unwrap();
 
-    let body2 = stage.statement(BuilderDialect::Return);
+    let body2 = stage.statement().definition(BuilderDialect::Return).new();
     let sig_i64 = Signature::new(vec![TestType::I64], TestType::Any, ());
-    let _spec2 = stage.specialize(sf, Some(sig_i64), body2, None).unwrap();
+    let _spec2 = stage
+        .specialize()
+        .staged_func(sf)
+        .signature(sig_i64)
+        .body(body2)
+        .new()
+        .unwrap();
 
     let stage = stage.finalize().unwrap();
     let sf_info = sf.get_info(&stage).unwrap();
@@ -168,16 +212,24 @@ fn staged_function_all_matching_returns_most_specific() {
 #[test]
 fn staged_function_all_matching_excludes_invalidated() {
     let mut stage = new_stage();
-    let sf = stage.staged_function(None, None, None, None).unwrap();
+    let sf = stage.staged_function().new().unwrap();
 
-    let body1 = stage.statement(BuilderDialect::Return);
+    let body1 = stage.statement().definition(BuilderDialect::Return).new();
     let default_sig: Signature<TestType> = Signature::placeholder();
-    let spec1 = stage.specialize(sf, None, body1, None).unwrap();
+    let spec1 = stage
+        .specialize()
+        .staged_func(sf)
+        .body(body1)
+        .new()
+        .unwrap();
 
     // Invalidate spec1 by redefining
-    let body2 = stage.statement(BuilderDialect::Return);
+    let body2 = stage.statement().definition(BuilderDialect::Return).new();
     let err = stage
-        .specialize(sf, None, body2, None)
+        .specialize()
+        .staged_func(sf)
+        .body(body2)
+        .new()
         .expect_err("duplicate");
     let _spec2 = stage.redefine_specialization(err);
 

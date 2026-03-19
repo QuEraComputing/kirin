@@ -12,8 +12,8 @@ use kirin_ir::*;
 fn block_builder_creates_block_with_arguments_and_statements() {
     let mut stage = new_stage();
 
-    let s0 = stage.statement(BuilderDialect::Nop);
-    let s1 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
 
     let block = stage
         .block()
@@ -47,7 +47,10 @@ fn block_builder_substitutes_builder_block_arguments() {
     let arg0 = stage.block_argument().index(0);
     let arg1 = stage.block_argument().index(1);
 
-    let add_stmt = stage.statement(BuilderDialect::Add(arg0.into(), arg1.into()));
+    let add_stmt = stage
+        .statement()
+        .definition(BuilderDialect::Add(arg0.into(), arg1.into()))
+        .new();
 
     let block = stage
         .block()
@@ -79,7 +82,7 @@ fn block_builder_substitutes_builder_block_arguments() {
 #[should_panic(expected = "is not a terminator")]
 fn block_builder_terminator_rejects_non_terminator() {
     let mut stage = new_stage();
-    let nop = stage.statement(BuilderDialect::Nop);
+    let nop = stage.statement().definition(BuilderDialect::Nop).new();
     let _ = stage.block().terminator(nop).new();
 }
 
@@ -87,7 +90,7 @@ fn block_builder_terminator_rejects_non_terminator() {
 #[should_panic(expected = "Cannot add terminator statement")]
 fn block_builder_stmt_rejects_terminator() {
     let mut stage = new_stage();
-    let ret = stage.statement(BuilderDialect::Return);
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
     let _ = stage.block().stmt(ret).new();
 }
 
@@ -96,9 +99,9 @@ fn block_builder_stmt_rejects_terminator() {
 #[test]
 fn statement_iter_double_ended() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
-    let s1 = stage.statement(BuilderDialect::Nop);
-    let s2 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s2 = stage.statement().definition(BuilderDialect::Nop).new();
 
     let block = stage.block().stmt(s0).stmt(s1).stmt(s2).new();
 
@@ -116,8 +119,8 @@ fn statement_iter_double_ended() {
 #[test]
 fn statement_iter_exact_size() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
-    let s1 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
 
     let block = stage.block().stmt(s0).stmt(s1).new();
 
@@ -133,7 +136,7 @@ fn statement_iter_exact_size() {
 #[test]
 fn block_first_last_statement_with_terminator_only() {
     let mut stage = new_stage();
-    let ret = stage.statement(BuilderDialect::Return);
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
     let block = stage.block().terminator(ret).new();
 
     let stage = stage.finalize().unwrap();
@@ -145,8 +148,8 @@ fn block_first_last_statement_with_terminator_only() {
 #[test]
 fn block_last_statement_without_terminator() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
-    let s1 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).new();
 
     let stage = stage.finalize().unwrap();
@@ -158,9 +161,9 @@ fn block_last_statement_without_terminator() {
 #[test]
 fn block_with_statements_and_terminator() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
-    let s1 = stage.statement(BuilderDialect::Nop);
-    let ret = stage.statement(BuilderDialect::Return);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
 
     let block = stage.block().stmt(s0).stmt(s1).terminator(ret).new();
 
@@ -189,7 +192,7 @@ fn empty_block_iteration() {
 #[test]
 fn single_statement_double_ended_iteration() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).new();
 
     let stage = stage.finalize().unwrap();
@@ -205,7 +208,7 @@ fn single_statement_double_ended_iteration() {
 #[test]
 fn block_argument_placeholder_substitution_with_zero_args() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).new();
 
     let stage = stage.finalize().unwrap();
@@ -318,9 +321,9 @@ fn empty_region() {
 #[test]
 fn detach_statement_updates_neighbors_and_parent_len() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
-    let s1 = stage.statement(BuilderDialect::Nop);
-    let s2 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s2 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).stmt(s2).new();
 
     let mut stage = stage.finalize().unwrap();
@@ -340,8 +343,8 @@ fn detach_statement_updates_neighbors_and_parent_len() {
 #[test]
 fn detach_head_statement_updates_block_head() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
-    let s1 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).new();
 
     let mut stage = stage.finalize().unwrap();
@@ -355,8 +358,8 @@ fn detach_head_statement_updates_block_head() {
 #[test]
 fn detach_tail_statement_updates_block_tail() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
-    let s1 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).stmt(s1).new();
 
     let mut stage = stage.finalize().unwrap();
@@ -370,7 +373,7 @@ fn detach_tail_statement_updates_block_tail() {
 #[test]
 fn detach_only_statement_leaves_empty_block() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage.block().stmt(s0).new();
 
     let mut stage = stage.finalize().unwrap();
@@ -387,7 +390,12 @@ fn detach_only_statement_leaves_empty_block() {
 #[test]
 fn builder_ssa_has_optional_type_and_builder_kind() {
     let mut stage = new_stage();
-    let ssa = stage.ssa(Some("x"), TestType::I32, BuilderSSAKind::Test);
+    let ssa = stage
+        .ssa()
+        .name("x")
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Test)
+        .new();
 
     // On BuilderStageInfo, SSA info is BuilderSSAInfo with Option<Type>
     let info = stage.ssa_arena().get(ssa).unwrap();
@@ -399,7 +407,11 @@ fn builder_ssa_has_optional_type_and_builder_kind() {
 #[test]
 fn builder_ssa_without_name() {
     let mut stage = new_stage();
-    let ssa = stage.ssa(None::<String>, TestType::I64, BuilderSSAKind::Test);
+    let ssa = stage
+        .ssa()
+        .ty(TestType::I64)
+        .kind(BuilderSSAKind::Test)
+        .new();
 
     let info = stage.ssa_arena().get(ssa).unwrap();
     assert!(info.name().is_none());
@@ -412,7 +424,7 @@ fn builder_ssa_without_name() {
 fn finalize_succeeds_with_resolved_typed_ssas() {
     let mut stage = new_stage();
 
-    let s0 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let block = stage
         .block()
         .argument(TestType::I32)
@@ -448,7 +460,11 @@ fn finalize_rejects_unresolved_ssa() {
 fn finalize_rejects_test_ssa() {
     let mut stage = new_stage();
 
-    stage.ssa(None::<String>, TestType::I32, BuilderSSAKind::Test);
+    stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Test)
+        .new();
 
     let err = stage.finalize().expect_err("should reject test SSA");
     assert!(matches!(err, FinalizeError::TestSSA(_)));
@@ -459,7 +475,7 @@ fn finalize_rejects_missing_type() {
     let mut stage = new_stage();
 
     // Create a statement first to get a valid Statement ID
-    let stmt = stage.statement(BuilderDialect::Nop);
+    let stmt = stage.statement().definition(BuilderDialect::Nop).new();
 
     // Create an SSA with no type via low-level arena access
     let ssas = stage.ssa_arena_mut();
@@ -502,8 +518,11 @@ fn finalize_block_with_statements_produces_clean_stage() {
 
     let arg0 = stage.block_argument().index(0);
     let arg1 = stage.block_argument().index(1);
-    let add = stage.statement(BuilderDialect::Add(arg0, arg1));
-    let ret = stage.statement(BuilderDialect::Return);
+    let add = stage
+        .statement()
+        .definition(BuilderDialect::Add(arg0, arg1))
+        .new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
 
     let block = stage
         .block()
@@ -555,7 +574,7 @@ fn link_statements_empty_slice() {
 #[test]
 fn link_statements_single_element() {
     let mut stage = new_stage();
-    let s0 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let list = stage.link_statements(&[s0]);
     assert_eq!(list.len(), 1);
     assert_eq!(list.head(), Some(&s0));
@@ -594,7 +613,7 @@ fn remap_block_identity_remaps_parents_and_ssa_kinds() {
 
     let stub = stage.block().new();
 
-    let s0 = stage.statement(BuilderDialect::Nop);
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
     let real = stage.block().argument(TestType::I32).stmt(s0).new();
 
     stage.remap_block_identity(stub, real);

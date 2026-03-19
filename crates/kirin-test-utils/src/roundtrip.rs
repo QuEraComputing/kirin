@@ -17,11 +17,11 @@ where
         // Create a dummy block to serve as the owner of operand SSAs
         let dummy_block = b.block().new();
         for (idx, (name, ty)) in operands.iter().enumerate() {
-            b.ssa(
-                Some((*name).to_string()),
-                ty.clone(),
-                BuilderSSAKind::BlockArgument(dummy_block, idx),
-            );
+            b.ssa()
+                .name((*name).to_string())
+                .ty(ty.clone())
+                .kind(BuilderSSAKind::BlockArgument(dummy_block, idx))
+                .new();
         }
     });
 

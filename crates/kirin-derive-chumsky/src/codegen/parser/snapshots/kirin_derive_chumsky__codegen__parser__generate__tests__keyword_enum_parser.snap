@@ -63,7 +63,7 @@ where
         let dialect_variant = output.0.emit_with(ctx, &|stmt, ctx| {
             <ArithOps as ::kirin::parsers::HasParserEmitIR<'t>>::emit_parsed(stmt, ctx)
         })?;
-        Ok(ctx.stage.statement(dialect_variant))
+        Ok(ctx.stage.statement().definition(dialect_variant).new())
     }
 }
 #[automatically_derived]
