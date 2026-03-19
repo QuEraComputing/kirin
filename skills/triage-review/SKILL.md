@@ -406,10 +406,25 @@ To keep the walkthrough efficient, batch up to 4 findings per `AskUserQuestion` 
 - Skipping Phase 3 verification (unverified findings waste the user's time)
 - Committing the report before user walkthrough is complete
 
+## Phase 4: Implementation Dispatch (Optional)
+
+After the report is finalized and walkthrough complete, the user may want to act on findings immediately. If so:
+
+1. **Categorize findings** into direct fixes (small, clear instructions) vs design work (needs plans)
+2. **Direct fixes**: Dispatch implementation agents with `isolation: "worktree"` — one agent per crate or crate group
+3. **Design work**: Dispatch plan-writing agents (read-only, no worktree needed) to create plans in `docs/plans/<crate>/<date>-<title>.md`
+4. **Uncertain items**: Ask the user via `AskUserQuestion` before proceeding
+
+**CRITICAL**: Code-editing agents MUST use `isolation: "worktree"` when running in parallel. See `dispatching-parallel-agents` skill for details.
+
+This phase bridges triage-review → implementation. If the user doesn't request immediate implementation, end after Phase 3.
+
 ## Integration
 
 **Skills this skill uses:**
-- `dispatching-parallel-agents` — run reviewer subagents concurrently
+- `dispatching-parallel-agents` — run reviewer subagents concurrently (Phase 2) and implementation agents (Phase 4)
+- `using-git-worktrees` — REQUIRED for Phase 4 implementation agents
+- `writing-plans` — plan creation for design-work findings in Phase 4
 - Persona files from `../../team/` — reviewer role definitions
 
 **Skills that call this skill:**

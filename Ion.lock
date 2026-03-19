@@ -14,7 +14,6 @@ checksum = "sha256:fbde834ed6f5e130cfbe1b3488b809a2c06023df11a8883bba6e839e00755
 name = "dispatching-parallel-agents"
 source = "https://github.com/obra/superpowers.git"
 path = "dispatching-parallel-agents"
-commit = "5ef73d25b71e69e63a74eae359fb26c7a6ac8fc0"
 checksum = "sha256:534432f7d0af6f567ec505ef251e6bbf0a8f2d12a34d9da9517fb131dd9c8646"
 
 [[skill]]
@@ -91,7 +90,6 @@ checksum = "sha256:322a20071306ede626dc73ac05182b08c97b60781e23ec3fbf23f85a4d27d
 name = "subagent-driven-development"
 source = "https://github.com/obra/superpowers.git"
 path = "subagent-driven-development"
-commit = "5ef73d25b71e69e63a74eae359fb26c7a6ac8fc0"
 checksum = "sha256:8e3828df01e278931c40cf27e61ea0a4fc34f331c0095934d3eeae2f08e6e805"
 
 [[skill]]
