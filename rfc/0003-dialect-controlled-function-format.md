@@ -8,6 +8,25 @@
 
 Give dialect authors control over the text format of specialized function declarations. Instead of the hard-coded `stage @A fn @foo(T) -> T; specialize @A fn @foo(T) -> T { body }` syntax, the framework only provides the `specialize @stage` prefix. Everything else — function name, parameter names, types, body layout — is arranged by the dialect's format string using `{function:...}` and `{body:...}` projections. The dialect statement implements a `HasSignature` trait so the framework can extract the function signature from the parsed definition.
 
+### Relationship to MLIR
+
+In MLIR, function-like operations (`func.func`, `gpu.func`, `llvm.func`) fully control their text format. Each dialect implements its own custom parser/printer — there is no framework-imposed function syntax. `FunctionOpInterface` is a semantic interface (argument types, result types, callable), not a syntactic constraint.
+
+Kirin follows the same principle with one addition: the `specialize @stage` prefix. This exists because Kirin has an explicit multi-stage pipeline concept (stage → staged function → specialization) that MLIR does not. The prefix associates the function with a stage — everything after is dialect-controlled.
+
+**Division of responsibility:**
+
+| Concern | Who handles it |
+|---------|---------------|
+| Call resolution, dispatch | Framework |
+| Function name registration (global symbol) | Framework |
+| Stage association | Framework (`specialize @stage` prefix) |
+| Specialization indexing | Framework |
+| Signature extraction for dispatch | Dialect (`HasSignature` trait) |
+| Entire text representation of function body | Dialect (format string + projections) |
+
+For truly custom formats beyond what projections support, dialect authors can implement a manual `HasParser`/`PrettyPrint` (analogous to MLIR's `hasCustomAssemblyFormat`).
+
 ## Motivation
 
 ### Current format is rigid and duplicative
