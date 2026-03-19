@@ -58,7 +58,7 @@ where
                     }
                 }
             }
-            _ => unreachable!(),
+            Self::__Phantom(..) => unreachable!(),
         }
     }
 }

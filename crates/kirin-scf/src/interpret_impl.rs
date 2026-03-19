@@ -9,6 +9,10 @@ use crate::{For, If, StructuredControlFlow, Yield};
 /// Trait for values that can serve as induction variables in `scf.for` loops.
 pub trait ForLoopValue {
     /// Returns whether the loop should continue (`self < end`).
+    ///
+    /// Returns `None` when the loop condition is indeterminate. For concrete
+    /// interpreters, `None` terminates the loop (condition = false). Abstract
+    /// interpreters should handle `None` by exploring both paths.
     fn loop_condition(&self, end: &Self) -> Option<bool>;
     /// Advance the induction variable by `step`.
     fn loop_step(&self, step: &Self) -> Self;
