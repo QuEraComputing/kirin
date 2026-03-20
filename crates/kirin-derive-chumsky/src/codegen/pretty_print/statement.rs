@@ -385,7 +385,6 @@ impl GeneratePrettyPrint {
                 if let Ok(fmt) = Format::parse(&fmt_str, None) {
                     return fmt.elements().iter().any(|e| {
                         matches!(e, FormatElement::Context(_))
-                            || matches!(e, FormatElement::Field(_, FormatOption::Body(_)))
                     });
                 }
             }

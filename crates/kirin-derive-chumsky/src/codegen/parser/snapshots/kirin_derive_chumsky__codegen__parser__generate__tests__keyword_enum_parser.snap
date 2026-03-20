@@ -81,6 +81,8 @@ where
     }
 }
 #[automatically_derived]
+impl ::kirin::parsers::ExtractSignature for ArithOps {}
+#[automatically_derived]
 impl<'tokens, Language, LanguageOutput>
     ::kirin::parsers::HasDialectEmitIR<'tokens, Language, LanguageOutput> for ArithOps
 where

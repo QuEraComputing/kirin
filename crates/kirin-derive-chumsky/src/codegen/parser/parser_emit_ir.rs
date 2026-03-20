@@ -164,6 +164,8 @@ impl GenerateHasDialectParser {
             for<'t> Self: #crate_path::HasParserEmitIR<'t>
         });
 
+        let (eg2, tg2, wc2) = ir_input.generics.split_for_impl();
+
         quote! {
             #[automatically_derived]
             impl #impl_generics #crate_path::ParseEmit for #original_name #ty_generics
@@ -177,6 +179,11 @@ impl GenerateHasDialectParser {
                     #crate_path::HasParserEmitIR::emit_parsed(&ast, ctx).map_err(#crate_path::ChumskyError::Emit)
                 }
             }
+
+            #[automatically_derived]
+            impl #eg2 #crate_path::ExtractSignature for #original_name #tg2
+            #wc2
+            {}
         }
     }
 }

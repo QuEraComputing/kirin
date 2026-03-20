@@ -147,6 +147,73 @@ specialize @A fn @foo(i32) -> i32 { ^bb0(%x: i32) { ret %x; } }
     assert_eq!(printed.trim(), printed2.trim(), "roundtrip should be stable");
 }
 
+// --- Pipeline-level projected format e2e test ---
+
+/// A dialect where the function body uses projected DiGraph format.
+/// The body format is `({body:ports}) {{ {body:body} }}` — ports and body
+/// are parsed from projections, and the function signature is extracted
+/// from the IR after emit.
+#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
+#[kirin(builders, type = SimpleType, crate = kirin::ir)]
+#[chumsky(crate = kirin::parsers)]
+enum ProjectedFuncLang {
+    #[chumsky(format = "$add {0}, {1}")]
+    Add(
+        SSAValue,
+        SSAValue,
+        #[kirin(type = SimpleType::F64)] ResultValue,
+    ),
+    #[chumsky(format = "$constant {0}")]
+    Constant(
+        #[kirin(into)] kirin_test_languages::Value,
+        #[kirin(type = SimpleType::F64)] ResultValue,
+    ),
+    /// Function body: `({body:ports}) {{ {body:body} }}`
+    #[chumsky(format = "({0:ports}) {{ {0:body} }}")]
+    FuncBody(DiGraph),
+}
+
+#[test]
+fn test_projected_func_pipeline_parse() {
+    use kirin::ir::{Pipeline, StageInfo};
+    use kirin::parsers::ParsePipelineText;
+
+    let mut pipeline: Pipeline<StageInfo<ProjectedFuncLang>> = Pipeline::new();
+    pipeline.add_stage().stage(StageInfo::default()).name("test").new();
+
+    // Framework parses fn @foo(f64) -> f64, signature is Some.
+    // Auto-creates staged function. Body text is `(%p0: f64) { ... }` parsed by dialect.
+    let input = "specialize @test fn @foo(f64) -> f64 (%p0: f64) { %r = add %p0, %p0; yield %r; }";
+    let functions = pipeline.parse(input).expect("should parse projected format");
+    assert_eq!(functions.len(), 1);
+}
+
+#[test]
+fn test_projected_func_pipeline_roundtrip() {
+    use kirin::ir::{Pipeline, StageInfo};
+    use kirin::parsers::ParsePipelineText;
+    use kirin_prettyless::PrettyPrintExt;
+
+    let mut pipeline: Pipeline<StageInfo<ProjectedFuncLang>> = Pipeline::new();
+    pipeline.add_stage().stage(StageInfo::default()).name("test").new();
+
+    // With explicit stage — standard flow
+    let input = r#"
+stage @test fn @foo(f64) -> f64;
+specialize @test fn @foo(f64) -> f64 (%p0: f64) { %r = add %p0, %p0; yield %r; }
+"#;
+    pipeline.parse(input).expect("should parse");
+
+    // Roundtrip: print → reparse → reprint
+    let printed = pipeline.sprint();
+    let mut pipeline2: Pipeline<StageInfo<ProjectedFuncLang>> = Pipeline::new();
+    pipeline2.add_stage().stage(StageInfo::default()).name("test").new();
+    pipeline2.parse(printed.trim()).expect("should reparse printed output");
+    let printed2 = pipeline2.sprint();
+
+    assert_eq!(printed.trim(), printed2.trim(), "projected pipeline roundtrip should be stable");
+}
+
 // --- Full digraph roundtrip tests ---
 
 #[test]
