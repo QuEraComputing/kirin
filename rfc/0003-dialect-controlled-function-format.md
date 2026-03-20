@@ -97,7 +97,7 @@ The dialect's function-body struct uses `{:...}` context projections and `{field
 |-----------|---------------|--------|
 | `{body:ports}` | `%name: Type, %name: Type` | Graph port declarations (DiGraph/UnGraph) |
 | `{body:captures}` | `%name: Type, %name: Type` | Graph capture declarations |
-| `{body:yields}` | `Type, Type` | Yield types (from yield statement or signature) |
+| `{:return}` | `Type, Type` | Yield types (from yield statement or signature) |
 | `{body:args}` | `%name: Type, %name: Type` | Block arguments (for Region/Block bodies) |
 | `{body:body}` | The inner statements | Statement list (no graph header, no braces) |
 | `{body}` | Full body with header | Current behavior — entire `digraph ^name(...) { ... }` |
@@ -109,7 +109,7 @@ The dialect's function-body struct uses `{:...}` context projections and `{field
 ```rust
 #[derive(Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
-#[chumsky(format = "fn {:name}({body:ports}) -> {body:yields} { {body:body} }")]
+#[chumsky(format = "fn {:name}({body:ports}) -> {:return} { {body:body} }")]
 pub struct CircuitFunction {
     pub body: DiGraph,
 }
@@ -151,7 +151,7 @@ Here `{function:params}` prints type-only parameter list from the signature, and
 ### Example: Signal processing with captures
 
 ```rust
-#[chumsky(format = "fn {:name}({body:ports}) captures ({body:captures}) -> {body:yields} { digraph {body:body} }")]
+#[chumsky(format = "fn {:name}({body:ports}) captures ({body:captures}) -> {:return} { digraph {body:body} }")]
 pub struct DSPFunction {
     pub body: DiGraph,
 }
@@ -183,7 +183,7 @@ fn @bell_pair(%q0: Qubit, %q1: Qubit) -> Qubit, Qubit {
 }
 ```
 
-The format string has no layout hints — just `"fn {:name}({body:ports}) -> {body:yields} { digraph {body:body} }"`. The `{` `}` tokens tell the printer to indent.
+The format string has no layout hints — just `"fn {:name}({body:ports}) -> {:return} { digraph {body:body} }"`. The `{` `}` tokens tell the printer to indent.
 
 **Rule 2: Projections carry their own layout.** Each `{body:...}` projection knows how to format its content:
 
@@ -191,7 +191,7 @@ The format string has no layout hints — just `"fn {:name}({body:ports}) -> {bo
 |-----------|--------|
 | `{body:ports}` | Comma-separated, inline: `%q0: Qubit, %q1: Qubit` |
 | `{body:captures}` | Comma-separated, inline |
-| `{body:yields}` | Comma-separated, inline: `Qubit, Qubit` |
+| `{:return}` | Comma-separated, inline: `Qubit, Qubit` |
 | `{body:body}` | Statement list, newline-separated with indent |
 | `{body:args}` | Comma-separated, inline |
 | `{body}` | Full body including header, uses its own layout |

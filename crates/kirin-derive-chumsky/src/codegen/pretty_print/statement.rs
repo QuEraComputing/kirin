@@ -347,12 +347,18 @@ impl GeneratePrettyPrint {
                         parts.push(print_expr);
                     }
                 }
-                FormatElement::Context(_) => {
-                    // Context projection ({:name}) prints the enclosing function name
+                FormatElement::Context(proj) => {
                     if !is_first && prev_is_field_like {
                         parts.push(quote! { doc.text(" ") });
                     }
-                    parts.push(quote! { doc.print_function_name() });
+                    match proj {
+                        crate::format::ContextProjection::Name => {
+                            parts.push(quote! { doc.print_function_name() });
+                        }
+                        crate::format::ContextProjection::Return => {
+                            parts.push(quote! { doc.print_return_types() });
+                        }
+                    }
                 }
             }
         }

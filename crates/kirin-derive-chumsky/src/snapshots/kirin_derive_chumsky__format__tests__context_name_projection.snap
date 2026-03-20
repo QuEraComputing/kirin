@@ -31,11 +31,8 @@ Format {
                 Arrow,
             ],
         ),
-        Field(
-            "body",
-            Body(
-                Yields,
-            ),
+        Context(
+            Return,
         ),
     ],
 }

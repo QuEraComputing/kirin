@@ -38,11 +38,13 @@ pub enum FormatElement<'src> {
     Context(ContextProjection),
 }
 
-/// Context projections: `{:name}`, `{:...}` — properties of the enclosing function.
+/// Context projections: `{:name}`, `{:return}` — properties of the enclosing function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContextProjection {
     /// `{:name}` — the function's global symbol name (`@symbol`).
     Name,
+    /// `{:return}` — the function's return type(s) (`Type, Type`).
+    Return,
 }
 
 /// Projections for `{field:...}` body structural parts.
@@ -52,8 +54,6 @@ pub enum BodyProjection {
     Ports,
     /// `{field:captures}` — graph capture declarations (`%name: Type, ...`).
     Captures,
-    /// `{field:yields}` — yield types (`Type, Type`).
-    Yields,
     /// `{field:args}` — block arguments (`%name: Type, ...`).
     Args,
     /// `{field:body}` — inner statements only (no header, no braces).
@@ -105,11 +105,12 @@ impl<'src> Format<'src> {
             .ignore_then(select! { Token::Identifier(name) => name })
             .map(FormatElement::Keyword);
 
-        // Parse context projection: {:name} (empty field name = enclosing function property)
+        // Parse context projection: {:name}, {:return} (enclosing function properties)
         let context_projection = just(Token::LBrace)
             .ignore_then(just(Token::Colon))
             .ignore_then(select! {
                 Token::Identifier("name") => ContextProjection::Name,
+                Token::Identifier("return") => ContextProjection::Return,
             })
             .then_ignore(just(Token::RBrace))
             .map(FormatElement::Context);
@@ -128,7 +129,6 @@ impl<'src> Format<'src> {
                             Token::Identifier("name") => FormatOption::Name,
                             Token::Identifier("ports") => FormatOption::Body(BodyProjection::Ports),
                             Token::Identifier("captures") => FormatOption::Body(BodyProjection::Captures),
-                            Token::Identifier("yields") => FormatOption::Body(BodyProjection::Yields),
                             Token::Identifier("args") => FormatOption::Body(BodyProjection::Args),
                             Token::Identifier("body") => FormatOption::Body(BodyProjection::Body),
                         })
@@ -287,7 +287,7 @@ mod tests {
 
     #[test]
     fn test_context_name_projection() {
-        let input = "fn {:name}({body:ports}) -> {body:yields}";
+        let input = "fn {:name}({body:ports}) -> {:return}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);
@@ -311,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_body_captures_projection() {
-        let input = "fn {:name}({body:ports}) captures ({body:captures}) -> {body:yields} {{ {body:body} }}";
+        let input = "fn {:name}({body:ports}) captures ({body:captures}) -> {:return} {{ {body:body} }}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);

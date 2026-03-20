@@ -291,10 +291,12 @@ where
         let staged_info = staged_fn.expect_info(self.stage);
         let spec = &staged_info.specializations()[idx];
 
-        // Set function name context so the body's PrettyPrint can access it
-        // via doc.print_function_name() for {:name} projections.
-        let prev = self.function_name();
+        // Set function context so the body's PrettyPrint can access it
+        // via doc.print_function_name() and doc.print_return_types().
+        let prev_name = self.function_name();
         self.set_function_name(staged_info.name());
+        let ret_text = format!("{}", spec.signature().ret());
+        self.set_return_type_text(Some(ret_text));
 
         // Check if the body's PrettyPrint includes the function header
         let body_def = spec.body().expect_info(self.stage).definition();
@@ -307,7 +309,8 @@ where
         };
 
         let body = self.print_statement(spec.body());
-        self.set_function_name(prev);
+        self.set_function_name(prev_name);
+        self.set_return_type_text(None);
 
         header + self.text(" ") + body
     }
@@ -336,11 +339,14 @@ where
             return doc;
         }
 
-        // Set function name context for body PrettyPrint projections.
-        let prev = self.function_name();
+        // Set function context for body PrettyPrint projections.
+        let prev_name = self.function_name();
         self.set_function_name(info.name());
 
         for spec in active {
+            let ret_text = format!("{}", spec.signature().ret());
+            self.set_return_type_text(Some(ret_text));
+
             doc += self.line_();
             let body_def = spec.body().expect_info(self.stage).definition();
             if body_def.prints_function_header() {
@@ -351,7 +357,8 @@ where
             doc += self.text(" ") + self.print_statement(spec.body());
         }
 
-        self.set_function_name(prev);
+        self.set_function_name(prev_name);
+        self.set_return_type_text(None);
         doc
     }
 
@@ -424,6 +431,17 @@ where
     }
 
     // ── Function context helpers ────────────────────────────────────────────────
+
+    /// Print the enclosing function's return type(s).
+    ///
+    /// Used by `{:return}` projection in generated PrettyPrint code.
+    /// Returns the return type string set by the framework printer.
+    pub fn print_return_types(&'a self) -> ArenaDoc<'a> {
+        let text = self
+            .return_type_text()
+            .unwrap_or_else(|| "()".to_string());
+        self.text(text)
+    }
 
     /// Print the enclosing function name as `@symbol_name`.
     ///

@@ -169,9 +169,6 @@ pub fn parser_expr<L: Layout>(
             FormatOption::Body(BodyProjection::Captures) => {
                 quote! { #crate_path::capture_list::<_, #ir_type>() }
             }
-            FormatOption::Body(BodyProjection::Yields) => {
-                quote! { #crate_path::yield_type_list::<_, #ir_type>() }
-            }
             FormatOption::Body(BodyProjection::Body) => {
                 quote! { #crate_path::digraph_body_statements(language.clone()) }
             }
@@ -277,13 +274,6 @@ pub fn print_expr<L: Layout>(
                             doc.print_captures_only(__info.ports(), __info.edge_count())
                         }
                     },
-                    BodyProjection::Yields => quote! {
-                        {
-                            use #ir::GetInfo as _;
-                            let __info = #field_ref.expect_info(doc.stage());
-                            doc.print_yields_only(__info.yields())
-                        }
-                    },
                     BodyProjection::Body => quote! {
                         doc.print_digraph_body_only(#field_ref)
                     },
@@ -318,9 +308,6 @@ pub fn print_expr<L: Layout>(
                     BodyProjection::Body => quote! {
                         doc.print_ungraph_body_only(#field_ref)
                     },
-                    BodyProjection::Yields => {
-                        unreachable!("BodyProjection::Yields is not valid on UnGraph fields")
-                    }
                     BodyProjection::Args => {
                         unreachable!("BodyProjection::Args is not valid on UnGraph fields")
                     }

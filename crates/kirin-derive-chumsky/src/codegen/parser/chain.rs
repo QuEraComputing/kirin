@@ -59,12 +59,27 @@ impl GenerateHasDialectParser {
                         type_params,
                     )));
                 }
-                FormatElement::Context(_) => {
-                    // Context projections ({:name}) are parsed and discarded at the
-                    // statement level — the function text parser captures the value.
-                    parser_parts.push(ParserPart::Token(
-                        quote! { #crate_path::symbol() },
-                    ));
+                FormatElement::Context(proj) => {
+                    // Context projections are parsed and discarded at the
+                    // statement level — the function text parser provides the values.
+                    match proj {
+                        crate::format::ContextProjection::Name => {
+                            parser_parts.push(ParserPart::Token(
+                                quote! { #crate_path::symbol() },
+                            ));
+                        }
+                        crate::format::ContextProjection::Return => {
+                            // Parse a comma-separated type list
+                            parser_parts.push(ParserPart::Token(
+                                quote! {
+                                    <#ir_type as #crate_path::HasParser<'t>>::parser()
+                                        .separated_by(#crate_path::chumsky::prelude::just(#crate_path::Token::Comma))
+                                        .at_least(1)
+                                        .collect::<::std::vec::Vec<_>>()
+                                },
+                            ));
+                        }
+                    }
                 }
             }
         }

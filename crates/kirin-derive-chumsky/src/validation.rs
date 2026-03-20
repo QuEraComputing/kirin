@@ -154,7 +154,6 @@ impl<'ir> ValidationVisitor<'ir> {
                     .map(|r| match r {
                         BodyProjection::Ports => ":ports",
                         BodyProjection::Captures => ":captures",
-                        BodyProjection::Yields => ":yields",
                         BodyProjection::Args => ":args",
                         BodyProjection::Body => ":body",
                     })
@@ -206,7 +205,6 @@ impl<'ir> ValidationVisitor<'ir> {
                 let suffix = match proj {
                     crate::format::BodyProjection::Ports => format!("{}_ports", field),
                     crate::format::BodyProjection::Captures => format!("{}_captures", field),
-                    crate::format::BodyProjection::Yields => format!("{}_yields", field),
                     crate::format::BodyProjection::Args => format!("{}_args", field),
                     crate::format::BodyProjection::Body => format!("{}_body", field),
                 };
@@ -270,7 +268,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
             use crate::format::BodyProjection;
             let category = field.category();
             let valid = match proj {
-                BodyProjection::Ports | BodyProjection::Captures | BodyProjection::Yields => {
+                BodyProjection::Ports | BodyProjection::Captures => {
                     matches!(
                         category,
                         FieldCategory::DiGraph | FieldCategory::UnGraph
@@ -294,14 +292,11 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                 let proj_name = match proj {
                     BodyProjection::Ports => ":ports",
                     BodyProjection::Captures => ":captures",
-                    BodyProjection::Yields => ":yields",
                     BodyProjection::Args => ":args",
                     BodyProjection::Body => ":body",
                 };
                 let valid_on = match proj {
-                    BodyProjection::Ports
-                    | BodyProjection::Captures
-                    | BodyProjection::Yields => "DiGraph or UnGraph",
+                    BodyProjection::Ports | BodyProjection::Captures => "DiGraph or UnGraph",
                     BodyProjection::Args => "Block",
                     BodyProjection::Body => "DiGraph, UnGraph, Region, or Block",
                 };
@@ -654,15 +649,10 @@ mod tests {
     }
 
     #[test]
-    fn yields_projection_on_argument_is_invalid() {
-        let fields = vec![make_argument(0, "body")];
-        let stmt = make_stmt(fields.clone());
-        let format = Format::parse("{body:yields}", None).unwrap();
-        let err = validate_format(&stmt, &format, &fields).unwrap_err();
-        assert!(
-            err.to_string().contains(":yields"),
-            "Error should mention :yields: {}",
-            err
-        );
+    fn yields_is_not_a_body_projection() {
+        // :yields was removed as a body projection — it's now {:return} (context).
+        // {body:yields} should fail to parse.
+        let result = Format::parse("{body:yields}", None);
+        assert!(result.is_err(), "yields should not be a valid body projection");
     }
 }

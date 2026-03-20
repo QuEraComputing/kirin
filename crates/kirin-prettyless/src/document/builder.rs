@@ -30,6 +30,10 @@ pub struct Document<'a, L: Dialect> {
     /// need to set the function name context before delegating to the dialect's
     /// `PrettyPrint` impl.
     pub(super) function_name: Cell<Option<GlobalSymbol>>,
+    /// The return type string of the enclosing function, if any.
+    ///
+    /// Set by the framework printer for `{:return}` context projections.
+    pub(super) return_type_text: Cell<Option<String>>,
 }
 
 impl<'a, L: Dialect> Document<'a, L> {
@@ -46,6 +50,7 @@ impl<'a, L: Dialect> Document<'a, L> {
             stage,
             global_symbols: None,
             function_name: Cell::new(None),
+            return_type_text: Cell::new(None),
         }
     }
 
@@ -65,6 +70,7 @@ impl<'a, L: Dialect> Document<'a, L> {
             stage,
             global_symbols: Some(global_symbols),
             function_name: Cell::new(None),
+            return_type_text: Cell::new(None),
         }
     }
 
@@ -86,6 +92,16 @@ impl<'a, L: Dialect> Document<'a, L> {
     /// Returns the enclosing function name, if one has been set.
     pub fn function_name(&self) -> Option<GlobalSymbol> {
         self.function_name.get()
+    }
+
+    /// Set the return type text for `{:return}` context projections.
+    pub fn set_return_type_text(&self, text: Option<String>) {
+        self.return_type_text.set(text);
+    }
+
+    /// Returns the return type text, if set.
+    pub fn return_type_text(&self) -> Option<String> {
+        self.return_type_text.take()
     }
 
     /// Indent a document by the configured tab spaces.
