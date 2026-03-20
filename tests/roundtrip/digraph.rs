@@ -43,7 +43,7 @@ enum ProjectedDigraphLanguage {
         #[kirin(into)] kirin_test_languages::Value,
         #[kirin(type = SimpleType::F64)] ResultValue,
     ),
-    #[chumsky(format = "$projected_func ({0:ports}) {{ {0:body} }}")]
+    #[chumsky(format = "$projected_func ({0:ports}) captures ({0:captures}) {{ {0:body} }}")]
     ProjectedFunc(DiGraph, #[kirin(type = SimpleType::F64)] ResultValue),
 }
 
@@ -54,7 +54,7 @@ enum ProjectedDigraphLanguage {
 #[test]
 fn test_projected_digraph_parse_and_render() {
     let input =
-        "%out = projected_func (%p0: f64) { %c = constant 1; %r = add %p0, %c; yield %r; }";
+        "%out = projected_func (%p0: f64) captures () { %c = constant 1; %r = add %p0, %c; yield %r; }";
     let (stage, stmt) =
         roundtrip::emit_statement::<ProjectedDigraphLanguage>(input, &[]);
     let rendered =
@@ -70,7 +70,7 @@ fn test_projected_digraph_parse_and_render() {
 #[test]
 fn test_projected_digraph_roundtrip_stability() {
     let input =
-        "%out = projected_func (%p0: f64) { %r = add %p0, %p0; yield %r; }";
+        "%out = projected_func (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }";
     let (stage, stmt) =
         roundtrip::emit_statement::<ProjectedDigraphLanguage>(input, &[]);
     let rendered =
@@ -90,7 +90,7 @@ fn test_projected_digraph_roundtrip_stability() {
 
 #[test]
 fn test_projected_digraph_empty_body_roundtrip() {
-    let input = "%out = projected_func (%p0: f64) { yield %p0; }";
+    let input = "%out = projected_func (%p0: f64) captures () { yield %p0; }";
     let (stage, stmt) =
         roundtrip::emit_statement::<ProjectedDigraphLanguage>(input, &[]);
     let rendered =
@@ -168,8 +168,8 @@ enum ProjectedFuncLang {
         #[kirin(into)] kirin_test_languages::Value,
         #[kirin(type = SimpleType::F64)] ResultValue,
     ),
-    /// Function body: `({body:ports}) {{ {body:body} }}`
-    #[chumsky(format = "({0:ports}) {{ {0:body} }}")]
+    /// Function body: `({body:ports}) captures ({body:captures}) {{ {body:body} }}`
+    #[chumsky(format = "({0:ports}) captures ({0:captures}) {{ {0:body} }}")]
     FuncBody(DiGraph),
 }
 
@@ -183,7 +183,7 @@ fn test_projected_func_pipeline_parse() {
 
     // Framework parses fn @foo(f64) -> f64, signature is Some.
     // Auto-creates staged function. Body text is `(%p0: f64) { ... }` parsed by dialect.
-    let input = "specialize @test fn @foo(f64) -> f64 (%p0: f64) { %r = add %p0, %p0; yield %r; }";
+    let input = "specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }";
     let functions = pipeline.parse(input).expect("should parse projected format");
     assert_eq!(functions.len(), 1);
 }
@@ -200,7 +200,7 @@ fn test_projected_func_pipeline_roundtrip() {
     // With explicit stage — standard flow
     let input = r#"
 stage @test fn @foo(f64) -> f64;
-specialize @test fn @foo(f64) -> f64 (%p0: f64) { %r = add %p0, %p0; yield %r; }
+specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }
 "#;
     pipeline.parse(input).expect("should parse");
 

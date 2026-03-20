@@ -52,6 +52,8 @@ pub struct ValidationVisitor<'ir> {
     name_occurrences: HashSet<usize>,
     /// ResultValue fields that have name occurrence (default or :name)
     result_name_occurrences: HashSet<usize>,
+    /// Body projections seen per field index (for completeness checking)
+    body_projections: std::collections::HashMap<usize, Vec<crate::format::BodyProjection>>,
     /// Accumulated errors
     errors: Vec<syn::Error>,
 }
@@ -66,6 +68,7 @@ impl<'ir> ValidationVisitor<'ir> {
             referenced_fields: HashSet::new(),
             name_occurrences: HashSet::new(),
             result_name_occurrences: HashSet::new(),
+            body_projections: std::collections::HashMap::new(),
             errors: Vec::new(),
         }
     }
@@ -117,6 +120,54 @@ impl<'ir> ValidationVisitor<'ir> {
                      Using only {{{}:type}} is not sufficient because the name cannot be inferred.",
                     field, field, field, field
                 ));
+            }
+        }
+
+        // Validate body projection completeness: when a field has ANY body projection,
+        // all required projections must be present for roundtrip correctness.
+        for field in collected {
+            if let Some(projs) = self.body_projections.get(&field.index) {
+                use crate::format::BodyProjection;
+                let has = |p: BodyProjection| projs.contains(&p);
+                let (required, field_kind): (&[BodyProjection], &str) = match field.category() {
+                    FieldCategory::DiGraph => (
+                        &[BodyProjection::Ports, BodyProjection::Captures, BodyProjection::Body],
+                        "DiGraph",
+                    ),
+                    FieldCategory::UnGraph => (
+                        &[BodyProjection::Ports, BodyProjection::Captures, BodyProjection::Body],
+                        "UnGraph",
+                    ),
+                    FieldCategory::Block => (
+                        &[BodyProjection::Args, BodyProjection::Body],
+                        "Block",
+                    ),
+                    FieldCategory::Region => (
+                        &[BodyProjection::Body],
+                        "Region",
+                    ),
+                    _ => continue,
+                };
+                let missing: Vec<&str> = required
+                    .iter()
+                    .filter(|r| !has(**r))
+                    .map(|r| match r {
+                        BodyProjection::Ports => ":ports",
+                        BodyProjection::Captures => ":captures",
+                        BodyProjection::Yields => ":yields",
+                        BodyProjection::Args => ":args",
+                        BodyProjection::Body => ":body",
+                    })
+                    .collect();
+                if !missing.is_empty() {
+                    self.add_error(format!(
+                        "{} field '{}' uses body projections but is missing required projection(s): {}. \
+                         All structural parts must be present for roundtrip correctness.",
+                        field_kind,
+                        field,
+                        missing.join(", "),
+                    ));
+                }
             }
         }
 
@@ -263,6 +314,14 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                 ));
                 return Ok(());
             }
+        }
+
+        // Track body projections per field for completeness checking
+        if let FormatOption::Body(proj) = option {
+            self.body_projections
+                .entry(field.index)
+                .or_default()
+                .push(*proj);
         }
 
         // Check for duplicate default occurrences
@@ -503,19 +562,27 @@ mod tests {
     }
 
     #[test]
-    fn body_projection_on_digraph_is_valid() {
+    fn complete_digraph_projections_are_valid() {
         let fields = vec![make_digraph(0, "body")];
         let stmt = make_stmt(fields.clone());
-        let format = Format::parse("{body:body}", None).unwrap();
+        let format =
+            Format::parse("({body:ports}) captures ({body:captures}) {{ {body:body} }}", None)
+                .unwrap();
         assert!(validate_format(&stmt, &format, &fields).is_ok());
     }
 
     #[test]
-    fn ports_projection_on_digraph_is_valid() {
+    fn incomplete_digraph_projections_are_invalid() {
+        // Only :body without :ports and :captures
         let fields = vec![make_digraph(0, "body")];
         let stmt = make_stmt(fields.clone());
-        let format = Format::parse("{body:ports}", None).unwrap();
-        assert!(validate_format(&stmt, &format, &fields).is_ok());
+        let format = Format::parse("{body:body}", None).unwrap();
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains(":ports"),
+            "Error should mention missing :ports: {}",
+            err
+        );
     }
 
     #[test]
