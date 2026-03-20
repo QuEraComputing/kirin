@@ -94,7 +94,7 @@ struct FunctionBody {
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, kirin_ir::Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = I32Type, crate = kirin_ir)]
-#[chumsky(crate = crate, format = "{body}")]
+#[chumsky(crate = crate, format = "{:signature} {body}")]
 struct LowerBody {
     body: Region,
 }
