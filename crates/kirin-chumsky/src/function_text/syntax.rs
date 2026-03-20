@@ -11,7 +11,9 @@ pub(super) type RichError<'src> = Rich<'src, Token<'src>, SimpleSpan>;
 
 #[derive(Debug, Clone)]
 pub(super) struct Header<'src, T> {
+    #[allow(dead_code)]
     pub stage: SymbolName<'src>,
+    #[allow(dead_code)]
     pub function: SymbolName<'src>,
     pub signature: Signature<T>,
     pub span: SimpleSpan,
@@ -21,8 +23,14 @@ pub(super) struct Header<'src, T> {
 pub(super) enum Declaration<'src, T> {
     Stage(Header<'src, T>),
     Specialize {
-        header: Header<'src, T>,
-        /// Span of the body portion only (the brace-balanced region).
+        stage: SymbolName<'src>,
+        function: SymbolName<'src>,
+        /// Framework-parsed signature from `fn @name(types) -> type`.
+        /// `None` when the dialect controls the format (e.g., projection-based).
+        signature: Option<Signature<T>>,
+        /// Span of the body portion (from after `fn @name` through closing `}`).
+        /// When signature is Some, this covers `keyword { ... }` or `{ ... }`.
+        /// When signature is None, this covers `(%q: T) -> T { ... }`.
         body_span: SimpleSpan,
         /// Span of the entire specialize declaration.
         span: SimpleSpan,
@@ -65,6 +73,21 @@ where
             signature: Signature::new(params, ret, ()),
         })
         .labelled("function signature")
+}
+
+/// Parses just `(types) -> type` — the parameter/return part of a function signature.
+fn fn_params_and_return<'src, I, L>()
+-> impl Parser<'src, I, Signature<L::Type>, ParserError<'src>>
+where
+    I: TokenInput<'src>,
+    L: Dialect + HasParser<'src>,
+    L::Type: HasParser<'src, Output = L::Type>,
+{
+    type_list_parser::<I, L>()
+        .then_ignore(just(Token::Arrow))
+        .then(L::Type::parser())
+        .map(|(params, ret)| Signature::new(params, ret, ()))
+        .labelled("function params and return type")
 }
 
 /// Body span scanner. Matches an optional keyword prefix (e.g. `digraph`,
@@ -125,18 +148,18 @@ where
         });
 
     let specialize_decl = identifier("specialize")
-        .ignore_then(symbol())
-        .then(fn_signature_parser::<I, L>())
-        .then(body_span::<I>())
-        .map_with(|((stage, sig), body_span), extra| Declaration::Specialize {
-            header: Header {
+        .ignore_then(symbol())                                   // @stage
+        .then(identifier("fn").ignore_then(symbol()))            // fn @name
+        .then(fn_params_and_return::<I, L>().or_not())           // optional (types) -> type
+        .then(body_span::<I>())                                  // body through closing }
+        .map_with(|(((stage, function), signature), body_span), extra| {
+            Declaration::Specialize {
                 stage,
-                function: sig.function,
-                signature: sig.signature,
+                function,
+                signature,
+                body_span,
                 span: extra.span(),
-            },
-            body_span,
-            span: extra.span(),
+            }
         });
 
     choice((stage_decl, specialize_decl))

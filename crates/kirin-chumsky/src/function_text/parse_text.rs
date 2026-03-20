@@ -83,8 +83,8 @@ use rustc_hash::FxHashMap;
 
 use chumsky::span::SimpleSpan;
 use kirin_ir::{
-    CompileStage, Dialect, Function, GetInfo, GlobalSymbol, Id, Pipeline, StageInfo, StageMeta,
-    StagedFunction,
+    CompileStage, Dialect, Function, GetInfo, GlobalSymbol, Id, Pipeline, Signature, StageInfo,
+    StageMeta, StagedFunction,
 };
 use kirin_lexer::Token;
 use strsim::levenshtein;
@@ -260,14 +260,16 @@ pub fn second_pass_concrete<'t, L>(
 ) -> Result<usize, FunctionParseError>
 where
     L: Dialect + ParseEmit<L> + HasParser<'t>,
-    L::Type: HasParser<'t, Output = L::Type>,
+    L::Type: kirin_ir::Placeholder + HasParser<'t, Output = L::Type>,
 {
     let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
         .map_err(parse_error_from_chumsky)?;
     let next_index = advance_to_next_declaration(ctx.tokens, ctx.start_index, consumed_span);
 
     let Declaration::Specialize {
-        header,
+        stage: _stage_sym,
+        function,
+        signature,
         body_span,
         span,
     } = declaration
@@ -284,7 +286,8 @@ where
     apply_specialize_declaration::<L>(
         stage,
         stage_id,
-        &header,
+        &function,
+        signature.as_ref(),
         body_text,
         span,
         ctx.function_lookup,
@@ -560,7 +563,8 @@ where
 fn apply_specialize_declaration<L>(
     stage: &mut StageInfo<L>,
     stage_id: CompileStage,
-    header: &Header<'_, L::Type>,
+    function_name: &SymbolName<'_>,
+    framework_signature: Option<&Signature<L::Type>>,
     body_text: &str,
     span: SimpleSpan,
     function_lookup: &FxHashMap<String, Function>,
@@ -569,12 +573,11 @@ fn apply_specialize_declaration<L>(
 ) -> Result<(), FunctionParseError>
 where
     L: Dialect + ParseEmit<L>,
+    L::Type: kirin_ir::Placeholder,
 {
-    let (function, staged_function) =
-        resolve_specialize_target::<L>(stage_id, header, span, function_lookup, staged_lookup)?;
-
-    stage.with_builder(|builder| {
-        let body_statement = {
+    // Parse and emit the body first — we need it to extract signature if needed
+    let body_statement = stage
+        .with_builder(|builder| {
             let mut emit_ctx = EmitContext::new(builder);
             L::parse_and_emit(body_text, &mut emit_ctx).map_err(|err| {
                 let (kind, message) = match &err {
@@ -590,51 +593,106 @@ where
                     }
                 };
                 FunctionParseError::new(kind, Some(span), message)
-            })?
-        };
+            })
+        })
+        .map_err(|err| {
+            FunctionParseError::new(
+                FunctionParseErrorKind::EmitFailed,
+                Some(span),
+                err.to_string(),
+            )
+        })?;
 
-        builder
-            .specialize()
-            .staged_func(staged_function)
-            .signature(header.signature.clone())
-            .body(body_statement)
-            .new()
-            .map_err(|err| {
-                FunctionParseError::new(
-                    FunctionParseErrorKind::EmitFailed,
-                    Some(span),
-                    err.to_string(),
-                )
-            })?;
+    // Determine signature: framework-parsed or dialect-extracted
+    let signature = if let Some(sig) = framework_signature {
+        sig.clone()
+    } else if let Some(sig) = L::extract_signature(body_statement, stage) {
+        sig
+    } else {
+        return Err(FunctionParseError::new(
+            FunctionParseErrorKind::EmitFailed,
+            Some(span),
+            format!(
+                "no function signature available for '{}'. Either use `stage` declaration \
+                 with explicit signature, or implement `extract_signature` on ParseEmit.",
+                function_name.name
+            ),
+        ));
+    };
 
-        Ok(())
-    })?;
+    // Resolve or auto-create the staged function
+    let (function, staged_function) = resolve_or_create_specialize_target::<L>(
+        stage,
+        stage_id,
+        function_name,
+        &signature,
+        span,
+        function_lookup,
+        staged_lookup,
+    )?;
+
+    // Construct the specialization
+    stage
+        .with_builder(|builder| {
+            builder
+                .specialize()
+                .staged_func(staged_function)
+                .signature(signature.clone())
+                .body(body_statement)
+                .new()
+                .map_err(|err| {
+                    FunctionParseError::new(
+                        FunctionParseErrorKind::EmitFailed,
+                        Some(span),
+                        err.to_string(),
+                    )
+                })
+        })
+        .map_err(|err| {
+            FunctionParseError::new(
+                FunctionParseErrorKind::EmitFailed,
+                Some(span),
+                err.to_string(),
+            )
+        })?;
 
     state.record(function);
     Ok(())
 }
 
-fn resolve_specialize_target<'src, L>(
+fn resolve_or_create_specialize_target<L>(
+    _stage: &mut StageInfo<L>,
     stage_id: CompileStage,
-    header: &Header<'src, L::Type>,
+    function_name: &SymbolName<'_>,
+    _signature: &Signature<L::Type>,
     span: SimpleSpan,
     function_lookup: &FxHashMap<String, Function>,
     staged_lookup: &FxHashMap<StagedKey, StagedFunction>,
 ) -> Result<(Function, StagedFunction), FunctionParseError>
 where
     L: Dialect,
+    L::Type: kirin_ir::Placeholder,
 {
-    let Some(function) = function_lookup.get(header.function.name).copied() else {
-        return Err(missing_stage_declaration_error(header, Some(span)));
-    };
-    let key = StagedKey {
-        stage: stage_id,
-        function,
-    };
-    let Some(staged_function) = staged_lookup.get(&key).copied() else {
-        return Err(missing_stage_declaration_error(header, Some(span)));
-    };
-    Ok((function, staged_function))
+    // Look up existing function and staged function
+    if let Some(function) = function_lookup.get(function_name.name).copied() {
+        let key = StagedKey {
+            stage: stage_id,
+            function,
+        };
+        if let Some(staged_function) = staged_lookup.get(&key).copied() {
+            return Ok((function, staged_function));
+        }
+    }
+
+    // No staged function found.
+    Err(FunctionParseError::new(
+        FunctionParseErrorKind::MissingStageDeclaration,
+        Some(span),
+        format!(
+            "specialize declaration for function '@{}' has no matching stage declaration",
+            function_name.name
+        ),
+    ))
 }
 
 fn ensure_forward_progress(
@@ -870,17 +928,3 @@ fn stage_missing_error(stage_symbol: &str, span: Option<SimpleSpan>) -> Function
     )
 }
 
-/// Build a standardized error for `specialize` declarations without a matching stage header.
-fn missing_stage_declaration_error<L>(
-    header: &Header<'_, L>,
-    span: Option<SimpleSpan>,
-) -> FunctionParseError {
-    FunctionParseError::new(
-        FunctionParseErrorKind::MissingStageDeclaration,
-        span.or(Some(header.span)),
-        format!(
-            "specialize declaration for stage '@{}' and function '@{}' has no matching stage declaration",
-            header.stage.name, header.function.name
-        ),
-    )
-}
