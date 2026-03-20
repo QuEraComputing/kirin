@@ -390,4 +390,165 @@ where
             .and_then(|symbols| symbols.resolve(symbol).cloned())
             .unwrap_or_else(|| usize::from(symbol).to_string())
     }
+
+    // ── Projection helpers (for format-string projections like {body:ports}) ──
+
+    /// Print only the edge port declarations: `%name: Type, %name: Type`
+    ///
+    /// No parentheses — the caller adds those via literal tokens in the format string.
+    pub fn print_ports_only(&'a self, ports: &[Port], edge_count: usize) -> ArenaDoc<'a> {
+        let edge_ports = &ports[..edge_count];
+        self.print_port_list(edge_ports)
+    }
+
+    /// Print only the capture port declarations: `%name: Type, %name: Type`
+    ///
+    /// No parentheses or `capture` keyword — the caller adds those via literal tokens.
+    pub fn print_captures_only(&'a self, ports: &[Port], edge_count: usize) -> ArenaDoc<'a> {
+        let capture_ports = &ports[edge_count..];
+        self.print_port_list(capture_ports)
+    }
+
+    /// Print only yield types: `Type, Type`
+    ///
+    /// Prints the *type* of each yield value, comma-separated.
+    pub fn print_yields_only(&'a self, yields: &[SSAValue]) -> ArenaDoc<'a> {
+        self.list(yields.iter(), ", ", |ssa| self.print_ssa_type(*ssa))
+    }
+
+    /// Print a DiGraph body only: statements + yield, no header, no braces.
+    pub fn print_digraph_body_only(&'a self, digraph: &DiGraph) -> ArenaDoc<'a> {
+        let info = digraph.expect_info(self.stage);
+
+        let mut inner = self.nil();
+        let mut first = true;
+        for (_idx, stmt) in info.graph().node_references() {
+            if !first {
+                inner += self.line_();
+            }
+            inner += self.print_statement(stmt) + self.text(";");
+            first = false;
+        }
+
+        if !info.yields().is_empty() {
+            if !first {
+                inner += self.line_();
+            }
+            let yield_doc = self.list(info.yields().iter(), ", ", |ssa| self.print_ssa_ref(*ssa));
+            inner += self.text("yield ") + yield_doc + self.text(";");
+        }
+
+        inner
+    }
+
+    /// Print an UnGraph body only: interleaved edge/node statements, no header, no braces.
+    pub fn print_ungraph_body_only(&'a self, ungraph: &UnGraph) -> ArenaDoc<'a> {
+        let info = ungraph.expect_info(self.stage);
+        let edge_stmts = info.edge_statements();
+
+        let edge_result_to_stmt: std::collections::HashMap<SSAValue, Statement> = edge_stmts
+            .iter()
+            .flat_map(|&edge_stmt| {
+                edge_stmt
+                    .results::<L>(self.stage)
+                    .map(move |rv| (SSAValue::from(*rv), edge_stmt))
+            })
+            .collect();
+
+        let mut printed_edges: HashSet<Statement> = HashSet::new();
+        let mut inner = self.nil();
+        let mut first = true;
+
+        for (_idx, node_stmt) in info.graph().node_references() {
+            for arg in node_stmt.arguments::<L>(self.stage) {
+                if let Some(&edge_stmt) = edge_result_to_stmt.get(arg)
+                    && printed_edges.insert(edge_stmt)
+                {
+                    if !first {
+                        inner += self.line_();
+                    }
+                    inner += self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
+                    first = false;
+                }
+            }
+
+            if !first {
+                inner += self.line_();
+            }
+            inner += self.print_statement(node_stmt) + self.text(";");
+            first = false;
+        }
+
+        for &edge_stmt in edge_stmts {
+            if printed_edges.insert(edge_stmt) {
+                if !first {
+                    inner += self.line_();
+                }
+                inner += self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
+                first = false;
+            }
+        }
+
+        inner
+    }
+
+    /// Print a Region body only: blocks without outer braces.
+    pub fn print_region_body_only(&'a self, region: &Region) -> ArenaDoc<'a> {
+        let mut inner = self.nil();
+        for block in region.blocks(self.stage) {
+            inner += self.print_block(&block);
+            inner += self.line_();
+        }
+        inner
+    }
+
+    /// Print a Block body only: statements without the header or braces.
+    pub fn print_block_body_only(&'a self, block: &Block) -> ArenaDoc<'a> {
+        let mut inner = self.nil();
+        for (i, stmt) in block.statements(self.stage).enumerate() {
+            if i > 0 {
+                inner += self.line_();
+            }
+            inner += self.print_statement(&stmt) + self.text(";");
+        }
+        if let Some(terminator) = block.terminator(self.stage) {
+            if !inner.is_nil() {
+                inner += self.line_();
+            }
+            inner += self.print_statement(&terminator) + self.text(";");
+        }
+        inner
+    }
+
+    /// Print Block arguments only: `%name: Type, %name: Type`
+    ///
+    /// No parentheses — the caller adds those via literal tokens.
+    pub fn print_block_args_only(&'a self, block: &Block) -> ArenaDoc<'a> {
+        let block_info = block.expect_info(self.stage);
+        let args = &block_info.arguments;
+        let mut doc = self.nil();
+        for (i, arg) in args.iter().enumerate() {
+            if i > 0 {
+                doc += self.text(", ");
+            }
+            let name = self.ssa_name(*arg);
+            let info = arg.expect_info(self.stage);
+            doc += self.text(format!("%{}: {}", name, info.ty()));
+        }
+        doc
+    }
+
+    /// Helper: print a comma-separated list of ports as `%name: Type, %name: Type`.
+    fn print_port_list(&'a self, ports: &[Port]) -> ArenaDoc<'a> {
+        let mut doc = self.nil();
+        for (i, port) in ports.iter().enumerate() {
+            if i > 0 {
+                doc += self.text(", ");
+            }
+            let name = self.ssa_name(*port);
+            let info: &Item<SSAInfo<L>> = port.expect_info(self.stage);
+            doc += self.text(format!("%{}: {}", name, info.ty()));
+        }
+        doc
+    }
 }

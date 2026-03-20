@@ -196,7 +196,8 @@ impl GeneratePrettyPrint {
         let bindings = stmt.field_bindings("f");
         let fields = &bindings.field_idents;
 
-        let print_expr = self.generate_format_print(&format, &field_map, &collected, fields);
+        let ir_path = Self::ir_path(ir_input);
+        let print_expr = self.generate_format_print(&format, &field_map, &collected, fields, &ir_path);
 
         let pattern = if bindings.is_empty() {
             match variant_name {
@@ -279,6 +280,7 @@ impl GeneratePrettyPrint {
         field_map: &IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)>,
         _collected: &[FieldInfo<PrettyPrintLayout>],
         field_vars: &[syn::Ident],
+        ir_path: &syn::Path,
     ) -> TokenStream {
         let prettyless_path = &self.prettyless_path;
         let elements = format.elements();
@@ -334,7 +336,7 @@ impl GeneratePrettyPrint {
                         let var_ref = quote! { #var };
 
                         let print_expr =
-                            field_kind::print_expr(field, prettyless_path, &var_ref, opt);
+                            field_kind::print_expr(field, prettyless_path, &var_ref, opt, Some(ir_path));
 
                         if !is_first && prev_is_field_like {
                             parts.push(quote! { doc.text(" ") });

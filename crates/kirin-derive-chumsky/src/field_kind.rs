@@ -9,7 +9,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 use crate::ChumskyLayout;
-use crate::format::{Format, FormatElement, FormatOption};
+use crate::format::{BodyProjection, Format, FormatElement, FormatOption};
 
 /// Extension trait for [`FieldCategory`] with chumsky-specific AST generation helpers.
 pub trait FieldCategoryExt {
@@ -167,6 +167,7 @@ pub fn print_expr<L: Layout>(
     prettyless_path: &syn::Path,
     field_ref: &TokenStream,
     opt: &FormatOption,
+    ir_path: Option<&syn::Path>,
 ) -> TokenStream {
     match field.category() {
         FieldCategory::Argument | FieldCategory::Result => match opt {
@@ -185,14 +186,35 @@ pub fn print_expr<L: Layout>(
                 unreachable!("projection options are for pseudo-fields, not Argument/Result fields")
             }
         },
-        FieldCategory::Block => quote! {
-            doc.print_block(#field_ref)
+        FieldCategory::Block => match opt {
+            FormatOption::Default => quote! { doc.print_block(#field_ref) },
+            FormatOption::Body(BodyProjection::Args) => quote! {
+                doc.print_block_args_only(#field_ref)
+            },
+            FormatOption::Body(BodyProjection::Body) => quote! {
+                doc.print_block_body_only(#field_ref)
+            },
+            FormatOption::Body(_) => {
+                unreachable!("Ports/Captures/Yields projections are not valid on Block fields")
+            }
+            FormatOption::Function(_) | FormatOption::Name | FormatOption::Type => {
+                unreachable!("Name/Type/Function projections are not valid on Block fields")
+            }
         },
         FieldCategory::Successor => quote! {
             #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
         },
-        FieldCategory::Region => quote! {
-            doc.print_region(#field_ref)
+        FieldCategory::Region => match opt {
+            FormatOption::Default => quote! { doc.print_region(#field_ref) },
+            FormatOption::Body(BodyProjection::Body) => quote! {
+                doc.print_region_body_only(#field_ref)
+            },
+            FormatOption::Body(_) => {
+                unreachable!("Ports/Captures/Yields/Args projections are not valid on Region fields")
+            }
+            FormatOption::Function(_) | FormatOption::Name | FormatOption::Type => {
+                unreachable!("Name/Type/Function projections are not valid on Region fields")
+            }
         },
         FieldCategory::Symbol => quote! {
             #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
@@ -202,11 +224,77 @@ pub fn print_expr<L: Layout>(
                 #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
             }
         }
-        FieldCategory::DiGraph => quote! {
-            doc.print_digraph(#field_ref)
+        FieldCategory::DiGraph => match opt {
+            FormatOption::Default => quote! { doc.print_digraph(#field_ref) },
+            FormatOption::Body(proj) => {
+                let ir = ir_path.expect("ir_path required for Body projections on DiGraph");
+                match proj {
+                    BodyProjection::Ports => quote! {
+                        {
+                            use #ir::GetInfo as _;
+                            let __info = #field_ref.expect_info(doc.stage());
+                            doc.print_ports_only(__info.ports(), __info.edge_count())
+                        }
+                    },
+                    BodyProjection::Captures => quote! {
+                        {
+                            use #ir::GetInfo as _;
+                            let __info = #field_ref.expect_info(doc.stage());
+                            doc.print_captures_only(__info.ports(), __info.edge_count())
+                        }
+                    },
+                    BodyProjection::Yields => quote! {
+                        {
+                            use #ir::GetInfo as _;
+                            let __info = #field_ref.expect_info(doc.stage());
+                            doc.print_yields_only(__info.yields())
+                        }
+                    },
+                    BodyProjection::Body => quote! {
+                        doc.print_digraph_body_only(#field_ref)
+                    },
+                    BodyProjection::Args => {
+                        unreachable!("BodyProjection::Args is not valid on DiGraph fields")
+                    }
+                }
+            }
+            FormatOption::Function(_) | FormatOption::Name | FormatOption::Type => {
+                unreachable!("Name/Type/Function projections are not valid on DiGraph fields")
+            }
         },
-        FieldCategory::UnGraph => quote! {
-            doc.print_ungraph(#field_ref)
+        FieldCategory::UnGraph => match opt {
+            FormatOption::Default => quote! { doc.print_ungraph(#field_ref) },
+            FormatOption::Body(proj) => {
+                let ir = ir_path.expect("ir_path required for Body projections on UnGraph");
+                match proj {
+                    BodyProjection::Ports => quote! {
+                        {
+                            use #ir::GetInfo as _;
+                            let __info = #field_ref.expect_info(doc.stage());
+                            doc.print_ports_only(__info.ports(), __info.edge_count())
+                        }
+                    },
+                    BodyProjection::Captures => quote! {
+                        {
+                            use #ir::GetInfo as _;
+                            let __info = #field_ref.expect_info(doc.stage());
+                            doc.print_captures_only(__info.ports(), __info.edge_count())
+                        }
+                    },
+                    BodyProjection::Body => quote! {
+                        doc.print_ungraph_body_only(#field_ref)
+                    },
+                    BodyProjection::Yields => {
+                        unreachable!("BodyProjection::Yields is not valid on UnGraph fields")
+                    }
+                    BodyProjection::Args => {
+                        unreachable!("BodyProjection::Args is not valid on UnGraph fields")
+                    }
+                }
+            }
+            FormatOption::Function(_) | FormatOption::Name | FormatOption::Type => {
+                unreachable!("Name/Type/Function projections are not valid on UnGraph fields")
+            }
         },
     }
 }
