@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::Cell;
 
 use kirin_ir::{Dialect, GetInfo, GlobalSymbol, Id, InternTable, Item, SSAInfo, StageInfo};
 use prettyless::{Arena, DocAllocator};
@@ -22,6 +23,13 @@ pub struct Document<'a, L: Dialect> {
     pub(super) arena: Arena<'a>,
     pub(super) stage: &'a StageInfo<L>,
     pub(super) global_symbols: Option<&'a InternTable<String, GlobalSymbol>>,
+    /// The name of the enclosing function, if any.
+    ///
+    /// Uses `Cell` for interior mutability because `print_specialized_function`
+    /// and `print_staged_function` receive `&'a self` (shared reference) but
+    /// need to set the function name context before delegating to the dialect's
+    /// `PrettyPrint` impl.
+    pub(super) function_name: Cell<Option<GlobalSymbol>>,
 }
 
 impl<'a, L: Dialect> Document<'a, L> {
@@ -37,6 +45,7 @@ impl<'a, L: Dialect> Document<'a, L> {
             arena,
             stage,
             global_symbols: None,
+            function_name: Cell::new(None),
         }
     }
 
@@ -55,12 +64,28 @@ impl<'a, L: Dialect> Document<'a, L> {
             arena,
             stage,
             global_symbols: Some(global_symbols),
+            function_name: Cell::new(None),
         }
     }
 
     /// Returns a reference to the global symbol table, if available.
     pub fn global_symbols(&self) -> Option<&'a InternTable<String, GlobalSymbol>> {
         self.global_symbols
+    }
+
+    /// Set the enclosing function name for format-string projections.
+    ///
+    /// When set, dialect `PrettyPrint` impls can call
+    /// [`Document::print_function_name`] to render `@name` for the enclosing
+    /// function. This is used by `{function:name}` projections in generated
+    /// format-string pretty printers.
+    pub fn set_function_name(&self, name: Option<GlobalSymbol>) {
+        self.function_name.set(name);
+    }
+
+    /// Returns the enclosing function name, if one has been set.
+    pub fn function_name(&self) -> Option<GlobalSymbol> {
+        self.function_name.get()
     }
 
     /// Indent a document by the configured tab spaces.

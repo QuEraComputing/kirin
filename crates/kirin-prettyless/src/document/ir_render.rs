@@ -283,12 +283,23 @@ where
     ///   <body>
     /// }
     /// ```
+    ///
+    /// Sets the enclosing function name on the document so that dialect
+    /// `PrettyPrint` impls can access it via [`Document::print_function_name`].
     pub fn print_specialized_function(&'a self, func: &SpecializedFunction) -> ArenaDoc<'a> {
         let (staged_fn, idx) = func.id();
         let staged_info = staged_fn.expect_info(self.stage);
         let spec = &staged_info.specializations()[idx];
         let header = self.print_specialize_header(staged_info.name(), spec.signature());
-        header + self.text(" ") + self.print_statement(spec.body())
+
+        // Set function name context so the body's PrettyPrint can access it
+        // via doc.print_function_name() for {function:name} projections.
+        let prev = self.function_name();
+        self.set_function_name(staged_info.name());
+        let body = self.print_statement(spec.body());
+        self.set_function_name(prev);
+
+        header + self.text(" ") + body
     }
 
     /// Pretty print a staged function with all its non-invalidated specializations.
@@ -315,11 +326,17 @@ where
             return doc;
         }
 
+        // Set function name context for body PrettyPrint projections.
+        let prev = self.function_name();
+        self.set_function_name(info.name());
+
         for spec in active {
             doc += self.line_();
             doc += self.print_specialize_header(info.name(), spec.signature());
             doc += self.text(" ") + self.print_statement(spec.body());
         }
+
+        self.set_function_name(prev);
         doc
     }
 
@@ -389,6 +406,21 @@ where
         self.global_symbols
             .and_then(|symbols| symbols.resolve(symbol).cloned())
             .unwrap_or_else(|| usize::from(symbol).to_string())
+    }
+
+    // ── Function context helpers ────────────────────────────────────────────────
+
+    /// Print the enclosing function name as `@symbol_name`.
+    ///
+    /// Used by `{function:name}` projection in generated PrettyPrint code.
+    /// Returns `@unnamed` if no function name has been set via
+    /// [`Document::set_function_name`].
+    pub fn print_function_name(&'a self) -> ArenaDoc<'a> {
+        let name_text = self
+            .function_name()
+            .map(|symbol| self.resolve_global_symbol(symbol))
+            .unwrap_or_else(|| "unnamed".to_string());
+        self.text(format!("@{}", name_text))
     }
 
     // ── Projection helpers (for format-string projections like {body:ports}) ──
