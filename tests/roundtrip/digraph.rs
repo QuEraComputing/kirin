@@ -24,7 +24,86 @@ enum DiGraphLanguage {
     GraphFunc(DiGraph, #[kirin(type = SimpleType::F64)] ResultValue),
 }
 
+/// A digraph language variant using body projections.
+///
+/// Instead of `digraph ^name(...) { ... }`, this uses projected format:
+/// `projected_func (%port: Type) { stmt; yield %v; }`
+#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
+#[kirin(builders, type = SimpleType, crate = kirin::ir)]
+#[chumsky(crate = kirin::parsers)]
+enum ProjectedDigraphLanguage {
+    #[chumsky(format = "$add {0}, {1}")]
+    Add(
+        SSAValue,
+        SSAValue,
+        #[kirin(type = SimpleType::F64)] ResultValue,
+    ),
+    #[chumsky(format = "$constant {0}")]
+    Constant(
+        #[kirin(into)] kirin_test_languages::Value,
+        #[kirin(type = SimpleType::F64)] ResultValue,
+    ),
+    #[chumsky(format = "$projected_func ({0:ports}) {{ {0:body} }}")]
+    ProjectedFunc(DiGraph, #[kirin(type = SimpleType::F64)] ResultValue),
+}
+
 // --- Statement-level roundtrip tests ---
+
+// --- Projected digraph roundtrip tests ---
+
+#[test]
+fn test_projected_digraph_parse_and_render() {
+    let input =
+        "%out = projected_func (%p0: f64) { %c = constant 1; %r = add %p0, %c; yield %r; }";
+    let (stage, stmt) =
+        roundtrip::emit_statement::<ProjectedDigraphLanguage>(input, &[]);
+    let rendered =
+        roundtrip::render_statement::<ProjectedDigraphLanguage>(&stage, stmt);
+
+    // Verify structural elements
+    assert!(rendered.contains("projected_func"), "rendered: {}", rendered);
+    assert!(rendered.contains("%p0: f64"), "rendered: {}", rendered);
+    assert!(rendered.contains("constant 1"), "rendered: {}", rendered);
+    assert!(rendered.contains("yield %r"), "rendered: {}", rendered);
+}
+
+#[test]
+fn test_projected_digraph_roundtrip_stability() {
+    let input =
+        "%out = projected_func (%p0: f64) { %r = add %p0, %p0; yield %r; }";
+    let (stage, stmt) =
+        roundtrip::emit_statement::<ProjectedDigraphLanguage>(input, &[]);
+    let rendered =
+        roundtrip::render_statement::<ProjectedDigraphLanguage>(&stage, stmt);
+
+    // Second roundtrip
+    let (stage2, stmt2) =
+        roundtrip::emit_statement::<ProjectedDigraphLanguage>(rendered.trim(), &[]);
+    let rendered2 =
+        roundtrip::render_statement::<ProjectedDigraphLanguage>(&stage2, stmt2);
+    assert_eq!(
+        rendered.trim(),
+        rendered2.trim(),
+        "projected digraph roundtrip should be stable"
+    );
+}
+
+#[test]
+fn test_projected_digraph_empty_body_roundtrip() {
+    let input = "%out = projected_func (%p0: f64) { yield %p0; }";
+    let (stage, stmt) =
+        roundtrip::emit_statement::<ProjectedDigraphLanguage>(input, &[]);
+    let rendered =
+        roundtrip::render_statement::<ProjectedDigraphLanguage>(&stage, stmt);
+
+    let (stage2, stmt2) =
+        roundtrip::emit_statement::<ProjectedDigraphLanguage>(rendered.trim(), &[]);
+    let rendered2 =
+        roundtrip::render_statement::<ProjectedDigraphLanguage>(&stage2, stmt2);
+    assert_eq!(rendered.trim(), rendered2.trim());
+}
+
+// --- Full digraph roundtrip tests ---
 
 #[test]
 fn test_digraph_add_roundtrip() {

@@ -30,31 +30,33 @@ pub struct Format<'src> {
 pub enum FormatElement<'src> {
     /// Literal tokens to match exactly.
     Token(Vec<Token<'src>>),
-    /// A field interpolation like `{name}` or `{name:type}`.
+    /// A field interpolation like `{name}`, `{name:type}`, or `{name:ports}`.
     Field(&'src str, FormatOption),
     /// A keyword interpolation like `$add` that gets namespace-prefixed.
     Keyword(&'src str),
+    /// A context projection like `{:name}` — properties of the enclosing function.
+    Context(ContextProjection),
 }
 
-/// Projections for `{function:...}` pseudo-field.
+/// Context projections: `{:name}`, `{:...}` — properties of the enclosing function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum FunctionProjection {
-    /// `{function:name}` — the function's global symbol name (`@symbol`).
+pub enum ContextProjection {
+    /// `{:name}` — the function's global symbol name (`@symbol`).
     Name,
 }
 
-/// Projections for `{body:...}` pseudo-field.
+/// Projections for `{field:...}` body structural parts.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BodyProjection {
-    /// `{body:ports}` — graph port declarations (`%name: Type, ...`).
+    /// `{field:ports}` — graph port declarations (`%name: Type, ...`).
     Ports,
-    /// `{body:captures}` — graph capture declarations (`%name: Type, ...`).
+    /// `{field:captures}` — graph capture declarations (`%name: Type, ...`).
     Captures,
-    /// `{body:yields}` — yield types (`Type, Type`).
+    /// `{field:yields}` — yield types (`Type, Type`).
     Yields,
-    /// `{body:args}` — block arguments (`%name: Type, ...`).
+    /// `{field:args}` — block arguments (`%name: Type, ...`).
     Args,
-    /// `{body:body}` — inner statements only (no header, no braces).
+    /// `{field:body}` — inner statements only (no header, no braces).
     Body,
 }
 
@@ -68,9 +70,7 @@ pub enum FormatOption {
     /// Default behavior based on field type.
     #[default]
     Default,
-    /// Projection on the `function` pseudo-field.
-    Function(FunctionProjection),
-    /// Projection on the `body` pseudo-field.
+    /// Body structural projection on a field (`{field:ports}`, `{field:body}`, etc.).
     Body(BodyProjection),
 }
 
@@ -105,31 +105,16 @@ impl<'src> Format<'src> {
             .ignore_then(select! { Token::Identifier(name) => name })
             .map(FormatElement::Keyword);
 
-        // Parse body projection: {body:ports}, {body:captures}, etc.
-        let body_projection = just(Token::LBrace)
-            .ignore_then(just(Token::Identifier("body")))
+        // Parse context projection: {:name} (empty field name = enclosing function property)
+        let context_projection = just(Token::LBrace)
             .ignore_then(just(Token::Colon))
             .ignore_then(select! {
-                Token::Identifier("ports") => BodyProjection::Ports,
-                Token::Identifier("captures") => BodyProjection::Captures,
-                Token::Identifier("yields") => BodyProjection::Yields,
-                Token::Identifier("args") => BodyProjection::Args,
-                Token::Identifier("body") => BodyProjection::Body,
+                Token::Identifier("name") => ContextProjection::Name,
             })
             .then_ignore(just(Token::RBrace))
-            .map(|proj| FormatElement::Field("body", FormatOption::Body(proj)));
+            .map(FormatElement::Context);
 
-        // Parse function projection: {function:name}
-        let function_projection = just(Token::LBrace)
-            .ignore_then(just(Token::Identifier("function")))
-            .ignore_then(just(Token::Colon))
-            .ignore_then(select! {
-                Token::Identifier("name") => FunctionProjection::Name,
-            })
-            .then_ignore(just(Token::RBrace))
-            .map(|proj| FormatElement::Field("function", FormatOption::Function(proj)));
-
-        // Parse field interpolations like {name} or {name:type}
+        // Parse field interpolations: {name}, {name:type}, {name:ports}, {name:body}, etc.
         let interpolation = just(Token::LBrace)
             .ignore_then(
                 select! {
@@ -141,6 +126,11 @@ impl<'src> Format<'src> {
                         .ignore_then(select! {
                             Token::Identifier("type") => FormatOption::Type,
                             Token::Identifier("name") => FormatOption::Name,
+                            Token::Identifier("ports") => FormatOption::Body(BodyProjection::Ports),
+                            Token::Identifier("captures") => FormatOption::Body(BodyProjection::Captures),
+                            Token::Identifier("yields") => FormatOption::Body(BodyProjection::Yields),
+                            Token::Identifier("args") => FormatOption::Body(BodyProjection::Args),
+                            Token::Identifier("body") => FormatOption::Body(BodyProjection::Body),
                         })
                         .or_not(),
                 ),
@@ -163,12 +153,11 @@ impl<'src> Format<'src> {
             .map(FormatElement::Token);
 
         // Order matters: try escaped braces first, then dollar keyword,
-        // then projection pseudo-fields (body/function), then generic interpolation, then other
+        // then context projection ({:name}), then generic interpolation, then other
         escaped_lbrace
             .or(escaped_rbrace)
             .or(dollar_keyword)
-            .or(body_projection)
-            .or(function_projection)
+            .or(context_projection)
             .or(interpolation)
             .or(other)
             .repeated()
@@ -297,8 +286,8 @@ mod tests {
     }
 
     #[test]
-    fn test_function_name_projection() {
-        let input = "fn {function:name}({body:ports}) -> {body:yields}";
+    fn test_context_name_projection() {
+        let input = "fn {:name}({body:ports}) -> {body:yields}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);
@@ -322,7 +311,7 @@ mod tests {
 
     #[test]
     fn test_body_captures_projection() {
-        let input = "fn {function:name}({body:ports}) captures ({body:captures}) -> {body:yields} {{ {body:body} }}";
+        let input = "fn {:name}({body:ports}) captures ({body:captures}) -> {body:yields} {{ {body:body} }}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);
@@ -330,7 +319,7 @@ mod tests {
 
     #[test]
     fn test_body_args_projection() {
-        let input = "fn {function:name}({body:args})";
+        let input = "fn {:name}({body:args})";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);

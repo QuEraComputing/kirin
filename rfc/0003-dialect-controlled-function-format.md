@@ -83,15 +83,15 @@ The common pattern: `specialize @stage` prefix is framework-controlled, everythi
 
 ### Format string projections
 
-The dialect's function-body struct uses `{function:...}` and `{body:...}` projections in its format string:
+The dialect's function-body struct uses `{:...}` context projections and `{field:...}` body projections in its format string:
 
-#### `{function:...}` — SpecializedFunction metadata
+#### `{:...}` — Context projections (enclosing function metadata)
 
 | Projection | Parses/prints | Source |
 |-----------|---------------|--------|
-| `{function:name}` | `@symbol_name` | Function's global symbol |
+| `{:name}` | `@symbol_name` | Function's global symbol |
 
-#### `{body:...}` — Graph/Region body structural parts
+#### `{field:...}` — Body structural projections
 
 | Projection | Parses/prints | Source |
 |-----------|---------------|--------|
@@ -109,7 +109,7 @@ The dialect's function-body struct uses `{function:...}` and `{body:...}` projec
 ```rust
 #[derive(Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
-#[chumsky(format = "fn {function:name}({body:ports}) -> {body:yields} { {body:body} }")]
+#[chumsky(format = "fn {:name}({body:ports}) -> {body:yields} { {body:body} }")]
 pub struct CircuitFunction {
     pub body: DiGraph,
 }
@@ -131,7 +131,7 @@ The `specialize @circuit` prefix is added by the framework. Everything else come
 ```rust
 #[derive(Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = T)]
-#[chumsky(format = "fn {function:name}({function:params}) -> {function:ret} { {body} }")]
+#[chumsky(format = "fn {:name}({function:params}) -> {function:ret} { {body} }")]
 pub struct FunctionBody<T: CompileTimeValue> {
     pub body: Region,
 }
@@ -151,7 +151,7 @@ Here `{function:params}` prints type-only parameter list from the signature, and
 ### Example: Signal processing with captures
 
 ```rust
-#[chumsky(format = "fn {function:name}({body:ports}) captures ({body:captures}) -> {body:yields} { digraph {body:body} }")]
+#[chumsky(format = "fn {:name}({body:ports}) captures ({body:captures}) -> {body:yields} { digraph {body:body} }")]
 pub struct DSPFunction {
     pub body: DiGraph,
 }
@@ -183,7 +183,7 @@ fn @bell_pair(%q0: Qubit, %q1: Qubit) -> Qubit, Qubit {
 }
 ```
 
-The format string has no layout hints — just `"fn {function:name}({body:ports}) -> {body:yields} { digraph {body:body} }"`. The `{` `}` tokens tell the printer to indent.
+The format string has no layout hints — just `"fn {:name}({body:ports}) -> {body:yields} { digraph {body:body} }"`. The `{` `}` tokens tell the printer to indent.
 
 **Rule 2: Projections carry their own layout.** Each `{body:...}` projection knows how to format its content:
 
@@ -264,7 +264,7 @@ The two-pass architecture stays — it's needed for forward references. But the 
 **Pass 2**: For each `specialize`:
 1. Parse `specialize @stage_name` prefix (framework-controlled)
 2. Delegate remaining text to `L::parse_and_emit()` (dialect-controlled)
-3. The dialect parser uses `{function:name}`, `{body:ports}`, etc. to parse all components
+3. The dialect parser uses `{:name}`, `{body:ports}`, etc. to parse all components
 4. Call `HasSignature` on the emitted statement to get the signature
 5. Construct `SpecializedFunction` with the extracted signature and body statement
 
@@ -276,7 +276,7 @@ The statement-level printer (`ir_render.rs`) currently doesn't print function he
 
 1. The function text printer emits `specialize @stage_name ` prefix
 2. Delegates to the dialect's `PrettyPrint` for everything else
-3. The dialect's format-based PrettyPrint handles `{function:name}`, `{body:ports}`, etc.
+3. The dialect's format-based PrettyPrint handles `{:name}`, `{body:ports}`, etc.
 
 ## Alternatives
 
@@ -302,7 +302,7 @@ Add attributes to hide/show components:
 
 The unified format string approach (main design) is best:
 - One format string describes the complete text representation
-- Projections (`{function:...}`, `{body:...}`) reference structural parts clearly
+- Projections (`{:...}` context, `{field:...}` body) reference structural parts clearly
 - `HasSignature` cleanly separates IR construction from text format
 - Backward compatible via `{body}` (full body with header) and `{function:params}`/`{function:ret}` (signature from declaration)
 
@@ -311,9 +311,9 @@ The unified format string approach (main design) is best:
 | Crate | Impact | Changes |
 |-------|--------|---------|
 | `kirin-chumsky` | **Primary** | Function text parser: dialect-controlled format dispatch |
-| `kirin-chumsky` | **Primary** | New `{function:...}` and `{body:...}` projection parsers |
+| `kirin-chumsky` | **Primary** | New `{:...}` and `{field:...}` projection parsers |
 | `kirin-ir` | **Primary** | `HasSignature` trait definition |
-| `kirin-derive-chumsky` | **Primary** | Codegen for `{function:...}` and `{body:...}` projections |
+| `kirin-derive-chumsky` | **Primary** | Codegen for `{:...}` and `{field:...}` projections |
 | `kirin-prettyless` | **Secondary** | Function text printer delegates to dialect PrettyPrint |
 | `kirin-function` | **Migration** | `FunctionBody` implements `HasSignature`, format string updated |
 | `example/toy-qc` | **Migration** | `CircuitFunction`/`ZXFunction` format strings updated |
@@ -322,7 +322,7 @@ The unified format string approach (main design) is best:
 ## Migration path
 
 ### Phase 1: Add projection support (non-breaking)
-- Add `{function:...}` and `{body:...}` projections to format parser
+- Add `{:...}` context and `{field:...}` body projections to format parser
 - Add `HasSignature` trait with default impl (returns current hard-coded signature)
 - Existing format strings continue to work unchanged
 
@@ -368,7 +368,7 @@ The unified format string approach (main design) is best:
 
 ## Reference Implementation Plan
 
-1. Add `{function:...}` and `{body:...}` as new `FormatOption` variants in format parser
+1. Add `{:...}` context projections and `{field:...}` body projections in format parser
 2. Add `HasSignature<L>` trait to `kirin-ir`
 3. Codegen for projection parsers (port list, capture list, yield types, body-only)
 4. Codegen for projection printers

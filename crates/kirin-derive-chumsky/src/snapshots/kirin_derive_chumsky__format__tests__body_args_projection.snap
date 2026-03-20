@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-chumsky/src/format.rs
-assertion_line: 336
 expression: format
 ---
 Format {
@@ -12,11 +11,8 @@ Format {
                 ),
             ],
         ),
-        Field(
-            "function",
-            Function(
-                Name,
-            ),
+        Context(
+            Name,
         ),
         Token(
             [

@@ -151,22 +151,15 @@ impl<'ir> ValidationVisitor<'ir> {
             FormatOption::Default => field.ident.clone().unwrap_or_else(|| {
                 syn::Ident::new(&format!("{}", field), proc_macro2::Span::call_site())
             }),
-            // Projection pseudo-fields generate their own variable names
-            FormatOption::Function(proj) => {
-                let suffix = match proj {
-                    crate::format::FunctionProjection::Name => "function_name",
-                };
-                syn::Ident::new(suffix, proc_macro2::Span::call_site())
-            }
             FormatOption::Body(proj) => {
                 let suffix = match proj {
-                    crate::format::BodyProjection::Ports => "body_ports",
-                    crate::format::BodyProjection::Captures => "body_captures",
-                    crate::format::BodyProjection::Yields => "body_yields",
-                    crate::format::BodyProjection::Args => "body_args",
-                    crate::format::BodyProjection::Body => "body_body",
+                    crate::format::BodyProjection::Ports => format!("{}_ports", field),
+                    crate::format::BodyProjection::Captures => format!("{}_captures", field),
+                    crate::format::BodyProjection::Yields => format!("{}_yields", field),
+                    crate::format::BodyProjection::Args => format!("{}_args", field),
+                    crate::format::BodyProjection::Body => format!("{}_body", field),
                 };
-                syn::Ident::new(suffix, proc_macro2::Span::call_site())
+                syn::Ident::new(&suffix, proc_macro2::Span::call_site())
             }
         }
     }
@@ -209,7 +202,6 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                 FormatOption::Name => ":name",
                 FormatOption::Type => ":type",
                 FormatOption::Default
-                | FormatOption::Function(_)
                 | FormatOption::Body(_) => unreachable!(),
             };
             self.add_error(format!(

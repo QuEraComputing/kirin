@@ -11,7 +11,7 @@ use kirin_derive_toolkit::ir::fields::{Collection, FieldInfo};
 use kirin_derive_toolkit::ir::fields::FieldCategory;
 
 use crate::field_kind;
-use crate::format::{Format, FormatElement, FormatOption};
+use crate::format::{BodyProjection, Format, FormatElement, FormatOption};
 use crate::validation::FieldOccurrence;
 
 use super::GenerateHasDialectParser;
@@ -58,6 +58,13 @@ impl GenerateHasDialectParser {
                         ir_type,
                         type_params,
                     )));
+                }
+                FormatElement::Context(_) => {
+                    // Context projections ({:name}) are parsed and discarded at the
+                    // statement level — the function text parser captures the value.
+                    parser_parts.push(ParserPart::Token(
+                        quote! { #crate_path::symbol() },
+                    ));
                 }
             }
         }
@@ -358,6 +365,14 @@ impl GenerateHasDialectParser {
                     field
                 )
             }
+            // Check for body projection occurrences — reconstruct flat AST from pieces
+            Some(occs)
+                if occs
+                    .iter()
+                    .any(|o| matches!(o.option, FormatOption::Body(_))) =>
+            {
+                self.build_projected_field_value(field, occs, crate_path)
+            }
             Some(occs) if occs.len() == 1 => {
                 let occ = occs[0];
                 let var = &occ.var_name;
@@ -406,15 +421,129 @@ impl GenerateHasDialectParser {
         }
     }
 
+    /// Reconstructs a flat AST type from individually-parsed projection pieces.
+    fn build_projected_field_value(
+        &self,
+        field: &FieldInfo<ChumskyLayout>,
+        occs: &[&FieldOccurrence],
+        crate_path: &syn::Path,
+    ) -> TokenStream {
+        // Helper: find the variable for a specific body projection
+        let find_var = |proj: BodyProjection| -> Option<&syn::Ident> {
+            occs.iter()
+                .find(|o| matches!(&o.option, FormatOption::Body(p) if *p == proj))
+                .map(|o| &o.var_name)
+        };
+
+        match field.category() {
+            FieldCategory::DiGraph => {
+                let ports_expr = find_var(BodyProjection::Ports)
+                    .map(|v| quote! { #v })
+                    .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
+                let captures_expr = find_var(BodyProjection::Captures)
+                    .map(|v| quote! { #v })
+                    .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
+                // digraph_body_statements returns (Vec<Spanned<S>>, Vec<Spanned<&str>>)
+                let (stmts_expr, yields_expr) = if let Some(body) = find_var(BodyProjection::Body)
+                {
+                    (quote! { #body.0 }, quote! { #body.1 })
+                } else {
+                    (
+                        quote! { ::std::vec::Vec::new() },
+                        quote! { ::std::vec::Vec::new() },
+                    )
+                };
+
+                quote! {
+                    #crate_path::DiGraph {
+                        name: ::core::option::Option::None,
+                        ports: #ports_expr,
+                        captures: #captures_expr,
+                        statements: #stmts_expr,
+                        yields: #yields_expr,
+                    }
+                }
+            }
+            FieldCategory::UnGraph => {
+                let ports_expr = find_var(BodyProjection::Ports)
+                    .map(|v| quote! { #v })
+                    .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
+                let captures_expr = find_var(BodyProjection::Captures)
+                    .map(|v| quote! { #v })
+                    .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
+                let stmts_expr = find_var(BodyProjection::Body)
+                    .map(|v| quote! { #v })
+                    .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
+
+                quote! {
+                    #crate_path::UnGraph {
+                        name: ::core::option::Option::None,
+                        ports: #ports_expr,
+                        captures: #captures_expr,
+                        statements: #stmts_expr,
+                    }
+                }
+            }
+            FieldCategory::Block => {
+                let args_expr = find_var(BodyProjection::Args)
+                    .map(|v| quote! { #v })
+                    .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
+                let stmts_expr = find_var(BodyProjection::Body)
+                    .map(|v| quote! { #v })
+                    .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
+
+                // Block fields are Spanned<Block>, so we wrap in Spanned
+                quote! {
+                    #crate_path::Spanned {
+                        value: #crate_path::Block {
+                            label: ::core::option::Option::None,
+                            arguments: #args_expr,
+                            statements: #stmts_expr,
+                        },
+                        span: ::core::default::Default::default(),
+                    }
+                }
+            }
+            FieldCategory::Region => {
+                // region_body returns Vec<Spanned<Block>>
+                let blocks_expr = find_var(BodyProjection::Body)
+                    .map(|v| quote! { #v })
+                    .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
+
+                quote! {
+                    #crate_path::Region {
+                        blocks: #blocks_expr,
+                    }
+                }
+            }
+            _ => unreachable!("body projections only valid on body field types"),
+        }
+    }
+
     pub(super) fn token_parser(&self, tokens: &[kirin_lexer::Token<'_>]) -> TokenStream {
+        use kirin_lexer::Token as T;
         let crate_path = &self.config.crate_path;
+
+        // Map format-string escape tokens to their runtime equivalents.
+        // In the format string, {{ produces EscapedLBrace, but at runtime
+        // the input lexer produces LBrace for literal {.
+        let map_token = |tok: &kirin_lexer::Token<'_>| -> TokenStream {
+            match tok {
+                T::EscapedLBrace => quote! { #crate_path::Token::LBrace },
+                T::EscapedRBrace => quote! { #crate_path::Token::RBrace },
+                other => quote! { #other },
+            }
+        };
+
         let mut iter = tokens.iter();
         let Some(first) = iter.next() else {
             return quote! { #crate_path::chumsky::prelude::empty().ignored() };
         };
-        let mut parser = quote! { #crate_path::chumsky::prelude::just(#first) };
+        let first_tok = map_token(first);
+        let mut parser = quote! { #crate_path::chumsky::prelude::just(#first_tok) };
         for tok in iter {
-            parser = quote! { #parser.then_ignore(#crate_path::chumsky::prelude::just(#tok)) };
+            let mapped = map_token(tok);
+            parser = quote! { #parser.then_ignore(#crate_path::chumsky::prelude::just(#mapped)) };
         }
         parser
     }

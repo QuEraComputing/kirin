@@ -293,12 +293,12 @@ impl GeneratePrettyPrint {
             let prev_is_field_like = i > 0
                 && matches!(
                     elements[i - 1],
-                    FormatElement::Field(_, _) | FormatElement::Keyword(_)
+                    FormatElement::Field(_, _) | FormatElement::Keyword(_) | FormatElement::Context(_)
                 );
             let next_is_field_like = !is_last
                 && matches!(
                     elements[i + 1],
-                    FormatElement::Field(_, _) | FormatElement::Keyword(_)
+                    FormatElement::Field(_, _) | FormatElement::Keyword(_) | FormatElement::Context(_)
                 );
 
             match elem {
@@ -344,6 +344,13 @@ impl GeneratePrettyPrint {
 
                         parts.push(print_expr);
                     }
+                }
+                FormatElement::Context(_) => {
+                    // Context projection ({:name}) prints the enclosing function name
+                    if !is_first && prev_is_field_like {
+                        parts.push(quote! { doc.text(" ") });
+                    }
+                    parts.push(quote! { doc.print_function_name() });
                 }
             }
         }

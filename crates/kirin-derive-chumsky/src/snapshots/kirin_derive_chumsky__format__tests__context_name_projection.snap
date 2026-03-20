@@ -28,21 +28,6 @@ Format {
         Token(
             [
                 RParen,
-                Identifier(
-                    "captures",
-                ),
-                LParen,
-            ],
-        ),
-        Field(
-            "body",
-            Body(
-                Captures,
-            ),
-        ),
-        Token(
-            [
-                RParen,
                 Arrow,
             ],
         ),
@@ -51,22 +36,6 @@ Format {
             Body(
                 Yields,
             ),
-        ),
-        Token(
-            [
-                EscapedLBrace,
-            ],
-        ),
-        Field(
-            "body",
-            Body(
-                Body,
-            ),
-        ),
-        Token(
-            [
-                EscapedRBrace,
-            ],
         ),
     ],
 }

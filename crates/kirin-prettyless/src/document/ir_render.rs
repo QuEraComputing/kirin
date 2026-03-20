@@ -293,7 +293,7 @@ where
         let header = self.print_specialize_header(staged_info.name(), spec.signature());
 
         // Set function name context so the body's PrettyPrint can access it
-        // via doc.print_function_name() for {function:name} projections.
+        // via doc.print_function_name() for {:name} projections.
         let prev = self.function_name();
         self.set_function_name(staged_info.name());
         let body = self.print_statement(spec.body());
@@ -412,7 +412,7 @@ where
 
     /// Print the enclosing function name as `@symbol_name`.
     ///
-    /// Used by `{function:name}` projection in generated PrettyPrint code.
+    /// Used by `{:name}` projection in generated PrettyPrint code.
     /// Returns `@unnamed` if no function name has been set via
     /// [`Document::set_function_name`].
     pub fn print_function_name(&'a self) -> ArenaDoc<'a> {

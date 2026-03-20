@@ -40,7 +40,7 @@ pub struct BlockHeader<'src, TypeOutput> {
     pub arguments: Vec<Spanned<BlockArgument<'src, TypeOutput>>>,
 }
 
-/// A basic block containing a header and statements.
+/// A basic block containing a label, arguments, and statements.
 ///
 /// Represents syntax like:
 /// ```ignore
@@ -50,12 +50,17 @@ pub struct BlockHeader<'src, TypeOutput> {
 /// }
 /// ```
 ///
+/// Fields are flat to support both full parsing (with block header) and
+/// projection-based parsing (where pieces come from different format positions).
+///
 /// The `TypeOutput` parameter is the parsed type representation.
 /// The `StmtOutput` parameter is the parsed statement representation.
 #[derive(Debug, Clone, PartialEq)]
 pub struct Block<'src, TypeOutput, StmtOutput> {
-    /// The block header with label and arguments.
-    pub header: Spanned<BlockHeader<'src, TypeOutput>>,
+    /// The block label name (without `^` prefix). `None` in projection mode.
+    pub label: Option<Spanned<&'src str>>,
+    /// The block arguments.
+    pub arguments: Vec<Spanned<BlockArgument<'src, TypeOutput>>>,
     /// The statements in the block.
     pub statements: Vec<Spanned<StmtOutput>>,
 }
@@ -117,8 +122,6 @@ where
 {
     // Collect argument info for registration.
     let arg_info: Vec<_> = block_ast
-        .header
-        .value
         .arguments
         .iter()
         .map(|arg| {
@@ -131,7 +134,10 @@ where
     // Phase 1: Build the block with arguments only (no statements).
     // This creates real BlockArgument SSAs that nested blocks can safely
     // reference without triggering Unresolved(BlockArgument) resolution panics.
-    let block_name = block_ast.header.value.label.name.value.to_string();
+    let block_name = block_ast
+        .label
+        .map(|l| l.value.to_string())
+        .unwrap_or_else(|| "projected".to_string());
     let mut builder = ctx.stage.block().name(block_name);
     for (name, ty) in &arg_info {
         builder = builder.argument(ty.clone()).arg_name(name.clone());
@@ -178,9 +184,10 @@ where
 
     // Register the block only if not already registered (two-pass Region
     // creates stubs first, so the name may already be present).
-    let block_label = block_ast.header.value.label.name.value;
-    if ctx.lookup_block(block_label).is_none() {
-        ctx.register_block(block_label.to_string(), block);
+    if let Some(label) = block_ast.label {
+        if ctx.lookup_block(label.value).is_none() {
+            ctx.register_block(label.value.to_string(), block);
+        }
     }
 
     Ok(block)
@@ -242,7 +249,11 @@ impl<'src, TypeOutput, StmtOutput> Region<'src, TypeOutput, StmtOutput> {
             .blocks
             .iter()
             .map(|block_ast| {
-                let name = block_ast.value.header.value.label.name.value.to_string();
+                let name = block_ast
+                    .value
+                    .label
+                    .map(|l| l.value.to_string())
+                    .unwrap_or_else(|| "projected".to_string());
                 let stub = ctx.stage.block().name(name.clone()).new();
                 ctx.register_block(name, stub);
                 stub

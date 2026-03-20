@@ -6,7 +6,7 @@ use kirin_derive_toolkit::ir::Statement;
 use kirin_lexer::Token;
 
 use crate::ChumskyLayout;
-use crate::format::{Format, FormatElement, FormatOption};
+use crate::format::{ContextProjection, Format, FormatElement, FormatOption};
 use kirin_derive_toolkit::ir::fields::FieldInfo;
 
 /// Visitor trait for format-driven traversal.
@@ -31,6 +31,11 @@ pub trait FormatVisitor<'ir> {
 
     /// Called for token sequences between fields.
     fn visit_tokens(&mut self, _tokens: &[Token<'_>]) -> syn::Result<()> {
+        Ok(())
+    }
+
+    /// Called for context projections like `{:name}`.
+    fn visit_context(&mut self, _projection: &ContextProjection) -> syn::Result<()> {
         Ok(())
     }
 
@@ -80,6 +85,9 @@ pub fn visit_format<'ir, V: FormatVisitor<'ir>>(
             }
             FormatElement::Keyword(kw) => {
                 visitor.visit_keyword(kw)?;
+            }
+            FormatElement::Context(proj) => {
+                visitor.visit_context(proj)?;
             }
         }
     }

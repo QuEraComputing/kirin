@@ -1386,10 +1386,10 @@ fn test_graph_header_ports_only() {
     );
     assert!(result.is_ok());
     let dg = result.unwrap();
-    assert_eq!(dg.header.value.name.value, "dg0");
-    assert_eq!(dg.header.value.ports.len(), 1);
-    assert_eq!(dg.header.value.ports[0].value.name.value, "p0");
-    assert!(dg.header.value.captures.is_empty());
+    assert_eq!(dg.name.unwrap().value, "dg0");
+    assert_eq!(dg.ports.len(), 1);
+    assert_eq!(dg.ports[0].value.name.value, "p0");
+    assert!(dg.captures.is_empty());
     assert!(dg.statements.is_empty());
     assert!(dg.yields.is_empty());
 }
@@ -1403,9 +1403,9 @@ fn test_graph_header_ports_and_captures() {
     );
     assert!(result.is_ok());
     let dg = result.unwrap();
-    assert_eq!(dg.header.value.ports.len(), 2);
-    assert_eq!(dg.header.value.captures.len(), 1);
-    assert_eq!(dg.header.value.captures[0].value.name.value, "theta");
+    assert_eq!(dg.ports.len(), 2);
+    assert_eq!(dg.captures.len(), 1);
+    assert_eq!(dg.captures[0].value.name.value, "theta");
 }
 
 #[test]
@@ -1446,7 +1446,7 @@ fn test_ungraph_no_captures() {
     );
     assert!(result.is_ok());
     let ug = result.unwrap();
-    assert!(ug.header.value.captures.is_empty());
+    assert!(ug.captures.is_empty());
     assert!(ug.statements.is_empty());
 }
 

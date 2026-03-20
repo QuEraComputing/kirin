@@ -107,8 +107,8 @@ pub fn parser_expr<L: Layout>(
             }
             // Projection options are only used with pseudo-fields (function/body),
             // never with real Argument fields.
-            FormatOption::Function(_) | FormatOption::Body(_) => {
-                unreachable!("projection options are for pseudo-fields, not Argument fields")
+            FormatOption::Body(_) => {
+                unreachable!("body projection options are not valid on Argument fields")
             }
         },
         FieldCategory::Result => match opt {
@@ -121,23 +121,34 @@ pub fn parser_expr<L: Layout>(
             }
             // Projection options are only used with pseudo-fields (function/body),
             // never with real Result fields.
-            FormatOption::Function(_) | FormatOption::Body(_) => {
-                unreachable!("projection options are for pseudo-fields, not Result fields")
+            FormatOption::Body(_) => {
+                unreachable!("body projection options are not valid on Result fields")
             }
         },
-        FieldCategory::Block => {
-            quote! {
-                #crate_path::block::<_, #ir_type, _>(language.clone())
+        FieldCategory::Block => match opt {
+            FormatOption::Default => {
+                quote! { #crate_path::block::<_, #ir_type, _>(language.clone()) }
             }
-        }
+            FormatOption::Body(BodyProjection::Args) => {
+                quote! { #crate_path::block_argument_list_bare::<_, #ir_type>() }
+            }
+            FormatOption::Body(BodyProjection::Body) => {
+                quote! { #crate_path::block_body_statements(language.clone()) }
+            }
+            _ => unreachable!("validation prevents other projections on Block fields"),
+        },
         FieldCategory::Successor => {
             quote! { #crate_path::block_label() }
         }
-        FieldCategory::Region => {
-            quote! {
-                #crate_path::region::<_, #ir_type, _>(language.clone())
+        FieldCategory::Region => match opt {
+            FormatOption::Default => {
+                quote! { #crate_path::region::<_, #ir_type, _>(language.clone()) }
             }
-        }
+            FormatOption::Body(BodyProjection::Body) => {
+                quote! { #crate_path::region_body::<_, #ir_type, _>(language.clone()) }
+            }
+            _ => unreachable!("validation prevents other projections on Region fields"),
+        },
         FieldCategory::Symbol => {
             quote! { #crate_path::symbol() }
         }
@@ -148,16 +159,39 @@ pub fn parser_expr<L: Layout>(
                 .unwrap_or_else(|| syn::parse_quote!(()));
             quote! { <#ty as #crate_path::HasParser<'t>>::parser() }
         }
-        FieldCategory::DiGraph => {
-            quote! {
-                #crate_path::digraph::<_, #ir_type, _>(language.clone())
+        FieldCategory::DiGraph => match opt {
+            FormatOption::Default => {
+                quote! { #crate_path::digraph::<_, #ir_type, _>(language.clone()) }
             }
-        }
-        FieldCategory::UnGraph => {
-            quote! {
-                #crate_path::ungraph::<_, #ir_type, _>(language.clone())
+            FormatOption::Body(BodyProjection::Ports) => {
+                quote! { #crate_path::port_list::<_, #ir_type>() }
             }
-        }
+            FormatOption::Body(BodyProjection::Captures) => {
+                quote! { #crate_path::capture_list::<_, #ir_type>() }
+            }
+            FormatOption::Body(BodyProjection::Yields) => {
+                quote! { #crate_path::yield_type_list::<_, #ir_type>() }
+            }
+            FormatOption::Body(BodyProjection::Body) => {
+                quote! { #crate_path::digraph_body_statements(language.clone()) }
+            }
+            _ => unreachable!("validation prevents other projections on DiGraph fields"),
+        },
+        FieldCategory::UnGraph => match opt {
+            FormatOption::Default => {
+                quote! { #crate_path::ungraph::<_, #ir_type, _>(language.clone()) }
+            }
+            FormatOption::Body(BodyProjection::Ports) => {
+                quote! { #crate_path::port_list::<_, #ir_type>() }
+            }
+            FormatOption::Body(BodyProjection::Captures) => {
+                quote! { #crate_path::capture_list::<_, #ir_type>() }
+            }
+            FormatOption::Body(BodyProjection::Body) => {
+                quote! { #crate_path::ungraph_body_statements(language.clone()) }
+            }
+            _ => unreachable!("validation prevents other projections on UnGraph fields"),
+        },
     }
 }
 
@@ -182,8 +216,8 @@ pub fn print_expr<L: Layout>(
             },
             // Projection options are only used with pseudo-fields (function/body),
             // never with real Argument/Result fields.
-            FormatOption::Function(_) | FormatOption::Body(_) => {
-                unreachable!("projection options are for pseudo-fields, not Argument/Result fields")
+            FormatOption::Body(_) => {
+                unreachable!("body projection options are not valid on Argument/Result fields")
             }
         },
         FieldCategory::Block => match opt {
@@ -197,8 +231,8 @@ pub fn print_expr<L: Layout>(
             FormatOption::Body(_) => {
                 unreachable!("Ports/Captures/Yields projections are not valid on Block fields")
             }
-            FormatOption::Function(_) | FormatOption::Name | FormatOption::Type => {
-                unreachable!("Name/Type/Function projections are not valid on Block fields")
+            FormatOption::Name | FormatOption::Type => {
+                unreachable!("Name/Type projections are not valid on Block fields")
             }
         },
         FieldCategory::Successor => quote! {
@@ -212,8 +246,8 @@ pub fn print_expr<L: Layout>(
             FormatOption::Body(_) => {
                 unreachable!("Ports/Captures/Yields/Args projections are not valid on Region fields")
             }
-            FormatOption::Function(_) | FormatOption::Name | FormatOption::Type => {
-                unreachable!("Name/Type/Function projections are not valid on Region fields")
+            FormatOption::Name | FormatOption::Type => {
+                unreachable!("Name/Type projections are not valid on Region fields")
             }
         },
         FieldCategory::Symbol => quote! {
@@ -258,8 +292,8 @@ pub fn print_expr<L: Layout>(
                     }
                 }
             }
-            FormatOption::Function(_) | FormatOption::Name | FormatOption::Type => {
-                unreachable!("Name/Type/Function projections are not valid on DiGraph fields")
+            FormatOption::Name | FormatOption::Type => {
+                unreachable!("Name/Type projections are not valid on DiGraph fields")
             }
         },
         FieldCategory::UnGraph => match opt {
@@ -292,8 +326,8 @@ pub fn print_expr<L: Layout>(
                     }
                 }
             }
-            FormatOption::Function(_) | FormatOption::Name | FormatOption::Type => {
-                unreachable!("Name/Type/Function projections are not valid on UnGraph fields")
+            FormatOption::Name | FormatOption::Type => {
+                unreachable!("Name/Type projections are not valid on UnGraph fields")
             }
         },
     }

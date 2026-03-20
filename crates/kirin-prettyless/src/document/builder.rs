@@ -77,7 +77,7 @@ impl<'a, L: Dialect> Document<'a, L> {
     ///
     /// When set, dialect `PrettyPrint` impls can call
     /// [`Document::print_function_name`] to render `@name` for the enclosing
-    /// function. This is used by `{function:name}` projections in generated
+    /// function. This is used by `{:name}` projections in generated
     /// format-string pretty printers.
     pub fn set_function_name(&self, name: Option<GlobalSymbol>) {
         self.function_name.set(name);

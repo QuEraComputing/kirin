@@ -26,10 +26,17 @@ pub struct GraphHeader<'src, TypeOutput> {
 ///   yield %1;
 /// }
 /// ```
+///
+/// Fields are flat to support both full parsing (with graph header) and
+/// projection-based parsing (where pieces come from different format positions).
 #[derive(Debug, Clone, PartialEq)]
 pub struct DiGraph<'src, TypeOutput, StmtOutput> {
-    /// The graph header with name, ports, and captures.
-    pub header: Spanned<GraphHeader<'src, TypeOutput>>,
+    /// The graph label name (without `^` prefix). `None` in projection mode.
+    pub name: Option<Spanned<&'src str>>,
+    /// Edge port arguments.
+    pub ports: Vec<Spanned<super::BlockArgument<'src, TypeOutput>>>,
+    /// Capture arguments.
+    pub captures: Vec<Spanned<super::BlockArgument<'src, TypeOutput>>>,
     /// The statements (nodes) in the graph.
     pub statements: Vec<Spanned<StmtOutput>>,
     /// The yield values (output edges).
@@ -50,10 +57,16 @@ pub struct DiGraph<'src, TypeOutput, StmtOutput> {
 /// Edge statements are prefixed with `edge` keyword.
 /// The parser interleaves edge and node statements — the `is_edge` flag
 /// distinguishes them.
+///
+/// Fields are flat to support both full parsing and projection-based parsing.
 #[derive(Debug, Clone, PartialEq)]
 pub struct UnGraph<'src, TypeOutput, StmtOutput> {
-    /// The graph header with name, ports, and captures.
-    pub header: Spanned<GraphHeader<'src, TypeOutput>>,
+    /// The graph label name (without `^` prefix). `None` in projection mode.
+    pub name: Option<Spanned<&'src str>>,
+    /// Edge port arguments.
+    pub ports: Vec<Spanned<super::BlockArgument<'src, TypeOutput>>>,
+    /// Capture arguments.
+    pub captures: Vec<Spanned<super::BlockArgument<'src, TypeOutput>>>,
     /// All statements in the graph body.
     /// Each is tagged with whether it was prefixed with `edge`.
     pub statements: Vec<UnGraphStatement<'src, StmtOutput>>,
@@ -123,12 +136,14 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
         IR::Type: Clone,
         TypeOutput: EmitIR<IR, Output = IR::Type>,
     {
-        let header = &self.header.value;
-        let graph_name = header.name.value.to_string();
+        let graph_name = self
+            .name
+            .map(|n| n.value.to_string())
+            .unwrap_or_else(|| "projected".to_string());
 
         // Collect all port/capture types eagerly (before borrowing ctx.stage via builder)
-        let (port_names, port_types) = collect_port_info(&header.ports, ctx)?;
-        let (cap_names, cap_types) = collect_port_info(&header.captures, ctx)?;
+        let (port_names, port_types) = collect_port_info(&self.ports, ctx)?;
+        let (cap_names, cap_types) = collect_port_info(&self.captures, ctx)?;
 
         // Phase 1: Create the digraph with ports/captures only (no nodes/yields).
         // This produces real port SSAs immediately.
@@ -224,12 +239,14 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
         IR::Type: Clone,
         TypeOutput: EmitIR<IR, Output = IR::Type>,
     {
-        let header = &self.header.value;
-        let graph_name = header.name.value.to_string();
+        let graph_name = self
+            .name
+            .map(|n| n.value.to_string())
+            .unwrap_or_else(|| "projected".to_string());
 
         // Collect all port/capture types eagerly
-        let (port_names, port_types) = collect_port_info(&header.ports, ctx)?;
-        let (cap_names, cap_types) = collect_port_info(&header.captures, ctx)?;
+        let (port_names, port_types) = collect_port_info(&self.ports, ctx)?;
+        let (cap_names, cap_types) = collect_port_info(&self.captures, ctx)?;
 
         // Phase 1: Create the ungraph with ports/captures only (no edges/nodes).
         let mut builder = ctx.stage.ungraph().name(graph_name);

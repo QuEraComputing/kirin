@@ -151,9 +151,16 @@ where
 
     header
         .then(statements)
-        .map_with(|(header, statements), e| Spanned {
-            value: Block { header, statements },
-            span: e.span(),
+        .map_with(|(header, statements), e| {
+            let h = header.value;
+            Spanned {
+                value: Block {
+                    label: Some(h.label.name),
+                    arguments: h.arguments,
+                    statements,
+                },
+                span: e.span(),
+            }
         })
 }
 

@@ -215,10 +215,15 @@ where
 
     header
         .then(body)
-        .map(|(header, (statements, yields))| DiGraph {
-            header,
-            statements,
-            yields,
+        .map(|(header, (statements, yields))| {
+            let h = header.value;
+            DiGraph {
+                name: Some(h.name),
+                ports: h.ports,
+                captures: h.captures,
+                statements,
+                yields,
+            }
         })
         .labelled("digraph")
 }
@@ -272,6 +277,14 @@ where
 
     header
         .then(body)
-        .map(|(header, statements)| UnGraph { header, statements })
+        .map(|(header, statements)| {
+            let h = header.value;
+            UnGraph {
+                name: Some(h.name),
+                ports: h.ports,
+                captures: h.captures,
+                statements,
+            }
+        })
         .labelled("ungraph")
 }
