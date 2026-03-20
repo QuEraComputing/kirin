@@ -12,7 +12,7 @@ pub struct ZXFunction {
 }
 
 impl HasSignature<ZX> for ZXFunction {
-    fn signature(&self, stage: &StageInfo<ZX>) -> Signature<QubitType> {
+    fn signature(&self, stage: &StageInfo<ZX>) -> Option<Signature<QubitType>> {
         let info = self.body.expect_info(stage);
         let params: Vec<QubitType> = info
             .edge_ports()
@@ -20,7 +20,7 @@ impl HasSignature<ZX> for ZXFunction {
             .map(|p| p.expect_info(stage).ty().clone())
             .collect();
         let ret = QubitType::Qubit;
-        Signature::new(params, ret, ())
+        Some(Signature::new(params, ret, ()))
     }
 }
 

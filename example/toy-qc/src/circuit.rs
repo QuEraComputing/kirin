@@ -51,7 +51,7 @@ pub struct Measure {
 }
 
 impl HasSignature<Circuit> for CircuitFunction {
-    fn signature(&self, stage: &StageInfo<Circuit>) -> Signature<QubitType> {
+    fn signature(&self, stage: &StageInfo<Circuit>) -> Option<Signature<QubitType>> {
         let info = self.body.expect_info(stage);
         let params: Vec<QubitType> = info
             .edge_ports()
@@ -60,7 +60,7 @@ impl HasSignature<Circuit> for CircuitFunction {
             .collect();
         // DiGraph yields determine the return type; use Qubit as default
         let ret = QubitType::Qubit;
-        Signature::new(params, ret, ())
+        Some(Signature::new(params, ret, ()))
     }
 }
 
