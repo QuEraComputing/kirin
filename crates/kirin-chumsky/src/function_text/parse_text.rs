@@ -194,6 +194,11 @@ pub struct SecondPassCtx<'t> {
     pub state: &'t mut ParseState,
     /// The function's GlobalSymbol (for auto-creating staged functions).
     pub function_symbol: GlobalSymbol,
+    /// The function name (from parse_declaration_head, always available).
+    pub function_name: &'t str,
+    /// Link info for the pipeline to connect function ↔ staged function.
+    /// Set by second_pass_concrete after apply_specialize_declaration.
+    pub link: Option<(Function, StagedFunction)>,
 }
 
 // ---------------------------------------------------------------------------
@@ -270,7 +275,7 @@ where
 
     let Declaration::Specialize {
         stage: _stage_sym,
-        function,
+        function: _,
         signature,
         body_span,
         span,
@@ -285,10 +290,17 @@ where
 
     let body_text = &ctx.src[body_span.start..body_span.end];
 
-    apply_specialize_declaration::<L>(
+    // Use the function name from parse_declaration_head (always available),
+    // not from the chumsky Declaration (empty for dialect-controlled format).
+    let function_name = SymbolName {
+        name: ctx.function_name,
+        span,
+    };
+
+    let (function, staged_function) = apply_specialize_declaration::<L>(
         stage,
         stage_id,
-        &function,
+        &function_name,
         ctx.function_symbol,
         signature.as_ref(),
         body_text,
@@ -297,6 +309,9 @@ where
         &mut *ctx.staged_lookup,
         ctx.state,
     )?;
+
+    // Return link info for the pipeline to connect function ↔ staged function
+    ctx.link = Some((function, staged_function));
 
     Ok(next_index)
 }
@@ -401,6 +416,8 @@ where
                 staged_lookup: &mut staged_lookup,
                 state: &mut state,
                 function_symbol,
+                function_name: head.function.name,
+                link: None,
             };
             let stage = self
                 .stage_mut(stage_id)
@@ -412,6 +429,12 @@ where
                         stage_dialect_mismatch_error(stage_symbol.name, Some(stage_symbol.span))
                     })
                 })?;
+            // Link the function ↔ staged function if created in this pass
+            if let Some((function, staged_function)) = ctx.link {
+                self.link(function, stage_id, staged_function)
+                    .expect("link should succeed for auto-created function");
+            }
+
             ensure_forward_progress(
                 next_index,
                 start_index,
@@ -581,7 +604,7 @@ fn apply_specialize_declaration<L>(
     function_lookup: &mut FxHashMap<String, Function>,
     staged_lookup: &mut FxHashMap<StagedKey, StagedFunction>,
     state: &mut ParseState,
-) -> Result<(), FunctionParseError>
+) -> Result<(Function, StagedFunction), FunctionParseError>
 where
     L: Dialect + ParseEmit<L>,
     L::Type: kirin_ir::Placeholder,
@@ -669,7 +692,7 @@ where
         })?;
 
     state.record(function);
-    Ok(())
+    Ok((function, staged_function))
 }
 
 fn resolve_or_create_specialize_target<L>(

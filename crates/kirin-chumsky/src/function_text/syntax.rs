@@ -147,20 +147,38 @@ where
             })
         });
 
-    let specialize_decl = identifier("specialize")
-        .ignore_then(symbol())                                   // @stage
-        .then(identifier("fn").ignore_then(symbol()))            // fn @name
-        .then(fn_params_and_return::<I, L>().or_not())           // optional (types) -> type
-        .then(body_span::<I>())                                  // body through closing }
-        .map_with(|(((stage, function), signature), body_span), extra| {
+    // Option A: specialize @stage fn @name(types) -> type { body }
+    // Framework parses the signature. body_span starts after the signature.
+    let specialize_with_sig = identifier("specialize")
+        .ignore_then(symbol())
+        .then(fn_signature_parser::<I, L>())
+        .then(body_span::<I>())
+        .map_with(|((stage, sig), body_span), extra| Declaration::Specialize {
+            stage,
+            function: sig.function,
+            signature: Some(sig.signature),
+            body_span,
+            span: extra.span(),
+        });
+
+    // Option B: specialize @stage fn @name(...dialect format...)
+    // Framework can't parse the signature. body_span starts at `fn` to include
+    // `fn @name(...)` in the body_text for the dialect parser.
+    let specialize_dialect = identifier("specialize")
+        .ignore_then(symbol())
+        .then(body_span::<I>())  // captures from `fn` through closing `}`
+        .map_with(|(stage, body_span), extra| {
             Declaration::Specialize {
                 stage,
-                function,
-                signature,
+                // Function name will be extracted from body_text in second_pass
+                function: SymbolName { name: "", span: extra.span() },
+                signature: None,
                 body_span,
                 span: extra.span(),
             }
         });
+
+    let specialize_decl = specialize_with_sig.or(specialize_dialect);
 
     choice((stage_decl, specialize_decl))
 }

@@ -332,6 +332,131 @@ specialize @test fn @foo(f64) -> f64 { ^entry(%x: f64) { %r = add %x, %x; ret %r
     );
 }
 
+// --- Use Case 3: Full dialect control pipeline test ---
+
+/// A dialect with full dialect-controlled function format using {:name} and {:return}.
+/// Uses `manual_parse_emit` to provide custom `extract_signature`.
+#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
+#[kirin(builders, type = SimpleType, crate = kirin::ir)]
+#[chumsky(crate = kirin::parsers, manual_parse_emit)]
+enum DialectControlledLang {
+    #[chumsky(format = "$add {0}, {1}")]
+    Add(
+        SSAValue,
+        SSAValue,
+        #[kirin(type = SimpleType::F64)] ResultValue,
+    ),
+    #[chumsky(format = "$constant {0}")]
+    Constant(
+        #[kirin(into)] kirin_test_languages::Value,
+        #[kirin(type = SimpleType::F64)] ResultValue,
+    ),
+    /// Full dialect control: `fn {:name}({body:ports}) captures ({body:captures}) -> {:return} {{ {body:body} }}`
+    #[chumsky(
+        format = "fn {:name}({0:ports}) captures ({0:captures}) -> {:return} {{ {0:body} }}"
+    )]
+    FuncBody(DiGraph),
+}
+
+impl kirin::parsers::ParseEmit for DialectControlledLang {
+    fn parse_and_emit(
+        input: &str,
+        ctx: &mut kirin::parsers::EmitContext<'_, Self>,
+    ) -> Result<kirin::ir::Statement, kirin::parsers::ChumskyError> {
+        let ast = kirin::parsers::parse_ast::<Self>(input)?;
+        kirin::parsers::HasParserEmitIR::emit_parsed(&ast, ctx)
+            .map_err(kirin::parsers::ChumskyError::Emit)
+    }
+
+    fn extract_signature(
+        stmt: kirin::ir::Statement,
+        stage: &kirin::ir::StageInfo<Self>,
+    ) -> Option<kirin::ir::Signature<SimpleType>> {
+        use kirin::ir::GetInfo;
+        let def = stmt.expect_info(stage).definition();
+        match def {
+            DialectControlledLang::FuncBody(dg) => {
+                let info = dg.expect_info(stage);
+                // Params: edge ports + capture ports
+                let params: Vec<SimpleType> = info
+                    .edge_ports()
+                    .iter()
+                    .chain(info.capture_ports().iter())
+                    .map(|p| p.expect_info(stage).ty().clone())
+                    .collect();
+                // Return type from first yield's type
+                let ret = info
+                    .yields()
+                    .first()
+                    .map(|y| y.expect_info(stage).ty().clone())
+                    .unwrap_or(SimpleType::Unit);
+                Some(kirin::ir::Signature::new(params, ret, ()))
+            }
+            _ => None,
+        }
+    }
+}
+
+#[test]
+fn test_dialect_controlled_pipeline_parse() {
+    use kirin::ir::{Pipeline, StageInfo};
+    use kirin::parsers::ParsePipelineText;
+
+    let mut pipeline: Pipeline<StageInfo<DialectControlledLang>> = Pipeline::new();
+    pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("test")
+        .new();
+
+    // No stage declaration — dialect provides signature via extract_signature.
+    // Framework can't parse (%p0: f64) as type-only → signature = None → uses extract_signature.
+    let input =
+        "specialize @test fn @foo(%p0: f64) captures () -> f64 { %r = add %p0, %p0; yield %r; }";
+    let functions = pipeline
+        .parse(input)
+        .expect("should parse dialect-controlled format");
+    assert_eq!(functions.len(), 1);
+}
+
+#[test]
+fn test_dialect_controlled_pipeline_roundtrip() {
+    use kirin::ir::{Pipeline, StageInfo};
+    use kirin::parsers::ParsePipelineText;
+    use kirin_prettyless::PrettyPrintExt;
+
+    let mut pipeline: Pipeline<StageInfo<DialectControlledLang>> = Pipeline::new();
+    pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("test")
+        .new();
+
+    let input =
+        "specialize @test fn @foo(%p0: f64) captures () -> f64 { %r = add %p0, %p0; yield %r; }";
+    pipeline
+        .parse(input)
+        .expect("should parse dialect-controlled format");
+
+    let printed = pipeline.sprint();
+    let mut pipeline2: Pipeline<StageInfo<DialectControlledLang>> = Pipeline::new();
+    pipeline2
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("test")
+        .new();
+    pipeline2
+        .parse(printed.trim())
+        .expect("should reparse dialect-controlled format");
+    let printed2 = pipeline2.sprint();
+
+    assert_eq!(
+        printed.trim(),
+        printed2.trim(),
+        "dialect-controlled pipeline roundtrip should be stable"
+    );
+}
+
 // --- Full digraph roundtrip tests ---
 
 #[test]
