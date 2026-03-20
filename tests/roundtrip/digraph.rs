@@ -214,6 +214,124 @@ specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0;
     assert_eq!(printed.trim(), printed2.trim(), "projected pipeline roundtrip should be stable");
 }
 
+// --- Use Case 5: Block projections pipeline test ---
+
+/// A dialect using Block projections for the function body.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[kirin(builders, type = SimpleType, crate = kirin::ir)]
+#[chumsky(crate = kirin::parsers)]
+enum BlockProjectedLang {
+    #[chumsky(format = "$add {0}, {1}")]
+    Add(
+        SSAValue,
+        SSAValue,
+        #[kirin(type = SimpleType::F64)] ResultValue,
+    ),
+    #[chumsky(format = "$ret {0}")]
+    #[kirin(terminator)]
+    Ret(SSAValue),
+    /// Function body: `{:signature} ({body:args}) {{ {body:body} }}`
+    #[chumsky(format = "{:signature} ({body:args}) {{ {body:body} }}")]
+    FuncBody { body: Block },
+}
+
+#[test]
+fn test_block_projected_pipeline_roundtrip() {
+    use kirin::ir::{Pipeline, StageInfo};
+    use kirin::parsers::ParsePipelineText;
+    use kirin_prettyless::PrettyPrintExt;
+
+    let mut pipeline: Pipeline<StageInfo<BlockProjectedLang>> = Pipeline::new();
+    pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("test")
+        .new();
+
+    let input = r#"
+stage @test fn @foo(f64) -> f64;
+specialize @test fn @foo(f64) -> f64 (%x: f64) { %r = add %x, %x; ret %r; }
+"#;
+    pipeline.parse(input).expect("should parse block projection format");
+
+    let printed = pipeline.sprint();
+    let mut pipeline2: Pipeline<StageInfo<BlockProjectedLang>> = Pipeline::new();
+    pipeline2
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("test")
+        .new();
+    pipeline2
+        .parse(printed.trim())
+        .expect("should reparse block projection format");
+    let printed2 = pipeline2.sprint();
+
+    assert_eq!(
+        printed.trim(),
+        printed2.trim(),
+        "block projection pipeline roundtrip should be stable"
+    );
+}
+
+// --- Use Case 6: Region body-only projection pipeline test ---
+
+/// A dialect using Region body-only projection.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[kirin(builders, type = SimpleType, crate = kirin::ir)]
+#[chumsky(crate = kirin::parsers)]
+enum RegionProjectedLang {
+    #[chumsky(format = "$add {0}, {1}")]
+    Add(
+        SSAValue,
+        SSAValue,
+        #[kirin(type = SimpleType::F64)] ResultValue,
+    ),
+    #[chumsky(format = "$ret {0}")]
+    #[kirin(terminator)]
+    Ret(SSAValue),
+    /// Function body: `{:signature} {{ {body:body} }}`
+    #[chumsky(format = "{:signature} {{ {body:body} }}")]
+    FuncBody { body: Region },
+}
+
+#[test]
+fn test_region_projected_pipeline_roundtrip() {
+    use kirin::ir::{Pipeline, StageInfo};
+    use kirin::parsers::ParsePipelineText;
+    use kirin_prettyless::PrettyPrintExt;
+
+    let mut pipeline: Pipeline<StageInfo<RegionProjectedLang>> = Pipeline::new();
+    pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("test")
+        .new();
+
+    let input = r#"
+stage @test fn @foo(f64) -> f64;
+specialize @test fn @foo(f64) -> f64 { ^entry(%x: f64) { %r = add %x, %x; ret %r; } }
+"#;
+    pipeline.parse(input).expect("should parse region projection format");
+
+    let printed = pipeline.sprint();
+    let mut pipeline2: Pipeline<StageInfo<RegionProjectedLang>> = Pipeline::new();
+    pipeline2
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("test")
+        .new();
+    pipeline2
+        .parse(printed.trim())
+        .expect("should reparse region projection format");
+    let printed2 = pipeline2.sprint();
+
+    assert_eq!(
+        printed.trim(),
+        printed2.trim(),
+        "region projection pipeline roundtrip should be stable"
+    );
+}
+
 // --- Full digraph roundtrip tests ---
 
 #[test]

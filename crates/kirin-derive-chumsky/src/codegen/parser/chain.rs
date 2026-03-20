@@ -520,7 +520,7 @@ impl GenerateHasDialectParser {
                             arguments: #args_expr,
                             statements: #stmts_expr,
                         },
-                        span: ::core::default::Default::default(),
+                        span: #crate_path::chumsky::span::SimpleSpan::from(0..0),
                     }
                 }
             }
