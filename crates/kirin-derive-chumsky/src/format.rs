@@ -38,13 +38,17 @@ pub enum FormatElement<'src> {
     Context(ContextProjection),
 }
 
-/// Context projections: `{:name}`, `{:return}` — properties of the enclosing function.
+/// Context projections: `{:name}`, `{:return}`, `{:signature}` — properties of the enclosing function.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContextProjection {
     /// `{:name}` — the function's global symbol name (`@symbol`).
     Name,
     /// `{:return}` — the function's return type(s) (`Type, Type`).
     Return,
+    /// `{:signature}` — the full framework signature: `fn @name(Type, Type) -> RetType`.
+    /// Printed from the framework context. At parse time, the framework already consumed
+    /// the signature before the dialect parser sees the body text, so this is a no-op.
+    Signature,
 }
 
 /// Projections for `{field:...}` body structural parts.
@@ -111,6 +115,7 @@ impl<'src> Format<'src> {
             .ignore_then(select! {
                 Token::Identifier("name") => ContextProjection::Name,
                 Token::Identifier("return") => ContextProjection::Return,
+                Token::Identifier("signature") => ContextProjection::Signature,
             })
             .then_ignore(just(Token::RBrace))
             .map(FormatElement::Context);

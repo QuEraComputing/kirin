@@ -34,6 +34,10 @@ pub struct Document<'a, L: Dialect> {
     ///
     /// Set by the framework printer for `{:return}` context projections.
     pub(super) return_type_text: Cell<Option<String>>,
+    /// The full signature text `Type, Type) -> RetType` for `{:signature}`.
+    ///
+    /// Set by the framework printer. `print_function_signature()` prepends `fn @name(`.
+    pub(super) signature_text: Cell<Option<String>>,
 }
 
 impl<'a, L: Dialect> Document<'a, L> {
@@ -51,6 +55,7 @@ impl<'a, L: Dialect> Document<'a, L> {
             global_symbols: None,
             function_name: Cell::new(None),
             return_type_text: Cell::new(None),
+            signature_text: Cell::new(None),
         }
     }
 
@@ -71,6 +76,7 @@ impl<'a, L: Dialect> Document<'a, L> {
             global_symbols: Some(global_symbols),
             function_name: Cell::new(None),
             return_type_text: Cell::new(None),
+            signature_text: Cell::new(None),
         }
     }
 
@@ -102,6 +108,16 @@ impl<'a, L: Dialect> Document<'a, L> {
     /// Returns the return type text, if set.
     pub fn return_type_text(&self) -> Option<String> {
         self.return_type_text.take()
+    }
+
+    /// Set the full signature text for `{:signature}` context projections.
+    pub fn set_signature_text(&self, text: Option<String>) {
+        self.signature_text.set(text);
+    }
+
+    /// Returns the full signature text, if set.
+    pub fn signature_text(&self) -> Option<String> {
+        self.signature_text.take()
     }
 
     /// Indent a document by the configured tab spaces.

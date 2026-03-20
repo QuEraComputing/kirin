@@ -358,6 +358,9 @@ impl GeneratePrettyPrint {
                         crate::format::ContextProjection::Return => {
                             parts.push(quote! { doc.print_return_types() });
                         }
+                        crate::format::ContextProjection::Signature => {
+                            parts.push(quote! { doc.print_function_signature() });
+                        }
                     }
                 }
             }

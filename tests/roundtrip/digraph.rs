@@ -168,8 +168,8 @@ enum ProjectedFuncLang {
         #[kirin(into)] kirin_test_languages::Value,
         #[kirin(type = SimpleType::F64)] ResultValue,
     ),
-    /// Function body: `({body:ports}) captures ({body:captures}) {{ {body:body} }}`
-    #[chumsky(format = "({0:ports}) captures ({0:captures}) {{ {0:body} }}")]
+    /// Function body with explicit signature: `{:signature} ({body:ports}) captures ({body:captures}) {{ {body:body} }}`
+    #[chumsky(format = "{:signature} ({0:ports}) captures ({0:captures}) {{ {0:body} }}")]
     FuncBody(DiGraph),
 }
 

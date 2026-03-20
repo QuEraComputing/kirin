@@ -79,6 +79,11 @@ impl GenerateHasDialectParser {
                                 },
                             ));
                         }
+                        crate::format::ContextProjection::Signature => {
+                            // No-op at statement level — the function text parser
+                            // already consumed `fn @name(types) -> type` before
+                            // the dialect parser sees the body text.
+                        }
                     }
                 }
             }
