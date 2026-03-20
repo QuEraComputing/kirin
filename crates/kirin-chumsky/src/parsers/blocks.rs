@@ -73,6 +73,25 @@ where
         .labelled("block arguments")
 }
 
+/// Parses a bare list of block arguments (no surrounding parentheses).
+///
+/// Matches: `%arg0: i32, %arg1: f64` or empty
+///
+/// Use this for `:args` body projections where the caller provides delimiter tokens
+/// via the format string.
+pub fn block_argument_list_bare<'t, I, T>()
+-> impl Parser<'t, I, Vec<Spanned<BlockArgument<'t, <T as HasParser<'t>>::Output>>>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
+{
+    block_argument::<_, T>()
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .labelled("block arguments (bare)")
+}
+
 /// Parses a block header.
 ///
 /// Matches:
@@ -168,4 +187,47 @@ where
         .delimited_by(just(Token::LBrace), just(Token::RBrace))
         .map(|blocks| Region { blocks })
         .labelled("region")
+}
+
+/// Parses block body statements (without header, without braces).
+///
+/// Matches a sequence of `statement ;` pairs. This is the inner content of
+/// a block body, used for `:body` projections on Block fields where the
+/// caller provides surrounding syntax via the format string.
+pub fn block_body_statements<'t, I, S>(
+    language: RecursiveParser<'t, I, S>,
+) -> impl Parser<'t, I, Vec<Spanned<S>>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    S: Clone,
+{
+    language
+        .map_with(|stmt, e| Spanned {
+            value: stmt,
+            span: e.span(),
+        })
+        .then_ignore(just(Token::Semicolon))
+        .repeated()
+        .collect::<Vec<_>>()
+        .labelled("block body statements")
+}
+
+/// Parses region body (blocks without outer braces).
+///
+/// Matches a sequence of blocks, each optionally terminated by a semicolon.
+/// This is the inner content of a region, used for `:body` projections on
+/// Region fields where the caller provides surrounding syntax via the format string.
+pub fn region_body<'t, I, T, S>(
+    language: RecursiveParser<'t, I, S>,
+) -> impl Parser<'t, I, Vec<Spanned<Block<'t, <T as HasParser<'t>>::Output, S>>>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
+    S: Clone,
+{
+    block::<_, T, S>(language)
+        .then_ignore(just(Token::Semicolon).or_not())
+        .repeated()
+        .collect::<Vec<_>>()
+        .labelled("region body")
 }

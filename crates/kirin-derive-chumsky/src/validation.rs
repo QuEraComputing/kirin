@@ -222,6 +222,57 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
             return Ok(());
         }
 
+        // Validate body projections against field category
+        if let FormatOption::Body(proj) = option {
+            use crate::format::BodyProjection;
+            let category = field.category();
+            let valid = match proj {
+                BodyProjection::Ports | BodyProjection::Captures | BodyProjection::Yields => {
+                    matches!(
+                        category,
+                        FieldCategory::DiGraph | FieldCategory::UnGraph
+                    )
+                }
+                BodyProjection::Args => {
+                    matches!(category, FieldCategory::Block)
+                }
+                BodyProjection::Body => {
+                    matches!(
+                        category,
+                        FieldCategory::DiGraph
+                            | FieldCategory::UnGraph
+                            | FieldCategory::Region
+                            | FieldCategory::Block
+                    )
+                }
+            };
+
+            if !valid {
+                let proj_name = match proj {
+                    BodyProjection::Ports => ":ports",
+                    BodyProjection::Captures => ":captures",
+                    BodyProjection::Yields => ":yields",
+                    BodyProjection::Args => ":args",
+                    BodyProjection::Body => ":body",
+                };
+                let valid_on = match proj {
+                    BodyProjection::Ports
+                    | BodyProjection::Captures
+                    | BodyProjection::Yields => "DiGraph or UnGraph",
+                    BodyProjection::Args => "Block",
+                    BodyProjection::Body => "DiGraph, UnGraph, Region, or Block",
+                };
+                self.add_error(format!(
+                    "'{}' projection is only valid on {} fields, but '{}' is a {} field",
+                    proj_name,
+                    valid_on,
+                    field,
+                    field.category().ast_kind_name(),
+                ));
+                return Ok(());
+            }
+        }
+
         // Check for duplicate default occurrences
         if matches!(option, FormatOption::Default) {
             if self.default_occurrences.contains(&field.index) {
@@ -428,5 +479,131 @@ mod tests {
 
         let result = validate_format(&stmt, &format, &fields).unwrap();
         assert_eq!(result.occurrences.len(), 4);
+    }
+
+    // ---- Body projection validation tests ----
+
+    fn make_block(index: usize, name: &str) -> FieldInfo<ChumskyLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
+            collection: Collection::Single,
+            data: FieldData::Block,
+        }
+    }
+
+    fn make_region(index: usize, name: &str) -> FieldInfo<ChumskyLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
+            collection: Collection::Single,
+            data: FieldData::Region,
+        }
+    }
+
+    fn make_digraph(index: usize, name: &str) -> FieldInfo<ChumskyLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
+            collection: Collection::Single,
+            data: FieldData::DiGraph,
+        }
+    }
+
+    #[test]
+    fn body_projection_on_digraph_is_valid() {
+        let fields = vec![make_digraph(0, "body")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("{body:body}", None).unwrap();
+        assert!(validate_format(&stmt, &format, &fields).is_ok());
+    }
+
+    #[test]
+    fn ports_projection_on_digraph_is_valid() {
+        let fields = vec![make_digraph(0, "body")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("{body:ports}", None).unwrap();
+        assert!(validate_format(&stmt, &format, &fields).is_ok());
+    }
+
+    #[test]
+    fn body_projection_on_region_is_valid() {
+        let fields = vec![make_region(0, "body")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("{body:body}", None).unwrap();
+        assert!(validate_format(&stmt, &format, &fields).is_ok());
+    }
+
+    #[test]
+    fn args_projection_on_block_is_valid() {
+        let fields = vec![make_block(0, "body")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("{body:args} {body:body}", None).unwrap();
+        assert!(validate_format(&stmt, &format, &fields).is_ok());
+    }
+
+    #[test]
+    fn ports_projection_on_region_is_invalid() {
+        let fields = vec![make_region(0, "body")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("{body:ports}", None).unwrap();
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains(":ports"),
+            "Error should mention :ports: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn args_projection_on_region_is_invalid() {
+        let fields = vec![make_region(0, "body")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("{body:args}", None).unwrap();
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains(":args"),
+            "Error should mention :args: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn body_projection_on_value_is_invalid() {
+        let fields = vec![make_value(0, "body")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("{body:body}", None).unwrap();
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains(":body"),
+            "Error should mention :body: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn captures_projection_on_block_is_invalid() {
+        let fields = vec![make_block(0, "body")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("{body:captures}", None).unwrap();
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains(":captures"),
+            "Error should mention :captures: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn yields_projection_on_argument_is_invalid() {
+        let fields = vec![make_argument(0, "body")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("{body:yields}", None).unwrap();
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains(":yields"),
+            "Error should mention :yields: {}",
+            err
+        );
     }
 }
