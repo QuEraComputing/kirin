@@ -11,6 +11,19 @@ pub struct ZXFunction {
     pub body: UnGraph,
 }
 
+impl HasSignature<ZX> for ZXFunction {
+    fn signature(&self, stage: &StageInfo<ZX>) -> Signature<QubitType> {
+        let info = self.body.expect_info(stage);
+        let params: Vec<QubitType> = info
+            .edge_ports()
+            .iter()
+            .map(|p| p.expect_info(stage).ty().clone())
+            .collect();
+        let ret = QubitType::Qubit;
+        Signature::new(params, ret, ())
+    }
+}
+
 /// Wire edge operation — creates an edge SSAValue.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(edge, builders, type = QubitType)]

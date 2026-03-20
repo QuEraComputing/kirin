@@ -50,6 +50,20 @@ pub struct Measure {
     pub result: ResultValue,
 }
 
+impl HasSignature<Circuit> for CircuitFunction {
+    fn signature(&self, stage: &StageInfo<Circuit>) -> Signature<QubitType> {
+        let info = self.body.expect_info(stage);
+        let params: Vec<QubitType> = info
+            .edge_ports()
+            .iter()
+            .map(|p| p.expect_info(stage).ty().clone())
+            .collect();
+        // DiGraph yields determine the return type; use Qubit as default
+        let ret = QubitType::Qubit;
+        Signature::new(params, ret, ())
+    }
+}
+
 /// Circuit dialect language enum.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
