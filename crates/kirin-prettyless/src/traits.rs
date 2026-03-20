@@ -93,6 +93,19 @@ pub trait PrettyPrint {
     fn prints_result_names(&self) -> bool {
         false
     }
+
+    /// Whether this type's `pretty_print` output includes the function header
+    /// (`fn @name`, ports, yields, etc.).
+    ///
+    /// When `true`, the framework's `print_specialized_function` skips the
+    /// `fn @name(types) -> type` portion and only prints `specialize @stage `.
+    /// The dialect's PrettyPrint handles the rest.
+    ///
+    /// Returns `false` by default (framework prints the full header).
+    /// The derive macro sets this to `true` when body projections are used.
+    fn prints_function_header(&self) -> bool {
+        false
+    }
 }
 
 /// Builder for rendering pretty-printed IR nodes.

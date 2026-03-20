@@ -409,9 +409,9 @@ feat(derive-chumsky): reconstruct body field AST from projection pieces in parse
 
 ---
 
-## Task 5.4: Handle {function:name} pseudo-field parsing
+## Task 5.4: Handle {:name} pseudo-field parsing
 
-The `{function:name}` projection parses `@symbol_name` from the text. It's not a real struct field — "function" is a pseudo-field that provides context.
+The `{:name}` projection parses `@symbol_name` from the text. It's not a real struct field — "function" is a pseudo-field that provides context.
 
 **File:** `crates/kirin-derive-chumsky/src/codegen/parser/chain.rs`
 
@@ -449,7 +449,7 @@ cargo nextest run --workspace
 - [ ] **Step 4: Commit**
 
 ```
-feat(derive-chumsky): handle {function:name} pseudo-field in parser codegen
+feat(derive-chumsky): handle {:name} pseudo-field in parser codegen
 ```
 
 ---
@@ -465,7 +465,7 @@ feat(derive-chumsky): handle {function:name} pseudo-field in parser codegen
 fn test_projected_digraph_parser() {
     let input: syn::DeriveInput = syn::parse_quote! {
         #[kirin(type = SimpleType)]
-        #[chumsky(format = "fn {function:name}({body:ports}) -> {body:yields} { {body:body} }")]
+        #[chumsky(format = "fn {:name}({body:ports}) -> {body:yields} { {body:body} }")]
         struct MyFunction {
             pub body: DiGraph,
         }
@@ -481,7 +481,7 @@ fn test_projected_digraph_parser() {
 fn test_projected_block_parser() {
     let input: syn::DeriveInput = syn::parse_quote! {
         #[kirin(type = SimpleType)]
-        #[chumsky(format = "fn {function:name}({body:args}) { {body:body} }")]
+        #[chumsky(format = "fn {:name}({body:args}) { {body:body} }")]
         struct BlockFunction {
             pub body: Block,
         }
@@ -532,7 +532,7 @@ Task 5.1 (parser_expr) ── Task 5.3 (AST reconstruction) ── Task 5.5 (sna
                                                                   │
 Task 5.2 (ast_type — likely no-op)                         Task 5.6 (e2e verify)
                                                                   │
-Task 5.4 ({function:name})  ──────────────────────────────────────┘
+Task 5.4 ({:name})  ──────────────────────────────────────┘
 ```
 
 ## Risk Assessment

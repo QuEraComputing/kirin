@@ -290,12 +290,22 @@ where
         let (staged_fn, idx) = func.id();
         let staged_info = staged_fn.expect_info(self.stage);
         let spec = &staged_info.specializations()[idx];
-        let header = self.print_specialize_header(staged_info.name(), spec.signature());
 
         // Set function name context so the body's PrettyPrint can access it
         // via doc.print_function_name() for {:name} projections.
         let prev = self.function_name();
         self.set_function_name(staged_info.name());
+
+        // Check if the body's PrettyPrint includes the function header
+        let body_def = spec.body().expect_info(self.stage).definition();
+        let header = if body_def.prints_function_header() {
+            // Dialect controls the header — just print "specialize @stage "
+            self.text("specialize @") + self.text(self.stage_symbol_text())
+        } else {
+            // Framework prints the full header
+            self.print_specialize_header(staged_info.name(), spec.signature())
+        };
+
         let body = self.print_statement(spec.body());
         self.set_function_name(prev);
 
@@ -332,7 +342,12 @@ where
 
         for spec in active {
             doc += self.line_();
-            doc += self.print_specialize_header(info.name(), spec.signature());
+            let body_def = spec.body().expect_info(self.stage).definition();
+            if body_def.prints_function_header() {
+                doc += self.text("specialize @") + self.text(self.stage_symbol_text());
+            } else {
+                doc += self.print_specialize_header(info.name(), spec.signature());
+            }
             doc += self.text(" ") + self.print_statement(spec.body());
         }
 

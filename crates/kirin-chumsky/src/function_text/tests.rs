@@ -237,7 +237,9 @@ fn test_global_symbol_prefix_is_required() {
 }
 
 #[test]
-fn test_missing_stage_declaration_is_hard_error() {
+fn test_specialize_without_stage_auto_creates() {
+    // With auto-creation, specialize without a prior stage declaration
+    // succeeds by auto-creating the staged function.
     let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
     pipeline
         .add_stage()
@@ -245,11 +247,8 @@ fn test_missing_stage_declaration_is_hard_error() {
         .name("A")
         .new();
     let input = format!("specialize @A fn @foo(()) -> () {BODY}");
-    let err = pipeline.parse(&input).unwrap_err();
-    assert_eq!(
-        err.kind,
-        crate::FunctionParseErrorKind::MissingStageDeclaration
-    );
+    let result = pipeline.parse(&input);
+    assert!(result.is_ok(), "specialize without stage should auto-create: {:?}", result.err());
 }
 
 #[test]

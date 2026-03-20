@@ -189,9 +189,11 @@ pub struct SecondPassCtx<'t> {
     pub tokens: &'t [(Token<'t>, SimpleSpan)],
     pub start_index: usize,
     pub src: &'t str,
-    pub function_lookup: &'t FxHashMap<String, Function>,
-    pub staged_lookup: &'t FxHashMap<StagedKey, StagedFunction>,
+    pub function_lookup: &'t mut FxHashMap<String, Function>,
+    pub staged_lookup: &'t mut FxHashMap<StagedKey, StagedFunction>,
     pub state: &'t mut ParseState,
+    /// The function's GlobalSymbol (for auto-creating staged functions).
+    pub function_symbol: GlobalSymbol,
 }
 
 // ---------------------------------------------------------------------------
@@ -287,11 +289,12 @@ where
         stage,
         stage_id,
         &function,
+        ctx.function_symbol,
         signature.as_ref(),
         body_text,
         span,
-        ctx.function_lookup,
-        ctx.staged_lookup,
+        &mut *ctx.function_lookup,
+        &mut *ctx.staged_lookup,
         ctx.state,
     )?;
 
@@ -384,13 +387,20 @@ where
         }
 
         for (start_index, stage_id, stage_symbol) in pending_specializations {
+            // Pre-create the abstract function (needed for auto-create staged fn path)
+            let head = parse_declaration_head(&tokens, start_index)?;
+            let function =
+                get_or_create_function_by_name(self, &mut function_lookup, head.function.name);
+            let function_symbol = fn_symbol(self, function);
+
             let mut ctx = SecondPassCtx {
                 tokens: &tokens,
                 start_index,
                 src,
-                function_lookup: &function_lookup,
-                staged_lookup: &staged_lookup,
+                function_lookup: &mut function_lookup,
+                staged_lookup: &mut staged_lookup,
                 state: &mut state,
+                function_symbol,
             };
             let stage = self
                 .stage_mut(stage_id)
@@ -564,11 +574,12 @@ fn apply_specialize_declaration<L>(
     stage: &mut StageInfo<L>,
     stage_id: CompileStage,
     function_name: &SymbolName<'_>,
+    function_symbol: GlobalSymbol,
     framework_signature: Option<&Signature<L::Type>>,
     body_text: &str,
     span: SimpleSpan,
-    function_lookup: &FxHashMap<String, Function>,
-    staged_lookup: &FxHashMap<StagedKey, StagedFunction>,
+    function_lookup: &mut FxHashMap<String, Function>,
+    staged_lookup: &mut FxHashMap<StagedKey, StagedFunction>,
     state: &mut ParseState,
 ) -> Result<(), FunctionParseError>
 where
@@ -625,6 +636,7 @@ where
         stage,
         stage_id,
         function_name,
+        function_symbol,
         &signature,
         span,
         function_lookup,
@@ -661,38 +673,64 @@ where
 }
 
 fn resolve_or_create_specialize_target<L>(
-    _stage: &mut StageInfo<L>,
+    stage: &mut StageInfo<L>,
     stage_id: CompileStage,
     function_name: &SymbolName<'_>,
-    _signature: &Signature<L::Type>,
+    function_symbol: GlobalSymbol,
+    signature: &Signature<L::Type>,
     span: SimpleSpan,
-    function_lookup: &FxHashMap<String, Function>,
-    staged_lookup: &FxHashMap<StagedKey, StagedFunction>,
+    function_lookup: &mut FxHashMap<String, Function>,
+    staged_lookup: &mut FxHashMap<StagedKey, StagedFunction>,
 ) -> Result<(Function, StagedFunction), FunctionParseError>
 where
     L: Dialect,
     L::Type: kirin_ir::Placeholder,
 {
-    // Look up existing function and staged function
-    if let Some(function) = function_lookup.get(function_name.name).copied() {
-        let key = StagedKey {
-            stage: stage_id,
-            function,
-        };
-        if let Some(staged_function) = staged_lookup.get(&key).copied() {
-            return Ok((function, staged_function));
-        }
+    // Look up existing function
+    let function = function_lookup
+        .get(function_name.name)
+        .copied()
+        .ok_or_else(|| {
+            FunctionParseError::new(
+                FunctionParseErrorKind::MissingStageDeclaration,
+                Some(span),
+                format!(
+                    "specialize declaration for function '@{}' has no matching function",
+                    function_name.name
+                ),
+            )
+        })?;
+
+    let key = StagedKey {
+        stage: stage_id,
+        function,
+    };
+
+    // Return existing staged function if present
+    if let Some(staged_function) = staged_lookup.get(&key).copied() {
+        return Ok((function, staged_function));
     }
 
-    // No staged function found.
-    Err(FunctionParseError::new(
-        FunctionParseErrorKind::MissingStageDeclaration,
-        Some(span),
-        format!(
-            "specialize declaration for function '@{}' has no matching stage declaration",
-            function_name.name
-        ),
-    ))
+    // Auto-create staged function from extracted signature.
+    // This supports `specialize` without a preceding `stage` declaration.
+    let staged_function = stage
+        .with_builder(|builder| {
+            builder
+                .staged_function()
+                .name(function_symbol)
+                .signature(signature.clone())
+                .new()
+        })
+        .map_err(|err| {
+            FunctionParseError::new(
+                FunctionParseErrorKind::EmitFailed,
+                Some(span),
+                format!("failed to auto-create staged function: {}", err),
+            )
+        })?;
+
+    staged_lookup.insert(key, staged_function);
+    Ok((function, staged_function))
 }
 
 fn ensure_forward_progress(

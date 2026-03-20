@@ -103,6 +103,50 @@ fn test_projected_digraph_empty_body_roundtrip() {
     assert_eq!(rendered.trim(), rendered2.trim());
 }
 
+// --- Pipeline-level roundtrip tests (auto-create staged function) ---
+
+#[test]
+fn test_specialize_without_stage_auto_creates() {
+    use kirin::ir::{Pipeline, StageInfo};
+    use kirin::parsers::ParsePipelineText;
+    use kirin_test_languages::CallableLanguage;
+
+    let mut pipeline: Pipeline<StageInfo<CallableLanguage>> = Pipeline::new();
+    pipeline.add_stage().stage(StageInfo::default()).name("A").new();
+
+    // No `stage` declaration — specialize auto-creates the staged function
+    let input = "specialize @A fn @foo(i32) -> i32 { ^bb0(%x: i32) { ret %x; } }";
+    let functions = pipeline.parse(input).expect("should parse without stage declaration");
+    assert_eq!(functions.len(), 1, "should create one function");
+}
+
+#[test]
+fn test_specialize_without_stage_roundtrip() {
+    use kirin::ir::{Pipeline, StageInfo};
+    use kirin::parsers::ParsePipelineText;
+    use kirin_prettyless::PrettyPrintExt;
+    use kirin_test_languages::CallableLanguage;
+
+    // First parse: with explicit stage declaration
+    let mut pipeline: Pipeline<StageInfo<CallableLanguage>> = Pipeline::new();
+    pipeline.add_stage().stage(StageInfo::default()).name("A").new();
+
+    let input = r#"
+stage @A fn @foo(i32) -> i32;
+specialize @A fn @foo(i32) -> i32 { ^bb0(%x: i32) { ret %x; } }
+"#;
+    pipeline.parse(input).expect("should parse");
+
+    // Print and reparse for stability
+    let printed = pipeline.sprint();
+    let mut pipeline2: Pipeline<StageInfo<CallableLanguage>> = Pipeline::new();
+    pipeline2.add_stage().stage(StageInfo::default()).name("A").new();
+    pipeline2.parse(printed.trim()).expect("should reparse");
+    let printed2 = pipeline2.sprint();
+
+    assert_eq!(printed.trim(), printed2.trim(), "roundtrip should be stable");
+}
+
 // --- Full digraph roundtrip tests ---
 
 #[test]

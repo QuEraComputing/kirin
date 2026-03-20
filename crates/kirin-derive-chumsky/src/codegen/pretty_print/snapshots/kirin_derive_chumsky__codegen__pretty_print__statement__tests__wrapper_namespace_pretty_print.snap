@@ -28,4 +28,10 @@ impl ::kirin::pretty::PrettyPrint for MyLanguage {
             MyLanguage::Cf(inner) => ::kirin::pretty::PrettyPrint::prints_result_names(inner),
         }
     }
+    fn prints_function_header(&self) -> bool {
+        match self {
+            MyLanguage::Arith(inner) => ::kirin::pretty::PrettyPrint::prints_function_header(inner),
+            MyLanguage::Cf(inner) => ::kirin::pretty::PrettyPrint::prints_function_header(inner),
+        }
+    }
 }
