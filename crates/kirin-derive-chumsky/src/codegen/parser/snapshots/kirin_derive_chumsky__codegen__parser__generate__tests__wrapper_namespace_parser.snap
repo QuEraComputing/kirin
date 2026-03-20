@@ -111,7 +111,6 @@ impl ::kirin::parsers::ParseEmit for MyLanguage
 where
     for<'t> Self: ::kirin::parsers::HasParserEmitIR<'t>,
 {
-    const HAS_FUNCTION_FORMAT: bool = true;
     fn parse_and_emit(
         input: &str,
         ctx: &mut ::kirin::parsers::EmitContext<'_, Self>,

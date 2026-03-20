@@ -10,7 +10,6 @@ use quote::quote;
 
 use crate::ChumskyLayout;
 use crate::codegen::{ImplBounds, init_where_clause};
-use crate::format::{Format, FormatElement};
 
 use super::GenerateHasDialectParser;
 
@@ -147,37 +146,6 @@ impl GenerateHasDialectParser {
         }
     }
 
-    /// Check if any variant/struct format contains a context projection ({:signature}, {:name}).
-    fn has_function_format(
-        &self,
-        ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
-    ) -> bool {
-        let check_stmt =
-            |stmt: &kirin_derive_toolkit::ir::Statement<ChumskyLayout>| -> bool {
-                let format_str = crate::codegen::format_for_statement(ir_input, stmt);
-                if let Some(fmt_str) = format_str {
-                    if let Ok(fmt) = Format::parse(&fmt_str, None) {
-                        return fmt
-                            .elements()
-                            .iter()
-                            .any(|e| matches!(e, FormatElement::Context(_)));
-                    }
-                }
-                false
-            };
-
-        match &ir_input.data {
-            kirin_derive_toolkit::ir::Data::Struct(s) => check_stmt(&s.0),
-            kirin_derive_toolkit::ir::Data::Enum(e) => {
-                use kirin_derive_toolkit::ir::VariantRef;
-                e.iter_variants().any(|v| match v {
-                    VariantRef::Regular { stmt, .. } => check_stmt(stmt),
-                    VariantRef::Wrapper { .. } => true, // wrappers may contain function bodies
-                })
-            }
-        }
-    }
-
     /// Generates a `ParseEmit` impl that delegates to `HasParserEmitIR`.
     ///
     /// This is shared between regular and wrapper struct paths.
@@ -196,15 +164,11 @@ impl GenerateHasDialectParser {
             for<'t> Self: #crate_path::HasParserEmitIR<'t>
         });
 
-        let has_function_format = self.has_function_format(ir_input);
-
         quote! {
             #[automatically_derived]
             impl #impl_generics #crate_path::ParseEmit for #original_name #ty_generics
             #wc
             {
-                const HAS_FUNCTION_FORMAT: bool = #has_function_format;
-
                 fn parse_and_emit(
                     input: &str,
                     ctx: &mut #crate_path::EmitContext<'_, Self>,

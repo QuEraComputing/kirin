@@ -586,19 +586,6 @@ where
     L: Dialect + ParseEmit<L>,
     L::Type: kirin_ir::Placeholder,
 {
-    // Check that the dialect supports function body format
-    if !L::HAS_FUNCTION_FORMAT {
-        return Err(FunctionParseError::new(
-            FunctionParseErrorKind::InvalidHeader,
-            Some(span),
-            format!(
-                "dialect does not have a function body format. \
-                 Add {{:signature}} to the format string of the function body variant \
-                 (e.g., `#[chumsky(format = \"{{:signature}} {{body}}\")]`).",
-            ),
-        ));
-    }
-
     // Parse and emit the body first — we need it to extract signature if needed
     let body_statement = stage
         .with_builder(|builder| {

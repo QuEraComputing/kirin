@@ -110,7 +110,6 @@ impl kirin_chumsky::ParseEmit for Return
 where
     for<'t> Self: kirin_chumsky::HasParserEmitIR<'t>,
 {
-    const HAS_FUNCTION_FORMAT: bool = false;
     fn parse_and_emit(
         input: &str,
         ctx: &mut kirin_chumsky::EmitContext<'_, Self>,
