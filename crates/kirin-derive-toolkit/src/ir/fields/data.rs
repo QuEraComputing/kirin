@@ -19,6 +19,8 @@ pub enum FieldCategory {
     DiGraph,
     /// Undirected graph body (`UnGraph`).
     UnGraph,
+    /// Function signature (`Signature` / `Signature<T>`).
+    Signature,
     /// Symbol reference (`Symbol`).
     Symbol,
     /// Plain Rust value (anything not recognized as an IR primitive).
@@ -55,6 +57,7 @@ pub enum FieldData<L: Layout> {
     Region,
     DiGraph,
     UnGraph,
+    Signature,
     Symbol,
     Value {
         ty: syn::Type,
@@ -82,6 +85,7 @@ impl<L: Layout> Clone for FieldData<L> {
             FieldData::Region => FieldData::Region,
             FieldData::DiGraph => FieldData::DiGraph,
             FieldData::UnGraph => FieldData::UnGraph,
+            FieldData::Signature => FieldData::Signature,
             FieldData::Symbol => FieldData::Symbol,
             FieldData::Value {
                 ty,
@@ -125,6 +129,11 @@ mod tests {
     #[test]
     fn field_category_is_ssa_like_region() {
         assert!(!FieldCategory::Region.is_ssa_like());
+    }
+
+    #[test]
+    fn field_category_is_ssa_like_signature() {
+        assert!(!FieldCategory::Signature.is_ssa_like());
     }
 
     #[test]

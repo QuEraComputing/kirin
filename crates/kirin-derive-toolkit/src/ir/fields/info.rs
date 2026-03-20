@@ -50,6 +50,7 @@ impl<L: Layout> FieldInfo<L> {
             FieldData::Region => FieldCategory::Region,
             FieldData::DiGraph => FieldCategory::DiGraph,
             FieldData::UnGraph => FieldCategory::UnGraph,
+            FieldData::Signature => FieldCategory::Signature,
             FieldData::Symbol => FieldCategory::Symbol,
             FieldData::Value { .. } => FieldCategory::Value,
         }
@@ -65,6 +66,7 @@ impl<L: Layout> FieldInfo<L> {
             FieldCategory::Region => "region",
             FieldCategory::DiGraph => "digraph",
             FieldCategory::UnGraph => "ungraph",
+            FieldCategory::Signature => "signature",
             FieldCategory::Symbol => "symbol",
             FieldCategory::Value => "value",
         }
@@ -236,6 +238,7 @@ mod tests {
             (FieldData::Block, "block"),
             (FieldData::Successor, "successor"),
             (FieldData::Region, "region"),
+            (FieldData::Signature, "signature"),
             (FieldData::Symbol, "symbol"),
             (
                 FieldData::Value {

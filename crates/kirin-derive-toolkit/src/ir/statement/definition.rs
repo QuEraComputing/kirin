@@ -251,6 +251,15 @@ impl<L: Layout> Statement<L> {
             });
         }
 
+        if let Some(collection) = Collection::from_type(ty, "Signature") {
+            return Ok(FieldInfo {
+                index,
+                ident,
+                collection,
+                data: FieldData::Signature,
+            });
+        }
+
         if let Some(collection) = Collection::from_type(ty, "Symbol") {
             return Ok(FieldInfo {
                 index,

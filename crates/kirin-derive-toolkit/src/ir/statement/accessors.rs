@@ -58,6 +58,13 @@ impl<L: Layout> Statement<L> {
             .filter(|f| f.category() == FieldCategory::UnGraph)
     }
 
+    /// Iterates fields classified as [`FieldCategory::Signature`].
+    pub fn signatures(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+        self.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::Signature)
+    }
+
     /// Iterates fields classified as [`FieldCategory::Value`] (plain Rust types).
     pub fn values(&self) -> impl Iterator<Item = &FieldInfo<L>> {
         self.fields

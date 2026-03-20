@@ -75,6 +75,7 @@ fn build_fn_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
             | FieldCategory::Region
             | FieldCategory::DiGraph
             | FieldCategory::UnGraph
+            | FieldCategory::Signature
             | FieldCategory::Symbol => {
                 let ty = field_type_for_category(&field.collection, field.category());
                 let name = field.name_ident(ty.span());
@@ -116,6 +117,7 @@ fn build_fn_let_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
             | FieldCategory::Region
             | FieldCategory::DiGraph
             | FieldCategory::UnGraph
+            | FieldCategory::Signature
             | FieldCategory::Symbol => {
                 let ty = field_type_for_category(&field.collection, field.category());
                 let name = field.name_ident(ty.span());
@@ -135,6 +137,7 @@ fn field_type_for_category(collection: &Collection, category: FieldCategory) -> 
         FieldCategory::Region => "Region",
         FieldCategory::DiGraph => "DiGraph",
         FieldCategory::UnGraph => "UnGraph",
+        FieldCategory::Signature => "Signature",
         FieldCategory::Symbol => "Symbol",
         FieldCategory::Value => {
             unreachable!("field_type_for_category does not support Value")

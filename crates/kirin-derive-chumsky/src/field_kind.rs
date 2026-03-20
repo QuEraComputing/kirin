@@ -31,6 +31,7 @@ impl FieldCategoryExt for FieldCategory {
             FieldCategory::Value => "value",
             FieldCategory::DiGraph => "digraph",
             FieldCategory::UnGraph => "ungraph",
+            FieldCategory::Signature => "signature",
         }
     }
 
@@ -83,6 +84,9 @@ pub fn ast_type<L: Layout>(
         }
         FieldCategory::UnGraph => {
             quote! { #crate_path::UnGraph<'t, #type_output, LanguageOutput> }
+        }
+        FieldCategory::Signature => {
+            unreachable!("Signature codegen not yet implemented")
         }
     }
 }
@@ -189,6 +193,9 @@ pub fn parser_expr<L: Layout>(
             }
             _ => unreachable!("validation prevents other projections on UnGraph fields"),
         },
+        FieldCategory::Signature => {
+            unreachable!("Signature codegen not yet implemented")
+        }
     }
 }
 
@@ -317,6 +324,9 @@ pub fn print_expr<L: Layout>(
                 unreachable!("Name/Type projections are not valid on UnGraph fields")
             }
         },
+        FieldCategory::Signature => {
+            unreachable!("Signature codegen not yet implemented")
+        }
     }
 }
 

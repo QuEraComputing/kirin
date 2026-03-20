@@ -137,6 +137,7 @@ impl GenerateEmitIR {
                         | FieldCategory::Block
                         | FieldCategory::Successor
                         | FieldCategory::Region
+                        | FieldCategory::Signature
                         | FieldCategory::Symbol => {
                             quote! { #emitted_var.into() }
                         }
