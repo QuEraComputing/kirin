@@ -6,7 +6,7 @@ use kirin::prelude::*;
 /// forward through gates.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
-#[chumsky(format = "{body}")]
+#[chumsky(format = "{:signature} {body}")]
 pub struct CircuitFunction {
     pub body: DiGraph,
 }

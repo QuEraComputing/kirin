@@ -3,7 +3,7 @@ source: crates/kirin-prettyless/src/tests/sprint_with_globals.rs
 expression: output
 ---
 stage @0 fn @my_function(i64) -> i64;
-specialize @0 fn @my_function(i64) -> i64 %1 = {
+specialize @0 %1 = {
   ^0 {
     %0 = constant 42;
     return %0;

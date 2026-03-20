@@ -2,7 +2,7 @@
 source: crates/kirin-prettyless/src/tests/write.rs
 expression: output
 ---
-specialize @0 fn @test_func(i64) -> i64 %8 = {
+specialize @0 %8 = {
   ^0(%5: i64, %y: f64) {
     %0 = constant 1.2;
     %1 = constant 3.4;

@@ -107,7 +107,9 @@ impl<'a, L: Dialect> Document<'a, L> {
 
     /// Returns the return type text, if set.
     pub fn return_type_text(&self) -> Option<String> {
-        self.return_type_text.take()
+        let val = self.return_type_text.take();
+        self.return_type_text.set(val.clone());
+        val
     }
 
     /// Set the full signature text for `{:signature}` context projections.
@@ -117,7 +119,9 @@ impl<'a, L: Dialect> Document<'a, L> {
 
     /// Returns the full signature text, if set.
     pub fn signature_text(&self) -> Option<String> {
-        self.signature_text.take()
+        let val = self.signature_text.take();
+        self.signature_text.set(val.clone());
+        val
     }
 
     /// Indent a document by the configured tab spaces.

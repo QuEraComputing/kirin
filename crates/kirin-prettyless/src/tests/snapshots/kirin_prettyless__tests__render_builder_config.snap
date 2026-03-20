@@ -2,7 +2,7 @@
 source: crates/kirin-prettyless/src/tests/impls.rs
 expression: output
 ---
-specialize @0 fn @test(i64) -> i64 %3 = {
+specialize @0 %3 = {
   ^0 {
     %0 = constant 1;
     %1 = constant 2;

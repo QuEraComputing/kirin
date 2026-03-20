@@ -3,7 +3,7 @@ source: crates/kirin-prettyless/src/tests/pipeline.rs
 expression: output
 ---
 stage @0 fn @bar(i64, f64) -> i64;
-specialize @0 fn @bar(i64, f64) -> i64 %1 = {
+specialize @0 %1 = {
   ^0 {
     %0 = constant 7;
     return %0;

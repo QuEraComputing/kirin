@@ -7,7 +7,7 @@ use kirin_derive_toolkit::ir::fields::FieldInfo;
 use kirin_lexer::Token;
 
 use crate::field_kind;
-use crate::format::{Format, FormatElement, FormatOption};
+use crate::format::{Format, FormatElement};
 
 use crate::codegen::generate_enum_match;
 
@@ -91,7 +91,6 @@ impl GeneratePrettyPrint {
 
         // Generate prints_result_names override for new-format dialects
         let prints_result_names = self.generate_prints_result_names(ir_input);
-        let prints_function_header = self.generate_prints_function_header(ir_input);
 
         quote! {
             #[automatically_derived]
@@ -112,7 +111,6 @@ impl GeneratePrettyPrint {
                 }
 
                 #prints_result_names
-                #prints_function_header
             }
         }
     }
@@ -373,125 +371,6 @@ impl GeneratePrettyPrint {
             let rest = &parts[1..];
             quote! {
                 #first #(+ #rest)*
-            }
-        }
-    }
-
-    /// Generates the `prints_function_header` method override.
-    ///
-    /// Returns `true` when the format string contains body projections or context
-    /// projections, meaning the dialect controls the function header output.
-    fn generate_prints_function_header(
-        &self,
-        ir_input: &kirin_derive_toolkit::ir::Input<PrettyPrintLayout>,
-    ) -> TokenStream {
-        use kirin_derive_toolkit::ir::VariantRef;
-        let prettyless_path = &self.prettyless_path;
-
-        let has_projections = |stmt: &kirin_derive_toolkit::ir::Statement<PrettyPrintLayout>| -> bool {
-            let format_str = crate::codegen::format_for_statement(ir_input, stmt);
-            if let Some(fmt_str) = format_str {
-                if let Ok(fmt) = Format::parse(&fmt_str, None) {
-                    return fmt.elements().iter().any(|e| {
-                        matches!(e, FormatElement::Context(_))
-                    });
-                }
-            }
-            false
-        };
-
-        match &ir_input.data {
-            kirin_derive_toolkit::ir::Data::Struct(s) => {
-                if s.0.wraps.is_some() {
-                    quote! {
-                        fn prints_function_header(&self) -> bool {
-                            #prettyless_path::PrettyPrint::prints_function_header(&self.0)
-                        }
-                    }
-                } else if has_projections(&s.0) {
-                    quote! { fn prints_function_header(&self) -> bool { true } }
-                } else {
-                    quote! {}  // Use default (false)
-                }
-            }
-            kirin_derive_toolkit::ir::Data::Enum(e) => {
-                let has_wrappers = e
-                    .iter_variants()
-                    .any(|v| matches!(v, VariantRef::Wrapper { .. }));
-                let any_projections = e
-                    .iter_variants()
-                    .any(|v| match v {
-                        VariantRef::Regular { stmt, .. } => has_projections(stmt),
-                        VariantRef::Wrapper { .. } => false,
-                    });
-
-                if !has_wrappers && !any_projections {
-                    quote! {}  // Use default (false)
-                } else if !has_wrappers && any_projections {
-                    // Some variants have projections — need per-variant dispatch
-                    let dialect_name = &ir_input.name;
-                    let arms: Vec<_> = e
-                        .iter_variants()
-                        .map(|v| match v {
-                            VariantRef::Regular { name, stmt, .. } => {
-                                let val = has_projections(stmt);
-                                quote! { #dialect_name::#name { .. } => { #val } }
-                            }
-                            VariantRef::Wrapper { name, .. } => {
-                                quote! {
-                                    #dialect_name::#name(inner) => {
-                                        #prettyless_path::PrettyPrint::prints_function_header(inner)
-                                    }
-                                }
-                            }
-                        })
-                        .collect();
-                    let wildcard = if e.has_hidden_variants {
-                        quote! { _ => false }
-                    } else {
-                        quote! {}
-                    };
-                    quote! {
-                        fn prints_function_header(&self) -> bool {
-                            match self {
-                                #(#arms)*
-                                #wildcard
-                            }
-                        }
-                    }
-                } else {
-                    // Has wrappers — delegate
-                    let dialect_name = &ir_input.name;
-                    let arms: Vec<_> = e
-                        .iter_variants()
-                        .map(|v| match v {
-                            VariantRef::Wrapper { name, .. } => {
-                                quote! {
-                                    #dialect_name::#name(inner) => {
-                                        #prettyless_path::PrettyPrint::prints_function_header(inner)
-                                    }
-                                }
-                            }
-                            VariantRef::Regular { name, stmt, .. } => {
-                                let val = has_projections(stmt);
-                                quote! { #dialect_name::#name { .. } => { #val } }
-                            }
-                        })
-                        .collect();
-                    let wildcard = if e.has_hidden_variants {
-                        quote! { _ => false }
-                    } else {
-                        quote! {}
-                    };
-                    quote! {
-                        fn prints_function_header(&self) -> bool {
-                            match self {
-                                #(#arms)*
-                                #wildcard
-                            }
-                        }
-                    }
-                }
             }
         }
     }

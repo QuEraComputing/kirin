@@ -89,7 +89,7 @@ use kirin_ir::{
 use kirin_lexer::Token;
 use strsim::levenshtein;
 
-use crate::{EmitContext, ExtractSignature, HasParser, ParseEmit};
+use crate::{EmitContext, HasParser, ParseEmit};
 
 use super::dispatch::ParseDispatch;
 use super::error::{DiagnosticError, FunctionParseError, FunctionParseErrorKind};
@@ -261,7 +261,7 @@ pub fn second_pass_concrete<'t, L>(
     ctx: &mut SecondPassCtx<'t>,
 ) -> Result<usize, FunctionParseError>
 where
-    L: Dialect + ParseEmit<L> + ExtractSignature<L> + HasParser<'t>,
+    L: Dialect + ParseEmit<L> + HasParser<'t>,
     L::Type: kirin_ir::Placeholder + HasParser<'t, Output = L::Type>,
 {
     let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
@@ -583,7 +583,7 @@ fn apply_specialize_declaration<L>(
     state: &mut ParseState,
 ) -> Result<(), FunctionParseError>
 where
-    L: Dialect + ParseEmit<L> + ExtractSignature<L>,
+    L: Dialect + ParseEmit<L>,
     L::Type: kirin_ir::Placeholder,
 {
     // Parse and emit the body first — we need it to extract signature if needed

@@ -13,7 +13,7 @@
 
 use kirin_ir::{CompileStage, Dialect, StageInfo, StageMeta};
 
-use crate::{ExtractSignature, HasParser, ParseEmit};
+use crate::{HasParser, ParseEmit};
 
 use super::error::FunctionParseError;
 use super::parse_text::{FirstPassCtx, FirstPassDispatchResult, SecondPassCtx};
@@ -47,7 +47,7 @@ pub trait ParseDispatch: StageMeta {
 /// not a type parameter being resolved recursively through the trait solver.
 impl<L> ParseDispatch for StageInfo<L>
 where
-    L: Dialect + ParseEmit<L> + ExtractSignature<L>,
+    L: Dialect + ParseEmit<L>,
     L::Type: kirin_ir::Placeholder, // Still needed for staged_function() on StageInfo
     for<'t> L: HasParser<'t>,
     for<'t> L::Type: HasParser<'t, Output = L::Type>,

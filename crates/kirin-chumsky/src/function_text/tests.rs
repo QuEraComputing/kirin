@@ -87,7 +87,7 @@ trivial_type_lattice!(I32Type, "i32", just(Token::Identifier("i32")));
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, kirin_ir::Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = UnitType, crate = kirin_ir)]
-#[chumsky(crate = crate, format = "{body}")]
+#[chumsky(crate = crate, format = "{:signature} {body}")]
 struct FunctionBody {
     body: Region,
 }

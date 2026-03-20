@@ -13,7 +13,7 @@ use kirin_ir::{Dialect, Region};
 pub enum CallableLanguage {
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
-        chumsky(format = "{body}")
+        chumsky(format = "{:signature} {body}")
     )]
     Function { body: Region },
     #[wraps]

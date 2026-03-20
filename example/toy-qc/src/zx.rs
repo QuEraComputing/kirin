@@ -6,7 +6,7 @@ use kirin::prelude::*;
 /// and spiders/boxes are nodes connected by those edges.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
-#[chumsky(format = "{body}")]
+#[chumsky(format = "{:signature} {body}")]
 pub struct ZXFunction {
     pub body: UnGraph,
 }

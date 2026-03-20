@@ -9,7 +9,7 @@ use kirin_test_utils::roundtrip;
 #[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum ConstantLanguage {
-    #[chumsky(format = "{body}")]
+    #[chumsky(format = "{:signature} {body}")]
     Function { body: Region },
     #[kirin(constant, pure)]
     #[chumsky(format = "$constant {value} -> {result:type}")]

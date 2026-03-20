@@ -304,15 +304,7 @@ where
         let sig_text = format!("{}) -> {}", params_text, sig.ret());
         self.set_signature_text(Some(sig_text));
 
-        // Check if the body's PrettyPrint includes the function header
-        let body_def = spec.body().expect_info(self.stage).definition();
-        let header = if body_def.prints_function_header() {
-            // Dialect controls the header — just print "specialize @stage "
-            self.text("specialize @") + self.text(self.stage_symbol_text())
-        } else {
-            // Framework prints the full header
-            self.print_specialize_header(staged_info.name(), spec.signature())
-        };
+        let header = self.text("specialize @") + self.text(self.stage_symbol_text());
 
         let body = self.print_statement(spec.body());
         self.set_function_name(prev_name);
@@ -359,12 +351,7 @@ where
             self.set_signature_text(Some(sig_text));
 
             doc += self.line_();
-            let body_def = spec.body().expect_info(self.stage).definition();
-            if body_def.prints_function_header() {
-                doc += self.text("specialize @") + self.text(self.stage_symbol_text());
-            } else {
-                doc += self.print_specialize_header(info.name(), spec.signature());
-            }
+            doc += self.text("specialize @") + self.text(self.stage_symbol_text());
             doc += self.text(" ") + self.print_statement(spec.body());
         }
 
@@ -395,17 +382,6 @@ where
             + self.text(" fn @")
             + self.print_fn_signature(name, sig)
             + self.text(";")
-    }
-
-    fn print_specialize_header(
-        &'a self,
-        name: Option<GlobalSymbol>,
-        sig: &Signature<L::Type>,
-    ) -> ArenaDoc<'a> {
-        self.text("specialize @")
-            + self.text(self.stage_symbol_text())
-            + self.text(" fn @")
-            + self.print_fn_signature(name, sig)
     }
 
     /// Render `name(T0, T1) -> Ret` — shared by all header variants.
@@ -459,7 +435,8 @@ where
             .unwrap_or_else(|| ") -> ()".to_string());
 
         // sig_text is "Type, Type) -> RetType" — we prepend "fn @name("
-        self.text(format!("fn @{}({}", name_text, sig_text))
+        let full = format!("fn @{}({}", name_text, sig_text);
+        self.text(full)
     }
 
     /// Print the enclosing function's return type(s).
