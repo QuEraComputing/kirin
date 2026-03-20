@@ -105,6 +105,11 @@ pub fn parser_expr<L: Layout>(
             FormatOption::Default => {
                 quote! { #crate_path::ssa_value::<_, #ir_type>() }
             }
+            // Projection options are only used with pseudo-fields (function/body),
+            // never with real Argument fields.
+            FormatOption::Function(_) | FormatOption::Body(_) => {
+                unreachable!("projection options are for pseudo-fields, not Argument fields")
+            }
         },
         FieldCategory::Result => match opt {
             FormatOption::Name => quote! { #crate_path::nameof_ssa() },
@@ -113,6 +118,11 @@ pub fn parser_expr<L: Layout>(
             }
             FormatOption::Default => {
                 quote! { #crate_path::result_value::<_, #ir_type>() }
+            }
+            // Projection options are only used with pseudo-fields (function/body),
+            // never with real Result fields.
+            FormatOption::Function(_) | FormatOption::Body(_) => {
+                unreachable!("projection options are for pseudo-fields, not Result fields")
             }
         },
         FieldCategory::Block => {
@@ -169,6 +179,11 @@ pub fn print_expr<L: Layout>(
             FormatOption::Default => quote! {
                 #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
             },
+            // Projection options are only used with pseudo-fields (function/body),
+            // never with real Argument/Result fields.
+            FormatOption::Function(_) | FormatOption::Body(_) => {
+                unreachable!("projection options are for pseudo-fields, not Argument/Result fields")
+            }
         },
         FieldCategory::Block => quote! {
             doc.print_block(#field_ref)

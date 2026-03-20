@@ -1,0 +1,25 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+assertion_line: 320
+expression: format
+---
+Format {
+    elements: [
+        Token(
+            [
+                EscapedLBrace,
+            ],
+        ),
+        Field(
+            "body",
+            Body(
+                Body,
+            ),
+        ),
+        Token(
+            [
+                EscapedRBrace,
+            ],
+        ),
+    ],
+}

@@ -5,6 +5,119 @@ use kirin_lexer::Token;
 
 use super::values::ssa_name;
 
+// ---- Component parsers for format projections ----
+
+/// Parses a comma-separated port list without surrounding parentheses.
+///
+/// Matches: `%name: Type, %name: Type`
+///
+/// This is the standalone component parser for `{body:ports}` projections.
+/// Unlike `block_argument_list()`, it does NOT expect surrounding `(` `)`.
+pub fn port_list<'t, I, T>()
+-> impl Parser<'t, I, Vec<Spanned<BlockArgument<'t, <T as HasParser<'t>>::Output>>>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
+{
+    super::block_argument::<_, T>()
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .labelled("port list")
+}
+
+/// Parses a comma-separated capture list without surrounding parentheses
+/// and without the `capture` keyword.
+///
+/// Matches: `%name: Type, %name: Type`
+///
+/// This is the standalone component parser for `{body:captures}` projections.
+/// The caller is responsible for parsing any surrounding syntax (e.g., `captures (` `)`)
+/// via format string literals.
+pub fn capture_list<'t, I, T>()
+-> impl Parser<'t, I, Vec<Spanned<BlockArgument<'t, <T as HasParser<'t>>::Output>>>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
+{
+    super::block_argument::<_, T>()
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .labelled("capture list")
+}
+
+/// Parses a comma-separated list of types (no names).
+///
+/// Matches: `Type, Type, Type`
+///
+/// This is the standalone component parser for `{body:yields}` projections.
+pub fn yield_type_list<'t, I, T>()
+-> impl Parser<'t, I, Vec<Spanned<<T as HasParser<'t>>::Output>>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
+{
+    T::parser()
+        .map_with(|ty, e| Spanned {
+            value: ty,
+            span: e.span(),
+        })
+        .separated_by(just(Token::Comma))
+        .allow_trailing()
+        .collect::<Vec<_>>()
+        .labelled("yield type list")
+}
+
+/// Parses graph body statements (for digraph) without the graph header or braces.
+///
+/// Matches: `stmt; stmt; ... [yield %v0, %v1;]`
+///
+/// This is the standalone component parser for `{body:body}` projections on digraph fields.
+/// The caller is responsible for parsing surrounding `{` `}` via format string literals.
+pub fn digraph_body_statements<'t, I, S>(
+    language: RecursiveParser<'t, I, S>,
+) -> impl Parser<'t, I, (Vec<Spanned<S>>, Vec<Spanned<&'t str>>), ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    S: Clone,
+{
+    let statements = language
+        .clone()
+        .map_with(|stmt, e| Spanned {
+            value: stmt,
+            span: e.span(),
+        })
+        .then_ignore(just(Token::Semicolon))
+        .repeated()
+        .collect::<Vec<_>>();
+
+    let yields = yield_clause().or_not().map(|y| y.unwrap_or_default());
+
+    statements.then(yields).labelled("digraph body statements")
+}
+
+/// Parses ungraph body statements without the graph header or braces.
+///
+/// Matches: `[edge] stmt; [edge] stmt; ...`
+///
+/// This is the standalone component parser for `{body:body}` projections on ungraph fields.
+/// The caller is responsible for parsing surrounding `{` `}` via format string literals.
+pub fn ungraph_body_statements<'t, I, S>(
+    language: RecursiveParser<'t, I, S>,
+) -> impl Parser<'t, I, Vec<UnGraphStatement<'t, S>>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    S: Clone,
+{
+    ungraph_statement(language)
+        .repeated()
+        .collect::<Vec<_>>()
+        .labelled("ungraph body statements")
+}
+
+// ---- End component parsers ----
+
 /// Parses a `capture(...)` clause.
 ///
 /// Matches: `capture(%name: Type, ...)`

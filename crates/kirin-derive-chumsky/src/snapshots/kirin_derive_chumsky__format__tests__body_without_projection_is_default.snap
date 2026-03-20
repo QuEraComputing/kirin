@@ -1,0 +1,13 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+assertion_line: 345
+expression: format
+---
+Format {
+    elements: [
+        Field(
+            "body",
+            Default,
+        ),
+    ],
+}

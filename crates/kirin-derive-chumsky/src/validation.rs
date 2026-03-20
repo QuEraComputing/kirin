@@ -151,6 +151,23 @@ impl<'ir> ValidationVisitor<'ir> {
             FormatOption::Default => field.ident.clone().unwrap_or_else(|| {
                 syn::Ident::new(&format!("{}", field), proc_macro2::Span::call_site())
             }),
+            // Projection pseudo-fields generate their own variable names
+            FormatOption::Function(proj) => {
+                let suffix = match proj {
+                    crate::format::FunctionProjection::Name => "function_name",
+                };
+                syn::Ident::new(suffix, proc_macro2::Span::call_site())
+            }
+            FormatOption::Body(proj) => {
+                let suffix = match proj {
+                    crate::format::BodyProjection::Ports => "body_ports",
+                    crate::format::BodyProjection::Captures => "body_captures",
+                    crate::format::BodyProjection::Yields => "body_yields",
+                    crate::format::BodyProjection::Args => "body_args",
+                    crate::format::BodyProjection::Body => "body_body",
+                };
+                syn::Ident::new(suffix, proc_macro2::Span::call_site())
+            }
         }
     }
 
@@ -191,7 +208,9 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
             let option_name = match option {
                 FormatOption::Name => ":name",
                 FormatOption::Type => ":type",
-                FormatOption::Default => unreachable!(),
+                FormatOption::Default
+                | FormatOption::Function(_)
+                | FormatOption::Body(_) => unreachable!(),
             };
             self.add_error(format!(
                 "format option '{}' cannot be used on {} field '{}'. \

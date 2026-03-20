@@ -36,6 +36,28 @@ pub enum FormatElement<'src> {
     Keyword(&'src str),
 }
 
+/// Projections for `{function:...}` pseudo-field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FunctionProjection {
+    /// `{function:name}` — the function's global symbol name (`@symbol`).
+    Name,
+}
+
+/// Projections for `{body:...}` pseudo-field.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum BodyProjection {
+    /// `{body:ports}` — graph port declarations (`%name: Type, ...`).
+    Ports,
+    /// `{body:captures}` — graph capture declarations (`%name: Type, ...`).
+    Captures,
+    /// `{body:yields}` — yield types (`Type, Type`).
+    Yields,
+    /// `{body:args}` — block arguments (`%name: Type, ...`).
+    Args,
+    /// `{body:body}` — inner statements only (no header, no braces).
+    Body,
+}
+
 /// Options for field interpolation.
 #[derive(Debug, Clone, Default)]
 pub enum FormatOption {
@@ -46,6 +68,10 @@ pub enum FormatOption {
     /// Default behavior based on field type.
     #[default]
     Default,
+    /// Projection on the `function` pseudo-field.
+    Function(FunctionProjection),
+    /// Projection on the `body` pseudo-field.
+    Body(BodyProjection),
 }
 
 impl<'src> Format<'src> {
@@ -78,6 +104,30 @@ impl<'src> Format<'src> {
         let dollar_keyword = just(Token::Dollar)
             .ignore_then(select! { Token::Identifier(name) => name })
             .map(FormatElement::Keyword);
+
+        // Parse body projection: {body:ports}, {body:captures}, etc.
+        let body_projection = just(Token::LBrace)
+            .ignore_then(just(Token::Identifier("body")))
+            .ignore_then(just(Token::Colon))
+            .ignore_then(select! {
+                Token::Identifier("ports") => BodyProjection::Ports,
+                Token::Identifier("captures") => BodyProjection::Captures,
+                Token::Identifier("yields") => BodyProjection::Yields,
+                Token::Identifier("args") => BodyProjection::Args,
+                Token::Identifier("body") => BodyProjection::Body,
+            })
+            .then_ignore(just(Token::RBrace))
+            .map(|proj| FormatElement::Field("body", FormatOption::Body(proj)));
+
+        // Parse function projection: {function:name}
+        let function_projection = just(Token::LBrace)
+            .ignore_then(just(Token::Identifier("function")))
+            .ignore_then(just(Token::Colon))
+            .ignore_then(select! {
+                Token::Identifier("name") => FunctionProjection::Name,
+            })
+            .then_ignore(just(Token::RBrace))
+            .map(|proj| FormatElement::Field("function", FormatOption::Function(proj)));
 
         // Parse field interpolations like {name} or {name:type}
         let interpolation = just(Token::LBrace)
@@ -112,10 +162,13 @@ impl<'src> Format<'src> {
             .collect()
             .map(FormatElement::Token);
 
-        // Order matters: try escaped braces first, then dollar keyword, then interpolation, then other
+        // Order matters: try escaped braces first, then dollar keyword,
+        // then projection pseudo-fields (body/function), then generic interpolation, then other
         escaped_lbrace
             .or(escaped_rbrace)
             .or(dollar_keyword)
+            .or(body_projection)
+            .or(function_projection)
             .or(interpolation)
             .or(other)
             .repeated()
@@ -238,6 +291,55 @@ mod tests {
     #[test]
     fn test_dollar_keyword_cnot() {
         let input = "$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_function_name_projection() {
+        let input = "fn {function:name}({body:ports}) -> {body:yields}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_body_ports_projection() {
+        let input = "{body:ports}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_body_body_projection() {
+        let input = "{{ {body:body} }}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_body_captures_projection() {
+        let input = "fn {function:name}({body:ports}) captures ({body:captures}) -> {body:yields} {{ {body:body} }}";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_body_args_projection() {
+        let input = "fn {function:name}({body:args})";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_body_without_projection_is_default() {
+        // {body} without :projection should be FormatOption::Default (backward compat)
+        let input = "{body}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);

@@ -1,0 +1,45 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+assertion_line: 304
+expression: format
+---
+Format {
+    elements: [
+        Token(
+            [
+                Identifier(
+                    "fn",
+                ),
+            ],
+        ),
+        Field(
+            "function",
+            Function(
+                Name,
+            ),
+        ),
+        Token(
+            [
+                LParen,
+            ],
+        ),
+        Field(
+            "body",
+            Body(
+                Ports,
+            ),
+        ),
+        Token(
+            [
+                RParen,
+                Arrow,
+            ],
+        ),
+        Field(
+            "body",
+            Body(
+                Yields,
+            ),
+        ),
+    ],
+}

@@ -1,0 +1,15 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+assertion_line: 312
+expression: format
+---
+Format {
+    elements: [
+        Field(
+            "body",
+            Body(
+                Ports,
+            ),
+        ),
+    ],
+}

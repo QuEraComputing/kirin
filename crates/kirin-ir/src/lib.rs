@@ -38,7 +38,7 @@ pub use node::{
 };
 pub use pipeline::Pipeline;
 pub use signature::{
-    ExactSemantics, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
+    ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
 pub use stage::{
     HasStageInfo, StageAction, StageActionMut, StageArenas, StageDispatch, StageDispatchMiss,
@@ -49,9 +49,9 @@ pub use stage::{
 /// Re-exports of the most commonly used types for dialect authors.
 pub mod prelude {
     pub use crate::{
-        Block, BuilderStageInfo, CompileStage, Dialect, Function, GetInfo, HasStageInfo, Pipeline,
-        Region, ResultValue, SSAValue, Signature, SignatureSemantics, StageInfo, StageMeta,
-        Statement,
+        Block, BuilderStageInfo, CompileStage, Dialect, Function, GetInfo, HasSignature,
+        HasStageInfo, Pipeline, Region, ResultValue, SSAValue, Signature, SignatureSemantics,
+        StageInfo, StageMeta, Statement,
     };
     pub use crate::{CompileTimeValue, Placeholder, Typeof};
 }
