@@ -184,10 +184,10 @@ where
 
     // Register the block only if not already registered (two-pass Region
     // creates stubs first, so the name may already be present).
-    if let Some(label) = block_ast.label {
-        if ctx.lookup_block(label.value).is_none() {
-            ctx.register_block(label.value.to_string(), block);
-        }
+    if let Some(label) = block_ast.label
+        && ctx.lookup_block(label.value).is_none()
+    {
+        ctx.register_block(label.value.to_string(), block);
     }
 
     Ok(block)

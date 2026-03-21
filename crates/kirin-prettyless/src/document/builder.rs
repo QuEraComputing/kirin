@@ -138,10 +138,10 @@ impl<'a, L: Dialect> Document<'a, L> {
         Id: From<V>,
     {
         let info = value.expect_info(self.stage);
-        if let Some(name_sym) = info.name() {
-            if let Some(resolved) = self.stage.symbol_table().resolve(name_sym) {
-                return resolved.clone();
-            }
+        if let Some(name_sym) = info.name()
+            && let Some(resolved) = self.stage.symbol_table().resolve(name_sym)
+        {
+            return resolved.clone();
         }
         format!("{}", Id::from(value).raw())
     }

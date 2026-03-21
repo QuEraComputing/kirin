@@ -185,14 +185,12 @@ impl<'src> Format<'src> {
             // Simple heuristic: look for {.identifier} pattern
             let mut chars = input.chars().peekable();
             while let Some(c) = chars.next() {
-                if c == '{' {
-                    if let Some(&'.') = chars.peek() {
-                        return Err(syn::Error::new(
-                            span.unwrap_or_else(Span::call_site),
-                            "Legacy `{.keyword}` syntax is no longer supported. \
-                             Use `$keyword` instead of `{.keyword}` in format strings.",
-                        ));
-                    }
+                if c == '{' && chars.peek() == Some(&'.') {
+                    return Err(syn::Error::new(
+                        span.unwrap_or_else(Span::call_site),
+                        "Legacy `{.keyword}` syntax is no longer supported. \
+                         Use `$keyword` instead of `{.keyword}` in format strings.",
+                    ));
                 }
             }
         }
