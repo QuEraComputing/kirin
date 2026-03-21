@@ -41,7 +41,7 @@ Auto-naming: test function name with `test_` prefix stripped. Multiple snapshots
 Snapshots live in `snapshots/` adjacent to the test source. Naming: `<crate>__<module_path>__<test_name>.snap`.
 
 ```
-src/format.rs              → src/snapshots/kirin_derive_chumsky__format__tests__test_name.snap
+src/format.rs              → src/snapshots/<crate>__format__tests__test_name.snap
 src/codegen/parser/gen.rs  → src/codegen/parser/snapshots/...__gen__tests__test_name.snap
 tests/stack_interp.rs      → tests/snapshots/stack_interp__test_name.snap
 ```
@@ -50,8 +50,8 @@ tests/stack_interp.rs      → tests/snapshots/stack_interp__test_name.snap
 
 ```
 ---
-source: crates/kirin-derive-chumsky/src/format.rs
-expression: format
+source: <crate>/src/<file>.rs
+expression: <expression>
 ---
 <snapshot content here>
 ```

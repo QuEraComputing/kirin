@@ -13,7 +13,6 @@ Test-driven codebase review. Discovers design issues, bugs, and ergonomic proble
 
 The insight: writing a test is the fastest way to discover whether an API is awkward, a behavior is wrong, or a design forces unnecessary boilerplate. If you can't write a clean test for something, that's a signal worth reporting.
 
-**Announce at start:** "I'm using the test-coverage-review skill to discover issues through test writing."
 
 ## When to Use
 

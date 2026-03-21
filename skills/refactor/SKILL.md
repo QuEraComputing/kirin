@@ -11,7 +11,6 @@ argument-hint: "[what to refactor]"
 
 Rust-specific refactoring orchestration with architectural guardrails and a configurable agent team. Six phases: scope & pre-flight, review panel, implementation planning, guarded execution, final validation, template capture.
 
-**Announce at start:** "I'm using the refactor skill to orchestrate this refactoring."
 
 ## When to Use
 

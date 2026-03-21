@@ -159,8 +159,8 @@ ion-cli (scaffold) → skill-creator (draft, eval, benchmark) → skill-health (
 
 **Skills this skill audits:** All local skills in the skills directory.
 
-**When benchmark checks fail:** Load the `skill-creator` skill to run or re-run pressure scenario benchmarks. This skill detects missing benchmarks; `skill-creator` produces them.
+**When benchmark checks fail:** Use the `skill-creator` skill (external, managed via ion-cli) to run or re-run pressure scenario benchmarks. This skill detects missing benchmarks; `skill-creator` produces them.
 
 **Skills that should trigger this skill:**
-- The `skill-creator` skill — after finishing skill creation/iteration, run health check
-- The `ion-cli` skill — after `ion skill new`, suggest running health check on the new skill
+- After finishing skill creation/iteration with `skill-creator`, run health check
+- After creating a new skill with `ion skill new`, run health check on it

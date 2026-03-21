@@ -11,7 +11,6 @@ argument-hint: "[feature description]"
 
 Orchestrator for building new capabilities — from a single helper method to an entire framework subsystem. Hybrid approach: strict gates at critical checkpoints (design review before implementation, tests before merge), flexible ordering within phases. The skill scales by activating more phases for larger work.
 
-**Announce at start:** "I'm using the feature-dev skill to orchestrate this feature development."
 
 ## When to Use
 

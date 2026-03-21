@@ -11,8 +11,6 @@ argument-hint: "[scope: full | crate-name | subsystem | recent]"
 
 Comprehensive codebase review with three core reviewer roles (**Formalism**, **Code Quality**, **Ergonomics/DX**) plus optional domain-parameterized reviewers (**Dialect Author**, **Compiler Engineer**). Four phases: generate a review plan, execute parallel per-crate reviews with a cross-review validation step, aggregate into a final report, then verify findings and walk through them with the user.
 
-**Announce at start:** "I'm using the triage-review skill to orchestrate this codebase review."
-
 **Read-only:** This skill produces review reports. It does NOT modify code.
 
 ## When to Use
