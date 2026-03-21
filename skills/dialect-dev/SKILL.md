@@ -7,192 +7,156 @@ argument-hint: "[dialect name or domain]"
 
 # Dialect Development
 
-## Overview
-
-Kirin-specific orchestrator for building a new dialect from scratch. Unlike general feature development, dialect development follows a fixed progression that starts with **text format design and operational semantics** before any code is written. Each phase produces independently testable output.
-
-**Announce at start:** "I'm using the dialect-dev skill to orchestrate this dialect development."
-
 **Key principle:** Text format and semantics first, data structures second. The text format is the user-facing contract; the IR types exist to support it.
+
+Fixed progression: Spec (Phase 1) → GATE → IR Types (Phase 2) → Parser+Printer (Phase 3) → Interpreter (Phase 4) → GATE → Complete
 
 ## When to Use
 
-- Building a new dialect (e.g., a quantum gate dialect, a memory management dialect)
-- Adding a significant extension to an existing dialect (new operation categories)
+- Building a new dialect or significant extension to an existing one
+- **Also when types already exist but lack parser/printer/interpreter** — Phase 1 still applies. Existing types encode implicit assumptions about format and semantics. Phase 1 means documenting what the types imply as a spec, not skipping it.
 
-**Don't use for:**
-- Adding 1-2 operations to an existing dialect (just add them directly)
-- Refactoring an existing dialect (load the `refactor` skill)
-- General feature development not dialect-specific (load the `feature-dev` skill)
+**Don't use for:** 1-2 operations added to an existing dialect (just add them), refactoring (load `refactor`), non-dialect features (load `feature-dev`).
 
 ## Target
 
 The dialect to build: **$ARGUMENTS**
 
-If no target was provided, ask the user what dialect they want to build.
+If not provided, ask what dialect to build and what domain it targets.
 
-## Pre-requisites
+## Phase 1: Spec — Text Format, Semantics, Types
 
-Before starting, the user should be able to answer:
-1. What domain does this dialect target?
-2. What are the key operations? (even rough names help)
-3. What type system does the dialect need? (single type? type lattice? generic over types?)
+The most important phase. This is where edge cases are discovered cheaply — before they're baked into 4 layers of code.
 
-If the user can't answer these, load the `brainstorming` skill first to explore the design space.
+### Step 1: Text Format
 
-## Phase 1: Text Format & Semantics Design
+For each operation, write the concrete syntax. Use the spec template in `references/spec-template.md`.
 
-The most important phase. Everything else derives from this.
-
-### Step 1: Text Format Design
-
-Load the `ir-spec-writing` skill. Design the text syntax for every operation in the dialect.
-
-For each operation, define:
-- **Text format**: How it appears in `.kirin` text (the `#[chumsky(format = "...")]` string)
-- **Operands**: SSA values, block arguments, regions, successors
-- **Results**: What the operation produces
-- **Attributes**: Compile-time properties (terminator, pure, speculatable, constant)
-
-Use existing dialects as reference patterns. Refer to AGENTS.md Chumsky Parser Conventions for format string syntax.
-
-### Step 2: Operational Semantics Design
-
-For each operation, define **what it means** — not how it's implemented, but what it computes:
-
-- **Denotational**: What mathematical function does this operation represent?
-- **Operational**: What steps does evaluation take? What are the observable effects?
-- **Type rules**: What types are the inputs/outputs? What constraints must hold?
-
-For example, for a quantum gate dialect:
 ```
-# X gate (Pauli-X)
-Semantics: Applies the Pauli-X matrix [[0,1],[1,0]] to a single qubit.
-Type rule: qubit -> qubit
-Text: %result = quantum.x %input -> qubit
-Terminator: no
-Pure: yes (no side effects on classical state)
+# <operation name>
+Format:  %result = <namespace>.<op> %operand1, %operand2 -> <result-type>
+Operands: %operand1: <type>, %operand2: <type>
+Results:  %result: <type>
+Attrs:    terminator: no | pure: yes | speculatable: yes | constant: no
 ```
 
-**Document these in the spec.** The semantics drive the interpreter implementation later. Getting them wrong here means fixing them in 4 places (spec, IR, parser, interpreter).
+Write 2-3 **example programs** showing operations composed together. These become test cases later.
 
-### Step 3: Type System Design
+### Step 2: Operational Semantics
 
-If the dialect needs its own type system (not just reusing an existing one):
+For each operation, define what it computes. Focus on **edge cases** — this is where the value is:
 
-- Define the type lattice (what types exist, how they relate)
-- Determine if you need `TypeLattice` (for subtype dispatch) or just `CompileTimeValue`
-- Define `Placeholder::placeholder()` — what's the "unknown type" value?
+```
+# <operation name>
+Semantics: <mathematical definition>
+Type rule: <input types> -> <output types>
+Edge cases:
+  - <what happens at boundary? overflow? NaN? empty input?>
+  - <preconditions? what if violated?>
+  - <interaction with other operations?>
+```
 
-**Output:** Spec document with text format examples, operational semantics for every operation, and type system definition.
+**The edge cases section is mandatory.** Testing showed that without it, "obvious" operations hide real design decisions:
+- Negation: what about integer minimum (i32::MIN overflows)?
+- Min/Max: NaN propagation semantics?
+- Clamp: precondition `lo <= hi` — what if violated?
+- Measure: does it consume the qubit (linearity)?
+
+If you can't identify edge cases, you don't understand the operation well enough to implement it.
+
+### Step 3: Type System
+
+If the dialect needs its own types: define the type lattice, `CompileTimeValue` impl, and `Placeholder::placeholder()`. If reusing an existing type, confirm compatibility and document it.
+
+### Output
+
+A spec document containing: text format for every operation, operational semantics with edge cases, type system, and 2-3 example programs. Save to the design directory (see AGENTS.md Project structure).
 
 ### GATE: Spec Review
 
-Load the `triage-review` skill scoped to the spec document and any related existing code.
+Load the `triage-review` skill scoped to the spec. Suggest reviewers:
+- **Formalism** — semantics well-defined? Operations compose? Type rules consistent?
+- **Dialect Author** (with domain context) — text format natural for the domain?
+- **Ergonomics/DX** — syntax understandable? Concept budget reasonable?
 
-**Required reviewers:**
-- **Formalism** (PL Theorist) — are the semantics well-defined? Do operations compose? Are type rules consistent?
-- **Dialect Author** — inject the domain background for this dialect (see AGENTS.md Dialect Domain Context). Does the text format feel natural for the domain?
-- **Ergonomics/DX** (Physicist) — will users understand the syntax? Is the concept budget reasonable?
-
-**Gate condition:** Spec is approved. Semantics are unambiguous. Text format is clear.
+**Gate condition:** Spec approved. Semantics unambiguous. Edge cases resolved.
 
 ## Phase 2: IR Types
 
-Implement the Rust types that represent the dialect.
+Translate the spec into Rust types. Refer to AGENTS.md Derive Infrastructure Conventions.
 
-1. **Dialect enum or struct** — `#[derive(Dialect)]` with `#[kirin(type = T)]`
-2. **Operation variants** — one per operation from the spec, with correct field types (`SSAValue`, `ResultValue`, `Block`, `Region`, `Successor`)
-3. **Type lattice** (if needed) — implement `CompileTimeValue`, `Placeholder`, and lattice traits
-4. **Derive annotations** — `#[kirin(terminator)]`, `#[kirin(pure)]`, `#[kirin(constant)]` as defined in the spec
+1. Dialect enum/struct with `#[derive(Dialect)]` and `#[kirin(type = T)]`
+2. Operation variants matching the spec's operand/result structure exactly
+3. Type lattice impls if needed
+4. Derive annotations (`#[kirin(terminator)]`, `#[kirin(pure)]`, etc.) as the spec defines
 
-Refer to AGENTS.md Derive Infrastructure Conventions for attribute patterns.
+**Verification:** `cargo check` passes.
 
-**Verification:** `cargo check` passes. Derive expansion generates correct trait impls.
+## Phase 3: Parser + Printer
 
-## Phase 3: Parser
+Parser and printer derive from the same format strings and are always tested together.
 
-Implement parsing from text format to IR.
+1. Add `#[derive(HasParser, PrettyPrint)]` to operations and dialect enum
+2. Format strings must match the spec's text format exactly
+3. Write **roundtrip tests** (parse → emit → print → compare) using the example programs from Phase 1
 
-1. **Format strings** — `#[chumsky(format = "...")]` on each operation, matching the spec's text format exactly
-2. **`#[derive(HasParser)]`** — generates parser from format strings
-3. **Type parsing** (if custom types) — implement `HasParser` for the type enum, or use `#[chumsky(format = ...)]` on type variants
+**Verification:** All spec examples roundtrip correctly. Place tests per AGENTS.md Test Conventions.
 
-**Verification:** Parse the example programs from the spec. Every example should parse without errors.
+## Phase 4: Interpreter
 
-## Phase 4: Printer
+Translate the operational semantics from Phase 1 into Rust.
 
-Implement pretty-printing from IR back to text.
+1. `#[derive(Interpretable)]` for dispatch boilerplate
+2. Manual `interpret` impls for actual computation logic
+3. `CallSemantics` / `SSACFGRegion` if the dialect has callable or region-containing operations
 
-1. **`#[derive(PrettyPrint)]`** — generates printer from format strings (same source as parser)
-2. **Roundtrip test** — parse → emit → print → compare against original text
+**The implementation must match the spec semantics exactly** — including edge case behavior. If an implementation decision diverges, update the spec first.
 
-**Verification:** Roundtrip tests pass for every example from the spec. Place roundtrip tests following AGENTS.md Test Conventions.
-
-## Phase 5: Interpreter
-
-Implement the operational semantics from Phase 1 as Rust code.
-
-1. **`#[derive(Interpretable)]`** — generates dispatch boilerplate
-2. **Manual `interpret` impls** — implement the actual semantics for each operation
-3. **`CallSemantics`** (if the dialect has callable operations) — implement function-call evaluation
-4. **`SSACFGRegion`** (if the dialect has region-containing operations) — mark for standard CFG evaluation
-
-The interpreter implementation should match the operational semantics from the spec **exactly**. If an implementation decision diverges from the spec, update the spec first.
-
-**Verification:** Evaluate the example programs from the spec. Check that results match the expected semantics.
+**Verification:** Evaluate the example programs from Phase 1. Results match spec'd semantics. Test the edge cases explicitly.
 
 ### GATE: Integration Review
 
-After all phases are complete:
+1. Load `test-coverage-review` — verify coverage, discover missed edge cases
+2. Load `triage-review` — include Formalism, Code Quality, Dialect Author, Soundness Adversary
 
-1. Load the `test-coverage-review` skill to verify coverage and discover edge cases
-2. Load the `triage-review` skill for multi-perspective review — include:
-   - **Formalism** — does the implementation match the spec semantics?
-   - **Code Quality** — are there unnecessary `#[allow]` annotations or duplication?
-   - **Dialect Author** (with domain context) — does it feel right for the domain?
-   - **Soundness Adversary** — can invalid IR be constructed through the public API?
+**Gate condition:** No P0/P1. Spec and implementation aligned.
 
-**Gate condition:** No P0/P1 issues. Spec and implementation are aligned.
+## Phase 5: Complete
 
-## Phase 6: Complete
-
-1. Load the `verification-before-completion` skill
-2. Load the `finishing-a-development-branch` skill
+Load `verification-before-completion`, then `finishing-a-development-branch`.
 
 ## Iteration
 
-Dialect development is inherently iterative. Common backtrack patterns:
+Backtracking is expected. The spec is the source of truth — update it when you backtrack.
 
 | Discovery | Go Back To |
 |-----------|-----------|
-| Interpreter reveals ambiguity in semantics | Phase 1 Step 2 (operational semantics) |
-| Parser can't express the text format | Phase 1 Step 1 (text format design) |
-| Type lattice doesn't support needed dispatch | Phase 1 Step 3 (type system design) |
-| Roundtrip fails because print doesn't match parse | Phase 3 or Phase 4 (usually a format string issue) |
-| Triage-review finds formalism issue | Phase 1 (spec) |
-
-Backtracking is expected and healthy. Update the spec document when you backtrack — the spec is the source of truth.
+| Interpreter reveals semantic ambiguity | Phase 1 Step 2 |
+| Parser can't express the text format | Phase 1 Step 1 |
+| Type lattice doesn't support dispatch | Phase 1 Step 3 |
+| Roundtrip mismatch | Phase 3 (usually format string) |
+| Review finds formalism issue | Phase 1 |
 
 ## Red Flags — STOP
 
-- Writing IR types before the text format is designed (Phase 2 before Phase 1)
-- Implementing interpreter before spec semantics are reviewed (Phase 5 before Gate)
-- Spec and implementation diverging without updating the spec
+- Writing IR types before text format is designed (Phase 2 before Phase 1)
+- Implementing interpreter before spec review gate passes
+- Spec and implementation diverging without updating spec
 - Skipping the spec review gate
-- Adding operations not in the spec without updating the spec first
-- Using `#[allow(...)]` to suppress derive errors instead of fixing the type definitions
+- Adding operations not in the spec without updating spec first
+- Using `#[allow(...)]` to suppress derive errors instead of fixing types
 
 ## Rationalization Table
 
 | Temptation | Rationalization | Reality |
 |-----------|----------------|---------|
-| Write IR types first | "I need to see the types to design the text format" | The text format is the user-facing contract. Types serve the format, not the reverse. Types written first constrain the format to what's easy to represent, not what's natural for the domain. |
-| Skip operational semantics | "The semantics are obvious from the operation names" | 'Obvious' semantics have edge cases: what does division by zero do? What happens when a loop body yields early? Ambiguity here becomes 4 bugs later (spec, IR, parser, interpreter). |
-| Skip spec review gate | "The spec is simple, let's just implement" | Simple specs still have composability issues. The Formalism reviewer catches interactions you don't see when looking at operations in isolation. |
-| Implement all phases at once | "Faster to write everything together" | Phases are ordered so each validates the previous. A parser bug found in Phase 3 is cheap. The same bug found after writing the interpreter in Phase 5 requires fixing 3 layers. |
-| Add operations during implementation | "I realized we need one more operation" | Add it to the spec first, get it reviewed, then implement. Unreviewed operations accumulate semantic debt. |
-| Suppress derive errors with `#[allow]` | "I'll fix the type definition later" | Derive errors signal misaligned types. Suppressing them hides the misalignment until it surfaces as a runtime bug in the interpreter. Fix the type definition now. |
+| Write IR types first | "I need to see the types to design the format" | Types written first constrain the format to what's easy to represent, not what's natural for the domain. Format is the user-facing contract — it leads. |
+| Skip semantics | "The semantics are obvious from the names" | Testing proved this wrong: "obvious" operations like Neg, Min, Clamp all have non-obvious edge cases (i32::MIN overflow, NaN propagation, precondition violations). Ambiguity in semantics becomes 4 bugs (spec, IR, parser, interpreter). |
+| Skip spec review | "The spec is simple, let's just implement" | Simple specs still have composability issues invisible from a single-operation view. |
+| Implement all phases at once | "Faster to do it together" | Each phase validates the previous. A format bug in Phase 3 is cheap. The same bug found after Phase 4 requires fixing 3 layers. |
+| Build on existing types without spec | "Types already exist, just add parser/printer" | Existing types encode implicit decisions. Phase 1 means making those decisions explicit as a spec — not skipping the spec. The types are a foundation, not a finished design. |
+| Add operations during implementation | "I realized we need one more" | Add to spec first, review, then implement. Unreviewed operations accumulate semantic debt. |
+| Suppress derive errors | "I'll fix the type definition later" | Derive errors signal misaligned types. Suppressing hides the problem until it's a runtime bug. |
 
 ## Integration
 
@@ -202,9 +166,9 @@ Backtracking is expected and healthy. Update the spec document when you backtrac
 |-------|-------|------|
 | 3 | `triage-review` | Spec review gate, integration review gate |
 | 3 | `test-coverage-review` | Integration review gate |
-| 2 | `brainstorming` | Pre-requisite exploration if domain is unclear |
-| 2 | `writing-plans` | Phase 2-5 if the dialect is large enough to need a plan |
-| 2 | `finishing-a-development-branch` | Phase 6 completion |
-| 1 | `verification-before-completion` | Phase 6 checks |
-| Domain | `ir-spec-writing` | Phase 1 Step 1 text format design |
-| Domain | `kirin-derive-macros` | Phase 2 if custom derive behavior is needed |
+| 2 | `brainstorming` | Pre-requisite exploration if domain unclear |
+| 2 | `writing-plans` | Phase 2-4 if large enough to need a plan |
+| 2 | `finishing-a-development-branch` | Phase 5 completion |
+| 1 | `verification-before-completion` | Phase 5 checks |
+| Domain | `ir-spec-writing` | Phase 1 Step 1 |
+| Domain | `kirin-derive-macros` | Phase 2 if custom derive needed |
