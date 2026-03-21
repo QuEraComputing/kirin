@@ -296,20 +296,10 @@ where
         let prev_name = self.function_name();
         self.set_function_name(staged_info.name());
 
-        // Set signature context for {:return} and {:signature} projections
-        let sig = spec.signature();
-        let ret_text = format!("{}", sig.ret());
-        self.set_return_type_text(Some(ret_text));
-        let params_text = sig.params().iter().map(|p| format!("{}", p)).collect::<Vec<_>>().join(", ");
-        let sig_text = format!("{}) -> {}", params_text, sig.ret());
-        self.set_signature_text(Some(sig_text));
-
         let header = self.text("specialize @") + self.text(self.stage_symbol_text());
 
         let body = self.print_statement(spec.body());
         self.set_function_name(prev_name);
-        self.set_return_type_text(None);
-        self.set_signature_text(None);
 
         header + self.text(" ") + body
     }
@@ -343,21 +333,12 @@ where
         self.set_function_name(info.name());
 
         for spec in active {
-            let sig = spec.signature();
-            let ret_text = format!("{}", sig.ret());
-            self.set_return_type_text(Some(ret_text));
-            let params_text = sig.params().iter().map(|p| format!("{}", p)).collect::<Vec<_>>().join(", ");
-            let sig_text = format!("{}) -> {}", params_text, sig.ret());
-            self.set_signature_text(Some(sig_text));
-
             doc += self.line_();
             doc += self.text("specialize @") + self.text(self.stage_symbol_text());
             doc += self.text(" ") + self.print_statement(spec.body());
         }
 
         self.set_function_name(prev_name);
-        self.set_return_type_text(None);
-        self.set_signature_text(None);
         doc
     }
 
@@ -419,36 +400,6 @@ where
     }
 
     // ── Function context helpers ────────────────────────────────────────────────
-
-    /// Print the full framework function signature: `fn @name(Type, Type) -> RetType`.
-    ///
-    /// Used by `{:signature}` projection in generated PrettyPrint code.
-    /// Reads function name and signature from the framework context.
-    pub fn print_function_signature(&'a self) -> ArenaDoc<'a> {
-        let name_text = self
-            .function_name()
-            .map(|symbol| self.resolve_global_symbol(symbol))
-            .unwrap_or_else(|| "unnamed".to_string());
-
-        let sig_text = self
-            .signature_text()
-            .unwrap_or_else(|| ") -> ()".to_string());
-
-        // sig_text is "Type, Type) -> RetType" — we prepend "fn @name("
-        let full = format!("fn @{}({}", name_text, sig_text);
-        self.text(full)
-    }
-
-    /// Print the enclosing function's return type(s).
-    ///
-    /// Used by `{:return}` projection in generated PrettyPrint code.
-    /// Returns the return type string set by the framework printer.
-    pub fn print_return_types(&'a self) -> ArenaDoc<'a> {
-        let text = self
-            .return_type_text()
-            .unwrap_or_else(|| "()".to_string());
-        self.text(text)
-    }
 
     /// Print the enclosing function name as `@symbol_name`.
     ///

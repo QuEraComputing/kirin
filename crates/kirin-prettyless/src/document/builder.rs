@@ -30,14 +30,6 @@ pub struct Document<'a, L: Dialect> {
     /// need to set the function name context before delegating to the dialect's
     /// `PrettyPrint` impl.
     pub(super) function_name: Cell<Option<GlobalSymbol>>,
-    /// The return type string of the enclosing function, if any.
-    ///
-    /// Set by the framework printer for `{:return}` context projections.
-    pub(super) return_type_text: Cell<Option<String>>,
-    /// The full signature text `Type, Type) -> RetType` for `{:signature}`.
-    ///
-    /// Set by the framework printer. `print_function_signature()` prepends `fn @name(`.
-    pub(super) signature_text: Cell<Option<String>>,
 }
 
 impl<'a, L: Dialect> Document<'a, L> {
@@ -54,8 +46,6 @@ impl<'a, L: Dialect> Document<'a, L> {
             stage,
             global_symbols: None,
             function_name: Cell::new(None),
-            return_type_text: Cell::new(None),
-            signature_text: Cell::new(None),
         }
     }
 
@@ -75,8 +65,6 @@ impl<'a, L: Dialect> Document<'a, L> {
             stage,
             global_symbols: Some(global_symbols),
             function_name: Cell::new(None),
-            return_type_text: Cell::new(None),
-            signature_text: Cell::new(None),
         }
     }
 
@@ -98,30 +86,6 @@ impl<'a, L: Dialect> Document<'a, L> {
     /// Returns the enclosing function name, if one has been set.
     pub fn function_name(&self) -> Option<GlobalSymbol> {
         self.function_name.get()
-    }
-
-    /// Set the return type text for `{:return}` context projections.
-    pub fn set_return_type_text(&self, text: Option<String>) {
-        self.return_type_text.set(text);
-    }
-
-    /// Returns the return type text, if set.
-    pub fn return_type_text(&self) -> Option<String> {
-        let val = self.return_type_text.take();
-        self.return_type_text.set(val.clone());
-        val
-    }
-
-    /// Set the full signature text for `{:signature}` context projections.
-    pub fn set_signature_text(&self, text: Option<String>) {
-        self.signature_text.set(text);
-    }
-
-    /// Returns the full signature text, if set.
-    pub fn signature_text(&self) -> Option<String> {
-        let val = self.signature_text.take();
-        self.signature_text.set(val.clone());
-        val
     }
 
     /// Indent a document by the configured tab spaces.
