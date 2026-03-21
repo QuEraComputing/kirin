@@ -80,6 +80,7 @@ Layer 1: Primitives (atomic utilities)
   insta-snapshot-testing — snapshot test workflow
   using-git-worktrees — worktree lifecycle management
   verification-before-completion — pre-completion verification checks
+  skill-health — audit local skills for drift, convention violations, missing benchmarks
 
 Domain-Specific (standalone, composable with any layer):
   kirin-derive-macros — derive macro development guidance
