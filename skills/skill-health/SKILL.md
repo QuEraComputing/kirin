@@ -149,8 +149,18 @@ For `all` audits, also produce a summary table:
 
 This skill is a **Layer 1 primitive** — it serves all other skills.
 
+**Position in the skill lifecycle:**
+
+```
+ion-cli (scaffold) → skill-creator (draft, eval, benchmark) → skill-health (audit conventions)
+```
+
+`skill-creator` ensures the skill **works** (triggers, compliance, benchmarks). This skill ensures the skill **fits the project** (layer, references, conventions). Run this after `skill-creator` finishes, or periodically on existing skills.
+
 **Skills this skill audits:** All local skills in the skills directory.
 
+**When benchmark checks fail:** Load the `skill-creator` skill to run or re-run pressure scenario benchmarks. This skill detects missing benchmarks; `skill-creator` produces them.
+
 **Skills that should trigger this skill:**
-- The `writing-skills` skill — after creating/modifying a skill, run health check
+- The `skill-creator` skill — after finishing skill creation/iteration, run health check
 - The `ion-cli` skill — after `ion skill new`, suggest running health check on the new skill
