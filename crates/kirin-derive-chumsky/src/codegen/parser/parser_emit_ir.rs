@@ -149,16 +149,11 @@ impl GenerateHasDialectParser {
     /// Generates a `ParseEmit` impl that delegates to `HasParserEmitIR`.
     ///
     /// This is shared between regular and wrapper struct paths.
-    /// Returns empty tokens when `#[chumsky(manual_parse_emit)]` is set.
     fn generate_parse_emit_delegating_impl(
         &self,
         ir_input: &kirin_derive_toolkit::ir::Input<ChumskyLayout>,
         crate_path: &syn::Path,
     ) -> TokenStream {
-        if ir_input.extra_attrs.manual_parse_emit {
-            return quote! {};
-        }
-
         let original_name = &ir_input.name;
         let ir_path = &self.config.ir_path;
 

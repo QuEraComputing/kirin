@@ -13,11 +13,6 @@ pub struct ChumskyGlobalAttrs {
 
     /// Default format string for all variants/statements.
     pub format: Option<String>,
-
-    /// Skip generating `ParseEmit` impl. Set this when you need to manually
-    /// implement `ParseEmit` (e.g., to override `extract_signature`).
-    #[darling(default)]
-    pub manual_parse_emit: bool,
 }
 
 impl HasCratePath for ChumskyGlobalAttrs {
