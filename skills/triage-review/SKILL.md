@@ -90,10 +90,11 @@ digraph phase1 {
 
 Plan contents:
 1. **Scope**: files in scope, line counts, module structure summary
-2. **Reviewer roster**: which reviewers and why
+2. **Reviewer roster**: which reviewers and why (for narrower scopes, drop reviewers whose focus areas don't apply)
 3. **Focus areas**: which areas apply per reviewer, per crate
 4. **File assignments**: which files each reviewer should focus on
 5. **Design context**: which AGENTS.md convention sections are relevant to this scope (included in reviewer prompts to prevent false positives)
+6. **Hypothesis registry** (if applicable): when the user arrives with suspected issues, register each as a hypothesis to **confirm or deny with evidence** — not as a starting assumption. Reviewers test hypotheses alongside their independent analysis. A hypothesis like "builder duplication" gets quantified: which functions, how many lines, what percentage is truly duplicated vs structurally similar but semantically different.
 
 ## Phase 2: Execute Review
 
@@ -357,6 +358,7 @@ Batch up to 4 findings per `AskUserQuestion` call. Each question gets its own pr
 | Skip verification agent | "The reviewers were thorough" | Reviewers describe code from memory. The verification agent reads actual source and catches misquoted line numbers, stale references, and misread logic. |
 | Rush through P3 walkthrough | "P3 is low priority, just accept them all" | P3 findings accumulate into technical debt. The walkthrough is where the user decides which are worth tracking vs discarding. |
 | Assign P1 to uncertain finding | "It looks serious even though I'm not sure" | Uncertain P1 findings undermine trust in the report. Downgrade to P2 and phrase as a question. |
+| Organize review around user's suspected issues | "The user already knows what's wrong, just confirm it" | Confirmation bias. User suspicions become hypotheses to test, not the review's structure. Independent reviewer analysis discovers issues the user doesn't suspect. The previous review found its highest-value findings in areas nobody expected. |
 
 ## Next Steps (After Review)
 
