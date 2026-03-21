@@ -86,9 +86,9 @@ pub fn ast_type<L: Layout>(
             quote! { #crate_path::UnGraph<'t, #type_output, LanguageOutput> }
         }
         FieldCategory::Signature => {
-            // Signature<T> where T is the ir_type. Use kirin_ir::Signature directly.
-            // The type_output is <ir_type as HasParser<'t>>::Output which equals ir_type.
-            quote! { ::kirin_ir::Signature<#type_output> }
+            // Treat like Value: use the HasParser Output directly.
+            // Signature<T> implements HasParser with Output = Signature<T>.
+            quote! { <#crate_path::ir::Signature<#ir_type> as #crate_path::HasParser<'t>>::Output }
         }
     }
 }
@@ -194,7 +194,7 @@ pub fn parser_expr<L: Layout>(
         FieldCategory::Signature => match opt {
             FormatOption::Default => {
                 // Whole signature: use Signature<T>::parser()
-                quote! { <#ir_type::Signature<#ir_type> as #crate_path::HasParser<'t>>::parser() }
+                quote! { <#crate_path::ir::Signature<#ir_type> as #crate_path::HasParser<'t>>::parser() }
             }
             FormatOption::Signature(crate::format::SignatureProjection::Inputs) => {
                 // Type list: T::parser().separated_by(comma).collect::<Vec<_>>()

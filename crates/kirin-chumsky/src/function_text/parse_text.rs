@@ -276,7 +276,7 @@ where
     let Declaration::Specialize {
         stage: _stage_sym,
         function: _,
-        signature,
+        signature: _,
         body_span,
         span,
     } = declaration
@@ -302,7 +302,6 @@ where
         stage_id,
         &function_name,
         ctx.function_symbol,
-        signature.as_ref(),
         body_text,
         span,
         &mut *ctx.function_lookup,
@@ -598,7 +597,6 @@ fn apply_specialize_declaration<L>(
     stage_id: CompileStage,
     function_name: &SymbolName<'_>,
     function_symbol: GlobalSymbol,
-    framework_signature: Option<&Signature<L::Type>>,
     body_text: &str,
     span: SimpleSpan,
     function_lookup: &mut FxHashMap<String, Function>,
@@ -637,17 +635,14 @@ where
             )
         })?;
 
-    // Determine signature: framework-parsed or from HasSignature on the body statement
-    let signature = if let Some(sig) = framework_signature {
-        sig.clone()
-    } else {
-        let def = body_statement.expect_info(stage).definition();
-        def.signature().unwrap_or_else(|| {
-            // Fallback: create a placeholder signature if the body type
-            // doesn't carry one (e.g., no Signature field).
-            kirin_ir::Signature::placeholder()
-        })
-    };
+    // Get signature from HasSignature on the body statement.
+    // The Signature field is populated by the statement parser from format string elements.
+    let def = body_statement.expect_info(stage).definition();
+    let signature = def.signature().unwrap_or_else(|| {
+        // Fallback: create a placeholder signature if the body type
+        // doesn't carry one (e.g., no Signature field).
+        kirin_ir::Signature::placeholder()
+    });
 
     // Resolve or auto-create the staged function
     let (function, staged_function) = resolve_or_create_specialize_target::<L>(

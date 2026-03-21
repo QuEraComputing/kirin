@@ -537,6 +537,7 @@ impl GenerateHasDialectParser {
     /// Reconstruct a `Signature` from its `{sig:inputs}` and `{sig:return}` projection variables.
     fn build_projected_signature_value(&self, occs: &[&FieldOccurrence]) -> TokenStream {
         use crate::format::SignatureProjection;
+        let ir_path = &self.config.ir_path;
         let find_sig_var = |proj: SignatureProjection| -> Option<&syn::Ident> {
             occs.iter()
                 .find(|o| matches!(&o.option, FormatOption::Signature(p) if *p == proj))
@@ -546,7 +547,7 @@ impl GenerateHasDialectParser {
             .expect("validation ensures {sig:inputs} is present");
         let return_var = find_sig_var(SignatureProjection::Return)
             .expect("validation ensures {sig:return} is present");
-        quote! { ::kirin_ir::Signature::new(#inputs_var, #return_var, ()) }
+        quote! { #ir_path::Signature::new(#inputs_var, #return_var, ()) }
     }
 
     pub(super) fn token_parser(&self, tokens: &[kirin_lexer::Token<'_>]) -> TokenStream {

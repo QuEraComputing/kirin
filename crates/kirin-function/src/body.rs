@@ -2,12 +2,15 @@ use kirin::prelude::*;
 
 /// Structural function-body statement used by function text parsing.
 ///
-/// Name, signature, and return type live on staged/specialized function headers.
+/// The `sig` field stores the function's type signature (`(T, T) -> T`),
+/// parsed from the format string. `derive(Dialect)` generates `HasSignature`
+/// which returns `Some(self.sig.clone())`.
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = T)]
-#[chumsky(format = "{:signature} {body}")]
+#[chumsky(format = "fn {:name}{sig} {body}")]
 pub struct FunctionBody<T: CompileTimeValue> {
     pub(crate) body: Region,
+    pub(crate) sig: Signature<T>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
