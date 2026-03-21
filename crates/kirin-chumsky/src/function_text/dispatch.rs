@@ -47,7 +47,7 @@ pub trait ParseDispatch: StageMeta {
 /// not a type parameter being resolved recursively through the trait solver.
 impl<L> ParseDispatch for StageInfo<L>
 where
-    L: Dialect + ParseEmit<L>,
+    L: Dialect + ParseEmit<L> + kirin_ir::HasSignature<L>,
     L::Type: kirin_ir::Placeholder, // Still needed for staged_function() on StageInfo
     for<'t> L: HasParser<'t>,
     for<'t> L::Type: HasParser<'t, Output = L::Type>,

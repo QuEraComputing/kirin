@@ -39,6 +39,9 @@ pub struct EmitContext<'a, L: Dialect> {
     /// When set, undefined SSA references use this function to create
     /// forward-reference placeholders. Used for graph bodies with relaxed dominance.
     forward_ref_creator: Option<ForwardRefCreator<L>>,
+    /// Function name extracted by `{:name}` context projection during parsing.
+    /// The function text parser reads this after `parse_and_emit` completes.
+    function_name: Option<String>,
 }
 
 impl<'a, L: Dialect> EmitContext<'a, L> {
@@ -48,6 +51,7 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
             ssa_names: FxHashMap::default(),
             block_names: FxHashMap::default(),
             forward_ref_creator: None,
+            function_name: None,
         }
     }
 
@@ -94,6 +98,17 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
 
     pub fn register_block(&mut self, name: String, block: kirin_ir::Block) {
         self.block_names.insert(name, block);
+    }
+
+    /// Set the function name (called by `{:name}` parser codegen during emit).
+    pub fn set_function_name(&mut self, name: String) {
+        self.function_name = Some(name);
+    }
+
+    /// Get the function name that was parsed by `{:name}` during emit.
+    /// Returns `None` if the format string doesn't include `{:name}`.
+    pub fn function_name(&self) -> Option<&str> {
+        self.function_name.as_deref()
     }
 }
 

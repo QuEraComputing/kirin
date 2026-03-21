@@ -1,4 +1,4 @@
-use kirin_ir::{Dialect, Signature, StageInfo, Statement};
+use kirin_ir::{Dialect, Statement};
 
 use super::{EmitContext, EmitError, EmitIR, HasParser, ParseError, parse_ast};
 
@@ -69,21 +69,6 @@ pub trait ParseEmit<L: Dialect = Self>: Dialect {
     /// Parse input text and emit a single IR statement.
     fn parse_and_emit(input: &str, ctx: &mut EmitContext<'_, L>)
     -> Result<Statement, ChumskyError>;
-
-    /// Extract a function signature from a parsed body statement.
-    ///
-    /// The function text parser calls this after `parse_and_emit` to get the
-    /// specialized signature when the framework didn't parse one from the header.
-    ///
-    /// Default implementation returns `None` (framework uses its own parsed signature).
-    /// Override for languages whose function body types carry signature information
-    /// (e.g., DiGraph ports -> params, yields -> return types).
-    fn extract_signature(
-        _stmt: Statement,
-        _stage: &StageInfo<L>,
-    ) -> Option<Signature<L::Type>> {
-        None
-    }
 }
 
 /// Marker trait for dialects whose `HasParser::Output` directly implements `EmitIR`.

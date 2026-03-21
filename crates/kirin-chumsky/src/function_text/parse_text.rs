@@ -266,7 +266,7 @@ pub fn second_pass_concrete<'t, L>(
     ctx: &mut SecondPassCtx<'t>,
 ) -> Result<usize, FunctionParseError>
 where
-    L: Dialect + ParseEmit<L> + HasParser<'t>,
+    L: Dialect + ParseEmit<L> + HasParser<'t> + kirin_ir::HasSignature<L>,
     L::Type: kirin_ir::Placeholder + HasParser<'t, Output = L::Type>,
 {
     let (declaration, consumed_span) = parse_one_declaration::<L>(&ctx.tokens[ctx.start_index..])
@@ -606,7 +606,7 @@ fn apply_specialize_declaration<L>(
     state: &mut ParseState,
 ) -> Result<(Function, StagedFunction), FunctionParseError>
 where
-    L: Dialect + ParseEmit<L>,
+    L: Dialect + ParseEmit<L> + kirin_ir::HasSignature<L>,
     L::Type: kirin_ir::Placeholder,
 {
     // Parse and emit the body first — we need it to extract signature if needed
@@ -637,21 +637,16 @@ where
             )
         })?;
 
-    // Determine signature: framework-parsed or dialect-extracted
+    // Determine signature: framework-parsed or from HasSignature on the body statement
     let signature = if let Some(sig) = framework_signature {
         sig.clone()
-    } else if let Some(sig) = L::extract_signature(body_statement, stage) {
-        sig
     } else {
-        return Err(FunctionParseError::new(
-            FunctionParseErrorKind::EmitFailed,
-            Some(span),
-            format!(
-                "no function signature available for '{}'. Either use `stage` declaration \
-                 with explicit signature, or implement `extract_signature` on ParseEmit.",
-                function_name.name
-            ),
-        ));
+        let def = body_statement.expect_info(stage).definition();
+        def.signature().unwrap_or_else(|| {
+            // Fallback: create a placeholder signature if the body type
+            // doesn't carry one (e.g., no Signature field).
+            kirin_ir::Signature::placeholder()
+        })
     };
 
     // Resolve or auto-create the staged function
