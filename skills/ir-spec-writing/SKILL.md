@@ -5,6 +5,8 @@ description: Use when designing new IR constructs, dialect operations, text form
 
 # IR Spec Writing
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 Create text format and semantics specifications for IR constructs through example-driven iterative design. This covers a wide range of IR features:
 
 - **New body kinds** (e.g., graph bodies alongside Block/Region)

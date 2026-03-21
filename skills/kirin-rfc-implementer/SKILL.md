@@ -5,6 +5,8 @@ description: Use when an approved Kirin RFC needs to be translated into code and
 
 # Kirin RFC Implementer
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 ## Overview
 
 Implement RFC-scoped changes in the Kirin workspace with a traceable workflow from RFC requirements to code, tests, and final RFC status updates.

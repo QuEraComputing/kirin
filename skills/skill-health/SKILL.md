@@ -7,6 +7,8 @@ argument-hint: "[skill-name | all]"
 
 # Skill Health
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 Audit and maintain local skills as the project evolves. Detects drift, enforces conventions, and tracks benchmark coverage.
 
 **Key principle:** Skills are living documents. As the project changes (crate renames, new conventions, architecture shifts), skills go stale. This skill catches that before it causes compliance failures.

@@ -5,6 +5,8 @@ description: Use when 2+ independent problems need concurrent investigation or f
 
 # Dispatching Parallel Agents
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 ## Overview
 
 When you have multiple unrelated failures (different test files, different subsystems, different bugs), investigating them sequentially wastes time. Each investigation is independent and can happen in parallel.

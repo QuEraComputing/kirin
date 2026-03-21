@@ -6,6 +6,8 @@ argument-hint: "[path to plan file]"
 
 # Subagent-Driven Development
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 Execute plan by dispatching fresh subagent per task, with two-stage review after each: spec compliance review first, then code quality review.
 
 **Core principle:** Fresh subagent per task + two-stage review (spec then quality) = high quality, fast iteration

@@ -5,6 +5,8 @@ description: Use when proposing changes to Kirin dialects, IR behavior, function
 
 # Kirin RFC Writer
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 ## Overview
 
 Create RFC-style design documents that match Kirin conventions, stay grounded in concrete code locations, and follow the repository RFC flow based on `cargo xtask new-rfc`.
