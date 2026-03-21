@@ -207,7 +207,8 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
 
     builder = builder
         .add(BuilderTemplate::new())
-        .add(TraitImplTemplate::marker(&trait_path, &ir.attrs.ir_type));
+        .add(TraitImplTemplate::marker(&trait_path, &ir.attrs.ir_type))
+        .add(crate::has_signature::has_signature_template(crate_path));
 
     builder.build()
 }

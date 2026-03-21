@@ -50,17 +50,11 @@ pub struct Measure {
     pub result: ResultValue,
 }
 
+// TODO(RFC-0004): Replace with `sig: Signature<QubitType>` field — manual impl
+// will be deleted once the derive generates HasSignature and the parser populates the field.
 impl HasSignature<Circuit> for CircuitFunction {
-    fn signature(&self, stage: &StageInfo<Circuit>) -> Option<Signature<QubitType>> {
-        let info = self.body.expect_info(stage);
-        let params: Vec<QubitType> = info
-            .edge_ports()
-            .iter()
-            .map(|p| p.expect_info(stage).ty().clone())
-            .collect();
-        // DiGraph yields determine the return type; use Qubit as default
-        let ret = QubitType::Qubit;
-        Some(Signature::new(params, ret, ()))
+    fn signature(&self) -> Option<Signature<QubitType>> {
+        None
     }
 }
 

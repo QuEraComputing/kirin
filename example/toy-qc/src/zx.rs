@@ -11,16 +11,10 @@ pub struct ZXFunction {
     pub body: UnGraph,
 }
 
+// TODO(RFC-0004): Replace with `sig: Signature<QubitType>` field
 impl HasSignature<ZX> for ZXFunction {
-    fn signature(&self, stage: &StageInfo<ZX>) -> Option<Signature<QubitType>> {
-        let info = self.body.expect_info(stage);
-        let params: Vec<QubitType> = info
-            .edge_ports()
-            .iter()
-            .map(|p| p.expect_info(stage).ty().clone())
-            .collect();
-        let ret = QubitType::Qubit;
-        Some(Signature::new(params, ret, ()))
+    fn signature(&self) -> Option<Signature<QubitType>> {
+        None
     }
 }
 

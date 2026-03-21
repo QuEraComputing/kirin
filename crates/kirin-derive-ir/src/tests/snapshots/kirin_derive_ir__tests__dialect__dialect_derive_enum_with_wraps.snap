@@ -1,5 +1,5 @@
 ---
-source: crates/kirin-derive-ir/src/generate.rs
+source: crates/kirin-derive-ir/src/tests/dialect.rs
 expression: generate_dialect_code(input)
 ---
 #[automatically_derived]
@@ -470,4 +470,13 @@ impl ::kirin::ir::IsEdge for ArithLanguage {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for ArithLanguage {
     type Type = SimpleType;
+}
+#[automatically_derived]
+impl ::kirin::ir::HasSignature<Self> for ArithLanguage {
+    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::HasSignature<AddOp>>::signature(field_0),
+            Self::Sub(field_0) => <SubOp as ::kirin::ir::HasSignature<SubOp>>::signature(field_0),
+        }
+    }
 }

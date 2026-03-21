@@ -1,5 +1,5 @@
 ---
-source: crates/kirin-derive-ir/src/generate.rs
+source: crates/kirin-derive-ir/src/tests/dialect.rs
 expression: generate_dialect_code(input)
 ---
 #[automatically_derived]
@@ -478,4 +478,17 @@ impl ::kirin::ir::IsEdge for CfOps {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for CfOps {
     type Type = SimpleType;
+}
+#[automatically_derived]
+impl ::kirin::ir::HasSignature<Self> for CfOps {
+    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+        match self {
+            Self::Branch(field_0) => {
+                <BranchOp as ::kirin::ir::HasSignature<BranchOp>>::signature(field_0)
+            }
+            Self::Return(field_0) => {
+                <ReturnOp as ::kirin::ir::HasSignature<ReturnOp>>::signature(field_0)
+            }
+        }
+    }
 }

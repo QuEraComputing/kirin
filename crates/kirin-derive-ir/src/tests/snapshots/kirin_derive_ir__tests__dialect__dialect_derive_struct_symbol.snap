@@ -1,5 +1,5 @@
 ---
-source: crates/kirin-derive-ir/src/generate.rs
+source: crates/kirin-derive-ir/src/tests/dialect.rs
 expression: generate_dialect_code(input)
 ---
 #[automatically_derived]
@@ -341,4 +341,10 @@ impl ::kirin::ir::IsEdge for CallExtern {
 #[automatically_derived]
 impl ::kirin::ir::Dialect for CallExtern {
     type Type = SimpleType;
+}
+#[automatically_derived]
+impl ::kirin::ir::HasSignature<Self> for CallExtern {
+    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+        None
+    }
 }
