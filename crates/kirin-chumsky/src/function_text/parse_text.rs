@@ -275,8 +275,6 @@ where
 
     let Declaration::Specialize {
         stage: _stage_sym,
-        function: _,
-        signature: _,
         body_span,
         span,
     } = declaration

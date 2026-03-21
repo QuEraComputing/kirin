@@ -24,13 +24,7 @@ pub(super) enum Declaration<'src, T> {
     Stage(Header<'src, T>),
     Specialize {
         stage: SymbolName<'src>,
-        function: SymbolName<'src>,
-        /// Framework-parsed signature from `fn @name(types) -> type`.
-        /// `None` when the dialect controls the format (e.g., projection-based).
-        signature: Option<Signature<T>>,
-        /// Span of the body portion (from after `fn @name` through closing `}`).
-        /// When signature is Some, this covers `keyword { ... }` or `{ ... }`.
-        /// When signature is None, this covers `(%q: T) -> T { ... }`.
+        /// Span of the body portion (from keyword through closing `}`).
         body_span: SimpleSpan,
         /// Span of the entire specialize declaration.
         span: SimpleSpan,
@@ -73,20 +67,6 @@ where
             signature: Signature::new(params, ret, ()),
         })
         .labelled("function signature")
-}
-
-/// Parses just `(types) -> type` — the parameter/return part of a function signature.
-fn fn_params_and_return<'src, I, L>() -> impl Parser<'src, I, Signature<L::Type>, ParserError<'src>>
-where
-    I: TokenInput<'src>,
-    L: Dialect + HasParser<'src>,
-    L::Type: HasParser<'src, Output = L::Type>,
-{
-    type_list_parser::<I, L>()
-        .then_ignore(just(Token::Arrow))
-        .then(L::Type::parser())
-        .map(|(params, ret)| Signature::new(params, ret, ()))
-        .labelled("function params and return type")
 }
 
 /// Body span scanner. Matches an optional keyword prefix (e.g. `digraph`,
@@ -153,18 +133,10 @@ where
     let specialize_decl = identifier("specialize")
         .ignore_then(symbol())
         .then(body_span::<I>()) // captures from keyword (e.g. `fn`) through closing `}`
-        .map_with(|(stage, body_span), extra| {
-            Declaration::Specialize {
-                stage,
-                // Function name extracted from EmitContext after parse_and_emit
-                function: SymbolName {
-                    name: "",
-                    span: extra.span(),
-                },
-                signature: None,
-                body_span,
-                span: extra.span(),
-            }
+        .map_with(|(stage, body_span), extra| Declaration::Specialize {
+            stage,
+            body_span,
+            span: extra.span(),
         });
 
     choice((stage_decl, specialize_decl))
