@@ -1,6 +1,7 @@
 ---
 name: insta-snapshot-testing
 description: Use when writing new snapshot tests, updating snapshots after code changes, reviewing pending `.snap.new` files, cleaning up orphaned snapshots, or troubleshooting cargo insta failures. Triggers on insta assertions, snapshot mismatches, `.snap` file management, or CI snapshot rejection.
+user-invocable: false
 ---
 
 # Insta Snapshot Testing

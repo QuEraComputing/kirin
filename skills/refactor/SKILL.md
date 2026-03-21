@@ -1,6 +1,8 @@
 ---
 name: refactor
 description: Use when refactoring Rust code across crates, extracting traits, splitting modules, or renaming across 3+ files. Also auto-suggested when detecting cross-crate moves or trait extractions.
+effort: high
+argument-hint: "[what to refactor]"
 ---
 
 # Refactor
@@ -20,6 +22,12 @@ Rust-specific refactoring orchestration with architectural guardrails and a conf
 - Single-file changes
 - Adding new code that doesn't touch existing abstractions
 - Bug fixes that don't change public APIs
+
+## Target
+
+The refactoring target is: **$ARGUMENTS**
+
+If no target was provided, ask the user what to refactor.
 
 ## Phase 1: Scope & Pre-flight
 
@@ -230,6 +238,17 @@ If yes, save to the team templates directory (see AGENTS.md Project structure) a
 - `cargo check` failing 3+ times on the same error (escalate to user)
 - Any agent placing types in a crate not listed in the pre-flight summary
 - Verifier auto-fixing code instead of reporting to lead
+
+## Rationalization Table
+
+| Temptation | Rationalization | Reality |
+|-----------|----------------|---------|
+| Skip pre-flight | "This refactor is simple, I know what needs to move" | 'Simple' refactors have hidden consumers. Pre-flight takes 5 minutes; debugging a missed re-export takes 30. |
+| Skip triage-review | "I already know the code well enough" | You know the code. The Formalism reviewer catches abstraction issues. The Soundness Adversary catches invariant violations. Fresh eyes find what familiarity hides. |
+| Start coding before plan approval | "I'll adjust the plan based on what I find" | Code-first planning produces sunk-cost pressure to keep bad decisions. Plan approval costs 2 minutes; reworking a wrong approach costs hours. |
+| Edit the same file from two agents | "The changes are in different functions" | Git merges on function granularity, not line granularity. Two agents touching the same file creates merge conflicts that require manual resolution. |
+| Let the verifier fix issues | "It's faster than dispatching back to the implementer" | The verifier lacks the implementer's context. Verifier fixes introduce new bugs at a higher rate. Report to lead, let the right agent fix it. |
+| Skip exploration budget | "I need to read one more file to understand" | The budget exists because unbounded exploration delays the actual work. If 20 reads aren't enough, the scope is wrong — simplify it. |
 
 ## Integration
 

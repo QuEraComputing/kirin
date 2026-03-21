@@ -1,6 +1,8 @@
 ---
 name: feature-dev
 description: Use when building new capabilities — from a single helper method to an entire framework subsystem. Triggers on new feature requests, new subsystem development, multi-crate additions, or any work that needs design exploration before coding. Not for refactoring existing code or implementing approved RFCs.
+effort: high
+argument-hint: "[feature description]"
 ---
 
 # Feature Development
@@ -23,6 +25,12 @@ Orchestrator for building new capabilities — from a single helper method to an
 - Implementing an already-approved RFC (load the `kirin-rfc-implementer` skill)
 - Adding a new dialect (load the `dialect-dev` skill — it has domain-specific phases)
 - Bug fixes (load the `systematic-debugging` skill)
+
+## Target
+
+The feature to build: **$ARGUMENTS**
+
+If no target was provided, ask the user what they want to build.
 
 ## Scale Detection
 
@@ -130,6 +138,15 @@ After implementation is complete (or at each milestone for large work):
 - Framework-scale work without a spec or RFC
 - Proceeding after review surfaces P0/P1 issues without addressing them
 - Parallel agents without worktree isolation
+
+## Rationalization Table
+
+| Temptation | Rationalization | Reality |
+|-----------|----------------|---------|
+| Skip design for medium work | "It's only 3 files, I can figure it out as I go" | 3 files with a new API surface means design decisions. Coding without design means the first approach becomes permanent, even if a 5-minute design phase would have found a better one. |
+| Skip design review gate | "The design is straightforward, review would be rubber-stamping" | If the design is truly straightforward, the review takes 2 minutes. If it's not (and you didn't realize), the review catches it before you've written 500 lines. |
+| Blast through milestones | "I'm in flow, the next milestone is similar" | Each milestone is a checkpoint. Bugs compound across milestones — a wrong assumption in milestone 1 becomes a structural problem by milestone 3. Pause, verify, continue. |
+| Treat large work as medium | "It's a big feature but the approach is clear" | If it spans multiple crates or needs a spec, it's large. Calling it medium to skip phases saves 30 minutes of planning and costs hours of rework. |
 
 ## Integration
 

@@ -1,6 +1,8 @@
 ---
 name: test-coverage-review
 description: Use when test coverage needs improvement, edge cases are unexercised, or design issues and bugs should be discovered through test writing rather than code reading. Triggers on requests to improve tests, add edge case coverage, find bugs through testing, verify behavior after a refactor, or do test-driven review of a crate or subsystem.
+effort: high
+argument-hint: "[crate, subsystem, or module to cover]"
 ---
 
 # Test Coverage Review
@@ -29,7 +31,9 @@ The insight: writing a test is the fastest way to discover whether an API is awk
 
 ### Scoping
 
-Ask the user what to cover. Accept a crate name, subsystem, or specific module. If unspecified, look at recent git changes to pick a focus area.
+The review scope is: **$ARGUMENTS**
+
+If no scope was provided, ask the user what to cover. Accept a crate name, subsystem, or specific module. If still unspecified, look at recent git changes to pick a focus area.
 
 ### Dispatching test agents
 

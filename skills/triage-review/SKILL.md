@@ -1,6 +1,8 @@
 ---
 name: triage-review
 description: Use when significant code changes need multi-perspective review, after completing a refactor, or when 10+ commits accumulate on a feature branch without review. Triggers on codebase-wide quality concerns, architectural drift, or pre-merge validation of large feature branches.
+effort: high
+argument-hint: "[scope: full | crate-name | subsystem | recent]"
 ---
 
 # Triage Review
@@ -24,7 +26,11 @@ Comprehensive codebase review with three core reviewer roles (**Formalism**, **C
 - Fixing issues (user decides what to act on, possibly by loading the `refactor` skill)
 - Implementation planning (use `writing-plans`)
 
-## Scope Types
+## Scope
+
+The review scope is: **$ARGUMENTS**
+
+If no scope was provided, ask the user what to review.
 
 | Scope | Argument | What's reviewed |
 |-------|----------|----------------|
@@ -334,13 +340,23 @@ Batch up to 4 findings per `AskUserQuestion` call. Each question gets its own pr
 - Proceeding with review after user rejects the plan
 - Assigning P0/P1 to a finding with "uncertain" confidence
 - Omitting design context from reviewer prompts (causes false positives on intentional patterns)
-- Skipping the pre-filter step (causes findings that contradict documented decisions)
 - Skipping Phase 3 verification (unverified findings waste the user's time)
 - Committing the report before user walkthrough is complete
-- **Skipping the cross-review step** (catches false positives and calibrates severity)
-- **Code Quality reviewer not referencing Formalism findings during cross-review**
-- **Ergonomics reviewer not including toy scenario code in their report**
-- **Full report missing external references or code locations**
+- Skipping the cross-review step
+- Code Quality reviewer not referencing Formalism findings during cross-review
+- Ergonomics reviewer not including toy scenario code in their report
+- Full report missing external references or code locations
+
+## Rationalization Table
+
+| Temptation | Rationalization | Reality |
+|-----------|----------------|---------|
+| Skip cross-review | "Reviewers already covered each other's areas" | Cross-review catches false positives that propagate into the final report and waste the user's time during walkthrough. Different perspectives catch different errors. |
+| Combine cross-review with aggregation | "More efficient as a single pass" | Aggregation without cross-review means false positives, duplicate findings, and uncalibrated severities all pass through. Two distinct steps, always. |
+| Skip design context in prompts | "The reviewer will figure out what's intentional" | Without design context, reviewers flag 30-50% intentional patterns as issues. The user wastes walkthrough time on false positives. |
+| Skip verification agent | "The reviewers were thorough" | Reviewers describe code from memory. The verification agent reads actual source and catches misquoted line numbers, stale references, and misread logic. |
+| Rush through P3 walkthrough | "P3 is low priority, just accept them all" | P3 findings accumulate into technical debt. The walkthrough is where the user decides which are worth tracking vs discarding. |
+| Assign P1 to uncertain finding | "It looks serious even though I'm not sure" | Uncertain P1 findings undermine trust in the report. Downgrade to P2 and phrase as a question. |
 
 ## Next Steps (After Review)
 

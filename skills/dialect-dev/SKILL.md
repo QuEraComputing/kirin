@@ -1,6 +1,8 @@
 ---
 name: dialect-dev
 description: Use when building a new Kirin dialect from scratch or adding a significant extension to an existing dialect. Triggers on requests to create a dialect, design dialect operations, or implement a full dialect stack (text format, IR types, parser, printer, interpreter, tests). Kirin-specific — not for general feature work.
+effort: high
+argument-hint: "[dialect name or domain]"
 ---
 
 # Dialect Development
@@ -22,6 +24,12 @@ Kirin-specific orchestrator for building a new dialect from scratch. Unlike gene
 - Adding 1-2 operations to an existing dialect (just add them directly)
 - Refactoring an existing dialect (load the `refactor` skill)
 - General feature development not dialect-specific (load the `feature-dev` skill)
+
+## Target
+
+The dialect to build: **$ARGUMENTS**
+
+If no target was provided, ask the user what dialect they want to build.
 
 ## Pre-requisites
 
@@ -174,6 +182,17 @@ Backtracking is expected and healthy. Update the spec document when you backtrac
 - Skipping the spec review gate
 - Adding operations not in the spec without updating the spec first
 - Using `#[allow(...)]` to suppress derive errors instead of fixing the type definitions
+
+## Rationalization Table
+
+| Temptation | Rationalization | Reality |
+|-----------|----------------|---------|
+| Write IR types first | "I need to see the types to design the text format" | The text format is the user-facing contract. Types serve the format, not the reverse. Types written first constrain the format to what's easy to represent, not what's natural for the domain. |
+| Skip operational semantics | "The semantics are obvious from the operation names" | 'Obvious' semantics have edge cases: what does division by zero do? What happens when a loop body yields early? Ambiguity here becomes 4 bugs later (spec, IR, parser, interpreter). |
+| Skip spec review gate | "The spec is simple, let's just implement" | Simple specs still have composability issues. The Formalism reviewer catches interactions you don't see when looking at operations in isolation. |
+| Implement all phases at once | "Faster to write everything together" | Phases are ordered so each validates the previous. A parser bug found in Phase 3 is cheap. The same bug found after writing the interpreter in Phase 5 requires fixing 3 layers. |
+| Add operations during implementation | "I realized we need one more operation" | Add it to the spec first, get it reviewed, then implement. Unreviewed operations accumulate semantic debt. |
+| Suppress derive errors with `#[allow]` | "I'll fix the type definition later" | Derive errors signal misaligned types. Suppressing them hides the misalignment until it surfaces as a runtime bug in the interpreter. Fix the type definition now. |
 
 ## Integration
 
