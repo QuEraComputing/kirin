@@ -38,17 +38,14 @@ pub enum FormatElement<'src> {
     Context(ContextProjection),
 }
 
-/// Context projections: `{:name}`, `{:return}`, `{:signature}` — properties of the enclosing function.
+/// Context projections: `{:name}` — properties of the enclosing function.
+///
+/// After RFC 0004, only `{:name}` remains. `{:return}` and `{:signature}` have been
+/// replaced by Signature field projections (`{sig:inputs}`, `{sig:return}`).
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ContextProjection {
     /// `{:name}` — the function's global symbol name (`@symbol`).
     Name,
-    /// `{:return}` — the function's return type(s) (`Type, Type`).
-    Return,
-    /// `{:signature}` — the full framework signature: `fn @name(Type, Type) -> RetType`.
-    /// Printed from the framework context. At parse time, the framework already consumed
-    /// the signature before the dialect parser sees the body text, so this is a no-op.
-    Signature,
 }
 
 /// Projections for `{field:...}` body structural parts.
@@ -64,6 +61,15 @@ pub enum BodyProjection {
     Body,
 }
 
+/// Projections for `{sig:...}` Signature field parts.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum SignatureProjection {
+    /// `{sig:inputs}` — comma-separated input type list (`Type, Type`).
+    Inputs,
+    /// `{sig:return}` — single return type (`Type`).
+    Return,
+}
+
 /// Options for field interpolation.
 #[derive(Debug, Clone, Default)]
 pub enum FormatOption {
@@ -76,6 +82,8 @@ pub enum FormatOption {
     Default,
     /// Body structural projection on a field (`{field:ports}`, `{field:body}`, etc.).
     Body(BodyProjection),
+    /// Signature projection on a Signature field (`{sig:inputs}`, `{sig:return}`).
+    Signature(SignatureProjection),
 }
 
 impl<'src> Format<'src> {
@@ -109,13 +117,11 @@ impl<'src> Format<'src> {
             .ignore_then(select! { Token::Identifier(name) => name })
             .map(FormatElement::Keyword);
 
-        // Parse context projection: {:name}, {:return} (enclosing function properties)
+        // Parse context projection: {:name} (enclosing function name)
         let context_projection = just(Token::LBrace)
             .ignore_then(just(Token::Colon))
             .ignore_then(select! {
                 Token::Identifier("name") => ContextProjection::Name,
-                Token::Identifier("return") => ContextProjection::Return,
-                Token::Identifier("signature") => ContextProjection::Signature,
             })
             .then_ignore(just(Token::RBrace))
             .map(FormatElement::Context);
@@ -136,6 +142,8 @@ impl<'src> Format<'src> {
                             Token::Identifier("captures") => FormatOption::Body(BodyProjection::Captures),
                             Token::Identifier("args") => FormatOption::Body(BodyProjection::Args),
                             Token::Identifier("body") => FormatOption::Body(BodyProjection::Body),
+                            Token::Identifier("inputs") => FormatOption::Signature(SignatureProjection::Inputs),
+                            Token::Identifier("return") => FormatOption::Signature(SignatureProjection::Return),
                         })
                         .or_not(),
                 ),
@@ -292,7 +300,15 @@ mod tests {
 
     #[test]
     fn test_context_name_projection() {
-        let input = "fn {:name}({body:ports}) -> {:return}";
+        let input = "fn {:name}({body:ports})";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_signature_projections() {
+        let input = "fn {:name}({sig:inputs}) -> {sig:return} {body}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);
@@ -316,7 +332,7 @@ mod tests {
 
     #[test]
     fn test_body_captures_projection() {
-        let input = "fn {:name}({body:ports}) captures ({body:captures}) -> {:return} {{ {body:body} }}";
+        let input = "fn {:name}({sig:inputs}) -> {sig:return} ({body:ports}) captures ({body:captures}) {{ {body:body} }}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
         insta::assert_debug_snapshot!(format);

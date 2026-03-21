@@ -210,6 +210,13 @@ impl<'ir> ValidationVisitor<'ir> {
                 };
                 syn::Ident::new(&suffix, proc_macro2::Span::call_site())
             }
+            FormatOption::Signature(proj) => {
+                let suffix = match proj {
+                    crate::format::SignatureProjection::Inputs => format!("{}_inputs", field),
+                    crate::format::SignatureProjection::Return => format!("{}_return", field),
+                };
+                syn::Ident::new(&suffix, proc_macro2::Span::call_site())
+            }
         }
     }
 
@@ -251,7 +258,8 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                 FormatOption::Name => ":name",
                 FormatOption::Type => ":type",
                 FormatOption::Default
-                | FormatOption::Body(_) => unreachable!(),
+                | FormatOption::Body(_)
+                | FormatOption::Signature(_) => unreachable!(),
             };
             self.add_error(format!(
                 "format option '{}' cannot be used on {} field '{}'. \

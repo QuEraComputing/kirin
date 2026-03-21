@@ -20,6 +20,29 @@ Format {
             ],
         ),
         Field(
+            "sig",
+            Signature(
+                Inputs,
+            ),
+        ),
+        Token(
+            [
+                RParen,
+                Arrow,
+            ],
+        ),
+        Field(
+            "sig",
+            Signature(
+                Return,
+            ),
+        ),
+        Token(
+            [
+                LParen,
+            ],
+        ),
+        Field(
             "body",
             Body(
                 Ports,
@@ -43,11 +66,7 @@ Format {
         Token(
             [
                 RParen,
-                Arrow,
             ],
-        ),
-        Context(
-            Return,
         ),
         Token(
             [

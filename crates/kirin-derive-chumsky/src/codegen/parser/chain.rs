@@ -64,25 +64,11 @@ impl GenerateHasDialectParser {
                     // statement level — the function text parser provides the values.
                     match proj {
                         crate::format::ContextProjection::Name => {
+                            // Parse and discard the @symbol — the function text parser
+                            // extracts the name from EmitContext after parse_and_emit.
                             parser_parts.push(ParserPart::Token(
                                 quote! { #crate_path::symbol() },
                             ));
-                        }
-                        crate::format::ContextProjection::Return => {
-                            // Parse a comma-separated type list
-                            parser_parts.push(ParserPart::Token(
-                                quote! {
-                                    <#ir_type as #crate_path::HasParser<'t>>::parser()
-                                        .separated_by(#crate_path::chumsky::prelude::just(#crate_path::Token::Comma))
-                                        .at_least(1)
-                                        .collect::<::std::vec::Vec<_>>()
-                                },
-                            ));
-                        }
-                        crate::format::ContextProjection::Signature => {
-                            // No-op at statement level — the function text parser
-                            // already consumed `fn @name(types) -> type` before
-                            // the dialect parser sees the body text.
                         }
                     }
                 }
@@ -393,6 +379,14 @@ impl GenerateHasDialectParser {
             {
                 self.build_projected_field_value(field, occs, crate_path)
             }
+            // Check for signature projection occurrences — reconstruct Signature from pieces
+            Some(occs)
+                if occs
+                    .iter()
+                    .any(|o| matches!(o.option, FormatOption::Signature(_))) =>
+            {
+                self.build_projected_signature_value(occs)
+            }
             Some(occs) if occs.len() == 1 => {
                 let occ = occs[0];
                 let var = &occ.var_name;
@@ -538,6 +532,21 @@ impl GenerateHasDialectParser {
             }
             _ => unreachable!("body projections only valid on body field types"),
         }
+    }
+
+    /// Reconstruct a `Signature` from its `{sig:inputs}` and `{sig:return}` projection variables.
+    fn build_projected_signature_value(&self, occs: &[&FieldOccurrence]) -> TokenStream {
+        use crate::format::SignatureProjection;
+        let find_sig_var = |proj: SignatureProjection| -> Option<&syn::Ident> {
+            occs.iter()
+                .find(|o| matches!(&o.option, FormatOption::Signature(p) if *p == proj))
+                .map(|o| &o.var_name)
+        };
+        let inputs_var = find_sig_var(SignatureProjection::Inputs)
+            .expect("validation ensures {sig:inputs} is present");
+        let return_var = find_sig_var(SignatureProjection::Return)
+            .expect("validation ensures {sig:return} is present");
+        quote! { ::kirin_ir::Signature::new(#inputs_var, #return_var, ()) }
     }
 
     pub(super) fn token_parser(&self, tokens: &[kirin_lexer::Token<'_>]) -> TokenStream {

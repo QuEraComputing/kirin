@@ -20,15 +20,26 @@ Format {
             ],
         ),
         Field(
-            "body",
-            Body(
-                Ports,
+            "sig",
+            Signature(
+                Inputs,
             ),
         ),
         Token(
             [
                 RParen,
+                Arrow,
             ],
+        ),
+        Field(
+            "sig",
+            Signature(
+                Return,
+            ),
+        ),
+        Field(
+            "body",
+            Default,
         ),
     ],
 }
