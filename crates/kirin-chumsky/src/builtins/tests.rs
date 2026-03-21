@@ -114,3 +114,43 @@ fn test_parse_i32_overflow() {
 fn test_parse_u32_overflow() {
     assert!(parse_with::<u32>("4294967296").is_err());
 }
+
+// === Signature tests ===
+
+use kirin_ir::Signature;
+
+#[test]
+fn test_parse_signature_two_params() {
+    assert_eq!(
+        parse_with::<Signature<i32>>("(1, 2) -> 3"),
+        Ok(Signature::new(vec![1, 2], 3, ()))
+    );
+}
+
+#[test]
+fn test_parse_signature_zero_params() {
+    assert_eq!(
+        parse_with::<Signature<i32>>("() -> 42"),
+        Ok(Signature::new(vec![], 42, ()))
+    );
+}
+
+#[test]
+fn test_parse_signature_single_param() {
+    assert_eq!(
+        parse_with::<Signature<i32>>("(1) -> 2"),
+        Ok(Signature::new(vec![1], 2, ()))
+    );
+}
+
+#[test]
+fn test_signature_display() {
+    let sig = Signature::new(vec![1, 2], 3, ());
+    assert_eq!(format!("{}", sig), "(1, 2) -> 3");
+}
+
+#[test]
+fn test_signature_display_empty_params() {
+    let sig: Signature<i32> = Signature::new(vec![], 42, ());
+    assert_eq!(format!("{}", sig), "() -> 42");
+}

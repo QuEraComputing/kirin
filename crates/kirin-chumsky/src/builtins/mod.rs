@@ -13,6 +13,7 @@
 mod float;
 mod integer;
 mod primitive;
+mod signature;
 
 #[cfg(test)]
 mod tests;

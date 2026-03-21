@@ -36,6 +36,19 @@ impl<T, C> Signature<T, C> {
     }
 }
 
+impl<T: std::fmt::Display, C> std::fmt::Display for Signature<T, C> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "(")?;
+        for (i, param) in self.params.iter().enumerate() {
+            if i > 0 {
+                write!(f, ", ")?;
+            }
+            write!(f, "{}", param)?;
+        }
+        write!(f, ") -> {}", self.ret)
+    }
+}
+
 impl<T: crate::Placeholder> Signature<T> {
     /// Creates a signature with no parameters and a placeholder return type.
     ///
