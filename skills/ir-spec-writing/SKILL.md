@@ -1,6 +1,6 @@
 ---
 name: ir-spec-writing
-description: "Use when designing new IR constructs, dialect semantics, text format syntax, or iterating on existing IR specifications. Covers text format design, semantic rule definition, and spec document writing for compiler IR features. Trigger when: user wants to design a new IR node type, define dialect text syntax, write a language/IR spec, or revise existing IR semantics."
+description: Use when designing new IR constructs, dialect operations, text format syntax, type system extensions, or semantic rules — or when iterating on existing IR specifications. Triggers on requests to design a new IR node type, define dialect text syntax, write a language or IR spec, add new body kinds, or revise operational semantics.
 ---
 
 # IR Spec Writing

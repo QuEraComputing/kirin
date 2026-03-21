@@ -47,11 +47,4 @@ Numbered list of specific changes for the Migrator:
 
 ## Kirin-Specific Context
 
-Reference CLAUDE.md and AGENTS.md for crate ownership. The crate categories are:
-- **Core:** kirin-ir, kirin-lexer
-- **Parser/Printer:** kirin-chumsky, kirin-prettyless, kirin-chumsky-derive, kirin-chumsky-format
-- **Interpreter:** kirin-interpreter, kirin-derive-interpreter
-- **Dialects:** kirin-cf, kirin-scf, kirin-constant, kirin-arith, kirin-bitwise, kirin-cmp, kirin-function
-- **Derive Infrastructure:** kirin-derive-core, kirin-derive, kirin-prettyless-derive
-- **Analysis:** kirin-interval
-- **Testing:** kirin-test-utils, kirin-test-languages
+Reference AGENTS.md for the current crate categories, subsystem groupings, and project structure. Do not rely on hardcoded crate lists — always check AGENTS.md for the current state.

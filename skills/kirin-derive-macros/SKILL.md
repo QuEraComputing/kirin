@@ -1,6 +1,6 @@
 ---
 name: kirin-derive-macros
-description: Use when building or debugging kirin derive macros. Reuses kirin-derive-toolkit's code-block algebra, IR model, and generators. Escalates to /refactor if the toolkit's design makes the new derive too complicated.
+description: Use when building, debugging, or extending derive macros in the kirin ecosystem — new proc-macro crates, changes to existing kirin derives, or debugging expanded derive output. Triggers on derive macro development, kirin-derive-toolkit usage, or proc-macro compilation errors in kirin crates.
 ---
 
 # Kirin Derive Macros
@@ -22,18 +22,18 @@ Skill for developing new derive macros in the kirin ecosystem. The primary direc
 **Don't use for:**
 - Using existing derive macros (just apply them)
 - Non-kirin proc-macro work (use general Rust proc-macro knowledge instead)
-- Refactoring the toolkit itself (use `/refactor`)
+- Refactoring the toolkit itself (load the `refactor` skill)
 
 ## Core Directive: Reuse the Toolkit
 
-Before writing any code, explore what `kirin-derive-toolkit` already provides. Read these in order:
+Before writing any code, explore what `kirin-derive-toolkit` already provides. Locate the toolkit crate via the Crates section of AGENTS.md, then read its source in this order:
 
-1. `crates/kirin-derive-toolkit/src/lib.rs` — public API surface
-2. `crates/kirin-derive-toolkit/src/tokens/` — code-block types (`TraitImpl`, `MatchExpr`, `Method`, etc.)
-3. `crates/kirin-derive-toolkit/src/ir/` — IR model (`Input<L>`, `Statement<L>`, `FieldInfo<L>`, `Layout`)
-4. `crates/kirin-derive-toolkit/src/emit.rs` — `Emit` trait (visitor pattern for code generation)
-5. `crates/kirin-derive-toolkit/src/scan.rs` — `Scan` trait (visitor pattern for info collection)
-6. `crates/kirin-derive-toolkit/src/codegen/` — utilities (`combine_where_clauses`, generics helpers)
+1. The crate root (`lib.rs`) — public API surface
+2. The `tokens/` module — code-block types (`TraitImpl`, `MatchExpr`, `Method`, etc.)
+3. The `ir/` module — IR model (`Input<L>`, `Statement<L>`, `FieldInfo<L>`, `Layout`)
+4. The `emit.rs` module — `Emit` trait (visitor pattern for code generation)
+5. The `scan.rs` module — `Scan` trait (visitor pattern for info collection)
+6. The `codegen/` module — utilities (`combine_where_clauses`, generics helpers)
 
 **Checklist before writing new helpers:**
 - [ ] Is there an existing code-block type that fits? (`TraitImpl`, `MatchExpr`, `Method`, `MatchArm`)
@@ -93,7 +93,7 @@ When the toolkit design makes the new derive too complicated:
    **Work saved at:** [worktree path or branch name]
    ```
 
-4. **Suggest using `/refactor`** to improve `kirin-derive-toolkit` before continuing the derive implementation. The refactor should target the specific gap identified.
+4. **Suggest loading the `refactor` skill** to improve `kirin-derive-toolkit` before continuing the derive implementation. The refactor should target the specific gap identified.
 
 5. **Do NOT work around the limitation** by:
    - Writing raw `quote!` composition for structural code
@@ -270,15 +270,10 @@ Add a real type using the derive in `kirin-test-languages` to verify trait bound
 ## Integration
 
 **Escalates to:**
-- `/refactor` — when toolkit design needs improvement to support the new derive
+- The `refactor` skill — when toolkit design needs improvement to support the new derive
 
 **Pairs with:**
-- `/test-driven-development` — snapshot-first workflow
-- `/triage-review` — multi-perspective review of derive changes
+- The `test-driven-development` skill — snapshot-first workflow
+- The `triage-review` skill — multi-perspective review of derive changes
 
-**Key paths:**
-- `crates/kirin-derive-toolkit/` — toolkit (IR, code blocks, utilities)
-- `crates/kirin-derive-ir/` — reference: StandardLayout + Generator chain
-- `crates/kirin-derive-interpreter/` — reference: custom Layout + Scan/Emit
-- `crates/kirin-derive-chumsky/` — reference: complex derive with format visitor
-- `crates/kirin-derive-prettyless/` — reference: minimal derive
+**Key crates** (see AGENTS.md Crates section for the Derive Infrastructure group and their locations).

@@ -1,6 +1,6 @@
 ---
 name: kirin-rfc-implementer
-description: Implement an existing Kirin RFC end-to-end and verify the delivered code matches the RFC intent. Use when executing an approved RFC, translating it into code and tests, validating behavior, checking implementation-to-RFC alignment, and updating the RFC metadata status to Implemented using `cargo xtask new-rfc --update`.
+description: Use when an approved Kirin RFC needs to be translated into code and tests. Triggers on requests to implement an RFC, execute an RFC plan, verify RFC-to-code alignment, or update RFC status to Implemented. Covers incremental implementation, behavior validation, and RFC metadata updates via `cargo xtask new-rfc --update`.
 ---
 
 # Kirin RFC Implementer

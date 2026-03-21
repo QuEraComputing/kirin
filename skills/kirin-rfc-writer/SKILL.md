@@ -1,6 +1,6 @@
 ---
 name: kirin-rfc-writer
-description: Draft, revise, and review Request for Comments (RFC) design documents for the Kirin framework. Use when proposing or changing dialects, IR and function model behavior, parser or pretty-printer interfaces, crate boundaries, public APIs, or migration strategy, and when turning implementation ideas into structured RFC documents under `rfc/`.
+description: Use when proposing changes to Kirin dialects, IR behavior, function model, parser or printer interfaces, crate boundaries, public APIs, or migration strategy that need a formal design document. Triggers on requests to write an RFC, create a design proposal, or formalize an implementation idea into a structured RFC under `rfc/`.
 ---
 
 # Kirin RFC Writer

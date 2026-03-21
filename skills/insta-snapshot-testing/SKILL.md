@@ -1,6 +1,6 @@
 ---
 name: insta-snapshot-testing
-description: Use when writing, updating, reviewing, or troubleshooting snapshot tests with cargo insta — covers assertion macros, file locations, pending snapshot workflow, unreferenced cleanup, and CI behavior
+description: Use when writing new snapshot tests, updating snapshots after code changes, reviewing pending `.snap.new` files, cleaning up orphaned snapshots, or troubleshooting cargo insta failures. Triggers on insta assertions, snapshot mismatches, `.snap` file management, or CI snapshot rejection.
 ---
 
 # Insta Snapshot Testing

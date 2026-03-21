@@ -54,6 +54,16 @@ Task tool (general-purpose):
     - In existing codebases, follow established patterns. Improve code you're touching
       the way a good developer would, but don't restructure things outside your task.
 
+    ## Code Quality Awareness
+
+    Your work will be reviewed by a Code Quality reviewer. Avoid common issues:
+    - Do NOT introduce `#[allow(...)]` annotations — fix the underlying issue instead.
+      If you believe a suppression is genuinely needed, flag it in your report with
+      the root cause explanation.
+    - Do NOT duplicate logic that exists elsewhere — check for existing helpers first.
+    - Add `#[must_use]` to new public constructors and accessors that return values.
+    - Follow Rust best practices for ownership, error handling, and naming.
+
     ## When You're in Over Your Head
 
     It is always OK to stop and say "this is too hard for me." Bad work is worse than

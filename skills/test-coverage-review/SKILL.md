@@ -1,13 +1,13 @@
 ---
 name: test-coverage-review
-description: Use when wanting to improve test coverage while simultaneously discovering design issues, bugs, and API ergonomic problems. Writes new tests targeting uncovered or edge-case code paths; when a test reveals excessive boilerplate, unexpected behavior, or a bug, it stops and reports the finding. Produces a lightweight findings report, then iterates with the user on confirmation and solutions. Use this skill whenever the user mentions improving tests, adding edge case coverage, test-driven review, or discovering issues through testing.
+description: Use when test coverage needs improvement, edge cases are unexercised, or design issues and bugs should be discovered through test writing rather than code reading. Triggers on requests to improve tests, add edge case coverage, find bugs through testing, verify behavior after a refactor, or do test-driven review of a crate or subsystem.
 ---
 
 # Test Coverage Review
 
 ## Overview
 
-Test-driven codebase review. Discovers design issues, bugs, and ergonomic problems by actually writing tests — not by reading code and speculating. Three phases: dispatch agents to write tests and collect findings autonomously, merge findings and present them to the user, then iterate on solutions together.
+Test-driven codebase review. Discovers design issues, bugs, and ergonomic problems by actually writing tests — not by reading code and speculating. Three phases: dispatch agents to write tests and collect findings autonomously, merge and verify findings, then walk through findings with the user for confirmation.
 
 The insight: writing a test is the fastest way to discover whether an API is awkward, a behavior is wrong, or a design forces unnecessary boilerplate. If you can't write a clean test for something, that's a signal worth reporting.
 
@@ -21,8 +21,8 @@ The insight: writing a test is the fastest way to discover whether an API is awk
 - When edge cases haven't been exercised yet
 
 **Don't use for:**
-- Comprehensive multi-reviewer codebase review (use `/triage-review`)
-- Implementing fixes from an existing review (just fix them directly or use `/refactor`)
+- Comprehensive multi-reviewer codebase review (load the `triage-review` skill)
+- Implementing fixes from an existing review (just fix them directly or load the `refactor` skill)
 - Writing tests for a specific known bug (just write the test)
 
 ## Phase 1: Test Writing and Discovery (Agent-Driven)
@@ -35,14 +35,32 @@ Ask the user what to cover. Accept a crate name, subsystem, or specific module. 
 
 Partition the scope into independent work areas (e.g., by crate, module, or subsystem). Launch agents in parallel — each agent owns a slice of the codebase and works autonomously.
 
-The orchestrator picks a `<title>` slug summarizing the review scope (e.g., `test-coverage`, `interpreter-edge-cases`). Agent findings go into a shared directory: `design/reviews/review-<date>-<title>/`. Each agent writes to its own file within that directory.
+The orchestrator picks a `<title>` slug summarizing the review scope (e.g., `test-coverage`, `interpreter-edge-cases`). Agent findings go into a shared directory under the review output directory (see AGENTS.md Project structure) as `review-<date>-<title>/`. Each agent writes to its own file within that directory.
 
 Each agent's prompt must include:
 1. Which files/modules to cover
 2. The test writing strategy and discovery signals (below)
-3. **A unique findings document path** — `design/reviews/review-<date>-<title>/review-<date>-<area-slug>.md`
+3. **A unique findings document path** — `<review-dir>/review-<date>-<title>/review-<date>-<area-slug>.md`
 4. Instructions to write findings to that document as they're discovered (not at the end)
 5. The finding format template (below)
+6. **Persona guidance** (see below)
+
+### Agent persona guidance
+
+Match agent persona to the scope being tested:
+
+| Scope | Persona Lens | What to Emphasize |
+|-------|-------------|-------------------|
+| Core IR | Code Quality (Implementer persona, review mode) | Invariant violations, API misuse paths, missing `#[must_use]` |
+| Parser/printer | Code Quality + Ergonomics (Physicist persona) | Roundtrip correctness, error message quality, parse failure edge cases |
+| Interpreter | Code Quality + Formalism (PL Theorist persona) | Semantic preservation, lattice law violations, control flow edge cases |
+| Dialect crates | Dialect Author persona (with domain context from AGENTS.md) | Domain-framework alignment, derive experience, boilerplate ratio |
+| Derive macros | Code Quality + Compiler Engineer persona | Generated code quality, error message quality, attribute edge cases |
+| Builder/arena/interpreter | Soundness Adversary persona | Invariant violations, stale ID attacks, bypass paths, unsafe audit |
+
+For **dialect crates**, include domain context from the triage-review Domain Context Resolution table (e.g., ZX calculus for quantum dialects, compiler engineering for SCF). This lets the test agent write domain-meaningful tests, not just structural ones.
+
+Read the relevant persona file from the team directory (see AGENTS.md Project structure) and include its content in the agent prompt alongside the test writing strategy. The persona informs *what kind of issues to look for* — the test writing strategy informs *how to find them*.
 
 The orchestrator does NOT read or merge findings during Phase 1. Let agents run to completion.
 
@@ -59,12 +77,7 @@ Write tests in priority order:
 3. **Interaction tests** — how components compose (e.g., parse → emit → interpret roundtrip)
 4. **Regression seeds** — patterns that historically cause bugs in similar codebases
 
-Follow the project's test conventions from AGENTS.md:
-- Roundtrip tests → `tests/roundtrip/`
-- Unit tests → inline `#[cfg(test)]`
-- Codegen snapshots → inline in derive crates
-- New test types → `kirin-test-types`
-- New test helpers → `kirin-test-utils`
+Follow the project's test conventions from AGENTS.md (see the Test Conventions section for where each test type belongs).
 
 #### Discovery signals — when to stop and report
 
@@ -78,6 +91,10 @@ While writing each test, watch for these signals. When you hit one, **stop writi
 | Test exposes inconsistent behavior across similar APIs | **Consistency issue** | "`Block::last_statement` returns `Option` but `Region::entry_block` panics on empty" |
 | Same test pattern repeated 3+ times with only type changes | **Missing abstraction** | "Every dialect's parse test repeats the same 8-line parser setup; could be a test helper" |
 | Test passes but the API it exercises is unnecessarily hard to use | **Ergonomic issue** | "`ParsePipelineText` requires a `CompileStage` even when there's only one stage" |
+| Dialect operation's IR encoding doesn't naturally express a domain concept | **Domain alignment** | "ZX spider fusion requires manually building two statements + a rewrite; should be one operation" |
+| Adding a new operation requires touching 4+ files or 3+ derives | **Framework friction** | "Adding `TweezerPulse::Ramp` required edits in lib.rs, interpret_impl.rs, Cargo.toml, and test fixtures" |
+| Test can construct invalid state through the public API without unsafe | **Soundness hole** | "Can create a `Block` with terminator pointing to a statement in a different block — no validation" |
+| `debug_assert!` guards an invariant that isn't checked in release | **Release-mode gap** | "Graph node existence only validated by `debug_assert!` — release build silently accepts invalid nodes" |
 
 When a test compiles and passes cleanly with minimal setup, that's a healthy signal — keep it and move on to the next test.
 
@@ -147,10 +164,10 @@ After all agents complete:
 
 1. **Verify the build** — run `cargo nextest run --workspace` to confirm all new tests pass
 2. **Fix compilation errors** — if any agent introduced broken tests, fix them before proceeding
-3. **Read all agent findings documents** — collect findings from each file in `design/reviews/review-<date>-<title>/`
-4. **Merge into a single report** — create `design/reviews/review-<date>-<title>.md` (at the same level as the agent directory) with a combined tests table and all findings, ordered by severity (P1 first, then P2, then P3)
+3. **Read all agent findings documents** — collect findings from each agent's file in the review directory
+4. **Merge into a single report** — create `<review-dir>/review-<date>-<title>.md` (at the same level as the agent directory) with a combined tests table and all findings, ordered by severity (P1 first, then P2, then P3)
 5. **Deduplicate** — if multiple agents found the same issue, keep the one with stronger evidence
-6. **Clean up** — delete the agent directory `design/reviews/review-<date>-<title>/` and its contents, since the merged report now contains everything
+6. **Clean up** — delete the per-agent directory and its contents, since the merged report now contains everything
 
 The orchestrator should not re-discover or re-investigate findings at this stage. Trust the agents' reports — just merge and organize.
 
@@ -211,44 +228,17 @@ For P3 findings, you can batch up to 3-4 per `AskUserQuestion` call. Still inclu
 
 1. **Update the merged findings report** with the user's decisions (confirmed, won't fix, needs discussion resolution)
 2. **Commit passing tests** with user approval
-3. Proceed to Phase 4
+3. This skill ends after the interview. See Next Steps below.
 
-## Phase 4: Solution Planning and Implementation
+## Next Steps (After Discovery)
 
-After the user has confirmed findings and iterated on solutions, this skill orchestrates the next steps by delegating to the appropriate skills. The key principle: this skill owns the discovery and confirmation loop, then hands off to specialized skills for design exploration, planning, and implementation.
+This skill is **read-only** — it writes tests and produces a findings report with the user's decisions. It does not implement fixes. See AGENTS.md Skill Architecture for the composition model.
 
-### Step 1: Delegate complex design questions to `/brainstorming`
-
-If any confirmed finding involves a non-obvious design choice — e.g., a new trait boundary, a module restructure, or a change that affects multiple crates — delegate to `/brainstorming` before planning. Signs that brainstorming is needed:
-
-- The user selected "Needs Discussion" and the solution direction is still open
-- Multiple findings interact (fixing one affects how another should be fixed)
-- The solution involves introducing a new abstraction or changing a public API
-
-Provide `/brainstorming` with the finding, the test evidence, and the solution directions discussed so far. The brainstorming output feeds back into the findings report as a refined solution direction.
-
-### Step 2: Write a fix plan with `/writing-plans`
-
-Once all confirmed findings have clear solution directions (either from the interview or from brainstorming), delegate to `/writing-plans` to produce an implementation plan.
-
-Provide the plan with:
-- The updated findings report (with solution directions and user decisions)
-- Which findings can be fixed independently vs. which have dependencies
-- Any ordering constraints (e.g., trait changes before call-site updates)
-
-The plan should group findings into implementation units — sets of changes that can be applied and verified together.
-
-### Step 3: Implement fixes with `/subagent-driven-development`
-
-Once the user approves the plan, delegate to `/subagent-driven-development` to execute it. The plan from Step 2 provides the task breakdown; subagent-driven-development handles parallel dispatch, conflict avoidance, and verification.
-
-### When to skip steps
-
-- **Skip brainstorming** if all findings have straightforward fixes (e.g., adding a test helper, fixing a panic on empty input)
-- **Skip writing-plans** if there's only 1-2 simple findings — just fix them directly
-- **Skip subagent-driven-development** if there's only one finding — fix it inline
-
-Use judgment. The full pipeline (brainstorm → plan → parallel implement) is for sessions that produce 3+ non-trivial findings. For simpler sessions, collapse the steps.
+To act on confirmed findings:
+- **Design-heavy findings**: Load the `brainstorming` skill, then the `writing-plans` skill
+- **Multiple findings with dependencies**: Load the `writing-plans` skill to sequence them, then the `subagent-driven-development` skill to execute
+- **Simple fixes (1-2 findings)**: Fix them directly — no orchestration skill needed
+- **Structural changes**: Load the `refactor` skill
 
 ## Red Flags — STOP
 
@@ -261,22 +251,15 @@ Use judgment. The full pipeline (brainstorm → plan → parallel implement) is 
 - Forcing findings when the code is actually well-designed
 - Writing tests that only pass because they test trivial/tautological things
 - Jumping to implementation without the findings interview
-- Starting `/subagent-driven-development` without a plan from `/writing-plans` (unless trivially simple)
-- Skipping `/brainstorming` for design-heavy findings where the solution direction is unclear
 
 ## Integration
 
-**Skills this skill delegates to (Phase 4):**
-- `/brainstorming` — explore complex design questions before committing to a solution
-- `/writing-plans` — produce an implementation plan from confirmed findings
-- `/subagent-driven-development` — execute the plan with parallel agents
-
-**Skills this skill uses (Phases 1-3):**
-- `insta-snapshot-testing` — for snapshot-based test discoveries
-- `test-driven-development` — follows TDD conventions for test structure
-- `verification-before-completion` — verify passing tests before committing
+**Skills this skill uses (load when needed):**
+- The `insta-snapshot-testing` skill — for snapshot-based test discoveries
+- The `test-driven-development` skill — follows TDD conventions for test structure
+- The `verification-before-completion` skill — verify passing tests before committing
 
 **Related:**
-- `/triage-review` — comprehensive multi-reviewer review (heavier weight, read-only)
-- `/refactor` — for larger structural changes beyond point fixes
-- `/requesting-code-review` — PR-level review (not discovery-oriented)
+- The `triage-review` skill — comprehensive multi-reviewer review (heavier weight, read-only)
+- The `refactor` skill — for larger structural changes beyond point fixes
+- The `requesting-code-review` skill — PR-level review (not discovery-oriented)

@@ -58,31 +58,21 @@ Output format:
 
 Present to user for approval before proceeding.
 
-## Phase 2: Review Panel
+## Phase 2: Review
 
-**Before any implementation**, run the review panel to evaluate the proposed changes. This catches architectural issues early.
+**Before any implementation**, review the proposed changes to catch architectural issues early.
 
-### Panel Staffing
+Load the `triage-review` skill scoped to the affected crates. The triage-review skill handles reviewer selection, parallel dispatch, cross-review, and aggregation. Pass the pre-flight summary as context so reviewers evaluate the proposed refactor, not just the current state.
 
-Read persona files from `../../team/` directory. Staff reviewers based on scope:
+When loading triage-review for a refactor, suggest including:
+- **Soundness Adversary** if the refactor touches builder APIs, arena/ID code, or interpreter internals
+- **Dialect Author** if the refactor affects dialect crates or dialect author-facing APIs
 
-| Role | File | Staff When |
-|------|------|-----------|
-| PL Theorist | `../../team/pl-theorist.md` | API/trait redesigns, new abstractions |
-| Compiler Engineer | `../../team/compiler-engineer.md` | Performance-sensitive changes, derive macro work |
-| Physicist | `../../team/physicist.md` | Public API changes, prelude changes |
-
-### Review Process
-
-1. Spawn reviewers (use `triad-design-review` agent when all three are needed, or individual agents for focused reviews)
-2. Each reviewer evaluates the pre-flight summary and proposed changes independently
-3. If panel is active: reviewers debate and converge on recommendations
-4. When PL Theorist and Physicist disagree, surface the disagreement to the user
-5. **Present consolidated review findings to the user**
+The triage-review walkthrough (Phase 3 of that skill) serves as the user decision point — the user confirms or rejects findings before implementation begins.
 
 ### User Decision Point
 
-After presenting review findings, ask the user:
+After the triage-review walkthrough completes, ask the user:
 
 ```
 How would you like to proceed with the implementation?
@@ -96,8 +86,8 @@ The user's choice determines how Phase 3 designs the plan.
 ## Phase 3: Implementation Planning
 
 Design the implementation plan based on the user's choice from Phase 2. Use existing skills:
-- `writing-plans` — to create a detailed step-by-step plan if one doesn't exist
-- `brainstorming` — for upstream design work if the approach is unclear
+- Load the `writing-plans` skill to create a detailed step-by-step plan if one doesn't exist
+- Load the `brainstorming` skill for upstream design work if the approach is unclear
 
 ### For Parallel Agent Teams
 
@@ -118,7 +108,7 @@ Map work streams to agent roles:
 
 ### For Solo Agent
 
-Use `subagent-driven-development` or `executing-plans` for step-by-step execution with review checkpoints.
+Load the `subagent-driven-development` or `executing-plans` skill for step-by-step execution with review checkpoints.
 
 ### Plan Approval
 
@@ -138,7 +128,7 @@ Every implementer/builder/migrator agent MUST work in its own git worktree under
 
 **Setup procedure:**
 1. Check if `.worktrees/` exists and is in `.gitignore`
-2. If not, use the `using-git-worktrees` skill to set it up (creates directory, verifies gitignore, commits)
+2. If not, load the `using-git-worktrees` skill to set it up (creates directory, verifies gitignore, commits)
 3. If `.worktrees/` already exists, skip the skill and create worktrees directly
 
 **Creating per-agent worktrees:**
@@ -195,7 +185,7 @@ The lead agent (you) orchestrates:
 
 ### Guardian Role
 
-Read `../../team/guardian.md`. The Guardian runs as the lead agent's advisor:
+Read the Guardian persona (from the team directory, see AGENTS.md). The Guardian runs as the lead agent's advisor:
 - Pre-flight analysis (Phase 1)
 - Migration checklist production for Migrators
 - Post-validation pub-item diffing (Phase 5)
@@ -210,14 +200,14 @@ For small refactors, the lead agent can absorb Guardian duties directly.
    - `cargo test --doc --workspace`
    - `cargo insta test --workspace` (if snapshot tests exist)
 2. **Diff pub items** in changed files against pre-flight list — flag unintended changes
-3. **Documenter** (read `../../team/documenter.md`) updates CLAUDE.md/AGENTS.md/memory if conventions changed
-4. Hand off to `finishing-a-development-branch`
+3. Read the **Documenter** persona (from the team directory) to update CLAUDE.md/AGENTS.md/memory if conventions changed
+4. Load the `finishing-a-development-branch` skill to complete
 
 ## Phase 6: Template Capture
 
 **Automatically prompt** after successful refactor: "Save this team configuration as a template?"
 
-If yes, save to `../../team/templates/<name>.md`:
+If yes, save to the team templates directory (see AGENTS.md Project structure) as `<name>.md`:
 ```markdown
 # Template: [name]
 
@@ -243,15 +233,15 @@ If yes, save to `../../team/templates/<name>.md`:
 
 ## Integration
 
-**Required workflow skills:**
-- `using-git-worktrees` — worktree setup (only if `.worktrees/` doesn't exist yet)
-- `finishing-a-development-branch` — completion after Phase 5
+**Required workflow skills (load when needed):**
+- The `using-git-worktrees` skill — worktree setup (only if `.worktrees/` doesn't exist yet)
+- The `finishing-a-development-branch` skill — completion after Phase 5
 
 **Execution skills (choose based on user's Phase 2 decision):**
-- `subagent-driven-development` — solo agent, task-by-task with review
-- `executing-plans` — parallel or sequential execution with batch checkpoints
+- The `subagent-driven-development` skill — solo agent, task-by-task with review
+- The `executing-plans` skill — parallel or sequential execution with batch checkpoints
 
 **Optional:**
-- `brainstorming` — upstream design work before /refactor
-- `writing-plans` — creates detailed plan if one doesn't exist
-- `simplify` — post-refactor code cleanup
+- The `brainstorming` skill — upstream design work before refactoring
+- The `writing-plans` skill — creates detailed plan if one doesn't exist
+- The `simplify` skill — post-refactor code cleanup

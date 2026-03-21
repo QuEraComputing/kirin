@@ -40,8 +40,86 @@ Avoid large paragraphs in commit messages, keep them concise and focused on the 
 - `tests` contains integration tests for the top-level crate `kirin`
 - `crates` contains the crates that make up the project, most implementation can be found here.
 - `docs/design` contains core design documents: syntax design, IR data structure design, text format specs, and semantic rule definitions. These are checked into git.
-- `docs/superpowers/` contains brainstorming artifacts, implementation plans, and other skill-generated working files. This directory is gitignored — do not check these files in.
+- `docs/review` contains review reports from triage-review and test-coverage-review skills, organized as `<date>/` with per-crate subdirectories. Checked into git.
+- `docs/plans` contains implementation plans. Checked into git.
+- `docs/superpowers/` contains brainstorming artifacts and other skill-generated working files. This directory is gitignored — do not check these files in.
 - `.agents` contains agent specific implementations that is not included in this file, e.g skills.
+- `.agents/team` contains reviewer and implementer persona definitions used by review and refactoring skills.
+- `.agents/team/templates` contains saved team configurations from past refactors.
+- `skills/` contains project-specific skill definitions. Managed via `ion-cli` (see Skill Management below).
+
+### Skill Management
+
+Skills are managed using `ion-cli`. Use `ion-cli --json` for structured, non-interactive control of skill installation, search, and project management. Load the `ion-cli` skill for details on available commands.
+
+### Skill Architecture
+
+Skills are organized into composable layers. Higher layers compose lower layers — never the reverse.
+
+```
+Layer 4: Orchestrators (compose lower layers into end-to-end workflows)
+  feature-dev — design + implement new capabilities, scales from small to framework-level
+  dialect-dev — kirin-specific: text format + semantics → IR → parser → printer → interpreter
+  refactor — restructure existing code with architectural guardrails
+  kirin-rfc-implementer — implement an approved RFC end-to-end
+
+Layer 3: Review & Discovery (read-only, produce reports)
+  triage-review — multi-perspective codebase review with cross-review validation
+  test-coverage-review — discovers issues by writing tests, reports findings
+
+Layer 2: Workflow Steps (reusable building blocks)
+  brainstorming — open design exploration
+  writing-plans — structured implementation plan creation
+  subagent-driven-development — same-session task execution with per-task review
+  executing-plans — cross-session/parallel plan execution
+  finishing-a-development-branch — completion, CI, merge
+
+Layer 1: Primitives (atomic utilities)
+  dispatching-parallel-agents — parallel agent orchestration with isolation
+  ask-user-question — structured user interviews
+  insta-snapshot-testing — snapshot test workflow
+  using-git-worktrees — worktree lifecycle management
+  verification-before-completion — pre-completion verification checks
+
+Domain-Specific (standalone, composable with any layer):
+  kirin-derive-macros — derive macro development guidance
+  kirin-rfc-writer — RFC drafting
+  ir-spec-writing — IR specification design
+```
+
+**Composition rules:**
+- Layer 3 skills are **read-only** — they produce reports and findings but do not modify code.
+- Layer 4 orchestrators compose Layer 3 (for review) + Layer 2 (for planning/execution). They are the only skills that drive end-to-end workflows.
+- When a review skill discovers issues that need fixing, the user loads an orchestrator (e.g., `refactor`) or a Layer 2 skill (e.g., `subagent-driven-development`) separately. Reviews do not dispatch implementation.
+- Domain-specific skills are standalone and can be composed with any layer.
+
+### Subsystem Groupings
+
+Named subsystem groupings for scoping reviews and refactors:
+
+| Subsystem | Crates |
+|-----------|--------|
+| `ir` | kirin-ir |
+| `parser` | kirin-chumsky, kirin-derive-chumsky |
+| `printer` | kirin-prettyless, kirin-derive-prettyless |
+| `interpreter` | kirin-interpreter, kirin-derive-interpreter |
+| `derive` | kirin-derive-toolkit, kirin-derive-ir, kirin-derive-chumsky, kirin-derive-interpreter, kirin-derive-prettyless |
+| `dialects` | kirin-cf, kirin-scf, kirin-constant, kirin-arith, kirin-bitwise, kirin-cmp, kirin-function |
+
+### Dialect Domain Context
+
+Each dialect crate targets a specific domain. Reviewers (especially the Dialect Author persona) need this context:
+
+| Crate(s) | Domain | Key References |
+|-----------|--------|----------------|
+| kirin-cf, kirin-scf | Compiler Engineering | Control flow graphs, SSA form, structured control flow (Cytron et al.), dominance, loop nesting |
+| kirin-arith, kirin-bitwise, kirin-cmp | Numerics / Arithmetic | Type promotion rules, overflow semantics, IEEE 754, comparison semantics |
+| kirin-function | PL / Lambda Calculus | Function application, closures, specialization, parametric polymorphism, calling conventions |
+| kirin-constant | Compile-time Evaluation | Constant folding, staged computation, compile-time value semantics |
+| kirin-ir (core) | Compiler IR Design | MLIR (Lattner et al. 2020), SSA form, regions/blocks/operations, arena-based IR |
+| kirin-interpreter | Abstract Interpretation | Cousot & Cousot framework, lattice-based analysis, widening/narrowing, fixpoint computation |
+
+For user-defined dialects not in this table, ask the user for domain context during review planning.
 
 ### Crates
 

@@ -1,13 +1,13 @@
 ---
 name: triage-review
-description: Use when wanting a comprehensive codebase review with multiple expert perspectives, after completing a refactor, or when significant work has accumulated on a feature branch
+description: Use when significant code changes need multi-perspective review, after completing a refactor, or when 10+ commits accumulate on a feature branch without review. Triggers on codebase-wide quality concerns, architectural drift, or pre-merge validation of large feature branches.
 ---
 
 # Triage Review
 
 ## Overview
 
-Comprehensive codebase review with selectable expert reviewer personas. Three phases: generate a review plan (scope + reviewers + themes), dispatch parallel reviewer subagents and synthesize a themed report, then verify findings and walk through them with the user for confirmation.
+Comprehensive codebase review with three core reviewer roles (**Formalism**, **Code Quality**, **Ergonomics/DX**) plus optional domain-parameterized reviewers (**Dialect Author**, **Compiler Engineer**). Four phases: generate a review plan, execute parallel per-crate reviews with a cross-review validation step, aggregate into a final report, then verify findings and walk through them with the user.
 
 **Announce at start:** "I'm using the triage-review skill to orchestrate this codebase review."
 
@@ -16,12 +16,12 @@ Comprehensive codebase review with selectable expert reviewer personas. Three ph
 ## When to Use
 
 - Explicit: user invokes `/triage-review <scope>`
-- Auto-suggest after `/refactor` completes Phase 4
+- Auto-suggest after the `refactor` skill completes Phase 4
 - Auto-suggest when 10+ commits accumulate on a feature branch since last review
 
 **Don't use for:**
 - PR-level code review (use `requesting-code-review`)
-- Fixing issues (user decides what to act on, possibly via `/refactor`)
+- Fixing issues (user decides what to act on, possibly by loading the `refactor` skill)
 - Implementation planning (use `writing-plans`)
 
 ## Scope Types
@@ -35,39 +35,31 @@ Comprehensive codebase review with selectable expert reviewer personas. Three ph
 
 ### Subsystem Mapping
 
-| Subsystem | Crates |
-|-----------|--------|
-| `interpreter` | kirin-interpreter, kirin-derive-interpreter |
-| `parser` | kirin-chumsky, kirin-chumsky-derive, kirin-chumsky-format |
-| `derive` | kirin-derive-core, kirin-derive, kirin-chumsky-derive, kirin-derive-interpreter, kirin-prettyless-derive |
-| `ir` | kirin-ir |
-| `dialects` | kirin-cf, kirin-scf, kirin-constant, kirin-arith, kirin-bitwise, kirin-cmp, kirin-function |
-| `printer` | kirin-prettyless, kirin-prettyless-derive |
+Refer to the **Subsystem Groupings** table in AGENTS.md for the current crate-to-subsystem mapping.
 
-## Reviewer Pool
+## Reviewer Roles
 
-Read persona files from `../../team/` directory.
+Read persona files from the team directory (see AGENTS.md Project structure for location).
 
-| Reviewer | File | Expertise | Default for |
-|----------|------|-----------|-------------|
-| PL Theorist | `../../team/pl-theorist.md` | Formalism, abstraction design, trait boundaries | Abstractions & Type Design |
-| Compiler Engineer | `../../team/compiler-engineer.md` | Build graph, error quality, scalability | Performance & Scalability |
-| Rust Engineer | `../../team/implementer.md` | Code quality, idioms, safety, patterns | Code Quality & Idioms, Correctness & Safety |
-| Physicist | `../../team/physicist.md` | API clarity, naming, learning curve | API Ergonomics & Naming |
+| Role | Persona | Focus Areas | Mandate |
+|------|---------|-------------|---------|
+| Formalism | PL Theorist | Abstraction composability, literature alignment, syntax/API/semantic ambiguity | Propose 2-3 alternative formalisms per significant finding; compare with concrete metrics; reason in formal logic, PL theory, or math |
+| Code Quality | Implementer (review mode) | Clippy workaround investigation, duplication analysis, Rust best practices | Investigate every `#[allow]` annotation; reference Formalism findings for abstraction opportunities during cross-review |
+| Ergonomics/DX | Physicist | User repetition, lifetime complexity, concept budget | Test public APIs in toy scenarios; explore edge cases; report both findings AND use cases tried |
 
-**Default roster:** All four for `full` scope. For narrower scopes, propose a relevant subset based on content.
+**Default roster:** All three for `full` scope. For narrower scopes, propose a relevant subset.
 
-## Review Themes
+**Optional reviewers** (include when relevant to scope):
 
-| Theme | Primary Reviewer | Description |
-|-------|-----------------|-------------|
-| Correctness & Safety | Rust Engineer | Bugs, unsoundness, missing error handling, unsafe usage |
-| Abstractions & Type Design | PL Theorist | Trait boundaries, type-level invariants, compositionality |
-| Performance & Scalability | Compiler Engineer | Compilation time, runtime efficiency, build graph, scaling |
-| API Ergonomics & Naming | Physicist | API clarity, concept naming, learning curve, composability |
-| Code Quality & Idioms | Rust Engineer | Rust patterns, readability, maintainability |
+| Role | Persona | When to Include |
+|------|---------|-----------------|
+| Compiler Engineer | Compiler Engineer | Derive macros, crate graph changes, performance-sensitive paths |
+| Dialect Author | Dialect Author | Dialect crates, framework API changes that affect dialect authors |
+| Soundness Adversary | Soundness Adversary | Builder APIs, arena/ID code, interpreter core, unsafe code, finalization paths |
 
-Not all themes apply to every review. Phase 1 proposes which are relevant.
+The **Dialect Author** is a domain-parameterized role — their domain expertise is injected at dispatch time. Refer to the **Dialect Domain Context** table in AGENTS.md for known crate-to-domain mappings. For crates not in that table, ask the user during Phase 1 what domain background the reviewer should have.
+
+The **Soundness Adversary** focuses on invariant violations — they try to break the framework through adversarial API usage. Include when reviewing builder APIs, arena/ID code, interpreter core, or any code with `unsafe`. In read-only mode (triage-review), they describe attack sequences. In test-writing mode (load the `test-coverage-review` skill), they write adversarial tests.
 
 ## Phase 1: Review Plan
 
@@ -76,11 +68,11 @@ digraph phase1 {
     "Parse scope argument" -> "Identify files in scope";
     "Identify files in scope" -> "Propose reviewer roster";
     "Propose reviewer roster" -> "User approves roster?";
-    "User approves roster?" -> "Propose relevant themes" [label="yes"];
+    "User approves roster?" -> "Propose relevant focus areas" [label="yes"];
     "User approves roster?" -> "Adjust roster" [label="no"];
     "Adjust roster" -> "User approves roster?";
-    "Propose relevant themes" -> "Assign themes to reviewers";
-    "Assign themes to reviewers" -> "Write review plan";
+    "Propose relevant focus areas" -> "Assign focus areas to reviewers";
+    "Assign focus areas to reviewers" -> "Write review plan";
     "Write review plan" -> "User approves plan?";
     "User approves plan?" -> "Phase 2" [label="yes"];
     "User approves plan?" -> "Adjust plan" [label="no"];
@@ -88,158 +80,101 @@ digraph phase1 {
 }
 ```
 
-**Output:** `docs/plans/YYYY-MM-DD-<scope>-review-plan.md`
+**Output:** Save to the plans directory (see AGENTS.md Project structure) as `YYYY-MM-DD-<scope>-review-plan.md`.
 
 Plan contents:
 1. **Scope**: files in scope, line counts, module structure summary
 2. **Reviewer roster**: which reviewers and why
-3. **Themes**: which themes apply, assigned primary + optional secondary reviewer
+3. **Focus areas**: which areas apply per reviewer, per crate
 4. **File assignments**: which files each reviewer should focus on
-5. **Design context**: which AGENTS.md convention sections are relevant to this scope (will be included in reviewer prompts to prevent false positives on intentional design decisions)
+5. **Design context**: which AGENTS.md convention sections are relevant to this scope (included in reviewer prompts to prevent false positives)
 
 ## Phase 2: Execute Review
 
 ```dot
 digraph phase2 {
-    "Read review plan" -> "Dispatch reviewer subagents in parallel";
-    "Dispatch reviewer subagents in parallel" -> "Collect findings";
-    "Collect findings" -> "Synthesize themed report";
-    "Synthesize themed report" -> "Identify cross-cutting themes";
-    "Identify cross-cutting themes" -> "Write report";
-    "Write report" -> "Phase 3";
+    "Read review plan" -> "Step 1: Dispatch reviewers in parallel (per crate)";
+    "Step 1: Dispatch reviewers in parallel (per crate)" -> "Collect initial reports";
+    "Collect initial reports" -> "Step 2: Cross-review (per crate)";
+    "Step 2: Cross-review (per crate)" -> "Collect cross-review notes";
+    "Collect cross-review notes" -> "Step 3: Lead reviewer aggregates per-crate report";
+    "Step 3: Lead reviewer aggregates per-crate report" -> "Step 4: Main lead aggregates full report";
+    "Step 4: Main lead aggregates full report" -> "Phase 3";
 }
 ```
 
-**REQUIRED SUB-SKILL:** Use superpowers:dispatching-parallel-agents to run reviewers concurrently.
+**REQUIRED:** Load the `dispatching-parallel-agents` skill to run reviewers concurrently.
 
-### Reviewer Subagent Prompt Template
+**Path convention:** In the prompts below, `<review-dir>` refers to the review output directory defined in AGENTS.md Project structure. Resolve it once at the start of Phase 2.
 
-For each reviewer, dispatch a subagent with:
-1. The reviewer's persona file content (read from `../../team/<persona>.md`)
-2. Their assigned themes
-3. The files to review (from the plan)
-4. **Design context** (see below)
-5. Output format instructions (see below)
+**Maximize parallelism:** Within each step, all reviewers for all crates run in parallel. Steps are sequential (Step 2 depends on Step 1 outputs, etc.).
+
+### Step 1: Initial Review (Parallel)
+
+Dispatch all assigned reviewers in parallel for each crate or crate group. Each reviewer produces one report file.
+
+**Output per reviewer:** Save to the review directory (see AGENTS.md Project structure) under `<datetime>/<crate>/<role>-<title>.md`.
 
 #### Design context block
 
-Before dispatching, read the project's `AGENTS.md` (specifically the conventions sections relevant to the scope — e.g., "IR Design Conventions", "Interpreter Conventions", "Derive Infrastructure Conventions"). Include the relevant sections verbatim in each reviewer's prompt as a **Design Context** block. This gives reviewers visibility into documented design decisions so they don't flag intentional patterns as issues.
+Before dispatching, read the project's `AGENTS.md` (specifically the conventions sections relevant to the scope). Include the relevant sections verbatim in each reviewer's prompt as a **Design Context** block. This prevents reviewers from flagging intentional patterns as issues.
 
-#### Output format instructions
+#### Reviewer prompts
 
-```
-You are reviewing the following files as the [Reviewer Name].
+Construct each reviewer's prompt using the templates in `prompts/reviewer-prompts.md`. Each prompt combines:
+1. The reviewer's persona content (from the team directory)
+2. Role-specific focus areas (from the prompts file)
+3. Design context (relevant AGENTS.md sections)
+4. Confidence and severity levels (from `prompts/confidence-and-severity.md`)
+5. File assignments and output path from the plan
 
-Your assigned themes: [theme list]
+### Step 2: Cross-Review (Parallel)
 
-## Design Context
+After all initial reviews for a crate are complete, each reviewer reads the other reviewers' reports for the same crate.
 
-The following design decisions are documented in AGENTS.md. Do NOT flag
-these as issues — they are intentional:
+**Purpose:** Catch false positives, calibrate severity, and surface cross-cutting insights that only become visible when findings from different perspectives are compared.
 
-[paste relevant AGENTS.md convention sections here]
+**Output per reviewer:** `<review-dir>/<datetime>/<crate>/<role>-cross-review.md`
 
-## Confidence Requirement
+Construct cross-review prompts using the template in `prompts/cross-review.md`. The Code Quality reviewer gets an additional section for formalism-informed duplication analysis.
 
-For each finding, you MUST classify your confidence:
+### Step 3: Lead Reviewer Aggregation (Per-Crate)
 
-- **confirmed**: You are certain this is an issue (e.g., demonstrable bug,
-  clear violation of Rust idioms, provably incorrect logic). Use for P0/P1.
-- **likely**: You believe this is an issue but there may be a design reason
-  you're not aware of. Use for P1/P2.
-- **uncertain**: This looks unusual but could be intentional. You cannot
-  rule out a valid design reason. Use for P2/P3 only.
+**Lead assignment:** The Formalism reviewer is the per-crate lead by default. If Formalism is not in the roster, use Code Quality. The main lead for the full report (Step 4) is always the orchestrating agent (you), not a subagent.
 
-Do NOT assign P0 or P1 severity to findings with "uncertain" confidence.
-When uncertain, phrase the finding as a question (e.g., "Is X intentional?
-If not, consider Y.").
+For each crate, the lead reviewer reads all initial reviews and cross-review notes, then produces a consolidated report.
 
-## Output Format
+**Output:** `<review-dir>/<datetime>/<crate>/final-report.md`
 
-For each finding:
-[severity] [confidence] finding description — file:line
+The lead reviewer MUST:
+1. **Resolve disagreements** — remove findings with cross-review consensus against them. Surface unresolved disputes with both perspectives.
+2. **Adjust severities** — apply cross-review suggestions.
+3. **Remove duplicates** — merge independently-flagged findings.
+4. **Add clarity** — each finding needs a clear explanation, code example, and specific suggested action.
+5. **Organize** — by severity (P0 first), then by focus area.
+6. **Include strengths** — note what the crate does well.
 
-Severity levels:
-- P0: Must fix (bugs, unsoundness, correctness issues)
-- P1: Should fix (significant improvements, design issues)
-- P2: Nice to have (minor improvements, ergonomic tweaks)
-- P3: Informational (observations, notes for future)
+Use the per-crate report format from `prompts/report-formats.md`.
 
-Keep your review to 200-400 words. Focus on your assigned themes.
-```
+### Step 4: Full Report Aggregation
 
-### Report Synthesis
+After all per-crate final reports are complete, produce the workspace-level report.
 
-After all reviewers return, synthesize into themed report.
+**Output:** `<review-dir>/<datetime>/report.md`
 
-#### Pre-filter step
+The full report MUST:
+1. **Aggregate** findings from all per-crate reports, organized by priority
+2. **Include code references** — every finding must cite `file:line`
+3. **Include external references** — clippy lint docs, Rust API guidelines, papers, MLIR docs
+4. **Executive summary** — severity counts, key themes, architectural strengths
+5. **Cross-cutting themes** — patterns across multiple crates
+6. **Priority-ordered action items** — Quick Wins / Moderate Effort / Design Work / Documentation
 
-Before writing the report, cross-reference every finding against:
-1. `AGENTS.md` design conventions — drop findings that contradict documented decisions
-2. `CLAUDE.md` project instructions — drop findings that conflict with stated conventions
-3. Previous review reports in `docs/reviews/` — drop findings already marked `[Won't Fix]` in prior reviews
-
-For each dropped finding, note it in a `## Filtered Findings` section at the end of the report (collapsed by default) so the user can audit what was removed and why.
-
-#### Synthesis steps
-
-1. Group findings by theme (not by reviewer)
-2. Within each theme, sort by severity (P0 first)
-3. Include reviewer attribution and confidence inline: `[P1] [confirmed] finding — file:line [PL Theorist]`
-4. Identify cross-cutting themes (patterns across 2+ reviewers/themes)
-5. Write summary counts (separately for confirmed vs uncertain findings)
-
-**Output:** `docs/reviews/YYYY-MM-DD-<scope>-review.md`
-
-### Report Format
-
-```markdown
-# <Scope> Review — YYYY-MM-DD
-
-**Scope:** <description>
-**Reviewers:** <list>
-**Plan:** docs/plans/YYYY-MM-DD-<scope>-review-plan.md
-
-## Correctness & Safety
-[P0] [confirmed] <finding> — <file:line> [Reviewer]
-[P1] [likely] <finding> — <file:line> [Reviewer]
-
-## Abstractions & Type Design
-...
-
-## Performance & Scalability
-...
-
-## API Ergonomics & Naming
-...
-
-## Code Quality & Idioms
-...
-
-## Cross-Cutting Themes
-1. <theme> — identified by <N> reviewers across <themes>
-
-## Summary
-- P0: N issues (must fix)
-- P1: N issues (should fix)
-- P2: N improvements (nice to have)
-- P3: N notes (informational)
-
-Confirmed: N | Likely: N | Uncertain: N
-
-## Filtered Findings
-
-<details>
-<summary>N findings filtered (click to expand)</summary>
-
-- <finding> — filtered because: <reason (e.g., "contradicts AGENTS.md IR Design Conventions: deleted flag needed for rewrite framework")>
-- ...
-</details>
-```
+Use the full report format from `prompts/report-formats.md`.
 
 ## Phase 3: Verify & Confirm
 
-After the report is written to `docs/reviews/`, verify the findings and walk through them with the user.
+After the full report is written, verify findings and walk through them with the user.
 
 ```dot
 digraph phase3 {
@@ -259,7 +194,7 @@ digraph phase3 {
 
 Dispatch a background agent to double-check the review. The agent must:
 
-1. Read the synthesized report from `docs/reviews/YYYY-MM-DD-<scope>-review.md`
+1. Read the full report from `<review-dir>/<datetime>/report.md`
 2. For each finding, read the actual source code at the cited `file:line`
 3. Verify:
    - Does the code at the cited location actually match what the finding describes?
@@ -296,15 +231,15 @@ Do NOT dispute findings based on design opinions — only factual errors.
 
 ### Step 2: User Walkthrough
 
-After verification, present findings to the user in batches using `AskUserQuestion`. Group findings by severity tier to keep the walkthrough efficient.
+After verification, present findings to the user in batches using `AskUserQuestion`. Group findings by severity tier.
 
 #### Walkthrough procedure
 
 1. **P0/P1 findings** (if any): Present each individually. These are high-impact and need per-finding confirmation.
 
-2. **P2 findings**: Present as a batch with one question. List all P2 findings and let the user multi-select which ones to accept.
+2. **P2 findings**: Present as sequential single-select questions, each with a preview.
 
-3. **P3 findings**: Present as a batch with one question. Let the user multi-select which ones to keep vs discard.
+3. **P3 findings**: Present as sequential single-select questions, each with a preview.
 
 #### Illustration requirement
 
@@ -369,10 +304,7 @@ options:
     description: "Want to discuss before deciding"
 ```
 
-For P2/P3 (batched, one question per finding with preview since previews require single-select):
-
-When there are N findings in a tier, present them as N sequential single-select questions, each with a preview. This is preferred over multi-select because previews are only supported for single-select.
-
+For P2/P3 (one question per finding with preview):
 ```
 question: "[P2] <finding summary> — <file:line>"
 options:
@@ -382,7 +314,7 @@ options:
     description: "Not worth addressing"
 ```
 
-To keep the walkthrough efficient, batch up to 4 findings per `AskUserQuestion` call (the tool supports 1-4 questions per call). Each question gets its own preview.
+Batch up to 4 findings per `AskUserQuestion` call. Each question gets its own preview.
 
 #### After walkthrough
 
@@ -405,32 +337,31 @@ To keep the walkthrough efficient, batch up to 4 findings per `AskUserQuestion` 
 - Skipping the pre-filter step (causes findings that contradict documented decisions)
 - Skipping Phase 3 verification (unverified findings waste the user's time)
 - Committing the report before user walkthrough is complete
+- **Skipping the cross-review step** (catches false positives and calibrates severity)
+- **Code Quality reviewer not referencing Formalism findings during cross-review**
+- **Ergonomics reviewer not including toy scenario code in their report**
+- **Full report missing external references or code locations**
 
-## Phase 4: Implementation Dispatch (Optional)
+## Next Steps (After Review)
 
-After the report is finalized and walkthrough complete, the user may want to act on findings immediately. If so:
+This skill is **read-only** — it produces a report with prioritized, verified findings. It does not implement fixes. See AGENTS.md Skill Architecture for the composition model.
 
-1. **Categorize findings** into direct fixes (small, clear instructions) vs design work (needs plans)
-2. **Direct fixes**: Dispatch implementation agents with `isolation: "worktree"` — one agent per crate or crate group
-3. **Design work**: Dispatch plan-writing agents (read-only, no worktree needed) to create plans in `docs/plans/<crate>/<date>-<title>.md`
-4. **Uncertain items**: Ask the user via `AskUserQuestion` before proceeding
-
-**CRITICAL**: Code-editing agents MUST use `isolation: "worktree"` when running in parallel. See `dispatching-parallel-agents` skill for details.
-
-This phase bridges triage-review → implementation. If the user doesn't request immediate implementation, end after Phase 3.
+To act on findings:
+- **Direct fixes**: Load the `refactor` skill with the review report as input
+- **Design work**: Load the `brainstorming` skill, then the `writing-plans` skill
+- **Quick wins**: Fix them directly — no skill needed for small, obvious changes
 
 ## Integration
 
-**Skills this skill uses:**
-- `dispatching-parallel-agents` — run reviewer subagents concurrently (Phase 2) and implementation agents (Phase 4)
-- `using-git-worktrees` — REQUIRED for Phase 4 implementation agents
-- `writing-plans` — plan creation for design-work findings in Phase 4
-- Persona files from `../../team/` — reviewer role definitions
+**Skills this skill uses (load when needed):**
+- The `dispatching-parallel-agents` skill — run reviewer subagents concurrently (Phase 2)
+- The `rust-best-practices` skill — referenced by Code Quality reviewer
+- Persona files from the team directory (see AGENTS.md Project structure)
 
-**Skills that call this skill:**
-- `/refactor` Phase 4 — auto-suggests `/triage-review` after refactor completes
-- `/finishing-a-development-branch` — could auto-suggest `/triage-review recent` before merge
+**Skills that load this skill:**
+- The `refactor` skill — loads triage-review for its review phase
+- The `finishing-a-development-branch` skill — may suggest `triage-review recent` before merge
 
 **Related but distinct:**
-- `requesting-code-review` — PR-level review (not codebase-wide)
-- `writing-plans` — implementation planning (not review)
+- The `requesting-code-review` skill — PR-level review (not codebase-wide)
+- The `test-coverage-review` skill — discovers issues by writing tests (complementary)

@@ -1,6 +1,6 @@
 ---
 name: ask-user-question
-description: Run a structured interview using the AskUserQuestion tool to gather requirements one question at a time. Use when the user says "interview me", "ask me questions about", "use the ask user skill", "use your interview skill", or when requirements are ambiguous and need a guided, option-based questionnaire before proceeding.
+description: Use when requirements are ambiguous and need clarification through a guided interview, or when the user requests "interview me", "ask me questions about", or "use your interview skill". Triggers on unclear scope, missing constraints, or architectural decisions that need user input before planning or implementation can proceed.
 ---
 
 # Ask User Question
