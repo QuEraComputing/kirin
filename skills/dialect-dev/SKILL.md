@@ -7,6 +7,8 @@ argument-hint: "[dialect name or domain]"
 
 # Dialect Development
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 **Key principle:** Text format and semantics first, data structures second. The text format is the user-facing contract; the IR types exist to support it.
 
 Fixed progression: Spec (Phase 1) → GATE → IR Types (Phase 2) → Parser+Printer (Phase 3) → Interpreter (Phase 4) → GATE → Complete

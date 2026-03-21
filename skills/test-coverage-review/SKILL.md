@@ -9,6 +9,8 @@ argument-hint: "[crate, subsystem, or module to cover]"
 
 ## Overview
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 Test-driven codebase review. Discovers design issues, bugs, and ergonomic problems by actually writing tests — not by reading code and speculating. Three phases: dispatch agents to write tests and collect findings autonomously, merge and verify findings, then walk through findings with the user for confirmation.
 
 The insight: writing a test is the fastest way to discover whether an API is awkward, a behavior is wrong, or a design forces unnecessary boilerplate. If you can't write a clean test for something, that's a signal worth reporting.

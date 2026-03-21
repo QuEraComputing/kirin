@@ -7,6 +7,8 @@ description: Use when building, debugging, or extending derive macros in the kir
 
 ## Overview
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 Skill for developing new derive macros in the kirin ecosystem. The primary directive is to **reuse `kirin-derive-toolkit` infrastructure as much as possible** — its IR model, code-block algebra, Scan/Emit traits, and utility functions. If the existing toolkit design makes a new derive unreasonably complex, the skill escalates rather than shoe-horning.
 
 

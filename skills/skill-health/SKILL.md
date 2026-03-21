@@ -31,7 +31,7 @@ For each skill, verify:
 | `argument-hint` | Present if skill accepts arguments |
 | Line count | SKILL.md under 500 lines |
 | Supporting files | Heavy content (>100 lines inline) extracted to supporting files |
-| No `Announce at start` | Agents do this from the description — inline announcement wastes tokens |
+| `Announce at start` present | Required for skills that can be auto-triggered — users need to know which skill is driving behavior. Use generic phrasing ("State which skill is being used"), not hardcoded announcement text. |
 
 ### 2. Reference Health
 

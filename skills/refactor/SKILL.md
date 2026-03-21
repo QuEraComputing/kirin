@@ -9,6 +9,8 @@ argument-hint: "[what to refactor]"
 
 ## Overview
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 Rust-specific refactoring orchestration with architectural guardrails and a configurable agent team. Six phases: scope & pre-flight, review panel, implementation planning, guarded execution, final validation, template capture.
 
 

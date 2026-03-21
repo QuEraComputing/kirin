@@ -9,6 +9,8 @@ argument-hint: "[feature description]"
 
 ## Overview
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 Orchestrator for building new capabilities — from a single helper method to an entire framework subsystem. Hybrid approach: strict gates at critical checkpoints (design review before implementation, tests before merge), flexible ordering within phases. The skill scales by activating more phases for larger work.
 
 
