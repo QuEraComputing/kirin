@@ -197,7 +197,8 @@ impl GeneratePrettyPrint {
         let fields = &bindings.field_idents;
 
         let ir_path = Self::ir_path(ir_input);
-        let print_expr = self.generate_format_print(&format, &field_map, &collected, fields, &ir_path);
+        let print_expr =
+            self.generate_format_print(&format, &field_map, &collected, fields, &ir_path);
 
         let pattern = if bindings.is_empty() {
             match variant_name {
@@ -293,12 +294,16 @@ impl GeneratePrettyPrint {
             let prev_is_field_like = i > 0
                 && matches!(
                     elements[i - 1],
-                    FormatElement::Field(_, _) | FormatElement::Keyword(_) | FormatElement::Context(_)
+                    FormatElement::Field(_, _)
+                        | FormatElement::Keyword(_)
+                        | FormatElement::Context(_)
                 );
             let next_is_field_like = !is_last
                 && matches!(
                     elements[i + 1],
-                    FormatElement::Field(_, _) | FormatElement::Keyword(_) | FormatElement::Context(_)
+                    FormatElement::Field(_, _)
+                        | FormatElement::Keyword(_)
+                        | FormatElement::Context(_)
                 );
 
             match elem {
@@ -335,8 +340,13 @@ impl GeneratePrettyPrint {
                         let var = &field_vars[*idx];
                         let var_ref = quote! { #var };
 
-                        let print_expr =
-                            field_kind::print_expr(field, prettyless_path, &var_ref, opt, Some(ir_path));
+                        let print_expr = field_kind::print_expr(
+                            field,
+                            prettyless_path,
+                            &var_ref,
+                            opt,
+                            Some(ir_path),
+                        );
 
                         if !is_first && prev_is_field_like {
                             parts.push(quote! { doc.text(" ") });

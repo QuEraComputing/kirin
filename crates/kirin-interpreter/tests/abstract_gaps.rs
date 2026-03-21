@@ -40,7 +40,10 @@ fn build_abstract_recursive(
 ) -> SpecializedFunction {
     let func = pipeline.function().name("rec").new().unwrap();
     let staged = pipeline
-        .staged_function::<CallLang>().func(func).stage(stage_id).new()
+        .staged_function::<CallLang>()
+        .func(func)
+        .stage(stage_id)
+        .new()
         .unwrap();
 
     pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
@@ -118,7 +121,11 @@ fn build_abstract_recursive(
             .add_block(call_block)
             .add_block(exit_block)
             .new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(staged).body(body).new().unwrap()
     })
 }
@@ -177,7 +184,11 @@ fn test_summary_cache_tightest_match() {
             .terminator(ret)
             .new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     });
 
@@ -230,7 +241,11 @@ fn test_summary_seed_refinable() {
             .terminator(ret)
             .new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     });
 

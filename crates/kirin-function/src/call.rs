@@ -36,6 +36,12 @@ mod tests {
     #[derive(Debug, Clone, Hash, PartialEq, Eq)]
     struct UnitTy;
 
+    impl std::fmt::Display for UnitTy {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "unit")
+        }
+    }
+
     fn make_call(num_args: usize) -> Call<UnitTy> {
         Call {
             target: Symbol::from(42usize),

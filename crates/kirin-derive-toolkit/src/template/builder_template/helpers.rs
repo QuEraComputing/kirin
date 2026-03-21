@@ -51,7 +51,7 @@ fn build_result_path(input: &InputMeta, info: &StatementInfo) -> proc_macro2::To
     quote! { #mod_name::#name }
 }
 
-fn build_fn_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
+fn build_fn_inputs(info: &StatementInfo, ir_type: &syn::Path) -> Vec<proc_macro2::TokenStream> {
     let mut inputs = Vec::new();
     for field in info.fields.iter() {
         match field.category() {
@@ -69,13 +69,17 @@ fn build_fn_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
                 };
                 inputs.push(sig);
             }
+            FieldCategory::Signature => {
+                let ty = field_type_for_signature(&field.collection, ir_type);
+                let name = field.name_ident(proc_macro2::Span::call_site());
+                inputs.push(quote! { #name: impl Into<#ty> });
+            }
             FieldCategory::Argument
             | FieldCategory::Block
             | FieldCategory::Successor
             | FieldCategory::Region
             | FieldCategory::DiGraph
             | FieldCategory::UnGraph
-            | FieldCategory::Signature
             | FieldCategory::Symbol => {
                 let ty = field_type_for_category(&field.collection, field.category());
                 let name = field.name_ident(ty.span());
@@ -86,7 +90,7 @@ fn build_fn_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
     inputs
 }
 
-fn build_fn_let_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
+fn build_fn_let_inputs(info: &StatementInfo, ir_type: &syn::Path) -> Vec<proc_macro2::TokenStream> {
     let mut assigns = Vec::new();
     for field in info.fields.iter() {
         match field.category() {
@@ -111,13 +115,17 @@ fn build_fn_let_inputs(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
                     assigns.push(quote! {});
                 }
             }
+            FieldCategory::Signature => {
+                let ty = field_type_for_signature(&field.collection, ir_type);
+                let name = field.name_ident(proc_macro2::Span::call_site());
+                assigns.push(quote! { let #name: #ty = #name.into(); });
+            }
             FieldCategory::Argument
             | FieldCategory::Block
             | FieldCategory::Successor
             | FieldCategory::Region
             | FieldCategory::DiGraph
             | FieldCategory::UnGraph
-            | FieldCategory::Signature
             | FieldCategory::Symbol => {
                 let ty = field_type_for_category(&field.collection, field.category());
                 let name = field.name_ident(ty.span());
@@ -137,8 +145,10 @@ fn field_type_for_category(collection: &Collection, category: FieldCategory) -> 
         FieldCategory::Region => "Region",
         FieldCategory::DiGraph => "DiGraph",
         FieldCategory::UnGraph => "UnGraph",
-        FieldCategory::Signature => "Signature",
         FieldCategory::Symbol => "Symbol",
+        FieldCategory::Signature => {
+            unreachable!("use field_type_for_signature for Signature fields")
+        }
         FieldCategory::Value => {
             unreachable!("field_type_for_category does not support Value")
         }
@@ -148,6 +158,15 @@ fn field_type_for_category(collection: &Collection, category: FieldCategory) -> 
         Collection::Single => syn::parse_quote!(#base_ident),
         Collection::Vec => syn::parse_quote!(Vec<#base_ident>),
         Collection::Option => syn::parse_quote!(Option<#base_ident>),
+    }
+}
+
+/// Returns the type for a Signature field, parameterized by the ir_type.
+fn field_type_for_signature(collection: &Collection, ir_type: &syn::Path) -> syn::Type {
+    match collection {
+        Collection::Single => syn::parse_quote!(Signature<#ir_type>),
+        Collection::Vec => syn::parse_quote!(Vec<Signature<#ir_type>>),
+        Collection::Option => syn::parse_quote!(Option<Signature<#ir_type>>),
     }
 }
 
@@ -191,7 +210,7 @@ fn build_fn_body(
     crate_path: &syn::Path,
 ) -> proc_macro2::TokenStream {
     let statement_id = statement_id_name(info);
-    let let_inputs = build_fn_let_inputs(info);
+    let let_inputs = build_fn_let_inputs(info, &input.ir_type);
     let let_results = let_name_eq_result_value(info, result_name_map, crate_path);
 
     let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
@@ -304,7 +323,7 @@ pub(super) fn build_fn_for_statement(
         return Ok(proc_macro2::TokenStream::new());
     }
 
-    let inputs = build_fn_inputs(info);
+    let inputs = build_fn_inputs(info, &input.ir_type);
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
     let name = &input.name;
     let ir_type = &input.ir_type;

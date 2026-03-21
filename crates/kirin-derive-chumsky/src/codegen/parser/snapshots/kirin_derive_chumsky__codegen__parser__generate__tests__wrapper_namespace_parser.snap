@@ -5,7 +5,7 @@ expression: generate_parser_code(input)
 #[automatically_derived]
 impl<'t> ::kirin::parsers::HasDialectParser<'t> for MyLanguage
 where
-    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+    SimpleType: ::kirin::parsers::HasParser<'t, Output = SimpleType> + 't,
     ArithOps: ::kirin::parsers::HasDialectParser<'t>,
     CfOps: ::kirin::parsers::HasDialectParser<'t>,
 {
@@ -57,7 +57,7 @@ where
 #[automatically_derived]
 impl<'t> ::kirin::parsers::HasParser<'t> for MyLanguage
 where
-    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+    SimpleType: ::kirin::parsers::HasParser<'t, Output = SimpleType> + 't,
     ArithOps: ::kirin::parsers::HasDialectParser<'t>,
     CfOps: ::kirin::parsers::HasDialectParser<'t>,
 {
@@ -82,7 +82,7 @@ where
 impl<'t> ::kirin::parsers::HasParserEmitIR<'t> for MyLanguage
 where
     MyLanguage: ::kirin::ir::Dialect<Type = SimpleType>,
-    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+    SimpleType: ::kirin::parsers::HasParser<'t, Output = SimpleType> + 't,
     <SimpleType as ::kirin::parsers::HasParser<'t>>::Output:
         ::kirin::parsers::EmitIR<MyLanguage, Output = <MyLanguage as ::kirin::ir::Dialect>::Type>,
     ArithOps: ::kirin::parsers::HasDialectEmitIR<
@@ -126,7 +126,7 @@ impl<'tokens, Language, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect<Type = SimpleType>,
     LanguageOutput: Clone + PartialEq + 'tokens,
-    SimpleType: ::kirin::parsers::HasParser<'tokens> + 'tokens,
+    SimpleType: ::kirin::parsers::HasParser<'tokens, Output = SimpleType> + 'tokens,
     <SimpleType as ::kirin::parsers::HasParser<'tokens>>::Output:
         ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
     ArithOps: ::kirin::parsers::HasDialectEmitIR<'tokens, Language, LanguageOutput>,

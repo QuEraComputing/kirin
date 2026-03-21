@@ -87,16 +87,18 @@ trivial_type_lattice!(I32Type, "i32", just(Token::Identifier("i32")));
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, kirin_ir::Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = UnitType, crate = kirin_ir)]
-#[chumsky(crate = crate, format = "{:signature} {body}")]
+#[chumsky(crate = crate, format = "fn {:name}{sig} {body}")]
 struct FunctionBody {
     body: Region,
+    sig: Signature<UnitType>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, kirin_ir::Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = I32Type, crate = kirin_ir)]
-#[chumsky(crate = crate, format = "{:signature} {body}")]
+#[chumsky(crate = crate, format = "fn {:name}{sig} {body}")]
 struct LowerBody {
     body: Region,
+    sig: Signature<I32Type>,
 }
 
 // ---------------------------------------------------------------------------
@@ -248,7 +250,11 @@ fn test_specialize_without_stage_auto_creates() {
         .new();
     let input = format!("specialize @A fn @foo(()) -> () {BODY}");
     let result = pipeline.parse(&input);
-    assert!(result.is_ok(), "specialize without stage should auto-create: {:?}", result.err());
+    assert!(
+        result.is_ok(),
+        "specialize without stage should auto-create: {:?}",
+        result.err()
+    );
 }
 
 #[test]
@@ -281,7 +287,7 @@ fn test_pipeline_roundtrip_print_parse_print() {
     pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
         let block = b.block().new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::new(b, region);
+        let body = FunctionBody::new(b, region, Signature::new(vec![], UnitType, ()));
         b.specialize()
             .staged_func(staged_function)
             .signature(unit_sig())

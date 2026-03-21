@@ -6,9 +6,10 @@ use kirin::prelude::*;
 /// forward through gates.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
-#[chumsky(format = "{:signature} {body}")]
+#[chumsky(format = "fn {:name}{sig} {body}")]
 pub struct CircuitFunction {
     pub body: DiGraph,
+    pub sig: Signature<QubitType>,
 }
 
 /// Single-qubit Hadamard gate.
@@ -48,14 +49,6 @@ pub struct Rz {
 pub struct Measure {
     pub qubit: SSAValue,
     pub result: ResultValue,
-}
-
-// TODO(RFC-0004): Replace with `sig: Signature<QubitType>` field — manual impl
-// will be deleted once the derive generates HasSignature and the parser populates the field.
-impl HasSignature<Circuit> for CircuitFunction {
-    fn signature(&self) -> Option<Signature<QubitType>> {
-        None
-    }
 }
 
 /// Circuit dialect language enum.

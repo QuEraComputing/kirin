@@ -149,19 +149,17 @@ where
         .delimited_by(just(Token::LBrace), just(Token::RBrace))
         .labelled("block statements");
 
-    header
-        .then(statements)
-        .map_with(|(header, statements), e| {
-            let h = header.value;
-            Spanned {
-                value: Block {
-                    label: Some(h.label.name),
-                    arguments: h.arguments,
-                    statements,
-                },
-                span: e.span(),
-            }
-        })
+    header.then(statements).map_with(|(header, statements), e| {
+        let h = header.value;
+        Spanned {
+            value: Block {
+                label: Some(h.label.name),
+                arguments: h.arguments,
+                statements,
+            },
+            span: e.span(),
+        }
+    })
 }
 
 /// Parses a region containing multiple blocks.

@@ -8,6 +8,12 @@ use crate::ControlFlow;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 struct UnitTy;
 
+impl std::fmt::Display for UnitTy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unit")
+    }
+}
+
 fn make_branch() -> ControlFlow<UnitTy> {
     ControlFlow::Branch {
         target: Successor::from_block(Block::from(kirin::ir::Id::from(TestSSAValue(10)))),

@@ -10,9 +10,21 @@ use crate::Constant;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 struct TestTy;
 
+impl std::fmt::Display for TestTy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "TestTy")
+    }
+}
+
 /// Minimal value type for T parameter.
 #[derive(Debug, Clone, Hash, PartialEq, Eq)]
 struct TestVal(i64);
+
+impl std::fmt::Display for TestVal {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 impl Typeof<TestTy> for TestVal {
     fn type_of(&self) -> TestTy {

@@ -6,16 +6,10 @@ use kirin::prelude::*;
 /// and spiders/boxes are nodes connected by those edges.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
-#[chumsky(format = "{:signature} {body}")]
+#[chumsky(format = "fn {:name}{sig} {body}")]
 pub struct ZXFunction {
     pub body: UnGraph,
-}
-
-// TODO(RFC-0004): Replace with `sig: Signature<QubitType>` field
-impl HasSignature<ZX> for ZXFunction {
-    fn signature(&self) -> Option<Signature<QubitType>> {
-        None
-    }
+    pub sig: Signature<QubitType>,
 }
 
 /// Wire edge operation — creates an edge SSAValue.

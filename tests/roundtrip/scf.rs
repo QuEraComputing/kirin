@@ -9,8 +9,11 @@ use kirin_test_utils::roundtrip;
 #[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 enum ScfLanguage {
-    #[chumsky(format = "{:signature} {body}")]
-    Function { body: Region },
+    #[chumsky(format = "fn {:name}{sig} {body}")]
+    Function {
+        body: Region,
+        sig: Signature<ArithType>,
+    },
     #[wraps]
     Scf(StructuredControlFlow<ArithType>),
     #[wraps]

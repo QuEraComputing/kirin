@@ -5,7 +5,7 @@ expression: generate_parser_code(input)
 #[automatically_derived]
 impl<'t> kirin_chumsky::HasDialectParser<'t> for Return
 where
-    SimpleType: kirin_chumsky::HasParser<'t> + 't,
+    SimpleType: kirin_chumsky::HasParser<'t, Output = SimpleType> + 't,
 {
     type Output<__TypeOutput, __LanguageOutput>
         = ReturnAST<'t, __TypeOutput, __LanguageOutput>
@@ -68,7 +68,7 @@ where
 #[automatically_derived]
 impl<'t> kirin_chumsky::HasParser<'t> for Return
 where
-    SimpleType: kirin_chumsky::HasParser<'t> + 't,
+    SimpleType: kirin_chumsky::HasParser<'t, Output = SimpleType> + 't,
 {
     type Output = ReturnASTSelf<'t, <SimpleType as kirin_chumsky::HasParser<'t>>::Output>;
     fn parser<I>() -> kirin_chumsky::BoxedParser<'t, I, Self::Output>
@@ -91,7 +91,7 @@ where
 impl<'t> kirin_chumsky::HasParserEmitIR<'t> for Return
 where
     Return: ::kirin::ir::Dialect<Type = SimpleType>,
-    SimpleType: kirin_chumsky::HasParser<'t> + 't,
+    SimpleType: kirin_chumsky::HasParser<'t, Output = SimpleType> + 't,
     <SimpleType as kirin_chumsky::HasParser<'t>>::Output:
         kirin_chumsky::EmitIR<Return, Output = <Return as ::kirin::ir::Dialect>::Type>,
 {
@@ -125,7 +125,7 @@ impl<'tokens, Language, LanguageOutput>
 where
     Language: ::kirin::ir::Dialect<Type = SimpleType>,
     LanguageOutput: Clone + PartialEq + 'tokens,
-    SimpleType: kirin_chumsky::HasParser<'tokens> + 'tokens,
+    SimpleType: kirin_chumsky::HasParser<'tokens, Output = SimpleType> + 'tokens,
     <SimpleType as kirin_chumsky::HasParser<'tokens>>::Output:
         kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
 {

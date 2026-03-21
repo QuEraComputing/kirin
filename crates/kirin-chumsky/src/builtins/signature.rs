@@ -2,7 +2,9 @@ use chumsky::prelude::*;
 use kirin_ir::Signature;
 use kirin_lexer::Token;
 
-use crate::traits::{BoxedParser, HasParser, TokenInput};
+use crate::traits::{BoxedParser, DirectlyParsable, HasParser, TokenInput};
+
+impl<T> DirectlyParsable for Signature<T> where T: DirectlyParsable + Clone + PartialEq + 'static {}
 
 impl<'t, T> HasParser<'t> for Signature<T>
 where

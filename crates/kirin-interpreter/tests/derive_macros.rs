@@ -106,7 +106,11 @@ fn build_add_one_eval_call(
         }
 
         let region = b.region().add_block(entry).add_block(code_block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
@@ -138,7 +142,11 @@ fn build_add_one_interpretable(
         }
 
         let region = b.region().add_block(entry).add_block(code_block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }

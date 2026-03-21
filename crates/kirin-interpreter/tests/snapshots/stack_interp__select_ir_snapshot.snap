@@ -2,7 +2,7 @@
 source: crates/kirin-interpreter/tests/stack_interp.rs
 expression: ir
 ---
-specialize @0 fn @unnamed() -> i64 {
+specialize @0 fn @unnamed () -> i64 {
   ^0(%0: i64) {
     %3 = constant 1 -> i64;
     %4 = add %0, %3 -> i64;

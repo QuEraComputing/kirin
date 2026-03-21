@@ -264,7 +264,11 @@ fn test_session_abstract_interp_with_args() {
             .terminator(ret)
             .new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     });
 

@@ -6,7 +6,7 @@ impl<'t, TypeOutput, LanguageOutput> ArithOpsAST<'t, TypeOutput, LanguageOutput>
 where
     TypeOutput: Clone + PartialEq + 't,
     LanguageOutput: Clone + PartialEq + 't,
-    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+    SimpleType: ::kirin::parsers::HasParser<'t, Output = SimpleType> + 't,
 {
     fn emit_with<__Language, __EmitLanguageOutput>(
         &self,
@@ -24,7 +24,7 @@ where
             ::kirin::ir::Statement,
             ::kirin::parsers::EmitError,
         >,
-        SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+        SimpleType: ::kirin::parsers::HasParser<'t, Output = SimpleType> + 't,
         <SimpleType as ::kirin::parsers::HasParser<'t>>::Output: ::kirin::parsers::EmitIR<
             __Language,
             Output = <__Language as ::kirin::ir::Dialect>::Type,
@@ -69,7 +69,7 @@ where
     Language: ::kirin::ir::Dialect + From<ArithOps>,
     TypeOutput: Clone + PartialEq,
     LanguageOutput: Clone + PartialEq + 't,
-    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+    SimpleType: ::kirin::parsers::HasParser<'t, Output = SimpleType> + 't,
     <SimpleType as ::kirin::parsers::HasParser<'t>>::Output:
         ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
 {
@@ -88,7 +88,7 @@ impl<'t, TypeOutput, Language> ::kirin::parsers::EmitIR<Language>
 where
     Language: ::kirin::ir::Dialect + From<ArithOps>,
     TypeOutput: Clone + PartialEq,
-    SimpleType: ::kirin::parsers::HasParser<'t> + 't,
+    SimpleType: ::kirin::parsers::HasParser<'t, Output = SimpleType> + 't,
     <SimpleType as ::kirin::parsers::HasParser<'t>>::Output:
         ::kirin::parsers::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
 {

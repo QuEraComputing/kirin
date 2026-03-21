@@ -15,6 +15,14 @@ enum TestType {
     Any,
 }
 
+impl std::fmt::Display for TestType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            TestType::Any => write!(f, "Any"),
+        }
+    }
+}
+
 macro_rules! impl_empty_dialect_traits {
     ($dialect:ty) => {
         impl<'a> HasArguments<'a> for $dialect {

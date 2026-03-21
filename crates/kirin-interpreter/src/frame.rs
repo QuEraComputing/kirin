@@ -125,7 +125,11 @@ mod tests {
             let ret = Return::<ArithType>::new(b, c0_result);
             let block = b.block().stmt(c0).terminator(ret).new();
             let region = b.region().add_block(block).new();
-            let body = FunctionBody::<ArithType>::new(b, region);
+            let body = FunctionBody::<ArithType>::new(
+                b,
+                region,
+                kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+            );
             let spec = b.specialize().staged_func(sf).body(body).new().unwrap();
             (spec, block, c0_result)
         });

@@ -93,7 +93,6 @@ pub trait PrettyPrint {
     fn prints_result_names(&self) -> bool {
         false
     }
-
 }
 
 /// Builder for rendering pretty-printed IR nodes.

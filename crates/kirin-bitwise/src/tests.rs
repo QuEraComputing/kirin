@@ -8,6 +8,12 @@ use crate::Bitwise;
 #[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
 struct UnitTy;
 
+impl std::fmt::Display for UnitTy {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "unit")
+    }
+}
+
 fn make_and() -> Bitwise<UnitTy> {
     Bitwise::And {
         lhs: TestSSAValue(0).into(),

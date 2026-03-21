@@ -66,9 +66,7 @@ impl GenerateHasDialectParser {
                         crate::format::ContextProjection::Name => {
                             // Parse and discard the @symbol — the function text parser
                             // extracts the name from EmitContext after parse_and_emit.
-                            parser_parts.push(ParserPart::Token(
-                                quote! { #crate_path::symbol() },
-                            ));
+                            parser_parts.push(ParserPart::Token(quote! { #crate_path::symbol() }));
                         }
                     }
                 }
@@ -196,8 +194,7 @@ impl GenerateHasDialectParser {
                     } else {
                         None
                     };
-                    let value =
-                        self.build_field_value(field, &field_occurrences, crate_path, ri);
+                    let value = self.build_field_value(field, &field_occurrences, crate_path, ri);
                     quote! { #name: #value }
                 })
                 .collect();
@@ -393,13 +390,8 @@ impl GenerateHasDialectParser {
 
                 match &occ.option {
                     FormatOption::Name => {
-                        field_kind::construct_from_name_only(
-                            field,
-                            crate_path,
-                            var,
-                            result_index,
-                        )
-                        .unwrap_or_else(|| quote! { #var })
+                        field_kind::construct_from_name_only(field, crate_path, var, result_index)
+                            .unwrap_or_else(|| quote! { #var })
                     }
                     FormatOption::Type if field.category().is_ssa_like() => {
                         unreachable!(
@@ -458,8 +450,7 @@ impl GenerateHasDialectParser {
                     .map(|v| quote! { #v })
                     .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
                 // digraph_body_statements returns (Vec<Spanned<S>>, Vec<Spanned<&str>>)
-                let (stmts_expr, yields_expr) = if let Some(body) = find_var(BodyProjection::Body)
-                {
+                let (stmts_expr, yields_expr) = if let Some(body) = find_var(BodyProjection::Body) {
                     (quote! { #body.0 }, quote! { #body.1 })
                 } else {
                     (

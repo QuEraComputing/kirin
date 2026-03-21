@@ -55,7 +55,11 @@ fn test_abstract_interp_constants() {
 
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     });
 
@@ -151,7 +155,11 @@ fn test_abstract_interp_call_caches_summary() {
 
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     });
 
@@ -456,8 +464,17 @@ fn test_abstract_analysis_result_ssa_values() {
 
             let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
             let region = b.region().add_block(block).new();
-            let func_body = FunctionBody::<ArithType>::new(b, region);
-            let spec_fn = b.specialize().staged_func(sf).body(func_body).new().unwrap();
+            let func_body = FunctionBody::<ArithType>::new(
+                b,
+                region,
+                kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+            );
+            let spec_fn = b
+                .specialize()
+                .staged_func(sf)
+                .body(func_body)
+                .new()
+                .unwrap();
             (spec_fn, c1_result, c2_result, add_result)
         });
 

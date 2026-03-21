@@ -6,7 +6,7 @@ impl<'t, TypeOutput, LanguageOutput> AddAST<'t, TypeOutput, LanguageOutput>
 where
     TypeOutput: Clone + PartialEq + 't,
     LanguageOutput: Clone + PartialEq + 't,
-    SimpleType: kirin_chumsky::HasParser<'t> + 't,
+    SimpleType: kirin_chumsky::HasParser<'t, Output = SimpleType> + 't,
 {
     fn emit_with<__Language, __EmitLanguageOutput>(
         &self,
@@ -24,7 +24,7 @@ where
             ::kirin::ir::Statement,
             kirin_chumsky::EmitError,
         >,
-        SimpleType: kirin_chumsky::HasParser<'t> + 't,
+        SimpleType: kirin_chumsky::HasParser<'t, Output = SimpleType> + 't,
         <SimpleType as kirin_chumsky::HasParser<'t>>::Output:
             kirin_chumsky::EmitIR<__Language, Output = <__Language as ::kirin::ir::Dialect>::Type>,
     {
@@ -52,7 +52,7 @@ where
     Language: ::kirin::ir::Dialect + From<Add>,
     TypeOutput: Clone + PartialEq,
     LanguageOutput: Clone + PartialEq + 't,
-    SimpleType: kirin_chumsky::HasParser<'t> + 't,
+    SimpleType: kirin_chumsky::HasParser<'t, Output = SimpleType> + 't,
     <SimpleType as kirin_chumsky::HasParser<'t>>::Output:
         kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
 {
@@ -70,7 +70,7 @@ impl<'t, TypeOutput, Language> kirin_chumsky::EmitIR<Language> for AddASTSelf<'t
 where
     Language: ::kirin::ir::Dialect + From<Add>,
     TypeOutput: Clone + PartialEq,
-    SimpleType: kirin_chumsky::HasParser<'t> + 't,
+    SimpleType: kirin_chumsky::HasParser<'t, Output = SimpleType> + 't,
     <SimpleType as kirin_chumsky::HasParser<'t>>::Output:
         kirin_chumsky::EmitIR<Language, Output = <Language as ::kirin::ir::Dialect>::Type>,
 {

@@ -40,7 +40,10 @@ fn build_recursive_func(
 ) -> SpecializedFunction {
     let func = pipeline.function().name("rec").new().unwrap();
     let staged = pipeline
-        .staged_function::<RecursiveLang>().func(func).stage(stage_id).new()
+        .staged_function::<RecursiveLang>()
+        .func(func)
+        .stage(stage_id)
+        .new()
         .unwrap();
 
     pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
@@ -119,7 +122,11 @@ fn build_recursive_func(
             .add_block(call_block)
             .add_block(exit_block)
             .new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(staged).body(body).new().unwrap()
     })
 }
@@ -196,7 +203,11 @@ fn test_unbound_value_in_frame() {
         let ret = Return::<ArithType>::new(b, c0.result);
         let block = b.block().stmt(c0).terminator(ret).new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     });
     let first_stmt = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
@@ -234,7 +245,11 @@ fn test_arity_mismatch_too_few_args() {
             .terminator(ret)
             .new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         let spec_fn = b.specialize().staged_func(sf).body(body).new().unwrap();
         (spec_fn, block)
     });
@@ -272,7 +287,11 @@ fn test_arity_mismatch_too_many_args() {
         let ret = Return::<ArithType>::new(b, SSAValue::from(ba_x));
         let block = b.block().argument(ArithType::I64).terminator(ret).new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         let spec_fn = b.specialize().staged_func(sf).body(body).new().unwrap();
         (spec_fn, block)
     });
@@ -310,7 +329,11 @@ fn test_arity_mismatch_zero_args_block() {
         let ret = Return::<ArithType>::new(b, c0.result);
         let block = b.block().stmt(c0).terminator(ret).new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         let spec_fn = b.specialize().staged_func(sf).body(body).new().unwrap();
         (spec_fn, block)
     });
@@ -447,7 +470,10 @@ fn test_halt_during_nested_call() {
     // Build callee: a function whose body contains a HaltStmt.
     let callee_func = pipeline.function().name("halter").new().unwrap();
     let callee_staged = pipeline
-        .staged_function::<HaltLang>().func(callee_func).stage(stage_id).new()
+        .staged_function::<HaltLang>()
+        .func(callee_func)
+        .stage(stage_id)
+        .new()
         .unwrap();
 
     pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
@@ -455,15 +481,25 @@ fn test_halt_during_nested_call() {
         let block = b.block().stmt(halt).new();
         // No terminator — the Halt interrupts before we need one.
         let region = b.region().add_block(block).new();
-        let callee_body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize().staged_func(callee_staged).body(callee_body).new()
+        let callee_body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
+        b.specialize()
+            .staged_func(callee_staged)
+            .body(callee_body)
+            .new()
             .unwrap();
     });
 
     // Build caller: calls the callee function by name.
     let caller_func = pipeline.function().name("caller").new().unwrap();
     let caller_staged = pipeline
-        .staged_function::<HaltLang>().func(caller_func).stage(stage_id).new()
+        .staged_function::<HaltLang>()
+        .func(caller_func)
+        .stage(stage_id)
+        .new()
         .unwrap();
 
     let caller_spec = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
@@ -472,8 +508,16 @@ fn test_halt_during_nested_call() {
         let ret = Return::<ArithType>::new(b, call.res);
         let block = b.block().stmt(call).terminator(ret).new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
-        b.specialize().staged_func(caller_staged).body(body).new().unwrap()
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
+        b.specialize()
+            .staged_func(caller_staged)
+            .body(body)
+            .new()
+            .unwrap()
     });
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);

@@ -978,4 +978,3 @@ fn stage_missing_error(stage_symbol: &str, span: Option<SimpleSpan>) -> Function
         format!("stage '@{stage_symbol}' does not exist in the pipeline"),
     )
 }
-

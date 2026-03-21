@@ -20,6 +20,12 @@ mod tests {
     #[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
     struct UnitTy;
 
+    impl std::fmt::Display for UnitTy {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            write!(f, "unit")
+        }
+    }
+
     fn make_return() -> Return<UnitTy> {
         Return {
             value: TestSSAValue(0).into(),

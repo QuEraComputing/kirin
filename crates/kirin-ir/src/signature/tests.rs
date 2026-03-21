@@ -9,6 +9,16 @@ enum SimpleType {
     Bool,
 }
 
+impl std::fmt::Display for SimpleType {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SimpleType::Int => write!(f, "Int"),
+            SimpleType::Float => write!(f, "Float"),
+            SimpleType::Bool => write!(f, "Bool"),
+        }
+    }
+}
+
 #[test]
 fn test_exact_applicable_match() {
     let call = Signature::new(

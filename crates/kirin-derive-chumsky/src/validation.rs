@@ -131,21 +131,25 @@ impl<'ir> ValidationVisitor<'ir> {
                 let has = |p: BodyProjection| projs.contains(&p);
                 let (required, field_kind): (&[BodyProjection], &str) = match field.category() {
                     FieldCategory::DiGraph => (
-                        &[BodyProjection::Ports, BodyProjection::Captures, BodyProjection::Body],
+                        &[
+                            BodyProjection::Ports,
+                            BodyProjection::Captures,
+                            BodyProjection::Body,
+                        ],
                         "DiGraph",
                     ),
                     FieldCategory::UnGraph => (
-                        &[BodyProjection::Ports, BodyProjection::Captures, BodyProjection::Body],
+                        &[
+                            BodyProjection::Ports,
+                            BodyProjection::Captures,
+                            BodyProjection::Body,
+                        ],
                         "UnGraph",
                     ),
-                    FieldCategory::Block => (
-                        &[BodyProjection::Args, BodyProjection::Body],
-                        "Block",
-                    ),
-                    FieldCategory::Region => (
-                        &[BodyProjection::Body],
-                        "Region",
-                    ),
+                    FieldCategory::Block => {
+                        (&[BodyProjection::Args, BodyProjection::Body], "Block")
+                    }
+                    FieldCategory::Region => (&[BodyProjection::Body], "Region"),
                     _ => continue,
                 };
                 let missing: Vec<&str> = required
@@ -257,9 +261,9 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
             let option_name = match option {
                 FormatOption::Name => ":name",
                 FormatOption::Type => ":type",
-                FormatOption::Default
-                | FormatOption::Body(_)
-                | FormatOption::Signature(_) => unreachable!(),
+                FormatOption::Default | FormatOption::Body(_) | FormatOption::Signature(_) => {
+                    unreachable!()
+                }
             };
             self.add_error(format!(
                 "format option '{}' cannot be used on {} field '{}'. \
@@ -277,10 +281,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
             let category = field.category();
             let valid = match proj {
                 BodyProjection::Ports | BodyProjection::Captures => {
-                    matches!(
-                        category,
-                        FieldCategory::DiGraph | FieldCategory::UnGraph
-                    )
+                    matches!(category, FieldCategory::DiGraph | FieldCategory::UnGraph)
                 }
                 BodyProjection::Args => {
                     matches!(category, FieldCategory::Block)
@@ -462,12 +463,12 @@ mod tests {
             make_result(2, "result"),
         ];
         let stmt = make_stmt(fields.clone());
-        let format =
-            Format::parse("$add {lhs}, {rhs} -> {result:name}", None).unwrap();
+        let format = Format::parse("$add {lhs}, {rhs} -> {result:name}", None).unwrap();
 
         let err = validate_format(&stmt, &format, &fields).unwrap_err();
         assert!(
-            err.to_string().contains("Result names are parsed generically"),
+            err.to_string()
+                .contains("Result names are parsed generically"),
             "Error should reject legacy result:name: {}",
             err
         );
@@ -486,7 +487,8 @@ mod tests {
 
         let err = validate_format(&stmt, &format, &fields).unwrap_err();
         assert!(
-            err.to_string().contains("Result names are parsed generically"),
+            err.to_string()
+                .contains("Result names are parsed generically"),
             "Error should reject legacy result default: {}",
             err
         );
@@ -528,8 +530,11 @@ mod tests {
             make_result(3, "tgt_out"),
         ];
         let stmt = make_stmt(fields.clone());
-        let format =
-            Format::parse("$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}", None).unwrap();
+        let format = Format::parse(
+            "$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}",
+            None,
+        )
+        .unwrap();
 
         let result = validate_format(&stmt, &format, &fields).unwrap();
         assert_eq!(result.occurrences.len(), 4);
@@ -568,9 +573,11 @@ mod tests {
     fn complete_digraph_projections_are_valid() {
         let fields = vec![make_digraph(0, "body")];
         let stmt = make_stmt(fields.clone());
-        let format =
-            Format::parse("({body:ports}) captures ({body:captures}) {{ {body:body} }}", None)
-                .unwrap();
+        let format = Format::parse(
+            "({body:ports}) captures ({body:captures}) {{ {body:body} }}",
+            None,
+        )
+        .unwrap();
         assert!(validate_format(&stmt, &format, &fields).is_ok());
     }
 
@@ -661,6 +668,9 @@ mod tests {
         // :yields was removed as a body projection — it's now {:return} (context).
         // {body:yields} should fail to parse.
         let result = Format::parse("{body:yields}", None);
-        assert!(result.is_err(), "yields should not be a valid body projection");
+        assert!(
+            result.is_err(),
+            "yields should not be a valid body projection"
+        );
     }
 }

@@ -155,6 +155,16 @@ mod tests {
         Top,
     }
 
+    impl std::fmt::Display for SimpleType {
+        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+            match self {
+                SimpleType::Bot => write!(f, "Bot"),
+                SimpleType::Mid => write!(f, "Mid"),
+                SimpleType::Top => write!(f, "Top"),
+            }
+        }
+    }
+
     impl Lattice for SimpleType {
         fn join(&self, other: &Self) -> Self {
             match (self, other) {

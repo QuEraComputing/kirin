@@ -86,9 +86,8 @@ pub fn ast_type<L: Layout>(
             quote! { #crate_path::UnGraph<'t, #type_output, LanguageOutput> }
         }
         FieldCategory::Signature => {
-            // Treat like Value: use the HasParser Output directly.
-            // Signature<T> implements HasParser with Output = Signature<T>.
-            quote! { <#crate_path::ir::Signature<#ir_type> as #crate_path::HasParser<'t>>::Output }
+            // Signature<T> directly. The where clause ensures T: HasParser<'t, Output = T>.
+            quote! { #crate_path::ir::Signature<#ir_type> }
         }
     }
 }
@@ -193,8 +192,20 @@ pub fn parser_expr<L: Layout>(
         },
         FieldCategory::Signature => match opt {
             FormatOption::Default => {
-                // Whole signature: use Signature<T>::parser()
-                quote! { <#crate_path::ir::Signature<#ir_type> as #crate_path::HasParser<'t>>::parser() }
+                // Whole signature: inline the parser to avoid Output = T constraint.
+                // Parses "(T, T, ...) -> T" into Signature<T>.
+                quote! {
+                    <#ir_type as #crate_path::HasParser<'t>>::parser()
+                        .separated_by(#crate_path::chumsky::prelude::just(#crate_path::Token::Comma))
+                        .collect::<::std::vec::Vec<_>>()
+                        .delimited_by(
+                            #crate_path::chumsky::prelude::just(#crate_path::Token::LParen),
+                            #crate_path::chumsky::prelude::just(#crate_path::Token::RParen),
+                        )
+                        .then_ignore(#crate_path::chumsky::prelude::just(#crate_path::Token::Arrow))
+                        .then(<#ir_type as #crate_path::HasParser<'t>>::parser())
+                        .map(|(params, ret)| #crate_path::ir::Signature::new(params, ret, ()))
+                }
             }
             FormatOption::Signature(crate::format::SignatureProjection::Inputs) => {
                 // Type list: T::parser().separated_by(comma).collect::<Vec<_>>()
@@ -235,7 +246,9 @@ pub fn print_expr<L: Layout>(
             // Projection options are only used with pseudo-fields (function/body),
             // never with real Argument/Result fields.
             FormatOption::Body(_) | FormatOption::Signature(_) => {
-                unreachable!("body/signature projection options are not valid on Argument/Result fields")
+                unreachable!(
+                    "body/signature projection options are not valid on Argument/Result fields"
+                )
             }
         },
         FieldCategory::Block => match opt {
@@ -262,7 +275,9 @@ pub fn print_expr<L: Layout>(
                 doc.print_region_body_only(#field_ref)
             },
             FormatOption::Body(_) => {
-                unreachable!("Ports/Captures/Yields/Args projections are not valid on Region fields")
+                unreachable!(
+                    "Ports/Captures/Yields/Args projections are not valid on Region fields"
+                )
             }
             FormatOption::Name | FormatOption::Type | FormatOption::Signature(_) => {
                 unreachable!("Name/Type/Signature projections are not valid on Region fields")
@@ -341,6 +356,7 @@ pub fn print_expr<L: Layout>(
         FieldCategory::Signature => match opt {
             FormatOption::Default => {
                 // Whole signature: print (T, T) -> T
+                // T: Display is guaranteed by CompileTimeValue.
                 quote! {
                     doc.text(::std::format!("{}", #field_ref))
                 }
@@ -356,7 +372,7 @@ pub fn print_expr<L: Layout>(
                 quote! { doc.text(::std::format!("{}", #field_ref.ret())) }
             }
             _ => unreachable!("validation prevents other options on Signature fields"),
-        }
+        },
     }
 }
 

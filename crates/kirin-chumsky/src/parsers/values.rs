@@ -103,8 +103,7 @@ where
 ///
 /// Returns the list of parsed result names. If there are no results
 /// (zero-result operation), returns an empty Vec.
-pub fn result_name_list<'t, I>()
--> impl Parser<'t, I, Vec<Spanned<&'t str>>, ParserError<'t>>
+pub fn result_name_list<'t, I>() -> impl Parser<'t, I, Vec<Spanned<&'t str>>, ParserError<'t>>
 where
     I: TokenInput<'t>,
 {

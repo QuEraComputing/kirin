@@ -1,4 +1,7 @@
-pub trait CompileTimeValue: Clone + std::fmt::Debug + std::hash::Hash + PartialEq {}
+pub trait CompileTimeValue:
+    Clone + std::fmt::Debug + std::fmt::Display + std::hash::Hash + PartialEq
+{
+}
 
 /// A type that can produce a placeholder value for use before type inference.
 ///
@@ -47,4 +50,7 @@ pub trait Typeof<Ty> {
     fn type_of(&self) -> Ty;
 }
 
-impl<T> CompileTimeValue for T where T: Clone + std::fmt::Debug + std::hash::Hash + PartialEq {}
+impl<T> CompileTimeValue for T where
+    T: Clone + std::fmt::Debug + std::fmt::Display + std::hash::Hash + PartialEq
+{
+}

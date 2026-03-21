@@ -64,6 +64,14 @@ impl GenerateEmitIR {
                     FieldCategory::UnGraph => quote! {
                         let #emitted_var = #var.emit_with(ctx, emit_language_output)?;
                     },
+                    FieldCategory::Signature => {
+                        // Signature<T> is a compile-time value, not an IR node.
+                        // Clone it directly — the Output = T constraint on HasParser
+                        // ensures the AST stores Signature<T> matching the struct field.
+                        quote! {
+                            let #emitted_var = #var.clone();
+                        }
+                    }
                     _ => quote! {
                         let #emitted_var = #crate_path::EmitIR::emit(#var, ctx)?;
                     },

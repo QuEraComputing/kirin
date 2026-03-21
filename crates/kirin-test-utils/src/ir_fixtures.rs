@@ -25,7 +25,11 @@ pub fn build_constants(
 
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
@@ -52,7 +56,11 @@ pub fn build_add_one(
             .terminator(ret)
             .new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
@@ -76,7 +84,11 @@ pub fn build_linear_program(
 
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
-        let func_body = FunctionBody::<ArithType>::new(b, region);
+        let func_body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         let spec_fn = b
             .specialize()
             .staged_func(sf)
@@ -163,7 +175,11 @@ pub fn build_select_program(
             .add_block(truthy_block)
             .add_block(falsy_block)
             .new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
@@ -240,7 +256,11 @@ pub fn build_branch_fork_program(
             .add_block(neg_block)
             .add_block(pos_block)
             .new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
@@ -346,7 +366,11 @@ pub fn build_loop_program(
             .add_block(loop_body)
             .add_block(loop_exit)
             .new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
@@ -437,7 +461,11 @@ pub fn build_infinite_loop(
             .add_block(body)
             .add_block(exit)
             .new();
-        let func_body = FunctionBody::<ArithType>::new(b, region);
+        let func_body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize()
             .staged_func(sf)
             .body(func_body)
@@ -469,7 +497,11 @@ pub fn build_div_program(
             .terminator(ret)
             .new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }
@@ -497,7 +529,11 @@ pub fn build_rem_program(
             .terminator(ret)
             .new();
         let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(b, region);
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+        );
         b.specialize().staged_func(sf).body(body).new().unwrap()
     })
 }

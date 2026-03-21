@@ -76,8 +76,7 @@ where
 }
 
 /// Parses just `(types) -> type` — the parameter/return part of a function signature.
-fn fn_params_and_return<'src, I, L>()
--> impl Parser<'src, I, Signature<L::Type>, ParserError<'src>>
+fn fn_params_and_return<'src, I, L>() -> impl Parser<'src, I, Signature<L::Type>, ParserError<'src>>
 where
     I: TokenInput<'src>,
     L: Dialect + HasParser<'src>,
@@ -153,12 +152,15 @@ where
     // The function name is extracted post-parse from EmitContext::function_name().
     let specialize_decl = identifier("specialize")
         .ignore_then(symbol())
-        .then(body_span::<I>())  // captures from keyword (e.g. `fn`) through closing `}`
+        .then(body_span::<I>()) // captures from keyword (e.g. `fn`) through closing `}`
         .map_with(|(stage, body_span), extra| {
             Declaration::Specialize {
                 stage,
                 // Function name extracted from EmitContext after parse_and_emit
-                function: SymbolName { name: "", span: extra.span() },
+                function: SymbolName {
+                    name: "",
+                    span: extra.span(),
+                },
                 signature: None,
                 body_span,
                 span: extra.span(),

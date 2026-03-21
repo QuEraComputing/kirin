@@ -81,11 +81,15 @@ impl ImplBounds {
 
     // --- IR type predicates ---
 
-    /// `IrType: HasParser<'lt> + 'lt`
+    /// `IrType: HasParser<'lt, Output = IrType> + 'lt`
+    ///
+    /// The `Output = IrType` constraint is required for Signature fields
+    /// (which store `Signature<T>` directly rather than `Signature<T::Output>`)
+    /// and is always satisfied by type lattices.
     pub fn ir_type_has_parser(&self, lt: &syn::Lifetime) -> syn::WherePredicate {
         let ir_type = &self.ir_type;
         let crate_path = &self.crate_path;
-        syn::parse_quote! { #ir_type: #crate_path::HasParser<#lt> + #lt }
+        syn::parse_quote! { #ir_type: #crate_path::HasParser<#lt, Output = #ir_type> + #lt }
     }
 
     /// `<IrType as HasParser<'lt>>::Output: EmitIR<Lang, Output = <Lang as Dialect>::Type>`

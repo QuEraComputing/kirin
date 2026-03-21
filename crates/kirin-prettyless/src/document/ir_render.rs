@@ -37,6 +37,33 @@ where
         self.text(format!("{}", info.ty()))
     }
 
+    /// Print a function signature as `(T, T) -> T`.
+    ///
+    /// Uses a generic type parameter `T: Display` so that the caller can pass
+    /// `Signature<T>` where `T` is the struct's type parameter — the `Display`
+    /// bound is satisfied because the enclosing `PrettyPrint` method has
+    /// `L::Type: Display` and the dialect sets `Type = T`.
+    pub fn print_signature<T: std::fmt::Display>(&'a self, sig: &Signature<T>) -> ArenaDoc<'a> {
+        self.text(format!("{}", sig))
+    }
+
+    /// Print a signature's params as a comma-separated list.
+    pub fn print_signature_inputs<T: std::fmt::Display>(
+        &'a self,
+        sig: &Signature<T>,
+    ) -> ArenaDoc<'a> {
+        let parts: Vec<String> = sig.params().iter().map(|p| format!("{}", p)).collect();
+        self.text(parts.join(", "))
+    }
+
+    /// Print a signature's return type.
+    pub fn print_signature_return<T: std::fmt::Display>(
+        &'a self,
+        sig: &Signature<T>,
+    ) -> ArenaDoc<'a> {
+        self.text(format!("{}", sig.ret()))
+    }
+
     /// Pretty print a statement by printing its definition.
     ///
     /// Prints `%name1, %name2 = ` before the dialect body for statements

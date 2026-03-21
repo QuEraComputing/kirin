@@ -17,10 +17,7 @@ impl PrettyPrint for SimpleLanguage {
     {
         match self {
             SimpleLanguage::Add(lhs, rhs, _res) => {
-                doc.text("add ")
-                    + lhs.pretty_print(doc)
-                    + doc.text(", ")
-                    + rhs.pretty_print(doc)
+                doc.text("add ") + lhs.pretty_print(doc) + doc.text(", ") + rhs.pretty_print(doc)
             }
             SimpleLanguage::Constant(value, _res) => doc.text(format!("constant {}", value)),
             SimpleLanguage::Return(retval) => doc.text("return ") + retval.pretty_print(doc),

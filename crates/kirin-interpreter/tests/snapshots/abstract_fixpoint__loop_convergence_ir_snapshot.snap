@@ -2,7 +2,7 @@
 source: crates/kirin-interpreter/tests/abstract_fixpoint.rs
 expression: ir
 ---
-specialize @0 fn @unnamed() -> i64 {
+specialize @0 fn @unnamed () -> i64 {
   ^0(%0: i64) {
     br ^1 (%0);
   }
