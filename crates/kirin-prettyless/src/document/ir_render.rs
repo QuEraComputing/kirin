@@ -161,25 +161,12 @@ where
             return self.nil();
         }
 
-        let print_port_list = |port_slice: &[Port]| -> ArenaDoc<'a> {
-            let mut doc = self.nil();
-            for (i, port) in port_slice.iter().enumerate() {
-                if i > 0 {
-                    doc += self.text(", ");
-                }
-                let name = self.ssa_name(*port);
-                let info: &SSAInfo<L> = port.expect_info(self.stage);
-                doc += self.text(format!("%{}: {}", name, info.ty()));
-            }
-            doc
-        };
-
-        let edge_doc = print_port_list(edge_ports).enclose("(", ")");
+        let edge_doc = self.print_port_list(edge_ports).enclose("(", ")");
 
         if capture_ports.is_empty() {
             edge_doc
         } else {
-            let capture_doc = print_port_list(capture_ports).enclose("(", ")");
+            let capture_doc = self.print_port_list(capture_ports).enclose("(", ")");
             if edge_ports.is_empty() {
                 self.text("()") + self.text(" capture") + capture_doc
             } else {

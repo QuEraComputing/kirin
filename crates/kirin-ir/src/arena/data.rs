@@ -32,12 +32,14 @@ impl<I: Identifier, T> Arena<I, T> {
     }
 
     /// Allocate a new item in the arena and return its identifier.
+    #[must_use]
     pub fn alloc(&mut self, item: T) -> I {
         let id = self.next_id();
         self.items.push(Item::new(item));
         id
     }
 
+    #[must_use]
     pub fn alloc_with_id(&mut self, f: impl FnOnce(I) -> T) -> I {
         let id = self.next_id();
         let item = f(id);
@@ -53,6 +55,7 @@ impl<I: Identifier, T> Arena<I, T> {
         self.items.get_mut(id.into().into().raw())
     }
 
+    #[must_use]
     pub fn delete(&mut self, id: impl Into<I>) -> bool {
         if let Some(arena_item) = self.get_mut(id)
             && !arena_item.deleted

@@ -8,6 +8,7 @@ use super::{EmitContext, EmitError, EmitIR, HasParser, ParseError, parse_ast};
 /// syntax errors) and errors that occurred during IR emission (e.g., undefined
 /// SSA values or blocks).
 #[derive(Debug, Clone)]
+#[must_use]
 pub enum ChumskyError {
     /// One or more syntax errors from the chumsky parser.
     Parse(Vec<ParseError>),

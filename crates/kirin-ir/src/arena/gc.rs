@@ -24,7 +24,8 @@ impl<I: Identifier, T> Arena<I, T> {
     ///
     /// Callers are responsible for updating all external references. There is
     /// currently no runtime detection of stale IDs.
-    pub fn gc(&mut self) -> IdMap<I> {
+    #[must_use]
+    pub(crate) fn gc(&mut self) -> IdMap<I> {
         let mut counter = 0;
         let raw = self
             .items

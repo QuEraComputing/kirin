@@ -3,6 +3,7 @@ use rustc_hash::FxHashMap;
 
 /// Error type for IR emission from parsed AST nodes.
 #[derive(Debug, Clone, PartialEq, Eq)]
+#[must_use]
 pub enum EmitError {
     /// An SSA value was referenced but never defined.
     UndefinedSSA(String),
@@ -218,7 +219,7 @@ fn create_forward_ref<L: Dialect>(
         None,
         BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(0)),
     );
-    ssas.alloc(ssa);
+    let _ = ssas.alloc(ssa);
     id
 }
 

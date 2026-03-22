@@ -43,7 +43,7 @@ pub(crate) fn allocate_ports<L: Dialect>(
             Some(ty),
             BuilderSSAKind::Port(parent, index),
         );
-        stage.ssas.alloc(ssa);
+        let _ = stage.ssas.alloc(ssa);
         all_ports.push(port);
     }
 
@@ -56,7 +56,7 @@ pub(crate) fn allocate_ports<L: Dialect>(
             Some(ty),
             BuilderSSAKind::Port(parent, index),
         );
-        stage.ssas.alloc(ssa);
+        let _ = stage.ssas.alloc(ssa);
         all_ports.push(port);
     }
 
@@ -136,7 +136,7 @@ pub(crate) fn resolve_and_replace<L: Dialect>(
 
     // Delete placeholder SSAs
     for &old in replacements.keys() {
-        stage.ssas.delete(old);
+        let _ = stage.ssas.delete(old);
     }
 
     // Apply replacements

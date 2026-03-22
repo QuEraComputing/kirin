@@ -38,7 +38,7 @@ impl<'a, L: Dialect> PlaceholderBuilder<'a, L> {
         let kind = self.make_ssa_kind(BuilderKey::Index(index));
         let id = self.stage.ssas.next_id();
         let ssa = BuilderSSAInfo::new(id, None, None, kind);
-        self.stage.ssas.alloc(ssa);
+        let _ = self.stage.ssas.alloc(ssa);
         id
     }
 
@@ -48,7 +48,7 @@ impl<'a, L: Dialect> PlaceholderBuilder<'a, L> {
         let kind = self.make_ssa_kind(BuilderKey::Named(symbol));
         let id = self.stage.ssas.next_id();
         let ssa = BuilderSSAInfo::new(id, None, None, kind);
-        self.stage.ssas.alloc(ssa);
+        let _ = self.stage.ssas.alloc(ssa);
         id
     }
 }
@@ -68,7 +68,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
     ) -> SSAValue {
         let id = self.ssas.next_id();
         let ssa = BuilderSSAInfo::new(id, name.map(|n| self.symbols.intern(n)), Some(ty), kind);
-        self.ssas.alloc(ssa);
+        let _ = self.ssas.alloc(ssa);
         id
     }
 
@@ -109,7 +109,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             parent: None,
             definition,
         };
-        self.statements.alloc(statement);
+        let _ = self.statements.alloc(statement);
 
         // Resolve Unresolved(Result(idx)) SSAs now that the statement ID is known
         let result_ssas: Vec<SSAValue> = self.statements[id]
@@ -199,7 +199,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             backedges: backedges.unwrap_or_default(),
             invalidated: false,
         };
-        self.staged_functions.alloc(staged_function);
+        let _ = self.staged_functions.alloc(staged_function);
         Ok(id)
     }
 

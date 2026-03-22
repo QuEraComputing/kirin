@@ -249,7 +249,7 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
             graph,
             edge_stmts,
         );
-        self.stage.ungraphs.alloc(info);
+        let _ = self.stage.ungraphs.alloc(info);
         id
     }
 }

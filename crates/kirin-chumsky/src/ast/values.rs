@@ -144,7 +144,7 @@ where
                 None,
                 BuilderSSAKind::Unresolved(kirin_ir::ResolutionInfo::Result(result_index)),
             );
-            ssas.alloc(ssa_info);
+            let _ = ssas.alloc(ssa_info);
             id
         };
 

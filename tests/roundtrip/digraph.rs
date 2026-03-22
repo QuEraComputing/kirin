@@ -124,7 +124,7 @@ fn test_specialize_without_stage_auto_creates() {
 fn test_specialize_without_stage_roundtrip() {
     use kirin::ir::{Pipeline, StageInfo};
     use kirin::parsers::ParsePipelineText;
-    use kirin_prettyless::PrettyPrintExt;
+
     use kirin_test_languages::CallableLanguage;
 
     // First parse: with explicit stage declaration
@@ -215,7 +215,7 @@ fn test_projected_func_pipeline_parse() {
 fn test_projected_func_pipeline_roundtrip() {
     use kirin::ir::{Pipeline, StageInfo};
     use kirin::parsers::ParsePipelineText;
-    use kirin_prettyless::PrettyPrintExt;
+
 
     let mut pipeline: Pipeline<StageInfo<ProjectedFuncLang>> = Pipeline::new();
     pipeline
@@ -279,7 +279,7 @@ enum BlockProjectedLang {
 fn test_block_projected_pipeline_roundtrip() {
     use kirin::ir::{Pipeline, StageInfo};
     use kirin::parsers::ParsePipelineText;
-    use kirin_prettyless::PrettyPrintExt;
+
 
     let mut pipeline: Pipeline<StageInfo<BlockProjectedLang>> = Pipeline::new();
     pipeline
@@ -343,7 +343,7 @@ enum RegionProjectedLang {
 fn test_region_projected_pipeline_roundtrip() {
     use kirin::ir::{Pipeline, StageInfo};
     use kirin::parsers::ParsePipelineText;
-    use kirin_prettyless::PrettyPrintExt;
+
 
     let mut pipeline: Pipeline<StageInfo<RegionProjectedLang>> = Pipeline::new();
     pipeline
@@ -431,7 +431,7 @@ fn test_dialect_controlled_pipeline_parse() {
 fn test_dialect_controlled_pipeline_roundtrip() {
     use kirin::ir::{Pipeline, StageInfo};
     use kirin::parsers::ParsePipelineText;
-    use kirin_prettyless::PrettyPrintExt;
+
 
     let mut pipeline: Pipeline<StageInfo<DialectControlledLang>> = Pipeline::new();
     pipeline

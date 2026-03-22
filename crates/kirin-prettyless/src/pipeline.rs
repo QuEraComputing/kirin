@@ -80,6 +80,7 @@ where
 ///
 /// Given a [`Function`] ID, looks up its [`FunctionInfo`](kirin_ir::FunctionInfo)
 /// to find the staged functions at each compilation stage, then renders each one.
+#[must_use]
 pub struct PipelineDocument<'a, S> {
     config: Config,
     pipeline: &'a Pipeline<S>,
@@ -120,6 +121,7 @@ impl<'a, S: RenderDispatch> PipelineDocument<'a, S> {
 }
 
 /// Builder for rendering a specific [`Function`] across pipeline stages.
+#[must_use = "call .into_string(), .print(), or .bat() to produce output"]
 pub struct FunctionRenderBuilder<'a, S> {
     function: Function,
     pipeline: &'a Pipeline<S>,
@@ -161,6 +163,7 @@ impl<'a, S: RenderDispatch> FunctionRenderBuilder<'a, S> {
 }
 
 /// Builder for rendering all functions in a [`Pipeline`].
+#[must_use = "call .into_string(), .print(), or .bat() to produce output"]
 pub struct PipelineRenderBuilder<'a, S> {
     pipeline: &'a Pipeline<S>,
     config: Config,

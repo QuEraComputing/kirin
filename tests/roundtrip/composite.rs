@@ -3,20 +3,6 @@ use kirin::prelude::*;
 use kirin::pretty::Config;
 use kirin_test_languages::{SimpleLanguage, SimpleType};
 
-/// Strip trailing whitespace in each line of the input string.
-#[allow(dead_code)]
-fn strip_trailing_whitespace(s: &str) -> String {
-    if s.is_empty() {
-        return "\n".to_string();
-    }
-    let mut res = String::with_capacity(s.len());
-    for line in s.lines() {
-        res.push_str(line.trim_end());
-        res.push('\n');
-    }
-    res
-}
-
 /// Create a dummy block argument SSA kind for test operand SSAs.
 fn test_ssa_kind(block: Block) -> BuilderSSAKind {
     BuilderSSAKind::BlockArgument(block, 0)
@@ -50,8 +36,12 @@ fn test_roundtrip_add() {
 
     // Emit to get the dialect variant
     let mut emit_ctx = EmitContext::new(&mut stage);
-    emit_ctx.register_ssa("a".to_string(), ssa_a);
-    emit_ctx.register_ssa("b".to_string(), ssa_b);
+    emit_ctx
+        .register_ssa("a".to_string(), ssa_a)
+        .expect("register should succeed");
+    emit_ctx
+        .register_ssa("b".to_string(), ssa_b)
+        .expect("register should succeed");
 
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
@@ -140,7 +130,9 @@ fn test_roundtrip_return() {
 
     // Emit
     let mut emit_ctx = EmitContext::new(&mut stage);
-    emit_ctx.register_ssa("v".to_string(), ssa_v);
+    emit_ctx
+        .register_ssa("v".to_string(), ssa_v)
+        .expect("register should succeed");
 
     let statement = ast.emit(&mut emit_ctx).expect("emit failed");
 
@@ -255,7 +247,6 @@ fn test_roundtrip_function_multiple_blocks() {
     arena_doc
         .render_fmt(max_width, &mut output)
         .expect("render failed");
-    println!("{}", output);
     // Note: output has a trailing newline from pretty printer
     assert_eq!(output.trim_end(), input);
 }

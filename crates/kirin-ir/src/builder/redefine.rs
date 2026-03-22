@@ -68,7 +68,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             backedges: error.backedges,
             invalidated: false,
         };
-        self.staged_functions.alloc(staged_function);
+        let _ = self.staged_functions.alloc(staged_function);
         id
     }
 }

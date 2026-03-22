@@ -32,6 +32,7 @@ impl Display for FunctionParseErrorKind {
 
 /// A domain error for function-text parse failures.
 #[derive(Debug)]
+#[must_use]
 pub struct FunctionParseError {
     pub kind: FunctionParseErrorKind,
     pub span: Option<SimpleSpan>,

@@ -34,6 +34,12 @@ impl Detach for Statement {
         // doesn't use linked-list bookkeeping.
         if let Some(StatementParent::Block(block)) = parent {
             let parent_info = block.expect_info_mut(stage);
+
+            // Clear terminator cache if this statement was the cached terminator.
+            if parent_info.terminator == Some(*self) {
+                parent_info.terminator = None;
+            }
+
             if prev.is_none() {
                 debug_assert!(
                     *parent_info.get_head() == Some(*self),
@@ -50,11 +56,10 @@ impl Detach for Statement {
                 *parent_info.get_tail_mut() = prev;
             }
 
-            debug_assert!(
-                parent_info.get_len() > 0,
-                "Parent block length is already zero before detach"
-            );
-            *parent_info.get_len_mut() -= 1;
+            *parent_info.get_len_mut() = parent_info
+                .get_len()
+                .checked_sub(1)
+                .expect("linked list length underflow: detaching from a parent with zero length");
         }
     }
 }
@@ -101,11 +106,10 @@ macro_rules! impl_detach {
                         *parent_info.get_tail_mut() = prev;
                     }
 
-                    debug_assert!(
-                        parent_info.get_len() > 0,
-                        "Parent block length is already zero before detach"
-                    );
-                    *parent_info.get_len_mut() -= 1;
+                    *parent_info.get_len_mut() = parent_info
+                        .get_len()
+                        .checked_sub(1)
+                        .expect("linked list length underflow: detaching from a parent with zero length");
                 }
             }
         }

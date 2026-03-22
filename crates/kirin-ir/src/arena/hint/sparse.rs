@@ -51,7 +51,6 @@ impl<I: Identifier, T> SparseHint<I, T> {
 
 impl<T, I> std::ops::Index<I> for SparseHint<I, T>
 where
-    T: Clone,
     I: Identifier,
 {
     type Output = T;
@@ -64,7 +63,6 @@ where
 
 impl<T, I> std::ops::IndexMut<I> for SparseHint<I, T>
 where
-    T: Clone,
     I: Identifier,
 {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {

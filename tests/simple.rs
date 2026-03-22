@@ -60,7 +60,6 @@ fn test_block() {
     let max_width = doc.config().max_width;
     let mut buf = String::new();
     arena_doc.render_fmt(max_width, &mut buf).unwrap();
-    println!("{}", buf);
     // Verify the output contains expected elements
     assert!(buf.contains("function"));
     assert!(buf.contains("constant"));

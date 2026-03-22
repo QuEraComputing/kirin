@@ -105,7 +105,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
                     Some(ty),
                     BuilderSSAKind::BlockArgument(id, index),
                 );
-                self.stage.ssas.alloc(ssa);
+                let _ = self.stage.ssas.alloc(ssa);
                 arg
             })
             .collect::<Vec<_>>();
@@ -159,7 +159,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         }
         // Apply replacements and delete placeholder SSAs
         for &old in replacements.keys() {
-            self.stage.ssas.delete(old);
+            let _ = self.stage.ssas.delete(old);
         }
         for &stmt_id in &self.statements {
             let info = &mut self.stage.statements[stmt_id];
@@ -189,7 +189,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
             .statements(self.stage.link_statements(&self.statements))
             .maybe_terminator(self.terminator)
             .new();
-        self.stage.blocks.alloc(block);
+        let _ = self.stage.blocks.alloc(block);
         id
     }
 }

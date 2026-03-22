@@ -137,7 +137,7 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             graph,
             self.yields,
         );
-        self.stage.digraphs.alloc(info);
+        let _ = self.stage.digraphs.alloc(info);
         id
     }
 }

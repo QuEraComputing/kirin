@@ -15,6 +15,7 @@ pub type Args<V> = SmallVec<[V; 2]>;
 /// [`Infallible`] (no extra variants), which is sufficient for abstract
 /// interpreters. Concrete interpreters use [`ConcreteExt`] for `Break`/`Halt`.
 #[derive(Debug)]
+#[must_use = "continuations must be handled to advance interpreter state"]
 pub enum Continuation<V, Ext = Infallible> {
     /// Advance to the next statement in the current block.
     Continue,

@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-bat = { version = "0.26", optional = true }
+bat = { version = "0.26", optional = true, default-features = false, features = ["regex-fancy", "paging"] }
 kirin-ir.workspace = true
 kirin-derive-prettyless = { workspace = true, optional = true }
 petgraph.workspace = true

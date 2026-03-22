@@ -344,7 +344,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
 
         real_info.node.ptr = stub;
         *self.blocks[stub] = real_info;
-        self.blocks.delete(real);
+        let _ = self.blocks.delete(real);
     }
 
     /// Attach node statements and yield values to an existing digraph.

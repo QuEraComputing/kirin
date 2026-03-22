@@ -87,6 +87,7 @@ pub trait HasDialectParser<'t>: Sized {
 
 /// A parse error with location information.
 #[derive(Debug, Clone)]
+#[must_use]
 pub struct ParseError {
     pub message: String,
     pub span: SimpleSpan,

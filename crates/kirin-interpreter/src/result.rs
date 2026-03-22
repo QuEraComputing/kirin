@@ -100,7 +100,11 @@ impl<V> AnalysisResult<V> {
             let Some(other_args) = other.block_args.get(block) else {
                 return false;
             };
-            debug_assert_eq!(self_args.len(), other_args.len());
+            assert_eq!(
+                self_args.len(),
+                other_args.len(),
+                "block argument count mismatch in is_subseteq"
+            );
             for ssa in self_args {
                 match (self.values.get(ssa), other.values.get(ssa)) {
                     (Some(a), Some(b)) if !a.is_subseteq(b) => return false,
