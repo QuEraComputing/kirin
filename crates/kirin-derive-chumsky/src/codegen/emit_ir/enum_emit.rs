@@ -1,6 +1,7 @@
 use std::collections::HashSet;
 
-use kirin_derive_toolkit::ir::fields::FieldInfo;
+use kirin_derive_toolkit::codegen::ConstructorBuilder;
+use kirin_derive_toolkit::ir::fields::{FieldCategory, FieldInfo};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -108,74 +109,36 @@ impl GenerateEmitIR {
         _fields_in_fmt: &HashSet<usize>,
         is_tuple: bool,
     ) -> TokenStream {
-        use kirin_derive_toolkit::ir::fields::FieldCategory;
-
         let ast_field_vars: std::collections::HashMap<usize, &syn::Ident> = ast_fields
             .iter()
             .zip(field_vars.iter())
             .map(|(f, v)| (f.index, v))
             .collect();
 
-        let ordered_all_fields: Vec<_> = if is_tuple {
-            let mut sorted: Vec<_> = all_fields.iter().collect();
-            sorted.sort_by_key(|f| f.index);
-            sorted
-        } else {
-            all_fields.iter().collect()
+        let ctor = match variant_name {
+            Some(v) => ConstructorBuilder::new_variant(original_name, v, is_tuple),
+            None => ConstructorBuilder::new_struct(original_name, is_tuple),
         };
 
-        let field_values: Vec<_> = ordered_all_fields
-            .iter()
-            .map(|field| {
-                if let Some(var) = ast_field_vars.get(&field.index) {
-                    let emitted_var =
-                        syn::Ident::new(&format!("{}_ir", var), proc_macro2::Span::call_site());
+        ctor.build(all_fields, |field| {
+            if let Some(var) = ast_field_vars.get(&field.index) {
+                let emitted_var =
+                    syn::Ident::new(&format!("{}_ir", var), proc_macro2::Span::call_site());
 
-                    match field.category() {
-                        FieldCategory::Argument
-                        | FieldCategory::Result
-                        | FieldCategory::Block
-                        | FieldCategory::Successor
-                        | FieldCategory::Region
-                        | FieldCategory::Signature
-                        | FieldCategory::Symbol => {
-                            quote! { #emitted_var.into() }
-                        }
-                        FieldCategory::Value => {
-                            quote! { #emitted_var }
-                        }
-                        FieldCategory::DiGraph | FieldCategory::UnGraph => {
-                            quote! { #emitted_var.into() }
-                        }
+                match field.category() {
+                    FieldCategory::Value => {
+                        quote! { #emitted_var }
                     }
-                } else if let Some(default_value) = field.default_value() {
-                    let default_expr = default_value.to_expr();
-                    quote! { #default_expr }
-                } else {
-                    quote! { ::core::default::Default::default() }
+                    _ => {
+                        quote! { #emitted_var.into() }
+                    }
                 }
-            })
-            .collect();
-
-        if is_tuple {
-            match variant_name {
-                Some(v) => quote! { #original_name::#v(#(#field_values),*) },
-                None => quote! { #original_name(#(#field_values),*) },
+            } else if let Some(default_value) = field.default_value() {
+                let default_expr = default_value.to_expr();
+                quote! { #default_expr }
+            } else {
+                quote! { ::core::default::Default::default() }
             }
-        } else {
-            let field_assigns: Vec<_> = ordered_all_fields
-                .iter()
-                .zip(field_values.iter())
-                .map(|(field, value)| {
-                    let name = field.ident.as_ref().unwrap();
-                    quote! { #name: #value }
-                })
-                .collect();
-
-            match variant_name {
-                Some(v) => quote! { #original_name::#v { #(#field_assigns),* } },
-                None => quote! { #original_name { #(#field_assigns),* } },
-            }
-        }
+        })
     }
 }
