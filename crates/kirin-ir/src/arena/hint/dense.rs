@@ -44,16 +44,17 @@ impl<I: Identifier, T> DenseHint<I, T> {
     }
 
     pub fn insert_or_combine(&mut self, id: I, value: T, combine: impl FnOnce(&T, T) -> T) {
-        let entry = self.data.get_mut(id.into().raw());
-        if let Some(slot) = entry {
-            match slot {
-                Some(existing) => {
-                    let new_value = combine(existing, value);
-                    *existing = new_value;
-                }
-                None => {
-                    *slot = Some(value);
-                }
+        let idx = id.into().raw();
+        if idx >= self.data.len() {
+            self.data.resize_with(idx + 1, || None);
+        }
+        match &mut self.data[idx] {
+            Some(existing) => {
+                let new_value = combine(existing, value);
+                *existing = new_value;
+            }
+            slot @ None => {
+                *slot = Some(value);
             }
         }
     }
@@ -78,5 +79,67 @@ where
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
         self.get_mut(index)
             .expect("No annotation found for the given identifier")
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::arena::id::Id;
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+    struct TestId(Id);
+
+    impl From<Id> for TestId {
+        fn from(id: Id) -> Self {
+            TestId(id)
+        }
+    }
+
+    impl From<TestId> for Id {
+        fn from(id: TestId) -> Self {
+            id.0
+        }
+    }
+
+    impl Identifier for TestId {}
+
+    fn make_hint(len: usize) -> DenseHint<TestId, i32> {
+        DenseHint {
+            data: std::iter::repeat_with(|| None).take(len).collect(),
+            marker: std::marker::PhantomData,
+        }
+    }
+
+    #[test]
+    fn insert_or_combine_out_of_range_resizes() {
+        let mut hint = make_hint(2);
+        let out_of_range_id = TestId(Id(5));
+
+        hint.insert_or_combine(out_of_range_id, 42, |existing, new| existing + new);
+
+        assert_eq!(hint.get(out_of_range_id), Some(&42));
+        assert_eq!(hint.len(), 6);
+    }
+
+    #[test]
+    fn insert_or_combine_combines_existing() {
+        let mut hint = make_hint(2);
+        let id = TestId(Id(0));
+
+        hint.insert(id, 10);
+        hint.insert_or_combine(id, 5, |existing, new| existing + new);
+
+        assert_eq!(hint.get(id), Some(&15));
+    }
+
+    #[test]
+    fn insert_or_combine_inserts_into_empty_slot() {
+        let mut hint = make_hint(2);
+        let id = TestId(Id(1));
+
+        hint.insert_or_combine(id, 7, |existing, new| existing + new);
+
+        assert_eq!(hint.get(id), Some(&7));
     }
 }
