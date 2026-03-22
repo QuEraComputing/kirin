@@ -1,5 +1,6 @@
 use super::{EmitContext, EmitError, HasDialectParser};
 
+#[doc(hidden)]
 /// Witness trait for emitting IR from a dialect's parsed AST output.
 ///
 /// **This trait is an implementation detail of derive-generated code.**

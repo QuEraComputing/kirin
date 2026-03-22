@@ -20,6 +20,54 @@ pub fn validate_format<'ir>(
     ValidationVisitor::new().validate(stmt, format, collected)
 }
 
+/// Validates that `ir_path` is available when DiGraph/UnGraph fields use body projections.
+///
+/// Body projections on graph fields (`{field:ports}`, `{field:captures}`, `{field:body}`)
+/// require `ir_path` (the `#[kirin(crate = ...)]` path) for pretty-print code generation.
+/// Call this before pretty-print codegen to surface a proper `syn::Error` instead of a panic.
+pub fn validate_ir_path_for_body_projections<L: kirin_derive_toolkit::ir::Layout>(
+    format: &Format<'_>,
+    collected: &[FieldInfo<L>],
+    ir_path: Option<&syn::Path>,
+    span: proc_macro2::Span,
+) -> syn::Result<()> {
+    if ir_path.is_some() {
+        return Ok(());
+    }
+
+    for elem in format.elements() {
+        if let crate::format::FormatElement::Field(name, crate::format::FormatOption::Body(_)) =
+            elem
+        {
+            let field = collected.iter().find(|f| {
+                f.ident.as_ref().is_some_and(|id| id == name) || f.index.to_string() == *name
+            });
+            if let Some(field) = field {
+                if matches!(
+                    field.category(),
+                    FieldCategory::DiGraph | FieldCategory::UnGraph
+                ) {
+                    let kind = match field.category() {
+                        FieldCategory::DiGraph => "DiGraph",
+                        FieldCategory::UnGraph => "UnGraph",
+                        _ => unreachable!(),
+                    };
+                    return Err(syn::Error::new(
+                        span,
+                        format!(
+                            "{kind} field '{field}' uses body projections which require \
+                             the IR crate path for code generation. Ensure a \
+                             `#[kirin(crate = ...)]` attribute is present.",
+                        ),
+                    ));
+                }
+            }
+        }
+    }
+
+    Ok(())
+}
+
 /// Result of validation containing field occurrences.
 #[derive(Debug)]
 pub struct ValidationResult<'a> {

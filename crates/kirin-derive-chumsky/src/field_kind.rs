@@ -294,7 +294,9 @@ pub fn print_expr<L: Layout>(
         FieldCategory::DiGraph => match opt {
             FormatOption::Default => quote! { doc.print_digraph(#field_ref) },
             FormatOption::Body(proj) => {
-                let ir = ir_path.expect("ir_path required for Body projections on DiGraph");
+                // unwrap: validate_ir_path_for_body_projections guarantees ir_path is Some
+                // when DiGraph fields use body projections.
+                let ir = ir_path.unwrap();
                 match proj {
                     BodyProjection::Ports => quote! {
                         {
@@ -325,7 +327,9 @@ pub fn print_expr<L: Layout>(
         FieldCategory::UnGraph => match opt {
             FormatOption::Default => quote! { doc.print_ungraph(#field_ref) },
             FormatOption::Body(proj) => {
-                let ir = ir_path.expect("ir_path required for Body projections on UnGraph");
+                // unwrap: validate_ir_path_for_body_projections guarantees ir_path is Some
+                // when UnGraph fields use body projections.
+                let ir = ir_path.unwrap();
                 match proj {
                     BodyProjection::Ports => quote! {
                         {

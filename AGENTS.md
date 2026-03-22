@@ -8,6 +8,7 @@
 - use `mod.rs` over `<name>.rs` for modules that contain multiple files.
 - `mod.rs` should stay lean: only module declarations (`mod`), re-exports (`pub use`), and prelude definitions. Move substantial logic into sibling files within the same directory.
 - when creating tests, always put common tools created for testing in the `kirin-test-utils` crate, unless they are specific to a single crate.
+- **No unsafe code.** All implementations MUST use safe Rust. Do not use `unsafe` blocks, `mem::zeroed()`, `mem::transmute()`, `MaybeUninit`, raw pointers, or any other unsafe constructs. If a problem seems to require unsafe, redesign the approach to use safe alternatives (e.g., `Option` for tombstones, `enum` for tagged unions, bounds/trait constraints for type safety). Existing unsafe code is a bug to be fixed, not a pattern to follow.
 
 ## Build and Test
 

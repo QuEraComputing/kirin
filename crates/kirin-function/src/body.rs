@@ -14,3 +14,9 @@ pub struct FunctionBody<T: CompileTimeValue> {
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
+
+impl<T: CompileTimeValue> HasRegionBody for FunctionBody<T> {
+    fn region(&self) -> &Region {
+        &self.body
+    }
+}

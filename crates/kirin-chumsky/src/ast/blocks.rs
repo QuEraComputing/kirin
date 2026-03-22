@@ -156,7 +156,7 @@ where
         .map(|arg| kirin_ir::SSAValue::from(Id::from(*arg)))
         .collect();
     for ((name, _), ssa) in arg_info.iter().zip(block_args.iter()) {
-        ctx.register_ssa(name.clone(), *ssa);
+        ctx.register_ssa(name.clone(), *ssa)?;
     }
 
     // Phase 2: Emit statements now that block arguments are real SSAs.
@@ -187,7 +187,7 @@ where
     if let Some(label) = block_ast.label
         && ctx.lookup_block(label.value).is_none()
     {
-        ctx.register_block(label.value.to_string(), block);
+        ctx.register_block(label.value.to_string(), block)?;
     }
 
     Ok(block)
@@ -243,22 +243,24 @@ impl<'src, TypeOutput, StmtOutput> Region<'src, TypeOutput, StmtOutput> {
         IR: Dialect,
         TypeOutput: EmitIR<IR, Output = IR::Type>,
     {
+        // Push a new scope for the region's blocks and SSA names.
+        // This ensures inner block names and SSA names do not pollute
+        // the outer scope, and outer names are restored on pop.
+        ctx.push_scope();
+
         // Pass 1: Create stub blocks and register their names so that forward
         // references (e.g. `br ^exit` before ^exit is defined) can resolve.
-        let stub_blocks: Vec<_> = self
-            .blocks
-            .iter()
-            .map(|block_ast| {
-                let name = block_ast
-                    .value
-                    .label
-                    .map(|l| l.value.to_string())
-                    .unwrap_or_else(|| "projected".to_string());
-                let stub = ctx.stage.block().name(name.clone()).new();
-                ctx.register_block(name, stub);
-                stub
-            })
-            .collect();
+        let mut stub_blocks = Vec::with_capacity(self.blocks.len());
+        for block_ast in &self.blocks {
+            let name = block_ast
+                .value
+                .label
+                .map(|l| l.value.to_string())
+                .unwrap_or_else(|| "projected".to_string());
+            let stub = ctx.stage.block().name(name.clone()).new();
+            ctx.register_block(name, stub)?;
+            stub_blocks.push(stub);
+        }
 
         // Pass 2: Emit full block bodies. Successor references inside these
         // blocks resolve to the stubs created above.
@@ -274,6 +276,9 @@ impl<'src, TypeOutput, StmtOutput> Region<'src, TypeOutput, StmtOutput> {
         for (&stub, &real) in stub_blocks.iter().zip(real_blocks.iter()) {
             ctx.stage.remap_block_identity(stub, real);
         }
+
+        // Pop the region scope — inner names are discarded.
+        ctx.pop_scope();
 
         // Build the region using the stub IDs (now containing real data).
         let mut builder = ctx.stage.region();

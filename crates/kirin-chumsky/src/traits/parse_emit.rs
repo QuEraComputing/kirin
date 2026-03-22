@@ -65,6 +65,14 @@ impl From<EmitError> for ChumskyError {
 /// 2. **Marker**: Implement `SimpleParseEmit` for non-recursive dialects
 ///    (no `Block`/`Region` fields) to get a blanket impl for free.
 /// 3. **Manual**: Implement directly for full control over parse+emit.
+///
+/// # Decision table
+///
+/// | Dialect characteristics                  | Recommended path          |
+/// |------------------------------------------|--------------------------|
+/// | Has `Block`, `Region`, or `DiGraph` fields | `#[derive(HasParser)]`  |
+/// | No `Block`/`Region`/`DiGraph`, no recursion | `impl SimpleParseEmit` |
+/// | Custom parse logic or non-standard emit  | `impl ParseEmit` manually |
 pub trait ParseEmit<L: Dialect = Self>: Dialect {
     /// Parse input text and emit a single IR statement.
     fn parse_and_emit(input: &str, ctx: &mut EmitContext<'_, L>)

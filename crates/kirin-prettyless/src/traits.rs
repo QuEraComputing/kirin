@@ -118,6 +118,7 @@ pub trait PrettyPrint {
 /// // Display with bat pager
 /// node.render(&stage).bat();
 /// ```
+#[must_use = "call .into_string(), .print(), or .bat() to produce output"]
 pub struct RenderBuilder<'n, 's, N, L: Dialect> {
     node: &'n N,
     stage: &'s StageInfo<L>,

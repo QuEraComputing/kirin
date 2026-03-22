@@ -386,20 +386,33 @@ impl_from_test!(BlockArgument);
 impl_from_test!(DeletedSSAValue);
 impl_from_test!(Port);
 
-/// GetInfo impl for SSAValue — returns `Item<SSAInfo<L>>` from
-/// finalized `StageInfo` (clean types with `L::Type` and `SSAKind`).
+/// GetInfo impl for SSAValue — returns `SSAInfo<L>` from finalized
+/// `StageInfo` (clean types with `L::Type` and `SSAKind`).
+///
+/// Deleted or tombstoned SSA slots (`None` in the arena) return `None`
+/// from `get_info`, so stale IDs never produce invalid data.
 impl<L: Dialect, T> GetInfo<L> for T
 where
     T: Into<SSAValue> + Identifier,
 {
-    type Info = crate::arena::Item<SSAInfo<L>>;
+    type Info = SSAInfo<L>;
 
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
-        stage.ssas.get(*self)
+        let item = stage.ssas.get(*self)?;
+        if item.deleted() {
+            return None;
+        }
+        // Deref through Item to Option<SSAInfo<L>>, then unwrap the Option ref
+        (**item).as_ref()
     }
 
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
-        stage.ssas.get_mut(*self)
+        let item = stage.ssas.get_mut(*self)?;
+        if item.deleted() {
+            return None;
+        }
+        // DerefMut through Item to Option<SSAInfo<L>>, then unwrap the Option ref
+        (**item).as_mut()
     }
 }
 

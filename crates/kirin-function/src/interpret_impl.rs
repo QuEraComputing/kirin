@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, Dialect, GetInfo, HasStageInfo};
+use kirin::prelude::{CompileTimeValue, Dialect, GetInfo, HasRegionBody, HasStageInfo};
 use kirin_interpreter::{
     Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion, StageResolutionError,
 };
@@ -6,25 +6,51 @@ use smallvec::smallvec;
 
 use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
 
-impl<T> SSACFGRegion for FunctionBody<T>
+/// Shared entry-block lookup for any type with a single region body.
+fn region_entry_block<L: Dialect>(
+    op: &impl HasRegionBody,
+    stage: &kirin::prelude::StageInfo<L>,
+) -> Result<kirin::prelude::Block, InterpreterError> {
+    op.region()
+        .blocks(stage)
+        .next()
+        .ok_or(InterpreterError::missing_entry_block())
+}
+
+/// Shared interpret logic for any type with a single region body: resolve stage,
+/// find the entry block, and jump to it.
+fn interpret_region_body<'ir, I, L>(
+    op: &impl HasRegionBody,
+    interp: &mut I,
+) -> Result<Continuation<I::Value, I::Ext>, I::Error>
 where
-    T: kirin::prelude::CompileTimeValue,
+    I: Interpreter<'ir>,
+    I::StageInfo: HasStageInfo<L>,
+    I::Error: From<InterpreterError>,
+    L: Interpretable<'ir, I> + 'ir,
 {
+    let stage = interp.resolve_stage::<L>()?;
+    let entry = op
+        .region()
+        .blocks(stage)
+        .next()
+        .ok_or(InterpreterError::missing_entry_block())?;
+    Ok(Continuation::Jump(entry, smallvec![]))
+}
+
+impl<T: CompileTimeValue> SSACFGRegion for FunctionBody<T> {
     fn entry_block<L: Dialect>(
         &self,
         stage: &kirin::prelude::StageInfo<L>,
     ) -> Result<kirin::prelude::Block, InterpreterError> {
-        self.body
-            .blocks(stage)
-            .next()
-            .ok_or(InterpreterError::missing_entry_block())
+        region_entry_block(self, stage)
     }
 }
 
 impl<'ir, I, T> Interpretable<'ir, I> for FunctionBody<T>
 where
     I: Interpreter<'ir>,
-    T: kirin::prelude::CompileTimeValue,
+    T: CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
@@ -32,35 +58,23 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        let stage = interp.resolve_stage::<L>()?;
-        let entry = self
-            .body
-            .blocks(stage)
-            .next()
-            .ok_or(InterpreterError::missing_entry_block())?;
-        Ok(Continuation::Jump(entry, smallvec![]))
+        interpret_region_body(self, interp)
     }
 }
 
-impl<T> SSACFGRegion for Lambda<T>
-where
-    T: kirin::prelude::CompileTimeValue,
-{
+impl<T: CompileTimeValue> SSACFGRegion for Lambda<T> {
     fn entry_block<L: Dialect>(
         &self,
         stage: &kirin::prelude::StageInfo<L>,
     ) -> Result<kirin::prelude::Block, InterpreterError> {
-        self.body
-            .blocks(stage)
-            .next()
-            .ok_or(InterpreterError::missing_entry_block())
+        region_entry_block(self, stage)
     }
 }
 
 impl<'ir, I, T> Interpretable<'ir, I> for Lambda<T>
 where
     I: Interpreter<'ir>,
-    T: kirin::prelude::CompileTimeValue,
+    T: CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
     where
@@ -68,13 +82,7 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        let stage = interp.resolve_stage::<L>()?;
-        let entry = self
-            .body
-            .blocks(stage)
-            .next()
-            .ok_or(InterpreterError::missing_entry_block())?;
-        Ok(Continuation::Jump(entry, smallvec![]))
+        interpret_region_body(self, interp)
     }
 }
 

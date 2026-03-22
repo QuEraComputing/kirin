@@ -12,6 +12,13 @@ use super::arenas::Arenas;
 /// functions) and a clean SSA arena where every value has a resolved type and
 /// kind. It is the read-only output of [`BuilderStageInfo::finalize`].
 ///
+/// # SSA tombstones
+///
+/// The SSA arena stores `Option<SSAInfo<L>>`: live items are `Some(info)`,
+/// deleted (tombstoned) items are `None`. This avoids the need for `unsafe`
+/// zeroed memory and guarantees that stale IDs pointing at deleted slots
+/// never yield invalid data — they yield `None` instead.
+///
 /// # Obtaining a `StageInfo`
 ///
 /// Build IR with [`BuilderStageInfo`], then call
@@ -58,7 +65,7 @@ use super::arenas::Arenas;
 #[derive(Debug)]
 pub struct StageInfo<L: Dialect> {
     pub(crate) nodes: Arenas<L>,
-    pub(crate) ssas: Arena<SSAValue, SSAInfo<L>>,
+    pub(crate) ssas: Arena<SSAValue, Option<SSAInfo<L>>>,
 }
 
 impl<L> Default for StageInfo<L>
@@ -77,7 +84,7 @@ impl<L> Clone for StageInfo<L>
 where
     L: Dialect,
     StatementInfo<L>: Clone,
-    SSAInfo<L>: Clone,
+    Option<SSAInfo<L>>: Clone,
 {
     fn clone(&self) -> Self {
         Self {
@@ -103,7 +110,10 @@ impl<L: Dialect> DerefMut for StageInfo<L> {
 
 impl<L: Dialect> StageInfo<L> {
     /// Get a reference to the SSA values arena.
-    pub fn ssa_arena(&self) -> &Arena<SSAValue, SSAInfo<L>> {
+    ///
+    /// The arena stores `Option<SSAInfo<L>>`: live items are `Some(info)`,
+    /// deleted (tombstoned) items are `None`.
+    pub fn ssa_arena(&self) -> &Arena<SSAValue, Option<SSAInfo<L>>> {
         &self.ssas
     }
 

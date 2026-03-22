@@ -153,7 +153,20 @@ impl<L: Dialect> From<StageInfo<L>> for BuilderStageInfo<L> {
     fn from(stage: StageInfo<L>) -> Self {
         Self {
             nodes: stage.nodes,
-            ssas: stage.ssas.map(BuilderSSAInfo::from),
+            ssas: stage.ssas.map(|opt| match opt {
+                Some(info) => BuilderSSAInfo::from(info),
+                None => {
+                    // Deleted/tombstoned item — create a minimal placeholder
+                    // BuilderSSAInfo. The arena slot is already marked deleted,
+                    // so this value is never accessed through normal APIs.
+                    BuilderSSAInfo::new(
+                        SSAValue::from(crate::arena::Id(0)),
+                        None,
+                        None,
+                        BuilderSSAKind::Test,
+                    )
+                }
+            }),
         }
     }
 }
@@ -194,8 +207,10 @@ impl<L: Dialect> BuilderStageInfo<L> {
     /// Checks that no `BuilderSSAKind::Unresolved` or `BuilderSSAKind::Test` values remain,
     /// and that all SSAs have types set. Converts the SSA arena from [`BuilderSSAInfo`]
     /// to [`SSAInfo`](crate::node::ssa::SSAInfo).
+    ///
+    /// Deleted SSA slots become `None` tombstones in the resulting arena.
     pub fn finalize(self) -> Result<StageInfo<L>, FinalizeError> {
-        // Validate all SSAs first
+        // Validate all live SSAs first
         for ssa_info in self.ssas.iter() {
             match ssa_info.builder_kind() {
                 BuilderSSAKind::Unresolved(_) => {
@@ -211,15 +226,15 @@ impl<L: Dialect> BuilderStageInfo<L> {
             }
         }
         // All live SSAs are valid — infallible conversion.
-        // Deleted SSAs may have unresolved kinds, so use map_live to handle
-        // them separately. Deleted items are never accessed through public APIs.
+        // Deleted SSAs become `None` tombstones (safe, no zeroed memory).
         let ssas = self.ssas.map_live(
             |info| {
-                info.finalize()
-                    .expect("finalize: SSA validation passed but conversion failed")
+                Some(
+                    info.finalize()
+                        .expect("finalize: SSA validation passed but conversion failed"),
+                )
             },
-            // SAFETY: deleted items are tombstoned and never dereferenced.
-            |_info| unsafe { std::mem::zeroed() },
+            |_info| None,
         );
         Ok(StageInfo {
             nodes: self.nodes,
@@ -230,8 +245,9 @@ impl<L: Dialect> BuilderStageInfo<L> {
     /// Convert to [`StageInfo`] without validation.
     ///
     /// This is a `pub(crate)` escape hatch used by [`StageInfo::with_builder`]
-    /// to round-trip through the builder. SSAs with missing types or unresolved
-    /// kinds get best-effort defaults. Not part of the public API.
+    /// to round-trip through the builder. SSAs with unresolved kinds get a
+    /// best-effort default. SSAs with missing types and deleted items become
+    /// `None` tombstones. Not part of the public API.
     pub(crate) fn finalize_unchecked(self) -> StageInfo<L> {
         let ssas = self.ssas.map_live(
             |info| {
@@ -246,30 +262,22 @@ impl<L: Dialect> BuilderStageInfo<L> {
                     ));
                 let uses = info.uses;
                 match info.ty {
-                    Some(ty) => crate::node::ssa::SSAInfo {
+                    Some(ty) => Some(crate::node::ssa::SSAInfo {
                         id,
                         name,
                         ty,
                         kind,
                         uses,
-                    },
-                    None => {
-                        // SAFETY: The type field is zeroed. This is only used in
-                        // the with_builder round-trip path where SSAs created by
-                        // the parser may lack types. Deleted items are tombstoned
-                        // and never dereferenced.
-                        let mut ssa_info: crate::node::ssa::SSAInfo<L> =
-                            unsafe { std::mem::zeroed() };
-                        ssa_info.id = id;
-                        ssa_info.name = name;
-                        ssa_info.kind = kind;
-                        ssa_info.uses = uses;
-                        ssa_info
-                    }
+                    }),
+                    // Type-less SSAs cannot produce a valid SSAInfo<L>.
+                    // Tombstone them — callers should ensure types are set
+                    // before finalization (e.g., via #[kirin(type = ...)]
+                    // annotations or explicit builder calls).
+                    None => None,
                 }
             },
-            // SAFETY: deleted items are tombstoned and never dereferenced.
-            |_info| unsafe { std::mem::zeroed() },
+            // Deleted items become None tombstones — safe, no zeroed memory.
+            |_info| None,
         );
         StageInfo {
             nodes: self.nodes,

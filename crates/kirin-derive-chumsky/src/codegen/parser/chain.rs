@@ -325,7 +325,9 @@ impl GenerateHasDialectParser {
     /// Builds a ResultValue AST field for new-format mode.
     ///
     /// The name comes from `__result_names[idx]` and the type comes from
-    /// the `:type` occurrence in the format string (if present).
+    /// the `:type` occurrence in the format string (if present). When no
+    /// `:type` projection is in the format, falls back to the `#[kirin(type = expr)]`
+    /// annotation to ensure the SSA always gets a type during emission.
     fn build_new_format_result_value(
         &self,
         field: &FieldInfo<ChumskyLayout>,
@@ -340,6 +342,10 @@ impl GenerateHasDialectParser {
         let ty_expr = if let Some(type_occ) = type_occ {
             let var = &type_occ.var_name;
             quote! { Some(#var.ty.clone()) }
+        } else if let Some(ssa_type) = field.ssa_type() {
+            // No :type in format string — use the #[kirin(type = expr)] annotation
+            // to ensure the ResultValue SSA gets a type during emission.
+            quote! { Some(#ssa_type) }
         } else {
             quote! { None }
         };

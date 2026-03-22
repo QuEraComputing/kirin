@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use kirin_ir::{
-    Block, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Item, Port, Region, SSAInfo, SSAValue,
+    Block, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Port, Region, SSAInfo, SSAValue,
     Signature, SpecializedFunction, StagedFunction, Statement, UnGraph,
 };
 use petgraph::visit::IntoNodeReferences;
@@ -21,7 +21,7 @@ where
     /// Resolves the name via [`Document::ssa_name`] and prepends `%`.
     pub fn print_ssa_ref<V>(&'a self, value: V) -> ArenaDoc<'a>
     where
-        V: Copy + GetInfo<L, Info = Item<SSAInfo<L>>>,
+        V: Copy + GetInfo<L, Info = SSAInfo<L>>,
         Id: From<V>,
     {
         self.text(format!("%{}", self.ssa_name(value)))
@@ -30,7 +30,7 @@ where
     /// Print the type of an SSA value.
     pub fn print_ssa_type<V>(&'a self, value: V) -> ArenaDoc<'a>
     where
-        V: Copy + GetInfo<L, Info = Item<SSAInfo<L>>>,
+        V: Copy + GetInfo<L, Info = SSAInfo<L>>,
         Id: From<V>,
     {
         let info = value.expect_info(self.stage);
@@ -168,7 +168,7 @@ where
                     doc += self.text(", ");
                 }
                 let name = self.ssa_name(*port);
-                let info: &Item<SSAInfo<L>> = port.expect_info(self.stage);
+                let info: &SSAInfo<L> = port.expect_info(self.stage);
                 doc += self.text(format!("%{}: {}", name, info.ty()));
             }
             doc
@@ -206,26 +206,7 @@ where
         let mut header = self.text("digraph ") + self.text(graph_name);
         header += self.print_ports(info.ports(), info.edge_count());
 
-        // Body: nodes + yield
-        let mut inner = self.nil();
-        let mut first = true;
-        for (_idx, stmt) in info.graph().node_references() {
-            if !first {
-                inner += self.line_();
-            }
-            inner += self.print_statement(stmt) + self.text(";");
-            first = false;
-        }
-
-        // Yield line
-        if !info.yields().is_empty() {
-            if !first {
-                inner += self.line_();
-            }
-            let yield_doc = self.list(info.yields().iter(), ", ", |ssa| self.print_ssa_ref(*ssa));
-            inner += self.text("yield ") + yield_doc + self.text(";");
-        }
-
+        let inner = self.print_digraph_body_only(digraph);
         header + self.text(" {") + self.block_indent(inner) + self.line_() + self.text("}")
     }
 
@@ -247,58 +228,7 @@ where
         let mut header = self.text("ungraph ") + self.text(graph_name);
         header += self.print_ports(info.ports(), info.edge_count());
 
-        // Body: interleave edge statements with node statements.
-        // For each node, print any unprinted edge statements whose results it uses,
-        // then print the node itself.
-        let edge_stmts = info.edge_statements();
-
-        // Build a map from result SSAValues to their edge statement
-        let edge_result_to_stmt: std::collections::HashMap<SSAValue, Statement> = edge_stmts
-            .iter()
-            .flat_map(|&edge_stmt| {
-                edge_stmt
-                    .results::<L>(self.stage)
-                    .map(move |rv| (SSAValue::from(*rv), edge_stmt))
-            })
-            .collect();
-
-        let mut printed_edges: HashSet<Statement> = HashSet::new();
-        let mut inner = self.nil();
-        let mut first = true;
-
-        for (_idx, node_stmt) in info.graph().node_references() {
-            // Find edge statements used by this node
-            for arg in node_stmt.arguments::<L>(self.stage) {
-                if let Some(&edge_stmt) = edge_result_to_stmt.get(arg)
-                    && printed_edges.insert(edge_stmt)
-                {
-                    if !first {
-                        inner += self.line_();
-                    }
-                    inner += self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
-                    first = false;
-                }
-            }
-
-            // Print the node
-            if !first {
-                inner += self.line_();
-            }
-            inner += self.print_statement(node_stmt) + self.text(";");
-            first = false;
-        }
-
-        // Print any remaining unprinted edge statements
-        for &edge_stmt in edge_stmts {
-            if printed_edges.insert(edge_stmt) {
-                if !first {
-                    inner += self.line_();
-                }
-                inner += self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
-                first = false;
-            }
-        }
-
+        let inner = self.print_ungraph_body_only(ungraph);
         header + self.text(" {") + self.block_indent(inner) + self.line_() + self.text("}")
     }
 
@@ -596,7 +526,7 @@ where
                 doc += self.text(", ");
             }
             let name = self.ssa_name(*port);
-            let info: &Item<SSAInfo<L>> = port.expect_info(self.stage);
+            let info: &SSAInfo<L> = port.expect_info(self.stage);
             doc += self.text(format!("%{}: {}", name, info.ty()));
         }
         doc

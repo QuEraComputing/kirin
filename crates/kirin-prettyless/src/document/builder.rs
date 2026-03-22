@@ -1,7 +1,7 @@
 use std::borrow::Cow;
 use std::cell::Cell;
 
-use kirin_ir::{Dialect, GetInfo, GlobalSymbol, Id, InternTable, Item, SSAInfo, StageInfo};
+use kirin_ir::{Dialect, GetInfo, GlobalSymbol, Id, InternTable, SSAInfo, StageInfo};
 use prettyless::{Arena, DocAllocator};
 
 use crate::{ArenaDoc, Config, PrettyPrint};
@@ -134,7 +134,7 @@ impl<'a, L: Dialect> Document<'a, L> {
     /// a `%` prefix.
     pub fn ssa_name<V>(&self, value: V) -> String
     where
-        V: Copy + GetInfo<L, Info = Item<SSAInfo<L>>>,
+        V: Copy + GetInfo<L, Info = SSAInfo<L>>,
         Id: From<V>,
     {
         let info = value.expect_info(self.stage);

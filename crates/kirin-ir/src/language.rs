@@ -72,6 +72,16 @@ pub trait HasUngraphsMut<'a> {
     fn ungraphs_mut(&'a mut self) -> Self::IterMut;
 }
 
+/// Structural trait for dialect operations that have a single region body.
+///
+/// This trait is intentionally not a supertrait of `Dialect` — it applies to
+/// individual operations (e.g., `FunctionBody`, `Lambda`) that contain a single
+/// `Region`, not to the dialect enum itself.  It enables shared helper functions
+/// for interpreter and analysis code that operate on region-bearing operations.
+pub trait HasRegionBody {
+    fn region(&self) -> &crate::Region;
+}
+
 pub trait IsTerminator {
     fn is_terminator(&self) -> bool;
 }

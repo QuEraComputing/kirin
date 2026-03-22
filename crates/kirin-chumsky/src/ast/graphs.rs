@@ -145,6 +145,9 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
         let (port_names, port_types) = collect_port_info(&self.ports, ctx)?;
         let (cap_names, cap_types) = collect_port_info(&self.captures, ctx)?;
 
+        // Push a new scope for the graph body's SSA names.
+        ctx.push_scope();
+
         // Phase 1: Create the digraph with ports/captures only (no nodes/yields).
         // This produces real port SSAs immediately.
         let mut builder = ctx.stage.digraph().name(graph_name);
@@ -177,10 +180,10 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
             .map(|p| SSAValue::from(*p))
             .collect();
         for (ssa, name) in port_ssas.into_iter().zip(port_names.iter()) {
-            ctx.register_ssa(name.clone(), ssa);
+            ctx.register_ssa(name.clone(), ssa)?;
         }
         for (ssa, name) in cap_ssas.into_iter().zip(cap_names.iter()) {
-            ctx.register_ssa(name.clone(), ssa);
+            ctx.register_ssa(name.clone(), ssa)?;
         }
 
         // Phase 3: Emit all statements with relaxed dominance.
@@ -202,6 +205,9 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
                 .ok_or_else(|| EmitError::UndefinedSSA(y.value.to_string()))?;
             yield_ssas.push(ssa);
         }
+
+        // Pop the graph scope — inner names are discarded.
+        ctx.pop_scope();
 
         // Phase 5: Attach nodes and yields to the already-created digraph.
         ctx.stage
@@ -248,6 +254,9 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
         let (port_names, port_types) = collect_port_info(&self.ports, ctx)?;
         let (cap_names, cap_types) = collect_port_info(&self.captures, ctx)?;
 
+        // Push a new scope for the graph body's SSA names.
+        ctx.push_scope();
+
         // Phase 1: Create the ungraph with ports/captures only (no edges/nodes).
         let mut builder = ctx.stage.ungraph().name(graph_name);
 
@@ -279,10 +288,10 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
             .map(|p| SSAValue::from(*p))
             .collect();
         for (ssa, name) in port_ssas.into_iter().zip(port_names.iter()) {
-            ctx.register_ssa(name.clone(), ssa);
+            ctx.register_ssa(name.clone(), ssa)?;
         }
         for (ssa, name) in cap_ssas.into_iter().zip(cap_names.iter()) {
-            ctx.register_ssa(name.clone(), ssa);
+            ctx.register_ssa(name.clone(), ssa)?;
         }
 
         // Phase 3: Emit all statements with relaxed dominance, tracking edge vs node
@@ -298,6 +307,9 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
             }
         }
         ctx.set_relaxed_dominance(false);
+
+        // Pop the graph scope — inner names are discarded.
+        ctx.pop_scope();
 
         // Phase 4: Attach edges and nodes to the already-created ungraph.
         ctx.stage

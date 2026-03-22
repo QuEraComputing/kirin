@@ -24,8 +24,9 @@ pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
     Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasDigraphs, HasDigraphsMut,
-    HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
-    HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator,
+    HasRegionBody, HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors,
+    HasSuccessorsMut, HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable,
+    IsTerminator,
 };
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice};
 pub use node::{
@@ -49,9 +50,9 @@ pub use stage::{
 /// Re-exports of the most commonly used types for dialect authors.
 pub mod prelude {
     pub use crate::{
-        Block, BuilderStageInfo, CompileStage, Dialect, Function, GetInfo, HasSignature,
-        HasStageInfo, Pipeline, Region, ResultValue, SSAValue, Signature, SignatureSemantics,
-        StageInfo, StageMeta, Statement,
+        Block, BuilderStageInfo, CompileStage, Dialect, Function, GetInfo, HasRegionBody,
+        HasSignature, HasStageInfo, Pipeline, Region, ResultValue, SSAValue, Signature,
+        SignatureSemantics, StageInfo, StageMeta, Statement,
     };
     pub use crate::{CompileTimeValue, Placeholder, Typeof};
 }

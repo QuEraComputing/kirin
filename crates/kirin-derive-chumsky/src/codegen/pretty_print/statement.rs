@@ -197,6 +197,14 @@ impl GeneratePrettyPrint {
         let fields = &bindings.field_idents;
 
         let ir_path = Self::ir_path(ir_input);
+        // Validate that ir_path is available if any DiGraph/UnGraph field uses body projections.
+        crate::validation::validate_ir_path_for_body_projections(
+            &format,
+            &collected,
+            Some(&ir_path),
+            stmt.name.span(),
+        )
+        .expect("ir_path validation failed");
         let print_expr =
             self.generate_format_print(&format, &field_map, &collected, fields, &ir_path);
 

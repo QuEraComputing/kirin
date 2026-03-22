@@ -1,9 +1,57 @@
 //! Format string parsing.
 //!
-//! Format strings define the syntax for parsing dialect statements.
-//! For example: `"{res} = add {lhs} {rhs}"` defines a statement that
-//! parses a result value, an equals sign, the keyword "add", and two
-//! operands.
+//! Format strings define the syntax for parsing and printing dialect statements.
+//! They are specified via the `#[chumsky(format = "...")]` attribute on dialect
+//! structs or enum variants.
+//!
+//! # EBNF Grammar
+//!
+//! ```text
+//! format         ::= element*
+//! element        ::= escaped_brace | dollar_keyword | context_proj | interpolation | literal+
+//!
+//! escaped_brace  ::= '{{' | '}}'
+//! dollar_keyword ::= '$' IDENT
+//! context_proj   ::= '{:' context_name '}'
+//! interpolation  ::= '{' field_ref (':' projection)? '}'
+//!
+//! field_ref      ::= IDENT | INT
+//! projection     ::= 'name' | 'type' | body_proj | sig_proj
+//! body_proj      ::= 'ports' | 'captures' | 'args' | 'body'
+//! sig_proj       ::= 'inputs' | 'return'
+//! context_name   ::= 'name'
+//!
+//! literal        ::= <any token except '{', '{{', '}}'>
+//! IDENT          ::= <identifier token>
+//! INT            ::= <integer literal token>
+//! ```
+//!
+//! # Projection Table
+//!
+//! Not all projections are valid on every field category. The table below shows
+//! which projections are accepted for each [`FieldCategory`](kirin_derive_toolkit::ir::fields::FieldCategory).
+//!
+//! | Field Category | `(default)` | `:name` | `:type` | `:ports` | `:captures` | `:args` | `:body` | `:inputs` | `:return` |
+//! |----------------|:-----------:|:-------:|:-------:|:--------:|:-----------:|:-------:|:-------:|:---------:|:---------:|
+//! | Argument       | yes         | yes     | yes     |          |             |         |         |           |           |
+//! | Result         | --          | --      | yes     |          |             |         |         |           |           |
+//! | Block          | yes         |         |         |          |             | yes     | yes     |           |           |
+//! | Successor      | yes         |         |         |          |             |         |         |           |           |
+//! | Region         | yes         |         |         |          |             |         | yes     |           |           |
+//! | Symbol         | yes         |         |         |          |             |         |         |           |           |
+//! | Value          | yes         |         |         |          |             |         |         |           |           |
+//! | DiGraph        | yes         |         |         | yes      | yes         |         | yes     |           |           |
+//! | UnGraph        | yes         |         |         | yes      | yes         |         | yes     |           |           |
+//! | Signature      | yes         |         |         |          |             |         |         | yes       | yes       |
+//!
+//! **Result fields**: Result names (`%name =`) are parsed generically by the
+//! framework. Only `:type` is valid in the format string. Using `{result}` or
+//! `{result:name}` is rejected by validation.
+//!
+//! **Body projection completeness**: When any body projection (`:ports`, `:captures`,
+//! `:args`, `:body`) is used on a field, all required projections for that field
+//! category must be present for roundtrip correctness. For example, a DiGraph field
+//! with `:body` must also have `:ports` and `:captures`.
 //!
 //! # Escaping
 //!
@@ -12,6 +60,25 @@
 //!
 //! Note: `}` characters don't need escaping since they're only special
 //! when closing an interpolation. Use `}` directly in the format string.
+//!
+//! # Examples
+//!
+//! ```text
+//! // Simple binary operation with keyword, two arguments, and result type:
+//! "$add {lhs}, {rhs} -> {result:type}"
+//!
+//! // Quantum gate with multiple results:
+//! "$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}"
+//!
+//! // Function body with signature projections and context name:
+//! "fn {:name}({sig:inputs}) -> {sig:return} ({body:ports}) captures ({body:captures}) {{ {body:body} }}"
+//!
+//! // Block field with args/body projections:
+//! "$for ({body:args}) {{ {body:body} }}"
+//!
+//! // Literal braces via escaping:
+//! "dict {{ {key} }} = {value}"
+//! ```
 
 use chumsky::input::Stream;
 use chumsky::prelude::*;

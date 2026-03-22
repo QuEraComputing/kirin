@@ -15,3 +15,9 @@ pub struct Lambda<T: CompileTimeValue> {
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
+
+impl<T: CompileTimeValue> HasRegionBody for Lambda<T> {
+    fn region(&self) -> &Region {
+        &self.body
+    }
+}

@@ -4,6 +4,23 @@ use kirin_function::{Bind, Lambda, Return};
 use kirin_test_languages::{CallableLanguage, SimpleType};
 use kirin_test_utils::roundtrip;
 
+// --- Split signature projection tests ---
+
+// Dialect using split signature projections: {sig:inputs} and {sig:return}
+// separately parse and print the Signature's input types and return type.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[kirin(builders, type = SimpleType, crate = kirin::ir)]
+#[chumsky(crate = kirin::parsers)]
+enum SplitSigLanguage {
+    #[chumsky(format = "fn {:name}({sig:inputs}) -> {sig:return} {body}")]
+    Function {
+        body: Region,
+        sig: Signature<SimpleType>,
+    },
+    #[wraps]
+    Return(Return<SimpleType>),
+}
+
 // --- Tests from function_roundtrip.rs (using shared CallableLanguage) ---
 
 #[test]
@@ -91,4 +108,49 @@ fn test_lambda_parse_roundtrip_single_capture() {
         "%f = lambda @closure captures(%x) { } -> i32",
         &[("x", SimpleType::I32)],
     );
+}
+
+// --- Split signature projection roundtrip tests ---
+
+#[test]
+fn test_split_sig_pipeline_multiple_params() {
+    let input = r#"
+stage @A fn @main(i32, i64) -> i32;
+
+specialize @A fn @main(i32, i64) -> i32 {
+  ^bb0(%x: i32, %y: i64) {
+    ret %x;
+  }
+}
+"#;
+    roundtrip::assert_pipeline_roundtrip::<SplitSigLanguage>(input);
+}
+
+#[test]
+fn test_split_sig_pipeline_single_param() {
+    let input = r#"
+stage @A fn @main(i32) -> i32;
+
+specialize @A fn @main(i32) -> i32 {
+  ^bb0(%x: i32) {
+    ret %x;
+  }
+}
+"#;
+    roundtrip::assert_pipeline_roundtrip::<SplitSigLanguage>(input);
+}
+
+#[test]
+fn test_split_sig_pipeline_many_params() {
+    // Exercises split signature with three input types and a different return type
+    let input = r#"
+stage @A fn @compute(i32, i64, f32) -> f64;
+
+specialize @A fn @compute(i32, i64, f32) -> f64 {
+  ^bb0(%x: i32, %y: i64, %z: f32) {
+    ret %x;
+  }
+}
+"#;
+    roundtrip::assert_pipeline_roundtrip::<SplitSigLanguage>(input);
 }

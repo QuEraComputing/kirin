@@ -398,7 +398,7 @@ fn test_emit_context_ssa_lookup() {
     assert!(ctx.lookup_ssa("x").is_none());
 
     // Register and lookup
-    ctx.register_ssa("x".to_string(), ssa);
+    ctx.register_ssa("x".to_string(), ssa).unwrap();
     assert_eq!(ctx.lookup_ssa("x"), Some(ssa));
 
     // Missing still returns None
@@ -416,20 +416,22 @@ fn test_emit_context_block_lookup() {
     assert!(ctx.lookup_block("bb0").is_none());
 
     // Register and lookup
-    ctx.register_block("bb0".to_string(), block);
+    ctx.register_block("bb0".to_string(), block).unwrap();
     assert_eq!(ctx.lookup_block("bb0"), Some(block));
 }
 
 #[test]
-fn test_emit_context_ssa_overwrite() {
+fn test_emit_context_ssa_duplicate_errors() {
     let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
     let ssa1 = kirin_ir::SSAValue::from(stage.block_argument().index(0));
     let ssa2 = kirin_ir::SSAValue::from(stage.block_argument().index(1));
 
     let mut ctx = crate::traits::EmitContext::new(&mut stage);
-    ctx.register_ssa("x".to_string(), ssa1);
-    ctx.register_ssa("x".to_string(), ssa2);
-    assert_eq!(ctx.lookup_ssa("x"), Some(ssa2));
+    ctx.register_ssa("x".to_string(), ssa1).unwrap();
+    let err = ctx.register_ssa("x".to_string(), ssa2);
+    assert_eq!(err, Err(crate::traits::EmitError::DuplicateSSA("x".to_string())));
+    // First registration is kept
+    assert_eq!(ctx.lookup_ssa("x"), Some(ssa1));
 }
 
 // === parse_ast Tests ===
@@ -946,15 +948,17 @@ fn test_spanned_copy_for_copy_types() {
 // === EmitContext: block overwrite ===
 
 #[test]
-fn test_emit_context_block_overwrite() {
+fn test_emit_context_block_duplicate_errors() {
     let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
     let block1 = stage.block().new();
     let block2 = stage.block().new();
 
     let mut ctx = crate::traits::EmitContext::new(&mut stage);
-    ctx.register_block("bb0".to_string(), block1);
-    ctx.register_block("bb0".to_string(), block2);
-    assert_eq!(ctx.lookup_block("bb0"), Some(block2));
+    ctx.register_block("bb0".to_string(), block1).unwrap();
+    let err = ctx.register_block("bb0".to_string(), block2);
+    assert_eq!(err, Err(crate::traits::EmitError::DuplicateBlock("bb0".to_string())));
+    // First registration is kept
+    assert_eq!(ctx.lookup_block("bb0"), Some(block1));
 }
 
 // === Multiple SSA / block registrations ===
@@ -966,8 +970,8 @@ fn test_emit_context_multiple_distinct_names() {
     let ssa_b = kirin_ir::SSAValue::from(stage.block_argument().index(1));
 
     let mut ctx = crate::traits::EmitContext::new(&mut stage);
-    ctx.register_ssa("a".to_string(), ssa_a);
-    ctx.register_ssa("b".to_string(), ssa_b);
+    ctx.register_ssa("a".to_string(), ssa_a).unwrap();
+    ctx.register_ssa("b".to_string(), ssa_b).unwrap();
     assert_eq!(ctx.lookup_ssa("a"), Some(ssa_a));
     assert_eq!(ctx.lookup_ssa("b"), Some(ssa_b));
     assert_ne!(ssa_a, ssa_b);

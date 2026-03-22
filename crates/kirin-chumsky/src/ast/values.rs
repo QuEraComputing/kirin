@@ -149,7 +149,7 @@ where
         };
 
         // Register the SSA in the symbol table for later reference
-        ctx.register_ssa(self.name.value.to_string(), ssa);
+        ctx.register_ssa(self.name.value.to_string(), ssa)?;
 
         Ok(ssa.into())
     }
