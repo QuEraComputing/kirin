@@ -56,11 +56,11 @@ stage @test fn @main(i64, i64) -> i64;
 specialize @test fn @main(i64, i64) -> i64 {
   ^entry(%x: i64, %cond: i64) {
     %doubled = add %x, %x -> i64;
-    if %cond then ^then() {
+    %if_result = if %cond then ^then() {
       yield %doubled;
     } else ^else() {
       yield %x;
-    };
+    } -> i64;
     %captured = constant 41 -> i64;
     %closure = lambda @adder captures(%captured) {
       ^bb0(%arg: i64) {

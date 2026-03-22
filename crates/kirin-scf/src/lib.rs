@@ -52,12 +52,13 @@ pub enum StructuredControlFlow<T: CompileTimeValue> {
 ///
 /// Corresponds to MLIR's `scf.if`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[chumsky(format = "$if {condition} then {then_body} else {else_body}")]
+#[chumsky(format = "$if {condition} then {then_body} else {else_body} -> {result:type}")]
 #[kirin(builders, type = T)]
 pub struct If<T: CompileTimeValue> {
     condition: SSAValue,
     then_body: Block,
     else_body: Block,
+    result: ResultValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
@@ -68,14 +69,18 @@ pub struct If<T: CompileTimeValue> {
 ///
 /// Corresponds to MLIR's `scf.for`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[chumsky(format = "$for {induction_var} in {start}..{end} step {step} do {body}")]
+#[chumsky(
+    format = "$for {induction_var} in {start}..{end} step {step} iter_args({init_args}) do {body} -> {result:type}"
+)]
 #[kirin(builders, type = T)]
 pub struct For<T: CompileTimeValue> {
     induction_var: SSAValue,
     start: SSAValue,
     end: SSAValue,
     step: SSAValue,
+    init_args: Vec<SSAValue>,
     body: Block,
+    result: ResultValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }

@@ -4,11 +4,12 @@ specialize @source fn @abs(i64) -> i64 {
   ^entry(%x: i64) {
     %zero = constant 0 -> i64;
     %is_neg = lt %x, %zero -> i64;
-    if %is_neg then ^then() {
+    %result = if %is_neg then ^then() {
       %negated = neg %x -> i64;
-      ret %negated;
+      yield %negated;
     } else ^else() {
-      ret %x;
-    };
+      yield %x;
+    } -> i64;
+    ret %result;
   }
 }

@@ -30,11 +30,11 @@ stage @test fn @main(i64, i64) -> i64;
 specialize @test fn @main(i64, i64) -> i64 {
   ^entry(%x: i64, %cond: i64) {
     %doubled = add %x, %x -> i64;
-    if %cond then ^then() {
-      %r = add %doubled, %doubled -> i64;
+    %r = if %cond then ^then() {
+      %r2 = add %doubled, %doubled -> i64;
     } else ^else() {
-      %r2 = sub %doubled, %doubled -> i64;
-    };
+      %r3 = sub %doubled, %doubled -> i64;
+    } -> i64;
   }
 }
 "#;
@@ -48,11 +48,47 @@ stage @test fn @main(i64, i64) -> i64;
 
 specialize @test fn @main(i64, i64) -> i64 {
   ^entry(%x: i64, %cond: i64) {
-    if %cond then ^then() {
+    %result = if %cond then ^then() {
       yield %x;
     } else ^else() {
       yield %x;
-    };
+    } -> i64;
+  }
+}
+"#;
+    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+}
+
+#[test]
+fn test_for_with_iter_args_roundtrip() {
+    let input = r#"
+stage @test fn @main(i64, i64, i64) -> i64;
+
+specialize @test fn @main(i64, i64, i64) -> i64 {
+  ^entry(%lo: i64, %hi: i64, %s: i64) {
+    %init = add %lo, %lo -> i64;
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+      %next = add %acc, %i -> i64;
+      yield %next;
+    } -> i64;
+    ret %sum;
+  }
+}
+"#;
+    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+}
+
+#[test]
+fn test_for_no_iter_args_roundtrip() {
+    let input = r#"
+stage @test fn @main(i64, i64, i64) -> i64;
+
+specialize @test fn @main(i64, i64, i64) -> i64 {
+  ^entry(%lo: i64, %hi: i64, %s: i64) {
+    %r = for %lo in %lo..%hi step %s iter_args() do ^body(%i: i64) {
+      yield %i;
+    } -> i64;
+    ret %r;
   }
 }
 "#;

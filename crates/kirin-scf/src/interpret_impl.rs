@@ -15,7 +15,11 @@ pub trait ForLoopValue {
     /// interpreters should handle `None` by exploring both paths.
     fn loop_condition(&self, end: &Self) -> Option<bool>;
     /// Advance the induction variable by `step`.
-    fn loop_step(&self, step: &Self) -> Self;
+    ///
+    /// Returns `None` on arithmetic overflow/underflow.
+    fn loop_step(&self, step: &Self) -> Option<Self>
+    where
+        Self: Sized;
 }
 
 impl ForLoopValue for i64 {
@@ -23,8 +27,8 @@ impl ForLoopValue for i64 {
         Some(*self < *end)
     }
 
-    fn loop_step(&self, step: &i64) -> i64 {
-        self + step
+    fn loop_step(&self, step: &i64) -> Option<i64> {
+        self.checked_add(*step)
     }
 }
 
@@ -73,24 +77,36 @@ mod tests {
 
     #[test]
     fn loop_step_positive() {
-        assert_eq!(0i64.loop_step(&1), 1);
-        assert_eq!(5i64.loop_step(&3), 8);
+        assert_eq!(0i64.loop_step(&1), Some(1));
+        assert_eq!(5i64.loop_step(&3), Some(8));
     }
 
     #[test]
     fn loop_step_negative() {
-        assert_eq!(10i64.loop_step(&-1), 9);
-        assert_eq!(0i64.loop_step(&-5), -5);
+        assert_eq!(10i64.loop_step(&-1), Some(9));
+        assert_eq!(0i64.loop_step(&-5), Some(-5));
     }
 
     #[test]
     fn loop_step_zero() {
-        assert_eq!(42i64.loop_step(&0), 42);
+        assert_eq!(42i64.loop_step(&0), Some(42));
     }
 
     #[test]
     fn loop_step_from_negative() {
-        assert_eq!((-10i64).loop_step(&3), -7);
+        assert_eq!((-10i64).loop_step(&3), Some(-7));
+    }
+
+    #[test]
+    fn loop_step_overflow_returns_none() {
+        assert_eq!(i64::MAX.loop_step(&1), None);
+        assert_eq!((i64::MAX - 1).loop_step(&2), None);
+    }
+
+    #[test]
+    fn loop_step_underflow_returns_none() {
+        assert_eq!(i64::MIN.loop_step(&-1), None);
+        assert_eq!((i64::MIN + 1).loop_step(&-2), None);
     }
 
     // --- Simulate a complete loop ---
@@ -103,7 +119,7 @@ mod tests {
         let mut iterations = 0;
         while iv.loop_condition(&end) == Some(true) {
             iterations += 1;
-            iv = iv.loop_step(&step);
+            iv = iv.loop_step(&step).unwrap();
         }
         assert_eq!(iterations, 5);
         assert_eq!(iv, 5);
@@ -117,7 +133,7 @@ mod tests {
         let mut iterations = 0;
         while iv.loop_condition(&end) == Some(true) {
             iterations += 1;
-            iv = iv.loop_step(&step);
+            iv = iv.loop_step(&step).unwrap();
         }
         assert_eq!(iterations, 5);
         assert_eq!(iv, 10);
@@ -131,7 +147,7 @@ mod tests {
         let mut current = iv;
         while current.loop_condition(&end) == Some(true) {
             iterations += 1;
-            current = current.loop_step(&1);
+            current = current.loop_step(&1).unwrap();
         }
         assert_eq!(iterations, 0);
     }
@@ -144,7 +160,7 @@ mod tests {
         let mut iterations = 0;
         while iv.loop_condition(&end) == Some(true) {
             iterations += 1;
-            iv = iv.loop_step(&step);
+            iv = iv.loop_step(&step).unwrap();
         }
         assert_eq!(iterations, 1);
     }
@@ -173,13 +189,25 @@ where
         L: Interpretable<'ir, I> + 'ir,
     {
         let cond = interp.read(self.condition)?;
-        match cond.is_truthy() {
-            Some(true) => Ok(Continuation::Jump(self.then_body, smallvec![])),
-            Some(false) => Ok(Continuation::Jump(self.else_body, smallvec![])),
-            None => Ok(Continuation::Fork(smallvec![
-                (self.then_body, smallvec![]),
-                (self.else_body, smallvec![]),
-            ])),
+        let block = match cond.is_truthy() {
+            Some(true) => self.then_body,
+            Some(false) => self.else_body,
+            None => {
+                return Ok(Continuation::Fork(smallvec![
+                    (self.then_body, smallvec![]),
+                    (self.else_body, smallvec![]),
+                ]));
+            }
+        };
+        let stage = interp.active_stage_info::<L>();
+        interp.bind_block_args(stage, block, &[])?;
+        let control = interp.eval_block(stage, block)?;
+        match control {
+            Continuation::Yield(value) => {
+                interp.write(self.result, value)?;
+                Ok(Continuation::Continue)
+            }
+            other => Ok(other),
         }
     }
 }
@@ -199,16 +227,44 @@ where
         let mut iv = interp.read(self.start)?;
         let end = interp.read(self.end)?;
         let step = interp.read(self.step)?;
+
+        // Initialize loop-carried state from init_args.
+        let mut carried: Vec<I::Value> = self
+            .init_args
+            .iter()
+            .map(|ssa| interp.read(*ssa))
+            .collect::<Result<_, _>>()?;
+
         let stage = interp.active_stage_info::<L>();
         while iv.loop_condition(&end) == Some(true) {
-            interp.bind_block_args(stage, self.body, &[iv.clone()])?;
+            // Bind induction variable as the first block argument, followed by carried values.
+            let mut block_args = Vec::with_capacity(1 + carried.len());
+            block_args.push(iv.clone());
+            block_args.extend(carried.iter().cloned());
+            interp.bind_block_args(stage, self.body, &block_args)?;
+
             let control = interp.eval_block(stage, self.body)?;
             match control {
-                Continuation::Yield(_) => {}
+                Continuation::Yield(value) => {
+                    // The yielded value feeds back as loop-carried state for next iteration.
+                    if !self.init_args.is_empty() {
+                        carried = vec![value];
+                    }
+                }
                 other => return Ok(other),
             }
-            iv = iv.loop_step(&step);
+            iv = iv.loop_step(&step).ok_or_else(|| {
+                I::Error::from(InterpreterError::Custom(
+                    "scf.for: induction variable overflow during loop step".into(),
+                ))
+            })?;
         }
+
+        // Write final loop-carried value to result.
+        if let Some(value) = carried.into_iter().next() {
+            interp.write(self.result, value)?;
+        }
+
         Ok(Continuation::Continue)
     }
 }
