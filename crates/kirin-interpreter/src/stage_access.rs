@@ -178,9 +178,6 @@ mod tests {
 
         let mut interp = AbstractInterpreter::<Unit, _, InterpreterError>::new(&pipeline, stage_id);
 
-        assert!(
-            interp.try_in_stage::<CompositeLanguage>().is_ok(),
-            "should succeed on valid pipeline"
-        );
+        interp.try_in_stage::<CompositeLanguage>().unwrap();
     }
 }
