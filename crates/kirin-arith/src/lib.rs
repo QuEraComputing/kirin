@@ -50,7 +50,7 @@ mod types;
 use kirin::prelude::*;
 
 pub use checked_ops::{CheckedDiv, CheckedRem};
-pub use types::{ArithType, ArithValue};
+pub use types::{ArithConversionError, ArithType, ArithValue};
 
 /// Generic arithmetic statements parameterized by a compile-time type lattice.
 ///

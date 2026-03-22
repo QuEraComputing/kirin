@@ -443,7 +443,8 @@ where
         + std::ops::Div<Output = I::Value>
         + std::ops::Rem<Output = I::Value>
         + From<i64>
-        + From<ArithValue>,
+        + TryFrom<ArithValue>,
+    <I::Value as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
     I::Error: From<InterpreterError>,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>

@@ -12,7 +12,7 @@ mod arith_type;
 mod arith_value;
 
 pub use arith_type::ArithType;
-pub use arith_value::ArithValue;
+pub use arith_value::{ArithConversionError, ArithValue};
 
 #[cfg(test)]
 mod tests {
@@ -107,5 +107,94 @@ mod tests {
             parse_ast::<ArithValue>(&min).unwrap(),
             ArithValue::I64(i64::MIN)
         );
+    }
+
+    // --- TryFrom<ArithValue> for i64 tests ---
+
+    #[test]
+    fn try_from_i64_is_infallible() {
+        assert_eq!(i64::try_from(ArithValue::I64(42)), Ok(42));
+        assert_eq!(i64::try_from(ArithValue::I64(i64::MAX)), Ok(i64::MAX));
+        assert_eq!(i64::try_from(ArithValue::I64(i64::MIN)), Ok(i64::MIN));
+    }
+
+    #[test]
+    fn try_from_widening_integer_is_infallible() {
+        assert_eq!(i64::try_from(ArithValue::I8(127)), Ok(127));
+        assert_eq!(i64::try_from(ArithValue::I16(-32768)), Ok(-32768));
+        assert_eq!(
+            i64::try_from(ArithValue::I32(i32::MAX as i64 as i32)),
+            Ok(i32::MAX as i64)
+        );
+        assert_eq!(i64::try_from(ArithValue::U8(255)), Ok(255));
+        assert_eq!(i64::try_from(ArithValue::U16(65535)), Ok(65535));
+        assert_eq!(
+            i64::try_from(ArithValue::U32(u32::MAX)),
+            Ok(u32::MAX as i64)
+        );
+    }
+
+    #[test]
+    fn try_from_i128_out_of_range_is_err() {
+        assert!(i64::try_from(ArithValue::I128(i128::MAX)).is_err());
+        assert!(i64::try_from(ArithValue::I128(i128::MIN)).is_err());
+    }
+
+    #[test]
+    fn try_from_i128_in_range_is_ok() {
+        assert_eq!(i64::try_from(ArithValue::I128(42)), Ok(42));
+        assert_eq!(
+            i64::try_from(ArithValue::I128(i64::MAX as i128)),
+            Ok(i64::MAX)
+        );
+    }
+
+    #[test]
+    fn try_from_u64_over_max_is_err() {
+        assert!(i64::try_from(ArithValue::U64(u64::MAX)).is_err());
+        assert!(i64::try_from(ArithValue::U64(i64::MAX as u64 + 1)).is_err());
+    }
+
+    #[test]
+    fn try_from_u64_in_range_is_ok() {
+        assert_eq!(i64::try_from(ArithValue::U64(0)), Ok(0));
+        assert_eq!(
+            i64::try_from(ArithValue::U64(i64::MAX as u64)),
+            Ok(i64::MAX)
+        );
+    }
+
+    #[test]
+    fn try_from_u128_out_of_range_is_err() {
+        assert!(i64::try_from(ArithValue::U128(u128::MAX)).is_err());
+    }
+
+    #[test]
+    fn try_from_float_whole_is_ok() {
+        assert_eq!(i64::try_from(ArithValue::F64(42.0)), Ok(42));
+        assert_eq!(i64::try_from(ArithValue::F32(0.0)), Ok(0));
+    }
+
+    #[test]
+    fn try_from_float_fractional_is_err() {
+        assert!(i64::try_from(ArithValue::F64(2.5)).is_err());
+        assert!(i64::try_from(ArithValue::F32(0.1)).is_err());
+    }
+
+    #[test]
+    fn try_from_float_nonfinite_is_err() {
+        assert!(i64::try_from(ArithValue::F64(f64::INFINITY)).is_err());
+        assert!(i64::try_from(ArithValue::F64(f64::NAN)).is_err());
+        assert!(i64::try_from(ArithValue::F32(f32::NEG_INFINITY)).is_err());
+    }
+
+    #[test]
+    fn to_i64_lossy_preserves_old_behavior() {
+        // Lossy wrapping for values outside i64 range.
+        let _ = ArithValue::U64(u64::MAX).to_i64_lossy();
+        let _ = ArithValue::I128(i128::MAX).to_i64_lossy();
+        // Normal conversions.
+        assert_eq!(ArithValue::I64(42).to_i64_lossy(), 42);
+        assert_eq!(ArithValue::I8(-1).to_i64_lossy(), -1);
     }
 }

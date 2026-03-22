@@ -1,9 +1,20 @@
-use std::ops::{BitAnd, BitOr, BitXor, Not, Shl, Shr};
+use std::ops::{BitAnd, BitOr, BitXor, Not};
 
 use kirin::prelude::{CompileTimeValue, HasStageInfo};
 use kirin_interpreter::{Interpretable, Interpreter, InterpreterError, InterpreterExt};
 
-use crate::Bitwise;
+use crate::{Bitwise, CheckedShl, CheckedShr};
+
+#[derive(Debug)]
+struct ShiftOverflow;
+
+impl std::fmt::Display for ShiftOverflow {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "shift amount out of range")
+    }
+}
+
+impl std::error::Error for ShiftOverflow {}
 
 impl<'ir, I, T> Interpretable<'ir, I> for Bitwise<T>
 where
@@ -13,8 +24,8 @@ where
         + BitOr<Output = I::Value>
         + BitXor<Output = I::Value>
         + Not<Output = I::Value>
-        + Shl<Output = I::Value>
-        + Shr<Output = I::Value>,
+        + CheckedShl
+        + CheckedShr,
     T: CompileTimeValue,
 {
     fn interpret<L>(
@@ -41,10 +52,16 @@ where
             } => interp.unary_op(*operand, *result, |a| !a),
             Bitwise::Shl {
                 lhs, rhs, result, ..
-            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a << b),
+            } => interp.try_binary_op(*lhs, *rhs, *result, |a, b| {
+                a.checked_shl(b)
+                    .ok_or_else(|| InterpreterError::custom(ShiftOverflow).into())
+            }),
             Bitwise::Shr {
                 lhs, rhs, result, ..
-            } => interp.binary_op(*lhs, *rhs, *result, |a, b| a >> b),
+            } => interp.try_binary_op(*lhs, *rhs, *result, |a, b| {
+                a.checked_shr(b)
+                    .ok_or_else(|| InterpreterError::custom(ShiftOverflow).into())
+            }),
             Self::__Phantom(..) => unreachable!(),
         }
     }

@@ -6,7 +6,8 @@ use crate::Constant;
 impl<'ir, I, T, Ty> Interpretable<'ir, I> for Constant<T, Ty>
 where
     I: Interpreter<'ir>,
-    I::Value: From<T>,
+    I::Value: TryFrom<T>,
+    <I::Value as TryFrom<T>>::Error: std::error::Error + Send + Sync + 'static,
     T: CompileTimeValue + Typeof<Ty> + Clone + PrettyPrint,
     Ty: CompileTimeValue,
 {
@@ -16,7 +17,7 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        let val = I::Value::from(self.value.clone());
+        let val = I::Value::try_from(self.value.clone()).map_err(InterpreterError::custom)?;
         interp.write(self.result, val)?;
         Ok(Continuation::Continue)
     }

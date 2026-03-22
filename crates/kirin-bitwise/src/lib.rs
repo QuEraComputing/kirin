@@ -41,9 +41,12 @@
 //! - Verifier passes are expected to enforce type compatibility, including the
 //!   RFC rule that shift count type must match the shifted value type.
 
+mod checked_ops;
 mod interpret_impl;
 
 use kirin::prelude::*;
+
+pub use checked_ops::{CheckedShl, CheckedShr};
 
 #[cfg(test)]
 mod tests;

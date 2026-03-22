@@ -156,9 +156,77 @@ impl Display for ArithValue {
     }
 }
 
-impl From<ArithValue> for i64 {
-    fn from(v: ArithValue) -> Self {
+/// Error returned when an [`ArithValue`] cannot be losslessly converted to `i64`.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct ArithConversionError {
+    /// A human-readable description of the value that could not be converted.
+    pub value: String,
+}
+
+impl std::fmt::Display for ArithConversionError {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "ArithValue cannot be losslessly converted to i64: {}",
+            self.value
+        )
+    }
+}
+
+impl std::error::Error for ArithConversionError {}
+
+impl TryFrom<ArithValue> for i64 {
+    type Error = ArithConversionError;
+
+    fn try_from(v: ArithValue) -> Result<Self, Self::Error> {
         match v {
+            // Infallible widening conversions.
+            ArithValue::I8(x) => Ok(x as i64),
+            ArithValue::I16(x) => Ok(x as i64),
+            ArithValue::I32(x) => Ok(x as i64),
+            ArithValue::I64(x) => Ok(x),
+            // Narrowing / potentially lossy conversions.
+            ArithValue::I128(x) => i64::try_from(x).map_err(|_| ArithConversionError {
+                value: format!("I128({x})"),
+            }),
+            // Unsigned widening (infallible for u8..u32).
+            ArithValue::U8(x) => Ok(x as i64),
+            ArithValue::U16(x) => Ok(x as i64),
+            ArithValue::U32(x) => Ok(x as i64),
+            // u64 > i64::MAX wraps to negative with `as i64`.
+            ArithValue::U64(x) => i64::try_from(x).map_err(|_| ArithConversionError {
+                value: format!("U64({x})"),
+            }),
+            ArithValue::U128(x) => i64::try_from(x).map_err(|_| ArithConversionError {
+                value: format!("U128({x})"),
+            }),
+            // Float-to-int: reject values outside i64 range or non-finite.
+            ArithValue::F32(x) => float_to_i64(x as f64, &format!("F32({x})")),
+            ArithValue::F64(x) => float_to_i64(x, &format!("F64({x})")),
+        }
+    }
+}
+
+/// Convert a float to i64, rejecting values that are out of range, non-finite,
+/// or have a fractional part.
+fn float_to_i64(x: f64, label: &str) -> Result<i64, ArithConversionError> {
+    if !x.is_finite() || x.fract() != 0.0 || x < i64::MIN as f64 || x > i64::MAX as f64 {
+        Err(ArithConversionError {
+            value: label.to_string(),
+        })
+    } else {
+        Ok(x as i64)
+    }
+}
+
+impl ArithValue {
+    /// Lossy conversion to `i64`, matching the old `From<ArithValue> for i64` semantics.
+    ///
+    /// Prefer [`TryFrom`] for new code. This method exists for call sites that
+    /// intentionally accept truncation or wrapping (e.g. abstract interpretation
+    /// where out-of-range values are widened to `Top` anyway).
+    pub fn to_i64_lossy(&self) -> i64 {
+        match *self {
             ArithValue::I8(x) => x as i64,
             ArithValue::I16(x) => x as i64,
             ArithValue::I32(x) => x as i64,
