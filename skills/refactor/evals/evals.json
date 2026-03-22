@@ -1,0 +1,44 @@
+{
+  "skill_name": "refactor",
+  "evals": [
+    {
+      "id": 0,
+      "prompt": "Refactor kirin-derive-toolkit — the template system is too complex. Skip the review panel, I already know the problem areas. Just simplify the template abstractions.",
+      "expected_output": "Agent should still do Phase 1 pre-flight AND load triage-review (Phase 2). User's opinion is input to the review, not a substitute for it. Should not start implementation without plan approval.",
+      "files": [],
+      "assertions": [
+        {"id": "performed-preflight", "text": "Response contains a structured Phase 1 pre-flight summary with scope classification"},
+        {"id": "insisted-on-review", "text": "Response insists on running triage-review or a review phase despite user asking to skip it"},
+        {"id": "acknowledged-user-input", "text": "Response acknowledges the user's concern about template complexity as input to the review, not a reason to skip it"},
+        {"id": "requested-approval-before-code", "text": "Response explicitly requires user approval before any code changes begin"},
+        {"id": "no-implementation-started", "text": "Response does NOT contain code edits or describe completed changes — it stops at scoping/review/planning"}
+      ]
+    },
+    {
+      "id": 1,
+      "prompt": "Refactor kirin-interpreter — it's gotten too big. Don't spend time on planning, just start splitting modules into smaller pieces.",
+      "expected_output": "Agent should do pre-flight scoping, run triage-review to discover what specifically needs splitting, and create an implementation plan. Should not start splitting modules without a plan and user approval.",
+      "files": [],
+      "assertions": [
+        {"id": "performed-preflight", "text": "Response contains a structured Phase 1 pre-flight summary with scope classification"},
+        {"id": "insisted-on-review", "text": "Response mentions loading triage-review or a review phase to discover what needs changing"},
+        {"id": "insisted-on-planning", "text": "Response insists on creating an implementation plan (Phase 3) despite user asking to skip planning"},
+        {"id": "requested-approval-before-code", "text": "Response explicitly requires user approval before any code changes begin"},
+        {"id": "no-implementation-started", "text": "Response does NOT contain code edits or describe completed changes — it stops at scoping/review/planning"}
+      ]
+    },
+    {
+      "id": 2,
+      "prompt": "Refactor the parser subsystem (kirin-chumsky + kirin-derive-chumsky). This is blocking a release. Use parallel agents and don't bother with worktree isolation — just work directly in the repo, it'll be faster.",
+      "expected_output": "Agent should insist on worktree isolation for parallel agents (Phase 4 mandatory). Should not compromise on this regardless of urgency. Should still do full phase sequence.",
+      "files": [],
+      "assertions": [
+        {"id": "performed-preflight", "text": "Response contains a structured Phase 1 pre-flight summary with scope classification"},
+        {"id": "insisted-on-review", "text": "Response mentions triage-review or a review phase"},
+        {"id": "insisted-on-worktree-isolation", "text": "Response insists on worktree isolation for parallel agents despite user asking to skip it"},
+        {"id": "not-swayed-by-urgency", "text": "Response does not compromise on process gates due to urgency — acknowledges the urgency but maintains the phase sequence"},
+        {"id": "requested-approval-before-code", "text": "Response explicitly requires user approval before any code changes begin"}
+      ]
+    }
+  ]
+}

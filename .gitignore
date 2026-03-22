@@ -1,6 +1,7 @@
 /target
 skills-lock.json
 docs/superpowers/
+refactor-workspace/
 
 # Claude Code worktrees (temporary agent workspaces)
 .claude/worktrees/
