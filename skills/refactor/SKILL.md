@@ -129,6 +129,39 @@ Output the same pre-flight summary format. Present to user for approval before p
 
 ---
 
+### Finding Walkthrough (both paths)
+
+When presenting review findings to the user for accept/reject decisions, don't
+just list findings — help the user make informed decisions:
+
+**For each finding, present:**
+1. The finding summary and severity
+2. Your recommendation (accept or won't-fix) with rationale
+
+**When recommending won't-fix**, explain why:
+- **Acceptable complexity** — the finding is valid but the cost of fixing outweighs
+  the benefit (e.g., P3-3 FieldCategory closed enum — 3 additions ever, acceptable)
+- **Intentional design** — the pattern is deliberate, not accidental (e.g., Lexical/Lifted
+  isomorphism — intentional, only 2 modes)
+- **Out of scope** — the finding is valid but belongs to a different refactoring effort
+- **Risk too high** — the fix touches too many critical paths for this refactoring cycle
+
+**When there are multiple valid options** (e.g., fix now vs defer vs workaround),
+present all options with trade-offs. Example format:
+```
+P2-1: DiGraph/UnGraph duplication (~195 lines)
+  A: Full unification into GraphInfo<L, D, Extra> — recovers ~250 lines, half-day effort (recommended)
+  B: Extract shared helpers only — smaller scope, but structural duplication remains
+  C: Won't fix — zero risk, but duplication compounds as graph features grow
+→ Recommend A — duplication spans 4 crates and will compound.
+```
+
+When there is a clear winner, state it. When genuinely ambiguous, say so.
+
+**Track decisions:** Record the accept/reject decision for each finding along
+with the rationale. This becomes input to the planning phase — rejected findings
+go into the index.md "Excluded Findings" table with reasons.
+
 ### User Decision Point
 
 After both paths converge (review + pre-flight both complete), present ALL implementation options. Include a recommendation based on the refactor's characteristics, but let the user choose.
@@ -414,18 +447,8 @@ For small refactors, the lead agent can absorb Guardian duties directly.
 
 **Automatically prompt** after successful refactor: "Save this team configuration as a template?"
 
-If yes, save to the team templates directory (see AGENTS.md Project structure) as `<name>.md`:
-```markdown
-# Template: [name]
-
-**Refactor type:** [description]
-**Pattern:** [in-place / additive-then-switchover]
-**Scope:** [N] crates
-**Staffed roles:** [list with rationale]
-**What worked:** [notes]
-**What to adjust:** [notes]
-**Date:** [YYYY-MM-DD]
-```
+If yes, save to the team templates directory (see AGENTS.md) as `<name>.md` with:
+refactor type, pattern, scope, staffed roles, what worked, what to adjust, date.
 
 ## Red Flags — STOP Immediately
 
@@ -448,16 +471,15 @@ If yes, save to the team templates directory (see AGENTS.md Project structure) a
 | Temptation | Rationalization | Reality |
 |-----------|----------------|---------|
 | Skip pre-flight | "This refactor is simple, I know what needs to move" | 'Simple' refactors have hidden consumers. Pre-flight takes 5 minutes; debugging a missed re-export takes 30. |
-| Skip triage-review | "I already know the code well enough" | You know the code. The Formalism reviewer catches abstraction issues. The Soundness Adversary catches invariant violations. Fresh eyes find what familiarity hides. |
-| Pre-flight before review on a broad target | "I'll figure out the scope first, then review" | Without review, pre-flight is guessing. For broad targets, you don't know what's wrong yet — the review discovers the refactoring scope. Pre-flight-first only works when the user already specifies concrete changes. |
+| Skip triage-review | "I already know the code well enough" / "I already know the problem areas" | You know the code. The Formalism reviewer catches abstraction issues. The Soundness Adversary catches invariant violations. Fresh eyes find what familiarity hides. User knowledge is input to the review, not a substitute. |
+| Pre-flight before review on a broad target | "I'll figure out the scope first, then review" | Without review, pre-flight is guessing. For broad targets, you don't know what's wrong yet — the review discovers the refactoring scope. |
 | Start coding before plan approval | "I'll adjust the plan based on what I find" | Code-first planning produces sunk-cost pressure to keep bad decisions. Plan approval costs 2 minutes; reworking a wrong approach costs hours. |
 | Edit the same file from two agents | "The changes are in different functions" | Git merges on function granularity, not line granularity. Two agents touching the same file creates merge conflicts that require manual resolution. |
 | Let the verifier fix issues | "It's faster than dispatching back to the implementer" | The verifier lacks the implementer's context. Verifier fixes introduce new bugs at a higher rate. Report to lead, let the right agent fix it. |
 | Skip exploration budget | "I need to read one more file to understand" | The budget exists because unbounded exploration delays the actual work. If 20 reads aren't enough, the scope is wrong — simplify it. |
 | Dispatch agents in foreground | "I need to wait for them anyway before merging" | Foreground dispatch blocks the user. Refactors take minutes per agent — the user should be free to ask questions or provide context while agents work in background. |
 | Write plans directly instead of delegating | "It's faster than dispatching a whole planning team" | The lead agent's context is for orchestration, not codebase exploration. Writing plans directly pollutes it with details from 10+ files per finding, degrading orchestration quality for later phases. Per-finding isolation also prevents cross-contamination between plans. The planning team runs in background — the user isn't waiting. |
-| Skip the Plan Reviewer | "The user already read the plans, they look fine" | Human review catches content issues. The Plan Reviewer catches structural issues: file overlaps between plans in the same wave, dependency cycles, missing findings. A human scanning 10 plan files will not reliably build the cross-plan file map that detects overlaps. Skipping the reviewer risks merge conflicts during execution — far more expensive than the 30-second review. |
-| Skip triage-review on focused path | "The user already knows the problem areas" | The user knows *their* problems. The Formalism reviewer catches abstraction-level issues the user isn't looking for. The Soundness Adversary catches invariant violations. User knowledge is input to the review, not a replacement for it. |
+| Skip the Plan Reviewer | "The user already read the plans, they look fine" | Human review catches content issues. The Plan Reviewer catches structural issues: file overlaps between plans in the same wave, dependency cycles, missing findings. Skipping it risks merge conflicts during execution — far more expensive than the 30-second review. |
 
 ## Integration
 
