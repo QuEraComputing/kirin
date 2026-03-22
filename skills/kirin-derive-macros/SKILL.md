@@ -268,6 +268,16 @@ Add a real type using the derive in `kirin-test-languages` to verify trait bound
 11. [ ] Verify expanded code with `KIRIN_EXPAND_DEBUG=1`
 12. [ ] **Complexity check**: did you stay within toolkit's design, or did you work around it? If the latter, escalate.
 
+## Rationalization Table
+
+| Temptation | Rationalization | Reality |
+|-----------|----------------|---------|
+| Write raw `quote!` for structural code | "TraitImpl is overkill for this simple impl block" | Simple impl blocks grow. Raw `quote!` for structural code means generics, where clauses, and type positions are string-concatenated — one missed angle bracket is a cryptic proc-macro error. Toolkit types catch structural mistakes at Rust compile time. |
+| Duplicate toolkit logic in the derive crate | "I just need a small helper, not worth a toolkit change" | Small helpers accumulate. kirin-derive-chumsky absorbed darling as a direct dep for this reason — the exception became load-bearing. If the helper is useful, it belongs in the toolkit. |
+| Skip the complexity gate | "I'm almost done, escalating now wastes the progress" | Sunk cost. Working around the toolkit creates a derive that's harder to maintain than the toolkit gap it avoided. The escalation procedure preserves your work in a worktree — nothing is lost. |
+| Use `proc_macro2::TokenStream` as escape hatch | "The toolkit types can't express this pattern" | That's the escalation signal, not a reason to bypass. Untyped token streams in structural positions silently accept malformed output that only fails when users apply the derive. |
+| Import darling directly | "The toolkit re-export is the same version" | The workspace has multiple darling versions via transitive deps. Direct imports can resolve to the wrong version, causing trait mismatch errors that only surface in downstream crates. |
+
 ## Integration
 
 **Escalates to:**

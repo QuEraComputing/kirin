@@ -194,6 +194,16 @@ New designs should reuse these patterns where possible rather than inventing par
 - **Single argument list for mixed-purpose inputs** — when arguments carry two different semantic roles, use syntactic separation to make each argument's role unambiguous from the syntax alone
 - **Ignoring composition** — a dialect operation that can't be wrapped in a `#[wraps]` enum or used with namespace prefixes won't compose with other dialects
 
+## Rationalization Table
+
+| Temptation | Rationalization | Reality |
+|-----------|----------------|---------|
+| Design data structures first | "I need to see the Rust types to understand the design space" | Types constrain the format to what's easy to represent, not what's natural for the domain. Graph body design showed this: arena-first thinking led to `NodeId` everywhere; text-first thinking led to `^label` syntax that users actually understand. |
+| Write rules without examples | "The rule is clear from the grammar" | Grammar rules that look unambiguous in isolation collide when composed. The graph body spec had three rules that individually parsed fine but created ambiguity when a node had both edge args and captures. Examples caught it; grammar alone didn't. |
+| Fix the example to match the rule | "The example has a typo, the rule is right" | If the example doesn't work with the rule, the rule hasn't been tested against reality. Fixing examples instead of rules is how specs accumulate silent contradictions that surface as parser bugs. |
+| Skip the composition check | "This dialect is standalone, composition doesn't matter yet" | Every standalone dialect eventually gets wrapped in a `#[wraps]` enum. Namespace prefix conflicts, parse ambiguity with existing sigils, and format string incompatibilities are cheaper to find during spec than after 4 layers of implementation. |
+| Use implicit scoping for brevity | "Explicit capture lists are too verbose" | Implicit resolution creates parser ambiguity (is `%x` a local or captured value?) and user confusion about value provenance. The verbosity of explicit capture pays for itself in unambiguous parsing and readable IR dumps. |
+
 ## Spec Location
 
-Save specs to `docs/design/<topic>.md` unless the user specifies otherwise. Commit after the review loop passes.
+Save specs to the design directory (see AGENTS.md Project structure) unless the user specifies otherwise. Commit after the review loop passes.

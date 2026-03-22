@@ -63,7 +63,7 @@ Match agent persona to the scope being tested:
 | Derive macros | Code Quality + Compiler Engineer persona | Generated code quality, error message quality, attribute edge cases |
 | Builder/arena/interpreter | Soundness Adversary persona | Invariant violations, stale ID attacks, bypass paths, unsafe audit |
 
-For **dialect crates**, include domain context from the triage-review Domain Context Resolution table (e.g., ZX calculus for quantum dialects, compiler engineering for SCF). This lets the test agent write domain-meaningful tests, not just structural ones.
+For **dialect crates**, include domain context from the Dialect Domain Context table in AGENTS.md (e.g., compiler engineering for SCF). This lets the test agent write domain-meaningful tests, not just structural ones.
 
 Read the relevant persona file from the team directory (see AGENTS.md Project structure) and include its content in the agent prompt alongside the test writing strategy. The persona informs *what kind of issues to look for* — the test writing strategy informs *how to find them*.
 
@@ -256,6 +256,16 @@ To act on confirmed findings:
 - Forcing findings when the code is actually well-designed
 - Writing tests that only pass because they test trivial/tautological things
 - Jumping to implementation without the findings interview
+
+## Rationalization Table
+
+| Temptation | Rationalization | Reality |
+|-----------|----------------|---------|
+| Fix a bug found during test writing | "I found it, I know the fix, it's one line" | Discovery and implementation are separate phases. Fixing during discovery biases the remaining test effort toward areas near the fix, and the fix bypasses review. Record it, move on. |
+| Report a finding without test evidence | "The code obviously has this problem, writing a test is redundant" | "Obviously" wrong code that passes all existing tests is either correct or untested. Without a test demonstrating the issue, the finding is speculation. The test IS the evidence. |
+| Flag an AGENTS.md convention as an issue | "This convention seems wrong" | Conventions are intentional design decisions. Flagging them wastes walkthrough time on false positives. If the convention truly seems wrong, note it in Dropped Findings with the reason. |
+| Force findings on well-designed code | "I need to find something to justify the review" | A clean report is a valid outcome. Inflated findings erode trust in the review process. Report what the code does well — that's also valuable signal. |
+| Skip the findings interview | "The report is clear enough, user can read it" | The interview is where severity gets calibrated by domain knowledge the agent lacks. A P2 the agent flagged might be a P0 the user recognizes, or a known non-issue. Skipping it means acting on uncalibrated priorities. |
 
 ## Integration
 

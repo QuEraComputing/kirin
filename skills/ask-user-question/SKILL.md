@@ -5,6 +5,8 @@ description: Use when requirements are ambiguous and need clarification through 
 
 # Ask User Question
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 ## Overview
 
 Use a structured interview to collect missing context before planning or executing work. Ask informed, option-based questions with clear tradeoffs, and wait for answers before proceeding.

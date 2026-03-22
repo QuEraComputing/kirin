@@ -23,7 +23,6 @@ Orchestrator for building new capabilities — from a single helper method to an
 
 **Don't use for:**
 - Restructuring existing code (load the `refactor` skill)
-- Implementing an already-approved RFC (load the `kirin-rfc-implementer` skill)
 - Adding a new dialect (load the `dialect-dev` skill — it has domain-specific phases)
 - Bug fixes (load the `systematic-debugging` skill)
 
@@ -63,7 +62,7 @@ Formalize the approach. Scale the formalization to match the work:
 |----------|------|---------------|
 | Inline design notes | Medium scale, internal changes | None — write notes in the plan |
 | Text format / API spec | New syntax, new public API | The `ir-spec-writing` skill |
-| RFC | Large changes affecting multiple crates or user-facing contracts | The `kirin-rfc-writer` skill |
+| RFC | Large changes affecting multiple crates or user-facing contracts | *(RFC skill in development)* |
 
 For framework-scale work, you may produce multiple specs/RFCs. Each spec should be independently reviewable.
 
@@ -163,4 +162,3 @@ After implementation is complete (or at each milestone for large work):
 | 2 | `finishing-a-development-branch` | Phase 5 completion |
 | 1 | `verification-before-completion` | Phase 5 checks |
 | Domain | `ir-spec-writing` | Phase 2 spec writing |
-| Domain | `kirin-rfc-writer` | Phase 2 RFC writing |

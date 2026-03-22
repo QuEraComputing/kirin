@@ -61,7 +61,6 @@ Layer 4: Orchestrators (compose lower layers into end-to-end workflows)
   feature-dev — design + implement new capabilities, scales from small to framework-level
   dialect-dev — kirin-specific: text format + semantics → IR → parser → printer → interpreter
   refactor — restructure existing code with architectural guardrails
-  kirin-rfc-implementer — implement an approved RFC end-to-end
 
 Layer 3: Review & Discovery (read-only, produce reports)
   triage-review — multi-perspective codebase review with cross-review validation
@@ -84,7 +83,6 @@ Layer 1: Primitives (atomic utilities)
 
 Domain-Specific (standalone, composable with any layer):
   kirin-derive-macros — derive macro development guidance
-  kirin-rfc-writer — RFC drafting
   ir-spec-writing — IR specification design
 ```
 

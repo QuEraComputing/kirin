@@ -6,6 +6,8 @@ user-invocable: false
 
 # Insta Snapshot Testing
 
+**Announce at start:** State which skill is being used so the user knows what process is driving behavior.
+
 ## Overview
 
 Insta captures output as `.snap` files. These are **generated artifacts** — all management goes through `cargo insta`. Never manually create, edit, move, or delete `.snap` or `.snap.new` files.

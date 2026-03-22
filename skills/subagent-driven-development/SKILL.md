@@ -264,6 +264,17 @@ Done!
 - Dispatch fix subagent with specific instructions
 - Don't try to fix manually (context pollution)
 
+## Rationalization Table
+
+| Temptation | Rationalization | Reality |
+|-----------|----------------|---------|
+| Skip spec compliance review | "The implementer's self-review was thorough" | Self-review catches syntax and style issues. Spec compliance catches scope drift — extra features added, requirements missed. These are different failure modes; self-review does not cover both. |
+| Accept "close enough" on spec | "It's 90% there, the remaining 10% is minor" | The 10% gap is where bugs hide. A missing progress report or an extra `--json` flag compounds across tasks. Spec compliance is binary — met or not met. |
+| Fix issues yourself instead of re-dispatching | "It's faster than spinning up another subagent" | You now have implementation context polluting your orchestration context. The next task dispatch inherits assumptions from your fix. Fresh subagents are cheap; debugging context pollution is not. |
+| Run code quality before spec compliance | "Quality issues are easier to spot, let's do those first" | Quality review on spec-noncompliant code wastes a review cycle. The implementer will rewrite to fix spec gaps, invalidating quality feedback. Always spec first. |
+| Provide minimal context to subagent | "The plan file has everything they need" | Subagents start cold. Without scene-setting (what was done before, what comes next, project conventions), they make locally-correct but globally-wrong decisions. 2 minutes of context saves 20 minutes of rework. |
+| Skip worktree isolation for "quick" parallel tasks | "These two tasks touch different files" | Concurrent `cargo check` on shared `target/` causes lock contention and stale artifact errors. Worktree isolation prevents this regardless of file disjointness. |
+
 ## Integration
 
 **Required workflow skills:**
