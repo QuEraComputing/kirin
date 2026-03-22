@@ -336,6 +336,23 @@ Every agent that edits code works in its own git worktree. The pre-dispatch gate
 
 Each agent works in its isolated worktree. The lead agent (or a merge orchestrator) merges branches back in dependency order.
 
+**Known bug (agent teams + worktrees):** `isolation: "worktree"` silently fails
+when combined with `team_name` — agents land in the main directory instead of a
+worktree. Tracked at https://github.com/anthropics/claude-code/issues/37549.
+
+**Workaround:** When an agent's worktree check (invariant #0) fails, the agent
+MUST abort and report to the lead — it must NOT proceed in the main directory
+on its own. The lead then decides how to handle it:
+1. **If file disjointness is verified** — the lead may explicitly override
+   invariant #0 for that agent, authorizing it to work in the main directory.
+   The override message must name the specific files the agent is allowed to touch.
+2. **If file disjointness is NOT verified** — the lead must set up worktrees
+   manually (via `git worktree add`) and re-dispatch the agent with its working
+   directory set to the worktree path.
+
+The key principle: agents never self-authorize working in the main directory.
+Only the lead can grant that override after verifying safety.
+
 ### Pre-Dispatch Gate (orchestrator checklist)
 
 Before dispatching ANY code-editing agent (whether via Agent Teams or background agents), verify:
@@ -352,9 +369,11 @@ If any check fails, do NOT dispatch. Fix the call first.
 
 ```
 REFACTOR INVARIANTS — these override any conflicting instructions:
-0. WORKTREE CHECK: You MUST be running in a git worktree, not the main working directory.
-   Run `git rev-parse --show-toplevel` — if the result is the project root (not a worktree path),
-   STOP immediately and report to the lead. Do not edit files in the main working directory.
+0. WORKTREE CHECK: Run `git rev-parse --show-toplevel` FIRST. If the result is the project
+   root (not a worktree path), you are NOT in a worktree. ABORT immediately — do not read
+   code, do not edit files, do not proceed with any plan steps. Report to the lead and WAIT
+   for explicit instructions. Only the lead can authorize working in the main directory.
+   Do NOT self-authorize, even if you believe the work is safe.
 1. NEVER use `#[allow(...)]` or ignore comments as fixes for real errors.
 2. NEVER remove one-liner wrapper methods without verifying they are not visibility bridges
    (methods that expose pub(crate) internals through a pub interface).
@@ -436,6 +455,7 @@ refactor type, pattern, scope, staffed roles, what worked, what to adjust, date.
 - Merging a worktree commit without running workspace tests afterward — cherry-picks can silently conflict at the semantic level even when git reports no textual conflicts
 - A design-work plan with no fallback approaches — if the primary design hits a framework constraint, the agent has no guidance and makes ad-hoc decisions
 - An implementer applying a fix before writing a failing test — the test-first sequence (write test → fail → fix → pass) validates both the bug and the fix. Applying the fix first means we never proved the old behavior was broken.
+- An agent proceeding in the main directory after worktree check fails without explicit lead authorization — agents must abort and wait, never self-authorize
 
 ## Rationalization Table
 
