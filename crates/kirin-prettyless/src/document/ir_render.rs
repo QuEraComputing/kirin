@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use kirin_ir::{
     Block, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Port, Region, SSAInfo, SSAValue, Signature,
-    SpecializedFunction, StagedFunction, Statement, UnGraph,
+    SpecializedFunction, StagedFunction, Statement, Symbol, UnGraph,
 };
 use petgraph::visit::IntoNodeReferences;
 use prettyless::DocAllocator;
@@ -16,6 +16,38 @@ impl<'a, L: Dialect + PrettyPrint> Document<'a, L>
 where
     L::Type: std::fmt::Display,
 {
+    /// Resolve a block/graph name to `^resolved` or fall back to `fallback`'s Display output.
+    ///
+    /// Used by `print_block`, `print_digraph`, and `print_ungraph` to avoid
+    /// duplicating the symbol-table lookup + caret-prefix logic.
+    fn resolve_caret_name(
+        &self,
+        name: Option<Symbol>,
+        fallback: impl std::fmt::Display,
+    ) -> String {
+        name.and_then(|name_sym| {
+            self.stage
+                .symbol_table()
+                .resolve(name_sym)
+                .map(|s| format!("^{}", s))
+        })
+        .unwrap_or_else(|| format!("{}", fallback))
+    }
+
+    /// Format an SSA value as `%name: Type`.
+    ///
+    /// Used by block argument printing, port list printing, and projection
+    /// helpers to avoid duplicating the `%name: Type` pattern.
+    fn format_typed_ssa_binding<V>(&'a self, value: V) -> ArenaDoc<'a>
+    where
+        V: Copy + GetInfo<L, Info = SSAInfo<L>>,
+        Id: From<V>,
+    {
+        let name = self.ssa_name(value);
+        let info = value.expect_info(self.stage);
+        self.text(format!("%{}: {}", name, info.ty()))
+    }
+
     /// Print an SSA value reference as `%name`.
     ///
     /// Resolves the name via [`Document::ssa_name`] and prepends `%`.
@@ -93,30 +125,13 @@ where
         let block_info = block.expect_info(self.stage);
 
         // Build block header with arguments: ^name(%arg0: type, %arg1: type)
-        // Look up block name from symbol table, fall back to ^index
-        let block_name = block_info
-            .name
-            .and_then(|name_sym| {
-                self.stage
-                    .symbol_table()
-                    .resolve(name_sym)
-                    .map(|s| format!("^{}", s))
-            })
-            .unwrap_or_else(|| format!("{}", block)); // Block's Display includes the ^
+        let block_name = self.resolve_caret_name(block_info.name, block);
         let mut header = self.text(block_name);
 
         // Add arguments
         let args = &block_info.arguments;
         if !args.is_empty() {
-            let mut args_doc = self.nil();
-            for (i, arg) in args.iter().enumerate() {
-                if i > 0 {
-                    args_doc += self.text(", ");
-                }
-                let name = self.ssa_name(*arg);
-                let info = arg.expect_info(self.stage);
-                args_doc += self.text(format!("%{}: {}", name, info.ty()));
-            }
+            let args_doc = self.list(args.iter(), ", ", |arg| self.format_typed_ssa_binding(*arg));
             header += args_doc.enclose("(", ")");
         }
 
@@ -180,15 +195,7 @@ where
         let info = digraph.expect_info(self.stage);
 
         // Header: digraph ^name(ports) {
-        let graph_name = info
-            .name()
-            .and_then(|name_sym| {
-                self.stage
-                    .symbol_table()
-                    .resolve(name_sym)
-                    .map(|s| format!("^{}", s))
-            })
-            .unwrap_or_else(|| format!("{}", digraph));
+        let graph_name = self.resolve_caret_name(info.name(), digraph);
 
         let mut header = self.text("digraph ") + self.text(graph_name);
         header += self.print_ports(info.ports(), info.edge_count());
@@ -202,15 +209,7 @@ where
         let info = ungraph.expect_info(self.stage);
 
         // Header: ungraph ^name(ports) {
-        let graph_name = info
-            .name()
-            .and_then(|name_sym| {
-                self.stage
-                    .symbol_table()
-                    .resolve(name_sym)
-                    .map(|s| format!("^{}", s))
-            })
-            .unwrap_or_else(|| format!("{}", ungraph));
+        let graph_name = self.resolve_caret_name(info.name(), ungraph);
 
         let mut header = self.text("ungraph ") + self.text(graph_name);
         header += self.print_ports(info.ports(), info.edge_count());
@@ -493,29 +492,13 @@ where
     pub fn print_block_args_only(&'a self, block: &Block) -> ArenaDoc<'a> {
         let block_info = block.expect_info(self.stage);
         let args = &block_info.arguments;
-        let mut doc = self.nil();
-        for (i, arg) in args.iter().enumerate() {
-            if i > 0 {
-                doc += self.text(", ");
-            }
-            let name = self.ssa_name(*arg);
-            let info = arg.expect_info(self.stage);
-            doc += self.text(format!("%{}: {}", name, info.ty()));
-        }
-        doc
+        self.list(args.iter(), ", ", |arg| self.format_typed_ssa_binding(*arg))
     }
 
     /// Helper: print a comma-separated list of ports as `%name: Type, %name: Type`.
     fn print_port_list(&'a self, ports: &[Port]) -> ArenaDoc<'a> {
-        let mut doc = self.nil();
-        for (i, port) in ports.iter().enumerate() {
-            if i > 0 {
-                doc += self.text(", ");
-            }
-            let name = self.ssa_name(*port);
-            let info: &SSAInfo<L> = port.expect_info(self.stage);
-            doc += self.text(format!("%{}: {}", name, info.ty()));
-        }
-        doc
+        self.list(ports.iter(), ", ", |port| {
+            self.format_typed_ssa_binding(*port)
+        })
     }
 }

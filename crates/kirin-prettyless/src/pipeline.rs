@@ -157,7 +157,7 @@ impl<'a, S: RenderDispatch> FunctionRenderBuilder<'a, S> {
     /// Display with bat pager.
     #[cfg(feature = "bat")]
     pub fn bat(self) -> Result<(), RenderError> {
-        crate::bat::print_str(&self.into_string()?);
+        crate::bat::print_str(&self.into_string()?)?;
         Ok(())
     }
 }
@@ -206,7 +206,7 @@ impl<'a, S: RenderDispatch> PipelineRenderBuilder<'a, S> {
     /// Display with bat pager.
     #[cfg(feature = "bat")]
     pub fn bat(self) -> Result<(), RenderError> {
-        crate::bat::print_str(&self.into_string()?);
+        crate::bat::print_str(&self.into_string()?)?;
         Ok(())
     }
 }

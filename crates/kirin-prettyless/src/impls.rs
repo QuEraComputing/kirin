@@ -192,6 +192,14 @@ macro_rules! impl_pretty_print_float {
                 where
                     L::Type: std::fmt::Display,
                 {
+                    // Handle special float values explicitly so output roundtrips
+                    // through the parser (NaN and Inf have no decimal representation).
+                    if self.is_nan() {
+                        return doc.text("nan");
+                    }
+                    if self.is_infinite() {
+                        return doc.text(if self.is_sign_positive() { "inf" } else { "-inf" });
+                    }
                     // Ensure we always print as a float (with decimal point)
                     if self.fract() == 0.0 {
                         doc.text(format!("{:.1}", self))

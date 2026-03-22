@@ -68,6 +68,38 @@ fn test_pretty_print_f32_fractional() {
     assert_eq!(buf, "1.23");
 }
 
+// --- f32 special values ---
+
+#[test]
+fn test_pretty_print_f32_nan() {
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::new(Default::default(), &stage);
+    let arena_doc = f32::NAN.pretty_print(&doc);
+    let mut buf = String::new();
+    arena_doc.render_fmt(80, &mut buf).unwrap();
+    assert_eq!(buf, "nan");
+}
+
+#[test]
+fn test_pretty_print_f32_positive_inf() {
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::new(Default::default(), &stage);
+    let arena_doc = f32::INFINITY.pretty_print(&doc);
+    let mut buf = String::new();
+    arena_doc.render_fmt(80, &mut buf).unwrap();
+    assert_eq!(buf, "inf");
+}
+
+#[test]
+fn test_pretty_print_f32_negative_inf() {
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::new(Default::default(), &stage);
+    let arena_doc = f32::NEG_INFINITY.pretty_print(&doc);
+    let mut buf = String::new();
+    arena_doc.render_fmt(80, &mut buf).unwrap();
+    assert_eq!(buf, "-inf");
+}
+
 // --- f64 ---
 
 #[test]
@@ -98,6 +130,38 @@ fn test_pretty_print_f64_zero() {
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
     assert_eq!(buf, "0.0");
+}
+
+// --- f64 special values ---
+
+#[test]
+fn test_pretty_print_f64_nan() {
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::new(Default::default(), &stage);
+    let arena_doc = f64::NAN.pretty_print(&doc);
+    let mut buf = String::new();
+    arena_doc.render_fmt(80, &mut buf).unwrap();
+    assert_eq!(buf, "nan");
+}
+
+#[test]
+fn test_pretty_print_f64_positive_inf() {
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::new(Default::default(), &stage);
+    let arena_doc = f64::INFINITY.pretty_print(&doc);
+    let mut buf = String::new();
+    arena_doc.render_fmt(80, &mut buf).unwrap();
+    assert_eq!(buf, "inf");
+}
+
+#[test]
+fn test_pretty_print_f64_negative_inf() {
+    let stage: kirin_ir::StageInfo<SimpleLanguage> = kirin_ir::StageInfo::default();
+    let doc = Document::new(Default::default(), &stage);
+    let arena_doc = f64::NEG_INFINITY.pretty_print(&doc);
+    let mut buf = String::new();
+    arena_doc.render_fmt(80, &mut buf).unwrap();
+    assert_eq!(buf, "-inf");
 }
 
 // --- Vec<T> ---
