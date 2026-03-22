@@ -161,7 +161,7 @@ No agent dispatch needed. The lead agent (you) implements changes directly in th
 
 Load the `subagent-driven-development` or `executing-plans` skill for step-by-step execution with review checkpoints.
 
-Dispatch a single background agent (`run_in_background: true`) with `isolation: "worktree"`. The user can continue interacting while the agent works sequentially through the plan.
+Dispatch a single agent through the pre-dispatch gate (see Phase 4) — `run_in_background: true` and `isolation: "worktree"` are both required. The user can continue interacting while the agent works sequentially through the plan.
 
 ### For Agent Team
 
@@ -188,17 +188,19 @@ Use `TeamCreate` to create a refactor team, then spawn implementer teammates. Th
 
 1. Create team: `TeamCreate(team_name: "refactor-<scope>", description: "Refactoring <scope>")`
 2. Create tasks for each work stream using `TaskCreate` — one task per agent assignment, with dependencies reflecting the ordering
-3. Spawn agents as teammates: `Agent(team_name: "refactor-<scope>", name: "<role>-<crate>", isolation: "worktree", run_in_background: true, ...)`
+3. Spawn each code-editing teammate through the pre-dispatch gate (see Phase 4). Every call MUST include both `isolation: "worktree"` and `run_in_background: true`:
+   ```
+   Agent(team_name: "refactor-<scope>", name: "<role>-<crate>",
+         isolation: "worktree", run_in_background: true, ...)
+   ```
 4. Teammates pick up tasks from the shared list, work in isolated worktrees, mark tasks complete, and go idle
 5. The lead (you) monitors progress, creates follow-up tasks when dependencies unblock, and assigns merge/fix tasks
 6. The Verifier teammate picks up verification tasks after each implementer completes
 7. After all work is done, send shutdown messages to all teammates and call `TeamDelete`
 
-**Worktree isolation is MANDATORY for all team members.** Every teammate that edits code MUST be spawned with `isolation: "worktree"`. This is non-negotiable — even within an agent team, concurrent edits to the same working directory cause cascading build errors, LSP floods, and merge conflicts.
-
 **Option B: Background Agents (fallback)**
 
-If `TeamCreate` is not available, dispatch agents with `run_in_background: true` and `isolation: "worktree"` directly. Track progress through agent completion notifications.
+If `TeamCreate` is not available, dispatch agents through the pre-dispatch gate with `run_in_background: true` and `isolation: "worktree"`. Track progress through agent completion notifications.
 
 **Non-blocking requirement (both options):** All implementer agents MUST run in background (`run_in_background: true`). The user must be able to interact with the main agent at all times during execution. Never block on agent completion.
 
@@ -214,23 +216,30 @@ Present the implementation plan to the user. Include:
 
 ## Phase 4: Guarded Execution
 
-### Worktree Isolation (MANDATORY for all code-editing agents)
+### Worktree Isolation
 
-Every agent that edits code MUST work in its own git worktree — whether dispatched as a standalone background agent or as a teammate in an agent team. This applies to all execution modes except Direct implementation.
-
-**When using the Agent tool**, set `isolation: "worktree"` on every code-editing agent. This is NON-NEGOTIABLE regardless of coordination model (agent team or background agents).
-
-**Setup procedure** (for manual worktree management if needed):
-1. Check if `.worktrees/` exists and is in `.gitignore`
-2. If not, load the `using-git-worktrees` skill to set it up (creates directory, verifies gitignore, commits)
-3. If `.worktrees/` already exists, skip the skill and create worktrees directly
+Every agent that edits code works in its own git worktree. The pre-dispatch gate (below) enforces this — `isolation: "worktree"` on the Agent call is the mechanism that creates the worktree automatically. This applies to all execution modes except Direct implementation.
 
 Each agent works in its isolated worktree. The lead agent (or a merge orchestrator) merges branches back in dependency order.
+
+### Pre-Dispatch Gate (orchestrator checklist)
+
+Before dispatching ANY code-editing agent (whether via Agent Teams or background agents), verify:
+
+1. `isolation: "worktree"` is set on the Agent call — this is the enforcement mechanism, not a suggestion
+2. `run_in_background: true` is set
+3. The agent's prompt includes the invariants block below
+4. The agent's file assignments don't overlap with any other active agent
+
+If any check fails, do NOT dispatch. Fix the call first.
 
 ### Invariants (inject into ALL agent prompts)
 
 ```
 REFACTOR INVARIANTS — these override any conflicting instructions:
+0. WORKTREE CHECK: You MUST be running in a git worktree, not the main working directory.
+   Run `git rev-parse --show-toplevel` — if the result is the project root (not a worktree path),
+   STOP immediately and report to the lead. Do not edit files in the main working directory.
 1. NEVER use `#[allow(...)]` or ignore comments as fixes for real errors.
 2. NEVER remove one-liner wrapper methods without verifying they are not visibility bridges
    (methods that expose pub(crate) internals through a pub interface).
@@ -314,7 +323,8 @@ If yes, save to the team templates directory (see AGENTS.md Project structure) a
 - Rewriting the pre-flight summary more than once
 - Making code changes before user approves pre-flight summary AND implementation plan
 - Two agents editing the same file (even in different worktrees — merge will conflict)
-- An implementer agent NOT running in a worktree during parallel execution
+- Dispatching a code-editing agent without going through the pre-dispatch gate
+- A code-editing agent NOT running in a worktree (any execution mode except Direct)
 - `cargo check` failing 3+ times on the same error (escalate to user)
 - Any agent placing types in a crate not listed in the pre-flight summary
 - Verifier auto-fixing code instead of reporting to lead
