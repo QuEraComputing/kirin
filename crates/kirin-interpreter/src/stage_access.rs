@@ -80,6 +80,22 @@ pub trait StageAccess<'ir>: Sized + 'ir {
         }
     }
 
+    /// Fallible version of [`in_stage`](Self::in_stage).
+    ///
+    /// Returns `Err(InterpreterError::StageResolution { .. })` when the active
+    /// stage does not contain a `StageInfo<L>`, instead of panicking.
+    fn try_in_stage<L>(&mut self) -> Result<Staged<'_, 'ir, Self, L>, InterpreterError>
+    where
+        Self::StageInfo: HasStageInfo<L>,
+        L: Dialect,
+    {
+        let stage = self.resolve_stage::<L>()?;
+        Ok(Staged {
+            interp: self,
+            stage,
+        })
+    }
+
     /// Convenience: resolve typed [`StageInfo`] for the current active stage.
     ///
     /// Equivalent to `self.resolve_stage_info(self.active_stage())`.
@@ -97,5 +113,74 @@ pub trait StageAccess<'ir>: Sized + 'ir {
             interp: self,
             stage,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::{AbstractInterpreter, AbstractValue};
+    use kirin_ir::{HasBottom, Lattice, Pipeline};
+    use kirin_test_languages::CompositeLanguage;
+
+    /// Minimal abstract value for testing stage access.
+    #[derive(Clone, Debug, PartialEq, Eq)]
+    struct Unit;
+
+    impl Lattice for Unit {
+        fn join(&self, _other: &Self) -> Self {
+            Unit
+        }
+        fn meet(&self, _other: &Self) -> Self {
+            Unit
+        }
+        fn is_subseteq(&self, _other: &Self) -> bool {
+            true
+        }
+    }
+
+    impl HasBottom for Unit {
+        fn bottom() -> Self {
+            Unit
+        }
+    }
+
+    impl AbstractValue for Unit {
+        fn widen(&self, _next: &Self) -> Self {
+            Unit
+        }
+    }
+
+    #[test]
+    fn try_in_stage_returns_error_on_misconfigured_pipeline() {
+        // Create one pipeline to obtain a valid CompileStage ID, then use a
+        // *different* empty pipeline so the ID doesn't resolve.
+        let mut donor: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+        let stage_id = donor.add_stage().stage(StageInfo::default()).new();
+
+        let empty: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+        let mut interp = AbstractInterpreter::<Unit, _, InterpreterError>::new(&empty, stage_id);
+
+        match interp.try_in_stage::<CompositeLanguage>() {
+            Ok(_) => panic!("should fail on empty pipeline"),
+            Err(InterpreterError::StageResolution {
+                kind: crate::StageResolutionError::MissingStage,
+                ..
+            }) => {} // expected
+            Err(other) => panic!("expected MissingStage, got {other:?}"),
+        }
+    }
+
+    #[test]
+    fn try_in_stage_succeeds_on_valid_pipeline() {
+        let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+        let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+        let mut interp = AbstractInterpreter::<Unit, _, InterpreterError>::new(&pipeline, stage_id);
+
+        assert!(
+            interp.try_in_stage::<CompositeLanguage>().is_ok(),
+            "should succeed on valid pipeline"
+        );
     }
 }

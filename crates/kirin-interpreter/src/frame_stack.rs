@@ -82,6 +82,12 @@ impl<V, X> FrameStack<V, X> {
         self.frames.last().map(Frame::stage).unwrap_or(fallback)
     }
 
+    /// Read an SSA value from the **top** frame only.
+    ///
+    /// This is correct for SSA semantics: each frame represents a single
+    /// function invocation and SSA values do not escape their defining scope.
+    /// Returns [`InterpreterError::UnboundValue`] if the value is not present
+    /// in the current frame (or the stack is empty).
     pub fn read<E: From<InterpreterError>>(&self, value: SSAValue) -> Result<&V, E> {
         self.frames
             .last()

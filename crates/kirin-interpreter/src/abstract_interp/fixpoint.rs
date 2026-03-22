@@ -106,8 +106,9 @@ where
     /// Run forward abstract interpretation starting from `entry` block with
     /// `initial_args` bound to the block's arguments.
     ///
-    /// Returns an [`AnalysisResult`] containing all SSA values and the joined
-    /// return value.
+    /// On success the current frame is consumed (popped) and its state is
+    /// moved into the returned [`AnalysisResult`]. The caller must pop the
+    /// frame itself on error paths.
     pub fn run_forward<L>(
         &mut self,
         stage_id: CompileStage,
@@ -122,23 +123,25 @@ where
 
         {
             let block_info = entry.expect_info(stage);
-            let arg_ssas: Vec<SSAValue> = block_info
-                .arguments
-                .iter()
-                .map(|ba| SSAValue::from(*ba))
-                .collect();
-            if arg_ssas.len() != initial_args.len() {
+            if block_info.arguments.len() != initial_args.len() {
                 return Err(InterpreterError::ArityMismatch {
-                    expected: arg_ssas.len(),
+                    expected: block_info.arguments.len(),
                     got: initial_args.len(),
                 }
                 .into());
             }
             let frame = self.frames.current_mut()?;
             let (values, fp) = frame.values_and_extra_mut();
-            for (ssa, val) in arg_ssas.iter().zip(initial_args.iter()) {
-                values.insert(*ssa, val.clone());
-            }
+            let arg_ssas: Vec<SSAValue> = block_info
+                .arguments
+                .iter()
+                .zip(initial_args.iter())
+                .map(|(ba, val)| {
+                    let ssa = SSAValue::from(*ba);
+                    values.insert(ssa, val.clone());
+                    ssa
+                })
+                .collect();
             fp.block_args.insert(entry, arg_ssas);
             fp.worklist.push_unique(entry);
         }
@@ -184,12 +187,9 @@ where
             }
         }
 
-        let frame = self.frames.current()?;
-        Ok(AnalysisResult::new(
-            frame.values().clone(),
-            frame.extra().block_args.clone(),
-            return_value,
-        ))
+        let frame = self.frames.pop()?;
+        let (_callee, _stage, values, fp) = frame.into_parts();
+        Ok(AnalysisResult::new(values, fp.block_args, return_value))
     }
 
     // -- Internal helpers ---------------------------------------------------
@@ -271,6 +271,8 @@ where
                     None => v.clone(),
                 });
             }
+            // Call is handled inline in `eval_block` (the call handler writes
+            // the return value directly), so it never reaches propagation.
             Continuation::Continue | Continuation::Call { .. } => {}
             Continuation::Ext(inf) => match *inf {},
         }
@@ -316,18 +318,10 @@ where
         S: HasStageInfo<L>,
         L: Dialect + 'ir,
     {
-        let target_arg_ssas: Vec<SSAValue> = {
-            let block_info = target.expect_info(stage);
-            block_info
-                .arguments
-                .iter()
-                .map(|ba| SSAValue::from(*ba))
-                .collect()
-        };
-
-        if target_arg_ssas.len() != args.len() {
+        let block_info = target.expect_info(stage);
+        if block_info.arguments.len() != args.len() {
             return Err(InterpreterError::ArityMismatch {
-                expected: target_arg_ssas.len(),
+                expected: block_info.arguments.len(),
                 got: args.len(),
             }
             .into());
@@ -340,10 +334,17 @@ where
         let first_visit = !fp.block_args.contains_key(&target);
 
         if first_visit {
-            for (ssa, val) in target_arg_ssas.iter().zip(args.iter()) {
-                values.insert(*ssa, val.clone());
-            }
-            fp.block_args.insert(target, target_arg_ssas);
+            let arg_ssas: Vec<SSAValue> = block_info
+                .arguments
+                .iter()
+                .zip(args.iter())
+                .map(|(ba, val)| {
+                    let ssa = SSAValue::from(*ba);
+                    values.insert(ssa, val.clone());
+                    ssa
+                })
+                .collect();
+            fp.block_args.insert(target, arg_ssas);
             Ok(true)
         } else {
             let visit_count = fp.visit_counts.entry(target).or_insert(0);
@@ -351,8 +352,9 @@ where
             let current_count = *visit_count;
 
             let mut changed = false;
-            for (ssa, new_val) in target_arg_ssas.iter().zip(args.iter()) {
-                match values.entry(*ssa) {
+            for (ba, new_val) in block_info.arguments.iter().zip(args.iter()) {
+                let ssa = SSAValue::from(*ba);
+                match values.entry(ssa) {
                     std::collections::hash_map::Entry::Occupied(mut entry) => {
                         let merged = if narrowing {
                             entry.get().narrow(new_val)

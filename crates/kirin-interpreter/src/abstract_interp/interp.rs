@@ -44,6 +44,7 @@ where
     /// Type-erased call handler installed by [`analyze`](Self::analyze) so that
     /// [`interpret_block`] can dispatch nested calls through [`CallSemantics`]
     /// without requiring `L: CallSemantics` in its own bounds.
+    #[allow(clippy::type_complexity)]
     pub(crate) call_handler: Option<
         fn(
             &mut AbstractInterpreter<'ir, V, S, E, G>,
@@ -312,6 +313,7 @@ where
 {
     type Ext = std::convert::Infallible;
 
+    #[allow(clippy::multiple_bound_locations)] // L: Dialect on method + where clause
     fn eval_block<L: Dialect>(
         &mut self,
         stage: &'ir StageInfo<L>,

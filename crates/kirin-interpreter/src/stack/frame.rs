@@ -138,6 +138,7 @@ where
 {
     type Ext = ConcreteExt;
 
+    #[allow(clippy::multiple_bound_locations)] // L: Dialect on method + where clause
     fn eval_block<L: Dialect>(
         &mut self,
         stage: &'ir StageInfo<L>,

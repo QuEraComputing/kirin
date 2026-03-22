@@ -129,8 +129,11 @@ where
                 crate::FixpointState::default(),
             ))?;
             let result = interp.run_forward::<L>(stage_id, entry, args);
-            let _ = interp.frames.pop()?;
-
+            // run_forward pops the frame on success; pop on error to maintain
+            // the frame stack invariant.
+            if result.is_err() {
+                let _ = interp.frames.pop::<E>();
+            }
             let result = result?;
 
             // Check convergence against old tentative result

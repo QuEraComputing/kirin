@@ -41,13 +41,8 @@ pub trait BlockEvaluator<'ir>: ValueStore + StageAccess<'ir> + 'ir {
             }
             .into());
         }
-        let arg_ssas: Vec<SSAValue> = block_info
-            .arguments
-            .iter()
-            .map(|ba| SSAValue::from(*ba))
-            .collect();
-        for (ssa, val) in arg_ssas.iter().zip(args.iter()) {
-            self.write_ssa(*ssa, val.clone())?;
+        for (ba, val) in block_info.arguments.iter().zip(args.iter()) {
+            self.write_ssa(SSAValue::from(*ba), val.clone())?;
         }
         Ok(())
     }
@@ -62,6 +57,7 @@ pub trait BlockEvaluator<'ir>: ValueStore + StageAccess<'ir> + 'ir {
     ///
     /// The caller must call [`bind_block_args`](Self::bind_block_args) first
     /// to write values into the block's argument SSA slots.
+    #[allow(clippy::multiple_bound_locations)] // L: Dialect on method + where clause
     fn eval_block<L: Dialect>(
         &mut self,
         stage: &'ir StageInfo<L>,
