@@ -161,6 +161,26 @@ Map work streams to agent roles:
 
 **Critical dependency sequencing**: If work stream B depends on A's output, A must complete before B starts. Use task dependencies (`addBlockedBy`) to enforce this.
 
+#### Team Coordination: Agent Teams (preferred) or Background Agents
+
+**Option A: Agent Teams (preferred when TeamCreate is available)**
+
+Use `TeamCreate` to create a refactor team, then spawn implementer teammates. This gives structured coordination via shared task lists and message passing.
+
+1. Create team: `TeamCreate(team_name: "refactor-<scope>", description: "Refactoring <scope>")`
+2. Create tasks for each work stream using `TaskCreate` — one task per agent assignment, with dependencies reflecting the ordering
+3. Spawn agents as teammates: `Agent(team_name: "refactor-<scope>", name: "<role>-<crate>", isolation: "worktree", run_in_background: true, ...)`
+4. Teammates pick up tasks from the shared list, work in isolated worktrees, mark tasks complete, and go idle
+5. The lead (you) monitors progress, creates follow-up tasks when dependencies unblock, and assigns merge/fix tasks
+6. The Verifier teammate picks up verification tasks after each implementer completes
+7. After all work is done, send shutdown messages to all teammates and call `TeamDelete`
+
+**Option B: Background Agents (fallback)**
+
+If `TeamCreate` is not available, dispatch agents with `run_in_background: true` and `isolation: "worktree"` directly. Track progress through agent completion notifications.
+
+**Non-blocking requirement (both options):** All implementer agents MUST run in background (`run_in_background: true`). The user must be able to interact with the main agent at all times during execution. Never block on agent completion.
+
 ### For Solo Agent
 
 Load the `subagent-driven-development` or `executing-plans` skill for step-by-step execution with review checkpoints.
@@ -285,6 +305,7 @@ If yes, save to the team templates directory (see AGENTS.md Project structure) a
 - `cargo check` failing 3+ times on the same error (escalate to user)
 - Any agent placing types in a crate not listed in the pre-flight summary
 - Verifier auto-fixing code instead of reporting to lead
+- Dispatching implementer agents in foreground (blocking) instead of background — user must remain able to interact
 
 ## Rationalization Table
 
@@ -297,6 +318,7 @@ If yes, save to the team templates directory (see AGENTS.md Project structure) a
 | Edit the same file from two agents | "The changes are in different functions" | Git merges on function granularity, not line granularity. Two agents touching the same file creates merge conflicts that require manual resolution. |
 | Let the verifier fix issues | "It's faster than dispatching back to the implementer" | The verifier lacks the implementer's context. Verifier fixes introduce new bugs at a higher rate. Report to lead, let the right agent fix it. |
 | Skip exploration budget | "I need to read one more file to understand" | The budget exists because unbounded exploration delays the actual work. If 20 reads aren't enough, the scope is wrong — simplify it. |
+| Dispatch agents in foreground | "I need to wait for them anyway before merging" | Foreground dispatch blocks the user. Refactors take minutes per agent — the user should be free to ask questions or provide context while agents work in background. |
 
 ## Integration
 
@@ -305,6 +327,8 @@ If yes, save to the team templates directory (see AGENTS.md Project structure) a
 - The `finishing-a-development-branch` skill — completion after Phase 5
 
 **Execution skills (choose based on user's Phase 2 decision):**
+- `TeamCreate` / `TeamDelete` — preferred for parallel agent teams (structured coordination with shared task lists)
+- `Agent` with `run_in_background: true` + `isolation: "worktree"` — fallback for parallel execution when teams are unavailable
 - The `subagent-driven-development` skill — solo agent, task-by-task with review
 - The `executing-plans` skill — parallel or sequential execution with batch checkpoints
 
