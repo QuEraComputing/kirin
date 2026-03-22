@@ -127,24 +127,43 @@ Output the same pre-flight summary format. Present to user for approval before p
 
 ### User Decision Point
 
-After both paths converge (review + pre-flight both complete), ask the user:
+After both paths converge (review + pre-flight both complete), present ALL implementation options. Include a recommendation based on the refactor's characteristics, but let the user choose.
 
 ```
 How would you like to proceed with the implementation?
 
-1. Parallel agent team — multiple implementers in isolated worktrees (faster, recommended for large refactors)
-2. Solo agent — single agent executes sequentially (simpler, recommended for small refactors)
+1. Direct — I implement the changes myself in this session (best for small, straightforward refactors with < 3 files)
+2. Sequential agent — a single background agent executes step-by-step with review checkpoints (best for medium refactors or highly sequential changes where each step depends on the previous)
+3. Agent team — multiple implementers working in parallel, each in isolated worktrees (best for large refactors with independent work streams across crates)
 ```
+
+**Recommendation heuristics** (suggest, don't force):
+- 1-3 files, no cross-crate moves → recommend Direct
+- Single crate or strictly sequential dependency chain → recommend Sequential agent
+- 2+ independent work streams across crates → recommend Agent team
 
 The user's choice determines how Phase 3 designs the plan.
 
 ## Phase 3: Implementation Planning
 
-Design the implementation plan based on the user's choice from Phase 2. Use existing skills:
+Design the implementation plan based on the user's choice. Use existing skills:
 - Load the `writing-plans` skill to create a detailed step-by-step plan if one doesn't exist
 - Load the `brainstorming` skill for upstream design work if the approach is unclear
 
-### For Parallel Agent Teams
+### For Direct Implementation
+
+No agent dispatch needed. The lead agent (you) implements changes directly in the current session.
+- Follow the invariants from Phase 4
+- Run `cargo check -p <crate>` after every file modification
+- Present changes to user for review at natural checkpoints
+
+### For Sequential Agent
+
+Load the `subagent-driven-development` or `executing-plans` skill for step-by-step execution with review checkpoints.
+
+Dispatch a single background agent (`run_in_background: true`) with `isolation: "worktree"`. The user can continue interacting while the agent works sequentially through the plan.
+
+### For Agent Team
 
 Identify independent work streams that can run concurrently. Group by:
 - **Dependency order**: foundation crates first, then dependents
@@ -159,9 +178,9 @@ Map work streams to agent roles:
 | Migrator | Update downstream consumers (imports, Cargo.toml, feature flags) | When downstream crates are affected |
 | Verifier | Run checks, tests, and review agent output; report findings to lead | Always (dedicated agent) |
 
-**Critical dependency sequencing**: If work stream B depends on A's output, A must complete before B starts. Use task dependencies (`addBlockedBy`) to enforce this.
+**Critical dependency sequencing**: If work stream B depends on A's output, A must complete before B starts. Use task dependencies to enforce this.
 
-#### Team Coordination: Agent Teams (preferred) or Background Agents
+#### Coordination: Agent Teams (preferred) or Background Agents
 
 **Option A: Agent Teams (preferred when TeamCreate is available)**
 
@@ -175,15 +194,13 @@ Use `TeamCreate` to create a refactor team, then spawn implementer teammates. Th
 6. The Verifier teammate picks up verification tasks after each implementer completes
 7. After all work is done, send shutdown messages to all teammates and call `TeamDelete`
 
+**Worktree isolation is MANDATORY for all team members.** Every teammate that edits code MUST be spawned with `isolation: "worktree"`. This is non-negotiable — even within an agent team, concurrent edits to the same working directory cause cascading build errors, LSP floods, and merge conflicts.
+
 **Option B: Background Agents (fallback)**
 
 If `TeamCreate` is not available, dispatch agents with `run_in_background: true` and `isolation: "worktree"` directly. Track progress through agent completion notifications.
 
 **Non-blocking requirement (both options):** All implementer agents MUST run in background (`run_in_background: true`). The user must be able to interact with the main agent at all times during execution. Never block on agent completion.
-
-### For Solo Agent
-
-Load the `subagent-driven-development` or `executing-plans` skill for step-by-step execution with review checkpoints.
 
 ### Plan Approval
 
@@ -197,23 +214,18 @@ Present the implementation plan to the user. Include:
 
 ## Phase 4: Guarded Execution
 
-### Worktree Isolation (MANDATORY for parallel agents)
+### Worktree Isolation (MANDATORY for all code-editing agents)
 
-Every implementer/builder/migrator agent MUST work in its own git worktree under `.worktrees/`.
+Every agent that edits code MUST work in its own git worktree — whether dispatched as a standalone background agent or as a teammate in an agent team. This applies to all execution modes except Direct implementation.
 
-**Setup procedure:**
+**When using the Agent tool**, set `isolation: "worktree"` on every code-editing agent. This is NON-NEGOTIABLE regardless of coordination model (agent team or background agents).
+
+**Setup procedure** (for manual worktree management if needed):
 1. Check if `.worktrees/` exists and is in `.gitignore`
 2. If not, load the `using-git-worktrees` skill to set it up (creates directory, verifies gitignore, commits)
 3. If `.worktrees/` already exists, skip the skill and create worktrees directly
 
-**Creating per-agent worktrees:**
-```bash
-git worktree add .worktrees/<agent-name> -b refactor/<agent-name>
-```
-
 Each agent works in its isolated worktree. The lead agent (or a merge orchestrator) merges branches back in dependency order.
-
-**When using the Agent tool**, set `isolation: "worktree"` to enforce worktree isolation per agent. This is NON-NEGOTIABLE for parallel execution.
 
 ### Invariants (inject into ALL agent prompts)
 
@@ -234,8 +246,9 @@ REFACTOR INVARIANTS — these override any conflicting instructions:
 
 The strategy depends on execution mode:
 
-- **Solo agent**: Run `cargo check -p <crate>` after every file modification. Do not batch.
-- **Parallel agents**: Each agent runs `cargo check` within its own worktree. Cross-crate checks happen AFTER merging, led by the Verifier agent.
+- **Direct**: Run `cargo check -p <crate>` after every file modification. Do not batch.
+- **Sequential agent**: Run `cargo check -p <crate>` after every file modification within the worktree.
+- **Agent team**: Each agent runs `cargo check` within its own worktree. Cross-crate checks happen AFTER merging, led by the Verifier agent.
 
 ### The Verifier Agent
 
