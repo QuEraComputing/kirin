@@ -291,19 +291,33 @@ Do NOT dispute findings based on design opinions — only factual errors.
 
 ### Step 2: User Walkthrough
 
-After verification, present **every finding individually** to the user using
-`AskUserQuestion`. Do NOT batch, aggregate, or skip findings to save time. The
-user is expected to answer every question — this is the decision point that
-determines the refactoring scope.
+After verification, walk through **every finding** with the user using
+`AskUserQuestion`. Do NOT skip or silently aggregate findings to save time. The
+user is expected to make an accept/reject decision on every finding — this is
+the decision point that determines the refactoring scope.
 
-**One finding per question, always.** Even if there are 20+ findings, present
-each one individually. The user needs to make an informed accept/reject decision
-for each finding, and batching loses context.
+**Every finding gets a decision.** Even if there are 20+ findings, each one
+needs an individual accept/reject from the user.
+
+**Grouping similar findings is encouraged** — present related findings together
+in one `AskUserQuestion` call so the user sees the pattern. But each finding
+within the group still gets its own accept/reject option. For example, if 3
+findings all relate to "silent failures in builder APIs", present them as one
+question group with 3 individual decision points, not as a single "accept all
+builder findings?" question.
+
+Good grouping criteria:
+- Same cross-cutting theme (e.g., "silent failure" findings across crates)
+- Same crate and related code area
+- Coupled findings that share a root cause
+
+Bad grouping: unrelated findings lumped together just to reduce question count.
 
 #### Walkthrough procedure
 
-Walk through all findings in severity order (P0 first, then P1, P2, P3). Each
-finding gets its own `AskUserQuestion` call with a full explanation.
+Walk through all findings in severity order (P0 first, then P1, P2, P3).
+Group related findings where it helps the user see patterns, but every finding
+gets its own decision within the group.
 
 #### Illustration requirement
 
@@ -435,7 +449,7 @@ options:
 - Omitting design context from reviewer prompts (causes false positives on intentional patterns)
 - Skipping Phase 3 verification (unverified findings waste the user's time)
 - Committing the report before user walkthrough is complete
-- Batching or aggregating findings during walkthrough — every finding gets its own question
+- Aggregating multiple findings into a single accept/reject decision — each finding gets its own decision even when grouped
 - Skipping lower-severity findings to "save time" — the user decides what to skip, not the agent
 - Skipping the cross-review step
 - Code Quality reviewer not referencing Formalism findings during cross-review
@@ -451,7 +465,7 @@ options:
 | Skip design context in prompts | "The reviewer will figure out what's intentional" | Without design context, reviewers flag 30-50% intentional patterns as issues. The user wastes walkthrough time on false positives. |
 | Skip verification agent | "The reviewers were thorough" | Reviewers describe code from memory. The verification agent reads actual source and catches misquoted line numbers, stale references, and misread logic. |
 | Rush through P3 walkthrough | "P3 is low priority, just accept them all" | P3 findings accumulate into technical debt. The walkthrough is where the user decides which are worth tracking vs discarding. |
-| Batch findings to save time | "There are 20 findings, I'll group them" | Each finding needs an individual accept/reject decision with context. Batching loses the explanation and forces the user to context-switch between findings in the same question. One question per finding, always. |
+| Merge findings into one decision | "These 3 are similar, I'll ask once" | Group related findings to show patterns, but each finding still needs its own accept/reject. "Accept all builder findings" hides the individual trade-offs — the user might want to accept the rename but reject the API change. |
 | Assign P1 to uncertain finding | "It looks serious even though I'm not sure" | Uncertain P1 findings undermine trust in the report. Downgrade to P2 and phrase as a question. |
 | Organize review around user's suspected issues | "The user already knows what's wrong, just confirm it" | Confirmation bias. User suspicions become hypotheses to test, not the review's structure. Independent reviewer analysis discovers issues the user doesn't suspect. The previous review found its highest-value findings in areas nobody expected. |
 | Dispatch reviewers in foreground | "I need to wait for them anyway before the next step" | Foreground dispatch blocks the user from interacting with the main agent. Big reviews take minutes — the user should be free to ask questions, work on other things, or provide context while reviewers work in background. |
