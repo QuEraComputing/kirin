@@ -71,6 +71,30 @@ working around the issue.>
 - "This API accepts this pattern" — write a minimal test before building on it
 - "Changing X does not break downstream crate Y" — cargo check -p <Y> first
 
+## Regression Test (P0/P1 findings)
+
+<For P0 and P1 severity findings, the implementation SHOULD start by writing a
+test that reproduces the issue BEFORE fixing it. This is not mandatory — some
+issues (e.g., UB from mem::zeroed) are hard to test directly — but the planner
+should try their best to design a reproducing test. A test-first approach:
+1. Proves the issue is real (not a false positive from the review)
+2. Confirms the fix actually resolves the issue (test goes from fail to pass)
+3. Prevents regressions in future changes
+
+If a reproducing test is not feasible, explain why in this section and describe
+how the fix will be validated instead.>
+
+- [ ] **Write regression test for <issue description>**
+  <Describe the test: what it sets up, what behavior it exercises, and what
+  assertion captures the bug. Reference the test file and function name.>
+  Test file: `<crate>/tests/<file>.rs` or inline `#[cfg(test)]`
+
+- [ ] **Run the test — confirm it fails (or demonstrates the issue)**
+  Run: `<command>`
+  Expected: <FAIL with specific error, or demonstrates the problematic behavior>
+
+<For P2+ findings, skip this section — go straight to Implementation Steps.>
+
 ## Implementation Steps
 
 <Ordered steps. Use checkbox syntax for tracking. Each step is one action —
@@ -84,7 +108,11 @@ Granularity guide:
 - "Run cargo clippy and fix warnings" — one step
 
 Include exact code patterns where they clarify intent, but do not write the
-full implementation — the implementer adapts to the current code state.>
+full implementation — the implementer adapts to the current code state.
+
+For P0/P1 findings with a regression test above, the first implementation
+step should be the fix, and a subsequent step should re-run the regression
+test to confirm it passes.>
 
 - [ ] **Step 1: <title>**
   <What to do. Reference specific functions, types, or patterns.>
@@ -170,9 +198,20 @@ assumptions. Common cases in refactoring:
 If the planner verified the assumption during exploration, still include the step —
 the code may change between planning and execution.
 
+**Regression Test (P0/P1 only):** For P0 and P1 findings, try hard to design a
+test that reproduces the issue before implementing the fix. Think about:
+- Can you construct an input that triggers the bug? (e.g., nested blocks with
+  duplicate SSA names for P0-2 scope shadowing)
+- Can you assert on the wrong behavior? (e.g., zeroed type field for P1-2)
+- If the issue is UB or a panic, can you write a test that catches it under
+  debug/test builds? (e.g., `#[should_panic]`, miri, debug_assert)
+If truly infeasible, explain why and describe the alternative validation.
+
 **Implementation Steps:** Use `- [ ]` checkbox syntax. One action per step. Include
-`Run:` and `Expected:` lines for steps that produce verifiable output. Follow the
-cycle: write test → run (expect fail) → implement → run (expect pass) → clippy → commit.
+`Run:` and `Expected:` lines for steps that produce verifiable output. For P0/P1
+with a regression test, the cycle is: write regression test → run (expect fail) →
+implement fix → run (expect pass) → clippy → commit. For P2+: write test →
+run (expect fail) → implement → run (expect pass) → clippy → commit.
 
 **Must Not Do:** Always include these two mandatory items plus any finding-specific constraints:
 - Never `#[allow(...)]` to suppress warnings — fix the root cause

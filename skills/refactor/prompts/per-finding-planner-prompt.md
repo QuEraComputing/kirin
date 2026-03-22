@@ -69,6 +69,15 @@ Agent (general-purpose):
     implementer runs these first; if any fails, they STOP and report. This
     prevents agents from silently working around stale review findings.
 
+    Regression test rule (P0/P1 findings) — for P0 and P1 severity findings,
+    the plan SHOULD include a "Regression Test" section that designs a test
+    reproducing the issue BEFORE the fix. Try hard to come up with a test:
+    construct an input that triggers the bug, assert on the wrong behavior,
+    or use #[should_panic] / debug assertions. If truly infeasible (e.g.,
+    UB that only manifests at runtime under specific conditions), explain why
+    and describe how the fix will be validated instead. This is preferred,
+    not mandatory — but put real effort into it.
+
     Step granularity — each step should be one action: write test, run test,
     implement change, run tests, fix clippy, commit. Use checkbox syntax
     (`- [ ]`) for tracking. Include expected output for verification steps
