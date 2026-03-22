@@ -24,6 +24,7 @@ mod block;
 mod context;
 pub mod digraph;
 pub mod error;
+mod graph_common;
 mod redefine;
 mod region;
 mod stage_info;
