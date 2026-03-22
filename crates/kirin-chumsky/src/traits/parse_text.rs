@@ -81,7 +81,9 @@ where
     let existing_ssas = collect_existing_ssas(stage);
     let mut emit_ctx = EmitContext::new(stage);
     for (name, ssa) in existing_ssas {
-        emit_ctx.register_ssa(name, ssa);
+        // Pre-existing SSAs are already valid; duplicates cannot occur here
+        // because names come from the stage's own symbol table.
+        let _ = emit_ctx.register_ssa(name, ssa);
     }
     L::parse_and_emit(input, &mut emit_ctx)
 }

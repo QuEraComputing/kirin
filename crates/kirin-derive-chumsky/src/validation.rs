@@ -42,25 +42,25 @@ pub fn validate_ir_path_for_body_projections<L: kirin_derive_toolkit::ir::Layout
             let field = collected.iter().find(|f| {
                 f.ident.as_ref().is_some_and(|id| id == name) || f.index.to_string() == *name
             });
-            if let Some(field) = field {
-                if matches!(
-                    field.category(),
+            if let Some(field) = field.filter(|f| {
+                matches!(
+                    f.category(),
                     FieldCategory::DiGraph | FieldCategory::UnGraph
-                ) {
-                    let kind = match field.category() {
-                        FieldCategory::DiGraph => "DiGraph",
-                        FieldCategory::UnGraph => "UnGraph",
-                        _ => unreachable!(),
-                    };
-                    return Err(syn::Error::new(
-                        span,
-                        format!(
-                            "{kind} field '{field}' uses body projections which require \
-                             the IR crate path for code generation. Ensure a \
-                             `#[kirin(crate = ...)]` attribute is present.",
-                        ),
-                    ));
-                }
+                )
+            }) {
+                let kind = match field.category() {
+                    FieldCategory::DiGraph => "DiGraph",
+                    FieldCategory::UnGraph => "UnGraph",
+                    _ => unreachable!(),
+                };
+                return Err(syn::Error::new(
+                    span,
+                    format!(
+                        "{kind} field '{field}' uses body projections which require \
+                         the IR crate path for code generation. Ensure a \
+                         `#[kirin(crate = ...)]` attribute is present.",
+                    ),
+                ));
             }
         }
     }
