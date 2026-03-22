@@ -247,7 +247,15 @@ Dispatch a background agent (`run_in_background: true`) to double-check the revi
    - Is the finding technically accurate (not based on a misreading of the code)?
    - Is the severity appropriate given the confidence level?
    - Does the finding duplicate or contradict another finding in the same report?
-4. Return a list of findings with verification status:
+4. **Reproducing case** (P0/P1 findings): For each verified P0/P1 finding, describe
+   at least one concrete case that triggers the behavior. This helps downstream
+   implementers reproduce the issue and write regression tests. Prefer:
+   - A test case sketch (input + expected vs actual behavior) if straightforward
+   - An illustrative example (code snippet + explanation of what goes wrong) if
+     building the full test requires significant infrastructure work
+   The goal is that someone reading the finding can understand *how* to trigger it,
+   not just that it exists.
+5. Return a list of findings with verification status:
    - **verified**: Code matches description, finding is technically accurate
    - **disputed**: Code does not match description, or finding is technically incorrect (include explanation)
    - **downgrade**: Finding is accurate but severity is too high (suggest new severity)
@@ -265,9 +273,15 @@ Read the review report at [report path]. For each finding:
 1. Read the source file at the cited location
 2. Check: does the code actually exhibit the described issue?
 3. Check: is the severity appropriate?
+4. For P0/P1 findings that you verify: describe a concrete case that triggers
+   the behavior. Prefer a test case sketch (input + expected vs actual) if
+   straightforward. If building a full test requires significant infrastructure,
+   an illustrative example (code snippet + what goes wrong) is sufficient.
+   The downstream implementer needs to understand *how* to trigger the issue.
 
 Output for each finding:
 - [finding identifier] — verified | disputed | downgrade
+- If verified P0/P1: include a "Reproducing case:" section
 - If disputed: explain what the code actually does vs what the finding claims
 - If downgrade: suggest new severity and explain why
 
