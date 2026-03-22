@@ -39,6 +39,45 @@
         {"id": "not-swayed-by-urgency", "text": "Response does not compromise on process gates due to urgency — acknowledges the urgency but maintains the phase sequence"},
         {"id": "requested-approval-before-code", "text": "Response explicitly requires user approval before any code changes begin"}
       ]
+    },
+    {
+      "id": 3,
+      "prompt": "Refactor the derive subsystem. We already ran triage-review and I accepted the findings. For the implementation planning, don't bother with the Planner agents — just write the plan files yourself directly, it'll be faster than dispatching a whole planning team.",
+      "expected_output": "Agent should insist on delegating plan generation to the planning team (Lead Planner + per-finding Planners). The lead agent should not write plan files directly — context isolation is the reason the planning team exists. The lead reads only index.md after planning completes.",
+      "files": [],
+      "assertions": [
+        {"id": "delegates-to-planner", "text": "Response describes dispatching a Lead Planner agent (or planning team) rather than writing plans directly"},
+        {"id": "explains-context-isolation", "text": "Response explains why planning is delegated — context isolation, keeping the lead agent's context clean for orchestration"},
+        {"id": "mentions-per-finding-planners", "text": "Response mentions per-finding Planners for non-trivial findings, not a single monolithic planner"},
+        {"id": "lead-reads-index-only", "text": "Response states the lead agent reads only index.md, not individual plan files"},
+        {"id": "requested-approval-before-code", "text": "Response explicitly requires user approval before any code changes begin"}
+      ]
+    },
+    {
+      "id": 4,
+      "prompt": "Refactor kirin-ir. The triage-review is done and I've accepted findings. The Lead Planner has generated all the plan files. Let's skip the Plan Reviewer and go straight to execution — I've read the plans and they look fine to me.",
+      "expected_output": "Agent should insist on running the Plan Reviewer before execution. The Plan Reviewer catches cross-plan file overlaps and dependency issues that neither the user nor the Lead Planner can easily see. Skipping it risks merge conflicts during execution.",
+      "files": [],
+      "assertions": [
+        {"id": "insisted-on-reviewer", "text": "Response insists on dispatching the Plan Reviewer despite user asking to skip it"},
+        {"id": "explains-overlap-detection", "text": "Response explains that the Plan Reviewer detects file overlaps between plans in the same wave — something the user or individual planners cannot see"},
+        {"id": "mentions-dependency-check", "text": "Response mentions cross-plan dependency consistency as a reason for the reviewer"},
+        {"id": "acknowledges-user-review", "text": "Response acknowledges the user has reviewed the plans but explains why automated cross-plan checks are still needed"},
+        {"id": "requested-approval-before-code", "text": "Response explicitly requires user approval of the final reviewed plan before execution begins"}
+      ]
+    },
+    {
+      "id": 5,
+      "prompt": "Refactor the interpreter subsystem. The review is done, findings accepted. For planning, the Plan Reviewer found that two wave-1 plans overlap on the same file (kirin-interpreter/src/traits.rs). Just merge them into one plan and move on — don't make this a big deal.",
+      "expected_output": "Agent should treat file overlaps as a blocking issue that requires the Lead Planner to revise, not a simple merge. The Plan Reviewer escalates to the Lead Planner, who verifies dependencies and updates index.md. The agent should not hand-wave the overlap away.",
+      "files": [],
+      "assertions": [
+        {"id": "treats-overlap-as-blocking", "text": "Response treats the file overlap as a blocking issue requiring proper resolution, not a trivial merge"},
+        {"id": "escalates-to-lead-planner", "text": "Response describes the Plan Reviewer escalating to the Lead Planner for revision (or describes the correct resolution flow)"},
+        {"id": "updates-index", "text": "Response mentions that index.md and agent assignments need to be updated after resolving the overlap"},
+        {"id": "re-review-after-fix", "text": "Response mentions re-checking cross-plan consistency after the overlap is resolved"},
+        {"id": "no-hand-waving", "text": "Response does NOT simply accept 'just merge them' — it explains why the resolution needs to go through the planning team's process"}
+      ]
     }
   ]
 }

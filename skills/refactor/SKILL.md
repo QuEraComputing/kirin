@@ -85,7 +85,11 @@ Output format:
 
 Present to user for approval before proceeding.
 
-### Phase 2F: Review (validation)
+### Phase 2F: Review (validation, mandatory)
+
+**Triage-review is non-negotiable on both paths.** Even if the user says they already
+know the problems, load the review. User knowledge is input to the review, not a
+substitute — reviewers catch abstraction and soundness issues that familiarity hides.
 
 Load the `triage-review` skill scoped to the affected crates. Pass the pre-flight summary as context so reviewers evaluate the proposed refactor, not just the current state.
 
@@ -146,26 +150,110 @@ The user's choice determines how Phase 3 designs the plan.
 
 ## Phase 3: Implementation Planning
 
-Design the implementation plan based on the user's choice. Use existing skills:
-- Load the `writing-plans` skill to create a detailed step-by-step plan if one doesn't exist
-- Load the `brainstorming` skill for upstream design work if the approach is unclear
+Delegate plan generation to a planning team. The lead agent (you) MUST NOT write
+plan files directly — context isolation is the reason the planning team exists.
+The lead's context stays clean for orchestration; the planning agents absorb the
+heavy codebase exploration. The lead only reads the final `index.md`.
 
-### For Direct Implementation
+**Output:** `docs/plans/<root-refactor-name>/` where `<root-refactor-name>` matches
+the review directory naming convention (e.g., `2026-03-21-graph-parsing-refactor`).
 
-No agent dispatch needed. The lead agent (you) implements changes directly in the current session.
+**Prompt templates:** `./prompts/` — read these before dispatching planning agents.
+**Plan file templates:** `./templates/` — passed to planning agents as input.
+
+### Planning Team Roles
+
+| Role | Responsibility | Prompt |
+|------|---------------|--------|
+| **Lead Planner** | Classifies findings, writes low-hanging-fruit plan + index.md, dispatches per-finding Planners, verifies cross-plan dependencies | `./prompts/lead-planner-prompt.md` |
+| **Per-finding Planner** | Explores codebase deeply for one finding, generates one self-contained plan file | `./prompts/per-finding-planner-prompt.md` |
+| **Plan Reviewer** | Reviews all plans for completeness and cross-plan consistency, escalates overlaps to Lead Planner | `./prompts/plan-reviewer-prompt.md` |
+
+### Step 1: Dispatch the Lead Planner (mandatory)
+
+**Planning delegation is non-negotiable.** Even if the user asks you to write plans
+directly ("it'll be faster"), dispatch the planning team. The lead agent writing
+plans pollutes its context with codebase details it doesn't need for orchestration,
+and loses the per-finding isolation that prevents cross-contamination between plans.
+
+Read `./prompts/lead-planner-prompt.md` and dispatch. Provide:
+- Path to the review report
+- Pre-flight summary (from Phase 1/2)
+- Accepted findings list (from the walkthrough)
+- Paths to `./templates/` and `./prompts/`
+- Plan output directory
+
+The Lead Planner will:
+1. Classify findings into low-hanging fruit vs waves
+2. Write `low-hanging-fruit.md` directly (simple enough for one agent)
+3. Dispatch a **per-finding Planner** for each non-trivial plan file — one
+   agent per finding or coupled finding group, isolating each exploration
+4. Verify cross-plan dependencies and file disjointness after all Planners complete
+5. Generate the final `index.md`
+
+### Step 2: Dispatch the Plan Reviewer (mandatory)
+
+**The Plan Reviewer step is non-negotiable.** Even if the user says they've read
+the plans and they look fine, the Reviewer catches cross-plan file overlaps and
+dependency inconsistencies that human review cannot reliably detect across 10+
+plan files. Skipping it risks merge conflicts during execution that are far more
+expensive to fix than the review takes to run.
+
+After the Lead Planner reports completion, read `./prompts/plan-reviewer-prompt.md`
+and dispatch. Provide the plan directory path and the Lead Planner's agent
+name/ID (for escalation).
+
+The Plan Reviewer will:
+1. Review each plan file for self-containment, scope precision, and completeness
+2. Fix non-blocking issues in-place (wording, missing context, validation commands)
+3. Detect **file overlaps** between plans in the same wave — this is a blocking issue
+4. Escalate blocking issues (overlaps, dependency cycles) to the Lead Planner
+   via SendMessage, wait for revision, then re-check
+5. Report final cross-plan status
+
+### Step 3: Lead Reviews Orchestration Map
+
+After the Plan Reviewer reports CLEAN status, read ONLY `index.md` from the
+plan directory. This is the orchestration map — wave summaries, agent assignments,
+dependency graph, verification checkpoints. The lead does NOT need to read
+individual plan files.
+
+Present the plan to the user. Include:
+- The `index.md` content (wave summary, agent assignments, dependency graph)
+- Any issues the Plan Reviewer escalated and their resolution
+- Total agent count and expected merge sequence
+- Verification checkpoints
+
+**User approves before any code changes.**
+
+### Execution Modes
+
+After plan approval, the user chooses an execution mode (from the User Decision
+Point above). The plan directory structure works with all three modes:
+
+#### Direct Implementation
+
+The lead agent (you) reads plan files sequentially and implements changes.
+Start with `low-hanging-fruit.md`, then wave plan files in order.
 - Follow the invariants from Phase 4
 - Run `cargo check -p <crate>` after every file modification
 - Present changes to user for review at natural checkpoints
 
-### For Sequential Agent
+#### Sequential Agent
 
-Load the `subagent-driven-development` or `executing-plans` skill for step-by-step execution with review checkpoints.
+Load the `subagent-driven-development` or `executing-plans` skill. Pass each
+plan file as the task specification — the plan file's self-contained format
+matches the implementer-prompt template's expectation of full task text.
 
-Dispatch a single agent through the pre-dispatch gate (see Phase 4) — `run_in_background: true` and `isolation: "worktree"` are both required. The user can continue interacting while the agent works sequentially through the plan.
+Dispatch through the pre-dispatch gate (Phase 4) with `run_in_background: true`
+and `isolation: "worktree"`.
 
-### For Agent Team
+#### Agent Team
 
-Identify independent work streams that can run concurrently. Group by:
+Map plan files to agents: one plan file per agent (or all LHF items to a single
+agent). The `index.md` agent assignment table drives dispatch.
+
+Identify independent work streams from the wave structure. Group by:
 - **Dependency order**: foundation crates first, then dependents
 - **File disjointness**: agents MUST NOT edit the same files concurrently
 
@@ -181,7 +269,7 @@ Map work streams to agent roles:
 
 **Critical dependency sequencing**: If work stream B depends on A's output, A must complete before B starts. Use task dependencies to enforce this.
 
-#### Coordination: Agent Teams (preferred) or Background Agents
+##### Coordination: Agent Teams (preferred) or Background Agents
 
 **Option A: Agent Teams (preferred when TeamCreate is available)**
 
@@ -206,16 +294,6 @@ Use `TeamCreate` to create a refactor team, then spawn implementer teammates. Th
 If `TeamCreate` is not available, dispatch agents through the pre-dispatch gate with `run_in_background: true` and `isolation: "worktree"`. Track progress through agent completion notifications.
 
 **Non-blocking requirement (both options):** All implementer agents MUST run in background (`run_in_background: true`). The user must be able to interact with the main agent at all times during execution. Never block on agent completion.
-
-### Plan Approval
-
-Present the implementation plan to the user. Include:
-- Work streams and their ordering
-- Which agents handle which tasks
-- Expected merge sequence
-- Verification checkpoints
-
-**User approves before any code changes.**
 
 ## Phase 4: Guarded Execution
 
@@ -361,6 +439,9 @@ If yes, save to the team templates directory (see AGENTS.md Project structure) a
 - Any agent placing types in a crate not listed in the pre-flight summary
 - Verifier auto-fixing code instead of reporting to lead
 - Dispatching implementer agents in foreground (blocking) instead of background — user must remain able to interact
+- Lead agent writing plan files directly instead of dispatching the planning team (Phase 3 Step 1)
+- Skipping the Plan Reviewer step, even if the user says the plans look fine (Phase 3 Step 2)
+- Skipping triage-review on the Focused path because the user "already knows the problems" — user knowledge is input to review, not a substitute
 
 ## Rationalization Table
 
@@ -374,6 +455,9 @@ If yes, save to the team templates directory (see AGENTS.md Project structure) a
 | Let the verifier fix issues | "It's faster than dispatching back to the implementer" | The verifier lacks the implementer's context. Verifier fixes introduce new bugs at a higher rate. Report to lead, let the right agent fix it. |
 | Skip exploration budget | "I need to read one more file to understand" | The budget exists because unbounded exploration delays the actual work. If 20 reads aren't enough, the scope is wrong — simplify it. |
 | Dispatch agents in foreground | "I need to wait for them anyway before merging" | Foreground dispatch blocks the user. Refactors take minutes per agent — the user should be free to ask questions or provide context while agents work in background. |
+| Write plans directly instead of delegating | "It's faster than dispatching a whole planning team" | The lead agent's context is for orchestration, not codebase exploration. Writing plans directly pollutes it with details from 10+ files per finding, degrading orchestration quality for later phases. Per-finding isolation also prevents cross-contamination between plans. The planning team runs in background — the user isn't waiting. |
+| Skip the Plan Reviewer | "The user already read the plans, they look fine" | Human review catches content issues. The Plan Reviewer catches structural issues: file overlaps between plans in the same wave, dependency cycles, missing findings. A human scanning 10 plan files will not reliably build the cross-plan file map that detects overlaps. Skipping the reviewer risks merge conflicts during execution — far more expensive than the 30-second review. |
+| Skip triage-review on focused path | "The user already knows the problem areas" | The user knows *their* problems. The Formalism reviewer catches abstraction-level issues the user isn't looking for. The Soundness Adversary catches invariant violations. User knowledge is input to the review, not a replacement for it. |
 
 ## Integration
 
