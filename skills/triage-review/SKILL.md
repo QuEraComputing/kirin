@@ -100,11 +100,12 @@ Plan contents:
 
 ```dot
 digraph phase2 {
-    "Read review plan" -> "Step 1: Dispatch reviewers in parallel (per crate)";
-    "Step 1: Dispatch reviewers in parallel (per crate)" -> "Collect initial reports";
-    "Collect initial reports" -> "Step 2: Cross-review (per crate)";
-    "Step 2: Cross-review (per crate)" -> "Collect cross-review notes";
-    "Collect cross-review notes" -> "Step 3: Lead reviewer aggregates per-crate report";
+    "Read review plan" -> "Step 1: Dispatch reviewers in background (per crate)";
+    "Step 1: Dispatch reviewers in background (per crate)" -> "Notify user — remain responsive";
+    "Notify user — remain responsive" -> "Background agents complete";
+    "Background agents complete" -> "Step 2: Cross-review in background (per crate)";
+    "Step 2: Cross-review in background (per crate)" -> "Background agents complete (2)";
+    "Background agents complete (2)" -> "Step 3: Lead reviewer aggregates per-crate report";
     "Step 3: Lead reviewer aggregates per-crate report" -> "Step 4: Main lead aggregates full report";
     "Step 4: Main lead aggregates full report" -> "Phase 3";
 }
@@ -116,9 +117,47 @@ digraph phase2 {
 
 **Maximize parallelism:** Within each step, all reviewers for all crates run in parallel. Steps are sequential (Step 2 depends on Step 1 outputs, etc.).
 
-### Step 1: Initial Review (Parallel)
+### Execution Model: Agent Teams (preferred) or Background Agents
 
-Dispatch all assigned reviewers in parallel for each crate or crate group. Each reviewer produces one report file.
+The review team MUST run non-blocking so the user can continue interacting with the main agent during the review.
+
+#### Option A: Agent Teams (preferred when TeamCreate is available)
+
+Use `TeamCreate` to create a review team, then spawn reviewer teammates. This gives structured coordination via shared task lists and message passing.
+
+**Setup:**
+1. Create a team: `TeamCreate(team_name: "triage-review-<scope>", description: "Triage review of <scope>")`
+2. Create tasks for each reviewer assignment using `TaskCreate` (one task per reviewer-per-crate in Step 1, one per cross-review in Step 2, etc.)
+3. Spawn reviewer agents as teammates using `Agent(team_name: "triage-review-<scope>", name: "<role>-<crate>", run_in_background: true, ...)`
+4. Teammates pick up tasks from the shared task list, mark them complete, and go idle
+5. As teammates complete Step 1 tasks, create Step 2 (cross-review) tasks — teammates will pick them up automatically
+6. After all work is done, send shutdown messages to all teammates and call `TeamDelete`
+
+**Team coordination benefits:**
+- Teammates can discover each other via the team config and send DMs for cross-review coordination
+- Shared task list provides clear visibility into progress
+- The main agent (you) acts as team lead — creating tasks, monitoring progress, and aggregating results
+
+#### Option B: Background Agents (fallback)
+
+If `TeamCreate` is not available, dispatch agents with `run_in_background: true` directly.
+
+**After dispatching background agents:**
+1. Tell the user how many agents were dispatched and what they're doing
+2. Tell the user they can continue working — you will notify them when results arrive
+3. Do NOT block waiting for agents. Continue responding to user messages normally.
+4. When a background agent completes, you will be automatically notified. Acknowledge completion and proceed to the next step when all agents in the current step are done.
+5. Between steps, briefly summarize what was completed before dispatching the next batch.
+
+#### Common rules (both options)
+
+**Naming convention:** Give each agent a descriptive name (e.g., `formalism-kirin-ir`, `code-quality-kirin-chumsky`) so progress notifications are meaningful to the user.
+
+**Non-blocking requirement:** The user MUST be able to interact with the main agent at all times during the review. Never block on agent completion.
+
+### Step 1: Initial Review (Background, Parallel)
+
+Dispatch all assigned reviewers in parallel for each crate or crate group, using `run_in_background: true` on each Agent call. Each reviewer produces one report file.
 
 **Output per reviewer:** Save to the review directory (see AGENTS.md Project structure) under `<datetime>/<crate>/<role>-<title>.md`.
 
@@ -135,9 +174,9 @@ Construct each reviewer's prompt using the templates in `prompts/reviewer-prompt
 4. Confidence and severity levels (from `prompts/confidence-and-severity.md`)
 5. File assignments and output path from the plan
 
-### Step 2: Cross-Review (Parallel)
+### Step 2: Cross-Review (Background, Parallel)
 
-After all initial reviews for a crate are complete, each reviewer reads the other reviewers' reports for the same crate.
+After all initial reviews for a crate are complete, dispatch each reviewer with `run_in_background: true` to read the other reviewers' reports for the same crate.
 
 **Purpose:** Catch false positives, calibrate severity, and surface cross-cutting insights that only become visible when findings from different perspectives are compared.
 
@@ -149,7 +188,7 @@ Construct cross-review prompts using the template in `prompts/cross-review.md`. 
 
 **Lead assignment:** The Formalism reviewer is the per-crate lead by default. If Formalism is not in the roster, use Code Quality. The main lead for the full report (Step 4) is always the orchestrating agent (you), not a subagent.
 
-For each crate, the lead reviewer reads all initial reviews and cross-review notes, then produces a consolidated report.
+For each crate, the lead reviewer reads all initial reviews and cross-review notes, then produces a consolidated report. Dispatch per-crate leads with `run_in_background: true` when there are 3+ crates to aggregate.
 
 **Output:** `<review-dir>/<datetime>/<crate>/final-report.md`
 
@@ -199,7 +238,7 @@ digraph phase3 {
 
 ### Step 1: Verification Agent
 
-Dispatch a background agent to double-check the review. The agent must:
+Dispatch a background agent (`run_in_background: true`) to double-check the review. Tell the user verification is underway and they can continue working. The agent must:
 
 1. Read the full report from `<review-dir>/<datetime>/report.md`
 2. For each finding, read the actual source code at the cited `file:line`
@@ -337,6 +376,7 @@ Batch up to 4 findings per `AskUserQuestion` call. Each question gets its own pr
 - Modifying any code (this skill is read-only)
 - Skipping Phase 1 (user must approve plan before expensive review)
 - Dispatching reviewers sequentially instead of in parallel
+- Dispatching reviewers in foreground (blocking) instead of background — user must remain able to interact
 - Writing findings without file:line references
 - Proceeding with review after user rejects the plan
 - Assigning P0/P1 to a finding with "uncertain" confidence
@@ -359,6 +399,7 @@ Batch up to 4 findings per `AskUserQuestion` call. Each question gets its own pr
 | Rush through P3 walkthrough | "P3 is low priority, just accept them all" | P3 findings accumulate into technical debt. The walkthrough is where the user decides which are worth tracking vs discarding. |
 | Assign P1 to uncertain finding | "It looks serious even though I'm not sure" | Uncertain P1 findings undermine trust in the report. Downgrade to P2 and phrase as a question. |
 | Organize review around user's suspected issues | "The user already knows what's wrong, just confirm it" | Confirmation bias. User suspicions become hypotheses to test, not the review's structure. Independent reviewer analysis discovers issues the user doesn't suspect. The previous review found its highest-value findings in areas nobody expected. |
+| Dispatch reviewers in foreground | "I need to wait for them anyway before the next step" | Foreground dispatch blocks the user from interacting with the main agent. Big reviews take minutes — the user should be free to ask questions, work on other things, or provide context while reviewers work in background. |
 
 ## Next Steps (After Review)
 
@@ -375,6 +416,10 @@ To act on findings:
 - The `dispatching-parallel-agents` skill — run reviewer subagents concurrently (Phase 2)
 - The `rust-best-practices` skill — referenced by Code Quality reviewer
 - Persona files from the team directory (see AGENTS.md Project structure)
+
+**Tools this skill uses:**
+- `TeamCreate` / `TeamDelete` — preferred execution model for Phase 2 (agent teams with shared task lists)
+- `Agent` with `run_in_background: true` — fallback execution model when teams are unavailable
 
 **Skills that load this skill:**
 - The `refactor` skill — loads triage-review for its review phase
