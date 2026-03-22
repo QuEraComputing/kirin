@@ -77,18 +77,21 @@ working around the issue.>
 - "Changing a trait bound from `From<T>` to `TryFrom<T>` is non-breaking" —
   verify blanket impls cover existing callers via `cargo build --workspace`
 
-## Regression Test (P0/P1 findings)
+## Regression Test
 
-<For P0 and P1 severity findings, the implementation SHOULD start by writing a
-test that reproduces the issue BEFORE fixing it. This is not mandatory — some
-issues (e.g., UB from mem::zeroed) are hard to test directly — but the planner
-should try their best to design a reproducing test. A test-first approach:
-1. Proves the issue is real (not a false positive from the review)
+<The implementation MUST start by writing a test that triggers the bug BEFORE
+applying the fix. This applies to ALL severity levels, not just P0/P1. The
+test-first sequence is: write test → confirm it fails → apply fix → confirm
+it passes. This approach:
+1. Proves the bug is real (not a false positive from the review)
 2. Confirms the fix actually resolves the issue (test goes from fail to pass)
 3. Prevents regressions in future changes
 
-If a reproducing test is not feasible, explain why in this section and describe
-how the fix will be validated instead.>
+Only skip if writing the test requires significant implementation work that
+would be wasted if the fix approach changes — and the implementer must get
+lead approval before skipping. If a reproducing test is truly infeasible
+(e.g., UB that only manifests under specific runtime conditions), explain why
+and describe how the fix will be validated instead.>
 
 - [ ] **Write regression test for <issue description>**
   <Describe the test: what it sets up, what behavior it exercises, and what
@@ -98,8 +101,6 @@ how the fix will be validated instead.>
 - [ ] **Run the test — confirm it fails (or demonstrates the issue)**
   Run: `<command>`
   Expected: <FAIL with specific error, or demonstrates the problematic behavior>
-
-<For P2+ findings, skip this section — go straight to Implementation Steps.>
 
 ## Design Decisions (design-work plans only)
 
@@ -226,20 +227,22 @@ assumptions. Common cases in refactoring:
 If the planner verified the assumption during exploration, still include the step —
 the code may change between planning and execution.
 
-**Regression Test (P0/P1 only):** For P0 and P1 findings, try hard to design a
-test that reproduces the issue before implementing the fix. Think about:
+**Regression Test (all severities):** The implementation MUST start by writing a
+test that triggers the bug before applying the fix. This applies to ALL findings,
+not just P0/P1. Think about:
 - Can you construct an input that triggers the bug? (e.g., nested blocks with
   duplicate SSA names for P0-2 scope shadowing)
 - Can you assert on the wrong behavior? (e.g., zeroed type field for P1-2)
 - If the issue is UB or a panic, can you write a test that catches it under
   debug/test builds? (e.g., `#[should_panic]`, miri, debug_assert)
-If truly infeasible, explain why and describe the alternative validation.
+Only skip if writing the test requires significant implementation work — get
+lead approval first. If truly infeasible, explain why and describe alternative
+validation.
 
 **Implementation Steps:** Use `- [ ]` checkbox syntax. One action per step. Include
-`Run:` and `Expected:` lines for steps that produce verifiable output. For P0/P1
-with a regression test, the cycle is: write regression test → run (expect fail) →
-implement fix → run (expect pass) → clippy → commit. For P2+: write test →
-run (expect fail) → implement → run (expect pass) → clippy → commit.
+`Run:` and `Expected:` lines for steps that produce verifiable output. The cycle
+is always: write regression test → run (expect fail) → implement fix → run
+(expect pass) → clippy → commit.
 
 **Must Not Do:** Always include these two mandatory items plus any finding-specific constraints:
 - Never `#[allow(...)]` to suppress warnings — fix the root cause

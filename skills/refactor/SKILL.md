@@ -364,6 +364,10 @@ REFACTOR INVARIANTS — these override any conflicting instructions:
    regressions (use `cargo expand` or the project's debug dump mechanism like KIRIN_EXPAND_DEBUG=1).
 6. When snapshot tests exist: run `cargo insta test` to detect changes and report them
    (do NOT auto-accept without lead approval).
+7. REGRESSION TEST FIRST: Write a test that triggers the bug BEFORE applying the fix.
+   The sequence is: write test → confirm it fails → apply fix → confirm it passes.
+   This proves the bug is real and the fix actually addresses it. Only skip if writing
+   the test requires significant implementation work — and get lead approval first.
 ```
 
 ### Cargo Check Strategy
@@ -431,6 +435,7 @@ refactor type, pattern, scope, staffed roles, what worked, what to adjust, date.
 - Re-dispatching an agent that reported failure without first checking the worktree for commits — the work may already be done
 - Merging a worktree commit without running workspace tests afterward — cherry-picks can silently conflict at the semantic level even when git reports no textual conflicts
 - A design-work plan with no fallback approaches — if the primary design hits a framework constraint, the agent has no guidance and makes ad-hoc decisions
+- An implementer applying a fix before writing a failing test — the test-first sequence (write test → fail → fix → pass) validates both the bug and the fix. Applying the fix first means we never proved the old behavior was broken.
 
 ## Rationalization Table
 

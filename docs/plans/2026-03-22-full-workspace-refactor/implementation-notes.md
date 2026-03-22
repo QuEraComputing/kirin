@@ -43,6 +43,25 @@ Adding `result: ResultValue` to `If` means the parser now always expects `-> <ty
 
 **Design note:** MLIR's `scf.if` supports zero results (void if). Kirin's current `If` always produces one result. Supporting void `if` would require making `result` optional or using a sentinel type.
 
+**Design exploration (2026-03-22):** Attempted to implement void-if support. Three approaches were investigated:
+
+1. **`Option<ResultValue>` (rejected):** The derive macros explicitly reject `Option<ResultValue>` in both the builder template (`kirin-derive-toolkit/src/template/builder_template/helpers.rs:288-295, 432-439`) and the format string system. The builder assigns positional SSA indices (`Result(stmt, 0)`) and optional creation breaks this scheme. Same class of limitation as `Vec<ResultValue>`.
+
+2. **Remove `-> {result:type}` from format string (rejected):** Would make void-if work by relying on the `%r = ...` prefix for result-carrying ops. But loses explicit type annotation in text format, triggers `T: Placeholder` bound cascade on all SCF generics, and is a breaking change to all existing SCF text format.
+
+3. **Separate `VoidIf`/`VoidFor` enum variants (considered, deferred):** Avoids derive macro changes by using distinct types. Clean but adds API surface and branching in interpret impls.
+
+**Recommended future approach — optional format string syntax:** Add bracket syntax to format strings (e.g., `$if {condition} then {then_body} else {else_body} [-> {result:type}]`) where `[...]` denotes segments conditional on an `Option` field being `Some`. This requires coordinated changes to:
+- `kirin-derive-chumsky/src/format.rs` — EBNF parser for `[...]` optional segments
+- `kirin-derive-chumsky/src/validation.rs` — allow optional field occurrences
+- `kirin-derive-toolkit/src/template/builder_template/helpers.rs` — conditional SSA index allocation for `Option<ResultValue>`
+- `kirin-derive-chumsky/src/codegen/emit_ir/field_emit.rs` — conditional emit based on `Option::is_some()`
+- `kirin-derive-chumsky/src/codegen/pretty_print/statement.rs` — conditional print
+
+This is a derive infrastructure enhancement (~2-3 days) that would also benefit other dialects needing optional fields in text format. Should be bundled with `Vec<ResultValue>` support (issue #2) since both require builder template changes to the positional SSA indexing scheme.
+
+**Interpreter readiness:** The interpret impl changes are trivial once the derive supports `Option<ResultValue>` — guard `interp.write(self.result, value)` behind `if let Some(result) = self.result`. The `Continuation::Yield(V)` type stays unchanged; void handling is contained in kirin-scf.
+
 ---
 
 ## 4. `StackInterpreter::eval_block` Only Exits on `Yield` (pre-existing, documented)
@@ -53,6 +72,8 @@ Adding `result: ResultValue` to `If` means the parser now always expects `-> <ty
 `StackInterpreter::eval_block` calls `run_nested_calls(|_interp, is_yield| is_yield)`, meaning it only returns when it receives `Continuation::Yield`. A `Return` inside an SCF body causes it to try `pop()` on an empty pending_results stack, triggering `InterpreterError::NoFrame`.
 
 **Impact:** SCF block bodies must terminate with `yield`, not `ret`. This is correct per MLIR semantics but is not enforced at the IR level — it's a runtime invariant.
+
+**Deferred (2026-03-22):** Planned to add `eval_block` doc comment enhancement and explore IR-level yield enforcement. Deferred because the doc change was bundled with void-if (#3) which was blocked by derive macro limitations. The doc enhancement should be done standalone: document in `kirin-interpreter/src/block_eval.rs` that SCF body blocks MUST terminate with `Yield`, that `StackInterpreter::eval_block` only returns on `Yield`, and that `Return` inside an SCF body triggers `NoFrame`. A full Verifier trait for IR-level enforcement is a separate architectural initiative.
 
 ---
 
