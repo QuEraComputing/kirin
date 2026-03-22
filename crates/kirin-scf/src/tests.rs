@@ -2,26 +2,18 @@ use kirin::ir::{
     HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
     IsSpeculatable, IsTerminator, TestSSAValue,
 };
+use kirin_test_types::UnitType;
 
 use crate::{StructuredControlFlow, Yield};
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
-struct UnitTy;
-
-impl std::fmt::Display for UnitTy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unit")
-    }
-}
-
-fn make_yield() -> Yield<UnitTy> {
+fn make_yield() -> Yield<UnitType> {
     Yield {
         value: TestSSAValue(0).into(),
         marker: std::marker::PhantomData,
     }
 }
 
-fn make_scf_yield() -> StructuredControlFlow<UnitTy> {
+fn make_scf_yield() -> StructuredControlFlow<UnitType> {
     StructuredControlFlow::Yield(make_yield())
 }
 

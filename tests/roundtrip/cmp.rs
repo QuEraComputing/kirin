@@ -1,9 +1,22 @@
+use kirin::prelude::*;
 use kirin_arith::ArithType;
 use kirin_cmp::Cmp;
 use kirin_test_utils::roundtrip;
 
 fn assert_cmp_roundtrip(input: &str, operands: &[(&str, ArithType)]) {
     let (stage, statement) = roundtrip::emit_statement::<Cmp<ArithType>>(input, operands);
+
+    // Verify dialect properties: all cmp operations are pure and speculatable
+    let dialect = statement
+        .get_info(&stage)
+        .expect("statement should exist")
+        .definition();
+    assert!(dialect.is_pure(), "cmp statements should be pure");
+    assert!(
+        dialect.is_speculatable(),
+        "cmp statements should be speculatable"
+    );
+
     assert_eq!(
         roundtrip::render_statement::<Cmp<ArithType>>(&stage, statement).trim(),
         input

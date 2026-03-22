@@ -2,33 +2,25 @@ use kirin::ir::{
     Block, HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
     IsSpeculatable, IsTerminator, Successor, TestSSAValue,
 };
+use kirin_test_types::UnitType;
 
 use crate::ControlFlow;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
-struct UnitTy;
-
-impl std::fmt::Display for UnitTy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unit")
-    }
-}
-
-fn make_branch() -> ControlFlow<UnitTy> {
+fn make_branch() -> ControlFlow<UnitType> {
     ControlFlow::Branch {
         target: Successor::from_block(Block::from(kirin::ir::Id::from(TestSSAValue(10)))),
         args: vec![TestSSAValue(0).into(), TestSSAValue(1).into()],
     }
 }
 
-fn make_branch_no_args() -> ControlFlow<UnitTy> {
+fn make_branch_no_args() -> ControlFlow<UnitType> {
     ControlFlow::Branch {
         target: Successor::from_block(Block::from(kirin::ir::Id::from(TestSSAValue(10)))),
         args: vec![],
     }
 }
 
-fn make_cond_branch() -> ControlFlow<UnitTy> {
+fn make_cond_branch() -> ControlFlow<UnitType> {
     ControlFlow::ConditionalBranch {
         condition: TestSSAValue(0).into(),
         true_target: Successor::from_block(Block::from(kirin::ir::Id::from(TestSSAValue(10)))),
@@ -38,7 +30,7 @@ fn make_cond_branch() -> ControlFlow<UnitTy> {
     }
 }
 
-fn make_cond_branch_no_args() -> ControlFlow<UnitTy> {
+fn make_cond_branch_no_args() -> ControlFlow<UnitType> {
     ControlFlow::ConditionalBranch {
         condition: TestSSAValue(0).into(),
         true_target: Successor::from_block(Block::from(kirin::ir::Id::from(TestSSAValue(10)))),

@@ -32,17 +32,9 @@ mod tests {
         HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
         IsSpeculatable, IsTerminator, TestSSAValue,
     };
+    use kirin_test_types::UnitType;
 
-    #[derive(Debug, Clone, Hash, PartialEq, Eq)]
-    struct UnitTy;
-
-    impl std::fmt::Display for UnitTy {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "unit")
-        }
-    }
-
-    fn make_call(num_args: usize) -> Call<UnitTy> {
+    fn make_call(num_args: usize) -> Call<UnitType> {
         Call {
             target: Symbol::from(42usize),
             args: (0..num_args).map(|i| TestSSAValue(i).into()).collect(),

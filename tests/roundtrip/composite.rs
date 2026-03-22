@@ -181,27 +181,22 @@ fn test_roundtrip_function() {
         }
     }
 
-    // Pretty print using Document method
+    // Pretty print using Document method with 4-space indentation to match input
+    let config = Config {
+        tab_spaces: 4,
+        ..Default::default()
+    };
     let stage = stage.finalize().unwrap();
-    let doc = Document::new(Config::default(), &stage);
+    let doc = Document::new(config, &stage);
     let arena_doc = doc.print_statement(&statement);
     let max_width = doc.config().max_width;
-    let mut buf = String::new();
+    let mut output = String::new();
     arena_doc
-        .render_fmt(max_width, &mut buf)
+        .render_fmt(max_width, &mut output)
         .expect("render failed");
 
-    // Verify key structural elements are present
-    assert!(
-        buf.contains("%f = function"),
-        "Should have function result name"
-    );
-    assert!(buf.contains("add"), "Should have add instruction");
-    assert!(
-        buf.contains("constant 42"),
-        "Should have constant instruction"
-    );
-    assert!(buf.contains("return"), "Should have return instruction");
+    // Note: output has a trailing newline from pretty printer
+    assert_eq!(output.trim_end(), input);
 }
 
 /// Test roundtrip for a function with multiple blocks in the region.

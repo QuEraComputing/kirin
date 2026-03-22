@@ -2,20 +2,11 @@ use kirin::ir::{
     HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
     IsSpeculatable, IsTerminator, TestSSAValue,
 };
+use kirin_test_types::UnitType;
 
 use crate::Cmp;
 
-/// Helper: unit type for parameterizing Cmp.
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
-struct UnitTy;
-
-impl std::fmt::Display for UnitTy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unit")
-    }
-}
-
-fn make_eq() -> Cmp<UnitTy> {
+fn make_eq() -> Cmp<UnitType> {
     Cmp::Eq {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -23,7 +14,7 @@ fn make_eq() -> Cmp<UnitTy> {
     }
 }
 
-fn make_ne() -> Cmp<UnitTy> {
+fn make_ne() -> Cmp<UnitType> {
     Cmp::Ne {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -31,7 +22,7 @@ fn make_ne() -> Cmp<UnitTy> {
     }
 }
 
-fn make_lt() -> Cmp<UnitTy> {
+fn make_lt() -> Cmp<UnitType> {
     Cmp::Lt {
         lhs: TestSSAValue(3).into(),
         rhs: TestSSAValue(4).into(),
@@ -39,7 +30,7 @@ fn make_lt() -> Cmp<UnitTy> {
     }
 }
 
-fn make_le() -> Cmp<UnitTy> {
+fn make_le() -> Cmp<UnitType> {
     Cmp::Le {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -47,7 +38,7 @@ fn make_le() -> Cmp<UnitTy> {
     }
 }
 
-fn make_gt() -> Cmp<UnitTy> {
+fn make_gt() -> Cmp<UnitType> {
     Cmp::Gt {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -55,7 +46,7 @@ fn make_gt() -> Cmp<UnitTy> {
     }
 }
 
-fn make_ge() -> Cmp<UnitTy> {
+fn make_ge() -> Cmp<UnitType> {
     Cmp::Ge {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -63,7 +54,7 @@ fn make_ge() -> Cmp<UnitTy> {
     }
 }
 
-fn all_variants() -> Vec<Cmp<UnitTy>> {
+fn all_variants() -> Vec<Cmp<UnitType>> {
     vec![
         make_eq(),
         make_ne(),

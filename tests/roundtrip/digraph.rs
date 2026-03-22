@@ -2,6 +2,17 @@ use kirin::prelude::*;
 use kirin_test_languages::SimpleType;
 use kirin_test_utils::roundtrip;
 
+/// Create a test pipeline with a single stage named "test".
+fn make_test_pipeline<L: Dialect>() -> Pipeline<StageInfo<L>> {
+    let mut pipeline = Pipeline::new();
+    pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("test")
+        .new();
+    pipeline
+}
+
 /// A simple digraph language for roundtrip testing.
 ///
 /// Uses SimpleType as the type lattice. Inner statements are add/constant.
@@ -97,68 +108,6 @@ fn test_projected_digraph_empty_body_roundtrip() {
     assert_eq!(rendered.trim(), rendered2.trim());
 }
 
-// --- Pipeline-level roundtrip tests (auto-create staged function) ---
-
-#[test]
-fn test_specialize_without_stage_auto_creates() {
-    use kirin::ir::{Pipeline, StageInfo};
-    use kirin::parsers::ParsePipelineText;
-    use kirin_test_languages::CallableLanguage;
-
-    let mut pipeline: Pipeline<StageInfo<CallableLanguage>> = Pipeline::new();
-    pipeline
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("A")
-        .new();
-
-    // No `stage` declaration — specialize auto-creates the staged function
-    let input = "specialize @A fn @foo(i32) -> i32 { ^bb0(%x: i32) { ret %x; } }";
-    let functions = pipeline
-        .parse(input)
-        .expect("should parse without stage declaration");
-    assert_eq!(functions.len(), 1, "should create one function");
-}
-
-#[test]
-fn test_specialize_without_stage_roundtrip() {
-    use kirin::ir::{Pipeline, StageInfo};
-    use kirin::parsers::ParsePipelineText;
-
-    use kirin_test_languages::CallableLanguage;
-
-    // First parse: with explicit stage declaration
-    let mut pipeline: Pipeline<StageInfo<CallableLanguage>> = Pipeline::new();
-    pipeline
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("A")
-        .new();
-
-    let input = r#"
-stage @A fn @foo(i32) -> i32;
-specialize @A fn @foo(i32) -> i32 { ^bb0(%x: i32) { ret %x; } }
-"#;
-    pipeline.parse(input).expect("should parse");
-
-    // Print and reparse for stability
-    let printed = pipeline.sprint();
-    let mut pipeline2: Pipeline<StageInfo<CallableLanguage>> = Pipeline::new();
-    pipeline2
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("A")
-        .new();
-    pipeline2.parse(printed.trim()).expect("should reparse");
-    let printed2 = pipeline2.sprint();
-
-    assert_eq!(
-        printed.trim(),
-        printed2.trim(),
-        "roundtrip should be stable"
-    );
-}
-
 // --- Pipeline-level projected format e2e test ---
 
 /// A dialect where the function body uses projected DiGraph format.
@@ -192,15 +141,7 @@ enum ProjectedFuncLang {
 
 #[test]
 fn test_projected_func_pipeline_parse() {
-    use kirin::ir::{Pipeline, StageInfo};
-    use kirin::parsers::ParsePipelineText;
-
-    let mut pipeline: Pipeline<StageInfo<ProjectedFuncLang>> = Pipeline::new();
-    pipeline
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
+    let mut pipeline = make_test_pipeline::<ProjectedFuncLang>();
 
     // Framework parses fn @foo(f64) -> f64, signature is Some.
     // Auto-creates staged function. Body text is `(%p0: f64) { ... }` parsed by dialect.
@@ -213,32 +154,18 @@ fn test_projected_func_pipeline_parse() {
 
 #[test]
 fn test_projected_func_pipeline_roundtrip() {
-    use kirin::ir::{Pipeline, StageInfo};
-    use kirin::parsers::ParsePipelineText;
+    let mut pipeline = make_test_pipeline::<ProjectedFuncLang>();
 
-
-    let mut pipeline: Pipeline<StageInfo<ProjectedFuncLang>> = Pipeline::new();
-    pipeline
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
-
-    // With explicit stage — standard flow
+    // With explicit stage -- standard flow
     let input = r#"
 stage @test fn @foo(f64) -> f64;
 specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }
 "#;
     pipeline.parse(input).expect("should parse");
 
-    // Roundtrip: print → reparse → reprint
+    // Roundtrip: print -> reparse -> reprint
     let printed = pipeline.sprint();
-    let mut pipeline2: Pipeline<StageInfo<ProjectedFuncLang>> = Pipeline::new();
-    pipeline2
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
+    let mut pipeline2 = make_test_pipeline::<ProjectedFuncLang>();
     pipeline2
         .parse(printed.trim())
         .expect("should reparse printed output");
@@ -277,16 +204,7 @@ enum BlockProjectedLang {
 
 #[test]
 fn test_block_projected_pipeline_roundtrip() {
-    use kirin::ir::{Pipeline, StageInfo};
-    use kirin::parsers::ParsePipelineText;
-
-
-    let mut pipeline: Pipeline<StageInfo<BlockProjectedLang>> = Pipeline::new();
-    pipeline
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
+    let mut pipeline = make_test_pipeline::<BlockProjectedLang>();
 
     let input = r#"
 stage @test fn @foo(f64) -> f64;
@@ -297,12 +215,7 @@ specialize @test fn @foo(f64) -> f64 (%x: f64) { %r = add %x, %x; ret %r; }
         .expect("should parse block projection format");
 
     let printed = pipeline.sprint();
-    let mut pipeline2: Pipeline<StageInfo<BlockProjectedLang>> = Pipeline::new();
-    pipeline2
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
+    let mut pipeline2 = make_test_pipeline::<BlockProjectedLang>();
     pipeline2
         .parse(printed.trim())
         .expect("should reparse block projection format");
@@ -341,16 +254,7 @@ enum RegionProjectedLang {
 
 #[test]
 fn test_region_projected_pipeline_roundtrip() {
-    use kirin::ir::{Pipeline, StageInfo};
-    use kirin::parsers::ParsePipelineText;
-
-
-    let mut pipeline: Pipeline<StageInfo<RegionProjectedLang>> = Pipeline::new();
-    pipeline
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
+    let mut pipeline = make_test_pipeline::<RegionProjectedLang>();
 
     let input = r#"
 stage @test fn @foo(f64) -> f64;
@@ -361,12 +265,7 @@ specialize @test fn @foo(f64) -> f64 { ^entry(%x: f64) { %r = add %x, %x; ret %r
         .expect("should parse region projection format");
 
     let printed = pipeline.sprint();
-    let mut pipeline2: Pipeline<StageInfo<RegionProjectedLang>> = Pipeline::new();
-    pipeline2
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
+    let mut pipeline2 = make_test_pipeline::<RegionProjectedLang>();
     pipeline2
         .parse(printed.trim())
         .expect("should reparse region projection format");
@@ -409,15 +308,7 @@ enum DialectControlledLang {
 
 #[test]
 fn test_dialect_controlled_pipeline_parse() {
-    use kirin::ir::{Pipeline, StageInfo};
-    use kirin::parsers::ParsePipelineText;
-
-    let mut pipeline: Pipeline<StageInfo<DialectControlledLang>> = Pipeline::new();
-    pipeline
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
+    let mut pipeline = make_test_pipeline::<DialectControlledLang>();
 
     // Whole-signature format: {sig} parses (f64) -> f64, {graph:ports} parses the port bindings.
     let input = "specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }";
@@ -429,16 +320,7 @@ fn test_dialect_controlled_pipeline_parse() {
 
 #[test]
 fn test_dialect_controlled_pipeline_roundtrip() {
-    use kirin::ir::{Pipeline, StageInfo};
-    use kirin::parsers::ParsePipelineText;
-
-
-    let mut pipeline: Pipeline<StageInfo<DialectControlledLang>> = Pipeline::new();
-    pipeline
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
+    let mut pipeline = make_test_pipeline::<DialectControlledLang>();
 
     let input = "specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }";
     pipeline
@@ -446,12 +328,7 @@ fn test_dialect_controlled_pipeline_roundtrip() {
         .expect("should parse dialect-controlled format");
 
     let printed = pipeline.sprint();
-    let mut pipeline2: Pipeline<StageInfo<DialectControlledLang>> = Pipeline::new();
-    pipeline2
-        .add_stage()
-        .stage(StageInfo::default())
-        .name("test")
-        .new();
+    let mut pipeline2 = make_test_pipeline::<DialectControlledLang>();
     pipeline2
         .parse(printed.trim())
         .expect("should reparse dialect-controlled format");

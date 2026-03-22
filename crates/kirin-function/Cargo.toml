@@ -7,3 +7,6 @@ edition = "2024"
 kirin = { workspace = true }
 kirin-interpreter = { workspace = true }
 smallvec = { workspace = true }
+
+[dev-dependencies]
+kirin-test-types = { path = "../kirin-test-types" }

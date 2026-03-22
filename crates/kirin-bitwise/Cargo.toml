@@ -6,3 +6,6 @@ edition = "2024"
 [dependencies]
 kirin.workspace = true
 kirin-interpreter = { workspace = true }
+
+[dev-dependencies]
+kirin-test-types = { path = "../kirin-test-types" }

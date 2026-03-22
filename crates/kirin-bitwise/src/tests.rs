@@ -2,19 +2,11 @@ use kirin::ir::{
     HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
     IsSpeculatable, IsTerminator, TestSSAValue,
 };
+use kirin_test_types::UnitType;
 
 use crate::Bitwise;
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
-struct UnitTy;
-
-impl std::fmt::Display for UnitTy {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "unit")
-    }
-}
-
-fn make_and() -> Bitwise<UnitTy> {
+fn make_and() -> Bitwise<UnitType> {
     Bitwise::And {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -22,7 +14,7 @@ fn make_and() -> Bitwise<UnitTy> {
     }
 }
 
-fn make_or() -> Bitwise<UnitTy> {
+fn make_or() -> Bitwise<UnitType> {
     Bitwise::Or {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -30,7 +22,7 @@ fn make_or() -> Bitwise<UnitTy> {
     }
 }
 
-fn make_xor() -> Bitwise<UnitTy> {
+fn make_xor() -> Bitwise<UnitType> {
     Bitwise::Xor {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -38,14 +30,14 @@ fn make_xor() -> Bitwise<UnitTy> {
     }
 }
 
-fn make_not() -> Bitwise<UnitTy> {
+fn make_not() -> Bitwise<UnitType> {
     Bitwise::Not {
         operand: TestSSAValue(0).into(),
         result: TestSSAValue(1).into(),
     }
 }
 
-fn make_shl() -> Bitwise<UnitTy> {
+fn make_shl() -> Bitwise<UnitType> {
     Bitwise::Shl {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -53,7 +45,7 @@ fn make_shl() -> Bitwise<UnitTy> {
     }
 }
 
-fn make_shr() -> Bitwise<UnitTy> {
+fn make_shr() -> Bitwise<UnitType> {
     Bitwise::Shr {
         lhs: TestSSAValue(0).into(),
         rhs: TestSSAValue(1).into(),
@@ -61,7 +53,7 @@ fn make_shr() -> Bitwise<UnitTy> {
     }
 }
 
-fn all_variants() -> Vec<Bitwise<UnitTy>> {
+fn all_variants() -> Vec<Bitwise<UnitType>> {
     vec![
         make_and(),
         make_or(),

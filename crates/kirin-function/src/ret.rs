@@ -16,17 +16,9 @@ mod tests {
         HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
         IsSpeculatable, IsTerminator, TestSSAValue,
     };
+    use kirin_test_types::UnitType;
 
-    #[derive(Debug, Clone, Hash, PartialEq, Eq, Default)]
-    struct UnitTy;
-
-    impl std::fmt::Display for UnitTy {
-        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-            write!(f, "unit")
-        }
-    }
-
-    fn make_return() -> Return<UnitTy> {
+    fn make_return() -> Return<UnitType> {
         Return {
             value: TestSSAValue(0).into(),
             marker: std::marker::PhantomData,
