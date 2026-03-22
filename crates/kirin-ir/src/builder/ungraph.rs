@@ -1,7 +1,7 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use crate::node::port::{Port, PortParent};
-use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, ResolutionInfo, SSAValue};
+use crate::node::port::PortParent;
+use crate::node::ssa::SSAValue;
 use crate::node::stmt::{Statement, StatementParent};
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{BuilderStageInfo, Dialect};
@@ -77,109 +77,25 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
     #[allow(clippy::wrong_self_convention, clippy::new_ret_no_self)]
     pub fn new(self) -> UnGraph {
         let id = self.stage.ungraphs.next_id();
-        let edge_count = self.ports.len();
 
-        let mut all_ports = Vec::with_capacity(self.ports.len() + self.captures.len());
-        for (index, (ty, name)) in self.ports.into_iter().enumerate() {
-            let port: Port = self.stage.ssas.next_id().into();
-            let ssa = BuilderSSAInfo::new(
-                port.into(),
-                name.map(|n| self.stage.symbols.intern(n)),
-                Some(ty),
-                BuilderSSAKind::Port(PortParent::UnGraph(id), index),
-            );
-            self.stage.ssas.alloc(ssa);
-            all_ports.push(port);
-        }
-        for (i, (ty, name)) in self.captures.into_iter().enumerate() {
-            let index = edge_count + i;
-            let port: Port = self.stage.ssas.next_id().into();
-            let ssa = BuilderSSAInfo::new(
-                port.into(),
-                name.map(|n| self.stage.symbols.intern(n)),
-                Some(ty),
-                BuilderSSAKind::Port(PortParent::UnGraph(id), index),
-            );
-            self.stage.ssas.alloc(ssa);
-            all_ports.push(port);
-        }
+        // Allocate ports and resolve placeholders using shared helper
+        let allocated = super::graph_common::allocate_ports(
+            self.stage,
+            self.ports,
+            self.captures,
+            PortParent::UnGraph(id),
+        );
 
-        let port_name_to_index: std::collections::HashMap<crate::Symbol, usize> = all_ports
-            [..edge_count]
-            .iter()
-            .enumerate()
-            .filter_map(|(i, port)| {
-                let info = self.stage.ssas.get(SSAValue::from(*port))?;
-                info.name().map(|sym| (sym, i))
-            })
-            .collect();
-        let capture_name_to_index: std::collections::HashMap<crate::Symbol, usize> = all_ports
-            [edge_count..]
-            .iter()
-            .enumerate()
-            .filter_map(|(i, port)| {
-                let info = self.stage.ssas.get(SSAValue::from(*port))?;
-                info.name().map(|sym| (sym, i))
-            })
-            .collect();
-
-        // Build replacement map: placeholder SSA -> resolved port SSA
+        // UnGraph resolves both node and edge statements
         let all_stmts: Vec<Statement> = self
             .nodes
             .iter()
             .chain(self.edge_stmts.iter())
             .copied()
             .collect();
-        let mut replacements: std::collections::HashMap<SSAValue, SSAValue> =
-            std::collections::HashMap::new();
-        for &stmt_id in &all_stmts {
-            let info = &self.stage.statements[stmt_id];
-            for arg in info.definition.arguments() {
-                if replacements.contains_key(arg) {
-                    continue;
-                }
-                let ssa_info = self
-                    .stage
-                    .ssas
-                    .get(*arg)
-                    .expect("SSAValue not found in stage");
-                match ssa_info.kind {
-                    BuilderSSAKind::Unresolved(ResolutionInfo::Port(key)) => {
-                        let index = super::resolve_builder_key(
-                            key,
-                            edge_count,
-                            &port_name_to_index,
-                            &self.stage.symbols,
-                            "ungraph port",
-                        );
-                        replacements.insert(*arg, all_ports[index].into());
-                    }
-                    BuilderSSAKind::Unresolved(ResolutionInfo::Capture(key)) => {
-                        let index = super::resolve_builder_key(
-                            key,
-                            all_ports.len() - edge_count,
-                            &capture_name_to_index,
-                            &self.stage.symbols,
-                            "ungraph capture",
-                        );
-                        replacements.insert(*arg, all_ports[edge_count + index].into());
-                    }
-                    _ => {}
-                }
-            }
-        }
-        for &old in replacements.keys() {
-            self.stage.ssas.delete(old);
-        }
-        for &stmt_id in &all_stmts {
-            let info = &mut self.stage.statements[stmt_id];
-            for arg in info.definition.arguments_mut() {
-                if let Some(&replacement) = replacements.get(arg) {
-                    *arg = replacement;
-                }
-            }
-        }
+        super::graph_common::resolve_and_replace(self.stage, &all_stmts, &allocated, "ungraph");
 
+        // Build edge SSA set and boundary SSA set
         let mut edge_ssa_set: HashSet<SSAValue> = HashSet::new();
         for &edge_stmt in &self.edge_stmts {
             let info = &self.stage.statements[edge_stmt];
@@ -187,9 +103,10 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
                 edge_ssa_set.insert((*result).into());
             }
         }
-        let boundary_ssa_set: HashSet<SSAValue> = all_ports
+        let boundary_ssa_set: HashSet<SSAValue> = allocated
+            .all_ports
             .iter()
-            .take(edge_count)
+            .take(allocated.edge_count)
             .map(|p| (*p).into())
             .collect();
 
@@ -323,12 +240,12 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
         }
 
         let name_symbol = self.name.map(|n| self.stage.symbols.intern(n));
-        let info = UnGraphInfo::new(
+        let info = UnGraphInfo::from_parts(
             id,
             self.parent,
             name_symbol,
-            all_ports,
-            edge_count,
+            allocated.all_ports,
+            allocated.edge_count,
             graph,
             edge_stmts,
         );

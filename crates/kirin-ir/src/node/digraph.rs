@@ -1,8 +1,8 @@
+use crate::Dialect;
 use crate::arena::{GetInfo, Id};
 use crate::identifier;
-use crate::{Dialect, SSAValue, Statement, Symbol};
 
-use super::port::Port;
+use super::graph::{DiGraphExtra, GraphInfo};
 
 identifier! {
     /// A unique identifier for a directed graph body.
@@ -15,78 +15,35 @@ impl std::fmt::Display for DiGraph {
     }
 }
 
-#[derive(Clone, Debug)]
-pub struct DiGraphInfo<L: Dialect> {
-    pub(crate) id: DiGraph,
-    pub(crate) parent: Option<Statement>,
-    pub(crate) name: Option<Symbol>,
-    pub(crate) ports: Vec<Port>,
-    pub(crate) edge_count: usize,
-    pub(crate) graph: petgraph::Graph<Statement, SSAValue, petgraph::Directed>,
-    pub(crate) yields: Vec<SSAValue>,
-    _marker: std::marker::PhantomData<L>,
-}
+/// Information about a directed graph body.
+///
+/// This is a type alias for the generic [`GraphInfo`] with directed edges
+/// and [`DiGraphExtra`] (yield values).
+pub type DiGraphInfo<L> = GraphInfo<L, petgraph::Directed, DiGraphExtra>;
 
 impl<L: Dialect> DiGraphInfo<L> {
-    pub fn new(
+    /// Construct a new `DiGraphInfo` with all fields.
+    ///
+    /// This constructor preserves the original API. Internally it delegates
+    /// to [`GraphInfo::new`].
+    pub fn from_parts(
         id: DiGraph,
-        parent: Option<Statement>,
-        name: Option<Symbol>,
-        ports: Vec<Port>,
+        parent: Option<crate::Statement>,
+        name: Option<crate::Symbol>,
+        ports: Vec<super::port::Port>,
         edge_count: usize,
-        graph: petgraph::Graph<Statement, SSAValue, petgraph::Directed>,
-        yields: Vec<SSAValue>,
+        graph: petgraph::Graph<crate::Statement, crate::SSAValue, petgraph::Directed>,
+        yields: Vec<crate::SSAValue>,
     ) -> Self {
-        Self {
-            id,
+        GraphInfo::new(
+            id.into(),
             parent,
             name,
             ports,
             edge_count,
             graph,
-            yields,
-            _marker: std::marker::PhantomData,
-        }
-    }
-
-    pub fn id(&self) -> DiGraph {
-        self.id
-    }
-
-    pub fn parent(&self) -> Option<Statement> {
-        self.parent
-    }
-
-    pub fn name(&self) -> Option<Symbol> {
-        self.name
-    }
-
-    pub fn ports(&self) -> &[Port] {
-        &self.ports
-    }
-
-    pub fn edge_count(&self) -> usize {
-        self.edge_count
-    }
-
-    pub fn edge_ports(&self) -> &[Port] {
-        &self.ports[..self.edge_count]
-    }
-
-    pub fn capture_ports(&self) -> &[Port] {
-        &self.ports[self.edge_count..]
-    }
-
-    pub fn graph(&self) -> &petgraph::Graph<Statement, SSAValue, petgraph::Directed> {
-        &self.graph
-    }
-
-    pub fn graph_mut(&mut self) -> &mut petgraph::Graph<Statement, SSAValue, petgraph::Directed> {
-        &mut self.graph
-    }
-
-    pub fn yields(&self) -> &[SSAValue] {
-        &self.yields
+            DiGraphExtra::new(yields),
+        )
     }
 }
 

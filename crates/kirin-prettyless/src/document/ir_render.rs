@@ -1,8 +1,8 @@
 use std::collections::HashSet;
 
 use kirin_ir::{
-    Block, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Port, Region, SSAInfo, SSAValue,
-    Signature, SpecializedFunction, StagedFunction, Statement, UnGraph,
+    Block, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Port, Region, SSAInfo, SSAValue, Signature,
+    SpecializedFunction, StagedFunction, Statement, UnGraph,
 };
 use petgraph::visit::IntoNodeReferences;
 use prettyless::DocAllocator;

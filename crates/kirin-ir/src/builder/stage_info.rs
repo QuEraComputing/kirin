@@ -382,7 +382,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
         let dg_info = &mut self.digraphs[dg];
         dg_info.graph = graph;
-        dg_info.yields = yields.to_vec();
+        dg_info.extra.yields = yields.to_vec();
     }
 
     /// Attach edge and node statements to an existing ungraph.
@@ -529,7 +529,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
         let ug_info = &mut self.ungraphs[ug];
         ug_info.graph = new_graph;
-        ug_info.edge_statements = bfs_edge_order;
+        ug_info.extra.edge_statements = bfs_edge_order;
     }
 
     pub fn link_statements(&mut self, ptrs: &[Statement]) -> LinkedList<Statement> {
