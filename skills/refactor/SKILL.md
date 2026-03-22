@@ -11,7 +11,7 @@ argument-hint: "[what to refactor]"
 
 **Announce at start:** State which skill is being used so the user knows what process is driving behavior.
 
-Rust-specific refactoring orchestration with architectural guardrails and a configurable agent team. Six phases: scope & pre-flight, review panel, implementation planning, guarded execution, final validation, template capture.
+Rust-specific refactoring orchestration with architectural guardrails and a configurable agent team. Two entry paths depending on refactor size, then implementation planning, guarded execution, final validation, template capture.
 
 
 ## When to Use
@@ -30,13 +30,31 @@ The refactoring target is: **$ARGUMENTS**
 
 If no target was provided, ask the user what to refactor.
 
-## Phase 1: Scope & Pre-flight
+## Path Selection
+
+Before starting, classify the refactor and choose the appropriate path:
+
+| Signal | Path | Why |
+|--------|------|-----|
+| User specifies concrete changes ("extract trait X", "move Y to crate Z") | **Focused** — pre-flight first | You already know what moves; pre-flight scopes it, review validates it |
+| User gives a broad target ("refactor kirin-interpreter", "clean up the derive subsystem") | **Discovery** — triage-review first | You don't know what's wrong yet; review discovers the issues, pre-flight scopes the changes from findings |
+| Ambiguous | Ask the user: "Do you have specific changes in mind, or should I review the target first to identify what needs refactoring?" | |
+
+**Announce the chosen path** so the user knows which flow is driving behavior.
+
+---
+
+## Focused Path (pre-flight → review)
+
+Use when the user already knows what needs to change.
+
+### Phase 1F: Scope & Pre-flight
 
 **Exploration budget (hard cap):**
 - Small refactors (1-3 crates): 10 file reads + 5 grep searches
 - Large refactors (4+ crates): 20 file reads + 15 grep searches
 
-After budget is spent, you MUST have a concrete understanding and proceed to the review panel.
+After budget is spent, you MUST have a concrete understanding and proceed to the review.
 
 **Pre-flight checklist:**
 
@@ -67,21 +85,49 @@ Output format:
 
 Present to user for approval before proceeding.
 
-## Phase 2: Review
+### Phase 2F: Review (validation)
 
-**Before any implementation**, review the proposed changes to catch architectural issues early.
+Load the `triage-review` skill scoped to the affected crates. Pass the pre-flight summary as context so reviewers evaluate the proposed refactor, not just the current state.
 
-Load the `triage-review` skill scoped to the affected crates. The triage-review skill handles reviewer selection, parallel dispatch, cross-review, and aggregation. Pass the pre-flight summary as context so reviewers evaluate the proposed refactor, not just the current state.
-
-When loading triage-review for a refactor, suggest including:
+When loading triage-review, suggest including:
 - **Soundness Adversary** if the refactor touches builder APIs, arena/ID code, or interpreter internals
 - **Dialect Author** if the refactor affects dialect crates or dialect author-facing APIs
 
-The triage-review walkthrough (Phase 3 of that skill) serves as the user decision point — the user confirms or rejects findings before implementation begins.
+The triage-review walkthrough serves as the user decision point — confirms or rejects findings before implementation.
+
+→ After walkthrough completes, proceed to **Phase 3: Implementation Planning**.
+
+---
+
+## Discovery Path (triage-review → pre-flight)
+
+Use when the user provides a broad target without specific changes. The review discovers what needs refactoring; the pre-flight then scopes those discoveries into concrete changes.
+
+### Phase 1D: Triage Review (discovery)
+
+Load the `triage-review` skill scoped to the target crate(s)/subsystem. Do NOT pass a pre-flight summary — there is none yet. The reviewers evaluate the current state to identify architectural issues, code smells, and refactoring opportunities.
+
+When loading triage-review for discovery, suggest including:
+- **Soundness Adversary** if the target includes builder APIs, arena/ID code, or interpreter internals
+- **Dialect Author** if the target includes dialect crates or dialect author-facing APIs
+
+The triage-review walkthrough presents findings to the user. The user selects which findings to act on — this becomes the refactoring scope.
+
+### Phase 2D: Scope & Pre-flight (from findings)
+
+Using the accepted triage-review findings as input, run the pre-flight checklist (same as Phase 1F above). The difference: instead of scoping from user-specified changes, you scope from review-discovered issues.
+
+**Exploration budget**: same caps as Phase 1F.
+
+Output the same pre-flight summary format. Present to user for approval before proceeding.
+
+→ After approval, proceed to **Phase 3: Implementation Planning**.
+
+---
 
 ### User Decision Point
 
-After the triage-review walkthrough completes, ask the user:
+After both paths converge (review + pre-flight both complete), ask the user:
 
 ```
 How would you like to proceed with the implementation?
@@ -246,6 +292,7 @@ If yes, save to the team templates directory (see AGENTS.md Project structure) a
 |-----------|----------------|---------|
 | Skip pre-flight | "This refactor is simple, I know what needs to move" | 'Simple' refactors have hidden consumers. Pre-flight takes 5 minutes; debugging a missed re-export takes 30. |
 | Skip triage-review | "I already know the code well enough" | You know the code. The Formalism reviewer catches abstraction issues. The Soundness Adversary catches invariant violations. Fresh eyes find what familiarity hides. |
+| Pre-flight before review on a broad target | "I'll figure out the scope first, then review" | Without review, pre-flight is guessing. For broad targets, you don't know what's wrong yet — the review discovers the refactoring scope. Pre-flight-first only works when the user already specifies concrete changes. |
 | Start coding before plan approval | "I'll adjust the plan based on what I find" | Code-first planning produces sunk-cost pressure to keep bad decisions. Plan approval costs 2 minutes; reworking a wrong approach costs hours. |
 | Edit the same file from two agents | "The changes are in different functions" | Git merges on function granularity, not line granularity. Two agents touching the same file creates merge conflicts that require manual resolution. |
 | Let the verifier fix issues | "It's faster than dispatching back to the implementer" | The verifier lacks the implementer's context. Verifier fixes introduce new bugs at a higher rate. Report to lead, let the right agent fix it. |
