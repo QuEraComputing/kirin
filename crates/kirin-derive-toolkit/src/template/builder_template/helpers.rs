@@ -1,6 +1,6 @@
 use crate::codegen::ConstructorBuilder;
 use crate::context::InputMeta;
-use crate::ir::fields::{Collection, FieldCategory, FieldInfo};
+use crate::ir::fields::{Collection, FieldCategory, FieldIndex, FieldInfo};
 use crate::ir::{self, BuilderOptions, StandardLayout};
 use crate::misc::{is_type, to_snake_case};
 use quote::{format_ident, quote};
@@ -13,6 +13,7 @@ pub(super) struct StatementInfo {
     pub(super) build_fn_name: syn::Ident,
     pub(super) is_wrapper: bool,
     pub(super) wrapper_type: Option<syn::Type>,
+    pub(super) wrapper_field: Option<FieldIndex>,
 }
 
 pub(super) fn build_fn_name(
@@ -513,6 +514,13 @@ pub(super) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2:
         .clone()
         .unwrap_or_else(|| syn::parse_quote!(()));
 
+    // Determine if the wrapper field itself is a tuple (positional) field.
+    let wrapper_is_tuple = info
+        .wrapper_field
+        .as_ref()
+        .map(|f| f.ident.is_none())
+        .unwrap_or(true);
+
     let let_name_eq_input: Vec<_> = info
         .fields
         .iter()
@@ -532,8 +540,6 @@ pub(super) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2:
         })
         .collect();
 
-    let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
-
     let init_head = if input.is_enum {
         let variant_name = &info.name;
         quote! { Self::#variant_name }
@@ -542,10 +548,12 @@ pub(super) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2:
     };
 
     if info.fields.is_empty() {
-        let initialization = if is_tuple || info.fields.is_empty() {
+        // P1-11: Use wrapper_is_tuple to determine tuple vs named constructor.
+        let initialization = if wrapper_is_tuple {
             quote! { (value) }
         } else {
-            quote! { { value } }
+            let wrapper_name = info.wrapper_field.as_ref().unwrap().name();
+            quote! { { #wrapper_name: value } }
         };
 
         quote! {
@@ -557,22 +565,53 @@ pub(super) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2:
             }
         }
     } else {
-        let constructor = if input.is_enum {
-            ConstructorBuilder::new_variant(&input.name, &info.name, is_tuple).build_with_self(
-                &info.fields,
-                |field| {
+        // P1-10: Build constructor that includes BOTH the wrapper field and extra fields.
+        let wrapper_field_ref = info
+            .wrapper_field
+            .as_ref()
+            .expect("wrapper field should be present when is_wrapper is true");
+
+        let constructor = if wrapper_is_tuple {
+            // Tuple variant/struct: position matters. Build a full positional list
+            // where the wrapper index gets `value` and extras get their defaulted names.
+            let wrapper_idx = wrapper_field_ref.index;
+            let total_fields = info.fields.len() + 1;
+            let mut values = Vec::with_capacity(total_fields);
+            let mut extra_iter = info.fields.iter();
+            for i in 0..total_fields {
+                if i == wrapper_idx {
+                    values.push(quote! { value });
+                } else {
+                    let field = extra_iter
+                        .next()
+                        .expect("field count mismatch in tuple From impl");
                     let field_name = field.name_ident(info.name.span());
-                    quote! { #field_name }
-                },
-            )
+                    values.push(quote! { #field_name });
+                }
+            }
+            if input.is_enum {
+                let variant_name = &info.name;
+                quote! { Self::#variant_name(#(#values),*) }
+            } else {
+                quote! { Self(#(#values),*) }
+            }
         } else {
-            ConstructorBuilder::new_struct(&input.name, is_tuple).build_with_self(
-                &info.fields,
-                |field| {
+            // Named variant/struct: emit all field assignments including wrapper.
+            let wrapper_name = wrapper_field_ref.name();
+            let extra_assigns: Vec<_> = info
+                .fields
+                .iter()
+                .map(|field| {
                     let field_name = field.name_ident(info.name.span());
-                    quote! { #field_name }
-                },
-            )
+                    quote! { #field_name: #field_name }
+                })
+                .collect();
+            if input.is_enum {
+                let variant_name = &info.name;
+                quote! { Self::#variant_name { #wrapper_name: value, #(#extra_assigns),* } }
+            } else {
+                quote! { Self { #wrapper_name: value, #(#extra_assigns),* } }
+            }
         };
 
         quote! {

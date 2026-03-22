@@ -1,0 +1,359 @@
+---
+source: crates/kirin-derive-ir/src/tests/dialect.rs
+assertion_line: 241
+expression: code
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for WrapperOp {
+    type Iter = WrapperOpArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        let Self(field_0) = self;
+        WrapperOpArgumentsIter {
+            inner: <InnerOp as ::kirin::ir::HasArguments>::arguments(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpArgumentsIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasArguments<'a>>::Iter,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for WrapperOp {
+    type IterMut = WrapperOpArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        let Self(field_0) = self;
+        WrapperOpArgumentsMutIter {
+            inner: <InnerOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpArgumentsMutIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for WrapperOp {
+    type Iter = WrapperOpResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        let Self(field_0) = self;
+        WrapperOpResultsIter {
+            inner: <InnerOp as ::kirin::ir::HasResults>::results(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpResultsIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasResults<'a>>::Iter,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for WrapperOp {
+    type IterMut = WrapperOpResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        let Self(field_0) = self;
+        WrapperOpResultsMutIter {
+            inner: <InnerOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpResultsMutIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasResultsMut<'a>>::IterMut,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for WrapperOp {
+    type Iter = WrapperOpBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        let Self(field_0) = self;
+        WrapperOpBlocksIter {
+            inner: <InnerOp as ::kirin::ir::HasBlocks>::blocks(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpBlocksIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasBlocks<'a>>::Iter,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for WrapperOp {
+    type IterMut = WrapperOpBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        let Self(field_0) = self;
+        WrapperOpBlocksMutIter {
+            inner: <InnerOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpBlocksMutIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for WrapperOp {
+    type Iter = WrapperOpSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        let Self(field_0) = self;
+        WrapperOpSuccessorsIter {
+            inner: <InnerOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpSuccessorsIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasSuccessors<'a>>::Iter,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for WrapperOp {
+    type IterMut = WrapperOpSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        let Self(field_0) = self;
+        WrapperOpSuccessorsMutIter {
+            inner: <InnerOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpSuccessorsMutIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for WrapperOp {
+    type Iter = WrapperOpRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        let Self(field_0) = self;
+        WrapperOpRegionsIter {
+            inner: <InnerOp as ::kirin::ir::HasRegions>::regions(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpRegionsIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasRegions<'a>>::Iter,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for WrapperOp {
+    type IterMut = WrapperOpRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        let Self(field_0) = self;
+        WrapperOpRegionsMutIter {
+            inner: <InnerOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpRegionsMutIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for WrapperOp {
+    type Iter = WrapperOpDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        let Self(field_0) = self;
+        WrapperOpDigraphsIter {
+            inner: <InnerOp as ::kirin::ir::HasDigraphs>::digraphs(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpDigraphsIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasDigraphs<'a>>::Iter,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for WrapperOp {
+    type IterMut = WrapperOpDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self(field_0) = self;
+        WrapperOpDigraphsMutIter {
+            inner: <InnerOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpDigraphsMutIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for WrapperOp {
+    type Iter = WrapperOpUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        let Self(field_0) = self;
+        WrapperOpUngraphsIter {
+            inner: <InnerOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpUngraphsIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasUngraphs<'a>>::Iter,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for WrapperOp {
+    type IterMut = WrapperOpUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        let Self(field_0) = self;
+        WrapperOpUngraphsMutIter {
+            inner: <InnerOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpUngraphsMutIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for WrapperOp {
+    fn is_terminator(&self) -> bool {
+        let Self(field_0) = self;
+        <InnerOp as ::kirin::ir::IsTerminator>::is_terminator(field_0)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for WrapperOp {
+    fn is_constant(&self) -> bool {
+        let Self(field_0) = self;
+        <InnerOp as ::kirin::ir::IsConstant>::is_constant(field_0)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for WrapperOp {
+    fn is_pure(&self) -> bool {
+        let Self(field_0) = self;
+        <InnerOp as ::kirin::ir::IsPure>::is_pure(field_0)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for WrapperOp {
+    fn is_speculatable(&self) -> bool {
+        let Self(field_0) = self;
+        <InnerOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for WrapperOp {
+    fn is_edge(&self) -> bool {
+        let Self(field_0) = self;
+        <InnerOp as ::kirin::ir::IsEdge>::is_edge(field_0)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for WrapperOp {
+    type Type = SimpleType;
+}
+#[automatically_derived]
+impl ::kirin::ir::HasSignature<Self> for WrapperOp {
+    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+        let Self(field_0) = self;
+        <InnerOp as ::kirin::ir::HasSignature<InnerOp>>::signature(field_0)
+    }
+}

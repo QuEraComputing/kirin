@@ -1,0 +1,513 @@
+---
+source: crates/kirin-derive-ir/src/tests/dialect.rs
+assertion_line: 268
+expression: code
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for MixedWraps {
+    type Iter = MixedWrapsArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Simple(field_0) => MixedWrapsArgumentsIter::Simple(
+                <SimpleOp as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsArgumentsIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasArguments>::arguments(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsArgumentsIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasArguments<'a>>::Iter),
+    Wrapped(<InnerOp as ::kirin::ir::HasArguments<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for MixedWraps {
+    type IterMut = MixedWrapsArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Simple(field_0) => MixedWrapsArgumentsMutIter::Simple(
+                <SimpleOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsArgumentsMutIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsArgumentsMutIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+    Wrapped(<InnerOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for MixedWraps {
+    type Iter = MixedWrapsResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        match self {
+            Self::Simple(field_0) => MixedWrapsResultsIter::Simple(
+                <SimpleOp as ::kirin::ir::HasResults>::results(field_0),
+            ),
+            Self::Wrapped { inner, tag } => {
+                MixedWrapsResultsIter::Wrapped(<InnerOp as ::kirin::ir::HasResults>::results(inner))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsResultsIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasResults<'a>>::Iter),
+    Wrapped(<InnerOp as ::kirin::ir::HasResults<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for MixedWraps {
+    type IterMut = MixedWrapsResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Simple(field_0) => MixedWrapsResultsMutIter::Simple(
+                <SimpleOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsResultsMutIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasResultsMut>::results_mut(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsResultsMutIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+    Wrapped(<InnerOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for MixedWraps {
+    type Iter = MixedWrapsBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        match self {
+            Self::Simple(field_0) => {
+                MixedWrapsBlocksIter::Simple(<SimpleOp as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+            Self::Wrapped { inner, tag } => {
+                MixedWrapsBlocksIter::Wrapped(<InnerOp as ::kirin::ir::HasBlocks>::blocks(inner))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsBlocksIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+    Wrapped(<InnerOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for MixedWraps {
+    type IterMut = MixedWrapsBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Simple(field_0) => MixedWrapsBlocksMutIter::Simple(
+                <SimpleOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsBlocksMutIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasBlocksMut>::blocks_mut(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsBlocksMutIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+    Wrapped(<InnerOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for MixedWraps {
+    type Iter = MixedWrapsSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        match self {
+            Self::Simple(field_0) => MixedWrapsSuccessorsIter::Simple(
+                <SimpleOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsSuccessorsIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasSuccessors>::successors(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsSuccessorsIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+    Wrapped(<InnerOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for MixedWraps {
+    type IterMut = MixedWrapsSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Simple(field_0) => MixedWrapsSuccessorsMutIter::Simple(
+                <SimpleOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsSuccessorsMutIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsSuccessorsMutIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+    Wrapped(<InnerOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for MixedWraps {
+    type Iter = MixedWrapsRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        match self {
+            Self::Simple(field_0) => MixedWrapsRegionsIter::Simple(
+                <SimpleOp as ::kirin::ir::HasRegions>::regions(field_0),
+            ),
+            Self::Wrapped { inner, tag } => {
+                MixedWrapsRegionsIter::Wrapped(<InnerOp as ::kirin::ir::HasRegions>::regions(inner))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsRegionsIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasRegions<'a>>::Iter),
+    Wrapped(<InnerOp as ::kirin::ir::HasRegions<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for MixedWraps {
+    type IterMut = MixedWrapsRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Simple(field_0) => MixedWrapsRegionsMutIter::Simple(
+                <SimpleOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsRegionsMutIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasRegionsMut>::regions_mut(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsRegionsMutIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+    Wrapped(<InnerOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for MixedWraps {
+    type Iter = MixedWrapsDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Simple(field_0) => MixedWrapsDigraphsIter::Simple(
+                <SimpleOp as ::kirin::ir::HasDigraphs>::digraphs(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsDigraphsIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasDigraphs>::digraphs(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsDigraphsIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+    Wrapped(<InnerOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for MixedWraps {
+    type IterMut = MixedWrapsDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Simple(field_0) => MixedWrapsDigraphsMutIter::Simple(
+                <SimpleOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsDigraphsMutIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsDigraphsMutIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+    Wrapped(<InnerOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for MixedWraps {
+    type Iter = MixedWrapsUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Simple(field_0) => MixedWrapsUngraphsIter::Simple(
+                <SimpleOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsUngraphsIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasUngraphs>::ungraphs(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsUngraphsIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+    Wrapped(<InnerOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for MixedWraps {
+    type IterMut = MixedWrapsUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Simple(field_0) => MixedWrapsUngraphsMutIter::Simple(
+                <SimpleOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsUngraphsMutIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsUngraphsMutIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+    Wrapped(<InnerOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for MixedWraps {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::Simple(field_0) => {
+                <SimpleOp as ::kirin::ir::IsTerminator>::is_terminator(field_0)
+            }
+            Self::Wrapped { inner, tag } => {
+                <InnerOp as ::kirin::ir::IsTerminator>::is_terminator(inner)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for MixedWraps {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::Simple(field_0) => <SimpleOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+            Self::Wrapped { inner, tag } => {
+                <InnerOp as ::kirin::ir::IsConstant>::is_constant(inner)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for MixedWraps {
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::Simple(field_0) => <SimpleOp as ::kirin::ir::IsPure>::is_pure(field_0),
+            Self::Wrapped { inner, tag } => <InnerOp as ::kirin::ir::IsPure>::is_pure(inner),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for MixedWraps {
+    fn is_speculatable(&self) -> bool {
+        match self {
+            Self::Simple(field_0) => {
+                <SimpleOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
+            }
+            Self::Wrapped { inner, tag } => {
+                <InnerOp as ::kirin::ir::IsSpeculatable>::is_speculatable(inner)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for MixedWraps {
+    fn is_edge(&self) -> bool {
+        match self {
+            Self::Simple(field_0) => <SimpleOp as ::kirin::ir::IsEdge>::is_edge(field_0),
+            Self::Wrapped { inner, tag } => <InnerOp as ::kirin::ir::IsEdge>::is_edge(inner),
+        }
+    }
+}
+#[automatically_derived]
+impl From<SimpleOp> for MixedWraps {
+    fn from(value: SimpleOp) -> Self {
+        Self::Simple(value)
+    }
+}
+#[automatically_derived]
+impl From<InnerOp> for MixedWraps {
+    fn from(value: InnerOp) -> Self {
+        let tag = ::core::default::Default::default();
+        Self::Wrapped {
+            inner: value,
+            tag: tag,
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for MixedWraps {
+    type Type = SimpleType;
+}
+#[automatically_derived]
+impl ::kirin::ir::HasSignature<Self> for MixedWraps {
+    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+        match self {
+            Self::Simple(field_0) => {
+                <SimpleOp as ::kirin::ir::HasSignature<SimpleOp>>::signature(field_0)
+            }
+            Self::Wrapped { inner, tag } => {
+                <InnerOp as ::kirin::ir::HasSignature<InnerOp>>::signature(inner)
+            }
+        }
+    }
+}

@@ -48,6 +48,7 @@ impl BuilderTemplate {
             build_fn_name: fn_name,
             is_wrapper: stmt.wraps.is_some(),
             wrapper_type: stmt.wraps.as_ref().map(|w| w.ty.clone()),
+            wrapper_field: stmt.wraps.as_ref().map(|w| w.field.clone()),
         }
     }
 

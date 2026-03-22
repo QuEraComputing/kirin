@@ -23,9 +23,11 @@ fn signature_body_struct(
             .wrapper_binding
             .as_ref()
             .expect("wrapper binding should be present");
-        return Ok(
-            quote! { <#wrapper_ty as #full_trait_path<#wrapper_ty>>::#trait_method(#field) },
-        );
+        let pattern = &stmt_ctx.pattern;
+        return Ok(quote! {
+            let Self #pattern = self;
+            <#wrapper_ty as #full_trait_path<#wrapper_ty>>::#trait_method(#field)
+        });
     }
 
     let sig_field = stmt_ctx

@@ -220,3 +220,50 @@ fn test_dialect_derive_struct_edge() {
     };
     insta::assert_snapshot!(generate_dialect_code(input));
 }
+
+/// Regression test for P0-1: wrapper struct HasSignature codegen must destructure
+/// `self` before referencing the wrapper binding (e.g., `field_0`).
+#[test]
+fn test_dialect_derive_wrapper_struct_has_signature() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType)]
+        #[wraps]
+        struct WrapperOp(InnerOp);
+    };
+    let code = generate_dialect_code(input);
+    // The generated HasSignature impl must contain `let Self ... = self;`
+    // to destructure self before using the wrapper binding.
+    assert!(
+        code.contains("let Self"),
+        "P0-1 regression: wrapper struct HasSignature must destructure self.\n\
+         Generated code:\n{code}"
+    );
+    insta::assert_snapshot!(code);
+}
+
+/// Regression test for P1-10: From impl for wrapper variant with extra side-fields
+/// must include the wrapped value in the constructor, not silently discard it.
+#[test]
+fn test_dialect_derive_enum_wraps_with_extra_fields_from_impl() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType, builders)]
+        enum MixedWraps {
+            #[wraps]
+            Simple(SimpleOp),
+            Wrapped {
+                #[wraps]
+                inner: InnerOp,
+                tag: i64,
+            },
+        }
+    };
+    let code = generate_dialect_code(input);
+    // The From<InnerOp> impl for the Wrapped variant must use `value`
+    // in the constructor, not discard it.
+    assert!(
+        code.contains("inner: value") || code.contains("inner : value"),
+        "P1-10 regression: From impl for wrapper variant with extra fields \
+         must include the wrapped value.\nGenerated code:\n{code}"
+    );
+    insta::assert_snapshot!(code);
+}
