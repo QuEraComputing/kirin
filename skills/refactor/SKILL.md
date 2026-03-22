@@ -244,6 +244,22 @@ The Plan Reviewer will:
    via SendMessage, wait for revision, then re-check
 5. Report final cross-plan status
 
+### Design-Work Plans
+
+Some plans are classified as "design-work" effort — they require the implementer to make design decisions during execution, not just apply mechanical fixes. These are qualitatively different from "quick-win" or "moderate" plans and need special handling:
+
+**Planners should flag design-work plans** when:
+- The finding adds new fields/types to existing structs (breaking change)
+- Multiple valid approaches exist and the right one depends on framework constraints only discoverable at implementation time
+- The change cascades through derive macros, parsers, or interpreters in ways that are hard to predict from reading code alone
+
+**Design-work plans should include a "Design Decisions" section** documenting:
+- The options considered and trade-offs between them
+- Explicit decision points where the implementer should verify feasibility before committing (e.g., "check if the derive macros support `Vec<ResultValue>` — if not, fall back to single `ResultValue`")
+- Fallback approaches if the primary design doesn't work
+
+This matters because design-work agents often discover framework constraints the planner couldn't anticipate. For example, a plan might assume derive macros handle `Vec<ResultValue>` fields, but the macros reject them at compile time. Without a documented fallback, the agent wastes time or makes ad-hoc decisions that don't align with the project's design philosophy.
+
 ### Step 3: Lead Reviews Orchestration Map
 
 After the Plan Reviewer reports CLEAN status, read ONLY `index.md` from the
@@ -304,27 +320,11 @@ Map work streams to agent roles:
 
 ##### Coordination: Agent Teams (preferred) or Background Agents
 
-**Option A: Agent Teams (preferred when TeamCreate is available)**
+Read `./references/execution-operations.md` for full details on coordination options, merge procedures, worktree divergence handling, failure recovery, and agent role descriptions.
 
-Use `TeamCreate` to create a refactor team, then spawn implementer teammates. This gives structured coordination via shared task lists and message passing.
+**Option A: Agent Teams** — preferred when `TeamCreate` is available. Provides structured coordination with Integrator and Verifier agents.
 
-1. Create team: `TeamCreate(team_name: "refactor-<scope>", description: "Refactoring <scope>")`
-2. Create tasks for each work stream using `TaskCreate` — one task per agent assignment, with dependencies reflecting the ordering
-3. Spawn each code-editing teammate through the pre-dispatch gate (see Phase 4). Every call MUST include both `isolation: "worktree"` and `run_in_background: true`:
-   ```
-   Agent(team_name: "refactor-<scope>", name: "<role>-<crate>",
-         isolation: "worktree", run_in_background: true, ...)
-   ```
-4. Spawn the Integrator (works on the dev branch, not a worktree — it is the sole writer to the dev branch)
-5. Spawn the Verifier (read-only — no `isolation: "worktree"` needed)
-6. Teammates pick up tasks from the shared list, work in isolated worktrees, mark tasks complete, and go idle
-7. As implementers complete, the lead creates merge tasks for the Integrator specifying branch and merge order
-8. After each merge, the Integrator notifies the Verifier; the Verifier checks and reports to lead
-9. After all work is done, send shutdown messages to all teammates and call `TeamDelete`
-
-**Option B: Background Agents (fallback)**
-
-If `TeamCreate` is not available, dispatch agents through the pre-dispatch gate with `run_in_background: true` and `isolation: "worktree"`. Track progress through agent completion notifications.
+**Option B: Background Agents** — fallback when `TeamCreate` is not available. The lead performs integration directly using a merge-verify-cleanup cycle after each agent completes. Handles worktree branch divergence (parallel waves producing stale parents) via cherry-pick, and agent auth failures by checking worktrees for commits before re-dispatching.
 
 **Non-blocking requirement (both options):** All implementer agents MUST run in background (`run_in_background: true`). The user must be able to interact with the main agent at all times during execution. Never block on agent completion.
 
@@ -374,74 +374,37 @@ The strategy depends on execution mode:
 - **Sequential agent**: Run `cargo check -p <crate>` after every file modification within the worktree.
 - **Agent team**: Each agent runs `cargo check` within its own worktree. Cross-crate checks happen AFTER merging, led by the Verifier agent.
 
-### The Verifier Agent
+### Agent Roles (Verifier, Integrator, Lead, Guardian)
 
-**Always staff a Verifier** when using parallel agents. The Verifier:
+See `./references/execution-operations.md` for detailed role descriptions. Summary:
 
-1. **After each implementer completes a task**: reviews the changes in that agent's worktree, runs `cargo check` and relevant tests, reports findings to the lead
-2. **After merging**: runs full workspace verification (`cargo build --workspace`, `cargo nextest run --workspace`, `cargo test --doc --workspace`)
-3. **Reports issues to lead**: the lead decides whether to fix now or defer, and assigns fixes to an idle implementer
-
-The Verifier does NOT fix code — it only checks and reports. This separation prevents the verifier from introducing its own bugs.
-
-### The Integrator Agent
-
-**Always staff an Integrator** when using agent teams. The Integrator is a dedicated teammate responsible for merging worktree branches into the dev branch and producing a clean, cohesive result. Spawn with `run_in_background: true` but WITHOUT `isolation: "worktree"` — the Integrator is the sole writer to the dev branch and needs direct access to it.
-
-The Integrator:
-
-1. **Merges worktree branches** in dependency order as implementers complete their tasks. Does not wait for all implementers to finish — merges incrementally as work streams complete.
-2. **Resolves merge conflicts** — understands the refactor plan and makes informed decisions about which side to keep. Reports ambiguous conflicts to the lead.
-3. **Polishes the merged result:**
-   - Fixes import ordering and dead imports left by the merge
-   - Ensures consistent naming conventions across merged code from different agents
-   - Removes leftover TODO/FIXME markers that agents resolved in their own branches but didn't clean up in others'
-   - Runs `cargo fmt --all` after each merge
-4. **Cleans up worktree artifacts** — removes merged worktree branches, prunes stale references
-5. **Hands off to Verifier** — after each merge, notifies the Verifier to run checks on the merged state
-
-**The Integrator works on the dev branch directly** (not in a worktree) since it is the only agent writing to it. No other agent edits the dev branch.
-
-**Relationship to other roles:**
-- Implementers/Builders/Migrators → produce branches in worktrees
-- Integrator → merges those branches, resolves conflicts, polishes
-- Verifier → checks the merged result, reports issues back to lead
-- Lead → assigns merge order, triages Verifier findings
-
-### Lead Agent Responsibilities
-
-The lead agent (you) orchestrates:
-
-1. **Task assignment**: create tasks, assign to agents, track dependencies
-2. **Merge ordering**: tell the Integrator which branches to merge and in what order
-3. **Issue triage**: when the Verifier reports problems, decide:
-   - Which agent should fix it (prefer an idle agent with context, or the Integrator for polish issues)
-   - Whether to fix now or batch fixes after all agents complete
-4. **Unblocking**: if the Integrator hits an ambiguous conflict, make the call
-
-### Guardian Role
-
-Read the Guardian persona (from the team directory, see AGENTS.md). The Guardian runs as the lead agent's advisor:
-- Pre-flight analysis (Phase 1)
-- Migration checklist production for Migrators
-- Post-validation pub-item diffing (Phase 5)
-
-For small refactors, the lead agent can absorb Guardian duties directly.
+- **Verifier** — checks and reports, never fixes code. Staff when using parallel agents (Option A); lead absorbs this in Option B.
+- **Integrator** — merges worktree branches, resolves conflicts, polishes. Staff for Option A only; lead does this in Option B.
+- **Lead** — assigns tasks, orders merges, triages issues, unblocks conflicts.
+- **Guardian** — advisor to lead for pre-flight, migration checklists, post-validation pub-item diffs. For small refactors, lead absorbs this.
 
 ## Phase 5: Final Validation + Documentation
 
-1. **Integrator does final polish** on the fully merged dev branch:
+1. **Integrator does final polish** on the fully merged dev branch (or the lead does this directly in Option B):
    - `cargo fmt --all`
    - Remove any remaining worktree branches and stale references
    - Final pass for consistency: naming, imports, dead code from the merge process
-2. **Verifier runs final checks:**
+2. **Verifier runs final checks** (or the lead runs these in Option B):
    - `cargo build --workspace`
    - `cargo nextest run --workspace`
    - `cargo test --doc --workspace`
    - `cargo insta test --workspace` (if snapshot tests exist)
 3. **Diff pub items** in changed files against pre-flight list — flag unintended changes
-4. Read the **Documenter** persona (from the team directory) to update CLAUDE.md/AGENTS.md/memory if conventions changed
-5. Load the `finishing-a-development-branch` skill to complete
+4. **Document implementation issues** — save to `docs/plans/<name>/implementation-notes.md`:
+   - Design gaps discovered during implementation (e.g., framework limitations that forced workarounds)
+   - Assumptions from plans that proved wrong (e.g., derive macros didn't support a field type)
+   - Workarounds applied and what the "real fix" would be
+   - Pre-existing issues surfaced but not addressed (with rationale for deferral)
+   - Breaking changes introduced and their downstream impact
+
+   This step captures knowledge that is lost if not documented immediately — implementer agents discover things during execution that neither the review nor the plans anticipated. These notes inform future refactors and help the user understand what trade-offs were made.
+5. Read the **Documenter** persona (from the team directory) to update CLAUDE.md/AGENTS.md/memory if conventions changed
+6. Load the `finishing-a-development-branch` skill to complete
 
 ## Phase 6: Template Capture
 
@@ -465,21 +428,13 @@ refactor type, pattern, scope, staffed roles, what worked, what to adjust, date.
 - Lead agent writing plan files directly instead of dispatching the planning team (Phase 3 Step 1)
 - Skipping the Plan Reviewer step, even if the user says the plans look fine (Phase 3 Step 2)
 - Skipping triage-review on the Focused path because the user "already knows the problems" — user knowledge is input to review, not a substitute
+- Re-dispatching an agent that reported failure without first checking the worktree for commits — the work may already be done
+- Merging a worktree commit without running workspace tests afterward — cherry-picks can silently conflict at the semantic level even when git reports no textual conflicts
+- A design-work plan with no fallback approaches — if the primary design hits a framework constraint, the agent has no guidance and makes ad-hoc decisions
 
 ## Rationalization Table
 
-| Temptation | Rationalization | Reality |
-|-----------|----------------|---------|
-| Skip pre-flight | "This refactor is simple, I know what needs to move" | 'Simple' refactors have hidden consumers. Pre-flight takes 5 minutes; debugging a missed re-export takes 30. |
-| Skip triage-review | "I already know the code well enough" / "I already know the problem areas" | You know the code. The Formalism reviewer catches abstraction issues. The Soundness Adversary catches invariant violations. Fresh eyes find what familiarity hides. User knowledge is input to the review, not a substitute. |
-| Pre-flight before review on a broad target | "I'll figure out the scope first, then review" | Without review, pre-flight is guessing. For broad targets, you don't know what's wrong yet — the review discovers the refactoring scope. |
-| Start coding before plan approval | "I'll adjust the plan based on what I find" | Code-first planning produces sunk-cost pressure to keep bad decisions. Plan approval costs 2 minutes; reworking a wrong approach costs hours. |
-| Edit the same file from two agents | "The changes are in different functions" | Git merges on function granularity, not line granularity. Two agents touching the same file creates merge conflicts that require manual resolution. |
-| Let the verifier fix issues | "It's faster than dispatching back to the implementer" | The verifier lacks the implementer's context. Verifier fixes introduce new bugs at a higher rate. Report to lead, let the right agent fix it. |
-| Skip exploration budget | "I need to read one more file to understand" | The budget exists because unbounded exploration delays the actual work. If 20 reads aren't enough, the scope is wrong — simplify it. |
-| Dispatch agents in foreground | "I need to wait for them anyway before merging" | Foreground dispatch blocks the user. Refactors take minutes per agent — the user should be free to ask questions or provide context while agents work in background. |
-| Write plans directly instead of delegating | "It's faster than dispatching a whole planning team" | The lead agent's context is for orchestration, not codebase exploration. Writing plans directly pollutes it with details from 10+ files per finding, degrading orchestration quality for later phases. Per-finding isolation also prevents cross-contamination between plans. The planning team runs in background — the user isn't waiting. |
-| Skip the Plan Reviewer | "The user already read the plans, they look fine" | Human review catches content issues. The Plan Reviewer catches structural issues: file overlaps between plans in the same wave, dependency cycles, missing findings. Skipping it risks merge conflicts during execution — far more expensive than the 30-second review. |
+See `./references/rationalization-table.md` for the full table. Read it when tempted to skip a step. Key entries: skip pre-flight, skip review, skip plan reviewer, skip implementation notes, re-dispatch without checking worktree.
 
 ## Integration
 

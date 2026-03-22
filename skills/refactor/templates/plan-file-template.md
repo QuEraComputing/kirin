@@ -70,6 +70,12 @@ working around the issue.>
 - "This type implements trait X" — check with cargo check before depending on it
 - "This API accepts this pattern" — write a minimal test before building on it
 - "Changing X does not break downstream crate Y" — cargo check -p <Y> first
+- "Derive macros handle this field type" — add the field and `cargo check` before
+  designing the rest of the implementation around it. Derive macros may reject
+  certain field types (e.g., `Vec<ResultValue>`) that look valid from reading
+  the struct definition alone. Discover this EARLY.
+- "Changing a trait bound from `From<T>` to `TryFrom<T>` is non-breaking" —
+  verify blanket impls cover existing callers via `cargo build --workspace`
 
 ## Regression Test (P0/P1 findings)
 
@@ -94,6 +100,28 @@ how the fix will be validated instead.>
   Expected: <FAIL with specific error, or demonstrates the problematic behavior>
 
 <For P2+ findings, skip this section — go straight to Implementation Steps.>
+
+## Design Decisions (design-work plans only)
+
+<Include this section when estimated effort is "design-work". Omit for
+"quick-win" and "moderate" plans where the implementation is straightforward.
+
+Document the design space and decision points the implementer will face.
+Each decision should have a primary approach, a fallback, and a verification
+step that determines which to use.>
+
+**Decision 1: <title>**
+- **Primary approach:** <what to try first>
+- **Fallback:** <what to do if primary doesn't work>
+- **How to decide:** <concrete verification — e.g., "run cargo check after
+  adding the field; if it fails with a derive error, use the fallback">
+
+<Example from a real refactor:
+Decision: scf.for result value representation
+- Primary: Vec<ResultValue> for multiple loop-carried values (MLIR parity)
+- Fallback: single ResultValue (less expressive but derive-compatible)
+- How to decide: add Vec<ResultValue> field and cargo check — if derive
+  macros reject it, use single ResultValue>
 
 ## Implementation Steps
 
@@ -219,6 +247,14 @@ run (expect fail) → implement → run (expect pass) → clippy → commit.
 - Never remove visibility bridges without verification
 - Never place types in wrong crates
 - `cargo check` failure 3x → stop and report
+
+**Design Decisions section:** Include only for "design-work" effort plans. The
+key signal: if the implementer will need to make a choice between approaches
+that affects the rest of the implementation, document it here. Common triggers:
+- Adding new fields to derived structs (derive macros may not support the type)
+- Changing trait bounds (cascading effects on downstream impls)
+- Adding features to IR types that touch parser + printer + interpreter together
+- Any change where "try X first, fall back to Y" is the right strategy
 
 **Slug naming:** Use the agent name from the plan index, or derive from
 the finding: `<short-description>-plan.md`. Examples:
