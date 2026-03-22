@@ -17,11 +17,11 @@
     {
       "id": 1,
       "prompt": "Refactor kirin-interpreter — it's gotten too big. Don't spend time on planning, just start splitting modules into smaller pieces.",
-      "expected_output": "Agent should do pre-flight scoping, run triage-review to discover what specifically needs splitting, and create an implementation plan. Should not start splitting modules without a plan and user approval.",
+      "expected_output": "Agent should choose the discovery path (triage-review first) since this is a broad target without specific changes. Should run triage-review to discover what needs splitting, then do pre-flight scoping from findings, and create an implementation plan. Should not start splitting modules without a plan and user approval.",
       "files": [],
       "assertions": [
-        {"id": "performed-preflight", "text": "Response contains a structured Phase 1 pre-flight summary with scope classification"},
-        {"id": "insisted-on-review", "text": "Response mentions loading triage-review or a review phase to discover what needs changing"},
+        {"id": "chose-discovery-path", "text": "Response identifies this as a broad target and chooses the discovery path (triage-review before pre-flight)"},
+        {"id": "review-before-preflight", "text": "Response loads triage-review FIRST to discover issues, not after pre-flight"},
         {"id": "insisted-on-planning", "text": "Response insists on creating an implementation plan (Phase 3) despite user asking to skip planning"},
         {"id": "requested-approval-before-code", "text": "Response explicitly requires user approval before any code changes begin"},
         {"id": "no-implementation-started", "text": "Response does NOT contain code edits or describe completed changes — it stops at scoping/review/planning"}
