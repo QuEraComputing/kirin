@@ -30,6 +30,38 @@ The refactoring target is: **$ARGUMENTS**
 
 If no target was provided, ask the user what to refactor.
 
+## Phase 0: Capture Constraints
+
+Before choosing a path, capture the user's constraints. These shape every
+downstream decision — reviewer prompts, recommendation framing, plan scope.
+Skipping this leads to reviewers optimizing for the wrong thing (e.g., all
+reviewers recommend "minimal changes" when the user wants aggressive cleanup).
+
+**Ask upfront (or infer from the target description):**
+
+1. **API breaking tolerance**: Is breaking public API acceptable? ("aggressive
+   breaking OK" vs "must preserve backward compatibility")
+2. **Scope appetite**: Minimal targeted fix, or deep cleanup while we're here?
+3. **Priority ordering**: Which matters most — consistency, performance,
+   ergonomics, soundness, simplicity?
+4. **External constraints**: MLIR compatibility requirements? Deadline pressure?
+   Downstream consumers that can't change?
+
+If the target description already implies answers (e.g., "clean up any potential
+blockers to future development" implies aggressive breaking is OK), state your
+inference and confirm: "This sounds like breaking API is acceptable — correct?"
+
+**Output:** A constraints block that gets injected into every reviewer prompt
+and planning prompt:
+
+```
+## User Constraints
+- API breaking: [acceptable / avoid / last resort]
+- Scope: [minimal / moderate / aggressive cleanup]
+- Priorities: [ordered list]
+- External: [any constraints]
+```
+
 ## Path Selection
 
 Before starting, classify the refactor and choose the appropriate path:
@@ -38,7 +70,8 @@ Before starting, classify the refactor and choose the appropriate path:
 |--------|------|-----|
 | User specifies concrete changes ("extract trait X", "move Y to crate Z") | **Focused** — pre-flight first | You already know what moves; pre-flight scopes it, review validates it |
 | User gives a broad target ("refactor kirin-interpreter", "clean up the derive subsystem") | **Discovery** — triage-review first | You don't know what's wrong yet; review discovers the issues, pre-flight scopes the changes from findings |
-| Ambiguous | Ask the user: "Do you have specific changes in mind, or should I review the target first to identify what needs refactoring?" | |
+| User wants to evaluate design alternatives ("how should we support X", "evaluate options for Y") | **Design Exploration** — design-first | The question is "what should we build?", not "what's wrong?" — needs structured design evaluation before any code review |
+| Ambiguous | Ask the user: "Do you have specific changes in mind, should I review the target to identify issues, or are we evaluating design alternatives?" | |
 
 **Announce the chosen path** so the user knows which flow is driving behavior.
 
@@ -100,6 +133,91 @@ When loading triage-review, suggest including:
 The triage-review walkthrough serves as the user decision point — confirms or rejects findings before implementation.
 
 → After walkthrough completes, proceed to **Phase 3: Implementation Planning**.
+
+---
+
+## Design Exploration Path (design doc → review → pre-flight)
+
+Use when the user wants to evaluate design alternatives before committing to
+changes. The question is "what should we build?" rather than "what's wrong?" —
+this needs structured design evaluation, not code quality review.
+
+**Signals:** "evaluate options for X", "how should we support Y", "what if we
+change Z to work differently", comparing two or more approaches, requests to
+evaluate from formalism/theory.
+
+### Phase 0D: Structured Design Exploration
+
+Instead of jumping straight to triage-review (which is optimized for code quality
+findings, not design evaluation), first explore the design space systematically.
+
+**Step 1: Map the design dimensions.** For the target feature/change, identify
+every framework layer it touches. Use this checklist:
+
+| Layer | Questions to Answer |
+|-------|--------------------|
+| IR definitions | What struct/enum fields change? New types? |
+| Derive macros | What does the builder generate? What's rejected today? |
+| Text format | What does the syntax look like? Format string changes? |
+| Parser | How does it parse? New combinators needed? |
+| Printer | How does it print? New PrettyPrint impls? |
+| Interpreter (concrete) | How does the stack interpreter handle it? Continuation changes? |
+| Interpreter (abstract) | What's the lattice algebra? AnalysisResult changes? |
+| Dialect author API | What does a dialect author write? Concept budget? |
+| Existing dialects | Which dialects need updating? How? |
+
+Not all layers apply to every design. Skip irrelevant ones, but explicitly
+check each — missed layers surface as surprises during implementation.
+
+**Step 2: Identify design alternatives.** From the exploration, identify 2-4
+concrete design paths. For each, sketch what the code looks like at each
+affected layer.
+
+**Step 3: Dispatch design reviewers.** Load triage-review in **design evaluation
+mode** — each reviewer evaluates all paths from their perspective ("what if we
+go this way?"), not just the current code state.
+
+**Key difference from standard triage-review:** Pass the **User Constraints**
+block (from Phase 0) to every reviewer. This prevents reviewers from optimizing
+for constraints the user doesn't have (e.g., recommending minimal changes when
+the user wants aggressive cleanup).
+
+Reviewer prompts should be structured as:
+- "For each path, analyze [path-specific concerns for this reviewer role]"
+- "Recommend a path with rationale grounded in your review lens"
+- "Identify risks and mitigations for the recommended path"
+
+**Step 4: Design walkthrough.** Present findings per-path, not per-finding.
+The user decides which path to pursue. Unlike the standard finding walkthrough
+(accept/reject per finding), the design walkthrough is **iterative** — the user
+may combine elements from different paths, reject all paths and propose a new
+one, or want to drill deeper into a specific aspect.
+
+**Support direction changes:** If the user changes their mind about a
+foundational decision (e.g., switches from Path B to Path A mid-walkthrough),
+don't treat this as an error. Acknowledge the pivot, re-evaluate downstream
+decisions that depend on the changed foundation, and continue. Design exploration
+is inherently non-linear.
+
+**Step 5: Write a design document.** Before proceeding to implementation planning,
+capture all design decisions in a document (`docs/design/<feature-name>.md`).
+This is **mandatory** for Design Exploration path, not optional. The document
+should cover:
+- Motivation and the problem being solved
+- Design alternatives considered (with rationale for rejection)
+- Chosen design with rationale
+- Changes at each affected framework layer (from Step 1 checklist)
+- Examples (text format, Rust code, interpret impls)
+- Semantic rules (e.g., arity invariants, lattice algebra)
+- References (papers, MLIR docs, prior art)
+
+**The design document is the specification for the planning phase.** Without it,
+planners make ad-hoc design decisions during implementation — the exact problem
+this path exists to prevent.
+
+→ After the design document is written and user-approved, proceed to the standard
+pre-flight (Phase 1F) scoped to the chosen design, then **Phase 3: Implementation
+Planning**.
 
 ---
 
@@ -438,6 +556,9 @@ refactor type, pattern, scope, staffed roles, what worked, what to adjust, date.
 
 ## Red Flags — STOP Immediately
 
+- Dispatching reviewers without capturing user constraints (Phase 0) — constraints shape every recommendation
+- Design evaluation funneled through standard triage-review (code quality mode) instead of Design Exploration path — wrong tool for the question
+- Proceeding to implementation planning from the Design Exploration path without a design document — the doc IS the planning spec
 - Planning for more than 5 minutes without having started Phase 1 pre-flight
 - Rewriting the pre-flight summary more than once
 - Making code changes before user approves pre-flight summary AND implementation plan
@@ -473,7 +594,10 @@ See `./references/rationalization-table.md` for the full table. Read it when tem
 - The `subagent-driven-development` skill — solo agent, task-by-task with review
 - The `executing-plans` skill — parallel or sequential execution with batch checkpoints
 
+**Design Exploration path (load when needed):**
+- The `brainstorming` skill — upstream design work when the Design Exploration path needs open-ended ideation before structured evaluation
+- The `ir-spec-writing` skill — when the design involves new IR constructs, dialect operations, or semantic rules
+
 **Optional:**
-- The `brainstorming` skill — upstream design work before refactoring
 - The `writing-plans` skill — creates detailed plan if one doesn't exist
 - The `simplify` skill — post-refactor code cleanup
