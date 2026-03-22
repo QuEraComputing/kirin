@@ -177,6 +177,7 @@ Map work streams to agent roles:
 | Implementer | Modify existing crates | In-place refactors |
 | Migrator | Update downstream consumers (imports, Cargo.toml, feature flags) | When downstream crates are affected |
 | Verifier | Run checks, tests, and review agent output; report findings to lead | Always (dedicated agent) |
+| Integrator | Merge worktree branches, resolve conflicts, polish the merged result | Always when using agent teams (dedicated agent) |
 
 **Critical dependency sequencing**: If work stream B depends on A's output, A must complete before B starts. Use task dependencies to enforce this.
 
@@ -193,10 +194,12 @@ Use `TeamCreate` to create a refactor team, then spawn implementer teammates. Th
    Agent(team_name: "refactor-<scope>", name: "<role>-<crate>",
          isolation: "worktree", run_in_background: true, ...)
    ```
-4. Teammates pick up tasks from the shared list, work in isolated worktrees, mark tasks complete, and go idle
-5. The lead (you) monitors progress, creates follow-up tasks when dependencies unblock, and assigns merge/fix tasks
-6. The Verifier teammate picks up verification tasks after each implementer completes
-7. After all work is done, send shutdown messages to all teammates and call `TeamDelete`
+4. Spawn the Integrator (works on the dev branch, not a worktree — it is the sole writer to the dev branch)
+5. Spawn the Verifier (read-only — no `isolation: "worktree"` needed)
+6. Teammates pick up tasks from the shared list, work in isolated worktrees, mark tasks complete, and go idle
+7. As implementers complete, the lead creates merge tasks for the Integrator specifying branch and merge order
+8. After each merge, the Integrator notifies the Verifier; the Verifier checks and reports to lead
+9. After all work is done, send shutdown messages to all teammates and call `TeamDelete`
 
 **Option B: Background Agents (fallback)**
 
@@ -227,6 +230,7 @@ Each agent works in its isolated worktree. The lead agent (or a merge orchestrat
 Before dispatching ANY code-editing agent (whether via Agent Teams or background agents), verify:
 
 1. `isolation: "worktree"` is set on the Agent call — this is the enforcement mechanism, not a suggestion
+   - **Exception:** The Integrator works on the dev branch directly (no worktree) since it is the sole writer to it
 2. `run_in_background: true` is set
 3. The agent's prompt includes the invariants block below
 4. The agent's file assignments don't overlap with any other active agent
@@ -269,16 +273,40 @@ The strategy depends on execution mode:
 
 The Verifier does NOT fix code — it only checks and reports. This separation prevents the verifier from introducing its own bugs.
 
+### The Integrator Agent
+
+**Always staff an Integrator** when using agent teams. The Integrator is a dedicated teammate responsible for merging worktree branches into the dev branch and producing a clean, cohesive result. Spawn with `run_in_background: true` but WITHOUT `isolation: "worktree"` — the Integrator is the sole writer to the dev branch and needs direct access to it.
+
+The Integrator:
+
+1. **Merges worktree branches** in dependency order as implementers complete their tasks. Does not wait for all implementers to finish — merges incrementally as work streams complete.
+2. **Resolves merge conflicts** — understands the refactor plan and makes informed decisions about which side to keep. Reports ambiguous conflicts to the lead.
+3. **Polishes the merged result:**
+   - Fixes import ordering and dead imports left by the merge
+   - Ensures consistent naming conventions across merged code from different agents
+   - Removes leftover TODO/FIXME markers that agents resolved in their own branches but didn't clean up in others'
+   - Runs `cargo fmt --all` after each merge
+4. **Cleans up worktree artifacts** — removes merged worktree branches, prunes stale references
+5. **Hands off to Verifier** — after each merge, notifies the Verifier to run checks on the merged state
+
+**The Integrator works on the dev branch directly** (not in a worktree) since it is the only agent writing to it. No other agent edits the dev branch.
+
+**Relationship to other roles:**
+- Implementers/Builders/Migrators → produce branches in worktrees
+- Integrator → merges those branches, resolves conflicts, polishes
+- Verifier → checks the merged result, reports issues back to lead
+- Lead → assigns merge order, triages Verifier findings
+
 ### Lead Agent Responsibilities
 
 The lead agent (you) orchestrates:
 
 1. **Task assignment**: create tasks, assign to agents, track dependencies
-2. **Merge sequencing**: merge worktree branches back in dependency order
+2. **Merge ordering**: tell the Integrator which branches to merge and in what order
 3. **Issue triage**: when the Verifier reports problems, decide:
-   - Which agent should fix it (prefer an idle agent with context)
+   - Which agent should fix it (prefer an idle agent with context, or the Integrator for polish issues)
    - Whether to fix now or batch fixes after all agents complete
-4. **Conflict resolution**: if merges conflict, resolve or delegate
+4. **Unblocking**: if the Integrator hits an ambiguous conflict, make the call
 
 ### Guardian Role
 
@@ -291,14 +319,18 @@ For small refactors, the lead agent can absorb Guardian duties directly.
 
 ## Phase 5: Final Validation + Documentation
 
-1. **Verifier runs final checks:**
+1. **Integrator does final polish** on the fully merged dev branch:
+   - `cargo fmt --all`
+   - Remove any remaining worktree branches and stale references
+   - Final pass for consistency: naming, imports, dead code from the merge process
+2. **Verifier runs final checks:**
    - `cargo build --workspace`
    - `cargo nextest run --workspace`
    - `cargo test --doc --workspace`
    - `cargo insta test --workspace` (if snapshot tests exist)
-2. **Diff pub items** in changed files against pre-flight list — flag unintended changes
-3. Read the **Documenter** persona (from the team directory) to update CLAUDE.md/AGENTS.md/memory if conventions changed
-4. Load the `finishing-a-development-branch` skill to complete
+3. **Diff pub items** in changed files against pre-flight list — flag unintended changes
+4. Read the **Documenter** persona (from the team directory) to update CLAUDE.md/AGENTS.md/memory if conventions changed
+5. Load the `finishing-a-development-branch` skill to complete
 
 ## Phase 6: Template Capture
 
