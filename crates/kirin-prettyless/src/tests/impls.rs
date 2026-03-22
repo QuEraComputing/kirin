@@ -262,7 +262,21 @@ fn test_pretty_print_symbol_resolved() {
 // --- Successor ---
 
 #[test]
-fn test_pretty_print_successor() {
+fn test_pretty_print_successor_named() {
+    use kirin_ir::Successor;
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
+    let block = stage.block().name("target").new();
+    let succ = Successor::from_block(block);
+    let stage = stage.finalize().unwrap();
+    let doc = Document::new(Default::default(), &stage);
+    let arena_doc = succ.pretty_print(&doc);
+    let mut buf = String::new();
+    arena_doc.render_fmt(80, &mut buf).unwrap();
+    assert_eq!(buf, "^target");
+}
+
+#[test]
+fn test_pretty_print_successor_unnamed() {
     use kirin_ir::Successor;
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let block = stage.block().new();
@@ -272,7 +286,7 @@ fn test_pretty_print_successor() {
     let arena_doc = succ.pretty_print(&doc);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
-    // Successor renders via Display which is ^<raw_id>
+    // Unnamed blocks fall back to raw block ID
     assert!(buf.starts_with("^"), "expected '^' prefix, got: {}", buf);
 }
 
