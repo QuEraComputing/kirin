@@ -346,7 +346,7 @@ where
             let (function, function_symbol) = if matches!(head.keyword, DeclKeyword::Stage) {
                 let function =
                     get_or_create_function_by_name(self, &mut function_lookup, head.function.name);
-                (Some(function), Some(fn_symbol(self, function)))
+                (Some(function), Some(fn_symbol(self, function)?))
             } else {
                 (None, None)
             };
@@ -374,7 +374,13 @@ where
             let outcome = dispatch.outcome;
             if let Some((function, staged_function)) = dispatch.link {
                 self.link(function, stage_id, staged_function)
-                    .expect("link should succeed for valid function");
+                    .map_err(|e| {
+                        FunctionParseError::new(
+                            FunctionParseErrorKind::EmitFailed,
+                            Some(head.stage.span),
+                            format!("link failed: {e}"),
+                        )
+                    })?;
             }
 
             if outcome.keyword != head.keyword {
@@ -403,7 +409,7 @@ where
             let head = parse_declaration_head(&tokens, start_index)?;
             let function =
                 get_or_create_function_by_name(self, &mut function_lookup, head.function.name);
-            let function_symbol = fn_symbol(self, function);
+            let function_symbol = fn_symbol(self, function)?;
 
             let mut ctx = SecondPassCtx {
                 tokens: &tokens,
@@ -429,7 +435,13 @@ where
             // Link the function ↔ staged function if created in this pass
             if let Some((function, staged_function)) = ctx.link {
                 self.link(function, stage_id, staged_function)
-                    .expect("link should succeed for auto-created function");
+                    .map_err(|e| {
+                        FunctionParseError::new(
+                            FunctionParseErrorKind::EmitFailed,
+                            Some(stage_symbol.span),
+                            format!("link failed: {e}"),
+                        )
+                    })?;
             }
 
             ensure_forward_progress(
@@ -805,11 +817,20 @@ fn get_or_create_function_by_name<S>(
     function
 }
 
-fn fn_symbol<S>(pipeline: &Pipeline<S>, function: Function) -> GlobalSymbol {
+fn fn_symbol<S>(
+    pipeline: &Pipeline<S>,
+    function: Function,
+) -> Result<GlobalSymbol, FunctionParseError> {
     pipeline
         .function_info(function)
         .and_then(|info| info.name())
-        .expect("stage declarations should always use named functions")
+        .ok_or_else(|| {
+            FunctionParseError::new(
+                FunctionParseErrorKind::EmitFailed,
+                None,
+                "stage declarations should always use named functions",
+            )
+        })
 }
 
 /// Build a `(stage, function) -> staged function` lookup from existing pipeline state.

@@ -243,10 +243,10 @@ impl<'src, TypeOutput, StmtOutput> Region<'src, TypeOutput, StmtOutput> {
         IR: Dialect,
         TypeOutput: EmitIR<IR, Output = IR::Type>,
     {
-        // Push a new scope for the region's blocks and SSA names.
+        // Use RAII scope guard so the scope is always popped, even on error.
         // This ensures inner block names and SSA names do not pollute
         // the outer scope, and outer names are restored on pop.
-        ctx.push_scope();
+        let mut guard = ctx.scoped();
 
         // Pass 1: Create stub blocks and register their names so that forward
         // references (e.g. `br ^exit` before ^exit is defined) can resolve.
@@ -257,8 +257,8 @@ impl<'src, TypeOutput, StmtOutput> Region<'src, TypeOutput, StmtOutput> {
                 .label
                 .map(|l| l.value.to_string())
                 .unwrap_or_else(|| "projected".to_string());
-            let stub = ctx.stage.block().name(name.clone()).new();
-            ctx.register_block(name, stub)?;
+            let stub = guard.stage.block().name(name.clone()).new();
+            guard.register_block(name, stub)?;
             stub_blocks.push(stub);
         }
 
@@ -267,18 +267,18 @@ impl<'src, TypeOutput, StmtOutput> Region<'src, TypeOutput, StmtOutput> {
         let real_blocks: Vec<_> = self
             .blocks
             .iter()
-            .map(|block_ast| emit_block(&block_ast.value, ctx, emit_statement))
+            .map(|block_ast| emit_block(&block_ast.value, &mut guard, emit_statement))
             .collect::<Result<Vec<_>, EmitError>>()?;
 
         // Swap real block data into stub arena slots so that all existing
         // Successor handles (which point to stub IDs) see the real data.
         // This also remaps statement parents and block-arg ownership to stub IDs.
         for (&stub, &real) in stub_blocks.iter().zip(real_blocks.iter()) {
-            ctx.stage.remap_block_identity(stub, real);
+            guard.stage.remap_block_identity(stub, real);
         }
 
-        // Pop the region scope — inner names are discarded.
-        ctx.pop_scope();
+        // Drop scope guard — inner names are discarded.
+        drop(guard);
 
         // Build the region using the stub IDs (now containing real data).
         let mut builder = ctx.stage.region();

@@ -145,12 +145,12 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
         let (port_names, port_types) = collect_port_info(&self.ports, ctx)?;
         let (cap_names, cap_types) = collect_port_info(&self.captures, ctx)?;
 
-        // Push a new scope for the graph body's SSA names.
-        ctx.push_scope();
+        // Use RAII scope guard so the scope is always popped, even on error.
+        let mut guard = ctx.scoped();
 
         // Phase 1: Create the digraph with ports/captures only (no nodes/yields).
         // This produces real port SSAs immediately.
-        let mut builder = ctx.stage.digraph().name(graph_name);
+        let mut builder = guard.stage.digraph().name(graph_name);
 
         for (name, ty) in port_names.iter().zip(port_types.iter()) {
             builder = builder.port(ty.clone()).port_name(name.clone());
@@ -163,8 +163,8 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
         let dg = builder.new();
 
         // Phase 2: Read back real port/capture SSAs and register them in emit context.
-        // Collect SSA values first to avoid borrow conflict with ctx.
-        let dg_info = ctx
+        // Collect SSA values first to avoid borrow conflict with guard.
+        let dg_info = guard
             .stage
             .digraph_arena()
             .get(dg)
@@ -180,34 +180,37 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
             .map(|p| SSAValue::from(*p))
             .collect();
         for (ssa, name) in port_ssas.into_iter().zip(port_names.iter()) {
-            ctx.register_ssa(name.clone(), ssa)?;
+            guard.register_ssa(name.clone(), ssa)?;
         }
         for (ssa, name) in cap_ssas.into_iter().zip(cap_names.iter()) {
-            ctx.register_ssa(name.clone(), ssa)?;
+            guard.register_ssa(name.clone(), ssa)?;
         }
 
         // Phase 3: Emit all statements with relaxed dominance.
         // Graph bodies allow forward SSA references — a statement may reference
         // SSAs defined by later statements (e.g. cycles in signal processing graphs).
-        ctx.set_relaxed_dominance(true);
-        let mut node_stmts = Vec::new();
-        for stmt_ast in &self.statements {
-            let stmt = emit_statement(&stmt_ast.value, ctx)?;
-            node_stmts.push(stmt);
-        }
-        ctx.set_relaxed_dominance(false);
+        // Use RAII guard so relaxed dominance is always restored, even on error.
+        let node_stmts = {
+            let mut rd_guard = guard.relaxed_dominance_scope();
+            let mut stmts = Vec::new();
+            for stmt_ast in &self.statements {
+                let stmt = emit_statement(&stmt_ast.value, &mut rd_guard)?;
+                stmts.push(stmt);
+            }
+            stmts
+        };
 
         // Phase 4: Resolve yield references
         let mut yield_ssas = Vec::new();
         for y in &self.yields {
-            let ssa = ctx
+            let ssa = guard
                 .lookup_ssa(y.value)
                 .ok_or_else(|| EmitError::UndefinedSSA(y.value.to_string()))?;
             yield_ssas.push(ssa);
         }
 
-        // Pop the graph scope — inner names are discarded.
-        ctx.pop_scope();
+        // Drop scope guard — inner names are discarded.
+        drop(guard);
 
         // Phase 5: Attach nodes and yields to the already-created digraph.
         ctx.stage
@@ -254,11 +257,11 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
         let (port_names, port_types) = collect_port_info(&self.ports, ctx)?;
         let (cap_names, cap_types) = collect_port_info(&self.captures, ctx)?;
 
-        // Push a new scope for the graph body's SSA names.
-        ctx.push_scope();
+        // Use RAII scope guard so the scope is always popped, even on error.
+        let mut guard = ctx.scoped();
 
         // Phase 1: Create the ungraph with ports/captures only (no edges/nodes).
-        let mut builder = ctx.stage.ungraph().name(graph_name);
+        let mut builder = guard.stage.ungraph().name(graph_name);
 
         for (name, ty) in port_names.iter().zip(port_types.iter()) {
             builder = builder.port(ty.clone()).port_name(name.clone());
@@ -271,8 +274,8 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
         let ug = builder.new();
 
         // Phase 2: Read back real port/capture SSAs and register them in emit context.
-        // Collect SSA values first to avoid borrow conflict with ctx.
-        let ug_info = ctx
+        // Collect SSA values first to avoid borrow conflict with guard.
+        let ug_info = guard
             .stage
             .ungraph_arena()
             .get(ug)
@@ -288,28 +291,31 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
             .map(|p| SSAValue::from(*p))
             .collect();
         for (ssa, name) in port_ssas.into_iter().zip(port_names.iter()) {
-            ctx.register_ssa(name.clone(), ssa)?;
+            guard.register_ssa(name.clone(), ssa)?;
         }
         for (ssa, name) in cap_ssas.into_iter().zip(cap_names.iter()) {
-            ctx.register_ssa(name.clone(), ssa)?;
+            guard.register_ssa(name.clone(), ssa)?;
         }
 
-        // Phase 3: Emit all statements with relaxed dominance, tracking edge vs node
-        ctx.set_relaxed_dominance(true);
-        let mut edge_stmts = Vec::new();
-        let mut node_stmts = Vec::new();
-        for ug_stmt in &self.statements {
-            let stmt = emit_statement(&ug_stmt.stmt.value, ctx)?;
-            if ug_stmt.is_edge {
-                edge_stmts.push(stmt);
-            } else {
-                node_stmts.push(stmt);
+        // Phase 3: Emit all statements with relaxed dominance, tracking edge vs node.
+        // Use RAII guard so relaxed dominance is always restored, even on error.
+        let (edge_stmts, node_stmts) = {
+            let mut rd_guard = guard.relaxed_dominance_scope();
+            let mut edges = Vec::new();
+            let mut nodes = Vec::new();
+            for ug_stmt in &self.statements {
+                let stmt = emit_statement(&ug_stmt.stmt.value, &mut rd_guard)?;
+                if ug_stmt.is_edge {
+                    edges.push(stmt);
+                } else {
+                    nodes.push(stmt);
+                }
             }
-        }
-        ctx.set_relaxed_dominance(false);
+            (edges, nodes)
+        };
 
-        // Pop the graph scope — inner names are discarded.
-        ctx.pop_scope();
+        // Drop scope guard — inner names are discarded.
+        drop(guard);
 
         // Phase 4: Attach edges and nodes to the already-created ungraph.
         ctx.stage

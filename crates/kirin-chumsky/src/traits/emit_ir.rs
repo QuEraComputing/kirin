@@ -86,10 +86,7 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
     ///
     /// Panics if called when only the root scope remains.
     pub fn pop_scope(&mut self) {
-        assert!(
-            self.ssa_scopes.len() > 1,
-            "cannot pop the root SSA scope"
-        );
+        assert!(self.ssa_scopes.len() > 1, "cannot pop the root SSA scope");
         assert!(
             self.block_scopes.len() > 1,
             "cannot pop the root block scope"
@@ -145,11 +142,7 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
     ///
     /// Returns an error if the name already exists in the current scope,
     /// enforcing the SSA single-assignment invariant within each scope level.
-    pub fn register_ssa(
-        &mut self,
-        name: String,
-        ssa: kirin_ir::SSAValue,
-    ) -> Result<(), EmitError> {
+    pub fn register_ssa(&mut self, name: String, ssa: kirin_ir::SSAValue) -> Result<(), EmitError> {
         let top = self
             .ssa_scopes
             .last_mut()
@@ -200,6 +193,110 @@ impl<'a, L: Dialect> EmitContext<'a, L> {
     /// Returns `None` if the format string doesn't include `{:name}`.
     pub fn function_name(&self) -> Option<&str> {
         self.function_name.as_deref()
+    }
+
+    /// Push a new scope and return an RAII guard that pops it on drop.
+    ///
+    /// The returned [`ScopeGuard`] implements `DerefMut<Target = EmitContext>`,
+    /// so callers use it exactly like `&mut EmitContext`. When the guard is
+    /// dropped (explicitly via `drop(guard)` or at block end), `pop_scope()`
+    /// runs unconditionally — even if an error caused an early return.
+    ///
+    /// ```ignore
+    /// let mut guard = ctx.scoped();
+    /// // use `guard` as `&mut EmitContext` ...
+    /// drop(guard); // pop_scope() runs here
+    /// // `ctx` is usable again
+    /// ```
+    pub fn scoped(&mut self) -> ScopeGuard<'_, 'a, L> {
+        self.push_scope();
+        ScopeGuard { ctx: self }
+    }
+
+    /// Enter relaxed-dominance mode and return an RAII guard that restores
+    /// the previous mode on drop.
+    ///
+    /// The returned [`RelaxedDominanceGuard`] implements
+    /// `DerefMut<Target = EmitContext>`, so callers use it exactly like
+    /// `&mut EmitContext`. On drop, `set_relaxed_dominance(false)` runs
+    /// unconditionally.
+    ///
+    /// ```ignore
+    /// let mut guard = ctx.relaxed_dominance_scope();
+    /// // forward SSA references are allowed ...
+    /// drop(guard); // relaxed dominance disabled here
+    /// ```
+    pub fn relaxed_dominance_scope(&mut self) -> RelaxedDominanceGuard<'_, 'a, L> {
+        self.set_relaxed_dominance(true);
+        RelaxedDominanceGuard { ctx: self }
+    }
+
+    /// Return the current scope depth (number of scopes on the stack).
+    ///
+    /// The root scope has depth 1. Useful for assertions and tests.
+    pub fn scope_depth(&self) -> usize {
+        self.ssa_scopes.len()
+    }
+
+    /// Return whether relaxed-dominance mode is currently enabled.
+    pub fn is_relaxed_dominance(&self) -> bool {
+        self.forward_ref_creator.is_some()
+    }
+}
+
+/// RAII guard that pops a scope from [`EmitContext`] when dropped.
+///
+/// Created by [`EmitContext::scoped`]. Implements `Deref` and `DerefMut`
+/// to `EmitContext` so it can be used transparently as a context reference.
+pub struct ScopeGuard<'b, 'a, L: Dialect> {
+    ctx: &'b mut EmitContext<'a, L>,
+}
+
+impl<'a, L: Dialect> std::ops::Deref for ScopeGuard<'_, 'a, L> {
+    type Target = EmitContext<'a, L>;
+
+    fn deref(&self) -> &Self::Target {
+        self.ctx
+    }
+}
+
+impl<'a, L: Dialect> std::ops::DerefMut for ScopeGuard<'_, 'a, L> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.ctx
+    }
+}
+
+impl<L: Dialect> Drop for ScopeGuard<'_, '_, L> {
+    fn drop(&mut self) {
+        self.ctx.pop_scope();
+    }
+}
+
+/// RAII guard that disables relaxed-dominance mode on [`EmitContext`] when dropped.
+///
+/// Created by [`EmitContext::relaxed_dominance_scope`]. Implements `Deref`
+/// and `DerefMut` to `EmitContext` so it can be used transparently.
+pub struct RelaxedDominanceGuard<'b, 'a, L: Dialect> {
+    ctx: &'b mut EmitContext<'a, L>,
+}
+
+impl<'a, L: Dialect> std::ops::Deref for RelaxedDominanceGuard<'_, 'a, L> {
+    type Target = EmitContext<'a, L>;
+
+    fn deref(&self) -> &Self::Target {
+        self.ctx
+    }
+}
+
+impl<'a, L: Dialect> std::ops::DerefMut for RelaxedDominanceGuard<'_, 'a, L> {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.ctx
+    }
+}
+
+impl<L: Dialect> Drop for RelaxedDominanceGuard<'_, '_, L> {
+    fn drop(&mut self) {
+        self.ctx.set_relaxed_dominance(false);
     }
 }
 

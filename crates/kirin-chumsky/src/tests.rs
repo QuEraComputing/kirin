@@ -429,7 +429,10 @@ fn test_emit_context_ssa_duplicate_errors() {
     let mut ctx = crate::traits::EmitContext::new(&mut stage);
     ctx.register_ssa("x".to_string(), ssa1).unwrap();
     let err = ctx.register_ssa("x".to_string(), ssa2);
-    assert_eq!(err, Err(crate::traits::EmitError::DuplicateSSA("x".to_string())));
+    assert_eq!(
+        err,
+        Err(crate::traits::EmitError::DuplicateSSA("x".to_string()))
+    );
     // First registration is kept
     assert_eq!(ctx.lookup_ssa("x"), Some(ssa1));
 }
@@ -956,7 +959,10 @@ fn test_emit_context_block_duplicate_errors() {
     let mut ctx = crate::traits::EmitContext::new(&mut stage);
     ctx.register_block("bb0".to_string(), block1).unwrap();
     let err = ctx.register_block("bb0".to_string(), block2);
-    assert_eq!(err, Err(crate::traits::EmitError::DuplicateBlock("bb0".to_string())));
+    assert_eq!(
+        err,
+        Err(crate::traits::EmitError::DuplicateBlock("bb0".to_string()))
+    );
     // First registration is kept
     assert_eq!(ctx.lookup_block("bb0"), Some(block1));
 }
@@ -1480,4 +1486,119 @@ fn test_digraph_multiple_yields() {
     assert_eq!(dg.yields[0].value, "a");
     assert_eq!(dg.yields[1].value, "b");
     assert_eq!(dg.yields[2].value, "c");
+}
+
+// === Scope Guard Tests (P1-5, P1-6 regression) ===
+
+#[test]
+fn test_scope_guard_pops_on_normal_exit() {
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
+    let mut ctx = crate::traits::EmitContext::new(&mut stage);
+
+    assert_eq!(ctx.scope_depth(), 1);
+    {
+        let _guard = ctx.scoped();
+        // scope depth should be 2 inside the guard
+    }
+    // guard dropped, scope depth back to 1
+    assert_eq!(ctx.scope_depth(), 1);
+}
+
+#[test]
+fn test_scope_guard_pops_on_error_path() {
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
+    let mut ctx = crate::traits::EmitContext::new(&mut stage);
+
+    assert_eq!(ctx.scope_depth(), 1);
+
+    // Simulate an error path: the guard is dropped when the closure returns Err.
+    let result: Result<(), crate::traits::EmitError> = (|| {
+        let mut guard = ctx.scoped();
+        // Register something in the inner scope
+        let ssa = kirin_ir::SSAValue::from(guard.stage.block_argument().index(0));
+        guard.register_ssa("inner".to_string(), ssa)?;
+        // Simulate an error
+        Err(crate::traits::EmitError::Custom(
+            "simulated error".to_string(),
+        ))
+    })();
+
+    assert!(result.is_err());
+    // The scope was popped by the guard despite the error
+    assert_eq!(ctx.scope_depth(), 1);
+    // The inner-scope name should no longer be visible
+    assert!(ctx.lookup_ssa("inner").is_none());
+}
+
+#[test]
+fn test_relaxed_dominance_guard_restores_on_normal_exit() {
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
+    let mut ctx = crate::traits::EmitContext::new(&mut stage);
+
+    assert!(!ctx.is_relaxed_dominance());
+    {
+        let _guard = ctx.relaxed_dominance_scope();
+        // relaxed dominance should be enabled inside the guard
+    }
+    // guard dropped, relaxed dominance restored to false
+    assert!(!ctx.is_relaxed_dominance());
+}
+
+#[test]
+fn test_relaxed_dominance_guard_restores_on_error_path() {
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
+    let mut ctx = crate::traits::EmitContext::new(&mut stage);
+
+    assert!(!ctx.is_relaxed_dominance());
+
+    // Simulate an error path
+    let result: Result<(), crate::traits::EmitError> = (|| {
+        let _guard = ctx.relaxed_dominance_scope();
+        Err(crate::traits::EmitError::Custom(
+            "simulated error".to_string(),
+        ))
+    })();
+
+    assert!(result.is_err());
+    // Relaxed dominance was restored despite the error
+    assert!(!ctx.is_relaxed_dominance());
+}
+
+#[test]
+fn test_nested_scope_and_relaxed_dominance_guards() {
+    let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
+    let mut ctx = crate::traits::EmitContext::new(&mut stage);
+
+    // Register a name in the root scope
+    let ssa_outer = kirin_ir::SSAValue::from(stage.block_argument().index(0));
+    let mut ctx = crate::traits::EmitContext::new(&mut stage);
+    ctx.register_ssa("outer".to_string(), ssa_outer).unwrap();
+
+    assert_eq!(ctx.scope_depth(), 1);
+    assert!(!ctx.is_relaxed_dominance());
+
+    // Simulate the pattern used in DiGraph::emit_with
+    let result: Result<(), crate::traits::EmitError> = (|| {
+        let mut guard = ctx.scoped();
+        assert_eq!(guard.scope_depth(), 2);
+
+        // Enter relaxed dominance inside the scope
+        {
+            let mut rd_guard = guard.relaxed_dominance_scope();
+            assert!(rd_guard.is_relaxed_dominance());
+            // Simulate error inside relaxed dominance
+            let _ = rd_guard.resolve_ssa("forward_ref");
+            // rd_guard drops here, restoring relaxed dominance
+        }
+        assert!(!guard.is_relaxed_dominance());
+
+        // Force an error to test scope cleanup
+        Err(crate::traits::EmitError::Custom("simulated".to_string()))
+    })();
+
+    assert!(result.is_err());
+    assert_eq!(ctx.scope_depth(), 1);
+    assert!(!ctx.is_relaxed_dominance());
+    // Outer scope name should still be visible
+    assert_eq!(ctx.lookup_ssa("outer"), Some(ssa_outer));
 }
