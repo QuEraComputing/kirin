@@ -2,8 +2,12 @@ use super::data::Arena;
 use super::id::{Id, Identifier};
 
 /// IdMap from old -> new
+///
+/// Not yet used externally — GC infrastructure is retained for future use.
+#[allow(dead_code)]
 pub struct IdMap<I: Identifier>(Vec<Option<I>>);
 
+#[allow(dead_code)]
 impl<I: Identifier> IdMap<I> {
     pub fn get(&self, old: I) -> Option<I> {
         self.0.get(old.into().raw()).copied().flatten()
@@ -25,6 +29,7 @@ impl<I: Identifier, T> Arena<I, T> {
     /// Callers are responsible for updating all external references. There is
     /// currently no runtime detection of stale IDs.
     #[must_use]
+    #[allow(dead_code)]
     pub(crate) fn gc(&mut self) -> IdMap<I> {
         let mut counter = 0;
         let raw = self

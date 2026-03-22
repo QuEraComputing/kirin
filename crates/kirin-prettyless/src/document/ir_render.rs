@@ -20,11 +20,7 @@ where
     ///
     /// Used by `print_block`, `print_digraph`, and `print_ungraph` to avoid
     /// duplicating the symbol-table lookup + caret-prefix logic.
-    fn resolve_caret_name(
-        &self,
-        name: Option<Symbol>,
-        fallback: impl std::fmt::Display,
-    ) -> String {
+    fn resolve_caret_name(&self, name: Option<Symbol>, fallback: impl std::fmt::Display) -> String {
         name.and_then(|name_sym| {
             self.stage
                 .symbol_table()

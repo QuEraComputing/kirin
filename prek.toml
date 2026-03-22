@@ -1,0 +1,37 @@
+fail_fast = true
+
+# Built-in hooks (native Rust, fast)
+[[repos]]
+repo = "builtin"
+hooks = [
+  { id = "trailing-whitespace" },
+  { id = "end-of-file-fixer" },
+  { id = "check-toml" },
+  { id = "check-yaml" },
+  { id = "check-merge-conflict" },
+  { id = "check-added-large-files", args = ["--maxkb=512"] },
+  { id = "detect-private-key" },
+  { id = "no-commit-to-branch", args = ["-b", "main"] },
+]
+
+# Rust: format check
+[[repos]]
+repo = "local"
+[[repos.hooks]]
+id = "cargo-fmt"
+name = "cargo fmt"
+language = "system"
+entry = "cargo fmt --all -- --check"
+pass_filenames = false
+types = ["rust"]
+
+# Rust: clippy lint
+[[repos]]
+repo = "local"
+[[repos.hooks]]
+id = "cargo-clippy"
+name = "cargo clippy"
+language = "system"
+entry = "cargo clippy --workspace -- -D warnings"
+pass_filenames = false
+types = ["rust"]

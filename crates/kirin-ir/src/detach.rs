@@ -106,10 +106,9 @@ macro_rules! impl_detach {
                         *parent_info.get_tail_mut() = prev;
                     }
 
-                    *parent_info.get_len_mut() = parent_info
-                        .get_len()
-                        .checked_sub(1)
-                        .expect("linked list length underflow: detaching from a parent with zero length");
+                    *parent_info.get_len_mut() = parent_info.get_len().checked_sub(1).expect(
+                        "linked list length underflow: detaching from a parent with zero length",
+                    );
                 }
             }
         }
