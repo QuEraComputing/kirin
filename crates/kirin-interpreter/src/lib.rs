@@ -23,7 +23,7 @@ pub use abstract_interp::{
 };
 pub use block_eval::BlockEvaluator;
 pub use call::{CallSemantics, SSACFGRegion};
-pub use control::{Args, ConcreteExt, Continuation, write_results};
+pub use control::{Args, ConcreteExt, Continuation};
 pub use error::{InterpreterError, MissingEntryError, StageResolutionError};
 pub use ext::InterpreterExt;
 pub use frame::Frame;
@@ -43,7 +43,7 @@ pub use widening::WideningStrategy;
 pub mod prelude {
     pub use crate::{
         BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter, InterpreterError,
-        InterpreterExt, SSACFGRegion, write_results,
+        InterpreterExt, SSACFGRegion, ValueStore,
     };
 }
 

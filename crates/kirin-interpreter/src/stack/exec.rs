@@ -2,7 +2,7 @@ use kirin_ir::StageMeta;
 use smallvec::SmallVec;
 
 use super::StackInterpreter;
-use crate::{ConcreteExt, Continuation, InterpreterError};
+use crate::{ConcreteExt, Continuation, InterpreterError, ValueStore};
 
 // -- Execution engine -------------------------------------------------------
 
@@ -132,7 +132,7 @@ where
                     return Ok(values);
                 }
                 let results = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
-                crate::write_results(self, &results, &values)?;
+                self.write_many(&results, &values)?;
             }
         }
     }

@@ -1,6 +1,6 @@
 use kirin::prelude::{CompileTimeValue, HasStageInfo};
 use kirin_interpreter::{
-    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError, write_results,
+    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
 };
 use smallvec::{SmallVec, smallvec};
 
@@ -204,7 +204,7 @@ where
         let control = interp.eval_block(stage, block)?;
         match control {
             Continuation::Yield(values) => {
-                write_results(interp, &self.results, &values)?;
+                interp.write_many(&self.results, &values)?;
                 Ok(Continuation::Continue)
             }
             other => Ok(other),
@@ -259,7 +259,7 @@ where
         }
 
         // Write final loop-carried values to results with arity check.
-        write_results(interp, &self.results, &SmallVec::from(carried))?;
+        interp.write_many(&self.results, &SmallVec::from(carried))?;
 
         Ok(Continuation::Continue)
     }

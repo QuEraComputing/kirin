@@ -1,7 +1,5 @@
 use kirin::prelude::{CompileTimeValue, HasStageInfo};
-use kirin_interpreter::{
-    Continuation, Interpretable, Interpreter, InterpreterError, write_results,
-};
+use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
 use smallvec::SmallVec;
 
 use crate::{MakeTuple, TupleOp, Unpack};
@@ -75,7 +73,7 @@ where
     {
         let source = interp.read(self.source)?;
         let values = TupleValue::unpack(source).map_err(I::Error::from)?;
-        write_results(interp, &self.results, &SmallVec::from(values))?;
+        interp.write_many(&self.results, &SmallVec::from(values))?;
         Ok(Continuation::Continue)
     }
 }

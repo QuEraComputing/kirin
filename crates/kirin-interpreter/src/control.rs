@@ -3,8 +3,6 @@ use std::convert::Infallible;
 use kirin_ir::{Block, CompileStage, ResultValue, SpecializedFunction};
 use smallvec::SmallVec;
 
-use crate::{InterpreterError, ValueStore};
-
 /// Inline argument list for continuation variants.
 ///
 /// Most block/call arguments fit in 2 elements (or are empty), so we
@@ -59,31 +57,4 @@ pub enum ConcreteExt {
     Break,
     /// Terminate the session.
     Halt,
-}
-
-/// Write multiple return/yield values to their corresponding result slots
-/// with arity checking.
-///
-/// Returns [`InterpreterError::ArityMismatch`] if the number of values
-/// does not match the number of result slots.
-pub fn write_results<S>(
-    store: &mut S,
-    results: &[ResultValue],
-    values: &SmallVec<[S::Value; 1]>,
-) -> Result<(), S::Error>
-where
-    S: ValueStore,
-    S::Error: From<InterpreterError>,
-{
-    if results.len() != values.len() {
-        return Err(InterpreterError::ArityMismatch {
-            expected: results.len(),
-            got: values.len(),
-        }
-        .into());
-    }
-    for (rv, val) in results.iter().zip(values.iter()) {
-        store.write(*rv, val.clone())?;
-    }
-    Ok(())
 }

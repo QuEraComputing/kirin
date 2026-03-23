@@ -1,4 +1,7 @@
 use kirin_ir::{ResultValue, SSAValue};
+use smallvec::SmallVec;
+
+use crate::InterpreterError;
 
 /// Value read/write operations for SSA bindings.
 ///
@@ -16,8 +19,33 @@ pub trait ValueStore {
     /// Returns a cloned copy of the bound value.
     fn read(&self, value: SSAValue) -> Result<Self::Value, Self::Error>;
 
-    /// Bind a result to a value.
+    /// Bind a single result to a value.
     fn write(&mut self, result: ResultValue, value: Self::Value) -> Result<(), Self::Error>;
+
+    /// Bind multiple results to values with arity checking.
+    ///
+    /// Returns [`InterpreterError::ArityMismatch`] if the number of values
+    /// does not match the number of result slots.
+    fn write_many(
+        &mut self,
+        results: &[ResultValue],
+        values: &SmallVec<[Self::Value; 1]>,
+    ) -> Result<(), Self::Error>
+    where
+        Self::Error: From<InterpreterError>,
+    {
+        if results.len() != values.len() {
+            return Err(InterpreterError::ArityMismatch {
+                expected: results.len(),
+                got: values.len(),
+            }
+            .into());
+        }
+        for (rv, val) in results.iter().zip(values.iter()) {
+            self.write(*rv, val.clone())?;
+        }
+        Ok(())
+    }
 
     /// Bind an SSA value directly (e.g. block arguments).
     fn write_ssa(&mut self, ssa: SSAValue, value: Self::Value) -> Result<(), Self::Error>;
