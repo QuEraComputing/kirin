@@ -32,23 +32,47 @@ Kirin's design unifies them: **multi-result is syntactic sugar over product type
 - The **abstract interpreter** needs no special multi-result handling — the product
   is a single lattice element in the value domain.
 
-## ProductType: The Foundation
+## Product\<T\>: Unified Storage
 
-`ProductType<T>` is a generic wrapper in `kirin-ir` that represents an ordered
-collection of types. It uses `SmallVec` for compact storage (most products have
-1-3 elements).
+A single `Product<T>` in `kirin-ir` serves both the type level and the value level:
+
+- `Product<MyType>` — a product of types (in dialect type enums)
+- `Product<MyValue>` — a product of values (in dialect value enums)
+
+There is no separate `ProductType` or `ProductValue` struct — one generic
+wrapper handles both.
 
 ```rust
 // In kirin-ir:
 use smallvec::SmallVec;
 
-/// An ordered product of types — the type-level representation of
-/// multi-result operations and tuple values.
+/// An ordered product — used for both type-level products (multi-result
+/// type annotations) and value-level products (packed interpreter values).
 ///
-/// Uses SmallVec for compact storage: products with 1-2 elements
+/// Uses SmallVec for compact inline storage: products with ≤2 elements
 /// avoid heap allocation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct ProductType<T>(pub SmallVec<[T; 2]>);
+pub struct Product<T>(pub SmallVec<[T; 2]>);
+```
+
+### Construction Macro
+
+The `product!` macro mirrors `smallvec!` for ergonomic construction:
+
+```rust
+/// Construct a `Product` inline.
+///
+/// ```rust
+/// let types = product![I32, F64];       // Product<MyType>
+/// let values = product![v1, v2, v3];    // Product<MyValue>
+/// let empty = product![];               // Product<T> (empty)
+/// ```
+#[macro_export]
+macro_rules! product {
+    ($($elem:expr),* $(,)?) => {
+        $crate::Product(smallvec::smallvec![$($elem),*])
+    };
+}
 ```
 
 ### HasProduct Trait
@@ -67,33 +91,33 @@ only dialects that want multi-result statements need it.
 /// Similar to `Placeholder` — an opt-in trait that derive macros detect
 /// and add bounds for automatically.
 pub trait HasProduct: Sized {
-    /// Wrap element types into a product type.
-    fn product(elements: SmallVec<[Self; 2]>) -> Self;
+    /// Wrap a product into this type.
+    fn from_product(product: Product<Self>) -> Self;
 
-    /// Extract element types if this is a product. Returns None otherwise.
-    fn as_product(&self) -> Option<&[Self]>;
+    /// Extract the product if this is a product type. Returns None otherwise.
+    fn as_product(&self) -> Option<&Product<Self>>;
 }
 ```
 
-### Dialect Author Usage
+### Dialect Author Usage (Types)
 
 ```rust
-use kirin_ir::ProductType;
+use kirin_ir::Product;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, HasParser, PrettyPrint)]
 enum MyType {
     I32,
     F64,
-    Tuple(ProductType<MyType>),  // user chooses the variant name
+    Tuple(Product<MyType>),  // user chooses the variant name
 }
 
 impl HasProduct for MyType {
-    fn product(elements: SmallVec<[Self; 2]>) -> Self {
-        MyType::Tuple(ProductType(elements))
+    fn from_product(product: Product<Self>) -> Self {
+        MyType::Tuple(product)
     }
-    fn as_product(&self) -> Option<&[Self]> {
+    fn as_product(&self) -> Option<&Product<Self>> {
         match self {
-            MyType::Tuple(p) => Some(&p.0),
+            MyType::Tuple(p) => Some(p),
             _ => None,
         }
     }
@@ -110,39 +134,20 @@ derive macro automatically adds `T: HasProduct` to the generated builder's `wher
 clause — the same pattern as `T: Placeholder` for auto-placeholder. The dialect
 author never writes `+ HasProduct` on their struct definitions.
 
-## Product Value: Concrete Struct + Trait
+## ProductValue Trait
 
-### Product\<V\> — Concrete Storage
-
-The framework provides a concrete `Product<V>` struct for storing product values.
-Since a product value is always just an ordered list of values, there is no
-meaningful custom case — every dialect would implement the same thing. The framework
-provides it once.
-
-```rust
-// In kirin-interpreter:
-use smallvec::SmallVec;
-
-/// Concrete product value — an ordered collection of interpreter values.
-///
-/// Products with 1-2 elements avoid heap allocation via SmallVec.
-/// Dialect authors include this in their value enum to support
-/// multi-result statements and tuple operations.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Product<V>(pub SmallVec<[V; 2]>);
-```
-
-### ProductValue Trait — 3 Required Methods
+### 3 Required Methods
 
 The `ProductValue` trait requires 3 methods from the dialect author (borrow,
 consume, wrap). All product operations are provided as default implementations
-that delegate to `Product<V>` with zero unnecessary allocation.
+that delegate to `Product<T>` (the same struct from kirin-ir) with zero
+unnecessary allocation.
 
 ```rust
 /// Interpreter-level product value semantics.
 ///
-/// 3 required methods — all operations provided via `Product<V>`.
-/// No heap allocation for products with ≤2 elements.
+/// Uses the same `Product<T>` struct from kirin-ir — no separate
+/// value-level wrapper. 3 required methods, all operations provided.
 pub trait ProductValue: Sized + Clone {
     /// Borrow the product storage if this value is a product.
     fn as_product(&self) -> Option<&Product<Self>>;
@@ -187,9 +192,9 @@ pub trait ProductValue: Sized + Clone {
 }
 ```
 
-### Product\<V\> — Iterators
+### Product\<T\> — Iterators
 
-`Product<V>` delegates to `SmallVec` iterators for zero-allocation traversal:
+`Product<T>` delegates to `SmallVec` iterators for zero-allocation traversal:
 
 ```rust
 impl<V> Product<V> {
@@ -247,15 +252,33 @@ for (rv, val) in results.iter().zip(product) {  // IntoIterator
 
 ### Dialect Author Usage — Minimal
 
-```rust
-use kirin_interpreter::Product;
+Both the type enum and value enum use the same `Product<T>` from kirin-ir:
 
+```rust
+use kirin_ir::Product;
+
+// Type enum — same Product<T> as values:
+enum MyType {
+    I32, F64,
+    Tuple(Product<MyType>),
+}
+
+// Value enum — same Product<T> as types:
 enum MyValue {
     Int(i64),
     Float(f64),
-    Tuple(Product<MyValue>),  // concrete storage from framework
+    Tuple(Product<MyValue>),
 }
 
+// HasProduct (type level) — 2 methods:
+impl HasProduct for MyType {
+    fn from_product(p: Product<Self>) -> Self { MyType::Tuple(p) }
+    fn as_product(&self) -> Option<&Product<Self>> {
+        match self { MyType::Tuple(p) => Some(p), _ => None }
+    }
+}
+
+// ProductValue (value level) — 3 methods:
 impl ProductValue for MyValue {
     fn as_product(&self) -> Option<&Product<Self>> {
         match self { MyValue::Tuple(p) => Some(p), _ => None }
@@ -263,9 +286,7 @@ impl ProductValue for MyValue {
     fn into_product(self) -> Option<Product<Self>> {
         match self { MyValue::Tuple(p) => Some(p), _ => None }
     }
-    fn from_product(p: Product<Self>) -> Self {
-        MyValue::Tuple(p)
-    }
+    fn from_product(p: Product<Self>) -> Self { MyValue::Tuple(p) }
 }
 // Done — new_product, unpack, get, len, is_empty, iterators all free.
 ```
@@ -295,10 +316,15 @@ Several boilerplate patterns in this design are candidates for derive macros:
 | Pattern | Current | Future Derive |
 |---------|---------|---------------|
 | `HasProduct` impl on type enum | Manual 2-method impl | `#[derive(HasProduct)]` with `#[product]` on variant |
-| `ProductValue` impl on value enum | Manual 2-method impl | `#[derive(ProductValue)]` with `#[product]` on variant |
+| `ProductValue` impl on value enum | Manual 3-method impl | `#[derive(ProductValue)]` with `#[product]` on variant |
 | `IndexValue` impl on value enum | Manual 2-method impl | `#[derive(IndexValue)]` with `#[index]` on variant |
-| `HasParser`/`PrettyPrint` for `ProductType<T>` | Manual or framework-provided | Auto-detected `(T1, T2)` syntax for product variants |
+| `HasParser`/`PrettyPrint` for `Product<T>` | Manual or framework-provided | Auto-detected `(T1, T2)` syntax for product variants |
 | `AbstractValue` join for products | Manual pointwise join | Derive-generated pointwise join when `#[product]` present |
+
+Note: `HasProduct` and `ProductValue` have identical structure (variant wrapping
+`Product<Self>`). A single `#[product]` attribute could generate both impls if
+the enum is used as both a type and a value. In practice, type enums and value
+enums are separate, so separate derives are cleaner.
 
 These derives are **not required for the initial implementation** — the manual
 impls are 2-5 lines each. But they eliminate the last bits of boilerplate for
@@ -444,10 +470,10 @@ operations in their DSL programs.
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `ProductType<T>` | kirin-ir | Type-level product wrapper (SmallVec-backed) |
-| `HasProduct` | kirin-ir | Trait for dialect types — opt-in multi-result |
-| `Product<V>` | kirin-interpreter | Concrete product value storage (SmallVec-backed) |
-| `ProductValue` | kirin-interpreter | Trait for dialect values — 2 required methods, 5 provided |
+| `Product<T>` | kirin-ir | Unified product storage for both types and values (SmallVec-backed) |
+| `product![]` macro | kirin-ir | Ergonomic product construction |
+| `HasProduct` | kirin-ir | Trait for dialect types — opt-in multi-result (2 required methods) |
+| `ProductValue` | kirin-interpreter | Trait for dialect values — 3 required methods, 5 provided |
 | Auto-destructure | kirin-interpreter | Statement execution writes product to result slots |
 | `IndexValue` | kirin-tuple | Trait for value ↔ usize conversion (Get/Len only) |
 | `Tuple` dialect | kirin-tuple | Explicit new_tuple/unpack/get/len operations |
