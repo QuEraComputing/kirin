@@ -136,7 +136,7 @@ where
                 }
                 let results = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
                 // Auto-destructure: the "hidden unpack" from product to result slots
-                self.write_statement_results(&results, v)?;
+                self.write_product(&results, v)?;
             }
         }
     }

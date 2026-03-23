@@ -1,6 +1,6 @@
 use kirin_ir::{
-    Block, CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue, StageInfo,
-    StageMeta, Statement, SupportsStageDispatch,
+    Block, CompileStage, Dialect, HasStageInfo, Pipeline, SSAValue, StageInfo, StageMeta,
+    Statement, SupportsStageDispatch,
 };
 
 use super::{DynFrameDispatch, FrameDispatchAction, StackFrame, StackFrameExtra, StackInterpreter};
@@ -102,12 +102,8 @@ where
         self.frames.read(value).cloned()
     }
 
-    fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.frames.write(result, value)
-    }
-
-    fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
-        self.frames.write_ssa(ssa, value)
+    fn write(&mut self, target: SSAValue, value: V) -> Result<(), E> {
+        self.frames.write_ssa(target, value)
     }
 }
 

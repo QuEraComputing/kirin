@@ -1,8 +1,8 @@
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue,
-    SpecializedFunction, StageInfo, StageMeta,
+    Block, CompileStage, Dialect, HasStageInfo, Pipeline, SSAValue, SpecializedFunction, StageInfo,
+    StageMeta,
 };
 use rustc_hash::FxHashMap;
 
@@ -277,12 +277,8 @@ where
         self.frames.read(value).cloned()
     }
 
-    fn write(&mut self, result: ResultValue, value: V) -> Result<(), E> {
-        self.frames.write(result, value)
-    }
-
-    fn write_ssa(&mut self, ssa: SSAValue, value: V) -> Result<(), E> {
-        self.frames.write_ssa(ssa, value)
+    fn write(&mut self, target: SSAValue, value: V) -> Result<(), E> {
+        self.frames.write_ssa(target, value)
     }
 }
 
@@ -346,12 +342,12 @@ where
                             // For multi-result, the abstract value is a product
                             // in the lattice — the dialect's AbstractValue handles it.
                             for rv in &results {
-                                self.write(*rv, return_val.clone())?;
+                                self.write((*rv).into(), return_val.clone())?;
                             }
                         }
                         None => {
                             for rv in &results {
-                                self.write(*rv, V::bottom())?;
+                                self.write((*rv).into(), V::bottom())?;
                             }
                         }
                     }

@@ -18,7 +18,7 @@ where
         L: Interpretable<'ir, I> + 'ir,
     {
         let val = I::Value::try_from(self.value.clone()).map_err(InterpreterError::custom)?;
-        interp.write(self.result, val)?;
+        interp.write(self.result.into(), val)?;
         Ok(Continuation::Continue)
     }
 }

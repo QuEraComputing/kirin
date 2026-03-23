@@ -46,7 +46,7 @@ over product types at the interpreter level.
 | `HasProduct` | `kirin-ir/src/product.rs` | Trait for dialect types |
 | `product![]` | `kirin-ir/src/product.rs` | Construction macro |
 | `ProductValue` | `kirin-interpreter/src/product_value.rs` | Trait for dialect values |
-| `write_statement_results` | `kirin-interpreter/src/product_value.rs` | Auto-destructure helper |
+| `write_product` | `kirin-interpreter/src/product_value.rs` | Auto-destructure helper |
 | `IndexValue` | `kirin-tuple/src/interpret_impl.rs` | value ↔ usize for Get/Len |
 
 ### UPDATE (dialect interpret impls)
@@ -54,7 +54,7 @@ over product types at the interpreter level.
 | File | Current approach | New approach |
 |------|-----------------|-------------|
 | `kirin-scf/interpret_impl.rs` | `Yield(read_many(...))` | `Yield(ProductValue::new_product(values))` |
-| `kirin-scf/interpret_impl.rs` | `write_many(&results, &values)` on If | `write_statement_results(&results, v)` on If |
+| `kirin-scf/interpret_impl.rs` | `write_many(&results, &values)` on If | `write_product(&results, v)` on If |
 | `kirin-function/interpret_impl.rs` | `Return(read_many(...))` | `Return(ProductValue::new_product(values))` |
 | `kirin-function/interpret_impl.rs` | `Call { results: iter().collect() }` | `Call { results: iter().collect() }` (unchanged) |
 | `kirin-tuple/interpret_impl.rs` | `TupleValue` trait | Use framework `ProductValue` + add `IndexValue` |
@@ -131,7 +131,7 @@ the same files). Agents should use **manual edits** with
 - `run_nested_calls` returns `V` (single value)
 - `pending_results: Vec<SmallVec<[ResultValue; 1]>>` (keeps multi-result slots)
 - `Continuation::Return(v) | Yield(v)` — extract single V
-- Use `write_statement_results` to destructure V into result slots
+- Use `write_product` to destructure V into result slots
 - `should_exit` returns `Ok(v)` not `Ok(values)`
 
 **5. `stack/call.rs`** — Return type changes:
@@ -147,7 +147,7 @@ the same files). Agents should use **manual edits** with
 **8. `abstract_interp/interp.rs`** — eval_block Call arm:
 - `Continuation::Call { results, .. }` (stays multi-slot)
 - Use `return_value()` (not `return_values()`) for writing
-- If single result: write directly; if multi: use `write_statement_results`
+- If single result: write directly; if multi: use `write_product`
 
 **9. `block_eval.rs`** — Fix doc comment about eval_block return
 
@@ -171,7 +171,7 @@ pub trait ProductValue: Sized + Clone {
     fn is_empty(&self) -> Result<bool, InterpreterError> { ... }
 }
 
-pub fn write_statement_results<V, S>(
+pub fn write_product<V, S>(
     store: &mut S,
     results: &[kirin_ir::ResultValue],
     value: V,
@@ -196,8 +196,8 @@ where
 
 **Agent C**: `kirin-scf` interpret_impl
 - `Yield`: read SSA values via `read_many`, pack with `ProductValue::new_product`, return `Continuation::Yield(product)`. For single value, skip product wrapping. For zero values, handle void case.
-- `If`: Capture `Continuation::Yield(v)`, write to results via `write_statement_results`.
-- `For`: Loop-carried state as single V (product when multiple). Unpack yielded product each iteration. Write final to results via `write_statement_results`.
+- `If`: Capture `Continuation::Yield(v)`, write to results via `write_product`.
+- `For`: Loop-carried state as single V (product when multiple). Unpack yielded product each iteration. Write final to results via `write_product`.
 - Add `I::Value: ProductValue` bound on If and For.
 - Yield does NOT need ProductValue — it just packs values and yields.
 

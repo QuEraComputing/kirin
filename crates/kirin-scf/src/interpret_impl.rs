@@ -204,7 +204,7 @@ where
         let control = interp.eval_block(stage, block)?;
         match control {
             Continuation::Yield(v) => {
-                interp.write_statement_results(&self.results, v)?;
+                interp.write_product(&self.results, v)?;
                 Ok(Continuation::Continue)
             }
             other => Ok(other),
@@ -265,7 +265,7 @@ where
         }
 
         // Write final loop-carried state to results via auto-destructuring.
-        interp.write_statement_results(&self.results, carried)?;
+        interp.write_product(&self.results, carried)?;
 
         Ok(Continuation::Continue)
     }

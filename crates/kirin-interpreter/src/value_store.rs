@@ -23,8 +23,11 @@ pub trait ValueStore {
         values.iter().map(|ssa| self.read(*ssa)).collect()
     }
 
-    /// Bind a single result to a value.
-    fn write(&mut self, result: ResultValue, value: Self::Value) -> Result<(), Self::Error>;
+    /// Bind a value to an SSA slot.
+    ///
+    /// Accepts `ResultValue`, `BlockArgument`, `SSAValue`, etc. — anything
+    /// that converts to `SSAValue` via `Into`.
+    fn write(&mut self, target: SSAValue, value: Self::Value) -> Result<(), Self::Error>;
 
     /// Bind multiple results to values with arity checking.
     ///
@@ -46,7 +49,7 @@ pub trait ValueStore {
             .into());
         }
         for (rv, val) in results.iter().zip(values.iter()) {
-            self.write(*rv, val.clone())?;
+            self.write((*rv).into(), val.clone())?;
         }
         Ok(())
     }
@@ -56,7 +59,7 @@ pub trait ValueStore {
     /// If `results` has 0 or 1 entries, writes directly (no product overhead).
     /// If `results` has N > 1 entries, treats `value` as a product and writes
     /// each element to the corresponding result slot.
-    fn write_statement_results(
+    fn write_product(
         &mut self,
         results: &[ResultValue],
         value: Self::Value,
@@ -67,17 +70,14 @@ pub trait ValueStore {
     {
         match results.len() {
             0 => Ok(()),
-            1 => self.write(results[0], value),
+            1 => self.write(results[0].into(), value),
             _ => {
                 for (i, rv) in results.iter().enumerate() {
                     let element = ProductValue::get(&value, i).map_err(Self::Error::from)?;
-                    self.write(*rv, element)?;
+                    self.write((*rv).into(), element)?;
                 }
                 Ok(())
             }
         }
     }
-
-    /// Bind an SSA value directly (e.g. block arguments).
-    fn write_ssa(&mut self, ssa: SSAValue, value: Self::Value) -> Result<(), Self::Error>;
 }

@@ -692,7 +692,7 @@ fn test_multi_result_arity_mismatch() {
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
     let err = interp.call(caller_spec, stage_id, &[]).unwrap_err();
-    // SingleReturn returns a bare i64 (not a product). When write_statement_results
+    // SingleReturn returns a bare i64 (not a product). When write_product
     // tries to destructure it into 2 result slots, ProductValue::get fails because
     // i64 is not a product type.
     assert!(

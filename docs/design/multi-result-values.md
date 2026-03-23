@@ -356,7 +356,7 @@ pub enum Continuation<V, Ext = Infallible> {
         args: Args<V>,
         /// Where to write the return value(s) in the caller's frame.
         /// For multi-result calls, the return product is auto-destructured
-        /// into these slots by `run_nested_calls` via `write_statement_results`.
+        /// into these slots by `run_nested_calls` via `write_product`.
         results: SmallVec<[ResultValue; 1]>,
     },
     Return(V),
@@ -366,9 +366,9 @@ pub enum Continuation<V, Ext = Infallible> {
 ```
 
 When a function returns multiple values, `V` is a product. `run_nested_calls`
-auto-destructures the product into the result slots via `write_statement_results`.
+auto-destructures the product into the result slots via `write_product`.
 When a SCF body yields multiple values, `V` is also a product, and the parent
-operation (e.g., `If`, `For`) auto-destructures via `write_statement_results`.
+operation (e.g., `If`, `For`) auto-destructures via `write_product`.
 
 Note: `Call.results` uses `SmallVec<[ResultValue; 1]>` because `ResultValue` is
 a lightweight index (not a value). The heavyweight values (`Return(V)`, `Yield(V)`)
@@ -418,7 +418,7 @@ to the corresponding result slot:
 
 ```rust
 // Pseudocode — in the statement execution layer:
-fn write_statement_results<V: ProductValue>(
+fn write_product<V: ProductValue>(
     store: &mut impl ValueStore<Value = V>,
     results: &[ResultValue],
     value: V,
@@ -443,9 +443,9 @@ This happens in the framework, not in dialect interpret impls. The dialect autho
 `interpret()` method returns a single value (possibly a product), and the framework
 handles the rest.
 
-Note: `write_statement_results` and `write_many` serve different purposes:
+Note: `write_product` and `write_many` serve different purposes:
 - `write_many` is a raw slice-to-slice write (no product awareness)
-- `write_statement_results` destructures a single product value into result slots
+- `write_product` destructures a single product value into result slots
 
 ## Abstract Interpreter
 
@@ -532,7 +532,7 @@ operations in their DSL programs.
 | `product![]` macro | kirin-ir | Ergonomic product construction |
 | `HasProduct` | kirin-ir | Trait for dialect types — opt-in multi-result (2 required methods) |
 | `ProductValue` | kirin-interpreter | Trait for dialect values — 2 required, 3 provided (`new_product`, `get`, `len`) |
-| Auto-destructure | kirin-interpreter | `write_statement_results` — writes product to result slots |
+| Auto-destructure | kirin-interpreter | `write_product` — writes product to result slots |
 | `read_many`/`write_many` | kirin-interpreter | ValueStore helpers for bulk SSA read/write (product-unaware) |
 | `IndexValue` | kirin-tuple | Trait for value ↔ usize conversion (Get/Len only) |
 | `Tuple` dialect | kirin-tuple | Explicit new_tuple/unpack/get/len operations |

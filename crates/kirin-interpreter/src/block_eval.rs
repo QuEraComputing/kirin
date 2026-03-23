@@ -42,7 +42,7 @@ pub trait BlockEvaluator<'ir>: ValueStore + StageAccess<'ir> + 'ir {
             .into());
         }
         for (ba, val) in block_info.arguments.iter().zip(args.iter()) {
-            self.write_ssa(SSAValue::from(*ba), val.clone())?;
+            self.write(SSAValue::from(*ba), val.clone())?;
         }
         Ok(())
     }

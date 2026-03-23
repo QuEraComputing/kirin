@@ -52,7 +52,7 @@ impl<'ir, I: Interpreter<'ir>> InterpreterExt<'ir> for I {
     {
         let a = self.read(lhs)?;
         let b = self.read(rhs)?;
-        self.write(result, op(a, b))?;
+        self.write(result.into(), op(a, b))?;
         Ok(Continuation::Continue)
     }
 
@@ -66,7 +66,7 @@ impl<'ir, I: Interpreter<'ir>> InterpreterExt<'ir> for I {
         F: FnOnce(Self::Value) -> Self::Value,
     {
         let a = self.read(operand)?;
-        self.write(result, op(a))?;
+        self.write(result.into(), op(a))?;
         Ok(Continuation::Continue)
     }
 
@@ -83,7 +83,7 @@ impl<'ir, I: Interpreter<'ir>> InterpreterExt<'ir> for I {
         let a = self.read(lhs)?;
         let b = self.read(rhs)?;
         let v = op(a, b)?;
-        self.write(result, v)?;
+        self.write(result.into(), v)?;
         Ok(Continuation::Continue)
     }
 }
