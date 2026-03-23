@@ -1,6 +1,7 @@
 use kirin::prelude::{CompileTimeValue, Dialect, GetInfo, HasRegionBody, HasStageInfo};
 use kirin_interpreter::{
-    Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion, StageResolutionError,
+    Continuation, Interpretable, Interpreter, InterpreterError, ProductValue, SSACFGRegion,
+    StageResolutionError,
 };
 use smallvec::smallvec;
 
@@ -105,7 +106,7 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for Lexical<T>
 where
     I: Interpreter<'ir>,
-    I::Value: Clone,
+    I::Value: Clone + ProductValue,
     T: CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
@@ -258,7 +259,7 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for Return<T>
 where
     I: Interpreter<'ir>,
-    I::Value: Clone,
+    I::Value: Clone + ProductValue,
     T: kirin::prelude::CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
@@ -267,17 +268,13 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        // Return always produces exactly one value. Multi-result returns
-        // (product packing) require ProductValue and will be added in a
-        // follow-up wave.
-        assert_eq!(
-            self.values.len(),
-            1,
-            "Return currently supports exactly 1 value, got {}",
-            self.values.len()
-        );
-        let value = interp.read(self.values[0])?;
-        Ok(Continuation::Return(value))
+        let values: Vec<I::Value> = self
+            .values
+            .iter()
+            .map(|ssa| interp.read(*ssa))
+            .collect::<Result<_, _>>()?;
+        let product = <I::Value as ProductValue>::new_product(values);
+        Ok(Continuation::Return(product))
     }
 }
 
@@ -299,7 +296,7 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for Lifted<T>
 where
     I: Interpreter<'ir>,
-    I::Value: Clone,
+    I::Value: Clone + ProductValue,
     T: CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>

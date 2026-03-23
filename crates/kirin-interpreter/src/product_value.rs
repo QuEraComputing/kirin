@@ -17,8 +17,17 @@ pub trait ProductValue: Sized + Clone {
     // --- All provided ---
 
     /// Pack multiple values into a product value.
+    ///
+    /// For a single element, returns the value directly (no product wrapping).
+    /// For multiple elements, calls [`from_product`](Self::from_product).
+    /// This means dialect authors whose value type does not support products
+    /// can still use single-value operations — `from_product` is only called
+    /// when there are 2+ values.
     fn new_product(values: Vec<Self>) -> Self {
-        Self::from_product(Product(SmallVec::from_vec(values)))
+        match values.len() {
+            1 => values.into_iter().next().unwrap(),
+            _ => Self::from_product(Product(SmallVec::from_vec(values))),
+        }
     }
 
     /// Extract one element by index (clones the element).
@@ -44,20 +53,15 @@ pub trait ProductValue: Sized + Clone {
 }
 
 /// Trivial impl for `i64`: not a product type, so `as_product` always
-/// returns `None`. Used by concrete interpreter tests.
+/// returns `None`. `from_product` is unreachable for single-value uses
+/// because `new_product` returns the value directly when `len == 1`.
 impl ProductValue for i64 {
     fn as_product(&self) -> Option<&Product<Self>> {
         None
     }
 
-    fn from_product(product: Product<Self>) -> Self {
-        assert_eq!(
-            product.len(),
-            1,
-            "i64 cannot represent a product of {} elements",
-            product.len()
-        );
-        product[0]
+    fn from_product(_product: Product<Self>) -> Self {
+        panic!("i64 does not support product types; use a value enum with a Product variant")
     }
 }
 

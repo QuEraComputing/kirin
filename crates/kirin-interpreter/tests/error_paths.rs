@@ -436,6 +436,7 @@ impl<'ir, I> kirin_interpreter::Interpretable<'ir, I> for HaltLang
 where
     I: kirin_interpreter::Interpreter<'ir, Ext = ConcreteExt>,
     I::Value: Clone
+        + kirin_interpreter::ProductValue
         + std::ops::Add<Output = I::Value>
         + std::ops::Sub<Output = I::Value>
         + std::ops::Mul<Output = I::Value>
