@@ -72,7 +72,34 @@ pub fn visit_format<'ir, V: FormatVisitor<'ir>>(
     visitor.enter_statement(stmt, format)?;
 
     // Visit format elements in order
-    for elem in format.elements() {
+    visit_elements(
+        visitor,
+        format.elements(),
+        &field_map,
+        &mut referenced_fields,
+    )?;
+
+    // Visit fields with defaults that weren't in the format
+    for field in collected {
+        if !referenced_fields.contains(&field.index) && field.has_default() {
+            visitor.visit_default_field(field)?;
+        }
+    }
+
+    // Exit statement
+    visitor.exit_statement(stmt)?;
+
+    Ok(())
+}
+
+/// Visits format elements, recursing into optional sections.
+fn visit_elements<'ir, V: FormatVisitor<'ir>>(
+    visitor: &mut V,
+    elements: &[FormatElement<'_>],
+    field_map: &HashMap<String, &'ir FieldInfo<ChumskyLayout>>,
+    referenced_fields: &mut std::collections::HashSet<usize>,
+) -> syn::Result<()> {
+    for elem in elements {
         match elem {
             FormatElement::Token(tokens) => {
                 visitor.visit_tokens(tokens)?;
@@ -89,19 +116,11 @@ pub fn visit_format<'ir, V: FormatVisitor<'ir>>(
             FormatElement::Context(proj) => {
                 visitor.visit_context(proj)?;
             }
+            FormatElement::Optional(inner) => {
+                visit_elements(visitor, inner, field_map, referenced_fields)?;
+            }
         }
     }
-
-    // Visit fields with defaults that weren't in the format
-    for field in collected {
-        if !referenced_fields.contains(&field.index) && field.has_default() {
-            visitor.visit_default_field(field)?;
-        }
-    }
-
-    // Exit statement
-    visitor.exit_statement(stmt)?;
-
     Ok(())
 }
 

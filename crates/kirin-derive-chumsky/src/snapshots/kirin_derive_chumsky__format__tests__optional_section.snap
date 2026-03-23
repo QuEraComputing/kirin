@@ -1,0 +1,51 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+assertion_line: 464
+expression: format
+---
+Format {
+    elements: [
+        Keyword(
+            "if",
+        ),
+        Field(
+            "condition",
+            Default,
+        ),
+        Token(
+            [
+                Identifier(
+                    "then",
+                ),
+            ],
+        ),
+        Field(
+            "then_body",
+            Default,
+        ),
+        Token(
+            [
+                Identifier(
+                    "else",
+                ),
+            ],
+        ),
+        Field(
+            "else_body",
+            Default,
+        ),
+        Optional(
+            [
+                Token(
+                    [
+                        Arrow,
+                    ],
+                ),
+                Field(
+                    "result",
+                    Type,
+                ),
+            ],
+        ),
+    ],
+}

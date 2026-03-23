@@ -1,0 +1,42 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+assertion_line: 486
+expression: format
+---
+Format {
+    elements: [
+        Keyword(
+            "op",
+        ),
+        Field(
+            "x",
+            Default,
+        ),
+        Optional(
+            [
+                Token(
+                    [
+                        Arrow,
+                    ],
+                ),
+                Field(
+                    "a",
+                    Type,
+                ),
+            ],
+        ),
+        Optional(
+            [
+                Token(
+                    [
+                        Arrow,
+                    ],
+                ),
+                Field(
+                    "b",
+                    Type,
+                ),
+            ],
+        ),
+    ],
+}

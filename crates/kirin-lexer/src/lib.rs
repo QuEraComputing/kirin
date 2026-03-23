@@ -57,8 +57,12 @@ pub enum Token<'src> {
     EscapedRBrace,
     #[token("[")]
     LBracket,
+    #[token("[[")]
+    EscapedLBracket,
     #[token("]")]
     RBracket,
+    #[token("]]")]
+    EscapedRBracket,
     #[token("<")]
     LAngle,
     #[token(">")]
@@ -110,7 +114,9 @@ impl std::fmt::Display for Token<'_> {
             Token::RBrace => write!(f, "}}"),
             Token::EscapedRBrace => write!(f, "}}}}"),
             Token::LBracket => write!(f, "["),
+            Token::EscapedLBracket => write!(f, "[["),
             Token::RBracket => write!(f, "]"),
+            Token::EscapedRBracket => write!(f, "]]"),
             Token::LAngle => write!(f, "<"),
             Token::RAngle => write!(f, ">"),
             Token::Dollar => write!(f, "$"),
@@ -199,8 +205,14 @@ impl quote::ToTokens for Token<'_> {
             Token::LBracket => {
                 tokens.extend(quote::quote! { Token::LBracket });
             }
+            Token::EscapedLBracket => {
+                tokens.extend(quote::quote! { Token::EscapedLBracket });
+            }
             Token::RBracket => {
                 tokens.extend(quote::quote! { Token::RBracket });
+            }
+            Token::EscapedRBracket => {
+                tokens.extend(quote::quote! { Token::EscapedRBracket });
             }
             Token::LAngle => {
                 tokens.extend(quote::quote! { Token::LAngle });
@@ -467,6 +479,27 @@ mod tests {
     }
 
     #[test]
+    fn test_escaped_brackets() {
+        let input = "[[ ]]";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::EscapedLBracket)));
+        assert_eq!(lexer.next(), Some(Ok(Token::EscapedRBracket)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
+    fn test_escaped_brackets_mixed() {
+        // [[ should be EscapedLBracket, single [ should be LBracket
+        let input = "[[ foo ] ]]";
+        let mut lexer = Token::lexer(input);
+        assert_eq!(lexer.next(), Some(Ok(Token::EscapedLBracket)));
+        assert_eq!(lexer.next(), Some(Ok(Token::Identifier("foo"))));
+        assert_eq!(lexer.next(), Some(Ok(Token::RBracket)));
+        assert_eq!(lexer.next(), Some(Ok(Token::EscapedRBracket)));
+        assert_eq!(lexer.next(), None);
+    }
+
+    #[test]
     fn test_dollar_asterisk_question() {
         let input = "$ * ?";
         let mut lexer = Token::lexer(input);
@@ -590,7 +623,9 @@ mod tests {
         assert_eq!(Token::EscapedLBrace.to_string(), "{{");
         assert_eq!(Token::EscapedRBrace.to_string(), "}}");
         assert_eq!(Token::LBracket.to_string(), "[");
+        assert_eq!(Token::EscapedLBracket.to_string(), "[[");
         assert_eq!(Token::RBracket.to_string(), "]");
+        assert_eq!(Token::EscapedRBracket.to_string(), "]]");
         assert_eq!(Token::LAngle.to_string(), "<");
         assert_eq!(Token::RAngle.to_string(), ">");
         assert_eq!(Token::Dollar.to_string(), "$");

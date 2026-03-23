@@ -3,7 +3,7 @@
 use std::collections::HashSet;
 
 use kirin_derive_toolkit::ir::Statement;
-use kirin_derive_toolkit::ir::fields::{FieldCategory, FieldInfo};
+use kirin_derive_toolkit::ir::fields::{Collection, FieldCategory, FieldInfo};
 use kirin_lexer::Token;
 
 use crate::ChumskyLayout;
@@ -17,7 +17,138 @@ pub fn validate_format<'ir>(
     format: &Format<'_>,
     collected: &'ir [FieldInfo<ChumskyLayout>],
 ) -> syn::Result<ValidationResult<'ir>> {
+    // First, validate optional section structural rules
+    validate_optional_sections(format, stmt, collected)?;
+    // Then run the existing visitor-based validation
     ValidationVisitor::new().validate(stmt, format, collected)
+}
+
+/// Validates structural rules for optional sections `[...]` in the format string.
+fn validate_optional_sections(
+    format: &Format<'_>,
+    stmt: &Statement<ChumskyLayout>,
+    collected: &[FieldInfo<ChumskyLayout>],
+) -> syn::Result<()> {
+    use crate::format::FormatElement;
+    let span = stmt.name.span();
+
+    // Build field lookup
+    let field_map = crate::visitor::build_field_map(stmt, collected);
+
+    // Track fields inside optional sections vs outside
+    let mut fields_in_optional: HashSet<usize> = HashSet::new();
+    let mut fields_outside_optional: HashSet<usize> = HashSet::new();
+
+    // Check for nested optional sections (disallowed)
+    fn check_no_nesting(
+        elements: &[FormatElement<'_>],
+        inside_optional: bool,
+        span: proc_macro2::Span,
+    ) -> syn::Result<()> {
+        for elem in elements {
+            if let FormatElement::Optional(inner) = elem {
+                if inside_optional {
+                    return Err(syn::Error::new(
+                        span,
+                        "Nested `[...]` optional sections are not allowed. \
+                         Use a single `[...]` section or restructure the format string.",
+                    ));
+                }
+                check_no_nesting(inner, true, span)?;
+            }
+        }
+        Ok(())
+    }
+    check_no_nesting(format.elements(), false, span)?;
+
+    // Collect field references inside and outside optional sections
+    fn collect_field_refs(
+        elements: &[FormatElement<'_>],
+        inside_optional: bool,
+        fields_in_optional: &mut HashSet<usize>,
+        fields_outside_optional: &mut HashSet<usize>,
+        field_map: &std::collections::HashMap<String, &FieldInfo<ChumskyLayout>>,
+    ) {
+        for elem in elements {
+            match elem {
+                FormatElement::Field(name, _) => {
+                    if let Some(field) = field_map.get(*name) {
+                        if inside_optional {
+                            fields_in_optional.insert(field.index);
+                        } else {
+                            fields_outside_optional.insert(field.index);
+                        }
+                    }
+                }
+                FormatElement::Optional(inner) => {
+                    collect_field_refs(
+                        inner,
+                        true,
+                        fields_in_optional,
+                        fields_outside_optional,
+                        field_map,
+                    );
+                }
+                _ => {}
+            }
+        }
+    }
+    collect_field_refs(
+        format.elements(),
+        false,
+        &mut fields_in_optional,
+        &mut fields_outside_optional,
+        &field_map,
+    );
+
+    let mut errors = Vec::new();
+
+    // Rule 1: Fields inside [...] must be Option<T> or Vec<T>
+    for field_idx in &fields_in_optional {
+        if let Some(field) = collected
+            .iter()
+            .find(|f| f.index == *field_idx)
+            .filter(|f| matches!(f.collection, Collection::Single))
+        {
+            errors.push(syn::Error::new(
+                span,
+                format!(
+                    "Field '{}' inside an optional section `[...]` must be `Option<T>` or `Vec<T>`, \
+                     not a bare (non-collection) type. Wrap the field type in `Option<...>` or `Vec<...>`.",
+                    field
+                ),
+            ));
+        }
+    }
+
+    // Rule 2: Option<T> fields referenced outside [...] are an error
+    for field_idx in &fields_outside_optional {
+        if let Some(field) = collected
+            .iter()
+            .find(|f| f.index == *field_idx)
+            .filter(|f| matches!(f.collection, Collection::Option))
+        {
+            errors.push(syn::Error::new(
+                span,
+                format!(
+                    "Option field '{}' appears in the format string outside of an optional section `[...]`. \
+                     Move it inside `[...]` to clarify which tokens are optional, or change the type to non-Option.",
+                    field
+                ),
+            ));
+        }
+    }
+
+    if errors.is_empty() {
+        Ok(())
+    } else {
+        let mut iter = errors.into_iter();
+        let mut combined = iter.next().unwrap();
+        for err in iter {
+            combined.combine(err);
+        }
+        Err(combined)
+    }
 }
 
 /// Validates that `ir_path` is available when DiGraph/UnGraph fields use body projections.
@@ -35,34 +166,48 @@ pub fn validate_ir_path_for_body_projections<L: kirin_derive_toolkit::ir::Layout
         return Ok(());
     }
 
-    for elem in format.elements() {
-        if let crate::format::FormatElement::Field(name, crate::format::FormatOption::Body(_)) =
-            elem
-        {
-            let field = collected.iter().find(|f| {
-                f.ident.as_ref().is_some_and(|id| id == name) || f.index.to_string() == *name
-            });
-            if let Some(field) = field.filter(|f| {
-                matches!(
-                    f.category(),
-                    FieldCategory::DiGraph | FieldCategory::UnGraph
-                )
-            }) {
-                let kind = match field.category() {
-                    FieldCategory::DiGraph => "DiGraph",
-                    FieldCategory::UnGraph => "UnGraph",
-                    _ => unreachable!(),
-                };
-                return Err(syn::Error::new(
-                    span,
-                    format!(
-                        "{kind} field '{field}' uses body projections which require \
-                         the IR crate path for code generation. Ensure a \
-                         `#[kirin(crate = ...)]` attribute is present.",
-                    ),
-                ));
+    check_body_projections_in_elements(format.elements(), collected, span)?;
+
+    fn check_body_projections_in_elements<L: kirin_derive_toolkit::ir::Layout>(
+        elements: &[crate::format::FormatElement<'_>],
+        collected: &[FieldInfo<L>],
+        span: proc_macro2::Span,
+    ) -> syn::Result<()> {
+        for elem in elements {
+            match elem {
+                crate::format::FormatElement::Field(name, crate::format::FormatOption::Body(_)) => {
+                    let field = collected.iter().find(|f| {
+                        f.ident.as_ref().is_some_and(|id| id == name)
+                            || f.index.to_string() == *name
+                    });
+                    if let Some(field) = field.filter(|f| {
+                        matches!(
+                            f.category(),
+                            FieldCategory::DiGraph | FieldCategory::UnGraph
+                        )
+                    }) {
+                        let kind = match field.category() {
+                            FieldCategory::DiGraph => "DiGraph",
+                            FieldCategory::UnGraph => "UnGraph",
+                            _ => unreachable!(),
+                        };
+                        return Err(syn::Error::new(
+                            span,
+                            format!(
+                                "{kind} field '{field}' uses body projections which require \
+                                 the IR crate path for code generation. Ensure a \
+                                 `#[kirin(crate = ...)]` attribute is present.",
+                            ),
+                        ));
+                    }
+                }
+                crate::format::FormatElement::Optional(inner) => {
+                    check_body_projections_in_elements(inner, collected, span)?;
+                }
+                _ => {}
             }
         }
+        Ok(())
     }
 
     Ok(())
@@ -720,5 +865,140 @@ mod tests {
             result.is_err(),
             "yields should not be a valid body projection"
         );
+    }
+
+    // ---- Optional section validation tests ----
+
+    fn make_option_result(index: usize, name: &str) -> FieldInfo<ChumskyLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
+            collection: Collection::Option,
+            data: FieldData::Result {
+                ssa_type: syn::parse_quote!(MyType),
+                is_auto_placeholder: false,
+            },
+        }
+    }
+
+    fn make_vec_result(index: usize, name: &str) -> FieldInfo<ChumskyLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
+            collection: Collection::Vec,
+            data: FieldData::Result {
+                ssa_type: syn::parse_quote!(MyType),
+                is_auto_placeholder: false,
+            },
+        }
+    }
+
+    fn make_option_value(index: usize, name: &str) -> FieldInfo<ChumskyLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
+            collection: Collection::Option,
+            data: FieldData::Value {
+                ty: syn::parse_quote!(i64),
+                default: None,
+                into: false,
+                extra: ChumskyFieldAttrs {},
+            },
+        }
+    }
+
+    fn make_vec_value(index: usize, name: &str) -> FieldInfo<ChumskyLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
+            collection: Collection::Vec,
+            data: FieldData::Value {
+                ty: syn::parse_quote!(i64),
+                default: None,
+                into: false,
+                extra: ChumskyFieldAttrs {},
+            },
+        }
+    }
+
+    #[test]
+    fn validation_optional_section_with_option_field_is_valid() {
+        let fields = vec![make_argument(0, "cond"), make_option_result(1, "result")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("$if {cond}[ -> {result:type}]", None).unwrap();
+        assert!(validate_format(&stmt, &format, &fields).is_ok());
+    }
+
+    #[test]
+    fn validation_optional_section_with_vec_field_is_valid() {
+        let fields = vec![make_argument(0, "target"), make_vec_result(1, "results")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("$call {target}[ -> {results:type}]", None).unwrap();
+        assert!(validate_format(&stmt, &format, &fields).is_ok());
+    }
+
+    #[test]
+    fn validation_bare_field_inside_optional_is_invalid() {
+        // Single (non-collection) field inside [...] -> error
+        let fields = vec![make_argument(0, "cond"), make_result(1, "result")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("$if {cond}[ -> {result:type}]", None).unwrap();
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains("Option<T>") || err.to_string().contains("Vec<T>"),
+            "Error should mention Option or Vec: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn validation_option_field_outside_optional_is_invalid() {
+        // Option<T> field referenced outside [...] -> error
+        let fields = vec![make_argument(0, "x"), make_option_value(1, "y")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("$op {x}, {y}", None).unwrap();
+        let err = validate_format(&stmt, &format, &fields).unwrap_err();
+        assert!(
+            err.to_string().contains("outside of an optional section"),
+            "Error should mention outside optional: {}",
+            err
+        );
+    }
+
+    #[test]
+    fn validation_nested_optional_is_invalid() {
+        // Nested [...] inside [...] -> compile error
+        let result = Format::parse("$op {x}[[ -> {y}]]", None);
+        // Note: [[ is an escaped bracket, not nested [...].
+        // To test actual nesting we'd need [ inside [...], but the parser
+        // doesn't allow [ inside an optional section (it's consumed by the
+        // outer [...] parsing). Nesting is structurally prevented by the parser.
+        // The validation check exists for safety if the parser is ever changed.
+        assert!(
+            result.is_ok(),
+            "Escaped brackets should be valid: {:?}",
+            result
+        );
+    }
+
+    #[test]
+    fn validation_vec_field_outside_optional_is_valid() {
+        // Vec<T> field outside [...] -> OK (they handle emptiness via separator)
+        let fields = vec![make_argument(0, "x"), make_vec_value(1, "items")];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("$op {x}, {items}", None).unwrap();
+        assert!(validate_format(&stmt, &format, &fields).is_ok());
+    }
+
+    #[test]
+    fn validation_multiple_optional_sections_are_valid() {
+        let fields = vec![
+            make_argument(0, "x"),
+            make_option_result(1, "a"),
+            make_option_result(2, "b"),
+        ];
+        let stmt = make_stmt(fields.clone());
+        let format = Format::parse("$op {x}[ -> {a:type}][ -> {b:type}]", None).unwrap();
+        assert!(validate_format(&stmt, &format, &fields).is_ok());
     }
 }

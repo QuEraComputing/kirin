@@ -1,0 +1,57 @@
+---
+source: crates/kirin-derive-chumsky/src/format.rs
+assertion_line: 479
+expression: format
+---
+Format {
+    elements: [
+        Keyword(
+            "for",
+        ),
+        Field(
+            "iv",
+            Default,
+        ),
+        Token(
+            [
+                Identifier(
+                    "in",
+                ),
+            ],
+        ),
+        Field(
+            "start",
+            Default,
+        ),
+        Token(
+            [
+                DotDot,
+            ],
+        ),
+        Field(
+            "end",
+            Default,
+        ),
+        Token(
+            [
+                EscapedLBracket,
+            ],
+        ),
+        Token(
+            [
+                Identifier(
+                    "step",
+                ),
+            ],
+        ),
+        Field(
+            "step",
+            Default,
+        ),
+        Token(
+            [
+                EscapedRBracket,
+            ],
+        ),
+    ],
+}

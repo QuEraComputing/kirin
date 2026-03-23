@@ -22,6 +22,8 @@ pub enum ParserPart {
     Token(TokenStream),
     /// A field parser (parses a field value)
     Field(TokenStream),
+    /// An optional section — inner parts wrapped in `.or_not()`
+    OptionalSection(Vec<ParserPart>),
 }
 
 impl GenerateHasDialectParser {
@@ -38,43 +40,51 @@ impl GenerateHasDialectParser {
         let mut occurrence_iter = occurrences.iter();
         let mut parser_parts: Vec<ParserPart> = Vec::new();
 
-        for elem in format.elements() {
-            match elem {
-                FormatElement::Token(tokens) => {
-                    parser_parts.push(ParserPart::Token(self.token_parser(tokens)));
-                }
-                FormatElement::Keyword(name) => {
-                    parser_parts.push(ParserPart::Token(self.keyword_parser(name)));
-                }
-                FormatElement::Field(_, _) => {
-                    let occurrence = occurrence_iter
-                        .next()
-                        .expect("occurrence sequence mismatch");
-                    parser_parts.push(ParserPart::Field(self.field_parser(
-                        crate_path,
-                        occurrence.field,
-                        &occurrence.option,
-                        ast_name,
-                        ir_type,
-                        type_params,
-                    )));
-                }
-                FormatElement::Context(proj) => {
-                    // Context projections are parsed and discarded at the
-                    // statement level — the function text parser provides the values.
-                    match proj {
-                        crate::format::ContextProjection::Name => {
-                            // Parse and discard the @symbol — the function text parser
-                            // extracts the name from EmitContext after parse_and_emit.
-                            parser_parts.push(ParserPart::Token(quote! { #crate_path::symbol() }));
-                        }
-                    }
-                }
-            }
-        }
+        self.collect_parser_parts(
+            format.elements(),
+            &mut occurrence_iter,
+            &mut parser_parts,
+            crate_path,
+            ast_name,
+            ir_type,
+            type_params,
+        );
 
         if parser_parts.is_empty() {
             return Ok(quote! { #crate_path::chumsky::prelude::empty() });
+        }
+
+        let flat_parts = Self::flatten_optional_sections(parser_parts, crate_path);
+        Ok(Self::build_chain_from_flat_parts(&flat_parts, crate_path))
+    }
+
+    /// Flattens `OptionalSection` parts into `Field` parts by compiling each
+    /// optional section into a sub-chain wrapped in `.or_not()`.
+    fn flatten_optional_sections(
+        parts: Vec<ParserPart>,
+        crate_path: &syn::Path,
+    ) -> Vec<ParserPart> {
+        let mut flat = Vec::new();
+        for part in parts {
+            match part {
+                ParserPart::OptionalSection(inner) => {
+                    let inner_flat = Self::flatten_optional_sections(inner, crate_path);
+                    let inner_chain = Self::build_chain_from_flat_parts(&inner_flat, crate_path);
+                    flat.push(ParserPart::Field(quote! { (#inner_chain).or_not() }));
+                }
+                other => flat.push(other),
+            }
+        }
+        flat
+    }
+
+    /// Builds a chained parser expression from a flat list of Token/Field parts.
+    fn build_chain_from_flat_parts(
+        parser_parts: &[ParserPart],
+        crate_path: &syn::Path,
+    ) -> TokenStream {
+        if parser_parts.is_empty() {
+            return quote! { #crate_path::chumsky::prelude::empty() };
         }
 
         let first_field_idx = parser_parts
@@ -121,10 +131,69 @@ impl GenerateHasDialectParser {
                         }
                     }
                 },
+                ParserPart::OptionalSection(_) => {
+                    unreachable!("OptionalSection should have been flattened before building chain")
+                }
             }
         }
 
-        Ok(parser_expr.unwrap_or_else(|| quote! { #crate_path::chumsky::prelude::empty() }))
+        parser_expr.unwrap_or_else(|| quote! { #crate_path::chumsky::prelude::empty() })
+    }
+
+    /// Collects parser parts from format elements, recursing into optional sections.
+    fn collect_parser_parts<'a, 'b>(
+        &self,
+        elements: &[FormatElement<'_>],
+        occurrence_iter: &mut impl Iterator<Item = &'b FieldOccurrence<'a>>,
+        parser_parts: &mut Vec<ParserPart>,
+        crate_path: &syn::Path,
+        ast_name: &syn::Ident,
+        ir_type: &syn::Path,
+        type_params: &[TokenStream],
+    ) where
+        'a: 'b,
+    {
+        for elem in elements {
+            match elem {
+                FormatElement::Token(tokens) => {
+                    parser_parts.push(ParserPart::Token(self.token_parser(tokens)));
+                }
+                FormatElement::Keyword(name) => {
+                    parser_parts.push(ParserPart::Token(self.keyword_parser(name)));
+                }
+                FormatElement::Field(_, _) => {
+                    let occurrence = occurrence_iter
+                        .next()
+                        .expect("occurrence sequence mismatch");
+                    parser_parts.push(ParserPart::Field(self.field_parser(
+                        crate_path,
+                        occurrence.field,
+                        &occurrence.option,
+                        ast_name,
+                        ir_type,
+                        type_params,
+                    )));
+                }
+                FormatElement::Context(proj) => match proj {
+                    crate::format::ContextProjection::Name => {
+                        parser_parts.push(ParserPart::Token(quote! { #crate_path::symbol() }));
+                    }
+                },
+                FormatElement::Optional(inner) => {
+                    let mut inner_parts = Vec::new();
+                    self.collect_parser_parts(
+                        inner,
+                        occurrence_iter,
+                        &mut inner_parts,
+                        crate_path,
+                        ast_name,
+                        ir_type,
+                        type_params,
+                    );
+                    parser_parts.push(ParserPart::OptionalSection(inner_parts));
+                }
+            }
+        }
     }
 
     fn field_parser(
@@ -554,10 +623,14 @@ impl GenerateHasDialectParser {
         // Map format-string escape tokens to their runtime equivalents.
         // In the format string, {{ produces EscapedLBrace, but at runtime
         // the input lexer produces LBrace for literal {.
+        // Similarly, [[ produces EscapedLBracket, but at runtime
+        // the input lexer produces LBracket for literal [.
         let map_token = |tok: &kirin_lexer::Token<'_>| -> TokenStream {
             match tok {
                 T::EscapedLBrace => quote! { #crate_path::Token::LBrace },
                 T::EscapedRBrace => quote! { #crate_path::Token::RBrace },
+                T::EscapedLBracket => quote! { #crate_path::Token::LBracket },
+                T::EscapedRBracket => quote! { #crate_path::Token::RBracket },
                 other => quote! { #other },
             }
         };

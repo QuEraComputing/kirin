@@ -8,9 +8,12 @@
 //!
 //! ```text
 //! format         ::= element*
-//! element        ::= escaped_brace | dollar_keyword | context_proj | interpolation | literal+
+//! element        ::= escaped_brace | escaped_bracket | optional_section
+//!                   | dollar_keyword | context_proj | interpolation | literal+
 //!
 //! escaped_brace  ::= '{{' | '}}'
+//! escaped_bracket::= '[[' | ']]'
+//! optional_section ::= '[' element* ']'
 //! dollar_keyword ::= '$' IDENT
 //! context_proj   ::= '{:' context_name '}'
 //! interpolation  ::= '{' field_ref (':' projection)? '}'
@@ -21,7 +24,7 @@
 //! sig_proj       ::= 'inputs' | 'return'
 //! context_name   ::= 'name'
 //!
-//! literal        ::= <any token except '{', '{{', '}}'>
+//! literal        ::= <any token except '{', '{{', '}}', '[', '[[', ']]', ']'>
 //! IDENT          ::= <identifier token>
 //! INT            ::= <integer literal token>
 //! ```
@@ -57,6 +60,10 @@
 //!
 //! To include a literal `{` character in the format string, use `{{`:
 //! - `"{{"` produces a literal `{` token
+//!
+//! To include a literal `[` or `]` character in the format string, use `[[` or `]]`:
+//! - `"[["` produces a literal `[` token
+//! - `"]]"` produces a literal `]` token
 //!
 //! Note: `}` characters don't need escaping since they're only special
 //! when closing an interpolation. Use `}` directly in the format string.
@@ -103,6 +110,9 @@ pub enum FormatElement<'src> {
     Keyword(&'src str),
     /// A context projection like `{:name}` — properties of the enclosing function.
     Context(ContextProjection),
+    /// An optional section `[...]` — parsed as all-or-nothing.
+    /// Fields inside must be `Option<T>` or `Vec<T>`. Nesting is disallowed.
+    Optional(Vec<FormatElement<'src>>),
 }
 
 /// Context projections: `{:name}` — properties of the enclosing function.
@@ -179,6 +189,13 @@ impl<'src> Format<'src> {
         let escaped_rbrace =
             just(Token::EscapedRBrace).to(FormatElement::Token(vec![Token::EscapedRBrace]));
 
+        // Parse escaped brackets: [[ -> literal [, ]] -> literal ]
+        let escaped_lbracket =
+            just(Token::EscapedLBracket).to(FormatElement::Token(vec![Token::EscapedLBracket]));
+
+        let escaped_rbracket =
+            just(Token::EscapedRBracket).to(FormatElement::Token(vec![Token::EscapedRBracket]));
+
         // Parse dollar keyword like $add
         let dollar_keyword = just(Token::Dollar)
             .ignore_then(select! { Token::Identifier(name) => name })
@@ -218,13 +235,19 @@ impl<'src> Format<'src> {
             .then_ignore(just(Token::RBrace))
             .map(|(name, opt)| FormatElement::Field(name, opt.unwrap_or_default()));
 
-        // Parse literal tokens (anything that's not `{` or escaped braces)
+        // Parse literal tokens (anything that's not special)
         // Note: Regular `}` is allowed in literal tokens since it's only special after `{`
         let other = any()
             .filter(|t: &Token| {
                 !matches!(
                     t,
-                    Token::LBrace | Token::EscapedLBrace | Token::EscapedRBrace
+                    Token::LBrace
+                        | Token::EscapedLBrace
+                        | Token::EscapedRBrace
+                        | Token::LBracket
+                        | Token::EscapedLBracket
+                        | Token::EscapedRBracket
+                        | Token::RBracket
                 )
             })
             .repeated()
@@ -232,14 +255,28 @@ impl<'src> Format<'src> {
             .collect()
             .map(FormatElement::Token);
 
-        // Order matters: try escaped braces first, then dollar keyword,
-        // then context projection ({:name}), then generic interpolation, then other
-        escaped_lbrace
+        // Inner element parser (used for both top-level and inside [...])
+        let inner_element = escaped_lbrace
             .or(escaped_rbrace)
+            .or(escaped_lbracket)
+            .or(escaped_rbracket)
             .or(dollar_keyword)
             .or(context_projection)
             .or(interpolation)
-            .or(other)
+            .or(other);
+
+        // Parse optional section: [...] — no nesting allowed
+        // Inside an optional section, we parse all inner elements except [ and ]
+        // (nesting is disallowed by validation, but we also don't parse [ inside)
+        let optional_section = just(Token::LBracket)
+            .ignore_then(inner_element.clone().repeated().collect::<Vec<_>>())
+            .then_ignore(just(Token::RBracket))
+            .map(FormatElement::Optional);
+
+        // Order matters: try escaped braces/brackets first, then optional section,
+        // then dollar keyword, then context projection ({:name}), then generic interpolation, then other
+        inner_element
+            .or(optional_section)
             .repeated()
             .collect()
             .map(Format::new)
@@ -417,6 +454,35 @@ mod tests {
         let input = "{body}";
         let format = Format::parse(input, None).expect("Failed to parse format");
 
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_optional_section() {
+        let input = "$if {condition} then {then_body} else {else_body}[ -> {result:type}]";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_optional_section_call() {
+        let input = "$call {target}({args})[ -> {results:type}]";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_optional_section_escaped_brackets() {
+        // [[ and ]] produce literal bracket tokens
+        let input = "$for {iv} in {start}..{end} [[ step {step} ]]";
+        let format = Format::parse(input, None).expect("Failed to parse format");
+        insta::assert_debug_snapshot!(format);
+    }
+
+    #[test]
+    fn test_optional_section_multiple() {
+        let input = "$op {x}[ -> {a:type}][ -> {b:type}]";
+        let format = Format::parse(input, None).expect("Failed to parse format");
         insta::assert_debug_snapshot!(format);
     }
 

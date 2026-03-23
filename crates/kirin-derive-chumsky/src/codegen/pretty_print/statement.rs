@@ -51,6 +51,8 @@ fn tokens_to_string_with_spacing(
         match token {
             Token::EscapedLBrace => result.push('{'),
             Token::EscapedRBrace => result.push('}'),
+            Token::EscapedLBracket => result.push('['),
+            Token::EscapedRBracket => result.push(']'),
             other => result.push_str(&other.to_string()),
         }
     }
@@ -305,6 +307,7 @@ impl GeneratePrettyPrint {
                     FormatElement::Field(_, _)
                         | FormatElement::Keyword(_)
                         | FormatElement::Context(_)
+                        | FormatElement::Optional(_)
                 );
             let next_is_field_like = !is_last
                 && matches!(
@@ -312,6 +315,7 @@ impl GeneratePrettyPrint {
                     FormatElement::Field(_, _)
                         | FormatElement::Keyword(_)
                         | FormatElement::Context(_)
+                        | FormatElement::Optional(_)
                 );
 
             match elem {
@@ -373,6 +377,20 @@ impl GeneratePrettyPrint {
                         }
                     }
                 }
+                FormatElement::Optional(inner_elements) => {
+                    // For optional sections, generate conditional printing.
+                    // Find the first field reference in the section to use as the condition.
+                    let inner_print = self.generate_optional_section_print(
+                        inner_elements,
+                        field_map,
+                        _collected,
+                        field_vars,
+                        ir_path,
+                    );
+                    if let Some(inner_print) = inner_print {
+                        parts.push(inner_print);
+                    }
+                }
             }
         }
 
@@ -385,6 +403,56 @@ impl GeneratePrettyPrint {
                 #first #(+ #rest)*
             }
         }
+    }
+
+    /// Generates conditional printing code for an optional section `[...]`.
+    ///
+    /// The section is printed only if the first `Option` field inside it is `Some`,
+    /// or if the first `Vec` field is non-empty.
+    fn generate_optional_section_print(
+        &self,
+        inner_elements: &[FormatElement<'_>],
+        field_map: &IndexMap<String, (usize, &FieldInfo<PrettyPrintLayout>)>,
+        collected: &[FieldInfo<PrettyPrintLayout>],
+        field_vars: &[syn::Ident],
+        ir_path: &syn::Path,
+    ) -> Option<TokenStream> {
+        use kirin_derive_toolkit::ir::fields::Collection;
+        let prettyless_path = &self.prettyless_path;
+
+        // Find the first field reference to use as the condition
+        let condition_field = inner_elements.iter().find_map(|e| {
+            if let FormatElement::Field(name, _) = e {
+                field_map
+                    .get(&name.to_string())
+                    .map(|(idx, field)| (*idx, *field))
+            } else {
+                None
+            }
+        });
+
+        let (cond_idx, cond_field) = condition_field?;
+        let cond_var = &field_vars[cond_idx];
+
+        // Build the condition: Option fields check .is_some(), Vec fields check !.is_empty()
+        let condition = match cond_field.collection {
+            Collection::Option => quote! { #cond_var.is_some() },
+            Collection::Vec => quote! { !#cond_var.is_empty() },
+            Collection::Single => quote! { true }, // shouldn't happen after validation
+        };
+
+        // Build the inner print expression using the same format_print logic
+        let inner_format = crate::format::Format::new(inner_elements.to_vec());
+        let inner_print =
+            self.generate_format_print(&inner_format, field_map, collected, field_vars, ir_path);
+
+        Some(quote! {
+            (if #condition {
+                #inner_print
+            } else {
+                #prettyless_path::DocAllocator::nil(doc)
+            })
+        })
     }
 
     /// Generates the `prints_result_names` method override for the PrettyPrint impl.
