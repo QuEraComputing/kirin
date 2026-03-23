@@ -1,4 +1,5 @@
 use kirin_ir::{Dialect, HasStageInfo, SpecializedFunction, StageMeta};
+use smallvec::SmallVec;
 
 use super::StackInterpreter;
 use crate::{
@@ -36,10 +37,10 @@ where
         Ok(())
     }
 
-    /// Call a specialized function and return its result value.
-    pub fn call(self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
+    /// Call a specialized function and return its result values.
+    pub fn call(self, callee: SpecializedFunction, args: &[V]) -> Result<SmallVec<[V; 1]>, E>
     where
-        L: CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, Result = V>,
+        L: CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, Result = SmallVec<[V; 1]>>,
     {
         self.interp.call_with_stage::<L>(callee, self.stage, args)
     }

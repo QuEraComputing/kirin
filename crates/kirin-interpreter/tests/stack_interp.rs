@@ -1,7 +1,8 @@
 //! StackInterpreter tests: concrete execution, fuel, breakpoints, frame push/pop,
-//! and session-style abstract interpretation with Interval.
+//! session-style abstract interpretation with Interval, and multi-result writeback.
 
 use rustc_hash::FxHashSet;
+use smallvec::smallvec;
 
 use kirin_arith::{ArithType, ArithValue};
 use kirin_constant::Constant;
@@ -46,21 +47,21 @@ fn test_concrete_select() {
         .in_stage::<CompositeLanguage>()
         .call(spec_func, &[7])
         .unwrap();
-    assert_eq!(result, 8);
+    assert_eq!(result[0], 8);
 
     // select(-3) → -3+1 = -2 (truthy: nonzero)
     let result = interp
         .in_stage::<CompositeLanguage>()
         .call(spec_func, &[-3])
         .unwrap();
-    assert_eq!(result, -2);
+    assert_eq!(result[0], -2);
 
     // select(0) → 42 (falsy: zero)
     let result = interp
         .in_stage::<CompositeLanguage>()
         .call(spec_func, &[0])
         .unwrap();
-    assert_eq!(result, 42);
+    assert_eq!(result[0], 42);
 }
 
 // ===========================================================================
@@ -77,7 +78,7 @@ fn test_concrete_fuel_exhaustion() {
     let mut interp: StackInterpreter<i64, _> =
         StackInterpreter::new(&pipeline, stage_id).with_fuel(20);
 
-    let result = interp.in_stage::<CompositeLanguage>().call(spec_fn, &[42]);
+    let result: Result<_, _> = interp.in_stage::<CompositeLanguage>().call(spec_fn, &[42]);
     assert!(result.is_err());
     let err = result.unwrap_err();
     assert!(
@@ -124,7 +125,7 @@ fn test_concrete_breakpoints() {
     interp.clear_breakpoints();
     let control = interp.in_stage::<CompositeLanguage>().run().unwrap();
     match control {
-        Continuation::Return(v) => assert_eq!(v, 15, "expected 5 + 10 = 15"),
+        Continuation::Return(values) => assert_eq!(values[0], 15, "expected 5 + 10 = 15"),
         other => panic!("expected Return, got: {other:?}"),
     }
 }
@@ -187,7 +188,7 @@ fn test_concrete_manual_push_then_run_dynamic() {
 
     let control = interp.run().unwrap();
     match control {
-        Continuation::Return(v) => assert_eq!(v, 15, "expected 5 + 10 = 15"),
+        Continuation::Return(values) => assert_eq!(values[0], 15, "expected 5 + 10 = 15"),
         other => panic!("expected Return, got: {other:?}"),
     }
 }
@@ -206,21 +207,21 @@ fn test_concrete_sequential_calls() {
         .in_stage::<CompositeLanguage>()
         .call(spec_fn, &[5])
         .unwrap();
-    assert_eq!(result, 6);
+    assert_eq!(result[0], 6);
 
     // Call f(10) -> 11 — interpreter resets between calls
     let result = interp
         .in_stage::<CompositeLanguage>()
         .call(spec_fn, &[10])
         .unwrap();
-    assert_eq!(result, 11);
+    assert_eq!(result[0], 11);
 
     // Call f(-1) -> 0
     let result = interp
         .in_stage::<CompositeLanguage>()
         .call(spec_fn, &[-1])
         .unwrap();
-    assert_eq!(result, 0);
+    assert_eq!(result[0], 0);
 }
 
 #[test]
@@ -238,7 +239,7 @@ fn test_concrete_fuel_sufficient() {
         .in_stage::<CompositeLanguage>()
         .call(spec_fn, &[5])
         .unwrap();
-    assert_eq!(result, 6);
+    assert_eq!(result[0], 6);
 }
 
 // ===========================================================================
@@ -288,9 +289,9 @@ fn test_session_abstract_interp_with_args() {
         frame.write_ssa(SSAValue::from(block_args[0]), input);
         interp.push_frame(frame).unwrap();
         match interp.in_stage::<CompositeLanguage>().run().unwrap() {
-            Continuation::Return(v) => {
+            Continuation::Return(values) => {
                 interp.pop_frame().unwrap();
-                v
+                values.into_iter().next().unwrap()
             }
             other => panic!("expected Return, got {:?}", other),
         }
@@ -323,7 +324,7 @@ fn test_concrete_div_by_zero_returns_error() {
     let result = interp
         .in_stage::<CompositeLanguage>()
         .call(spec_fn, &[10, 2]);
-    assert_eq!(result.unwrap(), 5);
+    assert_eq!(result.unwrap()[0], 5);
 
     // Division by zero returns an error, not a panic
     let result = interp
@@ -353,7 +354,7 @@ fn test_concrete_rem_by_zero_returns_error() {
     let result = interp
         .in_stage::<CompositeLanguage>()
         .call(spec_fn, &[10, 3]);
-    assert_eq!(result.unwrap(), 1);
+    assert_eq!(result.unwrap()[0], 1);
 
     // Remainder by zero returns an error, not a panic
     let result = interp
@@ -367,5 +368,339 @@ fn test_concrete_rem_by_zero_returns_error() {
     assert!(
         matches!(err, InterpreterError::Custom(_)),
         "expected Custom error for remainder by zero, got: {err:?}"
+    );
+}
+
+// ===========================================================================
+// Multi-result writeback tests
+// ===========================================================================
+
+/// A terminator that returns two constant values via `Continuation::Return`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+#[kirin(builders, terminator, type = ArithType, crate = kirin_ir)]
+struct MultiReturn {
+    val_a: i64,
+    val_b: i64,
+}
+
+impl<'ir, I> kirin_interpreter::Interpretable<'ir, I> for MultiReturn
+where
+    I: kirin_interpreter::Interpreter<'ir>,
+    I::Value: From<i64>,
+{
+    fn interpret<L>(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: kirin_interpreter::Interpretable<'ir, I> + 'ir,
+    {
+        Ok(Continuation::Return(smallvec![
+            I::Value::from(self.val_a),
+            I::Value::from(self.val_b),
+        ]))
+    }
+}
+
+/// A caller statement that emits `Continuation::Call` with two result slots.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
+struct MultiResultCall {
+    target: Function,
+    callee_stage: CompileStage,
+    result_a: ResultValue,
+    result_b: ResultValue,
+}
+
+impl<'ir, I> kirin_interpreter::Interpretable<'ir, I> for MultiResultCall
+where
+    I: kirin_interpreter::Interpreter<'ir>,
+    I::Value: Clone,
+{
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: kirin_interpreter::Interpretable<'ir, I> + 'ir,
+    {
+        let target_stage = self.callee_stage;
+        let stage = interp.resolve_stage_info::<L>(target_stage)?;
+
+        let function_info = interp.pipeline().function_info(self.target).ok_or(
+            InterpreterError::StageResolution {
+                stage: target_stage,
+                kind: kirin_interpreter::StageResolutionError::MissingFunction {
+                    function: self.target,
+                },
+            },
+        )?;
+        let staged_function = function_info
+            .staged_functions()
+            .get(&target_stage)
+            .copied()
+            .ok_or(InterpreterError::StageResolution {
+                stage: target_stage,
+                kind: kirin_interpreter::StageResolutionError::MissingFunction {
+                    function: self.target,
+                },
+            })?;
+        let staged_info =
+            staged_function
+                .get_info(stage)
+                .ok_or(InterpreterError::StageResolution {
+                    stage: target_stage,
+                    kind: kirin_interpreter::StageResolutionError::MissingFunction {
+                        function: self.target,
+                    },
+                })?;
+
+        let callee = staged_info
+            .specializations()
+            .iter()
+            .find(|spec| !spec.is_invalidated())
+            .map(|spec| spec.id())
+            .ok_or(InterpreterError::StageResolution {
+                stage: target_stage,
+                kind: kirin_interpreter::StageResolutionError::NoSpecialization { staged_function },
+            })?;
+
+        Ok(Continuation::Call {
+            callee,
+            stage: target_stage,
+            args: smallvec![],
+            results: smallvec![self.result_a, self.result_b],
+        })
+    }
+}
+
+/// A terminator that reads two values and sums them into a single Return.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+#[kirin(builders, terminator, type = ArithType, crate = kirin_ir)]
+struct SumReturn {
+    a: SSAValue,
+    b: SSAValue,
+}
+
+impl<'ir, I> kirin_interpreter::Interpretable<'ir, I> for SumReturn
+where
+    I: kirin_interpreter::Interpreter<'ir>,
+    I::Value: Clone + std::ops::Add<Output = I::Value>,
+{
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: kirin_interpreter::Interpretable<'ir, I> + 'ir,
+    {
+        let a = interp.read(self.a)?;
+        let b = interp.read(self.b)?;
+        Ok(Continuation::Return(smallvec![a + b]))
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Dialect,
+    kirin_derive_interpreter::Interpretable,
+    kirin_derive_interpreter::CallSemantics,
+)]
+#[wraps]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
+enum MultiResultLang {
+    #[callable]
+    FunctionBody(FunctionBody<ArithType>),
+    Constant(Constant<ArithValue, ArithType>),
+    #[kirin(terminator)]
+    MultiReturn(MultiReturn),
+    MultiResultCall(MultiResultCall),
+    #[kirin(terminator)]
+    SumReturn(SumReturn),
+    #[kirin(terminator)]
+    Return(Return<ArithType>),
+}
+
+#[test]
+fn test_multi_result_writeback() {
+    let mut pipeline: Pipeline<StageInfo<MultiResultLang>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    // Build callee: returns (10, 20) via MultiReturn
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let callee_staged = pipeline
+        .staged_function::<MultiResultLang>()
+        .func(callee_func)
+        .stage(stage_id)
+        .new()
+        .unwrap();
+
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let multi_ret = MultiReturn::new(b, 10, 20);
+        let block = b.block().terminator(multi_ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            Signature::new(vec![], ArithType::default(), ()),
+        );
+        b.specialize()
+            .staged_func(callee_staged)
+            .body(body)
+            .new()
+            .unwrap();
+    });
+
+    // Build caller: calls callee, receives two results, sums them, returns sum.
+    let caller_func = pipeline.function().name("caller").new().unwrap();
+    let caller_staged = pipeline
+        .staged_function::<MultiResultLang>()
+        .func(caller_func)
+        .stage(stage_id)
+        .new()
+        .unwrap();
+
+    let caller_spec = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let call = MultiResultCall::new(b, callee_func, stage_id);
+        let sum_ret = SumReturn::new(
+            b,
+            SSAValue::from(call.result_a),
+            SSAValue::from(call.result_b),
+        );
+        let block = b.block().stmt(call).terminator(sum_ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            Signature::new(vec![], ArithType::default(), ()),
+        );
+        b.specialize()
+            .staged_func(caller_staged)
+            .body(body)
+            .new()
+            .unwrap()
+    });
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
+    let result = interp.call(caller_spec, stage_id, &[]).unwrap();
+    assert_eq!(
+        result[0], 30,
+        "expected 10 + 20 = 30 from multi-result call"
+    );
+}
+
+/// A terminator that returns a single value via `Continuation::Return`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+#[kirin(builders, terminator, type = ArithType, crate = kirin_ir)]
+struct SingleReturn {
+    val: i64,
+}
+
+impl<'ir, I> kirin_interpreter::Interpretable<'ir, I> for SingleReturn
+where
+    I: kirin_interpreter::Interpreter<'ir>,
+    I::Value: From<i64>,
+{
+    fn interpret<L>(&self, _interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: kirin_interpreter::Interpretable<'ir, I> + 'ir,
+    {
+        Ok(Continuation::Return(smallvec![I::Value::from(self.val)]))
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Dialect,
+    kirin_derive_interpreter::Interpretable,
+    kirin_derive_interpreter::CallSemantics,
+)]
+#[wraps]
+#[kirin(builders, type = ArithType, crate = kirin_ir)]
+enum ArityMismatchLang {
+    #[callable]
+    FunctionBody(FunctionBody<ArithType>),
+    MultiResultCall(MultiResultCall),
+    #[kirin(terminator)]
+    SingleReturn(SingleReturn),
+    #[kirin(terminator)]
+    Return(Return<ArithType>),
+}
+
+#[test]
+fn test_multi_result_arity_mismatch() {
+    // Caller expects 2 results but callee returns 1 — should get ArityMismatch.
+    let mut pipeline: Pipeline<StageInfo<ArityMismatchLang>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    // Build callee: returns single value (42)
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let callee_staged = pipeline
+        .staged_function::<ArityMismatchLang>()
+        .func(callee_func)
+        .stage(stage_id)
+        .new()
+        .unwrap();
+
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let single_ret = SingleReturn::new(b, 42);
+        let block = b.block().terminator(single_ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            Signature::new(vec![], ArithType::default(), ()),
+        );
+        b.specialize()
+            .staged_func(callee_staged)
+            .body(body)
+            .new()
+            .unwrap();
+    });
+
+    // Build caller: calls callee with 2 result slots but callee returns 1
+    let caller_func = pipeline.function().name("caller").new().unwrap();
+    let caller_staged = pipeline
+        .staged_function::<ArityMismatchLang>()
+        .func(caller_func)
+        .stage(stage_id)
+        .new()
+        .unwrap();
+
+    let caller_spec = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let call = MultiResultCall::new(b, callee_func, stage_id);
+        let ret = Return::<ArithType>::new(b, SSAValue::from(call.result_a));
+        let block = b.block().stmt(call).terminator(ret).new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            Signature::new(vec![], ArithType::default(), ()),
+        );
+        b.specialize()
+            .staged_func(caller_staged)
+            .body(body)
+            .new()
+            .unwrap()
+    });
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
+    let err = interp.call(caller_spec, stage_id, &[]).unwrap_err();
+    assert!(
+        matches!(
+            err,
+            InterpreterError::ArityMismatch {
+                expected: 2,
+                got: 1,
+            }
+        ),
+        "expected ArityMismatch {{ expected: 2, got: 1 }}, got: {err:?}"
     );
 }

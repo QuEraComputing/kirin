@@ -3,6 +3,7 @@ use std::marker::PhantomData;
 use kirin_ir::{
     CompileStage, Dialect, HasStageInfo, SpecializedFunction, StageAction, StageInfo, StageMeta,
 };
+use smallvec::SmallVec;
 
 use super::StackInterpreter;
 use crate::{
@@ -59,10 +60,10 @@ where
     G: 'ir,
     L: Dialect
         + Interpretable<'ir, StackInterpreter<'ir, V, S, E, G>>
-        + CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, Result = V>
+        + CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, Result = SmallVec<[V; 1]>>
         + 'ir,
 {
-    type Output = V;
+    type Output = SmallVec<[V; 1]>;
     type Error = E;
 
     fn run(

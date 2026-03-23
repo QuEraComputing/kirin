@@ -2,6 +2,7 @@ use kirin_ir::{
     CompileStage, Dialect, GetInfo, HasStageInfo, SpecializedFunction, StageInfo, StageMeta,
     SupportsStageDispatch,
 };
+use smallvec::SmallVec;
 
 use super::StackInterpreter;
 use super::dispatch::CallDynAction;
@@ -24,9 +25,9 @@ where
         callee: SpecializedFunction,
         stage: CompileStage,
         args: &[V],
-    ) -> Result<V, E>
+    ) -> Result<SmallVec<[V; 1]>, E>
     where
-        for<'a> S: SupportsStageDispatch<CallDynAction<'a, 'ir, V, S, E, G>, V, E>,
+        for<'a> S: SupportsStageDispatch<CallDynAction<'a, 'ir, V, S, E, G>, SmallVec<[V; 1]>, E>,
     {
         let pipeline = self.pipeline;
         let mut action = CallDynAction {
@@ -42,10 +43,13 @@ where
         callee: SpecializedFunction,
         stage: &'ir StageInfo<L>,
         args: &[V],
-    ) -> Result<V, E>
+    ) -> Result<SmallVec<[V; 1]>, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect + Interpretable<'ir, Self> + CallSemantics<'ir, Self, Result = V> + 'ir,
+        L: Dialect
+            + Interpretable<'ir, Self>
+            + CallSemantics<'ir, Self, Result = SmallVec<[V; 1]>>
+            + 'ir,
     {
         let stage_id = expect_stage_id(stage);
         let spec = callee

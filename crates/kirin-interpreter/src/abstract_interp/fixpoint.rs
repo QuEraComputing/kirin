@@ -2,6 +2,7 @@ use kirin_ir::{
     Block, CompileStage, Dialect, GetInfo, HasStageInfo, SSAValue, SpecializedFunction,
     StageAction, StageInfo, StageMeta, SupportsStageDispatch,
 };
+use smallvec::SmallVec;
 
 use crate::result::AnalysisResult;
 use crate::{
@@ -146,7 +147,7 @@ where
             fp.worklist.push_unique(entry);
         }
 
-        let mut return_value: Option<V> = None;
+        let mut return_values: Option<SmallVec<[V; 1]>> = None;
         let mut iterations = 0;
 
         loop {
@@ -162,7 +163,7 @@ where
             }
 
             let control = self.eval_block(stage, block)?;
-            self.propagate_control::<L>(stage, &control, false, &mut return_value)?;
+            self.propagate_control::<L>(stage, &control, false, &mut return_values)?;
         }
 
         if self.narrowing_iterations > 0 {
@@ -179,7 +180,7 @@ where
                 for &block in &blocks {
                     let control = self.eval_block(stage, block)?;
                     changed |=
-                        self.propagate_control::<L>(stage, &control, true, &mut return_value)?;
+                        self.propagate_control::<L>(stage, &control, true, &mut return_values)?;
                 }
                 if !changed {
                     break;
@@ -189,7 +190,7 @@ where
 
         let frame = self.frames.pop()?;
         let (_callee, _stage, values, fp) = frame.into_parts();
-        Ok(AnalysisResult::new(values, fp.block_args, return_value))
+        Ok(AnalysisResult::new(values, fp.block_args, return_values))
     }
 
     // -- Internal helpers ---------------------------------------------------
@@ -243,7 +244,7 @@ where
         stage: &'ir StageInfo<L>,
         control: &Continuation<V>,
         narrowing: bool,
-        return_value: &mut Option<V>,
+        return_values: &mut Option<SmallVec<[V; 1]>>,
     ) -> Result<bool, E>
     where
         S: HasStageInfo<L>,
@@ -259,20 +260,25 @@ where
                     changed |= self.propagate_edge::<L>(stage, *block, args, narrowing)?;
                 }
             }
-            Continuation::Return(v) | Continuation::Yield(v) => {
-                *return_value = Some(match return_value.take() {
-                    Some(existing) => {
-                        if narrowing {
-                            existing.narrow(v)
-                        } else {
-                            existing.join(v)
+            Continuation::Return(values) | Continuation::Yield(values) => {
+                match (&mut *return_values, values) {
+                    (None, vs) => *return_values = Some(vs.clone()),
+                    (Some(existing), vs) if existing.len() != vs.len() => {
+                        return Err(InterpreterError::ArityMismatch {
+                            expected: existing.len(),
+                            got: vs.len(),
+                        }
+                        .into());
+                    }
+                    (Some(existing), vs) => {
+                        for (e, v) in existing.iter_mut().zip(vs.iter()) {
+                            *e = if narrowing { e.narrow(v) } else { e.join(v) };
                         }
                     }
-                    None => v.clone(),
-                });
+                }
             }
             // Call is handled inline in `eval_block` (the call handler writes
-            // the return value directly), so it never reaches propagation.
+            // the return values directly), so it never reaches propagation.
             Continuation::Continue | Continuation::Call { .. } => {}
             Continuation::Ext(inf) => match *inf {},
         }

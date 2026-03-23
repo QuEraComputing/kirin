@@ -49,11 +49,11 @@ pub trait BlockEvaluator<'ir>: ValueStore + StageAccess<'ir> + 'ir {
 
     /// Execute a body block whose arguments have already been bound.
     ///
-    /// Returns a [`Continuation`] representing the block's result. The
+    /// Returns a [`Continuation`] representing the block's result values. The
     /// concrete variant depends on the interpreter: `StackInterpreter`
-    /// always returns `Continuation::Yield(values)` (using cursor-based
-    /// execution internally), while other implementations may propagate
-    /// the terminator's continuation directly.
+    /// always returns `Continuation::Yield(SmallVec<[V; 1]>)` (using
+    /// cursor-based execution internally), while other implementations may
+    /// propagate the terminator's continuation directly.
     ///
     /// The caller must call [`bind_block_args`](Self::bind_block_args) first
     /// to write values into the block's argument SSA slots.

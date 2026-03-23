@@ -250,7 +250,7 @@ where
             callee,
             stage: stage_id,
             args,
-            result: self.result(),
+            results: smallvec::smallvec![self.result()],
         })
     }
 }
@@ -268,7 +268,7 @@ where
         L: Interpretable<'ir, I> + 'ir,
     {
         let v = interp.read(self.value)?;
-        Ok(Continuation::Return(v))
+        Ok(Continuation::Return(smallvec::smallvec![v]))
     }
 }
 

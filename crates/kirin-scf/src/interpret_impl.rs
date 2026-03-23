@@ -203,8 +203,8 @@ where
         interp.bind_block_args(stage, block, &[])?;
         let control = interp.eval_block(stage, block)?;
         match control {
-            Continuation::Yield(value) => {
-                interp.write(self.result, value)?;
+            Continuation::Yield(values) => {
+                interp.write(self.result, values.into_iter().next().unwrap())?;
                 Ok(Continuation::Continue)
             }
             other => Ok(other),
@@ -245,10 +245,10 @@ where
 
             let control = interp.eval_block(stage, self.body)?;
             match control {
-                Continuation::Yield(value) => {
+                Continuation::Yield(values) => {
                     // The yielded value feeds back as loop-carried state for next iteration.
                     if !self.init_args.is_empty() {
-                        carried = vec![value];
+                        carried = vec![values.into_iter().next().unwrap()];
                     }
                 }
                 other => return Ok(other),
@@ -282,7 +282,7 @@ where
         L: Interpretable<'ir, I> + 'ir,
     {
         let v = interp.read(self.value)?;
-        Ok(Continuation::Yield(v))
+        Ok(Continuation::Yield(smallvec::smallvec![v]))
     }
 }
 

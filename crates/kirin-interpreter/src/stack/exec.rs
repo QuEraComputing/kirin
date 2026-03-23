@@ -1,7 +1,8 @@
-use kirin_ir::{ResultValue, StageMeta};
+use kirin_ir::StageMeta;
+use smallvec::SmallVec;
 
 use super::StackInterpreter;
-use crate::{ConcreteExt, Continuation, InterpreterError, ValueStore};
+use crate::{ConcreteExt, Continuation, InterpreterError};
 
 // -- Execution engine -------------------------------------------------------
 
@@ -88,20 +89,20 @@ where
     ///
     /// Runs until a `Return` or `Yield` continuation triggers exit (determined
     /// by `should_exit`). Nested `Call`s are tracked and their return values
-    /// written back automatically.
+    /// written back automatically with arity checking.
     ///
     /// `should_exit(interp, is_yield)` is called after `advance` for each
-    /// `Return`/`Yield`. Return `true` to exit the loop with the value.
-    pub(crate) fn run_nested_calls<F>(&mut self, mut should_exit: F) -> Result<V, E>
+    /// `Return`/`Yield`. Return `true` to exit the loop with the values.
+    pub(crate) fn run_nested_calls<F>(&mut self, mut should_exit: F) -> Result<SmallVec<[V; 1]>, E>
     where
         F: FnMut(&Self, bool) -> bool,
     {
-        let mut pending_results: Vec<ResultValue> = Vec::new();
+        let mut pending_results: Vec<SmallVec<[kirin_ir::ResultValue; 1]>> = Vec::new();
         loop {
             let control = self.run()?;
             match &control {
-                Continuation::Call { result, .. } => {
-                    pending_results.push(*result);
+                Continuation::Call { results, .. } => {
+                    pending_results.push(results.clone());
                 }
                 Continuation::Return(_) | Continuation::Yield(_) => {}
                 Continuation::Ext(ConcreteExt::Halt) => {
@@ -118,20 +119,20 @@ where
                 }
             }
 
-            let v = match &control {
-                Continuation::Return(v) | Continuation::Yield(v) => Some(v.clone()),
+            let values = match &control {
+                Continuation::Return(vs) | Continuation::Yield(vs) => Some(vs.clone()),
                 _ => None,
             };
 
             let is_yield = matches!(&control, Continuation::Yield(_));
             self.advance(&control)?;
 
-            if let Some(v) = v {
+            if let Some(values) = values {
                 if should_exit(self, is_yield) {
-                    return Ok(v);
+                    return Ok(values);
                 }
-                let result = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
-                ValueStore::write(self, result, v)?;
+                let results = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
+                crate::write_results(self, &results, &values)?;
             }
         }
     }

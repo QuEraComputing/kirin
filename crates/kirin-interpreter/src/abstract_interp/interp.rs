@@ -332,7 +332,7 @@ where
                     callee,
                     stage: callee_stage,
                     args,
-                    result,
+                    results,
                 } => {
                     let handler = self.call_handler.ok_or_else(|| {
                         InterpreterError::UnexpectedControl(
@@ -340,8 +340,25 @@ where
                         )
                     })?;
                     let analysis = handler(self, callee, callee_stage, &args)?;
-                    let return_val = analysis.return_value().cloned().unwrap_or_else(V::bottom);
-                    self.write(result, return_val)?;
+                    match analysis.return_values() {
+                        Some(return_vals) => {
+                            if return_vals.len() != results.len() {
+                                return Err(InterpreterError::ArityMismatch {
+                                    expected: results.len(),
+                                    got: return_vals.len(),
+                                }
+                                .into());
+                            }
+                            for (rv, val) in results.iter().zip(return_vals.iter()) {
+                                self.write(*rv, val.clone())?;
+                            }
+                        }
+                        None => {
+                            for rv in &results {
+                                self.write(*rv, V::bottom())?;
+                            }
+                        }
+                    }
                 }
                 other => return Ok(other),
             }

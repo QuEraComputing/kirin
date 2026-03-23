@@ -1,4 +1,5 @@
 use kirin_ir::{Block, Dialect, HasStageInfo, SpecializedFunction, StageInfo, StageMeta};
+use smallvec::SmallVec;
 
 use crate::{BlockEvaluator, Interpreter, InterpreterError, StageAccess};
 
@@ -50,7 +51,7 @@ where
     S: StageMeta + 'ir,
     G: 'ir,
 {
-    type Result = V;
+    type Result = SmallVec<[V; 1]>;
 
     fn eval_call<L>(
         &self,
@@ -58,12 +59,12 @@ where
         stage: &'ir StageInfo<L>,
         callee: SpecializedFunction,
         args: &[V],
-    ) -> Result<V, E>
+    ) -> Result<SmallVec<[V; 1]>, E>
     where
         S: HasStageInfo<L>,
         E: From<InterpreterError>,
         L: crate::Interpretable<'ir, crate::StackInterpreter<'ir, V, S, E, G>>
-            + CallSemantics<'ir, crate::StackInterpreter<'ir, V, S, E, G>, Result = V>
+            + CallSemantics<'ir, crate::StackInterpreter<'ir, V, S, E, G>, Result = SmallVec<[V; 1]>>
             + 'ir,
     {
         let entry = self.entry_block::<L>(stage)?;

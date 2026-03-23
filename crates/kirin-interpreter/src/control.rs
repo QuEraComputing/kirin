@@ -3,6 +3,8 @@ use std::convert::Infallible;
 use kirin_ir::{Block, CompileStage, ResultValue, SpecializedFunction};
 use smallvec::SmallVec;
 
+use crate::{InterpreterError, ValueStore};
+
 /// Inline argument list for continuation variants.
 ///
 /// Most block/call arguments fit in 2 elements (or are empty), so we
@@ -32,20 +34,20 @@ pub enum Continuation<V, Ext = Infallible> {
     /// `None`, which cannot happen for concrete values. The concrete
     /// interpreter panics if it encounters this variant.
     Fork(SmallVec<[(Block, Args<V>); 2]>),
-    /// Call a specialized function with arguments, writing the return value
-    /// to `result` in the caller's frame.
+    /// Call a specialized function with arguments, writing the return values
+    /// to `results` in the caller's frame.
     Call {
         callee: SpecializedFunction,
         stage: CompileStage,
         args: Args<V>,
-        /// Where to write the return value in the caller's frame.
-        result: ResultValue,
+        /// Where to write the return values in the caller's frame.
+        results: SmallVec<[ResultValue; 1]>,
     },
-    /// Return a single value from the current function frame.
-    Return(V),
-    /// Yield a value from an inline body block (e.g. `scf.yield`) without
+    /// Return values from the current function frame.
+    Return(SmallVec<[V; 1]>),
+    /// Yield values from an inline body block (e.g. `scf.yield`) without
     /// popping a call frame. The parent operation handles cursor restoration.
-    Yield(V),
+    Yield(SmallVec<[V; 1]>),
     /// Interpreter-specific extension variant.
     Ext(Ext),
 }
@@ -57,4 +59,31 @@ pub enum ConcreteExt {
     Break,
     /// Terminate the session.
     Halt,
+}
+
+/// Write multiple return/yield values to their corresponding result slots
+/// with arity checking.
+///
+/// Returns [`InterpreterError::ArityMismatch`] if the number of values
+/// does not match the number of result slots.
+pub fn write_results<S>(
+    store: &mut S,
+    results: &[ResultValue],
+    values: &SmallVec<[S::Value; 1]>,
+) -> Result<(), S::Error>
+where
+    S: ValueStore,
+    S::Error: From<InterpreterError>,
+{
+    if results.len() != values.len() {
+        return Err(InterpreterError::ArityMismatch {
+            expected: results.len(),
+            got: values.len(),
+        }
+        .into());
+    }
+    for (rv, val) in results.iter().zip(values.iter()) {
+        store.write(*rv, val.clone())?;
+    }
+    Ok(())
 }

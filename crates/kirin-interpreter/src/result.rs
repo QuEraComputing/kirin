@@ -1,16 +1,20 @@
 use kirin_ir::{Block, Lattice, SSAValue};
 use rustc_hash::FxHashMap;
+use smallvec::SmallVec;
 
 /// Result of an abstract interpretation analysis run.
 ///
 /// Stores a single flat map of all SSA values (both block arguments and
 /// statement results), per-block argument SSA value IDs for visited-block
-/// tracking, and the joined return value from all `Return` control flow paths.
+/// tracking, and the joined return values from all `Return` control flow paths.
+///
+/// Multi-result functions store one lattice element per return position
+/// (product lattice `L^n`), which is more precise than a single flat join.
 pub struct AnalysisResult<V> {
     values: FxHashMap<SSAValue, V>,
     /// Per-block argument SSA value IDs (values live in `values`).
     block_args: FxHashMap<Block, Vec<SSAValue>>,
-    return_value: Option<V>,
+    return_values: Option<SmallVec<[V; 1]>>,
 }
 
 impl<V: std::fmt::Debug> std::fmt::Debug for AnalysisResult<V> {
@@ -18,7 +22,7 @@ impl<V: std::fmt::Debug> std::fmt::Debug for AnalysisResult<V> {
         f.debug_struct("AnalysisResult")
             .field("values", &self.values)
             .field("block_args", &self.block_args)
-            .field("return_value", &self.return_value)
+            .field("return_values", &self.return_values)
             .finish()
     }
 }
@@ -28,7 +32,7 @@ impl<V: Clone> Clone for AnalysisResult<V> {
         Self {
             values: self.values.clone(),
             block_args: self.block_args.clone(),
-            return_value: self.return_value.clone(),
+            return_values: self.return_values.clone(),
         }
     }
 }
@@ -39,19 +43,19 @@ impl<V> AnalysisResult<V> {
         Self {
             values: FxHashMap::default(),
             block_args: FxHashMap::default(),
-            return_value: None,
+            return_values: None,
         }
     }
 
     pub fn new(
         values: FxHashMap<SSAValue, V>,
         block_args: FxHashMap<Block, Vec<SSAValue>>,
-        return_value: Option<V>,
+        return_values: Option<SmallVec<[V; 1]>>,
     ) -> Self {
         Self {
             values,
             block_args,
-            return_value,
+            return_values,
         }
     }
 
@@ -74,9 +78,14 @@ impl<V> AnalysisResult<V> {
         self.block_args.keys()
     }
 
-    /// Get the joined return value from all return paths.
+    /// Get the joined return values from all return paths.
+    pub fn return_values(&self) -> Option<&SmallVec<[V; 1]>> {
+        self.return_values.as_ref()
+    }
+
+    /// Backward-compatible accessor: get the first return value.
     pub fn return_value(&self) -> Option<&V> {
-        self.return_value.as_ref()
+        self.return_values.as_ref().and_then(|vs| vs.first())
     }
 
     /// Check if this result is subsumed by `other` (i.e. `self ⊑ other`).
@@ -88,9 +97,18 @@ impl<V> AnalysisResult<V> {
     where
         V: Lattice,
     {
-        // Check return values
-        match (&self.return_value, &other.return_value) {
-            (Some(a), Some(b)) if !a.is_subseteq(b) => return false,
+        // Check return values (pointwise comparison for multi-result)
+        match (&self.return_values, &other.return_values) {
+            (Some(a), Some(b)) => {
+                if a.len() != b.len() {
+                    return false;
+                }
+                for (av, bv) in a.iter().zip(b.iter()) {
+                    if !av.is_subseteq(bv) {
+                        return false;
+                    }
+                }
+            }
             (Some(_), None) => return false,
             _ => {}
         }
@@ -124,6 +142,7 @@ mod tests {
     use kirin_interval::Interval;
     use kirin_ir::{Arena, Block, TestSSAValue};
     use rustc_hash::FxHashMap;
+    use smallvec::smallvec;
 
     #[test]
     fn bottom_result_has_no_values() {
@@ -159,7 +178,7 @@ mod tests {
         let result = AnalysisResult::<Interval>::new(
             Default::default(),
             Default::default(),
-            Some(Interval::new(0, 10)),
+            Some(smallvec![Interval::new(0, 10)]),
         );
         assert!(result.is_subseteq(&result));
     }
@@ -169,12 +188,12 @@ mod tests {
         let narrow = AnalysisResult::<Interval>::new(
             Default::default(),
             Default::default(),
-            Some(Interval::new(2, 5)),
+            Some(smallvec![Interval::new(2, 5)]),
         );
         let wide = AnalysisResult::<Interval>::new(
             Default::default(),
             Default::default(),
-            Some(Interval::new(0, 10)),
+            Some(smallvec![Interval::new(0, 10)]),
         );
         assert!(narrow.is_subseteq(&wide));
         assert!(!wide.is_subseteq(&narrow));
@@ -185,7 +204,7 @@ mod tests {
         let with_return = AnalysisResult::<Interval>::new(
             Default::default(),
             Default::default(),
-            Some(Interval::constant(1)),
+            Some(smallvec![Interval::constant(1)]),
         );
         let without_return = AnalysisResult::<Interval>::bottom();
         // Some(_) is NOT subsumed by None
@@ -200,7 +219,11 @@ mod tests {
         let ssa: SSAValue = TestSSAValue(0).into();
         values.insert(ssa, Interval::constant(42));
 
-        let result = AnalysisResult::new(values, Default::default(), Some(Interval::constant(42)));
+        let result = AnalysisResult::new(
+            values,
+            Default::default(),
+            Some(smallvec![Interval::constant(42)]),
+        );
         let cloned = result.clone();
 
         assert_eq!(cloned.ssa_value(ssa), Some(&Interval::constant(42)));

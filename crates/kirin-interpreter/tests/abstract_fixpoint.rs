@@ -318,7 +318,7 @@ fn test_abstract_fixed_summary() {
     let fixed_result = AnalysisResult::new(
         Default::default(),
         Default::default(),
-        Some(Interval::new(100, 200)),
+        Some(smallvec::smallvec![Interval::new(100, 200)]),
     );
     interp
         .in_stage::<CompositeLanguage>()
