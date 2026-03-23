@@ -33,7 +33,7 @@ where
             .map(|ssa| interp.read(*ssa))
             .collect::<Result<_, _>>()?;
         let tuple = <I::Value as ProductValue>::new_product(values);
-        interp.write(self.result.into(), tuple)?;
+        interp.write(self.result, tuple)?;
         Ok(Continuation::Continue)
     }
 }
@@ -76,7 +76,7 @@ where
         let index_val = interp.read(self.index)?;
         let index = IndexValue::as_index(&index_val).map_err(I::Error::from)?;
         let element = ProductValue::get(&source, index).map_err(I::Error::from)?;
-        interp.write(self.result.into(), element)?;
+        interp.write(self.result, element)?;
         Ok(Continuation::Continue)
     }
 }
@@ -96,7 +96,7 @@ where
         let source = interp.read(self.source)?;
         let arity = ProductValue::len(&source).map_err(I::Error::from)?;
         let result_value = <I::Value as IndexValue>::from_index(arity);
-        interp.write(self.result.into(), result_value)?;
+        interp.write(self.result, result_value)?;
         Ok(Continuation::Continue)
     }
 }

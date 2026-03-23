@@ -27,7 +27,8 @@ pub trait ValueStore {
     ///
     /// Accepts `ResultValue`, `BlockArgument`, `SSAValue`, etc. — anything
     /// that converts to `SSAValue` via `Into`.
-    fn write(&mut self, target: SSAValue, value: Self::Value) -> Result<(), Self::Error>;
+    fn write(&mut self, target: impl Into<SSAValue>, value: Self::Value)
+    -> Result<(), Self::Error>;
 
     /// Bind multiple results to values with arity checking.
     ///
@@ -49,7 +50,7 @@ pub trait ValueStore {
             .into());
         }
         for (rv, val) in results.iter().zip(values.iter()) {
-            self.write((*rv).into(), val.clone())?;
+            self.write(SSAValue::from(*rv), val.clone())?;
         }
         Ok(())
     }
@@ -70,11 +71,11 @@ pub trait ValueStore {
     {
         match results.len() {
             0 => Ok(()),
-            1 => self.write(results[0].into(), value),
+            1 => self.write(SSAValue::from(results[0]), value),
             _ => {
                 for (i, rv) in results.iter().enumerate() {
                     let element = ProductValue::get(&value, i).map_err(Self::Error::from)?;
-                    self.write((*rv).into(), element)?;
+                    self.write(SSAValue::from(*rv), element)?;
                 }
                 Ok(())
             }

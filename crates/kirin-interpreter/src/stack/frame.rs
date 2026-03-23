@@ -102,8 +102,8 @@ where
         self.frames.read(value).cloned()
     }
 
-    fn write(&mut self, target: SSAValue, value: V) -> Result<(), E> {
-        self.frames.write_ssa(target, value)
+    fn write(&mut self, target: impl Into<SSAValue>, value: V) -> Result<(), E> {
+        self.frames.write_ssa(target.into(), value)
     }
 }
 

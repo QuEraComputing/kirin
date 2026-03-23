@@ -277,8 +277,8 @@ where
         self.frames.read(value).cloned()
     }
 
-    fn write(&mut self, target: SSAValue, value: V) -> Result<(), E> {
-        self.frames.write_ssa(target, value)
+    fn write(&mut self, target: impl Into<SSAValue>, value: V) -> Result<(), E> {
+        self.frames.write_ssa(target.into(), value)
     }
 }
 
@@ -342,12 +342,12 @@ where
                             // For multi-result, the abstract value is a product
                             // in the lattice — the dialect's AbstractValue handles it.
                             for rv in &results {
-                                self.write((*rv).into(), return_val.clone())?;
+                                self.write(*rv, return_val.clone())?;
                             }
                         }
                         None => {
                             for rv in &results {
-                                self.write((*rv).into(), V::bottom())?;
+                                self.write(*rv, V::bottom())?;
                             }
                         }
                     }
