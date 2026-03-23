@@ -24,6 +24,7 @@ members = [
   "crates/kirin-lexer",
   "crates/kirin-prettyless",
   "crates/kirin-scf",
+  "crates/kirin-unpack",
   "crates/kirin-test-languages",
   "crates/kirin-test-types",
   "crates/kirin-test-utils",
@@ -78,6 +79,7 @@ kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }
 kirin-lexer = { path = "crates/kirin-lexer", version = "0.1.0" }
 kirin-prettyless = { path = "crates/kirin-prettyless", version = "0.1.0" }
 kirin-scf = { path = "crates/kirin-scf", version = "0.1.0" }
+kirin-unpack = { path = "crates/kirin-unpack", version = "0.1.0" }
 kirin-test-languages = { path = "crates/kirin-test-languages", version = "0.1.0" }
 kirin-test-types = { path = "crates/kirin-test-types", version = "0.1.0" }
 kirin-test-utils = { path = "crates/kirin-test-utils", version = "0.1.0" }
@@ -114,6 +116,7 @@ kirin-cmp = { workspace = true }
 kirin-constant = { workspace = true }
 kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
+kirin-unpack = { workspace = true }
 kirin-test-languages = { workspace = true, features = [
   "arith-function-language",
   "bitwise-function-language",

@@ -718,6 +718,7 @@ dependencies = [
  "kirin-scf",
  "kirin-test-languages",
  "kirin-test-utils",
+ "kirin-unpack",
  "serde",
  "trybuild",
 ]
@@ -981,6 +982,16 @@ dependencies = [
  "kirin-prettyless",
  "kirin-test-languages",
  "kirin-test-types",
+]
+
+[[package]]
+name = "kirin-unpack"
+version = "0.1.0"
+dependencies = [
+ "kirin",
+ "kirin-interpreter",
+ "kirin-test-types",
+ "smallvec",
 ]
 
 [[package]]
