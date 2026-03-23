@@ -277,11 +277,7 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        let values: SmallVec<[I::Value; 1]> = self
-            .values
-            .iter()
-            .map(|ssa| interp.read(*ssa))
-            .collect::<Result<_, _>>()?;
+        let values = interp.read_many(&self.values)?;
         Ok(Continuation::Yield(values))
     }
 }

@@ -19,6 +19,11 @@ pub trait ValueStore {
     /// Returns a cloned copy of the bound value.
     fn read(&self, value: SSAValue) -> Result<Self::Value, Self::Error>;
 
+    /// Read multiple SSA values into a `SmallVec`.
+    fn read_many(&self, values: &[SSAValue]) -> Result<SmallVec<[Self::Value; 1]>, Self::Error> {
+        values.iter().map(|ssa| self.read(*ssa)).collect()
+    }
+
     /// Bind a single result to a value.
     fn write(&mut self, result: ResultValue, value: Self::Value) -> Result<(), Self::Error>;
 
