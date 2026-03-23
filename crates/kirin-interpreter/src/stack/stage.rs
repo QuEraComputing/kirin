@@ -2,13 +2,12 @@ use kirin_ir::{Dialect, HasStageInfo, SpecializedFunction, StageMeta};
 
 use super::StackInterpreter;
 use crate::{
-    CallSemantics, ConcreteExt, Continuation, Interpretable, InterpreterError, ProductValue,
-    StageAccess, Staged,
+    CallSemantics, ConcreteExt, Continuation, Interpretable, InterpreterError, StageAccess, Staged,
 };
 
 impl<'a, 'ir, V, S, E, G, L> Staged<'a, 'ir, StackInterpreter<'ir, V, S, E, G>, L>
 where
-    V: Clone + ProductValue + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,

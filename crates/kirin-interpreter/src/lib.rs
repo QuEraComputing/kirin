@@ -31,7 +31,7 @@ pub use frame::Frame;
 pub use frame_stack::FrameStack;
 pub use interpretable::Interpretable;
 pub use interpreter::Interpreter;
-pub use product_value::{ProductValue, write_statement_results};
+pub use product_value::ProductValue;
 pub use result::AnalysisResult;
 pub use scheduler::DedupScheduler;
 pub use stack::StackInterpreter;

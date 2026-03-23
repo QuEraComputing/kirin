@@ -1,7 +1,7 @@
-use kirin_ir::{Product, ResultValue};
+use kirin_ir::Product;
 use smallvec::SmallVec;
 
-use crate::{InterpreterError, ValueStore};
+use crate::InterpreterError;
 
 /// Interpreter-level product value semantics.
 ///
@@ -62,33 +62,5 @@ impl ProductValue for i64 {
 
     fn from_product(_product: Product<Self>) -> Self {
         panic!("i64 does not support product types; use a value enum with a Product variant")
-    }
-}
-
-/// Auto-destructure a single value into multiple result slots.
-///
-/// If `results` has 0 or 1 entries, writes directly (no product overhead).
-/// If `results` has N > 1 entries, treats `value` as a product and writes
-/// each element to the corresponding result slot.
-pub fn write_statement_results<S>(
-    store: &mut S,
-    results: &[ResultValue],
-    value: S::Value,
-) -> Result<(), S::Error>
-where
-    S: ValueStore,
-    S::Value: ProductValue,
-    S::Error: From<InterpreterError>,
-{
-    match results.len() {
-        0 => Ok(()),
-        1 => store.write(results[0], value),
-        _ => {
-            for (i, rv) in results.iter().enumerate() {
-                let element = ProductValue::get(&value, i).map_err(S::Error::from)?;
-                store.write(*rv, element)?;
-            }
-            Ok(())
-        }
     }
 }

@@ -186,6 +186,10 @@ For user-defined dialects not in this table, ask the user for domain context dur
 
 - **Stage accessor naming**: `active_stage()` returns `CompileStage` (the stage key), `active_stage_info::<L>()` returns `&'ir StageInfo<L>` (the resolved dialect-specific stage info). Resolve once at the top of a method and pass through to avoid repeated lookups.
 
+- **`ValueStore` is the home for all value read/write operations**: Any function that reads or writes SSA values/results must be a provided method on `ValueStore`, not a standalone function. This includes `write_statement_results` (auto-destructuring products into result slots). Standalone functions that take `&mut impl ValueStore` violate this convention — they should be methods on the trait instead. The reason: it keeps the API surface discoverable and consistent, and allows dialect authors to override behavior if needed.
+
+- **Product types and multi-result**: Multi-result is syntactic sugar over product types. `Continuation::Return(V)` and `Yield(V)` are single-valued — when a function returns multiple values, `V` is a product. The framework auto-destructures products via `ValueStore::write_statement_results`. `ProductValue` is required on `StackInterpreter` because `eval_block` → `run_nested_calls` handles the "hidden unpack" for multi-result calls. Dialect authors who define `Vec<ResultValue>` fields (e.g., `Call`, `Return`, `Yield`) own the multi-value semantics and must require `ProductValue` on their interpret impls. See `docs/design/multi-result-values.md` for the full design.
+
 ## Chumsky Parser Conventions
 
 - **Single lifetime `HasParser<'t>`**: All parser traits use a single lifetime `'t` (the input text lifetime). The old two-lifetime system (`HasParser<'tokens, 'src>`) has been collapsed. `HasDialectParser<'t>` has 4 required items: `Output` type, `namespaced_parser`, `clone_output`, `eq_output` — `recursive_parser` has a default impl.

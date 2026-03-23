@@ -1,6 +1,6 @@
 use kirin_ir::{ResultValue, SSAValue};
 
-use crate::InterpreterError;
+use crate::{InterpreterError, ProductValue};
 
 /// Value read/write operations for SSA bindings.
 ///
@@ -49,6 +49,33 @@ pub trait ValueStore {
             self.write(*rv, val.clone())?;
         }
         Ok(())
+    }
+
+    /// Auto-destructure a single value into multiple result slots.
+    ///
+    /// If `results` has 0 or 1 entries, writes directly (no product overhead).
+    /// If `results` has N > 1 entries, treats `value` as a product and writes
+    /// each element to the corresponding result slot.
+    fn write_statement_results(
+        &mut self,
+        results: &[ResultValue],
+        value: Self::Value,
+    ) -> Result<(), Self::Error>
+    where
+        Self::Value: ProductValue,
+        Self::Error: From<InterpreterError>,
+    {
+        match results.len() {
+            0 => Ok(()),
+            1 => self.write(results[0], value),
+            _ => {
+                for (i, rv) in results.iter().enumerate() {
+                    let element = ProductValue::get(&value, i).map_err(Self::Error::from)?;
+                    self.write(*rv, element)?;
+                }
+                Ok(())
+            }
+        }
     }
 
     /// Bind an SSA value directly (e.g. block arguments).

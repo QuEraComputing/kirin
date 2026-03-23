@@ -6,16 +6,13 @@ use kirin_ir::{
 use super::StackInterpreter;
 use super::dispatch::CallDynAction;
 use crate::stage::expect_stage_id;
-use crate::{
-    BlockEvaluator, CallSemantics, Continuation, Frame, Interpretable, InterpreterError,
-    ProductValue,
-};
+use crate::{BlockEvaluator, CallSemantics, Continuation, Frame, Interpretable, InterpreterError};
 
 // -- Call (inherent, not on the trait) --------------------------------------
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone + ProductValue + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,

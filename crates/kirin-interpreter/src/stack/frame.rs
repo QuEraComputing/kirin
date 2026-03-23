@@ -6,8 +6,8 @@ use kirin_ir::{
 use super::{DynFrameDispatch, FrameDispatchAction, StackFrame, StackFrameExtra, StackInterpreter};
 use crate::dispatch::DispatchCache;
 use crate::{
-    BlockEvaluator, ConcreteExt, Continuation, Frame, Interpretable, InterpreterError,
-    ProductValue, StageAccess, ValueStore,
+    BlockEvaluator, ConcreteExt, Continuation, Frame, Interpretable, InterpreterError, StageAccess,
+    ValueStore,
 };
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
@@ -19,7 +19,7 @@ where
         pipeline: &'ir Pipeline<S>,
     ) -> DispatchCache<DynFrameDispatch<'ir, V, S, E, G>>
     where
-        V: Clone + ProductValue + 'ir,
+        V: Clone + crate::ProductValue + 'ir,
         E: 'ir,
         S: 'ir
             + SupportsStageDispatch<
@@ -64,7 +64,7 @@ where
     /// `frame.stage()`. Fails atomically when depth or stage dispatch checks fail.
     pub fn push_frame(&mut self, frame: Frame<V, Option<Statement>>) -> Result<(), E>
     where
-        V: Clone + ProductValue + 'ir,
+        V: Clone + crate::ProductValue + 'ir,
         E: 'ir,
         S: 'ir,
         G: 'ir,
@@ -90,7 +90,7 @@ where
 
 impl<'ir, V, S, E, G> ValueStore for StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,
@@ -113,7 +113,7 @@ where
 
 impl<'ir, V, S, E, G> StageAccess<'ir> for StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,
@@ -131,7 +131,7 @@ where
 
 impl<'ir, V, S, E, G> BlockEvaluator<'ir> for StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone + ProductValue + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,

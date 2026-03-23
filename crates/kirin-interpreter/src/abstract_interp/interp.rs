@@ -342,9 +342,9 @@ where
                     let analysis = handler(self, callee, callee_stage, &args)?;
                     match analysis.return_value() {
                         Some(return_val) => {
-                            // Single return value: write to all result slots.
-                            // For multi-result calls with ProductValue support,
-                            // use write_statement_results instead.
+                            // Write the single return value to all result slots.
+                            // For multi-result, the abstract value is a product
+                            // in the lattice — the dialect's AbstractValue handles it.
                             for rv in &results {
                                 self.write(*rv, return_val.clone())?;
                             }

@@ -6,8 +6,7 @@ use kirin_ir::{
 
 use super::StackInterpreter;
 use crate::{
-    CallSemantics, ConcreteExt, Continuation, Interpretable, InterpreterError, ProductValue,
-    StageAccess,
+    CallSemantics, ConcreteExt, Continuation, Interpretable, InterpreterError, StageAccess,
 };
 
 pub(super) type DynStepFn<'ir, V, S, E, G> =
@@ -54,7 +53,7 @@ where
 
 impl<'a, 'ir, V, S, E, G, L> StageAction<S, L> for CallDynAction<'a, 'ir, V, S, E, G>
 where
-    V: Clone + ProductValue + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
@@ -80,7 +79,7 @@ fn dyn_step_for_lang<'ir, V, S, E, G, L>(
     interp: &mut StackInterpreter<'ir, V, S, E, G>,
 ) -> Result<Continuation<V, ConcreteExt>, E>
 where
-    V: Clone + ProductValue + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
@@ -96,7 +95,7 @@ fn dyn_push_call_frame_for_lang<'ir, V, S, E, G, L>(
     args: &[V],
 ) -> Result<(), E>
 where
-    V: Clone + ProductValue + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
@@ -111,7 +110,7 @@ fn dyn_advance_for_lang<'ir, V, S, E, G, L>(
     control: &Continuation<V, ConcreteExt>,
 ) -> Result<(), E>
 where
-    V: Clone + ProductValue + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
@@ -132,7 +131,7 @@ where
 
 impl<'ir, V, S, E, G, L> StageAction<S, L> for FrameDispatchAction<'ir, V, S, E, G>
 where
-    V: Clone + ProductValue + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,

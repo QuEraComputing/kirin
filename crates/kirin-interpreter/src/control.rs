@@ -32,13 +32,19 @@ pub enum Continuation<V, Ext = Infallible> {
     /// `None`, which cannot happen for concrete values. The concrete
     /// interpreter panics if it encounters this variant.
     Fork(SmallVec<[(Block, Args<V>); 2]>),
-    /// Call a specialized function with arguments, writing the return values
-    /// to `results` in the caller's frame.
+    /// Call a specialized function with arguments, writing the return value
+    /// to the result slots in the caller's frame.
+    ///
+    /// The function returns a single value (possibly a product). The framework
+    /// auto-destructures the product into the result slots — this is the
+    /// "hidden unpack" that makes `%a, %b = call @f(...)` work.
     Call {
         callee: SpecializedFunction,
         stage: CompileStage,
         args: Args<V>,
-        /// Where to write the return values in the caller's frame.
+        /// Where to write the return value(s) in the caller's frame.
+        /// Single-result: one slot, value written directly.
+        /// Multi-result: framework auto-destructures the product.
         results: SmallVec<[ResultValue; 1]>,
     },
     /// Return a value from the current function frame.

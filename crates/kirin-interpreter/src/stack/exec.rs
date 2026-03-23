@@ -2,13 +2,13 @@ use kirin_ir::StageMeta;
 use smallvec::SmallVec;
 
 use super::StackInterpreter;
-use crate::{ConcreteExt, Continuation, InterpreterError, ProductValue};
+use crate::{ConcreteExt, Continuation, InterpreterError, ProductValue, ValueStore};
 
 // -- Execution engine -------------------------------------------------------
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone + ProductValue + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,
@@ -89,7 +89,9 @@ where
     ///
     /// Runs until a `Return` or `Yield` continuation triggers exit (determined
     /// by `should_exit`). Nested `Call`s are tracked and their return values
-    /// written back automatically via [`write_statement_results`].
+    /// written back automatically. For multi-result calls, the framework
+    /// auto-destructures the single return product into the result slots
+    /// (the "hidden unpack" that makes `%a, %b = call @f(...)` work).
     ///
     /// `should_exit(interp, is_yield)` is called after `advance` for each
     /// `Return`/`Yield`. Return `true` to exit the loop with the value.
@@ -128,12 +130,13 @@ where
             let is_yield = matches!(&control, Continuation::Yield(_));
             self.advance(&control)?;
 
-            if let Some(value) = value {
+            if let Some(v) = value {
                 if should_exit(self, is_yield) {
-                    return Ok(value);
+                    return Ok(v);
                 }
                 let results = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
-                crate::write_statement_results(self, &results, value)?;
+                // Auto-destructure: the "hidden unpack" from product to result slots
+                self.write_statement_results(&results, v)?;
             }
         }
     }

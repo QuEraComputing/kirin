@@ -1,7 +1,6 @@
 use kirin::prelude::{CompileTimeValue, HasStageInfo};
 use kirin_interpreter::{
     BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError, ProductValue,
-    write_statement_results,
 };
 use smallvec::smallvec;
 
@@ -205,7 +204,7 @@ where
         let control = interp.eval_block(stage, block)?;
         match control {
             Continuation::Yield(v) => {
-                write_statement_results(interp, &self.results, v)?;
+                interp.write_statement_results(&self.results, v)?;
                 Ok(Continuation::Continue)
             }
             other => Ok(other),
@@ -266,7 +265,7 @@ where
         }
 
         // Write final loop-carried state to results via auto-destructuring.
-        write_statement_results(interp, &self.results, carried)?;
+        interp.write_statement_results(&self.results, carried)?;
 
         Ok(Continuation::Continue)
     }
