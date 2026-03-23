@@ -2,7 +2,7 @@ use kirin::prelude::{CompileTimeValue, Dialect, GetInfo, HasRegionBody, HasStage
 use kirin_interpreter::{
     Continuation, Interpretable, Interpreter, InterpreterError, SSACFGRegion, StageResolutionError,
 };
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 
 use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
 
@@ -250,7 +250,7 @@ where
             callee,
             stage: stage_id,
             args,
-            results: smallvec::smallvec![self.result()],
+            results: self.results().iter().copied().collect(),
         })
     }
 }
@@ -267,8 +267,12 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        let v = interp.read(self.value)?;
-        Ok(Continuation::Return(smallvec::smallvec![v]))
+        let values = self
+            .values
+            .iter()
+            .map(|ssa| interp.read(*ssa))
+            .collect::<Result<SmallVec<[I::Value; 1]>, _>>()?;
+        Ok(Continuation::Return(values))
     }
 }
 

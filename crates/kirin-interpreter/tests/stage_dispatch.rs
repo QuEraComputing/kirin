@@ -164,7 +164,7 @@ fn specialize_return_const(
     with_arg: bool,
 ) -> SpecializedFunction {
     let c = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(value));
-    let ret = Return::<ArithType>::new(stage, c.result);
+    let ret = Return::<ArithType>::new(stage, vec![c.result.into()]);
     let block = stage.block().stmt(c).terminator(ret).new();
     let region = stage.region().add_block(block).new();
     let body = FunctionBody::<ArithType>::new(
@@ -205,7 +205,7 @@ fn build_cross_stage_recursive_body(
     let call_arg: SSAValue = stage.block_arena()[call_block].arguments[0].into();
 
     let c0 = Constant::<ArithValue, ArithType>::new(stage, ArithValue::I64(0));
-    let ret0 = Return::<ArithType>::new(stage, c0.result);
+    let ret0 = Return::<ArithType>::new(stage, vec![c0.result.into()]);
     {
         let stmts: Vec<Statement> = vec![c0.into()];
         for stmt in &stmts {
@@ -222,7 +222,7 @@ fn build_cross_stage_recursive_body(
     }
 
     let call = StageCall::<ArithType>::new(stage, target_func, target_stage, vec![call_arg]);
-    let ret = Return::<ArithType>::new(stage, call.result);
+    let ret = Return::<ArithType>::new(stage, vec![call.result.into()]);
     {
         let call_stmt: Statement = call.into();
         *stage.statement_arena_mut()[call_stmt].get_parent_mut() =
@@ -322,8 +322,8 @@ fn build_caller_with_function_call(
     target: &str,
 ) -> Statement {
     let target_symbol = stage.symbol_table_mut().intern(target.to_string());
-    let call = kirin_function::Call::<ArithType>::new(stage, target_symbol, vec![]);
-    let ret = Return::<ArithType>::new(stage, call.res);
+    let call = kirin_function::Call::<ArithType>::new(stage, 1, target_symbol, vec![]);
+    let ret = Return::<ArithType>::new(stage, vec![call.results[0].into()]);
     let block = stage.block().stmt(call).terminator(ret).new();
     let region = stage.region().add_block(block).new();
     FunctionBody::<ArithType>::new(

@@ -88,7 +88,7 @@ fn test_composes_with_constant_and_control_flow() {
     let const_a = Constant::<ArithValue, ArithType>::new(&mut stage, ArithValue::I32(0b1010));
     let const_b = Constant::<ArithValue, ArithType>::new(&mut stage, ArithValue::I32(0b1100));
     let and_stmt = Bitwise::<ArithType>::op_and(&mut stage, const_a.result, const_b.result);
-    let ret_stmt = Return::<ArithType>::new(&mut stage, and_stmt.result);
+    let ret_stmt = Return::<ArithType>::new(&mut stage, vec![and_stmt.result.into()]);
 
     let stage = stage.finalize().unwrap();
     let const_a_def = const_a

@@ -51,7 +51,7 @@ fn test_abstract_interp_constants() {
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(10));
         let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(32));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
-        let ret = Return::<ArithType>::new(b, add.result);
+        let ret = Return::<ArithType>::new(b, vec![add.result.into()]);
 
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
@@ -151,7 +151,7 @@ fn test_abstract_interp_call_caches_summary() {
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(7));
         let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(3));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
-        let ret = Return::<ArithType>::new(b, add.result);
+        let ret = Return::<ArithType>::new(b, vec![add.result.into()]);
 
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
@@ -460,7 +460,7 @@ fn test_abstract_analysis_result_ssa_values() {
             let c2_result = c2.result;
             let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
             let add_result = add.result;
-            let ret = Return::<ArithType>::new(b, add.result);
+            let ret = Return::<ArithType>::new(b, vec![add.result.into()]);
 
             let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
             let region = b.region().add_block(block).new();

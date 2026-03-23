@@ -92,7 +92,7 @@ fn build_add_one_eval_call(
 
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let sum = Arith::<ArithType>::op_add(b, x, c1.result);
-        let ret = Return::<ArithType>::new(b, sum.result);
+        let ret = Return::<ArithType>::new(b, vec![sum.result.into()]);
         let code_block = b.block().stmt(c1).stmt(sum).terminator(ret).new();
 
         let br = ControlFlow::<ArithType>::op_branch(b, Successor::from_block(code_block), vec![]);
@@ -128,7 +128,7 @@ fn build_add_one_interpretable(
 
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let sum = Arith::<ArithType>::op_add(b, x, c1.result);
-        let ret = Return::<ArithType>::new(b, sum.result);
+        let ret = Return::<ArithType>::new(b, vec![sum.result.into()]);
         let code_block = b.block().stmt(c1).stmt(sum).terminator(ret).new();
 
         let br = ControlFlow::<ArithType>::op_branch(b, Successor::from_block(code_block), vec![]);

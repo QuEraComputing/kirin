@@ -21,7 +21,7 @@ pub fn build_constants(
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(10));
         let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(32));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
-        let ret = Return::<ArithType>::new(b, add.result);
+        let ret = Return::<ArithType>::new(b, vec![add.result.into()]);
 
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
@@ -46,7 +46,7 @@ pub fn build_add_one(
         let ba_x = b.block_argument().index(0);
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, SSAValue::from(ba_x), c1.result);
-        let ret = Return::<ArithType>::new(b, add.result);
+        let ret = Return::<ArithType>::new(b, vec![add.result.into()]);
 
         let block = b
             .block()
@@ -80,7 +80,7 @@ pub fn build_linear_program(
         let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(10));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, c1.result, c2.result);
         let add_stmt: Statement = add.id;
-        let ret = Return::<ArithType>::new(b, add.result);
+        let ret = Return::<ArithType>::new(b, vec![add.result.into()]);
 
         let block = b.block().stmt(c1).stmt(c2).stmt(add).terminator(ret).new();
         let region = b.region().add_block(block).new();
@@ -122,7 +122,7 @@ pub fn build_select_program(
         // truthy_block(val): ret val
         let truthy_block = b.block().argument(ArithType::I64).new();
         let truthy_val: SSAValue = b.block_arena()[truthy_block].arguments[0].into();
-        let ret_truthy = Return::<ArithType>::new(b, truthy_val);
+        let ret_truthy = Return::<ArithType>::new(b, vec![truthy_val.into()]);
         {
             let truthy_info: &mut Item<BlockInfo<CompositeLanguage>> =
                 b.block_arena_mut().get_mut(truthy_block).unwrap();
@@ -132,7 +132,7 @@ pub fn build_select_program(
         // falsy_block(val): ret val
         let falsy_block = b.block().argument(ArithType::I64).new();
         let falsy_val: SSAValue = b.block_arena()[falsy_block].arguments[0].into();
-        let ret_falsy = Return::<ArithType>::new(b, falsy_val);
+        let ret_falsy = Return::<ArithType>::new(b, vec![falsy_val.into()]);
         {
             let falsy_info: &mut Item<BlockInfo<CompositeLanguage>> =
                 b.block_arena_mut().get_mut(falsy_block).unwrap();
@@ -205,7 +205,7 @@ pub fn build_branch_fork_program(
         // neg_block(val): ret val
         let neg_block = b.block().argument(ArithType::I64).new();
         let neg_val: SSAValue = b.block_arena()[neg_block].arguments[0].into();
-        let ret_neg = Return::<ArithType>::new(b, neg_val);
+        let ret_neg = Return::<ArithType>::new(b, vec![neg_val.into()]);
         {
             let neg_info: &mut Item<BlockInfo<CompositeLanguage>> =
                 b.block_arena_mut().get_mut(neg_block).unwrap();
@@ -215,7 +215,7 @@ pub fn build_branch_fork_program(
         // pos_block(val): ret val
         let pos_block = b.block().argument(ArithType::I64).new();
         let pos_val: SSAValue = b.block_arena()[pos_block].arguments[0].into();
-        let ret_pos = Return::<ArithType>::new(b, pos_val);
+        let ret_pos = Return::<ArithType>::new(b, vec![pos_val.into()]);
         {
             let pos_info: &mut Item<BlockInfo<CompositeLanguage>> =
                 b.block_arena_mut().get_mut(pos_block).unwrap();
@@ -290,7 +290,7 @@ pub fn build_loop_program(
         // loop_exit(result): ret result
         let loop_exit = b.block().argument(ArithType::I64).new();
         let exit_val: SSAValue = b.block_arena()[loop_exit].arguments[0].into();
-        let ret_exit = Return::<ArithType>::new(b, exit_val);
+        let ret_exit = Return::<ArithType>::new(b, vec![exit_val.into()]);
         {
             let exit_info: &mut Item<BlockInfo<CompositeLanguage>> =
                 b.block_arena_mut().get_mut(loop_exit).unwrap();
@@ -400,7 +400,7 @@ pub fn build_infinite_loop(
         // exit(result): ret result
         let exit = b.block().argument(ArithType::I64).new();
         let exit_val: SSAValue = b.block_arena()[exit].arguments[0].into();
-        let ret_exit = Return::<ArithType>::new(b, exit_val);
+        let ret_exit = Return::<ArithType>::new(b, vec![exit_val.into()]);
         {
             let exit_info: &mut Item<BlockInfo<CompositeLanguage>> =
                 b.block_arena_mut().get_mut(exit).unwrap();
@@ -487,7 +487,7 @@ pub fn build_div_program(
         let ba_y = b.block_argument().index(1);
         let div =
             kirin_arith::Arith::<ArithType>::op_div(b, SSAValue::from(ba_x), SSAValue::from(ba_y));
-        let ret = Return::<ArithType>::new(b, div.result);
+        let ret = Return::<ArithType>::new(b, vec![div.result.into()]);
 
         let block = b
             .block()
@@ -519,7 +519,7 @@ pub fn build_rem_program(
         let ba_y = b.block_argument().index(1);
         let rem =
             kirin_arith::Arith::<ArithType>::op_rem(b, SSAValue::from(ba_x), SSAValue::from(ba_y));
-        let ret = Return::<ArithType>::new(b, rem.result);
+        let ret = Return::<ArithType>::new(b, vec![rem.result.into()]);
 
         let block = b
             .block()

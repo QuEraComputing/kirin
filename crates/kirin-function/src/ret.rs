@@ -2,9 +2,9 @@ use kirin::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(terminator, builders, type = T)]
-#[chumsky(format = "$ret {value}")]
+#[chumsky(format = "$ret[ {values}]")]
 pub struct Return<T: CompileTimeValue> {
-    pub(crate) value: SSAValue,
+    pub(crate) values: Vec<SSAValue>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
@@ -20,7 +20,7 @@ mod tests {
 
     fn make_return() -> Return<UnitType> {
         Return {
-            value: TestSSAValue(0).into(),
+            values: vec![TestSSAValue(0).into()],
             marker: std::marker::PhantomData,
         }
     }
@@ -51,6 +51,15 @@ mod tests {
         let args: Vec<_> = ret.arguments().copied().collect();
         assert_eq!(args.len(), 1);
         assert_eq!(args[0], TestSSAValue(0).into());
+    }
+
+    #[test]
+    fn has_no_arguments_when_void() {
+        let ret = Return::<UnitType> {
+            values: vec![],
+            marker: std::marker::PhantomData,
+        };
+        assert_eq!(ret.arguments().count(), 0);
     }
 
     #[test]
@@ -89,8 +98,9 @@ mod tests {
     }
 
     #[test]
-    fn value_field() {
+    fn values_field() {
         let ret = make_return();
-        assert_eq!(ret.value, TestSSAValue(0).into());
+        assert_eq!(ret.values.len(), 1);
+        assert_eq!(ret.values[0], TestSSAValue(0).into());
     }
 }

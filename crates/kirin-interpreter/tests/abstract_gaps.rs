@@ -56,7 +56,7 @@ fn build_abstract_recursive(
 
         // exit_block: c0 = const 0; ret c0
         let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
-        let ret0 = Return::<ArithType>::new(b, c0.result);
+        let ret0 = Return::<ArithType>::new(b, vec![c0.result.into()]);
         {
             let stmts: Vec<Statement> = vec![c0.into()];
             for stmt in &stmts {
@@ -74,8 +74,8 @@ fn build_abstract_recursive(
 
         // call_block(arg): call rec(arg); ret call_result
         let rec_sym = b.symbol_table_mut().intern("rec".to_string());
-        let call = kirin_function::Call::<ArithType>::new(b, rec_sym, vec![call_arg]);
-        let ret_call = Return::<ArithType>::new(b, call.res);
+        let call = kirin_function::Call::<ArithType>::new(b, 1, rec_sym, vec![call_arg]);
+        let ret_call = Return::<ArithType>::new(b, vec![call.results[0].into()]);
         {
             let call_stmt: Statement = call.into();
             *b.statement_arena_mut()[call_stmt].get_parent_mut() =
@@ -175,7 +175,7 @@ fn test_summary_cache_tightest_match() {
         let ba_x = b.block_argument().index(0);
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, SSAValue::from(ba_x), c1.result);
-        let ret = Return::<ArithType>::new(b, add.result);
+        let ret = Return::<ArithType>::new(b, vec![add.result.into()]);
         let block = b
             .block()
             .argument(ArithType::I64)
@@ -232,7 +232,7 @@ fn test_summary_seed_refinable() {
         let ba_x = b.block_argument().index(0);
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, SSAValue::from(ba_x), c1.result);
-        let ret = Return::<ArithType>::new(b, add.result);
+        let ret = Return::<ArithType>::new(b, vec![add.result.into()]);
         let block = b
             .block()
             .argument(ArithType::I64)

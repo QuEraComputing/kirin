@@ -255,7 +255,7 @@ fn test_session_abstract_interp_with_args() {
         let ba_x = b.block_argument().index(0);
         let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
         let add = kirin_arith::Arith::<ArithType>::op_add(b, SSAValue::from(ba_x), c1.result);
-        let ret = Return::<ArithType>::new(b, add.result);
+        let ret = Return::<ArithType>::new(b, vec![add.result.into()]);
 
         let block = b
             .block()
@@ -676,7 +676,7 @@ fn test_multi_result_arity_mismatch() {
 
     let caller_spec = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
         let call = MultiResultCall::new(b, callee_func, stage_id);
-        let ret = Return::<ArithType>::new(b, SSAValue::from(call.result_a));
+        let ret = Return::<ArithType>::new(b, vec![SSAValue::from(call.result_a)]);
         let block = b.block().stmt(call).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(

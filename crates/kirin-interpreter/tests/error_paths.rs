@@ -57,7 +57,7 @@ fn build_recursive_func(
 
         // exit_block: c0 = const 0; ret c0
         let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
-        let ret0 = Return::<ArithType>::new(b, c0.result);
+        let ret0 = Return::<ArithType>::new(b, vec![c0.result.into()]);
         {
             let stmts: Vec<Statement> = vec![c0.into()];
             for stmt in &stmts {
@@ -75,8 +75,8 @@ fn build_recursive_func(
 
         // call_block(arg): call rec(arg); ret call_result
         let rec_symbol = b.symbol_table_mut().intern("rec".to_string());
-        let call = kirin_function::Call::<ArithType>::new(b, rec_symbol, vec![call_arg]);
-        let ret_call = Return::<ArithType>::new(b, call.res);
+        let call = kirin_function::Call::<ArithType>::new(b, 1, rec_symbol, vec![call_arg]);
+        let ret_call = Return::<ArithType>::new(b, vec![call.results[0].into()]);
         {
             let call_stmt: Statement = call.into();
             *b.statement_arena_mut()[call_stmt].get_parent_mut() =
@@ -200,7 +200,7 @@ fn test_unbound_value_in_frame() {
     let spec_fn = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
         let sf = b.staged_function().new().unwrap();
         let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
-        let ret = Return::<ArithType>::new(b, c0.result);
+        let ret = Return::<ArithType>::new(b, vec![c0.result.into()]);
         let block = b.block().stmt(c0).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(
@@ -237,7 +237,7 @@ fn test_arity_mismatch_too_few_args() {
     let (spec_fn, block) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
         let sf = b.staged_function().new().unwrap();
         let ba_x = b.block_argument().index(0);
-        let ret = Return::<ArithType>::new(b, SSAValue::from(ba_x));
+        let ret = Return::<ArithType>::new(b, vec![SSAValue::from(ba_x)]);
         let block = b
             .block()
             .argument(ArithType::I64)
@@ -284,7 +284,7 @@ fn test_arity_mismatch_too_many_args() {
     let (spec_fn, block) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
         let sf = b.staged_function().new().unwrap();
         let ba_x = b.block_argument().index(0);
-        let ret = Return::<ArithType>::new(b, SSAValue::from(ba_x));
+        let ret = Return::<ArithType>::new(b, vec![SSAValue::from(ba_x)]);
         let block = b.block().argument(ArithType::I64).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(
@@ -326,7 +326,7 @@ fn test_arity_mismatch_zero_args_block() {
     let (spec_fn, block) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
         let sf = b.staged_function().new().unwrap();
         let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
-        let ret = Return::<ArithType>::new(b, c0.result);
+        let ret = Return::<ArithType>::new(b, vec![c0.result.into()]);
         let block = b.block().stmt(c0).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(
@@ -505,8 +505,8 @@ fn test_halt_during_nested_call() {
 
     let caller_spec = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
         let halter_sym = b.symbol_table_mut().intern("halter".to_string());
-        let call = kirin_function::Call::<ArithType>::new(b, halter_sym, vec![]);
-        let ret = Return::<ArithType>::new(b, call.res);
+        let call = kirin_function::Call::<ArithType>::new(b, 1, halter_sym, vec![]);
+        let ret = Return::<ArithType>::new(b, vec![call.results[0].into()]);
         let block = b.block().stmt(call).terminator(ret).new();
         let region = b.region().add_block(block).new();
         let body = FunctionBody::<ArithType>::new(

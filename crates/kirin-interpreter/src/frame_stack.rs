@@ -139,7 +139,7 @@ mod tests {
             let sf = b.staged_function().new().unwrap();
             let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
             let c0_result = c0.result;
-            let ret = Return::<ArithType>::new(b, c0_result);
+            let ret = Return::<ArithType>::new(b, vec![c0_result.into()]);
             let block = b.block().stmt(c0).terminator(ret).new();
             let region = b.region().add_block(block).new();
             let body = FunctionBody::<ArithType>::new(

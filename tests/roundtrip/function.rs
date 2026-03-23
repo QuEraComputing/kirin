@@ -56,6 +56,49 @@ fn test_return_roundtrip_and_terminator_property() {
     assert!(dialect.is_terminator(), "return should be a terminator");
 }
 
+// --- Multi-result and void call tests ---
+
+#[test]
+fn test_void_call_roundtrip() {
+    // Call with no results: no `%r =` prefix, no `-> type` suffix
+    roundtrip::assert_statement_roundtrip::<CallableLanguage>(
+        "call @bar(%x)",
+        &[("x", ArithType::I32)],
+    );
+}
+
+#[test]
+fn test_multi_result_call_roundtrip() {
+    roundtrip::assert_statement_roundtrip::<CallableLanguage>(
+        "%a, %b = call @foo(%x) -> i32, f64",
+        &[("x", ArithType::I32)],
+    );
+}
+
+#[test]
+fn test_void_return_roundtrip() {
+    let input = "ret";
+    let (stage, statement) = roundtrip::emit_statement::<CallableLanguage>(input, &[]);
+    assert_eq!(
+        roundtrip::render_statement::<CallableLanguage>(&stage, statement).trim(),
+        input
+    );
+
+    let dialect = statement
+        .get_info(&stage)
+        .expect("statement should exist")
+        .definition();
+    assert!(dialect.is_terminator(), "return should be a terminator");
+}
+
+#[test]
+fn test_multi_value_return_roundtrip() {
+    roundtrip::assert_statement_roundtrip::<CallableLanguage>(
+        "ret %a, %b",
+        &[("a", ArithType::I32), ("b", ArithType::F64)],
+    );
+}
+
 #[test]
 fn test_lowered_function_roundtrip_print_parse_print() {
     let input = r#"

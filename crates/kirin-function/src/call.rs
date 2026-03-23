@@ -2,11 +2,11 @@ use kirin::prelude::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = T)]
-#[chumsky(format = "$call {target}({args}) -> {res:type}")]
+#[chumsky(format = "$call {target}({args})[ -> {results:type}]")]
 pub struct Call<T: CompileTimeValue> {
     target: Symbol,
     args: Vec<SSAValue>,
-    res: ResultValue,
+    results: Vec<ResultValue>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
@@ -20,8 +20,8 @@ impl<T: CompileTimeValue> Call<T> {
         &self.args
     }
 
-    pub fn result(&self) -> ResultValue {
-        self.res
+    pub fn results(&self) -> &[ResultValue] {
+        &self.results
     }
 }
 
@@ -29,8 +29,8 @@ impl<T: CompileTimeValue> Call<T> {
 mod tests {
     use super::*;
     use kirin::ir::{
-        HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
-        IsSpeculatable, IsTerminator, TestSSAValue,
+        HasArguments, HasBlocks, HasRegions, HasSuccessors, IsConstant, IsPure, IsSpeculatable,
+        IsTerminator, TestSSAValue,
     };
     use kirin_test_types::UnitType;
 
@@ -38,7 +38,7 @@ mod tests {
         Call {
             target: Symbol::from(42usize),
             args: (0..num_args).map(|i| TestSSAValue(i).into()).collect(),
-            res: TestSSAValue(100).into(),
+            results: vec![TestSSAValue(100).into()],
             marker: std::marker::PhantomData,
         }
     }
@@ -65,7 +65,7 @@ mod tests {
 
     #[test]
     fn has_one_result() {
-        assert_eq!(make_call(0).results().count(), 1);
+        assert_eq!(make_call(0).results().len(), 1);
     }
 
     #[test]
@@ -104,9 +104,10 @@ mod tests {
     }
 
     #[test]
-    fn result_accessor() {
+    fn results_accessor() {
         let call = make_call(0);
-        assert_eq!(call.result(), TestSSAValue(100).into());
+        assert_eq!(call.results().len(), 1);
+        assert_eq!(call.results()[0], TestSSAValue(100).into());
     }
 
     #[test]
