@@ -110,41 +110,133 @@ derive macro automatically adds `T: HasProduct` to the generated builder's `wher
 clause — the same pattern as `T: Placeholder` for auto-placeholder. The dialect
 author never writes `+ HasProduct` on their struct definitions.
 
-## ProductValue Trait
+## Product Value: Concrete Struct + Trait
 
-The interpreter-level counterpart of `HasProduct`. Dialect value types implement
-this to define how product values are constructed and destructured at runtime.
+### Product\<V\> — Concrete Storage
+
+The framework provides a concrete `Product<V>` struct for storing product values.
+Since a product value is always just an ordered list of values, there is no
+meaningful custom case — every dialect would implement the same thing. The framework
+provides it once.
+
+```rust
+// In kirin-interpreter:
+use smallvec::SmallVec;
+
+/// Concrete product value — an ordered collection of interpreter values.
+///
+/// Products with 1-2 elements avoid heap allocation via SmallVec.
+/// Dialect authors include this in their value enum to support
+/// multi-result statements and tuple operations.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Product<V>(pub SmallVec<[V; 2]>);
+```
+
+### ProductValue Trait — 2 Required Methods
+
+The `ProductValue` trait requires only 2 methods from the dialect author.
+All product operations (`new_product`, `unpack`, `get`, `len`, `is_empty`)
+are provided as default implementations that delegate to `Product<V>`.
 
 ```rust
 /// Interpreter-level product value semantics.
 ///
-/// Dialect authors implement this on their value types to enable
-/// multi-result statements and tuple operations.
-pub trait ProductValue: Sized {
-    /// Pack multiple values into a single product value.
-    fn new_product(values: Vec<Self>) -> Self;
+/// Only 2 required methods — all operations are provided via `Product<V>`.
+pub trait ProductValue: Sized + Clone {
+    /// Check if this value is a product and get a reference.
+    fn as_product(&self) -> Option<&Product<Self>>;
 
-    /// Unpack a product value into its component values.
-    fn unpack(self) -> Result<Vec<Self>, InterpreterError>;
+    /// Wrap a product into this value type.
+    fn from_product(product: Product<Self>) -> Self;
 
-    /// Extract a single element by index (does not consume the product).
-    fn get(&self, index: usize) -> Result<Self, InterpreterError>;
+    // --- All provided via Product<V> ---
 
-    /// Query the number of elements.
-    fn len(&self) -> Result<usize, InterpreterError>;
+    fn new_product(values: Vec<Self>) -> Self {
+        Self::from_product(Product(SmallVec::from_vec(values)))
+    }
 
-    /// Returns true if the product has zero elements.
+    fn unpack(self) -> Result<Vec<Self>, InterpreterError> {
+        self.as_product()
+            .map(|p| p.0.to_vec())
+            .ok_or_else(|| InterpreterError::Custom("expected product value".into()))
+    }
+
+    fn get(&self, index: usize) -> Result<Self, InterpreterError> {
+        self.as_product()
+            .and_then(|p| p.0.get(index).cloned())
+            .ok_or_else(|| InterpreterError::Custom(
+                format!("product index {index} out of bounds").into()
+            ))
+    }
+
+    fn len(&self) -> Result<usize, InterpreterError> {
+        self.as_product()
+            .map(|p| p.0.len())
+            .ok_or_else(|| InterpreterError::Custom("expected product value".into()))
+    }
+
     fn is_empty(&self) -> Result<bool, InterpreterError> {
         self.len().map(|n| n == 0)
     }
+}
+```
 
-    /// Convert a value to a usize index (for Get statement).
+### Dialect Author Usage — Minimal
+
+```rust
+use kirin_interpreter::Product;
+
+enum MyValue {
+    Int(i64),
+    Float(f64),
+    Tuple(Product<MyValue>),  // concrete storage from framework
+}
+
+impl ProductValue for MyValue {
+    fn as_product(&self) -> Option<&Product<Self>> {
+        match self { MyValue::Tuple(p) => Some(p), _ => None }
+    }
+    fn from_product(p: Product<Self>) -> Self {
+        MyValue::Tuple(p)
+    }
+}
+// Done — new_product, unpack, get, len, is_empty all provided for free.
+```
+
+### IndexValue Trait — Separate Concern
+
+The `Get` and `Len` operations in `kirin-tuple` need to convert between
+value types and `usize` (index as an SSA value). This is a general
+integer conversion concern, not specific to products:
+
+```rust
+/// Convert between interpreter values and usize indices.
+/// Used by kirin-tuple's Get (value → index) and Len (index → value).
+pub trait IndexValue: Sized {
     fn as_index(&self) -> Result<usize, InterpreterError>;
-
-    /// Create a value from a usize (for Len statement).
     fn from_index(index: usize) -> Self;
 }
 ```
+
+This lives in `kirin-tuple` (not the framework), since only tuple operations
+need it.
+
+### Future: Derive Macro Opportunities
+
+Several boilerplate patterns in this design are candidates for derive macros:
+
+| Pattern | Current | Future Derive |
+|---------|---------|---------------|
+| `HasProduct` impl on type enum | Manual 2-method impl | `#[derive(HasProduct)]` with `#[product]` on variant |
+| `ProductValue` impl on value enum | Manual 2-method impl | `#[derive(ProductValue)]` with `#[product]` on variant |
+| `IndexValue` impl on value enum | Manual 2-method impl | `#[derive(IndexValue)]` with `#[index]` on variant |
+| `HasParser`/`PrettyPrint` for `ProductType<T>` | Manual or framework-provided | Auto-detected `(T1, T2)` syntax for product variants |
+| `AbstractValue` join for products | Manual pointwise join | Derive-generated pointwise join when `#[product]` present |
+
+These derives are **not required for the initial implementation** — the manual
+impls are 2-5 lines each. But they eliminate the last bits of boilerplate for
+dialect authors who use products heavily. They should be added to the derive
+infrastructure when the product pattern is validated across multiple dialects.
 
 ## Continuation Enum (Unchanged)
 
@@ -266,26 +358,32 @@ via `ProductValue::new_product` and returns a single `Yield(product)` /
 The `kirin-tuple` crate provides explicit tuple operations for dialect authors who
 want to work with product values in their DSL programs:
 
-| Statement | Description |
-|-----------|-------------|
-| `new_tuple(%a, %b) -> T` | Pack SSA values into a product |
-| `unpack %t -> T1, T2` | Bulk destructure (arity known) |
-| `get %t, %idx -> T` | Extract one element by index (arity not required) |
-| `len %t -> T` | Query arity |
+| Statement | Description | Bound |
+|-----------|-------------|-------|
+| `new_tuple(%a, %b) -> T` | Pack SSA values into a product | `V: ProductValue` |
+| `unpack %t -> T1, T2` | Bulk destructure (arity known) | `V: ProductValue` |
+| `get %t, %idx -> T` | Extract one element by index (arity not required) | `V: ProductValue + IndexValue` |
+| `len %t -> T` | Query arity | `V: ProductValue + IndexValue` |
 
-The dialect uses `ProductValue` (renamed from `TupleValue`) for interpreter
-semantics. Dialect authors who only use multi-result syntax don't need to depend
-on `kirin-tuple` — the `ProductValue` trait and auto-destructuring are framework-level.
+`ProductValue` lives in kirin-interpreter (framework-level). `IndexValue` lives
+in kirin-tuple (dialect-level — only needed for Get/Len).
+
+Dialect authors who only use multi-result syntax (`%a, %b = op ...`) don't need
+to depend on `kirin-tuple` — the `ProductValue` trait and auto-destructuring are
+framework-level. They only need `kirin-tuple` if they want explicit pack/unpack
+operations in their DSL programs.
 
 ## Summary: What Lives Where
 
 | Component | Location | Purpose |
 |-----------|----------|---------|
-| `ProductType<T>` | kirin-ir | Type-level product wrapper |
+| `ProductType<T>` | kirin-ir | Type-level product wrapper (SmallVec-backed) |
 | `HasProduct` | kirin-ir | Trait for dialect types — opt-in multi-result |
-| `ProductValue` | kirin-interpreter | Trait for dialect values — product semantics |
+| `Product<V>` | kirin-interpreter | Concrete product value storage (SmallVec-backed) |
+| `ProductValue` | kirin-interpreter | Trait for dialect values — 2 required methods, 5 provided |
 | Auto-destructure | kirin-interpreter | Statement execution writes product to result slots |
-| `Tuple` dialect | kirin-tuple | Explicit pack/unpack/get/len operations |
+| `IndexValue` | kirin-tuple | Trait for value ↔ usize conversion (Get/Len only) |
+| `Tuple` dialect | kirin-tuple | Explicit new_tuple/unpack/get/len operations |
 | `Vec<ResultValue>` support | kirin-derive-toolkit | Builder template codegen |
 | `[...]` syntax | kirin-derive-chumsky | Optional sections in format strings |
 
