@@ -7,6 +7,7 @@ mod language;
 mod lattice;
 mod node;
 mod pipeline;
+mod product;
 mod signature;
 mod stage;
 
@@ -38,6 +39,7 @@ pub use node::{
     Symbol, TestSSAValue, UnGraph, UnGraphExtra, UnGraphInfo,
 };
 pub use pipeline::Pipeline;
+pub use product::{HasProduct, Product};
 pub use signature::{
     ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
@@ -54,7 +56,7 @@ pub mod prelude {
         HasSignature, HasStageInfo, Pipeline, Region, ResultValue, SSAValue, Signature,
         SignatureSemantics, StageInfo, StageMeta, Statement,
     };
-    pub use crate::{CompileTimeValue, Placeholder, Typeof};
+    pub use crate::{CompileTimeValue, HasProduct, Placeholder, Product, Typeof};
 }
 
 #[cfg(feature = "derive")]
