@@ -1,5 +1,5 @@
 [package]
-name = "kirin-unpack"
+name = "kirin-tuple"
 version = "0.1.0"
 edition = "2024"
 

@@ -2,7 +2,7 @@ use kirin::prelude::{CompileTimeValue, HasStageInfo};
 use kirin_interpreter::{Continuation, Interpretable, Interpreter, InterpreterError};
 use smallvec::SmallVec;
 
-use crate::{MakeTuple, TupleOp, Unpack};
+use crate::{NewTuple, Tuple, Unpack};
 
 /// Extension point for tuple packing/unpacking at the interpreter level.
 ///
@@ -13,7 +13,7 @@ use crate::{MakeTuple, TupleOp, Unpack};
 ///
 /// ```ignore
 /// impl TupleValue for MyValue {
-///     fn make_tuple(values: Vec<Self>) -> Self {
+///     fn new_tuple(values: Vec<Self>) -> Self {
 ///         MyValue::Tuple(values)
 ///     }
 ///     fn unpack(self) -> Result<Vec<Self>, InterpreterError> {
@@ -28,7 +28,7 @@ use crate::{MakeTuple, TupleOp, Unpack};
 /// ```
 pub trait TupleValue: Sized {
     /// Pack multiple values into a single tuple value.
-    fn make_tuple(values: Vec<Self>) -> Self;
+    fn new_tuple(values: Vec<Self>) -> Self;
 
     /// Unpack a tuple value into its component values.
     ///
@@ -36,7 +36,7 @@ pub trait TupleValue: Sized {
     fn unpack(self) -> Result<Vec<Self>, InterpreterError>;
 }
 
-impl<'ir, I, T> Interpretable<'ir, I> for MakeTuple<T>
+impl<'ir, I, T> Interpretable<'ir, I> for NewTuple<T>
 where
     I: Interpreter<'ir>,
     I::Value: TupleValue + Clone,
@@ -53,7 +53,7 @@ where
             .iter()
             .map(|ssa| interp.read(*ssa))
             .collect::<Result<_, _>>()?;
-        let tuple = TupleValue::make_tuple(values);
+        let tuple = TupleValue::new_tuple(values);
         interp.write(self.result, tuple)?;
         Ok(Continuation::Continue)
     }
@@ -78,7 +78,7 @@ where
     }
 }
 
-impl<'ir, I, T> Interpretable<'ir, I> for TupleOp<T>
+impl<'ir, I, T> Interpretable<'ir, I> for Tuple<T>
 where
     I: Interpreter<'ir>,
     I::Value: TupleValue + Clone,
@@ -91,8 +91,8 @@ where
         L: Interpretable<'ir, I> + 'ir,
     {
         match self {
-            TupleOp::MakeTuple(op) => op.interpret::<L>(interp),
-            TupleOp::Unpack(op) => op.interpret::<L>(interp),
+            Tuple::NewTuple(op) => op.interpret::<L>(interp),
+            Tuple::Unpack(op) => op.interpret::<L>(interp),
         }
     }
 }

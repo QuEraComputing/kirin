@@ -718,7 +718,7 @@ dependencies = [
  "kirin-scf",
  "kirin-test-languages",
  "kirin-test-utils",
- "kirin-unpack",
+ "kirin-tuple",
  "serde",
  "trybuild",
 ]
@@ -985,7 +985,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "kirin-unpack"
+name = "kirin-tuple"
 version = "0.1.0"
 dependencies = [
  "kirin",

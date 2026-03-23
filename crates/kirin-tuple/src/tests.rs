@@ -4,10 +4,10 @@ use kirin::ir::{
 };
 use kirin_test_types::UnitType;
 
-use crate::{MakeTuple, TupleOp, Unpack};
+use crate::{NewTuple, Tuple, Unpack};
 
-fn make_make_tuple() -> MakeTuple<UnitType> {
-    MakeTuple {
+fn make_new_tuple() -> NewTuple<UnitType> {
+    NewTuple {
         args: vec![TestSSAValue(0).into(), TestSSAValue(1).into()],
         result: TestSSAValue(2).into(),
         marker: std::marker::PhantomData,
@@ -22,57 +22,57 @@ fn make_unpack() -> Unpack<UnitType> {
     }
 }
 
-// --- MakeTuple: not a terminator ---
+// --- NewTuple: not a terminator ---
 
 #[test]
-fn make_tuple_not_terminator() {
-    assert!(!make_make_tuple().is_terminator());
+fn new_tuple_not_terminator() {
+    assert!(!make_new_tuple().is_terminator());
 }
 
 #[test]
-fn make_tuple_not_pure() {
-    assert!(!make_make_tuple().is_pure());
+fn new_tuple_not_pure() {
+    assert!(!make_new_tuple().is_pure());
 }
 
 #[test]
-fn make_tuple_not_constant() {
-    assert!(!make_make_tuple().is_constant());
+fn new_tuple_not_constant() {
+    assert!(!make_new_tuple().is_constant());
 }
 
 #[test]
-fn make_tuple_not_speculatable() {
-    assert!(!make_make_tuple().is_speculatable());
+fn new_tuple_not_speculatable() {
+    assert!(!make_new_tuple().is_speculatable());
 }
 
-// --- MakeTuple: arguments and results ---
+// --- NewTuple: arguments and results ---
 
 #[test]
-fn make_tuple_has_arguments() {
-    let op = make_make_tuple();
+fn new_tuple_has_arguments() {
+    let op = make_new_tuple();
     let args: Vec<_> = op.arguments().copied().collect();
     assert_eq!(args.len(), 2);
 }
 
 #[test]
-fn make_tuple_has_one_result() {
-    let op = make_make_tuple();
+fn new_tuple_has_one_result() {
+    let op = make_new_tuple();
     let results: Vec<_> = op.results().copied().collect();
     assert_eq!(results.len(), 1);
 }
 
 #[test]
-fn make_tuple_no_successors() {
-    assert_eq!(make_make_tuple().successors().count(), 0);
+fn new_tuple_no_successors() {
+    assert_eq!(make_new_tuple().successors().count(), 0);
 }
 
 #[test]
-fn make_tuple_no_blocks() {
-    assert_eq!(make_make_tuple().blocks().count(), 0);
+fn new_tuple_no_blocks() {
+    assert_eq!(make_new_tuple().blocks().count(), 0);
 }
 
 #[test]
-fn make_tuple_no_regions() {
-    assert_eq!(make_make_tuple().regions().count(), 0);
+fn new_tuple_no_regions() {
+    assert_eq!(make_new_tuple().regions().count(), 0);
 }
 
 // --- Unpack: not a terminator ---
@@ -131,8 +131,8 @@ fn unpack_no_regions() {
 // --- Clone + PartialEq ---
 
 #[test]
-fn make_tuple_clone_eq() {
-    let op = make_make_tuple();
+fn new_tuple_clone_eq() {
+    let op = make_new_tuple();
     assert_eq!(op, op.clone());
 }
 
@@ -145,11 +145,11 @@ fn unpack_clone_eq() {
 // --- Debug formatting ---
 
 #[test]
-fn make_tuple_debug() {
-    let dbg = format!("{:?}", make_make_tuple());
+fn new_tuple_debug() {
+    let dbg = format!("{:?}", make_new_tuple());
     assert!(
-        dbg.contains("MakeTuple"),
-        "debug should contain 'MakeTuple': {dbg}"
+        dbg.contains("NewTuple"),
+        "debug should contain 'NewTuple': {dbg}"
     );
 }
 
@@ -162,40 +162,40 @@ fn unpack_debug() {
     );
 }
 
-// --- TupleOp wraps delegation ---
+// --- Tuple wraps delegation ---
 
 #[test]
-fn tuple_op_make_tuple_not_terminator() {
-    let op = TupleOp::MakeTuple(make_make_tuple());
+fn tuple_op_new_tuple_not_terminator() {
+    let op = Tuple::NewTuple(make_new_tuple());
     assert!(!op.is_terminator());
 }
 
 #[test]
 fn tuple_op_unpack_not_terminator() {
-    let op = TupleOp::Unpack(make_unpack());
+    let op = Tuple::Unpack(make_unpack());
     assert!(!op.is_terminator());
 }
 
 #[test]
-fn tuple_op_make_tuple_arguments() {
-    let op = TupleOp::MakeTuple(make_make_tuple());
+fn tuple_op_new_tuple_arguments() {
+    let op = Tuple::NewTuple(make_new_tuple());
     assert_eq!(op.arguments().count(), 2);
 }
 
 #[test]
 fn tuple_op_unpack_arguments() {
-    let op = TupleOp::Unpack(make_unpack());
+    let op = Tuple::Unpack(make_unpack());
     assert_eq!(op.arguments().count(), 1);
 }
 
 #[test]
-fn tuple_op_make_tuple_results() {
-    let op = TupleOp::MakeTuple(make_make_tuple());
+fn tuple_op_new_tuple_results() {
+    let op = Tuple::NewTuple(make_new_tuple());
     assert_eq!(op.results().count(), 1);
 }
 
 #[test]
 fn tuple_op_unpack_results() {
-    let op = TupleOp::Unpack(make_unpack());
+    let op = Tuple::Unpack(make_unpack());
     assert_eq!(op.results().count(), 2);
 }

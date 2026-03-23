@@ -2,11 +2,11 @@
 //!
 //! This dialect provides language-level tuple operations that complement
 //! the IR multi-result mechanism. A language can use IR multi-result,
-//! language-level tuples via `kirin-unpack`, or both.
+//! language-level tuples via `kirin-tuple`, or both.
 //!
-//! # Operations
+//! # Statements
 //!
-//! | Operation | Description |
+//! | Statement | Description |
 //! |-----------|-------------|
 //! | `make_tuple(%a, %b, ..) -> T` | Pack multiple SSA values into a single tuple value |
 //! | `unpack %t -> T, T, ..` | Destructure a tuple value into multiple SSA values (multi-result) |
@@ -31,8 +31,8 @@ mod tests;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[wraps]
 #[kirin(builders, type = T)]
-pub enum TupleOp<T: CompileTimeValue> {
-    MakeTuple(MakeTuple<T>),
+pub enum Tuple<T: CompileTimeValue> {
+    NewTuple(NewTuple<T>),
     Unpack(Unpack<T>),
 }
 
@@ -40,9 +40,9 @@ pub enum TupleOp<T: CompileTimeValue> {
 ///
 /// The result is a single `ResultValue` holding the packed tuple.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[chumsky(format = "$make_tuple({args}) -> {result:type}")]
+#[chumsky(format = "$new_tuple({args}) -> {result:type}")]
 #[kirin(builders, type = T)]
-pub struct MakeTuple<T: CompileTimeValue> {
+pub struct NewTuple<T: CompileTimeValue> {
     args: Vec<SSAValue>,
     result: ResultValue,
     #[kirin(default)]
