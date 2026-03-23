@@ -1,15 +1,55 @@
 //! Tuple pack/unpack dialect for Kirin.
 //!
 //! This dialect provides language-level tuple operations that complement
-//! the IR multi-result mechanism. A language can use IR multi-result,
-//! language-level tuples via `kirin-tuple`, or both.
+//! the IR multi-result mechanism. It bridges two distinct levels of
+//! abstraction:
+//!
+//! - **IR multi-result**: an operation produces N separate SSA values, each
+//!   with its own type (`Continuation::Yield(SmallVec<[V; 1]>)`). This is a
+//!   dataflow concept.
+//! - **Language-level tuple**: a single SSA value of a product type that
+//!   contains multiple values. This is a type system concept.
+//!
+//! A language can use IR multi-result, language-level tuples via this dialect,
+//! or both. They compose cleanly: `NewTuple` packs SSA values into a single
+//! tuple value, `Unpack` destructures a tuple back into multiple SSA values.
 //!
 //! # Statements
 //!
 //! | Statement | Description |
 //! |-----------|-------------|
-//! | `make_tuple(%a, %b, ..) -> T` | Pack multiple SSA values into a single tuple value |
+//! | `new_tuple(%a, %b, ..) -> T` | Pack multiple SSA values into a single tuple value |
 //! | `unpack %t -> T, T, ..` | Destructure a tuple value into multiple SSA values (multi-result) |
+//!
+//! # Design Context: Why a Tuple Dialect?
+//!
+//! MLIR defines a builtin `tuple<T1, T2>` type but provides **no standard
+//! operations** to construct or destructure it. The type was added in MLIR's
+//! early days as a "shell type, without semantics" to bridge non-MLIR
+//! representations that used tuples for multi-result. Once MLIR operations
+//! gained native multi-result support, the tuple type became largely
+//! redundant. Sean Silva (MLIR core) called having a builtin type with no
+//! operations "an anti-pattern." The community consensus is that dialects
+//! should define their own tuple-like types rather than rely on the builtin.
+//!
+//! In practice, multiple MLIR downstreams (CIRCT, Flang, CIR) each
+//! independently implement the same three operations: pack, unpack, and
+//! element access. This dialect standardizes that pattern for Kirin.
+//!
+//! Kirin's approach differs from MLIR in three ways:
+//!
+//! 1. The tuple type is **not builtin** — it lives in the user's value enum,
+//!    following the MLIR community's own recommendation for dialect-specific
+//!    types.
+//! 2. The operations are **standardized in a composable dialect** — avoiding
+//!    the "every downstream reinvents the same ops" problem.
+//! 3. The [`TupleValue`] trait lets each language define its own packing
+//!    semantics — matching the "shell type, without semantics" intent, but
+//!    with actual operations to work with.
+//!
+//! References:
+//! - [Rationale for not having tuple type operations](https://discourse.llvm.org/t/rationale-for-not-having-tuple-type-operations-in-the-main-dialects/3748)
+//! - [Rationale behind MLIR's builtin tuple type](https://discourse.llvm.org/t/rationale-behind-mlirs-builtin-tuple-type/84424)
 //!
 //! # Extension Point
 //!
