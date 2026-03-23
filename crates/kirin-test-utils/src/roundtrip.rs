@@ -1,7 +1,7 @@
 use std::fmt::Display;
 
 use kirin_chumsky::{ParsePipelineText, ParseStatementTextExt, PrettyPrint};
-use kirin_ir::{BuilderSSAKind, Dialect, GetInfo, Pipeline, StageInfo, Statement};
+use kirin_ir::{BuilderSSAKind, Dialect, Pipeline, StageInfo, Statement};
 use kirin_prettyless::{Config, Document, PipelinePrintExt, RenderDispatch};
 
 /// Parse a single statement with pre-registered operands.

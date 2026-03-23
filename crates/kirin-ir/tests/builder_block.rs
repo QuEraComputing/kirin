@@ -480,7 +480,7 @@ fn finalize_rejects_missing_type() {
     // Create an SSA with no type via low-level arena access
     let ssas = stage.ssa_arena_mut();
     let id = ssas.next_id();
-    ssas.alloc(BuilderSSAInfo::new(
+    let _ = ssas.alloc(BuilderSSAInfo::new(
         id,
         None,
         None,

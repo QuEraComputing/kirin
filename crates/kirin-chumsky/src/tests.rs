@@ -1567,7 +1567,7 @@ fn test_relaxed_dominance_guard_restores_on_error_path() {
 #[test]
 fn test_nested_scope_and_relaxed_dominance_guards() {
     let mut stage: kirin_ir::BuilderStageInfo<TestDialect> = kirin_ir::BuilderStageInfo::default();
-    let mut ctx = crate::traits::EmitContext::new(&mut stage);
+    let _ctx = crate::traits::EmitContext::new(&mut stage);
 
     // Register a name in the root scope
     let ssa_outer = kirin_ir::SSAValue::from(stage.block_argument().index(0));

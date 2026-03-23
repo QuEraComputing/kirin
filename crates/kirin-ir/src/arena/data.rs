@@ -263,7 +263,7 @@ mod tests {
     fn arena_is_empty() {
         let mut arena: Arena<TestId, i32> = Arena::default();
         assert!(arena.is_empty());
-        arena.alloc(1);
+        let _ = arena.alloc(1);
         assert!(!arena.is_empty());
     }
 
@@ -271,7 +271,7 @@ mod tests {
     fn arena_next_id_increments() {
         let mut arena: Arena<TestId, i32> = Arena::default();
         let id0 = arena.next_id();
-        arena.alloc(10);
+        let _ = arena.alloc(10);
         let id1 = arena.next_id();
         assert_ne!(id0, id1);
         assert_eq!(Id::from(id0).raw(), 0);

@@ -7,7 +7,7 @@
 //!
 //! Based on the text format in `docs/design/graph-ir-node.md`.
 
-use kirin_ir::{BuilderSSAKind, Dialect, Placeholder, ResultValue, SSAValue, UnGraph};
+use kirin_ir::{Dialect, Placeholder, ResultValue, SSAValue, UnGraph};
 use kirin_test_types::SimpleType;
 
 /// Edge operation — creates an edge SSAValue in an ungraph.
