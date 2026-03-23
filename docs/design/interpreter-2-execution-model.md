@@ -49,13 +49,91 @@ block-centric supertrait:
 - `VisitDiGraph<'ir>`
 - `VisitUnGraph<'ir>`
 - `CallExecutor<'ir>`
+- `CallableBody<'ir, I>`
 - `DebugDriver<'ir>`
 - `ConsumeResult<'ir, I>`
 
 An internal umbrella trait may compose the concrete runtime, but dialect authors
 should be able to depend on the narrowest capability they actually need.
 
-### 2. Effects and runtime events are separate
+The public API should also retain a typed-stage facade through `Staged<'a, ...>`
+for ergonomic host entrypoints and typed-stage execution.
+
+### 2. Stage-dynamic dispatch is explicit and cached
+
+The current concrete interpreter relies on stage-dynamic dispatch for stepping,
+advancing, and cross-stage call entry. `kirin-interpreter-2` needs an explicit
+equivalent.
+
+The concrete runtime should precompute a dispatch cache keyed by
+`CompileStage`, then attach the resolved dispatch entry to each active frame.
+This keeps runtime lookup O(1) while still allowing:
+
+- cross-stage calls
+- cross-stage recursion
+- host-driven `call(spec, stage, args)` entrypoints
+- stage-polymorphic stepping without repeated trait dispatch
+
+This is an internal runtime abstraction, but it is required for the concrete
+stack interpreter to preserve current functionality.
+
+### 3. The typed-stage facade stays public
+
+`StageAccess<'ir>` should continue to provide typed-stage helpers analogous to:
+
+- `in_stage::<L>()`
+- `try_in_stage::<L>()`
+- `with_stage(stage)`
+
+The resulting `Staged<'a, 'ir, I, L>` handle should remain the ergonomic typed
+API for host-side entrypoints and manual interpreter control. In the concrete
+runtime, it should continue to expose operations analogous to:
+
+- `step`
+- `advance`
+- `run`
+- `run_until_break`
+- `call`
+
+This keeps host code concise and preserves the current typed-stage execution
+style.
+
+### 4. Callable bodies have their own abstraction
+
+The new design needs an explicit abstraction for the *callee body*, not just the
+callsite.
+
+`CallableBody<'ir, I>` is the runtime-facing trait that decides how a callable
+body enters execution or otherwise evaluates a call boundary. This is the v2
+equivalent of the role currently played by `CallSemantics` and `SSACFGRegion`.
+
+This separation is important because:
+
+- callsites own outward result conventions via `ConsumeResult`
+- callable bodies own how execution begins or how custom body kinds are entered
+- the framework still needs a uniform place to attach blanket behavior for
+  standard callable body shapes such as SSA CFG regions
+
+A blanket implementation for CFG-style callable regions should remain part of
+the design.
+
+### 5. Interpreter-global state remains first-class
+
+The concrete interpreter should remain parameterized by interpreter-global state
+`G`, with accessors equivalent to `global()` and `global_mut()`.
+
+This state is separate from SSA value storage and should stay available for:
+
+- embedding environments
+- external runtime resources
+- debugger/session state
+- dialect-specific shared state that is not tied to one call frame
+
+Whether this is exposed through a dedicated trait or inherent methods can be
+settled during implementation planning, but the design should preserve the
+capability.
+
+### 6. Effects and runtime events are separate
 
 Semantic execution effects are distinct from debugger/runtime stop reasons.
 
@@ -82,7 +160,7 @@ enum ExecEffect<V> {
 Debugger and driver status should use a separate channel, for example through a
 runtime `RunStatus` and `StopReason`.
 
-### 3. Execution state is an internal closed cursor enum
+### 7. Execution state is an internal closed cursor enum
 
 `ExecutionCursor` is internal in v1. It is the resumable machine state used by
 the runtime loop. `ExecutionLocation` is the public/debug projection of that
@@ -112,7 +190,7 @@ enum ExecutionLocation {
 }
 ```
 
-### 4. Region is a first-class execution shape
+### 8. Region is a first-class execution shape
 
 `ExecRegion` is not just an entry-block lookup helper. It owns region-level
 stepping and scheduling. `ExecBlock` stays focused on linear within-block
@@ -121,7 +199,7 @@ execution.
 This allows current CFG-like regions to work naturally while leaving a home for
 future region kinds that are not just "find entry block and run blocks linearly".
 
-### 5. Graph support starts at visitation, not generic execution semantics
+### 9. Graph support starts at visitation, not generic execution semantics
 
 `VisitDiGraph` and `VisitUnGraph` provide framework-level graph visitation and
 state hooks. They should not impose one universal graph scheduler or execution
@@ -130,7 +208,7 @@ semantics.
 This keeps graph bodies first-class without forcing circuits, dataflow graphs,
 and future graph-like dialects through one baked-in traversal rule.
 
-### 6. Raw `Product<V>` is used directly for structural value lists
+### 10. Raw `Product<V>` is used directly for structural value lists
 
 The public interpreter protocol should use raw `kirin_ir::Product<V>` directly
 for structural lists of runtime values such as:
@@ -141,7 +219,7 @@ for structural lists of runtime values such as:
 
 No extra wrapper type is introduced for these lists.
 
-### 7. `Return` and `Yield` stay single-valued
+### 11. `Return` and `Yield` stay single-valued
 
 The semantic execution protocol uses `Return(V)` and `Yield(V)`, not
 `Return(Product<V>)` or `Yield(Product<V>)`.
@@ -150,7 +228,7 @@ This preserves the intended design that multiple outward results are a dialect
 convention, often expressible as sugar over one product-valued semantic result,
 rather than a second framework-level result transport mechanism.
 
-### 8. No global `ProductValue`-style requirement in the core
+### 12. No global `ProductValue`-style requirement in the core
 
 The new core interpreter must not impose a global runtime-value trait for
 packing or unpacking product values.
@@ -161,7 +239,7 @@ in the relevant `Interpretable` and `ConsumeResult` implementations.
 
 The framework owns execution mechanics, not value-convention policy.
 
-### 9. Result consumption is generic and dialect-owned
+### 13. Result consumption is generic and dialect-owned
 
 Nested execution boundaries are handled through a generic consumer trait:
 
@@ -192,7 +270,7 @@ Examples include:
 
 In v1, `ConsumeResult` should be implemented only by statement definitions.
 
-### 10. `Call` remains an effect so recursion uses the interpreter frame stack
+### 14. `Call` remains an effect so recursion uses the interpreter frame stack
 
 `Call` must remain in `ExecEffect`. Making call execution a synchronous Rust
 function returning `V` would move recursion to Rust call frames and would weaken
@@ -210,9 +288,42 @@ Instead, the runtime handles `ExecEffect::Call` by:
 
 This keeps recursion and nested execution explicit and debugger-friendly.
 
+### 15. Runtime control surfaces stay explicit
+
+The concrete interpreter should continue to expose the runtime-control features
+that exist today. In particular, the design should preserve:
+
+- instruction/fuel budgeting
+- maximum call-frame depth
+- explicit breakpoint configuration
+- runtime stop reasons beyond breakpoints, including dialect-driven halt-like
+  stops
+
+These controls belong to the concrete runtime and driver layer rather than to
+`ExecEffect<V>`, but they are part of the concrete interpreter abstraction and
+should be called out explicitly.
+
+### 16. Shared frame storage remains reusable
+
+The existing split between a reusable `Frame<V, X>` / `FrameStack<V, X>` kernel
+and interpreter-specific per-frame extra state is worth preserving.
+
+`kirin-interpreter-2` should continue to model frame storage as reusable shared
+infrastructure, with the concrete interpreter supplying extra per-frame state
+such as:
+
+- current execution cursor
+- stage-dynamic dispatch entry
+- pending nested-execution consumer metadata
+
+This matters because the new crate is still intended to share runtime structure
+with a future abstract interpreter even if only the concrete interpreter is
+implemented initially.
+
 ## Runtime Loop
 
-The runtime loop is a small-step engine over `ExecutionCursor`:
+The runtime loop is a small-step engine over `ExecutionCursor` and the active
+frame's already-resolved dispatch entry:
 
 1. project the current cursor to `ExecutionLocation`
 2. ask the debug driver whether execution should stop
@@ -241,6 +352,10 @@ loop {
     apply_effect(effect)?;
 }
 ```
+
+For stage-polymorphic execution, the concrete runtime should resolve the typed
+implementation from the frame's cached dispatch entry rather than rediscovering
+it on every step.
 
 ## Dialect Examples
 
@@ -332,9 +447,15 @@ Once graph visitation lands:
 The first implementation of `kirin-interpreter-2` should include:
 
 - the core trait family
+- stage-dynamic dispatch cache and per-frame dispatch entries
+- the typed `Staged<'a, ...>` facade
 - internal cursor model
+- reusable frame and frame-stack infrastructure
 - the concrete stack-based runtime
+- interpreter-global state support
+- fuel, max-depth, breakpoint, and halt control surfaces
 - block and region execution
+- callable-body abstraction with a blanket CFG-region path
 - explicit call-stack handling through `ExecEffect::Call`
 - statement-owned `ConsumeResult`
 
