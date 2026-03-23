@@ -440,6 +440,11 @@ Once graph visitation lands:
 
 - a compound graph node consumes nested execution results through
   `ConsumeResult`
+- a small toy language can define a computational-graph statement with a
+  `DiGraph` body, and its outward result should match a reference execution of
+  the equivalent computation through plain block execution
+- this comparison is output-level only; it does not require implementing a
+  second block-based version of the same language
 - breakpoint locations remain statement-based inside graph execution
 
 ## Recommended Initial Scope
