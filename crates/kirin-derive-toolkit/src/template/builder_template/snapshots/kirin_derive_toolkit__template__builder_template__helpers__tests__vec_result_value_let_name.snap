@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-toolkit/src/template/builder_template/helpers.rs
+expression: formatted
+---
+let mut __result_index : usize = 0 ; let results : Vec < ResultValue > = (0 .. results_count) . map (| __i | { stage . ssa () . kind (kirin_ir :: BuilderSSAKind :: Result (call_statement_id , __result_index + __i)) . ty (Lang :: Type :: from (MyType :: placeholder ())) . new () . into () }) . collect () ; __result_index += results_count ;

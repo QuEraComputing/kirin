@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-toolkit/src/template/builder_template/helpers.rs
+expression: formatted
+---
+results_count : usize , callee : impl Into < SSAValue >

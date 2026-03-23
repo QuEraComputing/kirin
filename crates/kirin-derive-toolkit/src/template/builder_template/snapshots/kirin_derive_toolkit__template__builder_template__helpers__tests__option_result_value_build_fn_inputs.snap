@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-toolkit/src/template/builder_template/helpers.rs
+expression: formatted
+---
+has_result : bool , condition : impl Into < SSAValue >

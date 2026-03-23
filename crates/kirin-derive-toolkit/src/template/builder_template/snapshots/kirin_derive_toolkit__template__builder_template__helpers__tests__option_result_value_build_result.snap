@@ -1,0 +1,16 @@
+---
+source: crates/kirin-derive-toolkit/src/template/builder_template/helpers.rs
+expression: formatted
+---
+#[automatically_derived]
+#[doc(hidden)]
+pub struct IfOp {
+    pub id: Statement,
+    pub result: Option<ResultValue>,
+}
+#[automatically_derived]
+impl From<IfOp> for Statement {
+    fn from(value: IfOp) -> Self {
+        value.id
+    }
+}

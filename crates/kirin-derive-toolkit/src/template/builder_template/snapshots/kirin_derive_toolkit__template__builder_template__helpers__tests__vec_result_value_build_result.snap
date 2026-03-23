@@ -1,0 +1,16 @@
+---
+source: crates/kirin-derive-toolkit/src/template/builder_template/helpers.rs
+expression: formatted
+---
+#[automatically_derived]
+#[doc(hidden)]
+pub struct Call {
+    pub id: Statement,
+    pub results: Vec<ResultValue>,
+}
+#[automatically_derived]
+impl From<Call> for Statement {
+    fn from(value: Call) -> Self {
+        value.id
+    }
+}

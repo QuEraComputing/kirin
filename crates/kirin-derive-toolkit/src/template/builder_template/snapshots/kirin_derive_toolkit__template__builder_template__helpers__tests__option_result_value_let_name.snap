@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-toolkit/src/template/builder_template/helpers.rs
+expression: formatted
+---
+let mut __result_index : usize = 0 ; let result : Option < ResultValue > = if has_result { let __val = stage . ssa () . kind (kirin_ir :: BuilderSSAKind :: Result (ifop_statement_id , __result_index)) . ty (Lang :: Type :: from (MyType :: placeholder ())) . new () . into () ; __result_index += 1 ; Some (__val) } else { None } ;

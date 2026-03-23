@@ -1,0 +1,5 @@
+---
+source: crates/kirin-derive-toolkit/src/template/builder_template/helpers.rs
+expression: formatted
+---
+let result : ResultValue = stage . ssa () . kind (kirin_ir :: BuilderSSAKind :: Result (add_statement_id , 0usize)) . ty (Lang :: Type :: from (MyType :: placeholder ())) . new () . into () ;

@@ -53,7 +53,30 @@ fn build_result_path(input: &InputMeta, info: &StatementInfo) -> proc_macro2::To
 }
 
 fn build_fn_inputs(info: &StatementInfo, ir_type: &syn::Path) -> Vec<proc_macro2::TokenStream> {
+    let result_names = result_names(info);
+    let result_fields: Vec<_> = info
+        .fields
+        .iter()
+        .filter(|f| f.category() == FieldCategory::Result)
+        .collect();
+    let result_name_iter = result_fields.iter().zip(result_names.iter());
+
     let mut inputs = Vec::new();
+    // Add count/flag parameters for Vec/Option result fields
+    for (field, name) in result_name_iter {
+        match field.collection {
+            Collection::Vec => {
+                let count_param = format_ident!("{}_count", name);
+                inputs.push(quote! { #count_param: usize });
+            }
+            Collection::Option => {
+                let has_param = format_ident!("has_{}", name);
+                inputs.push(quote! { #has_param: bool });
+            }
+            Collection::Single => {}
+        }
+    }
+
     for field in info.fields.iter() {
         match field.category() {
             FieldCategory::Result => continue,
@@ -261,6 +284,14 @@ fn build_fn_body(
     }}
 }
 
+/// Returns `true` if any Result field in `info` uses a dynamic collection
+/// (`Vec` or `Option`), requiring a runtime result-index counter.
+fn has_dynamic_result_index(info: &StatementInfo) -> bool {
+    info.fields.iter().any(|f| {
+        f.category() == FieldCategory::Result && !matches!(f.collection, Collection::Single)
+    })
+}
+
 fn let_name_eq_result_value(
     info: &StatementInfo,
     result_name_map: &std::collections::HashMap<usize, syn::Ident>,
@@ -268,48 +299,81 @@ fn let_name_eq_result_value(
 ) -> proc_macro2::TokenStream {
     let mut results = Vec::new();
     let statement_id = statement_id_name(info);
-    let mut result_index = 0usize;
+    let dynamic = has_dynamic_result_index(info);
+
+    // When any Vec/Option result field is present, we track result_index at runtime.
+    // Otherwise we use compile-time literal indices.
+    let mut static_index = 0usize;
+    if dynamic {
+        results.push(quote! {
+            let mut __result_index: usize = 0;
+        });
+    }
+
     for field in info.fields.iter() {
         if field.category() != FieldCategory::Result {
             continue;
         }
         let collection = &field.collection;
         let ssa_ty = field.ssa_type().expect("Result field must have ssa_type");
-
-        if matches!(collection, Collection::Vec) {
-            results.push(
-                syn::Error::new_spanned(
-                    field.name_ident(info.name.span()),
-                    "ResultValue field cannot be a Vec, consider implementing the builder manually",
-                )
-                .to_compile_error(),
-            );
-            continue;
-        } else if matches!(collection, Collection::Option) {
-            results.push(
-                syn::Error::new_spanned(
-                    field.name_ident(info.name.span()),
-                    "ResultValue field cannot be an Option, consider implementing the builder manually",
-                )
-                .to_compile_error(),
-            );
-            continue;
-        }
-
         let name = result_name_map
             .get(&field.index)
             .cloned()
             .unwrap_or_else(|| format_ident!("result", span = info.name.span()));
-        let index = result_index;
-        result_index += 1;
-        results.push(quote! {
-            let #name: ResultValue = stage
-                .ssa()
-                .kind(#crate_path::BuilderSSAKind::Result(#statement_id, #index))
-                .ty(Lang::Type::from(#ssa_ty))
-                .new()
-                .into();
-        });
+
+        match collection {
+            Collection::Single => {
+                let index_expr = if dynamic {
+                    quote! { __result_index }
+                } else {
+                    let idx = static_index;
+                    quote! { #idx }
+                };
+                results.push(quote! {
+                    let #name: ResultValue = stage
+                        .ssa()
+                        .kind(#crate_path::BuilderSSAKind::Result(#statement_id, #index_expr))
+                        .ty(Lang::Type::from(#ssa_ty))
+                        .new()
+                        .into();
+                });
+                static_index += 1;
+                if dynamic {
+                    results.push(quote! { __result_index += 1; });
+                }
+            }
+            Collection::Vec => {
+                let count_param = format_ident!("{}_count", name);
+                results.push(quote! {
+                    let #name: Vec<ResultValue> = (0..#count_param).map(|__i| {
+                        stage
+                            .ssa()
+                            .kind(#crate_path::BuilderSSAKind::Result(#statement_id, __result_index + __i))
+                            .ty(Lang::Type::from(#ssa_ty))
+                            .new()
+                            .into()
+                    }).collect();
+                    __result_index += #count_param;
+                });
+            }
+            Collection::Option => {
+                let has_param = format_ident!("has_{}", name);
+                results.push(quote! {
+                    let #name: Option<ResultValue> = if #has_param {
+                        let __val = stage
+                            .ssa()
+                            .kind(#crate_path::BuilderSSAKind::Result(#statement_id, __result_index))
+                            .ty(Lang::Type::from(#ssa_ty))
+                            .new()
+                            .into();
+                        __result_index += 1;
+                        Some(__val)
+                    } else {
+                        None
+                    };
+                });
+            }
+        }
     }
     quote! { #(#results)* }
 }
@@ -420,29 +484,23 @@ pub(super) fn build_result_impl(
         .collect::<Vec<_>>();
 
     for (field, name) in results.into_iter().zip(names.into_iter()) {
-        if matches!(field.collection, Collection::Vec) {
-            fields.push(
-                syn::Error::new_spanned(
-                    field.name_ident(info.name.span()),
-                    "ResultValue field cannot be a Vec, consider implementing the builder manually",
-                )
-                .to_compile_error(),
-            );
-            continue;
-        } else if matches!(field.collection, Collection::Option) {
-            fields.push(
-                syn::Error::new_spanned(
-                    field.name_ident(info.name.span()),
-                    "ResultValue field cannot be an Option, consider implementing the builder manually",
-                )
-                .to_compile_error(),
-            );
-            continue;
+        match field.collection {
+            Collection::Single => {
+                fields.push(quote! {
+                    pub #name: ResultValue,
+                });
+            }
+            Collection::Vec => {
+                fields.push(quote! {
+                    pub #name: Vec<ResultValue>,
+                });
+            }
+            Collection::Option => {
+                fields.push(quote! {
+                    pub #name: Option<ResultValue>,
+                });
+            }
         }
-
-        fields.push(quote! {
-            pub #name: ResultValue,
-        });
     }
 
     Ok(quote! {
@@ -623,5 +681,186 @@ pub(super) fn from_impl(input: &InputMeta, info: &StatementInfo) -> proc_macro2:
                 }
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::ir::StandardLayout;
+    use crate::ir::fields::{Collection, FieldData};
+    use quote::format_ident;
+
+    fn make_result_field(
+        index: usize,
+        name: &str,
+        collection: Collection,
+    ) -> FieldInfo<StandardLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
+            collection,
+            data: FieldData::Result {
+                ssa_type: syn::parse_quote!(MyType::placeholder()),
+                is_auto_placeholder: true,
+            },
+        }
+    }
+
+    fn make_argument_field(index: usize, name: &str) -> FieldInfo<StandardLayout> {
+        FieldInfo {
+            index,
+            ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
+            collection: Collection::Single,
+            data: FieldData::Argument {
+                ssa_type: syn::parse_quote!(MyType::placeholder()),
+            },
+        }
+    }
+
+    fn make_statement_info(name: &str, fields: Vec<FieldInfo<StandardLayout>>) -> StatementInfo {
+        StatementInfo {
+            name: format_ident!("{}", name),
+            fields,
+            build_fn_name: format_ident!("op_{}", name.to_lowercase()),
+            is_wrapper: false,
+            wrapper_type: None,
+            wrapper_field: None,
+        }
+    }
+
+    fn make_ir_statement(name: &str) -> ir::Statement<StandardLayout> {
+        let attrs = ir::StatementOptions {
+            format: None,
+            builder: None,
+            constant: false,
+            pure: false,
+            speculatable: false,
+            terminator: false,
+            edge: false,
+        };
+        ir::Statement::new(format_ident!("{}", name), attrs, (), (), vec![])
+    }
+
+    fn result_name_map_from(info: &StatementInfo) -> std::collections::HashMap<usize, syn::Ident> {
+        let names = result_names(info);
+        info.fields
+            .iter()
+            .filter(|f| f.category() == FieldCategory::Result)
+            .zip(names.into_iter())
+            .map(|(field, name)| (field.index, name))
+            .collect()
+    }
+
+    #[test]
+    fn vec_result_value_let_name_codegen() {
+        let info = make_statement_info(
+            "Call",
+            vec![
+                make_argument_field(0, "callee"),
+                make_result_field(1, "results", Collection::Vec),
+            ],
+        );
+        let name_map = result_name_map_from(&info);
+        let crate_path: syn::Path = syn::parse_quote!(kirin_ir);
+        let tokens = let_name_eq_result_value(&info, &name_map, &crate_path);
+        let formatted = crate::test_util::rustfmt_tokens(&tokens);
+        insta::assert_snapshot!("vec_result_value_let_name", formatted);
+    }
+
+    #[test]
+    fn option_result_value_let_name_codegen() {
+        let info = make_statement_info(
+            "IfOp",
+            vec![
+                make_argument_field(0, "condition"),
+                make_result_field(1, "result", Collection::Option),
+            ],
+        );
+        let name_map = result_name_map_from(&info);
+        let crate_path: syn::Path = syn::parse_quote!(kirin_ir);
+        let tokens = let_name_eq_result_value(&info, &name_map, &crate_path);
+        let formatted = crate::test_util::rustfmt_tokens(&tokens);
+        insta::assert_snapshot!("option_result_value_let_name", formatted);
+    }
+
+    #[test]
+    fn vec_result_value_build_result_codegen() {
+        let info = make_statement_info(
+            "Call",
+            vec![
+                make_argument_field(0, "callee"),
+                make_result_field(1, "results", Collection::Vec),
+            ],
+        );
+        let statement = make_ir_statement("Call");
+        let tokens = build_result_impl(&info, &statement).unwrap();
+        let formatted = crate::test_util::rustfmt_tokens(&tokens);
+        insta::assert_snapshot!("vec_result_value_build_result", formatted);
+    }
+
+    #[test]
+    fn option_result_value_build_result_codegen() {
+        let info = make_statement_info(
+            "IfOp",
+            vec![
+                make_argument_field(0, "condition"),
+                make_result_field(1, "result", Collection::Option),
+            ],
+        );
+        let statement = make_ir_statement("IfOp");
+        let tokens = build_result_impl(&info, &statement).unwrap();
+        let formatted = crate::test_util::rustfmt_tokens(&tokens);
+        insta::assert_snapshot!("option_result_value_build_result", formatted);
+    }
+
+    #[test]
+    fn single_result_value_unchanged() {
+        // Regression test: single ResultValue should continue to work exactly as before
+        let info = make_statement_info(
+            "Add",
+            vec![
+                make_argument_field(0, "lhs"),
+                make_argument_field(1, "rhs"),
+                make_result_field(2, "result", Collection::Single),
+            ],
+        );
+        let name_map = result_name_map_from(&info);
+        let crate_path: syn::Path = syn::parse_quote!(kirin_ir);
+        let tokens = let_name_eq_result_value(&info, &name_map, &crate_path);
+        let formatted = crate::test_util::rustfmt_tokens(&tokens);
+        insta::assert_snapshot!("single_result_value_let_name", formatted);
+    }
+
+    #[test]
+    fn vec_result_value_build_fn_inputs_codegen() {
+        let info = make_statement_info(
+            "Call",
+            vec![
+                make_argument_field(0, "callee"),
+                make_result_field(1, "results", Collection::Vec),
+            ],
+        );
+        let ir_type: syn::Path = syn::parse_quote!(MyType);
+        let inputs = build_fn_inputs(&info, &ir_type);
+        let tokens = quote! { #(#inputs),* };
+        let formatted = crate::test_util::rustfmt_tokens(&tokens);
+        insta::assert_snapshot!("vec_result_value_build_fn_inputs", formatted);
+    }
+
+    #[test]
+    fn option_result_value_build_fn_inputs_codegen() {
+        let info = make_statement_info(
+            "IfOp",
+            vec![
+                make_argument_field(0, "condition"),
+                make_result_field(1, "result", Collection::Option),
+            ],
+        );
+        let ir_type: syn::Path = syn::parse_quote!(MyType);
+        let inputs = build_fn_inputs(&info, &ir_type);
+        let tokens = quote! { #(#inputs),* };
+        let formatted = crate::test_util::rustfmt_tokens(&tokens);
+        insta::assert_snapshot!("option_result_value_build_fn_inputs", formatted);
     }
 }
