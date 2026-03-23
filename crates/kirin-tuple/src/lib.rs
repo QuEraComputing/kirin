@@ -16,10 +16,12 @@
 //!
 //! # Statements
 //!
-//! | Statement | Description |
-//! |-----------|-------------|
-//! | `new_tuple(%a, %b, ..) -> T` | Pack multiple SSA values into a single tuple value |
-//! | `unpack %t -> T, T, ..` | Destructure a tuple value into multiple SSA values (multi-result) |
+//! | Statement | Description | Analogues |
+//! |-----------|-------------|-----------|
+//! | `new_tuple(%a, %b, ..) -> T` | Pack SSA values into a tuple | CIRCT `hw.struct_create`, mlir-tuple `tuple.make` |
+//! | `unpack %t -> T, T, ..` | Bulk destructure (arity must be known) | CIRCT `hw.struct_explode` |
+//! | `get %t, <index> -> T` | Extract one element by index | CIRCT `hw.struct_extract`, Flang `fir.extract_value`, mlir-tuple `tuple.get` |
+//! | `len %t -> usize` | Query tuple arity | (no MLIR analogue — needed for abstract interpretation) |
 //!
 //! # Design Context: Why a Tuple Dialect?
 //!
@@ -74,6 +76,8 @@ mod tests;
 pub enum Tuple<T: CompileTimeValue> {
     NewTuple(NewTuple<T>),
     Unpack(Unpack<T>),
+    Get(Get<T>),
+    Len(Len<T>),
 }
 
 /// Packs multiple SSA values into a single tuple value.
@@ -91,6 +95,11 @@ pub struct NewTuple<T: CompileTimeValue> {
 
 /// Destructures a tuple value into multiple SSA values (multi-result).
 ///
+/// Requires the arity to be statically known at IR construction time
+/// (the number of `ResultValue` slots is fixed). For unknown-arity
+/// scenarios (e.g., parameterized types before type inference), use
+/// [`Get`] with an index instead.
+///
 /// Uses `Vec<ResultValue>` to support an arbitrary number of output values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$unpack {source} -> {results:type}")]
@@ -98,6 +107,41 @@ pub struct NewTuple<T: CompileTimeValue> {
 pub struct Unpack<T: CompileTimeValue> {
     source: SSAValue,
     results: Vec<ResultValue>,
+    #[kirin(default)]
+    marker: std::marker::PhantomData<T>,
+}
+
+/// Extracts a single element from a tuple by index.
+///
+/// Unlike [`Unpack`], this does not require knowing the full tuple arity.
+/// The index is an SSA value (typically a constant produced by the
+/// `kirin-constant` dialect). This is the right primitive for type
+/// inference scenarios where the tuple type is parameterized and arity
+/// is not yet resolved.
+///
+/// Analogues: CIRCT `hw.struct_extract`, Flang `fir.extract_value`,
+/// mlir-tuple-dialect `tuple.get`.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[chumsky(format = "$get {source}, {index} -> {result:type}")]
+#[kirin(builders, type = T)]
+pub struct Get<T: CompileTimeValue> {
+    source: SSAValue,
+    index: SSAValue,
+    result: ResultValue,
+    #[kirin(default)]
+    marker: std::marker::PhantomData<T>,
+}
+
+/// Queries the arity (number of elements) of a tuple value.
+///
+/// Returns a single SSA value holding the element count. Useful for
+/// abstract interpretation and dynamic dispatch over tuple structures.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[chumsky(format = "$len {source} -> {result:type}")]
+#[kirin(builders, type = T)]
+pub struct Len<T: CompileTimeValue> {
+    source: SSAValue,
+    result: ResultValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }

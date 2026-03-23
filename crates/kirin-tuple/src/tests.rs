@@ -4,7 +4,7 @@ use kirin::ir::{
 };
 use kirin_test_types::UnitType;
 
-use crate::{NewTuple, Tuple, Unpack};
+use crate::{Get, Len, NewTuple, Tuple, Unpack};
 
 fn make_new_tuple() -> NewTuple<UnitType> {
     NewTuple {
@@ -160,6 +160,81 @@ fn unpack_debug() {
         dbg.contains("Unpack"),
         "debug should contain 'Unpack': {dbg}"
     );
+}
+
+// --- Get ---
+
+fn make_get() -> Get<UnitType> {
+    Get {
+        source: TestSSAValue(0).into(),
+        index: TestSSAValue(10).into(),
+        result: TestSSAValue(1).into(),
+        marker: std::marker::PhantomData,
+    }
+}
+
+#[test]
+fn get_not_terminator() {
+    assert!(!make_get().is_terminator());
+}
+
+#[test]
+fn get_has_two_arguments() {
+    assert_eq!(make_get().arguments().count(), 2);
+}
+
+#[test]
+fn get_has_one_result() {
+    assert_eq!(make_get().results().count(), 1);
+}
+
+#[test]
+fn get_clone_eq() {
+    let op = make_get();
+    assert_eq!(op, op.clone());
+}
+
+#[test]
+fn get_debug() {
+    let dbg = format!("{:?}", make_get());
+    assert!(dbg.contains("Get"), "debug should contain 'Get': {dbg}");
+}
+
+// --- Len ---
+
+fn make_len() -> Len<UnitType> {
+    Len {
+        source: TestSSAValue(0).into(),
+        result: TestSSAValue(1).into(),
+        marker: std::marker::PhantomData,
+    }
+}
+
+#[test]
+fn len_not_terminator() {
+    assert!(!make_len().is_terminator());
+}
+
+#[test]
+fn len_has_one_argument() {
+    assert_eq!(make_len().arguments().count(), 1);
+}
+
+#[test]
+fn len_has_one_result() {
+    assert_eq!(make_len().results().count(), 1);
+}
+
+#[test]
+fn len_clone_eq() {
+    let op = make_len();
+    assert_eq!(op, op.clone());
+}
+
+#[test]
+fn len_debug() {
+    let dbg = format!("{:?}", make_len());
+    assert!(dbg.contains("Len"), "debug should contain 'Len': {dbg}");
 }
 
 // --- Tuple wraps delegation ---
