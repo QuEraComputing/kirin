@@ -44,6 +44,16 @@ pub trait FormatVisitor<'ir> {
         Ok(())
     }
 
+    /// Called when entering an optional section `[...]`.
+    fn enter_optional(&mut self) -> syn::Result<()> {
+        Ok(())
+    }
+
+    /// Called when exiting an optional section `[...]`.
+    fn exit_optional(&mut self) -> syn::Result<()> {
+        Ok(())
+    }
+
     /// Called for fields not in format string (have defaults).
     fn visit_default_field(&mut self, _field: &'ir FieldInfo<ChumskyLayout>) -> syn::Result<()> {
         Ok(())
@@ -117,7 +127,9 @@ fn visit_elements<'ir, V: FormatVisitor<'ir>>(
                 visitor.visit_context(proj)?;
             }
             FormatElement::Optional(inner) => {
+                visitor.enter_optional()?;
                 visit_elements(visitor, inner, field_map, referenced_fields)?;
+                visitor.exit_optional()?;
             }
         }
     }

@@ -137,6 +137,16 @@ impl<T: PrettyPrint> PrettyPrint for Vec<T> {
     {
         doc.list(self.iter(), ", ", |item| item.pretty_print(doc))
     }
+
+    fn pretty_print_type<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        doc.list(self.iter(), ", ", |item| item.pretty_print_type(doc))
+    }
 }
 
 impl<T: PrettyPrint> PrettyPrint for Option<T> {

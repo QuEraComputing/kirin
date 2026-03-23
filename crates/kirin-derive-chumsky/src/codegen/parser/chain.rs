@@ -344,13 +344,27 @@ impl GenerateHasDialectParser {
                 .map(|field| {
                     let name = field.ident.as_ref().unwrap();
                     if field.category() == FieldCategory::Result {
-                        let value = self.build_new_format_result_value(
-                            field,
-                            &field_occurrences,
-                            crate_path,
-                            result_idx,
-                        );
-                        result_idx += 1;
+                        let value = match field.collection {
+                            Collection::Vec => {
+                                // Don't increment result_idx — Vec consumes all remaining results
+                                self.build_vec_result_values(
+                                    field,
+                                    &field_occurrences,
+                                    crate_path,
+                                    result_idx,
+                                )
+                            }
+                            _ => {
+                                let v = self.build_new_format_result_value(
+                                    field,
+                                    &field_occurrences,
+                                    crate_path,
+                                    result_idx,
+                                );
+                                result_idx += 1;
+                                v
+                            }
+                        };
                         quote! { #name: #value }
                     } else {
                         let value =
@@ -371,14 +385,24 @@ impl GenerateHasDialectParser {
                 .iter()
                 .map(|field| {
                     if field.category() == FieldCategory::Result {
-                        let value = self.build_new_format_result_value(
-                            field,
-                            &field_occurrences,
-                            crate_path,
-                            result_idx,
-                        );
-                        result_idx += 1;
-                        value
+                        match field.collection {
+                            Collection::Vec => self.build_vec_result_values(
+                                field,
+                                &field_occurrences,
+                                crate_path,
+                                result_idx,
+                            ),
+                            _ => {
+                                let v = self.build_new_format_result_value(
+                                    field,
+                                    &field_occurrences,
+                                    crate_path,
+                                    result_idx,
+                                );
+                                result_idx += 1;
+                                v
+                            }
+                        }
                     } else {
                         self.build_field_value(field, &field_occurrences, crate_path, None)
                     }
@@ -424,6 +448,60 @@ impl GenerateHasDialectParser {
                 name: __result_names[#result_idx].clone(),
                 ty: #ty_expr,
                 result_index: #result_idx,
+            }
+        }
+    }
+
+    /// Builds a `Vec<ResultValue>` AST field for new-format mode.
+    ///
+    /// For `Vec<ResultValue>` fields, each element gets its name from
+    /// `__result_names[base + i]` and its type from the `:type` occurrence
+    /// (if present). When there's a `:type` occurrence, the type list is
+    /// zipped with the result names. When absent, all results get auto-placeholder types.
+    fn build_vec_result_values(
+        &self,
+        field: &FieldInfo<ChumskyLayout>,
+        field_occurrences: &HashMap<usize, Vec<&FieldOccurrence>>,
+        crate_path: &syn::Path,
+        base_idx: usize,
+    ) -> TokenStream {
+        let type_occ = field_occurrences
+            .get(&field.index)
+            .and_then(|occs| occs.iter().find(|o| matches!(o.option, FormatOption::Type)));
+
+        if let Some(type_occ) = type_occ {
+            // Has :type occurrence — zip type list with result names
+            let var = &type_occ.var_name;
+            quote! {
+                #var.iter().enumerate().map(|(i, ty_val)| {
+                    #crate_path::ResultValue {
+                        name: __result_names[#base_idx + i].clone(),
+                        ty: Some(ty_val.ty.clone()),
+                        result_index: #base_idx + i,
+                    }
+                }).collect::<::std::vec::Vec<_>>()
+            }
+        } else if let Some(ssa_type) = field.ssa_type() {
+            // No :type in format, but has #[kirin(type = expr)]
+            quote! {
+                (0..__result_names.len()).map(|i| {
+                    #crate_path::ResultValue {
+                        name: __result_names[#base_idx + i].clone(),
+                        ty: Some(#ssa_type),
+                        result_index: #base_idx + i,
+                    }
+                }).collect::<::std::vec::Vec<_>>()
+            }
+        } else {
+            // No type info — use None (auto-placeholder will be applied by builder)
+            quote! {
+                (0..__result_names.len()).map(|i| {
+                    #crate_path::ResultValue {
+                        name: __result_names[#base_idx + i].clone(),
+                        ty: None,
+                        result_index: #base_idx + i,
+                    }
+                }).collect::<::std::vec::Vec<_>>()
             }
         }
     }

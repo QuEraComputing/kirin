@@ -8,7 +8,14 @@ use crate::{StructuredControlFlow, Yield};
 
 fn make_yield() -> Yield<UnitType> {
     Yield {
-        value: TestSSAValue(0).into(),
+        values: vec![TestSSAValue(0).into()],
+        marker: std::marker::PhantomData,
+    }
+}
+
+fn make_void_yield() -> Yield<UnitType> {
+    Yield {
+        values: vec![],
         marker: std::marker::PhantomData,
     }
 }
@@ -46,7 +53,7 @@ fn yield_not_speculatable() {
     assert!(!make_yield().is_speculatable());
 }
 
-// --- Yield: has 1 argument (the value), no results, no successors ---
+// --- Yield: has arguments (the values), no results, no successors ---
 
 #[test]
 fn yield_has_one_argument() {
@@ -54,6 +61,17 @@ fn yield_has_one_argument() {
     let args: Vec<_> = y.arguments().copied().collect();
     assert_eq!(args.len(), 1);
     assert_eq!(args[0], TestSSAValue(0).into());
+}
+
+#[test]
+fn void_yield_has_no_arguments() {
+    let y = make_void_yield();
+    assert_eq!(y.arguments().count(), 0);
+}
+
+#[test]
+fn void_yield_is_terminator() {
+    assert!(make_void_yield().is_terminator());
 }
 
 #[test]

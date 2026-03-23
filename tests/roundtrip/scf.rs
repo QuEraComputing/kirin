@@ -94,3 +94,59 @@ specialize @test fn @main(i64, i64, i64) -> i64 {
 "#;
     roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
 }
+
+#[test]
+fn test_void_if_roundtrip() {
+    let input = r#"
+stage @test fn @main(i64) -> i64;
+
+specialize @test fn @main(i64) -> i64 {
+  ^entry(%cond: i64) {
+    if %cond then ^then() {
+      yield;
+    } else ^else() {
+      yield;
+    };
+  }
+}
+"#;
+    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+}
+
+#[test]
+fn test_multi_result_if_roundtrip() {
+    let input = r#"
+stage @test fn @main(i64, i64) -> i64;
+
+specialize @test fn @main(i64, i64) -> i64 {
+  ^entry(%x: i64, %cond: i64) {
+    %a, %b = if %cond then ^then() {
+      yield %x, %x;
+    } else ^else() {
+      yield %x, %x;
+    } -> i64, i64;
+  }
+}
+"#;
+    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+}
+
+#[test]
+fn test_multi_accumulator_for_roundtrip() {
+    let input = r#"
+stage @test fn @main(i64, i64, i64, i64) -> i64;
+
+specialize @test fn @main(i64, i64, i64, i64) -> i64 {
+  ^entry(%lo: i64, %hi: i64, %s: i64, %init2: i64) {
+    %init1 = add %lo, %lo -> i64;
+    %r1, %r2 = for %lo in %lo..%hi step %s iter_args(%init1, %init2) do ^body(%i: i64, %acc1: i64, %acc2: i64) {
+      %next1 = add %acc1, %i -> i64;
+      %next2 = add %acc2, %i -> i64;
+      yield %next1, %next2;
+    } -> i64, i64;
+    ret %r1;
+  }
+}
+"#;
+    roundtrip::assert_pipeline_roundtrip::<ScfLanguage>(input);
+}

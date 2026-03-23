@@ -386,6 +386,7 @@ impl GeneratePrettyPrint {
                         _collected,
                         field_vars,
                         ir_path,
+                        prev_is_field_like,
                     );
                     if let Some(inner_print) = inner_print {
                         parts.push(inner_print);
@@ -416,9 +417,9 @@ impl GeneratePrettyPrint {
         collected: &[FieldInfo<PrettyPrintLayout>],
         field_vars: &[syn::Ident],
         ir_path: &syn::Path,
+        needs_leading_space: bool,
     ) -> Option<TokenStream> {
         use kirin_derive_toolkit::ir::fields::Collection;
-        let prettyless_path = &self.prettyless_path;
 
         // Find the first field reference to use as the condition
         let condition_field = inner_elements.iter().find_map(|e| {
@@ -446,11 +447,19 @@ impl GeneratePrettyPrint {
         let inner_print =
             self.generate_format_print(&inner_format, field_map, collected, field_vars, ir_path);
 
+        // When the optional section follows a field-like element, add a leading
+        // space before the section content to maintain proper formatting.
+        let print_expr = if needs_leading_space {
+            quote! { doc.text(" ") + #inner_print }
+        } else {
+            inner_print
+        };
+
         Some(quote! {
             (if #condition {
-                #inner_print
+                #print_expr
             } else {
-                #prettyless_path::DocAllocator::nil(doc)
+                doc.nil()
             })
         })
     }

@@ -238,30 +238,29 @@ fn build_fn_body(
     let let_results = let_name_eq_result_value(info, result_name_map, crate_path);
 
     let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
+    // For Result fields with non-Copy collections (Vec, Option), clone when
+    // constructing the dialect struct so the original value remains available
+    // for the build result struct.
+    let field_value = |field: &FieldInfo<_>| {
+        if let Some(name) = result_name_map.get(&field.index) {
+            let needs_clone = field.category() == FieldCategory::Result
+                && !matches!(field.collection, Collection::Single);
+            if needs_clone {
+                quote! { #name.clone() }
+            } else {
+                quote! { #name }
+            }
+        } else {
+            let name = field.name_ident(info.name.span());
+            quote! { #name }
+        }
+    };
     let constructor = if input.is_enum {
-        ConstructorBuilder::new_variant(&input.name, &info.name, is_tuple).build_with_self(
-            &info.fields,
-            |field| {
-                if let Some(name) = result_name_map.get(&field.index) {
-                    quote! { #name }
-                } else {
-                    let name = field.name_ident(info.name.span());
-                    quote! { #name }
-                }
-            },
-        )
+        ConstructorBuilder::new_variant(&input.name, &info.name, is_tuple)
+            .build_with_self(&info.fields, field_value)
     } else {
-        ConstructorBuilder::new_struct(&input.name, is_tuple).build_with_self(
-            &info.fields,
-            |field| {
-                if let Some(name) = result_name_map.get(&field.index) {
-                    quote! { #name }
-                } else {
-                    let name = field.name_ident(info.name.span());
-                    quote! { #name }
-                }
-            },
-        )
+        ConstructorBuilder::new_struct(&input.name, is_tuple)
+            .build_with_self(&info.fields, field_value)
     };
 
     let build_result_path = build_result_path(input, info);
@@ -414,6 +413,7 @@ pub(super) fn build_fn_for_statement(
     };
 
     let fn_tokens = quote! {
+        #[allow(clippy::too_many_arguments)]
         pub fn #build_fn_name<Lang>(stage: &mut impl #crate_path::AsBuildStage<Lang>, #(#inputs),*) -> #build_result_path
         where
             Lang: #crate_path::Dialect + From<#self_ty>,

@@ -9,9 +9,9 @@
 //!
 //! | Operation | Description |
 //! |-----------|-------------|
-//! | `if %cond then {..} else {..}` | Two-way conditional with single-block bodies |
-//! | `for %iv in %lo..%hi step %s do {..}` | Counted loop with induction variable |
-//! | `yield %v` | Terminates an SCF body block, yielding a value to the parent |
+//! | `if %cond then {..} else {..} [-> types]` | Two-way conditional with 0-to-N results |
+//! | `for %iv in %lo..%hi step %s iter_args(..) do {..} [-> types]` | Counted loop with multi-accumulator support |
+//! | `yield [%v1, %v2, ..]` | Terminates an SCF body block, yielding 0-to-N values to the parent |
 //!
 //! # Block vs Region
 //!
@@ -50,15 +50,16 @@ pub enum StructuredControlFlow<T: CompileTimeValue> {
 /// Two-way conditional: evaluates `then_body` or `else_body` depending
 /// on `condition`. Both bodies are single blocks terminated by `yield`.
 ///
+/// Supports void-if (0 results) through multi-result (N results).
 /// Corresponds to MLIR's `scf.if`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[chumsky(format = "$if {condition} then {then_body} else {else_body} -> {result:type}")]
+#[chumsky(format = "$if {condition} then {then_body} else {else_body}[ -> {results:type}]")]
 #[kirin(builders, type = T)]
 pub struct If<T: CompileTimeValue> {
     condition: SSAValue,
     then_body: Block,
     else_body: Block,
-    result: ResultValue,
+    results: Vec<ResultValue>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
@@ -67,10 +68,11 @@ pub struct If<T: CompileTimeValue> {
 /// (exclusive) with a given `step`. The `body` block receives the current
 /// induction variable as a block argument.
 ///
+/// Supports multi-accumulator loops with `Vec<ResultValue>` results.
 /// Corresponds to MLIR's `scf.for`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(
-    format = "$for {induction_var} in {start}..{end} step {step} iter_args({init_args}) do {body} -> {result:type}"
+    format = "$for {induction_var} in {start}..{end} step {step} iter_args({init_args}) do {body}[ -> {results:type}]"
 )]
 #[kirin(builders, type = T)]
 pub struct For<T: CompileTimeValue> {
@@ -80,18 +82,20 @@ pub struct For<T: CompileTimeValue> {
     step: SSAValue,
     init_args: Vec<SSAValue>,
     body: Block,
-    result: ResultValue,
+    results: Vec<ResultValue>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
 
-/// Terminates an SCF body block, yielding a value back to the parent
+/// Terminates an SCF body block, yielding values back to the parent
 /// `If` or `For` operation. Analogous to MLIR's `scf.yield`.
+///
+/// Supports zero values (void-if) through N values (multi-result).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[chumsky(format = "$yield {value}")]
+#[chumsky(format = "$yield[ {values}]")]
 #[kirin(terminator, type = T)]
 pub struct Yield<T: CompileTimeValue> {
-    value: SSAValue,
+    values: Vec<SSAValue>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }

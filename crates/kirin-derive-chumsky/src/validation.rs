@@ -229,6 +229,11 @@ pub struct FieldOccurrence<'a> {
     pub option: FormatOption,
     /// The unique variable name for this occurrence.
     pub var_name: syn::Ident,
+    /// Whether this occurrence is inside an optional section `[...]`.
+    ///
+    /// When true and the field is `Vec<T>`, the parsed variable has type
+    /// `Option<Vec<T>>` and must be converted via `.unwrap_or_default()`.
+    pub in_optional: bool,
 }
 
 /// Visitor that validates format string usage.
@@ -249,6 +254,8 @@ pub struct ValidationVisitor<'ir> {
     body_projections: std::collections::HashMap<usize, Vec<crate::format::BodyProjection>>,
     /// Accumulated errors
     errors: Vec<syn::Error>,
+    /// Whether we are currently inside an optional section `[...]`.
+    in_optional_depth: usize,
 }
 
 impl<'ir> ValidationVisitor<'ir> {
@@ -263,6 +270,7 @@ impl<'ir> ValidationVisitor<'ir> {
             result_name_occurrences: HashSet::new(),
             body_projections: std::collections::HashMap::new(),
             errors: Vec::new(),
+            in_optional_depth: 0,
         }
     }
 
@@ -550,6 +558,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
             field,
             option: option.clone(),
             var_name,
+            in_optional: self.in_optional_depth > 0,
         });
 
         Ok(())
@@ -557,6 +566,16 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
 
     fn visit_tokens(&mut self, _tokens: &[Token<'_>]) -> syn::Result<()> {
         // No validation needed for tokens
+        Ok(())
+    }
+
+    fn enter_optional(&mut self) -> syn::Result<()> {
+        self.in_optional_depth += 1;
+        Ok(())
+    }
+
+    fn exit_optional(&mut self) -> syn::Result<()> {
+        self.in_optional_depth -= 1;
         Ok(())
     }
 

@@ -1,11 +1,11 @@
 use proc_macro2::TokenStream;
 use quote::quote;
 
-use kirin_derive_toolkit::ir::fields::FieldCategory;
+use kirin_derive_toolkit::ir::fields::{Collection, FieldCategory};
 
 use crate::ChumskyLayout;
 use crate::format::Format;
-use crate::validation::validate_format;
+use crate::validation::{FieldOccurrence, validate_format};
 
 use crate::codegen::{GeneratorConfig, format_for_statement};
 
@@ -164,6 +164,10 @@ impl GenerateHasDialectParser {
             .filter(|f| f.category() == FieldCategory::Result)
             .count();
 
+        // Generate rebindings for Vec fields inside optional sections.
+        // These convert `Option<Vec<T>>` (from `.or_not()`) back to `Vec<T>`.
+        let rebindings = optional_vec_rebindings(&occurrences);
+
         if result_field_count > 0 {
             // Parse result names generically, then the format body
             let constructor = self.ast_constructor_new_format(
@@ -175,12 +179,33 @@ impl GenerateHasDialectParser {
                 &type_params,
             );
 
-            Ok(quote! {{
-                use #crate_path::Token;
-                #crate_path::result_name_list()
-                    .then(#parser_expr)
-                    .map(|(__result_names, #pattern)| -> #return_type { #constructor })
-            }})
+            // When all result fields are Vec (dynamic count), the result name
+            // list is optional — 0 results means no `%name = ` prefix.
+            let all_results_are_vec = collected
+                .iter()
+                .filter(|f| f.category() == FieldCategory::Result)
+                .all(|f| matches!(f.collection, Collection::Vec));
+
+            if all_results_are_vec {
+                Ok(quote! {{
+                    use #crate_path::Token;
+                    #crate_path::result_name_list()
+                        .or_not()
+                        .then(#parser_expr)
+                        .map(|(__result_names_opt, #pattern)| -> #return_type {
+                            let __result_names = __result_names_opt.unwrap_or_default();
+                            #rebindings
+                            #constructor
+                        })
+                }})
+            } else {
+                Ok(quote! {{
+                    use #crate_path::Token;
+                    #crate_path::result_name_list()
+                        .then(#parser_expr)
+                        .map(|(__result_names, #pattern)| -> #return_type { #rebindings #constructor })
+                }})
+            }
         } else {
             // No result fields: original behavior
             let constructor = self.ast_constructor(
@@ -194,7 +219,7 @@ impl GenerateHasDialectParser {
 
             Ok(quote! {{
                 use #crate_path::Token;
-                #parser_expr.map(|#pattern| -> #return_type { #constructor })
+                #parser_expr.map(|#pattern| -> #return_type { #rebindings #constructor })
             }})
         }
     }
@@ -239,6 +264,25 @@ impl GenerateHasDialectParser {
 
         Ok(namespace_expr)
     }
+}
+
+/// Generates `let var = var.unwrap_or_default();` rebindings for `Vec` fields
+/// that are inside optional sections `[...]`.
+///
+/// When a `Vec<T>` field appears inside `[...]`, the parser wraps the section
+/// in `.or_not()`, producing `Option<Vec<T>>`. This function generates
+/// rebindings to convert `Option<Vec<T>>` back to `Vec<T>`.
+fn optional_vec_rebindings(occurrences: &[FieldOccurrence<'_>]) -> TokenStream {
+    let rebindings: Vec<_> = occurrences
+        .iter()
+        .filter(|occ| occ.in_optional && occ.field.collection == Collection::Vec)
+        .map(|occ| {
+            let var = &occ.var_name;
+            quote! { let #var = #var.unwrap_or_default(); }
+        })
+        .collect();
+
+    quote! { #(#rebindings)* }
 }
 
 #[cfg(test)]

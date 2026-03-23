@@ -1,8 +1,8 @@
 use kirin::prelude::{CompileTimeValue, HasStageInfo};
 use kirin_interpreter::{
-    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
+    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError, write_results,
 };
-use smallvec::smallvec;
+use smallvec::{SmallVec, smallvec};
 
 use crate::{For, If, StructuredControlFlow, Yield};
 
@@ -204,7 +204,7 @@ where
         let control = interp.eval_block(stage, block)?;
         match control {
             Continuation::Yield(values) => {
-                interp.write(self.result, values.into_iter().next().unwrap())?;
+                write_results(interp, &self.results, &values)?;
                 Ok(Continuation::Continue)
             }
             other => Ok(other),
@@ -246,10 +246,8 @@ where
             let control = interp.eval_block(stage, self.body)?;
             match control {
                 Continuation::Yield(values) => {
-                    // The yielded value feeds back as loop-carried state for next iteration.
-                    if !self.init_args.is_empty() {
-                        carried = vec![values.into_iter().next().unwrap()];
-                    }
+                    // All yielded values feed back as loop-carried state.
+                    carried = values.to_vec();
                 }
                 other => return Ok(other),
             }
@@ -260,10 +258,8 @@ where
             })?;
         }
 
-        // Write final loop-carried value to result.
-        if let Some(value) = carried.into_iter().next() {
-            interp.write(self.result, value)?;
-        }
+        // Write final loop-carried values to results with arity check.
+        write_results(interp, &self.results, &SmallVec::from(carried))?;
 
         Ok(Continuation::Continue)
     }
@@ -281,8 +277,12 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        let v = interp.read(self.value)?;
-        Ok(Continuation::Yield(smallvec::smallvec![v]))
+        let values: SmallVec<[I::Value; 1]> = self
+            .values
+            .iter()
+            .map(|ssa| interp.read(*ssa))
+            .collect::<Result<_, _>>()?;
+        Ok(Continuation::Yield(values))
     }
 }
 
