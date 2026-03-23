@@ -25,6 +25,17 @@ entry = "cargo fmt --all -- --check"
 pass_filenames = false
 types = ["rust"]
 
+# Rust: check (catches errors clippy might miss with different feature flags)
+[[repos]]
+repo = "local"
+[[repos.hooks]]
+id = "cargo-check"
+name = "cargo check"
+language = "system"
+entry = "cargo check --workspace --all-targets"
+pass_filenames = false
+types = ["rust"]
+
 # Rust: clippy lint
 [[repos]]
 repo = "local"
