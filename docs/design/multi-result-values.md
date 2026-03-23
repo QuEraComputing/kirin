@@ -136,24 +136,20 @@ author never writes `+ HasProduct` on their struct definitions.
 
 ## ProductValue Trait
 
-### 3 Required Methods
+### 2 Required Methods
 
-The `ProductValue` trait requires 3 methods from the dialect author (borrow,
-consume, wrap). All product operations are provided as default implementations
-that delegate to `Product<T>` (the same struct from kirin-ir) with zero
-unnecessary allocation.
+The `ProductValue` trait requires only 2 methods. All product operations
+are provided as defaults. `unpack` returns a borrowing iterator — the
+caller decides when to clone.
 
 ```rust
 /// Interpreter-level product value semantics.
 ///
-/// Uses the same `Product<T>` struct from kirin-ir — no separate
-/// value-level wrapper. 3 required methods, all operations provided.
+/// Uses the same `Product<T>` from kirin-ir. 2 required methods,
+/// all operations provided. No unnecessary allocation.
 pub trait ProductValue: Sized + Clone {
     /// Borrow the product storage if this value is a product.
     fn as_product(&self) -> Option<&Product<Self>>;
-
-    /// Consume and extract the product storage (zero-copy).
-    fn into_product(self) -> Option<Product<Self>>;
 
     /// Wrap a product into this value type.
     fn from_product(product: Product<Self>) -> Self;
@@ -164,10 +160,11 @@ pub trait ProductValue: Sized + Clone {
         Self::from_product(Product(SmallVec::from_vec(values)))
     }
 
-    /// Consuming destructure — returns SmallVec, no heap allocation.
-    fn unpack(self) -> Result<SmallVec<[Self; 2]>, InterpreterError> {
-        self.into_product()
-            .map(|p| p.0)
+    /// Borrowing destructure — returns an iterator of references.
+    /// Caller clones when ownership is needed.
+    fn unpack(&self) -> Result<UnpackIter<'_, Self>, InterpreterError> {
+        self.as_product()
+            .map(|p| UnpackIter(p.0.iter()))
             .ok_or_else(|| InterpreterError::Custom("expected product".into()))
     }
 
@@ -190,6 +187,17 @@ pub trait ProductValue: Sized + Clone {
         self.len().map(|n| n == 0)
     }
 }
+
+/// Borrowing iterator over product elements.
+pub struct UnpackIter<'a, V>(core::slice::Iter<'a, V>);
+
+impl<'a, V> Iterator for UnpackIter<'a, V> {
+    type Item = &'a V;
+    fn next(&mut self) -> Option<Self::Item> { self.0.next() }
+    fn size_hint(&self) -> (usize, Option<usize>) { self.0.size_hint() }
+}
+
+impl<V> ExactSizeIterator for UnpackIter<'_, V> {}
 ```
 
 ### Product\<T\> — Iterators
@@ -234,19 +242,29 @@ impl<V> FromIterator<V> for Product<V> {
 }
 ```
 
-The auto-destructure layer uses borrowing iteration (no allocation):
+All destructuring paths use borrowing — no allocation:
 
 ```rust
-// Auto-destructure — borrows, clones per element:
-let product = value.as_product().unwrap();
-for (i, rv) in results.iter().enumerate() {
-    store.write(*rv, product.0[i].clone())?;
+// Auto-destructure layer — borrows, clones per element:
+for (rv, elem) in results.iter().zip(value.unpack()?) {
+    store.write(*rv, elem.clone())?;
 }
 
-// kirin-tuple Unpack — consuming, zero-copy:
-let product = value.into_product().unwrap();
-for (rv, val) in results.iter().zip(product) {  // IntoIterator
-    store.write(*rv, val)?;
+// kirin-tuple Unpack — same pattern:
+for (rv, elem) in self.results.iter().zip(source.unpack()?) {
+    interp.write(*rv, elem.clone())?;
+}
+
+// Direct Product access when you have &Product<V>:
+let product = value.as_product().unwrap();
+for elem in product {  // &Product<V> implements IntoIterator
+    // process &V
+}
+
+// Owning destructure when needed — clone the Product, then consume:
+let owned = value.as_product().unwrap().clone();
+for elem in owned {  // Product<V> implements IntoIterator (consuming)
+    // process V (owned)
 }
 ```
 
@@ -278,17 +296,15 @@ impl HasProduct for MyType {
     }
 }
 
-// ProductValue (value level) — 3 methods:
+// ProductValue (value level) — 2 methods:
 impl ProductValue for MyValue {
     fn as_product(&self) -> Option<&Product<Self>> {
         match self { MyValue::Tuple(p) => Some(p), _ => None }
     }
-    fn into_product(self) -> Option<Product<Self>> {
-        match self { MyValue::Tuple(p) => Some(p), _ => None }
-    }
     fn from_product(p: Product<Self>) -> Self { MyValue::Tuple(p) }
 }
-// Done — new_product, unpack, get, len, is_empty, iterators all free.
+// Done — new_product, unpack, get, len, is_empty all free.
+// unpack returns UnpackIter (borrowing) — caller clones when needed.
 ```
 
 ### IndexValue Trait — Separate Concern
@@ -316,15 +332,15 @@ Several boilerplate patterns in this design are candidates for derive macros:
 | Pattern | Current | Future Derive |
 |---------|---------|---------------|
 | `HasProduct` impl on type enum | Manual 2-method impl | `#[derive(HasProduct)]` with `#[product]` on variant |
-| `ProductValue` impl on value enum | Manual 3-method impl | `#[derive(ProductValue)]` with `#[product]` on variant |
+| `ProductValue` impl on value enum | Manual 2-method impl | `#[derive(ProductValue)]` with `#[product]` on variant |
 | `IndexValue` impl on value enum | Manual 2-method impl | `#[derive(IndexValue)]` with `#[index]` on variant |
 | `HasParser`/`PrettyPrint` for `Product<T>` | Manual or framework-provided | Auto-detected `(T1, T2)` syntax for product variants |
 | `AbstractValue` join for products | Manual pointwise join | Derive-generated pointwise join when `#[product]` present |
 
-Note: `HasProduct` and `ProductValue` have identical structure (variant wrapping
-`Product<Self>`). A single `#[product]` attribute could generate both impls if
-the enum is used as both a type and a value. In practice, type enums and value
-enums are separate, so separate derives are cleaner.
+Note: `HasProduct` and `ProductValue` have identical required methods (`as_product`
++ `from_product`). A single `#[product]` attribute could generate both impls.
+In practice, type enums and value enums are separate, so separate derives are
+cleaner — but the attribute and detection logic can be shared in derive-toolkit.
 
 These derives are **not required for the initial implementation** — the manual
 impls are 2-5 lines each. But they eliminate the last bits of boilerplate for
