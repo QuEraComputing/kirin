@@ -340,9 +340,10 @@ impls are 2-5 lines each. But they eliminate the last bits of boilerplate for
 dialect authors who use products heavily. They should be added to the derive
 infrastructure when the product pattern is validated across multiple dialects.
 
-## Continuation Enum (Unchanged)
+## Continuation Enum
 
-The `Continuation` enum stays **single-valued**. No `SmallVec` wrapping.
+`Return` and `Yield` are **single-valued** — they carry one `V` (possibly a product).
+`Call` carries the result slots where the return value should be written:
 
 ```rust
 pub enum Continuation<V, Ext = Infallible> {
@@ -353,7 +354,10 @@ pub enum Continuation<V, Ext = Infallible> {
         callee: SpecializedFunction,
         stage: CompileStage,
         args: Args<V>,
-        result: ResultValue,
+        /// Where to write the return value(s) in the caller's frame.
+        /// For multi-result calls, the return product is auto-destructured
+        /// into these slots by `run_nested_calls` via `write_statement_results`.
+        results: SmallVec<[ResultValue; 1]>,
     },
     Return(V),
     Yield(V),
@@ -361,9 +365,50 @@ pub enum Continuation<V, Ext = Infallible> {
 }
 ```
 
-When a function returns multiple values, `V` is a product. When a SCF body yields
-multiple values, `V` is a product. The framework auto-destructures based on the
-IR's `Vec<ResultValue>` fields.
+When a function returns multiple values, `V` is a product. `run_nested_calls`
+auto-destructures the product into the result slots via `write_statement_results`.
+When a SCF body yields multiple values, `V` is also a product, and the parent
+operation (e.g., `If`, `For`) auto-destructures via `write_statement_results`.
+
+Note: `Call.results` uses `SmallVec<[ResultValue; 1]>` because `ResultValue` is
+a lightweight index (not a value). The heavyweight values (`Return(V)`, `Yield(V)`)
+are always single — that's the core design goal.
+
+## ValueStore Convenience APIs
+
+`ValueStore` provides symmetric multi-value read/write helpers that dialect authors
+use directly. These are **not** product-aware — they operate on slices of SSA values
+and result slots:
+
+```rust
+pub trait ValueStore {
+    type Value: Clone;
+    type Error;
+
+    fn read(&self, value: SSAValue) -> Result<Self::Value, Self::Error>;
+    fn write(&mut self, result: ResultValue, value: Self::Value) -> Result<(), Self::Error>;
+    fn write_ssa(&mut self, ssa: SSAValue, value: Self::Value) -> Result<(), Self::Error>;
+
+    /// Read multiple SSA values into a SmallVec.
+    fn read_many(&self, values: &[SSAValue]) -> Result<SmallVec<[Self::Value; 1]>, Self::Error> {
+        values.iter().map(|ssa| self.read(*ssa)).collect()
+    }
+
+    /// Write multiple results with arity checking.
+    fn write_many(
+        &mut self,
+        results: &[ResultValue],
+        values: &[Self::Value],
+    ) -> Result<(), Self::Error>
+    where Self::Error: From<InterpreterError>;
+}
+```
+
+These exist independently of `ProductValue`. Dialect authors use them when they
+have explicit `Vec<SSAValue>` or `Vec<ResultValue>` fields and want to read/write
+all values at once. For example, `kirin-tuple`'s `Unpack` uses `write_many` to
+write each element to its result slot, and `kirin-scf`'s `Yield` uses `read_many`
+to read all yielded values.
 
 ## Auto-Destructuring: Statement Execution Layer
 
@@ -397,6 +442,10 @@ fn write_statement_results<V: ProductValue>(
 This happens in the framework, not in dialect interpret impls. The dialect author's
 `interpret()` method returns a single value (possibly a product), and the framework
 handles the rest.
+
+Note: `write_statement_results` and `write_many` serve different purposes:
+- `write_many` is a raw slice-to-slice write (no product awareness)
+- `write_statement_results` destructures a single product value into result slots
 
 ## Abstract Interpreter
 
@@ -483,7 +532,8 @@ operations in their DSL programs.
 | `product![]` macro | kirin-ir | Ergonomic product construction |
 | `HasProduct` | kirin-ir | Trait for dialect types — opt-in multi-result (2 required methods) |
 | `ProductValue` | kirin-interpreter | Trait for dialect values — 2 required, 3 provided (`new_product`, `get`, `len`) |
-| Auto-destructure | kirin-interpreter | Statement execution writes product to result slots |
+| Auto-destructure | kirin-interpreter | `write_statement_results` — writes product to result slots |
+| `read_many`/`write_many` | kirin-interpreter | ValueStore helpers for bulk SSA read/write (product-unaware) |
 | `IndexValue` | kirin-tuple | Trait for value ↔ usize conversion (Get/Len only) |
 | `Tuple` dialect | kirin-tuple | Explicit new_tuple/unpack/get/len operations |
 | `Vec<ResultValue>` support | kirin-derive-toolkit | Builder template codegen |
