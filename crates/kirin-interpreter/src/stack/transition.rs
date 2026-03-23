@@ -3,11 +3,13 @@ use kirin_ir::{
 };
 
 use super::{DynFrameDispatch, FrameDispatchAction, StackInterpreter};
-use crate::{BlockEvaluator, ConcreteExt, Continuation, Interpretable, InterpreterError};
+use crate::{
+    BlockEvaluator, ConcreteExt, Continuation, Interpretable, InterpreterError, ProductValue,
+};
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone + 'ir,
+    V: Clone + ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,

@@ -41,11 +41,11 @@ pub enum Continuation<V, Ext = Infallible> {
         /// Where to write the return values in the caller's frame.
         results: SmallVec<[ResultValue; 1]>,
     },
-    /// Return values from the current function frame.
-    Return(SmallVec<[V; 1]>),
-    /// Yield values from an inline body block (e.g. `scf.yield`) without
+    /// Return a value from the current function frame.
+    Return(V),
+    /// Yield a value from an inline body block (e.g. `scf.yield`) without
     /// popping a call frame. The parent operation handles cursor restoration.
-    Yield(SmallVec<[V; 1]>),
+    Yield(V),
     /// Interpreter-specific extension variant.
     Ext(Ext),
 }

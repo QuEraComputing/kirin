@@ -2,13 +2,13 @@ use kirin_ir::StageMeta;
 use smallvec::SmallVec;
 
 use super::StackInterpreter;
-use crate::{ConcreteExt, Continuation, InterpreterError, ValueStore};
+use crate::{ConcreteExt, Continuation, InterpreterError, ProductValue};
 
 // -- Execution engine -------------------------------------------------------
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone + 'ir,
+    V: Clone + ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,
@@ -89,12 +89,13 @@ where
     ///
     /// Runs until a `Return` or `Yield` continuation triggers exit (determined
     /// by `should_exit`). Nested `Call`s are tracked and their return values
-    /// written back automatically with arity checking.
+    /// written back automatically via [`write_statement_results`].
     ///
     /// `should_exit(interp, is_yield)` is called after `advance` for each
-    /// `Return`/`Yield`. Return `true` to exit the loop with the values.
-    pub(crate) fn run_nested_calls<F>(&mut self, mut should_exit: F) -> Result<SmallVec<[V; 1]>, E>
+    /// `Return`/`Yield`. Return `true` to exit the loop with the value.
+    pub(crate) fn run_nested_calls<F>(&mut self, mut should_exit: F) -> Result<V, E>
     where
+        V: ProductValue,
         F: FnMut(&Self, bool) -> bool,
     {
         let mut pending_results: Vec<SmallVec<[kirin_ir::ResultValue; 1]>> = Vec::new();
@@ -119,20 +120,20 @@ where
                 }
             }
 
-            let values = match &control {
-                Continuation::Return(vs) | Continuation::Yield(vs) => Some(vs.clone()),
+            let value = match &control {
+                Continuation::Return(v) | Continuation::Yield(v) => Some(v.clone()),
                 _ => None,
             };
 
             let is_yield = matches!(&control, Continuation::Yield(_));
             self.advance(&control)?;
 
-            if let Some(values) = values {
+            if let Some(value) = value {
                 if should_exit(self, is_yield) {
-                    return Ok(values);
+                    return Ok(value);
                 }
                 let results = pending_results.pop().ok_or(InterpreterError::NoFrame)?;
-                self.write_many(&results, &values)?;
+                crate::write_statement_results(self, &results, value)?;
             }
         }
     }

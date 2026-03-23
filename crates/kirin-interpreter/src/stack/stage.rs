@@ -1,14 +1,14 @@
 use kirin_ir::{Dialect, HasStageInfo, SpecializedFunction, StageMeta};
-use smallvec::SmallVec;
 
 use super::StackInterpreter;
 use crate::{
-    CallSemantics, ConcreteExt, Continuation, Interpretable, InterpreterError, StageAccess, Staged,
+    CallSemantics, ConcreteExt, Continuation, Interpretable, InterpreterError, ProductValue,
+    StageAccess, Staged,
 };
 
 impl<'a, 'ir, V, S, E, G, L> Staged<'a, 'ir, StackInterpreter<'ir, V, S, E, G>, L>
 where
-    V: Clone + 'ir,
+    V: Clone + ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + HasStageInfo<L> + 'ir,
     G: 'ir,
@@ -37,10 +37,10 @@ where
         Ok(())
     }
 
-    /// Call a specialized function and return its result values.
-    pub fn call(self, callee: SpecializedFunction, args: &[V]) -> Result<SmallVec<[V; 1]>, E>
+    /// Call a specialized function and return its result value.
+    pub fn call(self, callee: SpecializedFunction, args: &[V]) -> Result<V, E>
     where
-        L: CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, Result = SmallVec<[V; 1]>>,
+        L: CallSemantics<'ir, StackInterpreter<'ir, V, S, E, G>, Result = V>,
     {
         self.interp.call_with_stage::<L>(callee, self.stage, args)
     }

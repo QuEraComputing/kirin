@@ -169,7 +169,7 @@ fn test_max_depth_exactly_sufficient() {
         StackInterpreter::new(&pipeline, stage_id).with_max_depth(3);
 
     let result = interp.call(spec_fn, stage_id, &[2]).unwrap();
-    assert_eq!(result[0], 0);
+    assert_eq!(result, 0);
 }
 
 #[test]

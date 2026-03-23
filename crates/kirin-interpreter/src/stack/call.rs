@@ -2,18 +2,20 @@ use kirin_ir::{
     CompileStage, Dialect, GetInfo, HasStageInfo, SpecializedFunction, StageInfo, StageMeta,
     SupportsStageDispatch,
 };
-use smallvec::SmallVec;
 
 use super::StackInterpreter;
 use super::dispatch::CallDynAction;
 use crate::stage::expect_stage_id;
-use crate::{BlockEvaluator, CallSemantics, Continuation, Frame, Interpretable, InterpreterError};
+use crate::{
+    BlockEvaluator, CallSemantics, Continuation, Frame, Interpretable, InterpreterError,
+    ProductValue,
+};
 
 // -- Call (inherent, not on the trait) --------------------------------------
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone + 'ir,
+    V: Clone + ProductValue + 'ir,
     E: From<InterpreterError> + 'ir,
     S: StageMeta + 'ir,
     G: 'ir,
@@ -25,9 +27,9 @@ where
         callee: SpecializedFunction,
         stage: CompileStage,
         args: &[V],
-    ) -> Result<SmallVec<[V; 1]>, E>
+    ) -> Result<V, E>
     where
-        for<'a> S: SupportsStageDispatch<CallDynAction<'a, 'ir, V, S, E, G>, SmallVec<[V; 1]>, E>,
+        for<'a> S: SupportsStageDispatch<CallDynAction<'a, 'ir, V, S, E, G>, V, E>,
     {
         let pipeline = self.pipeline;
         let mut action = CallDynAction {
@@ -43,13 +45,10 @@ where
         callee: SpecializedFunction,
         stage: &'ir StageInfo<L>,
         args: &[V],
-    ) -> Result<SmallVec<[V; 1]>, E>
+    ) -> Result<V, E>
     where
         S: HasStageInfo<L>,
-        L: Dialect
-            + Interpretable<'ir, Self>
-            + CallSemantics<'ir, Self, Result = SmallVec<[V; 1]>>
-            + 'ir,
+        L: Dialect + Interpretable<'ir, Self> + CallSemantics<'ir, Self, Result = V> + 'ir,
     {
         let stage_id = expect_stage_id(stage);
         let spec = callee

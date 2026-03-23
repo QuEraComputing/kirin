@@ -267,8 +267,17 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        let values = interp.read_many(&self.values)?;
-        Ok(Continuation::Return(values))
+        // Return always produces exactly one value. Multi-result returns
+        // (product packing) require ProductValue and will be added in a
+        // follow-up wave.
+        assert_eq!(
+            self.values.len(),
+            1,
+            "Return currently supports exactly 1 value, got {}",
+            self.values.len()
+        );
+        let value = interp.read(self.values[0])?;
+        Ok(Continuation::Return(value))
     }
 }
 

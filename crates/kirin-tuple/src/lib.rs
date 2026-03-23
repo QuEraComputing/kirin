@@ -59,7 +59,7 @@
 //! how tuple packing/unpacking works at the interpreter level.
 
 mod interpret_impl;
-pub use interpret_impl::TupleValue;
+pub use interpret_impl::IndexValue;
 
 use kirin::prelude::*;
 

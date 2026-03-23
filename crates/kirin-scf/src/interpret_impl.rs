@@ -1,8 +1,9 @@
 use kirin::prelude::{CompileTimeValue, HasStageInfo};
 use kirin_interpreter::{
-    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError,
+    BranchCondition, Continuation, Interpretable, Interpreter, InterpreterError, ProductValue,
+    write_statement_results,
 };
-use smallvec::{SmallVec, smallvec};
+use smallvec::smallvec;
 
 use crate::{For, If, StructuredControlFlow, Yield};
 
@@ -179,7 +180,7 @@ mod tests {
 impl<'ir, I, T> Interpretable<'ir, I> for If<T>
 where
     I: Interpreter<'ir>,
-    I::Value: Clone + BranchCondition,
+    I::Value: Clone + BranchCondition + ProductValue,
     T: CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
@@ -203,8 +204,8 @@ where
         interp.bind_block_args(stage, block, &[])?;
         let control = interp.eval_block(stage, block)?;
         match control {
-            Continuation::Yield(values) => {
-                interp.write_many(&self.results, &values)?;
+            Continuation::Yield(v) => {
+                write_statement_results(interp, &self.results, v)?;
                 Ok(Continuation::Continue)
             }
             other => Ok(other),
@@ -215,7 +216,7 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for For<T>
 where
     I: Interpreter<'ir>,
-    I::Value: Clone + ForLoopValue,
+    I::Value: Clone + ForLoopValue + ProductValue,
     T: CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
@@ -228,26 +229,32 @@ where
         let end = interp.read(self.end)?;
         let step = interp.read(self.step)?;
 
-        // Initialize loop-carried state from init_args.
-        let mut carried: Vec<I::Value> = self
+        // Initialize loop-carried state: pack init_args into a product (single V).
+        let init_values: Vec<I::Value> = self
             .init_args
             .iter()
             .map(|ssa| interp.read(*ssa))
             .collect::<Result<_, _>>()?;
+        let mut carried = ProductValue::new_product(init_values);
 
         let stage = interp.active_stage_info::<L>();
         while iv.loop_condition(&end) == Some(true) {
             // Bind induction variable as the first block argument, followed by carried values.
-            let mut block_args = Vec::with_capacity(1 + carried.len());
+            let mut block_args = Vec::with_capacity(1 + self.init_args.len());
             block_args.push(iv.clone());
-            block_args.extend(carried.iter().cloned());
+            if let Some(product) = carried.as_product() {
+                block_args.extend(product.iter().cloned());
+            } else if !self.init_args.is_empty() {
+                // Single carried value (not a product)
+                block_args.push(carried.clone());
+            }
             interp.bind_block_args(stage, self.body, &block_args)?;
 
             let control = interp.eval_block(stage, self.body)?;
             match control {
-                Continuation::Yield(values) => {
-                    // All yielded values feed back as loop-carried state.
-                    carried = values.to_vec();
+                Continuation::Yield(v) => {
+                    // Yielded value is the next loop-carried state (product or single).
+                    carried = v;
                 }
                 other => return Ok(other),
             }
@@ -258,8 +265,8 @@ where
             })?;
         }
 
-        // Write final loop-carried values to results with arity check.
-        interp.write_many(&self.results, &SmallVec::from(carried))?;
+        // Write final loop-carried state to results via auto-destructuring.
+        write_statement_results(interp, &self.results, carried)?;
 
         Ok(Continuation::Continue)
     }
@@ -268,7 +275,7 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for Yield<T>
 where
     I: Interpreter<'ir>,
-    I::Value: Clone,
+    I::Value: Clone + ProductValue,
     T: CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
@@ -277,15 +284,20 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        let values = interp.read_many(&self.values)?;
-        Ok(Continuation::Yield(values))
+        let values: Vec<I::Value> = self
+            .values
+            .iter()
+            .map(|ssa| interp.read(*ssa))
+            .collect::<Result<_, _>>()?;
+        let product = <I::Value as ProductValue>::new_product(values);
+        Ok(Continuation::Yield(product))
     }
 }
 
 impl<'ir, I, T> Interpretable<'ir, I> for StructuredControlFlow<T>
 where
     I: Interpreter<'ir>,
-    I::Value: Clone + BranchCondition + ForLoopValue,
+    I::Value: Clone + BranchCondition + ForLoopValue + ProductValue,
     T: CompileTimeValue,
 {
     fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>

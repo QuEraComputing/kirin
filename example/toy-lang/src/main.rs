@@ -105,7 +105,7 @@ fn run_program(
             )?;
             let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
             let result = interp.in_stage::<HighLevel>().call(spec, &args)?;
-            println!("{}", result[0]);
+            println!("{result}");
         }
         "lowered" => {
             let spec = resolve_specialization::<LowLevel>(
@@ -116,7 +116,7 @@ fn run_program(
             )?;
             let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
             let result = interp.in_stage::<LowLevel>().call(spec, &args)?;
-            println!("{}", result[0]);
+            println!("{result}");
         }
         other => {
             anyhow::bail!("unknown stage '{}'", other);

@@ -167,7 +167,7 @@ fn test_derived_eval_call() {
     let result = interp
         .in_stage::<DerivedEvalCallDialect>()
         .call(sf, &[10i64]);
-    assert_eq!(result.unwrap()[0], 11);
+    assert_eq!(result.unwrap(), 11);
 }
 
 #[test]
@@ -182,5 +182,5 @@ fn test_derived_interpretable() {
     let result = interp
         .in_stage::<DerivedInterpretableDialect>()
         .call(sf, &[10i64]);
-    assert_eq!(result.unwrap()[0], 11);
+    assert_eq!(result.unwrap(), 11);
 }

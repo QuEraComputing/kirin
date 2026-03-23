@@ -256,7 +256,7 @@ fn test_summary_seed_refinable() {
     let seed_result = AnalysisResult::new(
         Default::default(),
         Default::default(),
-        Some(smallvec::smallvec![Interval::top()]),
+        Some(Interval::top()),
     );
     interp
         .in_stage::<CallLang>()
@@ -433,7 +433,7 @@ fn test_analysis_result_is_subseteq_some_none() {
     let a: AnalysisResult<Interval> = AnalysisResult::new(
         Default::default(),
         Default::default(),
-        Some(smallvec::smallvec![Interval::new(0, 10)]),
+        Some(Interval::new(0, 10)),
     );
     let b: AnalysisResult<Interval> =
         AnalysisResult::new(Default::default(), Default::default(), None);
@@ -452,7 +452,7 @@ fn test_analysis_result_is_subseteq_none_some() {
     let b: AnalysisResult<Interval> = AnalysisResult::new(
         Default::default(),
         Default::default(),
-        Some(smallvec::smallvec![Interval::new(0, 10)]),
+        Some(Interval::new(0, 10)),
     );
 
     assert!(
@@ -466,12 +466,12 @@ fn test_analysis_result_is_subseteq_both_some() {
     let narrow: AnalysisResult<Interval> = AnalysisResult::new(
         Default::default(),
         Default::default(),
-        Some(smallvec::smallvec![Interval::new(3, 7)]),
+        Some(Interval::new(3, 7)),
     );
     let wide: AnalysisResult<Interval> = AnalysisResult::new(
         Default::default(),
         Default::default(),
-        Some(smallvec::smallvec![Interval::new(0, 10)]),
+        Some(Interval::new(0, 10)),
     );
 
     assert!(

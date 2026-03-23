@@ -314,7 +314,7 @@ fn test_cross_stage_recursive_call() {
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_a);
     let result = interp.call(spec_a, stage_a, &[6]).unwrap();
-    assert_eq!(result[0], 0);
+    assert_eq!(result, 0);
 }
 
 fn build_caller_with_function_call(
@@ -518,7 +518,7 @@ fn test_function_call_unique_specialization_success() {
 
     let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage);
     let result = interp.call(caller_spec, stage, &[]).unwrap();
-    assert_eq!(result[0], 11);
+    assert_eq!(result, 11);
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]

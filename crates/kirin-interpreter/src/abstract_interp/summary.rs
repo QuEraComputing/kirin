@@ -173,7 +173,6 @@ mod tests {
     use super::*;
     use kirin_interval::Interval;
     use kirin_ir::HasTop;
-    use smallvec::smallvec;
 
     #[test]
     fn empty_cache_is_empty() {
@@ -190,7 +189,7 @@ mod tests {
         let fixed = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::constant(42)]),
+            Some(Interval::constant(42)),
         );
         cache.set_fixed(fixed);
 
@@ -212,14 +211,14 @@ mod tests {
         let computed = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::new(0, 10)]),
+            Some(Interval::new(0, 10)),
         );
         cache.push_entry(vec![Interval::top()], computed);
 
         let fixed = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::constant(99)]),
+            Some(Interval::constant(99)),
         );
         cache.set_fixed(fixed);
 
@@ -238,7 +237,7 @@ mod tests {
         let wide = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::new(0, 100)]),
+            Some(Interval::new(0, 100)),
         );
         cache.push_entry(vec![Interval::new(0, 100)], wide);
 
@@ -246,7 +245,7 @@ mod tests {
         let narrow = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::new(0, 10)]),
+            Some(Interval::new(0, 10)),
         );
         cache.push_entry(vec![Interval::new(0, 10)], narrow);
 
@@ -261,7 +260,7 @@ mod tests {
         let entry = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::new(0, 10)]),
+            Some(Interval::new(0, 10)),
         );
         cache.push_entry(vec![Interval::new(0, 10)], entry);
 
@@ -275,7 +274,7 @@ mod tests {
         let entry = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::new(0, 10)]),
+            Some(Interval::new(0, 10)),
         );
         cache.push_entry(vec![Interval::top()], entry);
 
@@ -290,7 +289,7 @@ mod tests {
         let entry = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::constant(1)]),
+            Some(Interval::constant(1)),
         );
         cache.push_entry(vec![Interval::top(), Interval::top()], entry); // 2 args
 
@@ -330,12 +329,12 @@ mod tests {
         let r1 = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::constant(1)]),
+            Some(Interval::constant(1)),
         );
         let r2 = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::constant(2)]),
+            Some(Interval::constant(2)),
         );
         cache.push_entry(vec![Interval::new(0, 10)], r1);
         cache.push_entry(vec![Interval::new(20, 30)], r2);
@@ -352,7 +351,7 @@ mod tests {
         let r = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::constant(5)]),
+            Some(Interval::constant(5)),
         );
         cache.set_tentative(vec![], r);
 
@@ -366,7 +365,7 @@ mod tests {
         let promoted = AnalysisResult::new(
             Default::default(),
             Default::default(),
-            Some(smallvec![Interval::constant(5)]),
+            Some(Interval::constant(5)),
         );
         cache.promote_tentative(vec![], promoted);
 

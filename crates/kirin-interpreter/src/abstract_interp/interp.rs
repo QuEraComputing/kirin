@@ -340,17 +340,13 @@ where
                         )
                     })?;
                     let analysis = handler(self, callee, callee_stage, &args)?;
-                    match analysis.return_values() {
-                        Some(return_vals) => {
-                            if return_vals.len() != results.len() {
-                                return Err(InterpreterError::ArityMismatch {
-                                    expected: results.len(),
-                                    got: return_vals.len(),
-                                }
-                                .into());
-                            }
-                            for (rv, val) in results.iter().zip(return_vals.iter()) {
-                                self.write(*rv, val.clone())?;
+                    match analysis.return_value() {
+                        Some(return_val) => {
+                            // Single return value: write to all result slots.
+                            // For multi-result calls with ProductValue support,
+                            // use write_statement_results instead.
+                            for rv in &results {
+                                self.write(*rv, return_val.clone())?;
                             }
                         }
                         None => {

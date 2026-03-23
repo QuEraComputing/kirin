@@ -57,7 +57,7 @@ where
 
 impl<'ir, V, S, E> StackInterpreter<'ir, V, S, E, ()>
 where
-    V: Clone + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     S: StageMeta,
     E: From<InterpreterError> + 'ir,
     S: SupportsStageDispatch<
@@ -77,7 +77,7 @@ where
 
 impl<'ir, V, S, E, G> StackInterpreter<'ir, V, S, E, G>
 where
-    V: Clone + 'ir,
+    V: Clone + crate::ProductValue + 'ir,
     S: StageMeta,
     E: From<InterpreterError> + 'ir,
     S: SupportsStageDispatch<

@@ -1,5 +1,4 @@
 use kirin_ir::{ResultValue, SSAValue};
-use smallvec::SmallVec;
 
 use crate::InterpreterError;
 
@@ -19,8 +18,8 @@ pub trait ValueStore {
     /// Returns a cloned copy of the bound value.
     fn read(&self, value: SSAValue) -> Result<Self::Value, Self::Error>;
 
-    /// Read multiple SSA values into a `SmallVec`.
-    fn read_many(&self, values: &[SSAValue]) -> Result<SmallVec<[Self::Value; 1]>, Self::Error> {
+    /// Read multiple SSA values into a `Vec`.
+    fn read_many(&self, values: &[SSAValue]) -> Result<Vec<Self::Value>, Self::Error> {
         values.iter().map(|ssa| self.read(*ssa)).collect()
     }
 
@@ -34,7 +33,7 @@ pub trait ValueStore {
     fn write_many(
         &mut self,
         results: &[ResultValue],
-        values: &SmallVec<[Self::Value; 1]>,
+        values: &[Self::Value],
     ) -> Result<(), Self::Error>
     where
         Self::Error: From<InterpreterError>,

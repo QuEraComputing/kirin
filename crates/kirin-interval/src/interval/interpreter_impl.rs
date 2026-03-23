@@ -25,6 +25,22 @@ impl kirin_interpreter::BranchCondition for Interval {
     }
 }
 
+impl kirin_interpreter::ProductValue for Interval {
+    fn as_product(&self) -> Option<&kirin_ir::Product<Self>> {
+        None
+    }
+
+    fn from_product(product: kirin_ir::Product<Self>) -> Self {
+        assert_eq!(
+            product.len(),
+            1,
+            "Interval cannot represent a product of {} elements",
+            product.len()
+        );
+        product.into_iter().next().unwrap()
+    }
+}
+
 impl kirin_interpreter::AbstractValue for Interval {
     fn widen(&self, next: &Self) -> Self {
         if self.is_empty() {
