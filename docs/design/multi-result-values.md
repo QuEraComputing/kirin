@@ -132,35 +132,41 @@ use smallvec::SmallVec;
 pub struct Product<V>(pub SmallVec<[V; 2]>);
 ```
 
-### ProductValue Trait — 2 Required Methods
+### ProductValue Trait — 3 Required Methods
 
-The `ProductValue` trait requires only 2 methods from the dialect author.
-All product operations (`new_product`, `unpack`, `get`, `len`, `is_empty`)
-are provided as default implementations that delegate to `Product<V>`.
+The `ProductValue` trait requires 3 methods from the dialect author (borrow,
+consume, wrap). All product operations are provided as default implementations
+that delegate to `Product<V>` with zero unnecessary allocation.
 
 ```rust
 /// Interpreter-level product value semantics.
 ///
-/// Only 2 required methods — all operations are provided via `Product<V>`.
+/// 3 required methods — all operations provided via `Product<V>`.
+/// No heap allocation for products with ≤2 elements.
 pub trait ProductValue: Sized + Clone {
-    /// Check if this value is a product and get a reference.
+    /// Borrow the product storage if this value is a product.
     fn as_product(&self) -> Option<&Product<Self>>;
+
+    /// Consume and extract the product storage (zero-copy).
+    fn into_product(self) -> Option<Product<Self>>;
 
     /// Wrap a product into this value type.
     fn from_product(product: Product<Self>) -> Self;
 
-    // --- All provided via Product<V> ---
+    // --- All provided ---
 
     fn new_product(values: Vec<Self>) -> Self {
         Self::from_product(Product(SmallVec::from_vec(values)))
     }
 
-    fn unpack(self) -> Result<Vec<Self>, InterpreterError> {
-        self.as_product()
-            .map(|p| p.0.to_vec())
-            .ok_or_else(|| InterpreterError::Custom("expected product value".into()))
+    /// Consuming destructure — returns SmallVec, no heap allocation.
+    fn unpack(self) -> Result<SmallVec<[Self; 2]>, InterpreterError> {
+        self.into_product()
+            .map(|p| p.0)
+            .ok_or_else(|| InterpreterError::Custom("expected product".into()))
     }
 
+    /// Extract one element by index (clones the element).
     fn get(&self, index: usize) -> Result<Self, InterpreterError> {
         self.as_product()
             .and_then(|p| p.0.get(index).cloned())
@@ -172,12 +178,70 @@ pub trait ProductValue: Sized + Clone {
     fn len(&self) -> Result<usize, InterpreterError> {
         self.as_product()
             .map(|p| p.0.len())
-            .ok_or_else(|| InterpreterError::Custom("expected product value".into()))
+            .ok_or_else(|| InterpreterError::Custom("expected product".into()))
     }
 
     fn is_empty(&self) -> Result<bool, InterpreterError> {
         self.len().map(|n| n == 0)
     }
+}
+```
+
+### Product\<V\> — Iterators
+
+`Product<V>` delegates to `SmallVec` iterators for zero-allocation traversal:
+
+```rust
+impl<V> Product<V> {
+    pub fn iter(&self) -> core::slice::Iter<'_, V> {
+        self.0.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> core::slice::IterMut<'_, V> {
+        self.0.iter_mut()
+    }
+
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+}
+
+impl<V> IntoIterator for Product<V> {
+    type Item = V;
+    type IntoIter = smallvec::IntoIter<[V; 2]>;
+    fn into_iter(self) -> Self::IntoIter { self.0.into_iter() }
+}
+
+impl<'a, V> IntoIterator for &'a Product<V> {
+    type Item = &'a V;
+    type IntoIter = core::slice::Iter<'a, V>;
+    fn into_iter(self) -> Self::IntoIter { self.0.iter() }
+}
+
+impl<V> FromIterator<V> for Product<V> {
+    fn from_iter<I: IntoIterator<Item = V>>(iter: I) -> Self {
+        Product(iter.into_iter().collect())
+    }
+}
+```
+
+The auto-destructure layer uses borrowing iteration (no allocation):
+
+```rust
+// Auto-destructure — borrows, clones per element:
+let product = value.as_product().unwrap();
+for (i, rv) in results.iter().enumerate() {
+    store.write(*rv, product.0[i].clone())?;
+}
+
+// kirin-tuple Unpack — consuming, zero-copy:
+let product = value.into_product().unwrap();
+for (rv, val) in results.iter().zip(product) {  // IntoIterator
+    store.write(*rv, val)?;
 }
 ```
 
@@ -196,11 +260,14 @@ impl ProductValue for MyValue {
     fn as_product(&self) -> Option<&Product<Self>> {
         match self { MyValue::Tuple(p) => Some(p), _ => None }
     }
+    fn into_product(self) -> Option<Product<Self>> {
+        match self { MyValue::Tuple(p) => Some(p), _ => None }
+    }
     fn from_product(p: Product<Self>) -> Self {
         MyValue::Tuple(p)
     }
 }
-// Done — new_product, unpack, get, len, is_empty all provided for free.
+// Done — new_product, unpack, get, len, is_empty, iterators all free.
 ```
 
 ### IndexValue Trait — Separate Concern
