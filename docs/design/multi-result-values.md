@@ -160,14 +160,6 @@ pub trait ProductValue: Sized + Clone {
         Self::from_product(Product(SmallVec::from_vec(values)))
     }
 
-    /// Borrowing destructure — returns an iterator of references.
-    /// Caller clones when ownership is needed.
-    fn unpack(&self) -> Result<UnpackIter<'_, Self>, InterpreterError> {
-        self.as_product()
-            .map(|p| UnpackIter(p.0.iter()))
-            .ok_or_else(|| InterpreterError::Custom("expected product".into()))
-    }
-
     /// Extract one element by index (clones the element).
     fn get(&self, index: usize) -> Result<Self, InterpreterError> {
         self.as_product()
@@ -187,17 +179,18 @@ pub trait ProductValue: Sized + Clone {
         self.len().map(|n| n == 0)
     }
 }
+```
 
-/// Borrowing iterator over product elements.
-pub struct UnpackIter<'a, V>(core::slice::Iter<'a, V>);
+No `unpack` method or `UnpackIter` type — `Product<T>` already implements
+`IntoIterator` and `iter()`. Users who need to iterate over elements use
+`as_product()` directly:
 
-impl<'a, V> Iterator for UnpackIter<'a, V> {
-    type Item = &'a V;
-    fn next(&mut self) -> Option<Self::Item> { self.0.next() }
-    fn size_hint(&self) -> (usize, Option<usize>) { self.0.size_hint() }
+```rust
+let product = value.as_product().ok_or(err)?;
+for elem in product {       // &Product<V> -> IntoIterator -> &V
+    // process &V
 }
-
-impl<V> ExactSizeIterator for UnpackIter<'_, V> {}
+```
 ```
 
 ### Product\<T\> — Iterators
@@ -242,29 +235,29 @@ impl<V> FromIterator<V> for Product<V> {
 }
 ```
 
-All destructuring paths use borrowing — no allocation:
+All destructuring uses `as_product()` + `Product<T>` iterators — no
+wrapper types, no extra allocation:
 
 ```rust
 // Auto-destructure layer — borrows, clones per element:
-for (rv, elem) in results.iter().zip(value.unpack()?) {
+let product = value.as_product().ok_or(err)?;
+for (rv, elem) in results.iter().zip(product) {
     store.write(*rv, elem.clone())?;
 }
 
 // kirin-tuple Unpack — same pattern:
-for (rv, elem) in self.results.iter().zip(source.unpack()?) {
+let product = source.as_product().ok_or(err)?;
+for (rv, elem) in self.results.iter().zip(product) {
     interp.write(*rv, elem.clone())?;
 }
 
-// Direct Product access when you have &Product<V>:
-let product = value.as_product().unwrap();
-for elem in product {  // &Product<V> implements IntoIterator
-    // process &V
-}
+// Single element access:
+let elem = value.get(0)?;  // clones one element
 
-// Owning destructure when needed — clone the Product, then consume:
-let owned = value.as_product().unwrap().clone();
-for elem in owned {  // Product<V> implements IntoIterator (consuming)
-    // process V (owned)
+// Owning destructure when needed — clone then consume:
+let owned = value.as_product().ok_or(err)?.clone();
+for elem in owned {  // Product<V>: IntoIterator yields V (owned)
+    // process V
 }
 ```
 
@@ -489,7 +482,7 @@ operations in their DSL programs.
 | `Product<T>` | kirin-ir | Unified product storage for both types and values (SmallVec-backed) |
 | `product![]` macro | kirin-ir | Ergonomic product construction |
 | `HasProduct` | kirin-ir | Trait for dialect types — opt-in multi-result (2 required methods) |
-| `ProductValue` | kirin-interpreter | Trait for dialect values — 3 required methods, 5 provided |
+| `ProductValue` | kirin-interpreter | Trait for dialect values — 2 required, 3 provided (`new_product`, `get`, `len`) |
 | Auto-destructure | kirin-interpreter | Statement execution writes product to result slots |
 | `IndexValue` | kirin-tuple | Trait for value ↔ usize conversion (Get/Len only) |
 | `Tuple` dialect | kirin-tuple | Explicit new_tuple/unpack/get/len operations |
