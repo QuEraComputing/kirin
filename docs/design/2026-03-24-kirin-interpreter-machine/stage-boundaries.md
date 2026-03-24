@@ -15,7 +15,7 @@ Two common sources are:
 
 Dialect authors implement these conventions in `Interpretable<L>` for the
 current stage language. They use a public stage-switch API rather than
-manipulating kernel internals directly.
+manipulating machine internals directly.
 
 ## Shared Capability, Different Shell Behavior
 

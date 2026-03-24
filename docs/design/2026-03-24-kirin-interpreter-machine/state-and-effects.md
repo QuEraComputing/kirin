@@ -87,7 +87,7 @@ Effect consumption:
 - may use public interpreter helpers
 - returns a framework-defined `MachineAction<I::Stop>`
 
-This is the semantic-to-kernel boundary.
+This is the semantic-to-machine boundary.
 
 The framework should expose both:
 
