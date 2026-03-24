@@ -1,6 +1,6 @@
-# Parity Matrix and Opt-In Replacement Plumbing
+# Parity Matrix And Opt-In Replacement Plumbing
 
-**Wave:** 5
+**Wave:** 6
 **Agent role:** Implementer
 **Estimated effort:** moderate
 
@@ -31,7 +31,7 @@ The result should be a controlled opt-in switch, not a surprise replacement.
 **Out of scope:**
 
 - deleting `kirin-interpreter`,
-- removing old derive support,
+- deleting `kirin-derive-interpreter`,
 - claiming abstract-interpretation parity.
 
 ## Required Deliverables
@@ -45,9 +45,8 @@ The result should be a controlled opt-in switch, not a surprise replacement.
   graph execution,
   pilot dialect coverage,
   derive support status
-- a migration guide for downstream dialect crates, including the one-way
-  dependency switch sequence from `kirin-interpreter` to
-  `kirin-interpreter-2`
+- the migration guide for downstream dialect crates, validated against the pilot
+  conversions from Wave 5
 - an opt-in workspace path for using `kirin-interpreter-2`
 - regression tests or example runs that compare old and new concrete runtimes on
   representative programs where both runtimes are expected to agree
@@ -61,8 +60,9 @@ The result should be a controlled opt-in switch, not a surprise replacement.
 - [ ] Review the migration guide against the pilot dialect conversions and make
   sure it matches the actual successful sequence:
   verify v2 tests exist first,
-  remove old interpreter dependency,
-  add new interpreter dependency,
+  finish the new derive package first,
+  remove old dependencies,
+  add new dependencies,
   switch the crate,
   run tests.
 - [ ] Add dual-run tests in `example/toy-lang` or another suitable host harness
@@ -86,7 +86,7 @@ cargo test --doc --workspace
 
 1. The workspace has a documented, test-backed opt-in path for the new runtime.
 2. Parity claims are concrete rather than assumed.
-3. The old crate remains available until the parity checklist says it is safe to
-   switch consumers.
+3. The old interpreter and derive crates remain available until the parity
+   checklist says it is safe to switch consumers.
 4. The next decision after this wave is narrow and explicit: either switch the
    default, or close specific remaining gaps first.

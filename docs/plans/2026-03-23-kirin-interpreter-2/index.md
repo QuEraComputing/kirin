@@ -16,8 +16,10 @@ sequenced so that:
 1. the new crate can compile and host its own tests early,
 2. the concrete runtime lands before dialect adoption,
 3. graph execution is validated independently from CFG execution, and
-4. downstream migration remains opt-in until parity is demonstrated, and
-5. each migrated dialect crate switches in one direction from
+4. a new v2-specific derive package is finished before any downstream dialect
+   migration begins,
+5. downstream migration remains opt-in until parity is demonstrated, and
+6. each migrated dialect crate switches in one direction from
    `kirin-interpreter` to `kirin-interpreter-2` instead of carrying both
    interpreter integrations at once.
 
@@ -35,9 +37,11 @@ wave-2 (statement/block/region execution + calls + result consumers)
    |
 wave-3 (graph visitation + DiGraph toy-language tests)
    |
-wave-4 (derive support + pilot dialect adoption)
+wave-4 (new derive package for interpreter-2)
    |
-wave-5 (parity checks + opt-in switch plumbing)
+wave-5 (migration guide + pilot dialect migration)
+   |
+wave-6 (parity checks + opt-in switch plumbing)
 ```
 
 ## Waves
@@ -76,19 +80,27 @@ wave-5 (parity checks + opt-in switch plumbing)
 
 ### Wave 4
 
-**Depends on:** Wave 2 complete for runtime integration. Wave 3 preferred before merge so graph-related API drift is caught before downstream adoption.
+**Depends on:** Waves 2 and 3 complete
 
 | Plan File | Title | Agent Role | Crate(s) |
 |-----------|-------|------------|----------|
-| `wave-4/derive-and-adoption-plan.md` | Derive support and pilot dialect adoption | Implementer | kirin-derive-interpreter, kirin-interpreter-2, kirin-function, kirin-scf, kirin-cf, example/toy-lang |
+| `wave-4/derive-package-plan.md` | New derive package for interpreter-2 | Implementer | workspace, kirin-derive-interpreter-2, kirin-interpreter-2 |
 
 ### Wave 5
 
-**Depends on:** Waves 3 and 4 complete
+**Depends on:** Wave 4 complete
 
 | Plan File | Title | Agent Role | Crate(s) |
 |-----------|-------|------------|----------|
-| `wave-5/parity-switch-plan.md` | Parity matrix and opt-in replacement plumbing | Implementer | workspace, kirin, kirin-interpreter-2, example/toy-lang |
+| `wave-5/migration-and-adoption-plan.md` | Migration guide and pilot dialect migration | Implementer | kirin-derive-interpreter-2, kirin-interpreter-2, kirin-function, kirin-scf, kirin-cf, example/toy-lang |
+
+### Wave 6
+
+**Depends on:** Wave 5 complete
+
+| Plan File | Title | Agent Role | Crate(s) |
+|-----------|-------|------------|----------|
+| `wave-6/parity-switch-plan.md` | Parity matrix and opt-in replacement plumbing | Implementer | workspace, kirin, kirin-interpreter-2, example/toy-lang |
 
 ## Verification Checkpoints
 
@@ -103,8 +115,9 @@ Additional checkpoints by wave:
 - Wave 1: targeted stage and control-surface tests in `kirin-interpreter-2`.
 - Wave 2: targeted call, recursion, breakpoint, and result-consumer tests.
 - Wave 3: targeted graph execution tests, including the DiGraph output-equivalence case.
-- Wave 4: `cargo nextest run -p kirin-function -p kirin-scf -p kirin-cf -p toy-lang`
-- Wave 5: `cargo build --workspace`, `cargo nextest run --workspace`, `cargo test --doc --workspace`
+- Wave 4: `cargo build -p kirin-derive-interpreter-2` and derive-crate tests.
+- Wave 5: `cargo nextest run -p kirin-function -p kirin-scf -p kirin-cf -p toy-lang`
+- Wave 6: `cargo build --workspace`, `cargo nextest run --workspace`, `cargo test --doc --workspace`
 
 ## Major Risks
 
@@ -121,14 +134,18 @@ stable target, migrate each downstream dialect crate in one direction:
 3. add the `kirin-interpreter-2` dependency, and
 4. switch the crate to the new interpreter API.
 
-Wave 4 includes a migration-guide step so this sequence is written down and
+Wave 5 includes a migration-guide step so this sequence is written down and
 reused consistently.
 
 ### Risk 2: Derive codegen assumes old continuation/call abstractions
 
 `kirin-derive-interpreter` currently targets the old crate's `Continuation`,
-`CallSemantics`, and `SSACFGRegion` APIs. Wave 4 must treat derive support as a
-real codegen change, not a path-only rename.
+`CallSemantics`, and `SSACFGRegion` APIs.
+
+Mitigation: do not retrofit the old derive crate in place as the migration
+prerequisite. Build a separate `kirin-derive-interpreter-2` package whose macro
+surface is designed around the new runtime traits and effect protocol. Finish
+that crate before downstream migration starts.
 
 ### Risk 3: Graph API can drift before a concrete test exists
 
@@ -142,8 +159,10 @@ scheduler.
 - Merge Wave 0 and Wave 1 before any downstream crate sees the new runtime.
 - Keep Wave 2 self-contained inside `kirin-interpreter-2`; avoid touching
   dialect crates until call/result mechanics are proven.
-- Use Wave 3 to stabilize graph APIs before broad derive or dialect adoption.
-- Keep Wave 4 opt-in, but migrate each pilot dialect crate in one direction once
-  `kirin-interpreter-2` has enough local tests to support that switch.
-- Treat Wave 5 as the release gate for "ready to switch consumers", not for
+- Use Wave 3 to stabilize graph APIs before designing the derive package API.
+- Treat Wave 4 as a hard prerequisite: the new derive package must be finished
+  before any pilot dialect migration starts.
+- Keep Wave 5 opt-in, but migrate each pilot dialect crate in one direction once
+  both `kirin-interpreter-2` and `kirin-derive-interpreter-2` are ready.
+- Treat Wave 6 as the release gate for "ready to switch consumers", not for
   deleting the old runtime.
