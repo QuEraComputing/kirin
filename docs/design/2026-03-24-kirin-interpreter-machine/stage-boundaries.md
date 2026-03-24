@@ -2,7 +2,7 @@
 
 ## Stage Switching Is A Semantic Action
 
-Stage switching is not a kernel primitive like `Push` or `Pop`.
+Stage switching is not a machine action like `Push` or `Pop`.
 
 It is a semantic action initiated by dialect code through a public interpreter
 capability.

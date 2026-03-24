@@ -1,8 +1,8 @@
-# Machine Kernel
+# Machine
 
-## Kernel Responsibilities
+## Machine Responsibilities
 
-The framework kernel owns only the parts of execution that are genuinely
+The framework machine owns only the parts of execution that are genuinely
 generic:
 
 - the driver loop
@@ -13,7 +13,7 @@ generic:
 - consuming returned language effects
 - applying minimal cursor-stack control actions
 
-The kernel does not own language semantics such as:
+The machine does not own language semantics such as:
 
 - call frames
 - return conventions
@@ -68,7 +68,7 @@ trait ConsumeEffect<'ir, I>
 where
     I: Machine<'ir>,
 {
-    fn consume(self, interp: &mut I) -> Result<KernelAction<I::Stop>, I::Error>;
+    fn consume(self, interp: &mut I) -> Result<MachineAction<I::Stop>, I::Error>;
 }
 ```
 
@@ -76,14 +76,14 @@ This split means:
 
 - statement semantics define a language-owned effect type
 - effect consumption mutates dialect-owned state
-- the framework still controls cursor progression through `KernelAction`
+- the framework still controls cursor progression through `MachineAction`
 
-## Kernel Action
+## Machine Action
 
-`KernelAction` is the framework-owned control language for the cursor stack:
+`MachineAction` is the framework-owned control language for the cursor stack:
 
 ```rust
-enum KernelAction<Stop> {
+enum MachineAction<Stop> {
     Advance,
     Stay,
     Push(ExecutionSeed),
@@ -110,12 +110,12 @@ Meaning:
 
 This is intentionally minimal.
 
-Dialects may maintain richer semantic stacks in their own state, but the kernel
+Dialects may maintain richer semantic stacks in their own state, but the machine
 only sees the generic cursor-stack operations.
 
 ## Execution Seeds
 
-The kernel keeps full cursors internal. Public code constructs execution seeds.
+The machine keeps full cursors internal. Public code constructs execution seeds.
 
 The seed surface should use named per-shape seed structs wrapped by one public
 enum:
@@ -146,11 +146,11 @@ enum ExecutionSeed {
 ```
 
 The framework may later extend this with multi-seed fan-out support, analogous
-to the old `Fork`, but v1 should keep `KernelAction` single-seed.
+to the old `Fork`, but v1 should keep `MachineAction` single-seed.
 
 ## Internal Cursor Stack
 
-The kernel owns a stack of execution cursors.
+The machine owns a stack of execution cursors.
 
 This is not a semantic call stack. It is only the generic nesting stack for
 execution contexts. Dialects may keep semantic frame data in their own state if
@@ -158,7 +158,7 @@ they need it.
 
 The split is:
 
-- kernel cursor stack
+- machine cursor stack
   - where execution currently is
   - what nested execution contexts are active
 - dialect-owned state
@@ -169,13 +169,13 @@ stacks without forcing one framework-wide frame model.
 
 ## Step Lifecycle
 
-The kernel small-step cycle is:
+The machine small-step cycle is:
 
 1. resolve the current statement from the top cursor
 2. invoke `Interpretable::interpret`
 3. obtain a language-owned effect value
 4. consume that effect through `ConsumeEffect`
-5. obtain `KernelAction`
+5. obtain `MachineAction`
 6. apply that action to the cursor stack
 
 The dynamic driver loop layers breakpoints, fuel checks, and stop policy around

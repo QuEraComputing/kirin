@@ -2,7 +2,7 @@
 
 ## Two Concrete Shells
 
-The framework should support two concrete interpreter shells sharing one kernel
+The framework should support two concrete interpreter shells sharing one machine
 contract:
 
 - `SingleStageInterpreter<L>`
@@ -106,7 +106,7 @@ Convenience:
 `step()` should return a step-result artifact carrying:
 
 - the full language effect value
-- the applied `KernelAction`
+- the applied `MachineAction`
 
 This keeps typed execution useful for fine-grained testing and debugging.
 

@@ -85,14 +85,14 @@ Effect consumption:
 
 - mutates dialect-owned semantic state
 - may use public interpreter helpers
-- returns a framework-defined `KernelAction<I::Stop>`
+- returns a framework-defined `MachineAction<I::Stop>`
 
 This is the semantic-to-kernel boundary.
 
 The framework should expose both:
 
 - two-phase APIs
-  - `consume_effect(effect) -> KernelAction<Stop>`
+  - `consume_effect(effect) -> MachineAction<Stop>`
   - `apply_action(action)`
 - convenience API
   - `consume_and_apply(effect)`

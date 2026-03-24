@@ -1,4 +1,4 @@
-# Kirin Interpreter Machine-Kernel Design
+# Kirin Interpreter Machine Design
 
 **Date:** 2026-03-24
 **Status:** alternative design direction
@@ -11,11 +11,11 @@ This design takes a different direction from the earlier
 
 The core idea is:
 
-- the interpreter framework is a machine kernel for executing statement-level
+- the interpreter framework is a machine for executing statement-level
   operational semantics
 - dialects own their semantic state and semantic effect types
 - the framework owns cursor-stack management, driver loops, breakpoints, fuel,
-  and the minimal kernel action language
+  and the minimal machine action language
 - `Block`, `Region`, `DiGraph`, and `UnGraph` do not carry inherent
   operational meaning in the framework
 - statements decide how to execute nested bodies, using framework helpers or
@@ -29,8 +29,9 @@ This folder is intentionally additive. The earlier design docs remain unchanged.
 - `Interpretable` owns an associated language effect type.
 - effects are consumed by a separate `ConsumeEffect` trait.
 - `ConsumeEffect` mutates dialect-owned state and returns a framework-defined
-  `KernelAction<Stop>`.
-- the kernel manages an internal cursor stack and applies `KernelAction`.
+  `MachineAction<Stop>`.
+- the machine framework manages an internal cursor stack and applies
+  `MachineAction`.
 - the framework defines public execution seeds, but keeps full cursors internal.
 - there are two interpreter shells:
   - `SingleStageInterpreter<L>`
@@ -45,8 +46,8 @@ This folder is intentionally additive. The earlier design docs remain unchanged.
 
 ## Document Map
 
-- [machine-kernel.md](machine-kernel.md)
-  Kernel responsibilities, public traits, seeds, actions, and step lifecycle.
+- [machine.md](machine.md)
+  Machine responsibilities, public traits, seeds, actions, and step lifecycle.
 - [interpreter-shells.md](interpreter-shells.md)
   `SingleStageInterpreter<L>` and `DynamicInterpreter`.
 - [state-and-effects.md](state-and-effects.md)
@@ -59,13 +60,13 @@ This folder is intentionally additive. The earlier design docs remain unchanged.
 
 The earlier refactor design centered the runtime around body-shape executors
 such as `ExecBlock` and `ExecRegion`. This design replaces that framing with a
-statement-centric machine kernel.
+statement-centric interpreter machine.
 
 The practical consequence is:
 
 - body execution helpers become optional reusable defaults
 - statement operational semantics become the semantic authority
-- framework-owned traits are reduced to kernel capabilities and shell APIs
+- framework-owned traits are reduced to machine capabilities and shell APIs
 
 This direction is a better fit for:
 
