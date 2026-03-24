@@ -101,6 +101,30 @@ This keeps `#[wraps]` as the marker of semantic equivalence, keeps `#[callable]`
 as the marker of callable-body forwarding, and avoids introducing redundant
 selector attributes.
 
+The new derive package should not reimplement this forwarding logic ad hoc.
+Instead, `kirin-derive-toolkit` should grow a shared wrapper-forwarding template
+family and body-field helper utilities that `kirin-derive-interpreter-2` can
+configure.
+
+That shared toolkit layer should provide:
+
+- generic wrapper-forwarding template support for:
+  all-wrapper forwarding,
+  selector-gated forwarding,
+  configurable non-forwarding behavior
+- selector-policy configuration, including strict explicit-selection mode for
+  v2 derives rather than inheriting old backward-compat fallback behavior
+- body-field lookup and validation helpers for `#[body]`
+
+`kirin-derive-interpreter-2` should then be mostly configuration over those
+shared utilities:
+
+- `Interpretable`: all wrappers, require all
+- `ConsumeResult`: all wrappers, require all
+- `CallableBody`: selected wrappers via `#[callable]`, explicit-only
+- `SSACFGCallableBody`: same forwarding config plus concrete `#[body] Region`
+  validation
+
 ### 3. Stage-dynamic dispatch is explicit and cached
 
 The current concrete interpreter relies on stage-dynamic dispatch for stepping,
@@ -483,6 +507,13 @@ dialect handles value meaning.
 
 These tests should land before downstream dialect migration begins.
 
+`kirin-derive-toolkit` should also gain targeted tests for the new shared
+template utilities, especially:
+
+- explicit-only selector policy
+- backward-compatible fallback policy where still needed by older derives
+- `#[body]` field lookup and error reporting
+
 ### 3. Dialect-facing integration tests
 
 Use small test dialects to prove that the same runtime supports multiple result
@@ -531,6 +562,9 @@ Before downstream dialect migration begins, the workspace should also have a
 separate `kirin-derive-interpreter-2` crate implementing the approved derive
 surface for the new runtime.
 
+That derive crate should be built on new shared templates in
+`kirin-derive-toolkit`, not on copied derive-local forwarding logic.
+
 ## Follow-Up Planning
 
 Implementation planning should focus on:
@@ -540,6 +574,7 @@ Implementation planning should focus on:
 3. block and region stepping
 4. concrete call/return handling
 5. graph visitation surfaces without overcommitting to graph scheduling
-6. a separate `kirin-derive-interpreter-2` package
-7. migrating one or two representative dialects only after the new derive
+6. new shared forwarding/body templates in `kirin-derive-toolkit`
+7. a separate `kirin-derive-interpreter-2` package
+8. migrating one or two representative dialects only after the new derive
    package is finished
