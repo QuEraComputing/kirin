@@ -13,9 +13,10 @@ The core idea is:
 
 - the interpreter framework is a machine for executing statement-level
   operational semantics
-- dialects own their semantic state and semantic effect types
+- dialects own their semantic machine types, semantic effect types, and
+  semantic stop payloads
 - the framework owns cursor-stack management, driver loops, breakpoints, fuel,
-  and the minimal machine action language
+  and the shell control language
 - `Block`, `Region`, `DiGraph`, and `UnGraph` do not carry inherent
   operational meaning in the framework
 - statements decide how to execute nested bodies, using framework helpers or
@@ -26,19 +27,22 @@ This folder is intentionally additive. The earlier design docs remain unchanged.
 ## Key Decisions
 
 - `Interpretable` is the primary semantic trait.
-- `Interpretable` owns an associated language effect type.
-- effects are consumed by a separate `ConsumeEffect` trait.
-- `ConsumeEffect` mutates dialect-owned state and returns a framework-defined
-  `MachineAction<Stop>`.
-- the machine framework manages an internal cursor stack and applies
-  `MachineAction`.
+- `Machine<'ir>` owns associated `Effect` and `Stop` types.
+- effects are consumed by a separate `ConsumeEffect<'ir>` trait on machine
+  types.
+- `Interpreter<'ir>` is the typed shell trait over one top-level machine.
+- `ConsumeEffect` mutates machine-owned semantic state and returns shell-facing
+  `Control<Stop>`.
+- the shell manages an internal cursor stack and consumes `Control`.
 - the framework defines public execution seeds, but keeps full cursors internal.
 - there are two interpreter shells:
   - `SingleStageInterpreter<L>`
   - `DynamicInterpreter`
-- `SingleStageInterpreter<L>` exposes typed value/effect/state APIs.
+- `SingleStageInterpreter<L>` exposes typed value/effect/machine APIs.
 - `DynamicInterpreter` orchestrates a heterogeneous set of single-stage
   interpreters and does not expose raw typed effect/value APIs directly.
+- typed shells expose both local and lifted interpret/consume APIs.
+- driver APIs use `StepOutcome` and `RunResult`.
 - stage switching is a public capability on both shells:
   - `SingleStageInterpreter<L>` errors when switching is requested
   - `DynamicInterpreter` executes stage switches through stage-boundary
@@ -66,7 +70,8 @@ The practical consequence is:
 
 - body execution helpers become optional reusable defaults
 - statement operational semantics become the semantic authority
-- framework-owned traits are reduced to machine capabilities and shell APIs
+- framework-owned traits are reduced to machine composition traits and shell
+  APIs
 
 This direction is a better fit for:
 

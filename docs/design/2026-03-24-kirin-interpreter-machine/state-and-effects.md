@@ -1,8 +1,8 @@
 # State And Effects
 
-## Dialect-Defined State
+## Dialect-Defined Machines
 
-Each dialect defines its own semantic state type.
+Each dialect defines its own semantic machine type.
 
 The framework does not prescribe:
 
@@ -14,13 +14,13 @@ Those are language-level concerns and belong to the dialects that need them.
 
 Examples:
 
-- a function dialect may define call-frame state
-- an `scf`-style dialect may define loop-resume state
-- a graph dialect may define traversal agenda state
+- a function dialect may define call-frame machine state
+- an `scf`-style dialect may define loop-resume machine state
+- a graph dialect may define traversal agenda machine state
 
-## State Composition
+## Machine Composition
 
-Users may compose dialect state however they want:
+Users may compose dialect machines however they want:
 
 - tuples
 - named structs
@@ -28,32 +28,32 @@ Users may compose dialect state however they want:
 
 The framework should provide typed projection traits:
 
-- `ProjectState<T>`
-- `ProjectStateMut<T>`
+- `ProjectMachine<T>`
+- `ProjectMachineMut<T>`
 
 These should be supported on:
 
-- state payload types directly
+- machine types directly
 - interpreter shells as forwarding convenience
 
 This keeps dialect bounds explicit while allowing users to define composite
-state in ordinary Rust.
+machine state in ordinary Rust.
 
-## Root State Access
+## Root Machine Access
 
-The machine shell should expose:
+The interpreter shell should expose:
 
-- `state(&self) -> &Self::State`
-- `state_mut(&mut self) -> &mut Self::State`
+- `machine(&self) -> &Self::Machine`
+- `machine_mut(&mut self) -> &mut Self::Machine`
 
 This is important for dialect-local tests. A dialect author should be able to
-instantiate a concrete interpreter with just the state needed for that dialect,
-seed SSA values manually, and test the operational semantics without building a
-whole executable language.
+instantiate a concrete interpreter with just the machine needed for that
+dialect, seed SSA values manually, and test the operational semantics without
+building a whole executable language.
 
 ## Language-Owned Effects
 
-Effects are owned by the language semantics, not by the framework.
+Effects are owned by semantic machines, not by the framework.
 
 For wrapped dialect composition:
 
@@ -74,30 +74,50 @@ enum EffectC {
 }
 ```
 
+stop composition follows the same structural pattern:
+
+```rust
+enum StopC {
+    A(StopA),
+    B(StopB),
+}
+```
+
 `#[wraps]` should imply effect lifting in the same way it implies semantic
-delegation.
+delegation. Composite machines should likewise provide explicit stop lifting.
 
 ## Effect Consumption
 
-Each language effect implements `ConsumeEffect<'ir, I>`.
+Effect consumption is owned by machine types, not effect types:
 
-Effect consumption:
+```rust
+trait ConsumeEffect<'ir>: Machine<'ir> {
+    type Error;
 
-- mutates dialect-owned semantic state
-- may use public interpreter helpers
-- returns a framework-defined `MachineAction<I::Stop>`
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Control<Self::Stop>, Self::Error>;
+}
+```
 
-This is the semantic-to-machine boundary.
+Machine effect consumption:
 
-The framework should expose both:
+- mutates machine-owned semantic state
+- returns shell-facing `Control<Self::Stop>`
 
-- two-phase APIs
-  - `consume_effect(effect) -> MachineAction<Stop>`
-  - `apply_action(action)`
-- convenience API
-  - `consume_and_apply(effect)`
+This is the semantic-to-shell boundary.
 
-This is useful for tests and custom drivers.
+Interpreter shells should expose both local and lifted consumption helpers:
+
+- `consume_local_effect(effect)`
+- `consume_lifted_effect(effect)`
+- `consume_effect(effect)`
+- `consume_local_control(control)`
+- `consume_control(control)`
+
+`consume_local_effect` mutates only the projected submachine.
+`consume_control` mutates only the interpreter shell.
 
 ## Value Store Placement
 
@@ -127,8 +147,8 @@ The framework does not define semantic effects like `Return` or `Yield`.
 If a dialect wants those, it defines:
 
 - the effect variants
-- the state it needs
-- the `ConsumeEffect` behavior
+- the machine state it needs
+- the `ConsumeEffect` behavior on that machine
 
 This applies equally to:
 
@@ -136,3 +156,25 @@ This applies equally to:
 - yield conventions
 - graph output conventions
 - multi-result sugar over tuple/product values
+
+## Local And Lifted APIs
+
+The shell should support both local and top-level views of semantics.
+
+Interpret:
+
+- `interpret_local(stmt)` returns `Sub::Effect`
+- `interpret_lifted(stmt)` returns `I::Machine::Effect`
+- `interpret_current()` returns `I::Machine::Effect`
+
+Consume:
+
+- `consume_local_effect(effect)` returns `Control<Sub::Stop>`
+- `consume_lifted_effect(effect)` returns `Control<I::Machine::Stop>`
+- `consume_effect(effect)` returns `Control<I::Machine::Stop>`
+
+This split is the core testing story:
+
+- dialect-unit tests use local interpret/consume APIs
+- full-language stepping uses lifted/top-level APIs
+- the same interpreter shell supports both

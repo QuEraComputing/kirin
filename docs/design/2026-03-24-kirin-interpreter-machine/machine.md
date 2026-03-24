@@ -1,19 +1,24 @@
 # Machine
 
-## Machine Responsibilities
+## Core Split
 
-The framework machine owns only the parts of execution that are genuinely
-generic:
+This design uses a strict split between:
 
-- the driver loop
-- the current execution location
+- semantic machines
+- interpreter shells
+
+A `Machine<'ir>` is dialect- or language-defined semantic state. It is not the
+interpreter shell.
+
+An `Interpreter<'ir>` is the typed shell over one top-level machine. It owns:
+
 - the internal cursor stack
-- breakpoint and fuel handling
-- invoking statement semantics on the current statement
-- consuming returned language effects
-- applying minimal cursor-stack control actions
+- current execution location
+- control consumption
+- step and run driver loops
+- shell-level suspension policy such as breakpoints and fuel
 
-The machine does not own language semantics such as:
+The shell does not define language semantics such as:
 
 - call frames
 - return conventions
@@ -22,68 +27,108 @@ The machine does not own language semantics such as:
 - graph traversal stacks
 - product packing or unpacking policy
 
-Those belong to dialect-defined state and effect types.
+Those stay on dialect-defined machine types and effect types.
 
-## Public Trait Family
+## Semantic Machine Traits
 
-The public surface should be centered on a thin machine trait plus statement
-semantics:
+The structural machine trait should stay thin:
 
 ```rust
-trait Machine<'ir>: StageAccess<'ir> + RuntimeControl<'ir> {
-    type State;
-    type Error;
+trait Machine<'ir> {
+    type Effect;
     type Stop;
-
-    fn state(&self) -> &Self::State;
-    fn state_mut(&mut self) -> &mut Self::State;
 }
 ```
 
-`Machine<'ir>` is intentionally thin:
+Effects and semantic stop payloads compose structurally with machine
+composition.
 
-- it is the shared composition root for interpreter shells
-- it does not imply `ValueStore`
-- it does not imply one universal language effect type
-
-The primary semantics trait is:
+The two primary behavior traits are:
 
 ```rust
 trait Interpretable<'ir, I>: Dialect
 where
-    I: Machine<'ir>,
+    I: Interpreter<'ir>,
 {
-    type Effect: ConsumeEffect<'ir, I>;
+    type Machine: Machine<'ir>;
+    type Error;
 
-    fn interpret<L>(&self, interp: &mut I) -> Result<Self::Effect, I::Error>
-    where
-        L: Interpretable<'ir, I> + 'ir;
+    fn interpret(
+        &self,
+        interp: &mut I,
+    ) -> Result<<Self::Machine as Machine<'ir>>::Effect, Self::Error>;
 }
 ```
 
-The effect-consumption trait is:
-
 ```rust
-trait ConsumeEffect<'ir, I>
-where
-    I: Machine<'ir>,
-{
-    fn consume(self, interp: &mut I) -> Result<MachineAction<I::Stop>, I::Error>;
+trait ConsumeEffect<'ir>: Machine<'ir> {
+    type Error;
+
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Control<Self::Stop>, Self::Error>;
 }
 ```
 
-This split means:
+Both traits stay minimal:
 
-- statement semantics define a language-owned effect type
-- effect consumption mutates dialect-owned state
-- the framework still controls cursor progression through `MachineAction`
+- no projection bounds are baked into the traits
+- no lifting bounds are baked into the traits
+- local behavior owns its own local error type
 
-## Machine Action
+Those bounds are added only on the interpreter forwarding helpers or on
+individual impl blocks that need them.
 
-`MachineAction` is the framework-owned control language for the cursor stack:
+## Structural Machine Composition
+
+Composed machine types should provide explicit structural traits:
+
+- `ProjectMachine<T>`
+- `ProjectMachineMut<T>`
+- `LiftEffect<'ir, Sub>`
+- `LiftStop<'ir, Sub>`
+
+These traits live on composed machine types, not on the interpreter shell.
+The shell forwards them for ergonomics.
+
+This gives the intended composition rule:
 
 ```rust
-enum MachineAction<Stop> {
+enum DialectC {
+    A(DialectA),
+    B(DialectB),
+}
+
+struct MachineC {
+    a: MachineA,
+    b: MachineB,
+}
+
+enum EffectC {
+    A(EffectA),
+    B(EffectB),
+}
+
+enum StopC {
+    A(StopA),
+    B(StopB),
+}
+```
+
+The important symmetry is:
+
+- dialect composition is sum-like
+- machine composition is product-like
+- effect composition is sum-like
+- stop composition is sum-like
+
+## Shell Control
+
+The shell-facing control language is:
+
+```rust
+enum Control<Stop> {
     Advance,
     Stay,
     Push(ExecutionSeed),
@@ -106,38 +151,37 @@ Meaning:
 - `Pop`
   Finish the current execution context and resume its parent.
 - `Stop(stop)`
-  Stop execution for a semantic reason defined by the interpreter shell.
+  Stop execution for a semantic reason defined by the top-level machine.
 
-This is intentionally minimal.
+`Control<Stop>` is a plain public enum. The invariants live in
+`ExecutionSeed`, not in `Control` itself.
 
-Dialects may maintain richer semantic stacks in their own state, but the machine
-only sees the generic cursor-stack operations.
+`Control` should provide one small helper:
+
+```rust
+impl<S> Control<S> {
+    fn map_stop<T>(self, f: impl FnOnce(S) -> T) -> Control<T>;
+}
+```
+
+This makes composite machine effect consumption concise:
+
+```rust
+self.a.consume_effect(effect_a)?
+    .map_stop(StopC::A)
+```
 
 ## Execution Seeds
 
-The machine keeps full cursors internal. Public code constructs execution seeds.
+The shell keeps full cursors internal. Public code constructs execution seeds.
 
-The seed surface should use named per-shape seed structs wrapped by one public
-enum:
+Seeds are strictly intra-stage. Cross-stage execution is a separate interpreter
+capability and is never encoded in `Control`.
+
+The public seed surface should be:
 
 ```rust
-struct BlockSeed {
-    body: Block,
-}
-
-struct RegionSeed {
-    body: Region,
-}
-
-struct DiGraphSeed {
-    body: DiGraph,
-}
-
-struct UnGraphSeed {
-    body: UnGraph,
-}
-
-enum ExecutionSeed {
+pub enum ExecutionSeed {
     Block(BlockSeed),
     Region(RegionSeed),
     DiGraph(DiGraphSeed),
@@ -145,23 +189,191 @@ enum ExecutionSeed {
 }
 ```
 
-The framework may later extend this with multi-seed fan-out support, analogous
-to the old `Fork`, but v1 should keep `MachineAction` single-seed.
+with named per-shape seed types:
+
+- `BlockSeed`
+- `RegionSeed`
+- `DiGraphSeed`
+- `UnGraphSeed`
+
+These seed types should be public but use private fields and constructor
+helpers. CFG seeds can stay simple. Graph seeds may need richer entry payloads.
+
+The framework may later extend this surface with branch fan-out support, but v1
+keeps `Control` single-seed.
+
+## Interpreter Shell Trait
+
+The typed shell contract is:
+
+```rust
+trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
+    type Machine: Machine<'ir> + ConsumeEffect<'ir>;
+    type Error;
+
+    fn machine(&self) -> &Self::Machine;
+    fn machine_mut(&mut self) -> &mut Self::Machine;
+}
+```
+
+`Interpreter<'ir>` is the full typed shell contract. It should own:
+
+- top-level machine access
+- projection/lifting forwarding helpers
+- interpret APIs
+- effect-consumption APIs
+- control-consumption APIs
+- `step`
+- `run`
+- `run_until_break`
+
+Fuel and breakpoints stay on separate sibling traits rather than becoming
+supertraits of `Interpreter<'ir>`.
+
+The shell should forward structural machine operations for ergonomics:
+
+- `project_machine::<Sub>()`
+- `project_machine_mut::<Sub>()`
+- `lift_effect::<Sub>(...)`
+- `lift_stop::<Sub>(...)`
+
+## Interpret And Consume APIs
+
+The typed interpreter surface should distinguish local and top-level APIs.
+
+Interpret:
+
+- `interpret_local(stmt)`
+  Returns the local machine effect for `stmt`.
+- `interpret_lifted(stmt)`
+  Returns the lifted top-level machine effect.
+- `interpret_current()`
+  Cursor-driven API. Returns the top-level machine effect of the current
+  statement.
+
+Consume:
+
+- `consume_local_effect(effect)`
+  Consumes a submachine effect against only the projected submachine and returns
+  `Control<Sub::Stop>`.
+- `consume_lifted_effect(effect)`
+  Lifts a local effect into the top-level machine effect and consumes it as the
+  full machine.
+- `consume_effect(effect)`
+  Consumes a top-level machine effect and returns `Control<I::Machine::Stop>`.
+
+Control:
+
+- `consume_local_control(control)`
+  Convenience helper. Lifts `Control<Sub::Stop>` into top-level control and
+  forwards to `consume_control`.
+- `consume_control(control)`
+  Consumes shell control against the interpreter shell itself.
+
+All interpreter forwarding methods use method-level conversion bounds such as:
+
+- `D::Error: Into<I::Error>`
+- `Sub::Error: Into<I::Error>`
+
+The shell owns the final error surface. Local dialect and machine logic keep
+their own local error types.
+
+## Driver Result Types
+
+The driver-level result types should be:
+
+```rust
+struct StepResult<E, S> {
+    effect: E,
+    control: Control<S>,
+}
+```
+
+```rust
+enum StepOutcome<E, S> {
+    Stepped(StepResult<E, S>),
+    Suspended(SuspendReason),
+    Completed,
+}
+```
+
+```rust
+enum RunResult<S> {
+    Stopped(S),
+    Suspended(SuspendReason),
+    Completed,
+}
+```
+
+```rust
+enum SuspendReason {
+    Breakpoint,
+    FuelExhausted,
+    HostInterrupt,
+}
+```
+
+`step()` is a driver-style API:
+
+- `Completed` when there is no current statement
+- `Suspended(...)` for shell-level suspension
+- `Stepped(...)` when one statement was executed
+
+`interpret_current()` is lower-level and errors if there is no current
+statement.
+
+## Breakpoints And Locations
+
+The public execution-location surface stays statement-oriented:
+
+```rust
+enum ExecutionLocation {
+    BeforeStatement(Statement),
+    AfterStatement(Statement),
+}
+```
+
+Dynamic breakpoints are keyed by:
+
+- stage
+- execution location
+
+`BreakpointControl` should work over a dedicated value object:
+
+```rust
+struct Breakpoint {
+    stage: CompileStage,
+    location: ExecutionLocation,
+}
+```
+
+In v1, breakpoints are plain value objects:
+
+- add by value
+- remove by value
+- query membership by value
+
+The docs should explicitly distinguish:
+
+- shell breakpoint
+  debugger/driver suspension
+- semantic breakpoint statement
+  language-defined stop or effect
 
 ## Internal Cursor Stack
 
-The machine owns a stack of execution cursors.
+The shell owns a stack of execution cursors.
 
 This is not a semantic call stack. It is only the generic nesting stack for
-execution contexts. Dialects may keep semantic frame data in their own state if
-they need it.
+execution contexts. Dialects may keep semantic frame data in their own machine
+state if they need it.
 
 The split is:
 
-- machine cursor stack
+- shell cursor stack
   - where execution currently is
   - what nested execution contexts are active
-- dialect-owned state
+- dialect-owned machine state
   - what that nesting means semantically
 
 This allows dialects to define call stacks, graph traversal stacks, or loop
@@ -169,17 +381,16 @@ stacks without forcing one framework-wide frame model.
 
 ## Step Lifecycle
 
-The machine small-step cycle is:
+The common lifted shell cycle is:
 
 1. resolve the current statement from the top cursor
-2. invoke `Interpretable::interpret`
-3. obtain a language-owned effect value
-4. consume that effect through `ConsumeEffect`
-5. obtain `MachineAction`
-6. apply that action to the cursor stack
+2. interpret it into the top-level machine effect
+3. consume that effect through the top-level machine
+4. obtain `Control<I::Machine::Stop>`
+5. consume that control on the interpreter shell
 
-The dynamic driver loop layers breakpoints, fuel checks, and stop policy around
-this cycle.
+The local testing path uses the same phases with local effects and local
+control.
 
 ## Default Body Runners
 

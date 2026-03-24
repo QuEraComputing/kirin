@@ -2,7 +2,7 @@
 
 ## Stage Switching Is A Semantic Action
 
-Stage switching is not a machine action like `Push` or `Pop`.
+Stage switching is not shell control like `Push` or `Pop`.
 
 It is a semantic action initiated by dialect code through a public interpreter
 capability.
@@ -13,13 +13,14 @@ Two common sources are:
   symbol
 - a call convention that contains a `StagedFunction` naming another stage
 
-Dialect authors implement these conventions in `Interpretable<L>` for the
-current stage language. They use a public stage-switch API rather than
-manipulating machine internals directly.
+Dialect authors implement these conventions in `Interpretable` for the current
+stage language. They use a public stage-switch API rather than manipulating
+shell internals directly.
 
 ## Shared Capability, Different Shell Behavior
 
-The stage-switch capability should be shared by both shells:
+The stage-switch capability should be shared by both shells through their typed
+stage-specific interpreter views:
 
 - `SingleStageInterpreter<L>`
   reports a defined runtime error such as missing target-stage context or stage

@@ -2,7 +2,7 @@
 
 ## Two Concrete Shells
 
-The framework should support two concrete interpreter shells sharing one machine
+The framework should support two concrete shells sharing one typed shell
 contract:
 
 - `SingleStageInterpreter<L>`
@@ -19,20 +19,20 @@ supporting both:
 `SingleStageInterpreter<L>` is the typed execution shell for one language at
 one stage.
 
-It should own:
+It should own one top-level machine for that stage along with:
 
-- one value store for `L`
-- one root semantic state for `L`
+- one typed value store
+- one top-level machine
 - one cursor stack
-- one semantic stop payload type
+- one semantic stop payload type through `Machine::Stop`
 
-It should expose:
+It should implement the typed shell traits directly:
 
-- `Machine<'ir>`
-- typed `ValueStore`
-- typed effect inspection APIs
-- `state()` and `state_mut()`
-- stage-specific execution helpers
+- `Interpreter<'ir>`
+- `ValueStore`
+- `StageAccess<'ir>`
+- typed effect inspection and consumption APIs
+- driver APIs such as `step`, `run`, and `run_until_break`
 
 It is the preferred shell for:
 
@@ -46,12 +46,12 @@ It is the preferred shell for:
 
 It should be modeled as a heterogeneous collection of stage-local
 single-stage interpreters rather than as one monolithic interpreter with one
-global `Value`, `State`, and `Effect` type.
+global `Value`, `Machine`, and `Effect` type.
 
 Each stage entry may have its own:
 
 - value type
-- state type
+- machine type
 - effect type
 - stop payload type
 
@@ -63,8 +63,11 @@ The dynamic shell owns:
 - stage switching
 - stage-boundary orchestration
 
-The dynamic shell should not expose raw typed value/effect APIs directly.
-Typed APIs remain on stage-specific views or single-stage interpreters.
+The dynamic shell is not itself the typed `Interpreter<'ir>` surface.
+Typed APIs remain on:
+
+- `SingleStageInterpreter<L>`
+- typed stage-specific views returned from `in_stage::<L>()`
 
 ## Dynamic And Typed APIs
 
@@ -80,9 +83,13 @@ This yields the public split:
   - `run_until_break()`
 - typed stage-specific APIs
   - `interpret_current()`
+  - `interpret_local(stmt)`
+  - `interpret_lifted(stmt)`
+  - `consume_local_effect(effect)`
+  - `consume_lifted_effect(effect)`
   - `consume_effect(effect)`
-  - `apply_action(action)`
-  - `consume_and_apply(effect)`
+  - `consume_local_control(control)`
+  - `consume_control(control)`
   - `step()`
 
 The typed effect/value APIs belong on `SingleStageInterpreter<L>` and on typed
@@ -95,20 +102,26 @@ The typed stepping surface should support both low-level and convenience forms.
 Low-level:
 
 - `interpret_current()`
+- `interpret_local(stmt)`
+- `interpret_lifted(stmt)`
+- `consume_local_effect(effect)`
+- `consume_lifted_effect(effect)`
 - `consume_effect(effect)`
-- `apply_action(action)`
-- `consume_and_apply(effect)`
+- `consume_local_control(control)`
+- `consume_control(control)`
 
 Convenience:
 
 - `step()`
 
-`step()` should return a step-result artifact carrying:
+`step()` should return `StepOutcome`:
 
-- the full language effect value
-- the applied `MachineAction`
+- `Stepped(StepResult { effect, control })`
+- `Suspended(SuspendReason)`
+- `Completed`
 
-This keeps typed execution useful for fine-grained testing and debugging.
+This keeps typed execution useful for fine-grained testing and debugging while
+still behaving like a driver API.
 
 ## Dynamic Driver APIs
 
@@ -123,7 +136,8 @@ control, not effect inspection.
 
 ## Stage-Switch Behavior
 
-Both shells should implement the same public stage-switch capability.
+Both shells should expose the same public stage-switch capability on their typed
+stage-specific views.
 
 Behavior differs by shell:
 
@@ -136,3 +150,20 @@ This lets the same dialect semantics run on both shells:
 
 - same-stage semantics can be tested in `SingleStageInterpreter<L>`
 - cross-stage semantics can be exercised in `DynamicInterpreter`
+
+## Driver Control Traits
+
+Fuel and breakpoints should remain separate sibling traits rather than
+supertraits of `Interpreter<'ir>`.
+
+The intended layering is:
+
+- `Interpreter<'ir>`
+  typed semantic shell
+- `FuelControl`
+  shell fuel policy
+- `BreakpointControl`
+  shell breakpoint management
+
+This keeps the main typed shell trait focused while still exposing the driver
+controls on concrete shells and typed views that support them.
