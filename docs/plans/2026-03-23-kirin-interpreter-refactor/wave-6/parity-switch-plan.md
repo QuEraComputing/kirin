@@ -26,7 +26,7 @@ The result should be a controlled opt-in switch, not a surprise replacement.
 - top-level `src/lib.rs` if re-exports or features need adjustment
 - `crates/kirin-interpreter-2/README` or crate docs if needed
 - `example/toy-lang` test or example entrypoints
-- parity report or checklist under `docs/plans/2026-03-23-kirin-interpreter-2/`
+- parity report or checklist under `docs/plans/2026-03-23-kirin-interpreter-refactor/`
 
 **Out of scope:**
 

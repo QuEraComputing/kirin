@@ -36,38 +36,50 @@ This wave creates and stabilizes a new derive crate,
 ## Design Goals
 
 - Leave `kirin-derive-interpreter` intact for the old interpreter crate.
-- Design the new macro surface around `kirin-interpreter-2`, not around
+- Design the new macro surface around `kirin-interpreter-2`, not around old
   continuation-era compatibility shims.
 - Freeze the v2 derive surface before any pilot dialect crate starts
   migrating.
+- Land the shared `kirin-derive-toolkit` template and layout work that the new
+  derive crate depends on before downstream migration starts.
 
 ## Expected Macro Surface
 
-The exact names should be decided in this wave, but the package should support
-the v2 equivalents of:
+- `#[derive(Interpretable)]`
+- `#[derive(ConsumeResult)]`
+- `#[derive(CallableBody)]`
+- `#[derive(SSACFGCallableBody)]`
 
-- statement interpretation derive support,
-- callable-body derive support for standard callable body shapes,
-- any compatibility helper derives that are needed for the approved v2 runtime
-  surface.
+Helper attributes:
 
-If the final macro names differ from the old package, document that explicitly.
+- reuse `#[wraps]`
+- reuse `#[callable]`
+- reuse `#[interpret(...)]` for interpreter crate path override
+- add `#[body]` for concrete body derives
 
 ## Implementation Steps
 
 - [ ] Add `crates/kirin-derive-interpreter-2` as a new workspace member and
   workspace dependency.
-- [ ] Reuse shared derive infrastructure from `kirin-derive-toolkit` where that
-  is actually common, but do not force the v2 package to preserve old macro
-  contracts that no longer fit.
-- [ ] Design the v2 derive API explicitly:
-  choose macro names,
-  choose helper attributes,
-  define crate-path override behavior for `::kirin_interpreter_2`.
+- [ ] Add the required shared support in `kirin-derive-toolkit`:
+  wrapper-forwarding templates,
+  selector-policy configuration,
+  `#[body]` field lookup and validation,
+  and an interpreter-oriented layout/context path for normalized
+  `#[interpret(...)]`, `#[callable]`, and `#[body]` metadata.
+- [ ] Implement the approved v2 derive API explicitly:
+  `Interpretable`,
+  `ConsumeResult`,
+  `CallableBody`,
+  `SSACFGCallableBody`,
+  with `#[interpret(crate = ...)]` targeting `::kirin_interpreter_2` by
+  default.
 - [ ] Implement the new derives against the v2 trait contracts and effect
   return types.
 - [ ] Add focused tests proving the derives generate usable code for
   `kirin-interpreter-2`.
+- [ ] Add focused toolkit tests covering explicit-only selector policy and
+  `#[body]` validation.
 - [ ] Add documentation or crate-level examples that downstream dialect authors
   can follow during migration.
 
@@ -85,9 +97,11 @@ If the crate uses `trybuild`, include its test suite here as well.
 ## Success Criteria
 
 1. `kirin-derive-interpreter-2` exists as a separate crate in the workspace.
-2. The derive surface is designed around the v2 runtime rather than around the
+2. `kirin-derive-toolkit` provides the shared forwarding/body helpers needed by
+   the new derive package.
+3. The derive surface is designed around the v2 runtime rather than around the
    old crate's abstractions.
-3. The new derive package is test-covered and stable enough to be a prerequisite
-   for downstream migration.
-4. No downstream dialect crate has to mix old and new derive packages while the
+4. The new derive package is test-covered and stable enough to be a
+   prerequisite for downstream migration.
+5. No downstream dialect crate has to mix old and new derive packages while the
    new derive API is still unsettled.

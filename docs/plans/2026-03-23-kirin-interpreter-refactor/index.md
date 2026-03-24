@@ -1,7 +1,7 @@
-# Kirin Interpreter 2 — Implementation Plan Index
+# Kirin Interpreter Refactor — Implementation Plan Index
 
 **Date:** 2026-03-23
-**Design document:** `docs/design/interpreter-2-execution-model.md`
+**Design document:** `docs/design/2026-03-23-kirin-interpreter-refactor/index.md`
 **Pattern:** additive new crate + staged adoption
 **Primary crate:** `crates/kirin-interpreter-2`
 

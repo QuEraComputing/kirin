@@ -29,7 +29,7 @@ The pilot set should be:
 
 **Files to add or modify:**
 
-- `docs/plans/2026-03-23-kirin-interpreter-2/migration-guide.md`
+- `docs/plans/2026-03-23-kirin-interpreter-refactor/migration-guide.md`
 - `crates/kirin-function/src/*`
 - `crates/kirin-scf/src/*`
 - `crates/kirin-cf/src/*`
@@ -71,7 +71,7 @@ This is the migration sequence that addresses the trait-name overlap risk.
 
 ## Implementation Steps
 
-- [ ] Write `docs/plans/2026-03-23-kirin-interpreter-2/migration-guide.md`
+- [ ] Write `docs/plans/2026-03-23-kirin-interpreter-refactor/migration-guide.md`
   documenting the migration sequence and required preconditions.
 - [ ] Migrate `kirin-function` using the one-way switch process and run its
   tests.
