@@ -33,6 +33,8 @@ It should implement the typed shell traits directly:
 - `StageAccess<'ir>`
 - typed effect inspection and consumption APIs
 - driver APIs such as `step`, `run`, and `run_until_break`
+- optional sibling driver-control traits like `FuelControl` and
+  `BreakpointControl`
 
 It is the preferred shell for:
 
@@ -68,6 +70,10 @@ Typed APIs remain on:
 
 - `SingleStageInterpreter<L>`
 - typed stage-specific views returned from `in_stage::<L>()`
+
+These typed stage views should implement the same `Interpreter<'ir>` contract
+as the single-stage shell, so dialect operational semantics can stay portable
+across both execution modes.
 
 ## Dynamic And Typed APIs
 
@@ -123,6 +129,13 @@ Convenience:
 This keeps typed execution useful for fine-grained testing and debugging while
 still behaving like a driver API.
 
+The default implementation story should be:
+
+- `step()` is a conditional provided default when the returned effect/control
+  artifacts are cloneable
+- `run()` and `run_until_break()` are provided defaults that loop directly over
+  the shell primitives and do not inherit `step()` clone bounds
+
 ## Dynamic Driver APIs
 
 The dynamic shell should keep the familiar high-level driver operations:
@@ -133,6 +146,14 @@ The dynamic shell should keep the familiar high-level driver operations:
 
 These APIs are intentionally semantic-effect opaque. They are for execution
 control, not effect inspection.
+
+`step()` on the dynamic shell should still follow the same driver policy as the
+typed shell:
+
+- breakpoint and interrupt checks happen before executing the current statement
+- fuel is decremented only when a statement is actually executed
+- if the final statement runs, that call still counts as a step rather than a
+  `Completed` no-op
 
 ## Stage-Switch Behavior
 

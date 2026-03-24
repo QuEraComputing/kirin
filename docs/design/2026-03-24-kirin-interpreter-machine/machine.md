@@ -92,6 +92,36 @@ Composed machine types should provide explicit structural traits:
 These traits live on composed machine types, not on the interpreter shell.
 The shell forwards them for ergonomics.
 
+The intended signatures are:
+
+```rust
+trait ProjectMachine<T: ?Sized> {
+    fn project(&self) -> &T;
+}
+
+trait ProjectMachineMut<T: ?Sized> {
+    fn project_mut(&mut self) -> &mut T;
+}
+
+trait LiftEffect<'ir, Sub>: Machine<'ir>
+where
+    Sub: Machine<'ir>,
+{
+    fn lift_effect(effect: Sub::Effect) -> Self::Effect;
+}
+
+trait LiftStop<'ir, Sub>: Machine<'ir>
+where
+    Sub: Machine<'ir>,
+{
+    fn lift_stop(stop: Sub::Stop) -> Self::Stop;
+}
+```
+
+Projection allows `?Sized` to leave room for future borrowed or erased machine
+views. Effect and stop lifting stay concrete and sized because they describe
+structural composition of real machine components.
+
 This gives the intended composition rule:
 
 ```rust
@@ -171,6 +201,28 @@ self.a.consume_effect(effect_a)?
     .map_stop(StopC::A)
 ```
 
+## Shell Control Invariants
+
+The shell should keep the control invariants strict:
+
+- `Push(seed)` may grow the cursor stack.
+- `Replace(seed)` requires an active current cursor.
+- `Pop` requires an active current cursor.
+- `Stop(stop)` clears the cursor stack immediately.
+- invalid control against empty execution state is an interpreter error.
+
+`Completed` is a driver outcome, not a control-application fallback. So:
+
+- empty-stack `Pop` is an interpreter error
+- empty-stack `Replace` is an interpreter error
+
+`Advance` is cursor-kind specific. The public control layer does not define one
+universal “advance at end” rule. Advancing within a block, region, or graph
+cursor is part of internal cursor semantics.
+
+`Stay` means “no intended execution movement”, but the shell may still run
+consistency checks after applying it.
+
 ## Execution Seeds
 
 The shell keeps full cursors internal. Public code constructs execution seeds.
@@ -213,6 +265,20 @@ trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
 
     fn machine(&self) -> &Self::Machine;
     fn machine_mut(&mut self) -> &mut Self::Machine;
+
+    fn interpret_current(
+        &mut self,
+    ) -> Result<<Self::Machine as Machine<'ir>>::Effect, Self::Error>;
+
+    fn consume_effect(
+        &mut self,
+        effect: <Self::Machine as Machine<'ir>>::Effect,
+    ) -> Result<Control<<Self::Machine as Machine<'ir>>::Stop>, Self::Error>;
+
+    fn consume_control(
+        &mut self,
+        control: Control<<Self::Machine as Machine<'ir>>::Stop>,
+    ) -> Result<(), Self::Error>;
 }
 ```
 
@@ -230,12 +296,60 @@ trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
 Fuel and breakpoints stay on separate sibling traits rather than becoming
 supertraits of `Interpreter<'ir>`.
 
+The required primitive shell methods are:
+
+- `machine`
+- `machine_mut`
+- `interpret_current`
+- `consume_effect`
+- `consume_control`
+
+Everything else can be a provided default layered on top of those primitives.
+
 The shell should forward structural machine operations for ergonomics:
 
 - `project_machine::<Sub>()`
 - `project_machine_mut::<Sub>()`
 - `lift_effect::<Sub>(...)`
 - `lift_stop::<Sub>(...)`
+
+These should be provided forwarding methods, not extra implementation burden:
+
+```rust
+fn project_machine<Sub: ?Sized>(&self) -> &Sub
+where
+    Self::Machine: ProjectMachine<Sub>,
+{
+    self.machine().project()
+}
+
+fn project_machine_mut<Sub: ?Sized>(&mut self) -> &mut Sub
+where
+    Self::Machine: ProjectMachineMut<Sub>,
+{
+    self.machine_mut().project_mut()
+}
+
+fn lift_effect<Sub: Machine<'ir>>(
+    &self,
+    effect: Sub::Effect,
+) -> <Self::Machine as Machine<'ir>>::Effect
+where
+    Self::Machine: LiftEffect<'ir, Sub>,
+{
+    <Self::Machine as LiftEffect<'ir, Sub>>::lift_effect(effect)
+}
+
+fn lift_stop<Sub: Machine<'ir>>(
+    &self,
+    stop: Sub::Stop,
+) -> <Self::Machine as Machine<'ir>>::Stop
+where
+    Self::Machine: LiftStop<'ir, Sub>,
+{
+    <Self::Machine as LiftStop<'ir, Sub>>::lift_stop(stop)
+}
+```
 
 ## Interpret And Consume APIs
 
@@ -269,6 +383,59 @@ Control:
   forwards to `consume_control`.
 - `consume_control(control)`
   Consumes shell control against the interpreter shell itself.
+
+The intended method shapes are:
+
+```rust
+fn interpret_local<D>(
+    &mut self,
+    stmt: &D,
+) -> Result<<D::Machine as Machine<'ir>>::Effect, Self::Error>
+where
+    D: Interpretable<'ir, Self>,
+    D::Error: Into<Self::Error>;
+
+fn interpret_lifted<D>(
+    &mut self,
+    stmt: &D,
+) -> Result<<Self::Machine as Machine<'ir>>::Effect, Self::Error>
+where
+    D: Interpretable<'ir, Self>,
+    Self::Machine: LiftEffect<'ir, D::Machine>,
+    D::Error: Into<Self::Error>;
+
+fn consume_local_effect<Sub: Machine<'ir> + ConsumeEffect<'ir>>(
+    &mut self,
+    effect: <Sub as Machine<'ir>>::Effect,
+) -> Result<Control<<Sub as Machine<'ir>>::Stop>, Self::Error>
+where
+    Self::Machine: ProjectMachineMut<Sub>,
+    <Sub as ConsumeEffect<'ir>>::Error: Into<Self::Error>;
+
+fn consume_lifted_effect<Sub: Machine<'ir>>(
+    &mut self,
+    effect: <Sub as Machine<'ir>>::Effect,
+) -> Result<Control<<Self::Machine as Machine<'ir>>::Stop>, Self::Error>
+where
+    Self::Machine: LiftEffect<'ir, Sub>,
+    <Self::Machine as ConsumeEffect<'ir>>::Error: Into<Self::Error>;
+
+fn consume_local_control<Sub: Machine<'ir>>(
+    &mut self,
+    control: Control<<Sub as Machine<'ir>>::Stop>,
+) -> Result<(), Self::Error>
+where
+    Self::Machine: LiftStop<'ir, Sub>;
+```
+
+The default layering should be:
+
+- `interpret_lifted`
+  = `interpret_local` + `lift_effect`
+- `consume_lifted_effect`
+  = `lift_effect` + `consume_effect`
+- `consume_local_control`
+  = `map_stop` + `lift_stop` + `consume_control`
 
 All interpreter forwarding methods use method-level conversion bounds such as:
 
@@ -321,6 +488,51 @@ enum SuspendReason {
 
 `interpret_current()` is lower-level and errors if there is no current
 statement.
+
+`step()` should be a provided method when the artifacts it returns are
+cloneable. The clean condition is:
+
+- `<Self::Machine as Machine<'ir>>::Effect: Clone`
+- `Control<<Self::Machine as Machine<'ir>>::Stop>: Clone`
+
+That default can:
+
+1. check shell suspension policy
+2. interpret the current statement
+3. consume the resulting top-level effect
+4. clone the effect/control it needs to return
+5. consume the control on the shell
+6. return `StepOutcome::Stepped(...)`
+
+Concrete shells may override this path if they want a cheaper move-based
+implementation.
+
+`run()` and `run_until_break()` should also be provided defaults, but they
+should loop directly over:
+
+- `interpret_current`
+- `consume_effect`
+- `consume_control`
+
+rather than depending on `step()`. This avoids inheriting the clone bounds of
+the default `step()`.
+
+`run_until_break()` should:
+
+- return `Suspended(Breakpoint)` immediately if a breakpoint is already active
+  at the current stage/location
+- return `Suspended(Breakpoint)` when a later step reaches a breakpoint
+- still stop on any other suspension reason instead of hiding it
+
+Fuel should be decremented only for successful statement execution:
+
+- breakpoint checks do not burn fuel
+- immediate suspension does not burn fuel
+- one fully executed statement burns one fuel unit
+
+If the last statement executes and leaves the cursor stack empty, that call to
+`step()` should still return `Stepped(...)`. `Completed` means no statement
+executed because execution was already exhausted.
 
 ## Breakpoints And Locations
 
