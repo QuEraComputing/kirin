@@ -351,6 +351,57 @@ where
 }
 ```
 
+## Driver Control Traits
+
+Fuel and breakpoints are shell-driver concerns. They are not part of
+`Machine<'ir>` composition and should not be stored in user-composed semantic
+machine state.
+
+The intended control traits are:
+
+```rust
+trait BreakpointControl {
+    fn add_breakpoint(&mut self, breakpoint: Breakpoint) -> bool;
+    fn remove_breakpoint(&mut self, breakpoint: &Breakpoint) -> bool;
+    fn has_breakpoint(&self, breakpoint: &Breakpoint) -> bool;
+}
+
+trait FuelControl {
+    fn fuel(&self) -> Option<u64>;
+    fn set_fuel(&mut self, fuel: Option<u64>);
+    fn add_fuel(&mut self, fuel: u64);
+}
+
+trait InterruptControl {
+    fn request_interrupt(&mut self);
+    fn clear_interrupt(&mut self);
+    fn interrupt_requested(&self) -> bool;
+}
+```
+
+The behavioral rules are:
+
+- breakpoints are plain value objects
+- `add_breakpoint` / `remove_breakpoint` return whether the set changed
+- `add_fuel` saturates on overflow
+- fuel is a shell progress budget, not a semantic machine resource
+- `None` fuel means unlimited
+- `Some(0)` fuel is legal and suspends before the next statement executes
+- burning the last unit of fuel still lets that statement return `Stepped(...)`
+- `HostInterrupt` is level-triggered and remains active until explicitly cleared
+
+These traits should be implemented on:
+
+- typed interpreters and typed stage views
+- the stage-dynamic shell
+
+For the dynamic shell:
+
+- breakpoint state is one shared shell-level breakpoint set
+- fuel is one shared shell-level driver counter
+- typed stage views forward into that shared shell state
+- host interrupt is one shared shell-level latched flag
+
 ## Interpret And Consume APIs
 
 The typed interpreter surface should distinguish local and top-level APIs.
@@ -436,6 +487,23 @@ The default layering should be:
   = `lift_effect` + `consume_effect`
 - `consume_local_control`
   = `map_stop` + `lift_stop` + `consume_control`
+
+Low-level typed APIs ignore shell suspension policy:
+
+- `interpret_current`
+- `interpret_local`
+- `interpret_lifted`
+- `consume_local_effect`
+- `consume_lifted_effect`
+- `consume_effect`
+- `consume_local_control`
+- `consume_control`
+
+Only driver APIs apply shell suspension policy:
+
+- `step`
+- `run`
+- `run_until_break`
 
 All interpreter forwarding methods use method-level conversion bounds such as:
 
@@ -523,6 +591,12 @@ the default `step()`.
   at the current stage/location
 - return `Suspended(Breakpoint)` when a later step reaches a breakpoint
 - still stop on any other suspension reason instead of hiding it
+
+Driver APIs should share one immediate suspension priority order:
+
+1. breakpoint at current location
+2. fuel exhausted
+3. host interrupt
 
 Fuel should be decremented only for successful statement execution:
 

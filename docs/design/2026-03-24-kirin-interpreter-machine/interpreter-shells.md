@@ -185,6 +185,28 @@ The intended layering is:
   shell fuel policy
 - `BreakpointControl`
   shell breakpoint management
+- `InterruptControl`
+  shell host-interrupt policy
 
 This keeps the main typed shell trait focused while still exposing the driver
 controls on concrete shells and typed views that support them.
+
+These controls are shell state, not semantic machine state:
+
+- they do not belong in `Machine<'ir>` composition
+- they should not be projected through `ProjectMachine`
+
+For `DynamicInterpreter`, both traits operate on shared shell state:
+
+- one shared breakpoint set keyed by stage and execution location
+- one shared fuel counter
+- one shared latched host-interrupt flag
+
+Typed stage views into the dynamic shell should forward into that shared
+driver-control state rather than owning their own independent breakpoint or
+fuel storage.
+
+The shell-policy split should be explicit:
+
+- low-level typed semantic APIs ignore breakpoint, fuel, and interrupt policy
+- driver APIs (`step`, `run`, `run_until_break`) apply that suspension policy
