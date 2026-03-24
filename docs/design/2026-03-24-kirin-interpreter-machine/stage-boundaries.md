@@ -50,6 +50,66 @@ because cross-stage switching may be:
 
 It should leave room for abstract-interpretation boundaries later.
 
+The high-level boundary protocol should be a neutral stage-pair adapter, not a
+caller-owned or callee-owned trait.
+
+Its public contract should be caller-facing:
+
+```rust
+enum StageBoundaryResult<R, S> {
+    Returned(R),
+    Trapped(S),
+    Suspended(SuspendReason),
+    Completed,
+}
+```
+
+The boundary adapter should own its own protocol-specific payload types:
+
+- `Input`
+- `Return`
+- `Stop`
+- `Error`
+
+The intended high-level shape is:
+
+```rust
+trait StageBoundary<'ir, From, To> {
+    type Input;
+    type Return;
+    type Stop;
+    type Error;
+
+    fn execute<CF, CT>(
+        &self,
+        caller: &mut CF,
+        caller_stage: &'ir StageInfo<From>,
+        target: &mut CT,
+        target_stage: &'ir StageInfo<To>,
+        seed: ExecutionSeed,
+        input: Self::Input,
+    ) -> Result<StageBoundaryResult<Self::Return, Self::Stop>, Self::Error>
+    where
+        CF: Interpreter<'ir>,
+        CT: Interpreter<'ir>;
+}
+```
+
+Important properties of this shape:
+
+- `From` and `To` are explicit in the trait identity
+- the trait is implemented by standalone boundary adapter values
+- the trait is stateful/configurable because boundary adapters are value objects
+- the adapter receives both typed interpreter views and both typed stage-info
+  values
+- no public intermediate target-stage run result is exposed
+- returned values and trapped/stop payloads are already translated into the
+  caller-facing boundary world
+
+`Completed` remains in the boundary result because some boundary protocols may
+accept completion without explicit return, while others may treat it as an
+error. That policy belongs to the boundary adapter.
+
 ## General And Callable-Specific Entry
 
 The public stage-switch layer should provide both:
@@ -59,6 +119,29 @@ The public stage-switch layer should provide both:
 
 The general entry is important because call is not the only meaningful
 cross-stage operation.
+
+At the dynamic-shell surface, this should become two APIs:
+
+- `execute_in_stage(target_stage, seed, input)`
+- `execute_in_stage_with(boundary, target_stage, seed, input)`
+
+The first path resolves the boundary adapter internally from stage metadata or
+boundary registration. The second path takes an explicit boundary adapter value
+and is better for tests and advanced control.
+
+On typed caller-stage views, `From` should be inferred from the view and only
+`To` remains explicit:
+
+- `execute_in_stage::<To>(target_stage, seed, input)`
+- `execute_in_stage_with::<To>(boundary, target_stage, seed, input)`
+
+The target stage should support both forms:
+
+- precise typed target: `&'ir StageInfo<To>`
+- convenience runtime target: `CompileStage`
+
+The typed form is the exact contract. The runtime form is an ergonomic helper
+that resolves and validates `To` before boundary execution starts.
 
 ## Dynamic Stage Storage
 
@@ -73,6 +156,28 @@ Each stage entry may be initialized:
 
 This avoids allocating state for stages that are never executed while still
 allowing deterministic handcrafted test setup.
+
+Boundary adapters should operate on typed stage views, not on the dynamic shell
+directly. This keeps:
+
+- caller/target machine access explicit
+- value conversion statically typed
+- boundary logic testable independently from dynamic shell orchestration
+
+## Same-Stage Rule
+
+Stage-boundary execution is only for cross-stage execution.
+
+If a dialect resolves a target back to the current stage, it should use the
+ordinary same-stage nested execution helpers instead of going through the
+boundary protocol.
+
+The policy should be:
+
+- typed helpers short-circuit same-stage requests to the normal same-stage path
+- the dynamic shell still validates that boundary execution is truly cross-stage
+- if a same-stage request reaches the dynamic boundary layer, it is a shell
+  error
 
 ## Host-Driven Switching
 
