@@ -45,6 +45,9 @@ The result should be a controlled opt-in switch, not a surprise replacement.
   graph execution,
   pilot dialect coverage,
   derive support status
+- a migration guide for downstream dialect crates, including the one-way
+  dependency switch sequence from `kirin-interpreter` to
+  `kirin-interpreter-2`
 - an opt-in workspace path for using `kirin-interpreter-2`
 - regression tests or example runs that compare old and new concrete runtimes on
   representative programs where both runtimes are expected to agree
@@ -55,6 +58,13 @@ The result should be a controlled opt-in switch, not a surprise replacement.
   `kirin-interpreter-2` without changing current defaults.
 - [ ] Build a small parity matrix against the old concrete interpreter for the
   features both runtimes intentionally share.
+- [ ] Review the migration guide against the pilot dialect conversions and make
+  sure it matches the actual successful sequence:
+  verify v2 tests exist first,
+  remove old interpreter dependency,
+  add new interpreter dependency,
+  switch the crate,
+  run tests.
 - [ ] Add dual-run tests in `example/toy-lang` or another suitable host harness
   where the same program is executed by both interpreters and their observable
   outputs are compared.

@@ -16,7 +16,10 @@ sequenced so that:
 1. the new crate can compile and host its own tests early,
 2. the concrete runtime lands before dialect adoption,
 3. graph execution is validated independently from CFG execution, and
-4. downstream migration remains opt-in until parity is demonstrated.
+4. downstream migration remains opt-in until parity is demonstrated, and
+5. each migrated dialect crate switches in one direction from
+   `kirin-interpreter` to `kirin-interpreter-2` instead of carrying both
+   interpreter integrations at once.
 
 The plan intentionally separates "new runtime exists" from "workspace has
 switched to it". The old crate remains authoritative until the parity wave.
@@ -108,8 +111,18 @@ Additional checkpoints by wave:
 ### Risk 1: Trait-name overlap during adoption
 
 `kirin-interpreter` and `kirin-interpreter-2` intentionally reuse names such as
-`Interpretable` and `StageAccess`. Downstream crates will need explicit import
-discipline or separate `interpret_v2` modules during the dual-runtime period.
+`Interpretable` and `StageAccess`.
+
+Mitigation: once `kirin-interpreter-2` has enough crate-local tests to act as a
+stable target, migrate each downstream dialect crate in one direction:
+
+1. remove its dependency on `kirin-interpreter`,
+2. remove old-interpreter imports and impl wiring,
+3. add the `kirin-interpreter-2` dependency, and
+4. switch the crate to the new interpreter API.
+
+Wave 4 includes a migration-guide step so this sequence is written down and
+reused consistently.
 
 ### Risk 2: Derive codegen assumes old continuation/call abstractions
 
@@ -130,6 +143,7 @@ scheduler.
 - Keep Wave 2 self-contained inside `kirin-interpreter-2`; avoid touching
   dialect crates until call/result mechanics are proven.
 - Use Wave 3 to stabilize graph APIs before broad derive or dialect adoption.
-- Keep Wave 4 opt-in. Do not remove or rewrite the old interpreter crate yet.
+- Keep Wave 4 opt-in, but migrate each pilot dialect crate in one direction once
+  `kirin-interpreter-2` has enough local tests to support that switch.
 - Treat Wave 5 as the release gate for "ready to switch consumers", not for
   deleting the old runtime.
