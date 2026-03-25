@@ -80,23 +80,10 @@ across both execution modes.
 `DynamicInterpreter` should be parameterized by a framework `StageStore`
 abstraction.
 
-The framework should provide:
+The important storage rule is still the same:
 
-- a `StageStore` trait
-- a default erased heterogeneous implementation
-- room for custom user-provided store implementations
-
-`StageStore` should own:
-
-- typed stage-shell lookup
-- typed mutable stage-shell lookup
-- lazy stage-shell initialization
-
-It should not absorb unrelated policy such as stage-boundary adapter
-resolution.
-
-The important storage rule is that `StageStore` stores whole stage-local
-interpreter shells, not raw machine/value fragments.
+- `StageStore` stores whole stage-local interpreter shells, not raw
+  machine/value fragments
 
 This means each stage entry stores a full `SingleStageInterpreter<L>`-like
 typed execution unit, including:
@@ -108,6 +95,128 @@ typed execution unit, including:
 
 This avoids reconstructing typed interpreters out of raw parts every time the
 dynamic shell resolves `in_stage::<L>()`.
+
+### Family-Relative Storage
+
+The concrete storage direction should be driven by two inputs:
+
+- the stage enum `S`
+- the single-stage interpreter family `F`
+
+The stage enum remains the source of truth for which dialect lives at each
+`CompileStage`.
+
+The single-stage family decides, for each dialect `L`, which shell and machine
+type should be used for that stage in a particular interpretation mode.
+
+This mapping is family-relative, not dialect-absolute.
+
+For example, a concrete-execution family and an abstract-interpretation family
+may map the same dialect `L` to different machine and shell types.
+
+The intended shape is:
+
+```rust
+trait SingleStageFamily<'ir, S>
+where
+    S: StageMeta,
+{
+    type Error;
+    type Context;
+    type Shell<L>: Interpreter<'ir>
+    where
+        L: Dialect;
+
+    fn make_context(pipeline: &'ir Pipeline<S>) -> Result<Self::Context, Self::Error>;
+
+    fn build_shell<L>(
+        ctx: &Self::Context,
+        stage_id: CompileStage,
+        stage: &'ir StageInfo<L>,
+    ) -> Result<Self::Shell<L>, Self::Error>
+    where
+        L: Dialect;
+}
+```
+
+The family context exists because stage-local shell construction may need more
+than `&StageInfo<L>` alone. The current interpreter implementations already
+depend on pipeline-global state and stage identity in addition to the typed
+stage view.
+
+### Derived Store Shape
+
+The default direction should be a pipeline-shaped typed store, not a purely
+erased bag of stage shells.
+
+The stage enum `S` should derive a parallel stage-entry layout relative to a
+family `F`.
+
+Conceptually:
+
+```rust
+trait StageShellLayout<'ir, F>: StageMeta
+where
+    F: SingleStageFamily<'ir, Self>,
+    Self: Sized,
+{
+    type Entry;
+}
+```
+
+and the default store becomes:
+
+```rust
+struct DerivedStageStore<'ir, S, F>
+where
+    S: StageMeta + StageShellLayout<'ir, F>,
+    F: SingleStageFamily<'ir, S>,
+{
+    pipeline: &'ir Pipeline<S>,
+    family_ctx: F::Context,
+    entries: Vec<S::Entry>,
+}
+```
+
+Each `CompileStage` indexes one entry in `entries`, just like the existing
+pipeline and dispatch-cache machinery.
+
+The practical implication is:
+
+- storage is keyed by stage slot, not by dialect type
+- duplicate stage variants using the same dialect remain valid
+- typed shell access still resolves through `CompileStage` plus `HasStageInfo<L>`
+
+The default derived entry shape should be lazy and stage-local, for example
+storing `Option<F::Shell<L>>`-style slots per stage entry:
+
+- `None`
+  stage shell has not been initialized yet
+- `Some(shell)`
+  stage shell is ready
+
+This keeps the public model simple while still allowing lazy initialization and
+stage-local preseed overrides.
+
+The framework should provide:
+
+- a `StageStore` trait
+- a default derived heterogeneous implementation based on the stage enum plus
+  interpreter family
+- room for custom user-provided store implementations
+
+`StageStore` should own:
+
+- typed stage-shell lookup
+- typed mutable stage-shell lookup
+- lazy stage-shell initialization
+
+It should not absorb unrelated policy such as stage-boundary adapter
+resolution.
+
+An erased framework store may still be useful later, but it should be treated
+as an implementation strategy layered on top of this typed stage-layout model,
+not as the primary design center.
 
 ## Dynamic Orchestration Stack
 
@@ -258,6 +367,23 @@ These controls are shell state, not semantic machine state:
 
 - they do not belong in `Machine<'ir>` composition
 - they should not be projected through `ProjectMachine`
+
+## Deferred Storage Decisions
+
+The following storage questions are intentionally left open for the MVP
+implementation phase:
+
+- the exact public `StageStore` trait surface
+- whether callback-style stage access helpers are needed in v1, or can be
+  added later over direct borrowed access
+- the exact derive name and crate placement for `StageShellLayout`-style code
+  generation
+- the public API for preseeded stage-shell overrides
+- whether the framework should ship an erased store wrapper in the first
+  dynamic-shell implementation
+
+These should be revisited only after the single-stage concrete interpreter MVP
+has stabilized the typed shell and machine mechanism.
 
 For `DynamicInterpreter`, these control traits operate on shared shell state:
 

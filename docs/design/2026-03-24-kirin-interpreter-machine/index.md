@@ -41,6 +41,10 @@ This folder is intentionally additive. The earlier design docs remain unchanged.
 - `SingleStageInterpreter<L>` exposes typed value/effect/machine APIs.
 - `DynamicInterpreter` orchestrates a heterogeneous set of single-stage
   interpreters and does not expose raw typed effect/value APIs directly.
+- machine and shell selection are family-relative:
+  - the stage enum says which dialect lives at each stage
+  - the chosen single-stage interpreter family maps that dialect to a shell and
+    machine type
 - typed shells expose both local and lifted interpret/consume APIs.
 - driver APIs use `StepOutcome` and `RunResult`.
 - stage switching is a public capability on both shells:
@@ -82,3 +86,17 @@ This direction is a better fit for:
 - dialect-owned graph traversal state
 - staged programs with heterogeneous values/states/effects across stages
 - small dialect-local operational-semantics tests
+
+## Deferred After MVP
+
+The next implementation phase should stop at a single-stage concrete
+interpreter MVP.
+
+The following topics remain intentionally deferred until that typed shell and
+machine mechanism have been proven in code:
+
+- the exact `StageStore` trait surface
+- the `SingleStageFamily` and `StageShellLayout` derive details
+- the first concrete `DynamicInterpreter`
+- stage-boundary adapter registry and resolution
+- machine-side and interpreter-side derive macro expansion for the new runtime
