@@ -256,14 +256,19 @@ keeps `Control` single-seed.
 
 ### MVP Checkpoint
 
-The current `kirin-interpreter-2` MVP narrows execution seeds to block
-execution only:
+The current `kirin-interpreter-2` MVP now exposes the full public seed family:
 
 - `ExecutionSeed::Block`
+- `ExecutionSeed::Region`
+- `ExecutionSeed::DiGraph`
+- `ExecutionSeed::UnGraph`
 - `BlockSeed`
+- `RegionSeed`
+- `DiGraphSeed`
+- `UnGraphSeed`
 
-Region- and graph-shaped seeds remain design-only until the single-stage shell
-expands past the MVP.
+The single-stage shell also uses a closed internal cursor enum over those same
+four execution shapes.
 
 ## Interpreter Shell Trait
 

@@ -34,6 +34,7 @@ The implemented part currently covers:
 - `Machine<'ir>` / `ConsumeEffect<'ir>`
 - the primitive `Interpreter<'ir>` shell contract
 - `SingleStageInterpreter`
+- a closed internal cursor stack over block/region/digraph/ungraph execution
 - local vs lifted machine helpers
 - `Control<Stop>`, `StepOutcome`, and `RunResult`
 - shell-owned fuel, breakpoint, and interrupt controls

@@ -38,7 +38,16 @@ truth until a later expansion pass changes them.
 
 ### Current Implementation Truth
 
-- `ExecutionSeed` is currently block-only in `kirin-interpreter-2`.
+- `kirin-interpreter-2` now defines the full public seed family:
+  - `BlockSeed`
+  - `RegionSeed`
+  - `DiGraphSeed`
+  - `UnGraphSeed`
+- the single-stage shell now uses a closed internal cursor enum over:
+  - block
+  - region
+  - digraph
+  - ungraph
 - `SingleStageInterpreter` owns the driver convenience methods directly:
   - `step()`
   - `run()`
@@ -60,7 +69,6 @@ truth until a later expansion pass changes them.
 
 - lifting `step()` / `run()` / `run_until_break()` into `Interpreter<'ir>` as
   shared provided defaults
-- widening execution seeds beyond block execution
 - revisiting whether block-argument binding belongs in statement interpretation
   or in a higher-level helper boundary
 - `SingleStageFamily`
