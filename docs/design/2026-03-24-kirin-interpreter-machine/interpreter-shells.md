@@ -5,7 +5,7 @@
 The framework should support two concrete shells sharing one typed shell
 contract:
 
-- `SingleStageInterpreter<L>`
+- `interpreter::SingleStage<L>`
 - `DynamicInterpreter`
 
 The goal is to let dialect operational semantics remain portable while still
@@ -14,9 +14,9 @@ supporting both:
 - fast, typed, stage-local execution
 - staged programs with cross-stage switching
 
-## `SingleStageInterpreter<L>`
+## `interpreter::SingleStage<L>`
 
-`SingleStageInterpreter<L>` is the typed execution shell for one language at
+`interpreter::SingleStage<L>` is the typed execution shell for one language at
 one stage.
 
 It should own one top-level machine for that stage along with:
@@ -29,12 +29,13 @@ It should own one top-level machine for that stage along with:
 It should implement the typed shell traits directly:
 
 - `Interpreter<'ir>`
+- `interpreter::Position<'ir>`
+- `interpreter::Driver<'ir>`
 - `ValueStore`
 - `StageAccess<'ir>`
-- typed effect inspection and consumption APIs
-- driver APIs such as `step`, `run`, and `run_until_break`
-- optional sibling driver-control traits like `FuelControl`,
-  `BreakpointControl`, and `InterruptControl`
+- typed effect inspection and consumption APIs from `Interpreter<'ir>`
+- typed driver-control traits like `control::Fuel`, `control::Breakpoints`,
+  and `control::Interrupt`
 
 It is the preferred shell for:
 
@@ -44,15 +45,14 @@ It is the preferred shell for:
 
 ### MVP Checkpoint
 
-The current `kirin-interpreter-2` implementation proves this shell shape in
-code, with one intentional narrowing:
+The current `kirin-interpreter-2` implementation now proves this shell shape in
+code:
 
-- `SingleStageInterpreter` owns `step()`, `run()`, and `run_until_break()` as
-  inherent methods for now
-
-The primitive semantic shell trait `Interpreter<'ir>` is implemented and used
-by the shell, but the convenience driver APIs have not yet been lifted into
-shared provided defaults on the trait itself.
+- `interpreter::SingleStage` implements `Interpreter<'ir>`
+- `interpreter::SingleStage` implements `interpreter::Position<'ir>`
+- `interpreter::SingleStage` implements `interpreter::Driver<'ir>`
+- the same method syntax still works at call sites once the relevant traits are
+  imported
 
 ## `DynamicInterpreter`
 
@@ -80,12 +80,18 @@ The dynamic shell owns:
 The dynamic shell is not itself the typed `Interpreter<'ir>` surface.
 Typed APIs remain on:
 
-- `SingleStageInterpreter<L>`
+- `interpreter::SingleStage<L>`
 - typed stage-specific views returned from `in_stage::<L>()`
 
-These typed stage views should implement the same `Interpreter<'ir>` contract
-as the single-stage shell, so dialect operational semantics can stay portable
-across both execution modes.
+These typed stage views should implement the same layered typed-shell traits as
+the single-stage shell when the underlying state supports them:
+
+- `Interpreter<'ir>`
+- `interpreter::Position<'ir>`
+- `interpreter::Driver<'ir>`
+
+This keeps dialect operational semantics portable while leaving stage-dynamic
+orchestration on the outer shell.
 
 ## Dynamic Stage Store
 
@@ -97,7 +103,7 @@ The important storage rule is still the same:
 - `StageStore` stores whole stage-local interpreter shells, not raw
   machine/value fragments
 
-This means each stage entry stores a full `SingleStageInterpreter<L>`-like
+This means each stage entry stores a full `interpreter::SingleStage<L>`-like
 typed execution unit, including:
 
 - stage-local machine state
@@ -265,25 +271,35 @@ This yields the public split:
   - `step()`
   - `run()`
   - `run_until_break()`
-- typed stage-specific APIs
-  - `interpret_current()`
-  - `interpret_local(stmt)`
-  - `interpret_lifted(stmt)`
-  - `consume_local_effect(effect)`
-  - `consume_lifted_effect(effect)`
-  - `consume_effect(effect)`
-  - `consume_local_control(control)`
-  - `consume_control(control)`
-  - `step()`
+- typed stage-specific trait layers
+  - `Interpreter<'ir>`
+    - `interpret_current()`
+    - `interpret_local(stmt)`
+    - `interpret_lifted(stmt)`
+    - `consume_local_effect(effect)`
+    - `consume_lifted_effect(effect)`
+    - `consume_effect(effect)`
+    - `consume_local_control(control)`
+    - `consume_control(control)`
+  - `interpreter::Position<'ir>`
+    - `current_block()`
+    - `current_statement()`
+    - `current_location()`
+    - `cursor_depth()`
+  - `interpreter::Driver<'ir>`
+    - `step()`
+    - `run()`
+    - `run_until_break()`
 
-The typed effect/value APIs belong on `SingleStageInterpreter<L>` and on typed
+The typed effect/value APIs belong on `interpreter::SingleStage<L>` and on typed
 stage handles, not on the dynamic shell.
 
-## Typed Step APIs
+## Typed Driver APIs
 
-The typed stepping surface should support both low-level and convenience forms.
+The typed stepping surface should be split into semantic, observational, and
+driver layers.
 
-Low-level:
+Semantic shell APIs stay on `Interpreter<'ir>`:
 
 - `interpret_current()`
 - `interpret_local(stmt)`
@@ -294,14 +310,23 @@ Low-level:
 - `consume_local_control(control)`
 - `consume_control(control)`
 
-Convenience:
+Read-only execution inspection belongs on `interpreter::Position<'ir>`:
+
+- `current_block()`
+- `current_statement()`
+- `current_location()`
+- `cursor_depth()`
+
+Driver convenience belongs on `interpreter::Driver<'ir>`:
 
 - `step()`
+- `run()`
+- `run_until_break()`
 
-`step()` should return `StepOutcome`:
+`interpreter::Driver::step()` should return `result::Step`:
 
-- `Stepped(StepResult { effect, control })`
-- `Suspended(SuspendReason)`
+- `Stepped(Stepped { effect, control })`
+- `Suspended(Suspension)`
 - `Completed`
 
 This keeps typed execution useful for fine-grained testing and debugging while
@@ -309,14 +334,16 @@ still behaving like a driver API.
 
 The default implementation story should be:
 
-- `step()` is a conditional provided default when the returned effect/control
-  artifacts are cloneable
-- `run()` and `run_until_break()` are provided defaults that loop directly over
-  the shell primitives and do not inherit `step()` clone bounds
+- `step()` is a conditional provided default on `interpreter::Driver<'ir>` when
+  the returned effect/control artifacts are cloneable
+- `run()` and `run_until_break()` are provided defaults on
+  `interpreter::Driver<'ir>` that loop directly over the shell primitives and
+  do not inherit `step()` clone bounds
 
 The current MVP implementation narrows this slightly:
 
-- `SingleStageInterpreter` provides these driver methods directly
+- `interpreter::SingleStage` already implements the shared position and driver
+  traits directly
 - `run_until_break()` is currently the same implementation as `run()`, because
   the single-stage shell already stops on any suspension reason
 
@@ -352,34 +379,38 @@ stage-specific views.
 
 Behavior differs by shell:
 
-- `SingleStageInterpreter<L>`
+- `interpreter::SingleStage<L>`
   returns a defined runtime error when a statement requests stage switching
 - `DynamicInterpreter`
   executes the switch through the stage-boundary protocol
 
 This lets the same dialect semantics run on both shells:
 
-- same-stage semantics can be tested in `SingleStageInterpreter<L>`
+- same-stage semantics can be tested in `interpreter::SingleStage<L>`
 - cross-stage semantics can be exercised in `DynamicInterpreter`
 
 ## Driver Control Traits
 
 Fuel and breakpoints should remain separate sibling traits rather than
-supertraits of `Interpreter<'ir>`.
+being folded into `Interpreter<'ir>`.
 
 The intended layering is:
 
 - `Interpreter<'ir>`
   typed semantic shell
-- `FuelControl`
+- `interpreter::Position<'ir>`
+  typed execution-position inspection
+- `interpreter::Driver<'ir>`
+  typed stepping surface over shells that also expose control state
+- `control::Fuel`
   shell fuel policy
-- `BreakpointControl`
+- `control::Breakpoints`
   shell breakpoint management
-- `InterruptControl`
+- `control::Interrupt`
   shell host-interrupt policy
 
-This keeps the main typed shell trait focused while still exposing the driver
-controls on concrete shells and typed views that support them.
+This keeps the semantic shell trait focused while still exposing the driver
+surface on concrete shells and typed views that support it.
 
 These controls are shell state, not semantic machine state:
 
@@ -419,5 +450,25 @@ The shell-policy split should be explicit:
 - driver APIs (`step`, `run`, `run_until_break`) apply that suspension policy
 
 The current single-stage shell also keeps a small internal post-step
-checkpoint so `ExecutionLocation::AfterStatement(_)` remains observable for
+checkpoint so `control::Location::AfterStatement(_)` remains observable for
 breakpoints without widening the public machine semantics API.
+
+## Downstream Dialect Semantics
+
+Ordinary `Interpretable` authors should continue to see only the semantic shell
+contract:
+
+- `I: Interpreter<'ir>`
+
+They should not need:
+
+- `interpreter::Position<'ir>`
+- `interpreter::Driver<'ir>`
+- `control::Fuel`
+- `control::Breakpoints`
+- `control::Interrupt`
+
+Those traits are for shell authors, typed stage-view authors, tests, and
+debugging tools. If a dialect genuinely needs extra interpreter capability, it
+should ask for a narrow opt-in helper trait on that specific impl rather than
+widening the base `Interpretable` contract.

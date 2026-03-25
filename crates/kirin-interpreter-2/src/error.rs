@@ -1,4 +1,4 @@
-use kirin_ir::{CompileStage, SSAValue};
+use kirin_ir::{CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction};
 
 /// Detailed reason for a stage-resolution failure.
 #[derive(Debug, thiserror::Error)]
@@ -7,6 +7,21 @@ pub enum StageResolutionError {
     MissingStage,
     #[error("stage does not contain the requested dialect")]
     TypeMismatch,
+    #[error("unknown target: {name}")]
+    UnknownTarget { name: String },
+    #[error("missing function: {function:?}")]
+    MissingFunction { function: Function },
+    #[error("missing callee specialization info: {callee:?}")]
+    MissingCallee { callee: SpecializedFunction },
+    #[error("no live specialization for staged function: {staged_function:?}")]
+    NoSpecialization { staged_function: StagedFunction },
+    #[error(
+        "ambiguous specialization for staged function {staged_function:?}: {count} live matches"
+    )]
+    AmbiguousSpecialization {
+        staged_function: StagedFunction,
+        count: usize,
+    },
 }
 
 /// Detailed reason for a missing-entry failure.

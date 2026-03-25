@@ -2,14 +2,15 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
-use kirin_ir::{CompileStage, HasArguments, Pipeline, StageInfo};
+use kirin_ir::{CompileStage, HasArguments, Pipeline, StageInfo, Statement};
 use kirin_test_languages::CompositeLanguage;
 use kirin_test_utils::ir_fixtures::{build_add_one, build_linear_program, build_select_program};
 
 use crate::{
-    Breakpoint, BreakpointControl, ConsumeEffect, Control, ExecutionLocation, FuelControl,
-    Interpretable, InterpreterError, InterruptControl, Machine, RunResult, SingleStageInterpreter,
-    StepOutcome, SuspendReason, ValueStore,
+    ConsumeEffect, Interpretable, InterpreterError, Machine, ValueStore,
+    control::{Breakpoint, Breakpoints, Fuel, Interrupt, Location, Shell},
+    interpreter::{Driver, Position, SingleStage, StepResult},
+    result::{Run, Step, Suspension},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -30,17 +31,40 @@ impl<'ir> Machine<'ir> for TestMachine {
 impl<'ir> ConsumeEffect<'ir> for TestMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Control<Self::Stop>, Self::Error> {
+    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
         Ok(match effect {
-            TestEffect::Advance => Control::Advance,
-            TestEffect::Replace(block) => Control::Replace(block.into()),
-            TestEffect::Return(value) => Control::Stop(value),
+            TestEffect::Advance => Shell::Advance,
+            TestEffect::Replace(block) => Shell::Replace(block.into()),
+            TestEffect::Return(value) => Shell::Stop(value),
         })
     }
 }
 
 type TestInterp<'ir> =
-    SingleStageInterpreter<'ir, CompositeLanguage, ArithValue, TestMachine, InterpreterError>;
+    SingleStage<'ir, CompositeLanguage, ArithValue, TestMachine, InterpreterError>;
+
+fn current_statement_via_position<'ir, I>(interp: &I) -> Option<Statement>
+where
+    I: Position<'ir>,
+{
+    interp.current_statement()
+}
+
+fn current_location_via_position<'ir, I>(interp: &I) -> Option<Location>
+where
+    I: Position<'ir>,
+{
+    interp.current_location()
+}
+
+fn step_via_driver<'ir, I>(interp: &mut I) -> StepResult<'ir, I>
+where
+    I: Driver<'ir>,
+    <I::Machine as Machine<'ir>>::Effect: Clone,
+    Shell<<I::Machine as Machine<'ir>>::Stop>: Clone,
+{
+    interp.step()
+}
 
 fn unsupported(message: &'static str) -> InterpreterError {
     InterpreterError::custom(std::io::Error::other(message))
@@ -179,7 +203,7 @@ fn run_linear_program_returns_sum() {
     let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
     let result = interp.run_specialization(spec_fn, &[]).unwrap();
 
-    assert_eq!(result, RunResult::Stopped(ArithValue::I64(15)));
+    assert_eq!(result, Run::Stopped(ArithValue::I64(15)));
 }
 
 #[test]
@@ -193,7 +217,7 @@ fn run_add_one_binds_entry_args() {
         .run_specialization(spec_fn, &[ArithValue::I64(5)])
         .unwrap();
 
-    assert_eq!(result, RunResult::Stopped(ArithValue::I64(6)));
+    assert_eq!(result, Run::Stopped(ArithValue::I64(6)));
 }
 
 #[test]
@@ -206,12 +230,12 @@ fn run_select_program_handles_cfg_replace() {
     let truthy = interp
         .run_specialization(spec_fn, &[ArithValue::I64(7)])
         .unwrap();
-    assert_eq!(truthy, RunResult::Stopped(ArithValue::I64(8)));
+    assert_eq!(truthy, Run::Stopped(ArithValue::I64(8)));
 
     let falsy = interp
         .run_specialization(spec_fn, &[ArithValue::I64(0)])
         .unwrap();
-    assert_eq!(falsy, RunResult::Stopped(ArithValue::I64(42)));
+    assert_eq!(falsy, Run::Stopped(ArithValue::I64(42)));
 }
 
 #[test]
@@ -223,11 +247,11 @@ fn step_reports_last_statement_before_completion() {
     let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
     interp.start_specialization(spec_fn, &[]).unwrap();
 
-    assert!(matches!(interp.step().unwrap(), StepOutcome::Stepped(_)));
-    assert!(matches!(interp.step().unwrap(), StepOutcome::Stepped(_)));
-    assert!(matches!(interp.step().unwrap(), StepOutcome::Stepped(_)));
-    assert!(matches!(interp.step().unwrap(), StepOutcome::Stepped(_)));
-    assert!(matches!(interp.step().unwrap(), StepOutcome::Completed));
+    assert!(matches!(interp.step().unwrap(), Step::Stepped(_)));
+    assert!(matches!(interp.step().unwrap(), Step::Stepped(_)));
+    assert!(matches!(interp.step().unwrap(), Step::Stepped(_)));
+    assert!(matches!(interp.step().unwrap(), Step::Stepped(_)));
+    assert!(matches!(interp.step().unwrap(), Step::Completed));
 }
 
 #[test]
@@ -242,10 +266,46 @@ fn zero_fuel_suspends_before_first_statement() {
     let outcome = interp.step().unwrap();
     assert!(matches!(
         outcome,
-        StepOutcome::Suspended(SuspendReason::FuelExhausted)
+        Step::Suspended(Suspension::FuelExhausted)
     ));
     assert_eq!(interp.fuel(), Some(0));
     assert!(interp.current_statement().is_some());
+}
+
+#[test]
+fn position_trait_reads_single_stage_location() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
+    interp.start_specialization(spec_fn, &[]).unwrap();
+
+    let first = current_statement_via_position(&interp).unwrap();
+
+    assert_eq!(
+        current_location_via_position(&interp),
+        Some(Location::BeforeStatement(first))
+    );
+}
+
+#[test]
+fn driver_trait_steps_single_stage() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
+    interp.start_specialization(spec_fn, &[]).unwrap();
+    let first = current_statement_via_position(&interp).unwrap();
+
+    let outcome = step_via_driver(&mut interp).unwrap();
+
+    assert!(matches!(outcome, Step::Stepped(_)));
+    assert_eq!(
+        current_location_via_position(&interp),
+        Some(Location::AfterStatement(first))
+    );
 }
 
 #[test]
@@ -257,11 +317,11 @@ fn burning_last_fuel_unit_still_steps_once() {
     let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine).with_fuel(1);
     interp.start_specialization(spec_fn, &[]).unwrap();
 
-    assert!(matches!(interp.step().unwrap(), StepOutcome::Stepped(_)));
+    assert!(matches!(interp.step().unwrap(), Step::Stepped(_)));
     assert_eq!(interp.fuel(), Some(0));
     assert!(matches!(
         interp.step().unwrap(),
-        StepOutcome::Suspended(SuspendReason::FuelExhausted)
+        Step::Suspended(Suspension::FuelExhausted)
     ));
 }
 
@@ -276,7 +336,7 @@ fn run_suspends_when_fuel_runs_out() {
         .run_specialization(spec_fn, &[ArithValue::I64(5)])
         .unwrap();
 
-    assert_eq!(result, RunResult::Suspended(SuspendReason::FuelExhausted));
+    assert_eq!(result, Run::Suspended(Suspension::FuelExhausted));
 }
 
 #[test]
@@ -288,12 +348,12 @@ fn breakpoint_before_first_statement_suspends_immediately() {
     let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine).with_fuel(1);
     interp.start_specialization(spec_fn, &[]).unwrap();
     let first = interp.current_statement().unwrap();
-    let breakpoint = Breakpoint::new(stage_id, ExecutionLocation::BeforeStatement(first));
+    let breakpoint = Breakpoint::new(stage_id, Location::BeforeStatement(first));
     assert!(interp.add_breakpoint(breakpoint));
 
     let outcome = interp.step().unwrap();
 
-    assert_eq!(outcome, StepOutcome::Suspended(SuspendReason::Breakpoint));
+    assert_eq!(outcome, Step::Suspended(Suspension::Breakpoint));
     assert_eq!(interp.fuel(), Some(1));
     assert_eq!(interp.current_statement(), Some(first));
 }
@@ -307,14 +367,11 @@ fn breakpoint_wins_over_zero_fuel() {
     let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine).with_fuel(0);
     interp.start_specialization(spec_fn, &[]).unwrap();
     let first = interp.current_statement().unwrap();
-    interp.add_breakpoint(Breakpoint::new(
-        stage_id,
-        ExecutionLocation::BeforeStatement(first),
-    ));
+    interp.add_breakpoint(Breakpoint::new(stage_id, Location::BeforeStatement(first)));
 
     let outcome = interp.step().unwrap();
 
-    assert_eq!(outcome, StepOutcome::Suspended(SuspendReason::Breakpoint));
+    assert_eq!(outcome, Step::Suspended(Suspension::Breakpoint));
     assert_eq!(interp.fuel(), Some(0));
 }
 
@@ -328,15 +385,12 @@ fn after_statement_breakpoint_suspends_before_next_execution() {
     interp.start_specialization(spec_fn, &[]).unwrap();
     let first = interp.current_statement().unwrap();
 
-    assert!(matches!(interp.step().unwrap(), StepOutcome::Stepped(_)));
-    interp.add_breakpoint(Breakpoint::new(
-        stage_id,
-        ExecutionLocation::AfterStatement(first),
-    ));
+    assert!(matches!(interp.step().unwrap(), Step::Stepped(_)));
+    interp.add_breakpoint(Breakpoint::new(stage_id, Location::AfterStatement(first)));
 
     let outcome = interp.step().unwrap();
 
-    assert_eq!(outcome, StepOutcome::Suspended(SuspendReason::Breakpoint));
+    assert_eq!(outcome, Step::Suspended(Suspension::Breakpoint));
     assert_eq!(interp.fuel(), Some(2));
 }
 
@@ -349,14 +403,11 @@ fn run_until_break_suspends_at_current_breakpoint() {
     let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
     interp.start_specialization(spec_fn, &[]).unwrap();
     let first = interp.current_statement().unwrap();
-    interp.add_breakpoint(Breakpoint::new(
-        stage_id,
-        ExecutionLocation::BeforeStatement(first),
-    ));
+    interp.add_breakpoint(Breakpoint::new(stage_id, Location::BeforeStatement(first)));
 
     let result = interp.run_until_break().unwrap();
 
-    assert_eq!(result, RunResult::Suspended(SuspendReason::Breakpoint));
+    assert_eq!(result, Run::Suspended(Suspension::Breakpoint));
     assert_eq!(interp.current_statement(), Some(first));
 }
 
@@ -372,10 +423,7 @@ fn host_interrupt_suspends_before_execution() {
 
     let outcome = interp.step().unwrap();
 
-    assert_eq!(
-        outcome,
-        StepOutcome::Suspended(SuspendReason::HostInterrupt)
-    );
+    assert_eq!(outcome, Step::Suspended(Suspension::HostInterrupt));
     assert_eq!(interp.fuel(), Some(1));
     assert!(interp.current_statement().is_some());
 }
@@ -389,15 +437,12 @@ fn breakpoint_wins_over_host_interrupt() {
     let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
     interp.start_specialization(spec_fn, &[]).unwrap();
     let first = interp.current_statement().unwrap();
-    interp.add_breakpoint(Breakpoint::new(
-        stage_id,
-        ExecutionLocation::BeforeStatement(first),
-    ));
+    interp.add_breakpoint(Breakpoint::new(stage_id, Location::BeforeStatement(first)));
     interp.request_interrupt();
 
     let outcome = interp.step().unwrap();
 
-    assert_eq!(outcome, StepOutcome::Suspended(SuspendReason::Breakpoint));
+    assert_eq!(outcome, Step::Suspended(Suspension::Breakpoint));
 }
 
 #[test]
@@ -412,14 +457,14 @@ fn interrupt_is_level_triggered_until_cleared() {
 
     assert_eq!(
         interp.step().unwrap(),
-        StepOutcome::Suspended(SuspendReason::HostInterrupt)
+        Step::Suspended(Suspension::HostInterrupt)
     );
     assert_eq!(
         interp.step().unwrap(),
-        StepOutcome::Suspended(SuspendReason::HostInterrupt)
+        Step::Suspended(Suspension::HostInterrupt)
     );
 
     interp.clear_interrupt();
 
-    assert!(matches!(interp.step().unwrap(), StepOutcome::Stepped(_)));
+    assert!(matches!(interp.step().unwrap(), Step::Stepped(_)));
 }

@@ -1,6 +1,6 @@
 use kirin_ir::{ResultValue, SSAValue};
 
-use crate::InterpreterError;
+use crate::{InterpreterError, ProductValue};
 
 /// Typed SSA read/write storage used by stage-local shells.
 pub trait ValueStore {
@@ -37,5 +37,28 @@ pub trait ValueStore {
         }
 
         Ok(())
+    }
+
+    fn write_product(
+        &mut self,
+        results: &[ResultValue],
+        value: Self::Value,
+    ) -> Result<(), Self::Error>
+    where
+        Self::Value: ProductValue,
+        Self::Error: From<InterpreterError>,
+    {
+        match results.len() {
+            0 => Ok(()),
+            1 => self.write(SSAValue::from(results[0]), value),
+            _ => {
+                for (index, result) in results.iter().enumerate() {
+                    let element = ProductValue::get(&value, index).map_err(Self::Error::from)?;
+                    self.write(SSAValue::from(*result), element)?;
+                }
+
+                Ok(())
+            }
+        }
     }
 }

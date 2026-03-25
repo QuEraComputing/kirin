@@ -15,6 +15,20 @@ impl BlockCursor {
         }
     }
 
+    pub(crate) fn at_statement(block: Block, statement: Statement) -> Self {
+        Self {
+            block,
+            current: Some(statement),
+        }
+    }
+
+    pub(crate) fn exhausted(block: Block) -> Self {
+        Self {
+            block,
+            current: None,
+        }
+    }
+
     pub(crate) fn block(&self) -> Block {
         self.block
     }

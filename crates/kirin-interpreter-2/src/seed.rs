@@ -1,18 +1,59 @@
-use kirin_ir::{Block, DiGraph, Region, UnGraph};
+use kirin_ir::{Block, DiGraph, Region, Statement, UnGraph};
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum BlockStart {
+    Entry,
+    Statement(Statement),
+    Exhausted,
+}
 
 /// Public shell seed for entering block-local execution.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct BlockSeed {
     block: Block,
+    start: BlockStart,
 }
 
 impl BlockSeed {
     pub fn new(block: Block) -> Self {
-        Self { block }
+        Self {
+            block,
+            start: BlockStart::Entry,
+        }
+    }
+
+    pub fn at_statement(block: Block, statement: Statement) -> Self {
+        Self {
+            block,
+            start: BlockStart::Statement(statement),
+        }
+    }
+
+    pub fn exhausted(block: Block) -> Self {
+        Self {
+            block,
+            start: BlockStart::Exhausted,
+        }
     }
 
     pub fn block(self) -> Block {
         self.block
+    }
+
+    pub(crate) fn start(self) -> Option<Statement> {
+        match self.start {
+            BlockStart::Entry => None,
+            BlockStart::Statement(statement) => Some(statement),
+            BlockStart::Exhausted => None,
+        }
+    }
+
+    pub(crate) fn starts_at_entry(self) -> bool {
+        matches!(self.start, BlockStart::Entry)
+    }
+
+    pub(crate) fn is_exhausted(self) -> bool {
+        matches!(self.start, BlockStart::Exhausted)
     }
 }
 

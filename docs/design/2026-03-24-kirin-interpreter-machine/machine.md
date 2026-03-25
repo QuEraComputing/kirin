@@ -12,11 +12,9 @@ interpreter shell.
 
 An `Interpreter<'ir>` is the typed shell over one top-level machine. It owns:
 
-- the internal cursor stack
-- current execution location
+- top-level machine access
 - control consumption
-- step and run driver loops
-- shell-level suspension policy such as breakpoints and fuel
+- typed interpret and effect-consumption APIs
 
 The shell does not define language semantics such as:
 
@@ -28,6 +26,11 @@ The shell does not define language semantics such as:
 - product packing or unpacking policy
 
 Those stay on dialect-defined machine types and effect types.
+
+Concrete shells and typed stage views may additionally expose:
+
+- `interpreter::Position<'ir>` for read-only cursor inspection
+- `interpreter::Driver<'ir>` for step/run loops and suspension policy
 
 ## Semantic Machine Traits
 
@@ -67,7 +70,7 @@ trait ConsumeEffect<'ir>: Machine<'ir> {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Control<Self::Stop>, Self::Error>;
+    ) -> Result<Shell<Self::Stop>, Self::Error>;
 }
 ```
 
@@ -76,6 +79,8 @@ Both traits stay minimal:
 - no projection bounds are baked into the traits
 - no lifting bounds are baked into the traits
 - local behavior owns its own local error type
+- downstream dialect authors implementing `Interpretable` only depend on
+  `Interpreter<'ir>`, not on driver or position traits
 
 Those bounds are added only on the interpreter forwarding helpers or on
 individual impl blocks that need them.
@@ -158,7 +163,7 @@ The important symmetry is:
 The shell-facing control language is:
 
 ```rust
-enum Control<Stop> {
+enum Shell<Stop> {
     Advance,
     Stay,
     Push(ExecutionSeed),
@@ -183,14 +188,14 @@ Meaning:
 - `Stop(stop)`
   Stop execution for a semantic reason defined by the top-level machine.
 
-`Control<Stop>` is a plain public enum. The invariants live in
-`ExecutionSeed`, not in `Control` itself.
+`control::Shell<Stop>` is a plain public enum. The invariants live in
+`ExecutionSeed`, not in `Shell` itself.
 
-`Control` should provide one small helper:
+`Shell` should provide one small helper:
 
 ```rust
-impl<S> Control<S> {
-    fn map_stop<T>(self, f: impl FnOnce(S) -> T) -> Control<T>;
+impl<S> Shell<S> {
+    fn map_stop<T>(self, f: impl FnOnce(S) -> T) -> Shell<T>;
 }
 ```
 
@@ -228,7 +233,7 @@ consistency checks after applying it.
 The shell keeps full cursors internal. Public code constructs execution seeds.
 
 Seeds are strictly intra-stage. Cross-stage execution is a separate interpreter
-capability and is never encoded in `Control`.
+capability and is never encoded in `Shell`.
 
 The public seed surface should be:
 
@@ -252,7 +257,7 @@ These seed types should be public but use private fields and constructor
 helpers. CFG seeds can stay simple. Graph seeds may need richer entry payloads.
 
 The framework may later extend this surface with branch fan-out support, but v1
-keeps `Control` single-seed.
+keeps `Shell` single-seed.
 
 ### MVP Checkpoint
 
@@ -289,11 +294,11 @@ trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     fn consume_effect(
         &mut self,
         effect: <Self::Machine as Machine<'ir>>::Effect,
-    ) -> Result<Control<<Self::Machine as Machine<'ir>>::Stop>, Self::Error>;
+    ) -> Result<Shell<<Self::Machine as Machine<'ir>>::Stop>, Self::Error>;
 
     fn consume_control(
         &mut self,
-        control: Control<<Self::Machine as Machine<'ir>>::Stop>,
+        control: Shell<<Self::Machine as Machine<'ir>>::Stop>,
     ) -> Result<(), Self::Error>;
 }
 ```
@@ -305,12 +310,16 @@ trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
 - interpret APIs
 - effect-consumption APIs
 - control-consumption APIs
-- `step`
-- `run`
-- `run_until_break`
 
-Fuel and breakpoints stay on separate sibling traits rather than becoming
-supertraits of `Interpreter<'ir>`.
+It should not require:
+
+- current execution location
+- cursor-depth inspection
+- driver loops
+- breakpoint, fuel, or interrupt policy
+
+Fuel and breakpoints stay on separate public traits rather than becoming part
+of `Interpreter<'ir>` itself.
 
 The required primitive shell methods are:
 
@@ -367,6 +376,104 @@ where
 }
 ```
 
+## Position Trait
+
+Typed shells and typed stage views should share one small read-only cursor
+inspection trait:
+
+```rust
+trait Position<'ir>: StageAccess<'ir> {
+    fn cursor_depth(&self) -> usize;
+    fn current_block(&self) -> Option<Block>;
+    fn current_statement(&self) -> Option<Statement>;
+    fn current_location(&self) -> Option<Location>;
+}
+```
+
+The intent is:
+
+- `current_statement()`
+  the statement that would execute next if execution proceeds immediately
+- `current_location()`
+  the breakpoint-facing location, including post-step
+  `Location::AfterStatement(_)` checkpoints
+- `current_block()` and `cursor_depth()`
+  read-only structural inspection for tests, tooling, and typed stage views
+
+`Position<'ir>` is not a semantic dependency of `Interpretable`. It is a
+shell/view observation trait.
+
+## Driver Trait
+
+The high-level stepping surface should live in a second layered trait rather
+than on `Interpreter<'ir>` directly:
+
+```rust
+trait Driver<'ir>:
+    Interpreter<'ir>
+    + Position<'ir>
+    + control::Fuel
+    + control::Breakpoints
+    + control::Interrupt
+{
+    fn poll_execution_gate(
+        &mut self,
+    ) -> Result<Option<Statement>, Suspension>;
+
+    fn stop_pending(&self) -> bool;
+
+    fn take_stop(
+        &mut self,
+    ) -> Option<<Self::Machine as Machine<'ir>>::Stop>;
+
+    fn finish_step(&mut self, statement: Statement);
+
+    fn step(
+        &mut self,
+    ) -> Result<
+        Step<
+            <Self::Machine as Machine<'ir>>::Effect,
+            <Self::Machine as Machine<'ir>>::Stop,
+        >,
+        Self::Error,
+    >
+    where
+        <Self::Machine as Machine<'ir>>::Effect: Clone,
+        Shell<<Self::Machine as Machine<'ir>>::Stop>: Clone;
+
+    fn run(
+        &mut self,
+    ) -> Result<Run<<Self::Machine as Machine<'ir>>::Stop>, Self::Error>;
+
+    fn run_until_break(
+        &mut self,
+    ) -> Result<Run<<Self::Machine as Machine<'ir>>::Stop>, Self::Error>;
+}
+```
+
+Only the shell-facing hooks are required. `step()`, `run()`, and
+`run_until_break()` are intended to be provided defaults layered on top of
+those hooks plus the `Interpreter<'ir>` primitives.
+
+The required hooks stay small and shell-facing:
+
+- `poll_execution_gate()`
+  resolves the next executable statement while applying suspension policy and
+  clearing any stale post-step checkpoint
+- `stop_pending()` / `take_stop()`
+  expose the shell's latched semantic stop slot
+- `finish_step(statement)`
+  records post-step state such as `Location::AfterStatement(statement)` when no
+  semantic stop was latched
+
+This is the right boundary for the current roadmap:
+
+- `interpreter::SingleStage<L>` already has inherent equivalents for these
+  hooks
+- future typed stage views can forward the same hooks into shared dynamic-shell
+  state
+- ordinary dialect semantics stay on `Interpreter<'ir>` alone
+
 ## Driver Control Traits
 
 Fuel and breakpoints are shell-driver concerns. They are not part of
@@ -376,19 +483,19 @@ machine state.
 The intended control traits are:
 
 ```rust
-trait BreakpointControl {
+trait Breakpoints {
     fn add_breakpoint(&mut self, breakpoint: Breakpoint) -> bool;
     fn remove_breakpoint(&mut self, breakpoint: &Breakpoint) -> bool;
     fn has_breakpoint(&self, breakpoint: &Breakpoint) -> bool;
 }
 
-trait FuelControl {
+trait Fuel {
     fn fuel(&self) -> Option<u64>;
     fn set_fuel(&mut self, fuel: Option<u64>);
     fn add_fuel(&mut self, fuel: u64);
 }
 
-trait InterruptControl {
+trait Interrupt {
     fn request_interrupt(&mut self);
     fn clear_interrupt(&mut self);
     fn interrupt_requested(&self) -> bool;
@@ -410,6 +517,9 @@ These traits should be implemented on:
 
 - typed interpreters and typed stage views
 - the stage-dynamic shell
+
+`interpreter::Driver<'ir>` may inherit these traits, but `Interpreter<'ir>`
+should not.
 
 For the dynamic shell:
 
@@ -436,17 +546,17 @@ Consume:
 
 - `consume_local_effect(effect)`
   Consumes a submachine effect against only the projected submachine and returns
-  `Control<Sub::Stop>`.
+  `Shell<Sub::Stop>`.
 - `consume_lifted_effect(effect)`
   Lifts a local effect into the top-level machine effect and consumes it as the
   full machine.
 - `consume_effect(effect)`
-  Consumes a top-level machine effect and returns `Control<I::Machine::Stop>`.
+  Consumes a top-level machine effect and returns `Shell<I::Machine::Stop>`.
 
-Control:
+Shell:
 
 - `consume_local_control(control)`
-  Convenience helper. Lifts `Control<Sub::Stop>` into top-level control and
+  Convenience helper. Lifts `Shell<Sub::Stop>` into top-level control and
   forwards to `consume_control`.
 - `consume_control(control)`
   Consumes shell control against the interpreter shell itself.
@@ -474,7 +584,7 @@ where
 fn consume_local_effect<Sub: Machine<'ir> + ConsumeEffect<'ir>>(
     &mut self,
     effect: <Sub as Machine<'ir>>::Effect,
-) -> Result<Control<<Sub as Machine<'ir>>::Stop>, Self::Error>
+) -> Result<Shell<<Sub as Machine<'ir>>::Stop>, Self::Error>
 where
     Self::Machine: ProjectMachineMut<Sub>,
     <Sub as ConsumeEffect<'ir>>::Error: Into<Self::Error>;
@@ -482,14 +592,14 @@ where
 fn consume_lifted_effect<Sub: Machine<'ir>>(
     &mut self,
     effect: <Sub as Machine<'ir>>::Effect,
-) -> Result<Control<<Self::Machine as Machine<'ir>>::Stop>, Self::Error>
+) -> Result<Shell<<Self::Machine as Machine<'ir>>::Stop>, Self::Error>
 where
     Self::Machine: LiftEffect<'ir, Sub>,
     <Self::Machine as ConsumeEffect<'ir>>::Error: Into<Self::Error>;
 
 fn consume_local_control<Sub: Machine<'ir>>(
     &mut self,
-    control: Control<<Sub as Machine<'ir>>::Stop>,
+    control: Shell<<Sub as Machine<'ir>>::Stop>,
 ) -> Result<(), Self::Error>
 where
     Self::Machine: LiftStop<'ir, Sub>;
@@ -534,37 +644,37 @@ their own local error types.
 The driver-level result types should be:
 
 ```rust
-struct StepResult<E, S> {
+struct Stepped<E, S> {
     effect: E,
-    control: Control<S>,
+    control: Shell<S>,
 }
 ```
 
 ```rust
-enum StepOutcome<E, S> {
-    Stepped(StepResult<E, S>),
-    Suspended(SuspendReason),
+enum Step<E, S> {
+    Stepped(Stepped<E, S>),
+    Suspended(Suspension),
     Completed,
 }
 ```
 
 ```rust
-enum RunResult<S> {
+enum Run<S> {
     Stopped(S),
-    Suspended(SuspendReason),
+    Suspended(Suspension),
     Completed,
 }
 ```
 
 ```rust
-enum SuspendReason {
+enum Suspension {
     Breakpoint,
     FuelExhausted,
     HostInterrupt,
 }
 ```
 
-`step()` is a driver-style API:
+`Driver::step()` is a driver-style API:
 
 - `Completed` when there is no current statement
 - `Suspended(...)` for shell-level suspension
@@ -573,11 +683,11 @@ enum SuspendReason {
 `interpret_current()` is lower-level and errors if there is no current
 statement.
 
-`step()` should be a provided method when the artifacts it returns are
+`Driver::step()` should be a provided method when the artifacts it returns are
 cloneable. The clean condition is:
 
 - `<Self::Machine as Machine<'ir>>::Effect: Clone`
-- `Control<<Self::Machine as Machine<'ir>>::Stop>: Clone`
+- `Shell<<Self::Machine as Machine<'ir>>::Stop>: Clone`
 
 That default can:
 
@@ -586,13 +696,13 @@ That default can:
 3. consume the resulting top-level effect
 4. clone the effect/control it needs to return
 5. consume the control on the shell
-6. return `StepOutcome::Stepped(...)`
+6. return `Step::Stepped(...)`
 
-Concrete shells may override this path if they want a cheaper move-based
-implementation.
+Concrete shells and typed stage views may override this path if they want a
+cheaper move-based implementation.
 
-`run()` and `run_until_break()` should also be provided defaults, but they
-should loop directly over:
+`Driver::run()` and `Driver::run_until_break()` should also be provided
+defaults, but they should loop directly over:
 
 - `interpret_current`
 - `consume_effect`
@@ -601,7 +711,7 @@ should loop directly over:
 rather than depending on `step()`. This avoids inheriting the clone bounds of
 the default `step()`.
 
-`run_until_break()` should:
+`Driver::run_until_break()` should:
 
 - return `Suspended(Breakpoint)` immediately if a breakpoint is already active
   at the current stage/location
@@ -621,15 +731,15 @@ Fuel should be decremented only for successful statement execution:
 - one fully executed statement burns one fuel unit
 
 If the last statement executes and leaves the cursor stack empty, that call to
-`step()` should still return `Stepped(...)`. `Completed` means no statement
-executed because execution was already exhausted.
+`Driver::step()` should still return `Stepped(...)`. `Completed` means no
+statement executed because execution was already exhausted.
 
 ## Breakpoints And Locations
 
 The public execution-location surface stays statement-oriented:
 
 ```rust
-enum ExecutionLocation {
+enum Location {
     BeforeStatement(Statement),
     AfterStatement(Statement),
 }
@@ -640,12 +750,12 @@ Dynamic breakpoints are keyed by:
 - stage
 - execution location
 
-`BreakpointControl` should work over a dedicated value object:
+`control::Breakpoints` should work over a dedicated value object:
 
 ```rust
 struct Breakpoint {
     stage: CompileStage,
-    location: ExecutionLocation,
+    location: Location,
 }
 ```
 
@@ -689,12 +799,12 @@ stacks without forcing one framework-wide frame model.
 
 ## Step Lifecycle
 
-The common lifted shell cycle is:
+The common lifted driver cycle is:
 
 1. resolve the current statement from the top cursor
 2. interpret it into the top-level machine effect
 3. consume that effect through the top-level machine
-4. obtain `Control<I::Machine::Stop>`
+4. obtain `Shell<I::Machine::Stop>`
 5. consume that control on the interpreter shell
 
 The local testing path uses the same phases with local effects and local

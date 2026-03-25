@@ -22,6 +22,16 @@ composition.
 The existing `#[interpret(...)]` namespace remains the right home for
 interpreter-derive configuration.
 
+`Interpretable` remains the semantic-only downstream contract:
+
+- the generated impl should depend on `I: Interpreter<'ir>`
+- it should not require `I: interpreter::Position<'ir>`
+- it should not require `I: interpreter::Driver<'ir>`
+- it should not require control traits such as `control::Fuel`
+
+Driver and position APIs are for shell authors, typed stage views, and tooling,
+not for ordinary dialect semantics.
+
 Under the machine design, `#[derive(Interpretable)]` should always require an
 explicit machine binding:
 

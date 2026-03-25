@@ -29,7 +29,7 @@ Build a single-stage concrete interpreter that proves:
 
 - the `Machine<'ir>` / `ConsumeEffect<'ir>` split
 - the typed `Interpreter<'ir>` shell contract
-- the shell-facing `Control<Stop>` model
+- the shell-facing `control::Shell<Stop>` model
 - the basic step/run driver loop
 - the machine-composition seam needed for later growth
 
@@ -122,18 +122,18 @@ until they are reused elsewhere.
   - `Machine<'ir>`
   - `Interpretable<'ir, I>`
   - `ConsumeEffect<'ir>`
-  - `Control<Stop>`
-  - `StepResult`
-  - `StepOutcome`
-  - `RunResult`
-  - `SuspendReason`
+  - `control::Shell<Stop>`
+  - `result::Stepped`
+  - `result::Step`
+  - `result::Run`
+  - `result::Suspension`
 - keep `Machine<'ir>` thin:
   - `type Effect`
   - `type Stop`
 - define and document that `Interpretable::Machine` is the statement's local
   semantic machine vocabulary, not the family-selected top-level shell machine
 - keep `ConsumeEffect<'ir>` separate with its own `Error`
-- add `Control::map_stop`
+- add `Shell::map_stop`
 
 **Exit Criteria:**
 
@@ -151,7 +151,7 @@ until they are reused elsewhere.
 
 **Scope:**
 
-- introduce a minimal `SingleStageInterpreter` for one stage/language
+- introduce a minimal `interpreter::SingleStage` for one stage/language
 - give it:
   - pipeline reference
   - active/root `CompileStage`
@@ -216,7 +216,7 @@ until they are reused elsewhere.
 
 - one statement can be interpreted and advanced through the new shell
 - `run()` and `run_until_break()` exercise the same primitive pipeline
-- the shell returns `StepOutcome` and `RunResult` as designed
+- the shell returns `result::Step` and `result::Run` as designed
 - the first execution tests pass against:
   - `build_linear_program`
   - `build_add_one`
@@ -269,9 +269,9 @@ until they are reused elsewhere.
 **Scope:**
 
 - add sibling driver-control traits:
-  - `FuelControl`
-  - `BreakpointControl`
-  - `InterruptControl`
+  - `control::Fuel`
+  - `control::Breakpoints`
+  - `control::Interrupt`
 - implement the agreed suspension policy on the single-stage shell:
   - breakpoint before fuel before host interrupt
 - make `step()` available as:
@@ -362,7 +362,7 @@ of this MVP plan.
   - region
   - digraph
   - ungraph
-- `SingleStageInterpreter` owns the driver convenience methods directly:
+- `interpreter::SingleStage` owns the driver convenience methods directly:
   - `step()`
   - `run()`
   - `run_until_break()`
@@ -376,7 +376,7 @@ of this MVP plan.
   - `AfterStatement`
   through an internal post-step checkpoint
 - the current CFG branch semantics used in the MVP tests bind target block
-  arguments during `interpret(...)` before returning `Control::Replace(...)`
+  arguments during `interpret(...)` before returning `Shell::Replace(...)`
   this is a working MVP choice, not a settled framework-wide rule
 
 ## Guardrails
@@ -404,7 +404,7 @@ of this MVP plan.
 ### Risk 1: The single-stage shell can harden the wrong trait boundary
 
 The current implementation keeps `step()`, `run()`, and `run_until_break()` on
-`SingleStageInterpreter` rather than lifting them into shared provided defaults
+`interpreter::SingleStage` rather than lifting them into shared provided defaults
 on `Interpreter<'ir>`.
 
 Mitigation:
@@ -416,7 +416,7 @@ Mitigation:
 ### Risk 2: CFG branch binding can fossilize in the wrong layer
 
 The current MVP test semantics bind block arguments during `interpret(...)`
-before returning `Control::Replace(...)`.
+before returning `Shell::Replace(...)`.
 
 Mitigation:
 

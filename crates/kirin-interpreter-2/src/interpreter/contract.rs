@@ -1,6 +1,6 @@
 use crate::{
-    ConsumeEffect, Control, Interpretable, LiftEffect, LiftStop, Machine, ProjectMachine,
-    ProjectMachineMut, StageAccess, ValueStore,
+    ConsumeEffect, Interpretable, LiftEffect, LiftStop, Machine, ProjectMachine, ProjectMachineMut,
+    StageAccess, ValueStore, control::Shell,
 };
 
 /// Typed single-stage shell contract over one top-level machine.
@@ -18,11 +18,11 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     fn consume_effect(
         &mut self,
         effect: <Self::Machine as Machine<'ir>>::Effect,
-    ) -> Result<Control<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>;
+    ) -> Result<Shell<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>;
 
     fn consume_control(
         &mut self,
-        control: Control<<Self::Machine as Machine<'ir>>::Stop>,
+        control: Shell<<Self::Machine as Machine<'ir>>::Stop>,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error>;
 
     fn project_machine<'a, Sub: ?Sized>(&'a self) -> &'a Sub
@@ -94,7 +94,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     fn consume_local_effect<Sub>(
         &mut self,
         effect: <Sub as Machine<'ir>>::Effect,
-    ) -> Result<Control<<Sub as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
+    ) -> Result<Shell<<Sub as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
     where
         Self: Sized,
         Sub: Machine<'ir> + ConsumeEffect<'ir>,
@@ -109,7 +109,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     fn consume_lifted_effect<Sub: Machine<'ir>>(
         &mut self,
         effect: <Sub as Machine<'ir>>::Effect,
-    ) -> Result<Control<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
+    ) -> Result<Shell<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
     where
         Self: Sized,
         Self::Machine: LiftEffect<'ir, Sub>,
@@ -119,7 +119,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
 
     fn consume_local_control<Sub: Machine<'ir>>(
         &mut self,
-        control: Control<<Sub as Machine<'ir>>::Stop>,
+        control: Shell<<Sub as Machine<'ir>>::Stop>,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error>
     where
         Self: Sized,

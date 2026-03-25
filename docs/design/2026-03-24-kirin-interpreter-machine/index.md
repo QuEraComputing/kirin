@@ -33,10 +33,12 @@ The implemented part currently covers:
 
 - `Machine<'ir>` / `ConsumeEffect<'ir>`
 - the primitive `Interpreter<'ir>` shell contract
-- `SingleStageInterpreter`
+- `interpreter::SingleStage`
+- `interpreter::Position<'ir>`
+- `interpreter::Driver<'ir>`
 - a closed internal cursor stack over block/region/digraph/ungraph execution
 - local vs lifted machine helpers
-- `Control<Stop>`, `StepOutcome`, and `RunResult`
+- `control::Shell<Stop>`, `result::Step`, and `result::Run`
 - shell-owned fuel, breakpoint, and interrupt controls
 
 The dynamic-shell, family-relative storage, and stage-boundary sections in this
@@ -48,15 +50,20 @@ design folder remain design-only and intentionally deferred.
 - `Machine<'ir>` owns associated `Effect` and `Stop` types.
 - effects are consumed by a separate `ConsumeEffect<'ir>` trait on machine
   types.
-- `Interpreter<'ir>` is the typed shell trait over one top-level machine.
+- `Interpreter<'ir>` is the semantic typed shell trait over one top-level
+  machine.
+- `interpreter::Position<'ir>` is the read-only execution-position trait for
+  typed shells and typed stage views.
+- `interpreter::Driver<'ir>` layers `step`, `run`, and `run_until_break` over
+  shells and typed stage views that expose position plus driver-control state.
 - `ConsumeEffect` mutates machine-owned semantic state and returns shell-facing
-  `Control<Stop>`.
-- the shell manages an internal cursor stack and consumes `Control`.
+  `control::Shell<Stop>`.
+- the shell manages an internal cursor stack and consumes `Shell`.
 - the framework defines public execution seeds, but keeps full cursors internal.
 - there are two interpreter shells:
-  - `SingleStageInterpreter<L>`
+  - `interpreter::SingleStage<L>`
   - `DynamicInterpreter`
-- `SingleStageInterpreter<L>` exposes typed value/effect/machine APIs.
+- `interpreter::SingleStage<L>` exposes typed value/effect/machine APIs.
 - `DynamicInterpreter` orchestrates a heterogeneous set of single-stage
   interpreters and does not expose raw typed effect/value APIs directly.
 - machine and shell selection are family-relative:
@@ -64,9 +71,14 @@ design folder remain design-only and intentionally deferred.
   - the chosen single-stage interpreter family maps that dialect to a shell and
     machine type
 - typed shells expose both local and lifted interpret/consume APIs.
-- driver APIs use `StepOutcome` and `RunResult`.
+- typed shells and typed stage views share the same `Interpreter<'ir>` core,
+  with `Position<'ir>` and `Driver<'ir>` layered on top when available.
+- downstream `Interpretable` authors stay bound only to `Interpreter<'ir>`;
+  they do not need `Driver<'ir>` or `Position<'ir>` for ordinary dialect
+  semantics.
+- driver APIs use `result::Step` and `result::Run`.
 - stage switching is a public capability on both shells:
-  - `SingleStageInterpreter<L>` errors when switching is requested
+  - `interpreter::SingleStage<L>` errors when switching is requested
   - `DynamicInterpreter` executes stage switches through stage-boundary
     protocols
 
@@ -75,7 +87,7 @@ design folder remain design-only and intentionally deferred.
 - [machine.md](machine.md)
   Machine responsibilities, public traits, seeds, actions, and step lifecycle.
 - [interpreter-shells.md](interpreter-shells.md)
-  `SingleStageInterpreter<L>` and `DynamicInterpreter`.
+  `interpreter::SingleStage<L>` and `DynamicInterpreter`.
 - [state-and-effects.md](state-and-effects.md)
   Dialect-defined state, effect composition, projection traits, and testing
   implications.

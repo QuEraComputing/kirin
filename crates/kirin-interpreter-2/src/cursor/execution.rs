@@ -17,7 +17,14 @@ pub(crate) enum ExecutionCursor {
 impl ExecutionCursor {
     pub(crate) fn from_seed<L: Dialect>(stage: &StageInfo<L>, seed: ExecutionSeed) -> Self {
         match seed {
-            ExecutionSeed::Block(seed) => Self::Block(BlockCursor::new(stage, seed.block())),
+            ExecutionSeed::Block(seed) => {
+                Self::Block(match (seed.starts_at_entry(), seed.start()) {
+                    (true, _) => BlockCursor::new(stage, seed.block()),
+                    (false, Some(statement)) => BlockCursor::at_statement(seed.block(), statement),
+                    (false, None) if seed.is_exhausted() => BlockCursor::exhausted(seed.block()),
+                    _ => BlockCursor::new(stage, seed.block()),
+                })
+            }
             ExecutionSeed::Region(seed) => Self::Region(RegionCursor::new(stage, seed.region())),
             ExecutionSeed::DiGraph(seed) => {
                 Self::DiGraph(DiGraphCursor::new(stage, seed.digraph()))

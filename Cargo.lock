@@ -729,6 +729,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "kirin-interpreter-2",
 ]
 
 [[package]]
@@ -746,6 +747,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "kirin-interpreter-2",
  "kirin-test-types",
  "smallvec",
 ]
@@ -783,6 +785,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "kirin-interpreter-2",
 ]
 
 [[package]]
@@ -856,7 +859,11 @@ name = "kirin-function"
 version = "0.1.0"
 dependencies = [
  "kirin",
+ "kirin-arith",
+ "kirin-cf",
+ "kirin-constant",
  "kirin-interpreter",
+ "kirin-interpreter-2",
  "kirin-test-types",
  "smallvec",
 ]
@@ -893,6 +900,7 @@ dependencies = [
  "kirin-test-languages",
  "kirin-test-utils",
  "rustc-hash",
+ "smallvec",
  "thiserror 2.0.18",
 ]
 

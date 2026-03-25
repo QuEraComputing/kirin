@@ -24,6 +24,8 @@
 
 use kirin::prelude::*;
 
+pub mod interpreter2;
+
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[non_exhaustive]
 #[kirin(terminator, builders, type = T)]

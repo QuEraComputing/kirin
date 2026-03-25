@@ -3,8 +3,10 @@ use kirin_constant::Constant;
 use kirin_ir::{CompileStage, Pipeline, StageInfo, TestSSAValue};
 
 use crate::{
-    ConsumeEffect, Control, Interpretable, Interpreter, InterpreterError, LiftEffect, LiftStop,
-    Machine, ProjectMachine, ProjectMachineMut, SingleStageInterpreter,
+    ConsumeEffect, Interpretable, Interpreter, InterpreterError, LiftEffect, LiftStop, Machine,
+    ProjectMachine, ProjectMachineMut,
+    control::Shell,
+    interpreter::{Position, SingleStage},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, kirin_ir::Dialect)]
@@ -37,11 +39,11 @@ impl<'ir> Machine<'ir> for LeafMachine {
 impl<'ir> ConsumeEffect<'ir> for LeafMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Control<Self::Stop>, Self::Error> {
+    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
         match effect {
             LeafEffect::Record(value) => {
                 self.seen.push(value);
-                Ok(Control::Stop(LeafStop::Stored))
+                Ok(Shell::Stop(LeafStop::Stored))
             }
         }
     }
@@ -71,7 +73,7 @@ impl<'ir> Machine<'ir> for CompositeMachine {
 impl<'ir> ConsumeEffect<'ir> for CompositeMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Control<Self::Stop>, Self::Error> {
+    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
         match effect {
             CompositeEffect::Leaf(effect) => self
                 .leaf
@@ -106,7 +108,7 @@ impl<'ir> LiftStop<'ir, LeafMachine> for CompositeMachine {
 }
 
 type LiftInterp<'ir> =
-    SingleStageInterpreter<'ir, LiftLanguage, ArithValue, CompositeMachine, InterpreterError>;
+    SingleStage<'ir, LiftLanguage, ArithValue, CompositeMachine, InterpreterError>;
 
 impl<'ir> Interpretable<'ir, LiftInterp<'ir>> for Constant<ArithValue, ArithType> {
     type Machine = LeafMachine;
@@ -180,7 +182,7 @@ fn consume_local_effect_mutates_only_projected_submachine() {
         .consume_local_effect::<LeafMachine>(LeafEffect::Record(ArithValue::I64(3)))
         .unwrap();
 
-    assert_eq!(control, Control::Stop(LeafStop::Stored));
+    assert_eq!(control, Shell::Stop(LeafStop::Stored));
     assert_eq!(
         interp.project_machine::<LeafMachine>().seen,
         vec![ArithValue::I64(3)]
@@ -199,10 +201,7 @@ fn consume_lifted_effect_returns_top_level_control() {
         .consume_lifted_effect::<LeafMachine>(LeafEffect::Record(ArithValue::I64(4)))
         .unwrap();
 
-    assert_eq!(
-        control,
-        Control::Stop(CompositeStop::Leaf(LeafStop::Stored))
-    );
+    assert_eq!(control, Shell::Stop(CompositeStop::Leaf(LeafStop::Stored)));
     assert_eq!(
         interp.project_machine::<LeafMachine>().seen,
         vec![ArithValue::I64(4)]
@@ -221,7 +220,7 @@ fn consume_local_control_lifts_stop_and_applies_shell_mutation() {
     interp.push_block(block);
 
     interp
-        .consume_local_control::<LeafMachine>(Control::Stop(LeafStop::Stored))
+        .consume_local_control::<LeafMachine>(Shell::Stop(LeafStop::Stored))
         .unwrap();
 
     assert_eq!(interp.cursor_depth(), 0);

@@ -1,5 +1,5 @@
 /// Shell-owned statement fuel control.
-pub trait FuelControl {
+pub trait Fuel {
     fn fuel(&self) -> Option<u64>;
 
     fn set_fuel(&mut self, fuel: Option<u64>);

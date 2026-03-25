@@ -2,7 +2,7 @@ use kirin_ir::{CompileStage, Statement};
 
 /// Public statement-oriented execution locations for shell breakpoints.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub enum ExecutionLocation {
+pub enum Location {
     BeforeStatement(Statement),
     AfterStatement(Statement),
 }
@@ -11,11 +11,11 @@ pub enum ExecutionLocation {
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub struct Breakpoint {
     stage: CompileStage,
-    location: ExecutionLocation,
+    location: Location,
 }
 
 impl Breakpoint {
-    pub const fn new(stage: CompileStage, location: ExecutionLocation) -> Self {
+    pub const fn new(stage: CompileStage, location: Location) -> Self {
         Self { stage, location }
     }
 
@@ -23,13 +23,13 @@ impl Breakpoint {
         self.stage
     }
 
-    pub const fn location(&self) -> ExecutionLocation {
+    pub const fn location(&self) -> Location {
         self.location
     }
 }
 
 /// Shell-owned breakpoint set management.
-pub trait BreakpointControl {
+pub trait Breakpoints {
     fn add_breakpoint(&mut self, breakpoint: Breakpoint) -> bool;
 
     fn remove_breakpoint(&mut self, breakpoint: &Breakpoint) -> bool;

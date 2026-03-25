@@ -6,15 +6,16 @@ use kirin_ir::{
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
+use super::{Driver, Interpreter, Position};
 use crate::{
-    Breakpoint, BreakpointControl, ConsumeEffect, Control, ExecutionLocation, ExecutionSeed,
-    FuelControl, Interpretable, Interpreter, InterpreterError, InterruptControl, Machine,
-    RunResult, StageAccess, StepOutcome, StepResult, SuspendReason, ValueStore,
+    BlockSeed, ConsumeEffect, ExecutionSeed, Interpretable, InterpreterError, Machine, StageAccess,
+    ValueStore,
+    control::{Breakpoint, Breakpoints, Fuel, Interrupt, Location, Shell},
     cursor::ExecutionCursor,
 };
 
 /// Minimal concrete single-stage shell for the new machine design.
-pub struct SingleStageInterpreter<'ir, L, V, M, E>
+pub struct SingleStage<'ir, L, V, M, E>
 where
     L: Dialect + 'ir,
     V: 'ir,
@@ -34,7 +35,7 @@ where
     _error: PhantomData<fn() -> E>,
 }
 
-impl<'ir, L, V, M, E> SingleStageInterpreter<'ir, L, V, M, E>
+impl<'ir, L, V, M, E> SingleStage<'ir, L, V, M, E>
 where
     L: Dialect + 'ir,
     V: 'ir,
@@ -89,39 +90,22 @@ where
             .expect("single-stage interpreter points at a missing stage")
     }
 
-    pub fn cursor_depth(&self) -> usize {
-        self.cursor_stack.len()
-    }
-
-    pub fn current_block(&self) -> Option<Block> {
-        self.cursor_stack
-            .last()
-            .and_then(ExecutionCursor::current_block)
-    }
-
-    pub fn current_statement(&self) -> Option<Statement> {
-        self.cursor_stack.last().and_then(ExecutionCursor::current)
-    }
-
-    pub fn current_location(&self) -> Option<ExecutionLocation> {
-        self.after_statement
-            .map(ExecutionLocation::AfterStatement)
-            .or_else(|| {
-                self.current_statement()
-                    .map(ExecutionLocation::BeforeStatement)
-            })
-    }
-
     pub fn last_stop(&self) -> Option<&<M as Machine<'ir>>::Stop> {
         self.last_stop.as_ref()
     }
 
-    pub fn take_stop(&mut self) -> Option<<M as Machine<'ir>>::Stop> {
-        self.last_stop.take()
-    }
-
     pub fn clear_values(&mut self) {
         self.values.clear();
+    }
+
+    pub fn take_value_bindings(&mut self) -> Vec<(SSAValue, V)> {
+        self.values.drain().collect()
+    }
+
+    pub fn replace_value_bindings(&mut self, bindings: Vec<(SSAValue, V)>) -> Vec<(SSAValue, V)> {
+        let current = self.take_value_bindings();
+        self.values.extend(bindings);
+        current
     }
 
     pub fn clear_cursor_stack(&mut self) {
@@ -129,44 +113,26 @@ where
         self.after_statement = None;
     }
 
+    pub fn resume_seed_after_current(&self) -> Result<ExecutionSeed, InterpreterError> {
+        let stage = self.stage_info();
+        let statement = self
+            .current_statement()
+            .ok_or(InterpreterError::NoCurrentStatement)?;
+        let block = self
+            .current_block()
+            .ok_or(InterpreterError::InvalidControl(
+                "current statement is not block-local",
+            ))?;
+        let next = (*statement.next(stage)).or_else(|| block.terminator(stage));
+
+        Ok(match next {
+            Some(statement) => BlockSeed::at_statement(block, statement).into(),
+            None => BlockSeed::exhausted(block).into(),
+        })
+    }
+
     fn clear_after_statement(&mut self) {
         self.after_statement = None;
-    }
-
-    fn burn_step_fuel(&mut self) {
-        if let Some(remaining) = self.fuel.as_mut() {
-            debug_assert!(*remaining > 0, "fuel must be checked before step burn");
-            *remaining -= 1;
-        }
-    }
-
-    fn poll_execution_gate(&mut self) -> Result<Option<Statement>, SuspendReason> {
-        loop {
-            let Some(location) = self.current_location() else {
-                return Ok(None);
-            };
-
-            if self.has_breakpoint(&Breakpoint::new(self.stage, location)) {
-                return Err(SuspendReason::Breakpoint);
-            }
-
-            match location {
-                ExecutionLocation::AfterStatement(_) => {
-                    self.clear_after_statement();
-                }
-                ExecutionLocation::BeforeStatement(statement) => {
-                    if matches!(self.fuel, Some(0)) {
-                        return Err(SuspendReason::FuelExhausted);
-                    }
-
-                    if self.interrupt_requested {
-                        return Err(SuspendReason::HostInterrupt);
-                    }
-
-                    return Ok(Some(statement));
-                }
-            }
-        }
     }
 
     pub fn push_block(&mut self, block: Block) {
@@ -256,11 +222,11 @@ where
 
     pub fn apply_control(
         &mut self,
-        control: Control<<M as Machine<'ir>>::Stop>,
+        control: Shell<<M as Machine<'ir>>::Stop>,
     ) -> Result<(), InterpreterError> {
         self.clear_after_statement();
         match control {
-            Control::Advance => {
+            Shell::Advance => {
                 let stage = self.stage_info();
                 let cursor =
                     self.cursor_stack
@@ -271,13 +237,13 @@ where
                 cursor.advance(stage);
                 Ok(())
             }
-            Control::Stay => Ok(()),
-            Control::Push(seed) => {
+            Shell::Stay => Ok(()),
+            Shell::Push(seed) => {
                 self.push_seed(seed);
                 Ok(())
             }
-            Control::Replace(seed) => self.replace_seed(seed),
-            Control::Pop => {
+            Shell::Replace(seed) => self.replace_seed(seed),
+            Shell::Pop => {
                 self.cursor_stack
                     .pop()
                     .map(|_| ())
@@ -285,7 +251,7 @@ where
                         "pop requires an active cursor",
                     ))
             }
-            Control::Stop(stop) => {
+            Shell::Stop(stop) => {
                 self.last_stop = Some(stop);
                 self.cursor_stack.clear();
                 Ok(())
@@ -293,77 +259,11 @@ where
         }
     }
 
-    pub fn step(
-        &mut self,
-    ) -> Result<StepOutcome<<M as Machine<'ir>>::Effect, <M as Machine<'ir>>::Stop>, E>
-    where
-        V: Clone,
-        M: ConsumeEffect<'ir, Error = E>,
-        <M as Machine<'ir>>::Effect: Clone,
-        Control<<M as Machine<'ir>>::Stop>: Clone,
-        L: Interpretable<'ir, Self, Machine = M, Error = E>,
-        E: From<InterpreterError>,
-    {
-        let statement = match self.poll_execution_gate() {
-            Ok(Some(statement)) => statement,
-            Ok(None) => return Ok(StepOutcome::Completed),
-            Err(reason) => return Ok(StepOutcome::Suspended(reason)),
-        };
-
-        let effect = <Self as Interpreter<'ir>>::interpret_current(self)?;
-        let control = <Self as Interpreter<'ir>>::consume_effect(self, effect.clone())?;
-        <Self as Interpreter<'ir>>::consume_control(self, control.clone())?;
-        self.burn_step_fuel();
-
-        if self.last_stop.is_none() {
-            self.after_statement = Some(statement);
-        }
-
-        Ok(StepOutcome::Stepped(StepResult::new(effect, control)))
-    }
-
-    pub fn run(&mut self) -> Result<RunResult<<M as Machine<'ir>>::Stop>, E>
-    where
-        V: Clone,
-        M: ConsumeEffect<'ir, Error = E>,
-        L: Interpretable<'ir, Self, Machine = M, Error = E>,
-        E: From<InterpreterError>,
-    {
-        loop {
-            let statement = match self.poll_execution_gate() {
-                Ok(Some(statement)) => statement,
-                Ok(None) => return Ok(RunResult::Completed),
-                Err(reason) => return Ok(RunResult::Suspended(reason)),
-            };
-
-            let effect = <Self as Interpreter<'ir>>::interpret_current(self)?;
-            let control = <Self as Interpreter<'ir>>::consume_effect(self, effect)?;
-            <Self as Interpreter<'ir>>::consume_control(self, control)?;
-            self.burn_step_fuel();
-
-            if let Some(stop) = self.take_stop() {
-                return Ok(RunResult::Stopped(stop));
-            }
-
-            self.after_statement = Some(statement);
-        }
-    }
-
-    pub fn run_until_break(&mut self) -> Result<RunResult<<M as Machine<'ir>>::Stop>, E>
-    where
-        V: Clone,
-        M: ConsumeEffect<'ir, Error = E>,
-        L: Interpretable<'ir, Self, Machine = M, Error = E>,
-        E: From<InterpreterError>,
-    {
-        self.run()
-    }
-
     pub fn run_specialization(
         &mut self,
         callee: SpecializedFunction,
         args: &[V],
-    ) -> Result<RunResult<<M as Machine<'ir>>::Stop>, E>
+    ) -> Result<crate::result::Run<<M as Machine<'ir>>::Stop>, E>
     where
         V: Clone,
         M: ConsumeEffect<'ir, Error = E>,
@@ -371,11 +271,11 @@ where
         E: From<InterpreterError>,
     {
         self.start_specialization(callee, args)?;
-        self.run()
+        <Self as Driver<'ir>>::run(self)
     }
 }
 
-impl<'ir, L, V, M, E> FuelControl for SingleStageInterpreter<'ir, L, V, M, E>
+impl<'ir, L, V, M, E> Fuel for SingleStage<'ir, L, V, M, E>
 where
     L: Dialect + 'ir,
     V: 'ir,
@@ -391,7 +291,7 @@ where
     }
 }
 
-impl<'ir, L, V, M, E> BreakpointControl for SingleStageInterpreter<'ir, L, V, M, E>
+impl<'ir, L, V, M, E> Breakpoints for SingleStage<'ir, L, V, M, E>
 where
     L: Dialect + 'ir,
     V: 'ir,
@@ -411,7 +311,7 @@ where
     }
 }
 
-impl<'ir, L, V, M, E> InterruptControl for SingleStageInterpreter<'ir, L, V, M, E>
+impl<'ir, L, V, M, E> Interrupt for SingleStage<'ir, L, V, M, E>
 where
     L: Dialect + 'ir,
     V: 'ir,
@@ -431,7 +331,35 @@ where
     }
 }
 
-impl<'ir, L, V, M, E> ValueStore for SingleStageInterpreter<'ir, L, V, M, E>
+impl<'ir, L, V, M, E> Position<'ir> for SingleStage<'ir, L, V, M, E>
+where
+    L: Dialect + 'ir,
+    V: 'ir,
+    M: Machine<'ir> + 'ir,
+    E: 'ir,
+{
+    fn cursor_depth(&self) -> usize {
+        self.cursor_stack.len()
+    }
+
+    fn current_block(&self) -> Option<Block> {
+        self.cursor_stack
+            .last()
+            .and_then(ExecutionCursor::current_block)
+    }
+
+    fn current_statement(&self) -> Option<Statement> {
+        self.cursor_stack.last().and_then(ExecutionCursor::current)
+    }
+
+    fn current_location(&self) -> Option<Location> {
+        self.after_statement
+            .map(Location::AfterStatement)
+            .or_else(|| self.current_statement().map(Location::BeforeStatement))
+    }
+}
+
+impl<'ir, L, V, M, E> ValueStore for SingleStage<'ir, L, V, M, E>
 where
     L: Dialect + 'ir,
     V: Clone + 'ir,
@@ -458,7 +386,7 @@ where
     }
 }
 
-impl<'ir, L, V, M, E> StageAccess<'ir> for SingleStageInterpreter<'ir, L, V, M, E>
+impl<'ir, L, V, M, E> StageAccess<'ir> for SingleStage<'ir, L, V, M, E>
 where
     L: Dialect + 'ir,
     V: 'ir,
@@ -476,13 +404,64 @@ where
     }
 }
 
-impl<'ir, L, V, M, E> Interpreter<'ir> for SingleStageInterpreter<'ir, L, V, M, E>
+impl<'ir, L, V, M, E> Driver<'ir> for SingleStage<'ir, L, V, M, E>
 where
-    L: Dialect + 'ir + Interpretable<'ir, SingleStageInterpreter<'ir, L, V, M, E>, Machine = M>,
+    L: Dialect + 'ir + Interpretable<'ir, SingleStage<'ir, L, V, M, E>, Machine = M>,
     V: Clone + 'ir,
     M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,
-    <L as Interpretable<'ir, SingleStageInterpreter<'ir, L, V, M, E>>>::Error: Into<E>,
+    <L as Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
+    <M as ConsumeEffect<'ir>>::Error: Into<E>,
+{
+    fn poll_execution_gate(&mut self) -> Result<Option<Statement>, crate::result::Suspension> {
+        loop {
+            let Some(location) = self.current_location() else {
+                return Ok(None);
+            };
+
+            if self.has_breakpoint(&Breakpoint::new(self.stage, location)) {
+                return Err(crate::result::Suspension::Breakpoint);
+            }
+
+            match location {
+                Location::AfterStatement(_) => {
+                    self.clear_after_statement();
+                }
+                Location::BeforeStatement(statement) => {
+                    if matches!(self.fuel, Some(0)) {
+                        return Err(crate::result::Suspension::FuelExhausted);
+                    }
+
+                    if self.interrupt_requested {
+                        return Err(crate::result::Suspension::HostInterrupt);
+                    }
+
+                    return Ok(Some(statement));
+                }
+            }
+        }
+    }
+
+    fn stop_pending(&self) -> bool {
+        self.last_stop.is_some()
+    }
+
+    fn take_stop(&mut self) -> Option<<Self::Machine as Machine<'ir>>::Stop> {
+        self.last_stop.take()
+    }
+
+    fn finish_step(&mut self, statement: Statement) {
+        self.after_statement = Some(statement);
+    }
+}
+
+impl<'ir, L, V, M, E> Interpreter<'ir> for SingleStage<'ir, L, V, M, E>
+where
+    L: Dialect + 'ir + Interpretable<'ir, SingleStage<'ir, L, V, M, E>, Machine = M>,
+    V: Clone + 'ir,
+    M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
+    E: From<InterpreterError> + 'ir,
+    <L as Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
 {
     type Machine = M;
@@ -511,14 +490,14 @@ where
     fn consume_effect(
         &mut self,
         effect: <Self::Machine as Machine<'ir>>::Effect,
-    ) -> Result<Control<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
+    ) -> Result<Shell<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
     {
         self.machine.consume_effect(effect).map_err(Into::into)
     }
 
     fn consume_control(
         &mut self,
-        control: Control<<Self::Machine as Machine<'ir>>::Stop>,
+        control: Shell<<Self::Machine as Machine<'ir>>::Stop>,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error> {
         self.apply_control(control).map_err(Into::into)
     }
@@ -526,8 +505,8 @@ where
 
 #[cfg(test)]
 mod tests {
-    use super::SingleStageInterpreter;
-    use crate::{Control, InterpreterError};
+    use super::SingleStage;
+    use crate::{InterpreterError, control::Shell, interpreter::Position};
     use kirin_ir::{CompileStage, GetInfo, Pipeline, StageInfo};
     use kirin_test_languages::CompositeLanguage;
     use kirin_test_utils::ir_fixtures::{build_linear_program, first_statement_of_specialization};
@@ -547,11 +526,8 @@ mod tests {
         let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
         let expected = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
-        let mut interp = SingleStageInterpreter::<_, i64, _, InterpreterError>::new(
-            &pipeline,
-            stage_id,
-            TestMachine,
-        );
+        let mut interp =
+            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
 
         interp.push_specialization(spec_fn).unwrap();
 
@@ -576,25 +552,22 @@ mod tests {
             block.terminator(stage)
         };
 
-        let mut interp = SingleStageInterpreter::<_, i64, _, InterpreterError>::new(
-            &pipeline,
-            stage_id,
-            TestMachine,
-        );
+        let mut interp =
+            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
         interp.push_specialization(spec_fn).unwrap();
 
         assert_eq!(interp.current_statement(), Some(first));
 
-        interp.apply_control(Control::Advance).unwrap();
+        interp.apply_control(Shell::Advance).unwrap();
         assert_eq!(interp.current_statement(), second);
 
-        interp.apply_control(Control::Advance).unwrap();
+        interp.apply_control(Shell::Advance).unwrap();
         assert_eq!(interp.current_statement(), third);
 
-        interp.apply_control(Control::Advance).unwrap();
+        interp.apply_control(Shell::Advance).unwrap();
         assert_eq!(interp.current_statement(), terminator);
 
-        interp.apply_control(Control::Advance).unwrap();
+        interp.apply_control(Shell::Advance).unwrap();
         assert_eq!(interp.current_statement(), None);
     }
 
@@ -604,14 +577,11 @@ mod tests {
         let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
         let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
 
-        let mut interp = SingleStageInterpreter::<_, i64, _, InterpreterError>::new(
-            &pipeline,
-            stage_id,
-            TestMachine,
-        );
+        let mut interp =
+            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
         interp.push_specialization(spec_fn).unwrap();
 
-        interp.apply_control(Control::Stop("done")).unwrap();
+        interp.apply_control(Shell::Stop("done")).unwrap();
 
         assert_eq!(interp.cursor_depth(), 0);
         assert_eq!(interp.last_stop(), Some(&"done"));
@@ -625,14 +595,11 @@ mod tests {
             .stage_mut(stage_id)
             .unwrap()
             .with_builder(|b| b.block().new());
-        let mut interp = SingleStageInterpreter::<_, i64, _, InterpreterError>::new(
-            &pipeline,
-            stage_id,
-            TestMachine,
-        );
+        let mut interp =
+            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
 
         let error = interp
-            .apply_control(Control::Replace(block.into()))
+            .apply_control(Shell::Replace(block.into()))
             .unwrap_err();
 
         assert!(matches!(
@@ -645,13 +612,10 @@ mod tests {
     fn pop_without_active_cursor_errors() {
         let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
         let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
-        let mut interp = SingleStageInterpreter::<_, i64, _, InterpreterError>::new(
-            &pipeline,
-            stage_id,
-            TestMachine,
-        );
+        let mut interp =
+            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
 
-        let error = interp.apply_control(Control::Pop).unwrap_err();
+        let error = interp.apply_control(Shell::Pop).unwrap_err();
 
         assert!(matches!(
             error,

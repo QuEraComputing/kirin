@@ -22,7 +22,7 @@ shell internals directly.
 The stage-switch capability should be shared by both shells through their typed
 stage-specific interpreter views:
 
-- `SingleStageInterpreter<L>`
+- `interpreter::SingleStage<L>`
   reports a defined runtime error such as missing target-stage context or stage
   switch unsupported
 - `DynamicInterpreter`
@@ -59,7 +59,7 @@ Its public contract should be caller-facing:
 enum StageBoundaryResult<R, S> {
     Returned(R),
     Trapped(S),
-    Suspended(SuspendReason),
+    Suspended(Suspension),
     Completed,
 }
 ```
@@ -129,22 +129,22 @@ enum BoundaryControl<R, Ret, Stop> {
     Continue(R),
     Return(Ret),
     Trap(Stop),
-    Suspend(SuspendReason),
+    Suspend(Suspension),
     Complete,
 }
 ```
 
-This is intentionally separate from shell `Control`.
+This is intentionally separate from shell `Shell`.
 
 The target-side outcome fed back into the resumable protocol should use one
 framework-defined generic enum rather than exposing raw target-shell
-`RunResult`:
+`Run`:
 
 ```rust
 enum TargetStageOutcome<R, S> {
     Returned(R),
     Trapped(S),
-    Suspended(SuspendReason),
+    Suspended(Suspension),
     Completed,
 }
 ```

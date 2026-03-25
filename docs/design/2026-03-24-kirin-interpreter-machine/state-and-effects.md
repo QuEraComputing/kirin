@@ -97,14 +97,14 @@ trait ConsumeEffect<'ir>: Machine<'ir> {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Control<Self::Stop>, Self::Error>;
+    ) -> Result<Shell<Self::Stop>, Self::Error>;
 }
 ```
 
 Machine effect consumption:
 
 - mutates machine-owned semantic state
-- returns shell-facing `Control<Self::Stop>`
+- returns shell-facing `Shell<Self::Stop>`
 
 This is the semantic-to-shell boundary.
 
@@ -169,9 +169,9 @@ Interpret:
 
 Consume:
 
-- `consume_local_effect(effect)` returns `Control<Sub::Stop>`
-- `consume_lifted_effect(effect)` returns `Control<I::Machine::Stop>`
-- `consume_effect(effect)` returns `Control<I::Machine::Stop>`
+- `consume_local_effect(effect)` returns `Shell<Sub::Stop>`
+- `consume_lifted_effect(effect)` returns `Shell<I::Machine::Stop>`
+- `consume_effect(effect)` returns `Shell<I::Machine::Stop>`
 
 This split is the core testing story:
 
