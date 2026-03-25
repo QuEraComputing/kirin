@@ -254,6 +254,17 @@ helpers. CFG seeds can stay simple. Graph seeds may need richer entry payloads.
 The framework may later extend this surface with branch fan-out support, but v1
 keeps `Control` single-seed.
 
+### MVP Checkpoint
+
+The current `kirin-interpreter-2` MVP narrows execution seeds to block
+execution only:
+
+- `ExecutionSeed::Block`
+- `BlockSeed`
+
+Region- and graph-shaped seeds remain design-only until the single-stage shell
+expands past the MVP.
+
 ## Interpreter Shell Trait
 
 The typed shell contract is:
@@ -638,6 +649,12 @@ In v1, breakpoints are plain value objects:
 - add by value
 - remove by value
 - query membership by value
+
+### MVP Checkpoint
+
+The implemented single-stage shell supports both `BeforeStatement` and
+`AfterStatement` breakpoints by keeping an internal post-step checkpoint
+between successful statement executions.
 
 The docs should explicitly distinguish:
 

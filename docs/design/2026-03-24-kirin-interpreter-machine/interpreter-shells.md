@@ -42,6 +42,18 @@ It is the preferred shell for:
 - programs known to remain within one stage
 - fast typed execution without dynamic stage-dispatch overhead
 
+### MVP Checkpoint
+
+The current `kirin-interpreter-2` implementation proves this shell shape in
+code, with one intentional narrowing:
+
+- `SingleStageInterpreter` owns `step()`, `run()`, and `run_until_break()` as
+  inherent methods for now
+
+The primitive semantic shell trait `Interpreter<'ir>` is implemented and used
+by the shell, but the convenience driver APIs have not yet been lifted into
+shared provided defaults on the trait itself.
+
 ## `DynamicInterpreter`
 
 `DynamicInterpreter` is the stage-dynamic orchestrator.
@@ -302,6 +314,12 @@ The default implementation story should be:
 - `run()` and `run_until_break()` are provided defaults that loop directly over
   the shell primitives and do not inherit `step()` clone bounds
 
+The current MVP implementation narrows this slightly:
+
+- `SingleStageInterpreter` provides these driver methods directly
+- `run_until_break()` is currently the same implementation as `run()`, because
+  the single-stage shell already stops on any suspension reason
+
 ## Dynamic Driver APIs
 
 The dynamic shell should keep the familiar high-level driver operations:
@@ -399,3 +417,7 @@ The shell-policy split should be explicit:
 
 - low-level typed semantic APIs ignore breakpoint, fuel, and interrupt policy
 - driver APIs (`step`, `run`, `run_until_break`) apply that suspension policy
+
+The current single-stage shell also keeps a small internal post-step
+checkpoint so `ExecutionLocation::AfterStatement(_)` remains observable for
+breakpoints without widening the public machine semantics API.

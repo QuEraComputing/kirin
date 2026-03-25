@@ -1,7 +1,7 @@
 # Kirin Interpreter Machine Design
 
 **Date:** 2026-03-24
-**Status:** alternative design direction
+**Status:** alternative design direction with single-stage MVP implemented
 **Primary crates:** `crates/kirin-interpreter-2`, `crates/kirin-derive-interpreter-2`
 
 ## Summary
@@ -23,6 +23,23 @@ The core idea is:
   dialect-specific logic
 
 This folder is intentionally additive. The earlier design docs remain unchanged.
+
+## MVP Checkpoint
+
+`crates/kirin-interpreter-2` now backs the single-stage portion of this design
+with a real implementation.
+
+The implemented part currently covers:
+
+- `Machine<'ir>` / `ConsumeEffect<'ir>`
+- the primitive `Interpreter<'ir>` shell contract
+- `SingleStageInterpreter`
+- local vs lifted machine helpers
+- `Control<Stop>`, `StepOutcome`, and `RunResult`
+- shell-owned fuel, breakpoint, and interrupt controls
+
+The dynamic-shell, family-relative storage, and stage-boundary sections in this
+design folder remain design-only and intentionally deferred.
 
 ## Key Decisions
 

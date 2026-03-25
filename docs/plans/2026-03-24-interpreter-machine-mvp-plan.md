@@ -1,7 +1,7 @@
 # Interpreter Machine MVP Plan
 
 **Date:** 2026-03-24
-**Status:** draft
+**Status:** implementation-backed through Wave 5
 **Primary crate:** `crates/kirin-interpreter-2`
 
 `crates/kirin-derive-interpreter-2` is explicitly post-MVP.
@@ -20,6 +20,55 @@ This first implementation should prove:
 - the machine-composition seam needed for later growth
 
 The MVP does **not** need to implement the full dynamic staged runtime.
+
+## MVP Checkpoint
+
+The current `kirin-interpreter-2` implementation has completed the first five
+waves of this plan:
+
+- core machine/control/result vocabulary
+- a typed single-stage shell
+- an end-to-end single-stage execution loop
+- local vs lifted machine helpers
+- shell-owned fuel, breakpoint, and interrupt controls
+
+The MVP has proven the single-stage machine mechanism in code, but it has also
+made a few intentional narrowing decisions that should be treated as current
+truth until a later expansion pass changes them.
+
+### Current Implementation Truth
+
+- `ExecutionSeed` is currently block-only in `kirin-interpreter-2`.
+- `SingleStageInterpreter` owns the driver convenience methods directly:
+  - `step()`
+  - `run()`
+  - `run_until_break()`
+- `Interpreter<'ir>` currently remains the primitive semantic shell trait with
+  forwarding helpers, not the full provided-default driver surface described in
+  the design notes.
+- `run_until_break()` is currently equivalent to `run()` because the MVP shell
+  already stops on all suspension reasons, including breakpoints.
+- shell breakpoints support both:
+  - `BeforeStatement`
+  - `AfterStatement`
+  through an internal post-step checkpoint in the single-stage shell.
+- the current CFG branch semantics used in the MVP tests bind target block
+  arguments during `interpret(...)` before returning `Control::Replace(...)`.
+  This is a working MVP choice, not a settled framework-wide rule.
+
+### Still Deferred After The MVP
+
+- lifting `step()` / `run()` / `run_until_break()` into `Interpreter<'ir>` as
+  shared provided defaults
+- widening execution seeds beyond block execution
+- revisiting whether block-argument binding belongs in statement interpretation
+  or in a higher-level helper boundary
+- `SingleStageFamily`
+- `StageStore`
+- `StageShellLayout`
+- `DynamicInterpreter`
+- stage-boundary execution
+- `crates/kirin-derive-interpreter-2`
 
 ## Why Start Here
 
