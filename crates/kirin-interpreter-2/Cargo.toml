@@ -1,0 +1,13 @@
+[package]
+name = "kirin-interpreter-2"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-ir = { workspace = true }
+rustc-hash = "2.1.1"
+thiserror = { workspace = true }
+
+[dev-dependencies]
+kirin-test-languages = { workspace = true, features = ["composite-language"] }
+kirin-test-utils = { workspace = true, features = ["interpreter"] }

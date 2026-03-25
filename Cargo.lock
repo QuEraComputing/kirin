@@ -882,6 +882,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-interpreter-2"
+version = "0.1.0"
+dependencies = [
+ "kirin-ir",
+ "kirin-test-languages",
+ "kirin-test-utils",
+ "rustc-hash",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "kirin-interval"
 version = "0.1.0"
 dependencies = [
