@@ -33,8 +33,8 @@ It should implement the typed shell traits directly:
 - `StageAccess<'ir>`
 - typed effect inspection and consumption APIs
 - driver APIs such as `step`, `run`, and `run_until_break`
-- optional sibling driver-control traits like `FuelControl` and
-  `BreakpointControl`
+- optional sibling driver-control traits like `FuelControl`,
+  `BreakpointControl`, and `InterruptControl`
 
 It is the preferred shell for:
 
@@ -74,6 +74,63 @@ Typed APIs remain on:
 These typed stage views should implement the same `Interpreter<'ir>` contract
 as the single-stage shell, so dialect operational semantics can stay portable
 across both execution modes.
+
+## Dynamic Stage Store
+
+`DynamicInterpreter` should be parameterized by a framework `StageStore`
+abstraction.
+
+The framework should provide:
+
+- a `StageStore` trait
+- a default erased heterogeneous implementation
+- room for custom user-provided store implementations
+
+`StageStore` should own:
+
+- typed stage-shell lookup
+- typed mutable stage-shell lookup
+- lazy stage-shell initialization
+
+It should not absorb unrelated policy such as stage-boundary adapter
+resolution.
+
+The important storage rule is that `StageStore` stores whole stage-local
+interpreter shells, not raw machine/value fragments.
+
+This means each stage entry stores a full `SingleStageInterpreter<L>`-like
+typed execution unit, including:
+
+- stage-local machine state
+- stage-local value store
+- stage-local cursor stack
+- typed `Interpreter<'ir>` behavior
+
+This avoids reconstructing typed interpreters out of raw parts every time the
+dynamic shell resolves `in_stage::<L>()`.
+
+## Dynamic Orchestration Stack
+
+Each stored stage-local shell owns its own cursor stack.
+
+Same-stage nesting remains entirely inside that stage-local shell.
+
+`DynamicInterpreter` should still own a separate lightweight orchestration
+stack, but only for cross-stage resumption.
+
+One orchestration frame should conceptually carry:
+
+- caller stage identity
+- target stage identity
+- boundary adapter resume payload
+
+This stack is not:
+
+- a dialect semantic call stack
+- a replacement for stage-local cursor stacks
+
+It is only the cross-stage continuation stack used to resume the caller-side
+boundary protocol after target-stage execution returns.
 
 ## Dynamic And Typed APIs
 
@@ -155,6 +212,12 @@ typed shell:
 - if the final statement runs, that call still counts as a step rather than a
   `Completed` no-op
 
+Cross-stage driver state should remain separate from stage-local execution
+state:
+
+- stage-local shells own same-stage execution and cursor progression
+- the dynamic shell owns only stage selection and cross-stage orchestration
+
 ## Stage-Switch Behavior
 
 Both shells should expose the same public stage-switch capability on their typed
@@ -196,7 +259,7 @@ These controls are shell state, not semantic machine state:
 - they do not belong in `Machine<'ir>` composition
 - they should not be projected through `ProjectMachine`
 
-For `DynamicInterpreter`, both traits operate on shared shell state:
+For `DynamicInterpreter`, these control traits operate on shared shell state:
 
 - one shared breakpoint set keyed by stage and execution location
 - one shared fuel counter

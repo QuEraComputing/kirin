@@ -95,6 +95,9 @@ trait StageBoundary<'ir, From, To> {
 }
 ```
 
+This high-level trait should be a provided/default convenience layer built on a
+lower-level resumable boundary protocol so the two views do not drift.
+
 Important properties of this shape:
 
 - `From` and `To` are explicit in the trait identity
@@ -109,6 +112,101 @@ Important properties of this shape:
 `Completed` remains in the boundary result because some boundary protocols may
 accept completion without explicit return, while others may treat it as an
 error. That policy belongs to the boundary adapter.
+
+## Resumable Boundary Protocol
+
+The primitive protocol should be a lower-level resumable trait that the dynamic
+shell can drive directly.
+
+The boundary layer should own its own control language:
+
+```rust
+enum BoundaryControl<R, Ret, Stop> {
+    Enter {
+        seed: ExecutionSeed,
+        resume: R,
+    },
+    Continue(R),
+    Return(Ret),
+    Trap(Stop),
+    Suspend(SuspendReason),
+    Complete,
+}
+```
+
+This is intentionally separate from shell `Control`.
+
+The target-side outcome fed back into the resumable protocol should use one
+framework-defined generic enum rather than exposing raw target-shell
+`RunResult`:
+
+```rust
+enum TargetStageOutcome<R, S> {
+    Returned(R),
+    Trapped(S),
+    Suspended(SuspendReason),
+    Completed,
+}
+```
+
+The lower-level trait should therefore look like:
+
+```rust
+trait ResumableStageBoundary<'ir, From, To> {
+    type Input;
+    type Return;
+    type Stop;
+    type Resume;
+    type TargetReturn;
+    type TargetStop;
+    type Error;
+
+    fn enter<CF, CT>(
+        &self,
+        caller: &mut CF,
+        caller_stage: &'ir StageInfo<From>,
+        target: &mut CT,
+        target_stage: &'ir StageInfo<To>,
+        seed: ExecutionSeed,
+        input: Self::Input,
+    ) -> Result<BoundaryControl<Self::Resume, Self::Return, Self::Stop>, Self::Error>
+    where
+        CF: Interpreter<'ir>,
+        CT: Interpreter<'ir>;
+
+    fn resume<CF, CT>(
+        &self,
+        caller: &mut CF,
+        caller_stage: &'ir StageInfo<From>,
+        target: &mut CT,
+        target_stage: &'ir StageInfo<To>,
+        resume: Self::Resume,
+        outcome: TargetStageOutcome<Self::TargetReturn, Self::TargetStop>,
+    ) -> Result<BoundaryControl<Self::Resume, Self::Return, Self::Stop>, Self::Error>
+    where
+        CF: Interpreter<'ir>,
+        CT: Interpreter<'ir>;
+}
+```
+
+The associated types now split into:
+
+- caller-facing payloads:
+  - `Input`
+  - `Return`
+  - `Stop`
+- resumable protocol payloads:
+  - `Resume`
+  - `TargetReturn`
+  - `TargetStop`
+- local boundary error:
+  - `Error`
+
+The dynamic shell should store `Resume` in its cross-stage orchestration stack,
+not borrowed shell handles.
+
+The high-level `StageBoundary::execute(...)` path should be the simple default
+interpretation of this resumable protocol.
 
 ## General And Callable-Specific Entry
 
@@ -163,6 +261,12 @@ directly. This keeps:
 - caller/target machine access explicit
 - value conversion statically typed
 - boundary logic testable independently from dynamic shell orchestration
+
+This also means the dynamic shell is orchestrating over:
+
+- whole stored stage-local shells
+- a separate cross-stage continuation stack
+- resumable boundary adapter values
 
 ## Same-Stage Rule
 
