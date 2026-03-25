@@ -1,17 +1,31 @@
-# Interpreter Machine MVP Plan
+# Interpreter Machine MVP — Phased Plan Index
 
 **Date:** 2026-03-24
-**Status:** implementation-backed through Wave 5
+**Design document:** `docs/design/2026-03-24-kirin-interpreter-machine/index.md`
+**Pattern:** additive new crate + single-stage MVP first
 **Primary crate:** `crates/kirin-interpreter-2`
+**Status:** single-stage MVP implemented through Wave 6 checkpoint
+
+---
+
+## Summary
+
+This plan builds a minimal but real single-stage concrete interpreter around
+the new machine design before any dynamic-shell work begins.
+
+The sequencing is intentional:
+
+1. prove the machine/effect/control split in one typed shell,
+2. validate the local-vs-lifted machine seam in code,
+3. harden shell driver controls on that baseline runtime, and
+4. only then revisit family-relative storage, dynamic staging, and new derive
+   support.
 
 `crates/kirin-derive-interpreter-2` is explicitly post-MVP.
 
 ## Goal
 
-Build a minimal but real single-stage concrete interpreter around the new
-machine design.
-
-This first implementation should prove:
+Build a single-stage concrete interpreter that proves:
 
 - the `Machine<'ir>` / `ConsumeEffect<'ir>` split
 - the typed `Interpreter<'ir>` shell contract
@@ -19,86 +33,31 @@ This first implementation should prove:
 - the basic step/run driver loop
 - the machine-composition seam needed for later growth
 
-The MVP does **not** need to implement the full dynamic staged runtime.
+The MVP does **not** include the full dynamic staged runtime.
 
-## MVP Checkpoint
+## Dependency Graph
 
-The current `kirin-interpreter-2` implementation has completed the first five
-waves of this plan:
-
-- core machine/control/result vocabulary
-- a typed single-stage shell
-- an end-to-end single-stage execution loop
-- local vs lifted machine helpers
-- shell-owned fuel, breakpoint, and interrupt controls
-
-The MVP has proven the single-stage machine mechanism in code, but it has also
-made a few intentional narrowing decisions that should be treated as current
-truth until a later expansion pass changes them.
-
-### Current Implementation Truth
-
-- `kirin-interpreter-2` now defines the full public seed family:
-  - `BlockSeed`
-  - `RegionSeed`
-  - `DiGraphSeed`
-  - `UnGraphSeed`
-- the single-stage shell now uses a closed internal cursor enum over:
-  - block
-  - region
-  - digraph
-  - ungraph
-- `SingleStageInterpreter` owns the driver convenience methods directly:
-  - `step()`
-  - `run()`
-  - `run_until_break()`
-- `Interpreter<'ir>` currently remains the primitive semantic shell trait with
-  forwarding helpers, not the full provided-default driver surface described in
-  the design notes.
-- `run_until_break()` is currently equivalent to `run()` because the MVP shell
-  already stops on all suspension reasons, including breakpoints.
-- shell breakpoints support both:
-  - `BeforeStatement`
-  - `AfterStatement`
-  through an internal post-step checkpoint in the single-stage shell.
-- the current CFG branch semantics used in the MVP tests bind target block
-  arguments during `interpret(...)` before returning `Control::Replace(...)`.
-  This is a working MVP choice, not a settled framework-wide rule.
-
-### Still Deferred After The MVP
-
-- lifting `step()` / `run()` / `run_until_break()` into `Interpreter<'ir>` as
-  shared provided defaults
-- revisiting whether block-argument binding belongs in statement interpretation
-  or in a higher-level helper boundary
-- `SingleStageFamily`
-- `StageStore`
-- `StageShellLayout`
-- `DynamicInterpreter`
-- stage-boundary execution
-- `crates/kirin-derive-interpreter-2`
-
-## Why Start Here
-
-The dynamic design now depends on family-relative storage and stage-entry
-derivation.
-
-Those pieces are easier to stabilize after we have a working typed shell with:
-
-- one concrete cursor model
-- one concrete value store
-- one machine/effect/control pipeline
-- real tests for local and lifted semantics
-
-The single-stage shell is the smallest implementation that still exercises the
-new machine mechanism honestly.
+```text
+wave-1 (core runtime vocabulary)
+   |
+wave-2 (typed single-stage shell skeleton)
+   |
+wave-3 (mvp execution loop)
+   |
+wave-4 (local vs lifted machine APIs)
+   |
+wave-5 (single-stage shell hardening)
+   |
+wave-6 (documentation + migration checkpoint)
+```
 
 ## Reference Reuse, Not Migration
 
-`crates/kirin-interpreter` is reference material, not the implementation target.
+`crates/kirin-interpreter` is reference material, not the implementation
+target.
 
-The best reuse sources for `crates/kirin-interpreter-2` are the low-level
-runtime substrate pieces:
+The most relevant reuse sources for `crates/kirin-interpreter-2` are the
+low-level runtime substrate pieces:
 
 - `value_store.rs`
   minimal SSA read/write contract
@@ -117,8 +76,7 @@ runtime substrate pieces:
 - `error.rs`
   baseline runtime error taxonomy
 
-The pieces that should **not** be transplanted into `kirin-interpreter-2`
-are:
+The pieces that should **not** be transplanted into `kirin-interpreter-2` are:
 
 - `Continuation`
 - `CallSemantics`
@@ -128,56 +86,38 @@ are:
 - `run_nested_calls`
 - any hidden product-value writeback policy copied from the old runtime
 
-## Guardrails
-
-- Keep the implementation stage-local.
-- Keep the shell control language separate from semantic machine effects.
-- Do not hardcode a global “machine per dialect” rule; machine choice must stay
-  compatible with later family-relative interpretation modes.
-- Prefer a small trait surface and a small working interpreter over premature
-  dynamic-shell abstractions.
-- It is acceptable to narrow some features for the MVP if the docs are updated
-  to record the temporary restriction.
-
-## Explicit Non-Goals
-
-- no `DynamicInterpreter`
-- no `StageStore`
-- no cross-stage boundary execution
-- no resumable boundary protocol
-- no `crates/kirin-derive-interpreter-2` work in the MVP
-- no v2 derive macros in the MVP; use manual impls in tests/examples
-- no attempt to preserve every detail of the old `StackInterpreter` API
-
 ## Testing Baseline
 
-The first test matrix should stay small and should reuse existing shared IR
-fixtures rather than inventing a new dialect universe.
-
-Preferred baseline:
+The initial fixture matrix should stay small and reuse shared IR fixtures:
 
 - `CompositeLanguage`
 - `build_add_one`
 - `build_linear_program`
 - `build_select_program`
 
-The first helpers worth adding to `kirin-test-utils`, if two crates need them,
-are:
+The first helpers worth promoting to `kirin-test-utils`, if reused outside this
+crate, are:
 
 - `entry_cursor`
 - `entry_block_args`
 - `push_entry_frame_with_args`
 
-Keep synthetic test-only dialects inline in `crates/kirin-interpreter-2` until
-they are reused elsewhere.
+Keep synthetic test-only dialects inline in `crates/kirin-interpreter-2`
+until they are reused elsewhere.
 
-## Wave 1: Core Runtime Vocabulary
+## Wave Structure
+
+### Wave 1: Core Runtime Vocabulary
+
+**Depends on:** nothing
+**Status:** implemented
+**Crate(s):** `crates/kirin-interpreter-2`
 
 **Goal:** establish the new semantic and shell primitives in code.
 
 **Scope:**
 
-- create the new crate skeleton for `crates/kirin-interpreter-2`
+- create the new crate skeleton
 - add the core traits and types:
   - `Machine<'ir>`
   - `Interpretable<'ir, I>`
@@ -195,13 +135,17 @@ they are reused elsewhere.
 - keep `ConsumeEffect<'ir>` separate with its own `Error`
 - add `Control::map_stop`
 
-**Success criteria:**
+**Exit Criteria:**
 
 - the new primitives compile in isolation
 - the result/control types are usable without any dynamic-stage machinery
 - the crate has a stable low-level module layout for later waves
 
-## Wave 2: Typed Single-Stage Shell Skeleton
+### Wave 2: Typed Single-Stage Shell Skeleton
+
+**Depends on:** Wave 1 complete
+**Status:** implemented
+**Crate(s):** `crates/kirin-interpreter-2`
 
 **Goal:** implement one concrete single-stage shell over one top-level machine.
 
@@ -232,12 +176,16 @@ they are reused elsewhere.
 - stage identity still uses `CompileStage` so the shell remains compatible with
   later dynamic orchestration
 
-**Success criteria:**
+**Exit Criteria:**
 
 - a single-stage interpreter can be constructed against `Pipeline<StageInfo<L>>`
 - typed shell methods compile and can be called from tests
 
-## Wave 3: MVP Execution Loop
+### Wave 3: MVP Execution Loop
+
+**Depends on:** Wave 2 complete
+**Status:** implemented
+**Crate(s):** `crates/kirin-interpreter-2`
 
 **Goal:** make the shell execute statements end-to-end.
 
@@ -264,7 +212,7 @@ they are reused elsewhere.
 - if the MVP narrows execution seeds or cursor kinds, update the design docs to
   record the temporary restriction
 
-**Success criteria:**
+**Exit Criteria:**
 
 - one statement can be interpreted and advanced through the new shell
 - `run()` and `run_until_break()` exercise the same primitive pipeline
@@ -274,7 +222,11 @@ they are reused elsewhere.
   - `build_add_one`
   - `build_select_program`
 
-## Wave 4: Local vs Lifted Machine APIs
+### Wave 4: Local vs Lifted Machine APIs
+
+**Depends on:** Wave 3 complete
+**Status:** implemented
+**Crate(s):** `crates/kirin-interpreter-2`
 
 **Goal:** prove the machine-composition seam without dynamic staging.
 
@@ -300,13 +252,17 @@ they are reused elsewhere.
   - one simple composite machine
 - keep these manual; still no v2 derives in this wave
 
-**Success criteria:**
+**Exit Criteria:**
 
 - local semantic tests can run against a projected submachine
 - lifted effect/control flow works against a composed top-level machine
 - at least one call-capable inline test dialect exercises frame/call behavior
 
-## Wave 5: Single-Stage Concrete MVP Hardening
+### Wave 5: Single-Stage Concrete MVP Hardening
+
+**Depends on:** Wave 4 complete
+**Status:** implemented
+**Crate(s):** `crates/kirin-interpreter-2`
 
 **Goal:** make the single-stage shell usable as the baseline runtime.
 
@@ -329,20 +285,24 @@ they are reused elsewhere.
   - breakpoint semantics
   - host-interrupt semantics
 
-**If scope must narrow further:**
+**Scope reduction if needed:**
 
 - keep fuel mandatory
 - allow breakpoint and host-interrupt support to slip past the initial shell
-  MVP as long as the plan is updated explicitly
+  MVP only if the plan is updated explicitly
 
-**Success criteria:**
+**Exit Criteria:**
 
 - the single-stage shell can serve as the stable typed baseline for future
   expansion
 - shell control and suspension behavior are tested independently from
   cross-stage concerns
 
-## Wave 6: MVP Documentation And Migration Checkpoint
+### Wave 6: Documentation And Migration Checkpoint
+
+**Depends on:** Wave 5 complete
+**Status:** implemented
+**Crate(s):** `docs/design`, `docs/plans`
 
 **Goal:** reconcile the design notes with what the MVP actually proved.
 
@@ -362,34 +322,127 @@ they are reused elsewhere.
 - explicitly revisit leaf-machine binding and derive design only after the
   single-stage shell API is implementation-backed
 
-**Success criteria:**
+**Exit Criteria:**
 
 - the docs describe the implemented MVP truthfully
 - the deferred dynamic/runtime work starts from a tested typed shell instead of
   a speculative abstraction
 
-## Recommended Order Of Attack
+## Verification Checkpoints
 
-1. Wave 1
-2. Wave 2
-3. Wave 3
-4. Wave 4
-5. Wave 5
-6. Wave 6
+After each wave:
 
-Do not start the dynamic shell before Wave 4 is stable. The machine-composition
-surface must be proven in the single-stage shell first.
+1. `cargo test -p kirin-interpreter-2`
+2. `cargo clippy -p kirin-interpreter-2 --tests -- -D warnings`
+
+Additional checkpoints by wave:
+
+- Wave 1: crate primitives compile and stay self-contained
+- Wave 2: shell construction and stage/value access compile in tests
+- Wave 3: `build_linear_program`, `build_add_one`, and `build_select_program`
+  pass through the new shell
+- Wave 4: local-vs-lifted composition tests pass
+- Wave 5: driver-control tests cover breakpoint, fuel, and host interrupt
+- Wave 6: design docs and plan record the implementation-backed truth
+
+## Current MVP Checkpoint
+
+The current `kirin-interpreter-2` implementation has completed all six waves
+of this MVP plan.
+
+### Current Implementation Truth
+
+- the full public seed family exists:
+  - `BlockSeed`
+  - `RegionSeed`
+  - `DiGraphSeed`
+  - `UnGraphSeed`
+- the single-stage shell uses a closed internal cursor enum over:
+  - block
+  - region
+  - digraph
+  - ungraph
+- `SingleStageInterpreter` owns the driver convenience methods directly:
+  - `step()`
+  - `run()`
+  - `run_until_break()`
+- `Interpreter<'ir>` remains the primitive semantic shell trait with
+  forwarding helpers, not the full provided-default driver surface described in
+  the design notes
+- `run_until_break()` is currently equivalent to `run()` because the MVP shell
+  already stops on all suspension reasons, including breakpoints
+- shell breakpoints support both:
+  - `BeforeStatement`
+  - `AfterStatement`
+  through an internal post-step checkpoint
+- the current CFG branch semantics used in the MVP tests bind target block
+  arguments during `interpret(...)` before returning `Control::Replace(...)`
+  this is a working MVP choice, not a settled framework-wide rule
+
+## Guardrails
+
+- Keep the implementation stage-local.
+- Keep the shell control language separate from semantic machine effects.
+- Do not hardcode a global “machine per dialect” rule; machine choice must stay
+  compatible with later family-relative interpretation modes.
+- Prefer a small trait surface and a small working interpreter over premature
+  dynamic-shell abstractions.
+- If the implementation narrows the design, record that narrowing immediately.
+
+## Explicit Non-Goals
+
+- no `DynamicInterpreter`
+- no `StageStore`
+- no cross-stage boundary execution
+- no resumable boundary protocol
+- no `crates/kirin-derive-interpreter-2` work in the MVP
+- no v2 derive macros in the MVP; use manual impls in tests/examples
+- no attempt to preserve every detail of the old `StackInterpreter` API
+
+## Major Risks
+
+### Risk 1: The single-stage shell can harden the wrong trait boundary
+
+The current implementation keeps `step()`, `run()`, and `run_until_break()` on
+`SingleStageInterpreter` rather than lifting them into shared provided defaults
+on `Interpreter<'ir>`.
+
+Mitigation:
+
+- keep this deviation documented in the checkpoint section
+- do not generalize the driver trait surface until a second shell exists to
+  validate the default layering
+
+### Risk 2: CFG branch binding can fossilize in the wrong layer
+
+The current MVP test semantics bind block arguments during `interpret(...)`
+before returning `Control::Replace(...)`.
+
+Mitigation:
+
+- treat this as a provisional semantic choice, not framework law
+- revisit it once a second non-trivial dialect or derive-based implementation
+  exercises the same boundary
+
+### Risk 3: Dynamic-shell design can drift away from the implementation-backed core
+
+The family-relative storage and stage-boundary sections remain design-only.
+
+Mitigation:
+
+- treat this plan as the completion gate for the single-stage shell only
+- start dynamic-shell work from this checkpoint instead of from earlier
+  speculative drafts
 
 ## Deferred After This Plan
 
-These are deliberately postponed until the MVP exists:
+These topics remain intentionally postponed until after the single-stage MVP:
 
-- family-relative stage storage
-- stage-entry derivation from stage enums
-- dynamic shell orchestration stack
-- resumable cross-stage boundaries
+- lifting shared driver defaults into `Interpreter<'ir>`
+- `SingleStageFamily`
+- `StageStore`
+- `StageShellLayout`
+- `DynamicInterpreter`
+- stage-boundary execution
 - dynamic typed stage views
 - derive macros for the new runtime family
-
-Those areas will almost certainly need adjustment once the MVP reveals the
-parts of the design that are too abstract or too awkward in real code.
