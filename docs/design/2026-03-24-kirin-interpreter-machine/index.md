@@ -57,6 +57,9 @@ This folder is intentionally additive. The earlier design docs remain unchanged.
 - [state-and-effects.md](state-and-effects.md)
   Dialect-defined state, effect composition, projection traits, and testing
   implications.
+- [derive-and-tooling.md](derive-and-tooling.md)
+  Derive surface for `Interpretable` and machine composition traits, with user
+  examples.
 - [stage-boundaries.md](stage-boundaries.md)
   Stage switching, boundary protocols, and cross-stage execution.
 
