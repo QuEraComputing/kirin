@@ -28,7 +28,7 @@ pub use interrupt_control::InterruptControl;
 pub use machine::{ConsumeEffect, Machine};
 pub use projection::{LiftEffect, LiftStop, ProjectMachine, ProjectMachineMut};
 pub use result::{RunResult, StepOutcome, StepResult, SuspendReason};
-pub use seed::{BlockSeed, ExecutionSeed};
+pub use seed::{BlockSeed, DiGraphSeed, ExecutionSeed, RegionSeed, UnGraphSeed};
 pub use single_stage::SingleStageInterpreter;
 pub use stage_access::StageAccess;
 pub use value_store::ValueStore;

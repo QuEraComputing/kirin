@@ -1,6 +1,6 @@
 use kirin_ir::{Block, Dialect, StageInfo, Statement};
 
-/// MVP block-local shell cursor.
+/// Linear block-local shell cursor.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) struct BlockCursor {
     block: Block,

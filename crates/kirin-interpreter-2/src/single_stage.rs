@@ -10,7 +10,7 @@ use crate::{
     Breakpoint, BreakpointControl, ConsumeEffect, Control, ExecutionLocation, ExecutionSeed,
     FuelControl, Interpretable, Interpreter, InterpreterError, InterruptControl, Machine,
     RunResult, StageAccess, StepOutcome, StepResult, SuspendReason, ValueStore,
-    cursor::BlockCursor,
+    cursor::ExecutionCursor,
 };
 
 /// Minimal concrete single-stage shell for the new machine design.
@@ -25,7 +25,7 @@ where
     stage: CompileStage,
     machine: M,
     values: FxHashMap<SSAValue, V>,
-    cursor_stack: Vec<BlockCursor>,
+    cursor_stack: Vec<ExecutionCursor>,
     after_statement: Option<Statement>,
     breakpoints: FxHashSet<Breakpoint>,
     fuel: Option<u64>,
@@ -94,11 +94,13 @@ where
     }
 
     pub fn current_block(&self) -> Option<Block> {
-        self.cursor_stack.last().map(BlockCursor::block)
+        self.cursor_stack
+            .last()
+            .and_then(ExecutionCursor::current_block)
     }
 
     pub fn current_statement(&self) -> Option<Statement> {
-        self.cursor_stack.last().and_then(BlockCursor::current)
+        self.cursor_stack.last().and_then(ExecutionCursor::current)
     }
 
     pub fn current_location(&self) -> Option<ExecutionLocation> {
@@ -168,21 +170,17 @@ where
     }
 
     pub fn push_block(&mut self, block: Block) {
-        self.clear_after_statement();
-        self.cursor_stack
-            .push(BlockCursor::new(self.stage_info(), block));
+        self.push_seed(block.into());
     }
 
     pub fn push_seed(&mut self, seed: ExecutionSeed) {
-        match seed {
-            ExecutionSeed::Block(seed) => self.push_block(seed.block()),
-        }
+        self.clear_after_statement();
+        self.cursor_stack
+            .push(ExecutionCursor::from_seed(self.stage_info(), seed));
     }
 
     pub fn replace_seed(&mut self, seed: ExecutionSeed) -> Result<(), InterpreterError> {
-        let next_cursor = match seed {
-            ExecutionSeed::Block(seed) => BlockCursor::new(self.stage_info(), seed.block()),
-        };
+        let next_cursor = ExecutionCursor::from_seed(self.stage_info(), seed);
 
         self.clear_after_statement();
         let cursor = self
