@@ -7,8 +7,9 @@ use kirin_ir::{
 use rustc_hash::FxHashMap;
 
 use crate::{
-    ConsumeEffect, Control, ExecutionSeed, Interpretable, Interpreter, InterpreterError, Machine,
-    StageAccess, ValueStore, cursor::BlockCursor,
+    ConsumeEffect, Control, ExecutionSeed, FuelControl, Interpretable, Interpreter,
+    InterpreterError, Machine, RunResult, StageAccess, StepOutcome, StepResult, SuspendReason,
+    ValueStore, cursor::BlockCursor,
 };
 
 /// Minimal concrete single-stage shell for the new machine design.
@@ -24,6 +25,7 @@ where
     machine: M,
     values: FxHashMap<SSAValue, V>,
     cursor_stack: Vec<BlockCursor>,
+    fuel: Option<u64>,
     last_stop: Option<<M as Machine<'ir>>::Stop>,
     _error: PhantomData<fn() -> E>,
 }
@@ -42,6 +44,7 @@ where
             machine,
             values: FxHashMap::default(),
             cursor_stack: Vec::new(),
+            fuel: None,
             last_stop: None,
             _error: PhantomData,
         }
@@ -59,9 +62,15 @@ where
             machine,
             values,
             cursor_stack: Vec::new(),
+            fuel: None,
             last_stop: None,
             _error: PhantomData,
         }
+    }
+
+    pub fn with_fuel(mut self, fuel: u64) -> Self {
+        self.fuel = Some(fuel);
+        self
     }
 
     pub fn stage_info(&self) -> &'ir StageInfo<L> {
@@ -98,6 +107,17 @@ where
         self.cursor_stack.clear();
     }
 
+    fn spend_fuel(&mut self) -> bool {
+        match self.fuel.as_mut() {
+            Some(remaining) if *remaining == 0 => false,
+            Some(remaining) => {
+                *remaining -= 1;
+                true
+            }
+            None => true,
+        }
+    }
+
     pub fn push_block(&mut self, block: Block) {
         self.cursor_stack
             .push(BlockCursor::new(self.stage_info(), block));
@@ -129,6 +149,12 @@ where
         &mut self,
         callee: SpecializedFunction,
     ) -> Result<(), InterpreterError> {
+        let block = self.entry_block(callee)?;
+        self.push_block(block);
+        Ok(())
+    }
+
+    pub fn entry_block(&self, callee: SpecializedFunction) -> Result<Block, InterpreterError> {
         let stage = self.stage_info();
         let spec_info = callee.expect_info(stage);
         let body = *spec_info.body();
@@ -136,12 +162,47 @@ where
             .regions(stage)
             .next()
             .ok_or_else(InterpreterError::missing_entry_block)?;
-        let block = region
+
+        region
             .blocks(stage)
             .next()
-            .ok_or_else(InterpreterError::missing_entry_block)?;
-        self.push_block(block);
+            .ok_or_else(InterpreterError::missing_entry_block)
+    }
+
+    pub fn bind_block_args(&mut self, block: Block, args: &[V]) -> Result<(), E>
+    where
+        V: Clone,
+        E: From<InterpreterError>,
+    {
+        let stage = self.stage_info();
+        let block_info = block.expect_info(stage);
+        if block_info.arguments.len() != args.len() {
+            return Err(InterpreterError::ArityMismatch {
+                expected: block_info.arguments.len(),
+                got: args.len(),
+            }
+            .into());
+        }
+
+        for (argument, value) in block_info.arguments.iter().zip(args.iter()) {
+            self.write(SSAValue::from(*argument), value.clone())?;
+        }
+
         Ok(())
+    }
+
+    pub fn start_specialization(&mut self, callee: SpecializedFunction, args: &[V]) -> Result<(), E>
+    where
+        V: Clone,
+        E: From<InterpreterError>,
+    {
+        self.clear_values();
+        self.clear_cursor_stack();
+        self.last_stop = None;
+
+        let entry = self.entry_block(callee)?;
+        self.push_block(entry);
+        self.bind_block_args(entry, args)
     }
 
     pub fn apply_control(
@@ -180,6 +241,89 @@ where
                 Ok(())
             }
         }
+    }
+
+    pub fn step(
+        &mut self,
+    ) -> Result<StepOutcome<<M as Machine<'ir>>::Effect, <M as Machine<'ir>>::Stop>, E>
+    where
+        V: Clone,
+        M: ConsumeEffect<'ir, Error = E>,
+        <M as Machine<'ir>>::Effect: Clone,
+        Control<<M as Machine<'ir>>::Stop>: Clone,
+        L: Interpretable<'ir, Self, Machine = M, Error = E>,
+        E: From<InterpreterError>,
+    {
+        if self.current_statement().is_none() {
+            return Ok(StepOutcome::Completed);
+        }
+
+        if !self.spend_fuel() {
+            return Ok(StepOutcome::Suspended(SuspendReason::FuelExhausted));
+        }
+
+        let effect = <Self as Interpreter<'ir>>::interpret_current(self)?;
+        let control = <Self as Interpreter<'ir>>::consume_effect(self, effect.clone())?;
+        <Self as Interpreter<'ir>>::consume_control(self, control.clone())?;
+
+        Ok(StepOutcome::Stepped(StepResult::new(effect, control)))
+    }
+
+    pub fn run(&mut self) -> Result<RunResult<<M as Machine<'ir>>::Stop>, E>
+    where
+        V: Clone,
+        M: ConsumeEffect<'ir, Error = E>,
+        L: Interpretable<'ir, Self, Machine = M, Error = E>,
+        E: From<InterpreterError>,
+    {
+        loop {
+            if self.current_statement().is_none() {
+                return Ok(RunResult::Completed);
+            }
+
+            if !self.spend_fuel() {
+                return Ok(RunResult::Suspended(SuspendReason::FuelExhausted));
+            }
+
+            let effect = <Self as Interpreter<'ir>>::interpret_current(self)?;
+            let control = <Self as Interpreter<'ir>>::consume_effect(self, effect)?;
+            <Self as Interpreter<'ir>>::consume_control(self, control)?;
+
+            if let Some(stop) = self.take_stop() {
+                return Ok(RunResult::Stopped(stop));
+            }
+        }
+    }
+
+    pub fn run_specialization(
+        &mut self,
+        callee: SpecializedFunction,
+        args: &[V],
+    ) -> Result<RunResult<<M as Machine<'ir>>::Stop>, E>
+    where
+        V: Clone,
+        M: ConsumeEffect<'ir, Error = E>,
+        L: Interpretable<'ir, Self, Machine = M, Error = E>,
+        E: From<InterpreterError>,
+    {
+        self.start_specialization(callee, args)?;
+        self.run()
+    }
+}
+
+impl<'ir, L, V, M, E> FuelControl for SingleStageInterpreter<'ir, L, V, M, E>
+where
+    L: Dialect + 'ir,
+    V: 'ir,
+    M: Machine<'ir> + 'ir,
+    E: 'ir,
+{
+    fn fuel(&self) -> Option<u64> {
+        self.fuel
+    }
+
+    fn set_fuel(&mut self, fuel: Option<u64>) {
+        self.fuel = fuel;
     }
 }
 

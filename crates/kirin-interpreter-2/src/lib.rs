@@ -3,6 +3,7 @@ mod cursor;
 mod error;
 mod frame;
 mod frame_stack;
+mod fuel_control;
 mod interpretable;
 mod interpreter;
 mod machine;
@@ -17,6 +18,7 @@ pub use control::Control;
 pub use error::{InterpreterError, MissingEntryError, StageResolutionError};
 pub use frame::Frame;
 pub use frame_stack::FrameStack;
+pub use fuel_control::FuelControl;
 pub use interpretable::Interpretable;
 pub use interpreter::Interpreter;
 pub use machine::{ConsumeEffect, Machine};
@@ -30,7 +32,10 @@ pub use value_store::ValueStore;
 /// Essentials for dialect authors implementing machine-based semantics.
 pub mod prelude {
     pub use crate::{
-        ConsumeEffect, Control, Interpretable, Interpreter, LiftEffect, LiftStop, Machine,
-        ProjectMachine, ProjectMachineMut, StageAccess, ValueStore,
+        ConsumeEffect, Control, FuelControl, Interpretable, Interpreter, LiftEffect, LiftStop,
+        Machine, ProjectMachine, ProjectMachineMut, StageAccess, ValueStore,
     };
 }
+
+#[cfg(test)]
+mod tests;

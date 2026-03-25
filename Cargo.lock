@@ -885,6 +885,10 @@ dependencies = [
 name = "kirin-interpreter-2"
 version = "0.1.0"
 dependencies = [
+ "kirin-arith",
+ "kirin-cf",
+ "kirin-constant",
+ "kirin-function",
  "kirin-ir",
  "kirin-test-languages",
  "kirin-test-utils",
