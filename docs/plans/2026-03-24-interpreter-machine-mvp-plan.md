@@ -2,7 +2,9 @@
 
 **Date:** 2026-03-24
 **Status:** draft
-**Primary crates:** `crates/kirin-interpreter-2`, `crates/kirin-derive-interpreter-2`
+**Primary crate:** `crates/kirin-interpreter-2`
+
+`crates/kirin-derive-interpreter-2` is explicitly post-MVP.
 
 ## Goal
 
@@ -34,6 +36,41 @@ Those pieces are easier to stabilize after we have a working typed shell with:
 The single-stage shell is the smallest implementation that still exercises the
 new machine mechanism honestly.
 
+## Reference Reuse, Not Migration
+
+`crates/kirin-interpreter` is reference material, not the implementation target.
+
+The best reuse sources for `crates/kirin-interpreter-2` are the low-level
+runtime substrate pieces:
+
+- `value_store.rs`
+  minimal SSA read/write contract
+- `frame.rs`
+  per-call frame ownership shape
+- `frame_stack.rs`
+  top-frame SSA scoping, push/pop/current, max-depth handling
+- `stage_access.rs`
+  pipeline + active-stage ownership idea, in a much smaller single-stage form
+- `block_eval.rs`
+  `bind_block_args`
+- `stack/transition.rs`
+  concrete cursor advancement and fuel spending ideas
+- `stack/call.rs`
+  callee-entry sequencing only
+- `error.rs`
+  baseline runtime error taxonomy
+
+The pieces that should **not** be transplanted into `kirin-interpreter-2`
+are:
+
+- `Continuation`
+- `CallSemantics`
+- `SSACFGRegion`
+- dynamic stage-dispatch caches
+- `Staged`
+- `run_nested_calls`
+- any hidden product-value writeback policy copied from the old runtime
+
 ## Guardrails
 
 - Keep the implementation stage-local.
@@ -51,8 +88,31 @@ new machine mechanism honestly.
 - no `StageStore`
 - no cross-stage boundary execution
 - no resumable boundary protocol
-- no full derive-macro support for the new runtime
+- no `crates/kirin-derive-interpreter-2` work in the MVP
+- no v2 derive macros in the MVP; use manual impls in tests/examples
 - no attempt to preserve every detail of the old `StackInterpreter` API
+
+## Testing Baseline
+
+The first test matrix should stay small and should reuse existing shared IR
+fixtures rather than inventing a new dialect universe.
+
+Preferred baseline:
+
+- `CompositeLanguage`
+- `build_add_one`
+- `build_linear_program`
+- `build_select_program`
+
+The first helpers worth adding to `kirin-test-utils`, if two crates need them,
+are:
+
+- `entry_cursor`
+- `entry_block_args`
+- `push_entry_frame_with_args`
+
+Keep synthetic test-only dialects inline in `crates/kirin-interpreter-2` until
+they are reused elsewhere.
 
 ## Wave 1: Core Runtime Vocabulary
 
@@ -60,8 +120,10 @@ new machine mechanism honestly.
 
 **Scope:**
 
+- create the new crate skeleton for `crates/kirin-interpreter-2`
 - add the core traits and types:
   - `Machine<'ir>`
+  - `Interpretable<'ir, I>`
   - `ConsumeEffect<'ir>`
   - `Control<Stop>`
   - `StepResult`
@@ -71,6 +133,8 @@ new machine mechanism honestly.
 - keep `Machine<'ir>` thin:
   - `type Effect`
   - `type Stop`
+- define and document that `Interpretable::Machine` is the statement's local
+  semantic machine vocabulary, not the family-selected top-level shell machine
 - keep `ConsumeEffect<'ir>` separate with its own `Error`
 - add `Control::map_stop`
 
@@ -78,6 +142,7 @@ new machine mechanism honestly.
 
 - the new primitives compile in isolation
 - the result/control types are usable without any dynamic-stage machinery
+- the crate has a stable low-level module layout for later waves
 
 ## Wave 2: Typed Single-Stage Shell Skeleton
 
@@ -104,6 +169,9 @@ new machine mechanism honestly.
 
 - keep this single-stage only
 - no stage switching
+- no public stage-switch API on the MVP shell
+- keep `StageAccess<'ir>` minimal: fixed stage identity, typed stage view, and
+  only the resolution needed by the single-stage shell
 - stage identity still uses `CompileStage` so the shell remains compatible with
   later dynamic orchestration
 
@@ -124,8 +192,8 @@ new machine mechanism honestly.
   - `consume_control`
   - provided `run`
   - provided `run_until_break`
-- add a first concrete cursor model for statement stepping
-- support a minimal execution-seed surface sufficient for the MVP
+- add one concrete cursor kind for statement stepping
+- support one minimal execution-seed kind sufficient for the MVP
 - wire one fully working path:
   - current statement
   - local semantic effect
@@ -144,6 +212,10 @@ new machine mechanism honestly.
 - one statement can be interpreted and advanced through the new shell
 - `run()` and `run_until_break()` exercise the same primitive pipeline
 - the shell returns `StepOutcome` and `RunResult` as designed
+- the first execution tests pass against:
+  - `build_linear_program`
+  - `build_add_one`
+  - `build_select_program`
 
 ## Wave 4: Local vs Lifted Machine APIs
 
@@ -169,11 +241,13 @@ new machine mechanism honestly.
 - test with:
   - one leaf machine
   - one simple composite machine
+- keep these manual; still no v2 derives in this wave
 
 **Success criteria:**
 
 - local semantic tests can run against a projected submachine
 - lifted effect/control flow works against a composed top-level machine
+- at least one call-capable inline test dialect exercises frame/call behavior
 
 ## Wave 5: Single-Stage Concrete MVP Hardening
 
@@ -197,6 +271,12 @@ new machine mechanism honestly.
   - fuel semantics
   - breakpoint semantics
   - host-interrupt semantics
+
+**If scope must narrow further:**
+
+- keep fuel mandatory
+- allow breakpoint and host-interrupt support to slip past the initial shell
+  MVP as long as the plan is updated explicitly
 
 **Success criteria:**
 
@@ -222,6 +302,8 @@ new machine mechanism honestly.
   - `DynamicInterpreter`
   - stage boundaries
   - new derive support
+- explicitly revisit leaf-machine binding and derive design only after the
+  single-stage shell API is implementation-backed
 
 **Success criteria:**
 
