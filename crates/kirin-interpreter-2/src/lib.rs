@@ -1,3 +1,4 @@
+mod breakpoint_control;
 mod control;
 mod cursor;
 mod error;
@@ -6,6 +7,7 @@ mod frame_stack;
 mod fuel_control;
 mod interpretable;
 mod interpreter;
+mod interrupt_control;
 mod machine;
 mod projection;
 mod result;
@@ -14,6 +16,7 @@ mod single_stage;
 mod stage_access;
 mod value_store;
 
+pub use breakpoint_control::{Breakpoint, BreakpointControl, ExecutionLocation};
 pub use control::Control;
 pub use error::{InterpreterError, MissingEntryError, StageResolutionError};
 pub use frame::Frame;
@@ -21,6 +24,7 @@ pub use frame_stack::FrameStack;
 pub use fuel_control::FuelControl;
 pub use interpretable::Interpretable;
 pub use interpreter::Interpreter;
+pub use interrupt_control::InterruptControl;
 pub use machine::{ConsumeEffect, Machine};
 pub use projection::{LiftEffect, LiftStop, ProjectMachine, ProjectMachineMut};
 pub use result::{RunResult, StepOutcome, StepResult, SuspendReason};
@@ -32,8 +36,9 @@ pub use value_store::ValueStore;
 /// Essentials for dialect authors implementing machine-based semantics.
 pub mod prelude {
     pub use crate::{
-        ConsumeEffect, Control, FuelControl, Interpretable, Interpreter, LiftEffect, LiftStop,
-        Machine, ProjectMachine, ProjectMachineMut, StageAccess, ValueStore,
+        BreakpointControl, ConsumeEffect, Control, FuelControl, Interpretable, Interpreter,
+        InterruptControl, LiftEffect, LiftStop, Machine, ProjectMachine, ProjectMachineMut,
+        StageAccess, ValueStore,
     };
 }
 

@@ -4,12 +4,13 @@ use kirin_ir::{
     Block, CompileStage, Dialect, GetInfo, Pipeline, SSAValue, SpecializedFunction, StageInfo,
     Statement,
 };
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxHashMap, FxHashSet};
 
 use crate::{
-    ConsumeEffect, Control, ExecutionSeed, FuelControl, Interpretable, Interpreter,
-    InterpreterError, Machine, RunResult, StageAccess, StepOutcome, StepResult, SuspendReason,
-    ValueStore, cursor::BlockCursor,
+    Breakpoint, BreakpointControl, ConsumeEffect, Control, ExecutionLocation, ExecutionSeed,
+    FuelControl, Interpretable, Interpreter, InterpreterError, InterruptControl, Machine,
+    RunResult, StageAccess, StepOutcome, StepResult, SuspendReason, ValueStore,
+    cursor::BlockCursor,
 };
 
 /// Minimal concrete single-stage shell for the new machine design.
@@ -25,7 +26,10 @@ where
     machine: M,
     values: FxHashMap<SSAValue, V>,
     cursor_stack: Vec<BlockCursor>,
+    after_statement: Option<Statement>,
+    breakpoints: FxHashSet<Breakpoint>,
     fuel: Option<u64>,
+    interrupt_requested: bool,
     last_stop: Option<<M as Machine<'ir>>::Stop>,
     _error: PhantomData<fn() -> E>,
 }
@@ -44,7 +48,10 @@ where
             machine,
             values: FxHashMap::default(),
             cursor_stack: Vec::new(),
+            after_statement: None,
+            breakpoints: FxHashSet::default(),
             fuel: None,
+            interrupt_requested: false,
             last_stop: None,
             _error: PhantomData,
         }
@@ -62,7 +69,10 @@ where
             machine,
             values,
             cursor_stack: Vec::new(),
+            after_statement: None,
+            breakpoints: FxHashSet::default(),
             fuel: None,
+            interrupt_requested: false,
             last_stop: None,
             _error: PhantomData,
         }
@@ -91,6 +101,15 @@ where
         self.cursor_stack.last().and_then(BlockCursor::current)
     }
 
+    pub fn current_location(&self) -> Option<ExecutionLocation> {
+        self.after_statement
+            .map(ExecutionLocation::AfterStatement)
+            .or_else(|| {
+                self.current_statement()
+                    .map(ExecutionLocation::BeforeStatement)
+            })
+    }
+
     pub fn last_stop(&self) -> Option<&<M as Machine<'ir>>::Stop> {
         self.last_stop.as_ref()
     }
@@ -105,20 +124,51 @@ where
 
     pub fn clear_cursor_stack(&mut self) {
         self.cursor_stack.clear();
+        self.after_statement = None;
     }
 
-    fn spend_fuel(&mut self) -> bool {
-        match self.fuel.as_mut() {
-            Some(remaining) if *remaining == 0 => false,
-            Some(remaining) => {
-                *remaining -= 1;
-                true
+    fn clear_after_statement(&mut self) {
+        self.after_statement = None;
+    }
+
+    fn burn_step_fuel(&mut self) {
+        if let Some(remaining) = self.fuel.as_mut() {
+            debug_assert!(*remaining > 0, "fuel must be checked before step burn");
+            *remaining -= 1;
+        }
+    }
+
+    fn poll_execution_gate(&mut self) -> Result<Option<Statement>, SuspendReason> {
+        loop {
+            let Some(location) = self.current_location() else {
+                return Ok(None);
+            };
+
+            if self.has_breakpoint(&Breakpoint::new(self.stage, location)) {
+                return Err(SuspendReason::Breakpoint);
             }
-            None => true,
+
+            match location {
+                ExecutionLocation::AfterStatement(_) => {
+                    self.clear_after_statement();
+                }
+                ExecutionLocation::BeforeStatement(statement) => {
+                    if matches!(self.fuel, Some(0)) {
+                        return Err(SuspendReason::FuelExhausted);
+                    }
+
+                    if self.interrupt_requested {
+                        return Err(SuspendReason::HostInterrupt);
+                    }
+
+                    return Ok(Some(statement));
+                }
+            }
         }
     }
 
     pub fn push_block(&mut self, block: Block) {
+        self.clear_after_statement();
         self.cursor_stack
             .push(BlockCursor::new(self.stage_info(), block));
     }
@@ -134,6 +184,7 @@ where
             ExecutionSeed::Block(seed) => BlockCursor::new(self.stage_info(), seed.block()),
         };
 
+        self.clear_after_statement();
         let cursor = self
             .cursor_stack
             .last_mut()
@@ -209,6 +260,7 @@ where
         &mut self,
         control: Control<<M as Machine<'ir>>::Stop>,
     ) -> Result<(), InterpreterError> {
+        self.clear_after_statement();
         match control {
             Control::Advance => {
                 let stage = self.stage_info();
@@ -254,17 +306,20 @@ where
         L: Interpretable<'ir, Self, Machine = M, Error = E>,
         E: From<InterpreterError>,
     {
-        if self.current_statement().is_none() {
-            return Ok(StepOutcome::Completed);
-        }
-
-        if !self.spend_fuel() {
-            return Ok(StepOutcome::Suspended(SuspendReason::FuelExhausted));
-        }
+        let statement = match self.poll_execution_gate() {
+            Ok(Some(statement)) => statement,
+            Ok(None) => return Ok(StepOutcome::Completed),
+            Err(reason) => return Ok(StepOutcome::Suspended(reason)),
+        };
 
         let effect = <Self as Interpreter<'ir>>::interpret_current(self)?;
         let control = <Self as Interpreter<'ir>>::consume_effect(self, effect.clone())?;
         <Self as Interpreter<'ir>>::consume_control(self, control.clone())?;
+        self.burn_step_fuel();
+
+        if self.last_stop.is_none() {
+            self.after_statement = Some(statement);
+        }
 
         Ok(StepOutcome::Stepped(StepResult::new(effect, control)))
     }
@@ -277,22 +332,33 @@ where
         E: From<InterpreterError>,
     {
         loop {
-            if self.current_statement().is_none() {
-                return Ok(RunResult::Completed);
-            }
-
-            if !self.spend_fuel() {
-                return Ok(RunResult::Suspended(SuspendReason::FuelExhausted));
-            }
+            let statement = match self.poll_execution_gate() {
+                Ok(Some(statement)) => statement,
+                Ok(None) => return Ok(RunResult::Completed),
+                Err(reason) => return Ok(RunResult::Suspended(reason)),
+            };
 
             let effect = <Self as Interpreter<'ir>>::interpret_current(self)?;
             let control = <Self as Interpreter<'ir>>::consume_effect(self, effect)?;
             <Self as Interpreter<'ir>>::consume_control(self, control)?;
+            self.burn_step_fuel();
 
             if let Some(stop) = self.take_stop() {
                 return Ok(RunResult::Stopped(stop));
             }
+
+            self.after_statement = Some(statement);
         }
+    }
+
+    pub fn run_until_break(&mut self) -> Result<RunResult<<M as Machine<'ir>>::Stop>, E>
+    where
+        V: Clone,
+        M: ConsumeEffect<'ir, Error = E>,
+        L: Interpretable<'ir, Self, Machine = M, Error = E>,
+        E: From<InterpreterError>,
+    {
+        self.run()
     }
 
     pub fn run_specialization(
@@ -324,6 +390,46 @@ where
 
     fn set_fuel(&mut self, fuel: Option<u64>) {
         self.fuel = fuel;
+    }
+}
+
+impl<'ir, L, V, M, E> BreakpointControl for SingleStageInterpreter<'ir, L, V, M, E>
+where
+    L: Dialect + 'ir,
+    V: 'ir,
+    M: Machine<'ir> + 'ir,
+    E: 'ir,
+{
+    fn add_breakpoint(&mut self, breakpoint: Breakpoint) -> bool {
+        self.breakpoints.insert(breakpoint)
+    }
+
+    fn remove_breakpoint(&mut self, breakpoint: &Breakpoint) -> bool {
+        self.breakpoints.remove(breakpoint)
+    }
+
+    fn has_breakpoint(&self, breakpoint: &Breakpoint) -> bool {
+        self.breakpoints.contains(breakpoint)
+    }
+}
+
+impl<'ir, L, V, M, E> InterruptControl for SingleStageInterpreter<'ir, L, V, M, E>
+where
+    L: Dialect + 'ir,
+    V: 'ir,
+    M: Machine<'ir> + 'ir,
+    E: 'ir,
+{
+    fn request_interrupt(&mut self) {
+        self.interrupt_requested = true;
+    }
+
+    fn clear_interrupt(&mut self) {
+        self.interrupt_requested = false;
+    }
+
+    fn interrupt_requested(&self) -> bool {
+        self.interrupt_requested
     }
 }
 
@@ -511,5 +617,47 @@ mod tests {
 
         assert_eq!(interp.cursor_depth(), 0);
         assert_eq!(interp.last_stop(), Some(&"done"));
+    }
+
+    #[test]
+    fn replace_without_active_cursor_errors() {
+        let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+        let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+        let block = pipeline
+            .stage_mut(stage_id)
+            .unwrap()
+            .with_builder(|b| b.block().new());
+        let mut interp = SingleStageInterpreter::<_, i64, _, InterpreterError>::new(
+            &pipeline,
+            stage_id,
+            TestMachine,
+        );
+
+        let error = interp
+            .apply_control(Control::Replace(block.into()))
+            .unwrap_err();
+
+        assert!(matches!(
+            error,
+            InterpreterError::InvalidControl("replace requires an active cursor")
+        ));
+    }
+
+    #[test]
+    fn pop_without_active_cursor_errors() {
+        let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+        let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+        let mut interp = SingleStageInterpreter::<_, i64, _, InterpreterError>::new(
+            &pipeline,
+            stage_id,
+            TestMachine,
+        );
+
+        let error = interp.apply_control(Control::Pop).unwrap_err();
+
+        assert!(matches!(
+            error,
+            InterpreterError::InvalidControl("pop requires an active cursor")
+        ));
     }
 }

@@ -7,8 +7,9 @@ use kirin_test_languages::CompositeLanguage;
 use kirin_test_utils::ir_fixtures::{build_add_one, build_linear_program, build_select_program};
 
 use crate::{
-    ConsumeEffect, Control, FuelControl, Interpretable, InterpreterError, Machine, RunResult,
-    SingleStageInterpreter, StepOutcome, SuspendReason, ValueStore,
+    Breakpoint, BreakpointControl, ConsumeEffect, Control, ExecutionLocation, FuelControl,
+    Interpretable, InterpreterError, InterruptControl, Machine, RunResult, SingleStageInterpreter,
+    StepOutcome, SuspendReason, ValueStore,
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -276,4 +277,149 @@ fn run_suspends_when_fuel_runs_out() {
         .unwrap();
 
     assert_eq!(result, RunResult::Suspended(SuspendReason::FuelExhausted));
+}
+
+#[test]
+fn breakpoint_before_first_statement_suspends_immediately() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine).with_fuel(1);
+    interp.start_specialization(spec_fn, &[]).unwrap();
+    let first = interp.current_statement().unwrap();
+    let breakpoint = Breakpoint::new(stage_id, ExecutionLocation::BeforeStatement(first));
+    assert!(interp.add_breakpoint(breakpoint));
+
+    let outcome = interp.step().unwrap();
+
+    assert_eq!(outcome, StepOutcome::Suspended(SuspendReason::Breakpoint));
+    assert_eq!(interp.fuel(), Some(1));
+    assert_eq!(interp.current_statement(), Some(first));
+}
+
+#[test]
+fn breakpoint_wins_over_zero_fuel() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine).with_fuel(0);
+    interp.start_specialization(spec_fn, &[]).unwrap();
+    let first = interp.current_statement().unwrap();
+    interp.add_breakpoint(Breakpoint::new(
+        stage_id,
+        ExecutionLocation::BeforeStatement(first),
+    ));
+
+    let outcome = interp.step().unwrap();
+
+    assert_eq!(outcome, StepOutcome::Suspended(SuspendReason::Breakpoint));
+    assert_eq!(interp.fuel(), Some(0));
+}
+
+#[test]
+fn after_statement_breakpoint_suspends_before_next_execution() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine).with_fuel(3);
+    interp.start_specialization(spec_fn, &[]).unwrap();
+    let first = interp.current_statement().unwrap();
+
+    assert!(matches!(interp.step().unwrap(), StepOutcome::Stepped(_)));
+    interp.add_breakpoint(Breakpoint::new(
+        stage_id,
+        ExecutionLocation::AfterStatement(first),
+    ));
+
+    let outcome = interp.step().unwrap();
+
+    assert_eq!(outcome, StepOutcome::Suspended(SuspendReason::Breakpoint));
+    assert_eq!(interp.fuel(), Some(2));
+}
+
+#[test]
+fn run_until_break_suspends_at_current_breakpoint() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
+    interp.start_specialization(spec_fn, &[]).unwrap();
+    let first = interp.current_statement().unwrap();
+    interp.add_breakpoint(Breakpoint::new(
+        stage_id,
+        ExecutionLocation::BeforeStatement(first),
+    ));
+
+    let result = interp.run_until_break().unwrap();
+
+    assert_eq!(result, RunResult::Suspended(SuspendReason::Breakpoint));
+    assert_eq!(interp.current_statement(), Some(first));
+}
+
+#[test]
+fn host_interrupt_suspends_before_execution() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine).with_fuel(1);
+    interp.start_specialization(spec_fn, &[]).unwrap();
+    interp.request_interrupt();
+
+    let outcome = interp.step().unwrap();
+
+    assert_eq!(
+        outcome,
+        StepOutcome::Suspended(SuspendReason::HostInterrupt)
+    );
+    assert_eq!(interp.fuel(), Some(1));
+    assert!(interp.current_statement().is_some());
+}
+
+#[test]
+fn breakpoint_wins_over_host_interrupt() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
+    interp.start_specialization(spec_fn, &[]).unwrap();
+    let first = interp.current_statement().unwrap();
+    interp.add_breakpoint(Breakpoint::new(
+        stage_id,
+        ExecutionLocation::BeforeStatement(first),
+    ));
+    interp.request_interrupt();
+
+    let outcome = interp.step().unwrap();
+
+    assert_eq!(outcome, StepOutcome::Suspended(SuspendReason::Breakpoint));
+}
+
+#[test]
+fn interrupt_is_level_triggered_until_cleared() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
+    interp.start_specialization(spec_fn, &[]).unwrap();
+    interp.request_interrupt();
+
+    assert_eq!(
+        interp.step().unwrap(),
+        StepOutcome::Suspended(SuspendReason::HostInterrupt)
+    );
+    assert_eq!(
+        interp.step().unwrap(),
+        StepOutcome::Suspended(SuspendReason::HostInterrupt)
+    );
+
+    interp.clear_interrupt();
+
+    assert!(matches!(interp.step().unwrap(), StepOutcome::Stepped(_)));
 }
