@@ -400,7 +400,7 @@ pub fn build_infinite_loop(
         // exit(result): ret result
         let exit = b.block().argument(ArithType::I64).new();
         let exit_val: SSAValue = b.block_arena()[exit].arguments[0].into();
-        let ret_exit = Return::<ArithType>::new(b, vec![exit_val.into()]);
+        let ret_exit = Return::<ArithType>::new(b, vec![exit_val]);
         {
             let exit_info: &mut Item<BlockInfo<CompositeLanguage>> =
                 b.block_arena_mut().get_mut(exit).unwrap();
