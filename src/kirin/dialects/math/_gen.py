@@ -114,6 +114,8 @@ with open(os.path.join(os.path.dirname(__file__), "__init__.py"), "w") as f:
     for name, obj, sig in builtin_math_functions():
         if "is" in name:
             ret_type = "bool"
+        elif name in {"trunc", "ceil", "floor"}:
+            ret_type = "int"
         else:
             ret_type = "float"
         f.write(textwrap.dedent(f"""
