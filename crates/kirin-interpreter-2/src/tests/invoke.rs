@@ -308,13 +308,17 @@ fn flow_stay_leaves_current_cursor_unchanged() {
         crate::effect::Flow::Stay
     }
 
-    match stay_effect() {
-        crate::effect::Flow::Stay => {
-            assert_eq!(interp.current_statement(), before_statement);
-            assert_eq!(interp.current_location(), before_location);
-        }
-        crate::effect::Flow::Advance | crate::effect::Flow::Jump(_) | crate::effect::Flow::Stop(_) => {
-            unreachable!("future stay behavior should not map to another control flow")
-        }
+    fn apply_flow(interp: &mut InvokeInterp<'_>, flow: crate::effect::Flow<InvokeValue>) {
+        let control = match flow {
+            crate::effect::Flow::Advance => crate::control::Shell::Advance,
+            crate::effect::Flow::Jump(seed) => crate::control::Shell::Replace(seed),
+            crate::effect::Flow::Stop(stop) => crate::control::Shell::Stop(stop),
+            crate::effect::Flow::Stay => crate::control::Shell::Stay,
+        };
+        interp.apply_control(control).unwrap();
     }
+
+    apply_flow(&mut interp, stay_effect());
+    assert_eq!(interp.current_statement(), before_statement);
+    assert_eq!(interp.current_location(), before_location);
 }
