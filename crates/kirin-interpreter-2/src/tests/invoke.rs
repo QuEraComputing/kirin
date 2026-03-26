@@ -1,69 +1,320 @@
-use kirin_arith::ArithValue;
-use kirin_ir::{CompileStage, Pipeline, SpecializedFunction, StageInfo};
-use kirin_test_languages::CompositeLanguage;
+use kirin_arith::{Arith, ArithType, ArithValue};
+use kirin_constant::Constant;
+use kirin_function::{FunctionBody, Return};
+use kirin_ir::{CompileStage, GetInfo, HasArguments, Pipeline, Product, Signature, SpecializedFunction, StageInfo, Typeof, SSAValue};
 use kirin_test_utils::ir_fixtures::build_add_one;
+use kirin_test_languages::CompositeLanguage;
 
 use crate::{
-    ConsumeEffect, InterpreterError, Machine, control::Shell, effect, interpreter::SingleStage,
+    InterpreterError, Interpretable, ProductValue, ValueStore,
+    effect,
+    interpreter::{Driver, Position, SingleStage},
 };
 
-#[derive(Debug, Default)]
-struct InvokeMachine;
-
-impl<'ir> Machine<'ir> for InvokeMachine {
-    type Effect = effect::Flow<ArithValue>;
-    type Stop = ArithValue;
+#[derive(Clone, Debug, PartialEq)]
+enum InvokeValue {
+    I64(i64),
+    Product(Box<Product<InvokeValue>>),
 }
 
-impl<'ir> ConsumeEffect<'ir> for InvokeMachine {
-    type Error = InterpreterError;
-
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
-        Ok(match effect {
-            effect::Flow::Advance => Shell::Advance,
-            effect::Flow::Jump(seed) => Shell::Replace(seed),
-            effect::Flow::Stop(stop) => Shell::Stop(stop),
-        })
+impl Default for InvokeValue {
+    fn default() -> Self {
+        InvokeValue::I64(0)
     }
 }
 
+impl From<ArithValue> for InvokeValue {
+    fn from(value: ArithValue) -> Self {
+        match value {
+            ArithValue::I64(value) => InvokeValue::I64(value),
+            _ => panic!("unsupported arith value in invoke test scaffold"),
+        }
+    }
+}
+
+impl std::fmt::Display for InvokeValue {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            InvokeValue::I64(value) => write!(f, "{value}"),
+            InvokeValue::Product(product) => {
+                write!(f, "(")?;
+                for (index, value) in product.0.iter().enumerate() {
+                    if index > 0 {
+                        write!(f, ", ")?;
+                    }
+                    write!(f, "{value}")?;
+                }
+                write!(f, ")")
+            }
+        }
+    }
+}
+
+impl ProductValue for InvokeValue {
+    fn as_product(&self) -> Option<&Product<Self>> {
+        match self {
+            InvokeValue::Product(product) => Some(product.as_ref()),
+            _ => None,
+        }
+    }
+
+    fn from_product(product: Product<Self>) -> Self {
+        InvokeValue::Product(Box::new(product))
+    }
+}
+
+impl Typeof<ArithType> for InvokeValue {
+    fn type_of(&self) -> ArithType {
+        ArithType::I64
+    }
+}
+
+fn unsupported(message: &'static str) -> InterpreterError {
+    InterpreterError::custom(std::io::Error::other(message))
+}
+
 type InvokeInterp<'ir> =
-    SingleStage<'ir, CompositeLanguage, ArithValue, InvokeMachine, InterpreterError>;
+    SingleStage<'ir, CompositeLanguage, InvokeValue, effect::Stateless<InvokeValue>, InterpreterError>;
+
+fn as_i64(value: InvokeValue) -> Result<i64, InterpreterError> {
+    match value {
+        InvokeValue::I64(value) => Ok(value),
+        _ => Err(unsupported("expected i64 in invoke scaffold")),
+    }
+}
+
+fn build_caller_program(
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
+    stage_id: CompileStage,
+) -> (SpecializedFunction, SSAValue, SSAValue) {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    stage.with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let x = b.block_argument().index(0);
+        let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
+        let c2 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(2));
+        let sum = Arith::<ArithType>::op_add(b, x, c1.result);
+        let ret = Return::<ArithType>::new(b, vec![sum.result.into()]);
+        let c2_result: SSAValue = c2.result.into();
+        let sum_result: SSAValue = sum.result.into();
+
+        let block = b
+            .block()
+            .argument(ArithType::I64)
+            .stmt(c1)
+            .stmt(c2)
+            .stmt(sum)
+            .terminator(ret)
+            .new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            Signature::new(vec![], ArithType::default(), ()),
+        );
+        let spec = b.specialize().staged_func(sf).body(body).new().unwrap();
+        (spec, c2_result, sum_result)
+    })
+}
+
+fn build_pair_callee(
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    stage.with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+        let x = b.block_argument().index(0);
+        let c1 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
+        let dec = Arith::<ArithType>::op_sub(b, x, c1.result);
+        let ret = Return::<ArithType>::new(b, vec![x, dec.result.into()]);
+
+        let block = b
+            .block()
+            .argument(ArithType::I64)
+            .stmt(c1)
+            .stmt(dec)
+            .terminator(ret)
+            .new();
+        let region = b.region().add_block(block).new();
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            Signature::new(vec![], ArithType::default(), ()),
+        );
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    })
+}
+
+impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Constant<ArithValue, ArithType> {
+    type Machine = effect::Stateless<InvokeValue>;
+    type Error = InterpreterError;
+
+    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+        interp.write(self.result, self.value.clone().into())?;
+        Ok(effect::Flow::Advance)
+    }
+}
+
+impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Arith<ArithType> {
+    type Machine = effect::Stateless<InvokeValue>;
+    type Error = InterpreterError;
+
+    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+        match self {
+            Arith::Add { lhs, rhs, result, .. } => {
+                let lhs = as_i64(interp.read(*lhs)?)?;
+                let rhs = as_i64(interp.read(*rhs)?)?;
+                interp.write(*result, InvokeValue::I64(lhs + rhs))?;
+                Ok(effect::Flow::Advance)
+            }
+            Arith::Sub { lhs, rhs, result, .. } => {
+                let lhs = as_i64(interp.read(*lhs)?)?;
+                let rhs = as_i64(interp.read(*rhs)?)?;
+                interp.write(*result, InvokeValue::I64(lhs - rhs))?;
+                Ok(effect::Flow::Advance)
+            }
+            _ => Err(unsupported("unsupported arithmetic op in invoke scaffold")),
+        }
+    }
+}
+
+impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Return<ArithType> {
+    type Machine = effect::Stateless<InvokeValue>;
+    type Error = InterpreterError;
+
+    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+        let values = self
+            .arguments()
+            .map(|ssa| interp.read(*ssa))
+            .collect::<Result<Vec<_>, _>>()?;
+        Ok(effect::Flow::Stop(InvokeValue::new_product(values)))
+    }
+}
+
+impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for FunctionBody<ArithType> {
+    type Machine = effect::Stateless<InvokeValue>;
+    type Error = InterpreterError;
+
+    fn interpret(&self, _interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+        Err(unsupported("function bodies are structural and should not be stepped directly"))
+    }
+}
+
+impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for CompositeLanguage {
+    type Machine = effect::Stateless<InvokeValue>;
+    type Error = InterpreterError;
+
+    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+        match self {
+            CompositeLanguage::Arith(op) => op.interpret(interp),
+            CompositeLanguage::Constant(op) => op.interpret(interp),
+            CompositeLanguage::FunctionBody(op) => op.interpret(interp),
+            CompositeLanguage::Return(op) => op.interpret(interp),
+            CompositeLanguage::ControlFlow(_) => Err(unsupported("control flow not used in invoke scaffold")),
+        }
+    }
+}
 
 #[test]
 fn invoke_pushes_new_activation_and_preserves_caller_bindings() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
-    let callee: SpecializedFunction = build_add_one(&mut pipeline, stage_id);
-    let mut interp = InvokeInterp::new(&pipeline, stage_id, InvokeMachine);
-    let args = [ArithValue::I64(5)];
+    let callee = build_add_one(&mut pipeline, stage_id);
+    let (caller, _c2_value, sum_value) = build_caller_program(&mut pipeline, stage_id);
 
-    fn uses_invoke<'ir, I: crate::interpreter::Invoke<'ir>>(
-        interp: &mut I,
-        callee: SpecializedFunction,
-        args: &[ArithValue],
-    ) {
-        let _ = interp.invoke(callee, args, &[]);
-    }
+    let mut interp = InvokeInterp::new(&pipeline, stage_id, effect::Stateless::default());
+    interp.start_specialization(caller, &[InvokeValue::I64(7)]).unwrap();
 
-    uses_invoke(&mut interp, callee, &args);
+    let entry = interp.entry_block(caller).unwrap();
+    let caller_arg = entry.expect_info(interp.stage_info()).arguments[0];
+    let caller_location = interp.current_location();
+    let caller_statement = interp.current_statement();
+    assert!(caller_statement.is_some());
+    assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(7));
+
+    assert!(matches!(interp.step().unwrap(), crate::result::Step::Stepped(_)));
+    let caller_after_step = interp.current_statement();
+    assert_ne!(caller_after_step, caller_statement);
+    assert_eq!(interp.current_location(), caller_location);
+    assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(7));
+
+    let callee_entry = interp.entry_block(callee).unwrap();
+    let callee_first = callee_entry.first_statement(interp.stage_info()).unwrap();
+    let callee_arg = callee_entry.expect_info(interp.stage_info()).arguments[0];
+    let _ = interp.invoke(callee, &[InvokeValue::I64(7)], &[sum_value.into()]);
+
+    assert_eq!(interp.current_statement(), Some(callee_first));
+    assert_ne!(interp.current_location(), caller_location);
+    assert_eq!(interp.read(callee_arg.into()).unwrap(), InvokeValue::I64(7));
+    assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(7));
+    assert!(interp.read(sum_value).is_err());
+
+    let _ = interp.return_current(InvokeValue::I64(8));
+
+    assert_eq!(interp.current_statement(), caller_after_step);
+    assert_eq!(interp.current_location(), caller_location);
+    assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(7));
+    assert_eq!(interp.read(sum_value).unwrap(), InvokeValue::I64(8));
 }
 
 #[test]
 fn return_current_restores_caller_and_writes_product_results() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
-    let _callee: SpecializedFunction = build_add_one(&mut pipeline, stage_id);
-    let mut interp = InvokeInterp::new(&pipeline, stage_id, InvokeMachine);
+    let callee = build_pair_callee(&mut pipeline, stage_id);
+    let (caller, c2_value, sum_value) = build_caller_program(&mut pipeline, stage_id);
 
-    fn uses_return<'ir, I: crate::interpreter::Invoke<'ir>>(interp: &mut I, value: ArithValue) {
-        let _ = interp.return_current(value);
-    }
+    let mut interp = InvokeInterp::new(&pipeline, stage_id, effect::Stateless::default());
+    interp.start_specialization(caller, &[InvokeValue::I64(9)]).unwrap();
+    assert!(matches!(interp.step().unwrap(), crate::result::Step::Stepped(_)));
+    let caller_statement = interp.current_statement();
+    assert!(caller_statement.is_some());
+    let caller_location = interp.current_location();
 
-    uses_return(&mut interp, ArithValue::I64(1));
+    let callee_entry = interp.entry_block(callee).unwrap();
+    let callee_first = callee_entry.first_statement(interp.stage_info()).unwrap();
+    let callee_arg = callee_entry.expect_info(interp.stage_info()).arguments[0];
+
+    let _ = interp.invoke(callee, &[InvokeValue::I64(9)], &[sum_value.into(), c2_value.into()]);
+    assert_eq!(interp.current_statement(), Some(callee_first));
+    assert_ne!(interp.current_location(), caller_location);
+    assert_eq!(interp.read(callee_arg.into()).unwrap(), InvokeValue::I64(9));
+
+    let product = InvokeValue::new_product(vec![InvokeValue::I64(9), InvokeValue::I64(8)]);
+    let _ = interp.return_current(product);
+
+    let entry = interp.entry_block(caller).unwrap();
+    let caller_arg = entry.expect_info(interp.stage_info()).arguments[0];
+    assert_eq!(interp.current_statement(), caller_statement);
+    assert_eq!(interp.current_location(), caller_location);
+    assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(9));
+    assert_eq!(interp.read(sum_value).unwrap(), InvokeValue::I64(9));
+    assert_eq!(interp.read(c2_value).unwrap(), InvokeValue::I64(8));
 }
 
 #[test]
 fn flow_stay_leaves_current_cursor_unchanged() {
-    let _ = crate::effect::Flow::<ArithValue>::Stay;
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let caller = build_add_one(&mut pipeline, stage_id);
+
+    let mut interp = InvokeInterp::new(&pipeline, stage_id, effect::Stateless::default());
+    interp.start_specialization(caller, &[InvokeValue::I64(3)]).unwrap();
+    let before_statement = interp.current_statement();
+    let before_location = interp.current_location();
+
+    fn stay_effect() -> crate::effect::Flow<InvokeValue> {
+        crate::effect::Flow::Stay
+    }
+
+    match stay_effect() {
+        crate::effect::Flow::Stay => {
+            assert_eq!(interp.current_statement(), before_statement);
+            assert_eq!(interp.current_location(), before_location);
+        }
+        crate::effect::Flow::Advance | crate::effect::Flow::Jump(_) | crate::effect::Flow::Stop(_) => {
+            unreachable!("future stay behavior should not map to another control flow")
+        }
+    }
 }
