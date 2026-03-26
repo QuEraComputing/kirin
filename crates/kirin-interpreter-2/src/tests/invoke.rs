@@ -1,13 +1,15 @@
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
-use kirin_ir::{CompileStage, GetInfo, HasArguments, Pipeline, Product, Signature, SpecializedFunction, StageInfo, Typeof, SSAValue};
-use kirin_test_utils::ir_fixtures::build_add_one;
+use kirin_ir::{
+    CompileStage, GetInfo, HasArguments, Pipeline, Product, SSAValue, Signature,
+    SpecializedFunction, StageInfo, Typeof,
+};
 use kirin_test_languages::CompositeLanguage;
+use kirin_test_utils::ir_fixtures::build_add_one;
 
 use crate::{
-    InterpreterError, Interpretable, ProductValue, ValueStore,
-    effect,
+    Interpretable, InterpreterError, ProductValue, ValueStore, effect,
     interpreter::{Driver, Position, SingleStage},
 };
 
@@ -73,8 +75,13 @@ fn unsupported(message: &'static str) -> InterpreterError {
     InterpreterError::custom(std::io::Error::other(message))
 }
 
-type InvokeInterp<'ir> =
-    SingleStage<'ir, CompositeLanguage, InvokeValue, effect::Stateless<InvokeValue>, InterpreterError>;
+type InvokeInterp<'ir> = SingleStage<
+    'ir,
+    CompositeLanguage,
+    InvokeValue,
+    effect::Stateless<InvokeValue>,
+    InterpreterError,
+>;
 
 fn as_i64(value: InvokeValue) -> Result<i64, InterpreterError> {
     match value {
@@ -150,7 +157,10 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Constant<ArithValue, ArithTy
     type Machine = effect::Stateless<InvokeValue>;
     type Error = InterpreterError;
 
-    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+    fn interpret(
+        &self,
+        interp: &mut InvokeInterp<'ir>,
+    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
         interp.write(self.result, self.value.clone().into())?;
         Ok(effect::Flow::Advance)
     }
@@ -160,15 +170,22 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Arith<ArithType> {
     type Machine = effect::Stateless<InvokeValue>;
     type Error = InterpreterError;
 
-    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+    fn interpret(
+        &self,
+        interp: &mut InvokeInterp<'ir>,
+    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
         match self {
-            Arith::Add { lhs, rhs, result, .. } => {
+            Arith::Add {
+                lhs, rhs, result, ..
+            } => {
                 let lhs = as_i64(interp.read(*lhs)?)?;
                 let rhs = as_i64(interp.read(*rhs)?)?;
                 interp.write(*result, InvokeValue::I64(lhs + rhs))?;
                 Ok(effect::Flow::Advance)
             }
-            Arith::Sub { lhs, rhs, result, .. } => {
+            Arith::Sub {
+                lhs, rhs, result, ..
+            } => {
                 let lhs = as_i64(interp.read(*lhs)?)?;
                 let rhs = as_i64(interp.read(*rhs)?)?;
                 interp.write(*result, InvokeValue::I64(lhs - rhs))?;
@@ -183,7 +200,10 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Return<ArithType> {
     type Machine = effect::Stateless<InvokeValue>;
     type Error = InterpreterError;
 
-    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+    fn interpret(
+        &self,
+        interp: &mut InvokeInterp<'ir>,
+    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
         let values = self
             .arguments()
             .map(|ssa| interp.read(*ssa))
@@ -196,8 +216,13 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for FunctionBody<ArithType> {
     type Machine = effect::Stateless<InvokeValue>;
     type Error = InterpreterError;
 
-    fn interpret(&self, _interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
-        Err(unsupported("function bodies are structural and should not be stepped directly"))
+    fn interpret(
+        &self,
+        _interp: &mut InvokeInterp<'ir>,
+    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+        Err(unsupported(
+            "function bodies are structural and should not be stepped directly",
+        ))
     }
 }
 
@@ -205,13 +230,18 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for CompositeLanguage {
     type Machine = effect::Stateless<InvokeValue>;
     type Error = InterpreterError;
 
-    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+    fn interpret(
+        &self,
+        interp: &mut InvokeInterp<'ir>,
+    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
         match self {
             CompositeLanguage::Arith(op) => op.interpret(interp),
             CompositeLanguage::Constant(op) => op.interpret(interp),
             CompositeLanguage::FunctionBody(op) => op.interpret(interp),
             CompositeLanguage::Return(op) => op.interpret(interp),
-            CompositeLanguage::ControlFlow(_) => Err(unsupported("control flow not used in invoke scaffold")),
+            CompositeLanguage::ControlFlow(_) => {
+                Err(unsupported("control flow not used in invoke scaffold"))
+            }
         }
     }
 }
@@ -224,7 +254,9 @@ fn invoke_pushes_new_activation_and_preserves_caller_bindings() {
     let (caller, _c2_value, sum_value) = build_caller_program(&mut pipeline, stage_id);
 
     let mut interp = InvokeInterp::new(&pipeline, stage_id, effect::Stateless::default());
-    interp.start_specialization(caller, &[InvokeValue::I64(7)]).unwrap();
+    interp
+        .start_specialization(caller, &[InvokeValue::I64(7)])
+        .unwrap();
 
     let entry = interp.entry_block(caller).unwrap();
     let caller_arg = entry.expect_info(interp.stage_info()).arguments[0];
@@ -233,7 +265,10 @@ fn invoke_pushes_new_activation_and_preserves_caller_bindings() {
     assert!(caller_statement.is_some());
     assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(7));
 
-    assert!(matches!(interp.step().unwrap(), crate::result::Step::Stepped(_)));
+    assert!(matches!(
+        interp.step().unwrap(),
+        crate::result::Step::Stepped(_)
+    ));
     let caller_after_step = interp.current_statement();
     assert_ne!(caller_after_step, caller_statement);
     assert_eq!(interp.current_location(), caller_location);
@@ -266,8 +301,13 @@ fn return_current_restores_caller_and_writes_product_results() {
     let (caller, c2_value, sum_value) = build_caller_program(&mut pipeline, stage_id);
 
     let mut interp = InvokeInterp::new(&pipeline, stage_id, effect::Stateless::default());
-    interp.start_specialization(caller, &[InvokeValue::I64(9)]).unwrap();
-    assert!(matches!(interp.step().unwrap(), crate::result::Step::Stepped(_)));
+    interp
+        .start_specialization(caller, &[InvokeValue::I64(9)])
+        .unwrap();
+    assert!(matches!(
+        interp.step().unwrap(),
+        crate::result::Step::Stepped(_)
+    ));
     let caller_statement = interp.current_statement();
     assert!(caller_statement.is_some());
     let caller_location = interp.current_location();
@@ -276,7 +316,11 @@ fn return_current_restores_caller_and_writes_product_results() {
     let callee_first = callee_entry.first_statement(interp.stage_info()).unwrap();
     let callee_arg = callee_entry.expect_info(interp.stage_info()).arguments[0];
 
-    let _ = interp.invoke(callee, &[InvokeValue::I64(9)], &[sum_value.into(), c2_value.into()]);
+    let _ = interp.invoke(
+        callee,
+        &[InvokeValue::I64(9)],
+        &[sum_value.into(), c2_value.into()],
+    );
     assert_eq!(interp.current_statement(), Some(callee_first));
     assert_ne!(interp.current_location(), caller_location);
     assert_eq!(interp.read(callee_arg.into()).unwrap(), InvokeValue::I64(9));
@@ -300,7 +344,9 @@ fn flow_stay_leaves_current_cursor_unchanged() {
     let caller = build_add_one(&mut pipeline, stage_id);
 
     let mut interp = InvokeInterp::new(&pipeline, stage_id, effect::Stateless::default());
-    interp.start_specialization(caller, &[InvokeValue::I64(3)]).unwrap();
+    interp
+        .start_specialization(caller, &[InvokeValue::I64(3)])
+        .unwrap();
     let before_statement = interp.current_statement();
     let before_location = interp.current_location();
 
