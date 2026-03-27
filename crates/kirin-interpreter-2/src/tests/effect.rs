@@ -1,7 +1,5 @@
-use std::convert::Infallible;
-
 use crate::{
-    ConsumeEffect, FromConstant, Lift, LiftEffect, Machine,
+    ConsumeEffect, FromConstant, Lift, Machine,
     control::Shell,
     effect::{Cursor, Flow, Stateless},
 };
@@ -33,20 +31,6 @@ fn stateless_machine_implements_machine_contract() {
 
     let machine = Stateless::<i64>::default();
     effect_roundtrip(&machine);
-}
-
-#[test]
-fn upcast_converts_infallible_flow_to_any_stop_type() {
-    assert_eq!(Flow::<Infallible>::Advance.upcast::<i64>(), Flow::Advance);
-    assert_eq!(Flow::<Infallible>::Stay.upcast::<i64>(), Flow::Stay);
-}
-
-#[test]
-fn lift_effect_blanket_converts_infallible_stateless_to_any_stateless() {
-    let advance: Flow<Infallible> = Flow::Advance;
-    let lifted: Flow<i64> =
-        <Stateless<i64> as LiftEffect<'_, Stateless<Infallible>>>::lift_effect(advance);
-    assert_eq!(lifted, Flow::<i64>::Advance);
 }
 
 #[test]

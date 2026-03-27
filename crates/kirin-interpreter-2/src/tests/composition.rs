@@ -95,18 +95,6 @@ impl ProjectMachineMut<LeafMachine> for CompositeMachine {
     }
 }
 
-impl<'ir> crate::LiftEffect<'ir, LeafMachine> for CompositeMachine {
-    fn lift_effect(effect: LeafEffect) -> CompositeEffect {
-        CompositeEffect::Leaf(effect)
-    }
-}
-
-impl<'ir> crate::LiftStop<'ir, LeafMachine> for CompositeMachine {
-    fn lift_stop(stop: LeafStop) -> CompositeStop {
-        CompositeStop::Leaf(stop)
-    }
-}
-
 impl Lift<CompositeEffect> for LeafEffect {
     fn lift(self) -> CompositeEffect {
         CompositeEffect::Leaf(self)

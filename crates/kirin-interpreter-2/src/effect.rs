@@ -1,9 +1,6 @@
-use std::{convert::Infallible, marker::PhantomData};
+use std::marker::PhantomData;
 
-use crate::{
-    ConsumeEffect, ExecutionSeed, InterpreterError, Lift, LiftEffect, LiftStop, Machine,
-    control::Shell,
-};
+use crate::{ConsumeEffect, ExecutionSeed, InterpreterError, Lift, Machine, control::Shell};
 
 /// Shared shell-facing semantic flow effects for simple dialects.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -34,19 +31,6 @@ impl<Stop> Flow<Stop> {
     }
 }
 
-impl Flow<Infallible> {
-    /// Upcast a total (never-stopping) flow into any target stop type.
-    pub fn upcast<T>(self) -> Flow<T> {
-        match self {
-            Self::Advance => Flow::Advance,
-            Self::Stay => Flow::Stay,
-            Self::Jump(seed) => Flow::Jump(seed),
-            // Infallible has no variants, so this arm is unreachable.
-            Self::Stop(never) => match never {},
-        }
-    }
-}
-
 /// Stateless machine for dialects whose effects are just shell flow.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Stateless<Stop>(PhantomData<fn() -> Stop>);
@@ -67,19 +51,6 @@ impl<'ir, Stop> ConsumeEffect<'ir> for Stateless<Stop> {
 
     fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
         Ok(effect.into_shell())
-    }
-}
-
-/// Any `Stateless<S>` can lift from a total (never-stopping) `Stateless<Infallible>`.
-impl<'ir, S> LiftEffect<'ir, Stateless<Infallible>> for Stateless<S> {
-    fn lift_effect(effect: Flow<Infallible>) -> Flow<S> {
-        effect.upcast()
-    }
-}
-
-impl<'ir, S> LiftStop<'ir, Stateless<Infallible>> for Stateless<S> {
-    fn lift_stop(stop: Infallible) -> S {
-        match stop {}
     }
 }
 

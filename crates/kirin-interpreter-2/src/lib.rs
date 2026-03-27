@@ -27,7 +27,7 @@ pub use interpreter::Interpreter;
 pub use lift::Lift;
 pub use machine::{ConsumeEffect, Machine};
 pub use product_value::ProductValue;
-pub use projection::{LiftEffect, LiftStop, ProjectMachine, ProjectMachineMut};
+pub use projection::{ProjectMachine, ProjectMachineMut};
 pub use seed::{BlockSeed, DiGraphSeed, ExecutionSeed, RegionSeed, UnGraphSeed};
 pub use stage_access::StageAccess;
 pub use total::Total;
@@ -41,9 +41,9 @@ pub type InterpreterStop<'ir, I> = <<I as Interpreter<'ir>>::Machine as Machine<
 /// Essentials for dialect authors implementing machine-based semantics.
 pub mod prelude {
     pub use crate::{
-        ConsumeEffect, Cursor, FromConstant, Interpretable, Lift, LiftEffect, LiftStop, Machine,
-        ProductValue, ProjectMachine, ProjectMachineMut, StageAccess, ValueStore, control, effect,
-        interpreter, result,
+        ConsumeEffect, Cursor, FromConstant, Interpretable, Lift, Machine, ProductValue,
+        ProjectMachine, ProjectMachineMut, StageAccess, ValueStore, control, effect, interpreter,
+        result,
     };
 }
 
