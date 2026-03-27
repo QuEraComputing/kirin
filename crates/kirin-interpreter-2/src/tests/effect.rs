@@ -1,7 +1,9 @@
+use std::convert::Infallible;
+
 use crate::{
-    ConsumeEffect, Machine,
+    ConsumeEffect, FromConstant, Lift, LiftEffect, Machine,
     control::Shell,
-    effect::{Flow, Stateless},
+    effect::{Cursor, Flow, Stateless},
 };
 
 #[test]
@@ -31,4 +33,39 @@ fn stateless_machine_implements_machine_contract() {
 
     let machine = Stateless::<i64>::default();
     effect_roundtrip(&machine);
+}
+
+#[test]
+fn upcast_converts_infallible_flow_to_any_stop_type() {
+    assert_eq!(Flow::<Infallible>::Advance.upcast::<i64>(), Flow::Advance);
+    assert_eq!(Flow::<Infallible>::Stay.upcast::<i64>(), Flow::Stay);
+}
+
+#[test]
+fn lift_effect_blanket_converts_infallible_stateless_to_any_stateless() {
+    let advance: Flow<Infallible> = Flow::Advance;
+    let lifted: Flow<i64> =
+        <Stateless<i64> as LiftEffect<'_, Stateless<Infallible>>>::lift_effect(advance);
+    assert_eq!(lifted, Flow::<i64>::Advance);
+}
+
+#[test]
+fn cursor_variants_are_distinct() {
+    let advance = Cursor::Advance;
+    let stay = Cursor::Stay;
+    assert_ne!(advance, stay);
+}
+
+#[test]
+fn lift_identity_returns_self() {
+    let flow: Flow<i64> = Flow::Advance;
+    let lifted: Flow<i64> = flow.lift();
+    assert_eq!(lifted, Flow::Advance);
+}
+
+#[test]
+fn from_constant_converts_via_try_from() {
+    // i64 implements From<i32>, so TryFrom<i32> is satisfied
+    let value: i64 = FromConstant::from_constant(42_i32).unwrap();
+    assert_eq!(value, 42_i64);
 }
