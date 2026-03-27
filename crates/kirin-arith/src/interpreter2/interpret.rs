@@ -1,11 +1,9 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
 use kirin::prelude::CompileTimeValue;
-use kirin_interpreter_2::{Interpretable, Interpreter, InterpreterError, ValueStore};
+use kirin_interpreter_2::{Interpretable, Interpreter, InterpreterError, effect::Cursor};
 
 use crate::{Arith, CheckedDiv, CheckedRem};
-
-use super::Effect;
 
 #[derive(Debug)]
 struct DivisionByZero;
@@ -20,21 +18,20 @@ impl std::error::Error for DivisionByZero {}
 
 impl<'ir, I, T> Interpretable<'ir, I> for Arith<T>
 where
-    I: Interpreter<'ir> + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
-    <I as ValueStore>::Value: Clone
-        + Add<Output = <I as ValueStore>::Value>
-        + Sub<Output = <I as ValueStore>::Value>
-        + Mul<Output = <I as ValueStore>::Value>
+    I: Interpreter<'ir> + kirin_interpreter_2::ValueStore<Error = <I as Interpreter<'ir>>::Error>,
+    <I as kirin_interpreter_2::ValueStore>::Value: Clone
+        + Add<Output = <I as kirin_interpreter_2::ValueStore>::Value>
+        + Sub<Output = <I as kirin_interpreter_2::ValueStore>::Value>
+        + Mul<Output = <I as kirin_interpreter_2::ValueStore>::Value>
         + CheckedDiv
         + CheckedRem
-        + Neg<Output = <I as ValueStore>::Value>,
+        + Neg<Output = <I as kirin_interpreter_2::ValueStore>::Value>,
     T: CompileTimeValue,
-    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
 {
-    type Machine = super::Machine;
+    type Effect = Cursor;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(&self, interp: &mut I) -> Result<Effect, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
         match self {
             Arith::Add {
                 lhs, rhs, result, ..
@@ -86,6 +83,6 @@ where
             Self::__Phantom(..) => unreachable!(),
         }
 
-        Ok(Effect::Advance)
+        Ok(Cursor::Advance)
     }
 }

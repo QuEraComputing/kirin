@@ -158,10 +158,10 @@ impl<'ir, I, D> crate::Interpretable<'ir, I> for Total<D>
 where
     I: Interpreter<'ir>,
     D: crate::Interpretable<'ir, I>,
-    <D::Machine as Machine<'ir>>::Effect: Lift<<I::Machine as Machine<'ir>>::Effect>,
+    D::Effect: Lift<<I::Machine as Machine<'ir>>::Effect>,
     D::Error: Into<<I as Interpreter<'ir>>::Error>,
 {
-    type Machine = I::Machine;
+    type Effect = <I::Machine as Machine<'ir>>::Effect;
     type Error = <I as Interpreter<'ir>>::Error;
 
     fn interpret(

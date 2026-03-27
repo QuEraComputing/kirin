@@ -1,12 +1,14 @@
 use crate::{
-    ConsumeEffect, Interpretable, LiftEffect, LiftStop, Machine, ProjectMachine, ProjectMachineMut,
-    StageAccess, ValueStore, control::Shell,
+    ConsumeEffect, Interpretable, Lift, Machine, ProjectMachine, ProjectMachineMut, StageAccess,
+    ValueStore, control::Shell,
 };
+
+use crate::InterpreterError;
 
 /// Typed single-stage shell contract over one top-level machine.
 pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     type Machine: Machine<'ir> + ConsumeEffect<'ir>;
-    type Error;
+    type Error: From<InterpreterError>;
 
     fn machine(&self) -> &Self::Machine;
     fn machine_mut(&mut self) -> &mut Self::Machine;
@@ -43,32 +45,10 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
         self.machine_mut().project_mut()
     }
 
-    fn lift_effect<Sub: Machine<'ir>>(
-        &self,
-        effect: <Sub as Machine<'ir>>::Effect,
-    ) -> <Self::Machine as Machine<'ir>>::Effect
-    where
-        Self: Sized,
-        Self::Machine: LiftEffect<'ir, Sub>,
-    {
-        <Self::Machine as LiftEffect<'ir, Sub>>::lift_effect(effect)
-    }
-
-    fn lift_stop<Sub: Machine<'ir>>(
-        &self,
-        stop: <Sub as Machine<'ir>>::Stop,
-    ) -> <Self::Machine as Machine<'ir>>::Stop
-    where
-        Self: Sized,
-        Self::Machine: LiftStop<'ir, Sub>,
-    {
-        <Self::Machine as LiftStop<'ir, Sub>>::lift_stop(stop)
-    }
-
     fn interpret_local<D>(
         &mut self,
         stmt: &D,
-    ) -> Result<<D::Machine as Machine<'ir>>::Effect, <Self as Interpreter<'ir>>::Error>
+    ) -> Result<D::Effect, <Self as Interpreter<'ir>>::Error>
     where
         Self: Sized,
         D: Interpretable<'ir, Self>,
@@ -84,11 +64,10 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     where
         Self: Sized,
         D: Interpretable<'ir, Self>,
-        Self::Machine: LiftEffect<'ir, D::Machine>,
+        D::Effect: Lift<<Self::Machine as Machine<'ir>>::Effect>,
         D::Error: Into<<Self as Interpreter<'ir>>::Error>,
     {
-        let effect = self.interpret_local(stmt)?;
-        Ok(self.lift_effect::<D::Machine>(effect))
+        stmt.interpret(self).map_err(Into::into).map(Lift::lift)
     }
 
     fn consume_local_effect<Sub>(
@@ -106,25 +85,25 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
             .map_err(Into::into)
     }
 
-    fn consume_lifted_effect<Sub: Machine<'ir>>(
+    fn consume_lifted_effect<E>(
         &mut self,
-        effect: <Sub as Machine<'ir>>::Effect,
+        effect: E,
     ) -> Result<Shell<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
     where
         Self: Sized,
-        Self::Machine: LiftEffect<'ir, Sub>,
+        E: Lift<<Self::Machine as Machine<'ir>>::Effect>,
     {
-        self.consume_effect(self.lift_effect::<Sub>(effect))
+        self.consume_effect(effect.lift())
     }
 
-    fn consume_local_control<Sub: Machine<'ir>>(
+    fn consume_local_control<S>(
         &mut self,
-        control: Shell<<Sub as Machine<'ir>>::Stop>,
+        control: Shell<S>,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error>
     where
         Self: Sized,
-        Self::Machine: LiftStop<'ir, Sub>,
+        S: Lift<<Self::Machine as Machine<'ir>>::Stop>,
     {
-        self.consume_control(control.map_stop(|stop| self.lift_stop::<Sub>(stop)))
+        self.consume_control(control.map_stop(Lift::lift))
     }
 }

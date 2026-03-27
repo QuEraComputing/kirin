@@ -232,7 +232,7 @@ fn build_multistage_named_function(
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Constant<ArithValue, ArithType> {
-    type Machine = effect::Stateless<InvokeValue>;
+    type Effect = effect::Flow<InvokeValue>;
     type Error = InterpreterError;
 
     fn interpret(
@@ -245,7 +245,7 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Constant<ArithValue, ArithTy
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Arith<ArithType> {
-    type Machine = effect::Stateless<InvokeValue>;
+    type Effect = effect::Flow<InvokeValue>;
     type Error = InterpreterError;
 
     fn interpret(
@@ -275,7 +275,7 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Arith<ArithType> {
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Return<ArithType> {
-    type Machine = effect::Stateless<InvokeValue>;
+    type Effect = effect::Flow<InvokeValue>;
     type Error = InterpreterError;
 
     fn interpret(
@@ -291,7 +291,7 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Return<ArithType> {
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for FunctionBody<ArithType> {
-    type Machine = effect::Stateless<InvokeValue>;
+    type Effect = effect::Flow<InvokeValue>;
     type Error = InterpreterError;
 
     fn interpret(
@@ -305,7 +305,7 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for FunctionBody<ArithType> {
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for CompositeLanguage {
-    type Machine = effect::Stateless<InvokeValue>;
+    type Effect = effect::Flow<InvokeValue>;
     type Error = InterpreterError;
 
     fn interpret(

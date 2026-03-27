@@ -347,7 +347,7 @@ where
     where
         V: Clone,
         M: crate::ConsumeEffect<'ir, Error = E>,
-        L: crate::Interpretable<'ir, Self, Machine = M, Error = E>,
+        L: crate::Interpretable<'ir, Self, Effect = <M as crate::Machine<'ir>>::Effect, Error = E>,
         E: From<InterpreterError>,
     {
         self.start_specialization(callee, args)?;

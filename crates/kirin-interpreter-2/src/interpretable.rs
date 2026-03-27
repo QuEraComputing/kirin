@@ -1,17 +1,14 @@
 use kirin_ir::Dialect;
 
-use crate::{Interpreter, Machine};
+use crate::Interpreter;
 
-/// Dialect execution hook returning local semantic machine effects.
+/// Dialect execution hook returning local semantic effects.
 pub trait Interpretable<'ir, I>: Dialect
 where
     I: Interpreter<'ir>,
 {
-    type Machine: Machine<'ir>;
+    type Effect;
     type Error;
 
-    fn interpret(
-        &self,
-        interp: &mut I,
-    ) -> Result<<Self::Machine as Machine<'ir>>::Effect, Self::Error>;
+    fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error>;
 }

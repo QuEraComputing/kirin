@@ -10,12 +10,10 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    Interpretable, InterpreterError, ProductValue, effect, interpreter::SingleStage,
+    Interpretable, Interpreter, InterpreterError, ProductValue, effect, interpreter::SingleStage,
 };
 
 use crate::{Bind, Call, FunctionBody, Return};
-
-use crate::interpreter2::Effect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(builders, type = ArithType, crate = kirin::ir)]
@@ -143,24 +141,21 @@ pub type TestMachine = effect::Stateless<TestValue>;
 pub type TestInterp<'ir> = SingleStage<'ir, TestLanguage, TestValue, TestMachine, InterpreterError>;
 
 impl<'ir> Interpretable<'ir, TestInterp<'ir>> for TestLanguage {
-    type Machine = TestMachine;
+    type Effect = effect::Flow<TestValue>;
     type Error = InterpreterError;
 
-    fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<Effect<TestValue>, Self::Error> {
+    fn interpret(
+        &self,
+        interp: &mut TestInterp<'ir>,
+    ) -> Result<effect::Flow<TestValue>, Self::Error> {
         match self {
-            TestLanguage::Constant(op) => op
-                .interpret(interp)
-                .map(|effect| effect.map_stop(|never| match never {})),
-            TestLanguage::Arith(op) => op
-                .interpret(interp)
-                .map(|effect| effect.map_stop(|never| match never {})),
-            TestLanguage::ControlFlow(op) => op
-                .interpret(interp)
-                .map(|effect| effect.map_stop(|never| match never {})),
-            TestLanguage::FunctionBody(op) => op.interpret(interp),
-            TestLanguage::Bind(op) => op.interpret(interp),
-            TestLanguage::Call(op) => op.interpret(interp),
-            TestLanguage::Return(op) => op.interpret(interp),
+            TestLanguage::Constant(op) => interp.interpret_lifted(op),
+            TestLanguage::Arith(op) => interp.interpret_lifted(op),
+            TestLanguage::ControlFlow(op) => interp.interpret_lifted(op),
+            TestLanguage::FunctionBody(op) => interp.interpret_lifted(op),
+            TestLanguage::Bind(op) => interp.interpret_lifted(op),
+            TestLanguage::Call(op) => interp.interpret_lifted(op),
+            TestLanguage::Return(op) => interp.interpret_lifted(op),
         }
     }
 }

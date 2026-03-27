@@ -95,7 +95,7 @@ fn is_truthy(value: &ArithValue) -> Result<bool, InterpreterError> {
 }
 
 impl<'ir> Interpretable<'ir, TestInterp<'ir>> for Constant<ArithValue, ArithType> {
-    type Machine = TestMachine;
+    type Effect = TestEffect;
     type Error = InterpreterError;
 
     fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {
@@ -105,7 +105,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for Constant<ArithValue, ArithType
 }
 
 impl<'ir> Interpretable<'ir, TestInterp<'ir>> for Arith<ArithType> {
-    type Machine = TestMachine;
+    type Effect = TestEffect;
     type Error = InterpreterError;
 
     fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {
@@ -124,7 +124,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for Arith<ArithType> {
 }
 
 impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ControlFlow<ArithType> {
-    type Machine = TestMachine;
+    type Effect = TestEffect;
     type Error = InterpreterError;
 
     fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {
@@ -164,7 +164,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ControlFlow<ArithType> {
 }
 
 impl<'ir> Interpretable<'ir, TestInterp<'ir>> for Return<ArithType> {
-    type Machine = TestMachine;
+    type Effect = TestEffect;
     type Error = InterpreterError;
 
     fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {
@@ -182,7 +182,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for Return<ArithType> {
 }
 
 impl<'ir> Interpretable<'ir, TestInterp<'ir>> for FunctionBody<ArithType> {
-    type Machine = TestMachine;
+    type Effect = TestEffect;
     type Error = InterpreterError;
 
     fn interpret(&self, _interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {
@@ -193,7 +193,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for FunctionBody<ArithType> {
 }
 
 impl<'ir> Interpretable<'ir, TestInterp<'ir>> for CompositeLanguage {
-    type Machine = TestMachine;
+    type Effect = TestEffect;
     type Error = InterpreterError;
 
     fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {

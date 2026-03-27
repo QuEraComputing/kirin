@@ -164,7 +164,13 @@ where
 
 impl<'ir, L, V, M, E> Driver<'ir> for SingleStage<'ir, L, V, M, E>
 where
-    L: Dialect + 'ir + crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>, Machine = M>,
+    L: Dialect
+        + 'ir
+        + crate::Interpretable<
+            'ir,
+            SingleStage<'ir, L, V, M, E>,
+            Effect = <M as Machine<'ir>>::Effect,
+        >,
     V: Clone + 'ir,
     M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,
@@ -220,7 +226,13 @@ where
 
 impl<'ir, L, V, M, E> Interpreter<'ir> for SingleStage<'ir, L, V, M, E>
 where
-    L: Dialect + 'ir + crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>, Machine = M>,
+    L: Dialect
+        + 'ir
+        + crate::Interpretable<
+            'ir,
+            SingleStage<'ir, L, V, M, E>,
+            Effect = <M as Machine<'ir>>::Effect,
+        >,
     V: Clone + 'ir,
     M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,
@@ -265,7 +277,13 @@ where
 
 impl<'ir, L, V, M, E> Invoke<'ir> for SingleStage<'ir, L, V, M, E>
 where
-    L: Dialect + 'ir + crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>, Machine = M>,
+    L: Dialect
+        + 'ir
+        + crate::Interpretable<
+            'ir,
+            SingleStage<'ir, L, V, M, E>,
+            Effect = <M as Machine<'ir>>::Effect,
+        >,
     V: Clone + crate::ProductValue + 'ir,
     M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,
@@ -314,7 +332,13 @@ where
 
 impl<'ir, L, V, M, E> ResolveCallee<'ir> for SingleStage<'ir, L, V, M, E>
 where
-    L: Dialect + 'ir + crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>, Machine = M>,
+    L: Dialect
+        + 'ir
+        + crate::Interpretable<
+            'ir,
+            SingleStage<'ir, L, V, M, E>,
+            Effect = <M as Machine<'ir>>::Effect,
+        >,
     V: Clone + 'ir,
     M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,

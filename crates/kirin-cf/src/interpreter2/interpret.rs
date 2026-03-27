@@ -1,34 +1,29 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::BranchCondition;
-use kirin_interpreter_2::{
-    Interpretable, Interpreter, InterpreterError, ValueStore, interpreter::BlockBindings,
-};
+use kirin_interpreter_2::{Interpretable, Interpreter, effect::Cursor, interpreter::BlockBindings};
 
 use crate::ControlFlow;
 
-use super::Effect;
-
-fn unsupported(message: &'static str) -> InterpreterError {
-    InterpreterError::custom(std::io::Error::other(message))
+fn unsupported(message: &'static str) -> kirin_interpreter_2::InterpreterError {
+    kirin_interpreter_2::InterpreterError::custom(std::io::Error::other(message))
 }
 
 impl<'ir, I, T> Interpretable<'ir, I> for ControlFlow<T>
 where
-    I: BlockBindings<'ir> + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
-    <I as ValueStore>::Value: Clone + BranchCondition,
+    I: BlockBindings<'ir> + kirin_interpreter_2::ValueStore<Error = <I as Interpreter<'ir>>::Error>,
+    <I as kirin_interpreter_2::ValueStore>::Value: Clone + BranchCondition,
     T: CompileTimeValue,
-    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
 {
-    type Machine = super::Machine;
+    type Effect = Cursor;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(&self, interp: &mut I) -> Result<Effect, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
         match self {
             ControlFlow::Branch { target, args } => {
                 let values = interp.read_many(args)?;
                 let block = target.target();
                 interp.bind_block_args(block, &values)?;
-                Ok(Effect::Jump(block.into()))
+                Ok(Cursor::Jump(block.into()))
             }
             ControlFlow::ConditionalBranch {
                 condition,
@@ -49,7 +44,7 @@ where
                     };
                 let values = interp.read_many(args)?;
                 interp.bind_block_args(block, &values)?;
-                Ok(Effect::Jump(block.into()))
+                Ok(Cursor::Jump(block.into()))
             }
             Self::__Phantom(..) => unreachable!(),
         }

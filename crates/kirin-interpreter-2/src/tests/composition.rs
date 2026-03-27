@@ -3,8 +3,8 @@ use kirin_constant::Constant;
 use kirin_ir::{CompileStage, Pipeline, StageInfo, TestSSAValue};
 
 use crate::{
-    ConsumeEffect, Interpretable, Interpreter, InterpreterError, LiftEffect, LiftStop, Machine,
-    ProjectMachine, ProjectMachineMut,
+    ConsumeEffect, Interpretable, Interpreter, InterpreterError, Lift, Machine, ProjectMachine,
+    ProjectMachineMut,
     control::Shell,
     interpreter::{Position, SingleStage},
 };
@@ -95,15 +95,27 @@ impl ProjectMachineMut<LeafMachine> for CompositeMachine {
     }
 }
 
-impl<'ir> LiftEffect<'ir, LeafMachine> for CompositeMachine {
+impl<'ir> crate::LiftEffect<'ir, LeafMachine> for CompositeMachine {
     fn lift_effect(effect: LeafEffect) -> CompositeEffect {
         CompositeEffect::Leaf(effect)
     }
 }
 
-impl<'ir> LiftStop<'ir, LeafMachine> for CompositeMachine {
+impl<'ir> crate::LiftStop<'ir, LeafMachine> for CompositeMachine {
     fn lift_stop(stop: LeafStop) -> CompositeStop {
         CompositeStop::Leaf(stop)
+    }
+}
+
+impl Lift<CompositeEffect> for LeafEffect {
+    fn lift(self) -> CompositeEffect {
+        CompositeEffect::Leaf(self)
+    }
+}
+
+impl Lift<CompositeStop> for LeafStop {
+    fn lift(self) -> CompositeStop {
+        CompositeStop::Leaf(self)
     }
 }
 
@@ -111,7 +123,7 @@ type LiftInterp<'ir> =
     SingleStage<'ir, LiftLanguage, ArithValue, CompositeMachine, InterpreterError>;
 
 impl<'ir> Interpretable<'ir, LiftInterp<'ir>> for Constant<ArithValue, ArithType> {
-    type Machine = LeafMachine;
+    type Effect = LeafEffect;
     type Error = InterpreterError;
 
     fn interpret(&self, _interp: &mut LiftInterp<'ir>) -> Result<LeafEffect, Self::Error> {
@@ -120,14 +132,14 @@ impl<'ir> Interpretable<'ir, LiftInterp<'ir>> for Constant<ArithValue, ArithType
 }
 
 impl<'ir> Interpretable<'ir, LiftInterp<'ir>> for LiftLanguage {
-    type Machine = CompositeMachine;
+    type Effect = CompositeEffect;
     type Error = InterpreterError;
 
     fn interpret(&self, interp: &mut LiftInterp<'ir>) -> Result<CompositeEffect, Self::Error> {
         match self {
             LiftLanguage::Constant(inner) => {
                 let effect = interp.interpret_local(inner)?;
-                Ok(interp.lift_effect::<LeafMachine>(effect))
+                Ok(effect.lift())
             }
         }
     }
@@ -198,7 +210,7 @@ fn consume_lifted_effect_returns_top_level_control() {
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
 
     let control = interp
-        .consume_lifted_effect::<LeafMachine>(LeafEffect::Record(ArithValue::I64(4)))
+        .consume_lifted_effect(LeafEffect::Record(ArithValue::I64(4)))
         .unwrap();
 
     assert_eq!(control, Shell::Stop(CompositeStop::Leaf(LeafStop::Stored)));
@@ -215,7 +227,7 @@ fn consume_local_control_lifts_stop_and_applies_shell_mutation() {
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
 
     interp
-        .consume_local_control::<LeafMachine>(Shell::Stop(LeafStop::Stored))
+        .consume_local_control(Shell::Stop(LeafStop::Stored))
         .unwrap();
 
     assert_eq!(interp.cursor_depth(), 0);

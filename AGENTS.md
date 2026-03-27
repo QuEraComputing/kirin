@@ -23,6 +23,8 @@ cargo insta review               # Review snapshot test changes
 cargo build -p toy-lang          # Build the toy language example binary
 cargo run -p toy-lang -- parse example/toy-lang/programs/add.kirin  # Parse an example program from repo root
 cargo nextest run -p toy-lang    # Run toy language example tests
+cargo build -p kirin-interpreter-2  # Build the interpreter-2 runtime crate
+cargo nextest run -p kirin-interpreter-2  # Run interpreter-2 crate tests
 ```
 
 Rust edition 2024. No `rust-toolchain.toml`; uses the default toolchain.
@@ -134,6 +136,7 @@ For user-defined dialects not in this table, ask the user for domain context dur
 
 **Interpreter:**
 - `kirin-interpreter` — Interpreter traits, `StackInterpreter`, `AbstractInterpreter`
+- `kirin-interpreter-2` — Next-generation interpreter runtime and shell/control APIs
 - `kirin-derive-interpreter` — `#[derive(Interpretable, CallSemantics)]`
 
 **Dialects:**
