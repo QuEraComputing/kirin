@@ -14,6 +14,7 @@ mod projection;
 pub mod result;
 mod seed;
 mod stage_access;
+mod total;
 mod value_store;
 
 pub use effect::Cursor;
@@ -29,6 +30,7 @@ pub use product_value::ProductValue;
 pub use projection::{LiftEffect, LiftStop, ProjectMachine, ProjectMachineMut};
 pub use seed::{BlockSeed, DiGraphSeed, ExecutionSeed, RegionSeed, UnGraphSeed};
 pub use stage_access::StageAccess;
+pub use total::Total;
 pub use value_store::ValueStore;
 
 /// Convenience alias for the interpreter's machine effect type.

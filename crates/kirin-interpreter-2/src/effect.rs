@@ -1,7 +1,8 @@
 use std::{convert::Infallible, marker::PhantomData};
 
 use crate::{
-    ConsumeEffect, ExecutionSeed, InterpreterError, LiftEffect, LiftStop, Machine, control::Shell,
+    ConsumeEffect, ExecutionSeed, InterpreterError, Lift, LiftEffect, LiftStop, Machine,
+    control::Shell,
 };
 
 /// Shared shell-facing semantic flow effects for simple dialects.
@@ -98,4 +99,15 @@ pub enum Cursor {
     Stay,
     /// Jump to a different execution point.
     Jump(ExecutionSeed),
+}
+
+/// Lift a total cursor directive into any `Flow<S>`.
+impl<S> Lift<Flow<S>> for Cursor {
+    fn lift(self) -> Flow<S> {
+        match self {
+            Self::Advance => Flow::Advance,
+            Self::Stay => Flow::Stay,
+            Self::Jump(seed) => Flow::Jump(seed),
+        }
+    }
 }
