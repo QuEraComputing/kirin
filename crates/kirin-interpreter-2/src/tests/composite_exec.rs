@@ -2,14 +2,14 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
-use kirin_ir::{CompileStage, HasArguments, Pipeline, StageInfo, Statement};
+use kirin_ir::{CompileStage, GetInfo, HasArguments, Pipeline, StageInfo, Statement};
 use kirin_test_languages::CompositeLanguage;
 use kirin_test_utils::ir_fixtures::{build_add_one, build_linear_program, build_select_program};
 
 use crate::{
     ConsumeEffect, Interpretable, InterpreterError, Machine, ValueStore,
     control::{Breakpoint, Breakpoints, Fuel, Interrupt, Location, Shell},
-    interpreter::{Driver, Position, SingleStage, StepResult},
+    interpreter::{BlockBindings, Driver, Position, SingleStage, StepResult, TypedStage},
     result::{Run, Step, Suspension},
 };
 
@@ -64,6 +64,19 @@ where
     Shell<<I::Machine as Machine<'ir>>::Stop>: Clone,
 {
     interp.step()
+}
+
+fn bind_block_args_via_block_bindings<'ir, I>(
+    interp: &mut I,
+    block: kirin_ir::Block,
+    args: &[<I as ValueStore>::Value],
+) -> Result<(), <I as crate::interpreter::Interpreter<'ir>>::Error>
+where
+    I: BlockBindings<'ir>,
+    <I as ValueStore>::Value: Clone,
+    <I as crate::interpreter::Interpreter<'ir>>::Error: From<InterpreterError>,
+{
+    interp.bind_block_args(block, args)
 }
 
 fn unsupported(message: &'static str) -> InterpreterError {
@@ -218,6 +231,26 @@ fn run_add_one_binds_entry_args() {
         .unwrap();
 
     assert_eq!(result, Run::Stopped(ArithValue::I64(6)));
+}
+
+#[test]
+fn block_bindings_trait_binds_block_args_and_computes_resume_seed() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_add_one(&mut pipeline, stage_id);
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
+    let entry = interp.entry_block(spec_fn).unwrap();
+    interp.push_specialization(spec_fn).unwrap();
+    bind_block_args_via_block_bindings(&mut interp, entry, &[ArithValue::I64(9)]).unwrap();
+
+    let first = current_statement_via_position(&interp).unwrap();
+    let second = (*first.next(interp.stage_info())).unwrap();
+    let expected = crate::BlockSeed::at_statement(entry, second).into();
+    let arg0 = entry.expect_info(interp.stage_info()).arguments[0];
+
+    assert_eq!(interp.read(arg0.into()).unwrap(), ArithValue::I64(9));
+    assert_eq!(interp.resume_seed_after_current().unwrap(), expected);
 }
 
 #[test]

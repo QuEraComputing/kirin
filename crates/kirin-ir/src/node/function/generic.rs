@@ -55,6 +55,10 @@ impl FunctionInfo {
         &self.staged_functions
     }
 
+    pub fn staged_function(&self, stage: CompileStage) -> Option<StagedFunction> {
+        self.staged_functions.get(&stage).copied()
+    }
+
     pub fn add_staged_function(&mut self, stage: CompileStage, func: StagedFunction) {
         self.staged_functions.insert(stage, func);
     }

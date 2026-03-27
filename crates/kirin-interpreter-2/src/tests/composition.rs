@@ -212,12 +212,7 @@ fn consume_lifted_effect_returns_top_level_control() {
 fn consume_local_control_lifts_stop_and_applies_shell_mutation() {
     let mut pipeline: Pipeline<StageInfo<LiftLanguage>> = Pipeline::new();
     let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
-    let block = pipeline
-        .stage_mut(stage_id)
-        .unwrap()
-        .with_builder(|b| b.block().new());
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
-    interp.push_block(block);
 
     interp
         .consume_local_control::<LeafMachine>(Shell::Stop(LeafStop::Stored))

@@ -35,4 +35,6 @@ mod staged;
 pub use compile_stage::CompileStage;
 pub use generic::{Function, FunctionInfo};
 pub use specialized::{SpecializedFunction, SpecializedFunctionInfo};
-pub use staged::{StagedFunction, StagedFunctionInfo, StagedNamePolicy};
+pub use staged::{
+    StagedFunction, StagedFunctionInfo, StagedNamePolicy, UniqueLiveSpecializationError,
+};

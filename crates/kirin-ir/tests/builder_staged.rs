@@ -242,3 +242,69 @@ fn staged_function_all_matching_excludes_invalidated() {
     let old = spec1.get_info(&stage).unwrap();
     assert!(old.is_invalidated());
 }
+
+#[test]
+fn staged_function_unique_live_specialization_returns_only_live_specialization() {
+    let mut stage = new_stage();
+    let sf = stage.staged_function().new().unwrap();
+
+    let body = stage.statement().definition(BuilderDialect::Return).new();
+    let spec = stage.specialize().staged_func(sf).body(body).new().unwrap();
+
+    let stage = stage.finalize().unwrap();
+    let sf_info = sf.get_info(&stage).unwrap();
+
+    assert_eq!(sf_info.unique_live_specialization().unwrap(), spec);
+}
+
+#[test]
+fn staged_function_unique_live_specialization_rejects_ambiguous_live_set() {
+    let mut stage = new_stage();
+    let sf = stage.staged_function().new().unwrap();
+
+    let body1 = stage.statement().definition(BuilderDialect::Return).new();
+    let sig_i32 = Signature::new(vec![TestType::I32], TestType::Any, ());
+    stage
+        .specialize()
+        .staged_func(sf)
+        .signature(sig_i32)
+        .body(body1)
+        .new()
+        .unwrap();
+
+    let body2 = stage.statement().definition(BuilderDialect::Return).new();
+    let sig_i64 = Signature::new(vec![TestType::I64], TestType::Any, ());
+    stage
+        .specialize()
+        .staged_func(sf)
+        .signature(sig_i64)
+        .body(body2)
+        .new()
+        .unwrap();
+
+    let stage = stage.finalize().unwrap();
+    let sf_info = sf.get_info(&stage).unwrap();
+
+    assert_eq!(
+        sf_info.unique_live_specialization(),
+        Err(UniqueLiveSpecializationError::Ambiguous { count: 2 })
+    );
+}
+
+#[test]
+fn pipeline_resolve_function_uses_stage_local_symbol_table() {
+    let mut pipeline: Pipeline<StageInfo<BuilderDialect>> = Pipeline::new();
+    let stage_id = pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("test")
+        .new();
+    let func = pipeline.function().name("target").new().unwrap();
+    let target = {
+        let stage = pipeline.stage_mut(stage_id).unwrap();
+        stage.symbol_table_mut().intern("target".to_string())
+    };
+
+    let stage = pipeline.stage(stage_id).unwrap();
+    assert_eq!(pipeline.resolve_function(stage, target), Some(func));
+}

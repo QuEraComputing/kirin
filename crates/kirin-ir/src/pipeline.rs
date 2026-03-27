@@ -9,9 +9,9 @@ use crate::node::function::{
     StagedFunction,
 };
 use crate::node::stmt::Statement;
-use crate::node::symbol::GlobalSymbol;
+use crate::node::symbol::{GlobalSymbol, Symbol};
 use crate::signature::Signature;
-use crate::stage::{HasStageInfo, StageMeta};
+use crate::stage::{HasStageInfo, StageInfo, StageMeta};
 
 /// A compilation pipeline that holds stages and a global symbol table.
 ///
@@ -188,7 +188,23 @@ impl<S> Pipeline<S> {
         let sym = self.lookup_symbol(func_name)?;
         let func = self.function_by_name(sym)?;
         let info = self.function_info(func)?;
-        info.staged_functions().get(&stage).copied()
+        info.staged_function(stage)
+    }
+
+    /// Resolve a stage-local [`Symbol`] to a pipeline-level [`Function`].
+    ///
+    /// The lookup chain is:
+    /// stage-local symbol -> interned name -> global symbol -> function id.
+    ///
+    /// Returns `None` if any link in that chain is missing.
+    pub fn resolve_function<L: Dialect>(
+        &self,
+        stage: &StageInfo<L>,
+        target: Symbol,
+    ) -> Option<Function> {
+        let target_name = stage.symbol_table().resolve(target)?;
+        let global_symbol = self.lookup_symbol(target_name)?;
+        self.function_by_name(global_symbol)
     }
 }
 

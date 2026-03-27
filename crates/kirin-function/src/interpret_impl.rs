@@ -7,17 +7,6 @@ use smallvec::smallvec;
 
 use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
 
-/// Shared entry-block lookup for any type with a single region body.
-fn region_entry_block<L: Dialect>(
-    op: &impl HasRegionBody,
-    stage: &kirin::prelude::StageInfo<L>,
-) -> Result<kirin::prelude::Block, InterpreterError> {
-    op.region()
-        .blocks(stage)
-        .next()
-        .ok_or(InterpreterError::missing_entry_block())
-}
-
 /// Shared interpret logic for any type with a single region body: resolve stage,
 /// find the entry block, and jump to it.
 fn interpret_region_body<'ir, I, L>(
@@ -32,10 +21,8 @@ where
 {
     let stage = interp.resolve_stage::<L>()?;
     let entry = op
-        .region()
-        .blocks(stage)
-        .next()
-        .ok_or(InterpreterError::missing_entry_block())?;
+        .entry_block(stage)
+        .ok_or_else(InterpreterError::missing_entry_block)?;
     Ok(Continuation::Jump(entry, smallvec![]))
 }
 
@@ -44,7 +31,7 @@ impl<T: CompileTimeValue> SSACFGRegion for FunctionBody<T> {
         &self,
         stage: &kirin::prelude::StageInfo<L>,
     ) -> Result<kirin::prelude::Block, InterpreterError> {
-        region_entry_block(self, stage)
+        HasRegionBody::entry_block(self, stage).ok_or_else(InterpreterError::missing_entry_block)
     }
 }
 
@@ -68,7 +55,7 @@ impl<T: CompileTimeValue> SSACFGRegion for Lambda<T> {
         &self,
         stage: &kirin::prelude::StageInfo<L>,
     ) -> Result<kirin::prelude::Block, InterpreterError> {
-        region_entry_block(self, stage)
+        HasRegionBody::entry_block(self, stage).ok_or_else(InterpreterError::missing_entry_block)
     }
 }
 
@@ -96,8 +83,8 @@ where
         stage: &kirin::prelude::StageInfo<L>,
     ) -> Result<kirin::prelude::Block, InterpreterError> {
         match self {
-            Lexical::FunctionBody(op) => op.entry_block(stage),
-            Lexical::Lambda(op) => op.entry_block(stage),
+            Lexical::FunctionBody(op) => SSACFGRegion::entry_block(op, stage),
+            Lexical::Lambda(op) => SSACFGRegion::entry_block(op, stage),
             _ => Err(InterpreterError::missing_entry_block()),
         }
     }
@@ -157,48 +144,22 @@ where
     {
         let stage_id = interp.active_stage();
         let stage = interp.resolve_stage::<L>()?;
-
         let target_name = stage
             .symbol_table()
             .resolve(self.target())
             .cloned()
-            .ok_or_else(|| InterpreterError::StageResolution {
-                stage: stage_id,
-                kind: StageResolutionError::UnknownTarget {
-                    name: format!("{:?}", self.target()),
-                },
-            })?;
-
-        let global_sym = interp
-            .pipeline()
-            .lookup_symbol(&target_name)
-            .ok_or_else(|| InterpreterError::StageResolution {
-                stage: stage_id,
-                kind: StageResolutionError::UnknownTarget {
-                    name: target_name.clone(),
-                },
-            })?;
-
+            .unwrap_or_else(|| format!("{:?}", self.target()));
         let function = interp
             .pipeline()
-            .function_by_name(global_sym)
-            .ok_or_else(|| InterpreterError::StageResolution {
+            .resolve_function(stage, self.target())
+            .ok_or(InterpreterError::StageResolution {
                 stage: stage_id,
                 kind: StageResolutionError::UnknownTarget { name: target_name },
             })?;
-
-        let function_info =
-            interp
-                .pipeline()
-                .function_info(function)
-                .ok_or(InterpreterError::StageResolution {
-                    stage: stage_id,
-                    kind: StageResolutionError::MissingFunction { function },
-                })?;
-        let staged_function = function_info
-            .staged_functions()
-            .get(&stage_id)
-            .copied()
+        let staged_function = interp
+            .pipeline()
+            .function_info(function)
+            .and_then(|info| info.staged_function(stage_id))
             .ok_or(InterpreterError::StageResolution {
                 stage: stage_id,
                 kind: StageResolutionError::MissingFunction { function },
@@ -210,37 +171,25 @@ where
                     stage: stage_id,
                     kind: StageResolutionError::MissingFunction { function },
                 })?;
-
-        let mut live_specializations = staged_info
-            .specializations()
-            .iter()
-            .filter(|spec| !spec.is_invalidated())
-            .map(|spec| spec.id());
-        let callee = match (live_specializations.next(), live_specializations.next()) {
-            (None, _) => {
-                return Err(InterpreterError::StageResolution {
-                    stage: stage_id,
-                    kind: StageResolutionError::NoSpecialization { staged_function },
+        let callee = staged_info
+            .unique_live_specialization()
+            .map_err(|error| match error {
+                kirin::prelude::UniqueLiveSpecializationError::NoSpecialization => {
+                    InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: StageResolutionError::NoSpecialization { staged_function },
+                    }
                 }
-                .into());
-            }
-            (Some(callee), None) => callee,
-            (Some(_), Some(_)) => {
-                let count = staged_info
-                    .specializations()
-                    .iter()
-                    .filter(|spec| !spec.is_invalidated())
-                    .count();
-                return Err(InterpreterError::StageResolution {
-                    stage: stage_id,
-                    kind: StageResolutionError::AmbiguousSpecialization {
-                        staged_function,
-                        count,
-                    },
+                kirin::prelude::UniqueLiveSpecializationError::Ambiguous { count } => {
+                    InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: StageResolutionError::AmbiguousSpecialization {
+                            staged_function,
+                            count,
+                        },
+                    }
                 }
-                .into());
-            }
-        };
+            })?;
 
         let args = self
             .args()
@@ -287,7 +236,7 @@ where
         stage: &kirin::prelude::StageInfo<L>,
     ) -> Result<kirin::prelude::Block, InterpreterError> {
         match self {
-            Lifted::FunctionBody(op) => op.entry_block(stage),
+            Lifted::FunctionBody(op) => SSACFGRegion::entry_block(op, stage),
             _ => Err(InterpreterError::missing_entry_block()),
         }
     }

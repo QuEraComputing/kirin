@@ -6,6 +6,16 @@ mod common;
 use common::{BuilderDialect, TestType, new_stage};
 use kirin_ir::*;
 
+struct RegionBodyOp {
+    region: Region,
+}
+
+impl HasRegionBody for RegionBodyOp {
+    fn region(&self) -> &Region {
+        &self.region
+    }
+}
+
 // --- BlockBuilder tests ---
 
 #[test]
@@ -49,7 +59,7 @@ fn block_builder_substitutes_builder_block_arguments() {
 
     let add_stmt = stage
         .statement()
-        .definition(BuilderDialect::Add(arg0.into(), arg1.into()))
+        .definition(BuilderDialect::Add(arg0, arg1))
         .new();
 
     let block = stage
@@ -245,6 +255,18 @@ fn region_builder_creates_region_with_ordered_blocks() {
     let b2_info = b2.expect_info(&stage);
     assert_eq!(b2_info.node.prev, Some(b1));
     assert_eq!(b2_info.node.next, None);
+}
+
+#[test]
+fn has_region_body_entry_block_returns_first_block() {
+    let mut stage = new_stage();
+    let b0 = stage.block().new();
+    let b1 = stage.block().new();
+    let region = stage.region().add_block(b0).add_block(b1).new();
+    let op = RegionBodyOp { region };
+
+    let stage = stage.finalize().unwrap();
+    assert_eq!(op.entry_block(&stage), Some(b0));
 }
 
 #[test]

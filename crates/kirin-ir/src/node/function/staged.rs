@@ -3,7 +3,7 @@ use crate::identifier;
 use crate::language::Dialect;
 use crate::signature::{Signature, SignatureCmp, SignatureSemantics};
 
-use super::specialized::SpecializedFunctionInfo;
+use super::specialized::{SpecializedFunction, SpecializedFunctionInfo};
 use crate::node::symbol::GlobalSymbol;
 
 identifier! {
@@ -24,6 +24,25 @@ pub enum StagedNamePolicy {
     /// Dispatch across signature variants is handled by signature semantics.
     MultipleDispatch,
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum UniqueLiveSpecializationError {
+    NoSpecialization,
+    Ambiguous { count: usize },
+}
+
+impl std::fmt::Display for UniqueLiveSpecializationError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::NoSpecialization => write!(f, "no live specialization"),
+            Self::Ambiguous { count } => {
+                write!(f, "ambiguous live specialization set: {count} live matches")
+            }
+        }
+    }
+}
+
+impl std::error::Error for UniqueLiveSpecializationError {}
 
 /// A function compiled to a specific stage, carrying the generic signature
 /// and all specializations for that stage.
@@ -93,6 +112,28 @@ impl<L: Dialect> StagedFunctionInfo<L> {
 
     pub fn add_specialization(&mut self, spec: SpecializedFunctionInfo<L>) {
         self.specializations.push(spec);
+    }
+
+    pub fn unique_live_specialization(
+        &self,
+    ) -> Result<SpecializedFunction, UniqueLiveSpecializationError> {
+        let mut live_specializations = self
+            .specializations
+            .iter()
+            .filter(|spec| !spec.is_invalidated())
+            .map(|spec| spec.id());
+
+        match (live_specializations.next(), live_specializations.next()) {
+            (None, _) => Err(UniqueLiveSpecializationError::NoSpecialization),
+            (Some(callee), None) => Ok(callee),
+            (Some(_), Some(_)) => Err(UniqueLiveSpecializationError::Ambiguous {
+                count: self
+                    .specializations
+                    .iter()
+                    .filter(|spec| !spec.is_invalidated())
+                    .count(),
+            }),
+        }
     }
 
     /// Find all specializations applicable to the given call signature,

@@ -2,15 +2,15 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
 use kirin_ir::{
-    CompileStage, GetInfo, HasArguments, Pipeline, Product, SSAValue, Signature,
-    SpecializedFunction, StageInfo, Typeof,
+    CompileStage, Function, GetInfo, HasArguments, Pipeline, Product, SSAValue, Signature,
+    SpecializedFunction, StageInfo, StagedFunction, Symbol, Typeof,
 };
 use kirin_test_languages::CompositeLanguage;
 use kirin_test_utils::ir_fixtures::build_add_one;
 
 use crate::{
     Interpretable, InterpreterError, ProductValue, ValueStore, effect,
-    interpreter::{Driver, Position, SingleStage},
+    interpreter::{Driver, Invoke, Position, ResolveCallee, SingleStage, TypedStage, callee},
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -153,6 +153,84 @@ fn build_pair_callee(
     })
 }
 
+fn build_named_constant_body(
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
+    stage_id: CompileStage,
+    value: i64,
+) -> kirin_ir::Statement {
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    stage.with_builder(|b| {
+        let constant = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(value));
+        let ret = Return::<ArithType>::new(b, vec![constant.result.into()]);
+        let block = b.block().stmt(constant).terminator(ret).new();
+        let region = b.region().add_block(block).new();
+        FunctionBody::<ArithType>::new(b, region, Signature::new(vec![], ArithType::I64, ())).into()
+    })
+}
+
+struct MultiStageNamedFunction {
+    function: Function,
+    symbol_a: Symbol,
+    symbol_b: Symbol,
+    staged_a: StagedFunction,
+    staged_b: StagedFunction,
+    spec_a: SpecializedFunction,
+    spec_b: SpecializedFunction,
+}
+
+fn build_multistage_named_function(
+    pipeline: &mut Pipeline<StageInfo<CompositeLanguage>>,
+    stage_a: CompileStage,
+    stage_b: CompileStage,
+    name: &str,
+) -> MultiStageNamedFunction {
+    let body_a = build_named_constant_body(pipeline, stage_a, 11);
+    let signature = Signature::new(vec![], ArithType::I64, ());
+    let (function, staged_a, spec_a) = pipeline
+        .define_function::<CompositeLanguage>()
+        .name(name.to_string())
+        .stage(stage_a)
+        .signature(signature.clone())
+        .body(body_a)
+        .new()
+        .unwrap();
+
+    let body_b = build_named_constant_body(pipeline, stage_b, 22);
+    let staged_b = pipeline
+        .staged_function::<CompositeLanguage>()
+        .func(function)
+        .stage(stage_b)
+        .signature(signature)
+        .new()
+        .unwrap();
+    let spec_b = pipeline
+        .stage_mut(stage_b)
+        .unwrap()
+        .with_builder(|b| b.specialize().staged_func(staged_b).body(body_b).new())
+        .unwrap();
+
+    let symbol_a = pipeline
+        .stage_mut(stage_a)
+        .unwrap()
+        .symbol_table_mut()
+        .intern(name.to_string());
+    let symbol_b = pipeline
+        .stage_mut(stage_b)
+        .unwrap()
+        .symbol_table_mut()
+        .intern(name.to_string());
+
+    MultiStageNamedFunction {
+        function,
+        symbol_a,
+        symbol_b,
+        staged_a,
+        staged_b,
+        spec_a,
+        spec_b,
+    }
+}
+
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Constant<ArithValue, ArithType> {
     type Machine = effect::Stateless<InvokeValue>;
     type Error = InterpreterError;
@@ -260,7 +338,6 @@ fn invoke_pushes_new_activation_and_preserves_caller_bindings() {
 
     let entry = interp.entry_block(caller).unwrap();
     let caller_arg = entry.expect_info(interp.stage_info()).arguments[0];
-    let caller_location = interp.current_location();
     let caller_statement = interp.current_statement();
     assert!(caller_statement.is_some());
     assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(7));
@@ -269,9 +346,9 @@ fn invoke_pushes_new_activation_and_preserves_caller_bindings() {
         interp.step().unwrap(),
         crate::result::Step::Stepped(_)
     ));
-    let caller_after_step = interp.current_statement();
-    assert_ne!(caller_after_step, caller_statement);
-    assert_eq!(interp.current_location(), caller_location);
+    let invoke_statement = interp.current_statement().unwrap();
+    let resume_statement = (*invoke_statement.next(interp.stage_info())).unwrap();
+    assert_ne!(Some(invoke_statement), caller_statement);
     assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(7));
 
     let callee_entry = interp.entry_block(callee).unwrap();
@@ -280,15 +357,20 @@ fn invoke_pushes_new_activation_and_preserves_caller_bindings() {
     let _ = interp.invoke(callee, &[InvokeValue::I64(7)], &[sum_value.into()]);
 
     assert_eq!(interp.current_statement(), Some(callee_first));
-    assert_ne!(interp.current_location(), caller_location);
+    assert_eq!(
+        interp.current_location(),
+        Some(crate::control::Location::BeforeStatement(callee_first))
+    );
     assert_eq!(interp.read(callee_arg.into()).unwrap(), InvokeValue::I64(7));
-    assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(7));
     assert!(interp.read(sum_value).is_err());
 
     let _ = interp.return_current(InvokeValue::I64(8));
 
-    assert_eq!(interp.current_statement(), caller_after_step);
-    assert_eq!(interp.current_location(), caller_location);
+    assert_eq!(interp.current_statement(), Some(resume_statement));
+    assert_eq!(
+        interp.current_location(),
+        Some(crate::control::Location::AfterStatement(invoke_statement))
+    );
     assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(7));
     assert_eq!(interp.read(sum_value).unwrap(), InvokeValue::I64(8));
 }
@@ -308,9 +390,8 @@ fn return_current_restores_caller_and_writes_product_results() {
         interp.step().unwrap(),
         crate::result::Step::Stepped(_)
     ));
-    let caller_statement = interp.current_statement();
-    assert!(caller_statement.is_some());
-    let caller_location = interp.current_location();
+    let invoke_statement = interp.current_statement().unwrap();
+    let resume_statement = (*invoke_statement.next(interp.stage_info())).unwrap();
 
     let callee_entry = interp.entry_block(callee).unwrap();
     let callee_first = callee_entry.first_statement(interp.stage_info()).unwrap();
@@ -322,7 +403,10 @@ fn return_current_restores_caller_and_writes_product_results() {
         &[sum_value.into(), c2_value.into()],
     );
     assert_eq!(interp.current_statement(), Some(callee_first));
-    assert_ne!(interp.current_location(), caller_location);
+    assert_eq!(
+        interp.current_location(),
+        Some(crate::control::Location::BeforeStatement(callee_first))
+    );
     assert_eq!(interp.read(callee_arg.into()).unwrap(), InvokeValue::I64(9));
 
     let product = InvokeValue::new_product(vec![InvokeValue::I64(9), InvokeValue::I64(8)]);
@@ -330,8 +414,11 @@ fn return_current_restores_caller_and_writes_product_results() {
 
     let entry = interp.entry_block(caller).unwrap();
     let caller_arg = entry.expect_info(interp.stage_info()).arguments[0];
-    assert_eq!(interp.current_statement(), caller_statement);
-    assert_eq!(interp.current_location(), caller_location);
+    assert_eq!(interp.current_statement(), Some(resume_statement));
+    assert_eq!(
+        interp.current_location(),
+        Some(crate::control::Location::AfterStatement(invoke_statement))
+    );
     assert_eq!(interp.read(caller_arg.into()).unwrap(), InvokeValue::I64(9));
     assert_eq!(interp.read(sum_value).unwrap(), InvokeValue::I64(9));
     assert_eq!(interp.read(c2_value).unwrap(), InvokeValue::I64(8));
@@ -355,16 +442,87 @@ fn flow_stay_leaves_current_cursor_unchanged() {
     }
 
     fn apply_flow(interp: &mut InvokeInterp<'_>, flow: crate::effect::Flow<InvokeValue>) {
-        let control = match flow {
-            crate::effect::Flow::Advance => crate::control::Shell::Advance,
-            crate::effect::Flow::Jump(seed) => crate::control::Shell::Replace(seed),
-            crate::effect::Flow::Stop(stop) => crate::control::Shell::Stop(stop),
-            crate::effect::Flow::Stay => crate::control::Shell::Stay,
-        };
-        interp.apply_control(control).unwrap();
+        interp.apply_control(flow.into_shell()).unwrap();
     }
 
     apply_flow(&mut interp, stay_effect());
     assert_eq!(interp.current_statement(), before_statement);
     assert_eq!(interp.current_location(), before_location);
+}
+
+#[test]
+fn callee_builder_resolves_stage_aware_queries() {
+    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
+    let stage_a: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_b: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let target = build_multistage_named_function(&mut pipeline, stage_a, stage_b, "target");
+    let interp = InvokeInterp::new(&pipeline, stage_a, effect::Stateless::default());
+
+    assert_eq!(interp.callee().specialized(target.spec_a), target.spec_a);
+    assert_eq!(
+        interp
+            .callee()
+            .staged(target.staged_a)
+            .specialization(callee::UniqueLive)
+            .args(&[])
+            .unwrap(),
+        target.spec_a
+    );
+    assert_eq!(
+        interp
+            .callee()
+            .staged(target.staged_b)
+            .specialization(callee::UniqueLive)
+            .args(&[])
+            .unwrap(),
+        target.spec_b
+    );
+    assert_eq!(
+        interp
+            .callee()
+            .function(target.function)
+            .stage(stage_b)
+            .staged_by(callee::ExactStage)
+            .args(&[])
+            .unwrap(),
+        target.spec_b
+    );
+    assert_eq!(
+        interp.callee().symbol(target.symbol_a).args(&[]).unwrap(),
+        target.spec_a
+    );
+    assert_eq!(
+        interp
+            .callee()
+            .symbol(target.symbol_b)
+            .stage(stage_b)
+            .specialization(callee::UniqueLive)
+            .args(&[])
+            .unwrap(),
+        target.spec_b
+    );
+}
+
+#[test]
+fn callee_specialization_policy_markers_cover_the_public_policy_surface() {
+    assert_eq!(
+        callee::SpecializationPolicy::from(callee::UniqueLive),
+        callee::SpecializationPolicy::UniqueLive
+    );
+    assert_eq!(
+        callee::SpecializationPolicy::from(callee::ExactMatch),
+        callee::SpecializationPolicy::ExactMatch
+    );
+    assert_eq!(
+        callee::SpecializationPolicy::from(callee::BestMatch),
+        callee::SpecializationPolicy::BestMatch
+    );
+    assert_eq!(
+        callee::SpecializationPolicy::from(callee::MaterializeExact),
+        callee::SpecializationPolicy::MaterializeExact
+    );
+    assert_eq!(
+        callee::SpecializationPolicy::from(callee::MultipleDispatch),
+        callee::SpecializationPolicy::MultipleDispatch
+    );
 }

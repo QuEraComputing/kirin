@@ -1,10 +1,12 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::BranchCondition;
-use kirin_interpreter_2::{Interpretable, Interpreter, InterpreterError, ValueStore};
+use kirin_interpreter_2::{
+    Interpretable, Interpreter, InterpreterError, ValueStore, interpreter::BlockBindings,
+};
 
 use crate::ControlFlow;
 
-use super::{Effect, runtime::Runtime};
+use super::Effect;
 
 fn unsupported(message: &'static str) -> InterpreterError {
     InterpreterError::custom(std::io::Error::other(message))
@@ -12,7 +14,7 @@ fn unsupported(message: &'static str) -> InterpreterError {
 
 impl<'ir, I, T> Interpretable<'ir, I> for ControlFlow<T>
 where
-    I: Runtime<'ir, T>,
+    I: BlockBindings<'ir> + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
     <I as ValueStore>::Value: Clone + BranchCondition,
     T: CompileTimeValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,

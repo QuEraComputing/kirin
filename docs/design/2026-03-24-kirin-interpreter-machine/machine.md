@@ -13,24 +13,77 @@ interpreter shell.
 An `Interpreter<'ir>` is the typed shell over one top-level machine. It owns:
 
 - top-level machine access
+- activation-stack management for same-stage execution
+- per-frame value storage and cursor state
 - control consumption
 - typed interpret and effect-consumption APIs
 
-The shell does not define language semantics such as:
+The shell owns generic execution mechanics over `SpecializedFunction`
+activations, but it does not define statement-level dispatch policy such as:
 
-- call frames
-- return conventions
-- yield conventions
-- loop stacks
-- graph traversal stacks
-- product packing or unpacking policy
+- how a call-like statement chooses a callee
+- whether a dialect uses symbolic lookup, static callees, overloads, or
+  multiple dispatch
+- dialect-specific loop or graph traversal semantic state
 
-Those stay on dialect-defined machine types and effect types.
+Those stay on dialect-defined statement semantics, machine types, and effect
+types.
 
 Concrete shells and typed stage views may additionally expose:
 
 - `interpreter::Position<'ir>` for read-only cursor inspection
 - `interpreter::Driver<'ir>` for step/run loops and suspension policy
+
+## Activation Frames
+
+For typed same-stage execution, the shell should use one activation stack as
+the single source of truth for invocation-local state.
+
+Conceptually:
+
+```rust
+Frame<V, Activation>
+```
+
+where the generic `Frame` owns:
+
+- `callee: SpecializedFunction`
+- `stage: CompileStage`
+- the SSA value environment
+
+and `Activation` owns shell-local control state:
+
+```rust
+struct Activation {
+    cursor_stack: Vec<ExecutionCursor>,
+    after_statement: Option<Statement>,
+    continuation: Option<Continuation>,
+}
+
+struct Continuation {
+    resume: ExecutionSeed,
+    results: Vec<ResultValue>,
+}
+```
+
+The top activation frame is the current invocation. This means:
+
+- `ValueStore` reads and writes the top frame's value environment
+- `TypedStage` resolves from the top frame's stage
+- `Position` inspects the top frame's cursor state
+- `Driver` advances only the top frame
+
+Call and return then become ordinary stack transitions:
+
+- call
+  push a fresh callee frame with a continuation back to the caller
+- return
+  pop the current frame, restore the caller as top-of-stack, and write the
+  returned product into the caller's result slots
+
+This model is preferred over splitting “active frame in the shell” from
+“suspended frames in a semantic machine”, because recursion and multi-result
+return are represented directly as stack operations on one structure.
 
 ## Semantic Machine Traits
 
@@ -157,6 +210,86 @@ The important symmetry is:
 - machine composition is product-like
 - effect composition is sum-like
 - stop composition is sum-like
+
+## Call Resolution and Invocation
+
+The framework should split function execution into two layers:
+
+- call resolution
+- specialized-function invocation
+
+Call resolution is statement semantics. Different dialect statements may choose
+callees differently:
+
+- a static call may already store a `SpecializedFunction`
+- a symbolic call may resolve a `Symbol` through the current stage
+- a future overloaded call may inspect argument values
+- a future cross-stage call may pick a different `StagedFunction` first
+
+Invocation is shell mechanics once a `SpecializedFunction` has been selected.
+That includes:
+
+- locating the callee body and entry block
+- pushing the callee activation
+- binding entry arguments
+- resuming the caller on return
+- writing returned products into caller result slots
+
+So the statement-side trait stays:
+
+```rust
+trait ResolveCall<'ir, I: Interpreter<'ir>> {
+    fn resolve_call(
+        &self,
+        interp: &I,
+        args: &[I::Value],
+    ) -> Result<SpecializedFunction, I::Error>;
+}
+```
+
+But the shell should expose callee-resolution tooling as a query language rather
+than a single vague `resolve_call(...)` helper.
+
+Conceptually:
+
+```rust
+let callee = interp.callee()
+    .symbol(self.target())
+    .stage(stage_id)                     // optional, defaults to current stage
+    .staged_by(callee::ExactStage)       // optional, defaults to ExactStage
+    .specialization(callee::UniqueLive)  // optional, defaults to UniqueLive
+    .args(&args)?;
+```
+
+The builder should make the resolution axes explicit:
+
+- target kind:
+  `specialized`, `staged`, `function`, or `symbol`
+- stage:
+  current activation stage by default, with optional explicit override
+- staged-function selection:
+  how a `Function` or `Symbol` becomes a `StagedFunction`
+- specialization selection:
+  how a `StagedFunction` becomes a `SpecializedFunction`
+
+Builtin specialization-policy vocabulary should be broad enough to describe
+common calling conventions even before every mode is implemented:
+
+- `UniqueLive`
+- `ExactMatch`
+- `BestMatch`
+- `MaterializeExact`
+- `MultipleDispatch`
+
+This keeps the builtin shell behavior precise and stage-aware while preserving
+the real ownership boundary:
+
+- statement semantics choose the callee
+- shell tooling helps resolve and execute the chosen callee
+
+Dialects remain free to bypass the builder entirely. `ResolveCall` is still the
+customization point for call convention semantics; the builder is only helper
+tooling provided by the shell.
 
 ## Shell Control
 

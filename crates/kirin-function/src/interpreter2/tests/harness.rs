@@ -1,5 +1,4 @@
 use std::{
-    convert::Infallible,
     convert::TryFrom,
     ops::{Add, Mul, Neg, Sub},
     rc::Rc,
@@ -8,16 +7,15 @@ use std::{
 use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
-use kirin_constant::{Constant, interpreter2 as constant2};
+use kirin_constant::Constant;
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    ConsumeEffect, Interpretable, Interpreter, InterpreterError, LiftEffect, LiftStop,
-    ProductValue, ProjectMachine, ProjectMachineMut, control::Shell, interpreter::SingleStage,
+    Interpretable, InterpreterError, ProductValue, effect, interpreter::SingleStage,
 };
 
 use crate::{Bind, Call, FunctionBody, Return};
 
-use crate::interpreter2::{Effect, Machine as FunctionMachine};
+use crate::interpreter2::Effect;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(builders, type = ArithType, crate = kirin::ir)]
@@ -140,76 +138,7 @@ impl BranchCondition for TestValue {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub enum TestEffect {
-    Leaf(constant2::Effect),
-    Function(Effect<TestValue>),
-}
-
-#[derive(Debug)]
-pub struct TestMachine {
-    function: FunctionMachine<TestValue>,
-}
-
-impl TestMachine {
-    pub fn frame_depth(&self) -> usize {
-        self.function.frame_depth()
-    }
-}
-
-impl Default for TestMachine {
-    fn default() -> Self {
-        Self {
-            function: FunctionMachine::new(),
-        }
-    }
-}
-
-impl<'ir> kirin_interpreter_2::Machine<'ir> for TestMachine {
-    type Effect = TestEffect;
-    type Stop = TestValue;
-}
-
-impl<'ir> ConsumeEffect<'ir> for TestMachine {
-    type Error = InterpreterError;
-
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
-        match effect {
-            TestEffect::Leaf(effect) => Ok(effect.map_stop(|never| match never {}).into_shell()),
-            TestEffect::Function(effect) => self.function.consume_effect(effect),
-        }
-    }
-}
-
-impl ProjectMachine<FunctionMachine<TestValue>> for TestMachine {
-    fn project(&self) -> &FunctionMachine<TestValue> {
-        &self.function
-    }
-}
-
-impl ProjectMachineMut<FunctionMachine<TestValue>> for TestMachine {
-    fn project_mut(&mut self) -> &mut FunctionMachine<TestValue> {
-        &mut self.function
-    }
-}
-
-impl<'ir> LiftEffect<'ir, FunctionMachine<TestValue>> for TestMachine {
-    fn lift_effect(effect: Effect<TestValue>) -> TestEffect {
-        TestEffect::Function(effect)
-    }
-}
-
-impl<'ir> LiftEffect<'ir, kirin_interpreter_2::effect::Stateless<Infallible>> for TestMachine {
-    fn lift_effect(effect: kirin_interpreter_2::effect::Flow<Infallible>) -> TestEffect {
-        TestEffect::Leaf(effect)
-    }
-}
-
-impl<'ir> LiftStop<'ir, FunctionMachine<TestValue>> for TestMachine {
-    fn lift_stop(stop: TestValue) -> TestValue {
-        stop
-    }
-}
+pub type TestMachine = effect::Stateless<TestValue>;
 
 pub type TestInterp<'ir> = SingleStage<'ir, TestLanguage, TestValue, TestMachine, InterpreterError>;
 
@@ -217,15 +146,21 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for TestLanguage {
     type Machine = TestMachine;
     type Error = InterpreterError;
 
-    fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {
+    fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<Effect<TestValue>, Self::Error> {
         match self {
-            TestLanguage::Constant(op) => interp.interpret_lifted(op),
-            TestLanguage::Arith(op) => interp.interpret_lifted(op),
-            TestLanguage::ControlFlow(op) => interp.interpret_lifted(op),
-            TestLanguage::FunctionBody(op) => interp.interpret_lifted(op),
-            TestLanguage::Bind(op) => interp.interpret_lifted(op),
-            TestLanguage::Call(op) => interp.interpret_lifted(op),
-            TestLanguage::Return(op) => interp.interpret_lifted(op),
+            TestLanguage::Constant(op) => op
+                .interpret(interp)
+                .map(|effect| effect.map_stop(|never| match never {})),
+            TestLanguage::Arith(op) => op
+                .interpret(interp)
+                .map(|effect| effect.map_stop(|never| match never {})),
+            TestLanguage::ControlFlow(op) => op
+                .interpret(interp)
+                .map(|effect| effect.map_stop(|never| match never {})),
+            TestLanguage::FunctionBody(op) => op.interpret(interp),
+            TestLanguage::Bind(op) => op.interpret(interp),
+            TestLanguage::Call(op) => op.interpret(interp),
+            TestLanguage::Return(op) => op.interpret(interp),
         }
     }
 }

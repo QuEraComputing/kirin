@@ -19,12 +19,18 @@ supporting both:
 `interpreter::SingleStage<L>` is the typed execution shell for one language at
 one stage.
 
-It should own one top-level machine for that stage along with:
+It should own one top-level machine for that stage along with one activation
+stack. Each activation frame carries:
 
-- one typed value store
-- one top-level machine
-- one cursor stack
-- one semantic stop payload type through `Machine::Stop`
+- the active `SpecializedFunction`
+- the active `CompileStage`
+- one typed SSA value environment
+- one per-frame cursor stack
+- one optional caller continuation payload for return/resume
+
+So the shell does not keep loose top-level `values` or one global
+`cursor_stack`. The top activation frame is the current invocation, and all
+typed shell views project over that frame.
 
 It should implement the typed shell traits directly:
 
@@ -42,6 +48,53 @@ It is the preferred shell for:
 - dialect-local operational-semantics tests
 - programs known to remain within one stage
 - fast typed execution without dynamic stage-dispatch overhead
+- same-stage function execution with recursion and implicit multi-result
+  pack/unpack
+
+### Call Resolution vs Invocation
+
+`interpreter::SingleStage<L>` should own generic invocation over
+`SpecializedFunction`, because functions are first-class IR entities in Kirin.
+
+That means the shell owns:
+
+- the activation stack
+- root entry into a `SpecializedFunction`
+- pushing a nested callee activation
+- returning from the current activation
+- resuming the caller activation
+
+Call-like statements still own calling convention and dispatch policy.
+
+Examples:
+
+- `StaticCall`
+  already stores a resolved `SpecializedFunction`, so it only asks the shell to
+  invoke that callee.
+- `SymbolicCall`
+  resolves a `Symbol` through the current stage and pipeline before invoking.
+- future overloaded or multi-dispatch calls
+  may consult argument values or dispatch attributes before selecting a callee.
+
+So the shell should expose a generic callee-query surface instead of one vague
+`resolve_call(...)` helper. Conceptually:
+
+- `interp.callee().specialized(callee)`
+- `interp.callee().staged(staged).args(&args)`
+- `interp.callee().function(function).stage(stage_id).args(&args)`
+- `interp.callee().symbol(symbol).args(&args)`
+
+with optional explicit selection axes such as:
+
+- `.stage(stage_id)`
+- `.staged_by(callee::ExactStage)`
+- `.specialization(callee::UniqueLive)`
+
+The split remains important:
+
+- call operations decide how to obtain the callee
+- the shell provides stage-aware resolution tooling and executes the callee once
+  resolved
 
 ### MVP Checkpoint
 
@@ -107,8 +160,7 @@ This means each stage entry stores a full `interpreter::SingleStage<L>`-like
 typed execution unit, including:
 
 - stage-local machine state
-- stage-local value store
-- stage-local cursor stack
+- stage-local activation stack
 - typed `Interpreter<'ir>` behavior
 
 This avoids reconstructing typed interpreters out of raw parts every time the

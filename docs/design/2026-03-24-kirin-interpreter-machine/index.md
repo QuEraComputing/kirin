@@ -15,8 +15,9 @@ The core idea is:
   operational semantics
 - dialects own their semantic machine types, semantic effect types, and
   semantic stop payloads
-- the framework owns cursor-stack management, driver loops, breakpoints, fuel,
-  and the shell control language
+- the framework owns activation-stack management for same-stage execution,
+  per-frame value environments, cursor-stack management, driver loops,
+  breakpoints, fuel, and the shell control language
 - `Block`, `Region`, `DiGraph`, and `UnGraph` do not carry inherent
   operational meaning in the framework
 - statements decide how to execute nested bodies, using framework helpers or
@@ -58,12 +59,19 @@ design folder remain design-only and intentionally deferred.
   shells and typed stage views that expose position plus driver-control state.
 - `ConsumeEffect` mutates machine-owned semantic state and returns shell-facing
   `control::Shell<Stop>`.
-- the shell manages an internal cursor stack and consumes `Shell`.
+- `interpreter::SingleStage<L>` owns the activation stack for same-stage
+  execution; the top activation frame is the current invocation.
+- `ValueStore`, `TypedStage`, `Position`, and driver stepping project over the
+  top activation frame.
+- the shell manages per-frame cursor stacks and consumes `Shell`.
 - the framework defines public execution seeds, but keeps full cursors internal.
 - there are two interpreter shells:
   - `interpreter::SingleStage<L>`
   - `DynamicInterpreter`
 - `interpreter::SingleStage<L>` exposes typed value/effect/machine APIs.
+- `Function`, `StagedFunction`, and `SpecializedFunction` own function identity
+  and specialization structure; call-like statements own dispatch policy, while
+  the shell owns specialized-function invocation and return/resume mechanics.
 - `DynamicInterpreter` orchestrates a heterogeneous set of single-stage
   interpreters and does not expose raw typed effect/value APIs directly.
 - machine and shell selection are family-relative:
@@ -106,7 +114,10 @@ statement-centric interpreter machine.
 The practical consequence is:
 
 - body execution helpers become optional reusable defaults
-- statement operational semantics become the semantic authority
+- statement operational semantics become the semantic authority for dispatch
+  policy and control effects
+- single-stage shells own generic activation and invocation mechanics for
+  `SpecializedFunction`
 - framework-owned traits are reduced to machine composition traits and shell
   APIs
 

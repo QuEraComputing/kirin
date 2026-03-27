@@ -80,6 +80,10 @@ pub trait HasUngraphsMut<'a> {
 /// for interpreter and analysis code that operate on region-bearing operations.
 pub trait HasRegionBody {
     fn region(&self) -> &crate::Region;
+
+    fn entry_block<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<crate::Block> {
+        self.region().blocks(stage).next()
+    }
 }
 
 pub trait IsTerminator {

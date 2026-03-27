@@ -14,7 +14,7 @@ pub use block::{Block, BlockInfo, Successor};
 pub use digraph::{DiGraph, DiGraphInfo};
 pub use function::{
     CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
-    StagedFunction, StagedFunctionInfo, StagedNamePolicy,
+    StagedFunction, StagedFunctionInfo, StagedNamePolicy, UniqueLiveSpecializationError,
 };
 pub use graph::{DiGraphExtra, GraphInfo, UnGraphExtra};
 pub use linked_list::{LinkedList, LinkedListNode};
