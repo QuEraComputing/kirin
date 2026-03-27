@@ -25,3 +25,17 @@ where
 {
     fn lift_stop(stop: Sub::Stop) -> Self::Stop;
 }
+
+/// Identity projection — any machine projects to itself.
+impl<T> ProjectMachine<T> for T {
+    fn project(&self) -> &T {
+        self
+    }
+}
+
+/// Identity projection — any machine projects to itself (mutable).
+impl<T> ProjectMachineMut<T> for T {
+    fn project_mut(&mut self) -> &mut T {
+        self
+    }
+}

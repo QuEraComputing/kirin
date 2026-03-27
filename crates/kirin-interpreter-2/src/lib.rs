@@ -31,6 +31,11 @@ pub use seed::{BlockSeed, DiGraphSeed, ExecutionSeed, RegionSeed, UnGraphSeed};
 pub use stage_access::StageAccess;
 pub use value_store::ValueStore;
 
+/// Convenience alias for the interpreter's machine effect type.
+pub type InterpreterEffect<'ir, I> = <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Effect;
+/// Convenience alias for the interpreter's machine stop type.
+pub type InterpreterStop<'ir, I> = <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Stop;
+
 /// Essentials for dialect authors implementing machine-based semantics.
 pub mod prelude {
     pub use crate::{
