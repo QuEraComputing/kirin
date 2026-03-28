@@ -84,12 +84,12 @@ enum TestEffect {
     Return(TestValue),
 }
 
-impl Lift<TestEffect> for Cursor {
+impl Lift<TestEffect> for Cursor<Block> {
     fn lift(self) -> TestEffect {
         match self {
             Cursor::Advance => TestEffect::Advance,
             Cursor::Stay => TestEffect::Advance,
-            Cursor::Jump(seed) => panic!("unexpected Jump in SCF test: {seed:?}"),
+            Cursor::Jump(block) => panic!("unexpected Jump in SCF test: {block:?}"),
         }
     }
 }
@@ -100,12 +100,16 @@ struct TestMachine;
 impl<'ir> Machine<'ir> for TestMachine {
     type Effect = TestEffect;
     type Stop = TestValue;
+    type Seed = Block;
 }
 
 impl<'ir> ConsumeEffect<'ir> for TestMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
         Ok(match effect {
             TestEffect::Advance => Shell::Advance,
             TestEffect::Return(value) => Shell::Stop(value),
@@ -149,7 +153,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ScfTestLang {
                 StructuredControlFlow::For(op) => op.interpret(interp).map(Lift::lift),
                 StructuredControlFlow::Yield(op) => {
                     // Delegate to the generic Yield impl which always errors
-                    let result: Result<Cursor, InterpreterError> = op.interpret(interp);
+                    let result: Result<Cursor<Block>, InterpreterError> = op.interpret(interp);
                     result.map(Lift::lift)
                 }
             },

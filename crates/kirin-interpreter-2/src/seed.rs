@@ -60,32 +60,3 @@ impl<V> From<Block> for BlockSeed<V> {
         Self::entry(block)
     }
 }
-
-/// Lightweight execution seed used by shell control variants.
-///
-/// This is a transitional type — Task 2 will make Shell/Cursor generic
-/// over the seed type, at which point this wrapper goes away.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct ExecutionSeed {
-    block: Block,
-}
-
-impl ExecutionSeed {
-    /// The target block.
-    #[must_use]
-    pub fn block(self) -> Block {
-        self.block
-    }
-}
-
-impl From<Block> for ExecutionSeed {
-    fn from(block: Block) -> Self {
-        Self { block }
-    }
-}
-
-impl<V> From<BlockSeed<V>> for ExecutionSeed {
-    fn from(seed: BlockSeed<V>) -> Self {
-        Self { block: seed.block }
-    }
-}

@@ -176,6 +176,7 @@ where
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
+    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
 {
     fn poll_execution_gate(&mut self) -> Result<Option<Statement>, crate::result::Suspension> {
         loop {
@@ -238,6 +239,7 @@ where
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
+    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
 {
     type Machine = M;
     type Error = E;
@@ -262,14 +264,19 @@ where
     fn consume_effect(
         &mut self,
         effect: <Self::Machine as Machine<'ir>>::Effect,
-    ) -> Result<Shell<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
-    {
+    ) -> Result<
+        Shell<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
+        <Self as Interpreter<'ir>>::Error,
+    > {
         self.machine.consume_effect(effect).map_err(Into::into)
     }
 
     fn consume_control(
         &mut self,
-        control: Shell<<Self::Machine as Machine<'ir>>::Stop>,
+        control: Shell<
+            <Self::Machine as Machine<'ir>>::Stop,
+            <Self::Machine as Machine<'ir>>::Seed,
+        >,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error> {
         self.apply_control(control).map_err(Into::into)
     }
@@ -290,6 +297,7 @@ where
     Self: ValueStore<Value = V, Error = E>,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
+    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
 {
     fn invoke(
         &mut self,
@@ -315,18 +323,21 @@ where
     fn return_current(
         &mut self,
         value: Self::Value,
-    ) -> Result<crate::effect::Flow<Self::Value>, <Self as Interpreter<'ir>>::Error> {
+    ) -> Result<
+        Shell<Self::Value, <Self::Machine as Machine<'ir>>::Seed>,
+        <Self as Interpreter<'ir>>::Error,
+    > {
         let frame = self.frames.pop::<InterpreterError>().map_err(E::from)?;
         let (_, _, _, activation) = frame.into_parts();
         let Some(continuation) = activation.continuation else {
             self.skip_finish_step = true;
-            return Ok(crate::effect::Flow::Stop(value));
+            return Ok(Shell::Stop(value));
         };
 
         self.restore_caller(&continuation).map_err(E::from)?;
         self.write_return_product(continuation.results(), value)?;
         self.skip_finish_step = true;
-        Ok(crate::effect::Flow::Stay)
+        Ok(Shell::Stay)
     }
 }
 
@@ -344,6 +355,7 @@ where
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
+    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
 {
     fn resolve_query(
         &self,

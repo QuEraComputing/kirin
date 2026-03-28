@@ -10,7 +10,8 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    Interpretable, Interpreter, InterpreterError, ProductValue, effect, interpreter::SingleStage,
+    ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue, control::Shell,
+    effect::Cursor, interpreter::SingleStage,
 };
 
 use crate::{Bind, Call, FunctionBody, Return};
@@ -136,26 +137,66 @@ impl BranchCondition for TestValue {
     }
 }
 
-pub type TestMachine = effect::Stateless<TestValue>;
+/// Effect type for the function test machine.
+///
+/// Uses Shell<TestValue, Block> so that both cursor-like effects (Advance, Stay)
+/// and stopping effects (Stop) can be represented.
+type TestEffect = Shell<TestValue, Block>;
+
+/// Machine for function tests that supports both cursor and stop effects.
+#[derive(Debug, Default)]
+pub struct TestMachine;
+
+impl<'ir> Machine<'ir> for TestMachine {
+    type Effect = TestEffect;
+    type Stop = TestValue;
+    type Seed = Block;
+}
+
+impl<'ir> ConsumeEffect<'ir> for TestMachine {
+    type Error = InterpreterError;
+
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
+        Ok(effect)
+    }
+}
 
 pub type TestInterp<'ir> = SingleStage<'ir, TestLanguage, TestValue, TestMachine, InterpreterError>;
 
+/// Lift a unit-seed cursor into the test effect type.
+fn lift_cursor(cursor: Cursor) -> TestEffect {
+    match cursor {
+        Cursor::Advance => Shell::Advance,
+        Cursor::Stay => Shell::Stay,
+        Cursor::Jump(()) => unreachable!("unit-seed cursor should never Jump"),
+    }
+}
+
+/// Lift a block-seed cursor into the test effect type.
+fn lift_block_cursor(cursor: Cursor<Block>) -> TestEffect {
+    match cursor {
+        Cursor::Advance => Shell::Advance,
+        Cursor::Stay => Shell::Stay,
+        Cursor::Jump(block) => Shell::Replace(block),
+    }
+}
+
 impl<'ir> Interpretable<'ir, TestInterp<'ir>> for TestLanguage {
-    type Effect = effect::Flow<TestValue>;
+    type Effect = TestEffect;
     type Error = InterpreterError;
 
-    fn interpret(
-        &self,
-        interp: &mut TestInterp<'ir>,
-    ) -> Result<effect::Flow<TestValue>, Self::Error> {
+    fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {
         match self {
-            TestLanguage::Constant(op) => interp.interpret_lifted(op),
-            TestLanguage::Arith(op) => interp.interpret_lifted(op),
-            TestLanguage::ControlFlow(op) => interp.interpret_lifted(op),
-            TestLanguage::FunctionBody(op) => interp.interpret_lifted(op),
-            TestLanguage::Bind(op) => interp.interpret_lifted(op),
-            TestLanguage::Call(op) => interp.interpret_lifted(op),
-            TestLanguage::Return(op) => interp.interpret_lifted(op),
+            TestLanguage::Constant(op) => op.interpret(interp).map(lift_cursor),
+            TestLanguage::Arith(op) => op.interpret(interp).map(lift_cursor),
+            TestLanguage::ControlFlow(op) => op.interpret(interp).map(lift_block_cursor),
+            TestLanguage::FunctionBody(op) => op.interpret(interp),
+            TestLanguage::Bind(op) => op.interpret(interp),
+            TestLanguage::Call(op) => op.interpret(interp),
+            TestLanguage::Return(op) => op.interpret(interp),
         }
     }
 }

@@ -251,8 +251,11 @@ where
 
     pub fn apply_control(
         &mut self,
-        control: Shell<<M as crate::Machine<'ir>>::Stop>,
-    ) -> Result<(), InterpreterError> {
+        control: Shell<<M as crate::Machine<'ir>>::Stop, <M as crate::Machine<'ir>>::Seed>,
+    ) -> Result<(), InterpreterError>
+    where
+        <M as crate::Machine<'ir>>::Seed: Into<InternalSeed>,
+    {
         match control {
             Shell::Advance => {
                 let stage = self.active_stage();
@@ -272,14 +275,14 @@ where
             Shell::Stay => Ok(()),
             Shell::Push(seed) => {
                 let stage = self.active_stage();
-                let internal_seed: InternalSeed = seed.block().into();
+                let internal_seed: InternalSeed = seed.into();
                 let next = ExecutionCursor::from_seed(self.stage_info_for(stage), internal_seed);
                 let activation = self.current_activation_mut()?;
                 activation.after_statement = None;
                 activation.cursor_stack.push(next);
                 Ok(())
             }
-            Shell::Replace(seed) => self.replace_current_seed(seed.block().into()),
+            Shell::Replace(seed) => self.replace_current_seed(seed.into()),
             Shell::Pop => {
                 let activation = self.current_activation_mut()?;
                 activation.after_statement = None;
@@ -356,6 +359,7 @@ where
         M: crate::ConsumeEffect<'ir, Error = E>,
         L: crate::Interpretable<'ir, Self, Effect = <M as crate::Machine<'ir>>::Effect, Error = E>,
         E: From<InterpreterError>,
+        <M as crate::Machine<'ir>>::Seed: Into<InternalSeed>,
     {
         self.start_specialization(callee, args)?;
         <Self as crate::interpreter::Driver<'ir>>::run(self)

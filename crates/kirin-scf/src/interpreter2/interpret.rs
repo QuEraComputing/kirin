@@ -1,7 +1,7 @@
-use kirin::prelude::CompileTimeValue;
+use kirin::prelude::{Block, CompileTimeValue};
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    Cursor, Interpretable, Interpreter, InterpreterError, ProductValue, ValueStore,
+    Cursor, Interpretable, Interpreter, InterpreterError, Machine, ProductValue, ValueStore,
     interpreter::InlineBlock,
 };
 use smallvec::SmallVec;
@@ -18,11 +18,12 @@ where
     <I as ValueStore>::Value: BranchCondition + ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
+    Block: Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
-    type Effect = Cursor;
+    type Effect = Cursor<Block>;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         let cond = interp.read(self.condition)?;
         let block = match cond.is_truthy() {
             Some(true) => self.then_body,
@@ -48,11 +49,12 @@ where
     <I as ValueStore>::Value: ForLoopValue + ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
+    Block: Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
-    type Effect = Cursor;
+    type Effect = Cursor<Block>;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         let mut iv = interp.read(self.start)?;
         let end = interp.read(self.end)?;
         let step = interp.read(self.step)?;
@@ -98,11 +100,12 @@ where
     <I as ValueStore>::Value: BranchCondition + ForLoopValue + ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
+    Block: Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
-    type Effect = Cursor;
+    type Effect = Cursor<Block>;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         match self {
             Self::If(op) => op.interpret(interp),
             Self::For(op) => op.interpret(interp),
@@ -117,10 +120,10 @@ where
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
-    type Effect = Cursor;
+    type Effect = Cursor<Block>;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(&self, _interp: &mut I) -> Result<Cursor, Self::Error> {
+    fn interpret(&self, _interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         Err(unsupported(
             "scf.yield has no independent semantics; \
              it may only appear as a terminator inside scf.if or scf.for body blocks",

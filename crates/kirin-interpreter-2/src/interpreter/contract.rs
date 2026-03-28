@@ -17,14 +17,21 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
         &mut self,
     ) -> Result<<Self::Machine as Machine<'ir>>::Effect, <Self as Interpreter<'ir>>::Error>;
 
+    #[allow(clippy::type_complexity)]
     fn consume_effect(
         &mut self,
         effect: <Self::Machine as Machine<'ir>>::Effect,
-    ) -> Result<Shell<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>;
+    ) -> Result<
+        Shell<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
+        <Self as Interpreter<'ir>>::Error,
+    >;
 
     fn consume_control(
         &mut self,
-        control: Shell<<Self::Machine as Machine<'ir>>::Stop>,
+        control: Shell<
+            <Self::Machine as Machine<'ir>>::Stop,
+            <Self::Machine as Machine<'ir>>::Seed,
+        >,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error>;
 
     fn project_machine<'a, Sub: ?Sized>(&'a self) -> &'a Sub
@@ -73,7 +80,10 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     fn consume_local_effect<Sub>(
         &mut self,
         effect: <Sub as Machine<'ir>>::Effect,
-    ) -> Result<Shell<<Sub as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
+    ) -> Result<
+        Shell<<Sub as Machine<'ir>>::Stop, <Sub as Machine<'ir>>::Seed>,
+        <Self as Interpreter<'ir>>::Error,
+    >
     where
         Self: Sized,
         Sub: Machine<'ir> + ConsumeEffect<'ir>,
@@ -85,10 +95,14 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
             .map_err(Into::into)
     }
 
+    #[allow(clippy::type_complexity)]
     fn consume_lifted_effect<E>(
         &mut self,
         effect: E,
-    ) -> Result<Shell<<Self::Machine as Machine<'ir>>::Stop>, <Self as Interpreter<'ir>>::Error>
+    ) -> Result<
+        Shell<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
+        <Self as Interpreter<'ir>>::Error,
+    >
     where
         Self: Sized,
         E: Lift<<Self::Machine as Machine<'ir>>::Effect>,
@@ -98,7 +112,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
 
     fn consume_local_control<S>(
         &mut self,
-        control: Shell<S>,
+        control: Shell<S, <Self::Machine as Machine<'ir>>::Seed>,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error>
     where
         Self: Sized,

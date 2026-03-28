@@ -72,6 +72,7 @@ mod tests {
     impl<'ir> crate::Machine<'ir> for TestMachine {
         type Effect = ();
         type Stop = &'static str;
+        type Seed = kirin_ir::Block;
     }
 
     #[test]

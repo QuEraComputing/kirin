@@ -6,7 +6,7 @@ use kirin_ir::{Block, DiGraph, Region, Statement, UnGraph};
 /// should resume after an invoke or control transfer. Not part of the public
 /// effect system; only the cursor/activation machinery uses this.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum BlockStart {
+pub enum BlockStart {
     Entry,
     Statement(Statement),
     Exhausted,
@@ -18,38 +18,38 @@ pub(crate) enum BlockStart {
 /// a specific point within a block. The public `BlockSeed<V>` always
 /// enters at block entry; this type handles mid-block resume.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) struct InternalBlockSeed {
+pub struct InternalBlockSeed {
     block: Block,
     start: BlockStart,
 }
 
 impl InternalBlockSeed {
-    pub(crate) fn new(block: Block) -> Self {
+    pub fn new(block: Block) -> Self {
         Self {
             block,
             start: BlockStart::Entry,
         }
     }
 
-    pub(crate) fn at_statement(block: Block, statement: Statement) -> Self {
+    pub fn at_statement(block: Block, statement: Statement) -> Self {
         Self {
             block,
             start: BlockStart::Statement(statement),
         }
     }
 
-    pub(crate) fn exhausted(block: Block) -> Self {
+    pub fn exhausted(block: Block) -> Self {
         Self {
             block,
             start: BlockStart::Exhausted,
         }
     }
 
-    pub(crate) fn block(self) -> Block {
+    pub fn block(self) -> Block {
         self.block
     }
 
-    pub(crate) fn start(self) -> Option<Statement> {
+    pub fn start(self) -> Option<Statement> {
         match self.start {
             BlockStart::Entry => None,
             BlockStart::Statement(statement) => Some(statement),
@@ -57,11 +57,11 @@ impl InternalBlockSeed {
         }
     }
 
-    pub(crate) fn starts_at_entry(self) -> bool {
+    pub fn starts_at_entry(self) -> bool {
         matches!(self.start, BlockStart::Entry)
     }
 
-    pub(crate) fn is_exhausted(self) -> bool {
+    pub fn is_exhausted(self) -> bool {
         matches!(self.start, BlockStart::Exhausted)
     }
 }
@@ -77,7 +77,7 @@ impl From<Block> for InternalBlockSeed {
 /// Represents all the different body shapes the cursor can walk.
 /// This is the old `ExecutionSeed` enum, now internal to the cursor system.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub(crate) enum InternalSeed {
+pub enum InternalSeed {
     Block(InternalBlockSeed),
     Region(Region),
     DiGraph(DiGraph),
@@ -111,5 +111,16 @@ impl From<DiGraph> for InternalSeed {
 impl From<UnGraph> for InternalSeed {
     fn from(ungraph: UnGraph) -> Self {
         Self::UnGraph(ungraph)
+    }
+}
+
+/// Dummy conversion for unit seed types (machines that never push/replace).
+///
+/// Satisfies the `Seed: Into<InternalSeed>` bound on `apply_control`.
+/// Only the Push and Replace shell variants use the conversion, and those
+/// can never be constructed when `Seed = ()`.
+impl From<()> for InternalSeed {
+    fn from(_: ()) -> Self {
+        unreachable!("unit seed should never appear in Push or Replace")
     }
 }

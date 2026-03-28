@@ -1,7 +1,7 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter_2::{
-    Interpretable, Interpreter, InterpreterError, ProductValue,
-    effect::Flow,
+    Interpretable, Interpreter, InterpreterError, Machine, ProductValue,
+    control::Shell,
     interpreter::{Invoke, ResolveCall, ResolveCallee},
 };
 
@@ -16,13 +16,13 @@ where
     I: Interpreter<'ir>,
     T: CompileTimeValue,
 {
-    type Effect = Flow<<I as kirin_interpreter_2::ValueStore>::Value>;
+    type Effect = Shell<
+        <I as kirin_interpreter_2::ValueStore>::Value,
+        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
+    >;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(
-        &self,
-        _interp: &mut I,
-    ) -> Result<Flow<<I as kirin_interpreter_2::ValueStore>::Value>, Self::Error> {
+    fn interpret(&self, _interp: &mut I) -> Result<Self::Effect, Self::Error> {
         Err(unsupported("function bodies are structural and should not be stepped directly").into())
     }
 }
@@ -32,13 +32,13 @@ where
     I: Interpreter<'ir>,
     T: CompileTimeValue,
 {
-    type Effect = Flow<<I as kirin_interpreter_2::ValueStore>::Value>;
+    type Effect = Shell<
+        <I as kirin_interpreter_2::ValueStore>::Value,
+        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
+    >;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(
-        &self,
-        _interp: &mut I,
-    ) -> Result<Flow<<I as kirin_interpreter_2::ValueStore>::Value>, Self::Error> {
+    fn interpret(&self, _interp: &mut I) -> Result<Self::Effect, Self::Error> {
         Err(unsupported("bind is not yet supported in interpreter2").into())
     }
 }
@@ -65,17 +65,17 @@ where
     T: CompileTimeValue,
     <I as kirin_interpreter_2::ValueStore>::Value: Clone,
 {
-    type Effect = Flow<<I as kirin_interpreter_2::ValueStore>::Value>;
+    type Effect = Shell<
+        <I as kirin_interpreter_2::ValueStore>::Value,
+        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
+    >;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(
-        &self,
-        interp: &mut I,
-    ) -> Result<Flow<<I as kirin_interpreter_2::ValueStore>::Value>, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error> {
         let args = interp.read_many(self.args())?;
         let callee = self.resolve_call(interp, &args)?;
         interp.invoke(callee, &args, self.results())?;
-        Ok(Flow::Stay)
+        Ok(Shell::Stay)
     }
 }
 
@@ -85,13 +85,13 @@ where
     T: CompileTimeValue,
     <I as kirin_interpreter_2::ValueStore>::Value: Clone + ProductValue,
 {
-    type Effect = Flow<<I as kirin_interpreter_2::ValueStore>::Value>;
+    type Effect = Shell<
+        <I as kirin_interpreter_2::ValueStore>::Value,
+        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
+    >;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(
-        &self,
-        interp: &mut I,
-    ) -> Result<Flow<<I as kirin_interpreter_2::ValueStore>::Value>, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error> {
         let product = <I as kirin_interpreter_2::ValueStore>::Value::new_product(
             interp.read_many(&self.values)?,
         );
@@ -107,13 +107,13 @@ where
     T: CompileTimeValue,
     <I as kirin_interpreter_2::ValueStore>::Value: Clone + ProductValue,
 {
-    type Effect = Flow<<I as kirin_interpreter_2::ValueStore>::Value>;
+    type Effect = Shell<
+        <I as kirin_interpreter_2::ValueStore>::Value,
+        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
+    >;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(
-        &self,
-        interp: &mut I,
-    ) -> Result<Flow<<I as kirin_interpreter_2::ValueStore>::Value>, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error> {
         match self {
             Lifted::FunctionBody(op) => op.interpret(interp),
             Lifted::Bind(op) => op.interpret(interp),

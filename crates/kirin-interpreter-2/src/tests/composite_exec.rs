@@ -26,15 +26,19 @@ struct TestMachine;
 impl<'ir> Machine<'ir> for TestMachine {
     type Effect = TestEffect;
     type Stop = ArithValue;
+    type Seed = kirin_ir::Block;
 }
 
 impl<'ir> ConsumeEffect<'ir> for TestMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
         Ok(match effect {
             TestEffect::Advance => Shell::Advance,
-            TestEffect::Replace(block) => Shell::Replace(block.into()),
+            TestEffect::Replace(block) => Shell::Replace(block),
             TestEffect::Return(value) => Shell::Stop(value),
         })
     }
@@ -61,7 +65,7 @@ fn step_via_driver<'ir, I>(interp: &mut I) -> StepResult<'ir, I>
 where
     I: Driver<'ir>,
     <I::Machine as Machine<'ir>>::Effect: Clone,
-    Shell<<I::Machine as Machine<'ir>>::Stop>: Clone,
+    Shell<<I::Machine as Machine<'ir>>::Stop, <I::Machine as Machine<'ir>>::Seed>: Clone,
 {
     interp.step()
 }

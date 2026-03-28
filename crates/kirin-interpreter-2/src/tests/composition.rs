@@ -34,12 +34,16 @@ struct LeafMachine {
 impl<'ir> Machine<'ir> for LeafMachine {
     type Effect = LeafEffect;
     type Stop = LeafStop;
+    type Seed = ();
 }
 
 impl<'ir> ConsumeEffect<'ir> for LeafMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
         match effect {
             LeafEffect::Record(value) => {
                 self.seen.push(value);
@@ -68,12 +72,16 @@ struct CompositeMachine {
 impl<'ir> Machine<'ir> for CompositeMachine {
     type Effect = CompositeEffect;
     type Stop = CompositeStop;
+    type Seed = ();
 }
 
 impl<'ir> ConsumeEffect<'ir> for CompositeMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Shell<Self::Stop>, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
         match effect {
             CompositeEffect::Leaf(effect) => self
                 .leaf

@@ -1,6 +1,6 @@
 use kirin_ir::{ResultValue, SpecializedFunction};
 
-use crate::effect;
+use crate::{Machine, control::Shell};
 
 use super::Interpreter;
 
@@ -13,8 +13,12 @@ pub trait Invoke<'ir>: Interpreter<'ir> {
         results: &[ResultValue],
     ) -> Result<(), <Self as Interpreter<'ir>>::Error>;
 
+    #[allow(clippy::type_complexity)]
     fn return_current(
         &mut self,
         value: Self::Value,
-    ) -> Result<effect::Flow<Self::Value>, <Self as Interpreter<'ir>>::Error>;
+    ) -> Result<
+        Shell<Self::Value, <Self::Machine as Machine<'ir>>::Seed>,
+        <Self as Interpreter<'ir>>::Error,
+    >;
 }

@@ -1,7 +1,7 @@
 use kirin_ir::Block;
 
 use super::{Interpreter, Position};
-use crate::{InterpreterError, ProductValue, ValueStore, control::Shell};
+use crate::{InterpreterError, Machine, ProductValue, ValueStore, control::Shell};
 
 use super::BlockBindings;
 
@@ -18,6 +18,7 @@ pub trait InlineBlock<'ir>: BlockBindings<'ir> + Position<'ir>
 where
     <Self as ValueStore>::Value: ProductValue,
     <Self as Interpreter<'ir>>::Error: From<InterpreterError>,
+    Block: Into<<<Self as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
     /// Execute a block inline and return the product built from the
     /// terminator's arguments.
@@ -35,6 +36,7 @@ where
     T: BlockBindings<'ir> + Position<'ir>,
     <T as ValueStore>::Value: ProductValue,
     <T as Interpreter<'ir>>::Error: From<InterpreterError>,
+    Block: Into<<<T as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
     fn exec_inline_block(
         &mut self,

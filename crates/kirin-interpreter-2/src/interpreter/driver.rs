@@ -11,6 +11,7 @@ pub type StepResult<'ir, I> = Result<
     Step<
         <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Effect,
         <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Stop,
+        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
     >,
     <I as Interpreter<'ir>>::Error,
 >;
@@ -33,7 +34,7 @@ pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + I
     fn step(&mut self) -> StepResult<'ir, Self>
     where
         <Self::Machine as Machine<'ir>>::Effect: Clone,
-        Shell<<Self::Machine as Machine<'ir>>::Stop>: Clone,
+        Shell<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>: Clone,
     {
         let statement = match self.poll_execution_gate() {
             Ok(Some(statement)) => statement,

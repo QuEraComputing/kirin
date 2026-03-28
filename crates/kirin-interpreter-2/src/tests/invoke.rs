@@ -2,14 +2,15 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
 use kirin_ir::{
-    CompileStage, Function, GetInfo, HasArguments, Pipeline, Product, SSAValue, Signature,
+    Block, CompileStage, Function, GetInfo, HasArguments, Pipeline, Product, SSAValue, Signature,
     SpecializedFunction, StageInfo, StagedFunction, Symbol, Typeof,
 };
 use kirin_test_languages::CompositeLanguage;
 use kirin_test_utils::ir_fixtures::build_add_one;
 
 use crate::{
-    Interpretable, InterpreterError, ProductValue, ValueStore, effect,
+    ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue, ValueStore,
+    control::Shell,
     interpreter::{Driver, Invoke, Position, ResolveCallee, SingleStage, TypedStage, callee},
 };
 
@@ -75,13 +76,44 @@ fn unsupported(message: &'static str) -> InterpreterError {
     InterpreterError::custom(std::io::Error::other(message))
 }
 
-type InvokeInterp<'ir> = SingleStage<
-    'ir,
-    CompositeLanguage,
-    InvokeValue,
-    effect::Stateless<InvokeValue>,
-    InterpreterError,
->;
+/// Effect type for the invoke test machine.
+///
+/// Combines cursor operations with a Stop variant for function return.
+#[derive(Debug, Clone, PartialEq)]
+#[allow(dead_code)]
+enum InvokeEffect {
+    Advance,
+    Stay,
+    Stop(InvokeValue),
+}
+
+/// Machine for the invoke tests. Converts InvokeEffect into Shell controls.
+#[derive(Debug, Default)]
+struct InvokeMachine;
+
+impl<'ir> Machine<'ir> for InvokeMachine {
+    type Effect = InvokeEffect;
+    type Stop = InvokeValue;
+    type Seed = Block;
+}
+
+impl<'ir> ConsumeEffect<'ir> for InvokeMachine {
+    type Error = InterpreterError;
+
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
+        Ok(match effect {
+            InvokeEffect::Advance => Shell::Advance,
+            InvokeEffect::Stay => Shell::Stay,
+            InvokeEffect::Stop(value) => Shell::Stop(value),
+        })
+    }
+}
+
+type InvokeInterp<'ir> =
+    SingleStage<'ir, CompositeLanguage, InvokeValue, InvokeMachine, InterpreterError>;
 
 fn as_i64(value: InvokeValue) -> Result<i64, InterpreterError> {
     match value {
@@ -232,26 +264,20 @@ fn build_multistage_named_function(
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Constant<ArithValue, ArithType> {
-    type Effect = effect::Flow<InvokeValue>;
+    type Effect = InvokeEffect;
     type Error = InterpreterError;
 
-    fn interpret(
-        &self,
-        interp: &mut InvokeInterp<'ir>,
-    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<InvokeEffect, Self::Error> {
         interp.write(self.result, self.value.clone().into())?;
-        Ok(effect::Flow::Advance)
+        Ok(InvokeEffect::Advance)
     }
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Arith<ArithType> {
-    type Effect = effect::Flow<InvokeValue>;
+    type Effect = InvokeEffect;
     type Error = InterpreterError;
 
-    fn interpret(
-        &self,
-        interp: &mut InvokeInterp<'ir>,
-    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<InvokeEffect, Self::Error> {
         match self {
             Arith::Add {
                 lhs, rhs, result, ..
@@ -259,7 +285,7 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Arith<ArithType> {
                 let lhs = as_i64(interp.read(*lhs)?)?;
                 let rhs = as_i64(interp.read(*rhs)?)?;
                 interp.write(*result, InvokeValue::I64(lhs + rhs))?;
-                Ok(effect::Flow::Advance)
+                Ok(InvokeEffect::Advance)
             }
             Arith::Sub {
                 lhs, rhs, result, ..
@@ -267,7 +293,7 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Arith<ArithType> {
                 let lhs = as_i64(interp.read(*lhs)?)?;
                 let rhs = as_i64(interp.read(*rhs)?)?;
                 interp.write(*result, InvokeValue::I64(lhs - rhs))?;
-                Ok(effect::Flow::Advance)
+                Ok(InvokeEffect::Advance)
             }
             _ => Err(unsupported("unsupported arithmetic op in invoke scaffold")),
         }
@@ -275,29 +301,23 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Arith<ArithType> {
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Return<ArithType> {
-    type Effect = effect::Flow<InvokeValue>;
+    type Effect = InvokeEffect;
     type Error = InterpreterError;
 
-    fn interpret(
-        &self,
-        interp: &mut InvokeInterp<'ir>,
-    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<InvokeEffect, Self::Error> {
         let values = self
             .arguments()
             .map(|ssa| interp.read(*ssa))
             .collect::<Result<Vec<_>, _>>()?;
-        Ok(effect::Flow::Stop(InvokeValue::new_product(values)))
+        Ok(InvokeEffect::Stop(InvokeValue::new_product(values)))
     }
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for FunctionBody<ArithType> {
-    type Effect = effect::Flow<InvokeValue>;
+    type Effect = InvokeEffect;
     type Error = InterpreterError;
 
-    fn interpret(
-        &self,
-        _interp: &mut InvokeInterp<'ir>,
-    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+    fn interpret(&self, _interp: &mut InvokeInterp<'ir>) -> Result<InvokeEffect, Self::Error> {
         Err(unsupported(
             "function bodies are structural and should not be stepped directly",
         ))
@@ -305,13 +325,10 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for FunctionBody<ArithType> {
 }
 
 impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for CompositeLanguage {
-    type Effect = effect::Flow<InvokeValue>;
+    type Effect = InvokeEffect;
     type Error = InterpreterError;
 
-    fn interpret(
-        &self,
-        interp: &mut InvokeInterp<'ir>,
-    ) -> Result<effect::Flow<InvokeValue>, Self::Error> {
+    fn interpret(&self, interp: &mut InvokeInterp<'ir>) -> Result<InvokeEffect, Self::Error> {
         match self {
             CompositeLanguage::Arith(op) => op.interpret(interp),
             CompositeLanguage::Constant(op) => op.interpret(interp),
@@ -331,7 +348,7 @@ fn invoke_pushes_new_activation_and_preserves_caller_bindings() {
     let callee = build_add_one(&mut pipeline, stage_id);
     let (caller, _c2_value, sum_value) = build_caller_program(&mut pipeline, stage_id);
 
-    let mut interp = InvokeInterp::new(&pipeline, stage_id, effect::Stateless::default());
+    let mut interp = InvokeInterp::new(&pipeline, stage_id, InvokeMachine);
     interp
         .start_specialization(caller, &[InvokeValue::I64(7)])
         .unwrap();
@@ -382,7 +399,7 @@ fn return_current_restores_caller_and_writes_product_results() {
     let callee = build_pair_callee(&mut pipeline, stage_id);
     let (caller, c2_value, sum_value) = build_caller_program(&mut pipeline, stage_id);
 
-    let mut interp = InvokeInterp::new(&pipeline, stage_id, effect::Stateless::default());
+    let mut interp = InvokeInterp::new(&pipeline, stage_id, InvokeMachine);
     interp
         .start_specialization(caller, &[InvokeValue::I64(9)])
         .unwrap();
@@ -425,27 +442,21 @@ fn return_current_restores_caller_and_writes_product_results() {
 }
 
 #[test]
-fn flow_stay_leaves_current_cursor_unchanged() {
+fn shell_stay_leaves_current_cursor_unchanged() {
     let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
     let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
     let caller = build_add_one(&mut pipeline, stage_id);
 
-    let mut interp = InvokeInterp::new(&pipeline, stage_id, effect::Stateless::default());
+    let mut interp = InvokeInterp::new(&pipeline, stage_id, InvokeMachine);
     interp
         .start_specialization(caller, &[InvokeValue::I64(3)])
         .unwrap();
     let before_statement = interp.current_statement();
     let before_location = interp.current_location();
 
-    fn stay_effect() -> crate::effect::Flow<InvokeValue> {
-        crate::effect::Flow::Stay
-    }
-
-    fn apply_flow(interp: &mut InvokeInterp<'_>, flow: crate::effect::Flow<InvokeValue>) {
-        interp.apply_control(flow.into_shell()).unwrap();
-    }
-
-    apply_flow(&mut interp, stay_effect());
+    interp
+        .apply_control(Shell::<InvokeValue, Block>::Stay)
+        .unwrap();
     assert_eq!(interp.current_statement(), before_statement);
     assert_eq!(interp.current_location(), before_location);
 }
@@ -456,7 +467,7 @@ fn callee_builder_resolves_stage_aware_queries() {
     let stage_a: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
     let stage_b: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
     let target = build_multistage_named_function(&mut pipeline, stage_a, stage_b, "target");
-    let interp = InvokeInterp::new(&pipeline, stage_a, effect::Stateless::default());
+    let interp = InvokeInterp::new(&pipeline, stage_a, InvokeMachine);
 
     assert_eq!(interp.callee().specialized(target.spec_a), target.spec_a);
     assert_eq!(

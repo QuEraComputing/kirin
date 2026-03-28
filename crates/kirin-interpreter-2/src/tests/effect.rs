@@ -1,31 +1,37 @@
 use crate::{
     ConsumeEffect, FromConstant, Lift, Machine,
     control::Shell,
-    effect::{Cursor, Flow, Stateless},
+    effect::{Cursor, Stateless},
 };
 
 #[test]
-fn flow_maps_advance_and_stop_to_shell_controls() {
-    assert_eq!(Flow::<i64>::Advance.into_shell(), Shell::Advance);
-    assert_eq!(Flow::Stop(7).into_shell(), Shell::Stop(7));
+fn cursor_lifts_to_shell() {
+    let advance: Shell<i64, ()> = Cursor::<()>::Advance.lift();
+    assert_eq!(advance, Shell::Advance);
+
+    let stay: Shell<i64, ()> = Cursor::<()>::Stay.lift();
+    assert_eq!(stay, Shell::Stay);
+
+    let jump: Shell<i64, i32> = Cursor::Jump(42_i32).lift();
+    assert_eq!(jump, Shell::Replace(42));
 }
 
 #[test]
-fn stateless_machine_consumes_shared_flow_effects() {
+fn stateless_machine_consumes_cursor_effects() {
     let mut machine = Stateless::<i64>::default();
 
-    let advance = machine.consume_effect(Flow::Advance).unwrap();
-    let stop = machine.consume_effect(Flow::Stop(9)).unwrap();
+    let advance = machine.consume_effect(Cursor::Advance).unwrap();
+    let stay = machine.consume_effect(Cursor::Stay).unwrap();
 
     assert_eq!(advance, Shell::Advance);
-    assert_eq!(stop, Shell::Stop(9));
+    assert_eq!(stay, Shell::Stay);
 }
 
 #[test]
 fn stateless_machine_implements_machine_contract() {
     fn effect_roundtrip<'ir, M>(_: &M)
     where
-        M: Machine<'ir, Effect = Flow<i64>, Stop = i64>,
+        M: Machine<'ir, Effect = Cursor, Stop = i64, Seed = ()>,
     {
     }
 
@@ -35,16 +41,16 @@ fn stateless_machine_implements_machine_contract() {
 
 #[test]
 fn cursor_variants_are_distinct() {
-    let advance = Cursor::Advance;
-    let stay = Cursor::Stay;
+    let advance = Cursor::<()>::Advance;
+    let stay = Cursor::<()>::Stay;
     assert_ne!(advance, stay);
 }
 
 #[test]
 fn lift_identity_returns_self() {
-    let flow: Flow<i64> = Flow::Advance;
-    let lifted: Flow<i64> = flow.lift();
-    assert_eq!(lifted, Flow::Advance);
+    let cursor: Cursor<()> = Cursor::Advance;
+    let lifted: Cursor<()> = cursor.lift();
+    assert_eq!(lifted, Cursor::Advance);
 }
 
 #[test]

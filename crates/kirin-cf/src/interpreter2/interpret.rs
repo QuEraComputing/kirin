@@ -1,4 +1,4 @@
-use kirin::prelude::CompileTimeValue;
+use kirin::prelude::{Block, CompileTimeValue};
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{Interpretable, Interpreter, effect::Cursor, interpreter::BlockBindings};
 
@@ -14,16 +14,16 @@ where
     <I as kirin_interpreter_2::ValueStore>::Value: Clone + BranchCondition,
     T: CompileTimeValue,
 {
-    type Effect = Cursor;
+    type Effect = Cursor<Block>;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         match self {
             ControlFlow::Branch { target, args } => {
                 let values = interp.read_many(args)?;
                 let block = target.target();
                 interp.bind_block_args(block, values)?;
-                Ok(Cursor::Jump(block.into()))
+                Ok(Cursor::Jump(block))
             }
             ControlFlow::ConditionalBranch {
                 condition,
@@ -44,7 +44,7 @@ where
                     };
                 let values = interp.read_many(args)?;
                 interp.bind_block_args(block, values)?;
-                Ok(Cursor::Jump(block.into()))
+                Ok(Cursor::Jump(block))
             }
             Self::__Phantom(..) => unreachable!(),
         }
