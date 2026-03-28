@@ -11,7 +11,7 @@ use kirin_interpreter_2::{
     ValueStore, control::Shell, interpreter::SingleStage,
 };
 
-use crate::{If, StructuredControlFlow, Yield};
+use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
 
 // ---------------------------------------------------------------------------
 // Test value — wraps i64 with BranchCondition + ProductValue support
@@ -55,6 +55,22 @@ impl ProductValue for TestValue {
 
     fn from_product(product: ir::Product<Self>) -> Self {
         TestValue::Product(Box::new(product))
+    }
+}
+
+impl ForLoopValue for TestValue {
+    fn loop_condition(&self, end: &Self) -> Option<bool> {
+        match (self, end) {
+            (TestValue::I64(a), TestValue::I64(b)) => Some(a < b),
+            _ => None,
+        }
+    }
+
+    fn loop_step(&self, step: &Self) -> Option<Self> {
+        match (self, step) {
+            (TestValue::I64(a), TestValue::I64(b)) => a.checked_add(*b).map(TestValue::I64),
+            _ => None,
+        }
     }
 }
 
@@ -130,9 +146,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ScfTestLang {
         match self {
             ScfTestLang::Scf(scf) => match scf {
                 StructuredControlFlow::If(op) => op.interpret(interp).map(Lift::lift),
-                StructuredControlFlow::For(_) => {
-                    Err(unsupported("scf.for not yet implemented in test harness"))
-                }
+                StructuredControlFlow::For(op) => op.interpret(interp).map(Lift::lift),
                 StructuredControlFlow::Yield(op) => {
                     // Delegate to the generic Yield impl which always errors
                     let result: Result<Cursor, InterpreterError> = op.interpret(interp);
@@ -440,6 +454,420 @@ fn void_if_runs_without_error() {
     let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
     // cond=1 (truthy) — takes then branch, which yields nothing
     let result = interp.run_specialization(spec_fn, &[TestValue::I64(1)]);
+    match result {
+        Ok(kirin_interpreter_2::result::Run::Stopped(value)) => {
+            assert_eq!(value, TestValue::I64(99));
+        }
+        other => panic!("expected Stopped(99), got: {other:?}"),
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Helpers for building SCF For programs
+// ---------------------------------------------------------------------------
+
+/// Build: f(end) = result = for iv in 0..end step 1 iter_args(0) do { yield iv }; return result
+///
+/// Each iteration yields the induction variable. After the loop finishes,
+/// the carried state equals the last iv value yielded (end - 1).
+/// For end=5, result=4.
+fn build_for_yield_iv_program(
+    pipeline: &mut Pipeline<StageInfo<ScfTestLang>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+
+        // Build entry block with 1 arg: end
+        let entry_block = b.block().argument(ArithType::I64).new();
+        let end_ssa: SSAValue = b.block_arena()[entry_block].arguments[0].into();
+
+        // Build constants: start=0, step=1, init=0
+        let const_start = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
+        let const_step = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
+        let const_init = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
+
+        // Build body block with 2 args: [iv, carried]
+        // Yield iv (body block's first argument)
+        // We need to create the block first to get the block arg SSA values,
+        // then create the yield referencing the iv arg.
+        let body_block = b
+            .block()
+            .argument(ArithType::I64) // iv
+            .argument(ArithType::I64) // carried
+            .new();
+        let iv_block_arg: SSAValue = b.block_arena()[body_block].arguments[0].into();
+
+        // Create yield terminator that yields iv
+        let yield_op: Yield<ArithType> = Yield {
+            values: vec![iv_block_arg],
+            marker: std::marker::PhantomData,
+        };
+        let yield_stmt = b
+            .statement()
+            .definition(ScfTestLang::Scf(StructuredControlFlow::Yield(yield_op)))
+            .new();
+        {
+            use ir::query::ParentInfo;
+            let block_info: &mut Item<BlockInfo<ScfTestLang>> =
+                b.block_arena_mut().get_mut(body_block).unwrap();
+            block_info.terminator = Some(yield_stmt);
+
+            let stmt_info = &mut b.statement_arena_mut()[yield_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(body_block));
+        }
+
+        // Build the For statement
+        let for_stmt_id = b.statement_arena().next_id();
+        let for_result: ResultValue = b
+            .ssa()
+            .kind(ir::BuilderSSAKind::Result(for_stmt_id, 0))
+            .ty(ArithType::I64)
+            .new()
+            .into();
+
+        // induction_var is the SSA for the body block's first argument
+        let for_op: For<ArithType> = For {
+            induction_var: iv_block_arg,
+            start: const_start.result.into(),
+            end: end_ssa,
+            step: const_step.result.into(),
+            init_args: vec![const_init.result.into()],
+            body: body_block,
+            results: vec![for_result],
+            marker: std::marker::PhantomData,
+        };
+        let for_stmt = b
+            .statement()
+            .definition(ScfTestLang::Scf(StructuredControlFlow::For(for_op)))
+            .new();
+        assert_eq!(for_stmt, for_stmt_id);
+
+        // Build return
+        let ret = Return::<ArithType>::new(b, vec![SSAValue::from(for_result)]);
+
+        // Wire statements into entry block
+        {
+            use ir::query::ParentInfo;
+
+            let const_start_stmt: Statement = const_start.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_start_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let const_step_stmt: Statement = const_step.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_step_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let const_init_stmt: Statement = const_init.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_init_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let stmt_info = &mut b.statement_arena_mut()[for_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let ret_stmt: Statement = ret.into();
+            let stmt_info = &mut b.statement_arena_mut()[ret_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let linked =
+                b.link_statements(&[const_start_stmt, const_step_stmt, const_init_stmt, for_stmt]);
+            let block_info = &mut b.block_arena_mut()[entry_block];
+            block_info.statements = linked;
+            block_info.terminator = Some(ret_stmt);
+        }
+
+        let region = b.region().add_block(entry_block).new();
+        let body = FunctionBody::<ArithType>::new(
+            b,
+            region,
+            Signature::new(vec![ArithType::I64], ArithType::I64, ()),
+        );
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    })
+}
+
+/// Build: f() = result = for iv in 10..5 step 1 iter_args(42) do { yield iv }; return result
+///
+/// Start=10 >= end=5, so the loop body never executes.
+/// Result should be the initial carried value: 42.
+fn build_for_empty_range_program(
+    pipeline: &mut Pipeline<StageInfo<ScfTestLang>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+
+        // Build entry block with 0 args
+        let entry_block = b.block().new();
+
+        // Build constants: start=10, end=5, step=1, init=42
+        let const_start = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(10));
+        let const_end = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(5));
+        let const_step = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
+        let const_init = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(42));
+
+        // Build body block with 2 args: [iv, carried]
+        let body_block = b
+            .block()
+            .argument(ArithType::I64) // iv
+            .argument(ArithType::I64) // carried
+            .new();
+        let iv_block_arg: SSAValue = b.block_arena()[body_block].arguments[0].into();
+
+        // Create yield terminator that yields iv (won't actually execute)
+        let yield_op: Yield<ArithType> = Yield {
+            values: vec![iv_block_arg],
+            marker: std::marker::PhantomData,
+        };
+        let yield_stmt = b
+            .statement()
+            .definition(ScfTestLang::Scf(StructuredControlFlow::Yield(yield_op)))
+            .new();
+        {
+            use ir::query::ParentInfo;
+            let block_info: &mut Item<BlockInfo<ScfTestLang>> =
+                b.block_arena_mut().get_mut(body_block).unwrap();
+            block_info.terminator = Some(yield_stmt);
+
+            let stmt_info = &mut b.statement_arena_mut()[yield_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(body_block));
+        }
+
+        // Build the For statement
+        let for_stmt_id = b.statement_arena().next_id();
+        let for_result: ResultValue = b
+            .ssa()
+            .kind(ir::BuilderSSAKind::Result(for_stmt_id, 0))
+            .ty(ArithType::I64)
+            .new()
+            .into();
+
+        let for_op: For<ArithType> = For {
+            induction_var: iv_block_arg,
+            start: const_start.result.into(),
+            end: const_end.result.into(),
+            step: const_step.result.into(),
+            init_args: vec![const_init.result.into()],
+            body: body_block,
+            results: vec![for_result],
+            marker: std::marker::PhantomData,
+        };
+        let for_stmt = b
+            .statement()
+            .definition(ScfTestLang::Scf(StructuredControlFlow::For(for_op)))
+            .new();
+        assert_eq!(for_stmt, for_stmt_id);
+
+        // Build return
+        let ret = Return::<ArithType>::new(b, vec![SSAValue::from(for_result)]);
+
+        // Wire statements into entry block
+        {
+            use ir::query::ParentInfo;
+
+            let const_start_stmt: Statement = const_start.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_start_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let const_end_stmt: Statement = const_end.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_end_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let const_step_stmt: Statement = const_step.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_step_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let const_init_stmt: Statement = const_init.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_init_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let stmt_info = &mut b.statement_arena_mut()[for_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let ret_stmt: Statement = ret.into();
+            let stmt_info = &mut b.statement_arena_mut()[ret_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let linked = b.link_statements(&[
+                const_start_stmt,
+                const_end_stmt,
+                const_step_stmt,
+                const_init_stmt,
+                for_stmt,
+            ]);
+            let block_info = &mut b.block_arena_mut()[entry_block];
+            block_info.statements = linked;
+            block_info.terminator = Some(ret_stmt);
+        }
+
+        let region = b.region().add_block(entry_block).new();
+        let body =
+            FunctionBody::<ArithType>::new(b, region, Signature::new(vec![], ArithType::I64, ()));
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    })
+}
+
+/// Build: f() = for iv in 0..3 step 1 iter_args() do { yield }; return const 99
+///
+/// A void for loop (no carried state). The loop body yields nothing.
+/// The loop runs 3 iterations then the function returns 99.
+fn build_void_for_program(
+    pipeline: &mut Pipeline<StageInfo<ScfTestLang>>,
+    stage_id: CompileStage,
+) -> SpecializedFunction {
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+        let sf = b.staged_function().new().unwrap();
+
+        // Build entry block with 0 args
+        let entry_block = b.block().new();
+
+        // Build constants: start=0, end=3, step=1
+        let const_start = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(0));
+        let const_end = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(3));
+        let const_step = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(1));
+
+        // Build body block with 1 arg: [iv] (no carried values)
+        let body_block = b
+            .block()
+            .argument(ArithType::I64) // iv
+            .new();
+
+        // Create yield terminator with no values
+        let yield_op: Yield<ArithType> = Yield {
+            values: vec![],
+            marker: std::marker::PhantomData,
+        };
+        let yield_stmt = b
+            .statement()
+            .definition(ScfTestLang::Scf(StructuredControlFlow::Yield(yield_op)))
+            .new();
+        {
+            use ir::query::ParentInfo;
+            let block_info: &mut Item<BlockInfo<ScfTestLang>> =
+                b.block_arena_mut().get_mut(body_block).unwrap();
+            block_info.terminator = Some(yield_stmt);
+
+            let stmt_info = &mut b.statement_arena_mut()[yield_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(body_block));
+        }
+
+        let iv_block_arg: SSAValue = b.block_arena()[body_block].arguments[0].into();
+
+        // Build the For statement with 0 results
+        let for_op: For<ArithType> = For {
+            induction_var: iv_block_arg,
+            start: const_start.result.into(),
+            end: const_end.result.into(),
+            step: const_step.result.into(),
+            init_args: vec![],
+            body: body_block,
+            results: vec![],
+            marker: std::marker::PhantomData,
+        };
+        let for_stmt = b
+            .statement()
+            .definition(ScfTestLang::Scf(StructuredControlFlow::For(for_op)))
+            .new();
+
+        // Build constant 99 to return
+        let const_ret = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(99));
+
+        // Build return
+        let ret = Return::<ArithType>::new(b, vec![const_ret.result.into()]);
+
+        // Wire statements into entry block
+        {
+            use ir::query::ParentInfo;
+
+            let const_start_stmt: Statement = const_start.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_start_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let const_end_stmt: Statement = const_end.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_end_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let const_step_stmt: Statement = const_step.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_step_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let stmt_info = &mut b.statement_arena_mut()[for_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let const_ret_stmt: Statement = const_ret.into();
+            let stmt_info = &mut b.statement_arena_mut()[const_ret_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let ret_stmt: Statement = ret.into();
+            let stmt_info = &mut b.statement_arena_mut()[ret_stmt];
+            *stmt_info.get_parent_mut() = Some(StatementParent::Block(entry_block));
+
+            let linked = b.link_statements(&[
+                const_start_stmt,
+                const_end_stmt,
+                const_step_stmt,
+                for_stmt,
+                const_ret_stmt,
+            ]);
+            let block_info = &mut b.block_arena_mut()[entry_block];
+            block_info.statements = linked;
+            block_info.terminator = Some(ret_stmt);
+        }
+
+        let region = b.region().add_block(entry_block).new();
+        let body =
+            FunctionBody::<ArithType>::new(b, region, Signature::new(vec![], ArithType::I64, ()));
+        b.specialize().staged_func(sf).body(body).new().unwrap()
+    })
+}
+
+// ---------------------------------------------------------------------------
+// For tests
+// ---------------------------------------------------------------------------
+
+#[test]
+fn for_yield_iv_accumulator() {
+    // f(end=5) → for iv in 0..5 step 1 iter_args(0) do { yield iv } → result=4
+    let mut pipeline: Pipeline<StageInfo<ScfTestLang>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_for_yield_iv_program(&mut pipeline, stage_id);
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
+    let result = interp.run_specialization(spec_fn, &[TestValue::I64(5)]);
+    match result {
+        Ok(kirin_interpreter_2::result::Run::Stopped(value)) => {
+            assert_eq!(value, TestValue::I64(4));
+        }
+        other => panic!("expected Stopped(4), got: {other:?}"),
+    }
+}
+
+#[test]
+fn for_empty_range_returns_initial_carried() {
+    // f() → for iv in 10..5 step 1 iter_args(42) do { yield iv } → result=42 (0 iterations)
+    let mut pipeline: Pipeline<StageInfo<ScfTestLang>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_for_empty_range_program(&mut pipeline, stage_id);
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
+    let result = interp.run_specialization(spec_fn, &[]);
+    match result {
+        Ok(kirin_interpreter_2::result::Run::Stopped(value)) => {
+            assert_eq!(value, TestValue::I64(42));
+        }
+        other => panic!("expected Stopped(42), got: {other:?}"),
+    }
+}
+
+#[test]
+fn void_for_runs_without_error() {
+    // f() → for iv in 0..3 step 1 iter_args() do { yield }; return 99 → result=99
+    let mut pipeline: Pipeline<StageInfo<ScfTestLang>> = Pipeline::new();
+    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
+    let spec_fn = build_void_for_program(&mut pipeline, stage_id);
+
+    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
+    let result = interp.run_specialization(spec_fn, &[]);
     match result {
         Ok(kirin_interpreter_2::result::Run::Stopped(value)) => {
             assert_eq!(value, TestValue::I64(99));
