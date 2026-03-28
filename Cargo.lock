@@ -956,7 +956,11 @@ name = "kirin-scf"
 version = "0.1.0"
 dependencies = [
  "kirin",
+ "kirin-arith",
+ "kirin-constant",
+ "kirin-function",
  "kirin-interpreter",
+ "kirin-interpreter-2",
  "kirin-test-types",
  "smallvec",
 ]

@@ -26,6 +26,7 @@
 //! - `Yield` ↔ `scf.yield`
 
 mod interpret_impl;
+pub mod interpreter2;
 pub use interpret_impl::ForLoopValue;
 
 use kirin::prelude::*;
