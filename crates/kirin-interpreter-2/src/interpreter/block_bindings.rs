@@ -13,20 +13,20 @@ where
     fn bind_block_args(
         &mut self,
         block: Block,
-        args: &[<Self as ValueStore>::Value],
+        args: impl IntoIterator<Item = <Self as ValueStore>::Value>,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error> {
         let stage = self.stage_info();
         let block_info = block.expect_info(stage);
-        if block_info.arguments.len() != args.len() {
-            return Err(InterpreterError::ArityMismatch {
-                expected: block_info.arguments.len(),
-                got: args.len(),
-            }
-            .into());
+        let expected = block_info.arguments.len();
+
+        let mut got = 0;
+        for (argument, value) in block_info.arguments.iter().zip(args) {
+            self.write(SSAValue::from(*argument), value)?;
+            got += 1;
         }
 
-        for (argument, value) in block_info.arguments.iter().zip(args.iter()) {
-            self.write(SSAValue::from(*argument), value.clone())?;
+        if got != expected {
+            return Err(InterpreterError::ArityMismatch { expected, got }.into());
         }
 
         Ok(())

@@ -303,7 +303,7 @@ where
         self.push_frame(callee, stage, entry.into(), Some(continuation))
             .map_err(E::from)?;
 
-        if let Err(error) = self.bind_block_args(entry, args) {
+        if let Err(error) = self.bind_block_args(entry, args.iter().cloned()) {
             let _ = self.frames.pop::<InterpreterError>();
             return Err(error);
         }

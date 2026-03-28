@@ -4,6 +4,7 @@ use kirin_interpreter_2::{
     Cursor, Interpretable, Interpreter, InterpreterError, ProductValue, ValueStore,
     interpreter::InlineBlock,
 };
+use smallvec::SmallVec;
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
 
@@ -34,7 +35,7 @@ where
             }
         };
 
-        if let Some(product) = interp.exec_inline_block(block, &[])? {
+        if let Some(product) = interp.exec_inline_block(block, std::iter::empty())? {
             interp.write_product(&self.results, product)?;
         }
         Ok(Cursor::Advance)
@@ -64,9 +65,9 @@ where
             .collect::<Result<_, _>>()?;
         let mut carried = <<I as ValueStore>::Value as ProductValue>::new_product(init_values);
 
+        let mut block_args: SmallVec<[_; 8]> = SmallVec::with_capacity(1 + self.init_args.len());
         while iv.loop_condition(&end) == Some(true) {
             // Build block args: [iv, ...carried]
-            let mut block_args = Vec::with_capacity(1 + self.init_args.len());
             block_args.push(iv.clone());
             if let Some(product) = carried.as_product() {
                 block_args.extend(product.iter().cloned());
@@ -74,7 +75,7 @@ where
                 block_args.push(carried.clone());
             }
 
-            if let Some(product) = interp.exec_inline_block(self.body, &block_args)? {
+            if let Some(product) = interp.exec_inline_block(self.body, block_args.drain(..))? {
                 carried = product;
             }
 

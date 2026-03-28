@@ -69,7 +69,7 @@ where
 fn bind_block_args_via_block_bindings<'ir, I>(
     interp: &mut I,
     block: kirin_ir::Block,
-    args: &[<I as ValueStore>::Value],
+    args: impl IntoIterator<Item = <I as ValueStore>::Value>,
 ) -> Result<(), <I as crate::interpreter::Interpreter<'ir>>::Error>
 where
     I: BlockBindings<'ir>,
@@ -135,7 +135,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ControlFlow<ArithType> {
                     .map(|value| interp.read(*value))
                     .collect::<Result<Vec<_>, _>>()?;
                 let block = target.target();
-                interp.bind_block_args(block, &values)?;
+                interp.bind_block_args(block, values)?;
                 Ok(TestEffect::Replace(block))
             }
             ControlFlow::ConditionalBranch {
@@ -155,7 +155,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ControlFlow<ArithType> {
                     .iter()
                     .map(|value| interp.read(*value))
                     .collect::<Result<Vec<_>, _>>()?;
-                interp.bind_block_args(target, &values)?;
+                interp.bind_block_args(target, values)?;
                 Ok(TestEffect::Replace(target))
             }
             _ => Err(unsupported("unsupported control-flow op in MVP semantics")),
@@ -242,7 +242,7 @@ fn block_bindings_trait_binds_block_args_and_computes_resume_seed() {
     let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
     let entry = interp.entry_block(spec_fn).unwrap();
     interp.push_specialization(spec_fn).unwrap();
-    bind_block_args_via_block_bindings(&mut interp, entry, &[ArithValue::I64(9)]).unwrap();
+    bind_block_args_via_block_bindings(&mut interp, entry, [ArithValue::I64(9)]).unwrap();
 
     let first = current_statement_via_position(&interp).unwrap();
     let second = (*first.next(interp.stage_info())).unwrap();

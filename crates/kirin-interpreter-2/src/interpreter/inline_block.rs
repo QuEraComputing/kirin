@@ -26,7 +26,7 @@ where
     fn exec_inline_block(
         &mut self,
         block: Block,
-        args: &[<Self as ValueStore>::Value],
+        args: impl IntoIterator<Item = <Self as ValueStore>::Value>,
     ) -> Result<Option<<Self as ValueStore>::Value>, <Self as Interpreter<'ir>>::Error>;
 }
 
@@ -39,7 +39,7 @@ where
     fn exec_inline_block(
         &mut self,
         block: Block,
-        args: &[<Self as ValueStore>::Value],
+        args: impl IntoIterator<Item = <Self as ValueStore>::Value>,
     ) -> Result<Option<<Self as ValueStore>::Value>, <Self as Interpreter<'ir>>::Error> {
         let stage = self.stage_info();
         let terminator = block.terminator(stage);

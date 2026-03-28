@@ -22,7 +22,7 @@ where
             ControlFlow::Branch { target, args } => {
                 let values = interp.read_many(args)?;
                 let block = target.target();
-                interp.bind_block_args(block, &values)?;
+                interp.bind_block_args(block, values)?;
                 Ok(Cursor::Jump(block.into()))
             }
             ControlFlow::ConditionalBranch {
@@ -43,7 +43,7 @@ where
                         .into()),
                     };
                 let values = interp.read_many(args)?;
-                interp.bind_block_args(block, &values)?;
+                interp.bind_block_args(block, values)?;
                 Ok(Cursor::Jump(block.into()))
             }
             Self::__Phantom(..) => unreachable!(),

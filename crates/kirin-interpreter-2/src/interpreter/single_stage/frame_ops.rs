@@ -108,7 +108,11 @@ where
             .ok_or_else(InterpreterError::missing_entry_block)
     }
 
-    pub(super) fn bind_block_args(&mut self, block: Block, args: &[V]) -> Result<(), E>
+    pub(super) fn bind_block_args(
+        &mut self,
+        block: Block,
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<(), E>
     where
         V: Clone,
         E: From<InterpreterError>,
@@ -116,16 +120,16 @@ where
     {
         let stage = self.stage_info_for(self.active_stage());
         let block_info = block.expect_info(stage);
-        if block_info.arguments.len() != args.len() {
-            return Err(InterpreterError::ArityMismatch {
-                expected: block_info.arguments.len(),
-                got: args.len(),
-            }
-            .into());
+        let expected = block_info.arguments.len();
+
+        let mut got = 0;
+        for (argument, value) in block_info.arguments.iter().zip(args) {
+            self.write(SSAValue::from(*argument), value)?;
+            got += 1;
         }
 
-        for (argument, value) in block_info.arguments.iter().zip(args.iter()) {
-            self.write(SSAValue::from(*argument), value.clone())?;
+        if got != expected {
+            return Err(InterpreterError::ArityMismatch { expected, got }.into());
         }
 
         Ok(())
@@ -235,7 +239,7 @@ where
         self.push_frame(callee, self.root_stage, entry.into(), None)
             .map_err(E::from)?;
 
-        if let Err(error) = self.bind_block_args(entry, args) {
+        if let Err(error) = self.bind_block_args(entry, args.iter().cloned()) {
             self.clear_frames();
             return Err(error);
         }
