@@ -2,8 +2,7 @@ use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
     Cursor, Interpretable, Interpreter, InterpreterError, ProductValue, ValueStore,
-    control::Shell,
-    interpreter::{BlockBindings, Position},
+    interpreter::InlineBlock,
 };
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
@@ -14,7 +13,7 @@ fn unsupported(message: &'static str) -> InterpreterError {
 
 impl<'ir, I, T> Interpretable<'ir, I> for If<T>
 where
-    I: BlockBindings<'ir> + Position<'ir>,
+    I: InlineBlock<'ir>,
     <I as ValueStore>::Value: BranchCondition + ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
@@ -35,43 +34,16 @@ where
             }
         };
 
-        let stage = interp.stage_info();
-        let terminator = block.terminator(stage);
-
-        // Enter inline block
-        interp.consume_control(Shell::Push(block.into()))?;
-        interp.bind_block_args(block, &[])?;
-
-        // Run non-terminator statements
-        loop {
-            let current = interp.current_statement();
-            if current == terminator || current.is_none() {
-                break;
-            }
-            let effect = interp.interpret_current()?;
-            let control = interp.consume_effect(effect)?;
-            interp.consume_control(control)?;
-        }
-
-        // Read yield values from terminator's IR definition
-        if let Some(term) = terminator {
-            let values: Vec<<I as ValueStore>::Value> = term
-                .arguments(stage)
-                .map(|ssa| interp.read(*ssa))
-                .collect::<Result<_, _>>()?;
-            let product = <<I as ValueStore>::Value as ProductValue>::new_product(values);
+        if let Some(product) = interp.exec_inline_block(block, &[])? {
             interp.write_product(&self.results, product)?;
         }
-
-        // Exit inline block
-        interp.consume_control(Shell::Pop)?;
         Ok(Cursor::Advance)
     }
 }
 
 impl<'ir, I, T> Interpretable<'ir, I> for For<T>
 where
-    I: BlockBindings<'ir> + Position<'ir>,
+    I: InlineBlock<'ir>,
     <I as ValueStore>::Value: ForLoopValue + ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
@@ -92,9 +64,6 @@ where
             .collect::<Result<_, _>>()?;
         let mut carried = <<I as ValueStore>::Value as ProductValue>::new_product(init_values);
 
-        let stage = interp.stage_info();
-        let terminator = self.body.terminator(stage);
-
         while iv.loop_condition(&end) == Some(true) {
             // Build block args: [iv, ...carried]
             let mut block_args = Vec::with_capacity(1 + self.init_args.len());
@@ -105,32 +74,9 @@ where
                 block_args.push(carried.clone());
             }
 
-            // Enter inline block
-            interp.consume_control(Shell::Push(self.body.into()))?;
-            interp.bind_block_args(self.body, &block_args)?;
-
-            // Run non-terminator statements
-            loop {
-                let current = interp.current_statement();
-                if current == terminator || current.is_none() {
-                    break;
-                }
-                let effect = interp.interpret_current()?;
-                let control = interp.consume_effect(effect)?;
-                interp.consume_control(control)?;
+            if let Some(product) = interp.exec_inline_block(self.body, &block_args)? {
+                carried = product;
             }
-
-            // Read yield values from terminator
-            if let Some(term) = terminator {
-                let values: Vec<<I as ValueStore>::Value> = term
-                    .arguments(stage)
-                    .map(|ssa| interp.read(*ssa))
-                    .collect::<Result<_, _>>()?;
-                carried = <<I as ValueStore>::Value as ProductValue>::new_product(values);
-            }
-
-            // Exit inline block
-            interp.consume_control(Shell::Pop)?;
 
             iv = iv.loop_step(&step).ok_or_else(|| {
                 <I as Interpreter<'ir>>::Error::from(InterpreterError::custom(
@@ -147,7 +93,7 @@ where
 
 impl<'ir, I, T> Interpretable<'ir, I> for StructuredControlFlow<T>
 where
-    I: BlockBindings<'ir> + Position<'ir>,
+    I: InlineBlock<'ir>,
     <I as ValueStore>::Value: BranchCondition + ForLoopValue + ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
