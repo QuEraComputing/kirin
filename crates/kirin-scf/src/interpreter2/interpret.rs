@@ -6,7 +6,7 @@ use kirin_interpreter_2::{
     interpreter::{BlockBindings, Position},
 };
 
-use crate::{For, ForLoopValue, If, Yield};
+use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
 
 fn unsupported(message: &'static str) -> InterpreterError {
     InterpreterError::custom(std::io::Error::other(message))
@@ -142,6 +142,25 @@ where
         // Write final carried state to results
         interp.write_product(&self.results, carried)?;
         Ok(Cursor::Advance)
+    }
+}
+
+impl<'ir, I, T> Interpretable<'ir, I> for StructuredControlFlow<T>
+where
+    I: BlockBindings<'ir> + Position<'ir>,
+    <I as ValueStore>::Value: BranchCondition + ForLoopValue + ProductValue,
+    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
+    T: CompileTimeValue,
+{
+    type Effect = Cursor;
+    type Error = <I as Interpreter<'ir>>::Error;
+
+    fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
+        match self {
+            Self::If(op) => op.interpret(interp),
+            Self::For(op) => op.interpret(interp),
+            Self::Yield(op) => op.interpret(interp),
+        }
     }
 }
 
