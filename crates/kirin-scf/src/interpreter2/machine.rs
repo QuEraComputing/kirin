@@ -1,14 +1,16 @@
 use std::convert::Infallible;
 use std::marker::PhantomData;
 
-use kirin::prelude::Block;
-use kirin_interpreter_2::{ConsumeEffect, Cursor, InterpreterError, Lift, Machine, control::Shell};
+use kirin_interpreter_2::{
+    BlockSeed, ConsumeEffect, Cursor, InterpreterError, Lift, Machine, control::Shell,
+};
 
 /// Stateless machine for SCF dialect semantics.
 ///
 /// SCF operations (if, for, yield) are total — they never halt the program.
-/// `Effect = Cursor<Block>` (advance/stay/jump), `Stop = Infallible`.
-/// `Seed = Block` because inline block execution uses Shell::Push(block).
+/// `Effect = Cursor<BlockSeed<V>>` (advance/stay/jump), `Stop = Infallible`.
+/// `Seed = BlockSeed<V>` so inline block execution carries arguments through
+/// the effect pipeline.
 pub struct ScfMachine<V> {
     _marker: PhantomData<V>,
 }
@@ -22,9 +24,9 @@ impl<V> Default for ScfMachine<V> {
 }
 
 impl<'ir, V: 'ir> Machine<'ir> for ScfMachine<V> {
-    type Effect = Cursor<Block>;
+    type Effect = Cursor<BlockSeed<V>>;
     type Stop = Infallible;
-    type Seed = Block;
+    type Seed = BlockSeed<V>;
 }
 
 impl<'ir, V: 'ir> ConsumeEffect<'ir> for ScfMachine<V> {

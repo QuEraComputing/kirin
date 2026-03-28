@@ -116,8 +116,7 @@ impl From<UnGraph> for InternalSeed {
 
 /// Dummy conversion for unit seed types (machines that never push/replace).
 ///
-/// Satisfies the `Seed: Into<InternalSeed>` bound on `apply_control`.
-/// Only the Push and Replace shell variants use the conversion, and those
+/// Only the Push and Replace shell variants use seed conversion, and those
 /// can never be constructed when `Seed = ()`.
 impl From<()> for InternalSeed {
     fn from(_: ()) -> Self {

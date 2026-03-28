@@ -174,11 +174,10 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + 'ir,
-    M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
-    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
 {
     fn poll_execution_gate(&mut self) -> Result<Option<Statement>, crate::result::Suspension> {
         loop {
@@ -237,11 +236,10 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + 'ir,
-    M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
-    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
 {
     type Machine = M;
     type Error = E;
@@ -280,7 +278,7 @@ where
             <Self::Machine as Machine<'ir>>::Seed,
         >,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error> {
-        self.apply_control(control).map_err(Into::into)
+        self.apply_control(control)
     }
 }
 
@@ -294,12 +292,10 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + crate::ProductValue + 'ir,
-    M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
-    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
-    Block: Into<<M as Machine<'ir>>::Seed>,
 {
     fn exec(&mut self, seed: BlockSeed<V>) -> Result<Option<V>, E> {
         exec_block(self, seed)
@@ -316,12 +312,11 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + crate::ProductValue + 'ir,
-    M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,
     Self: ValueStore<Value = V, Error = E>,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
-    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
 {
     fn invoke(
         &mut self,
@@ -375,11 +370,10 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + 'ir,
-    M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
-    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
 {
     fn resolve_query(
         &self,

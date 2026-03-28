@@ -10,8 +10,8 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue, control::Shell,
-    effect::Cursor, interpreter::SingleStage,
+    BlockSeed, ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue,
+    control::Shell, effect::Cursor, interpreter::SingleStage,
 };
 
 use crate::{Bind, Call, FunctionBody, Return};
@@ -139,9 +139,9 @@ impl BranchCondition for TestValue {
 
 /// Effect type for the function test machine.
 ///
-/// Uses Shell<TestValue, Block> so that both cursor-like effects (Advance, Stay)
-/// and stopping effects (Stop) can be represented.
-type TestEffect = Shell<TestValue, Block>;
+/// Uses `Shell<TestValue, BlockSeed<TestValue>>` so that both cursor-like
+/// effects (Advance, Stay) and stopping effects (Stop) can be represented.
+type TestEffect = Shell<TestValue, BlockSeed<TestValue>>;
 
 /// Machine for function tests that supports both cursor and stop effects.
 #[derive(Debug, Default)]
@@ -150,7 +150,7 @@ pub struct TestMachine;
 impl<'ir> Machine<'ir> for TestMachine {
     type Effect = TestEffect;
     type Stop = TestValue;
-    type Seed = Block;
+    type Seed = BlockSeed<TestValue>;
 }
 
 impl<'ir> ConsumeEffect<'ir> for TestMachine {
@@ -176,11 +176,11 @@ fn lift_cursor(cursor: Cursor) -> TestEffect {
 }
 
 /// Lift a block-seed cursor into the test effect type.
-fn lift_block_cursor(cursor: Cursor<Block>) -> TestEffect {
+fn lift_block_cursor(cursor: Cursor<BlockSeed<TestValue>>) -> TestEffect {
     match cursor {
         Cursor::Advance => Shell::Advance,
         Cursor::Stay => Shell::Stay,
-        Cursor::Jump(block) => Shell::Replace(block),
+        Cursor::Jump(seed) => Shell::Replace(seed),
     }
 }
 

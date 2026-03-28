@@ -1,5 +1,3 @@
-use kirin_ir::{Block, GetInfo, SSAValue};
-
 use crate::{BlockSeed, InterpreterError, Machine, ProductValue, ValueStore, control::Shell};
 
 use super::{Interpreter, Position, TypedStage};
@@ -14,9 +12,12 @@ pub trait Exec<'ir, Seed>: Interpreter<'ir> {
     ) -> Result<Option<<Self as ValueStore>::Value>, <Self as Interpreter<'ir>>::Error>;
 }
 
-/// Execute a block seed inline: push the block onto the cursor stack, bind
-/// the seed-carried arguments, run all non-terminator statements, read the
+/// Execute a block seed inline: push the block (with args) onto the cursor
+/// stack via `Shell::Push`, run all non-terminator statements, read the
 /// terminator's arguments as a product, and pop the block.
+///
+/// Block argument binding happens inside `apply_control` when the seed is
+/// pushed — no separate binding step here.
 ///
 /// This is the standard implementation for `Exec<'ir, BlockSeed<V>>`. Concrete
 /// interpreter types delegate their `Exec` impl to this function.
@@ -31,28 +32,16 @@ where
         + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
     <I as ValueStore>::Value: ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
-    Block: Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
+    BlockSeed<<I as ValueStore>::Value>:
+        Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
-    let (block, args) = seed.into_parts();
+    let block = seed.block();
     let stage = interp.stage_info();
     let terminator = block.terminator(stage);
 
-    // Push the block as an inline execution context
-    interp.consume_control(Shell::Push(block.into()))?;
-
-    // Bind seed-carried arguments to the block's SSA argument slots
-    {
-        let stage = interp.stage_info();
-        let block_info = block.expect_info(stage);
-        let expected = block_info.arguments.len();
-        let got = args.len();
-        if got != expected {
-            return Err(InterpreterError::ArityMismatch { expected, got }.into());
-        }
-        for (argument, value) in block_info.arguments.iter().zip(args) {
-            interp.write(SSAValue::from(*argument), value)?;
-        }
-    }
+    // Push the block with its args as an inline execution context.
+    // apply_control will bind the seed-carried arguments to the block's SSA slots.
+    interp.consume_control(Shell::Push(seed.into()))?;
 
     // Run all non-terminator statements
     loop {

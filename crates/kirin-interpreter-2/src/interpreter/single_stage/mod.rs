@@ -61,7 +61,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::SingleStage;
-    use crate::{InterpreterError, control::Shell, interpreter::Position};
+    use crate::{BlockSeed, InterpreterError, control::Shell, interpreter::Position};
     use kirin_ir::{CompileStage, GetInfo, Pipeline, StageInfo};
     use kirin_test_languages::CompositeLanguage;
     use kirin_test_utils::ir_fixtures::{build_linear_program, first_statement_of_specialization};
@@ -72,7 +72,7 @@ mod tests {
     impl<'ir> crate::Machine<'ir> for TestMachine {
         type Effect = ();
         type Stop = &'static str;
-        type Seed = kirin_ir::Block;
+        type Seed = BlockSeed<i64>;
     }
 
     #[test]

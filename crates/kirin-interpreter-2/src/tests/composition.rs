@@ -3,8 +3,8 @@ use kirin_constant::Constant;
 use kirin_ir::{CompileStage, Pipeline, StageInfo, TestSSAValue};
 
 use crate::{
-    ConsumeEffect, Interpretable, Interpreter, InterpreterError, Lift, Machine, ProjectMachine,
-    ProjectMachineMut,
+    BlockSeed, ConsumeEffect, Interpretable, Interpreter, InterpreterError, Lift, Machine,
+    ProjectMachine, ProjectMachineMut,
     control::Shell,
     interpreter::{Position, SingleStage},
 };
@@ -72,7 +72,7 @@ struct CompositeMachine {
 impl<'ir> Machine<'ir> for CompositeMachine {
     type Effect = CompositeEffect;
     type Stop = CompositeStop;
-    type Seed = ();
+    type Seed = BlockSeed<ArithValue>;
 }
 
 impl<'ir> ConsumeEffect<'ir> for CompositeMachine {
@@ -83,10 +83,11 @@ impl<'ir> ConsumeEffect<'ir> for CompositeMachine {
         effect: Self::Effect,
     ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
         match effect {
-            CompositeEffect::Leaf(effect) => self
-                .leaf
-                .consume_effect(effect)
-                .map(|control| control.map_stop(CompositeStop::Leaf)),
+            CompositeEffect::Leaf(effect) => self.leaf.consume_effect(effect).map(|control| {
+                control
+                    .map_stop(CompositeStop::Leaf)
+                    .map_seed(|_: ()| unreachable!("leaf machine never pushes/replaces"))
+            }),
         }
     }
 }

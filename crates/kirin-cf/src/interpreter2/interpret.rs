@@ -1,8 +1,7 @@
-use kirin::prelude::{Block, CompileTimeValue, GetInfo, SSAValue};
+use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    Interpretable, Interpreter, InterpreterError, ValueStore, effect::Cursor,
-    interpreter::TypedStage,
+    BlockSeed, Interpretable, Interpreter, InterpreterError, ValueStore, effect::Cursor,
 };
 
 use crate::ControlFlow;
@@ -11,54 +10,24 @@ fn unsupported(message: &'static str) -> kirin_interpreter_2::InterpreterError {
     kirin_interpreter_2::InterpreterError::custom(std::io::Error::other(message))
 }
 
-/// Eagerly bind block arguments using `ValueStore::write`.
-///
-/// Local helper replacing the removed `BlockBindings` trait. This will be
-/// superseded by seed-carried args in a future task.
-fn bind_block_args<'ir, I>(
-    interp: &mut I,
-    block: Block,
-    args: impl IntoIterator<Item = <I as ValueStore>::Value>,
-) -> Result<(), <I as Interpreter<'ir>>::Error>
-where
-    I: Interpreter<'ir> + TypedStage<'ir> + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
-    <I as ValueStore>::Value: Clone,
-    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
-{
-    let stage = interp.stage_info();
-    let block_info = block.expect_info(stage);
-    let expected = block_info.arguments.len();
-
-    let mut got = 0;
-    for (argument, value) in block_info.arguments.iter().zip(args) {
-        interp.write(SSAValue::from(*argument), value)?;
-        got += 1;
-    }
-
-    if got != expected {
-        return Err(InterpreterError::ArityMismatch { expected, got }.into());
-    }
-
-    Ok(())
-}
-
 impl<'ir, I, T> Interpretable<'ir, I> for ControlFlow<T>
 where
-    I: Interpreter<'ir> + TypedStage<'ir> + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
+    I: Interpreter<'ir> + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
     <I as ValueStore>::Value: Clone + BranchCondition,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
-    type Effect = Cursor<Block>;
+    type Effect = Cursor<BlockSeed<<I as ValueStore>::Value>>;
     type Error = <I as Interpreter<'ir>>::Error;
 
-    fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
+    fn interpret(
+        &self,
+        interp: &mut I,
+    ) -> Result<Cursor<BlockSeed<<I as ValueStore>::Value>>, Self::Error> {
         match self {
             ControlFlow::Branch { target, args } => {
                 let values = interp.read_many(args)?;
-                let block = target.target();
-                bind_block_args(interp, block, values)?;
-                Ok(Cursor::Jump(block))
+                Ok(Cursor::jump(target.target(), values))
             }
             ControlFlow::ConditionalBranch {
                 condition,
@@ -78,8 +47,7 @@ where
                         .into()),
                     };
                 let values = interp.read_many(args)?;
-                bind_block_args(interp, block, values)?;
-                Ok(Cursor::Jump(block))
+                Ok(Cursor::jump(block, values))
             }
             Self::__Phantom(..) => unreachable!(),
         }

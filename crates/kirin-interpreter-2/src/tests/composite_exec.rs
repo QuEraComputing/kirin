@@ -2,21 +2,21 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
-use kirin_ir::{CompileStage, GetInfo, HasArguments, Pipeline, StageInfo, Statement};
+use kirin_ir::{CompileStage, HasArguments, Pipeline, StageInfo, Statement};
 use kirin_test_languages::CompositeLanguage;
 use kirin_test_utils::ir_fixtures::{build_add_one, build_linear_program, build_select_program};
 
 use crate::{
-    ConsumeEffect, Interpretable, InterpreterError, Machine, ValueStore,
+    BlockSeed, ConsumeEffect, Interpretable, InterpreterError, Machine, ValueStore,
     control::{Breakpoint, Breakpoints, Fuel, Interrupt, Location, Shell},
-    interpreter::{Driver, Position, SingleStage, StepResult, TypedStage},
+    interpreter::{Driver, Position, SingleStage, StepResult},
     result::{Run, Step, Suspension},
 };
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 enum TestEffect {
     Advance,
-    Replace(kirin_ir::Block),
+    Replace(BlockSeed<ArithValue>),
     Return(ArithValue),
 }
 
@@ -26,7 +26,7 @@ struct TestMachine;
 impl<'ir> Machine<'ir> for TestMachine {
     type Effect = TestEffect;
     type Stop = ArithValue;
-    type Seed = kirin_ir::Block;
+    type Seed = BlockSeed<ArithValue>;
 }
 
 impl<'ir> ConsumeEffect<'ir> for TestMachine {
@@ -38,7 +38,7 @@ impl<'ir> ConsumeEffect<'ir> for TestMachine {
     ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
         Ok(match effect {
             TestEffect::Advance => Shell::Advance,
-            TestEffect::Replace(block) => Shell::Replace(block),
+            TestEffect::Replace(seed) => Shell::Replace(seed),
             TestEffect::Return(value) => Shell::Stop(value),
         })
     }
@@ -68,38 +68,6 @@ where
     Shell<<I::Machine as Machine<'ir>>::Stop, <I::Machine as Machine<'ir>>::Seed>: Clone,
 {
     interp.step()
-}
-
-/// Eagerly bind block arguments using `ValueStore::write`.
-///
-/// This is a test-local helper replacing the removed `BlockBindings` trait.
-fn bind_block_args<'ir, I>(
-    interp: &mut I,
-    block: kirin_ir::Block,
-    args: impl IntoIterator<Item = <I as ValueStore>::Value>,
-) -> Result<(), <I as crate::interpreter::Interpreter<'ir>>::Error>
-where
-    I: crate::interpreter::Interpreter<'ir>
-        + TypedStage<'ir>
-        + ValueStore<Error = <I as crate::interpreter::Interpreter<'ir>>::Error>,
-    <I as ValueStore>::Value: Clone,
-    <I as crate::interpreter::Interpreter<'ir>>::Error: From<InterpreterError>,
-{
-    let stage = interp.stage_info();
-    let block_info = block.expect_info(stage);
-    let expected = block_info.arguments.len();
-
-    let mut got = 0;
-    for (argument, value) in block_info.arguments.iter().zip(args) {
-        interp.write(kirin_ir::SSAValue::from(*argument), value)?;
-        got += 1;
-    }
-
-    if got != expected {
-        return Err(InterpreterError::ArityMismatch { expected, got }.into());
-    }
-
-    Ok(())
 }
 
 fn unsupported(message: &'static str) -> InterpreterError {
@@ -153,13 +121,8 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ControlFlow<ArithType> {
     fn interpret(&self, interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {
         match self {
             ControlFlow::Branch { target, args } => {
-                let values = args
-                    .iter()
-                    .map(|value| interp.read(*value))
-                    .collect::<Result<Vec<_>, _>>()?;
-                let block = target.target();
-                bind_block_args(interp, block, values)?;
-                Ok(TestEffect::Replace(block))
+                let values = interp.read_many(args)?;
+                Ok(TestEffect::Replace(BlockSeed::new(target.target(), values)))
             }
             ControlFlow::ConditionalBranch {
                 condition,
@@ -169,17 +132,13 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ControlFlow<ArithType> {
                 false_args,
             } => {
                 let cond = interp.read(*condition)?;
-                let (target, args) = if is_truthy(&cond)? {
+                let (block, args) = if is_truthy(&cond)? {
                     (true_target.target(), true_args.as_slice())
                 } else {
                     (false_target.target(), false_args.as_slice())
                 };
-                let values = args
-                    .iter()
-                    .map(|value| interp.read(*value))
-                    .collect::<Result<Vec<_>, _>>()?;
-                bind_block_args(interp, target, values)?;
-                Ok(TestEffect::Replace(target))
+                let values = interp.read_many(args)?;
+                Ok(TestEffect::Replace(BlockSeed::new(block, values)))
             }
             _ => Err(unsupported("unsupported control-flow op in MVP semantics")),
         }

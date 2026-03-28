@@ -7,7 +7,7 @@ use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    ConsumeEffect, Cursor, Interpretable, InterpreterError, Lift, Machine, ProductValue,
+    BlockSeed, ConsumeEffect, Cursor, Interpretable, InterpreterError, Lift, Machine, ProductValue,
     ValueStore, control::Shell, interpreter::SingleStage,
 };
 
@@ -100,7 +100,7 @@ struct TestMachine;
 impl<'ir> Machine<'ir> for TestMachine {
     type Effect = TestEffect;
     type Stop = TestValue;
-    type Seed = Block;
+    type Seed = BlockSeed<TestValue>;
 }
 
 impl<'ir> ConsumeEffect<'ir> for TestMachine {

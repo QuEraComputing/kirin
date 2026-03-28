@@ -2,14 +2,14 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
 use kirin_ir::{
-    Block, CompileStage, Function, GetInfo, HasArguments, Pipeline, Product, SSAValue, Signature,
+    CompileStage, Function, GetInfo, HasArguments, Pipeline, Product, SSAValue, Signature,
     SpecializedFunction, StageInfo, StagedFunction, Symbol, Typeof,
 };
 use kirin_test_languages::CompositeLanguage;
 use kirin_test_utils::ir_fixtures::build_add_one;
 
 use crate::{
-    ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue, ValueStore,
+    BlockSeed, ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue, ValueStore,
     control::Shell,
     interpreter::{Driver, Invoke, Position, ResolveCallee, SingleStage, TypedStage, callee},
 };
@@ -94,7 +94,7 @@ struct InvokeMachine;
 impl<'ir> Machine<'ir> for InvokeMachine {
     type Effect = InvokeEffect;
     type Stop = InvokeValue;
-    type Seed = Block;
+    type Seed = BlockSeed<InvokeValue>;
 }
 
 impl<'ir> ConsumeEffect<'ir> for InvokeMachine {
@@ -455,7 +455,7 @@ fn shell_stay_leaves_current_cursor_unchanged() {
     let before_location = interp.current_location();
 
     interp
-        .apply_control(Shell::<InvokeValue, Block>::Stay)
+        .apply_control(Shell::<InvokeValue, BlockSeed<InvokeValue>>::Stay)
         .unwrap();
     assert_eq!(interp.current_statement(), before_statement);
     assert_eq!(interp.current_location(), before_location);
