@@ -1,6 +1,12 @@
 use std::marker::PhantomData;
 
-use crate::{ConsumeEffect, InterpreterError, Lift, Machine, control::Shell};
+use kirin_ir::Block;
+
+use crate::{
+    ConsumeEffect, InterpreterError, Lift, Machine,
+    control::Shell,
+    seed::{Args, BlockSeed},
+};
 
 /// Cursor directive for total (non-stopping) dialect operations.
 ///
@@ -21,6 +27,16 @@ pub enum Cursor<Seed = ()> {
 }
 
 impl<Seed: Copy> Copy for Cursor<Seed> {}
+
+impl<Seed> Cursor<Seed> {
+    /// Create a jump to a block with arguments.
+    pub fn jump<V>(block: Block, args: impl Into<Args<V>>) -> Self
+    where
+        BlockSeed<V>: Into<Seed>,
+    {
+        Cursor::Jump(BlockSeed::new(block, args.into()).into())
+    }
+}
 
 /// Lift a total cursor directive into any `Shell<S, Seed>`.
 impl<S, Seed> Lift<Shell<S, Seed>> for Cursor<Seed> {

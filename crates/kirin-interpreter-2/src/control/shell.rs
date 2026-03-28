@@ -1,3 +1,7 @@
+use kirin_ir::Block;
+
+use crate::seed::{Args, BlockSeed};
+
 /// Shell-facing control returned after semantic effect consumption.
 #[derive(Debug, Clone, PartialEq, Eq)]
 #[must_use = "controls must be handled by the interpreter shell"]
@@ -31,6 +35,27 @@ impl<S, Seed> Shell<S, Seed> {
             Shell::Pop => Shell::Pop,
             Shell::Stop(stop) => Shell::Stop(stop),
         }
+    }
+
+    /// Push an inline block execution context with arguments.
+    pub fn push_block<V>(block: Block, args: impl Into<Args<V>>) -> Self
+    where
+        BlockSeed<V>: Into<Seed>,
+    {
+        Shell::Push(BlockSeed::new(block, args.into()).into())
+    }
+
+    /// Replace the current cursor with a jump to a block with arguments.
+    pub fn replace_block<V>(block: Block, args: impl Into<Args<V>>) -> Self
+    where
+        BlockSeed<V>: Into<Seed>,
+    {
+        Shell::Replace(BlockSeed::new(block, args.into()).into())
+    }
+
+    /// Stop execution with a value.
+    pub fn stop(value: S) -> Self {
+        Shell::Stop(value)
     }
 }
 
