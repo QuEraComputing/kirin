@@ -1,7 +1,8 @@
 use kirin::prelude::{Block, CompileTimeValue};
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    BlockSeed, Cursor, Exec, Interpretable, Interpreter, InterpreterError, ProductValue, ValueStore,
+    Args, BlockSeed, Cursor, Exec, Interpretable, Interpreter, InterpreterError, ProductValue,
+    ValueStore,
 };
 use smallvec::SmallVec;
 
@@ -68,7 +69,6 @@ where
 
         let mut block_args: SmallVec<[_; 8]> = SmallVec::with_capacity(1 + self.init_args.len());
         while iv.loop_condition(&end) == Some(true) {
-            // Build block args: [iv, ...carried]
             block_args.push(iv.clone());
             if let Some(product) = carried.as_product() {
                 block_args.extend(product.iter().cloned());
@@ -76,8 +76,8 @@ where
                 block_args.push(carried.clone());
             }
 
-            let seed = BlockSeed::new(self.body, block_args.drain(..).collect::<Vec<_>>());
-            if let Some(product) = interp.exec(seed)? {
+            let args: Args<_> = block_args.drain(..).collect();
+            if let Some(product) = interp.exec(BlockSeed::new(self.body, args))? {
                 carried = product;
             }
 
