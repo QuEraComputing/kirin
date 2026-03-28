@@ -7,10 +7,7 @@ use kirin_ir::{
 };
 use kirin_test_languages::SimpleType;
 
-use crate::{
-    BlockSeed, DiGraphSeed, ExecutionSeed, RegionSeed, UnGraphSeed,
-    cursor::{DiGraphCursor, ExecutionCursor, RegionCursor, UnGraphCursor},
-};
+use crate::cursor::{DiGraphCursor, ExecutionCursor, InternalSeed, RegionCursor, UnGraphCursor};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 enum CursorDialect {
@@ -355,19 +352,19 @@ fn execution_cursor_construction_matches_seed_shape() {
     let stage = pipeline.stage(stage_id).unwrap();
 
     assert!(matches!(
-        ExecutionCursor::from_seed(stage, ExecutionSeed::from(BlockSeed::new(block))),
+        ExecutionCursor::from_seed(stage, InternalSeed::from(block)),
         ExecutionCursor::Block(_)
     ));
     assert!(matches!(
-        ExecutionCursor::from_seed(stage, ExecutionSeed::from(RegionSeed::new(region))),
+        ExecutionCursor::from_seed(stage, InternalSeed::from(region)),
         ExecutionCursor::Region(_)
     ));
     assert!(matches!(
-        ExecutionCursor::from_seed(stage, ExecutionSeed::from(DiGraphSeed::new(digraph))),
+        ExecutionCursor::from_seed(stage, InternalSeed::from(digraph)),
         ExecutionCursor::DiGraph(_)
     ));
     assert!(matches!(
-        ExecutionCursor::from_seed(stage, ExecutionSeed::from(UnGraphSeed::new(ungraph))),
+        ExecutionCursor::from_seed(stage, InternalSeed::from(ungraph)),
         ExecutionCursor::UnGraph(_)
     ));
 }
@@ -400,10 +397,10 @@ fn execution_cursor_current_block_is_shape_specific() {
     };
     let stage = stage.finalize().unwrap();
 
-    let block_cursor = ExecutionCursor::from_seed(&stage, ExecutionSeed::from(block));
-    let region_cursor = ExecutionCursor::from_seed(&stage, ExecutionSeed::from(region));
-    let digraph_cursor = ExecutionCursor::from_seed(&stage, ExecutionSeed::from(digraph));
-    let ungraph_cursor = ExecutionCursor::from_seed(&stage, ExecutionSeed::from(ungraph));
+    let block_cursor = ExecutionCursor::from_seed(&stage, InternalSeed::from(block));
+    let region_cursor = ExecutionCursor::from_seed(&stage, InternalSeed::from(region));
+    let digraph_cursor = ExecutionCursor::from_seed(&stage, InternalSeed::from(digraph));
+    let ungraph_cursor = ExecutionCursor::from_seed(&stage, InternalSeed::from(ungraph));
 
     assert_eq!(block_cursor.current_block(), Some(block));
     assert_eq!(

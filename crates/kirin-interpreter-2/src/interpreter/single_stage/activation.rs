@@ -1,18 +1,18 @@
 use kirin_ir::{ResultValue, Statement};
 
-use crate::{ExecutionSeed, cursor::ExecutionCursor};
+use crate::cursor::{ExecutionCursor, InternalSeed};
 
 #[derive(Debug)]
 pub(crate) struct Continuation {
     completed_statement: Statement,
-    resume: ExecutionSeed,
+    resume: InternalSeed,
     results: Vec<ResultValue>,
 }
 
 impl Continuation {
     pub(crate) fn new(
         completed_statement: Statement,
-        resume: ExecutionSeed,
+        resume: InternalSeed,
         results: Vec<ResultValue>,
     ) -> Self {
         Self {
@@ -26,7 +26,7 @@ impl Continuation {
         self.completed_statement
     }
 
-    pub(crate) fn resume(&self) -> ExecutionSeed {
+    pub(crate) fn resume(&self) -> InternalSeed {
         self.resume
     }
 

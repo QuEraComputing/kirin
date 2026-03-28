@@ -8,8 +8,10 @@ use super::{
     activation::{Activation, Continuation},
 };
 use crate::{
-    BlockSeed, ExecutionSeed, Frame, FrameStack, InterpreterError, ProductValue, StageAccess,
-    StageResolutionError, ValueStore, control::Shell, cursor::ExecutionCursor,
+    Frame, FrameStack, InterpreterError, ProductValue, StageAccess, StageResolutionError,
+    ValueStore,
+    control::Shell,
+    cursor::{ExecutionCursor, InternalBlockSeed, InternalSeed},
     interpreter::Position,
 };
 
@@ -37,7 +39,7 @@ where
     fn activation_for(
         &self,
         stage: CompileStage,
-        seed: ExecutionSeed,
+        seed: InternalSeed,
         continuation: Option<Continuation>,
     ) -> Activation {
         let cursor = ExecutionCursor::from_seed(self.stage_info_for(stage), seed);
@@ -48,14 +50,14 @@ where
         &mut self,
         callee: SpecializedFunction,
         stage: CompileStage,
-        seed: ExecutionSeed,
+        seed: InternalSeed,
         continuation: Option<Continuation>,
     ) -> Result<(), InterpreterError> {
         let activation = self.activation_for(stage, seed, continuation);
         self.frames.push(Frame::new(callee, stage, activation))
     }
 
-    fn replace_current_seed(&mut self, seed: ExecutionSeed) -> Result<(), InterpreterError> {
+    fn replace_current_seed(&mut self, seed: InternalSeed) -> Result<(), InterpreterError> {
         let stage = self.active_stage();
         let next_cursor = ExecutionCursor::from_seed(self.stage_info_for(stage), seed);
         let activation = self.current_activation_mut()?;
@@ -209,7 +211,7 @@ where
             })
     }
 
-    pub(crate) fn resume_seed_after_current(&self) -> Result<ExecutionSeed, InterpreterError> {
+    pub(crate) fn resume_seed_after_current(&self) -> Result<InternalSeed, InterpreterError> {
         let stage = self.stage_info_for(self.active_stage());
         let statement = self.current_statement_result()?;
         let block = self
@@ -220,8 +222,8 @@ where
         let next = (*statement.next(stage)).or_else(|| block.terminator(stage));
 
         Ok(match next {
-            Some(statement) => BlockSeed::at_statement(block, statement).into(),
-            None => BlockSeed::exhausted(block).into(),
+            Some(statement) => InternalBlockSeed::at_statement(block, statement).into(),
+            None => InternalBlockSeed::exhausted(block).into(),
         })
     }
 
@@ -270,13 +272,14 @@ where
             Shell::Stay => Ok(()),
             Shell::Push(seed) => {
                 let stage = self.active_stage();
-                let next = ExecutionCursor::from_seed(self.stage_info_for(stage), seed);
+                let internal_seed: InternalSeed = seed.block().into();
+                let next = ExecutionCursor::from_seed(self.stage_info_for(stage), internal_seed);
                 let activation = self.current_activation_mut()?;
                 activation.after_statement = None;
                 activation.cursor_stack.push(next);
                 Ok(())
             }
-            Shell::Replace(seed) => self.replace_current_seed(seed),
+            Shell::Replace(seed) => self.replace_current_seed(seed.block().into()),
             Shell::Pop => {
                 let activation = self.current_activation_mut()?;
                 activation.after_statement = None;

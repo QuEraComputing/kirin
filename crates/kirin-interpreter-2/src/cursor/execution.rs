@@ -1,9 +1,6 @@
 use kirin_ir::{Block, Dialect, StageInfo, Statement};
 
-use crate::{
-    ExecutionSeed,
-    cursor::{BlockCursor, DiGraphCursor, RegionCursor, UnGraphCursor},
-};
+use crate::cursor::{BlockCursor, DiGraphCursor, InternalSeed, RegionCursor, UnGraphCursor};
 
 /// Closed internal execution cursor by body shape.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -15,9 +12,9 @@ pub(crate) enum ExecutionCursor {
 }
 
 impl ExecutionCursor {
-    pub(crate) fn from_seed<L: Dialect>(stage: &StageInfo<L>, seed: ExecutionSeed) -> Self {
+    pub(crate) fn from_seed<L: Dialect>(stage: &StageInfo<L>, seed: InternalSeed) -> Self {
         match seed {
-            ExecutionSeed::Block(seed) => {
+            InternalSeed::Block(seed) => {
                 Self::Block(match (seed.starts_at_entry(), seed.start()) {
                     (true, _) => BlockCursor::new(stage, seed.block()),
                     (false, Some(statement)) => BlockCursor::at_statement(seed.block(), statement),
@@ -25,13 +22,9 @@ impl ExecutionCursor {
                     _ => BlockCursor::new(stage, seed.block()),
                 })
             }
-            ExecutionSeed::Region(seed) => Self::Region(RegionCursor::new(stage, seed.region())),
-            ExecutionSeed::DiGraph(seed) => {
-                Self::DiGraph(DiGraphCursor::new(stage, seed.digraph()))
-            }
-            ExecutionSeed::UnGraph(seed) => {
-                Self::UnGraph(UnGraphCursor::new(stage, seed.ungraph()))
-            }
+            InternalSeed::Region(region) => Self::Region(RegionCursor::new(stage, region)),
+            InternalSeed::DiGraph(digraph) => Self::DiGraph(DiGraphCursor::new(stage, digraph)),
+            InternalSeed::UnGraph(ungraph) => Self::UnGraph(UnGraphCursor::new(stage, ungraph)),
         }
     }
 

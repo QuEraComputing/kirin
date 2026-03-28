@@ -1,188 +1,91 @@
-use kirin_ir::{Block, DiGraph, Region, Statement, UnGraph};
+use kirin_ir::Block;
+use smallvec::SmallVec;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-enum BlockStart {
-    Entry,
-    Statement(Statement),
-    Exhausted,
-}
+/// Stack-allocated argument list for block entry.
+///
+/// Tuned for the common 0–2 argument case (block args, branch args).
+pub type Args<V> = SmallVec<[V; 2]>;
 
-/// Public shell seed for entering block-local execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct BlockSeed {
+/// Public seed for entering a block with arguments.
+///
+/// This is the composable, value-carrying seed that dialect effects use
+/// to request block execution. The interpreter shell converts this into
+/// internal cursor state.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct BlockSeed<V> {
     block: Block,
-    start: BlockStart,
+    args: Args<V>,
 }
 
-impl BlockSeed {
-    pub fn new(block: Block) -> Self {
+impl<V> BlockSeed<V> {
+    /// Create a seed to enter a block with the given arguments.
+    #[must_use]
+    pub fn new(block: Block, args: impl Into<Args<V>>) -> Self {
         Self {
             block,
-            start: BlockStart::Entry,
+            args: args.into(),
         }
     }
 
-    pub fn at_statement(block: Block, statement: Statement) -> Self {
+    /// Create a seed to enter a block with no arguments.
+    #[must_use]
+    pub fn entry(block: Block) -> Self {
         Self {
             block,
-            start: BlockStart::Statement(statement),
+            args: Args::new(),
         }
     }
 
-    pub fn exhausted(block: Block) -> Self {
-        Self {
-            block,
-            start: BlockStart::Exhausted,
-        }
-    }
-
-    pub fn block(self) -> Block {
+    /// The target block.
+    #[must_use]
+    pub fn block(&self) -> Block {
         self.block
     }
 
-    pub(crate) fn start(self) -> Option<Statement> {
-        match self.start {
-            BlockStart::Entry => None,
-            BlockStart::Statement(statement) => Some(statement),
-            BlockStart::Exhausted => None,
-        }
+    /// The arguments to bind when entering the block.
+    #[must_use]
+    pub fn args(&self) -> &[V] {
+        &self.args
     }
 
-    pub(crate) fn starts_at_entry(self) -> bool {
-        matches!(self.start, BlockStart::Entry)
-    }
-
-    pub(crate) fn is_exhausted(self) -> bool {
-        matches!(self.start, BlockStart::Exhausted)
+    /// Consume the seed, returning the block and arguments.
+    #[must_use]
+    pub fn into_parts(self) -> (Block, Args<V>) {
+        (self.block, self.args)
     }
 }
 
-impl From<Block> for BlockSeed {
+impl<V> From<Block> for BlockSeed<V> {
     fn from(block: Block) -> Self {
-        Self::new(block)
+        Self::entry(block)
     }
 }
 
-/// Public shell seed for entering region-local execution.
+/// Lightweight execution seed used by shell control variants.
+///
+/// This is a transitional type — Task 2 will make Shell/Cursor generic
+/// over the seed type, at which point this wrapper goes away.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct RegionSeed {
-    region: Region,
+pub struct ExecutionSeed {
+    block: Block,
 }
 
-impl RegionSeed {
-    pub fn new(region: Region) -> Self {
-        Self { region }
-    }
-
-    pub fn region(self) -> Region {
-        self.region
-    }
-}
-
-impl From<Region> for RegionSeed {
-    fn from(region: Region) -> Self {
-        Self::new(region)
-    }
-}
-
-/// Public shell seed for entering directed-graph execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct DiGraphSeed {
-    digraph: DiGraph,
-}
-
-impl DiGraphSeed {
-    pub fn new(digraph: DiGraph) -> Self {
-        Self { digraph }
-    }
-
-    pub fn digraph(self) -> DiGraph {
-        self.digraph
-    }
-}
-
-impl From<DiGraph> for DiGraphSeed {
-    fn from(digraph: DiGraph) -> Self {
-        Self::new(digraph)
-    }
-}
-
-/// Public shell seed for entering undirected-graph execution.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-pub struct UnGraphSeed {
-    ungraph: UnGraph,
-}
-
-impl UnGraphSeed {
-    pub fn new(ungraph: UnGraph) -> Self {
-        Self { ungraph }
-    }
-
-    pub fn ungraph(self) -> UnGraph {
-        self.ungraph
-    }
-}
-
-impl From<UnGraph> for UnGraphSeed {
-    fn from(ungraph: UnGraph) -> Self {
-        Self::new(ungraph)
-    }
-}
-
-/// Public shell execution seeds.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-pub enum ExecutionSeed {
-    Block(BlockSeed),
-    Region(RegionSeed),
-    DiGraph(DiGraphSeed),
-    UnGraph(UnGraphSeed),
-}
-
-impl From<BlockSeed> for ExecutionSeed {
-    fn from(seed: BlockSeed) -> Self {
-        Self::Block(seed)
+impl ExecutionSeed {
+    /// The target block.
+    #[must_use]
+    pub fn block(self) -> Block {
+        self.block
     }
 }
 
 impl From<Block> for ExecutionSeed {
     fn from(block: Block) -> Self {
-        Self::Block(block.into())
+        Self { block }
     }
 }
 
-impl From<RegionSeed> for ExecutionSeed {
-    fn from(seed: RegionSeed) -> Self {
-        Self::Region(seed)
-    }
-}
-
-impl From<Region> for ExecutionSeed {
-    fn from(region: Region) -> Self {
-        Self::Region(region.into())
-    }
-}
-
-impl From<DiGraphSeed> for ExecutionSeed {
-    fn from(seed: DiGraphSeed) -> Self {
-        Self::DiGraph(seed)
-    }
-}
-
-impl From<DiGraph> for ExecutionSeed {
-    fn from(digraph: DiGraph) -> Self {
-        Self::DiGraph(digraph.into())
-    }
-}
-
-impl From<UnGraphSeed> for ExecutionSeed {
-    fn from(seed: UnGraphSeed) -> Self {
-        Self::UnGraph(seed)
-    }
-}
-
-impl From<UnGraph> for ExecutionSeed {
-    fn from(ungraph: UnGraph) -> Self {
-        Self::UnGraph(ungraph.into())
+impl<V> From<BlockSeed<V>> for ExecutionSeed {
+    fn from(seed: BlockSeed<V>) -> Self {
+        Self { block: seed.block }
     }
 }

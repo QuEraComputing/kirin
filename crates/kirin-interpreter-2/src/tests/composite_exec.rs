@@ -246,7 +246,7 @@ fn block_bindings_trait_binds_block_args_and_computes_resume_seed() {
 
     let first = current_statement_via_position(&interp).unwrap();
     let second = (*first.next(interp.stage_info())).unwrap();
-    let expected = crate::BlockSeed::at_statement(entry, second).into();
+    let expected = crate::cursor::InternalBlockSeed::at_statement(entry, second).into();
     let arg0 = entry.expect_info(interp.stage_info()).arguments[0];
 
     assert_eq!(interp.read(arg0.into()).unwrap(), ArithValue::I64(9));
