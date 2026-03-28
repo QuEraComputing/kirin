@@ -23,7 +23,7 @@ pub use frame::Frame;
 pub use frame_stack::FrameStack;
 pub use from_constant::FromConstant;
 pub use interpretable::Interpretable;
-pub use interpreter::Interpreter;
+pub use interpreter::{Exec, Interpreter, exec_block};
 pub use lift::Lift;
 pub use machine::{ConsumeEffect, Machine};
 pub use product_value::ProductValue;
@@ -43,9 +43,9 @@ pub type InterpreterSeed<'ir, I> = <<I as Interpreter<'ir>>::Machine as Machine<
 /// Essentials for dialect authors implementing machine-based semantics.
 pub mod prelude {
     pub use crate::{
-        ConsumeEffect, Cursor, FromConstant, Interpretable, Lift, Machine, ProductValue,
-        ProjectMachine, ProjectMachineMut, StageAccess, ValueStore, control, effect, interpreter,
-        result,
+        ConsumeEffect, Cursor, Exec, FromConstant, Interpretable, Lift, Machine, ProductValue,
+        ProjectMachine, ProjectMachineMut, StageAccess, ValueStore, control, effect, exec_block,
+        interpreter, result,
     };
 }
 

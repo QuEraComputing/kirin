@@ -1,8 +1,7 @@
 use kirin::prelude::{Block, CompileTimeValue};
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    Cursor, Interpretable, Interpreter, InterpreterError, Machine, ProductValue, ValueStore,
-    interpreter::InlineBlock,
+    BlockSeed, Cursor, Exec, Interpretable, Interpreter, InterpreterError, ProductValue, ValueStore,
 };
 use smallvec::SmallVec;
 
@@ -14,11 +13,11 @@ fn unsupported(message: &'static str) -> InterpreterError {
 
 impl<'ir, I, T> Interpretable<'ir, I> for If<T>
 where
-    I: InlineBlock<'ir>,
+    I: Exec<'ir, BlockSeed<<I as ValueStore>::Value>>
+        + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
     <I as ValueStore>::Value: BranchCondition + ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
-    Block: Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
     type Effect = Cursor<Block>;
     type Error = <I as Interpreter<'ir>>::Error;
@@ -36,7 +35,7 @@ where
             }
         };
 
-        if let Some(product) = interp.exec_inline_block(block, std::iter::empty())? {
+        if let Some(product) = interp.exec(BlockSeed::entry(block))? {
             interp.write_product(&self.results, product)?;
         }
         Ok(Cursor::Advance)
@@ -45,11 +44,11 @@ where
 
 impl<'ir, I, T> Interpretable<'ir, I> for For<T>
 where
-    I: InlineBlock<'ir>,
+    I: Exec<'ir, BlockSeed<<I as ValueStore>::Value>>
+        + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
     <I as ValueStore>::Value: ForLoopValue + ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
-    Block: Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
     type Effect = Cursor<Block>;
     type Error = <I as Interpreter<'ir>>::Error;
@@ -77,7 +76,8 @@ where
                 block_args.push(carried.clone());
             }
 
-            if let Some(product) = interp.exec_inline_block(self.body, block_args.drain(..))? {
+            let seed = BlockSeed::new(self.body, block_args.drain(..).collect::<Vec<_>>());
+            if let Some(product) = interp.exec(seed)? {
                 carried = product;
             }
 
@@ -96,11 +96,11 @@ where
 
 impl<'ir, I, T> Interpretable<'ir, I> for StructuredControlFlow<T>
 where
-    I: InlineBlock<'ir>,
+    I: Exec<'ir, BlockSeed<<I as ValueStore>::Value>>
+        + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
     <I as ValueStore>::Value: BranchCondition + ForLoopValue + ProductValue,
     <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
-    Block: Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
     type Effect = Cursor<Block>;
     type Error = <I as Interpreter<'ir>>::Error;

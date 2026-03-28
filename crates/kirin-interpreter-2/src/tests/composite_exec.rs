@@ -9,7 +9,7 @@ use kirin_test_utils::ir_fixtures::{build_add_one, build_linear_program, build_s
 use crate::{
     ConsumeEffect, Interpretable, InterpreterError, Machine, ValueStore,
     control::{Breakpoint, Breakpoints, Fuel, Interrupt, Location, Shell},
-    interpreter::{BlockBindings, Driver, Position, SingleStage, StepResult, TypedStage},
+    interpreter::{Driver, Position, SingleStage, StepResult, TypedStage},
     result::{Run, Step, Suspension},
 };
 
@@ -70,17 +70,36 @@ where
     interp.step()
 }
 
-fn bind_block_args_via_block_bindings<'ir, I>(
+/// Eagerly bind block arguments using `ValueStore::write`.
+///
+/// This is a test-local helper replacing the removed `BlockBindings` trait.
+fn bind_block_args<'ir, I>(
     interp: &mut I,
     block: kirin_ir::Block,
     args: impl IntoIterator<Item = <I as ValueStore>::Value>,
 ) -> Result<(), <I as crate::interpreter::Interpreter<'ir>>::Error>
 where
-    I: BlockBindings<'ir>,
+    I: crate::interpreter::Interpreter<'ir>
+        + TypedStage<'ir>
+        + ValueStore<Error = <I as crate::interpreter::Interpreter<'ir>>::Error>,
     <I as ValueStore>::Value: Clone,
     <I as crate::interpreter::Interpreter<'ir>>::Error: From<InterpreterError>,
 {
-    interp.bind_block_args(block, args)
+    let stage = interp.stage_info();
+    let block_info = block.expect_info(stage);
+    let expected = block_info.arguments.len();
+
+    let mut got = 0;
+    for (argument, value) in block_info.arguments.iter().zip(args) {
+        interp.write(kirin_ir::SSAValue::from(*argument), value)?;
+        got += 1;
+    }
+
+    if got != expected {
+        return Err(InterpreterError::ArityMismatch { expected, got }.into());
+    }
+
+    Ok(())
 }
 
 fn unsupported(message: &'static str) -> InterpreterError {
@@ -139,7 +158,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ControlFlow<ArithType> {
                     .map(|value| interp.read(*value))
                     .collect::<Result<Vec<_>, _>>()?;
                 let block = target.target();
-                interp.bind_block_args(block, values)?;
+                bind_block_args(interp, block, values)?;
                 Ok(TestEffect::Replace(block))
             }
             ControlFlow::ConditionalBranch {
@@ -159,7 +178,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ControlFlow<ArithType> {
                     .iter()
                     .map(|value| interp.read(*value))
                     .collect::<Result<Vec<_>, _>>()?;
-                interp.bind_block_args(target, values)?;
+                bind_block_args(interp, target, values)?;
                 Ok(TestEffect::Replace(target))
             }
             _ => Err(unsupported("unsupported control-flow op in MVP semantics")),
@@ -235,26 +254,6 @@ fn run_add_one_binds_entry_args() {
         .unwrap();
 
     assert_eq!(result, Run::Stopped(ArithValue::I64(6)));
-}
-
-#[test]
-fn block_bindings_trait_binds_block_args_and_computes_resume_seed() {
-    let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
-    let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
-    let spec_fn = build_add_one(&mut pipeline, stage_id);
-
-    let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
-    let entry = interp.entry_block(spec_fn).unwrap();
-    interp.push_specialization(spec_fn).unwrap();
-    bind_block_args_via_block_bindings(&mut interp, entry, [ArithValue::I64(9)]).unwrap();
-
-    let first = current_statement_via_position(&interp).unwrap();
-    let second = (*first.next(interp.stage_info())).unwrap();
-    let expected = crate::cursor::InternalBlockSeed::at_statement(entry, second).into();
-    let arg0 = entry.expect_info(interp.stage_info()).arguments[0];
-
-    assert_eq!(interp.read(arg0.into()).unwrap(), ArithValue::I64(9));
-    assert_eq!(interp.resume_seed_after_current().unwrap(), expected);
 }
 
 #[test]

@@ -2,9 +2,11 @@ use kirin_ir::{Block, CompileStage, Dialect, Pipeline, SSAValue, StageInfo, Stat
 
 use super::SingleStage;
 use crate::{
-    ConsumeEffect, InterpreterError, Machine, StageAccess, ValueStore,
+    BlockSeed, ConsumeEffect, InterpreterError, Machine, StageAccess, ValueStore,
     control::{Breakpoint, Breakpoints, Fuel, Interrupt, Location, Shell},
-    interpreter::{Driver, Interpreter, Invoke, Position, ResolveCallee, TypedStage, callee},
+    interpreter::{
+        Driver, Exec, Interpreter, Invoke, Position, ResolveCallee, TypedStage, callee, exec_block,
+    },
 };
 
 impl<'ir, L, V, M, E> Fuel for SingleStage<'ir, L, V, M, E>
@@ -279,6 +281,28 @@ where
         >,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error> {
         self.apply_control(control).map_err(Into::into)
+    }
+}
+
+impl<'ir, L, V, M, E> Exec<'ir, BlockSeed<V>> for SingleStage<'ir, L, V, M, E>
+where
+    L: Dialect
+        + 'ir
+        + crate::Interpretable<
+            'ir,
+            SingleStage<'ir, L, V, M, E>,
+            Effect = <M as Machine<'ir>>::Effect,
+        >,
+    V: Clone + crate::ProductValue + 'ir,
+    M: Machine<'ir> + ConsumeEffect<'ir> + 'ir,
+    E: From<InterpreterError> + 'ir,
+    <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
+    <M as ConsumeEffect<'ir>>::Error: Into<E>,
+    <M as Machine<'ir>>::Seed: Into<crate::cursor::InternalSeed>,
+    Block: Into<<M as Machine<'ir>>::Seed>,
+{
+    fn exec(&mut self, seed: BlockSeed<V>) -> Result<Option<V>, E> {
+        exec_block(self, seed)
     }
 }
 
