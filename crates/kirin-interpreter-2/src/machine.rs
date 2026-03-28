@@ -1,4 +1,4 @@
-use crate::control::Shell;
+use crate::control::Directive;
 
 /// Thin structural semantic machine trait.
 pub trait Machine<'ir> {
@@ -14,5 +14,5 @@ pub trait ConsumeEffect<'ir>: Machine<'ir> {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error>;
+    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error>;
 }

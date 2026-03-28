@@ -5,7 +5,7 @@ use kirin_ir::{CompileStage, Pipeline, StageInfo, TestSSAValue};
 use crate::{
     BlockSeed, ConsumeEffect, Interpretable, Interpreter, InterpreterError, Lift, Machine,
     ProjectMachine, ProjectMachineMut,
-    control::Shell,
+    control::Directive,
     interpreter::{Position, SingleStage},
 };
 
@@ -43,11 +43,11 @@ impl<'ir> ConsumeEffect<'ir> for LeafMachine {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
+    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
         match effect {
             LeafEffect::Record(value) => {
                 self.seen.push(value);
-                Ok(Shell::Stop(LeafStop::Stored))
+                Ok(Directive::Stop(LeafStop::Stored))
             }
         }
     }
@@ -81,7 +81,7 @@ impl<'ir> ConsumeEffect<'ir> for CompositeMachine {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
+    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
         match effect {
             CompositeEffect::Leaf(effect) => self.leaf.consume_effect(effect).map(|control| {
                 control
@@ -191,7 +191,7 @@ fn consume_local_effect_mutates_only_projected_submachine() {
         .consume_local_effect::<LeafMachine>(LeafEffect::Record(ArithValue::I64(3)))
         .unwrap();
 
-    assert_eq!(control, Shell::Stop(LeafStop::Stored));
+    assert_eq!(control, Directive::Stop(LeafStop::Stored));
     assert_eq!(
         interp.project_machine::<LeafMachine>().seen,
         vec![ArithValue::I64(3)]
@@ -210,7 +210,10 @@ fn consume_lifted_effect_returns_top_level_control() {
         .consume_lifted_effect(LeafEffect::Record(ArithValue::I64(4)))
         .unwrap();
 
-    assert_eq!(control, Shell::Stop(CompositeStop::Leaf(LeafStop::Stored)));
+    assert_eq!(
+        control,
+        Directive::Stop(CompositeStop::Leaf(LeafStop::Stored))
+    );
     assert_eq!(
         interp.project_machine::<LeafMachine>().seen,
         vec![ArithValue::I64(4)]
@@ -224,7 +227,7 @@ fn consume_local_control_lifts_stop_and_applies_shell_mutation() {
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
 
     interp
-        .consume_local_control(Shell::Stop(LeafStop::Stored))
+        .consume_local_control(Directive::Stop(LeafStop::Stored))
         .unwrap();
 
     assert_eq!(interp.cursor_depth(), 0);

@@ -1,7 +1,7 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter_2::{
     Interpretable, Interpreter, InterpreterError, Machine, ProductValue,
-    control::Shell,
+    control::Directive,
     interpreter::{Invoke, ResolveCall, ResolveCallee},
 };
 
@@ -16,7 +16,7 @@ where
     I: Interpreter<'ir>,
     T: CompileTimeValue,
 {
-    type Effect = Shell<
+    type Effect = Directive<
         <I as kirin_interpreter_2::ValueStore>::Value,
         <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
     >;
@@ -32,7 +32,7 @@ where
     I: Interpreter<'ir>,
     T: CompileTimeValue,
 {
-    type Effect = Shell<
+    type Effect = Directive<
         <I as kirin_interpreter_2::ValueStore>::Value,
         <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
     >;
@@ -65,7 +65,7 @@ where
     T: CompileTimeValue,
     <I as kirin_interpreter_2::ValueStore>::Value: Clone,
 {
-    type Effect = Shell<
+    type Effect = Directive<
         <I as kirin_interpreter_2::ValueStore>::Value,
         <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
     >;
@@ -75,7 +75,7 @@ where
         let args = interp.read_many(self.args())?;
         let callee = self.resolve_call(interp, &args)?;
         interp.invoke(callee, &args, self.results())?;
-        Ok(Shell::Stay)
+        Ok(Directive::Stay)
     }
 }
 
@@ -85,7 +85,7 @@ where
     T: CompileTimeValue,
     <I as kirin_interpreter_2::ValueStore>::Value: Clone + ProductValue,
 {
-    type Effect = Shell<
+    type Effect = Directive<
         <I as kirin_interpreter_2::ValueStore>::Value,
         <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
     >;
@@ -107,7 +107,7 @@ where
     T: CompileTimeValue,
     <I as kirin_interpreter_2::ValueStore>::Value: Clone + ProductValue,
 {
-    type Effect = Shell<
+    type Effect = Directive<
         <I as kirin_interpreter_2::ValueStore>::Value,
         <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
     >;

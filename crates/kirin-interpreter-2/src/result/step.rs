@@ -1,4 +1,4 @@
-use crate::control::Shell;
+use crate::control::Directive;
 
 use super::Suspension;
 
@@ -6,11 +6,11 @@ use super::Suspension;
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Stepped<E, S, Seed = ()> {
     effect: E,
-    control: Shell<S, Seed>,
+    control: Directive<S, Seed>,
 }
 
 impl<E, S, Seed> Stepped<E, S, Seed> {
-    pub fn new(effect: E, control: Shell<S, Seed>) -> Self {
+    pub fn new(effect: E, control: Directive<S, Seed>) -> Self {
         Self { effect, control }
     }
 
@@ -18,11 +18,11 @@ impl<E, S, Seed> Stepped<E, S, Seed> {
         &self.effect
     }
 
-    pub fn control(&self) -> &Shell<S, Seed> {
+    pub fn control(&self) -> &Directive<S, Seed> {
         &self.control
     }
 
-    pub fn into_parts(self) -> (E, Shell<S, Seed>) {
+    pub fn into_parts(self) -> (E, Directive<S, Seed>) {
         (self.effect, self.control)
     }
 }

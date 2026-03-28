@@ -10,7 +10,7 @@ use super::{
 use crate::{
     BlockSeed, Frame, FrameStack, InterpreterError, ProductValue, StageAccess,
     StageResolutionError, ValueStore,
-    control::Shell,
+    control::Directive,
     cursor::{ExecutionCursor, InternalBlockSeed, InternalSeed},
     interpreter::Position,
 };
@@ -251,7 +251,7 @@ where
 
     pub fn apply_control(
         &mut self,
-        control: Shell<<M as crate::Machine<'ir>>::Stop, BlockSeed<V>>,
+        control: Directive<<M as crate::Machine<'ir>>::Stop, BlockSeed<V>>,
     ) -> Result<(), E>
     where
         V: Clone,
@@ -259,7 +259,7 @@ where
         Self: ValueStore<Value = V, Error = E>,
     {
         match control {
-            Shell::Advance => {
+            Directive::Advance => {
                 let stage = self.active_stage();
                 let stage = self.stage_info_for(stage);
                 let activation = self.current_activation_mut().map_err(E::from)?;
@@ -274,8 +274,8 @@ where
                 cursor.advance(stage);
                 Ok(())
             }
-            Shell::Stay => Ok(()),
-            Shell::Push(seed) => {
+            Directive::Stay => Ok(()),
+            Directive::Push(seed) => {
                 let (block, args) = seed.into_parts();
                 let stage = self.active_stage();
                 let internal_seed: InternalSeed = block.into();
@@ -286,13 +286,13 @@ where
                 self.bind_block_args(block, args)?;
                 Ok(())
             }
-            Shell::Replace(seed) => {
+            Directive::Replace(seed) => {
                 let (block, args) = seed.into_parts();
                 self.replace_current_seed(block.into()).map_err(E::from)?;
                 self.bind_block_args(block, args)?;
                 Ok(())
             }
-            Shell::Pop => {
+            Directive::Pop => {
                 let activation = self.current_activation_mut().map_err(E::from)?;
                 activation.after_statement = None;
                 activation
@@ -304,7 +304,7 @@ where
                     ))
                     .map_err(E::from)
             }
-            Shell::Stop(stop) => {
+            Directive::Stop(stop) => {
                 self.last_stop = Some(stop);
                 self.clear_frames();
                 self.skip_finish_step = false;

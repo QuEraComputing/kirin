@@ -1,6 +1,6 @@
 use crate::{
     ConsumeEffect, Interpretable, Lift, Machine, ProjectMachine, ProjectMachineMut, StageAccess,
-    ValueStore, control::Shell,
+    ValueStore, control::Directive,
 };
 
 use crate::InterpreterError;
@@ -22,13 +22,13 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
         &mut self,
         effect: <Self::Machine as Machine<'ir>>::Effect,
     ) -> Result<
-        Shell<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
+        Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
         <Self as Interpreter<'ir>>::Error,
     >;
 
     fn consume_control(
         &mut self,
-        control: Shell<
+        control: Directive<
             <Self::Machine as Machine<'ir>>::Stop,
             <Self::Machine as Machine<'ir>>::Seed,
         >,
@@ -81,7 +81,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
         &mut self,
         effect: <Sub as Machine<'ir>>::Effect,
     ) -> Result<
-        Shell<<Sub as Machine<'ir>>::Stop, <Sub as Machine<'ir>>::Seed>,
+        Directive<<Sub as Machine<'ir>>::Stop, <Sub as Machine<'ir>>::Seed>,
         <Self as Interpreter<'ir>>::Error,
     >
     where
@@ -100,7 +100,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
         &mut self,
         effect: E,
     ) -> Result<
-        Shell<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
+        Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
         <Self as Interpreter<'ir>>::Error,
     >
     where
@@ -112,7 +112,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
 
     fn consume_local_control<S>(
         &mut self,
-        control: Shell<S, <Self::Machine as Machine<'ir>>::Seed>,
+        control: Directive<S, <Self::Machine as Machine<'ir>>::Seed>,
     ) -> Result<(), <Self as Interpreter<'ir>>::Error>
     where
         Self: Sized,

@@ -1,19 +1,19 @@
 use crate::{
     ConsumeEffect, FromConstant, Lift, Machine,
-    control::Shell,
+    control::Directive,
     effect::{Cursor, Stateless},
 };
 
 #[test]
-fn cursor_lifts_to_shell() {
-    let advance: Shell<i64, ()> = Cursor::<()>::Advance.lift();
-    assert_eq!(advance, Shell::Advance);
+fn cursor_lifts_to_directive() {
+    let advance: Directive<i64, ()> = Cursor::<()>::Advance.lift();
+    assert_eq!(advance, Directive::Advance);
 
-    let stay: Shell<i64, ()> = Cursor::<()>::Stay.lift();
-    assert_eq!(stay, Shell::Stay);
+    let stay: Directive<i64, ()> = Cursor::<()>::Stay.lift();
+    assert_eq!(stay, Directive::Stay);
 
-    let jump: Shell<i64, i32> = Cursor::Jump(42_i32).lift();
-    assert_eq!(jump, Shell::Replace(42));
+    let jump: Directive<i64, i32> = Cursor::Jump(42_i32).lift();
+    assert_eq!(jump, Directive::Replace(42));
 }
 
 #[test]
@@ -23,8 +23,8 @@ fn stateless_machine_consumes_cursor_effects() {
     let advance = machine.consume_effect(Cursor::Advance).unwrap();
     let stay = machine.consume_effect(Cursor::Stay).unwrap();
 
-    assert_eq!(advance, Shell::Advance);
-    assert_eq!(stay, Shell::Stay);
+    assert_eq!(advance, Directive::Advance);
+    assert_eq!(stay, Directive::Stay);
 }
 
 #[test]

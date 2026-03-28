@@ -281,7 +281,7 @@ pub trait ResolveCall<'ir, I: Interpreter<'ir>> {
     ) -> Result<SpecializedFunction, <I as Interpreter<'ir>>::Error>;
 }
 
-/// Shell-side resolution for function callees.
+/// Interpreter-side resolution for function callees.
 pub trait ResolveCallee<'ir>: Interpreter<'ir> {
     fn callee(&self) -> callee::Builder<'_, 'ir, Self>
     where

@@ -1,4 +1,4 @@
-use crate::{BlockSeed, InterpreterError, Machine, ProductValue, ValueStore, control::Shell};
+use crate::{BlockSeed, InterpreterError, Machine, ProductValue, ValueStore, control::Directive};
 
 use super::{Interpreter, Position, TypedStage};
 
@@ -13,7 +13,7 @@ pub trait Exec<'ir, Seed>: Interpreter<'ir> {
 }
 
 /// Execute a block seed inline: push the block (with args) onto the cursor
-/// stack via `Shell::Push`, run all non-terminator statements, read the
+/// stack via `Directive::Push`, run all non-terminator statements, read the
 /// terminator's arguments as a product, and pop the block.
 ///
 /// Block argument binding happens inside `apply_control` when the seed is
@@ -41,7 +41,7 @@ where
 
     // Push the block with its args as an inline execution context.
     // apply_control will bind the seed-carried arguments to the block's SSA slots.
-    interp.consume_control(Shell::Push(seed.into()))?;
+    interp.consume_control(Directive::Push(seed.into()))?;
 
     // Run all non-terminator statements
     loop {
@@ -69,6 +69,6 @@ where
     };
 
     // Pop the inline context
-    interp.consume_control(Shell::Pop)?;
+    interp.consume_control(Directive::Pop)?;
     Ok(product)
 }

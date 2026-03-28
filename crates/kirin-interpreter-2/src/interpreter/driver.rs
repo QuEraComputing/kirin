@@ -3,7 +3,7 @@ use kirin_ir::Statement;
 use super::{Interpreter, Position};
 use crate::{
     Machine,
-    control::{Breakpoints, Fuel, Interrupt, Shell},
+    control::{Breakpoints, Directive, Fuel, Interrupt},
     result::{Run, Step, Stepped, Suspension},
 };
 
@@ -34,7 +34,8 @@ pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + I
     fn step(&mut self) -> StepResult<'ir, Self>
     where
         <Self::Machine as Machine<'ir>>::Effect: Clone,
-        Shell<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>: Clone,
+        Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>:
+            Clone,
     {
         let statement = match self.poll_execution_gate() {
             Ok(Some(statement)) => statement,

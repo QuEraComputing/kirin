@@ -1,10 +1,10 @@
 use kirin_ir::{ResultValue, SpecializedFunction};
 
-use crate::{Machine, control::Shell};
+use crate::{Machine, control::Directive};
 
 use super::Interpreter;
 
-/// Shell-side invocation of a resolved specialized function.
+/// Interpreter-side invocation of a resolved specialized function.
 pub trait Invoke<'ir>: Interpreter<'ir> {
     fn invoke(
         &mut self,
@@ -18,7 +18,7 @@ pub trait Invoke<'ir>: Interpreter<'ir> {
         &mut self,
         value: Self::Value,
     ) -> Result<
-        Shell<Self::Value, <Self::Machine as Machine<'ir>>::Seed>,
+        Directive<Self::Value, <Self::Machine as Machine<'ir>>::Seed>,
         <Self as Interpreter<'ir>>::Error,
     >;
 }

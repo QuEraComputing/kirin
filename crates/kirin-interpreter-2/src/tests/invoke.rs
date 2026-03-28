@@ -10,7 +10,7 @@ use kirin_test_utils::ir_fixtures::build_add_one;
 
 use crate::{
     BlockSeed, ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue, ValueStore,
-    control::Shell,
+    control::Directive,
     interpreter::{Driver, Invoke, Position, ResolveCallee, SingleStage, TypedStage, callee},
 };
 
@@ -87,7 +87,7 @@ enum InvokeEffect {
     Stop(InvokeValue),
 }
 
-/// Machine for the invoke tests. Converts InvokeEffect into Shell controls.
+/// Machine for the invoke tests. Converts InvokeEffect into Directive controls.
 #[derive(Debug, Default)]
 struct InvokeMachine;
 
@@ -103,11 +103,11 @@ impl<'ir> ConsumeEffect<'ir> for InvokeMachine {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
+    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
         Ok(match effect {
-            InvokeEffect::Advance => Shell::Advance,
-            InvokeEffect::Stay => Shell::Stay,
-            InvokeEffect::Stop(value) => Shell::Stop(value),
+            InvokeEffect::Advance => Directive::Advance,
+            InvokeEffect::Stay => Directive::Stay,
+            InvokeEffect::Stop(value) => Directive::Stop(value),
         })
     }
 }
@@ -455,7 +455,7 @@ fn shell_stay_leaves_current_cursor_unchanged() {
     let before_location = interp.current_location();
 
     interp
-        .apply_control(Shell::<InvokeValue, BlockSeed<InvokeValue>>::Stay)
+        .apply_control(Directive::<InvokeValue, BlockSeed<InvokeValue>>::Stay)
         .unwrap();
     assert_eq!(interp.current_statement(), before_statement);
     assert_eq!(interp.current_location(), before_location);

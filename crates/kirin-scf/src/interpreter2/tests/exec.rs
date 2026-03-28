@@ -8,7 +8,7 @@ use kirin_function::{FunctionBody, Return};
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
     BlockSeed, ConsumeEffect, Cursor, Interpretable, InterpreterError, Lift, Machine, ProductValue,
-    ValueStore, control::Shell, interpreter::SingleStage,
+    ValueStore, control::Directive, interpreter::SingleStage,
 };
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
@@ -109,10 +109,10 @@ impl<'ir> ConsumeEffect<'ir> for TestMachine {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
+    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
         Ok(match effect {
-            TestEffect::Advance => Shell::Advance,
-            TestEffect::Return(value) => Shell::Stop(value),
+            TestEffect::Advance => Directive::Advance,
+            TestEffect::Return(value) => Directive::Stop(value),
         })
     }
 }

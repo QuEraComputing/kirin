@@ -8,7 +8,7 @@ use kirin_test_utils::ir_fixtures::{build_add_one, build_linear_program, build_s
 
 use crate::{
     BlockSeed, ConsumeEffect, Interpretable, InterpreterError, Machine, ValueStore,
-    control::{Breakpoint, Breakpoints, Fuel, Interrupt, Location, Shell},
+    control::{Breakpoint, Breakpoints, Directive, Fuel, Interrupt, Location},
     interpreter::{Driver, Position, SingleStage, StepResult},
     result::{Run, Step, Suspension},
 };
@@ -35,11 +35,11 @@ impl<'ir> ConsumeEffect<'ir> for TestMachine {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
+    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
         Ok(match effect {
-            TestEffect::Advance => Shell::Advance,
-            TestEffect::Replace(seed) => Shell::Replace(seed),
-            TestEffect::Return(value) => Shell::Stop(value),
+            TestEffect::Advance => Directive::Advance,
+            TestEffect::Replace(seed) => Directive::Replace(seed),
+            TestEffect::Return(value) => Directive::Stop(value),
         })
     }
 }
@@ -65,7 +65,7 @@ fn step_via_driver<'ir, I>(interp: &mut I) -> StepResult<'ir, I>
 where
     I: Driver<'ir>,
     <I::Machine as Machine<'ir>>::Effect: Clone,
-    Shell<<I::Machine as Machine<'ir>>::Stop, <I::Machine as Machine<'ir>>::Seed>: Clone,
+    Directive<<I::Machine as Machine<'ir>>::Stop, <I::Machine as Machine<'ir>>::Seed>: Clone,
 {
     interp.step()
 }

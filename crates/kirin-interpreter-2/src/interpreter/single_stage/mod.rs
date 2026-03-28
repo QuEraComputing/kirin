@@ -61,7 +61,7 @@ where
 #[cfg(test)]
 mod tests {
     use super::SingleStage;
-    use crate::{BlockSeed, InterpreterError, control::Shell, interpreter::Position};
+    use crate::{BlockSeed, InterpreterError, control::Directive, interpreter::Position};
     use kirin_ir::{CompileStage, GetInfo, Pipeline, StageInfo};
     use kirin_test_languages::CompositeLanguage;
     use kirin_test_utils::ir_fixtures::{build_linear_program, first_statement_of_specialization};
@@ -114,16 +114,16 @@ mod tests {
 
         assert_eq!(interp.current_statement(), Some(first));
 
-        interp.apply_control(Shell::Advance).unwrap();
+        interp.apply_control(Directive::Advance).unwrap();
         assert_eq!(interp.current_statement(), second);
 
-        interp.apply_control(Shell::Advance).unwrap();
+        interp.apply_control(Directive::Advance).unwrap();
         assert_eq!(interp.current_statement(), third);
 
-        interp.apply_control(Shell::Advance).unwrap();
+        interp.apply_control(Directive::Advance).unwrap();
         assert_eq!(interp.current_statement(), terminator);
 
-        interp.apply_control(Shell::Advance).unwrap();
+        interp.apply_control(Directive::Advance).unwrap();
         assert_eq!(interp.current_statement(), None);
     }
 
@@ -137,7 +137,7 @@ mod tests {
             SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
         interp.push_specialization(spec_fn).unwrap();
 
-        interp.apply_control(Shell::Stop("done")).unwrap();
+        interp.apply_control(Directive::Stop("done")).unwrap();
 
         assert_eq!(interp.cursor_depth(), 0);
         assert_eq!(interp.last_stop(), Some(&"done"));
@@ -155,7 +155,7 @@ mod tests {
             SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
 
         let error = interp
-            .apply_control(Shell::Replace(block.into()))
+            .apply_control(Directive::Replace(block.into()))
             .unwrap_err();
 
         assert!(matches!(
@@ -172,7 +172,7 @@ mod tests {
         let mut interp =
             SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
 
-        let error = interp.apply_control(Shell::Pop).unwrap_err();
+        let error = interp.apply_control(Directive::Pop).unwrap_err();
 
         assert!(matches!(
             error,

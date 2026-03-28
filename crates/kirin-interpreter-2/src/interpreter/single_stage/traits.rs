@@ -3,7 +3,7 @@ use kirin_ir::{Block, CompileStage, Dialect, Pipeline, SSAValue, StageInfo, Stat
 use super::SingleStage;
 use crate::{
     BlockSeed, ConsumeEffect, InterpreterError, Machine, StageAccess, ValueStore,
-    control::{Breakpoint, Breakpoints, Fuel, Interrupt, Location, Shell},
+    control::{Breakpoint, Breakpoints, Directive, Fuel, Interrupt, Location},
     interpreter::{
         Driver, Exec, Interpreter, Invoke, Position, ResolveCallee, TypedStage, callee, exec_block,
     },
@@ -265,7 +265,7 @@ where
         &mut self,
         effect: <Self::Machine as Machine<'ir>>::Effect,
     ) -> Result<
-        Shell<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
+        Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
         <Self as Interpreter<'ir>>::Error,
     > {
         self.machine.consume_effect(effect).map_err(Into::into)
@@ -273,7 +273,7 @@ where
 
     fn consume_control(
         &mut self,
-        control: Shell<
+        control: Directive<
             <Self::Machine as Machine<'ir>>::Stop,
             <Self::Machine as Machine<'ir>>::Seed,
         >,
@@ -343,20 +343,20 @@ where
         &mut self,
         value: Self::Value,
     ) -> Result<
-        Shell<Self::Value, <Self::Machine as Machine<'ir>>::Seed>,
+        Directive<Self::Value, <Self::Machine as Machine<'ir>>::Seed>,
         <Self as Interpreter<'ir>>::Error,
     > {
         let frame = self.frames.pop::<InterpreterError>().map_err(E::from)?;
         let (_, _, _, activation) = frame.into_parts();
         let Some(continuation) = activation.continuation else {
             self.skip_finish_step = true;
-            return Ok(Shell::Stop(value));
+            return Ok(Directive::Stop(value));
         };
 
         self.restore_caller(&continuation).map_err(E::from)?;
         self.write_return_product(continuation.results(), value)?;
         self.skip_finish_step = true;
-        Ok(Shell::Stay)
+        Ok(Directive::Stay)
     }
 }
 

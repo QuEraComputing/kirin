@@ -11,7 +11,7 @@ use kirin_constant::Constant;
 use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
     BlockSeed, ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue,
-    control::Shell, effect::Cursor, interpreter::SingleStage,
+    control::Directive, effect::Cursor, interpreter::SingleStage,
 };
 
 use crate::{Bind, Call, FunctionBody, Return};
@@ -139,9 +139,9 @@ impl BranchCondition for TestValue {
 
 /// Effect type for the function test machine.
 ///
-/// Uses `Shell<TestValue, BlockSeed<TestValue>>` so that both cursor-like
+/// Uses `Directive<TestValue, BlockSeed<TestValue>>` so that both cursor-like
 /// effects (Advance, Stay) and stopping effects (Stop) can be represented.
-type TestEffect = Shell<TestValue, BlockSeed<TestValue>>;
+type TestEffect = Directive<TestValue, BlockSeed<TestValue>>;
 
 /// Machine for function tests that supports both cursor and stop effects.
 #[derive(Debug, Default)]
@@ -159,7 +159,7 @@ impl<'ir> ConsumeEffect<'ir> for TestMachine {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
+    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
         Ok(effect)
     }
 }
@@ -169,8 +169,8 @@ pub type TestInterp<'ir> = SingleStage<'ir, TestLanguage, TestValue, TestMachine
 /// Lift a unit-seed cursor into the test effect type.
 fn lift_cursor(cursor: Cursor) -> TestEffect {
     match cursor {
-        Cursor::Advance => Shell::Advance,
-        Cursor::Stay => Shell::Stay,
+        Cursor::Advance => Directive::Advance,
+        Cursor::Stay => Directive::Stay,
         Cursor::Jump(()) => unreachable!("unit-seed cursor should never Jump"),
     }
 }
@@ -178,9 +178,9 @@ fn lift_cursor(cursor: Cursor) -> TestEffect {
 /// Lift a block-seed cursor into the test effect type.
 fn lift_block_cursor(cursor: Cursor<BlockSeed<TestValue>>) -> TestEffect {
     match cursor {
-        Cursor::Advance => Shell::Advance,
-        Cursor::Stay => Shell::Stay,
-        Cursor::Jump(seed) => Shell::Replace(seed),
+        Cursor::Advance => Directive::Advance,
+        Cursor::Stay => Directive::Stay,
+        Cursor::Jump(seed) => Directive::Replace(seed),
     }
 }
 

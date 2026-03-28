@@ -2,7 +2,7 @@ use std::convert::Infallible;
 use std::marker::PhantomData;
 
 use kirin_interpreter_2::{
-    BlockSeed, ConsumeEffect, Cursor, InterpreterError, Lift, Machine, control::Shell,
+    BlockSeed, ConsumeEffect, Cursor, InterpreterError, Lift, Machine, control::Directive,
 };
 
 /// Stateless machine for SCF dialect semantics.
@@ -35,7 +35,7 @@ impl<'ir, V: 'ir> ConsumeEffect<'ir> for ScfMachine<V> {
     fn consume_effect(
         &mut self,
         effect: Self::Effect,
-    ) -> Result<Shell<Self::Stop, Self::Seed>, Self::Error> {
+    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
         Ok(effect.lift())
     }
 }
