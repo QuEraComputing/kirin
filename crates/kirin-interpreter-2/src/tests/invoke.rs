@@ -11,7 +11,9 @@ use kirin_test_utils::ir_fixtures::build_add_one;
 use crate::{
     BlockSeed, ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue, ValueStore,
     control::Directive,
-    interpreter::{Driver, Invoke, Position, ResolveCallee, SingleStage, TypedStage, callee},
+    interpreter::{
+        Driver, Interpreter, Invoke, Position, ResolveCallee, SingleStage, TypedStage, callee,
+    },
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -449,7 +451,7 @@ fn shell_stay_leaves_current_cursor_unchanged() {
     let before_location = interp.current_location();
 
     interp
-        .apply_control(Directive::<InvokeValue, BlockSeed<InvokeValue>>::Stay)
+        .consume_effect(Directive::<InvokeValue, BlockSeed<InvokeValue>>::Stay)
         .unwrap();
     assert_eq!(interp.current_statement(), before_statement);
     assert_eq!(interp.current_location(), before_location);

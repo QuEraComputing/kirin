@@ -4,6 +4,7 @@ use super::SingleStage;
 use crate::{
     BlockSeed, ConsumeEffect, InterpreterError, Machine, StageAccess, ValueStore,
     control::{Breakpoint, Breakpoints, Directive, Fuel, Interrupt, Location},
+    cursor::{ExecutionCursor, InternalSeed},
     interpreter::{
         Driver, Exec, Interpreter, Invoke, Position, ResolveCallee, TypedStage, callee, exec_block,
     },
@@ -271,7 +272,59 @@ where
             <Self::Machine as Machine<'ir>>::Seed,
         >,
     ) -> Result<(), Self::Error> {
-        self.apply_control(directive)
+        match directive {
+            Directive::Advance => {
+                let stage = self.active_stage();
+                let stage = self.stage_info_for(stage);
+                let activation = self.current_activation_mut().map_err(E::from)?;
+                activation.after_statement = None;
+                let cursor = activation
+                    .cursor_stack
+                    .last_mut()
+                    .ok_or(InterpreterError::InvalidControl(
+                        "advance requires an active cursor",
+                    ))
+                    .map_err(E::from)?;
+                cursor.advance(stage);
+                Ok(())
+            }
+            Directive::Stay => Ok(()),
+            Directive::Push(seed) => {
+                let (block, args) = seed.into_parts();
+                let stage = self.active_stage();
+                let internal_seed: InternalSeed = block.into();
+                let next = ExecutionCursor::from_seed(self.stage_info_for(stage), internal_seed);
+                let activation = self.current_activation_mut().map_err(E::from)?;
+                activation.after_statement = None;
+                activation.cursor_stack.push(next);
+                self.bind_block_args(block, args)?;
+                Ok(())
+            }
+            Directive::Replace(seed) => {
+                let (block, args) = seed.into_parts();
+                self.replace_current_seed(block.into()).map_err(E::from)?;
+                self.bind_block_args(block, args)?;
+                Ok(())
+            }
+            Directive::Pop => {
+                let activation = self.current_activation_mut().map_err(E::from)?;
+                activation.after_statement = None;
+                activation
+                    .cursor_stack
+                    .pop()
+                    .map(|_| ())
+                    .ok_or(InterpreterError::InvalidControl(
+                        "pop requires an active cursor",
+                    ))
+                    .map_err(E::from)
+            }
+            Directive::Stop(stop) => {
+                self.last_stop = Some(stop);
+                self.clear_frames();
+                self.skip_finish_step = false;
+                Ok(())
+            }
+        }
     }
 }
 

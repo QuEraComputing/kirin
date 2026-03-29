@@ -10,7 +10,6 @@ use super::{
 use crate::{
     BlockSeed, Frame, FrameStack, InterpreterError, ProductValue, StageAccess,
     StageResolutionError, ValueStore,
-    control::Directive,
     cursor::{ExecutionCursor, InternalBlockSeed, InternalSeed},
     interpreter::Position,
 };
@@ -57,7 +56,10 @@ where
         self.frames.push(Frame::new(callee, stage, activation))
     }
 
-    fn replace_current_seed(&mut self, seed: InternalSeed) -> Result<(), InterpreterError> {
+    pub(super) fn replace_current_seed(
+        &mut self,
+        seed: InternalSeed,
+    ) -> Result<(), InterpreterError> {
         let stage = self.active_stage();
         let next_cursor = ExecutionCursor::from_seed(self.stage_info_for(stage), seed);
         let activation = self.current_activation_mut()?;
@@ -247,70 +249,6 @@ where
         }
 
         Ok(())
-    }
-
-    pub fn apply_control(
-        &mut self,
-        control: Directive<<M as crate::Machine<'ir>>::Stop, BlockSeed<V>>,
-    ) -> Result<(), E>
-    where
-        V: Clone,
-        E: From<InterpreterError>,
-        Self: ValueStore<Value = V, Error = E>,
-    {
-        match control {
-            Directive::Advance => {
-                let stage = self.active_stage();
-                let stage = self.stage_info_for(stage);
-                let activation = self.current_activation_mut().map_err(E::from)?;
-                activation.after_statement = None;
-                let cursor = activation
-                    .cursor_stack
-                    .last_mut()
-                    .ok_or(InterpreterError::InvalidControl(
-                        "advance requires an active cursor",
-                    ))
-                    .map_err(E::from)?;
-                cursor.advance(stage);
-                Ok(())
-            }
-            Directive::Stay => Ok(()),
-            Directive::Push(seed) => {
-                let (block, args) = seed.into_parts();
-                let stage = self.active_stage();
-                let internal_seed: InternalSeed = block.into();
-                let next = ExecutionCursor::from_seed(self.stage_info_for(stage), internal_seed);
-                let activation = self.current_activation_mut().map_err(E::from)?;
-                activation.after_statement = None;
-                activation.cursor_stack.push(next);
-                self.bind_block_args(block, args)?;
-                Ok(())
-            }
-            Directive::Replace(seed) => {
-                let (block, args) = seed.into_parts();
-                self.replace_current_seed(block.into()).map_err(E::from)?;
-                self.bind_block_args(block, args)?;
-                Ok(())
-            }
-            Directive::Pop => {
-                let activation = self.current_activation_mut().map_err(E::from)?;
-                activation.after_statement = None;
-                activation
-                    .cursor_stack
-                    .pop()
-                    .map(|_| ())
-                    .ok_or(InterpreterError::InvalidControl(
-                        "pop requires an active cursor",
-                    ))
-                    .map_err(E::from)
-            }
-            Directive::Stop(stop) => {
-                self.last_stop = Some(stop);
-                self.clear_frames();
-                self.skip_finish_step = false;
-                Ok(())
-            }
-        }
     }
 
     pub(super) fn prepare_invoke(

@@ -61,7 +61,11 @@ where
 #[cfg(test)]
 mod tests {
     use super::SingleStage;
-    use crate::{BlockSeed, InterpreterError, control::Directive, interpreter::Position};
+    use crate::{
+        BlockSeed, Interpretable, InterpreterError,
+        control::Directive,
+        interpreter::{Interpreter, Position},
+    };
     use kirin_ir::{CompileStage, GetInfo, Pipeline, StageInfo};
     use kirin_test_languages::CompositeLanguage;
     use kirin_test_utils::ir_fixtures::{build_linear_program, first_statement_of_specialization};
@@ -70,9 +74,29 @@ mod tests {
     struct TestMachine;
 
     impl<'ir> crate::Machine<'ir> for TestMachine {
-        type Effect = ();
+        type Effect = Directive<&'static str, BlockSeed<i64>>;
         type Stop = &'static str;
         type Seed = BlockSeed<i64>;
+    }
+
+    impl<'ir> crate::ConsumeEffect<'ir> for TestMachine {
+        type Output = Directive<&'static str, BlockSeed<i64>>;
+        type Error = InterpreterError;
+
+        fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
+            Ok(effect)
+        }
+    }
+
+    type TestInterp<'ir> = SingleStage<'ir, CompositeLanguage, i64, TestMachine, InterpreterError>;
+
+    impl<'ir> Interpretable<'ir, TestInterp<'ir>> for CompositeLanguage {
+        type Effect = Directive<&'static str, BlockSeed<i64>>;
+        type Error = InterpreterError;
+
+        fn interpret(&self, _: &mut TestInterp<'ir>) -> Result<Self::Effect, Self::Error> {
+            unreachable!("tests do not interpret statements")
+        }
     }
 
     #[test]
@@ -82,8 +106,7 @@ mod tests {
         let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
         let expected = first_statement_of_specialization(&pipeline, stage_id, spec_fn);
 
-        let mut interp =
-            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
+        let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
 
         interp.push_specialization(spec_fn).unwrap();
 
@@ -92,7 +115,7 @@ mod tests {
     }
 
     #[test]
-    fn apply_control_advance_walks_block_and_then_exhausts() {
+    fn consume_effect_advance_walks_block_and_then_exhausts() {
         let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
         let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
         let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
@@ -108,22 +131,21 @@ mod tests {
             block.terminator(stage)
         };
 
-        let mut interp =
-            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
+        let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
         interp.push_specialization(spec_fn).unwrap();
 
         assert_eq!(interp.current_statement(), Some(first));
 
-        interp.apply_control(Directive::Advance).unwrap();
+        interp.consume_effect(Directive::Advance).unwrap();
         assert_eq!(interp.current_statement(), second);
 
-        interp.apply_control(Directive::Advance).unwrap();
+        interp.consume_effect(Directive::Advance).unwrap();
         assert_eq!(interp.current_statement(), third);
 
-        interp.apply_control(Directive::Advance).unwrap();
+        interp.consume_effect(Directive::Advance).unwrap();
         assert_eq!(interp.current_statement(), terminator);
 
-        interp.apply_control(Directive::Advance).unwrap();
+        interp.consume_effect(Directive::Advance).unwrap();
         assert_eq!(interp.current_statement(), None);
     }
 
@@ -133,11 +155,10 @@ mod tests {
         let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
         let spec_fn = build_linear_program(&mut pipeline, stage_id).0;
 
-        let mut interp =
-            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
+        let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
         interp.push_specialization(spec_fn).unwrap();
 
-        interp.apply_control(Directive::Stop("done")).unwrap();
+        interp.consume_effect(Directive::Stop("done")).unwrap();
 
         assert_eq!(interp.cursor_depth(), 0);
         assert_eq!(interp.last_stop(), Some(&"done"));
@@ -151,11 +172,10 @@ mod tests {
             .stage_mut(stage_id)
             .unwrap()
             .with_builder(|b| b.block().new());
-        let mut interp =
-            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
+        let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
 
         let error = interp
-            .apply_control(Directive::Replace(block.into()))
+            .consume_effect(Directive::Replace(block.into()))
             .unwrap_err();
 
         assert!(matches!(
@@ -169,10 +189,9 @@ mod tests {
     fn pop_without_active_cursor_errors() {
         let mut pipeline: Pipeline<StageInfo<CompositeLanguage>> = Pipeline::new();
         let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
-        let mut interp =
-            SingleStage::<_, i64, _, InterpreterError>::new(&pipeline, stage_id, TestMachine);
+        let mut interp = TestInterp::new(&pipeline, stage_id, TestMachine);
 
-        let error = interp.apply_control(Directive::Pop).unwrap_err();
+        let error = interp.consume_effect(Directive::Pop).unwrap_err();
 
         assert!(matches!(
             error,
