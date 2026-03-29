@@ -37,11 +37,13 @@ impl<'ir> Machine<'ir> for LeafMachine {
     type Seed = ();
 }
 
-impl<'ir> ConsumeEffect<'ir> for LeafMachine {
-    type Output = Directive<Self::Stop, Self::Seed>;
+impl<'ir> ConsumeEffect<'ir, Directive<LeafStop, ()>> for LeafMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Directive<LeafStop, ()>, Self::Error> {
         match effect {
             LeafEffect::Record(value) => {
                 self.seen.push(value);
@@ -73,11 +75,13 @@ impl<'ir> Machine<'ir> for CompositeMachine {
     type Seed = BlockSeed<ArithValue>;
 }
 
-impl<'ir> ConsumeEffect<'ir> for CompositeMachine {
-    type Output = Directive<Self::Stop, Self::Seed>;
+impl<'ir> ConsumeEffect<'ir, Directive<CompositeStop, BlockSeed<ArithValue>>> for CompositeMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Directive<CompositeStop, BlockSeed<ArithValue>>, Self::Error> {
         match effect {
             CompositeEffect::Leaf(effect) => self.leaf.consume_effect(effect).map(|control| {
                 control
@@ -153,8 +157,8 @@ fn interpret_local_and_lifted_return_different_effect_types() {
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
     let stmt = make_constant(7);
 
-    let local = interp.interpret_local(&stmt).unwrap();
-    let lifted = interp.interpret_lifted(&stmt).unwrap();
+    let local: LeafEffect = interp.interpret_local(&stmt).unwrap();
+    let lifted: CompositeEffect = Lift::lift(local.clone());
 
     assert_eq!(local, LeafEffect::Record(ArithValue::I64(7)));
     assert_eq!(lifted, CompositeEffect::Leaf(local));
@@ -166,15 +170,13 @@ fn project_machine_helpers_reach_leaf_machine() {
     let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
 
-    interp
-        .project_machine_mut::<LeafMachine>()
-        .seen
-        .push(ArithValue::I64(9));
+    {
+        let leaf: &mut LeafMachine = interp.machine_mut().project_mut();
+        leaf.seen.push(ArithValue::I64(9));
+    }
 
-    assert_eq!(
-        interp.project_machine::<LeafMachine>().seen,
-        vec![ArithValue::I64(9)]
-    );
+    let leaf: &LeafMachine = interp.machine().project();
+    assert_eq!(leaf.seen, vec![ArithValue::I64(9)]);
 }
 
 #[test]
@@ -183,16 +185,14 @@ fn local_effect_consumption_mutates_only_projected_submachine() {
     let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
 
-    let control = interp
-        .project_machine_mut::<LeafMachine>()
+    let leaf: &mut LeafMachine = interp.machine_mut().project_mut();
+    let control = leaf
         .consume_effect(LeafEffect::Record(ArithValue::I64(3)))
         .unwrap();
 
     assert_eq!(control, Directive::Stop(LeafStop::Stored));
-    assert_eq!(
-        interp.project_machine::<LeafMachine>().seen,
-        vec![ArithValue::I64(3)]
-    );
+    let leaf: &LeafMachine = interp.machine().project();
+    assert_eq!(leaf.seen, vec![ArithValue::I64(3)]);
     assert_eq!(interp.machine().shared_advances, 0);
     assert_eq!(interp.last_stop(), None);
 }
@@ -212,7 +212,11 @@ fn lifted_effect_consumption_returns_top_level_directive() {
         Directive::Stop(CompositeStop::Leaf(LeafStop::Stored))
     );
     assert_eq!(
-        interp.project_machine::<LeafMachine>().seen,
+        {
+            let m: &LeafMachine = interp.machine().project();
+            m
+        }
+        .seen,
         vec![ArithValue::I64(4)]
     );
 }

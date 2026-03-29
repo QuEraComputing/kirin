@@ -11,9 +11,7 @@ use kirin_test_utils::ir_fixtures::build_add_one;
 use crate::{
     BlockSeed, ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue, ValueStore,
     control::Directive,
-    interpreter::{
-        Driver, Interpreter, Invoke, Position, ResolveCallee, SingleStage, TypedStage, callee,
-    },
+    interpreter::{Driver, Invoke, Position, ResolveCallee, SingleStage, TypedStage, callee},
 };
 
 #[derive(Clone, Debug, PartialEq)]
@@ -95,11 +93,13 @@ impl<'ir> Machine<'ir> for InvokeMachine {
     type Seed = BlockSeed<InvokeValue>;
 }
 
-impl<'ir> ConsumeEffect<'ir> for InvokeMachine {
-    type Output = Directive<Self::Stop, Self::Seed>;
+impl<'ir> ConsumeEffect<'ir, Directive<InvokeValue, BlockSeed<InvokeValue>>> for InvokeMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Directive<InvokeValue, BlockSeed<InvokeValue>>, Self::Error> {
         Ok(match effect {
             InvokeEffect::Advance => Directive::Advance,
             InvokeEffect::Stay => Directive::Stay,

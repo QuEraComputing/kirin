@@ -148,11 +148,13 @@ impl<'ir> Machine<'ir> for TestMachine {
     type Seed = BlockSeed<TestValue>;
 }
 
-impl<'ir> ConsumeEffect<'ir> for TestMachine {
-    type Output = Directive<Self::Stop, Self::Seed>;
+impl<'ir> ConsumeEffect<'ir, Directive<TestValue, BlockSeed<TestValue>>> for TestMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Directive<TestValue, BlockSeed<TestValue>>, Self::Error> {
         Ok(effect)
     }
 }

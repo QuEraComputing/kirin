@@ -29,11 +29,13 @@ impl<'ir> Machine<'ir> for TestMachine {
     type Seed = BlockSeed<ArithValue>;
 }
 
-impl<'ir> ConsumeEffect<'ir> for TestMachine {
-    type Output = Directive<Self::Stop, Self::Seed>;
+impl<'ir> ConsumeEffect<'ir, Directive<ArithValue, BlockSeed<ArithValue>>> for TestMachine {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Directive<ArithValue, BlockSeed<ArithValue>>, Self::Error> {
         Ok(match effect {
             TestEffect::Advance => Directive::Advance,
             TestEffect::Replace(seed) => Directive::Replace(seed),
@@ -62,8 +64,7 @@ where
 fn step_via_driver<'ir, I>(interp: &mut I) -> StepResult<'ir, I>
 where
     I: Driver<'ir>,
-    <I::Machine as Machine<'ir>>::Effect: Clone,
-    Directive<<I::Machine as Machine<'ir>>::Stop, <I::Machine as Machine<'ir>>::Seed>: Clone,
+    <I as Machine<'ir>>::Effect: Clone,
 {
     interp.step()
 }

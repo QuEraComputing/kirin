@@ -2,22 +2,14 @@ use kirin_ir::Statement;
 
 use super::{Interpreter, Position};
 use crate::{
-    ConsumeEffect, Lift, Machine, ValueStore,
-    control::{Breakpoints, Directive, Fuel, Interrupt},
-    result::{Run, Step, Stepped, Suspension},
+    Machine, ValueStore,
+    control::{Breakpoints, Fuel, Interrupt},
+    result::{Run, Step, Suspension},
 };
 
-pub type StepResult<'ir, I> = Result<
-    Step<
-        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Effect,
-        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Stop,
-        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
-    >,
-    <I as ValueStore>::Error,
->;
+pub type StepResult<'ir, I> = Result<Step<<I as Machine<'ir>>::Effect>, <I as ValueStore>::Error>;
 
-pub type RunResult<'ir, I> =
-    Result<Run<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Stop>, <I as ValueStore>::Error>;
+pub type RunResult<'ir, I> = Result<Run<<I as Machine<'ir>>::Stop>, <I as ValueStore>::Error>;
 
 /// Shared driver loop for typed shells and typed stage views.
 pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + Interrupt {
@@ -25,15 +17,13 @@ pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + I
 
     fn stop_pending(&self) -> bool;
 
-    fn take_stop(&mut self) -> Option<<Self::Machine as Machine<'ir>>::Stop>;
+    fn take_stop(&mut self) -> Option<Self::Stop>;
 
     fn finish_step(&mut self, statement: Statement);
 
     fn step(&mut self) -> StepResult<'ir, Self>
     where
-        <Self::Machine as Machine<'ir>>::Effect: Clone,
-        Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>:
-            Clone,
+        Self::Effect: Clone,
     {
         let statement = match self.poll_execution_gate() {
             Ok(Some(statement)) => statement,
@@ -42,12 +32,7 @@ pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + I
         };
 
         let effect = self.interpret_current()?;
-        let output = self
-            .machine_mut()
-            .consume_effect(effect.clone())
-            .map_err(Into::into)?;
-        let directive = Lift::lift(output);
-        self.consume_effect(directive.clone())?;
+        self.consume_effect(effect.clone())?;
         if let Some(remaining) = self.fuel() {
             debug_assert!(remaining > 0, "fuel must be checked before step burn");
             self.set_fuel(Some(remaining - 1));
@@ -57,7 +42,7 @@ pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + I
             self.finish_step(statement);
         }
 
-        Ok(Step::Stepped(Stepped::new(effect, directive)))
+        Ok(Step::Stepped(effect))
     }
 
     fn run(&mut self) -> RunResult<'ir, Self> {
@@ -69,11 +54,7 @@ pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + I
             };
 
             let effect = self.interpret_current()?;
-            let output = self
-                .machine_mut()
-                .consume_effect(effect)
-                .map_err(Into::into)?;
-            self.consume_effect(Lift::lift(output))?;
+            self.consume_effect(effect)?;
             if let Some(remaining) = self.fuel() {
                 debug_assert!(remaining > 0, "fuel must be checked before step burn");
                 self.set_fuel(Some(remaining - 1));

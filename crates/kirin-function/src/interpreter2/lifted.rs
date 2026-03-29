@@ -1,6 +1,6 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter_2::{
-    Interpretable, Interpreter, InterpreterError, Machine, ProductValue,
+    Interpretable, Interpreter, InterpreterError, Machine, ProductValue, ValueStore,
     control::Directive,
     interpreter::{Invoke, ResolveCall, ResolveCallee},
 };
@@ -12,8 +12,8 @@ where
     I: Interpreter<'ir>,
     T: CompileTimeValue,
 {
-    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
-    type Error = I::Error;
+    type Effect = Directive<I::Value, <I as Machine<'ir>>::Seed>;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, _interp: &mut I) -> Result<Self::Effect, Self::Error> {
         Err(InterpreterError::unsupported(
@@ -28,8 +28,8 @@ where
     I: Interpreter<'ir>,
     T: CompileTimeValue,
 {
-    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
-    type Error = I::Error;
+    type Effect = Directive<I::Value, <I as Machine<'ir>>::Seed>;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, _interp: &mut I) -> Result<Self::Effect, Self::Error> {
         Err(InterpreterError::unsupported("bind is not yet supported in interpreter2").into())
@@ -45,7 +45,7 @@ where
         &self,
         interp: &I,
         args: &[I::Value],
-    ) -> Result<kirin::prelude::SpecializedFunction, I::Error> {
+    ) -> Result<kirin::prelude::SpecializedFunction, <I as ValueStore>::Error> {
         interp.callee().symbol(self.target()).args(args)
     }
 }
@@ -56,8 +56,8 @@ where
     T: CompileTimeValue,
     I::Value: Clone,
 {
-    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
-    type Error = I::Error;
+    type Effect = Directive<I::Value, <I as Machine<'ir>>::Seed>;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error> {
         let args = interp.read_many(self.args())?;
@@ -73,8 +73,8 @@ where
     T: CompileTimeValue,
     I::Value: Clone + ProductValue,
 {
-    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
-    type Error = I::Error;
+    type Effect = Directive<I::Value, <I as Machine<'ir>>::Seed>;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error> {
         let product = I::Value::new_product(interp.read_many(&self.values)?);
@@ -88,8 +88,8 @@ where
     T: CompileTimeValue,
     I::Value: Clone + ProductValue,
 {
-    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
-    type Error = I::Error;
+    type Effect = Directive<I::Value, <I as Machine<'ir>>::Seed>;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error> {
         match self {

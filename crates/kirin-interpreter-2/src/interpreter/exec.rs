@@ -1,4 +1,4 @@
-use crate::{BlockSeed, ConsumeEffect, Lift, Machine, ProductValue, control::Directive};
+use crate::{BlockSeed, Machine, ProductValue, control::Directive};
 
 use super::{Interpreter, Position, TypedStage};
 
@@ -6,7 +6,10 @@ use super::{Interpreter, Position, TypedStage};
 ///
 /// Minimal trait — bounds go on implementations, not on the trait itself.
 pub trait Exec<'ir, Seed>: Interpreter<'ir> {
-    fn exec(&mut self, seed: Seed) -> Result<Option<Self::Value>, Self::Error>;
+    fn exec(
+        &mut self,
+        seed: Seed,
+    ) -> Result<Option<Self::Value>, <Self as crate::ValueStore>::Error>;
 }
 
 /// Execute a block seed inline: push the block (with args) onto the cursor
@@ -21,11 +24,14 @@ pub trait Exec<'ir, Seed>: Interpreter<'ir> {
 pub fn exec_block<'ir, I>(
     interp: &mut I,
     seed: BlockSeed<I::Value>,
-) -> Result<Option<I::Value>, I::Error>
+) -> Result<Option<I::Value>, <I as crate::ValueStore>::Error>
 where
-    I: Interpreter<'ir> + Position<'ir> + TypedStage<'ir>,
+    I: Interpreter<'ir>
+        + Position<'ir>
+        + TypedStage<'ir>
+        + Machine<'ir, Effect = Directive<<I as Machine<'ir>>::Stop, <I as Machine<'ir>>::Seed>>,
     I::Value: ProductValue,
-    BlockSeed<I::Value>: Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
+    BlockSeed<I::Value>: Into<<I as Machine<'ir>>::Seed>,
 {
     let block = seed.block();
     let stage = interp.stage_info();
@@ -42,11 +48,7 @@ where
             break;
         }
         let effect = interp.interpret_current()?;
-        let output = interp
-            .machine_mut()
-            .consume_effect(effect)
-            .map_err(Into::into)?;
-        interp.consume_effect(Lift::lift(output))?;
+        interp.consume_effect(effect)?;
     }
 
     // Read terminator yields into a product

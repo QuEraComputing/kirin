@@ -56,15 +56,49 @@ where
         self.fuel = Some(fuel);
         self
     }
+
+    /// Access the inner dialect machine.
+    pub fn machine(&self) -> &M {
+        &self.machine
+    }
+
+    /// Mutably access the inner dialect machine.
+    pub fn machine_mut(&mut self) -> &mut M {
+        &mut self.machine
+    }
+}
+
+// Projection from interpreter shell to inner machine.
+impl<'ir, L, V, M, E> crate::ProjectMachine<M> for SingleStage<'ir, L, V, M, E>
+where
+    L: Dialect + 'ir,
+    V: 'ir,
+    M: Machine<'ir> + 'ir,
+    E: 'ir,
+{
+    fn project(&self) -> &M {
+        &self.machine
+    }
+}
+
+impl<'ir, L, V, M, E> crate::ProjectMachineMut<M> for SingleStage<'ir, L, V, M, E>
+where
+    L: Dialect + 'ir,
+    V: 'ir,
+    M: Machine<'ir> + 'ir,
+    E: 'ir,
+{
+    fn project_mut(&mut self) -> &mut M {
+        &mut self.machine
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::SingleStage;
     use crate::{
-        BlockSeed, Interpretable, InterpreterError,
-        control::Directive,
-        interpreter::{Interpreter, Position},
+        BlockSeed, ConsumeEffect, Interpretable, InterpreterError, control::Directive,
+        interpreter::Position,
     };
     use kirin_ir::{CompileStage, GetInfo, Pipeline, StageInfo};
     use kirin_test_languages::CompositeLanguage;
@@ -79,11 +113,13 @@ mod tests {
         type Seed = BlockSeed<i64>;
     }
 
-    impl<'ir> crate::ConsumeEffect<'ir> for TestMachine {
-        type Output = Directive<&'static str, BlockSeed<i64>>;
+    impl<'ir> crate::ConsumeEffect<'ir, Directive<&'static str, BlockSeed<i64>>> for TestMachine {
         type Error = InterpreterError;
 
-        fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
+        fn consume_effect(
+            &mut self,
+            effect: Self::Effect,
+        ) -> Result<Directive<&'static str, BlockSeed<i64>>, Self::Error> {
             Ok(effect)
         }
     }

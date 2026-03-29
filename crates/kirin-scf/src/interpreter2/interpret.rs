@@ -14,7 +14,7 @@ where
     T: CompileTimeValue,
 {
     type Effect = Cursor<Block>;
-    type Error = I::Error;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         let cond = interp.read(self.condition)?;
@@ -43,7 +43,7 @@ where
     T: CompileTimeValue,
 {
     type Effect = Cursor<Block>;
-    type Error = I::Error;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         let mut iv = interp.read(self.start)?;
@@ -73,7 +73,7 @@ where
             }
 
             iv = iv.loop_step(&step).ok_or_else(|| {
-                I::Error::from(InterpreterError::message(
+                <I as ValueStore>::Error::from(InterpreterError::message(
                     "scf.for: induction variable overflow during loop step",
                 ))
             })?;
@@ -92,7 +92,7 @@ where
     T: CompileTimeValue,
 {
     type Effect = Cursor<Block>;
-    type Error = I::Error;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         match self {
@@ -109,7 +109,7 @@ where
     T: CompileTimeValue,
 {
     type Effect = Cursor<Block>;
-    type Error = I::Error;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, _interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         Err(InterpreterError::unsupported(

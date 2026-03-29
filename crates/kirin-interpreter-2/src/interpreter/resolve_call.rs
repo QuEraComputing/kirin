@@ -263,7 +263,10 @@ pub mod callee {
             self
         }
 
-        pub fn args(self, args: &[I::Value]) -> Result<SpecializedFunction, I::Error> {
+        pub fn args(
+            self,
+            args: &[I::Value],
+        ) -> Result<SpecializedFunction, <I as crate::ValueStore>::Error> {
             self.interp.resolve_query(self.query, args)
         }
     }
@@ -271,7 +274,11 @@ pub mod callee {
 
 /// Request-side call resolution for call-like statements.
 pub trait ResolveCall<'ir, I: Interpreter<'ir>> {
-    fn resolve_call(&self, interp: &I, args: &[I::Value]) -> Result<SpecializedFunction, I::Error>;
+    fn resolve_call(
+        &self,
+        interp: &I,
+        args: &[I::Value],
+    ) -> Result<SpecializedFunction, <I as crate::ValueStore>::Error>;
 }
 
 /// Interpreter-side resolution for function callees.
@@ -287,5 +294,5 @@ pub trait ResolveCallee<'ir>: Interpreter<'ir> {
         &self,
         query: callee::Query,
         args: &[Self::Value],
-    ) -> Result<SpecializedFunction, Self::Error>;
+    ) -> Result<SpecializedFunction, <Self as crate::ValueStore>::Error>;
 }

@@ -1,6 +1,7 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter_2::{
-    BlockSeed, BranchCondition, Interpretable, Interpreter, InterpreterError, effect::Cursor,
+    BlockSeed, BranchCondition, Interpretable, Interpreter, InterpreterError, ValueStore,
+    effect::Cursor,
 };
 
 use crate::ControlFlow;
@@ -12,7 +13,7 @@ where
     T: CompileTimeValue,
 {
     type Effect = Cursor<BlockSeed<I::Value>>;
-    type Error = I::Error;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor<BlockSeed<I::Value>>, Self::Error> {
         match self {

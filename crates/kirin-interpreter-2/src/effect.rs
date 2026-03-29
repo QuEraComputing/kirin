@@ -65,11 +65,13 @@ impl<'ir, Stop, Seed> Machine<'ir> for Stateless<Stop, Seed> {
     type Seed = Seed;
 }
 
-impl<'ir, Stop, Seed> ConsumeEffect<'ir> for Stateless<Stop, Seed> {
-    type Output = Directive<Self::Stop, Self::Seed>;
+impl<'ir, Stop, Seed> ConsumeEffect<'ir, Directive<Stop, Seed>> for Stateless<Stop, Seed> {
     type Error = InterpreterError;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
+    fn consume_effect(
+        &mut self,
+        effect: Self::Effect,
+    ) -> Result<Directive<Stop, Seed>, Self::Error> {
         Ok(effect.lift())
     }
 }

@@ -158,16 +158,13 @@ impl<'ir, I, D> crate::Interpretable<'ir, I> for Total<D>
 where
     I: Interpreter<'ir>,
     D: crate::Interpretable<'ir, I>,
-    D::Effect: Lift<<I::Machine as Machine<'ir>>::Effect>,
-    D::Error: Into<I::Error>,
+    D::Effect: Lift<<I as Machine<'ir>>::Effect>,
+    D::Error: Into<<I as crate::ValueStore>::Error>,
 {
-    type Effect = <I::Machine as Machine<'ir>>::Effect;
-    type Error = I::Error;
+    type Effect = <I as Machine<'ir>>::Effect;
+    type Error = <I as crate::ValueStore>::Error;
 
-    fn interpret(
-        &self,
-        interp: &mut I,
-    ) -> Result<<I::Machine as Machine<'ir>>::Effect, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<<I as Machine<'ir>>::Effect, Self::Error> {
         self.0.interpret(interp).map_err(Into::into).map(Lift::lift)
     }
 }

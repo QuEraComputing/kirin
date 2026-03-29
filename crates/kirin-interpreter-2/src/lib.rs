@@ -35,12 +35,12 @@ pub use stage_access::StageAccess;
 pub use total::Total;
 pub use value_store::ValueStore;
 
-/// Convenience alias for the interpreter's machine effect type.
-pub type InterpreterEffect<'ir, I> = <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Effect;
-/// Convenience alias for the interpreter's machine stop type.
-pub type InterpreterStop<'ir, I> = <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Stop;
-/// Convenience alias for the interpreter's machine seed type.
-pub type InterpreterSeed<'ir, I> = <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed;
+/// Convenience alias for the interpreter's effect type.
+pub type InterpreterEffect<'ir, I> = <I as Machine<'ir>>::Effect;
+/// Convenience alias for the interpreter's stop type.
+pub type InterpreterStop<'ir, I> = <I as Machine<'ir>>::Stop;
+/// Convenience alias for the interpreter's seed type.
+pub type InterpreterSeed<'ir, I> = <I as Machine<'ir>>::Seed;
 
 /// Essentials for dialect authors implementing machine-based semantics.
 pub mod prelude {

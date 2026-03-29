@@ -6,9 +6,12 @@ pub trait Machine<'ir> {
 }
 
 /// Machine-owned effect consumption.
-pub trait ConsumeEffect<'ir>: Machine<'ir> {
-    type Output;
+///
+/// The `Output` type parameter is the result of consuming an effect:
+/// - Inner machines produce directives: `ConsumeEffect<'ir, Directive<Stop, Seed>>`
+/// - The interpreter shell is terminal: `ConsumeEffect<'ir, ()>`
+pub trait ConsumeEffect<'ir, Output = ()>: Machine<'ir> {
     type Error;
 
-    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error>;
+    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Output, Self::Error>;
 }

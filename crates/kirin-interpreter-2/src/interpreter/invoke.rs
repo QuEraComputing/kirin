@@ -11,11 +11,14 @@ pub trait Invoke<'ir>: Interpreter<'ir> {
         callee: SpecializedFunction,
         args: &[Self::Value],
         results: &[ResultValue],
-    ) -> Result<(), Self::Error>;
+    ) -> Result<(), <Self as crate::ValueStore>::Error>;
 
     #[allow(clippy::type_complexity)]
     fn return_current(
         &mut self,
         value: Self::Value,
-    ) -> Result<Directive<Self::Value, <Self::Machine as Machine<'ir>>::Seed>, Self::Error>;
+    ) -> Result<
+        Directive<Self::Value, <Self as Machine<'ir>>::Seed>,
+        <Self as crate::ValueStore>::Error,
+    >;
 }

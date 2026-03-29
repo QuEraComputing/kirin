@@ -1,5 +1,5 @@
 use kirin::prelude::{CompileTimeValue, PrettyPrint, Typeof};
-use kirin_interpreter_2::{FromConstant, Interpretable, Interpreter, effect::Cursor};
+use kirin_interpreter_2::{FromConstant, Interpretable, Interpreter, ValueStore, effect::Cursor};
 
 use crate::Constant;
 
@@ -11,7 +11,7 @@ where
     Ty: CompileTimeValue,
 {
     type Effect = Cursor;
-    type Error = I::Error;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
         let value = I::Value::from_constant(self.value.clone())?;

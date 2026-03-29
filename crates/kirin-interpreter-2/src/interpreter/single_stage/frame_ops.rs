@@ -306,10 +306,8 @@ where
         V: Clone,
         M: crate::ConsumeEffect<
                 'ir,
-                Error = E,
-                Output: crate::Lift<
-                    crate::control::Directive<<M as crate::Machine<'ir>>::Stop, BlockSeed<V>>,
-                >,
+                crate::control::Directive<<M as crate::Machine<'ir>>::Stop, BlockSeed<V>>,
+                Error: Into<E>,
             > + crate::Machine<'ir, Seed = BlockSeed<V>>,
         L: crate::Interpretable<'ir, Self, Effect = <M as crate::Machine<'ir>>::Effect, Error = E>,
         E: From<InterpreterError>,

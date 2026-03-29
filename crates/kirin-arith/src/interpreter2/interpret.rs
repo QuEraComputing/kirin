@@ -1,7 +1,9 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
 use kirin::prelude::CompileTimeValue;
-use kirin_interpreter_2::{Interpretable, Interpreter, InterpreterError, effect::Cursor};
+use kirin_interpreter_2::{
+    Interpretable, Interpreter, InterpreterError, ValueStore, effect::Cursor,
+};
 
 use crate::{Arith, CheckedDiv, CheckedRem};
 
@@ -29,7 +31,7 @@ where
     T: CompileTimeValue,
 {
     type Effect = Cursor;
-    type Error = I::Error;
+    type Error = <I as ValueStore>::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
         match self {
