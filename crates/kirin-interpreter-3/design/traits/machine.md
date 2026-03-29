@@ -18,7 +18,19 @@ trait Machine {
 The caller is responsible for projecting/lifting effects into the machine's effect type before calling
 `consume_effect`. The machine only knows about its own effect vocabulary.
 
-## Composition
+## Two Levels of Machine
+
+The `Machine` trait serves two levels:
+
+1. **Dialect machines** process dialect-specific effects. Simple dialects (arithmetic, comparisons)
+   use `()` as their machine. Stateful dialects (memory model, symbol table) define a concrete
+   machine struct with `type Effect = DialectSpecificEffect`.
+
+2. **The interpreter** is also a `Machine`. Its `Effect` is the unified `Effect<V, Seed, DE>` type
+   (see [effects.md](effects.md)). It handles all effect variants — cursor control, value binding,
+   seed execution — and delegates `Machine(de)` to the dialect machine.
+
+## Dialect Machine Composition
 
 Machines compose by **product** (state), effects by **sum** (language):
 
@@ -41,11 +53,7 @@ impl Machine for MachineC {
 }
 ```
 
-## Dialect Machines
-
-Each dialect optionally defines its own machine. Simple dialects (like arithmetic) that have no
-persistent state use `()` as their machine. Dialects with state (e.g., a memory model, a symbol
-table) define a concrete machine struct.
+## Direct Mutation via ProjectMut
 
 With `&mut I` access, dialects can mutate their machine directly via `ProjectMut`. Machine effects
 are for cases where state changes need to go through the effect pipeline (e.g., deferred processing,

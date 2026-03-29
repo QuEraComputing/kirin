@@ -8,8 +8,8 @@ This is the pattern used by `kirin-scf`.
 ## Key Characteristics
 
 - The dialect's `interpret()` creates a seed and executes it via `&mut I`
-- The seed composes `BlockSeed` and matches on the terminal effect
-- `try_project()` extracts base effects from the terminal for pattern matching
+- The seed creates a `BlockSeed` and calls `.execute(interp)` to run a block
+- Pattern-matches on the terminal to extract the yielded value
 
 ## Dialect Code (If operation)
 
@@ -17,17 +17,19 @@ This is the pattern used by `kirin-scf`.
 impl<I: Interpreter> Interpretable<I> for If<T>
 where
     I::Value: BranchCondition + ProductValue,
-    IfSeed<I::Value>: Execute<I>,
+    IfSeed: Execute<I>,
 {
     type Effect = ();
     type Error = Infallible;
 
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect<()>, I::Error<Infallible>> {
+    fn interpret(&self, interp: &mut I)
+        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
+    {
         let cond = interp.read(self.condition)?;
         let block = match cond.is_truthy() {
             Some(true) => self.then_body,
             Some(false) => self.else_body,
-            None => return InterpreterError::unsupported("nondeterministic scf.if").try_lift(),
+            None => return Err(InterpreterError::unsupported("nondeterministic scf.if").into()),
         };
 
         IfSeed {
@@ -35,7 +37,7 @@ where
             results: self.results.clone(),
         }.execute(interp)?;
 
-        BaseEffect::Advance.try_lift()
+        Ok(Effect::Advance)
     }
 }
 ```
@@ -43,24 +45,25 @@ where
 ## Seed Code (IfSeed)
 
 ```rust
-struct IfSeed<V> {
+struct IfSeed {
     block: Block,
     results: Product<ResultValue>,
 }
 
-impl<I: Machine> Execute<I> for IfSeed<V>
+impl<I: Interpreter> Execute<I> for IfSeed
 where
-    BlockSeed<V>: Execute<I>,
+    I::Value: ProductValue,
+    BlockSeed<I::Value>: Execute<I>,
 {
     fn execute(self, interp: &mut I) -> Result<I::Effect, I::Error> {
         let terminal = BlockSeed::entry(self.block).execute(interp)?;
 
         // Match the terminal effect — expect Yield from scf body
-        match terminal.try_project() {
-            Ok(BaseEffect::Yield(v)) => {
-                BaseEffect::BindProduct(self.results, v).try_lift()
+        match terminal {
+            Effect::Yield(v) => {
+                Ok(Effect::BindProduct(self.results, v))
             }
-            _ => InterpreterError::unsupported("expected yield from scf.if body").try_lift(),
+            _ => Err(InterpreterError::unsupported("expected yield from scf.if body").into()),
         }
     }
 }
@@ -69,9 +72,7 @@ where
 ## How It Works
 
 1. `interpret()` reads the condition, picks the block, creates `IfSeed`, calls `.execute(interp)`
-2. `IfSeed::execute()` creates a `BlockSeed` for the chosen block and executes it
-3. `BlockSeed::execute()` binds block args, steps through statements, returns the terminator's effect
-4. The terminator is `scf.yield` → produces `BaseEffect::Yield(v)`
-5. `try_project()` extracts the `BaseEffect` from the interpreter's effect type
-6. The seed matches `Yield(v)`, binds the product to result SSA slots via `BindProduct`
-7. Back in `interpret()`, returns `Advance` to move to the next statement
+2. `IfSeed::execute()` creates a `BlockSeed` and calls `.execute(interp)` which runs the block and returns the terminal effect
+3. The terminator is `scf.yield` → produces `Effect::Yield(v)`
+4. The seed matches `Yield(v)`, returns `BindProduct` to write the result to SSA slots
+5. Back in `interpret()`, returns `Advance` to move to the next statement

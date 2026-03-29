@@ -1,14 +1,14 @@
 # Example 9: Composed Dialect (Mixed Effects)
 
 When some sub-dialects have machine effects and others don't. This requires Lift impls
-for the composed effect type and `try_lift()` between GAT instantiations.
+for the composed effect type.
 
 ## Key Characteristics
 
 - Sub-dialects have different `Effect` types (`()` vs `MemoryEffect`)
 - The composed dialect defines a sum type for all machine effects
-- `try_lift()` converts between `I::Effect<SubDE>` and `I::Effect<ComposedDE>`
-- Framework-provided `Lift<I::Effect<DE>> for I::Effect<DE2>` when `DE2: Lift<DE>`
+- `Lift::lift` converts between `Effect<V, S, SubDE>` and `Effect<V, S, ComposedDE>`
+- Only the `Machine(de)` variant is transformed; all others pass through
 
 ## Code
 
@@ -41,37 +41,35 @@ where
     type Effect = MixedEffect;
     type Error = Infallible;
 
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect<MixedEffect>, I::Error<Infallible>> {
+    fn interpret(&self, interp: &mut I)
+        -> Result<Effect<I::Value, I::Seed, MixedEffect>, InterpError<Infallible>>
+    {
         match self {
-            Self::Add(op) => op.interpret(interp)?.try_lift(),
-            Self::Barrier(op) => op.interpret(interp)?.try_lift(),
+            Self::Add(op) => Ok(Lift::lift(op.interpret(interp)?)),
+            Self::Barrier(op) => Ok(Lift::lift(op.interpret(interp)?)),
         }
     }
 }
 ```
 
-## How try_lift Works Here
+## How Lift Works Here
 
-The framework provides a blanket Lift between GAT instantiations:
-
-```rust
-impl Lift<I::Effect<DE>> for I::Effect<DE2> where DE2: Lift<DE>
-```
+`Lift<Effect<V, S, DEA>> for Effect<V, S, DEC>` where `DEC: Lift<DEA>`:
 
 For each match arm:
 
-- **Add** returns `I::Effect<()>`. `try_lift()` converts to `I::Effect<MixedEffect>`:
-  - `Base(base)` → `Base(base)` (pass-through)
-  - `Execute(seed)` → `Execute(seed)` (pass-through)
+- **Add** returns `Effect<V, S, ()>`. `Lift::lift` converts to `Effect<V, S, MixedEffect>`:
+  - `Advance` → `Advance` (pass-through)
+  - `BindValue(s, v)` → `BindValue(s, v)` (pass-through)
   - `Machine(())` → unreachable (Add never produces machine effects)
 
-- **Barrier** returns `I::Effect<MemoryEffect>`. `try_lift()` converts to `I::Effect<MixedEffect>`:
-  - `Base(base)` → `Base(base)` (pass-through)
+- **Barrier** returns `Effect<V, S, MemoryEffect>`. `Lift::lift` converts to `Effect<V, S, MixedEffect>`:
   - `Machine(MemoryEffect::Barrier)` → `Machine(MixedEffect::Memory(Barrier))` via `Lift::lift`
+  - All other variants pass through unchanged
 
 ## The Lift<()> Impl
 
-`Lift<()> for MixedEffect` is needed because the framework Lift between GAT instantiations
-requires `MixedEffect: Lift<()>`. Since `Add` has `Effect = ()`, the composed type must be
+`Lift<()> for MixedEffect` is needed because the `Lift<Effect<V, S, ()>> for Effect<V, S, MixedEffect>`
+impl requires `MixedEffect: Lift<()>`. Since `Add` has `Effect = ()`, the composed type must be
 able to lift `()`. The impl is unreachable at runtime — Add never produces `Machine(())`
 variants — but the type system requires it.

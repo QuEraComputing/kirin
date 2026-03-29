@@ -9,7 +9,7 @@ We have experimented with interpreter designs in `kirin-interpreter` and `kirin-
 
 2. **No unified composition algebra.** interpreter-2 has ad-hoc `Lift` and `ProjectMachine`/`ProjectMachineMut` traits. Dialects, machines, effects, and errors each compose differently. We want a single Lift/Project algebra that works uniformly across all of these.
 
-3. **Error handling is fragmented.** interpreter-2 has multiple error types (`InterpreterError`, `ValueStore::Error`, `ConsumeEffect::Error`) with `From` conversion bounds scattered everywhere. We want errors to follow the same Lift/Project algebra as effects.
+3. **Error handling is fragmented.** interpreter-2 has multiple error types (`InterpreterError`, `ValueStore::Error`, `ConsumeEffect::Error`) with `From` conversion bounds scattered everywhere. We want errors to follow the same Lift algebra as effects.
 
 4. **Frames are over-exposed.** Frame management should be internal to the interpreter, not part of the public trait API.
 
@@ -17,13 +17,13 @@ We are starting a new design from scratch in `kirin-interpreter-3` based on thes
 
 ## Design Principles
 
-- **Lift/Project everywhere.** One algebra for composing dialects, machines, effects, and errors. Infallible (`Lift/Project`) and fallible (`TryLift/TryProject`) variants mirror `From/Into` and `TryFrom/TryInto`.
+- **Unified effect type.** A single `Effect<V, Seed, DE>` expresses everything — cursor control, value binding, completion, complex execution (seeds), and dialect machine effects. Both `Interpretable::interpret` and `Machine::consume_effect` use this same type.
+- **Lift/Project for composition.** `Lift<Effect<V, S, DEA>> for Effect<V, S, DEC>` handles composed dialects — only the `Machine(de)` variant is transformed. Same pattern for `InterpError<ME>`.
 - **Minimal trait surface.** Dialect authors see `Interpreter` (supertrait), `Interpretable`, `Execute` — that's it.
 - **Interpreter-specialized semantics.** `Interpretable<I>` is parameterized by the interpreter type because operational semantics depend on the interpreter (concrete vs abstract vs symbolic).
-- **GAT-based effect/error types.** `I::Effect<DE>` and `I::Error<ME>` are GATs parameterized by the dialect's own machine effect/error types. Uniform `try_lift()` for all conversions — no `Ok()` wrappers needed.
-- **Layered effects.** Base effects (shared by all interpreters) live in a `Base(...)` slot. Dialect machine effects live in a `Machine(DE)` slot. Interpreter-specific effects (Execute, Fork) are internal.
-- **Seeds for complex execution.** When a dialect needs to orchestrate multi-step execution (loops, nested block evaluation), it defines a custom seed type with an `Execute<I>` impl.
-- **Single-stage concrete first.** Focus on single-stage concrete interpretation, but leave room for abstract interpretation.
+- **Interpreter is a Machine.** `Interpreter: Machine` with `Machine::Effect = Effect<Self::Value, Self::Seed, Self::DialectEffect>`. The interpreter handles all effect variants and delegates `Machine(de)` to the dialect machine.
+- **Seeds for complex execution.** When a dialect needs to orchestrate multi-step execution (loops, nested block evaluation), it defines a custom seed type with an `Execute<I>` impl. Seeds consume `self`; dialect operations borrow `&self`.
+- **Single-stage concrete first.** Focus on single-stage concrete interpretation. Abstract interpreters express Fork as a machine effect.
 
 ## Running Example
 
@@ -50,13 +50,20 @@ struct MachineC { a: MachineA, b: MachineB }  // product composition
 
 ## Document Index
 
-- [lift_and_project.md](lift_and_project.md) — Lift/Project/TryLift/TryProject algebra
-- [machine.md](machine.md) — Machine trait, effect consumption, dialect machines
-- [effects.md](effects.md) — Layered effect types (BaseEffect, interpreter GAT, machine effects)
-- [errors.md](errors.md) — Error model (symmetric with effects, GAT-based)
-- [interpretable.md](interpretable.md) — Interpretable trait, Interpreter supertrait
-- [seed.md](seed.md) — Seed & Execute pattern for complex execution
-- [interpreter.md](interpreter.md) — Interpreter as a machine, SingleStage, execution loop
+### Traits
+- [traits/](traits/index.md) — trait hierarchy overview
+- [traits/lift_and_project.md](traits/lift_and_project.md) — Lift/Project/TryLift/TryProject algebra
+- [traits/machine.md](traits/machine.md) — Machine trait, two levels (dialect machines + interpreter)
+- [traits/effects.md](traits/effects.md) — Unified `Effect<V, Seed, DE>` type, Lift composition
+- [traits/errors.md](traits/errors.md) — `InterpError<ME>`, symmetric with effects
+- [traits/interpretable.md](traits/interpretable.md) — Interpretable, Interpreter, sub-traits
+- [traits/seed.md](traits/seed.md) — Execute trait, seed types, seed composition
+
+### Implementations
+- [interpreter.md](interpreter.md) — Interpreter overview, responsibilities
+- [single_stage.md](single_stage.md) — SingleStage concrete interpreter
+
+### Other
 - [multi_result.md](multi_result.md) — Product-based multi-result handling
 - [examples/](examples/index.md) — Complete API walkthrough with 10 examples
 
@@ -66,18 +73,17 @@ struct MachineC { a: MachineA, b: MachineB }  // product composition
 |---------|--------------|--------------|
 | Composition algebra | Ad-hoc Lift + ProjectMachine | Unified Lift/Project/TryLift/TryProject |
 | Trait surface | Machine, ConsumeEffect, Interpreter, Driver, Exec, Invoke, ResolveCallee, Position, Fuel, Breakpoints, Interrupt | Interpreter (Machine + ValueRead + PipelineAccess), Interpretable, Execute |
-| Dialect `interpret()` gets | `&mut I` (full interpreter) | `&mut I` (full interpreter, effect return as discipline) |
-| Dialect `interpret()` returns | Dialect-specific effect | `I::Effect<Self::Effect>` (GAT, uniform try_lift) |
+| Dialect `interpret()` gets | `&mut I` (full interpreter) | `&mut I` (full interpreter) |
+| Dialect `interpret()` returns | Dialect-specific effect | `Effect<I::Value, I::Seed, Self::Effect>` (direct construction) |
 | Type params on Interpretable | `<'ir, I>` | `<I: Interpreter>` (no lifetime) |
-| Effect model | Cursor -> Directive (two-level, fixed) | BaseEffect + GAT (layered, composable via Seq + Lift between GAT instantiations) |
-| Error model | Multiple types, From conversions | Same GAT algebra as effects, uniform try_lift |
+| Effect model | Cursor → Directive (two-level, fixed) | `Effect<V, Seed, DE>` (unified, composable via Lift) |
+| Error model | Multiple types, From conversions | `InterpError<ME>` (unified, composable via Lift) |
 | Seeds | Fixed Seed types on Machine | Open Execute trait, seeds are reusable |
 | Frames | Part of public trait API | Internal to interpreter |
 
 ## Deferred
 
-- **Abstract interpreter** — Fork effect, widening/narrowing, fixpoint loop. The GAT effect model leaves room.
+- **Abstract interpreter** — Fork as machine effect, widening/narrowing, fixpoint loop.
 - **Multi-stage interpretation** — stage switching, dynamic dialect dispatch across stages.
-- **Derive macros** — `#[derive(Interpretable)]` for the new trait. The composition pattern (match + try_lift) is mechanical and derivable.
-- **Builder patterns** — ergonomic effect construction helpers.
+- **Derive macros** — `#[derive(Interpretable)]` for the new trait. The composition pattern (match + Lift) is mechanical and derivable.
 - **Debugging features** — fuel, breakpoints, stepping. Interpreter-specific, addable without changing the trait algebra.

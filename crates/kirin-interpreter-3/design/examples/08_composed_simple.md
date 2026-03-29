@@ -7,7 +7,7 @@ This is the pattern for most current Kirin dialects composed into a language enu
 ## Key Characteristics
 
 - All sub-dialects have `Effect = ()` → composed effect is also `()`
-- No Lift, no `try_lift()` between GAT instantiations — direct pass-through
+- No Lift, no conversion — direct pass-through
 - Derivable via `#[derive(Interpretable)]` with `#[wraps]`
 
 ## Code
@@ -29,7 +29,9 @@ where
     type Effect = ();
     type Error = Infallible;
 
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect<()>, I::Error<Infallible>> {
+    fn interpret(&self, interp: &mut I)
+        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
+    {
         match self {
             Self::Add(op) => op.interpret(interp),
             Self::Branch(op) => op.interpret(interp),
@@ -41,6 +43,7 @@ where
 
 ## Why No Lift Is Needed
 
-Every sub-dialect returns `I::Effect<()>`. The composed dialect also returns `I::Effect<()>`.
-The types are identical — no conversion required. This is the simplest composition case and
-covers all current Kirin dialect crates (`kirin-arith`, `kirin-cf`, `kirin-scf`, `kirin-function`, etc.).
+Every sub-dialect returns `Effect<I::Value, I::Seed, ()>`. The composed dialect also returns
+`Effect<I::Value, I::Seed, ()>`. The types are identical — no conversion required. This is
+the simplest composition case and covers all current Kirin dialect crates (`kirin-arith`,
+`kirin-cf`, `kirin-scf`, `kirin-function`, etc.).

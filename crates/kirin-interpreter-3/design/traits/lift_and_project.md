@@ -104,6 +104,24 @@ impl<T> ProjectMut<T> for T {
 }
 ```
 
+## Usage in Interpreter-3
+
+The Lift/Project algebra is used at three levels:
+
+1. **Effect composition**: `Lift<Effect<V, S, DEA>> for Effect<V, S, DEC>` where `DEC: Lift<DEA>`.
+   Only the `Machine(de)` variant is transformed; all other effect variants pass through unchanged.
+   See [effects.md](effects.md).
+
+2. **Error composition**: `Lift<InterpError<MEA>> for InterpError<MEC>` where `MEC: Lift<MEA>`.
+   Same pattern — only the `Machine(me)` variant is transformed.
+   See [errors.md](errors.md).
+
+3. **Dialect machine composition**: `Lift<EffectA> for EffectC`, `Lift<ErrorA> for ErrorC` for
+   composing sub-dialect machine effects/errors into a parent enum. See [machine.md](machine.md).
+
+`TryProject` is used by seeds to pattern-match on terminal effects (e.g., extracting
+`Effect::Yield(v)` from a block's terminal effect).
+
 ## Implementation Plan
 
 Manual `Lift/Project` definitions first. Eventually move trait definitions into `kirin-ir` and

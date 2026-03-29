@@ -10,7 +10,7 @@ This is the pattern used by `kirin-function`.
 - Still `type Effect = ()` — no machine effects (the seed handles everything)
 - Uses `FunctionSeed` executed directly via `&mut I`
 - Callee resolved via `PipelineAccess::resolve_callee()` on the interpreter
-- No `CallEffect` type needed — seeds replace explicit Execute effects
+- Returns `Effect::Advance` after seed completes
 
 ## Code
 
@@ -29,7 +29,9 @@ where
     type Effect = ();
     type Error = Infallible;
 
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect<()>, I::Error<Infallible>> {
+    fn interpret(&self, interp: &mut I)
+        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
+    {
         let args: Vec<I::Value> = self.args.iter()
             .map(|a| interp.read(*a))
             .collect::<Result<_, _>>()?;
@@ -45,20 +47,20 @@ where
             results: self.results.clone(),
         }.execute(interp)?;
 
-        BaseEffect::Advance.try_lift()
+        Ok(Effect::Advance)
     }
 }
 ```
 
 ## Why Seeds Instead of Effects
 
-An earlier design had the dialect return `Execute(FunctionSeed)` as an effect. This was
+An earlier design had the dialect return `Effect::Execute(FunctionSeed)` as an effect. This was
 dropped because:
 
-1. **Orphan rule**: `CallEffect` (dialect crate) can't implement `Lift` for `SingleStageEffect`
+1. **Orphan rule**: `FunctionSeed` (dialect crate) can't implement `Lift` for `Effect`
    (interpreter crate) — neither crate owns both types.
 2. **Unnecessary indirection**: With `&mut I` access, the dialect can execute the seed directly.
-3. **Simpler API**: The dialect returns `BaseEffect::Advance` after the seed completes. No
+3. **Simpler API**: The dialect returns `Effect::Advance` after the seed completes. No
    custom effect type to define, no Lift to implement.
 
 The seed's `Execute<I>` impl has full `&mut I` access — it pushes frames, runs the function

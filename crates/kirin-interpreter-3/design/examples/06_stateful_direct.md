@@ -8,7 +8,7 @@ simple path for concrete interpreters — no machine effects needed.
 - The dialect defines a machine struct (`MemoryMachine`)
 - `I: Interpreter + ProjectMut<MemoryMachine>` — additional per-dialect bound
 - Sequential borrows: read values first, then project machine — no borrow conflicts
-- Still returns `BaseEffect` — the mutation happens in-place, not through effects
+- Still returns base `Effect` variants — the mutation happens in-place, not through effects
 
 ## Code
 
@@ -30,7 +30,9 @@ where
     type Effect = ();
     type Error = Infallible;
 
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect<()>, I::Error<Infallible>> {
+    fn interpret(&self, interp: &mut I)
+        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
+    {
         // Read values first (borrows interp immutably)
         let addr: u64 = interp.read(self.addr)?.into();
         let value = interp.read(self.value)?;
@@ -39,7 +41,7 @@ where
         let mem: &mut MemoryMachine = interp.project_mut();
         mem.storage.insert(addr, value.as_ref().to_vec());
 
-        BaseEffect::Advance.try_lift()
+        Ok(Effect::Advance)
     }
 }
 ```

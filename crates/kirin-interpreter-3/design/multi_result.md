@@ -51,12 +51,13 @@ trait ProductValue: Sized + Clone {
 
 ## Integration with Effects
 
-In interpreter-3, multi-result binding is expressed via the `BindProduct` base effect:
+In interpreter-3, multi-result binding is expressed via the `BindProduct` variant of the
+unified `Effect` type:
 
 ```rust
-BaseEffect::BindProduct(Product<ResultValue>, V)
+Effect::BindProduct(Product<ResultValue>, V)
 ```
 
-The interpreter's `consume_base` handler auto-destructures the product value into the individual
+The interpreter's `consume_effect` handler auto-destructures the product value into the individual
 result SSA slots using `ProductValue`. This replaces interpreter-2's `ValueStore::write_product`
 method — the operation is the same, but expressed as an effect rather than a direct mutation.

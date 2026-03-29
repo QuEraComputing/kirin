@@ -8,7 +8,7 @@ This is the pattern used by `kirin-arith`, `kirin-bitwise`, `kirin-cmp`, and `ki
 
 - `type Effect = ()` — no machine effects
 - `type Error = Infallible` — no custom errors, only InterpreterError from value reads
-- Returns `BaseEffect` (bind result + advance cursor) via `try_lift()`
+- Returns `Effect` variants directly (BindValue + Advance)
 
 ## Code
 
@@ -27,11 +27,13 @@ where
     type Effect = ();
     type Error = Infallible;
 
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect<()>, I::Error<Infallible>> {
+    fn interpret(&self, interp: &mut I)
+        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
+    {
         let a = interp.read(self.lhs)?;
         let b = interp.read(self.rhs)?;
         let result = a + b;
-        BaseEffect::BindValue(self.result, result).then(BaseEffect::Advance).try_lift()
+        Ok(Effect::BindValue(self.result, result).then(Effect::Advance))
     }
 }
 ```
@@ -39,10 +41,8 @@ where
 ## Step-by-Step
 
 1. `interp.read(self.lhs)` — reads SSA value via `ValueRead` trait. Returns `Result<I::Value, InterpreterError>`.
-2. `?` propagates `InterpreterError` → converted to `I::Error<Infallible>` via `TryLift<InterpreterError>`.
-3. `BaseEffect::BindValue(...).then(...)` — constructs `BaseEffect::Seq([BindValue, Advance])`.
-4. `.try_lift()` — converts `BaseEffect<V>` into `Result<I::Effect<()>, ...>` via
-   `TryLift<BaseEffect<V>>` on `I::Effect<()>`. The error is `Infallible` (always succeeds).
+2. `?` propagates `InterpreterError` → converted to `InterpError<Infallible>` via `From<InterpreterError>`.
+3. `Effect::BindValue(...).then(Effect::Advance)` — constructs `Effect::Seq([BindValue, Advance])`.
+4. `Ok(...)` — wraps the effect in the Ok position of the result.
 
-The dialect never references `SingleStageEffect` or any concrete interpreter type — it only
-uses `I::Effect<()>` and `try_lift()`.
+The dialect constructs `Effect` variants directly — no `try_lift()`, no GAT, no indirection.

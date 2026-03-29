@@ -22,10 +22,10 @@ struct ForLoopSeed<V> {
     results: Product<ResultValue>,
 }
 
-impl<I: Machine> Execute<I> for ForLoopSeed<V>
+impl<I: Interpreter> Execute<I> for ForLoopSeed<I::Value>
 where
-    V: ForLoopValue + ProductValue,
-    BlockSeed<V>: Execute<I>,
+    I::Value: ForLoopValue + ProductValue,
+    BlockSeed<I::Value>: Execute<I>,
 {
     fn execute(self, interp: &mut I) -> Result<I::Effect, I::Error> {
         let mut iv = self.start;
@@ -35,20 +35,19 @@ where
             let args = smallvec![iv.clone(), carried];
             let terminal = BlockSeed::new(self.body, args).execute(interp)?;
 
-            match terminal.try_project() {
-                Ok(BaseEffect::Yield(v)) => { carried = v; }
-                _ => return InterpreterError::unsupported("expected yield from for body").try_lift(),
+            match terminal {
+                Effect::Yield(v) => { carried = v; }
+                _ => return Err(
+                    InterpreterError::unsupported("expected yield from for body").into()
+                ),
             }
 
             iv = iv.loop_step(&self.step).ok_or_else(|| {
-                InterpreterError::message("induction variable overflow")
+                InterpError::from(InterpreterError::message("induction variable overflow"))
             })?;
         }
 
-        BaseEffect::Seq(smallvec![
-            BaseEffect::BindProduct(self.results, carried),
-            BaseEffect::Advance,
-        ]).try_lift()
+        Ok(Effect::BindProduct(self.results, carried).then(Effect::Advance))
     }
 }
 ```
@@ -58,7 +57,7 @@ where
 1. Initialize induction variable `iv` and carried state from seed fields
 2. Loop while `iv < end`:
    a. Pack `[iv, carried]` as block args
-   b. Execute `BlockSeed` → runs the for body
+   b. Create `BlockSeed`, call `.execute(interp)` → runs the for body
    c. Match terminal: expect `Yield(v)` → update carried state
    d. Step the induction variable
 3. After loop: bind final carried state to results, advance cursor
@@ -73,9 +72,11 @@ hatch for this pattern.
 Compare with the dialect's `interpret()`, which just creates the seed and delegates:
 
 ```rust
-fn interpret(&self, interp: &mut I) -> Result<I::Effect<()>, I::Error<Infallible>> {
+fn interpret(&self, interp: &mut I)
+    -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
+{
     // Read loop bounds, create ForLoopSeed, execute it
     ForLoopSeed { start, end, step, body, init, results }.execute(interp)?;
-    BaseEffect::Advance.try_lift()
+    Ok(Effect::Advance)
 }
 ```
