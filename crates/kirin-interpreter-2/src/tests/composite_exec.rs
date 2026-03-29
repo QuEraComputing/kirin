@@ -70,14 +70,10 @@ where
     interp.step()
 }
 
-fn unsupported(message: &'static str) -> InterpreterError {
-    InterpreterError::custom(std::io::Error::other(message))
-}
-
 fn expect_i64(value: ArithValue) -> Result<i64, InterpreterError> {
     match value {
         ArithValue::I64(value) => Ok(value),
-        _ => Err(unsupported("unsupported arith value in MVP semantics")),
+        _ => InterpreterError::unsupported_err("unsupported arith value in MVP semantics"),
     }
 }
 
@@ -109,7 +105,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for Arith<ArithType> {
                 interp.write(*result, ArithValue::I64(lhs + rhs))?;
                 Ok(TestEffect::Advance)
             }
-            _ => Err(unsupported("unsupported arith op in MVP semantics")),
+            _ => InterpreterError::unsupported_err("unsupported arith op in MVP semantics"),
         }
     }
 }
@@ -140,7 +136,7 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ControlFlow<ArithType> {
                 let values = interp.read_many(args)?;
                 Ok(TestEffect::Replace(BlockSeed::new(block, values)))
             }
-            _ => Err(unsupported("unsupported control-flow op in MVP semantics")),
+            _ => InterpreterError::unsupported_err("unsupported control-flow op in MVP semantics"),
         }
     }
 }
@@ -153,12 +149,12 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for Return<ArithType> {
         let values: Vec<_> = self.arguments().copied().collect();
         match values.as_slice() {
             [value] => Ok(TestEffect::Return(interp.read(*value)?)),
-            [] => Err(unsupported(
+            [] => InterpreterError::unsupported_err(
                 "void return is not supported in the MVP semantics",
-            )),
-            _ => Err(unsupported(
+            ),
+            _ => InterpreterError::unsupported_err(
                 "multi-value return is not supported in the MVP semantics",
-            )),
+            ),
         }
     }
 }
@@ -168,9 +164,9 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for FunctionBody<ArithType> {
     type Error = InterpreterError;
 
     fn interpret(&self, _interp: &mut TestInterp<'ir>) -> Result<TestEffect, Self::Error> {
-        Err(unsupported(
+        InterpreterError::unsupported_err(
             "function bodies are structural and should not be stepped directly",
-        ))
+        )
     }
 }
 

@@ -242,7 +242,6 @@ where
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
 {
     type Machine = M;
-    type Error = E;
 
     fn machine(&self) -> &Self::Machine {
         &self.machine
@@ -254,7 +253,7 @@ where
 
     fn interpret_current(
         &mut self,
-    ) -> Result<<Self::Machine as Machine<'ir>>::Effect, <Self as Interpreter<'ir>>::Error> {
+    ) -> Result<<Self::Machine as Machine<'ir>>::Effect, Self::Error> {
         let stage = self.stage_info_for(self.active_stage());
         let stmt = self.current_statement_result().map_err(E::from)?;
         let definition = stmt.definition(stage);
@@ -266,7 +265,7 @@ where
         effect: <Self::Machine as Machine<'ir>>::Effect,
     ) -> Result<
         Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
-        <Self as Interpreter<'ir>>::Error,
+        Self::Error,
     > {
         self.machine.consume_effect(effect).map_err(Into::into)
     }
@@ -277,7 +276,7 @@ where
             <Self::Machine as Machine<'ir>>::Stop,
             <Self::Machine as Machine<'ir>>::Seed,
         >,
-    ) -> Result<(), <Self as Interpreter<'ir>>::Error> {
+    ) -> Result<(), Self::Error> {
         self.apply_control(control)
     }
 }
@@ -323,7 +322,7 @@ where
         callee: kirin_ir::SpecializedFunction,
         args: &[Self::Value],
         results: &[kirin_ir::ResultValue],
-    ) -> Result<(), <Self as Interpreter<'ir>>::Error> {
+    ) -> Result<(), Self::Error> {
         let continuation = self.prepare_invoke(results).map_err(E::from)?;
         let stage = self.active_stage();
         let entry = self.entry_block(callee).map_err(E::from)?;
@@ -342,10 +341,7 @@ where
     fn return_current(
         &mut self,
         value: Self::Value,
-    ) -> Result<
-        Directive<Self::Value, <Self::Machine as Machine<'ir>>::Seed>,
-        <Self as Interpreter<'ir>>::Error,
-    > {
+    ) -> Result<Directive<Self::Value, <Self::Machine as Machine<'ir>>::Seed>, Self::Error> {
         let frame = self.frames.pop::<InterpreterError>().map_err(E::from)?;
         let (_, _, _, activation) = frame.into_parts();
         let Some(continuation) = activation.continuation else {
@@ -379,7 +375,7 @@ where
         &self,
         query: callee::Query,
         args: &[Self::Value],
-    ) -> Result<kirin_ir::SpecializedFunction, <Self as Interpreter<'ir>>::Error> {
+    ) -> Result<kirin_ir::SpecializedFunction, Self::Error> {
         let stage_id = match query.stage() {
             callee::Stage::Current => self.active_stage(),
             callee::Stage::Exact(stage) => stage,
@@ -409,9 +405,9 @@ where
                 .map_err(E::from),
             policy => {
                 let _ = args;
-                Err(InterpreterError::custom(std::io::Error::other(format!(
+                Err(InterpreterError::message(format!(
                     "{policy:?} callee resolution is not yet implemented in SingleStage",
-                )))
+                ))
                 .into())
             }
         }

@@ -1,29 +1,20 @@
 use kirin::prelude::CompileTimeValue;
-use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    BlockSeed, Interpretable, Interpreter, InterpreterError, ValueStore, effect::Cursor,
+    BlockSeed, BranchCondition, Interpretable, Interpreter, InterpreterError, effect::Cursor,
 };
 
 use crate::ControlFlow;
 
-fn unsupported(message: &'static str) -> kirin_interpreter_2::InterpreterError {
-    kirin_interpreter_2::InterpreterError::custom(std::io::Error::other(message))
-}
-
 impl<'ir, I, T> Interpretable<'ir, I> for ControlFlow<T>
 where
-    I: Interpreter<'ir> + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
-    <I as ValueStore>::Value: Clone + BranchCondition,
-    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
+    I: Interpreter<'ir>,
+    I::Value: Clone + BranchCondition,
     T: CompileTimeValue,
 {
-    type Effect = Cursor<BlockSeed<<I as ValueStore>::Value>>;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Effect = Cursor<BlockSeed<I::Value>>;
+    type Error = I::Error;
 
-    fn interpret(
-        &self,
-        interp: &mut I,
-    ) -> Result<Cursor<BlockSeed<<I as ValueStore>::Value>>, Self::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<Cursor<BlockSeed<I::Value>>, Self::Error> {
         match self {
             ControlFlow::Branch { target, args } => {
                 let values = interp.read_many(args)?;
@@ -41,7 +32,7 @@ where
                     match cond.is_truthy() {
                         Some(true) => (true_target.target(), true_args.as_slice()),
                         Some(false) => (false_target.target(), false_args.as_slice()),
-                        None => return Err(unsupported(
+                        None => return Err(InterpreterError::unsupported(
                             "nondeterministic branch conditions are not supported in interpreter2",
                         )
                         .into()),

@@ -20,16 +20,14 @@ pub trait ProductValue: Sized + Clone {
         self.as_product()
             .and_then(|product| product.get(index).cloned())
             .ok_or_else(|| {
-                InterpreterError::custom(std::io::Error::other(format!(
-                    "product index {index} out of bounds"
-                )))
+                InterpreterError::message(format!("product index {index} out of bounds"))
             })
     }
 
     fn len(&self) -> Result<usize, InterpreterError> {
         self.as_product()
             .map(Product::len)
-            .ok_or_else(|| InterpreterError::custom(std::io::Error::other("expected product")))
+            .ok_or_else(|| InterpreterError::message("expected product"))
     }
 
     fn is_empty(&self) -> Result<bool, InterpreterError> {

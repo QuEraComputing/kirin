@@ -6,16 +6,14 @@ use crate::{
 use crate::InterpreterError;
 
 /// Typed single-stage shell contract over one top-level machine.
-pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
+pub trait Interpreter<'ir>: ValueStore<Error: From<InterpreterError>> + StageAccess<'ir> {
     type Machine: Machine<'ir> + ConsumeEffect<'ir>;
-    type Error: From<InterpreterError>;
 
     fn machine(&self) -> &Self::Machine;
     fn machine_mut(&mut self) -> &mut Self::Machine;
 
-    fn interpret_current(
-        &mut self,
-    ) -> Result<<Self::Machine as Machine<'ir>>::Effect, <Self as Interpreter<'ir>>::Error>;
+    fn interpret_current(&mut self)
+    -> Result<<Self::Machine as Machine<'ir>>::Effect, Self::Error>;
 
     #[allow(clippy::type_complexity)]
     fn consume_effect(
@@ -23,7 +21,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
         effect: <Self::Machine as Machine<'ir>>::Effect,
     ) -> Result<
         Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
-        <Self as Interpreter<'ir>>::Error,
+        Self::Error,
     >;
 
     fn consume_control(
@@ -32,7 +30,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
             <Self::Machine as Machine<'ir>>::Stop,
             <Self::Machine as Machine<'ir>>::Seed,
         >,
-    ) -> Result<(), <Self as Interpreter<'ir>>::Error>;
+    ) -> Result<(), Self::Error>;
 
     fn project_machine<'a, Sub: ?Sized>(&'a self) -> &'a Sub
     where
@@ -52,14 +50,11 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
         self.machine_mut().project_mut()
     }
 
-    fn interpret_local<D>(
-        &mut self,
-        stmt: &D,
-    ) -> Result<D::Effect, <Self as Interpreter<'ir>>::Error>
+    fn interpret_local<D>(&mut self, stmt: &D) -> Result<D::Effect, Self::Error>
     where
         Self: Sized,
         D: Interpretable<'ir, Self>,
-        D::Error: Into<<Self as Interpreter<'ir>>::Error>,
+        D::Error: Into<Self::Error>,
     {
         stmt.interpret(self).map_err(Into::into)
     }
@@ -67,12 +62,12 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     fn interpret_lifted<D>(
         &mut self,
         stmt: &D,
-    ) -> Result<<Self::Machine as Machine<'ir>>::Effect, <Self as Interpreter<'ir>>::Error>
+    ) -> Result<<Self::Machine as Machine<'ir>>::Effect, Self::Error>
     where
         Self: Sized,
         D: Interpretable<'ir, Self>,
         D::Effect: Lift<<Self::Machine as Machine<'ir>>::Effect>,
-        D::Error: Into<<Self as Interpreter<'ir>>::Error>,
+        D::Error: Into<Self::Error>,
     {
         stmt.interpret(self).map_err(Into::into).map(Lift::lift)
     }
@@ -80,15 +75,12 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     fn consume_local_effect<Sub>(
         &mut self,
         effect: <Sub as Machine<'ir>>::Effect,
-    ) -> Result<
-        Directive<<Sub as Machine<'ir>>::Stop, <Sub as Machine<'ir>>::Seed>,
-        <Self as Interpreter<'ir>>::Error,
-    >
+    ) -> Result<Directive<<Sub as Machine<'ir>>::Stop, <Sub as Machine<'ir>>::Seed>, Self::Error>
     where
         Self: Sized,
         Sub: Machine<'ir> + ConsumeEffect<'ir>,
         Self::Machine: ProjectMachineMut<Sub>,
-        <Sub as ConsumeEffect<'ir>>::Error: Into<<Self as Interpreter<'ir>>::Error>,
+        <Sub as ConsumeEffect<'ir>>::Error: Into<Self::Error>,
     {
         self.project_machine_mut::<Sub>()
             .consume_effect(effect)
@@ -101,7 +93,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
         effect: E,
     ) -> Result<
         Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
-        <Self as Interpreter<'ir>>::Error,
+        Self::Error,
     >
     where
         Self: Sized,
@@ -113,7 +105,7 @@ pub trait Interpreter<'ir>: ValueStore + StageAccess<'ir> {
     fn consume_local_control<S>(
         &mut self,
         control: Directive<S, <Self::Machine as Machine<'ir>>::Seed>,
-    ) -> Result<(), <Self as Interpreter<'ir>>::Error>
+    ) -> Result<(), Self::Error>
     where
         Self: Sized,
         S: Lift<<Self::Machine as Machine<'ir>>::Stop>,

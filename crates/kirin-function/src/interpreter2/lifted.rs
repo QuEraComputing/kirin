@@ -7,23 +7,19 @@ use kirin_interpreter_2::{
 
 use crate::{Bind, Call, FunctionBody, Lifted, Return};
 
-fn unsupported(message: &'static str) -> InterpreterError {
-    InterpreterError::custom(std::io::Error::other(message))
-}
-
 impl<'ir, I, T> Interpretable<'ir, I> for FunctionBody<T>
 where
     I: Interpreter<'ir>,
     T: CompileTimeValue,
 {
-    type Effect = Directive<
-        <I as kirin_interpreter_2::ValueStore>::Value,
-        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
-    >;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
+    type Error = I::Error;
 
     fn interpret(&self, _interp: &mut I) -> Result<Self::Effect, Self::Error> {
-        Err(unsupported("function bodies are structural and should not be stepped directly").into())
+        Err(InterpreterError::unsupported(
+            "function bodies are structural and should not be stepped directly",
+        )
+        .into())
     }
 }
 
@@ -32,14 +28,11 @@ where
     I: Interpreter<'ir>,
     T: CompileTimeValue,
 {
-    type Effect = Directive<
-        <I as kirin_interpreter_2::ValueStore>::Value,
-        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
-    >;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
+    type Error = I::Error;
 
     fn interpret(&self, _interp: &mut I) -> Result<Self::Effect, Self::Error> {
-        Err(unsupported("bind is not yet supported in interpreter2").into())
+        Err(InterpreterError::unsupported("bind is not yet supported in interpreter2").into())
     }
 }
 
@@ -51,25 +44,20 @@ where
     fn resolve_call(
         &self,
         interp: &I,
-        args: &[<I as kirin_interpreter_2::ValueStore>::Value],
-    ) -> Result<kirin::prelude::SpecializedFunction, <I as Interpreter<'ir>>::Error> {
+        args: &[I::Value],
+    ) -> Result<kirin::prelude::SpecializedFunction, I::Error> {
         interp.callee().symbol(self.target()).args(args)
     }
 }
 
 impl<'ir, I, T> Interpretable<'ir, I> for Call<T>
 where
-    I: Invoke<'ir>
-        + ResolveCallee<'ir>
-        + kirin_interpreter_2::ValueStore<Error = <I as Interpreter<'ir>>::Error>,
+    I: Invoke<'ir> + ResolveCallee<'ir>,
     T: CompileTimeValue,
-    <I as kirin_interpreter_2::ValueStore>::Value: Clone,
+    I::Value: Clone,
 {
-    type Effect = Directive<
-        <I as kirin_interpreter_2::ValueStore>::Value,
-        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
-    >;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
+    type Error = I::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error> {
         let args = interp.read_many(self.args())?;
@@ -81,37 +69,27 @@ where
 
 impl<'ir, I, T> Interpretable<'ir, I> for Return<T>
 where
-    I: Invoke<'ir> + kirin_interpreter_2::ValueStore<Error = <I as Interpreter<'ir>>::Error>,
+    I: Invoke<'ir>,
     T: CompileTimeValue,
-    <I as kirin_interpreter_2::ValueStore>::Value: Clone + ProductValue,
+    I::Value: Clone + ProductValue,
 {
-    type Effect = Directive<
-        <I as kirin_interpreter_2::ValueStore>::Value,
-        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
-    >;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
+    type Error = I::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error> {
-        let product = <I as kirin_interpreter_2::ValueStore>::Value::new_product(
-            interp.read_many(&self.values)?,
-        );
+        let product = I::Value::new_product(interp.read_many(&self.values)?);
         interp.return_current(product)
     }
 }
 
 impl<'ir, I, T> Interpretable<'ir, I> for Lifted<T>
 where
-    I: Invoke<'ir>
-        + ResolveCallee<'ir>
-        + kirin_interpreter_2::ValueStore<Error = <I as Interpreter<'ir>>::Error>,
+    I: Invoke<'ir> + ResolveCallee<'ir>,
     T: CompileTimeValue,
-    <I as kirin_interpreter_2::ValueStore>::Value: Clone + ProductValue,
+    I::Value: Clone + ProductValue,
 {
-    type Effect = Directive<
-        <I as kirin_interpreter_2::ValueStore>::Value,
-        <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
-    >;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Effect = Directive<I::Value, <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>;
+    type Error = I::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error> {
         match self {

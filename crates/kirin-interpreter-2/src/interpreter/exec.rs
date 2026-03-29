@@ -1,4 +1,4 @@
-use crate::{BlockSeed, InterpreterError, Machine, ProductValue, ValueStore, control::Directive};
+use crate::{BlockSeed, Machine, ProductValue, control::Directive};
 
 use super::{Interpreter, Position, TypedStage};
 
@@ -6,10 +6,7 @@ use super::{Interpreter, Position, TypedStage};
 ///
 /// Minimal trait — bounds go on implementations, not on the trait itself.
 pub trait Exec<'ir, Seed>: Interpreter<'ir> {
-    fn exec(
-        &mut self,
-        seed: Seed,
-    ) -> Result<Option<<Self as ValueStore>::Value>, <Self as Interpreter<'ir>>::Error>;
+    fn exec(&mut self, seed: Seed) -> Result<Option<Self::Value>, Self::Error>;
 }
 
 /// Execute a block seed inline: push the block (with args) onto the cursor
@@ -23,17 +20,12 @@ pub trait Exec<'ir, Seed>: Interpreter<'ir> {
 /// interpreter types delegate their `Exec` impl to this function.
 pub fn exec_block<'ir, I>(
     interp: &mut I,
-    seed: BlockSeed<<I as ValueStore>::Value>,
-) -> Result<Option<<I as ValueStore>::Value>, <I as Interpreter<'ir>>::Error>
+    seed: BlockSeed<I::Value>,
+) -> Result<Option<I::Value>, I::Error>
 where
-    I: Interpreter<'ir>
-        + Position<'ir>
-        + TypedStage<'ir>
-        + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
-    <I as ValueStore>::Value: ProductValue,
-    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
-    BlockSeed<<I as ValueStore>::Value>:
-        Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
+    I: Interpreter<'ir> + Position<'ir> + TypedStage<'ir>,
+    I::Value: ProductValue,
+    BlockSeed<I::Value>: Into<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed>,
 {
     let block = seed.block();
     let stage = interp.stage_info();
@@ -57,13 +49,11 @@ where
     // Read terminator yields into a product
     let product = if let Some(term) = terminator {
         let stage = interp.stage_info();
-        let values: Vec<<I as ValueStore>::Value> = term
+        let values: Vec<I::Value> = term
             .arguments(stage)
             .map(|ssa| interp.read(*ssa))
             .collect::<Result<_, _>>()?;
-        Some(<<I as ValueStore>::Value as ProductValue>::new_product(
-            values,
-        ))
+        Some(<I::Value as ProductValue>::new_product(values))
     } else {
         None
     };

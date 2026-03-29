@@ -159,10 +159,10 @@ where
     I: Interpreter<'ir>,
     D: crate::Interpretable<'ir, I>,
     D::Effect: Lift<<I::Machine as Machine<'ir>>::Effect>,
-    D::Error: Into<<I as Interpreter<'ir>>::Error>,
+    D::Error: Into<I::Error>,
 {
     type Effect = <I::Machine as Machine<'ir>>::Effect;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Error = I::Error;
 
     fn interpret(
         &self,

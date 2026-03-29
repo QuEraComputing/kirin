@@ -6,8 +6,8 @@ use super::Interpreter;
 
 pub mod callee {
     use super::{
-        CompileStage, Function, Interpreter, PhantomData, ResolveCallee, SpecializedFunction,
-        StagedFunction, Symbol,
+        CompileStage, Function, PhantomData, ResolveCallee, SpecializedFunction, StagedFunction,
+        Symbol,
     };
 
     #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -263,10 +263,7 @@ pub mod callee {
             self
         }
 
-        pub fn args(
-            self,
-            args: &[I::Value],
-        ) -> Result<SpecializedFunction, <I as Interpreter<'ir>>::Error> {
+        pub fn args(self, args: &[I::Value]) -> Result<SpecializedFunction, I::Error> {
             self.interp.resolve_query(self.query, args)
         }
     }
@@ -274,11 +271,7 @@ pub mod callee {
 
 /// Request-side call resolution for call-like statements.
 pub trait ResolveCall<'ir, I: Interpreter<'ir>> {
-    fn resolve_call(
-        &self,
-        interp: &I,
-        args: &[I::Value],
-    ) -> Result<SpecializedFunction, <I as Interpreter<'ir>>::Error>;
+    fn resolve_call(&self, interp: &I, args: &[I::Value]) -> Result<SpecializedFunction, I::Error>;
 }
 
 /// Interpreter-side resolution for function callees.
@@ -294,5 +287,5 @@ pub trait ResolveCallee<'ir>: Interpreter<'ir> {
         &self,
         query: callee::Query,
         args: &[Self::Value],
-    ) -> Result<SpecializedFunction, <Self as Interpreter<'ir>>::Error>;
+    ) -> Result<SpecializedFunction, Self::Error>;
 }

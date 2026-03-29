@@ -5,10 +5,9 @@ use kirin::prelude::*;
 use kirin_arith::{ArithType, ArithValue};
 use kirin_constant::Constant;
 use kirin_function::{FunctionBody, Return};
-use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    BlockSeed, ConsumeEffect, Cursor, Interpretable, InterpreterError, Lift, Machine, ProductValue,
-    ValueStore, control::Directive, interpreter::SingleStage,
+    BlockSeed, BranchCondition, ConsumeEffect, Cursor, Interpretable, InterpreterError, Lift,
+    Machine, ProductValue, ValueStore, control::Directive, interpreter::SingleStage,
 };
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
@@ -29,9 +28,9 @@ impl TryFrom<ArithValue> for TestValue {
     fn try_from(value: ArithValue) -> Result<Self, Self::Error> {
         match value {
             ArithValue::I64(v) => Ok(TestValue::I64(v)),
-            _ => Err(InterpreterError::custom(std::io::Error::other(
-                "only i64 arith constants are supported in SCF tests",
-            ))),
+            _ => {
+                InterpreterError::message_err("only i64 arith constants are supported in SCF tests")
+            }
         }
     }
 }
@@ -138,10 +137,6 @@ type TestInterp<'ir> = SingleStage<'ir, ScfTestLang, TestValue, TestMachine, Int
 // Interpretable impl — single dispatch for the whole language
 // ---------------------------------------------------------------------------
 
-fn unsupported(message: &'static str) -> InterpreterError {
-    InterpreterError::custom(std::io::Error::other(message))
-}
-
 impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ScfTestLang {
     type Effect = TestEffect;
     type Error = InterpreterError;
@@ -162,15 +157,15 @@ impl<'ir> Interpretable<'ir, TestInterp<'ir>> for ScfTestLang {
                 interp.write(op.result, value)?;
                 Ok(TestEffect::Advance)
             }
-            ScfTestLang::FunctionBody(_) => Err(unsupported(
+            ScfTestLang::FunctionBody(_) => InterpreterError::unsupported_err(
                 "function bodies are structural and should not be stepped directly",
-            )),
+            ),
             ScfTestLang::Return(op) => {
                 let values: Vec<_> = op.arguments().copied().collect();
                 match values.as_slice() {
                     [value] => Ok(TestEffect::Return(interp.read(*value)?)),
-                    [] => Err(unsupported("void return not supported in test")),
-                    _ => Err(unsupported("multi-return not supported in test")),
+                    [] => InterpreterError::unsupported_err("void return not supported in test"),
+                    _ => InterpreterError::unsupported_err("multi-return not supported in test"),
                 }
             }
         }

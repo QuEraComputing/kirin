@@ -185,9 +185,9 @@ where
     ) -> Result<SpecializedFunction, InterpreterError> {
         let stage = self.stage_info_for(stage_id);
         let staged_info = staged_function.get_info(stage).ok_or_else(|| {
-            InterpreterError::custom(std::io::Error::other(format!(
+            InterpreterError::message(format!(
                 "missing staged function info for {staged_function:?} at stage {stage_id:?}"
-            )))
+            ))
         })?;
 
         staged_info

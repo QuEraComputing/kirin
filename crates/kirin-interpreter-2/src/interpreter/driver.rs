@@ -2,7 +2,7 @@ use kirin_ir::Statement;
 
 use super::{Interpreter, Position};
 use crate::{
-    Machine,
+    Machine, ValueStore,
     control::{Breakpoints, Directive, Fuel, Interrupt},
     result::{Run, Step, Stepped, Suspension},
 };
@@ -13,13 +13,11 @@ pub type StepResult<'ir, I> = Result<
         <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Stop,
         <<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Seed,
     >,
-    <I as Interpreter<'ir>>::Error,
+    <I as ValueStore>::Error,
 >;
 
-pub type RunResult<'ir, I> = Result<
-    Run<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Stop>,
-    <I as Interpreter<'ir>>::Error,
->;
+pub type RunResult<'ir, I> =
+    Result<Run<<<I as Interpreter<'ir>>::Machine as Machine<'ir>>::Stop>, <I as ValueStore>::Error>;
 
 /// Shared driver loop for typed shells and typed stage views.
 pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + Interrupt {

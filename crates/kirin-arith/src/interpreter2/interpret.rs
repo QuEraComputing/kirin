@@ -18,18 +18,18 @@ impl std::error::Error for DivisionByZero {}
 
 impl<'ir, I, T> Interpretable<'ir, I> for Arith<T>
 where
-    I: Interpreter<'ir> + kirin_interpreter_2::ValueStore<Error = <I as Interpreter<'ir>>::Error>,
-    <I as kirin_interpreter_2::ValueStore>::Value: Clone
-        + Add<Output = <I as kirin_interpreter_2::ValueStore>::Value>
-        + Sub<Output = <I as kirin_interpreter_2::ValueStore>::Value>
-        + Mul<Output = <I as kirin_interpreter_2::ValueStore>::Value>
+    I: Interpreter<'ir>,
+    I::Value: Clone
+        + Add<Output = I::Value>
+        + Sub<Output = I::Value>
+        + Mul<Output = I::Value>
         + CheckedDiv
         + CheckedRem
-        + Neg<Output = <I as kirin_interpreter_2::ValueStore>::Value>,
+        + Neg<Output = I::Value>,
     T: CompileTimeValue,
 {
     type Effect = Cursor;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Error = I::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor, Self::Error> {
         match self {

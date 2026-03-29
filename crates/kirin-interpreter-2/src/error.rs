@@ -57,6 +57,10 @@ pub enum InterpreterError {
     },
     #[error("invalid shell control transition: {0}")]
     InvalidControl(&'static str),
+    #[error("unsupported: {0}")]
+    Unsupported(&'static str),
+    #[error("{0}")]
+    Message(String),
     #[error(transparent)]
     Custom(Box<dyn std::error::Error + Send + Sync>),
 }
@@ -64,6 +68,22 @@ pub enum InterpreterError {
 impl InterpreterError {
     pub fn custom(error: impl std::error::Error + Send + Sync + 'static) -> Self {
         Self::Custom(Box::new(error))
+    }
+
+    pub fn unsupported(message: &'static str) -> Self {
+        Self::Unsupported(message)
+    }
+
+    pub fn unsupported_err<T>(message: &'static str) -> Result<T, Self> {
+        Err(Self::Unsupported(message))
+    }
+
+    pub fn message(msg: impl std::fmt::Display) -> Self {
+        Self::Message(msg.to_string())
+    }
+
+    pub fn message_err<T>(msg: impl std::fmt::Display) -> Result<T, Self> {
+        Err(Self::Message(msg.to_string()))
     }
 
     pub fn missing_entry_block() -> Self {

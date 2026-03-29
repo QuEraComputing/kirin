@@ -8,10 +8,9 @@ use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
-use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    BlockSeed, ConsumeEffect, Interpretable, InterpreterError, Machine, ProductValue,
-    control::Directive, effect::Cursor, interpreter::SingleStage,
+    BlockSeed, BranchCondition, ConsumeEffect, Interpretable, InterpreterError, Machine,
+    ProductValue, control::Directive, effect::Cursor, interpreter::SingleStage,
 };
 
 use crate::{Bind, Call, FunctionBody, Return};
@@ -57,14 +56,10 @@ impl ProductValue for TestValue {
     }
 }
 
-fn unsupported(message: &'static str) -> InterpreterError {
-    InterpreterError::custom(std::io::Error::other(message))
-}
-
 fn expect_i64(value: &TestValue) -> Result<i64, InterpreterError> {
     match value.0.as_ref() {
         TestValueKind::I64(value) => Ok(*value),
-        TestValueKind::Product(_) => Err(unsupported("expected scalar i64 value")),
+        TestValueKind::Product(_) => InterpreterError::unsupported_err("expected scalar i64 value"),
     }
 }
 
@@ -74,9 +69,9 @@ impl TryFrom<ArithValue> for TestValue {
     fn try_from(value: ArithValue) -> Result<Self, Self::Error> {
         match value {
             ArithValue::I64(value) => Ok(i64(value)),
-            _ => Err(unsupported(
+            _ => InterpreterError::unsupported_err(
                 "only i64 arith constants are supported in interpreter2 tests",
-            )),
+            ),
         }
     }
 }

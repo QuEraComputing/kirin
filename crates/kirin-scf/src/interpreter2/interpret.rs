@@ -1,27 +1,20 @@
 use kirin::prelude::{Block, CompileTimeValue};
-use kirin_interpreter::BranchCondition;
 use kirin_interpreter_2::{
-    Args, BlockSeed, Cursor, Exec, Interpretable, Interpreter, InterpreterError, ProductValue,
-    ValueStore,
+    Args, BlockSeed, BranchCondition, Cursor, Exec, Interpretable, Interpreter, InterpreterError,
+    ProductValue, ValueStore,
 };
 use smallvec::SmallVec;
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
 
-fn unsupported(message: &'static str) -> InterpreterError {
-    InterpreterError::custom(std::io::Error::other(message))
-}
-
 impl<'ir, I, T> Interpretable<'ir, I> for If<T>
 where
-    I: Exec<'ir, BlockSeed<<I as ValueStore>::Value>>
-        + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
+    I: Exec<'ir, BlockSeed<<I as ValueStore>::Value>>,
     <I as ValueStore>::Value: BranchCondition + ProductValue,
-    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     type Effect = Cursor<Block>;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Error = I::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         let cond = interp.read(self.condition)?;
@@ -29,7 +22,7 @@ where
             Some(true) => self.then_body,
             Some(false) => self.else_body,
             None => {
-                return Err(unsupported(
+                return Err(InterpreterError::unsupported(
                     "scf.if: nondeterministic conditions not supported in interpreter-2",
                 )
                 .into());
@@ -45,14 +38,12 @@ where
 
 impl<'ir, I, T> Interpretable<'ir, I> for For<T>
 where
-    I: Exec<'ir, BlockSeed<<I as ValueStore>::Value>>
-        + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
+    I: Exec<'ir, BlockSeed<<I as ValueStore>::Value>>,
     <I as ValueStore>::Value: ForLoopValue + ProductValue,
-    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     type Effect = Cursor<Block>;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Error = I::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         let mut iv = interp.read(self.start)?;
@@ -82,8 +73,8 @@ where
             }
 
             iv = iv.loop_step(&step).ok_or_else(|| {
-                <I as Interpreter<'ir>>::Error::from(InterpreterError::custom(
-                    std::io::Error::other("scf.for: induction variable overflow during loop step"),
+                I::Error::from(InterpreterError::message(
+                    "scf.for: induction variable overflow during loop step",
                 ))
             })?;
         }
@@ -96,14 +87,12 @@ where
 
 impl<'ir, I, T> Interpretable<'ir, I> for StructuredControlFlow<T>
 where
-    I: Exec<'ir, BlockSeed<<I as ValueStore>::Value>>
-        + ValueStore<Error = <I as Interpreter<'ir>>::Error>,
+    I: Exec<'ir, BlockSeed<<I as ValueStore>::Value>>,
     <I as ValueStore>::Value: BranchCondition + ForLoopValue + ProductValue,
-    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     type Effect = Cursor<Block>;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Error = I::Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
         match self {
@@ -117,14 +106,13 @@ where
 impl<'ir, I, T> Interpretable<'ir, I> for Yield<T>
 where
     I: Interpreter<'ir>,
-    <I as Interpreter<'ir>>::Error: From<InterpreterError>,
     T: CompileTimeValue,
 {
     type Effect = Cursor<Block>;
-    type Error = <I as Interpreter<'ir>>::Error;
+    type Error = I::Error;
 
     fn interpret(&self, _interp: &mut I) -> Result<Cursor<Block>, Self::Error> {
-        Err(unsupported(
+        Err(InterpreterError::unsupported(
             "scf.yield has no independent semantics; \
              it may only appear as a terminator inside scf.if or scf.for body blocks",
         )

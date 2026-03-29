@@ -72,10 +72,6 @@ impl Typeof<ArithType> for InvokeValue {
     }
 }
 
-fn unsupported(message: &'static str) -> InterpreterError {
-    InterpreterError::custom(std::io::Error::other(message))
-}
-
 /// Effect type for the invoke test machine.
 ///
 /// Combines cursor operations with a Stop variant for function return.
@@ -118,7 +114,7 @@ type InvokeInterp<'ir> =
 fn as_i64(value: InvokeValue) -> Result<i64, InterpreterError> {
     match value {
         InvokeValue::I64(value) => Ok(value),
-        _ => Err(unsupported("expected i64 in invoke scaffold")),
+        _ => InterpreterError::unsupported_err("expected i64 in invoke scaffold"),
     }
 }
 
@@ -295,7 +291,7 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for Arith<ArithType> {
                 interp.write(*result, InvokeValue::I64(lhs - rhs))?;
                 Ok(InvokeEffect::Advance)
             }
-            _ => Err(unsupported("unsupported arithmetic op in invoke scaffold")),
+            _ => InterpreterError::unsupported_err("unsupported arithmetic op in invoke scaffold"),
         }
     }
 }
@@ -318,9 +314,9 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for FunctionBody<ArithType> {
     type Error = InterpreterError;
 
     fn interpret(&self, _interp: &mut InvokeInterp<'ir>) -> Result<InvokeEffect, Self::Error> {
-        Err(unsupported(
+        InterpreterError::unsupported_err(
             "function bodies are structural and should not be stepped directly",
-        ))
+        )
     }
 }
 
@@ -335,7 +331,7 @@ impl<'ir> Interpretable<'ir, InvokeInterp<'ir>> for CompositeLanguage {
             CompositeLanguage::FunctionBody(op) => op.interpret(interp),
             CompositeLanguage::Return(op) => op.interpret(interp),
             CompositeLanguage::ControlFlow(_) => {
-                Err(unsupported("control flow not used in invoke scaffold"))
+                InterpreterError::unsupported_err("control flow not used in invoke scaffold")
             }
         }
     }

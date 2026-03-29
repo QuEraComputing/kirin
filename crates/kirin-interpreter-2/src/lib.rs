@@ -1,3 +1,4 @@
+mod branch_condition;
 pub mod control;
 pub mod cursor;
 pub mod effect;
@@ -17,6 +18,7 @@ mod stage_access;
 mod total;
 mod value_store;
 
+pub use branch_condition::BranchCondition;
 pub use effect::Cursor;
 pub use error::{InterpreterError, MissingEntryError, StageResolutionError};
 pub use frame::Frame;
@@ -43,9 +45,9 @@ pub type InterpreterSeed<'ir, I> = <<I as Interpreter<'ir>>::Machine as Machine<
 /// Essentials for dialect authors implementing machine-based semantics.
 pub mod prelude {
     pub use crate::{
-        ConsumeEffect, Cursor, Exec, FromConstant, Interpretable, Lift, Machine, ProductValue,
-        ProjectMachine, ProjectMachineMut, StageAccess, ValueStore, control, effect, exec_block,
-        interpreter, result,
+        BranchCondition, ConsumeEffect, Cursor, Exec, FromConstant, Interpretable, Lift, Machine,
+        ProductValue, ProjectMachine, ProjectMachineMut, StageAccess, ValueStore, control, effect,
+        exec_block, interpreter, result,
     };
 }
 
