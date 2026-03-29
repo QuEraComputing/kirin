@@ -38,12 +38,10 @@ impl<'ir> Machine<'ir> for LeafMachine {
 }
 
 impl<'ir> ConsumeEffect<'ir> for LeafMachine {
+    type Output = Directive<Self::Stop, Self::Seed>;
     type Error = InterpreterError;
 
-    fn consume_effect(
-        &mut self,
-        effect: Self::Effect,
-    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
+    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
         match effect {
             LeafEffect::Record(value) => {
                 self.seen.push(value);
@@ -76,12 +74,10 @@ impl<'ir> Machine<'ir> for CompositeMachine {
 }
 
 impl<'ir> ConsumeEffect<'ir> for CompositeMachine {
+    type Output = Directive<Self::Stop, Self::Seed>;
     type Error = InterpreterError;
 
-    fn consume_effect(
-        &mut self,
-        effect: Self::Effect,
-    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
+    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
         match effect {
             CompositeEffect::Leaf(effect) => self.leaf.consume_effect(effect).map(|control| {
                 control
@@ -182,13 +178,14 @@ fn project_machine_helpers_reach_leaf_machine() {
 }
 
 #[test]
-fn consume_local_effect_mutates_only_projected_submachine() {
+fn local_effect_consumption_mutates_only_projected_submachine() {
     let mut pipeline: Pipeline<StageInfo<LiftLanguage>> = Pipeline::new();
     let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
 
     let control = interp
-        .consume_local_effect::<LeafMachine>(LeafEffect::Record(ArithValue::I64(3)))
+        .project_machine_mut::<LeafMachine>()
+        .consume_effect(LeafEffect::Record(ArithValue::I64(3)))
         .unwrap();
 
     assert_eq!(control, Directive::Stop(LeafStop::Stored));
@@ -201,17 +198,17 @@ fn consume_local_effect_mutates_only_projected_submachine() {
 }
 
 #[test]
-fn consume_lifted_effect_returns_top_level_control() {
+fn lifted_effect_consumption_returns_top_level_directive() {
     let mut pipeline: Pipeline<StageInfo<LiftLanguage>> = Pipeline::new();
     let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
 
-    let control = interp
-        .consume_lifted_effect(LeafEffect::Record(ArithValue::I64(4)))
-        .unwrap();
+    let effect: CompositeEffect = LeafEffect::Record(ArithValue::I64(4)).lift();
+    let directive: Directive<_, _> =
+        Lift::lift(interp.machine_mut().consume_effect(effect).unwrap());
 
     assert_eq!(
-        control,
+        directive,
         Directive::Stop(CompositeStop::Leaf(LeafStop::Stored))
     );
     assert_eq!(
@@ -221,13 +218,13 @@ fn consume_lifted_effect_returns_top_level_control() {
 }
 
 #[test]
-fn consume_local_control_lifts_stop_and_applies_shell_mutation() {
+fn consume_effect_with_lifted_stop_applies_shell_mutation() {
     let mut pipeline: Pipeline<StageInfo<LiftLanguage>> = Pipeline::new();
     let stage_id: CompileStage = pipeline.add_stage().stage(StageInfo::default()).new();
     let mut interp = LiftInterp::new(&pipeline, stage_id, CompositeMachine::default());
 
     interp
-        .consume_local_control(Directive::Stop(LeafStop::Stored))
+        .consume_effect(Directive::Stop(LeafStop::Stored).map_stop(Lift::lift))
         .unwrap();
 
     assert_eq!(interp.cursor_depth(), 0);

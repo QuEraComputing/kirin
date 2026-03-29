@@ -94,12 +94,10 @@ impl<'ir> Machine<'ir> for InvokeMachine {
 }
 
 impl<'ir> ConsumeEffect<'ir> for InvokeMachine {
+    type Output = Directive<Self::Stop, Self::Seed>;
     type Error = InterpreterError;
 
-    fn consume_effect(
-        &mut self,
-        effect: Self::Effect,
-    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
+    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
         Ok(match effect {
             InvokeEffect::Advance => Directive::Advance,
             InvokeEffect::Stay => Directive::Stay,

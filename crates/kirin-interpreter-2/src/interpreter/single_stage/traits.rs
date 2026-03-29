@@ -174,7 +174,9 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + 'ir,
-    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>>
+        + ConsumeEffect<'ir, Output: crate::Lift<Directive<<M as Machine<'ir>>::Stop, BlockSeed<V>>>>
+        + 'ir,
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
@@ -236,7 +238,9 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + 'ir,
-    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>>
+        + ConsumeEffect<'ir, Output: crate::Lift<Directive<<M as Machine<'ir>>::Stop, BlockSeed<V>>>>
+        + 'ir,
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
@@ -262,22 +266,12 @@ where
 
     fn consume_effect(
         &mut self,
-        effect: <Self::Machine as Machine<'ir>>::Effect,
-    ) -> Result<
-        Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
-        Self::Error,
-    > {
-        self.machine.consume_effect(effect).map_err(Into::into)
-    }
-
-    fn consume_control(
-        &mut self,
-        control: Directive<
+        directive: Directive<
             <Self::Machine as Machine<'ir>>::Stop,
             <Self::Machine as Machine<'ir>>::Seed,
         >,
     ) -> Result<(), Self::Error> {
-        self.apply_control(control)
+        self.apply_control(directive)
     }
 }
 
@@ -291,7 +285,9 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + crate::ProductValue + 'ir,
-    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>>
+        + ConsumeEffect<'ir, Output: crate::Lift<Directive<<M as Machine<'ir>>::Stop, BlockSeed<V>>>>
+        + 'ir,
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,
@@ -311,7 +307,9 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + crate::ProductValue + 'ir,
-    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>>
+        + ConsumeEffect<'ir, Output: crate::Lift<Directive<<M as Machine<'ir>>::Stop, BlockSeed<V>>>>
+        + 'ir,
     E: From<InterpreterError> + 'ir,
     Self: ValueStore<Value = V, Error = E>,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
@@ -366,7 +364,9 @@ where
             Effect = <M as Machine<'ir>>::Effect,
         >,
     V: Clone + 'ir,
-    M: Machine<'ir, Seed = BlockSeed<V>> + ConsumeEffect<'ir> + 'ir,
+    M: Machine<'ir, Seed = BlockSeed<V>>
+        + ConsumeEffect<'ir, Output: crate::Lift<Directive<<M as Machine<'ir>>::Stop, BlockSeed<V>>>>
+        + 'ir,
     E: From<InterpreterError> + 'ir,
     <L as crate::Interpretable<'ir, SingleStage<'ir, L, V, M, E>>>::Error: Into<E>,
     <M as ConsumeEffect<'ir>>::Error: Into<E>,

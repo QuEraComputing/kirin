@@ -1,4 +1,4 @@
-use crate::{BlockSeed, Machine, ProductValue, control::Directive};
+use crate::{BlockSeed, ConsumeEffect, Lift, Machine, ProductValue, control::Directive};
 
 use super::{Interpreter, Position, TypedStage};
 
@@ -13,7 +13,7 @@ pub trait Exec<'ir, Seed>: Interpreter<'ir> {
 /// stack via `Directive::Push`, run all non-terminator statements, read the
 /// terminator's arguments as a product, and pop the block.
 ///
-/// Block argument binding happens inside `apply_control` when the seed is
+/// Block argument binding happens inside `consume_effect` when the seed is
 /// pushed — no separate binding step here.
 ///
 /// This is the standard implementation for `Exec<'ir, BlockSeed<V>>`. Concrete
@@ -32,8 +32,8 @@ where
     let terminator = block.terminator(stage);
 
     // Push the block with its args as an inline execution context.
-    // apply_control will bind the seed-carried arguments to the block's SSA slots.
-    interp.consume_control(Directive::Push(seed.into()))?;
+    // consume_effect will bind the seed-carried arguments to the block's SSA slots.
+    interp.consume_effect(Directive::Push(seed.into()))?;
 
     // Run all non-terminator statements
     loop {
@@ -42,8 +42,11 @@ where
             break;
         }
         let effect = interp.interpret_current()?;
-        let control = interp.consume_effect(effect)?;
-        interp.consume_control(control)?;
+        let output = interp
+            .machine_mut()
+            .consume_effect(effect)
+            .map_err(Into::into)?;
+        interp.consume_effect(Lift::lift(output))?;
     }
 
     // Read terminator yields into a product
@@ -59,6 +62,6 @@ where
     };
 
     // Pop the inline context
-    interp.consume_control(Directive::Pop)?;
+    interp.consume_effect(Directive::Pop)?;
     Ok(product)
 }

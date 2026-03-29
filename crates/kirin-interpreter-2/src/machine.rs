@@ -1,5 +1,3 @@
-use crate::control::Directive;
-
 /// Thin structural semantic machine trait.
 pub trait Machine<'ir> {
     type Effect;
@@ -9,10 +7,8 @@ pub trait Machine<'ir> {
 
 /// Machine-owned effect consumption.
 pub trait ConsumeEffect<'ir>: Machine<'ir> {
+    type Output;
     type Error;
 
-    fn consume_effect(
-        &mut self,
-        effect: Self::Effect,
-    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error>;
+    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error>;
 }

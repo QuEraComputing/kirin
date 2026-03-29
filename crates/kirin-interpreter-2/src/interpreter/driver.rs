@@ -2,7 +2,7 @@ use kirin_ir::Statement;
 
 use super::{Interpreter, Position};
 use crate::{
-    Machine, ValueStore,
+    ConsumeEffect, Lift, Machine, ValueStore,
     control::{Breakpoints, Directive, Fuel, Interrupt},
     result::{Run, Step, Stepped, Suspension},
 };
@@ -42,8 +42,12 @@ pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + I
         };
 
         let effect = self.interpret_current()?;
-        let control = self.consume_effect(effect.clone())?;
-        self.consume_control(control.clone())?;
+        let output = self
+            .machine_mut()
+            .consume_effect(effect.clone())
+            .map_err(Into::into)?;
+        let directive = Lift::lift(output);
+        self.consume_effect(directive.clone())?;
         if let Some(remaining) = self.fuel() {
             debug_assert!(remaining > 0, "fuel must be checked before step burn");
             self.set_fuel(Some(remaining - 1));
@@ -53,7 +57,7 @@ pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + I
             self.finish_step(statement);
         }
 
-        Ok(Step::Stepped(Stepped::new(effect, control)))
+        Ok(Step::Stepped(Stepped::new(effect, directive)))
     }
 
     fn run(&mut self) -> RunResult<'ir, Self> {
@@ -65,8 +69,11 @@ pub trait Driver<'ir>: Interpreter<'ir> + Position<'ir> + Fuel + Breakpoints + I
             };
 
             let effect = self.interpret_current()?;
-            let control = self.consume_effect(effect)?;
-            self.consume_control(control)?;
+            let output = self
+                .machine_mut()
+                .consume_effect(effect)
+                .map_err(Into::into)?;
+            self.consume_effect(Lift::lift(output))?;
             if let Some(remaining) = self.fuel() {
                 debug_assert!(remaining > 0, "fuel must be checked before step burn");
                 self.set_fuel(Some(remaining - 1));

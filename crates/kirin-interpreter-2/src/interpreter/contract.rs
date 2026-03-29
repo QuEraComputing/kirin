@@ -7,7 +7,17 @@ use crate::InterpreterError;
 
 /// Typed single-stage shell contract over one top-level machine.
 pub trait Interpreter<'ir>: ValueStore<Error: From<InterpreterError>> + StageAccess<'ir> {
-    type Machine: Machine<'ir> + ConsumeEffect<'ir>;
+    type Machine: Machine<'ir>
+        + ConsumeEffect<
+            'ir,
+            Output: Lift<
+                Directive<
+                    <Self::Machine as Machine<'ir>>::Stop,
+                    <Self::Machine as Machine<'ir>>::Seed,
+                >,
+            >,
+            Error: Into<Self::Error>,
+        >;
 
     fn machine(&self) -> &Self::Machine;
     fn machine_mut(&mut self) -> &mut Self::Machine;
@@ -15,18 +25,11 @@ pub trait Interpreter<'ir>: ValueStore<Error: From<InterpreterError>> + StageAcc
     fn interpret_current(&mut self)
     -> Result<<Self::Machine as Machine<'ir>>::Effect, Self::Error>;
 
-    #[allow(clippy::type_complexity)]
+    /// Consume a directive (the shell's effect type) by applying it to
+    /// interpreter state: advance cursor, push/pop blocks, record stops, etc.
     fn consume_effect(
         &mut self,
-        effect: <Self::Machine as Machine<'ir>>::Effect,
-    ) -> Result<
-        Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
-        Self::Error,
-    >;
-
-    fn consume_control(
-        &mut self,
-        control: Directive<
+        directive: Directive<
             <Self::Machine as Machine<'ir>>::Stop,
             <Self::Machine as Machine<'ir>>::Seed,
         >,
@@ -70,46 +73,5 @@ pub trait Interpreter<'ir>: ValueStore<Error: From<InterpreterError>> + StageAcc
         D::Error: Into<Self::Error>,
     {
         stmt.interpret(self).map_err(Into::into).map(Lift::lift)
-    }
-
-    fn consume_local_effect<Sub>(
-        &mut self,
-        effect: <Sub as Machine<'ir>>::Effect,
-    ) -> Result<Directive<<Sub as Machine<'ir>>::Stop, <Sub as Machine<'ir>>::Seed>, Self::Error>
-    where
-        Self: Sized,
-        Sub: Machine<'ir> + ConsumeEffect<'ir>,
-        Self::Machine: ProjectMachineMut<Sub>,
-        <Sub as ConsumeEffect<'ir>>::Error: Into<Self::Error>,
-    {
-        self.project_machine_mut::<Sub>()
-            .consume_effect(effect)
-            .map_err(Into::into)
-    }
-
-    #[allow(clippy::type_complexity)]
-    fn consume_lifted_effect<E>(
-        &mut self,
-        effect: E,
-    ) -> Result<
-        Directive<<Self::Machine as Machine<'ir>>::Stop, <Self::Machine as Machine<'ir>>::Seed>,
-        Self::Error,
-    >
-    where
-        Self: Sized,
-        E: Lift<<Self::Machine as Machine<'ir>>::Effect>,
-    {
-        self.consume_effect(effect.lift())
-    }
-
-    fn consume_local_control<S>(
-        &mut self,
-        control: Directive<S, <Self::Machine as Machine<'ir>>::Seed>,
-    ) -> Result<(), Self::Error>
-    where
-        Self: Sized,
-        S: Lift<<Self::Machine as Machine<'ir>>::Stop>,
-    {
-        self.consume_control(control.map_stop(Lift::lift))
     }
 }

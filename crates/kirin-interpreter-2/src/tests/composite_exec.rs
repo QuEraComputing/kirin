@@ -30,12 +30,10 @@ impl<'ir> Machine<'ir> for TestMachine {
 }
 
 impl<'ir> ConsumeEffect<'ir> for TestMachine {
+    type Output = Directive<Self::Stop, Self::Seed>;
     type Error = InterpreterError;
 
-    fn consume_effect(
-        &mut self,
-        effect: Self::Effect,
-    ) -> Result<Directive<Self::Stop, Self::Seed>, Self::Error> {
+    fn consume_effect(&mut self, effect: Self::Effect) -> Result<Self::Output, Self::Error> {
         Ok(match effect {
             TestEffect::Advance => Directive::Advance,
             TestEffect::Replace(seed) => Directive::Replace(seed),
