@@ -905,6 +905,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-interpreter-3"
+version = "0.1.0"
+dependencies = [
+ "kirin-ir",
+ "rustc-hash",
+ "smallvec",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "kirin-interval"
 version = "0.1.0"
 dependencies = [
