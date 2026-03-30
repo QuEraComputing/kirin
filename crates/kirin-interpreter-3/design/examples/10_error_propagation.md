@@ -7,7 +7,7 @@ custom dialect errors, and composed error handling.
 
 - `type Error = ArithError` — custom error type for the dialect
 - `InterpreterError` (from `read()`) enters `InterpError` via `From` and `?`
-- `ArithError` enters via `Err(InterpError::Machine(...))`
+- `ArithError` enters via `Err(InterpError::Dialect(...))`
 
 ## Code
 
@@ -21,11 +21,11 @@ impl<I: Interpreter> Interpretable<I> for CheckedDiv<T>
 where
     I::Value: Clone + Div<Output = I::Value> + PartialEq + Default,
 {
-    type Effect = ();
+    type Effect = Infallible;
     type Error = ArithError;
 
     fn interpret(&self, interp: &mut I)
-        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<ArithError>>
+        -> Result<Effect<I::Value, Infallible>, InterpError<ArithError>>
     {
         let a = interp.read(self.lhs)?;
         // InterpreterError from read() → InterpError<ArithError> via From + ?
@@ -34,7 +34,7 @@ where
 
         if b == I::Value::default() {
             // Custom error → InterpError<ArithError> via Machine variant
-            return Err(InterpError::Machine(ArithError::DivisionByZero));
+            return Err(InterpError::Dialect(ArithError::DivisionByZero));
         }
 
         Ok(Effect::BindValue(self.result, a / b).then(Effect::Advance))
@@ -49,7 +49,7 @@ Two error sources, each with a clear path into `InterpError<ArithError>`:
 | Source | Type | Enters via | InterpError variant |
 |---|---|---|---|
 | `interp.read()` | `InterpreterError` | `From` + `?` operator | `Interpreter(err)` |
-| Division by zero | `ArithError` | `Err(InterpError::Machine(...))` | `Machine(err)` |
+| Division by zero | `ArithError` | `Err(InterpError::Dialect(...))` | `Dialect(err)` |
 
 ### Path 1: InterpreterError (from value read)
 
@@ -63,7 +63,7 @@ interp.read(self.lhs)        → Result<V, InterpreterError>
 
 ```
 ArithError::DivisionByZero   → ArithError
-  InterpError::Machine(...)   → InterpError<ArithError>::Machine(DivisionByZero)
+  InterpError::Dialect(...)   → InterpError<ArithError>::Dialect(DivisionByZero)
   Err(...)                    → Result<_, InterpError<ArithError>>
 ```
 
@@ -85,7 +85,7 @@ impl<I: Interpreter> Interpretable<I> for ComposedDialect<T> {
     type Error = ComposedError;
 
     fn interpret(&self, interp: &mut I)
-        -> Result<Effect<I::Value, I::Seed, ...>, InterpError<ComposedError>>
+        -> Result<Effect<I::Value, ...>, InterpError<ComposedError>>
     {
         match self {
             Self::CheckedDiv(op) => {
@@ -98,4 +98,4 @@ impl<I: Interpreter> Interpretable<I> for ComposedDialect<T> {
 ```
 
 `Lift::lift` on `InterpError<ArithError>` converts to `InterpError<ComposedError>` —
-only the `Machine(me)` variant is transformed via `Lift<ArithError> for ComposedError`.
+only the `Dialect(err)` variant is transformed via `Lift<ArithError> for ComposedError`.

@@ -1,15 +1,15 @@
 # Example 7: Stateful Dialect (Machine Effects)
 
-When the dialect needs state changes processed through the machine's `consume_effect`
-pipeline rather than direct mutation. This is important for abstract interpretation
-compatibility, deferred processing, or cross-dialect effect ordering.
+Stateful dialects must express semantic state changes through the machine's `consume_effect`
+pipeline. This keeps the change visible to composition, ordering, and alternative
+interpreter strategies.
 
 ## Key Characteristics
 
 - `type Effect = MemoryEffect` — the dialect declares its own machine effect type
 - The effect goes to the `Machine(DE)` variant of the unified `Effect` type
 - The interpreter routes `Effect::Machine(de)` to `dialect_machine.consume_effect(de)`
-- No `ProjectMut` needed — the machine handles its own state update
+- No direct mutation path — the machine handles its own state update
 
 ## Code
 
@@ -28,7 +28,7 @@ impl<I: Interpreter> Interpretable<I> for MemoryBarrier<T> {
     type Error = Infallible;
 
     fn interpret(&self, interp: &mut I)
-        -> Result<Effect<I::Value, I::Seed, MemoryEffect>, InterpError<Infallible>>
+        -> Result<Effect<I::Value, MemoryEffect>, InterpError<Infallible>>
     {
         Ok(Effect::Machine(MemoryEffect::Barrier))
     }
@@ -49,7 +49,7 @@ A dialect can return either base effects or machine effects from the same impl u
 
 ```rust
 fn interpret(&self, interp: &mut I)
-    -> Result<Effect<I::Value, I::Seed, MemoryEffect>, InterpError<Infallible>>
+    -> Result<Effect<I::Value, MemoryEffect>, InterpError<Infallible>>
 {
     Ok(Effect::Seq(smallvec![
         Effect::BindValue(self.result, value),

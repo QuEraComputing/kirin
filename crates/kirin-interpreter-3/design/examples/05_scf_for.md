@@ -1,82 +1,75 @@
-# Example 5: SCF For Loop (Seed Composition)
+# Example 5: SCF For Loop (Inline Loop)
 
-The most complex seed example — a loop that repeatedly executes a block, using the
-yielded value as carried state for the next iteration.
+`scf.for` also does not automatically justify its own seed type. The loop orchestration can
+stay inline in `interpret()` while reusing `BlockSeed` for the body.
 
 ## Key Characteristics
 
-- `ForLoopSeed` composes `BlockSeed` in a loop
-- Each iteration matches on `Yield(v)` to extract carried state
-- The final carried state is bound to result SSA slots
-- Demonstrates seeds as the escape hatch for complex execution patterns
+- The operation owns the loop-specific control logic inline
+- Each iteration executes the body through `BlockSeed`
+- The returned `Yield` becomes the carried state for the next iteration
+- No `ForLoopSeed` is needed unless the same loop kernel is reused elsewhere
 
 ## Code
 
 ```rust
-struct ForLoopSeed<V> {
-    start: V,
-    end: V,
-    step: V,
-    body: Block,
-    init: V,
-    results: Product<ResultValue>,
-}
-
-impl<I: Interpreter> Execute<I> for ForLoopSeed<I::Value>
+impl<I: Interpreter> Interpretable<I> for For<T>
 where
     I::Value: ForLoopValue + ProductValue,
-    BlockSeed<I::Value>: Execute<I>,
+    BlockSeed<I::Value>: Execute<I, Output = I::Effect>,
 {
-    fn execute(self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        let mut iv = self.start;
-        let mut carried = self.init;
+    type Effect = Infallible;
+    type Error = Infallible;
 
-        while iv.loop_condition(&self.end) == Some(true) {
+    fn interpret(&self, interp: &mut I)
+        -> Result<Effect<I::Value, Infallible>, InterpError<Infallible>>
+    {
+        let mut iv = interp.read(self.start)?;
+        let end = interp.read(self.end)?;
+        let step = interp.read(self.step)?;
+        let mut carried = interp.read(self.init)?;
+
+        while iv.loop_condition(&end) == Some(true) {
             let args = smallvec![iv.clone(), carried];
             let terminal = BlockSeed::new(self.body, args).execute(interp)?;
 
             match terminal {
-                Effect::Yield(v) => { carried = v; }
-                _ => return Err(
-                    InterpreterError::unsupported("expected yield from for body").into()
-                ),
+                Effect::Yield(value) => {
+                    carried = value;
+                }
+                _ => {
+                    return Err(
+                        InterpreterError::unsupported("expected yield from for body").into()
+                    );
+                }
             }
 
-            iv = iv.loop_step(&self.step).ok_or_else(|| {
+            iv = iv.loop_step(&step).ok_or_else(|| {
                 InterpError::from(InterpreterError::message("induction variable overflow"))
             })?;
         }
 
-        Ok(Effect::BindProduct(self.results, carried).then(Effect::Advance))
+        Ok(Effect::BindProduct(self.results.clone(), carried).then(Effect::Advance))
     }
 }
 ```
 
+## Why There Is No `ForLoopSeed`
+
+The loop is imperative, but that does not by itself justify a separate abstraction:
+
+- the orchestration belongs to `scf.for`
+- the reusable part is already `BlockSeed`
+- introducing `ForLoopSeed` would mostly move code out of `interpret()` without defining a
+  stable reusable entrypoint
+
+If multiple operations later share the same loop executor, the design can revisit this.
+
 ## Execution Flow
 
-1. Initialize induction variable `iv` and carried state from seed fields
-2. Loop while `iv < end`:
-   a. Pack `[iv, carried]` as block args
-   b. Create `BlockSeed`, call `.execute(interp)` → runs the for body
-   c. Match terminal: expect `Yield(v)` → update carried state
-   d. Step the induction variable
-3. After loop: bind final carried state to results, advance cursor
-
-## Why This Is a Seed, Not an Effect
-
-The for loop needs to orchestrate multiple block executions in a loop, using return
-values from each iteration. This can't be expressed as a single returned effect — it
-requires imperative control flow with `&mut I` access. Seeds are the designed escape
-hatch for this pattern.
-
-Compare with the dialect's `interpret()`, which just creates the seed and delegates:
-
-```rust
-fn interpret(&self, interp: &mut I)
-    -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
-{
-    // Read loop bounds, create ForLoopSeed, execute it
-    ForLoopSeed { start, end, step, body, init, results }.execute(interp)?;
-    Ok(Effect::Advance)
-}
-```
+1. Read loop bounds and initial carried state
+2. While the induction variable says to continue:
+3. Execute the loop body via `BlockSeed`
+4. Match `Yield(value)` and thread it into the next iteration
+5. Step the induction variable
+6. After the loop, return `BindProduct(...).then(Advance)`

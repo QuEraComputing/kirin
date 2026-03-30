@@ -1,43 +1,29 @@
-# Example 6: Stateful Dialect (Direct Machine Mutation)
+# Example 6: Rejected Pattern (Direct Machine Mutation)
 
-A dialect with its own machine state, mutated directly via `ProjectMut<M>`. This is the
-simple path for concrete interpreters — no machine effects needed.
+This example is intentionally negative. It shows the pattern that `kirin-interpreter-3`
+rejects for dialect semantics.
 
-## Key Characteristics
+The code sketch mentions `ProjectMut` only to illustrate the old escape hatch. It is not part
+of the proposed public dialect-facing API.
 
-- The dialect defines a machine struct (`MemoryMachine`)
-- `I: Interpreter + ProjectMut<MemoryMachine>` — additional per-dialect bound
-- Sequential borrows: read values first, then project machine — no borrow conflicts
-- Still returns base `Effect` variants — the mutation happens in-place, not through effects
-
-## Code
+## Rejected Pattern
 
 ```rust
-struct MemoryMachine {
-    storage: HashMap<u64, Vec<u8>>,
-}
-
-struct Store<T> {
-    addr: SSAValue,
-    value: SSAValue,
-    _phantom: PhantomData<T>,
-}
-
-impl<I: Interpreter + ProjectMut<MemoryMachine>> Interpretable<I> for Store<T>
+impl<I> Interpretable<I> for Store<T>
 where
+    I: Interpreter + ProjectMut<MemoryMachine>,
     I::Value: Into<u64> + AsRef<[u8]>,
 {
-    type Effect = ();
+    type Effect = Infallible;
     type Error = Infallible;
 
-    fn interpret(&self, interp: &mut I)
-        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
-    {
-        // Read values first (borrows interp immutably)
+    fn interpret(
+        &self,
+        interp: &mut I,
+    ) -> Result<Effect<I::Value, Infallible>, InterpError<Infallible>> {
         let addr: u64 = interp.read(self.addr)?.into();
         let value = interp.read(self.value)?;
 
-        // Then project machine (borrows interp mutably — sequential, no conflict)
         let mem: &mut MemoryMachine = interp.project_mut();
         mem.storage.insert(addr, value.as_ref().to_vec());
 
@@ -46,23 +32,42 @@ where
 }
 ```
 
-## Borrow Pattern
+## Why This Is Rejected
 
-The sequential borrow pattern avoids Rust's aliasing restrictions:
+1. The write to `mem.storage` is semantically visible but not represented in the effect algebra.
+2. The write cannot participate in `Seq` ordering.
+3. The write cannot be lifted when the dialect is wrapped into a larger language.
+4. An abstract or replaying interpreter cannot observe or reinterpret the change.
 
+## Required Replacement
+
+Stateful dialects must emit `Effect::Machine(de)` instead:
+
+```rust
+enum MemoryEffect {
+    Store { addr: u64, bytes: Vec<u8> },
+}
+
+impl<I: Interpreter> Interpretable<I> for Store<T>
+where
+    I::Value: Into<u64> + AsRef<[u8]>,
+{
+    type Effect = MemoryEffect;
+    type Error = Infallible;
+
+    fn interpret(
+        &self,
+        interp: &mut I,
+    ) -> Result<Effect<I::Value, MemoryEffect>, InterpError<Infallible>> {
+        let addr: u64 = interp.read(self.addr)?.into();
+        let value = interp.read(self.value)?;
+
+        Ok(Effect::Machine(MemoryEffect::Store {
+            addr,
+            bytes: value.as_ref().to_vec(),
+        }))
+    }
+}
 ```
-interp.read(...)    ← immutable borrow (released before next line)
-interp.read(...)    ← immutable borrow (released before next line)
-interp.project_mut() ← mutable borrow (no conflict — previous borrows released)
-```
 
-This works because Rust allows sequential (non-overlapping) borrows. The dialect reads
-all values it needs, then takes the mutable reference to its machine.
-
-## When to Use Direct Mutation vs Machine Effects
-
-- **Direct mutation** (this example): for concrete interpreters where the mutation is
-  straightforward and doesn't need interception.
-- **Machine effects** ([Example 7](07_stateful_effects.md)): when the mutation needs to go
-  through the effect pipeline (e.g., abstract interpretation needs to process state changes
-  differently, or effects need ordering guarantees relative to other effects).
+That replacement keeps the state transition observable, ordered, and composable.

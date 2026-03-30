@@ -1,11 +1,9 @@
 # Error Model
 
-Errors follow the same Lift pattern as effects. A single `InterpError<ME>` type wraps
-base interpreter errors and dialect machine errors.
+Errors mirror the effect composition story: interpreter-shell failures and dialect-level
+failures share a single outer wrapper.
 
 ## Base Interpreter Errors
-
-Shared error vocabulary for all interpreters:
 
 ```rust
 enum InterpreterError {
@@ -18,63 +16,58 @@ enum InterpreterError {
 }
 ```
 
+These errors come from the interpreter shell: value lookup, stage resolution, frame handling,
+and other execution-mechanics failures.
+
 ## Unified Error Type
 
 ```rust
-enum InterpError<ME> {
+enum InterpError<DE> {
     Interpreter(InterpreterError),
-    Machine(ME),
+    Dialect(DE),
 }
 ```
 
-`From<InterpreterError>` enables the `?` operator on `read()` calls:
+- `Interpreter(e)` is for shell failures.
+- `Dialect(e)` is for dialect semantic failures and dialect-machine consumption failures.
+
+`From<InterpreterError>` supports `?` on `read()` and other interpreter APIs:
 
 ```rust
-impl<ME> From<InterpreterError> for InterpError<ME> {
-    fn from(e: InterpreterError) -> Self { Self::Interpreter(e) }
+impl<DE> From<InterpreterError> for InterpError<DE> {
+    fn from(error: InterpreterError) -> Self {
+        Self::Interpreter(error)
+    }
 }
 ```
 
-## Dialect Error Usage
+## Recommended Conventions
 
-**Dialects with no custom errors** use `Infallible`:
-
-```rust
-impl<I: Interpreter> Interpretable<I> for Arith<T> {
-    type Error = Infallible;
-    // InterpreterError from read() propagates via ? and From
-}
-```
-
-**Dialects with custom errors** define their own error type:
-
-```rust
-enum ArithError { Overflow, DivisionByZero }
-
-impl<I: Interpreter> Interpretable<I> for CheckedArith<T> {
-    type Error = ArithError;
-    // ArithError enters via Err(InterpError::Machine(ArithError::DivisionByZero))
-}
-```
+- Dialects with no custom errors use `Infallible`.
+- Dialects with custom semantic failures define a local error enum and return
+  `Err(InterpError::Dialect(...))`.
+- Interpreters route `Machine(de)` failures from the dialect machine into
+  `InterpError::Dialect(...)`.
 
 ## Composition via Lift
 
-Same pattern as effects — `Lift` converts between `InterpError` types with different `ME` parameters:
+Just like effects, only the dialect payload changes when composing:
 
 ```rust
-impl<MEA, MEC> Lift<InterpError<MEA>> for InterpError<MEC>
-where MEC: Lift<MEA>
+impl<EA, EC> Lift<InterpError<EA>> for InterpError<EC>
+where
+    EC: Lift<EA>,
 {
-    fn lift(from: InterpError<MEA>) -> Self {
+    fn lift(from: InterpError<EA>) -> Self {
         match from {
-            InterpError::Interpreter(e) => InterpError::Interpreter(e),
-            InterpError::Machine(me) => InterpError::Machine(Lift::lift(me)),
+            InterpError::Interpreter(error) => InterpError::Interpreter(error),
+            InterpError::Dialect(error) => InterpError::Dialect(Lift::lift(error)),
         }
     }
 }
 ```
 
-Composed dialect code uses `Lift::lift` on both effects and errors:
+Composed dialect code stays uniform:
 
 ```rust
 match self {
@@ -84,3 +77,8 @@ match self {
     }
 }
 ```
+
+## Invariant
+
+`InterpError<DE>` is the only public error envelope. A dialect or machine-specific failure
+must never escape as a raw error type once it crosses the interpreter boundary.

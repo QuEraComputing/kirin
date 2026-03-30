@@ -92,23 +92,11 @@ This avoids orphan rule violations because the composite type is defined later i
 - **Errors** compose by **sum** (enum of sub-errors): `ErrorC = ErrorA | ErrorB`
 - **Dialects** compose by **sum** (already how `#[derive(Dialect)]` works with `#[wraps]`)
 
-For mutable machine projection:
-
-```rust
-trait ProjectMut<To> {
-    fn project_mut(&mut self) -> &mut To;
-}
-
-impl<T> ProjectMut<T> for T {
-    fn project_mut(&mut self) -> &mut T { self }
-}
-```
-
 ## Usage in Interpreter-3
 
 The Lift/Project algebra is used at three levels:
 
-1. **Effect composition**: `Lift<Effect<V, S, DEA>> for Effect<V, S, DEC>` where `DEC: Lift<DEA>`.
+1. **Effect composition**: `Lift<Effect<V, DEA>> for Effect<V, DEC>` where `DEC: Lift<DEA>`.
    Only the `Machine(de)` variant is transformed; all other effect variants pass through unchanged.
    See [effects.md](effects.md).
 
@@ -119,7 +107,7 @@ The Lift/Project algebra is used at three levels:
 3. **Dialect machine composition**: `Lift<EffectA> for EffectC`, `Lift<ErrorA> for ErrorC` for
    composing sub-dialect machine effects/errors into a parent enum. See [machine.md](machine.md).
 
-`TryProject` is used by seeds to pattern-match on terminal effects (e.g., extracting
+`TryProject` is used by seeds to pattern-match on terminal effects (e.g. extracting
 `Effect::Yield(v)` from a block's terminal effect).
 
 ## Implementation Plan

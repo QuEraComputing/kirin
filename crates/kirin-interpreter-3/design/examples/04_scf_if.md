@@ -1,29 +1,30 @@
-# Example 4: SCF If (Custom Seed)
+# Example 4: SCF If (Inline Orchestration)
 
-Structured control flow operations define custom seeds that compose `BlockSeed`. The
-`IfSeed` executes one of two blocks and handles the Yield terminal effect.
+Structured control flow operations usually do not need their own seed type. `scf.if`
+can stay entirely inside `interpret()` while reusing the shared `BlockSeed` executor.
 
 This is the pattern used by `kirin-scf`.
 
 ## Key Characteristics
 
-- The dialect's `interpret()` creates a seed and executes it via `&mut I`
-- The seed creates a `BlockSeed` and calls `.execute(interp)` to run a block
-- Pattern-matches on the terminal to extract the yielded value
+- The operation reads its condition and chooses a block inline
+- It reuses `BlockSeed` to execute the selected block
+- It interprets the returned terminal inline
+- No `IfSeed` is needed because the orchestration is specific to this operation
 
-## Dialect Code (If operation)
+## Code
 
 ```rust
 impl<I: Interpreter> Interpretable<I> for If<T>
 where
     I::Value: BranchCondition + ProductValue,
-    IfSeed: Execute<I>,
+    BlockSeed<I::Value>: Execute<I, Output = I::Effect>,
 {
-    type Effect = ();
+    type Effect = Infallible;
     type Error = Infallible;
 
     fn interpret(&self, interp: &mut I)
-        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
+        -> Result<Effect<I::Value, Infallible>, InterpError<Infallible>>
     {
         let cond = interp.read(self.condition)?;
         let block = match cond.is_truthy() {
@@ -32,36 +33,11 @@ where
             None => return Err(InterpreterError::unsupported("nondeterministic scf.if").into()),
         };
 
-        IfSeed {
-            block,
-            results: self.results.clone(),
-        }.execute(interp)?;
+        let terminal = BlockSeed::entry(block).execute(interp)?;
 
-        Ok(Effect::Advance)
-    }
-}
-```
-
-## Seed Code (IfSeed)
-
-```rust
-struct IfSeed {
-    block: Block,
-    results: Product<ResultValue>,
-}
-
-impl<I: Interpreter> Execute<I> for IfSeed
-where
-    I::Value: ProductValue,
-    BlockSeed<I::Value>: Execute<I>,
-{
-    fn execute(self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        let terminal = BlockSeed::entry(self.block).execute(interp)?;
-
-        // Match the terminal effect — expect Yield from scf body
         match terminal {
-            Effect::Yield(v) => {
-                Ok(Effect::BindProduct(self.results, v))
+            Effect::Yield(value) => {
+                Ok(Effect::BindProduct(self.results.clone(), value).then(Effect::Advance))
             }
             _ => Err(InterpreterError::unsupported("expected yield from scf.if body").into()),
         }
@@ -69,10 +45,20 @@ where
 }
 ```
 
-## How It Works
+## Why There Is No `IfSeed`
 
-1. `interpret()` reads the condition, picks the block, creates `IfSeed`, calls `.execute(interp)`
-2. `IfSeed::execute()` creates a `BlockSeed` and calls `.execute(interp)` which runs the block and returns the terminal effect
-3. The terminator is `scf.yield` → produces `Effect::Yield(v)`
-4. The seed matches `Yield(v)`, returns `BindProduct` to write the result to SSA slots
-5. Back in `interpret()`, returns `Advance` to move to the next statement
+`scf.if` does have imperative orchestration, but that alone is not enough to justify a seed:
+
+- the logic is owned by one operation
+- it starts from the current operation, not from a reusable IR entrypoint
+- it can be expressed by calling the shared `BlockSeed` executor and interpreting the result
+
+If another feature later needs the exact same control kernel, that would be the time to
+introduce a reusable seed.
+
+## Execution Flow
+
+1. `interpret()` reads the condition and selects the block
+2. `BlockSeed::entry(block).execute(interp)` runs that block and returns its terminal effect
+3. `scf.if` matches on `Yield(value)`
+4. `scf.if` returns `BindProduct(...).then(Advance)` as its ordinary effect

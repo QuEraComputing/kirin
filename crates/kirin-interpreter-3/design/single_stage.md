@@ -1,72 +1,33 @@
 # SingleStage Interpreter
 
-The single-stage concrete interpreter. This is the initial focus — one language, one stage,
-no fixpoint iteration.
+`SingleStage` is the first concrete interpreter for the design:
 
-## Effect Type
+- one language
+- one stage
+- concrete execution
+- no fixpoint loop
 
-The concrete effect type for `SingleStage`:
+It is the reference implementation for the effect-first contract.
+
+## Concrete Effect Type
 
 ```rust
-enum Effect<V, Seed, DE> {
-    // Cursor control
+enum Effect<V, DE> {
     Advance,
     Stay,
     Jump(Block, SmallVec<[V; 2]>),
-
-    // Value binding
     BindValue(SSAValue, V),
     BindProduct(Product<ResultValue>, V),
-
-    // Completion
     Return(V),
     Yield(V),
     Stop(V),
-
-    // Composition
     Seq(SmallVec<[Self; 2]>),
-
-    // Complex execution (seeds)
-    Execute(Seed),
-
-    // Dialect machine effects
     Machine(DE),
 }
 ```
 
-**Type parameters:**
-
-- `V` — runtime value type (e.g., `i64`, `Value`)
-- `Seed` — seed type for complex execution (e.g., `CompositeSeed<V>`). Dialects never construct
-  `Execute` directly — they create seeds and execute them via `&mut I`.
-- `DE` — dialect machine effect type. `()` for pure dialects, a custom enum for stateful dialects.
-
-### Lift Implementation
-
-See [effects.md](traits/effects.md#composition-via-lift) for the `Lift` impl between
-`Effect` types with different `DE` parameters.
-
-### Combinators
-
-```rust
-impl<V, Seed, DE> Effect<V, Seed, DE> {
-    fn then(self, next: Self) -> Self {
-        Self::Seq(smallvec![self, next])
-    }
-}
-```
-
-`Seq` composes any effects — base, machine, or mixed:
-
-```rust
-Effect::BindValue(result, v).then(Effect::Advance)
-
-Effect::Seq(smallvec![
-    Effect::BindValue(result, v),
-    Effect::Machine(MemoryEffect::Flush),
-    Effect::Advance,
-])
-```
+There is no `Execute(Seed)` variant. Shared executors such as `BlockSeed`, `RegionSeed`,
+and `FunctionSeed` are invoked directly and return ordinary outputs.
 
 ## Struct
 
@@ -82,17 +43,13 @@ struct SingleStage<V, M: Machine, S> {
 }
 ```
 
-Frames, cursors, and the call stack are **internal** — not part of the public trait API.
+Frames, cursors, and the call stack remain internal implementation details.
 
-## Trait Implementations
-
-### Machine
+## Machine Implementation
 
 ```rust
-impl<V, M: Machine, S> Machine for SingleStage<V, M, S>
-where CompositeSeed<V>: Execute<Self>,
-{
-    type Effect = Effect<V, CompositeSeed<V>, M::Effect>;
+impl<V, M: Machine, S> Machine for SingleStage<V, M, S> {
+    type Effect = Effect<V, M::Effect>;
     type Error = InterpError<M::Error>;
 
     fn consume_effect(&mut self, effect: Self::Effect) -> Result<(), Self::Error> {
@@ -100,12 +57,14 @@ where CompositeSeed<V>: Execute<Self>,
             Effect::Advance => self.advance_cursor(),
             Effect::Stay => Ok(()),
             Effect::Jump(block, args) => self.jump_to(block, args),
-            Effect::BindValue(ssa, v) => self.values.bind(ssa, v).map_err(Into::into),
-            Effect::BindProduct(results, v) => self.values.bind_product(results, v).map_err(Into::into),
-            Effect::Return(v) => self.pop_frame_with(v),
-            Effect::Yield(v) => self.yield_to_caller(v),
-            Effect::Stop(v) => {
-                self.result = Some(v);
+            Effect::BindValue(ssa, value) => self.values.bind(ssa, value).map_err(Into::into),
+            Effect::BindProduct(results, value) => {
+                self.values.bind_product(results, value).map_err(Into::into)
+            }
+            Effect::Return(value) => self.pop_frame_with(value),
+            Effect::Yield(value) => self.yield_to_caller(value),
+            Effect::Stop(value) => {
+                self.result = Some(value);
                 Ok(())
             }
             Effect::Seq(effects) => {
@@ -114,46 +73,37 @@ where CompositeSeed<V>: Execute<Self>,
                 }
                 Ok(())
             }
-            Effect::Execute(seed) => {
-                let terminal = seed.execute(self)?;
-                self.consume_effect(terminal)
-            }
-            Effect::Machine(de) => {
-                self.dialect_machine.consume_effect(de).map_err(InterpError::Machine)
+            Effect::Machine(effect) => {
+                self.dialect_machine.consume_effect(effect).map_err(InterpError::Dialect)
             }
         }
     }
 }
 ```
 
-### ValueRead, PipelineAccess, ProjectMut
+## Interpreter-Side Traits
 
 ```rust
 impl<V, M: Machine, S> ValueRead for SingleStage<V, M, S> {
     type Value = V;
-    fn read(&self, value: SSAValue) -> Result<V, InterpreterError> { self.values.get(value) }
+
+    fn read(&self, value: SSAValue) -> Result<V, InterpreterError> {
+        self.values.get(value)
+    }
 }
 
 impl<V, M: Machine, S> PipelineAccess for SingleStage<V, M, S> {
     type StageInfo = S;
+
     fn pipeline(&self) -> &Pipeline<S> { &self.pipeline }
     fn current_stage(&self) -> CompileStage { self.current_stage }
 }
-
-impl<V, M: Machine, S, T> ProjectMut<T> for SingleStage<V, M, S>
-where M: ProjectMut<T>,
-{
-    fn project_mut(&mut self) -> &mut T { self.dialect_machine.project_mut() }
-}
 ```
 
-### Interpreter
+## Interpreter Implementation
 
 ```rust
-impl<V, M: Machine, S> Interpreter for SingleStage<V, M, S>
-where CompositeSeed<V>: Execute<Self>,
-{
-    type Seed = CompositeSeed<V>;
+impl<V, M: Machine, S> Interpreter for SingleStage<V, M, S> {
     type DialectEffect = M::Effect;
     type DialectError = M::Error;
 
@@ -164,36 +114,37 @@ where CompositeSeed<V>: Execute<Self>,
         M::Error: Lift<L::Error>,
     {
         let statement = self.current_statement()?;
-        let effect = statement.interpret(self)
-            .map(Lift::lift)
-            .map_err(Lift::lift)?;
+        let effect = statement.interpret(self).map(Lift::lift).map_err(Lift::lift)?;
         self.consume_effect(effect)?;
 
-        // Check if Stop was processed (stored the value, returned Ok)
-        if let Some(v) = self.result.take() {
-            Ok(ControlFlow::Break(v))
+        if let Some(value) = self.result.take() {
+            Ok(ControlFlow::Break(value))
         } else {
             Ok(ControlFlow::Continue(()))
         }
     }
-
-    // run<L> uses the default impl: loop { match self.step::<L>()? { ... } }
 }
 ```
 
 ## Execution Model
 
-**`step<L>`** is the core execution method. It:
-1. Fetches the current statement from the cursor
-2. Calls `statement.interpret(self)` → `Effect<V, Seed, L::Effect>`
-3. Lifts the effect via `Lift::lift` → `Effect<V, Seed, M::Effect>` (= `Self::Effect`)
-4. Calls `self.consume_effect(effect)` to process it
-5. Checks if `Stop(v)` was consumed (value stored in `self.result`)
+`step<L>` performs the entire statement boundary:
 
-**`run<L>`** uses the default impl from `Interpreter`: loop on `step` until `Break(v)`.
+1. fetch the current statement
+2. interpret it
+3. lift its effect into the composed dialect effect type
+4. consume the lifted effect
+5. detect whether `Stop(v)` completed execution
 
-**Effect lifting:** When `L` is the top-level language (the common case), `L::Effect = M::Effect`
-and `Lift::lift` is identity. For sub-dialects, `Lift` maps only the `Machine(de)` variant.
+`run<L>` is the default loop over `step<L>`.
 
-**Stop handling:** `consume_effect` for `Stop(v)` stores `v` in `self.result` and returns `Ok(())`.
-On the next check in `step`, `self.result.take()` produces `Some(v)` → `Break(v)`.
+## Seed Interaction
+
+Seeds do not pass through `consume_effect` as values. Instead:
+
+- a dialect invokes a shared executor such as `BlockSeed` or `FunctionSeed`
+- the seed may call `consume_effect` internally as it orchestrates nested execution
+- the seed returns the smallest useful output to its caller, often a terminal effect or a
+  regular dialect effect
+
+This keeps `SingleStage` focused on one effect algebra while still allowing complex control flow.

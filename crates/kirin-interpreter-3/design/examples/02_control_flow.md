@@ -7,7 +7,7 @@ This is the pattern used by `kirin-cf`.
 
 ## Key Characteristics
 
-- Still `type Effect = ()` and `type Error = Infallible` — no machine-specific types
+- Still `type Effect = Infallible` and `type Error = Infallible` — no machine-specific types
 - Uses `Effect::Jump` instead of `BindValue + Advance`
 - Shows error return: `Err(InterpreterError::unsupported(...).into())`
 
@@ -27,11 +27,11 @@ impl<I: Interpreter> Interpretable<I> for Branch<T>
 where
     I::Value: BranchCondition,
 {
-    type Effect = ();
+    type Effect = Infallible;
     type Error = Infallible;
 
     fn interpret(&self, interp: &mut I)
-        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
+        -> Result<Effect<I::Value, Infallible>, InterpError<Infallible>>
     {
         let cond = interp.read(self.condition)?;
         let (block, arg_ssas) = match cond.is_truthy() {

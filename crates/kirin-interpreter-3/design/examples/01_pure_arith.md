@@ -6,7 +6,7 @@ This is the pattern used by `kirin-arith`, `kirin-bitwise`, `kirin-cmp`, and `ki
 
 ## Key Characteristics
 
-- `type Effect = ()` — no machine effects
+- `type Effect = Infallible` — no machine effects
 - `type Error = Infallible` — no custom errors, only InterpreterError from value reads
 - Returns `Effect` variants directly (BindValue + Advance)
 
@@ -24,11 +24,11 @@ impl<I: Interpreter> Interpretable<I> for Add<T>
 where
     I::Value: Clone + std::ops::Add<Output = I::Value>,
 {
-    type Effect = ();
+    type Effect = Infallible;
     type Error = Infallible;
 
     fn interpret(&self, interp: &mut I)
-        -> Result<Effect<I::Value, I::Seed, ()>, InterpError<Infallible>>
+        -> Result<Effect<I::Value, Infallible>, InterpError<Infallible>>
     {
         let a = interp.read(self.lhs)?;
         let b = interp.read(self.rhs)?;

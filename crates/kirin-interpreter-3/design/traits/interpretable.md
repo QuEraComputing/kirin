@@ -1,46 +1,59 @@
 # Interpretable Trait
 
-The `Interpretable` trait is the dialect author's primary interface for providing dialect-specific semantics.
+`Interpretable<I>` is the dialect author's primary interface for statement semantics.
 
 ## Trait Definition
 
 ```rust
 trait Interpretable<I: Interpreter> {
-    type Effect;    // dialect's own machine effects (() if none)
-    type Error;     // dialect's own errors (Infallible if none)
+    type Effect;
+    type Error;
 
-    fn interpret(&self, interp: &mut I)
-        -> Result<Effect<I::Value, I::Seed, Self::Effect>, InterpError<Self::Error>>;
+    fn interpret(
+        &self,
+        interp: &mut I,
+    ) -> Result<Effect<I::Value, Self::Effect>, InterpError<Self::Error>>;
 }
 ```
 
-- **`I: Interpreter`** — dialects specialize on interpreter types because operational semantics
-  depend on the interpreter (concrete vs abstract vs symbolic).
-- **`&mut I`** — full interpreter access. Value reading via `ValueRead`, pipeline access via
-  `PipelineAccess`, machine projection via `ProjectMut<M>`.
-- **`Effect<I::Value, I::Seed, Self::Effect>`** — the unified effect type, parameterized by the
-  dialect's own machine effect type. Dialects construct variants directly (`Effect::Advance`,
-  `Effect::BindValue(...)`, `Effect::Machine(...)`).
-- **`InterpError<Self::Error>`** — the unified error type. `InterpreterError` from `read()`
-  propagates via `?` (using `From`). Custom errors use `InterpError::Machine(...)`.
+## Contract
+
+- `I: Interpreter` keeps semantics specialized to the interpreter model.
+- `&mut I` gives access to interpreter services such as value reads, callee resolution,
+  and reusable sub-executors like block, region, and function execution.
+- The return type is always the unified effect algebra.
+- Dialects with no machine effects use `type Effect = Infallible`.
+- Dialects with no custom errors use `type Error = Infallible`.
+
+## What `interpret()` May Do
+
+- Read SSA values via `ValueRead`
+- Resolve callees or stages via `PipelineAccess`
+- Invoke shared seeds such as `BlockSeed`, `RegionSeed`, or `FunctionSeed`
+- Return `Effect<V, DE>` values
+
+## What `interpret()` Must Not Do
+
+- Advance the cursor directly
+- Push or pop frames directly
+- Mutate dialect machine state directly
+- Bypass the effect algebra for semantically visible work
+
+If a state change matters, return `Effect::Machine(de)`.
 
 ## Interpreter Supertrait
 
 ```rust
 trait Interpreter: Machine + ValueRead + PipelineAccess {
-    type Seed;
     type DialectEffect;
     type DialectError;
 
-    /// Execute one statement: interpret it, lift the effect, consume it.
-    /// Returns `Continue(())` to keep going, `Break(v)` when execution completes.
     fn step<L>(&mut self) -> Result<ControlFlow<Self::Value>, Self::Error>
     where
         L: Interpretable<Self>,
         Self::DialectEffect: Lift<L::Effect>,
         Self::DialectError: Lift<L::Error>;
 
-    /// Run until completion. Default: loop on `step`.
     fn run<L>(&mut self) -> Result<Self::Value, Self::Error>
     where
         L: Interpretable<Self>,
@@ -50,54 +63,56 @@ trait Interpreter: Machine + ValueRead + PipelineAccess {
         loop {
             match self.step::<L>()? {
                 ControlFlow::Continue(()) => continue,
-                ControlFlow::Break(v) => return Ok(v),
+                ControlFlow::Break(value) => return Ok(value),
             }
         }
     }
 }
 ```
 
-The `Interpreter` trait extends `Machine` — the interpreter IS a machine whose effect type is
-`Effect<Self::Value, Self::Seed, Self::DialectEffect>`:
+For any interpreter:
 
-- `Machine::Effect = Effect<Self::Value, Self::Seed, Self::DialectEffect>`
+- `Machine::Effect = Effect<Self::Value, Self::DialectEffect>`
 - `Machine::Error = InterpError<Self::DialectError>`
 
-**`step`** is the required method — concrete implementations provide the interpret → lift → consume
-pipeline. **`run`** has a default impl that loops on `step`; override for custom strategies
-(e.g., abstract interpretation fixpoint).
+`step` is the only required execution entry point. It performs:
 
-`consume_effect` comes from `Machine`, value access from `ValueRead`, pipeline from `PipelineAccess`.
-Seeds compose via `Execute` (e.g., `IfSeed` creates a `BlockSeed` and calls `.execute(interp)`).
+1. Fetch current statement
+2. Call `interpret`
+3. Lift the returned effect and error into the interpreter's composed dialect types
+4. Consume the lifted effect
+5. Report whether execution has completed
 
-Sub-traits:
+## Supporting Traits
 
 ```rust
 trait ValueRead {
     type Value: Clone;
+
     fn read(&self, value: SSAValue) -> Result<Self::Value, InterpreterError>;
 }
 
 trait PipelineAccess {
     type StageInfo;
+
     fn pipeline(&self) -> &Pipeline<Self::StageInfo>;
     fn current_stage(&self) -> CompileStage;
+
     fn resolve_callee(
         &self,
         function: Function,
         args: &[Self::Value],
         policy: ResolutionPolicy,
     ) -> Result<SpecializedFunction, InterpreterError>
-    where Self: ValueRead;
+    where
+        Self: ValueRead;
 }
 ```
 
-`ProjectMut<T>` is per-dialect — not all dialects need machine projection. See [examples](../examples/index.md).
-
 ## Key Differences from interpreter-1/2
 
-- **No `'ir` lifetime on the trait.** Handled internally by the interpreter.
-- **No `L` type parameter.** No E0275 recursive trait resolution cycle.
-- **No GATs.** The unified `Effect<V, Seed, DE>` type replaces GAT-based `I::Effect<DE>`.
-  Dialects construct effect variants directly — no `try_lift()`.
-- **Unified Lift algebra.** `Lift<Effect<V, S, DEA>> for Effect<V, S, DEC>` handles composition.
+- No public frame or cursor APIs
+- No direct-mutation escape hatch for dialects
+- No seed variant inside `Effect`
+- No GAT-based effect family
+- One composition story for both effects and errors

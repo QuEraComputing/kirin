@@ -1,13 +1,13 @@
 # Unified Effect Type
 
-Effects are the language through which dialects and interpreters communicate. A single
-`Effect<V, Seed, DE>` type expresses everything — cursor control, value binding, completion,
-complex execution, and dialect machine effects.
+Effects are the only public language for semantically visible interpreter state changes.
+Dialects describe what should happen by returning `Effect<V, DE>`, and the interpreter shell
+decides how to realize that change.
 
 ## Effect Definition
 
 ```rust
-enum Effect<V, Seed, DE> {
+enum Effect<V, DE> {
     // Cursor control
     Advance,
     Stay,
@@ -22,39 +22,33 @@ enum Effect<V, Seed, DE> {
     Yield(V),
     Stop(V),
 
-    // Composition
+    // Ordered composition
     Seq(SmallVec<[Self; 2]>),
-
-    // Complex execution (seeds)
-    Execute(Seed),
 
     // Dialect machine effects
     Machine(DE),
 }
 ```
 
-**Type parameters:**
+## Type Parameters
 
-- `V` — runtime value type (e.g., `i64`, `Value`)
-- `Seed` — seed type for complex execution (e.g., `CompositeSeed<V>`). Dialects never construct
-  `Execute` directly — they create seeds and execute them via `&mut I`.
-- `DE` — dialect machine effect type. `()` for pure dialects, a custom enum for stateful dialects.
+- `V` — runtime value type
+- `DE` — dialect-machine effect type
 
-Both `Interpretable::interpret` and `Machine::consume_effect` use this same type. For an
-interpreter `I`, the concrete effect is `Effect<I::Value, I::Seed, I::DialectEffect>`, which
-is also `I::Effect` (the `Machine::Effect` associated type).
+Dialects with no machine effects use `Infallible`, not `()`. That keeps the impossible
+`Machine(_)` case uninhabited and avoids placeholder `Lift<()>` impls.
 
 ## Combinators
 
 ```rust
-impl<V, Seed, DE> Effect<V, Seed, DE> {
+impl<V, DE> Effect<V, DE> {
     fn then(self, next: Self) -> Self {
         Self::Seq(smallvec![self, next])
     }
 }
 ```
 
-`Seq` composes any effects — base, machine, or mixed:
+`Seq` gives ordered composition across all observable effect kinds:
 
 ```rust
 Effect::BindValue(result, v).then(Effect::Advance)
@@ -68,34 +62,31 @@ Effect::Seq(smallvec![
 
 ## Composition via Lift
 
-When composing sub-dialect effects into a larger dialect, `Lift` converts between
-`Effect` types with different `DE` parameters:
+When a sub-dialect is embedded in a larger language, only the machine-effect payload changes:
 
 ```rust
-impl<V, Seed, DEA, DEC> Lift<Effect<V, Seed, DEA>> for Effect<V, Seed, DEC>
-where DEC: Lift<DEA>
+impl<V, DEA, DEC> Lift<Effect<V, DEA>> for Effect<V, DEC>
+where
+    DEC: Lift<DEA>,
 {
-    fn lift(from: Effect<V, Seed, DEA>) -> Self {
+    fn lift(from: Effect<V, DEA>) -> Self {
         match from {
             Effect::Advance => Effect::Advance,
             Effect::Stay => Effect::Stay,
-            Effect::Jump(b, a) => Effect::Jump(b, a),
-            Effect::BindValue(s, v) => Effect::BindValue(s, v),
-            Effect::BindProduct(p, v) => Effect::BindProduct(p, v),
-            Effect::Return(v) => Effect::Return(v),
-            Effect::Yield(v) => Effect::Yield(v),
-            Effect::Stop(v) => Effect::Stop(v),
-            Effect::Seq(effs) => Effect::Seq(effs.into_iter().map(Lift::lift).collect()),
-            Effect::Execute(s) => Effect::Execute(s),
-            Effect::Machine(de) => Effect::Machine(Lift::lift(de)),
+            Effect::Jump(block, args) => Effect::Jump(block, args),
+            Effect::BindValue(ssa, value) => Effect::BindValue(ssa, value),
+            Effect::BindProduct(results, value) => Effect::BindProduct(results, value),
+            Effect::Return(value) => Effect::Return(value),
+            Effect::Yield(value) => Effect::Yield(value),
+            Effect::Stop(value) => Effect::Stop(value),
+            Effect::Seq(effects) => Effect::Seq(effects.into_iter().map(Lift::lift).collect()),
+            Effect::Machine(effect) => Effect::Machine(Lift::lift(effect)),
         }
     }
 }
 ```
 
-Only the `Machine(de)` variant is transformed — all other variants pass through unchanged.
-
-Composed dialect code:
+Composed dialect code stays mechanical:
 
 ```rust
 match self {
@@ -106,19 +97,21 @@ match self {
 
 ## Terminal vs Consumed Effects
 
-Effects follow two paths through the system:
+Effects appear in two places:
 
-- **Consumed**: The interpreter's `consume_effect` processes the effect (mutates state, advances cursor, etc.) and returns `()`.
-- **Terminal**: A seed runs a block and returns the terminator's effect to its caller *without* consuming it. The caller pattern-matches to decide what to do.
+- **Consumed effects** are handled by `Interpreter::consume_effect`.
+- **Terminal effects** are returned by seeds to their caller for inspection.
 
-For example, `BlockSeed::execute` steps through all non-terminator statements (consuming each effect), then returns the terminator's effect. `IfSeed::execute` matches on `Yield(v)` to extract the result.
+Typical examples:
 
-## Abstract Interpretation
+- `BlockSeed::execute` returns a terminal `Yield`, `Return`, or `Jump`.
+- An `scf.if` interpret impl can call `BlockSeed`, pattern-match on `Yield(v)`, and return
+  `BindProduct(...).then(Advance)`.
+- `SingleStage::consume_effect` handles `Advance`, `Jump`, `BindValue`, `Machine(de)`, and so on.
 
-The `Effect` type does not include a `Fork` variant. Abstract interpreters that need
-nondeterministic branching express it as a machine effect: `Effect::Machine(AnalysisEffect::Fork(...))`.
-This keeps Fork out of the concrete execution path entirely.
+## Invariants
 
-## Symmetry with Errors
-
-The error model follows the same pattern. See [errors.md](errors.md).
+1. If a state change must be observed, ordered, or lifted, it must be an effect.
+2. Dialects may not bypass `Effect::Machine(de)` by mutating machine state directly.
+3. Seeds are not effect variants. There is no `Execute(Seed)` case in the algebra.
+4. `Seq` preserves source order exactly.
