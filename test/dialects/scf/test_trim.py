@@ -8,7 +8,7 @@ iteration's value is needed (e.g., prev = curr pattern).
 """
 
 from kirin import rewrite
-from kirin.prelude import python_basic
+from kirin.prelude import structural, python_basic
 from kirin.dialects import py, scf, func, ilist, lowering
 
 basic_scf = python_basic.union(
@@ -27,8 +27,13 @@ def test_trim_prev_curr_used_after_loop():
             curr = prev + i + 1
         return curr
 
+    expected_return_val = main.py_func()
+    assert expected_return_val == 6
+
     rewrite.Walk(scf.trim.UnusedYield()).rewrite(main.code)
-    assert main() == main.py_func()  # 6
+    actual_return_val = main()
+
+    assert actual_return_val == expected_return_val
 
 
 def test_trim_prev_curr_unused_after_loop():
@@ -60,10 +65,34 @@ def test_trim_prev_curr_unused_after_loop():
             last_prev = prev
         return last_prev
 
-    expected_return_val = main.py_func()
-    assert expected_return_val == 3
+    expected = main.py_func()
+    assert expected == 3
 
     rewrite.Walk(scf.trim.UnusedYield()).rewrite(main.code)
-    actual_return_val = main()
+    actual = main()
+
+    assert actual == expected
+
+
+def test_trim_with_lists():
+
+    @structural(fold=False, typeinfer=True)
+    def mwe():
+
+        result = 0
+        start = ilist.IList([0])
+        stop = ilist.IList([1])
+        for _ in range(10):
+            result = start[0] + stop[0]
+            start = stop
+            stop = ilist.IList([result])
+
+        return result
+
+    expected_return_val = mwe.py_func()
+    assert expected_return_val == 89
+
+    rewrite.Walk(scf.trim.UnusedYield()).rewrite(mwe.code)
+    actual_return_val = mwe()
 
     assert actual_return_val == expected_return_val
