@@ -29,6 +29,27 @@ class UnusedYield(RewriteRule):
         if not any_unused:
             return RewriteResult()
 
+        # for For loops, keep loop-carried variables whose block arguments
+        # are used inside the body AND are actually mutated across iterations,
+        # even if the result is unused after the loop. A variable that is just
+        # passed through (yielded unchanged) can safely be replaced by its
+        # initializer.
+        if isinstance(node, For):
+            block = node.body.blocks[0]
+            yield_stmt = block.last_stmt
+            for idx in range(len(node.initializers)):
+                if idx not in uses and block.args[idx + 1].uses:
+                    # Check if the variable is mutated: the yielded value
+                    # differs from the block argument (not just passed through)
+                    if (
+                        isinstance(yield_stmt, Yield)
+                        and yield_stmt.args[idx] is not block.args[idx + 1]
+                    ):
+                        uses.add(idx)
+            results = [r for idx, r in enumerate(node._results) if idx in uses]
+            if len(results) == len(node._results):
+                return RewriteResult()
+
         node._results = results
         for region in node.regions:
             for block in region.blocks:
