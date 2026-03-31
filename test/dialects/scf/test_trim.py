@@ -16,6 +16,53 @@ basic_scf = python_basic.union(
 )
 
 
+def test_trim_noop_all_results_used():
+    """All loop results are used after the loop → nothing to trim (any_unused=False)."""
+
+    @basic_scf
+    def main():
+        total = 0
+        for i in range(4):
+            total = total + i
+        return total
+
+    expected_return_val = main.py_func()
+    assert expected_return_val == 6
+
+    rewrite.Walk(scf.trim.UnusedYield()).rewrite(main.code)
+
+    [loop] = [s for s in main.callable_region.stmts() if isinstance(s, scf.For)]
+    assert len(loop.initializers) == 1
+    assert len(loop.body.blocks[0].args) == 2
+
+    actual_return_val = main()
+    assert actual_return_val == expected_return_val
+
+
+def test_trim_noop_all_mutated_args_preserved():
+    """Results are unused after the loop, but all block args are used and
+    mutated inside the body → all get preserved, len(results)==len(node._results)."""
+
+    @basic_scf
+    def main():
+        a = 0
+        b = 1
+        for _ in range(5):
+            c = a + b
+            a = b
+            b = c
+        return 0
+
+    rewrite.Walk(scf.trim.UnusedYield()).rewrite(main.code)
+
+    [loop] = [s for s in main.callable_region.stmts() if isinstance(s, scf.For)]
+    assert len(loop.initializers) == 2
+    assert len(loop.body.blocks[0].args) == 3
+
+    actual_return_val = main()
+    assert actual_return_val == 0
+
+
 def test_trim_prev_curr_used_after_loop():
     """curr IS used after the loop → iter_arg preserved. Works correctly."""
 
