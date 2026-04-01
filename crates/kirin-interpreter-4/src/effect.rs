@@ -114,3 +114,75 @@ impl IsPush for () {
         None
     }
 }
+
+// ---------------------------------------------------------------------------
+// Marker trait impls for Action<V, R, C>
+// ---------------------------------------------------------------------------
+
+use crate::concrete::Action;
+
+impl<V, R, C> IsAdvance for Action<V, R, C> {
+    fn is_advance(&self) -> bool {
+        matches!(self, Action::Advance)
+    }
+}
+
+impl<V, R, C> IsJump for Action<V, R, C> {
+    type Value = V;
+
+    fn as_jump(&self) -> Option<(Block, &[Self::Value])> {
+        match self {
+            Action::Jump(block, args) => Some((*block, args)),
+            _ => None,
+        }
+    }
+}
+
+impl<V, R, C> IsCall for Action<V, R, C> {
+    type Value = V;
+
+    fn as_call(&self) -> Option<CallEffect<'_, Self::Value>> {
+        match self {
+            Action::Call(callee, args, results) => Some(CallEffect {
+                callee: *callee,
+                args,
+                results,
+            }),
+            _ => None,
+        }
+    }
+}
+
+impl<V, R, C> IsReturn for Action<V, R, C> {
+    type Value = V;
+
+    fn as_return(&self) -> Option<&Self::Value> {
+        match self {
+            Action::Return(v) => Some(v),
+            _ => None,
+        }
+    }
+}
+
+impl<V, R, C> IsYield for Action<V, R, C> {
+    type Value = V;
+
+    fn as_yield(&self) -> Option<&Self::Value> {
+        match self {
+            Action::Yield(v) => Some(v),
+            _ => None,
+        }
+    }
+}
+
+impl<V, R, C> IsPush for Action<V, R, C> {
+    type CursorEntry = C;
+
+    #[allow(clippy::wrong_self_convention)]
+    fn as_push(self) -> Option<Self::CursorEntry> {
+        match self {
+            Action::Push(c) => Some(c),
+            _ => None,
+        }
+    }
+}
