@@ -29,6 +29,13 @@ pub trait IsYield {
     fn as_yield(&self) -> Option<&Self::Value>;
 }
 
+/// An effect that means "push a new cursor entry onto the stack".
+pub trait IsPush {
+    type CursorEntry;
+    #[allow(clippy::wrong_self_convention)]
+    fn as_push(self) -> Option<Self::CursorEntry>;
+}
+
 /// Borrowed view of a call effect's data.
 pub struct CallEffect<'a, V> {
     pub callee: SpecializedFunction,
@@ -96,6 +103,14 @@ impl IsYield for () {
     type Value = ();
 
     fn as_yield(&self) -> Option<&Self::Value> {
+        None
+    }
+}
+
+impl IsPush for () {
+    type CursorEntry = ();
+
+    fn as_push(self) -> Option<Self::CursorEntry> {
         None
     }
 }
