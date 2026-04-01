@@ -3,7 +3,7 @@ use crate::effect::CursorEffect;
 use crate::error::InterpreterError;
 use crate::frame::Frame;
 use crate::frame_stack::FrameStack;
-use crate::lift::{Lift, LiftInto};
+use crate::lift::{Lift, LiftInto, ProjectMut, ProjectRef};
 use crate::traits::{Interpretable, Machine, PipelineAccess, ValueStore};
 use kirin_ir::{
     Block, CompileStage, Dialect, GetInfo, Pipeline, ResultValue, SSAValue, SpecializedFunction,
@@ -155,6 +155,22 @@ impl<'ir, L: Dialect, V: Clone, M> SingleStage<'ir, L, V, M> {
     /// Get a mutable reference to the inner dialect machine.
     pub fn machine_mut(&mut self) -> &mut M {
         &mut self.machine
+    }
+
+    /// Project to a sub-machine by shared reference.
+    pub fn project_machine<Sub: ?Sized>(&self) -> &Sub
+    where
+        M: ProjectRef<Sub>,
+    {
+        self.machine.project_ref()
+    }
+
+    /// Project to a sub-machine by mutable reference.
+    pub fn project_machine_mut<Sub: ?Sized>(&mut self) -> &mut Sub
+    where
+        M: ProjectMut<Sub>,
+    {
+        self.machine.project_mut()
     }
 
     /// Get the stage info reference for the current stage.

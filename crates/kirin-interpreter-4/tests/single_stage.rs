@@ -4,6 +4,7 @@ use kirin_function::{FunctionBody, Return};
 use kirin_interpreter_4::concrete::SingleStage;
 use kirin_interpreter_4::effect::CursorEffect;
 use kirin_interpreter_4::error::InterpreterError;
+use kirin_interpreter_4::lift::{ProjectMut, ProjectRef};
 use kirin_interpreter_4::traits::{Interpretable, Machine, ValueStore};
 use kirin_ir::*;
 
@@ -184,4 +185,114 @@ fn test_counter_machine() {
     interp.run().unwrap();
 
     assert_eq!(interp.machine().count, 2);
+}
+
+// ---------------------------------------------------------------------------
+// CompositeMachine — demonstrates ProjectRef/ProjectMut for sub-machines
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Default)]
+struct TraceMachine {
+    trace: Vec<&'static str>,
+}
+
+/// A composite machine with two sub-machines.
+#[derive(Debug, Default)]
+struct CompositeMachine {
+    counter: CounterMachine,
+    trace: TraceMachine,
+}
+
+impl Machine for CompositeMachine {
+    type Effect = ();
+    type Error = InterpreterError;
+
+    fn consume_effect(&mut self, _: ()) -> Result<(), InterpreterError> {
+        Ok(())
+    }
+}
+
+// ProjectRef/ProjectMut: composite → sub-machine
+impl ProjectRef<CounterMachine> for CompositeMachine {
+    fn project_ref(&self) -> &CounterMachine {
+        &self.counter
+    }
+}
+impl ProjectMut<CounterMachine> for CompositeMachine {
+    fn project_mut(&mut self) -> &mut CounterMachine {
+        &mut self.counter
+    }
+}
+impl ProjectRef<TraceMachine> for CompositeMachine {
+    fn project_ref(&self) -> &TraceMachine {
+        &self.trace
+    }
+}
+impl ProjectMut<TraceMachine> for CompositeMachine {
+    fn project_mut(&mut self) -> &mut TraceMachine {
+        &mut self.trace
+    }
+}
+
+type CompositeInterp<'ir> = SingleStage<'ir, TestDialect, TestValue, CompositeMachine>;
+
+impl<'ir> Interpretable<CompositeInterp<'ir>> for TestDialect {
+    type Effect = CursorEffect<TestValue>;
+    type Error = InterpreterError;
+
+    fn interpret(
+        &self,
+        interp: &mut CompositeInterp<'ir>,
+    ) -> Result<CursorEffect<TestValue>, InterpreterError> {
+        // Project to specific sub-machines instead of accessing the whole composite.
+        interp.project_machine_mut::<CounterMachine>().count += 1;
+
+        match self {
+            TestDialect::Constant(c) => {
+                interp
+                    .project_machine_mut::<TraceMachine>()
+                    .trace
+                    .push("constant");
+                let val = match &c.value {
+                    ArithValue::I64(n) => TestValue::I64(*n),
+                    other => {
+                        return Err(InterpreterError::UnhandledEffect(format!(
+                            "unsupported ArithValue variant in test: {other:?}"
+                        )));
+                    }
+                };
+                interp.write(c.result, val)?;
+                Ok(CursorEffect::Advance)
+            }
+            TestDialect::Return(_ret) => {
+                interp
+                    .project_machine_mut::<TraceMachine>()
+                    .trace
+                    .push("return");
+                Ok(CursorEffect::Advance)
+            }
+            TestDialect::FunctionBody(_) => Err(InterpreterError::UnhandledEffect(
+                "FunctionBody not expected in test execution".to_string(),
+            )),
+        }
+    }
+}
+
+#[test]
+fn test_composite_machine_projection() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let (spec, entry_block, _) = build_program(&mut pipeline, stage_id, 42);
+
+    let mut interp = CompositeInterp::new(&pipeline, stage_id, CompositeMachine::default());
+    interp.enter_function(spec, entry_block, &[]).unwrap();
+    interp.run().unwrap();
+
+    // Counter tracks total statements
+    assert_eq!(interp.project_machine::<CounterMachine>().count, 2);
+    // Trace tracks per-operation names
+    assert_eq!(
+        interp.project_machine::<TraceMachine>().trace,
+        vec!["constant", "return"]
+    );
 }

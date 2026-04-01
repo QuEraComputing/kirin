@@ -1,7 +1,7 @@
 # MVP Implementation Report
 
 **Date:** 2026-03-31
-**Status:** single-stage block execution working, 7 tests passing
+**Status:** single-stage block execution working, 8 tests passing
 
 ## Module Structure
 
@@ -9,7 +9,7 @@
 |------|---------|
 | `traits.rs` | `Machine`, `ValueStore`, `PipelineAccess`, `Interpretable<I>`, `Interpreter` (blanket) |
 | `effect.rs` | Marker traits (`IsAdvance`, `IsJump`, `IsCall`, `IsReturn`, `IsYield`) + `CursorEffect<V>` |
-| `lift.rs` | `Lift`/`Project`/`TryLift`/`TryProject` + `LiftInto`/`TryLiftInto` |
+| `lift.rs` | `Lift`/`Project`/`ProjectRef`/`ProjectMut` + `LiftInto`/`TryLiftInto` |
 | `error.rs` | `InterpreterError` (9 variants) |
 | `frame.rs` | `Frame<V, X>` with SSA value bindings |
 | `frame_stack.rs` | `FrameStack<V, X>` with max-depth enforcement |
@@ -54,9 +54,10 @@ The constraint `M: Machine<Effect = R, Error = InterpreterError>` ties the
 inner machine's effect type to `Action`'s `R` parameter. For `M = ()`,
 `R = ()` and `Delegate(())` is a no-op.
 
-**Potential generalization:** `Project<Sub>`/`ProjectMut<Sub>` for composite
-machines, letting dialect authors project to specific sub-machines instead of
-accessing the whole machine.
+Composite machines implement `ProjectRef<Sub>` and `ProjectMut<Sub>` to expose
+sub-machines. `SingleStage` forwards this via `project_machine::<Sub>()` and
+`project_machine_mut::<Sub>()`. Identity impls ensure every machine can project
+to itself, so single-machine interpreters work without extra boilerplate.
 
 ### 3. `Interpreter` trait has no methods
 
@@ -109,6 +110,10 @@ enum wrapping the operations you need, implement `Interpretable` on it.
 - `test_counter_machine` — `CounterMachine` tracks statement count via
   `interp.machine_mut()` inside `interpret`. Verifies `count == 2` after
   running constant + return.
+- `test_composite_machine_projection` — `CompositeMachine` with two
+  sub-machines (`CounterMachine`, `TraceMachine`). Dialect projects to each
+  via `interp.project_machine_mut::<Sub>()`. Verifies counter and trace
+  independently.
 - 4 unit tests on `Frame<V, X>` (read, write, into_parts, cursor methods).
 
 ## Deferred Work
@@ -130,9 +135,6 @@ enum wrapping the operations you need, implement `Interpretable` on it.
 
 - **`Receipt` trait**: bundle `Language`, `Value`, `Machine`, `StageInfo`,
   `Error` into one associated-type carrier. Simplifies `SingleStage` generics.
-- **Dialect machine composition**: `Project<Sub>`/`ProjectMut<Sub>` for
-  composite machines. The interpreter forwards projection to give dialect
-  authors `&mut SubMachine` during `interpret`.
 - **Driver control traits**: `Fuel`, `Breakpoints`, `Interrupt` — carried
   forward from interpreter-2 design unchanged.
 - **`Position` trait**: read-only cursor inspection for tests and debugging.

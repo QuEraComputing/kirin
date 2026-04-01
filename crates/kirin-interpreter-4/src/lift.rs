@@ -8,6 +8,22 @@ pub trait Project<To> {
     fn project(self) -> To;
 }
 
+/// Borrow-based projection: extract a `&To` reference from `&self`.
+///
+/// Used for composite machines where dialect authors need read access
+/// to a specific sub-machine.
+pub trait ProjectRef<To: ?Sized> {
+    fn project_ref(&self) -> &To;
+}
+
+/// Mutable projection: extract a `&mut To` reference from `&mut self`.
+///
+/// Used for composite machines where dialect authors need write access
+/// to a specific sub-machine during `interpret`.
+pub trait ProjectMut<To: ?Sized> {
+    fn project_mut(&mut self) -> &mut To;
+}
+
 pub trait TryLift<From>: Sized {
     type Error;
 
@@ -38,6 +54,18 @@ impl<T> Lift<T> for T {
 
 impl<T> Project<T> for T {
     fn project(self) -> T {
+        self
+    }
+}
+
+impl<T: ?Sized> ProjectRef<T> for T {
+    fn project_ref(&self) -> &T {
+        self
+    }
+}
+
+impl<T: ?Sized> ProjectMut<T> for T {
+    fn project_mut(&mut self) -> &mut T {
         self
     }
 }
