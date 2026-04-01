@@ -2,18 +2,18 @@ use crate::error::InterpreterError;
 use crate::frame::Frame;
 use kirin_ir::{CompileStage, ResultValue, SSAValue};
 
-pub struct FrameStack<V, X = ()> {
-    frames: Vec<Frame<V, X>>,
+pub struct FrameStack<V> {
+    frames: Vec<Frame<V>>,
     max_depth: Option<usize>,
 }
 
-impl<V, X> Default for FrameStack<V, X> {
+impl<V> Default for FrameStack<V> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<V, X> FrameStack<V, X> {
+impl<V> FrameStack<V> {
     pub fn new() -> Self {
         Self {
             frames: Vec::new(),
@@ -26,7 +26,7 @@ impl<V, X> FrameStack<V, X> {
         self
     }
 
-    pub fn push(&mut self, frame: Frame<V, X>) -> Result<(), InterpreterError> {
+    pub fn push(&mut self, frame: Frame<V>) -> Result<(), InterpreterError> {
         if let Some(max) = self.max_depth
             && self.frames.len() >= max
         {
@@ -36,15 +36,15 @@ impl<V, X> FrameStack<V, X> {
         Ok(())
     }
 
-    pub fn pop(&mut self) -> Option<Frame<V, X>> {
+    pub fn pop(&mut self) -> Option<Frame<V>> {
         self.frames.pop()
     }
 
-    pub fn current(&self) -> Option<&Frame<V, X>> {
+    pub fn current(&self) -> Option<&Frame<V>> {
         self.frames.last()
     }
 
-    pub fn current_mut(&mut self) -> Option<&mut Frame<V, X>> {
+    pub fn current_mut(&mut self) -> Option<&mut Frame<V>> {
         self.frames.last_mut()
     }
 
@@ -58,7 +58,7 @@ impl<V, X> FrameStack<V, X> {
 }
 
 // ValueStore-like helpers that delegate to the top frame
-impl<V: Clone, X> FrameStack<V, X> {
+impl<V: Clone> FrameStack<V> {
     pub fn read(&self, ssa: SSAValue) -> Result<V, InterpreterError> {
         let frame = self.current().ok_or(InterpreterError::NoFrame)?;
         frame

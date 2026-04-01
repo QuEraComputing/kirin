@@ -1,46 +1,30 @@
-use kirin_ir::{CompileStage, ResultValue, SSAValue, SpecializedFunction, Statement};
+use kirin_ir::{CompileStage, ResultValue, SSAValue, SpecializedFunction};
 use rustc_hash::FxHashMap;
 
 /// A call frame for one [`SpecializedFunction`] invocation.
 ///
 /// Stores the callee identity, per-frame SSA value bindings, and
-/// interpreter-specific extra state `X`:
-///
-/// - [`StackInterpreter`](crate::StackInterpreter) uses
-///   `Frame<V, Option<Statement>>` (instruction cursor).
-/// - [`AbstractInterpreter`](crate::AbstractInterpreter) uses
-///   `Frame<V, FixpointState>` (worklist + block arg tracking).
+/// `caller_results` — the result slots where the return value should
+/// be written when the frame is popped.
 #[derive(Debug)]
-pub struct Frame<V, X = ()> {
+pub struct Frame<V> {
     callee: SpecializedFunction,
     stage: CompileStage,
     values: FxHashMap<SSAValue, V>,
-    extra: X,
+    caller_results: Vec<ResultValue>,
 }
 
-// -- Common methods ---------------------------------------------------------
-
-impl<V, X> Frame<V, X> {
-    pub fn new(callee: SpecializedFunction, stage: CompileStage, extra: X) -> Self {
-        Self {
-            callee,
-            stage,
-            values: FxHashMap::default(),
-            extra,
-        }
-    }
-
-    pub fn with_values(
+impl<V> Frame<V> {
+    pub fn new(
         callee: SpecializedFunction,
         stage: CompileStage,
-        values: FxHashMap<SSAValue, V>,
-        extra: X,
+        caller_results: Vec<ResultValue>,
     ) -> Self {
         Self {
             callee,
             stage,
-            values,
-            extra,
+            values: FxHashMap::default(),
+            caller_results,
         }
     }
 
@@ -52,21 +36,12 @@ impl<V, X> Frame<V, X> {
         self.stage
     }
 
-    pub fn extra(&self) -> &X {
-        &self.extra
-    }
-
-    pub fn extra_mut(&mut self) -> &mut X {
-        &mut self.extra
+    pub fn caller_results(&self) -> &[ResultValue] {
+        &self.caller_results
     }
 
     pub fn values(&self) -> &FxHashMap<SSAValue, V> {
         &self.values
-    }
-
-    /// Simultaneous mutable access to the values map and extra state.
-    pub fn values_and_extra_mut(&mut self) -> (&mut FxHashMap<SSAValue, V>, &mut X) {
-        (&mut self.values, &mut self.extra)
     }
 
     pub fn read(&self, value: SSAValue) -> Option<&V> {
@@ -83,20 +58,15 @@ impl<V, X> Frame<V, X> {
     }
 
     /// Consume the frame, returning its constituent parts.
-    pub fn into_parts(self) -> (SpecializedFunction, CompileStage, FxHashMap<SSAValue, V>, X) {
-        (self.callee, self.stage, self.values, self.extra)
-    }
-}
-
-// -- Cursor methods for StackInterpreter ------------------------------------
-
-impl<V> Frame<V, Option<Statement>> {
-    pub fn cursor(&self) -> Option<Statement> {
-        self.extra
-    }
-
-    pub fn set_cursor(&mut self, cursor: Option<Statement>) {
-        self.extra = cursor;
+    pub fn into_parts(
+        self,
+    ) -> (
+        SpecializedFunction,
+        CompileStage,
+        FxHashMap<SSAValue, V>,
+        Vec<ResultValue>,
+    ) {
+        (self.callee, self.stage, self.values, self.caller_results)
     }
 }
 
@@ -139,7 +109,7 @@ mod tests {
     #[test]
     fn test_frame_read_returns_none_for_missing() {
         let (_pipeline, stage_id, callee, _block, _result) = build_fixture();
-        let frame: Frame<i32, ()> = Frame::new(callee, stage_id, ());
+        let frame: Frame<i32> = Frame::new(callee, stage_id, vec![]);
 
         let bogus = SSAValue::from(TestSSAValue(9999));
         assert!(frame.read(bogus).is_none());
@@ -148,7 +118,7 @@ mod tests {
     #[test]
     fn test_frame_write_overwrites() {
         let (_pipeline, stage_id, callee, _block, result) = build_fixture();
-        let mut frame: Frame<i32, ()> = Frame::new(callee, stage_id, ());
+        let mut frame: Frame<i32> = Frame::new(callee, stage_id, vec![]);
 
         let old = frame.write(result, 10);
         assert!(old.is_none(), "first write should return None");
@@ -163,32 +133,22 @@ mod tests {
     #[test]
     fn test_frame_into_parts() {
         let (_pipeline, stage_id, callee, _block, result) = build_fixture();
-        let mut frame: Frame<i32, String> = Frame::new(callee, stage_id, "extra".to_string());
+        let mut frame: Frame<i32> = Frame::new(callee, stage_id, vec![result]);
         frame.write(result, 42);
 
-        let (got_callee, got_stage, got_values, got_extra) = frame.into_parts();
+        let (got_callee, got_stage, got_values, got_caller_results) = frame.into_parts();
         assert_eq!(got_callee, callee);
         assert_eq!(got_stage, stage_id);
-        assert_eq!(got_extra, "extra");
+        assert_eq!(got_caller_results, vec![result]);
         let ssa: SSAValue = result.into();
         assert_eq!(got_values.get(&ssa), Some(&42));
     }
 
     #[test]
-    fn test_frame_cursor_methods() {
-        let (pipeline, stage_id, callee, block, _result) = build_fixture();
-        let mut frame: Frame<i32, Option<Statement>> = Frame::new(callee, stage_id, None);
+    fn test_frame_caller_results() {
+        let (_pipeline, stage_id, callee, _block, result) = build_fixture();
+        let frame: Frame<i32> = Frame::new(callee, stage_id, vec![result]);
 
-        assert_eq!(frame.cursor(), None);
-
-        let stage = pipeline.stage(stage_id).unwrap();
-        let stmt = block
-            .first_statement(stage)
-            .expect("fixture has statements");
-        frame.set_cursor(Some(stmt));
-        assert_eq!(frame.cursor(), Some(stmt));
-
-        frame.set_cursor(None);
-        assert_eq!(frame.cursor(), None);
+        assert_eq!(frame.caller_results(), &[result]);
     }
 }

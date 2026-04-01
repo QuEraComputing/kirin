@@ -63,7 +63,8 @@ impl<V, R> Lift<CursorEffect<V>> for Action<V, R> {
 pub struct SingleStage<'ir, L: Dialect, V: Clone, M = ()> {
     pipeline: &'ir Pipeline<StageInfo<L>>,
     stage_id: CompileStage,
-    frames: FrameStack<V, BlockCursor>,
+    frames: FrameStack<V>,
+    cursor: Option<BlockCursor>,
     machine: M,
 }
 
@@ -143,6 +144,7 @@ impl<'ir, L: Dialect, V: Clone, M> SingleStage<'ir, L, V, M> {
             pipeline,
             stage_id,
             frames: FrameStack::new(),
+            cursor: None,
             machine,
         }
     }
@@ -180,9 +182,9 @@ impl<'ir, L: Dialect, V: Clone, M> SingleStage<'ir, L, V, M> {
             .expect("stage must exist in pipeline")
     }
 
-    /// Get the current statement from the top frame's cursor.
+    /// Get the current statement from the cursor.
     pub fn current_statement(&self) -> Option<Statement> {
-        self.frames.current()?.extra().current()
+        self.cursor.as_ref()?.current()
     }
 
     /// Enter a function: push a frame with a [`BlockCursor`] positioned at
@@ -195,8 +197,9 @@ impl<'ir, L: Dialect, V: Clone, M> SingleStage<'ir, L, V, M> {
     ) -> Result<(), InterpreterError> {
         let stage = self.stage_info();
         let cursor = BlockCursor::new(stage, entry_block);
-        let frame = Frame::new(callee, self.stage_id, cursor);
+        let frame = Frame::new(callee, self.stage_id, vec![]);
         self.frames.push(frame)?;
+        self.cursor = Some(cursor);
         self.bind_block_args(entry_block, args)?;
         Ok(())
     }
@@ -231,8 +234,8 @@ impl<'ir, L: Dialect, V: Clone, M> SingleStage<'ir, L, V, M> {
     /// Advance the cursor to the next statement in the current block.
     fn advance_cursor(&mut self) -> Result<(), InterpreterError> {
         let stage = self.stage_info();
-        let frame = self.frames.current_mut().ok_or(InterpreterError::NoFrame)?;
-        frame.extra_mut().advance(stage);
+        let cursor = self.cursor.as_mut().ok_or(InterpreterError::NoFrame)?;
+        cursor.advance(stage);
         Ok(())
     }
 
@@ -240,8 +243,7 @@ impl<'ir, L: Dialect, V: Clone, M> SingleStage<'ir, L, V, M> {
     fn jump_to_block(&mut self, block: Block, args: &[V]) -> Result<(), InterpreterError> {
         let stage = self.stage_info();
         let cursor = BlockCursor::new(stage, block);
-        let frame = self.frames.current_mut().ok_or(InterpreterError::NoFrame)?;
-        *frame.extra_mut() = cursor;
+        self.cursor = Some(cursor);
         self.bind_block_args(block, args)?;
         Ok(())
     }
