@@ -1,7 +1,7 @@
 # MVP Implementation Report
 
-**Date:** 2026-03-31
-**Status:** single-stage block execution working, 8 tests passing
+**Date:** 2026-04-01 (updated)
+**Status:** execution seeds implemented, 10 tests passing
 
 ## Module Structure
 
@@ -116,35 +116,79 @@ enum wrapping the operations you need, implement `Interpretable` on it.
   independently.
 - 4 unit tests on `Frame<V, X>` (read, write, into_parts, cursor methods).
 
+## Execution Seeds Implementation (2026-04-01)
+
+Replaced the per-frame `BlockCursor` with user-definable cursor types and a
+global cursor stack. Key changes from the MVP:
+
+| Before | After |
+|--------|-------|
+| `Action<V, R>` (3 variants) | `Action<V, R, C>` (7 variants: +Return, Yield, Push, Call) |
+| `Frame<V, X>` with per-frame cursor | `Frame<V>` with `caller_results`, no cursor |
+| `FrameStack<V, X>` | `FrameStack<V>` |
+| `SingleStage<'ir, L, V, M>` | `SingleStage<'ir, L, V, M, C>` with `cursors: Vec<C>` |
+| `step()` interprets one statement | `step()` pops cursor, calls `execute`, dispatches effect |
+| `run()` returns `()` | `run()` returns `Option<V>` (top-level return value) |
+| `BlockCursor` (not generic) | `BlockCursor<V>` with `Execute<SingleStage<...>>` impl |
+
+### Design decisions
+
+1. **Global cursor stack** (not per-frame): Per-frame cursor stacks break when
+   cursors cross frame boundaries. The global stack naturally mirrors nesting.
+
+2. **Call as a driver-handled effect**: The frame stack is interpreter-internal
+   state. Cursors return `Call` effects; the driver handles frame push/pop.
+   Eliminates `FunctionCursor` for standard calls.
+
+3. **`C: Lift<BlockCursor<V>>` on the driver**: The `Call` handler creates a
+   `BlockCursor` for the callee's entry block and lifts it into `C`. All cursor
+   entry types must accept `BlockCursor<V>` as a variant.
+
+4. **Block exhaustion = error**: Well-formed IR blocks end with a terminator
+   producing a structural effect (Return, Yield, Call, Push). Block exhaustion
+   without one returns `InterpreterError::NoCurrent`.
+
+5. **Top-level Return → `pending_yield`**: When Return pops the last frame,
+   the value is stored in `pending_yield`. `run()` returns it.
+
+### Test coverage (10 tests)
+
+- 4 frame unit tests (read, write, into_parts, caller_results)
+- `test_constant_and_run` — basic block execution with Return
+- `test_step_by_step` — driver step semantics
+- `test_counter_machine` — dialect machine mutation during interpret
+- `test_composite_machine_projection` — ProjectRef/ProjectMut for sub-machines
+- `test_push_inline_block` — Push effect for inline block execution with Yield
+- `test_jump_multi_block` — Jump effect for multi-block CFG traversal
+
 ## Deferred Work
 
-### Near-term (next iteration)
+### Near-term
 
-- **Multi-block CFG execution**: region traversal where Jump effects follow
-  successor blocks. The interpreter already handles `Action::Jump` by replacing
-  the `BlockCursor` on the current frame — this may already work for intra-region
-  jumps.
-- **Function invocation**: `invoke(callee, args) -> Result<V, E>` as an
-  execution seed. Push a new frame, execute the callee's entry region, pop,
-  return the result.
-- **`ExecSeed` trait on `Interpreter`**: move `exec_block` and `invoke` to a
-  trait so dialect authors can call them via `I: Interpreter + ExecSeed`
-  rather than knowing the concrete type.
+- **`RegionCursor<V>`**: CFG traversal with proper region semantics (entry
+  block, follow jumps, return on Return/Yield).
+- **`ForCursor<V>`**: Loop iteration via Push/Yield cycle with the driver.
+- **Synchronous execution seed methods**: `exec_block`, `exec_region`, `invoke`
+  as convenience wrappers around the cursor stack.
+- **Callee query builder**: Port `callee::Query` from interpreter-2.
 
 ### Medium-term
 
-- **`Receipt` trait**: bundle `Language`, `Value`, `Machine`, `StageInfo`,
-  `Error` into one associated-type carrier. Simplifies `SingleStage` generics.
-- **Driver control traits**: `Fuel`, `Breakpoints`, `Interrupt` — carried
-  forward from interpreter-2 design unchanged.
-- **`Position` trait**: read-only cursor inspection for tests and debugging.
+- **`Receipt` trait**: Bundle `Language`, `Value`, `Machine`, `CursorEntry`,
+  `StageInfo`, `Error`.
+- **`#[derive(Execute)]`**: Auto-generate delegating impls for composite cursor
+  enums.
+- **`IsPush` marker trait usage**: Defined but not yet used by the driver (it
+  matches `Action` directly).
+- **Generalize cursor type visibility**: Add `type CursorEntry` to `Interpreter`
+  so dialects producing Push effects can write generic impls.
+- **Driver control traits**: `Fuel`, `Breakpoints`, `Interrupt`.
+- **`Position` trait**: Read-only cursor inspection.
 
 ### Long-term
 
-- **Abstract interpreter**: `AbstractInterpreter<R>` with fixpoint execution
-  seeds. `exec_block` runs to fixpoint, `invoke` checks/computes summaries.
-- **Derive macros**: `#[derive(Interpretable)]`, `#[derive(Machine)]` for
-  composite dialect/machine/effect enums.
-- **Graph execution seeds**: DiGraph, UnGraph traversal.
-- **Dynamic interpreter**: multi-stage with heterogeneous value types.
-- **Stage-boundary protocols**: cross-stage execution orchestration.
+- **Abstract interpreter**: Fixpoint cursor types, summary computation.
+- **Derive macros**: `#[derive(Interpretable)]`, `#[derive(Machine)]`.
+- **Graph cursors**: `DiGraphCursor`, `UnGraphCursor`.
+- **Custom calling conventions**: Coroutines, generators, graph functions.
+- **Dynamic interpreter**: Multi-stage with heterogeneous value types.

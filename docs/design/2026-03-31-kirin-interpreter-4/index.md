@@ -1,7 +1,7 @@
 # Kirin Interpreter-4 Design
 
-**Date:** 2026-03-31
-**Status:** design iteration, MVP implemented
+**Date:** 2026-04-01 (updated)
+**Status:** execution seeds implemented, 10 tests passing
 **Primary crate:** `crates/kirin-interpreter-4`
 
 ## Summary
@@ -45,31 +45,40 @@ From **kirin-interpreter-3** (machine design):
 - `Interpretable` as mutation over machine projection + returned effects
 
 New in **interpreter-4**:
-- execution seeds as interpreter methods callable during `interpret`
+- user-definable cursor types with `Execute<I>` trait
+- global cursor stack with flat driver loop (zero Rust recursion)
+- `Action<V, R, C>` effect algebra with Return/Yield/Push/Call
 - mixed-flavor effects (mutation + return effects in the same `interpret`)
-- `Receipt` trait for type parameter bundling
-- unified `Lift`/`Project` for machines, effects, and errors
+- unified `Lift`/`Project` for machines, effects, cursors, and errors
 
 ## Key Decisions
 
 1. `Interpretable::interpret(&self, interp: &mut I) -> Result<Effect, Error>`
    gives dialect authors full mutation access AND an effect return channel.
 
-2. Execution seeds (`exec_block`, `exec_region`, `invoke`) are **methods on the
-   interpreter**, not effect types. Dialect authors call them synchronously.
+2. **Execution seeds are cursor types**, not interpreter methods. Each cursor
+   implements `Execute<I>` with `&mut self`. The initial construction encodes
+   the starting point; mutation tracks traversal progress. There is no separate
+   "seed" concept.
 
-3. Effects are for **deferred control flow** — cursor changes, frame operations,
-   and stop signals that the shell handles after `interpret` returns.
+3. **Global cursor stack** — `Vec<C>` on the interpreter, not per-frame. The
+   driver pops, calls `execute`, dispatches the returned `Action`. All nesting
+   is on the cursor stack with zero Rust recursion.
 
-4. The interpreter IS a `Machine`. Its `consume_effect` dispatches to inner
-   dialect machines and handles cursor/frame effects.
+4. **Call/Return as driver-handled effects.** The frame stack is
+   interpreter-internal state. Cursors return `Call` effects; the driver pushes
+   frames. This eliminates `FunctionCursor` for standard function calls.
 
-5. Stage dispatch uses the pipeline's `StageInfo` directly. Single-stage
+5. The interpreter IS a `Machine`. Its `consume_effect` only handles `Delegate`
+   (inner machine effects). All structural effects (Push, Yield, Return, Call)
+   are handled by the driver loop.
+
+6. Stage dispatch uses the pipeline's `StageInfo` directly. Single-stage
    interpreters have `StageInfo<L>`, multi-stage have a stage enum with
    `HasStageInfo<L>` dispatch.
 
-6. `Receipt` bundles all type parameters (Language, Value, Machine, StageInfo,
-   Error) to keep concrete interpreter signatures manageable.
+7. `Receipt` trait for type parameter bundling is deferred until patterns
+   stabilize.
 
 ## Document Map
 
@@ -93,10 +102,11 @@ Interpreter-3 forced all body execution through the `Shell` control language
 - the shell's `inherit` method hardcoded traversal strategies
 - dialect authors lost the power to compose execution patterns
 
-Interpreter-4 keeps the `Shell` control language for cursor-level effects
-(Jump, Stop) but adds inline execution seeds that dialect authors call during
-`interpret`. The `Shell` enum becomes the **deferred** path; inline seeds are
-the **synchronous** path.
+Interpreter-4 replaces the shell's hardcoded traversal with user-definable
+cursor types. Dialect authors return `Push(BlockCursor)` to execute inline
+bodies (like `scf.if` branches) and the flat driver loop handles all nesting.
+The key win: `scf.for` can use `ForCursor` on the cursor stack — each iteration
+is one driver cycle, with zero Rust recursion regardless of nesting depth.
 
 ### vs kirin-interpreter (v1)
 

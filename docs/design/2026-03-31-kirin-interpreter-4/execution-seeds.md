@@ -4,251 +4,165 @@
 
 In interpreter-3, all IR traversal was hardcoded into the shell's `inherit`
 method. Dialect authors could not customize how they traverse statement bodies.
-Execution seeds fix this by making common traversal patterns available as
-**interpreter methods** that dialect authors call during `interpret`.
 
-## Two Execution Paths
+Interpreter-4 replaces hardcoded traversal with **user-definable cursor types**
+that implement `Execute<I>`. Each cursor encapsulates a traversal strategy.
+A single flat driver loop pops cursor entries and dispatches structural effects.
 
-### Synchronous (inline execution seeds)
+## Design: Cursor Types as Execution Seeds
 
-Dialect authors call execution methods on the interpreter during `interpret`.
-The interpreter pushes a cursor, runs the body, collects the result, pops the
-cursor, and returns to the dialect author.
+There is no separate "seed" concept. The cursor's initial state IS the seed —
+construction encodes the starting point (block, args, metadata), mutation tracks
+traversal progress.
 
-```rust
-let result = interp.exec_block(self.body_block, &args)?;
-```
-
-Use for:
-- structured control flow bodies (`scf.if`, `scf.for`)
-- inline function invocation when the dialect wants the result immediately
-- any body where the dialect author controls the iteration
-
-### Deferred (returned effects)
-
-Dialect authors return an effect that tells the shell to handle cursor/frame
-changes after `interpret` returns.
+### Core traits
 
 ```rust
-Ok(CfEffect::Jump(self.target, args))
-```
-
-Use for:
-- intra-region control flow jumps (branch, cond_branch)
-- function calls that should be handled by the shell's call stack
-- return/yield from the current function
-- stop signals
-
-## Execution Seed Methods
-
-The interpreter should provide these methods. Concrete and abstract interpreters
-give different implementations.
-
-### Block execution
-
-```rust
-fn exec_block(
-    &mut self,
-    block: Block,
-    args: &[Self::Value],
-) -> Result<Self::Value, Self::Error>;
-```
-
-Concrete: push block cursor, run non-terminator statements linearly, read
-terminator yield value, pop cursor, return the value.
-
-Abstract: run block to fixpoint, return the joined abstract value.
-
-### Region execution (CFG)
-
-```rust
-fn exec_region(
-    &mut self,
-    region: Region,
-    args: &[Self::Value],
-) -> Result<Self::Value, Self::Error>;
-```
-
-Concrete: push region cursor starting at entry block, follow Jump effects to
-successor blocks, return when a Return/Yield effect is encountered.
-
-Abstract: worklist-driven fixpoint over all reachable blocks in the region.
-
-### Function invocation
-
-```rust
-fn invoke(
-    &mut self,
-    callee: SpecializedFunction,
-    args: &[Self::Value],
-) -> Result<Self::Value, Self::Error>;
-```
-
-Concrete: push a new frame for the callee, execute the entry region, pop the
-frame, return the result.
-
-Abstract: check summary cache, compute summary if missing, return the summary
-result.
-
-### Graph execution (future)
-
-```rust
-fn exec_digraph(
-    &mut self,
-    graph: DiGraph,
-    args: &[Self::Value],
-) -> Result<Self::Value, Self::Error>;
-
-fn exec_ungraph(
-    &mut self,
-    graph: UnGraph,
-    args: &[Self::Value],
-) -> Result<Self::Value, Self::Error>;
-```
-
-These are deferred but the trait surface reserves room for them.
-
-## Trait Surface
-
-Execution seeds should be methods on a trait that the interpreter implements:
-
-```rust
-trait ExecSeed {
-    type Value: Clone;
-    type Error;
-
-    fn exec_block(
-        &mut self,
-        block: Block,
-        args: &[Self::Value],
-    ) -> Result<Self::Value, Self::Error>;
-
-    fn exec_region(
-        &mut self,
-        region: Region,
-        args: &[Self::Value],
-    ) -> Result<Self::Value, Self::Error>;
-
-    fn invoke(
-        &mut self,
-        callee: SpecializedFunction,
-        args: &[Self::Value],
-    ) -> Result<Self::Value, Self::Error>;
+/// User-definable cursor type. Tracks traversal state, returns effects.
+pub trait Execute<I: Interpreter> {
+    fn execute(&mut self, interp: &mut I) -> Result<<I as Machine>::Effect, I::Error>;
 }
 ```
 
-Or these could be methods directly on `Interpreter` as provided methods.
-The exact factoring is an implementation decision — the key constraint is that
-dialect authors can call them from within `interpret` via `&mut I`.
+`Execute` impls are for concrete interpreter types (e.g., `SingleStage<...>`),
+not generic `I: Interpreter`. The trait genericity enables sum-enum dispatch
+for composite cursor enums, not interpreter-polymorphic cursor reuse.
 
-Whether `ExecSeed` is a separate trait or part of `Interpreter` depends on
-whether we want dialect authors to opt into execution seed requirements:
+### Effect algebra
 
 ```rust
-// Option A: separate trait, opt-in
-impl<I: Interpreter + ExecSeed> Interpretable<I> for ScfIf { ... }
-
-// Option B: part of Interpreter, always available
-impl<I: Interpreter> Interpretable<I> for ScfIf { ... }
+pub enum Action<V, R = (), C = ()> {
+    Advance,                                          // local — handled inside execute
+    Jump(Block, Vec<V>),                              // local — handled inside execute
+    Return(V),                                        // structural — driver pops frame
+    Yield(V),                                         // structural — driver sets pending yield
+    Push(C),                                          // structural — driver stacks cursors
+    Call(SpecializedFunction, Vec<V>, Vec<ResultValue>), // structural — driver pushes frame
+    Delegate(R),                                      // structural — driver delegates to machine
+}
 ```
 
-Option B is simpler for dialect authors. Option A is more modular. For the MVP,
-Option B is preferred — `Interpreter` includes execution seed methods.
+Local effects (Advance, Jump) are consumed inside `execute`'s inner loop.
+Structural effects bubble to the driver.
 
-## Callee Resolution
+### Global cursor stack
 
-Function resolution belongs to the dialect author but the framework provides
-query builder tooling. This carries forward from both kirin-interpreter (v1) and
-interpreter-3 design.
+The interpreter has a single global `cursors: Vec<C>` separate from the frame
+stack. The frame stack holds SSA value bindings. The cursor stack holds
+traversal state. These are orthogonal.
 
-The query builder is a method on the interpreter:
+**Why global?** Per-frame cursor stacks break when a cursor crosses frame
+boundaries. With a global stack, cursor entries naturally mirror the nesting
+structure. Return consumes the callee's entries; the parent's entries sit below.
+
+**Why Call is a driver-handled effect?** The frame stack is interpreter-internal
+state. Cursors return `Call` effects; the driver pushes/pops frames. This
+eliminates `FunctionCursor` for standard calls.
+
+### Driver constraint
+
+The driver requires `C: Execute<Self> + Lift<BlockCursor<V>>`. The `Lift` bound
+exists because the `Call` handler creates a `BlockCursor` for the callee's
+entry block and lifts it into `C`. All cursor entry types must have a
+`Block(BlockCursor<V>)` variant (or be `BlockCursor<V>` itself).
+
+## Cursor Types
+
+### `BlockCursor<V>`
+
+Linear traversal through a single block. Handles Advance/Jump internally.
+Returns structural effects (Return, Yield, Push, Call) to the driver.
 
 ```rust
-fn resolve_callee(
-    &self,
-    target: Symbol,
-    args: &[Self::Value],
-) -> Result<SpecializedFunction, Self::Error>;
+pub struct BlockCursor<V> {
+    block: Block,
+    current: Option<Statement>,
+    results: Vec<ResultValue>,
+    args: Option<Vec<V>>,  // bound on first execute
+}
 ```
 
-Or as a builder for more complex resolution:
+### Composition
+
+Cursor types compose as sum enums, following the same pattern as dialects and
+effects:
 
 ```rust
-let callee = interp.callee()
-    .symbol(self.target())
-    .stage(stage_id)                     // optional, defaults to current
-    .specialization(callee::UniqueLive)  // optional, defaults to UniqueLive
-    .resolve()?;
+enum ScfCursor<V> {
+    Block(BlockCursor<V>),
+    Region(RegionCursor<V>),  // deferred
+    For(ForCursor<V>),        // deferred
+}
 ```
 
-For the MVP, a single `resolve_callee` method is sufficient. The builder can
-be added when more resolution modes are needed.
+`Lift` composes: `BlockCursor<V>` lifts into `ScfCursor::Block(...)`.
 
-## Custom Traversal
+### Custom cursors
 
-Execution seeds are helpers, not the only option. A dialect author can always
-implement custom body traversal by directly working with the IR and the
-interpreter:
+Domain-specific crates define their own cursor types:
 
 ```rust
-impl<I: Interpreter> Interpretable<I> for CustomLoop {
-    type Effect = ();
-    type Error = I::Error;
-
-    fn interpret(&self, interp: &mut I) -> Result<(), I::Error> {
-        loop {
-            let result = interp.exec_block(self.body, &[])?;
-            let cond = interp.read(self.condition)?;
-            if !cond.is_truthy() {
-                interp.write(self.result, result)?;
-                break;
-            }
-        }
-        Ok(())
+impl Execute<SingleStage<...>> for TensorGraphCursor {
+    fn execute(&mut self, interp: &mut SingleStage<...>) -> Result<Effect, Error> {
+        // Custom graph traversal
     }
 }
 ```
 
-This is the modularization that interpreter-3 lacked: the dialect author
-controls the iteration pattern while the framework provides the block execution
-primitive.
+## Two Execution Paths
 
-## Execution Seeds vs Shell Control
+### Deferred (cursor stack — primary)
 
-The split between execution seeds and shell control (effects):
+Dialect authors return effects that the driver handles after `interpret` returns.
+The cursor stack manages all nesting with zero Rust recursion.
 
-| Mechanism | Owned by | Timing | Example |
-|-----------|----------|--------|---------|
-| `exec_block` | dialect author | synchronous | `scf.if`, `scf.for` body execution |
-| `exec_region` | dialect author | synchronous | inline region execution |
-| `invoke` | dialect author | synchronous | inline function call |
-| `Effect::Jump` | shell | deferred | `cf.branch`, `cf.cond_branch` |
-| `Effect::Call` | shell | deferred | function call with shell-managed frames |
-| `Effect::Return` | shell | deferred | function return |
-| `Effect::Stop` | shell | deferred | halt execution |
+- `Action::Push(cursor)` — inline body execution (scf.if, scf.for)
+- `Action::Call(callee, args, results)` — function invocation
+- `Action::Return(v)` — function return
+- `Action::Yield(v)` — inline body completion
+- `Action::Jump(block, args)` — intra-block CFG traversal (handled by cursor)
 
-The synchronous path uses the interpreter's cursor/frame stack internally but
-the dialect author sees it as a simple call-and-return. The deferred path
-returns an effect that the shell processes after `interpret` completes.
+### Synchronous (future)
+
+Execution seed methods (`exec_block`, `exec_region`, `invoke`) on the
+interpreter that dialect authors call during `interpret`. These are convenience
+wrappers that internally use the cursor stack. Deferred to future work — the
+deferred path handles all current use cases.
+
+## Callee Resolution
+
+Minimal for this iteration. The driver resolves callees via:
+
+```rust
+impl SingleStage<...> {
+    fn push_call_frame(&mut self, callee: SpecializedFunction, ...) {
+        // callee → SpecializedFunctionInfo → body Statement → regions → entry block
+    }
+}
+```
+
+Callee query builder (`callee::Query` from interpreter-2) is deferred.
 
 ## Interaction with Abstract Interpretation
 
-Execution seeds are the key abstraction that makes `Interpretable` portable
-across concrete and abstract interpreters:
+Cursor types are the key abstraction for making traversal portable:
 
-- Concrete `exec_block`: push cursor, run linearly, return value
-- Abstract `exec_block`: run to fixpoint, return joined abstract value
-- Concrete `invoke`: push frame, execute, pop frame, return value
-- Abstract `invoke`: check/compute summary, return abstract result
+- Concrete `BlockCursor`: linear traversal, follow jumps, return on structural effect
+- Abstract `BlockCursor` (future): run to fixpoint, return joined abstract value
+- Concrete `ForCursor` (future): iterate loop body via Push/Yield cycle
+- Abstract `ForCursor` (future): widening/narrowing until fixpoint
 
-The dialect author writes ONE `Interpretable` impl. The interpreter type
-determines the execution strategy.
+The dialect author writes ONE `Interpretable` impl. The cursor type determines
+the traversal strategy.
 
-For deferred effects, the abstract interpreter handles them differently:
-- `CfEffect::Jump(block, args)` → enqueue block in worklist
-- `CfEffect::Fork(targets)` → enqueue all targets (undecidable branch)
-- `FuncEffect::Call(...)` → compute/lookup summary
-- `FuncEffect::Return(v)` → join into function summary
+## Backlog
 
-This is handled in the interpreter's `consume_effect`, not by the dialect
-author.
+- `RegionCursor<V>` — CFG traversal with proper region semantics
+- `ForCursor<V>` — loop iteration via Push/Yield cycle
+- Synchronous execution seed methods (`exec_block`, `exec_region`, `invoke`)
+- Callee query builder
+- `#[derive(Execute)]` for composite cursor enums
+- Graph cursors: `DiGraphCursor`, `UnGraphCursor`
+- Abstract interpreter cursors: fixpoint block/region execution
+- `IsPush` marker trait (defined, not yet used by driver)
+- Generalize cursor type visibility via `type CursorEntry` on `Interpreter`
