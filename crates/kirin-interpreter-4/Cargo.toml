@@ -1,0 +1,15 @@
+[package]
+name = "kirin-interpreter-4"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-ir.workspace = true
+rustc-hash = "2.1.2"
+smallvec.workspace = true
+
+[dev-dependencies]
+kirin-arith = { workspace = true }
+kirin-constant = { workspace = true }
+kirin-function = { workspace = true }
+kirin-test-languages = { workspace = true, features = ["composite-language"] }

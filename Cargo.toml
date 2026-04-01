@@ -20,17 +20,19 @@ members = [
   "crates/kirin-function",
   "crates/kirin-interpreter",
   "crates/kirin-interpreter-2",
+  "crates/kirin-interpreter-3",
+  "crates/kirin-interpreter-4",
   "crates/kirin-interval",
   "crates/kirin-ir",
   "crates/kirin-lexer",
   "crates/kirin-prettyless",
   "crates/kirin-scf",
-  "crates/kirin-tuple",
   "crates/kirin-test-languages",
   "crates/kirin-test-types",
   "crates/kirin-test-utils",
+  "crates/kirin-tuple",
   "example/toy-lang",
-  "example/toy-qc", "crates/kirin-interpreter-3",
+  "example/toy-qc"
 ]
 
 [workspace.dependencies]
@@ -82,12 +84,12 @@ kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }
 kirin-lexer = { path = "crates/kirin-lexer", version = "0.1.0" }
 kirin-prettyless = { path = "crates/kirin-prettyless", version = "0.1.0" }
 kirin-scf = { path = "crates/kirin-scf", version = "0.1.0" }
-kirin-tuple = { path = "crates/kirin-tuple", version = "0.1.0" }
 kirin-test-languages = { path = "crates/kirin-test-languages", version = "0.1.0" }
 kirin-test-types = { path = "crates/kirin-test-types", version = "0.1.0" }
 kirin-test-utils = { path = "crates/kirin-test-utils", version = "0.1.0" }
-predicates = "3"
+kirin-tuple = { path = "crates/kirin-tuple", version = "0.1.0" }
 petgraph = "0.7"
+predicates = "3"
 smallvec = "1.13"
 
 [[example]]
@@ -119,7 +121,6 @@ kirin-cmp = { workspace = true }
 kirin-constant = { workspace = true }
 kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
-kirin-tuple = { workspace = true }
 kirin-test-languages = { workspace = true, features = [
   "arith-function-language",
   "bitwise-function-language",
@@ -130,11 +131,12 @@ kirin-test-languages = { workspace = true, features = [
   "simple-language",
 ] }
 kirin-test-utils = { workspace = true, features = ["roundtrip"] }
+kirin-tuple = { workspace = true }
 trybuild = { workspace = true }
 
 [features]
-default = ["parser", "pretty", "interpret"]
-parser = ["dep:kirin-chumsky", "dep:kirin-lexer", "dep:chumsky"]
-pretty = ["dep:kirin-prettyless"]
+default = ["interpret", "parser", "pretty"]
 interpret = ["dep:kirin-interpreter"]
+parser = ["dep:chumsky", "dep:kirin-chumsky", "dep:kirin-lexer"]
+pretty = ["dep:kirin-prettyless"]
 serde = ["dep:serde"]

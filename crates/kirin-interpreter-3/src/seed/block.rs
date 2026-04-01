@@ -115,6 +115,7 @@ where
     }
 }
 
+#[allow(clippy::type_complexity)]
 fn split_terminal_effect<'ir, L, V, M, S>(
     interp: &mut SingleStage<'ir, L, V, M, S>,
     effect: Effect<V, M::Effect>,

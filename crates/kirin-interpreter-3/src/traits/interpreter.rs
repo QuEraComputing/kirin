@@ -54,6 +54,7 @@ pub trait Interpretable<I: Interpreter> {
     type Effect;
     type Error;
 
+    #[allow(clippy::type_complexity)]
     fn interpret(
         &self,
         interp: &mut I,
