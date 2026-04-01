@@ -4,7 +4,7 @@ use kirin_function::{FunctionBody, Return};
 use kirin_interpreter_4::concrete::SingleStage;
 use kirin_interpreter_4::effect::CursorEffect;
 use kirin_interpreter_4::error::InterpreterError;
-use kirin_interpreter_4::traits::{Interpretable, ValueStore};
+use kirin_interpreter_4::traits::{Interpretable, Machine, ValueStore};
 use kirin_ir::*;
 
 // ---------------------------------------------------------------------------
@@ -18,10 +18,6 @@ enum TestValue {
 
 // ---------------------------------------------------------------------------
 // TestDialect — local dialect to satisfy the orphan rule.
-//
-// Uses #[derive(Dialect)] with #[wraps] so that all Dialect supertraits
-// (IsTerminator, HasResults, HasArguments, IsEdge, HasUngraphs, ...) are
-// generated automatically via delegation to the inner types.
 // ---------------------------------------------------------------------------
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
@@ -35,16 +31,18 @@ enum TestDialect {
 }
 
 // ---------------------------------------------------------------------------
-// Interpretable impl for TestDialect on SingleStage
+// Interpretable impl — returns CursorEffect which lifts into Action via Lift
 // ---------------------------------------------------------------------------
 
-impl<'ir> Interpretable<SingleStage<'ir, TestDialect, TestValue>> for TestDialect {
+type TestInterp<'ir> = SingleStage<'ir, TestDialect, TestValue>;
+
+impl<'ir> Interpretable<TestInterp<'ir>> for TestDialect {
     type Effect = CursorEffect<TestValue>;
     type Error = InterpreterError;
 
     fn interpret(
         &self,
-        interp: &mut SingleStage<'ir, TestDialect, TestValue>,
+        interp: &mut TestInterp<'ir>,
     ) -> Result<CursorEffect<TestValue>, InterpreterError> {
         match self {
             TestDialect::Constant(c) => {
@@ -59,10 +57,7 @@ impl<'ir> Interpretable<SingleStage<'ir, TestDialect, TestValue>> for TestDialec
                 interp.write(c.result, val)?;
                 Ok(CursorEffect::Advance)
             }
-            TestDialect::Return(_ret) => {
-                // Return is a terminator; advancing past it exhausts the block cursor.
-                Ok(CursorEffect::Advance)
-            }
+            TestDialect::Return(_ret) => Ok(CursorEffect::Advance),
             TestDialect::FunctionBody(_) => Err(InterpreterError::UnhandledEffect(
                 "FunctionBody not expected in test execution".to_string(),
             )),
@@ -74,15 +69,14 @@ impl<'ir> Interpretable<SingleStage<'ir, TestDialect, TestValue>> for TestDialec
 // Tests
 // ---------------------------------------------------------------------------
 
-#[test]
-fn test_constant_and_run() {
-    // Build a pipeline with one stage containing a function: %0 = constant 42; ret %0
-    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
-    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
-
-    let (spec, entry_block, c0_result) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
+fn build_program(
+    pipeline: &mut Pipeline<StageInfo<TestDialect>>,
+    stage_id: CompileStage,
+    constant_value: i64,
+) -> (SpecializedFunction, Block, ResultValue) {
+    pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
         let sf = b.staged_function().new().unwrap();
-        let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(42));
+        let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(constant_value));
         let c0_result = c0.result;
         let ret = Return::<ArithType>::new(b, vec![c0_result.into()]);
         let block = b.block().stmt(c0).terminator(ret).new();
@@ -94,62 +88,100 @@ fn test_constant_and_run() {
         );
         let spec = b.specialize().staged_func(sf).body(body).new().unwrap();
         (spec, block, c0_result)
-    });
+    })
+}
 
-    // Create interpreter, enter the function, and run
-    let mut interp = SingleStage::<TestDialect, TestValue>::new(&pipeline, stage_id);
-    interp
-        .enter_function(spec, entry_block, &[])
-        .expect("enter_function should succeed");
-    interp.run().expect("run should succeed");
+#[test]
+fn test_constant_and_run() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let (spec, entry_block, c0_result) = build_program(&mut pipeline, stage_id, 42);
 
-    // Verify the constant was written
+    let mut interp = TestInterp::new(&pipeline, stage_id, ());
+    interp.enter_function(spec, entry_block, &[]).unwrap();
+    interp.run().unwrap();
+
     let result_ssa: SSAValue = c0_result.into();
-    let value = interp.read(result_ssa).expect("result should be bound");
-    assert_eq!(value, TestValue::I64(42));
+    assert_eq!(interp.read(result_ssa).unwrap(), TestValue::I64(42));
 }
 
 #[test]
 fn test_step_by_step() {
-    // Same program, but drive it with step() to verify step-level control.
     let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
     let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let (spec, entry_block, c0_result) = build_program(&mut pipeline, stage_id, 99);
 
-    let (spec, entry_block, c0_result) = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
-        let sf = b.staged_function().new().unwrap();
-        let c0 = Constant::<ArithValue, ArithType>::new(b, ArithValue::I64(99));
-        let c0_result = c0.result;
-        let ret = Return::<ArithType>::new(b, vec![c0_result.into()]);
-        let block = b.block().stmt(c0).terminator(ret).new();
-        let region = b.region().add_block(block).new();
-        let body = FunctionBody::<ArithType>::new(
-            b,
-            region,
-            Signature::new(vec![], ArithType::default(), ()),
-        );
-        let spec = b.specialize().staged_func(sf).body(body).new().unwrap();
-        (spec, block, c0_result)
-    });
+    let mut interp = TestInterp::new(&pipeline, stage_id, ());
+    interp.enter_function(spec, entry_block, &[]).unwrap();
 
-    let mut interp = SingleStage::<TestDialect, TestValue>::new(&pipeline, stage_id);
-    interp
-        .enter_function(spec, entry_block, &[])
-        .expect("enter_function should succeed");
+    assert!(interp.step().unwrap(), "first step: constant");
+    assert!(interp.step().unwrap(), "second step: return terminator");
+    assert!(!interp.step().unwrap(), "third step: exhausted");
 
-    // Step 1: execute the Constant statement
-    let ran = interp.step().expect("step should succeed");
-    assert!(ran, "first step should execute the constant");
-
-    // Step 2: execute the Return terminator
-    let ran = interp.step().expect("step should succeed");
-    assert!(ran, "second step should execute the return terminator");
-
-    // Step 3: block exhausted, no more statements
-    let ran = interp.step().expect("step should succeed");
-    assert!(!ran, "third step should return false (block exhausted)");
-
-    // Verify the value
     let result_ssa: SSAValue = c0_result.into();
-    let value = interp.read(result_ssa).expect("result should be bound");
-    assert_eq!(value, TestValue::I64(99));
+    assert_eq!(interp.read(result_ssa).unwrap(), TestValue::I64(99));
+}
+
+// ---------------------------------------------------------------------------
+// CounterMachine — demonstrates dialect machine accessed via mutation
+// ---------------------------------------------------------------------------
+
+#[derive(Debug, Default)]
+struct CounterMachine {
+    count: u32,
+}
+
+impl Machine for CounterMachine {
+    type Effect = ();
+    type Error = InterpreterError;
+
+    fn consume_effect(&mut self, _: ()) -> Result<(), InterpreterError> {
+        Ok(())
+    }
+}
+
+type CounterInterp<'ir> = SingleStage<'ir, TestDialect, TestValue, CounterMachine>;
+
+impl<'ir> Interpretable<CounterInterp<'ir>> for TestDialect {
+    type Effect = CursorEffect<TestValue>;
+    type Error = InterpreterError;
+
+    fn interpret(
+        &self,
+        interp: &mut CounterInterp<'ir>,
+    ) -> Result<CursorEffect<TestValue>, InterpreterError> {
+        interp.machine_mut().count += 1;
+
+        match self {
+            TestDialect::Constant(c) => {
+                let val = match &c.value {
+                    ArithValue::I64(n) => TestValue::I64(*n),
+                    other => {
+                        return Err(InterpreterError::UnhandledEffect(format!(
+                            "unsupported ArithValue variant in test: {other:?}"
+                        )));
+                    }
+                };
+                interp.write(c.result, val)?;
+                Ok(CursorEffect::Advance)
+            }
+            TestDialect::Return(_ret) => Ok(CursorEffect::Advance),
+            TestDialect::FunctionBody(_) => Err(InterpreterError::UnhandledEffect(
+                "FunctionBody not expected in test execution".to_string(),
+            )),
+        }
+    }
+}
+
+#[test]
+fn test_counter_machine() {
+    let mut pipeline: Pipeline<StageInfo<TestDialect>> = Pipeline::new();
+    let stage_id = pipeline.add_stage().stage(StageInfo::default()).new();
+    let (spec, entry_block, _) = build_program(&mut pipeline, stage_id, 42);
+
+    let mut interp = CounterInterp::new(&pipeline, stage_id, CounterMachine::default());
+    interp.enter_function(spec, entry_block, &[]).unwrap();
+    interp.run().unwrap();
+
+    assert_eq!(interp.machine().count, 2);
 }

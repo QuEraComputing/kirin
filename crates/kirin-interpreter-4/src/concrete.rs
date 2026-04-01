@@ -3,6 +3,7 @@ use crate::effect::CursorEffect;
 use crate::error::InterpreterError;
 use crate::frame::Frame;
 use crate::frame_stack::FrameStack;
+use crate::lift::{Lift, LiftInto};
 use crate::traits::{Interpretable, Machine, PipelineAccess, ValueStore};
 use kirin_ir::{
     Block, CompileStage, Dialect, GetInfo, Pipeline, ResultValue, SSAValue, SpecializedFunction,
@@ -10,33 +11,35 @@ use kirin_ir::{
 };
 
 // ---------------------------------------------------------------------------
-// Action + IntoAction
+// Action — the interpreter's effect algebra
 // ---------------------------------------------------------------------------
 
-/// What the interpreter should do after a statement executes.
-pub enum Action<V> {
+/// The interpreter's own effect type.
+///
+/// Dialect effects are lifted into `Action` via [`Lift`]. The interpreter's
+/// [`Machine::consume_effect`] dispatches on these variants directly.
+pub enum Action<V, R = ()> {
     /// Advance to the next statement in the current block.
     Advance,
     /// Jump the cursor to a different block with the given arguments.
     Jump(Block, Vec<V>),
+    /// Delegate to the inner dialect machine.
+    Delegate(R),
 }
 
-/// Convert an effect into an interpreter [`Action`].
-pub trait IntoAction<V> {
-    fn into_action(self) -> Action<V>;
-}
+// -- Lift impls: dialect effects → Action -----------------------------------
 
-/// `()` means "no effect" — default to advancing the cursor.
-impl<V> IntoAction<V> for () {
-    fn into_action(self) -> Action<V> {
+/// `()` (no effect) lifts to `Advance`.
+impl<V, R> Lift<()> for Action<V, R> {
+    fn lift(_: ()) -> Self {
         Action::Advance
     }
 }
 
-/// [`CursorEffect`] maps directly to [`Action`].
-impl<V> IntoAction<V> for CursorEffect<V> {
-    fn into_action(self) -> Action<V> {
-        match self {
+/// [`CursorEffect`] lifts directly into the corresponding [`Action`] variant.
+impl<V, R> Lift<CursorEffect<V>> for Action<V, R> {
+    fn lift(from: CursorEffect<V>) -> Self {
+        match from {
             CursorEffect::Advance => Action::Advance,
             CursorEffect::Jump(block, args) => Action::Jump(block, args),
         }
@@ -50,17 +53,24 @@ impl<V> IntoAction<V> for CursorEffect<V> {
 /// Single-stage concrete interpreter.
 ///
 /// Executes statements in a single dialect `L` at one compilation stage.
-/// Uses [`FrameStack<V, BlockCursor>`] where each frame holds SSA values
-/// and a block cursor tracking execution position.
-pub struct SingleStage<'ir, L: Dialect, V: Clone> {
+/// `M` is an optional inner dialect machine (default `()`) that handles
+/// delegated effects.
+///
+/// The interpreter's [`Machine::Effect`] is `Action<V, M::Effect>`. Dialect
+/// effects are lifted into `Action` via [`Lift`], then consumed by the
+/// interpreter: cursor effects are handled directly, and the remainder is
+/// delegated to the inner machine.
+pub struct SingleStage<'ir, L: Dialect, V: Clone, M = ()> {
     pipeline: &'ir Pipeline<StageInfo<L>>,
     stage_id: CompileStage,
     frames: FrameStack<V, BlockCursor>,
+    machine: M,
 }
 
-// -- Machine ----------------------------------------------------------------
+// -- Machine (unit) ---------------------------------------------------------
 
-impl<L: Dialect, V: Clone> Machine for SingleStage<'_, L, V> {
+/// `()` as a machine accepts no effects and does nothing.
+impl Machine for () {
     type Effect = ();
     type Error = InterpreterError;
 
@@ -69,9 +79,29 @@ impl<L: Dialect, V: Clone> Machine for SingleStage<'_, L, V> {
     }
 }
 
+// -- Machine ----------------------------------------------------------------
+
+impl<'ir, L, V, M> Machine for SingleStage<'ir, L, V, M>
+where
+    L: Dialect,
+    V: Clone,
+    M: Machine<Error = InterpreterError>,
+{
+    type Effect = Action<V, M::Effect>;
+    type Error = InterpreterError;
+
+    fn consume_effect(&mut self, effect: Action<V, M::Effect>) -> Result<(), InterpreterError> {
+        match effect {
+            Action::Advance => self.advance_cursor(),
+            Action::Jump(block, args) => self.jump_to_block(block, &args),
+            Action::Delegate(inner) => self.machine.consume_effect(inner),
+        }
+    }
+}
+
 // -- ValueStore -------------------------------------------------------------
 
-impl<L: Dialect, V: Clone> ValueStore for SingleStage<'_, L, V> {
+impl<L: Dialect, V: Clone, M> ValueStore for SingleStage<'_, L, V, M> {
     type Value = V;
     type Error = InterpreterError;
 
@@ -90,7 +120,7 @@ impl<L: Dialect, V: Clone> ValueStore for SingleStage<'_, L, V> {
 
 // -- PipelineAccess ---------------------------------------------------------
 
-impl<'ir, L: Dialect, V: Clone> PipelineAccess for SingleStage<'ir, L, V> {
+impl<'ir, L: Dialect, V: Clone, M> PipelineAccess for SingleStage<'ir, L, V, M> {
     type StageInfo = StageInfo<L>;
 
     fn pipeline(&self) -> &Pipeline<StageInfo<L>> {
@@ -106,14 +136,25 @@ impl<'ir, L: Dialect, V: Clone> PipelineAccess for SingleStage<'ir, L, V> {
 
 // -- Constructor & helpers --------------------------------------------------
 
-impl<'ir, L: Dialect, V: Clone> SingleStage<'ir, L, V> {
-    /// Create a new single-stage interpreter.
-    pub fn new(pipeline: &'ir Pipeline<StageInfo<L>>, stage_id: CompileStage) -> Self {
+impl<'ir, L: Dialect, V: Clone, M> SingleStage<'ir, L, V, M> {
+    /// Create a new single-stage interpreter with an inner dialect machine.
+    pub fn new(pipeline: &'ir Pipeline<StageInfo<L>>, stage_id: CompileStage, machine: M) -> Self {
         Self {
             pipeline,
             stage_id,
             frames: FrameStack::new(),
+            machine,
         }
+    }
+
+    /// Get a reference to the inner dialect machine.
+    pub fn machine(&self) -> &M {
+        &self.machine
+    }
+
+    /// Get a mutable reference to the inner dialect machine.
+    pub fn machine_mut(&mut self) -> &mut M {
+        &mut self.machine
     }
 
     /// Get the stage info reference for the current stage.
@@ -170,11 +211,34 @@ impl<'ir, L: Dialect, V: Clone> SingleStage<'ir, L, V> {
 
         Ok(())
     }
+
+    /// Advance the cursor to the next statement in the current block.
+    fn advance_cursor(&mut self) -> Result<(), InterpreterError> {
+        let stage = self.stage_info();
+        let frame = self.frames.current_mut().ok_or(InterpreterError::NoFrame)?;
+        frame.extra_mut().advance(stage);
+        Ok(())
+    }
+
+    /// Jump the cursor to a new block with arguments.
+    fn jump_to_block(&mut self, block: Block, args: &[V]) -> Result<(), InterpreterError> {
+        let stage = self.stage_info();
+        let cursor = BlockCursor::new(stage, block);
+        let frame = self.frames.current_mut().ok_or(InterpreterError::NoFrame)?;
+        *frame.extra_mut() = cursor;
+        self.bind_block_args(block, args)?;
+        Ok(())
+    }
 }
 
 // -- Step / Run -------------------------------------------------------------
 
-impl<'ir, L: Dialect, V: Clone> SingleStage<'ir, L, V> {
+impl<'ir, L, V, M> SingleStage<'ir, L, V, M>
+where
+    L: Dialect,
+    V: Clone,
+    M: Machine<Error = InterpreterError>,
+{
     /// Execute one statement and handle its effect.
     ///
     /// Returns `true` if a statement was executed, `false` if no current
@@ -182,7 +246,7 @@ impl<'ir, L: Dialect, V: Clone> SingleStage<'ir, L, V> {
     pub fn step(&mut self) -> Result<bool, InterpreterError>
     where
         L: Interpretable<Self>,
-        <L as Interpretable<Self>>::Effect: IntoAction<V>,
+        <L as Interpretable<Self>>::Effect: LiftInto<Action<V, M::Effect>>,
         <L as Interpretable<Self>>::Error: Into<InterpreterError>,
     {
         let Some(stmt) = self.current_statement() else {
@@ -193,10 +257,7 @@ impl<'ir, L: Dialect, V: Clone> SingleStage<'ir, L, V> {
         let definition = stmt.definition(stage);
         let effect = definition.interpret(self).map_err(Into::into)?;
 
-        match effect.into_action() {
-            Action::Advance => self.advance_cursor()?,
-            Action::Jump(block, args) => self.jump_to_block(block, &args)?,
-        }
+        self.consume_effect(effect.lift_into())?;
 
         Ok(true)
     }
@@ -205,7 +266,7 @@ impl<'ir, L: Dialect, V: Clone> SingleStage<'ir, L, V> {
     pub fn run(&mut self) -> Result<(), InterpreterError>
     where
         L: Interpretable<Self>,
-        <L as Interpretable<Self>>::Effect: IntoAction<V>,
+        <L as Interpretable<Self>>::Effect: LiftInto<Action<V, M::Effect>>,
         <L as Interpretable<Self>>::Error: Into<InterpreterError>,
     {
         while self.step()? {}
@@ -224,30 +285,12 @@ impl<'ir, L: Dialect, V: Clone> SingleStage<'ir, L, V> {
     ) -> Result<(), InterpreterError>
     where
         L: Interpretable<Self>,
-        <L as Interpretable<Self>>::Effect: IntoAction<V>,
+        <L as Interpretable<Self>>::Effect: LiftInto<Action<V, M::Effect>>,
         <L as Interpretable<Self>>::Error: Into<InterpreterError>,
     {
         self.enter_function(callee, block, args)?;
         self.run()?;
         self.frames.pop();
-        Ok(())
-    }
-
-    /// Advance the cursor to the next statement in the current block.
-    fn advance_cursor(&mut self) -> Result<(), InterpreterError> {
-        let stage = self.stage_info();
-        let frame = self.frames.current_mut().ok_or(InterpreterError::NoFrame)?;
-        frame.extra_mut().advance(stage);
-        Ok(())
-    }
-
-    /// Jump the cursor to a new block with arguments.
-    fn jump_to_block(&mut self, block: Block, args: &[V]) -> Result<(), InterpreterError> {
-        let stage = self.stage_info();
-        let cursor = BlockCursor::new(stage, block);
-        let frame = self.frames.current_mut().ok_or(InterpreterError::NoFrame)?;
-        *frame.extra_mut() = cursor;
-        self.bind_block_args(block, args)?;
         Ok(())
     }
 }
