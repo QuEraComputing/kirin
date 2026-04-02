@@ -730,6 +730,7 @@ dependencies = [
  "kirin",
  "kirin-interpreter",
  "kirin-interpreter-2",
+ "kirin-interpreter-4",
 ]
 
 [[package]]
@@ -738,6 +739,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "kirin-interpreter-4",
  "kirin-test-types",
 ]
 
@@ -748,6 +750,7 @@ dependencies = [
  "kirin",
  "kirin-interpreter",
  "kirin-interpreter-2",
+ "kirin-interpreter-4",
  "kirin-test-types",
  "smallvec",
 ]
@@ -776,6 +779,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "kirin-interpreter-4",
  "kirin-test-types",
 ]
 
@@ -786,6 +790,7 @@ dependencies = [
  "kirin",
  "kirin-interpreter",
  "kirin-interpreter-2",
+ "kirin-interpreter-4",
 ]
 
 [[package]]
@@ -864,6 +869,7 @@ dependencies = [
  "kirin-constant",
  "kirin-interpreter",
  "kirin-interpreter-2",
+ "kirin-interpreter-4",
  "kirin-test-types",
  "smallvec",
 ]
@@ -984,6 +990,7 @@ dependencies = [
  "kirin-function",
  "kirin-interpreter",
  "kirin-interpreter-2",
+ "kirin-interpreter-4",
  "kirin-test-types",
  "smallvec",
 ]

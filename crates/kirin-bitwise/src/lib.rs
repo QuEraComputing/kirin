@@ -43,6 +43,7 @@
 
 mod checked_ops;
 mod interpret_impl;
+pub mod interpreter4;
 
 use kirin::prelude::*;
 

@@ -1,5 +1,5 @@
 use crate::cursor::BlockCursor;
-use crate::effect::CursorEffect;
+use crate::effect::{CallPayload, CursorEffect, PopEffect, PushEffect, ReturnEffect, YieldEffect};
 use crate::error::InterpreterError;
 use crate::execute::Execute;
 use crate::frame::Frame;
@@ -34,6 +34,9 @@ pub enum Action<V, R = (), C = ()> {
     Yield(V),
     /// Push a new cursor entry onto the global cursor stack.
     Push(C),
+    /// Remove the current cursor from the stack without side effects.
+    /// Used by SCF-style cursors that handle inline execution internally.
+    Pop,
     /// Call a specialized function with arguments, writing results to the given slots.
     Call(SpecializedFunction, Vec<V>, Vec<ResultValue>),
     /// Delegate to the inner dialect machine.
@@ -56,6 +59,44 @@ impl<V, R, C> Lift<CursorEffect<V>> for Action<V, R, C> {
             CursorEffect::Advance => Action::Advance,
             CursorEffect::Jump(block, args) => Action::Jump(block, args),
         }
+    }
+}
+
+/// [`ReturnEffect`] lifts to [`Action::Return`].
+impl<V, R, C> Lift<ReturnEffect<V>> for Action<V, R, C> {
+    fn lift(from: ReturnEffect<V>) -> Self {
+        Action::Return(from.0)
+    }
+}
+
+/// [`YieldEffect`] lifts to [`Action::Yield`].
+impl<V, R, C> Lift<YieldEffect<V>> for Action<V, R, C> {
+    fn lift(from: YieldEffect<V>) -> Self {
+        Action::Yield(from.0)
+    }
+}
+
+/// [`CallPayload`] lifts to [`Action::Call`].
+impl<V, R, C> Lift<CallPayload<V>> for Action<V, R, C> {
+    fn lift(from: CallPayload<V>) -> Self {
+        Action::Call(from.callee, from.args, from.results)
+    }
+}
+
+/// [`PopEffect`] lifts to [`Action::Pop`].
+impl<V, R, C> Lift<PopEffect> for Action<V, R, C> {
+    fn lift(_: PopEffect) -> Self {
+        Action::Pop
+    }
+}
+
+/// [`PushEffect`] lifts to [`Action::Push`] when `C` can be lifted from `E`.
+impl<V, R, C, E> Lift<PushEffect<E>> for Action<V, R, C>
+where
+    C: Lift<E>,
+{
+    fn lift(from: PushEffect<E>) -> Self {
+        Action::Push(Lift::lift(from.0))
     }
 }
 
@@ -303,6 +344,9 @@ where
             Action::Call(callee, args, results) => {
                 self.cursors.push(entry);
                 self.push_call_frame(callee, args, results)?;
+            }
+            Action::Pop => {
+                // Cursor self-removes. Drop entry, no side effects.
             }
             Action::Advance => {
                 self.cursors.push(entry);

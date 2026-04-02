@@ -1,3 +1,4 @@
+use crate::lift::LiftInto;
 use kirin_ir::{CompileStage, Pipeline, ResultValue, SSAValue};
 
 /// Any stateful component that can consume effects.
@@ -36,8 +37,16 @@ pub trait PipelineAccess {
 /// Dialect authors implement this to define how a statement executes.
 /// `&mut I` provides mutation access (values, machine state, execution seeds).
 /// The return type provides an effect channel for deferred control flow.
+///
+/// The `Effect` type is bounded by [`LiftInto`] so the driver loop can
+/// lift dialect-specific effects (e.g. [`CursorEffect`], [`ReturnEffect`])
+/// into the interpreter's own effect type without dialect authors needing
+/// to call `.lift_into()` themselves.
+///
+/// [`CursorEffect`]: crate::effect::CursorEffect
+/// [`ReturnEffect`]: crate::effect::ReturnEffect
 pub trait Interpretable<I: Interpreter> {
-    type Effect;
+    type Effect: LiftInto<<I as Machine>::Effect>;
     type Error;
 
     fn interpret(&self, interp: &mut I) -> Result<Self::Effect, Self::Error>;

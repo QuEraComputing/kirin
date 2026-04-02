@@ -50,6 +50,30 @@ pub enum CursorEffect<V> {
     Jump(Block, Vec<V>),
 }
 
+/// Structural effect: return a value from the current function.
+#[derive(Debug, Clone)]
+pub struct ReturnEffect<V>(pub V);
+
+/// Structural effect: yield a value from inline execution.
+#[derive(Debug, Clone)]
+pub struct YieldEffect<V>(pub V);
+
+/// Structural effect: call a specialized function.
+#[derive(Debug, Clone)]
+pub struct CallPayload<V> {
+    pub callee: SpecializedFunction,
+    pub args: Vec<V>,
+    pub results: Vec<ResultValue>,
+}
+
+/// Structural effect: remove the current cursor from the stack.
+#[derive(Debug, Clone, Copy)]
+pub struct PopEffect;
+
+/// Structural effect: push a new cursor entry onto the stack.
+#[derive(Debug, Clone)]
+pub struct PushEffect<E>(pub E);
+
 impl<V> IsAdvance for CursorEffect<V> {
     fn is_advance(&self) -> bool {
         matches!(self, CursorEffect::Advance)

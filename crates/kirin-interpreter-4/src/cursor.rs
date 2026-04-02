@@ -75,7 +75,6 @@ use crate::traits::{Interpretable, Machine};
 impl<'ir, L, V, M, C> Execute<SingleStage<'ir, L, V, M, C>> for BlockCursor<V>
 where
     L: Dialect + Interpretable<SingleStage<'ir, L, V, M, C>>,
-    <L as Interpretable<SingleStage<'ir, L, V, M, C>>>::Effect: LiftInto<Action<V, M::Effect, C>>,
     <L as Interpretable<SingleStage<'ir, L, V, M, C>>>::Error: Into<InterpreterError>,
     V: Clone,
     M: Machine<Error = InterpreterError>,
