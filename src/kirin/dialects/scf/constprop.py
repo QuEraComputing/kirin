@@ -108,6 +108,17 @@ class DialectConstProp(interp.MethodTable):
 
         loop_vars = frame.get_values(stmt.initializers)
 
+        # Early termination is only sound when the loop body does not
+        # reference the iteration variable.  When the body ignores it,
+        # each iteration is a pure function of loop_vars alone, so
+        # convergence of loop_vars implies all subsequent iterations
+        # are identical (including purity).  If the body *does* use the
+        # iteration variable, different iterations may follow different
+        # code paths (e.g. conditional side effects on a particular i),
+        # so we must execute every iteration.
+        iter_var = stmt.body.blocks[0].args[0]
+        can_early_terminate = not iter_var.uses
+
         prev_loop_vars = None
         for value in iterable.data:
             with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
@@ -122,7 +133,11 @@ class DialectConstProp(interp.MethodTable):
             elif isinstance(loop_vars, interp.ReturnValue):
                 return loop_vars
 
-            if prev_loop_vars is not None and loop_vars == prev_loop_vars:
+            if (
+                can_early_terminate
+                and prev_loop_vars is not None
+                and loop_vars == prev_loop_vars
+            ):
                 break
             prev_loop_vars = loop_vars
 
