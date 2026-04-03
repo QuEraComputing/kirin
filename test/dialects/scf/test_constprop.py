@@ -116,6 +116,25 @@ def test_inside_return():
     assert value.data == 0
 
 
+def test_early_termination_when_body_ignores_iter_var():
+    """When the body doesn't reference the iteration variable and loop_vars
+    converge (x is Unknown, so Unknown + 1 = Unknown), early termination
+    should fire and produce the same result as running all iterations."""
+
+    @structural_no_opt
+    def converging_loop(x: int) -> int:
+        for _i in range(100):
+            x = x + 1
+        return x
+
+    constprop = const.Propagate(structural_no_opt)
+    frame, ret = constprop.run(converging_loop)
+
+    assert isinstance(ret, const.Unknown)
+    [for_stmt] = [s for s in converging_loop.code.walk() if isinstance(s, scf.For)]
+    assert for_stmt in frame.should_be_pure
+
+
 def test_no_early_termination_when_body_uses_iter_var():
     """Early termination must not fire when the body references the iteration
     variable, because later iterations may follow different code paths that
