@@ -119,8 +119,8 @@ def test_inside_return():
 def test_no_early_termination_when_body_uses_iter_var():
     """Early termination must not fire when the body references the iteration
     variable, because later iterations may follow different code paths that
-    affect purity.  Here the impure ``ImpureOp`` is guarded by ``i == 2``,
-    so the loop body is impure only on iteration 2.  If early termination
+    affect purity.  Here the impure ``ImpureOp`` is guarded by ``i == 50``,
+    so the loop body is impure only on iteration 50.  If early termination
     incorrectly broke after iteration 1 (where loop_vars converge), the
     for-loop would be marked as pure when it is not."""
 
@@ -128,8 +128,8 @@ def test_no_early_termination_when_body_uses_iter_var():
 
     @_group
     def impure_on_later_iter(x: int) -> int:
-        for i in range(5):
-            if i == 2:
+        for i in range(100):
+            if i == 50:
                 ImpureOp()
             x = x + 1
         return x
