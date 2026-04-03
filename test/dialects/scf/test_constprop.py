@@ -137,15 +137,7 @@ def test_no_early_termination_when_body_uses_iter_var():
     constprop = const.Propagate(_group)
     frame, ret = constprop.run(impure_on_later_iter)
 
-    # The for-loop statement is in the first block of the callable region.
-    for_stmt = None
-    for block in impure_on_later_iter.callable_region.blocks:
-        for stmt in block.stmts:
-            if isinstance(stmt, scf.For):
-                for_stmt = stmt
-                break
-
-    assert for_stmt is not None, "Could not find scf.For in the IR"
+    [for_stmt] = [s for s in impure_on_later_iter.code.walk() if isinstance(s, scf.For)]
     # The for-loop must NOT be in should_be_pure — it contains a
     # conditionally-impure operation on a later iteration.
     assert for_stmt not in frame.should_be_pure
