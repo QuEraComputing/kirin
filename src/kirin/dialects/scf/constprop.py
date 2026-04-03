@@ -108,6 +108,7 @@ class DialectConstProp(interp.MethodTable):
 
         loop_vars = frame.get_values(stmt.initializers)
 
+        prev_loop_vars = None
         for value in iterable.data:
             with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
                 loop_vars = interp_.frame_call_region(
@@ -120,6 +121,10 @@ class DialectConstProp(interp.MethodTable):
                 loop_vars = ()
             elif isinstance(loop_vars, interp.ReturnValue):
                 return loop_vars
+
+            if prev_loop_vars is not None and loop_vars == prev_loop_vars:
+                break
+            prev_loop_vars = loop_vars
 
         if not frame_is_not_pure:
             frame.should_be_pure.add(stmt)
