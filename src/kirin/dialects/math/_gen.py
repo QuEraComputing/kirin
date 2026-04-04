@@ -40,7 +40,27 @@ def builtin_math_functions():
                 sig = inspect.signature(obj)
                 yield name, obj, sig
             except:  # noqa: E722
-                continue
+                if name == "log":
+                    sig = inspect.Signature(
+                        parameters=[
+                            inspect.Parameter(
+                                "x",
+                                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                                annotation=object,
+                            ),
+                            inspect.Parameter(
+                                "base",
+                                inspect.Parameter.POSITIONAL_OR_KEYWORD,
+                                default=None,
+                                annotation=object,
+                            ),
+                        ],
+                        return_annotation=object,
+                    )
+                    yield name, obj, sig
+
+                else:
+                    continue
 
 
 with open(os.path.join(os.path.dirname(__file__), "stmts.py"), "w") as f:
