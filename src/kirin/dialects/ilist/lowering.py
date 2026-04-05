@@ -3,7 +3,7 @@ from dataclasses import dataclass
 
 from kirin import types, lowering
 from kirin.dialects import py
-from kirin.dialects.py.list._listcomp import lower_listcomp_via_desugaring
+from kirin.dialects.py._comprehension import lower_listcomp_via_desugaring
 
 from . import stmts as ilist
 from ._dialect import dialect

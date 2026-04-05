@@ -1,10 +1,10 @@
 import ast
 
 from kirin import types, lowering
+from kirin.dialects.py._comprehension import lower_listcomp_via_desugaring
 
 from .stmts import New
 from ._dialect import dialect
-from ._listcomp import lower_listcomp_via_desugaring
 
 
 @dialect.register

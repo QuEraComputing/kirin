@@ -1,7 +1,7 @@
 import ast
 
 from kirin import lowering
-from kirin.dialects.py.list._listcomp import lower_setcomp_via_desugaring
+from kirin.dialects.py._comprehension import lower_setcomp_via_desugaring
 
 from .stmts import New
 from ._dialect import dialect

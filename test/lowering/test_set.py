@@ -2,6 +2,7 @@ from kirin import types, lowering
 from kirin.prelude import basic_no_opt, structural_no_opt
 from kirin.dialects import cf, py, func
 from kirin.dialects.lowering import func as func_lowering
+from kirin.dialects.py._comprehension import lower_setcomp_via_desugaring
 
 lower = lowering.Python(
     [cf, func, py.base, py.constant, py.set, py.assign, func_lowering]
@@ -70,3 +71,7 @@ def test_set_comp_nested_generators_lower():
     code = lowering.Python(basic_no_opt).python_function(main)
 
     assert code is not None
+
+
+def test_set_comp_helper_import():
+    assert callable(lower_setcomp_via_desugaring)
