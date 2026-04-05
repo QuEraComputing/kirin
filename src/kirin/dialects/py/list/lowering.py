@@ -4,11 +4,11 @@ from kirin import types, lowering
 
 from .stmts import New
 from ._dialect import dialect
+from ._listcomp import lower_listcomp_via_desugaring
 
 
 @dialect.register
 class PythonLowering(lowering.FromPythonAST):
-
     def lower_List(self, state: lowering.State, node: ast.List) -> lowering.Result:
         elts = tuple(state.lower(each).expect_one() for each in node.elts)
 
@@ -20,3 +20,8 @@ class PythonLowering(lowering.FromPythonAST):
             typ = types.Any
 
         return state.current_frame.push(New(values=tuple(elts)))
+
+    def lower_ListComp(
+        self, state: lowering.State, node: ast.ListComp
+    ) -> lowering.Result:
+        return lower_listcomp_via_desugaring(state, node)

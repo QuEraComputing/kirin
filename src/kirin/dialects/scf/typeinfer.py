@@ -10,7 +10,6 @@ from ._dialect import dialect
 
 @dialect.register(key="typeinfer")
 class TypeInfer(absint.Methods):
-
     @interp.impl(IfElse)
     def if_else_(
         self,

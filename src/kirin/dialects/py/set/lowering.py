@@ -1,6 +1,7 @@
 import ast
 
 from kirin import lowering
+from kirin.dialects.py.list._listcomp import lower_setcomp_via_desugaring
 
 from .stmts import New
 from ._dialect import dialect
@@ -13,6 +14,11 @@ class PythonLowering(lowering.FromPythonAST):
         return state.current_frame.push(
             New(tuple(state.lower(each).expect_one() for each in node.elts))
         )
+
+    def lower_SetComp(
+        self, state: lowering.State, node: ast.SetComp
+    ) -> lowering.Result:
+        return lower_setcomp_via_desugaring(state, node)
 
     @lowering.akin(set)
     def lower_Call_set(self, state: lowering.State, node: ast.Call) -> lowering.Result:
