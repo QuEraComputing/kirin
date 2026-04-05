@@ -30,3 +30,15 @@ This page provides a reference for dialects that bring in semantics for common P
         - "!statement"
         show_root_heading: true
         show_if_no_docstring: true
+
+### Set
+
+`set` support currently covers set literals and `set()` construction only. Mutation APIs
+and `set(iterable)` are not part of this first version.
+
+::: kirin.dialects.py.set
+    options:
+        filters:
+        - "!statement"
+        show_root_heading: true
+        show_if_no_docstring: true
