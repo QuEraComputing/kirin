@@ -1,0 +1,171 @@
+// Kirin Hybrid IR — slide version
+// Render: dot -Tsvg docs/design/hybrid_ir_visualization.dot -o docs/design/hybrid_ir_visualization.svg
+//     or: dot -Tpng docs/design/hybrid_ir_visualization.dot -o docs/design/hybrid_ir_visualization.png -Gdpi=200
+digraph kirin {
+    compound=true
+    rankdir=TB
+    fontname="Helvetica Neue"
+    fontsize=14
+    node [fontname="Helvetica Neue" fontsize=11]
+    edge [fontname="Helvetica Neue" fontsize=9]
+    newrank=true
+    nodesep=0.35
+    ranksep=0.5
+    bgcolor="white"
+
+    label=<
+<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0" CELLPADDING="0">
+  <TR><TD><FONT POINT-SIZE="20"><B>Kirin Hybrid IR</B></FONT></TD></TR>
+  <TR><TD><FONT POINT-SIZE="13" COLOR="#555">Multi-stage pipeline  ·  SSA CFG + petgraph in one IR</FONT></TD></TR>
+  <TR><TD CELLPADDING="6"> </TD></TR>
+  <TR><TD>
+    <TABLE BORDER="0" CELLBORDER="1" CELLSPACING="0" CELLPADDING="5" COLOR="#ccc">
+      <TR>
+        <TD BGCOLOR="#f5f7ff" STYLE="ROUNDED">Statement</TD>
+        <TD BGCOLOR="#fff3e0" STYLE="ROUNDED"><B>Terminator</B></TD>
+        <TD BGCOLOR="#b7e1cd" STYLE="ROUNDED">◆ Port</TD>
+        <TD BGCOLOR="#fce4ec" STYLE="ROUNDED">Nested (hierarchy)</TD>
+        <TD BORDER="0"><FONT COLOR="#1565c0">- - → SSA</FONT>   <FONT COLOR="#137333">━→ data-flow</FONT></TD>
+      </TR>
+    </TABLE>
+  </TD></TR>
+</TABLE>
+>
+    labelloc=t
+
+    // ==== PIPELINE ====
+    subgraph cluster_pipeline {
+        label=<<B>Pipeline</B>>
+        style=rounded
+        color="#bbb"
+        bgcolor="#fafafa"
+        penwidth=1.5
+        fontsize=13
+
+        // ==== STAGE @source ====
+        subgraph cluster_source {
+            label=<<FONT POINT-SIZE="13"><B>Stage @source</B></FONT>  <FONT POINT-SIZE="10" COLOR="#666">SSA CFG</FONT>>
+            style="rounded,filled"
+            fillcolor="#e8f0fe"
+            color="#4285f4"
+            penwidth=1.5
+
+            subgraph cluster_fn_abs {
+                label=<<B>fn @abs</B>(i64) → i64>
+                style="rounded,filled"
+                fillcolor="#d2e3fc"
+                color="#1a73e8"
+                fontsize=12
+
+                subgraph cluster_region {
+                    label=<<I>Region</I>>
+                    style="dashed,filled"
+                    fillcolor="#ecf0f8"
+                    color="#7baaf7"
+                    fontsize=10
+
+                    subgraph cluster_entry {
+                        label=<<B>^entry</B>(%x: i64)>
+                        style="rounded,filled"
+                        fillcolor="white"
+                        color="#1a73e8"
+                        fontsize=11
+
+                        s0 [shape=Mrecord style=filled fillcolor="#f5f7ff"
+                            label="%zero = constant 0"]
+                        s1 [shape=Mrecord style=filled fillcolor="#f5f7ff"
+                            label="%neg = lt %x, %zero"]
+
+                        subgraph cluster_if {
+                            label=<<B>%result = if %neg</B>>
+                            style="rounded,filled"
+                            fillcolor="#fce4ec"
+                            color="#c62828"
+                            fontsize=10
+
+                            subgraph cluster_then {
+                                label=<^then>
+                                style="rounded,filled"
+                                fillcolor="white"
+                                color="#e57373"
+                                fontsize=10
+
+                                t0 [shape=Mrecord style=filled fillcolor="#f5f7ff"
+                                    label="%r = neg %x"]
+                                t1 [shape=Mrecord style="filled,bold" fillcolor="#fff3e0"
+                                    label="yield %r"]
+                                t0 -> t1 [style=invis weight=10]
+                            }
+
+                            subgraph cluster_else {
+                                label=<^else>
+                                style="rounded,filled"
+                                fillcolor="white"
+                                color="#e57373"
+                                fontsize=10
+
+                                e0 [shape=Mrecord style="filled,bold" fillcolor="#fff3e0"
+                                    label="yield %x"]
+                            }
+                        }
+
+                        s2 [shape=Mrecord style="filled,bold" fillcolor="#fff3e0"
+                            label="ret %result"]
+
+                        s0 -> s1 [style=invis weight=10]
+                        s1 -> t0 [style=invis weight=8]
+                        e0 -> s2 [style=invis weight=8]
+                    }
+                }
+            }
+
+            // SSA edge
+            s0 -> s1 [style=dashed color="#1565c0" constraint=false
+                label=<<FONT COLOR="#1565c0" POINT-SIZE="8">%zero</FONT>>]
+        }
+
+        // ==== STAGE @circuit ====
+        subgraph cluster_circuit {
+            label=<<FONT POINT-SIZE="13"><B>Stage @circuit</B></FONT>  <FONT POINT-SIZE="10" COLOR="#666">DiGraph</FONT>>
+            style="rounded,filled"
+            fillcolor="#e6f4ea"
+            color="#34a853"
+            penwidth=1.5
+
+            subgraph cluster_fn_bell {
+                label=<<B>fn @bell_pair</B>(Qubit, Qubit) → (Qubit, Qubit)>
+                style="rounded,filled"
+                fillcolor="#ceead6"
+                color="#137333"
+                fontsize=12
+
+                subgraph cluster_dg {
+                    label=<<I>DiGraph ^dg0</I>>
+                    style="dashed,filled"
+                    fillcolor="#dff0e5"
+                    color="#5bb974"
+                    fontsize=10
+
+                    port_q0 [shape=diamond style=filled fillcolor="#b7e1cd"
+                        label="%q0" width=0.6 height=0.5]
+                    port_q1 [shape=diamond style=filled fillcolor="#b7e1cd"
+                        label="%q1" width=0.6 height=0.5]
+
+                    g_h [shape=Mrecord style=filled fillcolor="#f0fff4"
+                        label="%q0_h = h %q0"]
+                    g_cx [shape=Mrecord style=filled fillcolor="#f0fff4"
+                        label="%q0', %q1' = cnot %q0_h, %q1"]
+                    g_y [shape=Mrecord style="filled,bold" fillcolor="#fff8e1"
+                        label="yield %q0', %q1'"]
+
+                    port_q0 -> g_h [color="#137333" penwidth=2]
+                    port_q1 -> g_cx [color="#137333" penwidth=2]
+                    g_h -> g_cx [color="#137333" penwidth=2
+                        label=<<FONT POINT-SIZE="8" COLOR="#137333">%q0_h</FONT>>]
+                    g_cx -> g_y [color="#137333" penwidth=1.5 style=dashed]
+                }
+            }
+        }
+    }
+
+}
