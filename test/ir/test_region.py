@@ -1,4 +1,4 @@
-from kirin.prelude import basic, basic_no_opt
+from kirin.prelude import basic, ilist, basic_no_opt
 from kirin.passes.aggressive.fold import Fold
 
 
@@ -41,12 +41,37 @@ def _level0(flag0: bool, flag1: bool, x: int):
         out = mix + 30
     else:
         out = mix + 40
-    return out
+
+    def fn(y: int):
+        return y + out
+
+    mapped = ilist.map(fn, ilist.range(3))
+    return mapped[0] + out
+
+
+@basic
+def _level1(flag0: bool, flag1: bool, x: int):
+    base = _level0(flag0, flag1, x)
+    base2 = _level0(flag1, flag0, x + 2)
+    if flag0:
+        mix = base + base2
+    else:
+        mix = base2 + base
+    if flag0:
+        out = mix + 31
+    else:
+        out = mix + 41
+
+    def fn(y: int):
+        return y + out
+
+    mapped = ilist.map(fn, ilist.range(3))
+    return mapped[0] + out
 
 
 @basic
 def _fold_target(flag0: bool, flag1: bool, x: int):
-    return _level0(flag0, flag1, x)
+    return _level1(flag0, flag1, x)
 
 
 def _has_unordered_edges(method):
@@ -80,13 +105,13 @@ def _all_owners_in_region(region):
                 owner = getattr(arg, "owner", None)
                 if owner is None:
                     continue
-                # ResultValue owner is a Statement
-                if hasattr(owner, "parent"):
-                    if owner not in region_stmts:
-                        return False
-                # BlockArgument owner is a Block
+                # BlockArgument owner is a Block (check first — Block also has parent)
                 if hasattr(owner, "stmts"):
                     if owner not in region_blocks:
+                        return False
+                # ResultValue owner is a Statement
+                elif hasattr(owner, "parent"):
+                    if owner not in region_stmts:
                         return False
     return True
 
