@@ -20,47 +20,6 @@ if TYPE_CHECKING:
     from kirin.serialization.core.serializationunit import SerializationUnit
 
 
-def _rpo_block_order(region: Region) -> list[Block]:
-    """Return blocks in reverse post-order of the CFG.
-
-    RPO guarantees that in well-formed SSA, a block's dominator is visited
-    before the block itself, so statement results are cloned before their uses.
-    Unreachable blocks (not in CFG) are appended at the end in original order.
-    """
-    from kirin.analysis.cfg import CFG
-
-    cfg = CFG(region)
-    successors = cfg.successors
-
-    visited: set[Block] = set()
-    post_order: list[Block] = []
-
-    if cfg.entry is not None:
-        stack: list[tuple[Block, bool]] = [(cfg.entry, False)]
-        while stack:
-            block, returning = stack.pop()
-            if returning:
-                post_order.append(block)
-                continue
-            if block in visited:
-                continue
-            visited.add(block)
-            stack.append((block, True))  # revisit after children
-            for succ in successors.get(block, ()):
-                if succ not in visited:
-                    stack.append((succ, False))
-
-    post_order.reverse()  # reverse post-order
-
-    # Append any unreachable blocks in their original order.
-    block_set = set(post_order)
-    for block in region.blocks:
-        if block not in block_set:
-            post_order.append(block)
-
-    return post_order
-
-
 @dataclass
 class RegionBlocks(MutableSequenceView[list[Block], "Region", Block]):
     """A View object that contains a list of Blocks of a Region.
@@ -187,6 +146,12 @@ class Region(IRNode["Statement"]):
     def clone(self, ssamap: dict[SSAValue, SSAValue] | None = None) -> Region:
         """Clone a region. This will clone all blocks and statements in the region.
         `SSAValue` defined outside the region will not be cloned unless provided in `ssamap`.
+
+        Note:
+            Blocks must be in definition order (e.g. reverse post-order of the CFG)
+            so that every statement result is cloned before it is referenced.
+            Use :class:`kirin.rewrite.SortBlocks` to ensure this after passes
+            that may reorder blocks.
         """
         ret = Region()
         successor_map: dict[Block, Block] = {}
@@ -208,23 +173,20 @@ class Region(IRNode["Statement"]):
                 new_arg = new_block.args.append_from(arg.type, arg.name)
                 _ssamap[arg] = new_arg
 
-        # Compute RPO for statement cloning order.
-        ordered_blocks = _rpo_block_order(self)
-
         def _map_arg(arg: SSAValue) -> SSAValue:
             if arg in _ssamap:
                 return _ssamap[arg]
             if arg in in_region_defs:
                 raise ValueError(
                     f"Region.clone: in-region SSA value {arg!r} used before "
-                    f"its defining statement was cloned. This indicates a bug "
-                    f"in block ordering during clone."
+                    f"its defining statement was cloned. This indicates a "
+                    f"block ordering issue — run SortBlocks before cloning."
                 )
             # Value defined outside the region — keep as-is.
             return arg
 
-        # Second pass: clone statements in RPO order.
-        for block in ordered_blocks:
+        # Second pass: clone statements in block-list order.
+        for block in self.blocks:
             for stmt in block.stmts:
                 new_stmt = stmt.from_stmt(
                     stmt,
