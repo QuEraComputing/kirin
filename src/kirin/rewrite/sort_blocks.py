@@ -18,6 +18,9 @@ class SortBlocks(RewriteRule):
     cfg: CFG
 
     def rewrite_Region(self, node: ir.Region) -> RewriteResult:
+        # NOTE: relies on self.cfg being up-to-date. When used inside
+        # CompactifyRegion, prior rules (DeadBlock, CFGEdge, etc.) mutate
+        # the shared CFG's successors/predecessors dicts in place.
         successors = self.cfg.successors
 
         visited: set[ir.Block] = set()

@@ -1,4 +1,8 @@
+import pytest
+
 from kirin.prelude import basic, ilist, basic_no_opt
+from kirin.analysis.cfg import CFG
+from kirin.rewrite.sort_blocks import SortBlocks
 from kirin.passes.aggressive.fold import Fold
 
 
@@ -135,3 +139,59 @@ def test_region_clone_after_aggressive_fold():
         cloned
     ), "Region.clone produced operands owned by statements outside the cloned region"
     assert cloned.is_structurally_equal(mt.callable_region)
+
+
+def _scramble_blocks(region):
+    """Reverse block order (keeping entry block first) to create out-of-order layout."""
+    blocks = list(region.blocks)
+    if len(blocks) <= 2:
+        return False
+    scrambled = [blocks[0]] + list(reversed(blocks[1:]))
+    region._blocks[:] = scrambled
+    region._block_idx = {block: i for i, block in enumerate(scrambled)}
+    return True
+
+
+@basic
+def _branchy(flag: bool, x: int):
+    if flag:
+        y = x + 1
+    else:
+        y = x + 2
+    return y + 3
+
+
+def test_sort_blocks_fixes_scrambled_region():
+    """SortBlocks must restore RPO order after blocks are scrambled."""
+    mt = _branchy.similar()
+    region = mt.callable_region
+    original_order = list(region.blocks)
+
+    assert _scramble_blocks(region)
+    assert list(region.blocks) != original_order
+
+    cfg = CFG(region)
+    result = SortBlocks(cfg).rewrite_Region(region)
+    assert result.has_done_something
+    # After sorting, clone must produce a self-contained region.
+    cloned = region.clone()
+    assert _all_owners_in_region(cloned)
+
+
+def test_region_clone_raises_on_unsorted_blocks():
+    """Region.clone must raise ValueError when blocks are out of definition order."""
+    mt = _fold_target.similar()
+    fold = Fold(mt.dialects)
+
+    # Fold to produce a complex CFG, then scramble blocks.
+    for _ in range(8):
+        result = fold.unsafe_run(mt)
+        if not result.has_done_something:
+            break
+
+    region = mt.callable_region
+    if not _scramble_blocks(region):
+        pytest.skip("Region has too few blocks to scramble")
+
+    with pytest.raises(ValueError, match="in-region SSA value"):
+        region.clone()
