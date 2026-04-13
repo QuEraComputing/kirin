@@ -146,10 +146,25 @@ class Region(IRNode["Statement"]):
     def clone(self, ssamap: dict[SSAValue, SSAValue] | None = None) -> Region:
         """Clone a region. This will clone all blocks and statements in the region.
         `SSAValue` defined outside the region will not be cloned unless provided in `ssamap`.
+
+        Note:
+            Blocks must be in definition order (e.g. reverse post-order of the CFG)
+            so that every statement result is cloned before it is referenced.
+            Use :class:`kirin.rewrite.SortBlocks` to ensure this after passes
+            that may reorder blocks.
         """
         ret = Region()
         successor_map: dict[Block, Block] = {}
         _ssamap = ssamap or {}
+
+        # Collect all SSA values defined inside this region (statement results).
+        # Block args are handled separately below.
+        in_region_defs: set[SSAValue] = set()
+        for block in self.blocks:
+            for stmt in block.stmts:
+                in_region_defs.update(stmt.results)
+
+        # First pass: create cloned blocks and block args (order doesn't matter).
         for block in self.blocks:
             new_block = Block()
             ret.blocks.append(new_block)
@@ -158,12 +173,24 @@ class Region(IRNode["Statement"]):
                 new_arg = new_block.args.append_from(arg.type, arg.name)
                 _ssamap[arg] = new_arg
 
-        # update statements
+        def _map_arg(arg: SSAValue) -> SSAValue:
+            if arg in _ssamap:
+                return _ssamap[arg]
+            if arg in in_region_defs:
+                raise ValueError(
+                    f"Region.clone: in-region SSA value {arg!r} used before "
+                    f"its defining statement was cloned. This indicates a "
+                    f"block ordering issue — run SortBlocks before cloning."
+                )
+            # Value defined outside the region — keep as-is.
+            return arg
+
+        # Second pass: clone statements in block-list order.
         for block in self.blocks:
             for stmt in block.stmts:
                 new_stmt = stmt.from_stmt(
                     stmt,
-                    args=[_ssamap.get(arg, arg) for arg in stmt.args],
+                    args=[_map_arg(arg) for arg in stmt.args],
                     regions=[region.clone(_ssamap) for region in stmt.regions],
                     successors=[
                         successor_map[successor] for successor in stmt.successors
