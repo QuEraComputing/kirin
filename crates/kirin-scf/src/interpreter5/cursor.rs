@@ -96,17 +96,18 @@ pub struct ForCursor<V> {
     body_stage: CompileStage,
 }
 
+#[bon::bon]
 impl<V> ForCursor<V> {
-    #[allow(clippy::too_many_arguments)]
+    #[builder]
     pub fn new(
         iv: V,
         end: V,
         step: V,
         carried: V,
         body: Block,
-        init_arg_count: usize,
-        results: Vec<ResultValue>,
         body_stage: CompileStage,
+        #[builder(default)] init_arg_count: usize,
+        #[builder(default)] results: Vec<ResultValue>,
     ) -> Self {
         Self {
             phase: ForPhase::CheckAndPush {

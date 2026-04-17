@@ -32,8 +32,7 @@ pub trait IsYield {
 /// An effect that means "push a new cursor entry onto the stack".
 pub trait IsPush {
     type CursorEntry;
-    #[allow(clippy::wrong_self_convention)]
-    fn as_push(self) -> Option<Self::CursorEntry>;
+    fn into_push(self) -> Option<Self::CursorEntry>;
 }
 
 /// Borrowed view of a call effect's data.
@@ -136,7 +135,7 @@ impl IsYield for () {
 impl IsPush for () {
     type CursorEntry = ();
 
-    fn as_push(self) -> Option<Self::CursorEntry> {
+    fn into_push(self) -> Option<Self::CursorEntry> {
         None
     }
 }
@@ -205,8 +204,7 @@ impl<V, R, C> IsYield for Action<V, R, C> {
 impl<V, R, C> IsPush for Action<V, R, C> {
     type CursorEntry = C;
 
-    #[allow(clippy::wrong_self_convention)]
-    fn as_push(self) -> Option<Self::CursorEntry> {
+    fn into_push(self) -> Option<Self::CursorEntry> {
         match self {
             Action::Push(c) => Some(c),
             _ => None,

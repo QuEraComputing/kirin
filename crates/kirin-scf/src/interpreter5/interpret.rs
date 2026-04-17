@@ -63,16 +63,16 @@ where
             .collect::<Result<_, _>>()?;
         let init_arg_count = init_values.len();
         let carried = V::new_product(init_values);
-        let cursor = ForCursor::new(
-            iv,
-            end,
-            step,
-            carried,
-            self.body,
-            init_arg_count,
-            self.results.clone(),
-            domain.current_stage(),
-        );
+        let cursor = ForCursor::builder()
+            .iv(iv)
+            .end(end)
+            .step(step)
+            .carried(carried)
+            .body(self.body)
+            .body_stage(domain.current_stage())
+            .init_arg_count(init_arg_count)
+            .results(self.results.clone())
+            .build();
         Ok(ControlFlow::Push(Boxed(Box::new(cursor))))
     }
 }

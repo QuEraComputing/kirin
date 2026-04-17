@@ -76,16 +76,18 @@ where
         let init_arg_count = init_values.len();
         let carried = <<I as ValueStore>::Value as ProductValue>::new_product(init_values);
 
-        Ok(PushEffect(ForCursor::new(
-            iv,
-            end,
-            step,
-            carried,
-            self.body,
-            init_arg_count,
-            self.results.clone(),
-            interp.current_stage(),
-        )))
+        Ok(PushEffect(
+            ForCursor::builder()
+                .iv(iv)
+                .end(end)
+                .step(step)
+                .carried(carried)
+                .body(self.body)
+                .body_stage(interp.current_stage())
+                .init_arg_count(init_arg_count)
+                .results(self.results.clone())
+                .build(),
+        ))
     }
 }
 
