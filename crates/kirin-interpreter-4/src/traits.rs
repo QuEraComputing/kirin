@@ -1,5 +1,5 @@
 use crate::lift::LiftInto;
-use kirin_ir::{CompileStage, Pipeline, ResultValue, SSAValue};
+use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue, StageInfo};
 
 /// Any stateful component that can consume effects.
 pub trait Machine {
@@ -30,6 +30,16 @@ pub trait PipelineAccess {
 
     fn pipeline(&self) -> &Pipeline<Self::StageInfo>;
     fn current_stage(&self) -> CompileStage;
+
+    fn current_stage_info<L>(&self) -> Option<&StageInfo<L>>
+    where
+        Self::StageInfo: HasStageInfo<L>,
+        L: Dialect,
+    {
+        self.pipeline()
+            .stage(self.current_stage())
+            .and_then(|s| s.try_stage_info())
+    }
 }
 
 /// Statement-level operational semantics.

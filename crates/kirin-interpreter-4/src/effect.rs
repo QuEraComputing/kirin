@@ -1,4 +1,4 @@
-use kirin_ir::{Block, ResultValue, SpecializedFunction};
+use kirin_ir::{Block, CompileStage, ResultValue, SpecializedFunction};
 
 /// An effect that means "advance to next statement".
 pub trait IsAdvance {
@@ -39,6 +39,7 @@ pub trait IsPush {
 /// Borrowed view of a call effect's data.
 pub struct CallEffect<'a, V> {
     pub callee: SpecializedFunction,
+    pub callee_stage: CompileStage,
     pub args: &'a [V],
     pub results: &'a [ResultValue],
 }
@@ -62,6 +63,7 @@ pub struct YieldEffect<V>(pub V);
 #[derive(Debug, Clone)]
 pub struct CallPayload<V> {
     pub callee: SpecializedFunction,
+    pub callee_stage: CompileStage,
     pub args: Vec<V>,
     pub results: Vec<ResultValue>,
 }
@@ -167,8 +169,9 @@ impl<V, R, C> IsCall for Action<V, R, C> {
 
     fn as_call(&self) -> Option<CallEffect<'_, Self::Value>> {
         match self {
-            Action::Call(callee, args, results) => Some(CallEffect {
+            Action::Call(callee, callee_stage, args, results) => Some(CallEffect {
                 callee: *callee,
+                callee_stage: *callee_stage,
                 args,
                 results,
             }),

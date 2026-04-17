@@ -38,7 +38,11 @@ where
             }
         };
 
-        Ok(PushEffect(IfCursor::new(block, self.results.clone())))
+        Ok(PushEffect(IfCursor::new(
+            block,
+            self.results.clone(),
+            interp.current_stage(),
+        )))
     }
 }
 
@@ -80,6 +84,7 @@ where
             self.body,
             init_arg_count,
             self.results.clone(),
+            interp.current_stage(),
         )))
     }
 }

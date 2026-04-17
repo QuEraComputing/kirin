@@ -29,7 +29,7 @@ pub use language::{
     HasSuccessorsMut, HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable,
     IsTerminator,
 };
-pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice};
+pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice, Widen};
 pub use node::{
     Block, BlockArgument, BlockInfo, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CompileStage,
     DeletedSSAValue, DiGraph, DiGraphExtra, DiGraphInfo, Function, FunctionInfo, GlobalSymbol,

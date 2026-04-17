@@ -7,3 +7,6 @@ pub mod frame;
 pub mod frame_stack;
 pub mod lift;
 pub mod traits;
+
+pub use concrete::{Action, Boxed, MakeBlockCursorAction, MultiStage, SingleStage};
+pub use cursor::BlockCursor;

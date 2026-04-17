@@ -22,9 +22,18 @@ cargo fmt --all                  # Format code
 cargo insta review               # Review snapshot test changes
 cargo build -p toy-lang          # Build the toy language example binary
 cargo run -p toy-lang -- parse example/toy-lang/programs/add.kirin  # Parse an example program from repo root
+cargo run -p toy-lang -- run example/toy-lang/programs/add.kirin --stage source --function main 3 5  # Execute toy-lang main with i64 args
 cargo nextest run -p toy-lang    # Run toy language example tests
+cargo build -p toy-qc            # Build the toy quantum-circuit example binary
+cargo run -p toy-qc -- parse example/toy-qc/programs/bell_pair.kirin  # Parse a toy-qc example program from repo root
+cargo nextest run -p toy-qc      # Run toy-qc example tests
 cargo build -p kirin-interpreter-2  # Build the interpreter-2 runtime crate
 cargo nextest run -p kirin-interpreter-2  # Run interpreter-2 crate tests
+cargo build -p kirin-interpreter-4  # Build the interpreter-4 runtime crate
+cargo nextest run -p kirin-interpreter-4  # Run interpreter-4 crate tests
+cargo nextest run -p kirin-interpreter-4 -E 'test(test_cross_stage_call)'  # Run interpreter-4 multi-stage cross-stage call test
+cargo build -p kirin-interpreter-5  # Build the interpreter-5 runtime crate
+cargo nextest run -p kirin-interpreter-5  # Run interpreter-5 crate tests
 ```
 
 Rust edition 2024. No `rust-toolchain.toml`; uses the default toolchain.
@@ -137,6 +146,9 @@ For user-defined dialects not in this table, ask the user for domain context dur
 **Interpreter:**
 - `kirin-interpreter` — Interpreter traits, `StackInterpreter`, `AbstractInterpreter`
 - `kirin-interpreter-2` — Next-generation interpreter runtime and shell/control APIs
+- `kirin-interpreter-3` — Runtime architecture experiments (machine/effect/value model prototypes)
+- `kirin-interpreter-4` — Current execution-seed runtime iteration (frame/cursor/effect model)
+- `kirin-interpreter-5` — Env/ConcreteDomain/cursor-stack interpreter (single and multi-stage)
 - `kirin-derive-interpreter` — `#[derive(Interpretable, CallSemantics)]`
 
 **Dialects:**

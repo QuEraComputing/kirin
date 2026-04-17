@@ -36,7 +36,7 @@ enum TestDialect {
 // ---------------------------------------------------------------------------
 
 type TestInterp<'ir> = SingleStage<'ir, TestDialect, TestValue>;
-type TestAction = Action<TestValue, (), BlockCursor<TestValue>>;
+type TestAction = Action<TestValue, (), BlockCursor<TestValue, TestDialect>>;
 
 impl<'ir> Interpretable<TestInterp<'ir>> for TestDialect {
     type Effect = TestAction;
@@ -148,7 +148,7 @@ impl Machine for CounterMachine {
 }
 
 type CounterInterp<'ir> = SingleStage<'ir, TestDialect, TestValue, CounterMachine>;
-type CounterAction = Action<TestValue, (), BlockCursor<TestValue>>;
+type CounterAction = Action<TestValue, (), BlockCursor<TestValue, TestDialect>>;
 
 impl<'ir> Interpretable<CounterInterp<'ir>> for TestDialect {
     type Effect = CounterAction;
@@ -250,7 +250,7 @@ impl ProjectMut<TraceMachine> for CompositeMachine {
 }
 
 type CompositeInterp<'ir> = SingleStage<'ir, TestDialect, TestValue, CompositeMachine>;
-type CompositeAction = Action<TestValue, (), BlockCursor<TestValue>>;
+type CompositeAction = Action<TestValue, (), BlockCursor<TestValue, TestDialect>>;
 
 impl<'ir> Interpretable<CompositeInterp<'ir>> for TestDialect {
     type Effect = CompositeAction;
@@ -351,7 +351,7 @@ enum PushDialect {
 }
 
 type PushInterp<'ir> = SingleStage<'ir, PushDialect, TestValue>;
-type PushAction = Action<TestValue, (), BlockCursor<TestValue>>;
+type PushAction = Action<TestValue, (), BlockCursor<TestValue, PushDialect>>;
 
 impl<'ir> Interpretable<PushInterp<'ir>> for PushDialect {
     type Effect = PushAction;
@@ -460,7 +460,7 @@ enum JumpDialect {
 }
 
 type JumpInterp<'ir> = SingleStage<'ir, JumpDialect, TestValue>;
-type JumpAction = Action<TestValue, (), BlockCursor<TestValue>>;
+type JumpAction = Action<TestValue, (), BlockCursor<TestValue, JumpDialect>>;
 
 impl<'ir> Interpretable<JumpInterp<'ir>> for JumpDialect {
     type Effect = JumpAction;

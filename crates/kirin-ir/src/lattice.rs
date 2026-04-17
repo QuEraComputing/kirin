@@ -57,3 +57,16 @@ pub trait FiniteLattice: HasBottom + HasTop {}
 impl<T: HasBottom + HasTop> FiniteLattice for T {}
 
 pub trait TypeLattice: FiniteLattice + CompileTimeValue {}
+
+/// A lattice with a widening operator for ensuring termination of fixpoint
+/// iteration over infinite-height domains (e.g. intervals, polyhedra).
+///
+/// Widening must satisfy:
+/// - **Upper bound**: `a.join(b).is_subseteq(&a.widen(b))` for all `a`, `b`
+/// - **Termination**: any ascending chain `x₀ ▽ x₁ ▽ x₂ ▽ …` stabilizes
+///
+/// For finite-height lattices, widening is unnecessary — use [`FiniteLattice`]
+/// directly and the fixpoint engine terminates by finite height alone.
+pub trait Widen: HasBottom {
+    fn widen(&self, other: &Self) -> Self;
+}

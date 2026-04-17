@@ -8,3 +8,4 @@ kirin.workspace = true
 kirin-interpreter = { workspace = true }
 kirin-interpreter-2 = { workspace = true }
 kirin-interpreter-4 = { workspace = true }
+kirin-interpreter-5 = { workspace = true }

@@ -154,9 +154,11 @@ where
         interp: &mut I,
     ) -> Result<CallPayload<<I as ValueStore>::Value>, InterpreterError> {
         let args = interp.read_many(self.args())?;
+        let callee_stage = interp.current_stage();
         let callee = resolve_call(interp, self.target())?;
         Ok(CallPayload {
             callee,
+            callee_stage,
             args,
             results: self.results().to_vec(),
         })
@@ -166,10 +168,6 @@ where
 // ---------------------------------------------------------------------------
 // Lifted — delegates to inner types
 // ---------------------------------------------------------------------------
-//
-// Each variant returns a different effect type (CursorEffect, ReturnEffect,
-// CallPayload). The wrapping enum lifts them all into the machine's effect
-// via LiftInto, returning <I as Machine>::Effect.
 
 impl<I, T, L> Interpretable<I> for Lifted<T>
 where
