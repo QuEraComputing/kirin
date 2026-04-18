@@ -3,6 +3,7 @@ pub mod interpreter4;
 pub mod interpreter5;
 pub mod interpreter6;
 pub mod interpreter7;
+pub mod interpreter8;
 pub use interpret_impl::CompareValue;
 
 use kirin::prelude::*;
