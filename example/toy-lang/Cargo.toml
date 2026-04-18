@@ -18,6 +18,7 @@ kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
 kirin-interpreter = { workspace = true }
 kirin-interpreter-5 = { workspace = true }
+kirin-interpreter-6 = { workspace = true }
 kirin-derive-interpreter = { workspace = true }
 kirin-chumsky = { workspace = true }
 kirin-prettyless = { workspace = true }

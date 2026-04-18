@@ -8,6 +8,7 @@ kirin.workspace = true
 kirin-interpreter = { workspace = true }
 kirin-interpreter-4 = { workspace = true }
 kirin-interpreter-5 = { workspace = true }
+kirin-interpreter-6 = { workspace = true }
 
 [dev-dependencies]
 kirin-test-types = { path = "../kirin-test-types" }
