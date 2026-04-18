@@ -1,17 +1,22 @@
+use std::convert::Infallible;
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Neg, Not, Sub};
 
 use kirin::prelude::HasStageInfo;
 use kirin_arith::{ArithValue, CheckedDiv, CheckedRem};
 use kirin_bitwise::{CheckedShl, CheckedShr};
 use kirin_cmp::CompareValue;
-use kirin_interpreter::{BranchCondition, ProductValue};
+use kirin_interpreter::{AbstractValue, BranchCondition, ProductValue};
+use kirin_interpreter_7::abstract_interp::AbstractInterp;
+use kirin_interpreter_7::concrete::ConcreteInterp;
 use kirin_interpreter_7::control::{Control, ControlExt};
 use kirin_interpreter_7::cursor::{BlockCursor, Execute};
-use kirin_interpreter_7::env::{ConcreteEnv, Interp, Interpretable};
+use kirin_interpreter_7::env::{ConcreteEnv, Interpretable};
 use kirin_interpreter_7::error::InterpreterError;
 use kirin_interpreter_7::lift::Lift;
 use kirin_scf::ForLoopValue;
 use kirin_scf::interpreter7::cursor::{ForCursor, IfCursor, SCFCursor};
+
+use crate::stage::Stage;
 
 use crate::language::{HighLevel, LowLevel};
 
@@ -89,10 +94,11 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// HighLevel: Interpretable<E>
+// HighLevel: Interpretable<ConcreteInterp<...>>
 // ---------------------------------------------------------------------------
 
-impl<E, V> Interpretable<E> for HighLevel
+impl<'ir, V> Interpretable<ConcreteInterp<'ir, Stage, HighLevel, V, HighLevelCursor<V>>>
+    for HighLevel
 where
     V: Clone
         + BranchCondition
@@ -115,18 +121,13 @@ where
         + CompareValue,
     <V as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
     <V as CompareValue>::Bool: Into<V>,
-    E: ConcreteEnv<Value = V, Dialect = HighLevel, Cursor = HighLevelCursor<V>>,
-    HighLevelCursor<V>: Lift<BlockCursor<V, HighLevel>>
-        + Lift<SCFCursor<V, HighLevel>>
-        + Lift<IfCursor<V, HighLevel>>
-        + Lift<ForCursor<V, HighLevel>>,
-    E::Ext: From<ControlExt<HighLevelCursor<V>>>,
-    E::StageContainer: HasStageInfo<HighLevel>,
-    E::Error: From<InterpreterError>,
 {
-    type Effect = Control<V, E::Ext>;
+    type Effect = Control<V, ControlExt<HighLevelCursor<V>>>;
 
-    fn interpret(&self, env: &mut E) -> Result<Control<V, E::Ext>, E::Error> {
+    fn interpret(
+        &self,
+        env: &mut ConcreteInterp<'ir, Stage, HighLevel, V, HighLevelCursor<V>>,
+    ) -> Result<Control<V, ControlExt<HighLevelCursor<V>>>, InterpreterError> {
         match self {
             HighLevel::Lexical(op) => op.interpret(env),
             HighLevel::Structured(op) => op.interpret(env),
@@ -139,47 +140,87 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// LowLevel: Interpretable<E>
-//
-// Works for both ConcreteInterp and AbstractInterp — uses only E: Interp.
+// LowLevel: Interpretable — concrete and abstract modes
 // ---------------------------------------------------------------------------
 
-impl<E> Interpretable<E> for LowLevel
+impl<'ir, V, C> Interpretable<ConcreteInterp<'ir, Stage, LowLevel, V, C>> for LowLevel
 where
-    E: Interp,
-    E::Dialect: kirin::prelude::Dialect,
-    E::Value: Clone
+    V: Clone
         + BranchCondition
         + ProductValue
         + 'static
-        + Add<Output = E::Value>
-        + Sub<Output = E::Value>
-        + Mul<Output = E::Value>
-        + Neg<Output = E::Value>
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Neg<Output = V>
         + CheckedDiv
         + CheckedRem
-        + BitAnd<Output = E::Value>
-        + BitOr<Output = E::Value>
-        + BitXor<Output = E::Value>
-        + Not<Output = E::Value>
+        + BitAnd<Output = V>
+        + BitOr<Output = V>
+        + BitXor<Output = V>
+        + Not<Output = V>
         + CheckedShl
         + CheckedShr
         + TryFrom<ArithValue>
         + CompareValue,
-    <E::Value as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
-    <E::Value as CompareValue>::Bool: Into<E::Value>,
-    E::StageContainer: HasStageInfo<LowLevel> + HasStageInfo<E::Dialect>,
+    <V as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
+    <V as CompareValue>::Bool: Into<V>,
+    C: 'static,
 {
-    type Effect = Control<E::Value, E::Ext>;
+    type Effect = Control<V, ControlExt<C>>;
 
-    fn interpret(&self, env: &mut E) -> Result<Control<E::Value, E::Ext>, E::Error> {
+    fn interpret(
+        &self,
+        env: &mut ConcreteInterp<'ir, Stage, LowLevel, V, C>,
+    ) -> Result<Control<V, ControlExt<C>>, InterpreterError> {
         match self {
             LowLevel::Lifted(op) => op.interpret(env),
             LowLevel::Constant(op) => op.interpret(env).map(Control::from),
             LowLevel::Arith(op) => op.interpret(env).map(Control::from),
             LowLevel::Cmp(op) => op.interpret(env).map(Control::from),
             LowLevel::Bitwise(op) => op.interpret(env).map(Control::from),
-            LowLevel::Cf(op) => op.interpret(env).map(|c| c.map_ext(Into::into)),
+            LowLevel::Cf(op) => op.interpret(env),
+        }
+    }
+}
+
+impl<'ir, V> Interpretable<AbstractInterp<'ir, Stage, LowLevel, V>> for LowLevel
+where
+    V: Clone
+        + AbstractValue
+        + BranchCondition
+        + ProductValue
+        + 'static
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Neg<Output = V>
+        + CheckedDiv
+        + CheckedRem
+        + BitAnd<Output = V>
+        + BitOr<Output = V>
+        + BitXor<Output = V>
+        + Not<Output = V>
+        + CheckedShl
+        + CheckedShr
+        + TryFrom<ArithValue>
+        + CompareValue,
+    <V as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
+    <V as CompareValue>::Bool: Into<V>,
+{
+    type Effect = Control<V, Infallible>;
+
+    fn interpret(
+        &self,
+        env: &mut AbstractInterp<'ir, Stage, LowLevel, V>,
+    ) -> Result<Control<V, Infallible>, InterpreterError> {
+        match self {
+            LowLevel::Lifted(op) => op.interpret(env),
+            LowLevel::Constant(op) => op.interpret(env).map(Control::from),
+            LowLevel::Arith(op) => op.interpret(env).map(Control::from),
+            LowLevel::Cmp(op) => op.interpret(env).map(Control::from),
+            LowLevel::Bitwise(op) => op.interpret(env).map(Control::from),
+            LowLevel::Cf(op) => op.interpret(env),
         }
     }
 }

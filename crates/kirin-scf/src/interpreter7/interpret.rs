@@ -1,73 +1,73 @@
-use kirin::prelude::CompileTimeValue;
+use kirin::prelude::{CompileTimeValue, Dialect, HasStageInfo, StageMeta};
 use kirin_interpreter::{BranchCondition, ProductValue};
+use kirin_interpreter_7::concrete::ConcreteInterp;
 use kirin_interpreter_7::control::{Control, ControlExt};
 use kirin_interpreter_7::cursor::BlockCursor;
-use kirin_interpreter_7::env::{ConcreteEnv, Interpretable};
+use kirin_interpreter_7::env::Interpretable;
 use kirin_interpreter_7::error::InterpreterError;
+use kirin_interpreter_7::interp::Interp;
 use kirin_interpreter_7::lift::Lift;
+use kirin_interpreter_7::store::Store;
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
 
 use super::cursor::{ForCursor, IfCursor, SCFCursor};
 
 // ---------------------------------------------------------------------------
-// If — concrete mode
+// If — concrete only
 //
-// Note: Abstract SCF interpretation is not supported in interpreter-7 via
-// Interpretable<AbstractEnv>. The Rust coherence rules prevent having two
-// impl blocks for Interpretable<E> on the same type (one for ConcreteEnv,
-// one for AbstractEnv) because Rust can't prove the bounds are disjoint.
-//
-// For abstract interpretation, use LowLevel (flat CF) programs, which work
-// with AbstractInterp via the Interpretable<E: Interp> impls in kirin-cf.
+// Abstract SCF interpretation is not supported: coherence prevents two
+// Interpretable impls on the same type bounded by E: ConcreteEnv vs
+// E: AbstractEnv. For abstract interpretation use flat CF programs.
 // ---------------------------------------------------------------------------
 
-impl<E, V, T> Interpretable<E> for If<T>
+impl<'ir, S, L, V, C, T> Interpretable<ConcreteInterp<'ir, S, L, V, C>> for If<T>
 where
-    T: CompileTimeValue,
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
     V: Clone + BranchCondition + 'static,
-    E: ConcreteEnv<Value = V>,
-    E::Cursor: Lift<BlockCursor<V, E::Dialect>> + Lift<IfCursor<V, E::Dialect>>,
-    E::Ext: From<ControlExt<E::Cursor>>,
-    E::Error: From<InterpreterError>,
+    C: Lift<BlockCursor<V, L>> + Lift<IfCursor<V, L>> + 'static,
+    T: CompileTimeValue,
 {
-    type Effect = Control<V, E::Ext>;
+    type Effect = Control<V, ControlExt<C>>;
 
-    fn interpret(&self, env: &mut E) -> Result<Control<V, E::Ext>, E::Error> {
+    fn interpret(
+        &self,
+        env: &mut ConcreteInterp<'ir, S, L, V, C>,
+    ) -> Result<Control<V, ControlExt<C>>, InterpreterError> {
         let cond = env.read(self.condition)?;
         let block = match cond.is_truthy() {
             Some(true) => self.then_body,
             Some(false) => self.else_body,
             None => {
-                return Err(E::Error::from(InterpreterError::UnhandledEffect(
+                return Err(InterpreterError::UnhandledEffect(
                     "scf.if: nondeterministic condition not supported in concrete mode".into(),
-                )));
+                ));
             }
         };
-        let cursor =
-            IfCursor::<V, E::Dialect>::new(block, self.results.clone(), env.current_stage());
-        Ok(Control::Ext(E::Ext::from(ControlExt::Push(
-            E::Cursor::lift(cursor),
-        ))))
+        let cursor = IfCursor::<V, L>::new(block, self.results.clone(), env.current_stage());
+        Ok(Control::Ext(ControlExt::Push(C::lift(cursor))))
     }
 }
 
 // ---------------------------------------------------------------------------
-// For — concrete mode
+// For — concrete only
 // ---------------------------------------------------------------------------
 
-impl<E, V, T> Interpretable<E> for For<T>
+impl<'ir, S, L, V, C, T> Interpretable<ConcreteInterp<'ir, S, L, V, C>> for For<T>
 where
-    T: CompileTimeValue,
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
     V: Clone + ForLoopValue + ProductValue + 'static,
-    E: ConcreteEnv<Value = V>,
-    E::Cursor: Lift<BlockCursor<V, E::Dialect>> + Lift<ForCursor<V, E::Dialect>>,
-    E::Ext: From<ControlExt<E::Cursor>>,
-    E::Error: From<InterpreterError>,
+    C: Lift<BlockCursor<V, L>> + Lift<ForCursor<V, L>> + 'static,
+    T: CompileTimeValue,
 {
-    type Effect = Control<V, E::Ext>;
+    type Effect = Control<V, ControlExt<C>>;
 
-    fn interpret(&self, env: &mut E) -> Result<Control<V, E::Ext>, E::Error> {
+    fn interpret(
+        &self,
+        env: &mut ConcreteInterp<'ir, S, L, V, C>,
+    ) -> Result<Control<V, ControlExt<C>>, InterpreterError> {
         let iv = env.read(self.start)?;
         let end = env.read(self.end)?;
         let step = env.read(self.step)?;
@@ -78,7 +78,7 @@ where
             .collect::<Result<_, _>>()?;
         let init_arg_count = init_values.len();
         let carried = V::new_product(init_values);
-        let cursor = ForCursor::<V, E::Dialect>::builder()
+        let cursor = ForCursor::<V, L>::builder()
             .iv(iv)
             .end(end)
             .step(step)
@@ -88,26 +88,28 @@ where
             .init_arg_count(init_arg_count)
             .results(self.results.clone())
             .build();
-        Ok(Control::Ext(E::Ext::from(ControlExt::Push(
-            E::Cursor::lift(cursor),
-        ))))
+        Ok(Control::Ext(ControlExt::Push(C::lift(cursor))))
     }
 }
 
 // ---------------------------------------------------------------------------
-// Yield — concrete mode
+// Yield — concrete only
 // ---------------------------------------------------------------------------
 
-impl<E, V, T> Interpretable<E> for Yield<T>
+impl<'ir, S, L, V, C, T> Interpretable<ConcreteInterp<'ir, S, L, V, C>> for Yield<T>
 where
-    T: CompileTimeValue,
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
     V: Clone + ProductValue,
-    E: ConcreteEnv<Value = V>,
-    E::Error: From<InterpreterError>,
+    C: 'static,
+    T: CompileTimeValue,
 {
-    type Effect = Control<V, E::Ext>;
+    type Effect = Control<V, ControlExt<C>>;
 
-    fn interpret(&self, env: &mut E) -> Result<Control<V, E::Ext>, E::Error> {
+    fn interpret(
+        &self,
+        env: &mut ConcreteInterp<'ir, S, L, V, C>,
+    ) -> Result<Control<V, ControlExt<C>>, InterpreterError> {
         let values: Vec<V> = self
             .values
             .iter()
@@ -119,24 +121,27 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// StructuredControlFlow — concrete dialect wrapper
+// StructuredControlFlow — concrete only
 // ---------------------------------------------------------------------------
 
-impl<E, V, T> Interpretable<E> for StructuredControlFlow<T>
+impl<'ir, S, L, V, C, T> Interpretable<ConcreteInterp<'ir, S, L, V, C>> for StructuredControlFlow<T>
 where
-    T: CompileTimeValue,
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
     V: Clone + BranchCondition + ForLoopValue + ProductValue + 'static,
-    E: ConcreteEnv<Value = V>,
-    E::Cursor: Lift<BlockCursor<V, E::Dialect>>
-        + Lift<IfCursor<V, E::Dialect>>
-        + Lift<ForCursor<V, E::Dialect>>
-        + Lift<SCFCursor<V, E::Dialect>>,
-    E::Ext: From<ControlExt<E::Cursor>>,
-    E::Error: From<InterpreterError>,
+    C: Lift<BlockCursor<V, L>>
+        + Lift<IfCursor<V, L>>
+        + Lift<ForCursor<V, L>>
+        + Lift<SCFCursor<V, L>>
+        + 'static,
+    T: CompileTimeValue,
 {
-    type Effect = Control<V, E::Ext>;
+    type Effect = Control<V, ControlExt<C>>;
 
-    fn interpret(&self, env: &mut E) -> Result<Control<V, E::Ext>, E::Error> {
+    fn interpret(
+        &self,
+        env: &mut ConcreteInterp<'ir, S, L, V, C>,
+    ) -> Result<Control<V, ControlExt<C>>, InterpreterError> {
         match self {
             Self::If(op) => op.interpret(env),
             Self::For(op) => op.interpret(env),
