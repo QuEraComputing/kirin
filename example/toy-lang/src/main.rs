@@ -1,5 +1,6 @@
 mod interpreter5;
 mod interpreter6;
+mod interpreter7;
 mod language;
 mod stage;
 

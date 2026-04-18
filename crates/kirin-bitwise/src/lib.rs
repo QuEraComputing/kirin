@@ -46,6 +46,7 @@ mod interpret_impl;
 pub mod interpreter4;
 pub mod interpreter5;
 pub mod interpreter6;
+pub mod interpreter7;
 
 use kirin::prelude::*;
 

@@ -733,6 +733,7 @@ dependencies = [
  "kirin-interpreter-4",
  "kirin-interpreter-5",
  "kirin-interpreter-6",
+ "kirin-interpreter-7",
 ]
 
 [[package]]
@@ -744,6 +745,7 @@ dependencies = [
  "kirin-interpreter-4",
  "kirin-interpreter-5",
  "kirin-interpreter-6",
+ "kirin-interpreter-7",
  "kirin-test-types",
 ]
 
@@ -757,6 +759,7 @@ dependencies = [
  "kirin-interpreter-4",
  "kirin-interpreter-5",
  "kirin-interpreter-6",
+ "kirin-interpreter-7",
  "kirin-test-types",
  "smallvec",
 ]
@@ -788,6 +791,7 @@ dependencies = [
  "kirin-interpreter-4",
  "kirin-interpreter-5",
  "kirin-interpreter-6",
+ "kirin-interpreter-7",
  "kirin-test-types",
 ]
 
@@ -801,6 +805,7 @@ dependencies = [
  "kirin-interpreter-4",
  "kirin-interpreter-5",
  "kirin-interpreter-6",
+ "kirin-interpreter-7",
 ]
 
 [[package]]
@@ -882,6 +887,7 @@ dependencies = [
  "kirin-interpreter-4",
  "kirin-interpreter-5",
  "kirin-interpreter-6",
+ "kirin-interpreter-7",
  "kirin-test-types",
  "smallvec",
 ]
@@ -964,6 +970,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-interpreter-7"
+version = "0.1.0"
+dependencies = [
+ "kirin-interpreter",
+ "kirin-ir",
+ "rustc-hash",
+]
+
+[[package]]
 name = "kirin-interval"
 version = "0.1.0"
 dependencies = [
@@ -1025,6 +1040,7 @@ dependencies = [
  "kirin-interpreter-4",
  "kirin-interpreter-5",
  "kirin-interpreter-6",
+ "kirin-interpreter-7",
  "kirin-test-types",
  "smallvec",
 ]
@@ -1987,6 +2003,7 @@ dependencies = [
  "kirin-interpreter",
  "kirin-interpreter-5",
  "kirin-interpreter-6",
+ "kirin-interpreter-7",
  "kirin-interval",
  "kirin-prettyless",
  "kirin-scf",
