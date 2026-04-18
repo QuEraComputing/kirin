@@ -624,20 +624,9 @@ specialize @lowered fn @factorial(i64) -> i64 {
             .expect("no staged info")
             .unique_live_specialization()
             .expect("no live specialization");
-        let spec_info = spec.get_info(stage_info).expect("no spec info");
-        let entry_block = spec_info
-            .body()
-            .definition(stage_info)
-            .regions()
-            .next()
-            .expect("no region")
-            .blocks(stage_info)
-            .next()
-            .expect("no entry block");
-
         let mut interp: AbstractInterp<'static, Stage, LowLevel, V> =
             AbstractInterp::new(pipeline, stage_id);
-        interp.analyze(entry_block, args).expect("analysis failed")
+        interp.analyze(spec, args).expect("analysis failed")
     }
 
     // -----------------------------------------------------------------------

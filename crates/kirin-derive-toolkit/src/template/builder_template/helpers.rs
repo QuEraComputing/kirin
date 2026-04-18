@@ -483,7 +483,7 @@ pub(super) fn build_result_impl(
         .filter(|f| f.category() == FieldCategory::Result)
         .collect::<Vec<_>>();
 
-    for (field, name) in results.into_iter().zip(names.into_iter()) {
+    for (field, name) in results.into_iter().zip(names) {
         match field.collection {
             Collection::Single => {
                 fields.push(quote! {

@@ -90,11 +90,8 @@ impl<V> AnalysisResult<V> {
     {
         // Check return value
         match (&self.return_value, &other.return_value) {
-            (Some(a), Some(b)) => {
-                if !a.is_subseteq(b) {
-                    return false;
-                }
-            }
+            (Some(a), Some(b)) if !a.is_subseteq(b) => return false,
+            (Some(_), Some(_)) => {}
             (Some(_), None) => return false,
             _ => {}
         }
