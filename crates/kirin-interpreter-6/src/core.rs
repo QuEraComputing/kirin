@@ -32,6 +32,13 @@ pub enum Core<V, C = ()> {
         args: Vec<V>,
         results: Vec<ResultValue>,
     },
+    /// Both successors are possible (abstract interpretation of nondeterministic branches).
+    ///
+    /// Produced by `kirin_cf::ConditionalBranch` when
+    /// `BranchCondition::is_truthy()` returns `None`. The concrete driver
+    /// returns an error if this variant reaches it; the abstract driver
+    /// adds both targets to the worklist.
+    Fork(Block, Vec<V>, Block, Vec<V>),
 }
 
 /// Unit `()` lifts to `Core::Advance` — convenience for ops that simply advance.

@@ -3,6 +3,8 @@ mod arith_impl;
 #[cfg(all(test, feature = "arith"))]
 mod arith_tests;
 mod arithmetic;
+#[cfg(feature = "bitwise")]
+mod bitwise_impl;
 mod bound;
 #[cfg(all(test, feature = "interpreter"))]
 mod branch_tests;

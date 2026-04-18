@@ -968,6 +968,7 @@ name = "kirin-interval"
 version = "0.1.0"
 dependencies = [
  "kirin-arith",
+ "kirin-bitwise",
  "kirin-cmp",
  "kirin-interpreter",
  "kirin-ir",
@@ -1986,6 +1987,7 @@ dependencies = [
  "kirin-interpreter",
  "kirin-interpreter-5",
  "kirin-interpreter-6",
+ "kirin-interval",
  "kirin-prettyless",
  "kirin-scf",
  "predicates",

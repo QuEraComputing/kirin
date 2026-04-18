@@ -1,6 +1,6 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::ProductValue;
-use kirin_interpreter_6::concrete::ConcreteDomain;
+use kirin_interpreter_6::abstract_domain::BaseDomain;
 use kirin_interpreter_6::core::Core;
 use kirin_interpreter_6::env::{Env, Interpretable};
 use kirin_interpreter_6::error::InterpreterError;
@@ -63,45 +63,48 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// Return — requires ConcreteDomain
+// Return — requires BaseDomain
 // ---------------------------------------------------------------------------
 
-impl<E, V, T> Interpretable<E> for Return<T>
+impl<E, T> Interpretable<E> for Return<T>
 where
     T: CompileTimeValue,
-    V: Clone + ProductValue,
-    E: ConcreteDomain<Value = V>,
-    E::Effect: Lift<Core<V, E::Cursor>> + Project<Core<V, E::Cursor>>,
+    E: BaseDomain,
+    E::Value: Clone + ProductValue,
+    // Restated from BaseDomain's where clause — Rust does not automatically
+    // propagate trait where-clause bounds to generic users of the trait.
+    E::Effect: Lift<Core<E::Value, E::Cursor>> + Project<Core<E::Value, E::Cursor>>,
     E::Error: From<InterpreterError>,
 {
-    type DialectEffect = Core<V, E::Cursor>;
+    type DialectEffect = Core<E::Value, E::Cursor>;
 
-    fn interpret(&self, env: &mut E) -> Result<Core<V, E::Cursor>, E::Error> {
-        let values: Vec<V> = self
+    fn interpret(&self, env: &mut E) -> Result<Core<E::Value, E::Cursor>, E::Error> {
+        let values: Vec<E::Value> = self
             .values
             .iter()
             .map(|ssa| env.read(*ssa))
             .collect::<Result<_, _>>()?;
-        let product = V::new_product(values);
+        let product = E::Value::new_product(values);
         Ok(Core::Return(product))
     }
 }
 
 // ---------------------------------------------------------------------------
-// Call — requires ConcreteDomain to resolve functions
+// Call — requires BaseDomain to resolve functions
 // ---------------------------------------------------------------------------
 
-impl<E, V, T> Interpretable<E> for Call<T>
+impl<E, T> Interpretable<E> for Call<T>
 where
     T: CompileTimeValue,
-    V: Clone,
-    E: ConcreteDomain<Value = V>,
-    E::Effect: Lift<Core<V, E::Cursor>> + Project<Core<V, E::Cursor>>,
+    E: BaseDomain,
+    E::Value: Clone,
+    // Restated from BaseDomain's where clause.
+    E::Effect: Lift<Core<E::Value, E::Cursor>> + Project<Core<E::Value, E::Cursor>>,
     E::Error: From<InterpreterError>,
 {
-    type DialectEffect = Core<V, E::Cursor>;
+    type DialectEffect = Core<E::Value, E::Cursor>;
 
-    fn interpret(&self, env: &mut E) -> Result<Core<V, E::Cursor>, E::Error> {
+    fn interpret(&self, env: &mut E) -> Result<Core<E::Value, E::Cursor>, E::Error> {
         let args = env.read_many(self.args())?;
         let stage_id = env.current_stage();
         let callee = env.resolve_function(self.target(), stage_id)?;
@@ -118,12 +121,13 @@ where
 // Lifted — delegates to inner types
 // ---------------------------------------------------------------------------
 
-impl<E, V, T> Interpretable<E> for Lifted<T>
+impl<E, T> Interpretable<E> for Lifted<T>
 where
     T: CompileTimeValue,
-    V: Clone + ProductValue,
-    E: ConcreteDomain<Value = V>,
-    E::Effect: Lift<Core<V, E::Cursor>> + Project<Core<V, E::Cursor>>,
+    E: BaseDomain,
+    E::Value: Clone + ProductValue,
+    // Restated from BaseDomain's where clause.
+    E::Effect: Lift<Core<E::Value, E::Cursor>> + Project<Core<E::Value, E::Cursor>>,
     E::Error: From<InterpreterError>,
 {
     type DialectEffect = E::Effect;
@@ -142,12 +146,13 @@ where
 // Lexical — delegates to inner types
 // ---------------------------------------------------------------------------
 
-impl<E, V, T> Interpretable<E> for Lexical<T>
+impl<E, T> Interpretable<E> for Lexical<T>
 where
     T: CompileTimeValue,
-    V: Clone + ProductValue,
-    E: ConcreteDomain<Value = V>,
-    E::Effect: Lift<Core<V, E::Cursor>> + Project<Core<V, E::Cursor>>,
+    E: BaseDomain,
+    E::Value: Clone + ProductValue,
+    // Restated from BaseDomain's where clause.
+    E::Effect: Lift<Core<E::Value, E::Cursor>> + Project<Core<E::Value, E::Cursor>>,
     E::Error: From<InterpreterError>,
 {
     type DialectEffect = E::Effect;

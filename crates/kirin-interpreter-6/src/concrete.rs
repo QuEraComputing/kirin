@@ -5,6 +5,7 @@ use kirin_ir::{
     SpecializedFunction, StageInfo, StageMeta, Symbol,
 };
 
+use crate::abstract_domain::BaseDomain;
 use crate::core::Core;
 use crate::cursor::{BlockCursor, Execute};
 use crate::env::Env;
@@ -14,58 +15,26 @@ use crate::frame_stack::FrameStack;
 use crate::lift::{Lift, Project};
 
 // ---------------------------------------------------------------------------
-// ConcreteDomain — extended Env for cursor-stack execution
+// ConcreteDomain — cursor-stack execution on top of BaseDomain
 // ---------------------------------------------------------------------------
 
-/// Extended [`Env`] interface for concrete (cursor-stack) execution.
+/// Extended [`BaseDomain`] interface for concrete (cursor-stack) execution.
 ///
-/// Adds cursor management, stage info lookup, and function resolution.
-/// The `where` clause constrains `Self::Effect` to support `Core` effects via
-/// `Lift` (producing them) and `Project` (extracting them in the driver loop).
+/// Adds `take_pending_yield` for extracting top-level return values from the
+/// driver loop. All stage info lookup and function resolution are on
+/// [`BaseDomain`].
 ///
 /// `type Cursor` is the language's cursor coproduct type, e.g. `MyLangCursor<V>`.
 /// It is `V`-parameterized only — no interpreter type appears in the cursor
 /// definition. The `Execute<Self>` impl adds execution behavior.
-pub trait ConcreteDomain: Env + Sized
+///
+/// Note: `Execute<Self>` is NOT a supertrait bound on `type Cursor` — adding
+/// it would create an inductive cycle. The bound is added explicitly in
+/// `ConcreteInterp::step` and `enter_function` instead.
+pub trait ConcreteDomain: BaseDomain
 where
     Self::Effect: Lift<Core<Self::Value, Self::Cursor>> + Project<Core<Self::Value, Self::Cursor>>,
 {
-    /// The containing language for this interpreter.
-    ///
-    /// Dialect `Interpretable<E>` impls reference `E::Language` instead of a
-    /// free `L: Dialect` type parameter, avoiding E0207 (unconstrained type param).
-    /// For single-dialect use: `type Language = MyDialect<T>`.
-    /// For composed languages: `type Language = MyComposedLanguage<T>`.
-    type Language: Dialect;
-
-    /// The composed cursor type for this interpreter.
-    ///
-    /// For single-dialect use: `BlockCursor<V, L>`.
-    /// For composed languages: a language cursor coproduct (e.g.
-    /// `MyLangCursor<V> = Block(BlockCursor<V, L>) | SCF(SCFCursor<V, L>)`).
-    ///
-    /// `#[derive(ComposedCursor)]` generates this type alongside the language enum.
-    /// Written manually until the derive is implemented — see the comment in
-    /// each dialect's `interpreter6/cursor.rs`.
-    ///
-    /// Note: `Execute<Self>` is NOT a supertrait bound here — adding it would
-    /// create an inductive cycle (`E: ConcreteDomain` → `E::Cursor: Execute<E>`
-    /// → impls of `Execute<E>` need `E: ConcreteDomain` → cycle). The bound is
-    /// added explicitly in `ConcreteInterp::step` and `enter_function` instead.
-    type Cursor;
-
-    type StageContainer: StageMeta;
-
-    fn stage_info_for<L: Dialect>(&self, stage_id: CompileStage) -> Option<&StageInfo<L>>
-    where
-        Self::StageContainer: HasStageInfo<L>;
-
-    fn resolve_function(
-        &self,
-        target: Symbol,
-        stage_id: CompileStage,
-    ) -> Result<SpecializedFunction, Self::Error>;
-
     fn take_pending_yield(&mut self) -> Option<Self::Value>;
 }
 
@@ -80,9 +49,7 @@ where
 /// `L` — the dialect (or composed language type).
 /// `V` — value type.
 /// `C` — cursor type, typically a language cursor coproduct `MyLangCursor<V>`.
-/// `Eff` — effect type, defaults to `Core<V, C>` (language-level effect coproduct
-///         for languages with only Core effects; use a composed effect enum for
-///         languages with dialect-specific non-Core effects).
+/// `Eff` — effect type, defaults to `Core<V, C>`.
 pub struct ConcreteInterp<'ir, S: StageMeta, L: Dialect, V: Clone, C, Eff = Core<V, C>> {
     pipeline: &'ir Pipeline<S>,
     stage_id: CompileStage,
@@ -123,9 +90,9 @@ where
     }
 }
 
-// -- ConcreteDomain ---------------------------------------------------------
+// -- BaseDomain -------------------------------------------------------------
 
-impl<'ir, S, L, V, C, Eff> ConcreteDomain for ConcreteInterp<'ir, S, L, V, C, Eff>
+impl<'ir, S, L, V, C, Eff> BaseDomain for ConcreteInterp<'ir, S, L, V, C, Eff>
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
@@ -171,7 +138,18 @@ where
             .unique_live_specialization()
             .map_err(|_| InterpreterError::UnhandledEffect("ambiguous specialization".into()))
     }
+}
 
+// -- ConcreteDomain ---------------------------------------------------------
+
+impl<'ir, S, L, V, C, Eff> ConcreteDomain for ConcreteInterp<'ir, S, L, V, C, Eff>
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+    V: Clone,
+    C: 'static,
+    Eff: Lift<Core<V, C>> + Project<Core<V, C>> + 'static,
+{
     fn take_pending_yield(&mut self) -> Option<V> {
         self.pending_yield.take()
     }
@@ -216,8 +194,7 @@ where
     /// Push a call frame and a `BlockCursor<V, LD>` for the entry block.
     ///
     /// `LD` is the dialect of the callee (may differ from `L` in cross-stage calls).
-    /// `C: Lift<BlockCursor<V, LD>>` is how the typed cursor is injected into the
-    /// language cursor coproduct — this impl is in the `Lift` impls for `MyLangCursor`.
+    /// `C: Lift<BlockCursor<V, LD>>` injects the typed cursor into the coproduct.
     pub fn enter_function<LD: Dialect>(
         &mut self,
         callee: SpecializedFunction,
@@ -244,7 +221,6 @@ where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
     V: Clone,
-    // C: Lift<BlockCursor<V, L>> needed to push call-frame cursors in push_call_frame.
     C: Execute<Self> + Lift<BlockCursor<V, L>> + 'static,
     Eff: Lift<Core<V, C>> + Project<Core<V, C>> + 'static,
 {
@@ -258,24 +234,18 @@ where
 
         match Project::<Core<V, C>>::project(effect) {
             Ok(Core::Advance) => {
-                // BlockCursor handles Advance internally; seeing it here means a
-                // cursor returned Advance to signal "re-execute me next tick".
                 self.cursors.push(cursor);
             }
             Ok(Core::Jump(..)) => {
-                // Same: BlockCursor handles Jump; another cursor returned it.
                 self.cursors.push(cursor);
             }
             Ok(Core::Push(new_cursor)) => {
                 self.cursors.push(cursor);
                 self.cursors.push(new_cursor);
             }
-            Ok(Core::Pop) => {
-                // Cursor self-removes.
-            }
+            Ok(Core::Pop) => {}
             Ok(Core::Yield(v)) => {
                 self.pending_yield = Some(v);
-                // Cursor is done — do not push back.
             }
             Ok(Core::Return(v)) => {
                 let frame = self.frames.pop().ok_or(InterpreterError::NoFrame)?;
@@ -287,7 +257,6 @@ where
                         self.frames.write(*result, v.clone())?;
                     }
                 }
-                // Cursor is done — do not push back.
             }
             Ok(Core::Call {
                 callee,
@@ -298,10 +267,14 @@ where
                 self.cursors.push(cursor);
                 self.push_call_frame(callee, stage, args, results)?;
             }
+            Ok(Core::Fork(..)) => {
+                return Err(InterpreterError::UnhandledEffect(
+                    "Core::Fork reached concrete driver; \
+                     use AbstractInterp for nondeterministic branches"
+                        .into(),
+                ));
+            }
             Err(_dialect_effect) => {
-                // A non-Core dialect effect reached the driver loop with no handler.
-                // For languages with non-Core effects, override `step` or use a
-                // custom driver that handles the Err branch.
                 return Err(InterpreterError::UnhandledEffect(
                     "non-Core effect reached driver loop; \
                      override step() or use a dialect-aware driver"

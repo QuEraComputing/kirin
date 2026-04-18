@@ -1,6 +1,6 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::BranchCondition;
-use kirin_interpreter_6::concrete::ConcreteDomain;
+use kirin_interpreter_6::abstract_domain::BaseDomain;
 use kirin_interpreter_6::core::Core;
 use kirin_interpreter_6::env::Interpretable;
 use kirin_interpreter_6::error::InterpreterError;
@@ -8,11 +8,13 @@ use kirin_interpreter_6::lift::{Lift, Project};
 
 use crate::ControlFlow;
 
-impl<E, V, T> Interpretable<E> for ControlFlow<T>
+impl<E, T> Interpretable<E> for ControlFlow<T>
 where
-    E: ConcreteDomain<Value = V>,
-    E::Effect: Lift<Core<V, E::Cursor>> + Project<Core<V, E::Cursor>>,
-    V: Clone + BranchCondition,
+    E: BaseDomain,
+    E::Value: Clone + BranchCondition,
+    // Restated from BaseDomain's where clause — Rust does not automatically
+    // propagate trait where-clause bounds to generic users of the trait.
+    E::Effect: Lift<Core<E::Value, E::Cursor>> + Project<Core<E::Value, E::Cursor>>,
     T: CompileTimeValue,
     E::Error: From<InterpreterError>,
 {
@@ -32,18 +34,26 @@ where
                 false_args,
             } => {
                 let cond = env.read(*condition)?;
-                let (block, arg_slice) = match cond.is_truthy() {
-                    Some(true) => (true_target.target(), true_args.as_slice()),
-                    Some(false) => (false_target.target(), false_args.as_slice()),
-                    None => {
-                        return Err(E::Error::from(InterpreterError::UnhandledEffect(
-                            "nondeterministic branch conditions are not supported in interpreter6"
-                                .into(),
-                        )));
+                match cond.is_truthy() {
+                    Some(true) => {
+                        let values = env.read_many(true_args)?;
+                        Ok(E::Effect::lift(Core::Jump(true_target.target(), values)))
                     }
-                };
-                let values = env.read_many(arg_slice)?;
-                Ok(E::Effect::lift(Core::Jump(block, values)))
+                    Some(false) => {
+                        let values = env.read_many(false_args)?;
+                        Ok(E::Effect::lift(Core::Jump(false_target.target(), values)))
+                    }
+                    None => {
+                        let true_values = env.read_many(true_args)?;
+                        let false_values = env.read_many(false_args)?;
+                        Ok(E::Effect::lift(Core::Fork(
+                            true_target.target(),
+                            true_values,
+                            false_target.target(),
+                            false_values,
+                        )))
+                    }
+                }
             }
             Self::__Phantom(..) => unreachable!(),
         }
