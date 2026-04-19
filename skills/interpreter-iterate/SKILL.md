@@ -42,6 +42,8 @@ Every iteration must preserve these. **Never reduce them.** Adding new features 
 1. **Concrete interpretation** — single-stage (source HighLevel) and multi-stage (HighLevel + LowLevel)
 2. **Abstract interpretation** — single-stage (source and lowered) and multi-stage; interval domain and type-lattice domain both tested
 3. **SCF support in abstract mode** — `scf.if` and `scf.for` must work under the abstract interpreter (not just concrete)
+7. **Forward and backward abstract interpretation** — the framework must support both directions using the same `Interpretable<E>` / cursor abstraction. Forward AI propagates facts along control flow (reaching definitions, interval analysis); backward AI propagates facts against control flow (liveness, slicing conditions). The traversal direction should be a parameter, not a structural fork in the framework.
+8. **Sparse abstract interpretation** — only a subset of SSAValues need a known lattice element; propagation follows the use-def chain from those SSAValues only. The environment/store must support partial mappings (`Option<LatticeElem>` or equivalent) without requiring every SSAValue to be initialized. This tests whether the framework's value store is flexible enough for demand-driven analysis.
 4. **Cross-stage calls** — source-stage functions calling lowered-stage functions (and vice-versa where appropriate)
 5. **API symmetry via Lift/Project** — every dialect-local ↔ total (coproduct) boundary must expose a symmetric bidirectional API: `lift` (local → total) and `project` (total → local). This principle must be applied consistently across all crossing points: cursors, values, effects, and environments. The canonical implementation is zero-cost enum-based Lift/Project with no heap allocation. A design that applies the pattern only to cursors but not to values or effects scores low on R2.
 6. **Flexible entry points** — two distinct use cases must both be supported:
@@ -60,6 +62,9 @@ In `example/toy-lang/src/interpreter<N>.rs`:
 - `abstract_multi_same_stage_type_propagates`, `abstract_multi_cross_stage_type_propagates`, `interval_cross_stage_doubles_range` (abstract, multi-stage)
 - `lowered_entry_calls_source` — concrete multi-stage with **LowLevel as entry point** calling a HighLevel function; verifies fixed-source is not the only supported direction
 - `symmetric_entry_highlevel`, `symmetric_entry_lowlevel` — same program entered from two different languages using a dialect-agnostic entry API; both must produce the same observable result; verifies the symmetric/dynamic use case
+- `backward_liveness_highlevel`, `backward_liveness_scf` — backward abstract interpretation computing live SSAValues at each program point; `scf` variant must flow liveness backward through `scf.if` branches
+- `sparse_interval_propagation` — sparse AI where only a subset of SSAValues have known intervals (others unmapped); verify that propagation follows use-def from the seeded values only and does not require initializing the full environment
+- `sparse_type_propagation` — same sparsity requirement for the type-lattice domain
 
 New iterations may **add** tests beyond this baseline (for new features, extensibility probes, etc.) but must never remove or weaken existing ones.
 
@@ -88,8 +93,8 @@ If the budget is reached without convergence, stop, commit what's done, log the 
 
 Once the weighted score falls below 18 for the first time (roughly "most dimensions at 4+"; all-4s baseline is 30), trigger the extensibility probe. Implement a new analysis entirely within `example/toy-lang/src/` — no changes to any interpreter crate or dialect crate. Good candidates:
 
-- **Liveness analysis**: abstract domain over `HashSet<SSAValue>` tracking live values at each program point
-- **Constant propagation**: abstract domain `ConstProp { Concrete(i64), Top }` — verifies the framework handles non-lattice-join semantics cleanly
+- **Liveness analysis**: abstract domain over `HashSet<SSAValue>` tracking live values at each program point — exercises backward AI direction
+- **Sparse constant propagation**: abstract domain `ConstProp { Concrete(i64), Top }` seeded at specific SSAValues; propagates sparsely along use-def — exercises sparse AI and non-lattice-join semantics
 - **Type inference**: verify ToyType propagates correctly through SCF and cross-stage calls with a richer lattice
 
 The probe **passes** (R8 = 5) if:
@@ -151,10 +156,10 @@ Score each dimension 1–5 using the rubric table below. A score of 5 means full
 
 | # | Dimension | 5 (Excellent) | 3 (Acceptable) | 1 (Critical gap) |
 |---|-----------|--------------|----------------|-----------------|
-| R1 | **Requirement completeness** | All non-negotiable features present and tested: concrete + abstract, single + multi-stage, SCF, cross-stage calls, both entry-point use cases | Most features present; one entry-point variant missing or untested | A core feature (interpretation mode, SCF, entry flexibility) is absent or broken |
+| R1 | **Requirement completeness** | All non-negotiable features present and tested: concrete + abstract, single + multi-stage, SCF, cross-stage calls, both entry-point use cases, forward + backward AI, sparse AI | Most features present; one variant (direction, sparsity, or entry) missing or untested | A core feature (interpretation mode, SCF, entry flexibility, AI direction) is absent or broken |
 | R2 | **API symmetry (Lift/Project)** | Every dialect-local ↔ total boundary has a symmetric bidirectional API (`lift`/`project`); applied uniformly across cursors, values, effects, and environments; zero-cost enum-based, no heap allocation | Symmetric API present for cursors but inconsistently applied to values or effects | Symmetry principle absent; boundaries crossed ad-hoc (downcasts, `Any`, one-way coercions) or requires heap allocation |
 | R3 | **Dialect locality** | Dialect authors implement only `Interpretable<E>`; cursor types and dispatch live in user code; zero interpreter-crate changes needed for new dialects | Minor leakage — one or two interpreter-internal concepts exposed | Dialect authors must edit the interpreter crate |
-| R4 | **Mode uniformity** | `Interpretable<E>` works identically for concrete and abstract modes; pure ops have a single generic impl; mode-specific ops use `E::Mode` discriminant only where necessary | Mostly uniform; a few ops duplicated unnecessarily | Separate traits or duplicate impls for concrete vs. abstract |
+| R4 | **Mode uniformity** | `Interpretable<E>` works identically for concrete and abstract modes; forward and backward traversal are a parameter, not a structural fork; pure ops have a single generic impl covering all mode/direction combinations; mode-specific ops use `E::Mode` discriminant only where necessary | Mostly uniform; a few ops duplicated, or forward/backward require separate trait impls | Separate traits or duplicate impls for concrete vs. abstract, or backward AI requires restructuring the core cursor |
 | R5 | **Dialect ergonomics** | Dialect authors write ≤ 1 impl per op type AND import ≤ 5 names from the framework prelude to get started; composition is mechanical enough to be derived; no repeated type bounds copy-paste | Moderate repetition or prelude breadth, but all discoverable from one import site | Extensive manual impl repetition OR author must hunt across multiple internal modules to understand the API contract |
 | R6 | **Type-system correctness** | No `'static` bounds, no `unsafe`, no `Box<dyn Trait>` in framework APIs; `'ir` lifetime threads correctly through all borrows | `'static` used only in abstract interp pipeline borrow (known limitation, tracked) | `unsafe`, `transmute`, or unsound lifetime casts present |
 | R7 | **Algebraic elegance** | Lift/Project, Mode, Cursor, and Env form a coherent algebra; naming is consistent; a new developer can predict the pattern from one example | Mostly coherent; some naming inconsistencies or ad-hoc special cases | Ad-hoc design; each new case requires a novel pattern |
