@@ -1,6 +1,7 @@
 pub mod abstract_call_dispatch;
 pub mod abstract_interp;
 pub mod algebra;
+pub mod backward;
 pub mod call_dispatch;
 pub mod concrete;
 pub mod context;

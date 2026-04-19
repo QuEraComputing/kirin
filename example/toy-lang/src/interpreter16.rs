@@ -1802,8 +1802,8 @@ specialize @lowered fn @double(i64) -> i64 {
     // Liveness analysis — extensibility probe (backward IR walker, R8+)
     //
     // Classical per-block liveness over SSA values in a single function body.
-    // Implemented entirely in toy-lang as a standalone IR walker; no changes
-    // to any framework crate.
+    // Uses `BackwardFixpoint` from `kirin-interpreter-16` for the fixpoint
+    // machinery; only the block-level transfer function is defined here.
     //
     // Equations (backward dataflow):
     //   use[B]      = SSA values read before being defined in B
@@ -1811,11 +1811,12 @@ specialize @lowered fn @double(i64) -> i64 {
     //   live_in[B]  = use[B] ∪ (live_out[B] − def[B])
     //   live_out[B] = ∪ live_in[S]  for each successor S of B
     //
-    // Iteration: backward worklist until fixed point.
+    // Iteration: backward worklist until fixed point (handled by the framework).
     // -----------------------------------------------------------------------
 
     use kirin::prelude::{Block, Dialect, GetInfo, SSAValue, StageInfo};
-    use std::collections::{HashMap, HashSet, VecDeque};
+    use kirin_interpreter_16::backward::{BackwardFixpoint, BlockTransferBackward};
+    use std::collections::{HashMap, HashSet};
 
     /// Per-function liveness result.
     struct LivenessResult {
@@ -1823,78 +1824,74 @@ specialize @lowered fn @double(i64) -> i64 {
         live_out: HashMap<Block, HashSet<SSAValue>>,
     }
 
-    /// Collect all blocks reachable via the region of a function-body statement.
-    ///
-    /// Returns `(blocks_in_order, successors_map)` where `successors_map[B]`
-    /// is the list of CFG successor blocks of B.
-    fn collect_blocks_and_succs<L: Dialect>(
-        body_stmt: kirin::prelude::Statement,
-        stage: &StageInfo<L>,
-    ) -> (Vec<Block>, HashMap<Block, Vec<Block>>) {
-        // The body statement's first region contains all blocks.
-        let region = body_stmt
-            .regions(stage)
-            .next()
-            .expect("function body must have a region");
-        let blocks: Vec<Block> = region.blocks(stage).collect();
+    // -----------------------------------------------------------------------
+    // Liveness transfer function — user-side domain
+    // -----------------------------------------------------------------------
 
-        // Build successor map: for each block, gather successors from its terminator.
-        let mut succs: HashMap<Block, Vec<Block>> = HashMap::new();
-        for &blk in &blocks {
-            let mut blk_succs = Vec::new();
-            if let Some(term) = blk.terminator(stage) {
-                for succ in term.successors(stage) {
-                    blk_succs.push(succ.target());
-                }
-            }
-            succs.insert(blk, blk_succs);
+    /// Transfer function for classical SSA liveness analysis.
+    ///
+    /// Given `live_out[B]`, computes `live_in[B]` by processing the block's
+    /// statements in forward order to collect gen (use) and kill (def) sets,
+    /// then applying:
+    ///   `live_in = use ∪ (live_out − def)`
+    struct LivenessTransfer;
+
+    impl<'ir> BlockTransferBackward<'ir> for LivenessTransfer {
+        type Domain = HashSet<SSAValue>;
+
+        fn join(a: &HashSet<SSAValue>, b: &HashSet<SSAValue>) -> HashSet<SSAValue> {
+            a.union(b).copied().collect()
         }
-        (blocks, succs)
+
+        fn bottom() -> HashSet<SSAValue> {
+            HashSet::new()
+        }
+
+        fn transfer_block<L: Dialect>(
+            &self,
+            block: Block,
+            stage: &StageInfo<L>,
+            live_out: HashSet<SSAValue>,
+        ) -> HashSet<SSAValue> {
+            let info = block.expect_info(stage);
+            let mut def_set: HashSet<SSAValue> = HashSet::new();
+            let mut use_set: HashSet<SSAValue> = HashSet::new();
+
+            // Block arguments are defined at block entry.
+            for &ba in &info.arguments {
+                def_set.insert(ba.into());
+            }
+
+            // Process each statement in forward order to build use/def.
+            let mut process_stmt = |stmt: kirin::prelude::Statement| {
+                for &val in stmt.arguments(stage) {
+                    if !def_set.contains(&val) {
+                        use_set.insert(val);
+                    }
+                }
+                for &rv in stmt.results(stage) {
+                    def_set.insert(rv.into());
+                }
+            };
+
+            for stmt in block.statements(stage) {
+                process_stmt(stmt);
+            }
+            if let Some(term) = block.terminator(stage) {
+                process_stmt(term);
+            }
+
+            // live_in = use ∪ (live_out − def)
+            use_set
+                .into_iter()
+                .chain(live_out.into_iter().filter(|v| !def_set.contains(v)))
+                .collect()
+        }
     }
 
-    /// Compute `(use_set, def_set)` for a single block.
-    ///
-    /// - `def_set`: block arguments (defined at block entry) + result values of
-    ///   all statements (including terminator).
-    /// - `use_set`: SSA values referenced as operands before being locally defined.
-    fn block_use_def<L: Dialect>(
-        blk: Block,
-        stage: &StageInfo<L>,
-    ) -> (HashSet<SSAValue>, HashSet<SSAValue>) {
-        let info = blk.expect_info(stage);
-        let mut def_set: HashSet<SSAValue> = HashSet::new();
-        let mut use_set: HashSet<SSAValue> = HashSet::new();
-
-        // Block arguments are defined at block entry.
-        for &ba in &info.arguments {
-            def_set.insert(ba.into());
-        }
-
-        // Helper: process one statement's uses and defs in order.
-        let mut process_stmt = |stmt: kirin::prelude::Statement| {
-            // Uses: all SSA operands not yet locally defined.
-            for &val in stmt.arguments(stage) {
-                if !def_set.contains(&val) {
-                    use_set.insert(val);
-                }
-            }
-            // Defs: result values produced by this statement.
-            for &rv in stmt.results(stage) {
-                def_set.insert(rv.into());
-            }
-        };
-
-        // Process non-terminator statements first.
-        for stmt in blk.statements(stage) {
-            process_stmt(stmt);
-        }
-        // Then the terminator (if present).
-        if let Some(term) = blk.terminator(stage) {
-            process_stmt(term);
-        }
-
-        (use_set, def_set)
-    }
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
 
     /// Run classical liveness analysis over a single function.
     ///
@@ -1904,63 +1901,14 @@ specialize @lowered fn @double(i64) -> i64 {
         body_stmt: kirin::prelude::Statement,
         stage: &StageInfo<L>,
     ) -> LivenessResult {
-        let (blocks, succs) = collect_blocks_and_succs(body_stmt, stage);
-
-        // Pre-compute use/def sets for every block.
-        let mut use_def: HashMap<Block, (HashSet<SSAValue>, HashSet<SSAValue>)> = HashMap::new();
-        for &blk in &blocks {
-            use_def.insert(blk, block_use_def(blk, stage));
+        let fp = BackwardFixpoint::new(LivenessTransfer);
+        let result = fp.analyze(body_stmt, stage);
+        let mut live_in = HashMap::new();
+        let mut live_out = HashMap::new();
+        for (block, (li, lo)) in result {
+            live_in.insert(block, li);
+            live_out.insert(block, lo);
         }
-
-        // Build predecessor map (needed for worklist ordering; optional but helpful).
-        let mut preds: HashMap<Block, Vec<Block>> = HashMap::new();
-        for &blk in &blocks {
-            preds.entry(blk).or_default();
-        }
-        for (&blk, blk_succs) in &succs {
-            for &s in blk_succs {
-                preds.entry(s).or_default().push(blk);
-            }
-        }
-
-        // Initialise all live_in / live_out to empty.
-        let mut live_in: HashMap<Block, HashSet<SSAValue>> =
-            blocks.iter().map(|&b| (b, HashSet::new())).collect();
-        let mut live_out: HashMap<Block, HashSet<SSAValue>> =
-            blocks.iter().map(|&b| (b, HashSet::new())).collect();
-
-        // Backward worklist: seed with all blocks.
-        let mut worklist: VecDeque<Block> = blocks.iter().copied().collect();
-
-        while let Some(blk) = worklist.pop_front() {
-            // live_out[blk] = ∪ live_in[s] for each successor s
-            let new_out: HashSet<SSAValue> = succs[&blk]
-                .iter()
-                .flat_map(|s| live_in[s].iter().copied())
-                .collect();
-
-            // live_in[blk] = use[blk] ∪ (live_out[blk] − def[blk])
-            let (use_set, def_set) = &use_def[&blk];
-            let new_in: HashSet<SSAValue> = use_set
-                .iter()
-                .copied()
-                .chain(new_out.iter().copied().filter(|v| !def_set.contains(v)))
-                .collect();
-
-            let changed = new_in != live_in[&blk] || new_out != live_out[&blk];
-            live_in.insert(blk, new_in);
-            live_out.insert(blk, new_out);
-
-            if changed {
-                // Re-add predecessors to the worklist.
-                for &pred in &preds[&blk] {
-                    if !worklist.contains(&pred) {
-                        worklist.push_back(pred);
-                    }
-                }
-            }
-        }
-
         LivenessResult { live_in, live_out }
     }
 
