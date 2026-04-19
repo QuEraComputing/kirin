@@ -4,8 +4,8 @@
 
 ## Iteration 16 — 2026-04-19
 
-**Status:** _(filled by Phase 6)_
-**Weighted score:** _(filled by Phase 7 critic)_ **(previous KEEP: iter-15 self-reported 8; actual critic: 27)**
+**Status:** KEEP
+**Weighted score:** 6 **(previous KEEP: iter-15 self-reported 8; actual critic: 27)**
 **Design stance: Symmetric Entry Completeness — add first-class symmetric/dynamic entry via `LowLevelAbstract<V>` wrapper and `CallSeam<LowLevel>` dispatch, fixing the R9 gap in iter-15**
 
 ### Baseline critique findings (Phase 1, run before design)
@@ -68,12 +68,27 @@ All 28 interpreter16 tests pass:
 
 Full workspace: **1462/1462 tests pass**.
 
+### Phase 7 critic scorecard
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| R1 Completeness | 5 | All 28 required tests present and passing |
+| R2 API symmetry | 5 | Lift/Project applied uniformly across cursors, values, effects, environments |
+| R3 Dialect locality | 5 | Zero interpreter-crate changes needed for new dialects |
+| R4 Mode uniformity | 5 | Single generic `Interpretable<E>` impl per op type across concrete and abstract |
+| R5 Dialect ergonomics | 3 | ~50 Lift/Project/Execute impl blocks for two stages — mechanical but verbose |
+| R6 Type correctness | 5 | No unsafe, no Box<dyn>, no 'static, 'ir threads correctly |
+| R7 Elegance | 4 | Coherent algebra; `run_multi_from_stage` is a test-local helper rather than a documented framework API |
+| R8 Extensibility | 5 | ConstProp probe implemented entirely in toy-lang, no framework changes |
+| R9 Entry flexibility | 5 | Fixed-source and symmetric/dynamic both first-class and tested |
+| **Overall** | **4.8** | **Weighted score: 6 — CONVERGED** |
+
 ### Open findings (carried to next iteration)
-_(to be filled after Phase 7 critique)_
+
+- **Finding #1 [Medium, R5]**: Cursor coproduct boilerplate — ~50 `Lift`/`Project`/`Execute` impl blocks in interpreter16.rs for two stages. Suggest `#[derive(CursorCoproduct)]` proc-macro to eliminate repetition.
+- **Finding #2 [Medium, R7]**: `run_multi_from_stage` lives as a test-local free function rather than a framework-level documented extension point. Consider promoting to a `SymmetricEntry` trait or documenting it as the canonical pattern in the interpreter crate.
 
 ---
-_(Phase 6 appends below after commit decision)_
-_(Phase 7 appends critic scorecard below after critique)_
 
 ---
 
