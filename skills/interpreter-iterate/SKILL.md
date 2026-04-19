@@ -110,21 +110,21 @@ At the **end** of the session, send one message summarizing: iterations run, fin
 
 ---
 
-## Phase 1: Determine Iteration Number
+## Phase 1: Baseline Critique (runs once at session start)
+
+Determine the current iteration number:
 
 ```bash
 ls crates/ | grep 'kirin-interpreter-[0-9]' | sort -V
 ```
 
-The next iteration N = max(existing) + 1. Do not prompt the user.
+The current (most recent) iteration is `max(existing)`. The next iteration N = current + 1.
 
----
-
-## Phase 2: Critique Current Design
+Run the critic subagent against the current codebase. This is the only critic run that happens *before* an iteration — every subsequent critique happens *after* a commit (see Phase 7). Do not prompt the user.
 
 Spawn a read-only critic subagent (`dontAsk` mode — never `bypassPermissions`). Brief it with:
-- All source files in `crates/kirin-interpreter-<prev>/src/`
-- `example/toy-lang/src/interpreter<prev>.rs`
+- All source files in `crates/kirin-interpreter-<current>/src/`
+- `example/toy-lang/src/interpreter<current>.rs`
 - The full rubric below (copy it verbatim into the critic brief)
 - `docs/log.md` history (so the critic doesn't re-report already-addressed issues)
 
@@ -187,11 +187,13 @@ score = Σ (6 - dimension_score) * weight
 
 **Convergence** when weighted score ≤ 8 AND R1 ≥ 4 AND R6 ≥ 4 (completeness and type correctness are never negotiable).
 
-Record the rubric scores, overall grade, and weighted score in `docs/log.md`.
+Record the rubric scores, overall grade, and weighted score in `docs/log.md`. This score is the baseline that all subsequent iterations are compared against.
+
+If convergence criteria are already met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 4, extensibility probe passed), stop immediately — nothing to do.
 
 ---
 
-## Phase 3: Design the Next Iteration
+## Phase 2: Design the Next Iteration
 
 Based on the highest-scoring findings, design changes. Prefer targeted fixes over full redesigns — only redesign what's broken. Write down (in your own reasoning, not to disk):
 
@@ -206,9 +208,9 @@ Then update `docs/design_principles.md` to reflect the current intended design. 
 
 ---
 
-## Phase 4: Implement
+## Phase 3: Implement
 
-### 4a: New crate scaffold
+### 3a: New crate scaffold
 
 ```bash
 cp -r crates/kirin-interpreter-<prev> crates/kirin-interpreter-<N>
@@ -221,11 +223,11 @@ Project conventions (from AGENTS.md):
 - No unsafe code
 - Mark manual impls with `// TODO: replace this with derive macro`
 
-### 4b: Dialect submodules
+### 3b: Dialect submodules
 
 For each affected dialect (`kirin-scf`, `kirin-function`, etc.), add a new submodule `interpreter<N>` under `crates/<dialect>/src/`. This may be a single `.rs` file or a directory with `mod.rs`. Update the dialect's `lib.rs`/`mod.rs` to declare it with `pub mod interpreter<N>;` (feature-gated if needed to avoid unused-code warnings when not testing).
 
-### 4c: Toy-lang example
+### 3c: Toy-lang example
 
 Create `example/toy-lang/src/interpreter<N>.rs`. It must contain:
 
@@ -257,7 +259,7 @@ Register the module in `example/toy-lang/src/lib.rs`: `pub mod interpreter<N>;`
 
 ---
 
-## Phase 5: Run Tests and Fix
+## Phase 4: Run Tests and Fix
 
 ```bash
 cargo nextest run -p toy-lang -E 'test(interpreter<N>)'
@@ -276,7 +278,7 @@ All tests must pass before committing.
 
 ---
 
-## Phase 6: Log Findings
+## Phase 5: Log Findings
 
 Append to `docs/log.md` (create if missing — this file must be gitignored):
 
@@ -323,11 +325,11 @@ Append to `docs/log.md` (create if missing — this file must be gitignored):
 
 ---
 
-## Phase 7: Commit and Evaluate
+## Phase 6: Commit and Evaluate
 
 Always commit — whether the iteration improves things or not. The commit creates a recoverable record. Then decide whether to keep it.
 
-### 7a: Commit
+### 6a: Commit
 
 ```bash
 git add crates/kirin-interpreter-<N>/
@@ -341,14 +343,14 @@ git commit -m "feat(interpreter-<N>): <one-line summary of main change>"
 
 Never stage or commit anything under `docs/`. Never use `git add .` or `git add -A` — always stage specific files.
 
-### 7b: Score Comparison
+### 6b: Score Comparison
 
 Compare the weighted convergence score from this iteration against the previous iteration's score (read from `docs/log.md`):
 
 - **Improved**: this iteration's score < previous iteration's score, OR this is the first iteration
 - **No improvement**: this iteration's score ≥ previous iteration's score
 
-### 7c: Discard if No Improvement
+### 6c: Discard if No Improvement
 
 If the score did **not** improve, revert the commit immediately:
 
@@ -362,11 +364,27 @@ Then log the discarded iteration in `docs/log.md` (see Phase 6 template — use 
 
 If the score **did** improve, log with `status: KEEP` and proceed.
 
-### 7d: Consecutive Failure Check
+### 6d: Consecutive Failure Check
 
 If two consecutive iterations are discarded (neither improved the score), stop the loop:
 - Log: "Stopped after N consecutive non-improving iterations — design may have reached a local optimum. Review open findings manually."
 - Do not attempt a third iteration with the same finding set — a different approach is needed that requires human input.
+
+---
+
+## Phase 7: Critique the Committed Iteration
+
+Run the critic subagent against the code that was just committed (or the previous KEEP iteration if this one was discarded). This is the critic run for iteration N — it produces the findings that Phase 2 of iteration N+1 will design against.
+
+Same critic brief as Phase 1:
+- All source files in `crates/kirin-interpreter-<N>/src/` (or `<prev>` if N was discarded)
+- `example/toy-lang/src/interpreter<N>.rs` (or `<prev>` if N was discarded)
+- The full rubric (copy verbatim)
+- Updated `docs/log.md` (so the critic sees the discarded iteration notes too)
+
+The critic produces the same structured report (Part 1 scorecard + Part 2 findings). Append the scores to the current iteration's log entry.
+
+This is the **only** critic run per iteration. Do not re-run the critic mid-iteration or before committing.
 
 ---
 
@@ -378,7 +396,7 @@ After Phase 7, check:
 
 **Stop if** the iteration budget is exhausted.
 
-**Stop if** two consecutive iterations were discarded (Phase 7d).
+**Stop if** two consecutive iterations were discarded (Phase 6d).
 
 **Otherwise** increment N and loop to Phase 2 immediately — no user prompt needed.
 
