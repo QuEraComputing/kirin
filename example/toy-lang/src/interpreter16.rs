@@ -1799,6 +1799,356 @@ specialize @lowered fn @double(i64) -> i64 {
     }
 
     // -----------------------------------------------------------------------
+    // Liveness analysis — extensibility probe (backward IR walker, R8+)
+    //
+    // Classical per-block liveness over SSA values in a single function body.
+    // Implemented entirely in toy-lang as a standalone IR walker; no changes
+    // to any framework crate.
+    //
+    // Equations (backward dataflow):
+    //   use[B]      = SSA values read before being defined in B
+    //   def[B]      = SSA values defined in B (block args + statement results)
+    //   live_in[B]  = use[B] ∪ (live_out[B] − def[B])
+    //   live_out[B] = ∪ live_in[S]  for each successor S of B
+    //
+    // Iteration: backward worklist until fixed point.
+    // -----------------------------------------------------------------------
+
+    use kirin::prelude::{Block, Dialect, GetInfo, SSAValue, StageInfo};
+    use std::collections::{HashMap, HashSet, VecDeque};
+
+    /// Per-function liveness result.
+    struct LivenessResult {
+        live_in: HashMap<Block, HashSet<SSAValue>>,
+        live_out: HashMap<Block, HashSet<SSAValue>>,
+    }
+
+    /// Collect all blocks reachable via the region of a function-body statement.
+    ///
+    /// Returns `(blocks_in_order, successors_map)` where `successors_map[B]`
+    /// is the list of CFG successor blocks of B.
+    fn collect_blocks_and_succs<L: Dialect>(
+        body_stmt: kirin::prelude::Statement,
+        stage: &StageInfo<L>,
+    ) -> (Vec<Block>, HashMap<Block, Vec<Block>>) {
+        // The body statement's first region contains all blocks.
+        let region = body_stmt
+            .regions(stage)
+            .next()
+            .expect("function body must have a region");
+        let blocks: Vec<Block> = region.blocks(stage).collect();
+
+        // Build successor map: for each block, gather successors from its terminator.
+        let mut succs: HashMap<Block, Vec<Block>> = HashMap::new();
+        for &blk in &blocks {
+            let mut blk_succs = Vec::new();
+            if let Some(term) = blk.terminator(stage) {
+                for succ in term.successors(stage) {
+                    blk_succs.push(succ.target());
+                }
+            }
+            succs.insert(blk, blk_succs);
+        }
+        (blocks, succs)
+    }
+
+    /// Compute `(use_set, def_set)` for a single block.
+    ///
+    /// - `def_set`: block arguments (defined at block entry) + result values of
+    ///   all statements (including terminator).
+    /// - `use_set`: SSA values referenced as operands before being locally defined.
+    fn block_use_def<L: Dialect>(
+        blk: Block,
+        stage: &StageInfo<L>,
+    ) -> (HashSet<SSAValue>, HashSet<SSAValue>) {
+        let info = blk.expect_info(stage);
+        let mut def_set: HashSet<SSAValue> = HashSet::new();
+        let mut use_set: HashSet<SSAValue> = HashSet::new();
+
+        // Block arguments are defined at block entry.
+        for &ba in &info.arguments {
+            def_set.insert(ba.into());
+        }
+
+        // Helper: process one statement's uses and defs in order.
+        let mut process_stmt = |stmt: kirin::prelude::Statement| {
+            // Uses: all SSA operands not yet locally defined.
+            for &val in stmt.arguments(stage) {
+                if !def_set.contains(&val) {
+                    use_set.insert(val);
+                }
+            }
+            // Defs: result values produced by this statement.
+            for &rv in stmt.results(stage) {
+                def_set.insert(rv.into());
+            }
+        };
+
+        // Process non-terminator statements first.
+        for stmt in blk.statements(stage) {
+            process_stmt(stmt);
+        }
+        // Then the terminator (if present).
+        if let Some(term) = blk.terminator(stage) {
+            process_stmt(term);
+        }
+
+        (use_set, def_set)
+    }
+
+    /// Run classical liveness analysis over a single function.
+    ///
+    /// `body_stmt` is the statement whose first region contains the function's
+    /// blocks (i.e. `SpecializedFunctionInfo::body()`).
+    fn analyze_liveness<L: Dialect>(
+        body_stmt: kirin::prelude::Statement,
+        stage: &StageInfo<L>,
+    ) -> LivenessResult {
+        let (blocks, succs) = collect_blocks_and_succs(body_stmt, stage);
+
+        // Pre-compute use/def sets for every block.
+        let mut use_def: HashMap<Block, (HashSet<SSAValue>, HashSet<SSAValue>)> = HashMap::new();
+        for &blk in &blocks {
+            use_def.insert(blk, block_use_def(blk, stage));
+        }
+
+        // Build predecessor map (needed for worklist ordering; optional but helpful).
+        let mut preds: HashMap<Block, Vec<Block>> = HashMap::new();
+        for &blk in &blocks {
+            preds.entry(blk).or_default();
+        }
+        for (&blk, blk_succs) in &succs {
+            for &s in blk_succs {
+                preds.entry(s).or_default().push(blk);
+            }
+        }
+
+        // Initialise all live_in / live_out to empty.
+        let mut live_in: HashMap<Block, HashSet<SSAValue>> =
+            blocks.iter().map(|&b| (b, HashSet::new())).collect();
+        let mut live_out: HashMap<Block, HashSet<SSAValue>> =
+            blocks.iter().map(|&b| (b, HashSet::new())).collect();
+
+        // Backward worklist: seed with all blocks.
+        let mut worklist: VecDeque<Block> = blocks.iter().copied().collect();
+
+        while let Some(blk) = worklist.pop_front() {
+            // live_out[blk] = ∪ live_in[s] for each successor s
+            let new_out: HashSet<SSAValue> = succs[&blk]
+                .iter()
+                .flat_map(|s| live_in[s].iter().copied())
+                .collect();
+
+            // live_in[blk] = use[blk] ∪ (live_out[blk] − def[blk])
+            let (use_set, def_set) = &use_def[&blk];
+            let new_in: HashSet<SSAValue> = use_set
+                .iter()
+                .copied()
+                .chain(new_out.iter().copied().filter(|v| !def_set.contains(v)))
+                .collect();
+
+            let changed = new_in != live_in[&blk] || new_out != live_out[&blk];
+            live_in.insert(blk, new_in);
+            live_out.insert(blk, new_out);
+
+            if changed {
+                // Re-add predecessors to the worklist.
+                for &pred in &preds[&blk] {
+                    if !worklist.contains(&pred) {
+                        worklist.push_back(pred);
+                    }
+                }
+            }
+        }
+
+        LivenessResult { live_in, live_out }
+    }
+
+    /// Convenience: run liveness on a named function in the `lowered` stage.
+    fn liveness_for_lowered_fn(pipeline: &Pipeline<Stage>, func_name: &str) -> LivenessResult {
+        let stage_id = pipeline.stage_by_name("lowered").unwrap();
+        let stage_info: &StageInfo<LowLevel> =
+            pipeline.stage(stage_id).unwrap().try_stage_info().unwrap();
+        let spec = pipeline
+            .resolve_staged_function(func_name, stage_id)
+            .unwrap()
+            .get_info(stage_info)
+            .unwrap()
+            .unique_live_specialization()
+            .unwrap();
+        let body_stmt = *spec.get_info(stage_info).unwrap().body();
+        analyze_liveness(body_stmt, stage_info)
+    }
+
+    // -----------------------------------------------------------------------
+    // Liveness tests
+    // -----------------------------------------------------------------------
+
+    /// For `ADD_LOWERED` (single block):
+    ///   - %a and %b are block arguments of ^entry, so they are in def[^entry].
+    ///   - `add %a, %b` uses %a and %b → they appear in use[^entry] (upward-exposed
+    ///     before any local def within the body — but block-arg defs come first in
+    ///     our def_set, so they are NOT in use[^entry]).
+    ///
+    /// Wait — %a and %b are block *arguments*, so they are in def[entry] from the
+    /// start. They are NOT in use[entry] because they are defined before any use in
+    /// the scanning order (block args → statements).
+    ///
+    /// What we really want to check is that live_in[^entry] contains %a and %b
+    /// when they are used and not passed in as block args.
+    ///
+    /// For ADD_LOWERED the function has exactly one block (^entry).  The block args
+    /// are %a and %b; the body has `%result = add %a, %b` then `ret %result`.
+    /// - def[^entry] = {%a, %b, %result}
+    /// - use[^entry] = {} (all uses are of locally-defined values)
+    /// - live_out[^entry] = {} (no successors)
+    /// - live_in[^entry] = {} (use ∪ (live_out − def) = {} ∪ {} = {})
+    ///
+    /// This confirms that in a single-block function with no cross-block uses,
+    /// everything is dead at block exit and live_in is empty.
+    #[test]
+    fn liveness_add_args_live_at_entry() {
+        let pipeline = build_pipeline(ADD_LOWERED);
+        let result = liveness_for_lowered_fn(&pipeline, "add");
+
+        // ADD_LOWERED has one block. Its live_in should be empty:
+        // %a and %b are block args (locally defined), so they're in def[^entry],
+        // not use[^entry]. The single block has no successors → live_out = {}.
+        assert_eq!(result.live_in.len(), 1, "ADD_LOWERED should have 1 block");
+        let (_, live_in) = result.live_in.iter().next().unwrap();
+        assert!(
+            live_in.is_empty(),
+            "all values in ADD_LOWERED are locally defined; live_in must be empty"
+        );
+        let (_, live_out) = result.live_out.iter().next().unwrap();
+        assert!(
+            live_out.is_empty(),
+            "single-exit block has no successors; live_out must be empty"
+        );
+    }
+
+    /// For `BRANCH_LOWERED` (sign function, 3 blocks):
+    ///
+    ///   ^entry(%x):
+    ///     %zero = constant 0
+    ///     %is_neg = lt %x, %zero
+    ///     cond_br %is_neg then=^neg() else=^pos()
+    ///
+    ///   ^neg():  %one = constant 1; ret %one
+    ///   ^pos():  %zero2 = constant 0; ret %zero2
+    ///
+    /// - def[^entry] = {%x, %zero, %is_neg}
+    /// - use[^entry] = {} (%x is a block arg → def before use in scan order)
+    /// - succs(^entry) = {^neg, ^pos}
+    /// - live_in[^neg] = {} (all defs local, no succs)
+    /// - live_in[^pos] = {} (all defs local, no succs)
+    /// - live_out[^entry] = live_in[^neg] ∪ live_in[^pos] = {}
+    /// - live_in[^entry] = {} ∪ ({} − def[^entry]) = {}
+    ///
+    /// Key assertion: %x is NOT live-out of ^entry because it is not used in
+    /// any successor (^neg and ^pos define their own constants without referencing %x).
+    #[test]
+    fn liveness_dead_after_use() {
+        let pipeline = build_pipeline(BRANCH_LOWERED);
+        let result = liveness_for_lowered_fn(&pipeline, "sign");
+
+        // BRANCH_LOWERED has 3 blocks.
+        assert_eq!(
+            result.live_in.len(),
+            3,
+            "BRANCH_LOWERED should have 3 blocks"
+        );
+
+        // All three blocks: live_in and live_out should be empty because
+        // each block defines its own constants and no block arg crosses a block boundary.
+        for (_blk, li) in &result.live_in {
+            assert!(
+                li.is_empty(),
+                "no value crosses a block boundary in BRANCH_LOWERED; all live_in must be empty"
+            );
+        }
+        for (_blk, lo) in &result.live_out {
+            assert!(
+                lo.is_empty(),
+                "no value crosses a block boundary in BRANCH_LOWERED; all live_out must be empty"
+            );
+        }
+    }
+
+    /// For `FACTORIAL_LOWERED`, %n from ^entry IS used in ^recurse (cross-block).
+    ///
+    ///   ^entry(%n):
+    ///     %one = constant 1
+    ///     %is_base = le %n, %one
+    ///     cond_br %is_base then=^base() else=^recurse()
+    ///
+    ///   ^base():  %one2 = constant 1; ret %one2
+    ///   ^recurse():
+    ///     %one3 = constant 1
+    ///     %n_minus_1 = sub %n, %one3     ← uses %n from ^entry!
+    ///     %rec = call @factorial(%n_minus_1)
+    ///     %prod = mul %n, %rec           ← uses %n again
+    ///     ret %prod
+    ///
+    /// %n is a block argument of ^entry (in def[^entry]).
+    /// ^recurse uses %n without defining it → %n ∈ use[^recurse].
+    /// Therefore %n ∈ live_in[^recurse].
+    /// Since ^entry → ^recurse: %n ∈ live_out[^entry].
+    /// But %n ∈ def[^entry], so %n ∉ live_in[^entry].
+    #[test]
+    fn liveness_cross_block_use_in_factorial() {
+        let pipeline = build_pipeline(FACTORIAL_LOWERED);
+        let stage_id = pipeline.stage_by_name("lowered").unwrap();
+        let stage_info: &StageInfo<LowLevel> =
+            pipeline.stage(stage_id).unwrap().try_stage_info().unwrap();
+        let spec = pipeline
+            .resolve_staged_function("factorial", stage_id)
+            .unwrap()
+            .get_info(stage_info)
+            .unwrap()
+            .unique_live_specialization()
+            .unwrap();
+        let spec_info = spec.get_info(stage_info).unwrap();
+        let body_stmt = *spec_info.body();
+        let result = analyze_liveness(body_stmt, stage_info);
+
+        // Collect the entry block (first block in the region).
+        let region = body_stmt.regions(stage_info).next().unwrap();
+        let mut block_iter = region.blocks(stage_info);
+        let entry_block = block_iter.next().expect("entry block must exist");
+        let base_block = block_iter.next().expect("base block must exist");
+        let recurse_block = block_iter.next().expect("recurse block must exist");
+
+        // Get %n: the first block argument of ^entry.
+        let entry_info = entry_block.expect_info(stage_info);
+        let n_ssa: SSAValue = entry_info.arguments[0].into();
+
+        // %n must be live-in of ^recurse (cross-block use).
+        assert!(
+            result.live_in[&recurse_block].contains(&n_ssa),
+            "%n must be live-in of ^recurse because it is used there without local definition"
+        );
+
+        // %n must be live-out of ^entry (because ^recurse needs it).
+        assert!(
+            result.live_out[&entry_block].contains(&n_ssa),
+            "%n must be live-out of ^entry because the recurse successor uses it"
+        );
+
+        // %n must NOT be live-in of ^entry (it is defined there as a block arg).
+        assert!(
+            !result.live_in[&entry_block].contains(&n_ssa),
+            "%n is defined by ^entry as a block arg; it must not appear in live_in[^entry]"
+        );
+
+        // %n must NOT be live in ^base (^base never references %n).
+        assert!(
+            !result.live_in[&base_block].contains(&n_ssa),
+            "%n is not used in ^base; it must not appear in live_in[^base]"
+        );
+    }
+
+    // -----------------------------------------------------------------------
     // Extensibility probe: ConstProp analysis (R8)
     // -----------------------------------------------------------------------
 
