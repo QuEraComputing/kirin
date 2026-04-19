@@ -11,6 +11,7 @@ kirin-interpreter-11 = { workspace = true }
 kirin-interpreter-12 = { workspace = true }
 kirin-interpreter-13 = { workspace = true }
 kirin-interpreter-14 = { workspace = true }
+kirin-interpreter-15 = { workspace = true }
 
 [dev-dependencies]
 kirin-test-types = { path = "../kirin-test-types" }

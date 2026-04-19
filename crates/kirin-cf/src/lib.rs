@@ -55,5 +55,6 @@ pub enum ControlFlow<T: CompileTimeValue> {
 mod interpret_impl;
 
 pub mod interpreter14;
+pub mod interpreter15;
 #[cfg(test)]
 mod tests;
