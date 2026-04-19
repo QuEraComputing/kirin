@@ -10,6 +10,7 @@ kirin-interpreter-10 = { workspace = true }
 kirin-interpreter-11 = { workspace = true }
 kirin-interpreter-12 = { workspace = true }
 kirin-interpreter-13 = { workspace = true }
+kirin-interpreter-14 = { workspace = true }
 bon = "3.8"
 smallvec = { workspace = true }
 
