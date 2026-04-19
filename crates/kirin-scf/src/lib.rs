@@ -26,6 +26,7 @@
 //! - `Yield` ↔ `scf.yield`
 
 mod interpret_impl;
+pub mod interpreter10;
 pub mod interpreter2;
 pub mod interpreter4;
 pub mod interpreter5;

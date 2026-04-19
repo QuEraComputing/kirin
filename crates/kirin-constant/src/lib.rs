@@ -2,6 +2,7 @@ mod interpret_impl;
 
 use kirin::prelude::*;
 
+pub mod interpreter10;
 pub mod interpreter2;
 pub mod interpreter4;
 pub mod interpreter5;
