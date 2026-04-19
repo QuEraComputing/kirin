@@ -18,6 +18,7 @@ kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
 kirin-interpreter = { workspace = true }
 kirin-interpreter-10 = { workspace = true }
+kirin-interpreter-11 = { workspace = true }
 kirin-interval = { workspace = true, features = ["interpreter", "arith", "bitwise", "cmp", "scf"] }
 kirin-derive-interpreter = { workspace = true }
 kirin-chumsky = { workspace = true }

@@ -3,6 +3,7 @@ mod interpret_impl;
 use kirin::prelude::*;
 
 pub mod interpreter10;
+pub mod interpreter11;
 
 #[cfg(test)]
 mod tests;

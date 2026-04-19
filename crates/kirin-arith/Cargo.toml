@@ -7,3 +7,4 @@ edition = "2024"
 kirin.workspace = true
 kirin-interpreter = { workspace = true }
 kirin-interpreter-10 = { workspace = true }
+kirin-interpreter-11 = { workspace = true }
