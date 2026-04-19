@@ -210,13 +210,19 @@ Then update `docs/design_principles.md` to reflect the current intended design. 
 
 ## Phase 3: Implement
 
+Each iteration starts from a blank slate. Do **not** copy the previous crate — that would carry forward its structural biases and prevent fundamental redesign. Read the previous iteration's code for reference and understanding, but write the new one from scratch based on the design from Phase 2.
+
 ### 3a: New crate scaffold
 
+Create a fresh crate:
+
 ```bash
-cp -r crates/kirin-interpreter-<prev> crates/kirin-interpreter-<N>
+cargo new --lib crates/kirin-interpreter-<N>
 ```
 
-Edit the new crate's `Cargo.toml`: update `name`, keep `version`. Add to workspace `Cargo.toml` members list. Apply all design changes to the new crate's source files.
+Add to workspace `Cargo.toml` members list. Write a new `Cargo.toml` with only the dependencies the new design actually needs — do not inherit the previous iteration's dependency list. Dependencies that were needed for a discarded abstraction should not carry over.
+
+Write all source files from scratch based on Phase 2's design. Reading the previous iteration's source for orientation is fine; copying it is not. If a module from the previous iteration is unchanged by the new design, rewrite it anyway — this surfaces hidden coupling and keeps the new crate self-consistent.
 
 Project conventions (from AGENTS.md):
 - `mod.rs` for multi-file modules, kept lean (only `mod` + `pub use`)
@@ -225,35 +231,24 @@ Project conventions (from AGENTS.md):
 
 ### 3b: Dialect submodules
 
-For each affected dialect (`kirin-scf`, `kirin-function`, etc.), add a new submodule `interpreter<N>` under `crates/<dialect>/src/`. This may be a single `.rs` file or a directory with `mod.rs`. Update the dialect's `lib.rs`/`mod.rs` to declare it with `pub mod interpreter<N>;` (feature-gated if needed to avoid unused-code warnings when not testing).
+For each affected dialect (`kirin-scf`, `kirin-function`, etc.), write a new submodule `interpreter<N>` from scratch under `crates/<dialect>/src/`. Do not copy from `interpreter<prev>` — the new design may require fundamentally different trait impls. Declare with `pub mod interpreter<N>;` in the dialect's `lib.rs`/`mod.rs`.
 
 ### 3c: Toy-lang example
 
-Create `example/toy-lang/src/interpreter<N>.rs`. It must contain:
+Write `example/toy-lang/src/interpreter<N>.rs` from scratch. The **test cases** are fixed (see Required Test Coverage), but the implementation structure — cursor types, trait impls, dispatch types — must reflect the new iteration's design, not the previous one's.
 
-**Cursor types** (same structure as the previous iteration, adapted to new APIs):
-- `HighLevelCursor<V>` — single-stage concrete cursor coproduct for HighLevel
-- `HighLevelAbstractCursor<V>` — single-stage abstract cursor coproduct
-- `MultiCursor<V>` — multi-stage concrete cursor coproduct (HighLevel + LowLevel)
-- `AbstractMultiCursor<V>` — multi-stage abstract cursor coproduct
+The required semantic surface (what the tests exercise) is fixed:
+- Single-stage concrete interpretation of HighLevel programs (SCF, recursion)
+- Single-stage abstract interpretation of HighLevel and LowLevel programs
+- Multi-stage concrete interpretation (source calls lowered)
+- Multi-stage abstract interpretation (type and interval domains)
 
-**Interpretable impls**:
-- `HighLevel: Interpretable<ConcreteInterp<..., HighLevelCursor<V>>>`
-- `HighLevel: Interpretable<AbstractInterp<..., HighLevelAbstractCursor<V>>>`
-- `LowLevel: Interpretable<E>` (single generic impl for both modes)
-- `HighLevel: Interpretable<MultiInterp<V>>` (concrete multi-stage, with cross-stage call fallback)
-- `HighLevel: Interpretable<AbstractMultiInterp<V>>` (abstract multi-stage)
-
-**Dispatch impls**:
-- `CallDispatch<V, HighLevelCursor<V>> for Stage`
-- `CallDispatch<V, MultiCursor<V>> for Stage`
-- `AbstractCallDispatch<V, HighLevelAbstractCursor<V>> for Stage`
-- `AbstractCallDispatch<V, AbstractBlockCursor<V, LowLevel>> for Stage`
-- `AbstractCallDispatch<V, AbstractMultiCursor<V>> for Stage`
-
-**Full baseline test suite** (all tests listed in requirements above).
-
-**Extensibility test** (if running the extensibility probe this iteration): add helper and tests for the new analysis type.
+The implementation structure (how those semantics are achieved) is unconstrained. A new iteration may:
+- Rename or restructure cursor types entirely
+- Replace the `Mode` discriminant pattern with a different mechanism
+- Unify concrete and abstract interpreters under a single type
+- Change how dispatch works across stages
+- Introduce new algebraic structures not present in previous iterations
 
 Register the module in `example/toy-lang/src/lib.rs`: `pub mod interpreter<N>;`
 
