@@ -9,3 +9,5 @@ refactor-workspace/
 # Managed by ion (all symlinks)
 .agents/skills/*
 .claude/skills/*
+docs/log.md
+docs/design_principles.md

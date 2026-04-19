@@ -1,0 +1,1 @@
+/Users/roger/Code/rust/kirin/skills/interpreter-iterate/SKILL.md
