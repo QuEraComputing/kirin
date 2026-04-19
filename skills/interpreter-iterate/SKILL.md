@@ -143,7 +143,11 @@ The critic must produce a **structured report** with three parts: (1) a rubric s
 
 #### Part 1 — Rubric Scorecard
 
-Score each dimension 1–5 using the rubric table below. A score of 5 means fully satisfied; 1 means critically broken. Record each score and a one-sentence justification.
+Score each dimension 1–5 using the rubric table below. A score of 5 means fully satisfied; 1 means critically broken. Use the full range: **do not default to 3**. If the code fully satisfies a criterion with no caveats, assign 5. If there is a critical gap, assign 1. Scores of 2 and 4 are valid and expected for partially-met criteria.
+
+**Score each dimension independently.** Do not let your overall impression of the design or a high score on one dimension bias others. In particular: R2 (API symmetry) measures *uniformity of the lift/project principle across all boundaries*; R7 (elegance) measures *coherence and predictability of the overall algebra* — these are related but distinct. Similarly, R3 (dialect locality) measures *whether the interpreter crate needs changes*; R5 (ergonomics) measures *how many concepts a dialect author must import and implement* — locality is necessary but not sufficient for ergonomics.
+
+**For each dimension, before assigning a score: cite 2–3 specific file:line locations as evidence.** This grounds the score in the code rather than impressions. If you cannot find code evidence, that itself informs the score.
 
 | # | Dimension | 5 (Excellent) | 3 (Acceptable) | 1 (Critical gap) |
 |---|-----------|--------------|----------------|-----------------|
@@ -156,6 +160,8 @@ Score each dimension 1–5 using the rubric table below. A score of 5 means full
 | R7 | **Algebraic elegance** | Lift/Project, Mode, Cursor, and Env form a coherent algebra; naming is consistent; a new developer can predict the pattern from one example | Mostly coherent; some naming inconsistencies or ad-hoc special cases | Ad-hoc design; each new case requires a novel pattern |
 | R8 | **Extensibility** | A new analysis or interpreter type can be added by implementing traits in user code only; demonstrated by at least one extensibility probe test | Framework is extensible in theory but probe not yet written | Framework requires core changes to add new interpreter types |
 | R9 | **Entry point flexibility** | Fixed-source and symmetric/dynamic entry are both first-class: fixed-source is typed as `Interp<HomeDialect,...>`; symmetric exposes a dialect-agnostic entry API where any language can initiate execution; both tested | One use case is supported; the other is possible but awkward (e.g. requires type-level workarounds to change the home dialect) | Only one entry mode exists; switching entry language requires recompilation or `unsafe` casts |
+
+**Score 4** = criterion mostly met with one clear caveat (e.g. one boundary missing symmetry, one internal type leaking, one workaround needed). **Score 2** = criterion attempted but fundamentally insufficient (e.g. lift/project exists only for cursors and is structurally incompatible with values, or unsafe is isolated to one place but load-bearing).
 
 **Overall iteration grade** = average of R1–R9, rounded to one decimal. Report it prominently.
 
@@ -201,7 +207,7 @@ After the critic returns, compute the **weighted convergence score**:
 score = Σ (5 - dimension_score) * weight
 ```
 
-A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 30 = 30.
+A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 30 = 30. To reach convergence (≤ 8), a typical passing design needs: all high-weight dimensions (R1, R3, R6, R9) at 5, and mid-weight ones (R2, R4, R8) at 4 or better, leaving room for R5/R7 at 4 (deficit = 0+3+0+3+2+0+2+3+0 = 13 — still above threshold). To actually converge: most dimensions at 5, with at most two at 4 (if low-weight). Example passing score: R1=5, R2=5, R3=5, R4=5, R5=4, R6=5, R7=4, R8=5, R9=5 → deficit = 0+0+0+0+2+0+2+0+0 = 4 ✓
 
 | Dimension | Weight |
 |-----------|--------|
@@ -467,9 +473,10 @@ The critic produces the same structured report (Part 1 scorecard + Part 2 streng
 | R6 Type correctness | <1–5> | <+/-N> | |
 | R7 Elegance         | <1–5> | <+/-N> | |
 | R8 Extensibility    | <1–5> | <+/-N> | |
+| R9 Entry flexibility | <1–5> | <+/-N> | |
 
 **Overall grade:** <avg>/5
-**Weighted score:** <N> (threshold ≤ 8; formula: Σ (5 - score) × weight)
+**Weighted score:** <N> (threshold ≤ 8; formula: Σ (5 - score) × weight; e.g. all-4s = 30, all-5s-except-R7=4-R8=4 = 5)
 
 ### Strengths identified (from critic)
 - Strength #<K> [<portability>]: <pattern name> — <what it achieves>
