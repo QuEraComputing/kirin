@@ -250,14 +250,7 @@ Select a design stance for this iteration that is **meaningfully different** fro
 | **Lens/optic algebra** | Lift/Project generalized to van Laarhoven lenses or optics; cursor navigation expressed as composition of optics over the IR structure. | Moderate — van Laarhoven lenses use `for<F: Functor>` which requires HKT workarounds; simpler optic encodings are feasible |
 | **Index-typed state machine** | Cursor is an indexed state machine; type indices enforce that only valid transitions are representable, eliminating runtime checks. | Feasible — Rust's type system handles phantom index types well; good fit for cursor navigation correctness |
 
-When a stance has "Hard" feasibility, it isn't off-limits — but plan extra iteration budget for type-system wrangling, and note any required compromises (e.g. bounded heap use) in the design principles doc.
-
-The chosen stance must be written into `docs/design_principles.md` as the **current design philosophy**, replacing the previous one. Include:
-1. The stance name and its core commitment in one sentence
-2. How it resolves each of the five major tensions (extensibility vs. DRY, type-safety vs. ergonomics, concrete vs. abstract uniformity, stage-local vs. multi-stage, dialect-local vs. interpreter-global)
-3. Which rubric dimensions this stance is expected to improve, and which may regress (honest tradeoff analysis)
-4. Which previous findings motivated choosing this stance over continuing the previous approach
-5. **Which strengths from previous iterations are being carried forward**, and how they are adapted to fit the new stance — cite the Strength # from the log
+When a stance has "Hard" feasibility, it isn't off-limits — but plan extra iteration budget for type-system wrangling, and note any required compromises (e.g. bounded heap use) in the log.
 
 ### Step 2c: Derive the concrete design
 
@@ -269,9 +262,16 @@ From the stance, derive the concrete Rust API:
 - How the concrete and abstract interpreters differ (or unify) under this stance
 - How multi-stage dispatch works
 
-Write this down in `docs/design_principles.md` under a "Current API shape" section. This is the specification the implementation must follow — it should be detailed enough that a fresh implementer could write the crate from it without reading the previous iteration.
+Write this design sketch directly into `docs/log.md` under the current iteration header (before implementation begins). Include:
+1. The stance name and its core commitment in one sentence
+2. How it resolves each of the five major tensions (extensibility vs. DRY, type-safety vs. ergonomics, concrete vs. abstract uniformity, stage-local vs. multi-stage, dialect-local vs. interpreter-global)
+3. Which rubric dimensions this stance is expected to improve, and which may regress (honest tradeoff analysis)
+4. Which previous findings motivated choosing this stance over continuing the previous approach
+5. **Which strengths from previous iterations are being carried forward**, and how they are adapted to fit the new stance — cite the Strength # from the log
 
-**Do not wait for user approval.** Proceed to implementation once the stance and API are written.
+This sketch is the specification the implementation must follow — detailed enough that a fresh implementer could write the crate from it without reading the previous iteration.
+
+**Do not wait for user approval.** Proceed to implementation once the sketch is written.
 
 ---
 
@@ -505,11 +505,7 @@ At session start, verify `docs/log.md` is gitignored:
 grep -q 'docs/log.md' .gitignore || echo 'docs/log.md' >> .gitignore
 ```
 
-`docs/design/`, `docs/plans/`, and `docs/review/` are committed — do not gitignore them. Only `docs/log.md` and `docs/design_principles.md` should be gitignored (they are working notes, not checked-in artifacts).
-
-```bash
-grep -q 'docs/design_principles.md' .gitignore || echo 'docs/design_principles.md' >> .gitignore
-```
+`docs/design/`, `docs/plans/`, and `docs/review/` are committed — do not gitignore them. Only `docs/log.md` should be gitignored (it is a working notes file, not a checked-in artifact).
 
 ---
 
