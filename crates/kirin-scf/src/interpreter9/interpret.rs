@@ -5,9 +5,9 @@ use kirin_interpreter_9::control::{Control, CursorExt};
 use kirin_interpreter_9::env::{AbstractEnv, AbstractMode, ConcreteMode, Env};
 use kirin_interpreter_9::error::InterpreterError;
 use kirin_interpreter_9::interpretable::Interpretable;
-use kirin_interpreter_9::scf_cursor::{
-    AbstractForCursor, AbstractIfCursor, ForCursor, ForLoopValue as IF9ForLoopValue, IfCursor,
-};
+
+use crate::ForLoopValue;
+use crate::interpreter9::cursor::{AbstractForCursor, AbstractIfCursor, ForCursor, IfCursor};
 
 use crate::{For, If, Yield};
 
@@ -77,7 +77,7 @@ pub fn eval_for_concrete<E, C, L, T>(
 where
     L: Dialect,
     E: Env<Mode = ConcreteMode<C>, Ext = CursorExt<C>>,
-    E::Value: Clone + IF9ForLoopValue + ProductValue + 'static,
+    E::Value: Clone + ForLoopValue + ProductValue + 'static,
     ForCursor<E::Value, L>: Lift<C>,
     E::Error: From<InterpreterError>,
     T: CompileTimeValue,

@@ -15,8 +15,9 @@ use kirin_interpreter_9::env::{ConcreteMode, Env};
 use kirin_interpreter_9::error::InterpreterError;
 use kirin_interpreter_9::execute::Execute;
 use kirin_interpreter_9::interpretable::Interpretable;
-use kirin_interpreter_9::scf_cursor::{ForLoopValue, SCFCursor};
+use kirin_scf::ForLoopValue;
 use kirin_scf::StructuredControlFlow;
+use kirin_scf::interpreter9::cursor::SCFCursor;
 use kirin_scf::interpreter9::interpret::{eval_for_concrete, eval_if_concrete};
 
 use crate::language::{HighLevel, LowLevel};
@@ -44,7 +45,7 @@ impl<V: Clone> Lift<HighLevelCursor<V>> for SCFCursor<V, HighLevel> {
 }
 
 impl<V: Clone> Lift<HighLevelCursor<V>>
-    for kirin_interpreter_9::scf_cursor::IfCursor<V, HighLevel>
+    for kirin_scf::interpreter9::cursor::IfCursor<V, HighLevel>
 {
     fn lift(self) -> HighLevelCursor<V> {
         HighLevelCursor::Scf(SCFCursor::If(self))
@@ -52,7 +53,7 @@ impl<V: Clone> Lift<HighLevelCursor<V>>
 }
 
 impl<V: Clone> Lift<HighLevelCursor<V>>
-    for kirin_interpreter_9::scf_cursor::ForCursor<V, HighLevel>
+    for kirin_scf::interpreter9::cursor::ForCursor<V, HighLevel>
 {
     fn lift(self) -> HighLevelCursor<V> {
         HighLevelCursor::Scf(SCFCursor::For(self))
