@@ -195,16 +195,49 @@ If convergence criteria are already met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 
 
 ## Phase 2: Design the Next Iteration
 
-Based on the highest-scoring findings, design changes. Prefer targeted fixes over full redesigns — only redesign what's broken. Write down (in your own reasoning, not to disk):
+Each iteration commits to a **distinct set of design principles** — not just incremental fixes to the previous design. The goal is to explore the design space, not hill-climb a single approach. An iteration that fixes the same issues with the same underlying philosophy as the previous one is wasted.
 
-1. What changes, and which finding it addresses
-2. API surface delta (new/changed traits, types, associated types)
-3. Algebra delta (Lift/Project changes, Mode discriminant changes, new cursor types)
-4. What stays the same — name it explicitly to avoid accidental breakage
+### Step 2a: Survey tried approaches
 
-Then update `docs/design_principles.md` to reflect the current intended design. This file is forward-looking (what the design *should* be now), not a history — remove stale principles.
+Read `docs/log.md` to build a map of what has been tried:
+- Which design principles each iteration committed to
+- What score each approach achieved per rubric dimension
+- Which dimensions improved vs. regressed vs. stayed flat
+- Which fundamental tensions (e.g. DRY vs. extensibility, mode uniformity vs. type safety) have appeared repeatedly
 
-**Do not wait for user approval.** Proceed to implementation.
+### Step 2b: Choose a design stance
+
+Select a design stance for this iteration that is **meaningfully different** from all previous KEEP iterations. A stance is a coherent set of commitments about how the core tensions are resolved. Examples of distinct stances (not exhaustive — invent new ones based on findings):
+
+| Stance | Core commitment |
+|--------|----------------|
+| **Effect-first** | All interpreter effects (call, return, yield, branch) are first-class values returned from `Interpretable::eval`; the interpreter loop pattern-matches on them. Cursor state is minimal. |
+| **Typeclass-style** | A single `Interpreter<V>` typeclass with associated types for mode, cursor, and env; concrete/abstract are instances, not separate types. |
+| **Tagless final** | Dialect semantics are expressed as constraints on a generic `F<_>` effect type; concrete and abstract interpreters provide different `F` implementations. |
+| **Free monad** | Dialect ops emit instructions into a free structure; a separate interpreter folds over them. Concrete and abstract interpreters are two folds. |
+| **Continuation-passing** | `Interpretable::eval` takes a continuation; the interpreter manages the continuation stack explicitly. Enables tail-call optimization and natural multi-stage dispatch. |
+| **Lens/optic algebra** | Lift/Project generalized to van Laarhoven lenses or optics; cursor navigation expressed as composition of optics over the IR structure. |
+| **Index-typed state machine** | Cursor is an indexed state machine; type indices enforce that only valid transitions are representable, eliminating runtime checks. |
+
+The chosen stance must be written into `docs/design_principles.md` as the **current design philosophy**, replacing the previous one. Include:
+1. The stance name and its core commitment in one sentence
+2. How it resolves each of the five major tensions (extensibility vs. DRY, type-safety vs. ergonomics, concrete vs. abstract uniformity, stage-local vs. multi-stage, dialect-local vs. interpreter-global)
+3. Which rubric dimensions this stance is expected to improve, and which may regress (honest tradeoff analysis)
+4. Which previous findings motivated choosing this stance over continuing the previous approach
+
+### Step 2c: Derive the concrete design
+
+From the stance, derive the concrete Rust API:
+- Core traits and their signatures
+- Associated types and their roles
+- How `Lift`/`Project` (or their replacements) work under this stance
+- How `Interpretable<E>` (or its replacement) is structured
+- How the concrete and abstract interpreters differ (or unify) under this stance
+- How multi-stage dispatch works
+
+Write this down in `docs/design_principles.md` under a "Current API shape" section. This is the specification the implementation must follow — it should be detailed enough that a fresh implementer could write the crate from it without reading the previous iteration.
+
+**Do not wait for user approval.** Proceed to implementation once the stance and API are written.
 
 ---
 
@@ -282,6 +315,7 @@ Append to `docs/log.md` (create if missing — this file must be gitignored):
 
 **Status: KEEP | DISCARD**
 **Weighted score: <N> (previous: <prev>) — improved: YES | NO**
+**Design stance: <stance name> — <one-sentence core commitment>**
 **Reason (if DISCARD):** <what the design change failed to address, or what new friction it introduced>
 
 ### Rubric Scorecard
@@ -299,8 +333,14 @@ Append to `docs/log.md` (create if missing — this file must be gitignored):
 **Overall grade:** <avg>/5
 **Weighted convergence score:** <N> (threshold: ≤ 8)
 
+### Design stance rationale
+- **Why this stance over continuing the previous approach:** <cite specific findings and rubric dimensions>
+- **Expected improvements:** R<N>, R<N>
+- **Expected regressions / accepted tradeoffs:** R<N> — <why acceptable>
+- **Tensions resolved differently from previous:** <e.g. "chose DRY over extensibility in the cursor layer because...">
+
 ### Findings addressed this iteration
-- Finding #<K> [<severity>]: <what was changed and why>
+- Finding #<K> [<severity>]: <what changed under the new stance>
 
 ### Design decisions
 - **<change>**: <rationale — the "why", not the "what">
@@ -362,8 +402,8 @@ If the score **did** improve, log with `status: KEEP` and proceed.
 ### 6d: Consecutive Failure Check
 
 If two consecutive iterations are discarded (neither improved the score), stop the loop:
-- Log: "Stopped after N consecutive non-improving iterations — design may have reached a local optimum. Review open findings manually."
-- Do not attempt a third iteration with the same finding set — a different approach is needed that requires human input.
+- Log: "Stopped after 2 consecutive non-improving iterations — the explored stances have not improved on the baseline. A fundamentally different stance or human insight is needed."
+- Do not attempt a third iteration automatically — the design space explored so far has not yielded improvement, and continuing without new direction wastes the iteration budget.
 
 ---
 
