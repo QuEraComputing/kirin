@@ -13,15 +13,17 @@ argument-hint: "[iteration number or 'next' or specific goal]"
 
 This skill is an **autonomous research loop** for the kirin interpreter framework. It runs without waiting for user approval between iterations. The user can initiate it and step away — the skill determines when convergence is reached.
 
-Each iteration:
-1. Critiques the current design (spawns a critic subagent)
-2. Scores the critique to decide whether another iteration is warranted
-3. Designs the next iteration based on findings
-4. Implements the new `kirin-interpreter-<N>` crate + dialect submodules + toy-lang
-5. Runs tests — fixes failures autonomously (may loop back to design if failures reveal flaws)
-6. Logs findings to `docs/log.md` (gitignored)
-7. Commits implementation (never docs/)
-8. Loops back to step 1 unless convergence criteria are met
+**Session start:** one baseline critique (Phase 1), then the autonomous loop:
+
+```
+Phase 2: Design (choose a distinct stance, derive API)
+Phase 3: Implement from scratch
+Phase 4: Run tests, fix failures
+Phase 5: Write partial log entry
+Phase 6: Commit → score comparison → keep or revert
+Phase 7: Critique the committed code (feeds next iteration's design)
+Phase 8: Converged? Stop. Otherwise loop to Phase 2.
+```
 
 ## Target
 
@@ -77,7 +79,7 @@ If the budget is reached without convergence, stop, commit what's done, log the 
 
 ### Extensibility Probe
 
-Once the weighted score falls below 20 for the first time (baseline is stable enough), trigger the extensibility probe. Implement a new analysis entirely within `example/toy-lang/src/` — no changes to any interpreter crate or dialect crate. Good candidates:
+Once the weighted score falls below 15 for the first time (roughly "most dimensions at 4+"), trigger the extensibility probe. Implement a new analysis entirely within `example/toy-lang/src/` — no changes to any interpreter crate or dialect crate. Good candidates:
 
 - **Liveness analysis**: abstract domain over `HashSet<SSAValue>` tracking live values at each program point
 - **Constant propagation**: abstract domain `ConstProp { Concrete(i64), Top }` — verifies the framework handles non-lattice-join semantics cleanly
@@ -188,8 +190,10 @@ Findings must be grounded in the code — cite lines, not vibes. The suggestion 
 After the critic returns, compute the **weighted convergence score**:
 
 ```
-score = Σ (6 - dimension_score) * weight
+score = Σ (5 - dimension_score) * weight
 ```
+
+A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 26 = 26.
 
 | Dimension | Weight |
 |-----------|--------|
@@ -227,15 +231,17 @@ Read `docs/log.md` to build a map of what has been tried:
 
 Select a design stance for this iteration that is **meaningfully different** from all previous KEEP iterations. A stance is a coherent set of commitments about how the core tensions are resolved. Examples of distinct stances (not exhaustive — invent new ones based on findings):
 
-| Stance | Core commitment |
-|--------|----------------|
-| **Effect-first** | All interpreter effects (call, return, yield, branch) are first-class values returned from `Interpretable::eval`; the interpreter loop pattern-matches on them. Cursor state is minimal. |
-| **Typeclass-style** | A single `Interpreter<V>` typeclass with associated types for mode, cursor, and env; concrete/abstract are instances, not separate types. |
-| **Tagless final** | Dialect semantics are expressed as constraints on a generic `F<_>` effect type; concrete and abstract interpreters provide different `F` implementations. |
-| **Free monad** | Dialect ops emit instructions into a free structure; a separate interpreter folds over them. Concrete and abstract interpreters are two folds. |
-| **Continuation-passing** | `Interpretable::eval` takes a continuation; the interpreter manages the continuation stack explicitly. Enables tail-call optimization and natural multi-stage dispatch. |
-| **Lens/optic algebra** | Lift/Project generalized to van Laarhoven lenses or optics; cursor navigation expressed as composition of optics over the IR structure. |
-| **Index-typed state machine** | Cursor is an indexed state machine; type indices enforce that only valid transitions are representable, eliminating runtime checks. |
+| Stance | Core commitment | Rust feasibility |
+|--------|----------------|-----------------|
+| **Effect-first** | All interpreter effects (call, return, yield, branch) are first-class values returned from `Interpretable::eval`; the interpreter loop pattern-matches on them. Cursor state is minimal. | Straightforward — aligns with Rust's enum-based control flow |
+| **Typeclass-style** | A single `Interpreter<V>` typeclass with associated types for mode, cursor, and env; concrete/abstract are instances, not separate types. | Feasible — Rust traits can model this, but associated type projections may require workarounds |
+| **Tagless final** | Dialect semantics are expressed as constraints on a generic `F<_>` effect type; concrete and abstract interpreters provide different `F` implementations. | Hard — Rust lacks HKT; requires `for<'a> F<'a, A>` workarounds or GATs; expect significant type-system friction |
+| **Free monad** | Dialect ops emit instructions into a free structure; a separate interpreter folds over them. Concrete and abstract interpreters are two folds. | Hard — idiomatic free monads in Rust typically require `Box<dyn>` or `enum` with many variants; may violate the no-heap constraint |
+| **Continuation-passing** | `Interpretable::eval` takes a continuation; the interpreter manages the continuation stack explicitly. Enables tail-call optimization and natural multi-stage dispatch. | Moderate — Rust doesn't optimize tail calls; stack depth may be a practical limit; closures add lifetime complexity |
+| **Lens/optic algebra** | Lift/Project generalized to van Laarhoven lenses or optics; cursor navigation expressed as composition of optics over the IR structure. | Moderate — van Laarhoven lenses use `for<F: Functor>` which requires HKT workarounds; simpler optic encodings are feasible |
+| **Index-typed state machine** | Cursor is an indexed state machine; type indices enforce that only valid transitions are representable, eliminating runtime checks. | Feasible — Rust's type system handles phantom index types well; good fit for cursor navigation correctness |
+
+When a stance has "Hard" feasibility, it isn't off-limits — but plan extra iteration budget for type-system wrangling, and note any required compromises (e.g. bounded heap use) in the design principles doc.
 
 The chosen stance must be written into `docs/design_principles.md` as the **current design philosophy**, replacing the previous one. Include:
 1. The stance name and its core commitment in one sentence
@@ -318,48 +324,29 @@ cargo nextest run -p kirin-function
 If tests fail:
 - Fix compilation errors first (most common after API changes)
 - Fix logic failures by tracing through the interpreter execution
-- If a failure reveals a design flaw, revise the relevant part of Phase 4 and re-run — do NOT loop all the way back to Phase 2 for a logic fix
+- If a failure reveals a design flaw, revise the relevant part of Phase 3 (implement) and re-run — do NOT loop all the way back to Phase 2 for a logic fix
 - If a failure reveals a fundamental design problem (critique score would jump by ≥5), abort this iteration's implementation, log what was attempted, and loop to Phase 2 with updated critique
 
 All tests must pass before committing.
 
 ---
 
-## Phase 5: Log Findings
+## Phase 5: Log Findings (partial — status filled in by Phase 6)
 
-Append to `docs/log.md` (create if missing — this file must be gitignored):
+Append a partial entry to `docs/log.md` (create if missing). Leave the status, score comparison, and discard reason blank — Phase 6 fills those in after the commit decision.
 
 ```markdown
 ## Iteration <N> — <YYYY-MM-DD>
 
-**Status: KEEP | DISCARD**
-**Weighted score: <N> (previous: <prev>) — improved: YES | NO**
+**Status:** _(filled by Phase 6)_
+**Weighted score:** _(filled by Phase 7 critic)_ **(previous KEEP: <prev>)**
 **Design stance: <stance name> — <one-sentence core commitment>**
-**Reason (if DISCARD):** <what the design change failed to address, or what new friction it introduced>
-
-### Rubric Scorecard
-| Dim | Score | Δ vs prev | Justification |
-|-----|-------|-----------|--------------|
-| R1 Completeness     | <1–5> | <+/-N>    | |
-| R2 Lift/Project     | <1–5> | <+/-N>    | |
-| R3 Dialect locality | <1–5> | <+/-N>    | |
-| R4 Mode uniformity  | <1–5> | <+/-N>    | |
-| R5 Boilerplate      | <1–5> | <+/-N>    | |
-| R6 Type correctness | <1–5> | <+/-N>    | |
-| R7 Elegance         | <1–5> | <+/-N>    | |
-| R8 Extensibility    | <1–5> | <+/-N>    | |
-
-**Overall grade:** <avg>/5
-**Weighted convergence score:** <N> (threshold: ≤ 8)
 
 ### Design stance rationale
-- **Why this stance over continuing the previous approach:** <cite specific findings and rubric dimensions>
+- **Why this stance:** <cite specific findings and rubric dimensions that motivated it>
 - **Expected improvements:** R<N>, R<N>
-- **Expected regressions / accepted tradeoffs:** R<N> — <why acceptable>
-- **Tensions resolved differently from previous:** <e.g. "chose DRY over extensibility in the cursor layer because...">
-
-### Strengths identified (from critic)
-- Strength #<K> [<portability>]: <pattern name> — <what it achieves>
+- **Accepted tradeoffs:** R<N> — <why acceptable>
+- **Tensions resolved differently:** <e.g. "DRY over extensibility in the cursor layer because...">
 
 ### Strengths carried forward from previous iterations
 - Strength #<K> from iteration <M>: <how it was adapted to this stance>
@@ -371,16 +358,18 @@ Append to `docs/log.md` (create if missing — this file must be gitignored):
 - **<change>**: <rationale — the "why", not the "what">
 
 ### Implementation notes
-- <surprises, non-obvious constraints, Rust type system friction encountered>
+- <surprises, Rust type system friction, non-obvious constraints>
 
 ### Test results
 - <K> baseline tests: PASS
 - Extensibility probe: PASS/FAIL/SKIPPED — <what was attempted, any friction>
 
 ### Open findings (carried to next iteration)
-- Finding #<K> [High/Medium]: <brief — the suggestion from the critic>
+- Finding #<K> [High/Medium]: <the critic's suggestion>
 
-### Convergence: YES / NO — <reason>
+---
+_(Phase 6 appends below after commit decision)_
+_(Phase 7 appends critic scorecard below after critique)_
 ```
 
 ---
@@ -405,24 +394,37 @@ Never stage or commit anything under `docs/`. Never use `git add .` or `git add 
 
 ### 6b: Score Comparison
 
-Compare the weighted convergence score from this iteration against the previous iteration's score (read from `docs/log.md`):
+The critic runs in Phase 7 and produces the score — but Phase 6 needs to decide KEEP vs. DISCARD before that. Use the **pre-commit self-assessment**: based on test results, implementation friction observed in Phase 3, and the design stance's expected tradeoffs, estimate whether the score is likely to improve. The Phase 7 critic will confirm.
 
-- **Improved**: this iteration's score < previous iteration's score, OR this is the first iteration
-- **No improvement**: this iteration's score ≥ previous iteration's score
+If tests all pass and the implementation matched the design spec with less friction than the previous iteration, treat as likely improved. If tests were hard to pass or the design required significant compromises, treat as likely not improved.
+
+Compare against the most recent **KEEP** iteration's score (not the most recent iteration — skip over DISCARDs when looking for the baseline).
+
+- **Likely improved** → proceed to Phase 7 critic, then update the log
+- **Likely not improved** → revert first, then run the Phase 7 critic on the KEEP baseline to confirm
 
 ### 6c: Discard if No Improvement
 
-If the score did **not** improve, revert the commit immediately:
+If the iteration did **not** improve (confirmed by Phase 7 critic score ≥ previous KEEP score), revert:
 
 ```bash
 git revert HEAD --no-edit
 ```
 
-This creates a revert commit that removes all implementation changes (`crates/kirin-interpreter-<N>/`, dialect submodules, and toy-lang additions) while keeping the history intact.
+This creates a revert commit that removes all implementation changes while keeping history intact.
 
-Then log the discarded iteration in `docs/log.md` (see Phase 6 template — use `status: DISCARD`). The log entry must include the reason the score did not improve (what the design change failed to address, or what new friction it introduced).
+Append to the iteration's log entry in `docs/log.md`:
 
-If the score **did** improve, log with `status: KEEP` and proceed.
+```markdown
+**Status: DISCARD**
+**Reason:** <what the stance failed to address — which dimensions regressed and why>
+```
+
+If the iteration improved, append:
+
+```markdown
+**Status: KEEP**
+```
 
 ### 6d: Consecutive Failure Check
 
@@ -442,7 +444,31 @@ Same critic brief as Phase 1:
 - The full rubric (copy verbatim)
 - Updated `docs/log.md` (so the critic sees the discarded iteration notes too)
 
-The critic produces the same structured report (Part 1 scorecard + Part 2 findings). Append the scores to the current iteration's log entry.
+The critic produces the same structured report (Part 1 scorecard + Part 2 strengths + Part 3 findings). Append the scorecard and strengths to the current iteration's log entry under the `_(Phase 7 appends...)_` marker:
+
+```markdown
+### Rubric Scorecard (from Phase 7 critic)
+| Dim | Score | Δ vs prev KEEP | Justification |
+|-----|-------|----------------|--------------|
+| R1 Completeness     | <1–5> | <+/-N> | |
+| R2 Lift/Project     | <1–5> | <+/-N> | |
+| R3 Dialect locality | <1–5> | <+/-N> | |
+| R4 Mode uniformity  | <1–5> | <+/-N> | |
+| R5 Boilerplate      | <1–5> | <+/-N> | |
+| R6 Type correctness | <1–5> | <+/-N> | |
+| R7 Elegance         | <1–5> | <+/-N> | |
+| R8 Extensibility    | <1–5> | <+/-N> | |
+
+**Overall grade:** <avg>/5
+**Weighted score:** <N> (threshold ≤ 8; formula: Σ (5 - score) × weight)
+
+### Strengths identified (from critic)
+- Strength #<K> [<portability>]: <pattern name> — <what it achieves>
+
+### Convergence: YES / NO — <reason>
+```
+
+Then update the `**Weighted score:**` field at the top of the log entry with the actual score.
 
 This is the **only** critic run per iteration. Do not re-run the critic mid-iteration or before committing.
 
