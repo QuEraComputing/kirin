@@ -3,6 +3,41 @@ use kirin_ir::{
     StageMeta, Symbol,
 };
 
+/// Look up the entry block for a specialization at a specific stage.
+///
+/// Convenience function for `CallDispatch` implementors: avoids repeating the
+/// stage → spec_info → body → region → first-block traversal in every arm of a
+/// match on `stage_id`.
+pub fn entry_block_of<S, L>(
+    pipeline: &Pipeline<S>,
+    callee: SpecializedFunction,
+    stage_id: CompileStage,
+) -> Result<Block, crate::error::InterpreterError>
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+{
+    let stage: &StageInfo<L> = pipeline
+        .stage(stage_id)
+        .and_then(|s| s.try_stage_info())
+        .ok_or(crate::error::InterpreterError::MissingEntry)?;
+    let spec_info = callee
+        .get_info(stage)
+        .ok_or(crate::error::InterpreterError::MissingEntry)?;
+    let body_stmt = *spec_info.body();
+    let definition = body_stmt.definition(stage).clone();
+    definition
+        .regions()
+        .next()
+        .ok_or(crate::error::InterpreterError::MissingEntry)
+        .and_then(|region| {
+            region
+                .blocks(stage)
+                .next()
+                .ok_or(crate::error::InterpreterError::MissingEntry)
+        })
+}
+
 use crate::error::InterpreterError;
 
 pub struct PipelineHandle<'ir, S: StageMeta> {

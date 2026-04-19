@@ -8,13 +8,19 @@ use kirin_ir::{
 };
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use crate::algebra::Lift;
+use crate::abstract_call_dispatch::AbstractCallDispatch;
+use crate::context::AbstractFrame;
 use crate::control::{Control, CursorExt};
-use crate::cursor::AbstractBlockCursor;
 use crate::env::{AbstractEnv, AbstractMode, Env};
 use crate::error::InterpreterError;
 use crate::execute::{Execute, StackEntry};
 use crate::pipeline::PipelineHandle;
+
+// ---------------------------------------------------------------------------
+// Function key — (function, stage) pair, Copy
+// ---------------------------------------------------------------------------
+
+type StagedKey = (SpecializedFunction, CompileStage);
 
 // ---------------------------------------------------------------------------
 // Intraprocedural state
@@ -54,25 +60,24 @@ struct FuncSummary<V> {
 
 /// Summary-based interprocedural fixpoint interpreter.
 ///
-/// `C` is the abstract cursor coproduct. For flat-CF programs, use
-/// `AbstractBlockCursor<V, L>` directly (the identity `Lift` impl applies).
-/// For SCF programs, use a coproduct that includes `AbstractBlockCursor<V, L>`
-/// and abstract SCF cursors (e.g. `AbstractIfCursor`, `AbstractForCursor`).
+/// Each function is identified by `(SpecializedFunction, CompileStage)` and
+/// has exactly one summary.  The abstract call graph records which call sites
+/// reach each function, enabling callers to be re-enqueued when a callee's
+/// summary output grows.
 ///
-/// # Correctness fix vs interpreter-9
-/// Abstract SCF cursors must use `AbstractBlockCursor` for their body execution,
-/// not `BlockCursor`. `AbstractBlockCursor: Execute<AbstractInterp>` is the
-/// correct impl; `BlockCursor: Execute<AbstractInterp>` does not type-check
-/// because `BlockCursor` requires `E: Env<Mode = ConcreteMode<C>>`.
+/// `C` is the abstract cursor coproduct. For flat-CF programs use
+/// `AbstractBlockCursor<V, L>` directly.  For SCF programs use a coproduct
+/// that includes `AbstractBlockCursor<V, L>` and the abstract SCF cursors.
 pub struct AbstractInterp<'ir, S: StageMeta, L: Dialect, V, C> {
     handle: PipelineHandle<'ir, S>,
     widening: WideningStrategy,
-    func_states: FxHashMap<SpecializedFunction, FuncState<V>>,
-    summaries: FxHashMap<SpecializedFunction, FuncSummary<V>>,
-    callers: FxHashMap<SpecializedFunction, FxHashSet<SpecializedFunction>>,
-    fn_visit_counts: FxHashMap<SpecializedFunction, usize>,
-    func_worklist: VecDeque<SpecializedFunction>,
-    current_func: Option<SpecializedFunction>,
+    func_states: FxHashMap<StagedKey, FuncState<V>>,
+    summaries: FxHashMap<StagedKey, FuncSummary<V>>,
+    /// Abstract call graph: callee → set of call sites (frames) that invoke it.
+    call_graph: FxHashMap<StagedKey, FxHashSet<AbstractFrame>>,
+    fn_visit_counts: FxHashMap<StagedKey, usize>,
+    func_worklist: VecDeque<StagedKey>,
+    current_key: Option<StagedKey>,
     cursor_stack: Vec<StackEntry<C, V>>,
     _phantom: PhantomData<L>,
 }
@@ -92,7 +97,9 @@ where
     type Stages = S;
 
     fn current_stage(&self) -> CompileStage {
-        self.handle.stage_id
+        self.current_key
+            .map(|(_, s)| s)
+            .unwrap_or(self.handle.stage_id)
     }
 
     fn pipeline(&self) -> &kirin_ir::Pipeline<S> {
@@ -100,18 +107,18 @@ where
     }
 
     fn read(&self, ssa: SSAValue) -> Result<V, InterpreterError> {
-        let func = self.current_func.ok_or(InterpreterError::NoFrame)?;
+        let key = self.current_key.ok_or(InterpreterError::NoFrame)?;
         self.func_states
-            .get(&func)
+            .get(&key)
             .and_then(|s| s.active_ssa.get(&ssa))
             .cloned()
             .ok_or(InterpreterError::UnboundValue(ssa))
     }
 
     fn write_result(&mut self, r: ResultValue, v: V) -> Result<(), InterpreterError> {
-        let func = self.current_func.ok_or(InterpreterError::NoFrame)?;
+        let key = self.current_key.ok_or(InterpreterError::NoFrame)?;
         self.func_states
-            .get_mut(&func)
+            .get_mut(&key)
             .ok_or(InterpreterError::NoFrame)?
             .active_ssa
             .insert(SSAValue::from(r), v);
@@ -119,9 +126,9 @@ where
     }
 
     fn write_ssa(&mut self, ssa: SSAValue, v: V) -> Result<(), InterpreterError> {
-        let func = self.current_func.ok_or(InterpreterError::NoFrame)?;
+        let key = self.current_key.ok_or(InterpreterError::NoFrame)?;
         self.func_states
-            .get_mut(&func)
+            .get_mut(&key)
             .ok_or(InterpreterError::NoFrame)?
             .active_ssa
             .insert(ssa, v);
@@ -138,66 +145,64 @@ where
     V: Clone + AbstractValue,
 {
     fn enqueue_block(&mut self, block: Block, args: Vec<V>) {
-        if let Some(func) = self.current_func
-            && let Some(state) = self.func_states.get_mut(&func)
-        {
-            let changed = if let Some(existing) = state.block_in.get(&block) {
-                if existing.len() != args.len() {
-                    state.block_in.insert(block, args);
-                    true
-                } else {
-                    let widening = self.widening;
-                    let visit_count = *state.visit_counts.get(&block).unwrap_or(&0);
-                    let new_args: Vec<V> = existing
-                        .iter()
-                        .zip(args.iter())
-                        .map(|(e, a)| widening.merge(e, a, visit_count))
-                        .collect();
-                    let changed = new_args
-                        .iter()
-                        .zip(existing.iter())
-                        .any(|(n, o)| !n.is_subseteq(o));
-                    if changed {
-                        state.block_in.insert(block, new_args);
-                    }
-                    changed
-                }
-            } else {
+        let Some(key) = self.current_key else { return };
+        let Some(state) = self.func_states.get_mut(&key) else {
+            return;
+        };
+
+        let changed = if let Some(existing) = state.block_in.get(&block) {
+            if existing.len() != args.len() {
                 state.block_in.insert(block, args);
                 true
-            };
-
-            if changed {
-                *state.visit_counts.entry(block).or_insert(0) += 1;
-                if !state.block_worklist.contains(&block) {
-                    state.block_worklist.push_back(block);
+            } else {
+                let widening = self.widening;
+                let visit_count = *state.visit_counts.get(&block).unwrap_or(&0);
+                let new_args: Vec<V> = existing
+                    .iter()
+                    .zip(args.iter())
+                    .map(|(e, a)| widening.merge(e, a, visit_count))
+                    .collect();
+                let changed = new_args
+                    .iter()
+                    .zip(existing.iter())
+                    .any(|(n, o)| !n.is_subseteq(o));
+                if changed {
+                    state.block_in.insert(block, new_args);
                 }
+                changed
+            }
+        } else {
+            state.block_in.insert(block, args);
+            true
+        };
+
+        if changed {
+            *state.visit_counts.entry(block).or_insert(0) += 1;
+            if !state.block_worklist.contains(&block) {
+                state.block_worklist.push_back(block);
             }
         }
     }
 
     fn record_return(&mut self, v: V) -> Result<(), InterpreterError> {
-        let func = self.current_func.ok_or(InterpreterError::NoFrame)?;
-        self.record_return_inner(func, v)
+        let key = self.current_key.ok_or(InterpreterError::NoFrame)?;
+        self.record_return_inner(key, v)
     }
 
     fn current_function(&self) -> SpecializedFunction {
-        self.current_func
+        self.current_key
             .expect("AbstractEnv::current_function called outside of analyze_function")
+            .0
     }
 }
 
 // -- Internal helpers -------------------------------------------------------
 
 impl<'ir, S: StageMeta, L: Dialect, V: Clone + AbstractValue, C> AbstractInterp<'ir, S, L, V, C> {
-    fn record_return_inner(
-        &mut self,
-        func: SpecializedFunction,
-        v: V,
-    ) -> Result<(), InterpreterError> {
+    fn record_return_inner(&mut self, key: StagedKey, v: V) -> Result<(), InterpreterError> {
         let summary = self
             .summaries
-            .get_mut(&func)
+            .get_mut(&key)
             .ok_or(InterpreterError::MissingEntry)?;
         let new_output = match &summary.output {
             None => v,
@@ -209,10 +214,18 @@ impl<'ir, S: StageMeta, L: Dialect, V: Clone + AbstractValue, C> AbstractInterp<
         };
         summary.output = Some(new_output);
 
-        if output_grew && let Some(callers) = self.callers.get(&func).cloned() {
-            for caller in callers {
-                if !self.func_worklist.contains(&caller) {
-                    self.func_worklist.push_back(caller);
+        if output_grew {
+            // Re-enqueue all callers recorded in the abstract call graph.
+            let caller_keys: Vec<StagedKey> = self
+                .call_graph
+                .get(&key)
+                .into_iter()
+                .flatten()
+                .map(|f| (f.func, f.stage))
+                .collect();
+            for ck in caller_keys {
+                if !self.func_worklist.contains(&ck) {
+                    self.func_worklist.push_back(ck);
                 }
             }
         }
@@ -238,10 +251,10 @@ impl<'ir, S: StageMeta, L: Dialect, V: Clone + AbstractValue, C> AbstractInterp<
             widening,
             func_states: FxHashMap::default(),
             summaries: FxHashMap::default(),
-            callers: FxHashMap::default(),
+            call_graph: FxHashMap::default(),
             fn_visit_counts: FxHashMap::default(),
             func_worklist: VecDeque::new(),
-            current_func: None,
+            current_key: None,
             cursor_stack: Vec::new(),
             _phantom: PhantomData,
         }
@@ -252,83 +265,87 @@ impl<'ir, S: StageMeta, L: Dialect, V: Clone + AbstractValue, C> AbstractInterp<
 
 impl<'ir, S, L, V, C> AbstractInterp<'ir, S, L, V, C>
 where
-    S: StageMeta + HasStageInfo<L>,
+    S: StageMeta + HasStageInfo<L> + AbstractCallDispatch<V, C>,
     L: Dialect,
     V: Clone + AbstractValue,
     C: Execute<Self>,
-    AbstractBlockCursor<V, L>: Execute<Self> + Lift<C>,
 {
-    /// Run the interprocedural fixpoint from `entry_fn` with `args`.
+    /// Run the interprocedural fixpoint from `entry_fn` at `stage_id` with `args`.
     pub fn analyze(
         &mut self,
         entry_fn: SpecializedFunction,
+        stage_id: CompileStage,
         args: Vec<V>,
     ) -> Result<Option<V>, InterpreterError> {
-        let entry_block = self
-            .handle
-            .entry_block_of::<L>(entry_fn, self.handle.stage_id)?;
+        let entry_block = S::entry_block_for(self.handle.pipeline, entry_fn, stage_id)?;
+        let entry_key = (entry_fn, stage_id);
         self.summaries.insert(
-            entry_fn,
+            entry_key,
             FuncSummary {
                 input: args,
                 output: None,
                 entry_block,
             },
         );
-        self.func_worklist.push_back(entry_fn);
+        self.func_worklist.push_back(entry_key);
 
-        while let Some(func) = self.func_worklist.pop_front() {
-            self.analyze_function(func)?;
+        while let Some(key) = self.func_worklist.pop_front() {
+            self.analyze_function(key)?;
         }
 
-        Ok(self.summaries.get(&entry_fn).and_then(|s| s.output.clone()))
+        Ok(self
+            .summaries
+            .get(&entry_key)
+            .and_then(|s| s.output.clone()))
     }
 
-    fn analyze_function(&mut self, func: SpecializedFunction) -> Result<(), InterpreterError> {
+    fn analyze_function(&mut self, key: StagedKey) -> Result<(), InterpreterError> {
+        let (_, func_stage) = key;
         let (entry_block, input) = {
             let s = self
                 .summaries
-                .get(&func)
+                .get(&key)
                 .ok_or(InterpreterError::MissingEntry)?;
             (s.entry_block, s.input.clone())
         };
 
         let mut state = FuncState::new();
-        state.block_in.insert(entry_block, input.clone());
+        state.block_in.insert(entry_block, input);
         state.block_worklist.push_back(entry_block);
-        self.func_states.insert(func, state);
-        self.current_func = Some(func);
+        self.func_states.insert(key, state);
+        self.current_key = Some(key);
 
         loop {
             while !self.cursor_stack.is_empty() {
-                self.step_cursor(func)?;
+                self.step_cursor(key)?;
             }
 
             let block = {
-                let state = self.func_states.get_mut(&func).unwrap();
+                let state = self.func_states.get_mut(&key).unwrap();
                 state.block_worklist.pop_front()
             };
             let Some(block) = block else { break };
 
             let block_args = self
                 .func_states
-                .get(&func)
+                .get(&key)
                 .and_then(|s| s.block_in.get(&block).cloned())
                 .unwrap_or_default();
 
-            let cursor = AbstractBlockCursor::<V, L>::new(block, self.handle.stage_id, block_args);
-            self.cursor_stack.push(StackEntry::new(cursor.lift()));
+            let cursor =
+                S::make_abstract_cursor(self.handle.pipeline, func_stage, block, block_args);
+            self.cursor_stack.push(StackEntry::new(cursor));
 
             while !self.cursor_stack.is_empty() {
-                self.step_cursor(func)?;
+                self.step_cursor(key)?;
             }
         }
 
-        self.current_func = None;
+        self.current_key = None;
         Ok(())
     }
 
-    fn step_cursor(&mut self, func: SpecializedFunction) -> Result<(), InterpreterError> {
+    fn step_cursor(&mut self, key: StagedKey) -> Result<(), InterpreterError> {
         let Some(mut entry) = self.cursor_stack.pop() else {
             return Ok(());
         };
@@ -344,9 +361,7 @@ where
                 self.cursor_stack.push(entry);
                 self.cursor_stack.push(StackEntry::new(new_cursor));
             }
-            Control::Ext(CursorExt::Pop) => {
-                // Cursor done; discard.
-            }
+            Control::Ext(CursorExt::Pop) => {}
             Control::Yield(v) => {
                 if let Some(parent) = self.cursor_stack.last_mut() {
                     parent.inbox = Some(v);
@@ -354,7 +369,7 @@ where
             }
             Control::Return(v) => {
                 self.cursor_stack.clear();
-                self.record_return_inner(func, v)?;
+                self.record_return_inner(key, v)?;
             }
             Control::Jump(block, args) => {
                 self.enqueue_block(block, args);
@@ -366,15 +381,15 @@ where
             }
             Control::Call {
                 callee,
+                stage: callee_stage,
                 args,
                 results,
-                ..
             } => {
                 self.cursor_stack.push(entry);
-                let call_result = self.handle_call(func, callee, args)?;
+                let call_result = self.handle_call(key, callee, callee_stage, &results, args)?;
                 for r in &results {
                     self.func_states
-                        .get_mut(&func)
+                        .get_mut(&key)
                         .ok_or(InterpreterError::NoFrame)?
                         .active_ssa
                         .insert(SSAValue::from(*r), call_result.clone());
@@ -387,13 +402,23 @@ where
 
     fn handle_call(
         &mut self,
-        caller: SpecializedFunction,
+        caller_key: StagedKey,
         callee: SpecializedFunction,
+        callee_stage: CompileStage,
+        call_site_results: &[ResultValue],
         new_args: Vec<V>,
     ) -> Result<V, InterpreterError> {
-        self.callers.entry(callee).or_default().insert(caller);
+        let callee_key = (callee, callee_stage);
 
-        if let Some(summary) = self.summaries.get(&callee) {
+        // Record this call site in the abstract call graph.
+        let frame = AbstractFrame {
+            func: caller_key.0,
+            stage: caller_key.1,
+            results: call_site_results.to_vec(),
+        };
+        self.call_graph.entry(callee_key).or_default().insert(frame);
+
+        if let Some(summary) = self.summaries.get(&callee_key) {
             let existing_input = summary.input.clone();
 
             if existing_input.len() != new_args.len() {
@@ -404,7 +429,7 @@ where
             }
 
             let widening = self.widening;
-            let fn_visits = *self.fn_visit_counts.get(&callee).unwrap_or(&0);
+            let fn_visits = *self.fn_visit_counts.get(&callee_key).unwrap_or(&0);
             let merged: Vec<V> = existing_input
                 .iter()
                 .zip(new_args.iter())
@@ -416,34 +441,32 @@ where
                 .any(|(n, o)| !n.is_subseteq(o));
 
             if input_grew {
-                self.summaries.get_mut(&callee).unwrap().input = merged;
-                *self.fn_visit_counts.entry(callee).or_insert(0) += 1;
-                if !self.func_worklist.contains(&callee) {
-                    self.func_worklist.push_back(callee);
+                self.summaries.get_mut(&callee_key).unwrap().input = merged;
+                *self.fn_visit_counts.entry(callee_key).or_insert(0) += 1;
+                if !self.func_worklist.contains(&callee_key) {
+                    self.func_worklist.push_back(callee_key);
                 }
             }
 
             Ok(self
                 .summaries
-                .get(&callee)
+                .get(&callee_key)
                 .unwrap()
                 .output
                 .clone()
                 .unwrap_or_else(V::bottom))
         } else {
-            let entry_block = self
-                .handle
-                .entry_block_of::<L>(callee, self.handle.stage_id)?;
+            let entry_block = S::entry_block_for(self.handle.pipeline, callee, callee_stage)?;
             self.summaries.insert(
-                callee,
+                callee_key,
                 FuncSummary {
                     input: new_args,
                     output: None,
                     entry_block,
                 },
             );
-            if !self.func_worklist.contains(&callee) {
-                self.func_worklist.push_back(callee);
+            if !self.func_worklist.contains(&callee_key) {
+                self.func_worklist.push_back(callee_key);
             }
             Ok(V::bottom())
         }

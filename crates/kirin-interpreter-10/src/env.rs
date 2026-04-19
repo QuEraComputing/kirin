@@ -106,6 +106,49 @@ pub trait Env {
             })
     }
 
+    /// Resolve a symbol from `src_stage` and find its specialization at `dst_stage`.
+    ///
+    /// Used for cross-stage calls where the call-site symbol lives in one stage's
+    /// symbol table but the callee body lives in a different stage.
+    fn resolve_function_cross_stage<Lsrc: Dialect, Ldst: Dialect>(
+        &self,
+        target: Symbol,
+        src_stage_id: CompileStage,
+        dst_stage_id: CompileStage,
+    ) -> Result<SpecializedFunction, Self::Error>
+    where
+        Self::Stages: HasStageInfo<Lsrc> + HasStageInfo<Ldst>,
+    {
+        let src_stage_info: &StageInfo<Lsrc> = self
+            .pipeline()
+            .stage(src_stage_id)
+            .and_then(|s| s.try_stage_info())
+            .ok_or_else(|| Self::Error::from(InterpreterError::MissingEntry))?;
+        let function = self
+            .pipeline()
+            .resolve_function(src_stage_info, target)
+            .ok_or_else(|| Self::Error::from(InterpreterError::MissingEntry))?;
+        let dst_stage_info: &StageInfo<Ldst> = self
+            .pipeline()
+            .stage(dst_stage_id)
+            .and_then(|s| s.try_stage_info())
+            .ok_or_else(|| Self::Error::from(InterpreterError::MissingEntry))?;
+        let staged_function = self
+            .pipeline()
+            .function_info(function)
+            .and_then(|info| info.staged_function(dst_stage_id))
+            .ok_or_else(|| Self::Error::from(InterpreterError::MissingEntry))?;
+        staged_function
+            .get_info(dst_stage_info)
+            .ok_or_else(|| Self::Error::from(InterpreterError::MissingEntry))?
+            .unique_live_specialization()
+            .map_err(|_| {
+                Self::Error::from(InterpreterError::UnhandledEffect(
+                    "ambiguous specialization".into(),
+                ))
+            })
+    }
+
     fn write_results(
         &mut self,
         results: &[ResultValue],

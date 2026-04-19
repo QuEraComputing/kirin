@@ -1032,6 +1032,7 @@ dependencies = [
  "kirin-cmp",
  "kirin-interpreter",
  "kirin-ir",
+ "kirin-scf",
  "kirin-test-utils",
 ]
 

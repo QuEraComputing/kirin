@@ -1,5 +1,18 @@
 use super::{Bound, Interval};
 
+#[cfg(feature = "scf")]
+impl kirin_scf::ForLoopValue for Interval {
+    fn loop_condition(&self, end: &Self) -> Option<bool> {
+        use kirin_cmp::CompareValue;
+        use kirin_interpreter::BranchCondition;
+        self.cmp_lt(end).is_truthy()
+    }
+
+    fn loop_step(&self, step: &Self) -> Option<Self> {
+        Some(self.clone() + step.clone())
+    }
+}
+
 impl kirin_interpreter::BranchCondition for Interval {
     fn is_truthy(&self) -> Option<bool> {
         if self.is_empty() {

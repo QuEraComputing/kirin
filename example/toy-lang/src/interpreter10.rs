@@ -1,13 +1,15 @@
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Neg, Not, Sub};
 
-use kirin::prelude::HasStageInfo;
+use kirin::prelude::{Block, CompileStage, HasStageInfo, Pipeline, SpecializedFunction};
 use kirin_arith::{ArithValue, CheckedDiv, CheckedRem};
 use kirin_bitwise::{CheckedShl, CheckedShr};
 use kirin_cmp::CompareValue;
 use kirin_function::interpreter10::interpret::eval_call_for_dialect;
 use kirin_interpreter::{AbstractValue, BranchCondition, ProductValue};
+use kirin_interpreter_10::abstract_call_dispatch::AbstractCallDispatch;
 use kirin_interpreter_10::abstract_interp::AbstractInterp;
 use kirin_interpreter_10::algebra::Lift;
+use kirin_interpreter_10::call_dispatch::CallDispatch;
 use kirin_interpreter_10::concrete::ConcreteInterp;
 use kirin_interpreter_10::control::{Control, CursorExt};
 use kirin_interpreter_10::cursor::{AbstractBlockCursor, BlockCursor};
@@ -15,9 +17,12 @@ use kirin_interpreter_10::env::{AbstractMode, ConcreteMode, Env};
 use kirin_interpreter_10::error::InterpreterError;
 use kirin_interpreter_10::execute::Execute;
 use kirin_interpreter_10::interpretable::Interpretable;
+use kirin_interpreter_10::pipeline::entry_block_of;
 use kirin_scf::ForLoopValue;
 use kirin_scf::StructuredControlFlow;
-use kirin_scf::interpreter10::cursor::{AbstractSCFCursor, SCFCursor};
+use kirin_scf::interpreter10::cursor::{
+    AbstractForCursor, AbstractIfCursor, AbstractSCFCursor, ForCursor, IfCursor, SCFCursor,
+};
 use kirin_scf::interpreter10::interpret::{
     eval_for_abstract, eval_for_concrete, eval_if_abstract, eval_if_concrete,
 };
@@ -366,6 +371,503 @@ where
 }
 
 // ---------------------------------------------------------------------------
+// CallDispatch for HighLevelCursor — single-stage (source) concrete interpreter
+//
+// Implements CallDispatch so ConcreteInterp<Stage, HighLevel, V, HighLevelCursor<V>>
+// can handle recursive calls within the source stage.
+// ---------------------------------------------------------------------------
+
+impl<V: Clone> CallDispatch<V, HighLevelCursor<V>> for Stage {
+    fn make_call_cursor(
+        pipeline: &Pipeline<Stage>,
+        callee: SpecializedFunction,
+        stage_id: CompileStage,
+        args: Vec<V>,
+    ) -> Result<HighLevelCursor<V>, InterpreterError> {
+        let entry = entry_block_of::<Stage, HighLevel>(pipeline, callee, stage_id)?;
+        Ok(HighLevelCursor::Block(BlockCursor::new(
+            entry, stage_id, args,
+        )))
+    }
+}
+
+// ---------------------------------------------------------------------------
+// MultiCursor — concrete cursor coproduct spanning both source and lowered stages
+//
+// Enables ConcreteInterp to evaluate programs whose call graph crosses stages:
+// source-stage HighLevel ops may call lowered-stage LowLevel functions (and
+// vice-versa). The cursor coproduct is the flat union of all stage-local cursors.
+//
+// BlockCursor<V, L> can Execute<E> for any E whose Mode = ConcreteMode<C> —
+// C is a free type parameter in the Execute impl — so both HighLevel and
+// LowLevel block cursors work within the same MultiCursor coproduct as long
+// as the Interpretable and HasStageInfo bounds are satisfied on the interpreter.
+// ---------------------------------------------------------------------------
+
+pub enum MultiCursor<V: Clone> {
+    High(BlockCursor<V, HighLevel>),
+    Scf(SCFCursor<V, HighLevel>),
+    Low(BlockCursor<V, LowLevel>),
+}
+
+// -- Lift impls: dialect-local cursors → MultiCursor -------------------------
+
+impl<V: Clone> Lift<MultiCursor<V>> for BlockCursor<V, HighLevel> {
+    fn lift(self) -> MultiCursor<V> {
+        MultiCursor::High(self)
+    }
+}
+
+impl<V: Clone> Lift<MultiCursor<V>> for IfCursor<V, HighLevel> {
+    fn lift(self) -> MultiCursor<V> {
+        MultiCursor::Scf(SCFCursor::If(self))
+    }
+}
+
+impl<V: Clone> Lift<MultiCursor<V>> for ForCursor<V, HighLevel> {
+    fn lift(self) -> MultiCursor<V> {
+        MultiCursor::Scf(SCFCursor::For(self))
+    }
+}
+
+impl<V: Clone> Lift<MultiCursor<V>> for SCFCursor<V, HighLevel> {
+    fn lift(self) -> MultiCursor<V> {
+        MultiCursor::Scf(self)
+    }
+}
+
+impl<V: Clone> Lift<MultiCursor<V>> for BlockCursor<V, LowLevel> {
+    fn lift(self) -> MultiCursor<V> {
+        MultiCursor::Low(self)
+    }
+}
+
+// -- Execute<MultiInterp<V>> for MultiCursor<V> ------------------------------
+
+// TODO: replace with derive macro
+impl<E, V> Execute<E> for MultiCursor<V>
+where
+    V: Clone
+        + BranchCondition
+        + ForLoopValue
+        + ProductValue
+        + 'static
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Neg<Output = V>
+        + CheckedDiv
+        + CheckedRem
+        + BitAnd<Output = V>
+        + BitOr<Output = V>
+        + BitXor<Output = V>
+        + Not<Output = V>
+        + CheckedShl
+        + CheckedShr
+        + TryFrom<ArithValue>
+        + CompareValue,
+    <V as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
+    <V as CompareValue>::Bool: Into<V>,
+    E: Env<Mode = ConcreteMode<MultiCursor<V>>, Value = V, Ext = CursorExt<MultiCursor<V>>>,
+    E::Stages: HasStageInfo<HighLevel> + HasStageInfo<LowLevel>,
+    E::Error: From<InterpreterError>,
+    HighLevel: Interpretable<E>,
+    LowLevel: Interpretable<E>,
+    BlockCursor<V, HighLevel>: Lift<MultiCursor<V>>,
+{
+    fn execute(
+        &mut self,
+        env: &mut E,
+        inbox: Option<V>,
+    ) -> Result<Control<V, CursorExt<MultiCursor<V>>>, E::Error> {
+        match self {
+            MultiCursor::High(c) => c.execute(env, inbox),
+            MultiCursor::Scf(c) => c.execute(env, inbox),
+            MultiCursor::Low(c) => c.execute(env, inbox),
+        }
+    }
+}
+
+// -- CallDispatch for MultiCursor — multi-stage dispatch ---------------------
+
+impl<V: Clone> CallDispatch<V, MultiCursor<V>> for Stage {
+    fn make_call_cursor(
+        pipeline: &Pipeline<Stage>,
+        callee: SpecializedFunction,
+        stage_id: CompileStage,
+        args: Vec<V>,
+    ) -> Result<MultiCursor<V>, InterpreterError> {
+        let stage_container = pipeline
+            .stage(stage_id)
+            .ok_or(InterpreterError::MissingEntry)?;
+        match stage_container {
+            Stage::Source(_) => {
+                let entry = entry_block_of::<Stage, HighLevel>(pipeline, callee, stage_id)?;
+                Ok(MultiCursor::High(BlockCursor::new(entry, stage_id, args)))
+            }
+            Stage::Lowered(_) => {
+                let entry = entry_block_of::<Stage, LowLevel>(pipeline, callee, stage_id)?;
+                Ok(MultiCursor::Low(BlockCursor::new(entry, stage_id, args)))
+            }
+        }
+    }
+}
+
+// -- HighLevel: Interpretable<MultiInterp<V>> — cross-stage call resolution --
+//
+// The single-stage HighLevel Interpretable resolves calls at the current stage.
+// This multi-stage impl also tries the lowered stage as a fallback, enabling
+// source code to call functions that only exist at lowered.
+// ---------------------------------------------------------------------------
+
+pub type MultiInterp<'ir, V> = ConcreteInterp<'ir, Stage, HighLevel, V, MultiCursor<V>>;
+
+// TODO: replace with derive macro
+impl<'ir, V> Interpretable<MultiInterp<'ir, V>> for HighLevel
+where
+    V: Clone
+        + BranchCondition
+        + ForLoopValue
+        + ProductValue
+        + 'static
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Neg<Output = V>
+        + CheckedDiv
+        + CheckedRem
+        + BitAnd<Output = V>
+        + BitOr<Output = V>
+        + BitXor<Output = V>
+        + Not<Output = V>
+        + CheckedShl
+        + CheckedShr
+        + TryFrom<ArithValue>
+        + CompareValue,
+    <V as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
+    <V as CompareValue>::Bool: Into<V>,
+{
+    fn eval(
+        &self,
+        env: &mut MultiInterp<'ir, V>,
+    ) -> Result<Control<V, CursorExt<MultiCursor<V>>>, InterpreterError> {
+        match self {
+            HighLevel::Lexical(op) => match op {
+                kirin_function::Lexical::FunctionBody(op) => op.eval(env),
+                kirin_function::Lexical::Lambda(op) => op.eval(env),
+                kirin_function::Lexical::Call(op) => {
+                    // Cross-stage call resolution: try the current (source) stage first,
+                    // then fall back to lowered. This lets source-stage programs call
+                    // functions that only exist at the lowered stage.
+                    let args = env.read_many(op.args())?;
+                    let target = op.target();
+                    let current = env.current_stage();
+                    if let Ok(callee) = env.resolve_function_for::<HighLevel>(target, current) {
+                        Ok(Control::Call {
+                            callee,
+                            stage: current,
+                            args,
+                            results: op.results().to_vec(),
+                        })
+                    } else {
+                        let lowered = env
+                            .pipeline()
+                            .stage_by_name("lowered")
+                            .ok_or(InterpreterError::MissingEntry)?;
+                        // The `target` symbol is from the source stage's symbol table;
+                        // resolve_function_cross_stage looks it up via HighLevel (source)
+                        // then finds the specialization in LowLevel (lowered).
+                        let callee = env.resolve_function_cross_stage::<HighLevel, LowLevel>(
+                            target, current, lowered,
+                        )?;
+                        Ok(Control::Call {
+                            callee,
+                            stage: lowered,
+                            args,
+                            results: op.results().to_vec(),
+                        })
+                    }
+                }
+                kirin_function::Lexical::Return(op) => op.eval(env),
+            },
+            HighLevel::Structured(op) => match op {
+                StructuredControlFlow::If(op) => {
+                    eval_if_concrete::<_, MultiCursor<V>, HighLevel, _>(op, env)
+                }
+                StructuredControlFlow::For(op) => {
+                    eval_for_concrete::<_, MultiCursor<V>, HighLevel, _>(op, env)
+                }
+                StructuredControlFlow::Yield(op) => op.eval(env),
+            },
+            HighLevel::Constant(op) => op.eval(env),
+            HighLevel::Arith(op) => op.eval(env),
+            HighLevel::Cmp(op) => op.eval(env),
+            HighLevel::Bitwise(op) => op.eval(env),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AbstractCallDispatch — single-stage abstract interpreters
+//
+// Each cursor coproduct used by analyze_highlevel / analyze_lowered needs a
+// corresponding AbstractCallDispatch impl so AbstractInterp can create the
+// right cursor type when dispatching calls.
+// ---------------------------------------------------------------------------
+
+impl<V: Clone> AbstractCallDispatch<V, AbstractBlockCursor<V, LowLevel>> for Stage {
+    fn make_abstract_cursor(
+        _pipeline: &Pipeline<Stage>,
+        stage_id: CompileStage,
+        block: Block,
+        args: Vec<V>,
+    ) -> AbstractBlockCursor<V, LowLevel> {
+        AbstractBlockCursor::new(block, stage_id, args)
+    }
+
+    fn entry_block_for(
+        pipeline: &Pipeline<Stage>,
+        callee: SpecializedFunction,
+        stage_id: CompileStage,
+    ) -> Result<Block, InterpreterError> {
+        entry_block_of::<Stage, LowLevel>(pipeline, callee, stage_id)
+    }
+}
+
+impl<V: Clone> AbstractCallDispatch<V, HighLevelAbstractCursor<V>> for Stage {
+    fn make_abstract_cursor(
+        _pipeline: &Pipeline<Stage>,
+        stage_id: CompileStage,
+        block: Block,
+        args: Vec<V>,
+    ) -> HighLevelAbstractCursor<V> {
+        HighLevelAbstractCursor::Block(AbstractBlockCursor::new(block, stage_id, args))
+    }
+
+    fn entry_block_for(
+        pipeline: &Pipeline<Stage>,
+        callee: SpecializedFunction,
+        stage_id: CompileStage,
+    ) -> Result<Block, InterpreterError> {
+        entry_block_of::<Stage, HighLevel>(pipeline, callee, stage_id)
+    }
+}
+
+// ---------------------------------------------------------------------------
+// AbstractMultiCursor — abstract cursor coproduct spanning source and lowered
+//
+// Mirrors MultiCursor for the abstract interpreter. Unlike HighLevelAbstractCursor
+// which ties `E::Mode = AbstractMode<HighLevelAbstractCursor<V>>`, the constituent
+// types (AbstractBlockCursor, AbstractSCFCursor) have `C` as a free type parameter
+// in their Execute impls — so they can operate inside AbstractMultiCursor<V>
+// without mode conflicts. This is the same free-C pattern as the concrete side.
+// ---------------------------------------------------------------------------
+
+pub enum AbstractMultiCursor<V: Clone> {
+    HighBlock(AbstractBlockCursor<V, HighLevel>),
+    HighScf(AbstractSCFCursor<V, HighLevel>),
+    Low(AbstractBlockCursor<V, LowLevel>),
+}
+
+impl<V: Clone> Lift<AbstractMultiCursor<V>> for AbstractBlockCursor<V, HighLevel> {
+    fn lift(self) -> AbstractMultiCursor<V> {
+        AbstractMultiCursor::HighBlock(self)
+    }
+}
+
+impl<V: Clone> Lift<AbstractMultiCursor<V>> for AbstractSCFCursor<V, HighLevel> {
+    fn lift(self) -> AbstractMultiCursor<V> {
+        AbstractMultiCursor::HighScf(self)
+    }
+}
+
+impl<V: Clone> Lift<AbstractMultiCursor<V>> for AbstractIfCursor<V, HighLevel> {
+    fn lift(self) -> AbstractMultiCursor<V> {
+        AbstractMultiCursor::HighScf(AbstractSCFCursor::If(self))
+    }
+}
+
+impl<V: Clone> Lift<AbstractMultiCursor<V>> for AbstractForCursor<V, HighLevel> {
+    fn lift(self) -> AbstractMultiCursor<V> {
+        AbstractMultiCursor::HighScf(AbstractSCFCursor::For(self))
+    }
+}
+
+impl<V: Clone> Lift<AbstractMultiCursor<V>> for AbstractBlockCursor<V, LowLevel> {
+    fn lift(self) -> AbstractMultiCursor<V> {
+        AbstractMultiCursor::Low(self)
+    }
+}
+
+// TODO: replace with derive macro
+impl<E, V> Execute<E> for AbstractMultiCursor<V>
+where
+    V: Clone
+        + AbstractValue
+        + BranchCondition
+        + ForLoopValue
+        + ProductValue
+        + 'static
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Neg<Output = V>
+        + CheckedDiv
+        + CheckedRem
+        + BitAnd<Output = V>
+        + BitOr<Output = V>
+        + BitXor<Output = V>
+        + Not<Output = V>
+        + CheckedShl
+        + CheckedShr
+        + TryFrom<ArithValue>
+        + CompareValue,
+    <V as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
+    <V as CompareValue>::Bool: Into<V>,
+    E: kirin_interpreter_10::env::AbstractEnv<Value = V, Ext = CursorExt<AbstractMultiCursor<V>>>,
+    E: Env<Mode = AbstractMode<AbstractMultiCursor<V>>>,
+    E::Stages: HasStageInfo<HighLevel> + HasStageInfo<LowLevel>,
+    E::Error: From<InterpreterError>,
+    HighLevel: Interpretable<E>,
+    LowLevel: Interpretable<E>,
+    // Required by AbstractSCFCursor<V, HighLevel>: Execute<E> (push bodies as HighBlock)
+    AbstractBlockCursor<V, HighLevel>: Lift<AbstractMultiCursor<V>>,
+{
+    fn execute(
+        &mut self,
+        env: &mut E,
+        inbox: Option<V>,
+    ) -> Result<Control<V, CursorExt<AbstractMultiCursor<V>>>, E::Error> {
+        match self {
+            AbstractMultiCursor::HighBlock(c) => c.execute(env, inbox),
+            AbstractMultiCursor::HighScf(c) => c.execute(env, inbox),
+            AbstractMultiCursor::Low(c) => c.execute(env, inbox),
+        }
+    }
+}
+
+// -- AbstractCallDispatch for AbstractMultiCursor — cross-stage dispatch ------
+
+impl<V: Clone> AbstractCallDispatch<V, AbstractMultiCursor<V>> for Stage {
+    fn make_abstract_cursor(
+        pipeline: &Pipeline<Stage>,
+        stage_id: CompileStage,
+        block: Block,
+        args: Vec<V>,
+    ) -> AbstractMultiCursor<V> {
+        match pipeline.stage(stage_id) {
+            Some(Stage::Source(_)) => {
+                AbstractMultiCursor::HighBlock(AbstractBlockCursor::new(block, stage_id, args))
+            }
+            _ => AbstractMultiCursor::Low(AbstractBlockCursor::new(block, stage_id, args)),
+        }
+    }
+
+    fn entry_block_for(
+        pipeline: &Pipeline<Stage>,
+        callee: SpecializedFunction,
+        stage_id: CompileStage,
+    ) -> Result<Block, InterpreterError> {
+        match pipeline.stage(stage_id) {
+            Some(Stage::Source(_)) => {
+                entry_block_of::<Stage, HighLevel>(pipeline, callee, stage_id)
+            }
+            Some(Stage::Lowered(_)) => {
+                entry_block_of::<Stage, LowLevel>(pipeline, callee, stage_id)
+            }
+            None => Err(InterpreterError::MissingEntry),
+        }
+    }
+}
+
+// -- AbstractMultiInterp — cross-stage abstract interpreter type alias --------
+
+pub type AbstractMultiInterp<'ir, V> =
+    AbstractInterp<'ir, Stage, HighLevel, V, AbstractMultiCursor<V>>;
+
+// -- HighLevel: Interpretable<AbstractMultiInterp<V>> — cross-stage resolution
+
+// TODO: replace with derive macro
+impl<'ir, V> Interpretable<AbstractMultiInterp<'ir, V>> for HighLevel
+where
+    V: Clone
+        + AbstractValue
+        + BranchCondition
+        + ForLoopValue
+        + ProductValue
+        + 'static
+        + Add<Output = V>
+        + Sub<Output = V>
+        + Mul<Output = V>
+        + Neg<Output = V>
+        + CheckedDiv
+        + CheckedRem
+        + BitAnd<Output = V>
+        + BitOr<Output = V>
+        + BitXor<Output = V>
+        + Not<Output = V>
+        + CheckedShl
+        + CheckedShr
+        + TryFrom<ArithValue>
+        + CompareValue,
+    <V as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
+    <V as CompareValue>::Bool: Into<V>,
+{
+    fn eval(
+        &self,
+        env: &mut AbstractMultiInterp<'ir, V>,
+    ) -> Result<Control<V, CursorExt<AbstractMultiCursor<V>>>, InterpreterError> {
+        match self {
+            HighLevel::Lexical(op) => match op {
+                kirin_function::Lexical::FunctionBody(op) => op.eval(env),
+                kirin_function::Lexical::Lambda(op) => op.eval(env),
+                kirin_function::Lexical::Call(op) => {
+                    let args = env.read_many(op.args())?;
+                    let target = op.target();
+                    let current = env.current_stage();
+                    if let Ok(callee) = env.resolve_function_for::<HighLevel>(target, current) {
+                        Ok(Control::Call {
+                            callee,
+                            stage: current,
+                            args,
+                            results: op.results().to_vec(),
+                        })
+                    } else {
+                        let lowered = env
+                            .pipeline()
+                            .stage_by_name("lowered")
+                            .ok_or(InterpreterError::MissingEntry)?;
+                        let callee = env.resolve_function_cross_stage::<HighLevel, LowLevel>(
+                            target, current, lowered,
+                        )?;
+                        Ok(Control::Call {
+                            callee,
+                            stage: lowered,
+                            args,
+                            results: op.results().to_vec(),
+                        })
+                    }
+                }
+                kirin_function::Lexical::Return(op) => op.eval(env),
+            },
+            HighLevel::Structured(op) => match op {
+                StructuredControlFlow::If(op) => {
+                    eval_if_abstract::<_, AbstractMultiCursor<V>, HighLevel, _>(op, env)
+                }
+                StructuredControlFlow::For(op) => {
+                    eval_for_abstract::<_, AbstractMultiCursor<V>, HighLevel, _>(op, env)
+                }
+                StructuredControlFlow::Yield(op) => op.eval(env),
+            },
+            HighLevel::Constant(op) => op.eval(env),
+            HighLevel::Arith(op) => op.eval(env),
+            HighLevel::Cmp(op) => op.eval(env),
+            HighLevel::Bitwise(op) => op.eval(env),
+        }
+    }
+}
+
+// ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
@@ -481,7 +983,9 @@ mod tests {
             .unwrap();
         let mut interp: AbstractInterp<'static, Stage, LowLevel, V, LowLevelAbstractCursor<V>> =
             AbstractInterp::new(pipeline, stage_id);
-        interp.analyze(spec, args).expect("analysis failed")
+        interp
+            .analyze(spec, stage_id, args)
+            .expect("analysis failed")
     }
 
     // -----------------------------------------------------------------------
@@ -536,7 +1040,64 @@ mod tests {
             .unwrap();
         let mut interp: AbstractInterp<'static, Stage, HighLevel, V, HighLevelAbstractCursor<V>> =
             AbstractInterp::new(pipeline, stage_id);
-        interp.analyze(spec, args).expect("analysis failed")
+        interp
+            .analyze(spec, stage_id, args)
+            .expect("analysis failed")
+    }
+
+    // -----------------------------------------------------------------------
+    // Helper: abstract analysis spanning source and lowered stages
+    // -----------------------------------------------------------------------
+
+    fn analyze_multi<V>(src: &str, func_name: &str, args: Vec<V>) -> Option<V>
+    where
+        V: Clone
+            + AbstractValue
+            + BranchCondition
+            + ForLoopValue
+            + ProductValue
+            + 'static
+            + Add<Output = V>
+            + Sub<Output = V>
+            + Mul<Output = V>
+            + Neg<Output = V>
+            + CheckedDiv
+            + CheckedRem
+            + BitAnd<Output = V>
+            + BitOr<Output = V>
+            + BitXor<Output = V>
+            + Not<Output = V>
+            + CheckedShl
+            + CheckedShr
+            + TryFrom<ArithValue>
+            + CompareValue,
+        <V as TryFrom<ArithValue>>::Error: std::error::Error + Send + Sync + 'static,
+        <V as CompareValue>::Bool: Into<V>,
+        HighLevel: Interpretable<AbstractMultiInterp<'static, V>>,
+        LowLevel: Interpretable<AbstractMultiInterp<'static, V>>,
+        AbstractMultiCursor<V>: Execute<AbstractMultiInterp<'static, V>>,
+    {
+        let pipeline: Pipeline<Stage> = {
+            let mut p = Pipeline::new();
+            ParsePipelineText::parse(&mut p, src).expect("parse failed");
+            p
+        };
+        let pipeline: &'static Pipeline<Stage> = Box::leak(Box::new(pipeline));
+        let stage_id = pipeline.stage_by_name("source").unwrap();
+        let stage_info: &StageInfo<HighLevel> =
+            pipeline.stage(stage_id).unwrap().try_stage_info().unwrap();
+        let spec = pipeline
+            .resolve_staged_function(func_name, stage_id)
+            .unwrap()
+            .get_info(stage_info)
+            .unwrap()
+            .unique_live_specialization()
+            .unwrap();
+        let mut interp: AbstractMultiInterp<'static, V> =
+            AbstractMultiInterp::new(pipeline, stage_id);
+        interp
+            .analyze(spec, stage_id, args)
+            .expect("analysis failed")
     }
 
     // -----------------------------------------------------------------------
@@ -912,5 +1473,152 @@ specialize @lowered fn @factorial(i64) -> i64 {
         let result =
             analyze_lowered::<ToyType>(ADD_LOWERED, "add", vec![ToyType::I64, ToyType::I64]);
         assert_eq!(result, Some(ToyType::I64));
+    }
+
+    // -----------------------------------------------------------------------
+    // Multi-stage concrete interpreter tests
+    //
+    // `MultiInterp` uses `MultiCursor<V>` which covers cursors for both the
+    // source (HighLevel) and lowered (LowLevel) stages. `CallDispatch for Stage`
+    // selects the correct `BlockCursor` variant based on the callee's stage.
+    //
+    // The `HighLevel: Interpretable<MultiInterp<V>>` impl tries to resolve
+    // function calls at the current stage first, then falls back to lowered.
+    // -----------------------------------------------------------------------
+
+    fn run_multi_i64(src: &str, func_name: &str, args: &[i64]) -> Option<i64> {
+        let pipeline: Pipeline<Stage> = {
+            let mut p = Pipeline::new();
+            ParsePipelineText::parse(&mut p, src).expect("parse failed");
+            p
+        };
+        let stage_id = pipeline.stage_by_name("source").unwrap();
+        let stage_info: &StageInfo<HighLevel> =
+            pipeline.stage(stage_id).unwrap().try_stage_info().unwrap();
+        let spec = pipeline
+            .resolve_staged_function(func_name, stage_id)
+            .unwrap()
+            .get_info(stage_info)
+            .unwrap()
+            .unique_live_specialization()
+            .unwrap();
+        let entry_block = {
+            let si: &StageInfo<HighLevel> =
+                pipeline.stage(stage_id).unwrap().try_stage_info().unwrap();
+            let spec_info = spec.get_info(si).unwrap();
+            let body_stmt = *spec_info.body();
+            let def = body_stmt.definition(si).clone();
+            def.regions()
+                .next()
+                .and_then(|r| r.blocks(si).next())
+                .unwrap()
+        };
+        let mut interp: MultiInterp<'_, i64> = MultiInterp::new(&pipeline, stage_id);
+        interp
+            .enter_function::<HighLevel>(spec, entry_block, args)
+            .unwrap();
+        interp.run().unwrap()
+    }
+
+    // A program where source::main calls a function that only exists at lowered.
+    // Exercises cross-stage call dispatch: HighLevel sees an unresolvable call at
+    // source stage, falls back to lowered, and CallDispatch creates a
+    // BlockCursor<i64, LowLevel> for the callee's frame.
+    const CROSS_STAGE_SRC: &str = r#"
+stage @source fn @main(i64) -> i64;
+stage @lowered fn @double(i64) -> i64;
+
+specialize @source fn @main(i64) -> i64 {
+  ^entry(%n: i64) {
+    %result = call @double(%n) -> i64;
+    ret %result;
+  }
+}
+
+specialize @lowered fn @double(i64) -> i64 {
+  ^entry(%n: i64) {
+    %r = add %n, %n -> i64;
+    ret %r;
+  }
+}
+"#;
+
+    // A program where source::wrapper calls source::add (same-stage call) to
+    // verify that same-stage calls through CallDispatch still work.
+    const SAME_STAGE_CALL_SRC: &str = r#"
+stage @source fn @add(i64, i64) -> i64;
+stage @source fn @wrapper(i64, i64) -> i64;
+
+specialize @source fn @add(i64, i64) -> i64 {
+  ^entry(%a: i64, %b: i64) {
+    %r = add %a, %b -> i64;
+    ret %r;
+  }
+}
+
+specialize @source fn @wrapper(i64, i64) -> i64 {
+  ^entry(%a: i64, %b: i64) {
+    %r = call @add(%a, %b) -> i64;
+    ret %r;
+  }
+}
+"#;
+
+    #[test]
+    fn multi_cross_stage_source_calls_lowered() {
+        // source::main calls lowered::double — a genuine cross-stage call.
+        let result = run_multi_i64(CROSS_STAGE_SRC, "main", &[7i64]);
+        assert_eq!(result, Some(14));
+    }
+
+    #[test]
+    fn multi_cross_stage_double_five() {
+        let result = run_multi_i64(CROSS_STAGE_SRC, "main", &[5i64]);
+        assert_eq!(result, Some(10));
+    }
+
+    #[test]
+    fn multi_same_stage_call_through_dispatch() {
+        // source calls source — verifies same-stage calls still work via CallDispatch.
+        let result = run_multi_i64(SAME_STAGE_CALL_SRC, "wrapper", &[3i64, 4i64]);
+        assert_eq!(result, Some(7));
+    }
+
+    // -----------------------------------------------------------------------
+    // Multi-stage abstract interpreter tests
+    //
+    // `AbstractMultiInterp` spans source (HighLevel) and lowered (LowLevel).
+    // The abstract interpreter tracks types across stage boundaries: when
+    // source::main calls lowered::double, the domain value (ToyType::I64)
+    // propagates through the cross-stage call and back.
+    // -----------------------------------------------------------------------
+
+    use crate::interpreter10::AbstractMultiCursor;
+
+    #[test]
+    fn abstract_multi_same_stage_type_propagates() {
+        // source::wrapper calls source::add — same stage, abstract multi-interp.
+        let result = analyze_multi::<ToyType>(
+            SAME_STAGE_CALL_SRC,
+            "wrapper",
+            vec![ToyType::I64, ToyType::I64],
+        );
+        assert_eq!(result, Some(ToyType::I64));
+    }
+
+    #[test]
+    fn abstract_multi_cross_stage_type_propagates() {
+        // source::main calls lowered::double — cross-stage, abstract multi-interp.
+        // The type I64 should propagate through the lowered::double call and back.
+        let result = analyze_multi::<ToyType>(CROSS_STAGE_SRC, "main", vec![ToyType::I64]);
+        assert_eq!(result, Some(ToyType::I64));
+    }
+
+    #[test]
+    fn interval_cross_stage_doubles_range() {
+        // source::main calls lowered::double (n + n) with input interval [1, 3].
+        // The result crosses the stage boundary and should be [2, 6].
+        let result = analyze_multi::<Interval>(CROSS_STAGE_SRC, "main", vec![Interval::new(1, 3)]);
+        assert_eq!(result, Some(Interval::new(2, 6)));
     }
 }

@@ -1,11 +1,12 @@
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, ResultValue, SSAValue,
+    Block, CompileStage, Dialect, HasStageInfo, Pipeline, ResultValue, SSAValue,
     SpecializedFunction, StageInfo, StageMeta,
 };
 
 use crate::algebra::Lift;
+use crate::call_dispatch::CallDispatch;
 use crate::control::{Control, CursorExt};
 use crate::cursor::BlockCursor;
 use crate::env::{ConcreteMode, Env};
@@ -120,11 +121,10 @@ where
 
 impl<'ir, S, L, V, C> ConcreteInterp<'ir, S, L, V, C>
 where
-    S: StageMeta + HasStageInfo<L>,
+    S: StageMeta + HasStageInfo<L> + CallDispatch<V, C>,
     L: Dialect,
     V: Clone,
     C: Execute<Self>,
-    BlockCursor<V, L>: Lift<C>,
 {
     pub fn step(&mut self) -> Result<bool, InterpreterError> {
         let Some(mut entry) = self.cursors.pop() else {
@@ -192,38 +192,22 @@ where
         Ok(self.result.take())
     }
 
+    /// Push a new call frame, dispatching cursor creation via `S::make_call_cursor`.
+    ///
+    /// `callee_stage` is where the callee lives — may differ from the interpreter's
+    /// primary stage in multi-stage pipelines. `CallDispatch` selects the correct
+    /// cursor variant so the callee's ops run under the right `Interpretable` impl.
     fn push_call_frame(
         &mut self,
         callee: SpecializedFunction,
-        _callee_stage: CompileStage,
+        callee_stage: CompileStage,
         args: Vec<V>,
         results: Vec<ResultValue>,
     ) -> Result<(), InterpreterError> {
-        let stage_id = self.handle.stage_id;
-        let stage: &StageInfo<L> = self
-            .handle
-            .pipeline
-            .stage(stage_id)
-            .and_then(|s| s.try_stage_info())
-            .ok_or(InterpreterError::MissingEntry)?;
-        let spec_info = callee
-            .get_info(stage)
-            .ok_or(InterpreterError::MissingEntry)?;
-        let body_stmt = *spec_info.body();
-        let definition = body_stmt.definition(stage);
-        let entry_region = definition
-            .regions()
-            .next()
-            .ok_or(InterpreterError::MissingEntry)?;
-        let entry_block = entry_region
-            .blocks(stage)
-            .next()
-            .ok_or(InterpreterError::MissingEntry)?;
-
-        let cursor = BlockCursor::<V, L>::new(entry_block, stage_id, args);
-        let frame = Frame::new(callee, stage_id, results);
+        let cursor = S::make_call_cursor(self.handle.pipeline, callee, callee_stage, args)?;
+        let frame = Frame::new(callee, callee_stage, results);
         self.frames.push(frame)?;
-        self.cursors.push(StackEntry::new(cursor.lift()));
+        self.cursors.push(StackEntry::new(cursor));
         Ok(())
     }
 }

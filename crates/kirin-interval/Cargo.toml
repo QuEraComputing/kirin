@@ -9,6 +9,7 @@ kirin-interpreter = { workspace = true, optional = true }
 kirin-arith = { workspace = true, optional = true }
 kirin-bitwise = { workspace = true, optional = true }
 kirin-cmp = { workspace = true, optional = true }
+kirin-scf = { workspace = true, optional = true }
 
 [dev-dependencies]
 kirin-test-utils = { path = "../kirin-test-utils" }
@@ -19,3 +20,4 @@ interpreter = ["kirin-interpreter"]
 arith = ["kirin-arith"]
 bitwise = ["kirin-bitwise"]
 cmp = ["kirin-cmp"]
+scf = ["kirin-scf", "kirin-cmp", "kirin-interpreter"]
