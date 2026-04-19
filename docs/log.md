@@ -2,6 +2,81 @@
 
 ---
 
+## Iteration 16 — 2026-04-19
+
+**Status:** _(filled by Phase 6)_
+**Weighted score:** _(filled by Phase 7 critic)_ **(previous KEEP: iter-15 self-reported 8; actual critic: 27)**
+**Design stance: Symmetric Entry Completeness — add first-class symmetric/dynamic entry via `LowLevelAbstract<V>` wrapper and `CallSeam<LowLevel>` dispatch, fixing the R9 gap in iter-15**
+
+### Baseline critique findings (Phase 1, run before design)
+
+Phase 1 critic assessed iter-15 and found weighted score = **27** (not 8 as self-reported). R9 was omitted from the self-assessment calculation entirely.
+
+- R1=4 (R9 tests missing), R2=5, R3=4, R4=5, R5=3, R6=5, R7=4, R8=5, **R9=2** (critical: no symmetric entry API, no required tests)
+
+### Design stance rationale
+
+- **Why this stance:** R9=2 (Critical) is the primary gap — three required tests absent (`lowered_entry_calls_source`, `symmetric_entry_highlevel`, `symmetric_entry_lowlevel`), no dialect-agnostic entry API. The framework machinery (MultiCursor, CallDispatch) already supports entering from any stage but is undemonstrated.
+- **Expected improvements:** R9 (2→5), R1 (4→5)
+- **Accepted tradeoffs:** R5 unchanged (cursor boilerplate still requires `LowLevelAbstract<V>` wrapper, adding one more structural type)
+- **Tensions resolved:** Fixed-source (HighLevel entry) vs. symmetric (any-dialect entry) — both are now first-class via `run_multi_from_stage` helper
+
+### Strengths carried forward from iter-15
+- Strength #1 (Mode-parametric single impl): `HighLevel/LowLevel: Interpretable<E>` each have one generic impl — preserved
+- Strength #2 (Coproduct Lift/Project algebra): unchanged, iter-16 inherits it
+- Strength #3 (ConstProp extensibility probe): unchanged, same tests
+- Strength #4 (ToyVal associated-type bound folding): unchanged
+- Strength #5 (O(1) worklist): unchanged
+
+### Findings addressed this iteration
+- Finding #1 [Critical, R9]: Add `run_multi_from_stage(pipeline, stage_name, func_name, args)` dispatch helper; add 3 required R9 tests; change `LowLevel: Interpretable<E>` to use `CallSeam<LowLevel>`; add `CallSeam<LowLevel>` for multi-stage interpreters
+- Finding #2 [High, R7]: `write_results` silent discard → `InterpreterError::UnhandledEffect` (explicit error)
+- Finding #3/4 [Medium, R5]: Add ToyVal blanket impl maintenance comment
+
+### Key design decisions
+
+- **`LowLevelAbstract<V>` wrapper**: Since `AbstractBlockCursor<V, LowLevel>` is a foreign type, `SingleStageCursorFor<LowLevel>` can't be added directly (E0210: uncovered type parameter `V`). A local wrapper `LowLevelAbstract<V>(AbstractBlockCursor<V, LowLevel>)` in interpreter16.rs avoids orphan issues while satisfying the blanket `CallSeam<LowLevel>` for `AbstractInterp`.
+- **`CallSeam<LowLevel>` for multi-stage**: Both `MultiInterp` and `AbstractMultiInterp` get explicit `CallSeam<LowLevel>` impls (lowered→source fallback pattern), since `MultiCursor`/`AbstractMultiCursor` don't implement `SingleStageCursorFor<LowLevel>`.
+- **Symmetric entry via `run_multi_from_stage`**: Runtime dispatch on stage name to pick the right `run_function::<LD>` call — demonstrates the dynamic entry use case without new framework machinery.
+
+### Implementation notes
+
+New files created:
+- `crates/kirin-interpreter-16/src/` — full interpreter crate (algebra, env, concrete, abstract_interp, cursor, control, error, execute, interpretable, pipeline, frame, frame_stack, call_dispatch, abstract_call_dispatch, context, lib)
+- `crates/kirin-function/src/interpreter16/interpret.rs` — CallSeam + blanket impls gated on SingleStageCursorFor<L>
+- `crates/kirin-scf/src/interpreter16/{cursor,interpret}.rs` — SCF cursors + ScfSeam impls
+- `crates/kirin-{constant,arith,cmp,bitwise,cf}/src/interpreter16/interpret.rs` — dialect Interpretable impls
+- `example/toy-lang/src/interpreter16.rs` — all cursor coproducts, LowLevelAbstract<V> wrapper, CallSeam<LowLevel> impls, run_multi_from_stage, R9 test programs and tests
+
+Key changes from iter-15:
+- `LowLevel: Interpretable<E>` now requires `E: CallSeam<LowLevel>` and uses `env.eval_call(op)` instead of `eval_call_for_dialect` — enables LowLevel code to call HighLevel functions cross-stage
+- `LowLevelAbstract<V>` wrapper enables `SingleStageCursorFor<LowLevel>` for abstract single-stage interpreter without orphan rule violations
+- `CallSeam<LowLevel>` explicit impls for `MultiInterp` and `AbstractMultiInterp` (lowered→source fallback)
+- `write_results` error on multi-result when `as_product()` returns None (silent discard bug fix from iter-15)
+
+### Test results
+
+All 28 interpreter16 tests pass:
+- Concrete single-stage: `test_add_highlevel`, `test_factorial`, `test_abs_positive`, `test_abs_negative`, `for_loop_sum_concrete`, `for_loop_sum_zero_iterations`
+- Abstract lowered interval: `interval_add_known_range`, `interval_branch_joins_both_paths`, `interval_factorial_converges`
+- Abstract source type lattice: `toytype_add_highlevel_abstract`, `toytype_abs_highlevel_abstract`, `toytype_factorial_highlevel_abstract`, `toytype_lowered_add_propagates_i64`
+- Abstract SCF: `for_loop_abstract_converges`
+- Multi-stage concrete: `multi_cross_stage_source_calls_lowered`, `multi_cross_stage_double_five`, `multi_same_stage_call_through_dispatch`
+- Multi-stage abstract: `abstract_multi_same_stage_type_propagates`, `abstract_multi_cross_stage_type_propagates`, `interval_cross_stage_doubles_range`
+- R9 entry flexibility: `lowered_entry_calls_source`, `symmetric_entry_highlevel`, `symmetric_entry_lowlevel`
+- Extensibility probe (ConstProp): `constprop_add_two_constants`, `constprop_top_input_propagates`, `constprop_branch_positive_input`, `constprop_branch_negative_input`, `constprop_branch_unknown_joins_both_paths`
+
+Full workspace: **1462/1462 tests pass**.
+
+### Open findings (carried to next iteration)
+_(to be filled after Phase 7 critique)_
+
+---
+_(Phase 6 appends below after commit decision)_
+_(Phase 7 appends critic scorecard below after critique)_
+
+---
+
 ## Iteration 12
 
 **Date**: 2026-04-19
@@ -227,6 +302,21 @@ Iteration 14 critique found four issues:
 
 1. (R3/Medium) `write_results` silently drops result slots 1..n when `as_product()` returns None — should return an explicit error
 2. (R5/Medium) Blanket `impl<V> ToyVal for V` must mirror supertrait bounds in desugared form due to Rust limitation — needs maintenance comment
+
+### Design Notes
+
+**Why `CallSeam<L>` exists — root cause analysis**
+
+`CallSeam<L>` is not logically necessary: `stage_id` at runtime already uniquely identifies which stage (and thus which dialect) a call targets. The `L` type parameter in `CallSeam<L>` and `resolve_function_for::<L>` exists solely because `Pipeline::resolve_function` (`kirin-ir/src/pipeline.rs:200`) takes a typed `&StageInfo<L>` to access the stage-local symbol table:
+
+```rust
+pub fn resolve_function<L: Dialect>(&self, stage: &StageInfo<L>, target: Symbol) -> Option<Function> {
+    let target_name = stage.symbol_table().resolve(target)?;  // only use of L
+    ...
+}
+```
+
+The `L` threading (`Interpretable<E> for HighLevel` → `CallSeam<L>` → `resolve_function_for::<L>` → `try_stage_info::<L>()` → `symbol_table()`) is entirely a consequence of this one API requiring a typed downcast to reach the symbol table. If `StageMeta` exposed `symbol_table()` directly (or `Pipeline` offered a `resolve_function_erased(stage_id, target)` method), `CallSeam<L>` could collapse into the base `Interpretable<E> for Call<T>` impl and `L` would not need to propagate through call dispatch at all.
 
 ### Strengths Identified
 
