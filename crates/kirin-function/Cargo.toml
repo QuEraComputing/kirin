@@ -6,13 +6,6 @@ edition = "2024"
 [dependencies]
 kirin = { workspace = true }
 kirin-interpreter = { workspace = true }
-kirin-interpreter-2 = { workspace = true }
-kirin-interpreter-4 = { workspace = true }
-kirin-interpreter-5 = { workspace = true }
-kirin-interpreter-6 = { workspace = true }
-kirin-interpreter-7 = { workspace = true }
-kirin-interpreter-8 = { workspace = true }
-kirin-interpreter-9 = { workspace = true }
 kirin-interpreter-10 = { workspace = true }
 smallvec = { workspace = true }
 

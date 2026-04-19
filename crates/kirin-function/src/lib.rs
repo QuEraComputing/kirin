@@ -20,13 +20,6 @@ pub mod bind;
 pub mod body;
 pub mod call;
 pub mod interpreter10;
-pub mod interpreter2;
-pub mod interpreter4;
-pub mod interpreter5;
-pub mod interpreter6;
-pub mod interpreter7;
-pub mod interpreter8;
-pub mod interpreter9;
 pub mod lambda;
 pub mod ret;
 

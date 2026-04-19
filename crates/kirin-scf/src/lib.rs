@@ -27,13 +27,6 @@
 
 mod interpret_impl;
 pub mod interpreter10;
-pub mod interpreter2;
-pub mod interpreter4;
-pub mod interpreter5;
-pub mod interpreter6;
-pub mod interpreter7;
-pub mod interpreter8;
-pub mod interpreter9;
 pub use interpret_impl::ForLoopValue;
 
 use kirin::prelude::*;
