@@ -43,7 +43,7 @@ Every iteration must preserve these. **Never reduce them.** Adding new features 
 2. **Abstract interpretation** — single-stage (source and lowered) and multi-stage; interval domain and type-lattice domain both tested
 3. **SCF support in abstract mode** — `scf.if` and `scf.for` must work under the abstract interpreter (not just concrete)
 4. **Cross-stage calls** — source-stage functions calling lowered-stage functions (and vice-versa where appropriate)
-5. **Lift/Project algebra** — zero-cost, enum-based, no heap allocation; covers cursor coproducts, and any other total/dialect objects
+5. **API symmetry via Lift/Project** — every dialect-local ↔ total (coproduct) boundary must expose a symmetric bidirectional API: `lift` (local → total) and `project` (total → local). This principle must be applied consistently across all crossing points: cursors, values, effects, and environments. The canonical implementation is zero-cost enum-based Lift/Project with no heap allocation. A design that applies the pattern only to cursors but not to values or effects scores low on R2.
 6. **Flexible entry points** — two distinct use cases must both be supported:
    - **Fixed-source**: one language is always the entry point (e.g. HighLevel/source), other languages serve only as intermediate compilation stages that are called into but never initiate execution
    - **Symmetric/dynamic**: any registered language can be the entry point at runtime (e.g. Rust calling Python or Python calling Rust — both directions valid); the interpreter must accept any language as the initial frame without compile-time specialization on a single "home" dialect
@@ -148,7 +148,7 @@ Score each dimension 1–5 using the rubric table below. A score of 5 means full
 | # | Dimension | 5 (Excellent) | 3 (Acceptable) | 1 (Critical gap) |
 |---|-----------|--------------|----------------|-----------------|
 | R1 | **Requirement completeness** | All non-negotiable features present and tested: concrete + abstract, single + multi-stage, SCF, cross-stage calls, both entry-point use cases | Most features present; one entry-point variant missing or untested | A core feature (interpretation mode, SCF, entry flexibility) is absent or broken |
-| R2 | **Lift/Project algebra** | Zero-cost enum-based lift/project with no heap allocation; consistent across cursor, effect, and value types | Works for cursors but not consistently applied elsewhere | Missing, unsound, or requires heap allocation |
+| R2 | **API symmetry (Lift/Project)** | Every dialect-local ↔ total boundary has a symmetric bidirectional API (`lift`/`project`); applied uniformly across cursors, values, effects, and environments; zero-cost enum-based, no heap allocation | Symmetric API present for cursors but inconsistently applied to values or effects | Symmetry principle absent; boundaries crossed ad-hoc (downcasts, `Any`, one-way coercions) or requires heap allocation |
 | R3 | **Dialect locality** | Dialect authors implement only `Interpretable<E>`; cursor types and dispatch live in user code; zero interpreter-crate changes needed for new dialects | Minor leakage — one or two interpreter-internal concepts exposed | Dialect authors must edit the interpreter crate |
 | R4 | **Mode uniformity** | `Interpretable<E>` works identically for concrete and abstract modes; pure ops have a single generic impl; mode-specific ops use `E::Mode` discriminant only where necessary | Mostly uniform; a few ops duplicated unnecessarily | Separate traits or duplicate impls for concrete vs. abstract |
 | R5 | **Dialect ergonomics** | Dialect authors write ≤ 1 impl per op type AND import ≤ 5 names from the framework prelude to get started; composition is mechanical enough to be derived; no repeated type bounds copy-paste | Moderate repetition or prelude breadth, but all discoverable from one import site | Extensive manual impl repetition OR author must hunt across multiple internal modules to understand the API contract |
@@ -206,7 +206,7 @@ A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 30 = 30.
 | Dimension | Weight |
 |-----------|--------|
 | R1 (completeness) | 5 |
-| R2 (lift/project) | 3 |
+| R2 (API symmetry) | 3 |
 | R3 (dialect locality) | 4 |
 | R4 (mode uniformity) | 3 |
 | R5 (dialect ergonomics) | 2 |
@@ -460,7 +460,7 @@ The critic produces the same structured report (Part 1 scorecard + Part 2 streng
 | Dim | Score | Δ vs prev KEEP | Justification |
 |-----|-------|----------------|--------------|
 | R1 Completeness     | <1–5> | <+/-N> | |
-| R2 Lift/Project     | <1–5> | <+/-N> | |
+| R2 API symmetry     | <1–5> | <+/-N> | |
 | R3 Dialect locality | <1–5> | <+/-N> | |
 | R4 Mode uniformity  | <1–5> | <+/-N> | |
 | R5 Dialect ergonomics | <1–5> | <+/-N> | |
