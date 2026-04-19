@@ -130,7 +130,7 @@ Spawn a read-only critic subagent (`dontAsk` mode — never `bypassPermissions`)
 
 ### Critic Brief
 
-The critic must produce a **structured report** with two parts: (1) a rubric scorecard, (2) per-finding review notes. The critic reads code, does not write any.
+The critic must produce a **structured report** with three parts: (1) a rubric scorecard, (2) strengths worth preserving, (3) per-finding review notes. The critic reads code, does not write any.
 
 #### Part 1 — Rubric Scorecard
 
@@ -149,7 +149,24 @@ Score each dimension 1–5 using the rubric table below. A score of 5 means full
 
 **Overall iteration grade** = average of R1–R8, rounded to one decimal. Report it prominently.
 
-#### Part 2 — Per-Finding Review Notes
+#### Part 2 — Strengths Worth Preserving
+
+For each design decision or pattern in this iteration that scores well or represents a genuine insight, write a strength note. These are things future iterations should consider keeping or adapting — not because they're mandated, but because they represent hard-won solutions that shouldn't be accidentally discarded when switching design stances.
+
+```
+Strength #<K>
+Dimension: R<N> — <dimension name>
+Location: <file>:<line> (or range)
+Pattern: <name the pattern or abstraction — e.g. "mode discriminant via PhantomData marker", "Lift as a free conversion typeclass">
+What it achieves: <why this works well — what problem it elegantly solves, cited against the rubric>
+Portability: <how transferable is this to a different design stance — freely portable | stance-dependent | tightly coupled to this design>
+```
+
+Strengths must be as specific as findings — cite code, not impressions. A strength that can't be pointed to in the source isn't a strength, it's a vibe.
+
+The number of strengths should reflect reality: a score-3 iteration might have 1–2 genuine strengths; a score-5 iteration might have 4–6. Do not inflate or deflate to seem balanced.
+
+#### Part 3 — Per-Finding Review Notes
 
 For each issue found (severity ≥ Medium), write a structured finding:
 
@@ -204,6 +221,7 @@ Read `docs/log.md` to build a map of what has been tried:
 - What score each approach achieved per rubric dimension
 - Which dimensions improved vs. regressed vs. stayed flat
 - Which fundamental tensions (e.g. DRY vs. extensibility, mode uniformity vs. type safety) have appeared repeatedly
+- **Which strengths were identified by the critic** — catalogue these separately; a strength marked "freely portable" is a candidate for adoption in any future stance; one marked "stance-dependent" should be adopted only if this iteration's stance is compatible
 
 ### Step 2b: Choose a design stance
 
@@ -224,6 +242,7 @@ The chosen stance must be written into `docs/design_principles.md` as the **curr
 2. How it resolves each of the five major tensions (extensibility vs. DRY, type-safety vs. ergonomics, concrete vs. abstract uniformity, stage-local vs. multi-stage, dialect-local vs. interpreter-global)
 3. Which rubric dimensions this stance is expected to improve, and which may regress (honest tradeoff analysis)
 4. Which previous findings motivated choosing this stance over continuing the previous approach
+5. **Which strengths from previous iterations are being carried forward**, and how they are adapted to fit the new stance — cite the Strength # from the log
 
 ### Step 2c: Derive the concrete design
 
@@ -338,6 +357,12 @@ Append to `docs/log.md` (create if missing — this file must be gitignored):
 - **Expected improvements:** R<N>, R<N>
 - **Expected regressions / accepted tradeoffs:** R<N> — <why acceptable>
 - **Tensions resolved differently from previous:** <e.g. "chose DRY over extensibility in the cursor layer because...">
+
+### Strengths identified (from critic)
+- Strength #<K> [<portability>]: <pattern name> — <what it achieves>
+
+### Strengths carried forward from previous iterations
+- Strength #<K> from iteration <M>: <how it was adapted to this stance>
 
 ### Findings addressed this iteration
 - Finding #<K> [<severity>]: <what changed under the new stance>
