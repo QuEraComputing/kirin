@@ -2,6 +2,61 @@
 
 ---
 
+## Iteration 17 — 2026-04-19
+
+**Status:** KEEP — CONVERGED
+**Weighted score:** 6 **(convergence threshold: ≤ 8)**
+**Design stance: Sparse Abstract Interpretation — AbstractInterp::read() returns V::bottom() for absent SSA values; adds 4 new required tests (backward_liveness_highlevel, backward_liveness_scf, sparse_interval_propagation, sparse_type_propagation)**
+
+### Motivation
+
+Iter-16 achieved convergence (score 6) but the skill definition added 4 new required tests that iter-16 didn't have, making it non-convergent by the new baseline. Iter-17 is a targeted delta:
+
+1. `AbstractInterp::read()` returns `V::bottom()` instead of `Err(UnboundValue)` for absent SSA values, enabling sparse abstract interpretation.
+2. New helpers `collect_free_vars` / `stmt_backward_liveness` for statement-level backward analysis on HighLevel single-block functions with scf.if/scf.for.
+3. All 4 missing tests added.
+
+### Key design decisions
+
+- **Sparse AI via bottom-for-absent**: The simplest correct approach — the lattice bottom is the "no information" value, so returning it for an unseeded SSA value is semantically sound. Analyses that need to distinguish "unset" from "bottom" must use an `Option<V>` wrapper in their own value type.
+- **Statement-level liveness**: Block-level `BackwardFixpoint` gives trivially-empty liveness for HighLevel single-block functions (no predecessor blocks). Statement-level analysis using `stmt.blocks(stage)` to collect free variables from nested scf.if/scf.for blocks was implemented in user code with no framework changes.
+- **No framework changes**: All new functionality is in `example/toy-lang/src/interpreter17.rs` and a thin new crate that is identical to iter-16 except for the `read()` change.
+
+### Test results
+
+All 35 interpreter17 tests pass:
+- All 28 iter-16 tests preserved
+- `backward_liveness_highlevel` — stmt-level backward liveness on ABS_SOURCE
+- `backward_liveness_scf` — stmt-level backward liveness on FACTORIAL_SOURCE with scf.if
+- `sparse_interval_propagation` — interval domain with partial seeding
+- `sparse_type_propagation` — type-lattice domain with partial seeding
+- (plus 3 liveness tests from BackwardFixpoint: `liveness_add_args_live_at_entry`, `liveness_dead_after_use`, `liveness_cross_block_use_in_factorial`)
+
+Full workspace: **1500/1500 tests pass**.
+
+### Phase 7 critic scorecard
+
+| Dimension | Score | Notes |
+|-----------|-------|-------|
+| R1 Completeness | 5 | All 35 required tests present and passing |
+| R2 API symmetry | 5 | Lift/Project uniform across cursors, values, effects, environments |
+| R3 Dialect locality | 5 | Zero interpreter-crate changes needed for new dialects |
+| R4 Mode uniformity | 5 | Single generic Interpretable<E> impl per op type |
+| R5 Dialect ergonomics | 3 | ~50 Lift/Project/Execute impl blocks for two stages |
+| R6 Type correctness | 5 | No unsafe, no Box<dyn>, no 'static, 'ir threads correctly |
+| R7 Elegance | 4 | Coherent algebra; run_multi_from_stage still test-local rather than documented framework API |
+| R8 Extensibility | 5 | ConstProp + sparse analyses implemented entirely in toy-lang |
+| R9 Entry flexibility | 5 | Fixed-source and symmetric/dynamic both first-class and tested |
+| **Overall** | **4.7** | **Weighted score: 6 — CONVERGED** |
+
+### Open findings (carried to next iteration if needed)
+
+- **Finding #1 [Medium, R5]**: Cursor coproduct boilerplate — ~50 impl blocks. Suggest `#[derive(CursorCoproduct)]` proc-macro.
+- **Finding #2 [Medium, R7]**: `run_multi_from_stage` is test-local. Consider promoting to a `SymmetricEntry` trait or documenting in interpreter crate.
+- **Finding #3 [Medium, R1]**: Sparse tests seed all args (including unused %c as bottom()). A test where read() is called for an SSA value never write_ssa'd during a fixpoint step would better demonstrate the iter-17 change vs. iter-16.
+
+---
+
 ## Iteration 16 — 2026-04-19
 
 **Status:** KEEP
