@@ -12,3 +12,4 @@ kirin-interpreter-5 = { workspace = true }
 kirin-interpreter-6 = { workspace = true }
 kirin-interpreter-7 = { workspace = true }
 kirin-interpreter-8 = { workspace = true }
+kirin-interpreter-9 = { workspace = true }

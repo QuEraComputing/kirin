@@ -50,6 +50,7 @@ pub mod interpreter5;
 pub mod interpreter6;
 pub mod interpreter7;
 pub mod interpreter8;
+pub mod interpreter9;
 
 mod types;
 

@@ -7,30 +7,12 @@ use smallvec::smallvec;
 use crate::{For, If, StructuredControlFlow, Yield};
 
 /// Trait for values that can serve as induction variables in `scf.for` loops.
-pub trait ForLoopValue {
-    /// Returns whether the loop should continue (`self < end`).
-    ///
-    /// Returns `None` when the loop condition is indeterminate. For concrete
-    /// interpreters, `None` terminates the loop (condition = false). Abstract
-    /// interpreters should handle `None` by exploring both paths.
-    fn loop_condition(&self, end: &Self) -> Option<bool>;
-    /// Advance the induction variable by `step`.
-    ///
-    /// Returns `None` on arithmetic overflow/underflow.
-    fn loop_step(&self, step: &Self) -> Option<Self>
-    where
-        Self: Sized;
-}
-
-impl ForLoopValue for i64 {
-    fn loop_condition(&self, end: &i64) -> Option<bool> {
-        Some(*self < *end)
-    }
-
-    fn loop_step(&self, step: &i64) -> Option<i64> {
-        self.checked_add(*step)
-    }
-}
+///
+/// Re-exported from `kirin-interpreter-9` so that all interpreter generations
+/// share a single trait definition. This lets `kirin_scf::ForLoopValue`
+/// implementors (e.g., `i64`) satisfy `kirin_interpreter_9::scf_cursor::ForLoopValue`
+/// bounds without an additional bridge impl.
+pub use kirin_interpreter_9::scf_cursor::ForLoopValue;
 
 #[cfg(test)]
 mod tests {
