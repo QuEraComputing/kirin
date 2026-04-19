@@ -151,7 +151,7 @@ Score each dimension 1–5 using the rubric table below. A score of 5 means full
 | R2 | **Lift/Project algebra** | Zero-cost enum-based lift/project with no heap allocation; consistent across cursor, effect, and value types | Works for cursors but not consistently applied elsewhere | Missing, unsound, or requires heap allocation |
 | R3 | **Dialect locality** | Dialect authors implement only `Interpretable<E>`; cursor types and dispatch live in user code; zero interpreter-crate changes needed for new dialects | Minor leakage — one or two interpreter-internal concepts exposed | Dialect authors must edit the interpreter crate |
 | R4 | **Mode uniformity** | `Interpretable<E>` works identically for concrete and abstract modes; pure ops have a single generic impl; mode-specific ops use `E::Mode` discriminant only where necessary | Mostly uniform; a few ops duplicated unnecessarily | Separate traits or duplicate impls for concrete vs. abstract |
-| R5 | **Boilerplate burden** | Dialect authors write ≤ 1 impl per op type; composition is mechanical enough to be derived; no repeated type bounds copy-paste | Moderate repetition but contained to well-marked `// TODO: derive` sites | Extensive manual impl repetition with no clear derive path |
+| R5 | **Dialect ergonomics** | Dialect authors write ≤ 1 impl per op type AND import ≤ 5 names from the framework prelude to get started; composition is mechanical enough to be derived; no repeated type bounds copy-paste | Moderate repetition or prelude breadth, but all discoverable from one import site | Extensive manual impl repetition OR author must hunt across multiple internal modules to understand the API contract |
 | R6 | **Type-system correctness** | No `'static` bounds, no `unsafe`, no `Box<dyn Trait>` in framework APIs; `'ir` lifetime threads correctly through all borrows | `'static` used only in abstract interp pipeline borrow (known limitation, tracked) | `unsafe`, `transmute`, or unsound lifetime casts present |
 | R7 | **Algebraic elegance** | Lift/Project, Mode, Cursor, and Env form a coherent algebra; naming is consistent; a new developer can predict the pattern from one example | Mostly coherent; some naming inconsistencies or ad-hoc special cases | Ad-hoc design; each new case requires a novel pattern |
 | R8 | **Extensibility** | A new analysis or interpreter type can be added by implementing traits in user code only; demonstrated by at least one extensibility probe test | Framework is extensible in theory but probe not yet written | Framework requires core changes to add new interpreter types |
@@ -209,7 +209,7 @@ A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 30 = 30.
 | R2 (lift/project) | 3 |
 | R3 (dialect locality) | 4 |
 | R4 (mode uniformity) | 3 |
-| R5 (boilerplate) | 2 |
+| R5 (dialect ergonomics) | 2 |
 | R6 (type correctness) | 4 |
 | R7 (elegance) | 2 |
 | R8 (extensibility) | 3 |
@@ -463,7 +463,7 @@ The critic produces the same structured report (Part 1 scorecard + Part 2 streng
 | R2 Lift/Project     | <1–5> | <+/-N> | |
 | R3 Dialect locality | <1–5> | <+/-N> | |
 | R4 Mode uniformity  | <1–5> | <+/-N> | |
-| R5 Boilerplate      | <1–5> | <+/-N> | |
+| R5 Dialect ergonomics | <1–5> | <+/-N> | |
 | R6 Type correctness | <1–5> | <+/-N> | |
 | R7 Elegance         | <1–5> | <+/-N> | |
 | R8 Extensibility    | <1–5> | <+/-N> | |
