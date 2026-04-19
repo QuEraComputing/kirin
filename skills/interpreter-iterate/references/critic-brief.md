@@ -30,6 +30,7 @@ If any of items 1–4 are found, R3 must be scored 1 or 2 regardless of how clea
 | R7 | **Algebraic elegance** | Lift/Project, Mode, Cursor, and Env form a coherent algebra; naming is consistent; a new developer can predict the pattern from one example | Mostly coherent; some naming inconsistencies or ad-hoc special cases | Ad-hoc design; each new case requires a novel pattern |
 | R8 | **Extensibility** | A new analysis or interpreter type can be added by implementing traits in user code only; demonstrated by at least one extensibility probe test | Framework is extensible in theory but probe not yet written | Framework requires core changes to add new interpreter types |
 | R9 | **Entry point flexibility** | Fixed-source and symmetric/dynamic entry are both first-class: fixed-source is typed as `Interp<HomeDialect,...>`; symmetric exposes a dialect-agnostic entry API where any language can initiate execution; both tested | One use case is supported; the other is possible but awkward (e.g. requires type-level workarounds to change the home dialect) | Only one entry mode exists; switching entry language requires recompilation or `unsafe` casts |
+| R10 | **Implementation readability** | Each file has a single clear responsibility and stays under ~150 lines; module hierarchy mirrors the conceptual hierarchy (e.g. `concrete/`, `abstract/`, `cursor/`); type names read naturally when module-qualified — `abstract::Interpreter`, `cursor::Block`, `env::Concrete` — with no redundancy (`abstract::AbstractInterpreter` fails this) and no cryptic abbreviations; single-letter type params only where the meaning is unambiguous by convention (`E`, `V`) | Most files are focused; one or two files exceed ~200 lines or mix concerns; qualified names mostly read well but a few are redundant or abbreviated; module hierarchy is flat where nesting would help | Implementation is largely in one or two giant files (500+ lines); modules are not organized by concept; type names are either redundant with their module or so abbreviated they require context to decode |
 
 **Score 4** = criterion mostly met with one clear caveat (e.g. one boundary missing symmetry, one internal type leaking, one workaround needed). **Score 2** = criterion attempted but fundamentally insufficient (e.g. lift/project exists only for cursors and is structurally incompatible with values, or unsafe is isolated to one place but load-bearing).
 
@@ -75,7 +76,7 @@ Findings must be grounded in the code — cite lines, not vibes. The suggestion 
 score = Σ (5 - dimension_score) * weight
 ```
 
-A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 30 = 30. To reach convergence (≤ 8), a typical passing design needs: all high-weight dimensions (R1, R3, R6, R9) at 5, and mid-weight ones (R2, R4, R8) at 4 or better, leaving room for R5/R7 at 4 (deficit = 0+3+0+3+2+0+2+3+0 = 13 — still above threshold). To actually converge: most dimensions at 5, with at most two at 4 (if low-weight). Example passing score: R1=5, R2=5, R3=5, R4=5, R5=4, R6=5, R7=4, R8=5, R9=5 → deficit = 0+0+0+0+2+0+2+0+0 = 4 ✓
+A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 33 = 33. To reach convergence (≤ 8), most dimensions must be at 5, with at most two or three low-weight dimensions at 4. Example passing score: R1=5, R2=5, R3=5, R4=5, R5=4, R6=5, R7=4, R8=5, R9=5, R10=4 → deficit = 0+0+0+0+2+0+2+0+0+3 = 7 ✓
 
 | Dimension | Weight |
 |-----------|--------|
@@ -88,5 +89,6 @@ A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 30 = 30. To
 | R7 (elegance) | 2 |
 | R8 (extensibility) | 3 |
 | R9 (entry flexibility) | 4 |
+| R10 (readability) | 3 |
 
 **Convergence** when weighted score ≤ 8 AND R1 ≥ 4 AND R6 ≥ 4 AND R9 ≥ 4 (completeness, type correctness, and entry flexibility are never negotiable).

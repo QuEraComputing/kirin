@@ -91,7 +91,7 @@ If the budget is reached without convergence, stop, commit what's done, log the 
 
 ### Extensibility Probe
 
-Once the weighted score falls below 18 for the first time (roughly "most dimensions at 4+"; all-4s baseline is 30), trigger the extensibility probe. Implement a new analysis entirely within `example/toy-lang/src/` — no changes to any interpreter crate or dialect crate. Good candidates:
+Once the weighted score falls below 20 for the first time (roughly "most dimensions at 4+"; all-4s baseline is 33), trigger the extensibility probe. Implement a new analysis entirely within `example/toy-lang/src/` — no changes to any interpreter crate or dialect crate. Good candidates:
 
 - **Liveness analysis**: abstract domain over `HashSet<SSAValue>` tracking live values at each program point — exercises backward AI direction
 - **Sparse constant propagation**: abstract domain `ConstProp { Concrete(i64), Top }` seeded at specific SSAValues; propagates sparsely along use-def — exercises sparse AI and non-lattice-join semantics
@@ -403,6 +403,7 @@ The critic produces the same structured report (Part 1 scorecard + Part 2 streng
 | R7 Elegance         | <1–5> | <+/-N> | |
 | R8 Extensibility    | <1–5> | <+/-N> | |
 | R9 Entry flexibility | <1–5> | <+/-N> | |
+| R10 Readability      | <1–5> | <+/-N> | |
 
 **Overall grade:** <avg>/5
 **Weighted score:** <N> (threshold ≤ 8; formula: Σ (5 - score) × weight; e.g. all-4s = 30, all-5s-except-R7=4-R8=4 = 5)
