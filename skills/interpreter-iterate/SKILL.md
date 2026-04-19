@@ -44,15 +44,22 @@ Every iteration must preserve these. **Never reduce them.** Adding new features 
 3. **SCF support in abstract mode** — `scf.if` and `scf.for` must work under the abstract interpreter (not just concrete)
 4. **Cross-stage calls** — source-stage functions calling lowered-stage functions (and vice-versa where appropriate)
 5. **Lift/Project algebra** — zero-cost, enum-based, no heap allocation; covers cursor coproducts, and any other total/dialect objects
+6. **Flexible entry points** — two distinct use cases must both be supported:
+   - **Fixed-source**: one language is always the entry point (e.g. HighLevel/source), other languages serve only as intermediate compilation stages that are called into but never initiate execution
+   - **Symmetric/dynamic**: any registered language can be the entry point at runtime (e.g. Rust calling Python or Python calling Rust — both directions valid); the interpreter must accept any language as the initial frame without compile-time specialization on a single "home" dialect
+
+   These are structurally different: fixed-source can be typed as `Interp<HomeDialect, ...>` with other dialects reachable only via call dispatch; symmetric requires the interpreter's entry API to be dialect-agnostic (accepting a stage + function + args without baking in a type-level home dialect).
 
 ### Required Test Coverage (these tests must exist and pass every iteration)
 
 In `example/toy-lang/src/interpreter<N>.rs`:
-- `test_add_highlevel`, `test_factorial`, `test_abs_positive`, `test_abs_negative` (concrete, single-stage)
-- `interval_add_known_range`, `interval_branch_joins_both_paths`, `interval_factorial_converges` (abstract, lowered, interval)
+- `test_add_highlevel`, `test_factorial`, `test_abs_positive`, `test_abs_negative` (concrete, single-stage, fixed HighLevel entry)
+- `interval_add_known_range`, `interval_branch_joins_both_paths`, `interval_factorial_converges` (abstract, lowered, interval, fixed LowLevel entry)
 - `toytype_add_highlevel_abstract`, `toytype_abs_highlevel_abstract`, `toytype_factorial_highlevel_abstract` (abstract, source, type lattice)
-- `multi_cross_stage_source_calls_lowered`, `multi_cross_stage_double_five`, `multi_same_stage_call_through_dispatch` (concrete, multi-stage)
+- `multi_cross_stage_source_calls_lowered`, `multi_cross_stage_double_five`, `multi_same_stage_call_through_dispatch` (concrete, multi-stage, fixed source entry)
 - `abstract_multi_same_stage_type_propagates`, `abstract_multi_cross_stage_type_propagates`, `interval_cross_stage_doubles_range` (abstract, multi-stage)
+- `lowered_entry_calls_source` — concrete multi-stage with **LowLevel as entry point** calling a HighLevel function; verifies fixed-source is not the only supported direction
+- `symmetric_entry_highlevel`, `symmetric_entry_lowlevel` — same program entered from two different languages using a dialect-agnostic entry API; both must produce the same observable result; verifies the symmetric/dynamic use case
 
 New iterations may **add** tests beyond this baseline (for new features, extensibility probes, etc.) but must never remove or weaken existing ones.
 
@@ -79,7 +86,7 @@ If the budget is reached without convergence, stop, commit what's done, log the 
 
 ### Extensibility Probe
 
-Once the weighted score falls below 15 for the first time (roughly "most dimensions at 4+"), trigger the extensibility probe. Implement a new analysis entirely within `example/toy-lang/src/` — no changes to any interpreter crate or dialect crate. Good candidates:
+Once the weighted score falls below 18 for the first time (roughly "most dimensions at 4+"; all-4s baseline is 30), trigger the extensibility probe. Implement a new analysis entirely within `example/toy-lang/src/` — no changes to any interpreter crate or dialect crate. Good candidates:
 
 - **Liveness analysis**: abstract domain over `HashSet<SSAValue>` tracking live values at each program point
 - **Constant propagation**: abstract domain `ConstProp { Concrete(i64), Top }` — verifies the framework handles non-lattice-join semantics cleanly
@@ -140,7 +147,7 @@ Score each dimension 1–5 using the rubric table below. A score of 5 means full
 
 | # | Dimension | 5 (Excellent) | 3 (Acceptable) | 1 (Critical gap) |
 |---|-----------|--------------|----------------|-----------------|
-| R1 | **Requirement completeness** | All non-negotiable features present and tested (concrete + abstract, single + multi-stage, SCF, cross-stage calls) | Most features present, minor gaps | A required feature is missing or broken |
+| R1 | **Requirement completeness** | All non-negotiable features present and tested: concrete + abstract, single + multi-stage, SCF, cross-stage calls, both entry-point use cases | Most features present; one entry-point variant missing or untested | A core feature (interpretation mode, SCF, entry flexibility) is absent or broken |
 | R2 | **Lift/Project algebra** | Zero-cost enum-based lift/project with no heap allocation; consistent across cursor, effect, and value types | Works for cursors but not consistently applied elsewhere | Missing, unsound, or requires heap allocation |
 | R3 | **Dialect locality** | Dialect authors implement only `Interpretable<E>`; cursor types and dispatch live in user code; zero interpreter-crate changes needed for new dialects | Minor leakage — one or two interpreter-internal concepts exposed | Dialect authors must edit the interpreter crate |
 | R4 | **Mode uniformity** | `Interpretable<E>` works identically for concrete and abstract modes; pure ops have a single generic impl; mode-specific ops use `E::Mode` discriminant only where necessary | Mostly uniform; a few ops duplicated unnecessarily | Separate traits or duplicate impls for concrete vs. abstract |
@@ -148,8 +155,9 @@ Score each dimension 1–5 using the rubric table below. A score of 5 means full
 | R6 | **Type-system correctness** | No `'static` bounds, no `unsafe`, no `Box<dyn Trait>` in framework APIs; `'ir` lifetime threads correctly through all borrows | `'static` used only in abstract interp pipeline borrow (known limitation, tracked) | `unsafe`, `transmute`, or unsound lifetime casts present |
 | R7 | **Algebraic elegance** | Lift/Project, Mode, Cursor, and Env form a coherent algebra; naming is consistent; a new developer can predict the pattern from one example | Mostly coherent; some naming inconsistencies or ad-hoc special cases | Ad-hoc design; each new case requires a novel pattern |
 | R8 | **Extensibility** | A new analysis or interpreter type can be added by implementing traits in user code only; demonstrated by at least one extensibility probe test | Framework is extensible in theory but probe not yet written | Framework requires core changes to add new interpreter types |
+| R9 | **Entry point flexibility** | Fixed-source and symmetric/dynamic entry are both first-class: fixed-source is typed as `Interp<HomeDialect,...>`; symmetric exposes a dialect-agnostic entry API where any language can initiate execution; both tested | One use case is supported; the other is possible but awkward (e.g. requires type-level workarounds to change the home dialect) | Only one entry mode exists; switching entry language requires recompilation or `unsafe` casts |
 
-**Overall iteration grade** = average of R1–R8, rounded to one decimal. Report it prominently.
+**Overall iteration grade** = average of R1–R9, rounded to one decimal. Report it prominently.
 
 #### Part 2 — Strengths Worth Preserving
 
@@ -193,7 +201,7 @@ After the critic returns, compute the **weighted convergence score**:
 score = Σ (5 - dimension_score) * weight
 ```
 
-A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 26 = 26.
+A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 30 = 30.
 
 | Dimension | Weight |
 |-----------|--------|
@@ -205,12 +213,13 @@ A perfect design (all 5s) scores 0. A design with all 4s scores 1 × 26 = 26.
 | R6 (type correctness) | 4 |
 | R7 (elegance) | 2 |
 | R8 (extensibility) | 3 |
+| R9 (entry flexibility) | 4 |
 
-**Convergence** when weighted score ≤ 8 AND R1 ≥ 4 AND R6 ≥ 4 (completeness and type correctness are never negotiable).
+**Convergence** when weighted score ≤ 8 AND R1 ≥ 4 AND R6 ≥ 4 AND R9 ≥ 4 (completeness, type correctness, and entry flexibility are never negotiable).
 
 Record the rubric scores, overall grade, and weighted score in `docs/log.md`. This score is the baseline that all subsequent iterations are compared against.
 
-If convergence criteria are already met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 4, extensibility probe passed), stop immediately — nothing to do.
+If convergence criteria are already met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 4, R9 ≥ 4, extensibility probe passed), stop immediately — nothing to do.
 
 ---
 
@@ -478,7 +487,7 @@ This is the **only** critic run per iteration. Do not re-run the critic mid-iter
 
 After Phase 7, check:
 
-**Stop if** convergence criteria are met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 4, extensibility probe passed).
+**Stop if** convergence criteria are met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 4, R9 ≥ 4, extensibility probe passed).
 
 **Stop if** the iteration budget is exhausted.
 
