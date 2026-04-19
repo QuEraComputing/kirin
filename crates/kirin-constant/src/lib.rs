@@ -4,6 +4,7 @@ use kirin::prelude::*;
 
 pub mod interpreter10;
 pub mod interpreter11;
+pub mod interpreter12;
 
 #[cfg(test)]
 mod tests;

@@ -8,6 +8,7 @@ kirin = { workspace = true }
 kirin-interpreter = { workspace = true }
 kirin-interpreter-10 = { workspace = true }
 kirin-interpreter-11 = { workspace = true }
+kirin-interpreter-12 = { workspace = true }
 smallvec = { workspace = true }
 
 [dev-dependencies]

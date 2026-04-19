@@ -26,6 +26,7 @@ use kirin::prelude::*;
 
 pub mod interpreter10;
 pub mod interpreter11;
+pub mod interpreter12;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[non_exhaustive]

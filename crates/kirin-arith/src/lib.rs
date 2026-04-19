@@ -46,6 +46,7 @@ mod checked_ops;
 mod interpret_impl;
 pub mod interpreter10;
 pub mod interpreter11;
+pub mod interpreter12;
 
 mod types;
 
