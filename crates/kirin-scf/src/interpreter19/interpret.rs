@@ -15,7 +15,7 @@ use crate::interpreter19::cursor::{AbstractForCursor, AbstractIfCursor, ForCurso
 use crate::{For, If, StructuredControlFlow, Yield};
 
 // ---------------------------------------------------------------------------
-// ScfSeam — crate-private, parametric over the dialect TYPE not the dialect.
+// ScfSeam — parametric over the dialect TYPE not the dialect.
 // ---------------------------------------------------------------------------
 
 pub trait ScfSeam<T: CompileTimeValue>: Env {
