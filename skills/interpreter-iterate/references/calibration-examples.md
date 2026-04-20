@@ -66,6 +66,26 @@ Ok(Control::Ext(CursorExt::Push(cursor.lift())))
 
 ---
 
+## Iteration 19 — R10: critic did not flag suppressed clippy lint, correct is R10 finding (Medium)
+
+**Pattern:**
+```rust
+impl<V: Clone, L: Dialect> ForCursor<V, L> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(iv: V, end: V, step: V, carried: V, body: Block,
+               body_stage: CompileStage, init_arg_count: usize,
+               results: Vec<ResultValue>) -> Self { ... }
+}
+```
+
+**Location:** `crates/kirin-scf/src/interpreter19/cursor.rs` — `ForCursor::new`
+
+**Why the critic was wrong:** The critic did not scan for `#[allow(clippy::...)]` annotations. `too_many_arguments` is a real structural problem: 8 positional arguments make call sites unreadable and fragile to argument reordering. The `allow` attribute silences the linter but does not fix the underlying API design issue. The correct fix is `#[bon::builder]` on the `impl` block plus `#[builder]` on `new`, which gives callers named fields and eliminates the arity problem entirely.
+
+**What to do instead:** Apply the R10 suppressed lint audit (pre-check item 4). When `#[allow(clippy::too_many_arguments)]` appears on a constructor or function, file a Medium R10 finding. The suggestion must be: add `#[bon::bon]` on the `impl` block and `#[builder]` on the function, remove the `#[allow]`. Update all call sites to use the builder API (`Type::builder().field(v)....build()`). Do not accept the `allow` annotation as a legitimate fix.
+
+---
+
 ## Iteration 16 — R3: critic did not flag as critical, correct is R3 = 1
 
 **Pattern:**

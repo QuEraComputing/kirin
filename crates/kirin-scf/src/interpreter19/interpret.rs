@@ -189,16 +189,16 @@ where
     let init_arg_count = init_values.len();
     let carried = E::Value::new_product(init_values);
     let body_stage = env.current_stage();
-    let cursor = ForCursor::<E::Value, L>::new(
-        iv,
-        end,
-        step,
-        carried,
-        op.body,
-        body_stage,
-        init_arg_count,
-        op.results.clone(),
-    );
+    let cursor = ForCursor::<E::Value, L>::builder()
+        .iv(iv)
+        .end(end)
+        .step(step)
+        .carried(carried)
+        .body(op.body)
+        .body_stage(body_stage)
+        .init_arg_count(init_arg_count)
+        .results(op.results.clone())
+        .build();
     Ok(Control::Ext(CursorExt::Push(cursor.lift())))
 }
 

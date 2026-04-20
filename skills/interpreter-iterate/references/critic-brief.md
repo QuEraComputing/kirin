@@ -52,7 +52,13 @@ A trait is load-bearing when: net economy > 0 **and** behavioral distinctness > 
 
 3. **Wrapper depth cap** — Any expression requiring ≥ 4 levels of wrapping to express a single semantic intent (e.g. "push a cursor") fails R10 regardless of occurrence count. The intent should be expressible in one function call.
 
-If any of items 1–3 are found: item 1 with ≥ 5 occurrences is a High severity finding; item 2 is Medium; item 3 is Medium. Score R10 accordingly — a single pattern with 10+ occurrences and no shorthand is an automatic R10 ≤ 3.
+4. **Suppressed lint audit** — Search for `#[allow(clippy::` annotations anywhere in the codebase. Each occurrence is a design signal: the linter found a real problem and the author chose to silence it rather than fix it. Treat each suppressed lint as a candidate R10 finding. Common patterns and their correct fixes:
+   - `#[allow(clippy::too_many_arguments)]` on a constructor or function → the correct fix is a builder pattern (e.g. `#[bon::builder]`); the `allow` is Medium severity.
+   - `#[allow(clippy::cognitive_complexity)]` → the function needs decomposition; Medium severity.
+   - `#[allow(clippy::type_complexity)]` → introduce a type alias or newtype; Low severity.
+   Do not accept `#[allow(...)]` as a legitimate solution. If the lint identifies a real structural problem, flag it as a finding and propose the fix.
+
+If any of items 1–4 are found: item 1 with ≥ 5 occurrences is a High severity finding; item 2 is Medium; item 3 is Medium; item 4 severity depends on the specific lint (see above). Score R10 accordingly — a single pattern with 10+ occurrences and no shorthand is an automatic R10 ≤ 3.
 
 **Score 4** = criterion mostly met with one clear caveat (e.g. one boundary missing symmetry, one internal type leaking, one workaround needed). **Score 2** = criterion attempted but fundamentally insufficient (e.g. lift/project exists only for cursors and is structurally incompatible with values, or unsafe is isolated to one place but load-bearing).
 

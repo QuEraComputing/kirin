@@ -105,8 +105,9 @@ pub struct ForCursor<V, L: Dialect> {
     _phantom: PhantomData<L>,
 }
 
+#[bon::bon]
 impl<V: Clone, L: Dialect> ForCursor<V, L> {
-    #[allow(clippy::too_many_arguments)]
+    #[builder]
     pub fn new(
         iv: V,
         end: V,
