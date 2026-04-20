@@ -22,7 +22,7 @@ members = [
   "crates/kirin-interpreter-10",
   "crates/kirin-interpreter-11", "crates/kirin-interpreter-12", "crates/kirin-interpreter-13", "crates/kirin-interpreter-14",
   "crates/kirin-interpreter-15", "crates/kirin-interpreter-16",
-  "crates/kirin-interpreter-17", "crates/kirin-interpreter-18",
+  "crates/kirin-interpreter-17", "crates/kirin-interpreter-18", "crates/kirin-interpreter-19",
   "crates/kirin-interval",
   "crates/kirin-ir",
   "crates/kirin-lexer",
@@ -86,6 +86,7 @@ kirin-interpreter-15 = { path = "crates/kirin-interpreter-15", version = "0.1.0"
 kirin-interpreter-16 = { path = "crates/kirin-interpreter-16", version = "0.1.0" }
 kirin-interpreter-17 = { path = "crates/kirin-interpreter-17", version = "0.1.0" }
 kirin-interpreter-18 = { path = "crates/kirin-interpreter-18", version = "0.1.0" }
+kirin-interpreter-19 = { path = "crates/kirin-interpreter-19", version = "0.1.0" }
 kirin-interval = { path = "crates/kirin-interval", version = "0.1.0" }
 # Internal crates
 kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }

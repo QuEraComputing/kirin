@@ -15,6 +15,7 @@ kirin-interpreter-15 = { workspace = true }
 kirin-interpreter-16 = { workspace = true }
 kirin-interpreter-17 = { workspace = true }
 kirin-interpreter-18 = { workspace = true }
+kirin-interpreter-19 = { workspace = true }
 smallvec = { workspace = true }
 
 [dev-dependencies]
