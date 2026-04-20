@@ -418,29 +418,29 @@ Then update the `**Weighted score:**` field at the top of the log entry with the
 
 This is the **only** critic run per iteration. Do not re-run the critic mid-iteration or before committing.
 
-### Score Review and Calibration
+### Score Review and Calibration (convergence only)
 
-After recording the scorecard, **always** do both of the following (the user may be asleep — the log is the durable record):
+The user only reviews scores when convergence is declared — do not pause mid-loop for feedback on non-converging iterations.
 
-1. **Append a scorecard summary to `docs/log.md`** under the current iteration, after the critic scorecard block:
-   ```
-   ### Score Review (awaiting user feedback)
-   R1=<s> R2=<s> R3=<s> R4=<s> R5=<s> R6=<s> R7=<s> R8=<s> R9=<s> R10=<s>
-   Weighted score: <N> | Verdict: CONVERGED / NOT YET
-   User corrections: _(none yet)_
-   ```
+**On every iteration (converged or not):** append the scorecard summary to `docs/log.md` so the user can read it later:
+```
+### Score Review
+R1=<s> R2=<s> R3=<s> R4=<s> R5=<s> R6=<s> R7=<s> R8=<s> R9=<s> R10=<s>
+Weighted score: <N> | Verdict: CONVERGED / NOT YET
+User corrections: _(none)_
+```
 
-2. **Post the same summary as a chat message** so the user sees it if they are watching:
-   ```
-   Iteration <N> critic scorecard:
-   R1=<s> R2=<s> R3=<s> R4=<s> R5=<s> R6=<s> R7=<s> R8=<s> R9=<s> R10=<s>
-   Weighted score: <N> | Verdict: CONVERGED / NOT YET
-   Any scores look wrong? Reply with e.g. "R3 should be 1 — for_widening_budget is SCF leakage" and I'll record it and keep iterating.
-   ```
+**When convergence is declared:** stop the loop, post the scorecard summary to chat, and wait for the user to review:
+```
+Iteration <N> declares convergence.
+R1=<s> R2=<s> R3=<s> R4=<s> R5=<s> R6=<s> R7=<s> R8=<s> R9=<s> R10=<s>
+Weighted score: <N>
+Any scores look wrong? Reply with e.g. "R3 should be 1 — for_widening_budget is SCF leakage" and I'll record it and keep iterating.
+```
 
 If the user replies with corrections:
-1. Update the `User corrections:` line in `docs/log.md` to record what was corrected and the user-supplied reason.
-2. For each correction, append to `references/calibration-examples.md` using this format:
+1. Update the `User corrections:` line in `docs/log.md`.
+2. For each correction, append to `references/calibration-examples.md`:
    ```
    ## Iteration <N> — R<dim>: critic scored <X>, correct is <Y>
    **Pattern:** <user's description of what the code does>
@@ -448,10 +448,9 @@ If the user replies with corrections:
    **Why the critic was wrong:** <the specific reasoning the user gave>
    **What to do instead:** <how to score this pattern correctly in future>
    ```
-2. **If convergence was declared but the user disagrees:** override the verdict, do not stop the loop. The user-corrected scores take precedence. Loop to Phase 2 using the corrected scores as the current baseline.
-3. **If no convergence was declared:** incorporate the corrections into the next iteration's design input (the corrected scores reflect the true rubric state) and continue normally.
+3. Override the convergence verdict — do not stop. Loop to Phase 2 using the corrected scores as the current baseline.
 
-If the user does not reply within a reasonable time or replies with no corrections, continue as the critic scored.
+If the user replies with no corrections, the loop ends.
 
 ---
 
