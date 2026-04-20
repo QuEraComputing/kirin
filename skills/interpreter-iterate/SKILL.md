@@ -420,17 +420,27 @@ This is the **only** critic run per iteration. Do not re-run the critic mid-iter
 
 ### Score Review and Calibration
 
-After recording the scorecard, **always** present it to the user as a short message (even in autonomous mode). Format:
+After recording the scorecard, **always** do both of the following (the user may be asleep — the log is the durable record):
 
-```
-Iteration <N> critic scorecard:
-R1=<s> R2=<s> R3=<s> R4=<s> R5=<s> R6=<s> R7=<s> R8=<s> R9=<s> R10=<s>
-Weighted score: <N> | Verdict: CONVERGED / NOT YET
-Any scores look wrong? Reply with e.g. "R3 should be 1 — for_widening_budget is SCF leakage" and I'll record it and keep iterating.
-```
+1. **Append a scorecard summary to `docs/log.md`** under the current iteration, after the critic scorecard block:
+   ```
+   ### Score Review (awaiting user feedback)
+   R1=<s> R2=<s> R3=<s> R4=<s> R5=<s> R6=<s> R7=<s> R8=<s> R9=<s> R10=<s>
+   Weighted score: <N> | Verdict: CONVERGED / NOT YET
+   User corrections: _(none yet)_
+   ```
+
+2. **Post the same summary as a chat message** so the user sees it if they are watching:
+   ```
+   Iteration <N> critic scorecard:
+   R1=<s> R2=<s> R3=<s> R4=<s> R5=<s> R6=<s> R7=<s> R8=<s> R9=<s> R10=<s>
+   Weighted score: <N> | Verdict: CONVERGED / NOT YET
+   Any scores look wrong? Reply with e.g. "R3 should be 1 — for_widening_budget is SCF leakage" and I'll record it and keep iterating.
+   ```
 
 If the user replies with corrections:
-1. For each correction, append to `references/calibration-examples.md` using this format:
+1. Update the `User corrections:` line in `docs/log.md` to record what was corrected and the user-supplied reason.
+2. For each correction, append to `references/calibration-examples.md` using this format:
    ```
    ## Iteration <N> — R<dim>: critic scored <X>, correct is <Y>
    **Pattern:** <user's description of what the code does>
