@@ -10,4 +10,5 @@ refactor-workspace/
 .agents/skills/*
 .claude/skills/*
 docs/log.md
+docs/log.old.md
 docs/design_principles.md
