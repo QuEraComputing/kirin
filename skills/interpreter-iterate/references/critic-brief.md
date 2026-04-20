@@ -2,6 +2,8 @@
 
 The critic must produce a **structured report** with three parts: (1) a rubric scorecard, (2) strengths worth preserving, (3) per-finding review notes. The critic reads code, does not write any.
 
+**Before scoring anything:** Read `references/calibration-examples.md`. These are real scoring disagreements from past iterations that the human reviewer corrected. They are ground truth — when you encounter a similar pattern, use the corrected score. Do not re-derive scores that have already been calibrated.
+
 ## Part 1 — Rubric Scorecard
 
 Score each dimension 1–5 using the rubric table below. A score of 5 means fully satisfied; 1 means critically broken. Use the full range: **do not default to 3**. If the code fully satisfies a criterion with no caveats, assign 5. If there is a critical gap, assign 1. Scores of 2 and 4 are valid and expected for partially-met criteria.

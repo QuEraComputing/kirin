@@ -418,13 +418,38 @@ Then update the `**Weighted score:**` field at the top of the log entry with the
 
 This is the **only** critic run per iteration. Do not re-run the critic mid-iteration or before committing.
 
+### Score Review and Calibration
+
+After recording the scorecard, **always** present it to the user as a short message (even in autonomous mode). Format:
+
+```
+Iteration <N> critic scorecard:
+R1=<s> R2=<s> R3=<s> R4=<s> R5=<s> R6=<s> R7=<s> R8=<s> R9=<s> R10=<s>
+Weighted score: <N> | Verdict: CONVERGED / NOT YET
+Any scores look wrong? Reply with e.g. "R3 should be 1 — for_widening_budget is SCF leakage" and I'll record it and keep iterating.
+```
+
+If the user replies with corrections:
+1. For each correction, append to `references/calibration-examples.md` using this format:
+   ```
+   ## Iteration <N> — R<dim>: critic scored <X>, correct is <Y>
+   **Pattern:** <user's description of what the code does>
+   **Location:** <file:line if known>
+   **Why the critic was wrong:** <the specific reasoning the user gave>
+   **What to do instead:** <how to score this pattern correctly in future>
+   ```
+2. **If convergence was declared but the user disagrees:** override the verdict, do not stop the loop. The user-corrected scores take precedence. Loop to Phase 2 using the corrected scores as the current baseline.
+3. **If no convergence was declared:** incorporate the corrections into the next iteration's design input (the corrected scores reflect the true rubric state) and continue normally.
+
+If the user does not reply within a reasonable time or replies with no corrections, continue as the critic scored.
+
 ---
 
 ## Phase 8: Loop or Stop
 
-After Phase 7, check:
+After Phase 7 (and any calibration corrections), check:
 
-**Stop if** convergence criteria are met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 4, R9 ≥ 4, extensibility probe passed).
+**Stop if** convergence criteria are met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 4, R9 ≥ 4, extensibility probe passed) **and the user has not overridden the verdict**.
 
 **Stop if** the iteration budget is exhausted.
 
