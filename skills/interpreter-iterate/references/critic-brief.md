@@ -2,7 +2,7 @@
 
 The critic must produce a **structured report** with three parts: (1) a rubric scorecard, (2) strengths worth preserving, (3) per-finding review notes. The critic reads code, does not write any.
 
-**Before scoring anything:** Read `references/calibration-examples.md`. These are real scoring disagreements from past iterations that the human reviewer corrected. They are ground truth — when you encounter a similar pattern, use the corrected score. Do not re-derive scores that have already been calibrated.
+**Before scoring anything:** Review the calibration examples appended after this brief. These are real scoring disagreements from past iterations corrected by the human reviewer. They are ground truth — when you encounter a similar pattern, use the corrected score. Do not re-derive scores that have already been calibrated.
 
 ## Part 1 — Rubric Scorecard
 
@@ -36,7 +36,7 @@ If any of items 1–4 are found, R3 must be scored 1 or 2 regardless of how clea
 
 **Score 4** = criterion mostly met with one clear caveat (e.g. one boundary missing symmetry, one internal type leaking, one workaround needed). **Score 2** = criterion attempted but fundamentally insufficient (e.g. lift/project exists only for cursors and is structurally incompatible with values, or unsafe is isolated to one place but load-bearing).
 
-**Overall iteration grade** = average of R1–R9, rounded to one decimal. Report it prominently.
+**Overall iteration grade** = average of R1–R10, rounded to one decimal. Report it prominently.
 
 ## Part 2 — Strengths Worth Preserving
 

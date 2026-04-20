@@ -42,8 +42,6 @@ Every iteration must preserve these. **Never reduce them.** Adding new features 
 1. **Concrete interpretation** — single-stage (source HighLevel) and multi-stage (HighLevel + LowLevel)
 2. **Abstract interpretation** — single-stage (source and lowered) and multi-stage; interval domain and type-lattice domain both tested
 3. **SCF support in abstract mode** — `scf.if` and `scf.for` must work under the abstract interpreter (not just concrete)
-7. **Forward and backward abstract interpretation** — the framework must support both directions using the same `Interpretable<E>` / cursor abstraction. Forward AI propagates facts along control flow (reaching definitions, interval analysis); backward AI propagates facts against control flow (liveness, slicing conditions). The traversal direction should be a parameter, not a structural fork in the framework.
-8. **Sparse abstract interpretation** — only a subset of SSAValues need a known lattice element; propagation follows the use-def chain from those SSAValues only. The environment/store must support partial mappings (`Option<LatticeElem>` or equivalent) without requiring every SSAValue to be initialized. This tests whether the framework's value store is flexible enough for demand-driven analysis.
 4. **Cross-stage calls** — source-stage functions calling lowered-stage functions (and vice-versa where appropriate)
 5. **API symmetry via Lift/Project** — every dialect-local ↔ total (coproduct) boundary must expose a symmetric bidirectional API: `lift` (local → total) and `project` (total → local). This principle must be applied consistently across all crossing points: cursors, values, effects, and environments. The canonical implementation is zero-cost enum-based Lift/Project with no heap allocation. A design that applies the pattern only to cursors but not to values or effects scores low on R2.
 6. **Flexible entry points** — two distinct use cases must both be supported:
@@ -51,6 +49,8 @@ Every iteration must preserve these. **Never reduce them.** Adding new features 
    - **Symmetric/dynamic**: any registered language can be the entry point at runtime (e.g. Rust calling Python or Python calling Rust — both directions valid); the interpreter must accept any language as the initial frame without compile-time specialization on a single "home" dialect
 
    These are structurally different: fixed-source can be typed as `Interp<HomeDialect, ...>` with other dialects reachable only via call dispatch; symmetric requires the interpreter's entry API to be dialect-agnostic (accepting a stage + function + args without baking in a type-level home dialect).
+7. **Forward and backward abstract interpretation** — the framework must support both directions using the same `Interpretable<E>` / cursor abstraction. Forward AI propagates facts along control flow (reaching definitions, interval analysis); backward AI propagates facts against control flow (liveness, slicing conditions). The traversal direction should be a parameter, not a structural fork in the framework.
+8. **Sparse abstract interpretation** — only a subset of SSAValues need a known lattice element; propagation follows the use-def chain from those SSAValues only. The environment/store must support partial mappings (`Option<LatticeElem>` or equivalent) without requiring every SSAValue to be initialized. This tests whether the framework's value store is flexible enough for demand-driven analysis.
 
 ### Required Test Coverage (these tests must exist and pass every iteration)
 
@@ -81,11 +81,12 @@ New iterations may **add** tests beyond this baseline (for new features, extensi
 
 The loop terminates autonomously when **all** of the following hold:
 
-1. **Rubric weighted score ≤ 8** (see Phase 2 scoring)
+1. **Rubric weighted score ≤ 8** (see scoring in `references/critic-brief.md`)
 2. **R1 (completeness) ≥ 4** — all non-negotiable features present and tested
 3. **R6 (type correctness) ≥ 4** — no unsafe, no unsound lifetime casts
-4. **Extensibility probe passed** (R8 = 5): at least one new analysis implemented without touching any interpreter crate
-5. **Iteration budget**: at most 5 iterations per session unless the user specified more
+4. **R9 (entry flexibility) ≥ 4** — both fixed-source and symmetric entry tested
+5. **Extensibility probe passed** (R8 = 5): at least one new analysis implemented without touching any interpreter crate
+6. **Iteration budget**: at most 5 iterations per session unless the user specified more
 
 If the budget is reached without convergence, stop, commit what's done, log the open issues and current rubric scores, and tell the user what remains.
 
@@ -139,12 +140,9 @@ Run the critic subagent against the current codebase. This is the only critic ru
 Spawn a read-only critic subagent (`dontAsk` mode — never `bypassPermissions`). Brief it with:
 - All source files in `crates/kirin-interpreter-<current>/src/`
 - `example/toy-lang/src/interpreter<current>.rs`
-- The full rubric below (copy it verbatim into the critic brief)
+- The full contents of `skills/interpreter-iterate/references/critic-brief.md` (rubric R1–R10, pre-checks, scoring guidance, report format)
+- The full contents of `skills/interpreter-iterate/references/calibration-examples.md` (ground-truth score corrections — append after the critic brief)
 - `docs/log.md` history (so the critic doesn't re-report already-addressed issues)
-
-### Critic Brief
-
-Read `references/critic-brief.md` and copy it verbatim into the critic subagent's prompt. It contains the full rubric (R1–R9 with anchors, pre-checks, and scoring guidance), the structured report format (scorecard + strengths + findings), and the weighted convergence score formula.
 
 ### Scoring and Convergence Decision
 
@@ -242,8 +240,11 @@ Write `example/toy-lang/src/interpreter<N>.rs` from scratch. The **test cases** 
 The required semantic surface (what the tests exercise) is fixed:
 - Single-stage concrete interpretation of HighLevel programs (SCF, recursion)
 - Single-stage abstract interpretation of HighLevel and LowLevel programs
-- Multi-stage concrete interpretation (source calls lowered)
+- Multi-stage concrete interpretation (source calls lowered, and lowered-entry calling source)
 - Multi-stage abstract interpretation (type and interval domains)
+- Symmetric/dynamic entry from any language
+- Forward and backward abstract interpretation (backward: liveness through SCF)
+- Sparse abstract interpretation (partial value store, use-def propagation only)
 
 The implementation structure (how those semantics are achieved) is unconstrained. A new iteration may:
 - Rename or restructure cursor types entirely
@@ -338,18 +339,11 @@ Never stage or commit anything under `docs/`. Never use `git add .` or `git add 
 
 ### 6b: Score Comparison
 
-The critic runs in Phase 7 and produces the score — but Phase 6 needs to decide KEEP vs. DISCARD before that. Use the **pre-commit self-assessment**: based on test results, implementation friction observed in Phase 3, and the design stance's expected tradeoffs, estimate whether the score is likely to improve. The Phase 7 critic will confirm.
-
-If tests all pass and the implementation matched the design spec with less friction than the previous iteration, treat as likely improved. If tests were hard to pass or the design required significant compromises, treat as likely not improved.
-
-Compare against the most recent **KEEP** iteration's score (not the most recent iteration — skip over DISCARDs when looking for the baseline).
-
-- **Likely improved** → proceed to Phase 7 critic, then update the log
-- **Likely not improved** → revert first, then run the Phase 7 critic on the KEEP baseline to confirm
+After committing, proceed directly to Phase 7 (critic). The critic score determines KEEP vs. DISCARD — do not pre-judge or revert before the critic runs. Compare the critic's weighted score against the most recent **KEEP** iteration's score (skip over DISCARDs when looking for the baseline).
 
 ### 6c: Discard if No Improvement
 
-If the iteration did **not** improve (confirmed by Phase 7 critic score ≥ previous KEEP score), revert:
+If the critic's weighted score did **not** improve compared to the previous KEEP score, revert:
 
 ```bash
 git revert HEAD --no-edit
@@ -385,7 +379,8 @@ Run the critic subagent against the code that was just committed (or the previou
 Same critic brief as Phase 1:
 - All source files in `crates/kirin-interpreter-<N>/src/` (or `<prev>` if N was discarded)
 - `example/toy-lang/src/interpreter<N>.rs` (or `<prev>` if N was discarded)
-- The full rubric (copy verbatim)
+- The full contents of `skills/interpreter-iterate/references/critic-brief.md` (copy verbatim)
+- The full contents of `skills/interpreter-iterate/references/calibration-examples.md` (append after the critic brief — these are ground-truth score corrections)
 - Updated `docs/log.md` (so the critic sees the discarded iteration notes too)
 
 The critic produces the same structured report (Part 1 scorecard + Part 2 strengths + Part 3 findings). Append the scorecard and strengths to the current iteration's log entry under the `_(Phase 7 appends...)_` marker:
@@ -406,7 +401,7 @@ The critic produces the same structured report (Part 1 scorecard + Part 2 streng
 | R10 Readability      | <1–5> | <+/-N> | |
 
 **Overall grade:** <avg>/5
-**Weighted score:** <N> (threshold ≤ 8; formula: Σ (5 - score) × weight; e.g. all-4s = 30, all-5s-except-R7=4-R8=4 = 5)
+**Weighted score:** <N> (threshold ≤ 8; formula: Σ (5 - score) × weight; e.g. all-4s = 33, see critic-brief.md for weights)
 
 ### Strengths identified (from critic)
 - Strength #<K> [<portability>]: <pattern name> — <what it achieves>
