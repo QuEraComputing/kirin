@@ -1,9 +1,0 @@
-[package]
-name = "kirin-interpreter-13"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-kirin-ir.workspace = true
-kirin-interpreter = { workspace = true }
-rustc-hash = "2.1.2"

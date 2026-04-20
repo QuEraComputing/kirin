@@ -6,15 +6,6 @@ edition = "2024"
 [dependencies]
 kirin.workspace = true
 kirin-interpreter = { workspace = true }
-kirin-interpreter-10 = { workspace = true }
-kirin-interpreter-11 = { workspace = true }
-kirin-interpreter-12 = { workspace = true }
-kirin-interpreter-13 = { workspace = true }
-kirin-interpreter-14 = { workspace = true }
-kirin-interpreter-15 = { workspace = true }
-kirin-interpreter-16 = { workspace = true }
-kirin-interpreter-17 = { workspace = true }
-kirin-interpreter-18 = { workspace = true }
 kirin-interpreter-19 = { workspace = true }
 
 [dev-dependencies]

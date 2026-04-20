@@ -729,15 +729,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-10",
- "kirin-interpreter-11",
- "kirin-interpreter-12",
- "kirin-interpreter-13",
- "kirin-interpreter-14",
- "kirin-interpreter-15",
- "kirin-interpreter-16",
- "kirin-interpreter-17",
- "kirin-interpreter-18",
  "kirin-interpreter-19",
 ]
 
@@ -747,15 +738,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-10",
- "kirin-interpreter-11",
- "kirin-interpreter-12",
- "kirin-interpreter-13",
- "kirin-interpreter-14",
- "kirin-interpreter-15",
- "kirin-interpreter-16",
- "kirin-interpreter-17",
- "kirin-interpreter-18",
  "kirin-interpreter-19",
  "kirin-test-types",
 ]
@@ -766,15 +748,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-10",
- "kirin-interpreter-11",
- "kirin-interpreter-12",
- "kirin-interpreter-13",
- "kirin-interpreter-14",
- "kirin-interpreter-15",
- "kirin-interpreter-16",
- "kirin-interpreter-17",
- "kirin-interpreter-18",
  "kirin-interpreter-19",
  "kirin-test-types",
  "smallvec",
@@ -804,15 +777,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-10",
- "kirin-interpreter-11",
- "kirin-interpreter-12",
- "kirin-interpreter-13",
- "kirin-interpreter-14",
- "kirin-interpreter-15",
- "kirin-interpreter-16",
- "kirin-interpreter-17",
- "kirin-interpreter-18",
  "kirin-interpreter-19",
  "kirin-test-types",
 ]
@@ -823,15 +787,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-10",
- "kirin-interpreter-11",
- "kirin-interpreter-12",
- "kirin-interpreter-13",
- "kirin-interpreter-14",
- "kirin-interpreter-15",
- "kirin-interpreter-16",
- "kirin-interpreter-17",
- "kirin-interpreter-18",
  "kirin-interpreter-19",
 ]
 
@@ -910,15 +865,6 @@ dependencies = [
  "kirin-cf",
  "kirin-constant",
  "kirin-interpreter",
- "kirin-interpreter-10",
- "kirin-interpreter-11",
- "kirin-interpreter-12",
- "kirin-interpreter-13",
- "kirin-interpreter-14",
- "kirin-interpreter-15",
- "kirin-interpreter-16",
- "kirin-interpreter-17",
- "kirin-interpreter-18",
  "kirin-interpreter-19",
  "kirin-test-types",
  "smallvec",
@@ -942,87 +888,6 @@ dependencies = [
  "rustc-hash",
  "smallvec",
  "thiserror 2.0.18",
-]
-
-[[package]]
-name = "kirin-interpreter-10"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
-]
-
-[[package]]
-name = "kirin-interpreter-11"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
-]
-
-[[package]]
-name = "kirin-interpreter-12"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
-]
-
-[[package]]
-name = "kirin-interpreter-13"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
-]
-
-[[package]]
-name = "kirin-interpreter-14"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
-]
-
-[[package]]
-name = "kirin-interpreter-15"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
-]
-
-[[package]]
-name = "kirin-interpreter-16"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
-]
-
-[[package]]
-name = "kirin-interpreter-17"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
-]
-
-[[package]]
-name = "kirin-interpreter-18"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
 ]
 
 [[package]]
@@ -1093,15 +958,6 @@ dependencies = [
  "kirin-constant",
  "kirin-function",
  "kirin-interpreter",
- "kirin-interpreter-10",
- "kirin-interpreter-11",
- "kirin-interpreter-12",
- "kirin-interpreter-13",
- "kirin-interpreter-14",
- "kirin-interpreter-15",
- "kirin-interpreter-16",
- "kirin-interpreter-17",
- "kirin-interpreter-18",
  "kirin-interpreter-19",
  "kirin-test-types",
  "smallvec",
@@ -2063,15 +1919,6 @@ dependencies = [
  "kirin-derive-interpreter",
  "kirin-function",
  "kirin-interpreter",
- "kirin-interpreter-10",
- "kirin-interpreter-11",
- "kirin-interpreter-12",
- "kirin-interpreter-13",
- "kirin-interpreter-14",
- "kirin-interpreter-15",
- "kirin-interpreter-16",
- "kirin-interpreter-17",
- "kirin-interpreter-18",
  "kirin-interpreter-19",
  "kirin-interval",
  "kirin-prettyless",

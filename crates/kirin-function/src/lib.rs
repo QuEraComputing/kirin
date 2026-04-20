@@ -19,10 +19,6 @@ use kirin::prelude::*;
 pub mod bind;
 pub mod body;
 pub mod call;
-pub mod interpreter10;
-pub mod interpreter11;
-pub mod interpreter12;
-pub mod interpreter13;
 pub mod lambda;
 pub mod ret;
 
@@ -56,9 +52,4 @@ pub enum Lifted<T: CompileTimeValue> {
     Call(Call<T>),
     Return(Return<T>),
 }
-pub mod interpreter14;
-pub mod interpreter15;
-pub mod interpreter16;
-pub mod interpreter17;
-pub mod interpreter18;
 pub mod interpreter19;

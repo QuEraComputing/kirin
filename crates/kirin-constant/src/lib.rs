@@ -2,11 +2,6 @@ mod interpret_impl;
 
 use kirin::prelude::*;
 
-pub mod interpreter10;
-pub mod interpreter11;
-pub mod interpreter12;
-pub mod interpreter13;
-
 #[cfg(test)]
 mod tests;
 
@@ -22,9 +17,4 @@ pub struct Constant<T: CompileTimeValue + Typeof<Ty> + PrettyPrint, Ty: CompileT
     #[kirin(default)]
     pub marker: std::marker::PhantomData<Ty>,
 }
-pub mod interpreter14;
-pub mod interpreter15;
-pub mod interpreter16;
-pub mod interpreter17;
-pub mod interpreter18;
 pub mod interpreter19;

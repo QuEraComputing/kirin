@@ -19,10 +19,7 @@ members = [
   "crates/kirin-derive-toolkit",
   "crates/kirin-function",
   "crates/kirin-interpreter",
-  "crates/kirin-interpreter-10",
-  "crates/kirin-interpreter-11", "crates/kirin-interpreter-12", "crates/kirin-interpreter-13", "crates/kirin-interpreter-14",
-  "crates/kirin-interpreter-15", "crates/kirin-interpreter-16",
-  "crates/kirin-interpreter-17", "crates/kirin-interpreter-18", "crates/kirin-interpreter-19",
+  "crates/kirin-interpreter-19",
   "crates/kirin-interval",
   "crates/kirin-ir",
   "crates/kirin-lexer",
@@ -77,15 +74,6 @@ kirin-derive-prettyless = { path = "crates/kirin-derive-prettyless", version = "
 kirin-derive-toolkit = { path = "crates/kirin-derive-toolkit", version = "0.1.0" }
 kirin-function = { path = "crates/kirin-function", version = "0.1.0" }
 kirin-interpreter = { path = "crates/kirin-interpreter", version = "0.1.0" }
-kirin-interpreter-10 = { path = "crates/kirin-interpreter-10", version = "0.1.0" }
-kirin-interpreter-11 = { path = "crates/kirin-interpreter-11", version = "0.1.0" }
-kirin-interpreter-12 = { path = "crates/kirin-interpreter-12", version = "0.1.0" }
-kirin-interpreter-13 = { path = "crates/kirin-interpreter-13", version = "0.1.0" }
-kirin-interpreter-14 = { path = "crates/kirin-interpreter-14", version = "0.1.0" }
-kirin-interpreter-15 = { path = "crates/kirin-interpreter-15", version = "0.1.0" }
-kirin-interpreter-16 = { path = "crates/kirin-interpreter-16", version = "0.1.0" }
-kirin-interpreter-17 = { path = "crates/kirin-interpreter-17", version = "0.1.0" }
-kirin-interpreter-18 = { path = "crates/kirin-interpreter-18", version = "0.1.0" }
 kirin-interpreter-19 = { path = "crates/kirin-interpreter-19", version = "0.1.0" }
 kirin-interval = { path = "crates/kirin-interval", version = "0.1.0" }
 # Internal crates

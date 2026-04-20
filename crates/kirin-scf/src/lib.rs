@@ -26,10 +26,6 @@
 //! - `Yield` ↔ `scf.yield`
 
 mod interpret_impl;
-pub mod interpreter10;
-pub mod interpreter11;
-pub mod interpreter12;
-pub mod interpreter13;
 pub use interpret_impl::ForLoopValue;
 
 use kirin::prelude::*;
@@ -103,9 +99,4 @@ pub struct Yield<T: CompileTimeValue> {
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
-pub mod interpreter14;
-pub mod interpreter15;
-pub mod interpreter16;
-pub mod interpreter17;
-pub mod interpreter18;
 pub mod interpreter19;

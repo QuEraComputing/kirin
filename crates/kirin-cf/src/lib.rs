@@ -24,11 +24,6 @@
 
 use kirin::prelude::*;
 
-pub mod interpreter10;
-pub mod interpreter11;
-pub mod interpreter12;
-pub mod interpreter13;
-
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[non_exhaustive]
 #[kirin(terminator, builders, type = T)]
@@ -54,11 +49,6 @@ pub enum ControlFlow<T: CompileTimeValue> {
 
 mod interpret_impl;
 
-pub mod interpreter14;
-pub mod interpreter15;
-pub mod interpreter16;
-pub mod interpreter17;
-pub mod interpreter18;
 pub mod interpreter19;
 #[cfg(test)]
 mod tests;

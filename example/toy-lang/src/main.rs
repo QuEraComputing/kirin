@@ -1,12 +1,3 @@
-mod interpreter10;
-mod interpreter11;
-mod interpreter12;
-mod interpreter13;
-mod interpreter14;
-mod interpreter15;
-mod interpreter16;
-mod interpreter17;
-mod interpreter18;
 mod interpreter19;
 mod language;
 mod stage;

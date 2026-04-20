@@ -1,8 +1,4 @@
 mod interpret_impl;
-pub mod interpreter10;
-pub mod interpreter11;
-pub mod interpreter12;
-pub mod interpreter13;
 pub use interpret_impl::CompareValue;
 
 use kirin::prelude::*;
@@ -63,9 +59,4 @@ pub enum Cmp<T: CompileTimeValue> {
     #[doc(hidden)]
     __Phantom(std::marker::PhantomData<T>),
 }
-pub mod interpreter14;
-pub mod interpreter15;
-pub mod interpreter16;
-pub mod interpreter17;
-pub mod interpreter18;
 pub mod interpreter19;
