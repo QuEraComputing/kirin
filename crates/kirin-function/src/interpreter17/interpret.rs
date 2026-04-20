@@ -1,9 +1,5 @@
-use kirin::prelude::{CompileTimeValue, Dialect, HasStageInfo, StageMeta};
-use kirin_interpreter::{AbstractValue, ProductValue};
-use kirin_interpreter_17::abstract_call_dispatch::AbstractCallDispatch;
-use kirin_interpreter_17::abstract_interp::AbstractInterp;
-use kirin_interpreter_17::algebra::SingleStageCursorFor;
-use kirin_interpreter_17::concrete::ConcreteInterp;
+use kirin::prelude::CompileTimeValue;
+use kirin_interpreter::ProductValue;
 use kirin_interpreter_17::control::Control;
 use kirin_interpreter_17::env::Env;
 use kirin_interpreter_17::error::InterpreterError;
@@ -12,55 +8,11 @@ use kirin_interpreter_17::interpretable::Interpretable;
 use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
 
 // ---------------------------------------------------------------------------
-// CallSeam — interpreter-side trait for call dispatch
+// Note: CallSeam<L> and its blanket impls for ConcreteInterp / AbstractInterp
+// live entirely in kirin-interpreter-17/src/call_seam.rs. Dialect impls that
+// need call dispatch import kirin_interpreter_17::call_seam::CallSeam and call
+// env.eval_call(target, stage, args, results) directly.
 // ---------------------------------------------------------------------------
-
-pub trait CallSeam<L: Dialect>: Env {
-    fn eval_call(
-        &mut self,
-        op: &Call<L::Type>,
-    ) -> Result<Control<Self::Value, Self::Ext>, Self::Error>;
-}
-
-// ---------------------------------------------------------------------------
-// Blanket CallSeam impl for ConcreteInterp — single-stage case.
-// ---------------------------------------------------------------------------
-
-impl<'ir, S, L, V, C> CallSeam<L> for ConcreteInterp<'ir, S, L, V, C>
-where
-    S: StageMeta + HasStageInfo<L>,
-    L: Dialect,
-    V: Clone,
-    C: SingleStageCursorFor<L>,
-    Self::Error: From<InterpreterError>,
-{
-    fn eval_call(
-        &mut self,
-        op: &Call<L::Type>,
-    ) -> Result<Control<Self::Value, Self::Ext>, Self::Error> {
-        eval_call_for_dialect::<_, L, _>(op, self)
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Blanket CallSeam impl for AbstractInterp — single-stage case.
-// ---------------------------------------------------------------------------
-
-impl<'ir, S, L, V, C> CallSeam<L> for AbstractInterp<'ir, S, L, V, C>
-where
-    S: StageMeta + HasStageInfo<L> + AbstractCallDispatch<V, C>,
-    L: Dialect,
-    V: Clone + AbstractValue,
-    C: SingleStageCursorFor<L>,
-    Self::Error: From<InterpreterError>,
-{
-    fn eval_call(
-        &mut self,
-        op: &Call<L::Type>,
-    ) -> Result<Control<Self::Value, Self::Ext>, Self::Error> {
-        eval_call_for_dialect::<_, L, _>(op, self)
-    }
-}
 
 // ---------------------------------------------------------------------------
 // Structural ops
@@ -116,7 +68,7 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// Call — base impl errors; composed languages use CallSeam::eval_call.
+// Call — base impl errors; dialect impls invoke CallSeam::eval_call directly.
 // ---------------------------------------------------------------------------
 
 impl<E, T> Interpretable<E> for Call<T>
@@ -134,30 +86,24 @@ where
 }
 
 // ---------------------------------------------------------------------------
-// Dialect-aware Call helper
+// Lexical — delegates all arms; Call arm returns error (use CallSeam instead)
 // ---------------------------------------------------------------------------
 
-pub fn eval_call_for_dialect<E, L, T>(
-    op: &Call<T>,
-    env: &mut E,
-) -> Result<Control<E::Value, E::Ext>, E::Error>
+impl<E, T> Interpretable<E> for Lexical<T>
 where
     E: Env,
-    E::Stages: HasStageInfo<L>,
-    E::Value: Clone,
+    E::Value: Clone + ProductValue,
     E::Error: From<InterpreterError>,
-    L: Dialect,
     T: CompileTimeValue,
 {
-    let args = env.read_many(op.args())?;
-    let stage_id = env.current_stage();
-    let callee = env.resolve_function_for::<L>(op.target(), stage_id)?;
-    Ok(Control::Call {
-        callee,
-        stage: stage_id,
-        args,
-        results: op.results().to_vec(),
-    })
+    fn eval(&self, env: &mut E) -> Result<Control<E::Value, E::Ext>, E::Error> {
+        match self {
+            Lexical::FunctionBody(op) => op.eval(env),
+            Lexical::Lambda(op) => op.eval(env),
+            Lexical::Call(op) => op.eval(env),
+            Lexical::Return(op) => op.eval(env),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
@@ -177,27 +123,6 @@ where
             Lifted::Bind(op) => op.eval(env),
             Lifted::Call(op) => op.eval(env),
             Lifted::Return(op) => op.eval(env),
-        }
-    }
-}
-
-// ---------------------------------------------------------------------------
-// Lexical
-// ---------------------------------------------------------------------------
-
-impl<E, T> Interpretable<E> for Lexical<T>
-where
-    E: Env,
-    E::Value: Clone + ProductValue,
-    E::Error: From<InterpreterError>,
-    T: CompileTimeValue,
-{
-    fn eval(&self, env: &mut E) -> Result<Control<E::Value, E::Ext>, E::Error> {
-        match self {
-            Lexical::FunctionBody(op) => op.eval(env),
-            Lexical::Lambda(op) => op.eval(env),
-            Lexical::Call(op) => op.eval(env),
-            Lexical::Return(op) => op.eval(env),
         }
     }
 }

@@ -12,26 +12,67 @@ use kirin_interpreter_17::interpretable::Interpretable;
 
 use crate::ForLoopValue;
 use crate::interpreter17::cursor::{AbstractForCursor, AbstractIfCursor, ForCursor, IfCursor};
-use crate::{For, If, Yield};
+use crate::{For, If, StructuredControlFlow, Yield};
 
 // ---------------------------------------------------------------------------
-// ScfSeam
+// ScfSeam — crate-private, parametric over the dialect TYPE not the dialect.
+//
+// Using T: CompileTimeValue (not L: Dialect) avoids E0207: the blanket impls
+// have L in ConcreteInterp<..., L, ...> directly, and the Interpretable impls
+// have T in If<T>/For<T> directly — both constrained.
 // ---------------------------------------------------------------------------
 
-pub trait ScfSeam<L: Dialect>: Env {
-    fn eval_if(&mut self, op: &If<L::Type>)
-    -> Result<Control<Self::Value, Self::Ext>, Self::Error>;
-    fn eval_for(
-        &mut self,
-        op: &For<L::Type>,
-    ) -> Result<Control<Self::Value, Self::Ext>, Self::Error>;
+pub(crate) trait ScfSeam<T: CompileTimeValue>: Env {
+    fn eval_if(&mut self, op: &If<T>) -> Result<Control<Self::Value, Self::Ext>, Self::Error>;
+    fn eval_for(&mut self, op: &For<T>) -> Result<Control<Self::Value, Self::Ext>, Self::Error>;
+}
+
+// ---------------------------------------------------------------------------
+// Interpretable impls for If, For, StructuredControlFlow
+// ---------------------------------------------------------------------------
+
+impl<E, T> Interpretable<E> for If<T>
+where
+    T: CompileTimeValue,
+    E: ScfSeam<T>,
+{
+    fn eval(&self, env: &mut E) -> Result<Control<E::Value, E::Ext>, E::Error> {
+        env.eval_if(self)
+    }
+}
+
+impl<E, T> Interpretable<E> for For<T>
+where
+    T: CompileTimeValue,
+    E: ScfSeam<T>,
+{
+    fn eval(&self, env: &mut E) -> Result<Control<E::Value, E::Ext>, E::Error> {
+        env.eval_for(self)
+    }
+}
+
+impl<E, T> Interpretable<E> for StructuredControlFlow<T>
+where
+    T: CompileTimeValue,
+    E: Env,
+    If<T>: Interpretable<E>,
+    For<T>: Interpretable<E>,
+    Yield<T>: Interpretable<E>,
+{
+    fn eval(&self, env: &mut E) -> Result<Control<E::Value, E::Ext>, E::Error> {
+        match self {
+            StructuredControlFlow::If(op) => op.eval(env),
+            StructuredControlFlow::For(op) => op.eval(env),
+            StructuredControlFlow::Yield(op) => op.eval(env),
+        }
+    }
 }
 
 // ---------------------------------------------------------------------------
 // Blanket ScfSeam impl for ConcreteInterp
 // ---------------------------------------------------------------------------
 
-impl<'ir, S, L, V, C> ScfSeam<L> for ConcreteInterp<'ir, S, L, V, C>
+impl<'ir, S, L, V, C> ScfSeam<L::Type> for ConcreteInterp<'ir, S, L, V, C>
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
@@ -55,7 +96,7 @@ where
 // Blanket ScfSeam impl for AbstractInterp
 // ---------------------------------------------------------------------------
 
-impl<'ir, S, L, V, C> ScfSeam<L> for AbstractInterp<'ir, S, L, V, C>
+impl<'ir, S, L, V, C> ScfSeam<L::Type> for AbstractInterp<'ir, S, L, V, C>
 where
     S: StageMeta + HasStageInfo<L> + AbstractCallDispatch<V, C>,
     L: Dialect,
@@ -80,7 +121,7 @@ where
 // If concrete helper
 // ---------------------------------------------------------------------------
 
-pub fn eval_if_concrete<E, C, L, T>(
+pub(crate) fn eval_if_concrete<E, C, L, T>(
     op: &If<T>,
     env: &mut E,
 ) -> Result<Control<E::Value, CursorExt<C>>, E::Error>
@@ -106,7 +147,7 @@ where
     Ok(Control::Ext(CursorExt::Push(cursor.lift())))
 }
 
-pub fn eval_if_abstract<E, C, L, T>(
+pub(crate) fn eval_if_abstract<E, C, L, T>(
     op: &If<T>,
     env: &mut E,
 ) -> Result<Control<E::Value, CursorExt<C>>, E::Error>
@@ -130,7 +171,7 @@ where
 // For concrete helper
 // ---------------------------------------------------------------------------
 
-pub fn eval_for_concrete<E, C, L, T>(
+pub(crate) fn eval_for_concrete<E, C, L, T>(
     op: &For<T>,
     env: &mut E,
 ) -> Result<Control<E::Value, CursorExt<C>>, E::Error>
@@ -167,7 +208,7 @@ where
     Ok(Control::Ext(CursorExt::Push(cursor.lift())))
 }
 
-pub fn eval_for_abstract<E, C, L, T>(
+pub(crate) fn eval_for_abstract<E, C, L, T>(
     op: &For<T>,
     env: &mut E,
 ) -> Result<Control<E::Value, CursorExt<C>>, E::Error>

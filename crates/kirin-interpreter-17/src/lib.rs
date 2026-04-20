@@ -3,6 +3,7 @@ pub mod abstract_interp;
 pub mod algebra;
 pub mod backward;
 pub mod call_dispatch;
+pub mod call_seam;
 pub mod concrete;
 pub mod context;
 pub mod control;
@@ -21,6 +22,7 @@ pub mod prelude {
     pub use crate::algebra::{Lift, LiftInto, Project, ProjectInto, SingleStageCursorFor};
     pub use crate::backward::{BackwardFixpoint, BlockTransferBackward};
     pub use crate::call_dispatch::CallDispatch;
+    pub use crate::call_seam::CallSeam;
     pub use crate::concrete::ConcreteInterp;
     pub use crate::control::{Control, CursorExt};
     pub use crate::env::{AbstractEnv, AbstractMode, ConcreteMode, Env};

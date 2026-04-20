@@ -1,15 +1,17 @@
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Neg, Not, Sub};
 
-use kirin::prelude::{Block, CompileStage, HasStageInfo, Pipeline, SpecializedFunction};
-use kirin_arith::{ArithValue, CheckedDiv, CheckedRem};
+use kirin::prelude::{
+    Block, CompileStage, HasStageInfo, Pipeline, ResultValue, SpecializedFunction, Symbol,
+};
+use kirin_arith::{ArithType, ArithValue, CheckedDiv, CheckedRem};
 use kirin_bitwise::{CheckedShl, CheckedShr};
 use kirin_cmp::CompareValue;
-use kirin_function::interpreter17::interpret::CallSeam;
 use kirin_interpreter::{AbstractValue, BranchCondition, ProductValue};
 use kirin_interpreter_17::abstract_call_dispatch::AbstractCallDispatch;
 use kirin_interpreter_17::abstract_interp::AbstractInterp;
 use kirin_interpreter_17::algebra::{Lift, Project, SingleStageCursorFor};
 use kirin_interpreter_17::call_dispatch::CallDispatch;
+use kirin_interpreter_17::call_seam::CallSeam;
 use kirin_interpreter_17::concrete::ConcreteInterp;
 use kirin_interpreter_17::control::{Control, CursorExt};
 use kirin_interpreter_17::cursor::{AbstractBlockCursor, BlockCursor};
@@ -22,7 +24,6 @@ use kirin_scf::ForLoopValue;
 use kirin_scf::interpreter17::cursor::{
     AbstractForCursor, AbstractIfCursor, AbstractSCFCursor, ForCursor, IfCursor, SCFCursor,
 };
-use kirin_scf::interpreter17::interpret::ScfSeam;
 
 use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
@@ -267,24 +268,25 @@ where
 
 impl<E, V> Interpretable<E> for HighLevel
 where
-    E: Env<Value = V> + ScfSeam<HighLevel> + CallSeam<HighLevel>,
+    E: Env<Value = V> + CallSeam<HighLevel>,
     E::Stages: HasStageInfo<HighLevel>,
     E::Error: From<InterpreterError>,
     V: ToyVal,
+    kirin_scf::StructuredControlFlow<ArithType>: Interpretable<E>,
 {
     fn eval(&self, env: &mut E) -> Result<Control<V, E::Ext>, E::Error> {
         match self {
             HighLevel::Lexical(op) => match op {
                 kirin_function::Lexical::FunctionBody(op) => op.eval(env),
                 kirin_function::Lexical::Lambda(op) => op.eval(env),
-                kirin_function::Lexical::Call(op) => env.eval_call(op),
+                kirin_function::Lexical::Call(op) => {
+                    let args = env.read_many(op.args())?;
+                    let stage = env.current_stage();
+                    env.eval_call(op.target(), stage, args, op.results().to_vec())
+                }
                 kirin_function::Lexical::Return(op) => op.eval(env),
             },
-            HighLevel::Structured(op) => match op {
-                kirin_scf::StructuredControlFlow::If(op) => env.eval_if(op),
-                kirin_scf::StructuredControlFlow::For(op) => env.eval_for(op),
-                kirin_scf::StructuredControlFlow::Yield(op) => op.eval(env),
-            },
+            HighLevel::Structured(op) => op.eval(env),
             HighLevel::Constant(op) => op.eval(env),
             HighLevel::Arith(op) => op.eval(env),
             HighLevel::Cmp(op) => op.eval(env),
@@ -313,7 +315,11 @@ where
             LowLevel::Lifted(op) => match op {
                 kirin_function::Lifted::FunctionBody(op) => op.eval(env),
                 kirin_function::Lifted::Bind(op) => op.eval(env),
-                kirin_function::Lifted::Call(op) => env.eval_call(op),
+                kirin_function::Lifted::Call(op) => {
+                    let args = env.read_many(op.args())?;
+                    let stage = env.current_stage();
+                    env.eval_call(op.target(), stage, args, op.results().to_vec())
+                }
                 kirin_function::Lifted::Return(op) => op.eval(env),
             },
             LowLevel::Constant(op) => op.eval(env),
@@ -451,7 +457,7 @@ impl<V: Clone> CallDispatch<V, MultiCursor<V>> for Stage {
 
 pub type MultiInterp<'ir, V> = ConcreteInterp<'ir, Stage, HighLevel, V, MultiCursor<V>>;
 
-// Multi-stage concrete: tries HighLevel first, falls back to LowLevel.
+// Multi-stage concrete: HighLevel calls — tries HighLevel first, falls back to LowLevel.
 // MultiCursor does NOT implement SingleStageCursorFor<HighLevel>.
 impl<'ir, V> CallSeam<HighLevel> for MultiInterp<'ir, V>
 where
@@ -459,17 +465,17 @@ where
 {
     fn eval_call(
         &mut self,
-        op: &kirin_function::Call<<HighLevel as kirin::prelude::Dialect>::Type>,
+        target: Symbol,
+        stage: CompileStage,
+        args: Vec<V>,
+        results: Vec<ResultValue>,
     ) -> Result<Control<V, CursorExt<MultiCursor<V>>>, InterpreterError> {
-        let args = self.read_many(op.args())?;
-        let target = op.target();
-        let current = self.current_stage();
-        if let Ok(callee) = self.resolve_function_for::<HighLevel>(target, current) {
+        if let Ok(callee) = self.resolve_function_for::<HighLevel>(target, stage) {
             Ok(Control::Call {
                 callee,
-                stage: current,
+                stage,
                 args,
-                results: op.results().to_vec(),
+                results,
             })
         } else {
             let lowered = self
@@ -477,12 +483,12 @@ where
                 .stage_by_name("lowered")
                 .ok_or(InterpreterError::MissingEntry)?;
             let callee =
-                self.resolve_function_cross_stage::<HighLevel, LowLevel>(target, current, lowered)?;
+                self.resolve_function_cross_stage::<HighLevel, LowLevel>(target, stage, lowered)?;
             Ok(Control::Call {
                 callee,
                 stage: lowered,
                 args,
-                results: op.results().to_vec(),
+                results,
             })
         }
     }
@@ -497,17 +503,17 @@ where
 {
     fn eval_call(
         &mut self,
-        op: &kirin_function::Call<<LowLevel as kirin::prelude::Dialect>::Type>,
+        target: Symbol,
+        stage: CompileStage,
+        args: Vec<V>,
+        results: Vec<ResultValue>,
     ) -> Result<Control<V, CursorExt<MultiCursor<V>>>, InterpreterError> {
-        let args = self.read_many(op.args())?;
-        let target = op.target();
-        let current = self.current_stage();
-        if let Ok(callee) = self.resolve_function_for::<LowLevel>(target, current) {
+        if let Ok(callee) = self.resolve_function_for::<LowLevel>(target, stage) {
             Ok(Control::Call {
                 callee,
-                stage: current,
+                stage,
                 args,
-                results: op.results().to_vec(),
+                results,
             })
         } else {
             let source = self
@@ -515,12 +521,12 @@ where
                 .stage_by_name("source")
                 .ok_or(InterpreterError::MissingEntry)?;
             let callee =
-                self.resolve_function_cross_stage::<LowLevel, HighLevel>(target, current, source)?;
+                self.resolve_function_cross_stage::<LowLevel, HighLevel>(target, stage, source)?;
             Ok(Control::Call {
                 callee,
                 stage: source,
                 args,
-                results: op.results().to_vec(),
+                results,
             })
         }
     }
@@ -690,17 +696,17 @@ where
 {
     fn eval_call(
         &mut self,
-        op: &kirin_function::Call<<HighLevel as kirin::prelude::Dialect>::Type>,
+        target: Symbol,
+        stage: CompileStage,
+        args: Vec<V>,
+        results: Vec<ResultValue>,
     ) -> Result<Control<V, CursorExt<AbstractMultiCursor<V>>>, InterpreterError> {
-        let args = self.read_many(op.args())?;
-        let target = op.target();
-        let current = self.current_stage();
-        if let Ok(callee) = self.resolve_function_for::<HighLevel>(target, current) {
+        if let Ok(callee) = self.resolve_function_for::<HighLevel>(target, stage) {
             Ok(Control::Call {
                 callee,
-                stage: current,
+                stage,
                 args,
-                results: op.results().to_vec(),
+                results,
             })
         } else {
             let lowered = self
@@ -708,12 +714,12 @@ where
                 .stage_by_name("lowered")
                 .ok_or(InterpreterError::MissingEntry)?;
             let callee =
-                self.resolve_function_cross_stage::<HighLevel, LowLevel>(target, current, lowered)?;
+                self.resolve_function_cross_stage::<HighLevel, LowLevel>(target, stage, lowered)?;
             Ok(Control::Call {
                 callee,
                 stage: lowered,
                 args,
-                results: op.results().to_vec(),
+                results,
             })
         }
     }
@@ -727,17 +733,17 @@ where
 {
     fn eval_call(
         &mut self,
-        op: &kirin_function::Call<<LowLevel as kirin::prelude::Dialect>::Type>,
+        target: Symbol,
+        stage: CompileStage,
+        args: Vec<V>,
+        results: Vec<ResultValue>,
     ) -> Result<Control<V, CursorExt<AbstractMultiCursor<V>>>, InterpreterError> {
-        let args = self.read_many(op.args())?;
-        let target = op.target();
-        let current = self.current_stage();
-        if let Ok(callee) = self.resolve_function_for::<LowLevel>(target, current) {
+        if let Ok(callee) = self.resolve_function_for::<LowLevel>(target, stage) {
             Ok(Control::Call {
                 callee,
-                stage: current,
+                stage,
                 args,
-                results: op.results().to_vec(),
+                results,
             })
         } else {
             let source = self
@@ -745,12 +751,12 @@ where
                 .stage_by_name("source")
                 .ok_or(InterpreterError::MissingEntry)?;
             let callee =
-                self.resolve_function_cross_stage::<LowLevel, HighLevel>(target, current, source)?;
+                self.resolve_function_cross_stage::<LowLevel, HighLevel>(target, stage, source)?;
             Ok(Control::Call {
                 callee,
                 stage: source,
                 args,
-                results: op.results().to_vec(),
+                results,
             })
         }
     }
