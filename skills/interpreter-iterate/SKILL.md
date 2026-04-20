@@ -123,6 +123,20 @@ At the **start** of the session, send one message: "Running interpreter-iterate 
 
 At the **end** of the session, send one message summarizing: iterations run, final convergence score, which requirements are satisfied, and what remains open.
 
+### Orchestrator Architecture
+
+**The main agent is the orchestrator.** It does not implement, research, or critique code directly. It spawns subagents for those tasks and acts on their reports. This keeps the orchestrator's context small so late-session protocol steps (calibration updates, log writes) are never buried under implementation noise.
+
+| Phase | Subagent type | What it does | What it returns |
+|-------|--------------|-------------|----------------|
+| 1, 7  | Critic (`dontAsk`) | Reads source + rubric → scores the code | Structured scorecard report |
+| 2     | Research (`dontAsk`) | Reads log history + calibration → proposes design stance | Design sketch with stance rationale |
+| 3–4   | Implementer (`auto`) | Given design spec → creates crate, runs tests, fixes failures | Test results + list of implementation decisions made |
+
+The orchestrator reads each subagent's report, updates `docs/log.md`, makes the convergence decision, and updates `references/calibration-examples.md`. **These three artifacts are always written by the orchestrator, never by a subagent.**
+
+Brief each subagent with only what it needs — do not dump the entire conversation history into the prompt. The research subagent needs log history and calibration examples. The implementer needs the design sketch from the research subagent's report and the required test list. The critic needs source files and the rubric.
+
 ---
 
 ## Phase 1: Baseline Critique (runs once at session start)
@@ -156,13 +170,18 @@ If convergence criteria are already met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 
 
 ---
 
-## Phase 2: Design the Next Iteration
+## Phase 2: Design the Next Iteration (via Research Subagent)
 
 Each iteration commits to a **distinct set of design principles** — not just incremental fixes to the previous design. The goal is to explore the design space, not hill-climb a single approach. An iteration that fixes the same issues with the same underlying philosophy as the previous one is wasted.
 
+Spawn a read-only research subagent (`dontAsk`). Brief it with: the full contents of `docs/log.md`, the full contents of `references/calibration-examples.md`, and the instructions below. The subagent returns a design sketch; the orchestrator writes it into `docs/log.md` and proceeds to Phase 3.
+
+---
+*Instructions for the research subagent:*
+
 ### Step 2a: Survey tried approaches
 
-Read `docs/log.md` to build a map of what has been tried:
+Read the provided `docs/log.md` to build a map of what has been tried:
 - Which design principles each iteration committed to
 - What score each approach achieved per rubric dimension
 - Which dimensions improved vs. regressed vs. stayed flat
@@ -204,11 +223,18 @@ Write this design sketch directly into `docs/log.md` under the current iteration
 
 This sketch is the specification the implementation must follow — detailed enough that a fresh implementer could write the crate from it without reading the previous iteration.
 
-**Do not wait for user approval.** Proceed to implementation once the sketch is written.
+*Return this sketch to the orchestrator. The orchestrator writes it to `docs/log.md` and spawns the implementer subagent.*
 
 ---
 
-## Phase 3: Implement
+---
+
+## Phase 3: Implement (via Implementer Subagent)
+
+Spawn an implementer subagent (`auto` mode). Brief it with: the design sketch from Phase 2, the Required Test Coverage list from this skill, and the Subagent Implementation Brief below. The subagent implements the crate, runs tests, fixes failures, and returns a report. The orchestrator does not inspect individual files — it reads the report and proceeds to Phase 5.
+
+---
+*Instructions for the implementer subagent:*
 
 Each iteration starts from a blank slate. Do **not** copy the previous crate — that would carry forward its structural biases and prevent fundamental redesign. Read the previous iteration's code for reference and understanding, but write the new one from scratch based on the design from Phase 2.
 
@@ -273,6 +299,8 @@ If tests fail:
 - If a failure reveals a fundamental design problem (critique score would jump by ≥5), abort this iteration's implementation, log what was attempted, and loop to Phase 2 with updated critique
 
 All tests must pass before committing.
+
+Return to the orchestrator: (1) pass/fail summary for each required test, (2) a list of implementation decisions made (departures from the design sketch, workarounds for Rust type system constraints, surprising findings), (3) any open issues that could not be resolved.
 
 ---
 
@@ -449,9 +477,37 @@ If the user replies with no corrections, the loop ends.
 
 ---
 
-## Phase 8: Loop or Stop
+## Phase 8: Calibration Update, Then Loop or Stop
 
-After Phase 7 (and any calibration corrections), check:
+### 8a: Mandatory Calibration Update (runs every iteration, no exceptions)
+
+Before making the loop/stop decision, the orchestrator must update `references/calibration-examples.md`. This step runs whether the iteration converged or not, whether the user gave feedback or not.
+
+The orchestrator reviews two sources:
+
+1. **User corrections** (if any were given in Phase 7's score review): already recorded per Phase 7 instructions. Confirm they are in `calibration-examples.md`.
+
+2. **Orchestrator observations** — things the orchestrator noticed during this iteration that the critic missed or would likely miss in a future session. These include:
+   - Code patterns the critic scored generously that turned out to be problems during implementation (e.g. a "clean" abstraction that caused 10 delegation impls)
+   - Comment/visibility inconsistencies (e.g. a comment says `pub(crate)` but the code is `pub`)
+   - DRY violations at the expression level that were only visible in aggregate (repeated wrapping patterns)
+   - Vestigial abstractions carried over from previous design stances that pass all tests but add no value
+   - Any finding that the critic's rubric would not have caught mechanically
+
+For each observation, ask: "Would the critic, following the current rubric and calibration examples, have flagged this?" If no, add a calibration entry:
+```
+## Iteration <N> — R<dim>: critic scored <X>, correct is <Y>
+**Pattern:** <code snippet or description>
+**Location:** <file:line if known>
+**Why the critic was wrong:** <specific reasoning — what rubric gap caused the miss>
+**What to do instead:** <how to score this pattern correctly in future>
+```
+
+If there is genuinely nothing to add, write a one-line note: `# Iteration <N>: no new calibration entries.` — this confirms the step ran rather than being skipped.
+
+### 8b: Loop or Stop Decision
+
+After 8a, check:
 
 **Stop if** convergence criteria are met (weighted score ≤ 8, R1 ≥ 4, R6 ≥ 4, R9 ≥ 4, extensibility probe passed) **and the user has not overridden the verdict**.
 
@@ -477,6 +533,8 @@ grep -q 'docs/log.md' .gitignore || echo 'docs/log.md' >> .gitignore
 
 ## Subagent Notes
 
-- Critic subagent: `dontAsk` mode, read-only, must return a structured report with severity tags
-- Implementation subagents (if parallelizing crate vs. dialect work): use git worktrees, merge before commit
-- Never use `bypassPermissions` — it exhausts session auth
+- **Critic subagent** (`dontAsk`, read-only): spawned in Phase 1 and Phase 7. Returns structured scorecard + strengths + findings. Never modifies files.
+- **Research subagent** (`dontAsk`, read-only): spawned in Phase 2. Reads `docs/log.md` and `references/calibration-examples.md`. Returns design sketch only — does not touch files.
+- **Implementer subagent** (`auto`): spawned in Phase 3. Receives design sketch + test list. Creates crate, runs tests, fixes failures. Returns test results + implementation decisions. Does not touch `docs/log.md` or `references/calibration-examples.md` — those are orchestrator-only artifacts.
+- **Orchestrator (main agent)**: writes all three artifacts — `docs/log.md`, `references/calibration-examples.md`, and the commit. Reads subagent reports. Makes all decisions (keep/discard, convergence, calibration). Never spawns `bypassPermissions`.
+- If parallelizing crate vs. dialect work within the implementer subagent: use git worktrees within that subagent, merge before returning to orchestrator.
