@@ -336,6 +336,69 @@ mod tests {
         assert_eq!(inner_info.graph().node_count(), 1, "inner has NodeB");
     }
 
+    // --- Lift/Project roundtrip tests (derive-generated impls) ---
+
+    /// `lift` then `try_project` on the same variant is the identity.
+    #[test]
+    fn lift_then_project_same_variant_is_identity() {
+        let test_ssa: SSAValue = TestSSAValue(0).into();
+
+        let edge = UngraphEdge {
+            res: test_ssa.into(),
+        };
+        let lifted = Lift::<UngraphLanguage>::lift(edge.clone());
+        let back: Result<UngraphEdge, UngraphLanguage> = lifted.try_project();
+        assert_eq!(back, Ok(edge));
+
+        let node_a = UngraphNodeA {
+            param: test_ssa,
+            ports: vec![],
+        };
+        let lifted = Lift::<UngraphLanguage>::lift(node_a.clone());
+        let back: Result<UngraphNodeA, UngraphLanguage> = lifted.try_project();
+        assert_eq!(back, Ok(node_a));
+    }
+
+    /// `try_project` on a mismatched variant returns `Err` with the original sum.
+    #[test]
+    fn project_wrong_variant_returns_err() {
+        let test_ssa: SSAValue = TestSSAValue(0).into();
+        let edge = UngraphEdge {
+            res: test_ssa.into(),
+        };
+        let lifted = Lift::<UngraphLanguage>::lift(edge.clone());
+        // Projecting as NodeA must fail and return the original sum.
+        let result: Result<UngraphNodeA, UngraphLanguage> = lifted.try_project();
+        assert_eq!(result, Err(UngraphLanguage::Edge(edge)));
+    }
+
+    /// `try_project` then `lift` on the same variant is the identity.
+    #[test]
+    fn project_then_lift_same_variant_is_identity() {
+        let test_ssa: SSAValue = TestSSAValue(0).into();
+        let edge = UngraphEdge {
+            res: test_ssa.into(),
+        };
+        let sum = UngraphLanguage::Edge(edge);
+        let inner: UngraphEdge = sum.clone().try_project().unwrap();
+        let roundtrip = Lift::<UngraphLanguage>::lift(inner);
+        assert_eq!(roundtrip, sum);
+    }
+
+    /// `LiftInto` and `ProjectInto` convenience mirrors agree with `lift`/`try_project`.
+    #[test]
+    fn lift_into_project_into_roundtrip() {
+        let test_ssa: SSAValue = TestSSAValue(0).into();
+        let node_b = UngraphNodeB {
+            param0: test_ssa,
+            param1: test_ssa,
+            ports: vec![],
+        };
+        let sum: UngraphLanguage = node_b.clone().lift_into();
+        let back: Result<UngraphNodeB, UngraphLanguage> = sum.project_into();
+        assert_eq!(back, Ok(node_b));
+    }
+
     /// Compound node embedded in a block — mixing sequential and graph IR.
     #[test]
     fn compound_in_block() {

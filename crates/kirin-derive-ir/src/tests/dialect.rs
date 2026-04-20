@@ -267,3 +267,92 @@ fn test_dialect_derive_enum_wraps_with_extra_fields_from_impl() {
     );
     insta::assert_snapshot!(code);
 }
+
+/// Lift/Project are generated for pure wrapper enums (all variants #[wraps], no side fields).
+#[test]
+fn test_dialect_derive_enum_pure_wrapper_generates_lift_project() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType)]
+        enum CompositeOps {
+            #[wraps]
+            Alpha(AlphaOp),
+            #[wraps]
+            Beta(BetaOp),
+            #[wraps]
+            Gamma(GammaOp),
+        }
+    };
+    let code = generate_dialect_code(input);
+    assert!(
+        code.contains("Lift<CompositeOps>"),
+        "pure wrapper enum must generate Lift impls.\nGenerated code:\n{code}"
+    );
+    assert!(
+        code.contains("Project<AlphaOp>") && code.contains("Project<BetaOp>"),
+        "pure wrapper enum must generate Project impls.\nGenerated code:\n{code}"
+    );
+    insta::assert_snapshot!(code);
+}
+
+/// Lift/Project are NOT generated when the enum has any non-pure-wrapper variant.
+#[test]
+fn test_dialect_derive_enum_mixed_does_not_generate_lift_project() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType)]
+        enum MixedOps {
+            #[wraps]
+            Add(AddOp),
+            Literal { value: i64 },
+        }
+    };
+    let code = generate_dialect_code(input);
+    assert!(
+        !code.contains("Lift<MixedOps>"),
+        "mixed enum must NOT generate Lift impls.\nGenerated code:\n{code}"
+    );
+    assert!(
+        !code.contains("Project<AddOp>"),
+        "mixed enum must NOT generate Project impls.\nGenerated code:\n{code}"
+    );
+}
+
+/// Lift/Project are NOT generated when a wrapper variant has extra side fields.
+#[test]
+fn test_dialect_derive_enum_wrapper_with_side_fields_no_lift_project() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType, builders)]
+        enum MixedWraps {
+            #[wraps]
+            Simple(SimpleOp),
+            Wrapped {
+                #[wraps]
+                inner: InnerOp,
+                tag: i64,
+            },
+        }
+    };
+    let code = generate_dialect_code(input);
+    assert!(
+        !code.contains("Lift<MixedWraps>"),
+        "wrapper-with-side-fields enum must NOT generate Lift impls.\nGenerated code:\n{code}"
+    );
+}
+
+/// Wrapper struct generates Lift/Project to and from its inner type.
+#[test]
+fn test_dialect_derive_wrapper_struct_generates_lift_project() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType)]
+        #[wraps]
+        struct WrapperOp(InnerOp);
+    };
+    let code = generate_dialect_code(input);
+    assert!(
+        code.contains("Lift<WrapperOp>"),
+        "wrapper struct must generate Lift impl.\nGenerated code:\n{code}"
+    );
+    assert!(
+        code.contains("Project<InnerOp>"),
+        "wrapper struct must generate Project impl.\nGenerated code:\n{code}"
+    );
+}

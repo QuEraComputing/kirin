@@ -5,6 +5,7 @@ use syn::parse_macro_input;
 
 mod generate;
 mod has_signature;
+mod lift_project;
 
 #[cfg(test)]
 mod tests;

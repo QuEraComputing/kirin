@@ -1,0 +1,615 @@
+---
+source: crates/kirin-derive-ir/src/tests/dialect.rs
+expression: code
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for CompositeOps {
+    type Iter = CompositeOpsArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsArgumentsIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsArgumentsIter::Beta(
+                <BetaOp as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsArgumentsIter::Gamma(
+                <GammaOp as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsArgumentsIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasArguments<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasArguments<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasArguments<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsArgumentsMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsArgumentsMutIter::Beta(
+                <BetaOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsArgumentsMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsArgumentsMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for CompositeOps {
+    type Iter = CompositeOpsResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsResultsIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasResults>::results(field_0),
+            ),
+            Self::Beta(field_0) => {
+                CompositeOpsResultsIter::Beta(<BetaOp as ::kirin::ir::HasResults>::results(field_0))
+            }
+            Self::Gamma(field_0) => CompositeOpsResultsIter::Gamma(
+                <GammaOp as ::kirin::ir::HasResults>::results(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsResultsIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasResults<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasResults<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasResults<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsResultsMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsResultsMutIter::Beta(
+                <BetaOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsResultsMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsResultsMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for CompositeOps {
+    type Iter = CompositeOpsBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        match self {
+            Self::Alpha(field_0) => {
+                CompositeOpsBlocksIter::Alpha(<AlphaOp as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+            Self::Beta(field_0) => {
+                CompositeOpsBlocksIter::Beta(<BetaOp as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+            Self::Gamma(field_0) => {
+                CompositeOpsBlocksIter::Gamma(<GammaOp as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsBlocksIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsBlocksMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsBlocksMutIter::Beta(
+                <BetaOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsBlocksMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsBlocksMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for CompositeOps {
+    type Iter = CompositeOpsSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsSuccessorsIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsSuccessorsIter::Beta(
+                <BetaOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsSuccessorsIter::Gamma(
+                <GammaOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsSuccessorsIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsSuccessorsMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsSuccessorsMutIter::Beta(
+                <BetaOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsSuccessorsMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsSuccessorsMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegions<'a> for CompositeOps {
+    type Iter = CompositeOpsRegionsIter<'a>;
+    fn regions(&'a self) -> Self::Iter {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsRegionsIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasRegions>::regions(field_0),
+            ),
+            Self::Beta(field_0) => {
+                CompositeOpsRegionsIter::Beta(<BetaOp as ::kirin::ir::HasRegions>::regions(field_0))
+            }
+            Self::Gamma(field_0) => CompositeOpsRegionsIter::Gamma(
+                <GammaOp as ::kirin::ir::HasRegions>::regions(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsRegionsIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasRegions<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasRegions<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasRegions<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsRegionsIter<'a> {
+    type Item = &'a ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasRegionsMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsRegionsMutIter<'a>;
+    fn regions_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsRegionsMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsRegionsMutIter::Beta(
+                <BetaOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsRegionsMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsRegionsMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsRegionsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Region;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for CompositeOps {
+    type Iter = CompositeOpsDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsDigraphsIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasDigraphs>::digraphs(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsDigraphsIter::Beta(
+                <BetaOp as ::kirin::ir::HasDigraphs>::digraphs(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsDigraphsIter::Gamma(
+                <GammaOp as ::kirin::ir::HasDigraphs>::digraphs(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsDigraphsIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsDigraphsMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsDigraphsMutIter::Beta(
+                <BetaOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsDigraphsMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsDigraphsMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for CompositeOps {
+    type Iter = CompositeOpsUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsUngraphsIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsUngraphsIter::Beta(
+                <BetaOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsUngraphsIter::Gamma(
+                <GammaOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsUngraphsIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsUngraphsMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsUngraphsMutIter::Beta(
+                <BetaOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsUngraphsMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsUngraphsMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for CompositeOps {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::Alpha(field_0) => <AlphaOp as ::kirin::ir::IsTerminator>::is_terminator(field_0),
+            Self::Beta(field_0) => <BetaOp as ::kirin::ir::IsTerminator>::is_terminator(field_0),
+            Self::Gamma(field_0) => <GammaOp as ::kirin::ir::IsTerminator>::is_terminator(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for CompositeOps {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::Alpha(field_0) => <AlphaOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+            Self::Beta(field_0) => <BetaOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+            Self::Gamma(field_0) => <GammaOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for CompositeOps {
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::Alpha(field_0) => <AlphaOp as ::kirin::ir::IsPure>::is_pure(field_0),
+            Self::Beta(field_0) => <BetaOp as ::kirin::ir::IsPure>::is_pure(field_0),
+            Self::Gamma(field_0) => <GammaOp as ::kirin::ir::IsPure>::is_pure(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for CompositeOps {
+    fn is_speculatable(&self) -> bool {
+        match self {
+            Self::Alpha(field_0) => {
+                <AlphaOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
+            }
+            Self::Beta(field_0) => {
+                <BetaOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
+            }
+            Self::Gamma(field_0) => {
+                <GammaOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for CompositeOps {
+    fn is_edge(&self) -> bool {
+        match self {
+            Self::Alpha(field_0) => <AlphaOp as ::kirin::ir::IsEdge>::is_edge(field_0),
+            Self::Beta(field_0) => <BetaOp as ::kirin::ir::IsEdge>::is_edge(field_0),
+            Self::Gamma(field_0) => <GammaOp as ::kirin::ir::IsEdge>::is_edge(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for CompositeOps {
+    type Type = SimpleType;
+}
+#[automatically_derived]
+impl ::kirin::ir::HasSignature<Self> for CompositeOps {
+    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+        match self {
+            Self::Alpha(field_0) => {
+                <AlphaOp as ::kirin::ir::HasSignature<AlphaOp>>::signature(field_0)
+            }
+            Self::Beta(field_0) => {
+                <BetaOp as ::kirin::ir::HasSignature<BetaOp>>::signature(field_0)
+            }
+            Self::Gamma(field_0) => {
+                <GammaOp as ::kirin::ir::HasSignature<GammaOp>>::signature(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Lift<CompositeOps> for AlphaOp {
+    fn lift(self) -> CompositeOps {
+        CompositeOps::Alpha(self)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Project<AlphaOp> for CompositeOps {
+    fn try_project(self) -> ::core::result::Result<AlphaOp, Self> {
+        match self {
+            CompositeOps::Alpha(inner) => Ok(inner),
+            other => Err(other),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Lift<CompositeOps> for BetaOp {
+    fn lift(self) -> CompositeOps {
+        CompositeOps::Beta(self)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Project<BetaOp> for CompositeOps {
+    fn try_project(self) -> ::core::result::Result<BetaOp, Self> {
+        match self {
+            CompositeOps::Beta(inner) => Ok(inner),
+            other => Err(other),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Lift<CompositeOps> for GammaOp {
+    fn lift(self) -> CompositeOps {
+        CompositeOps::Gamma(self)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Project<GammaOp> for CompositeOps {
+    fn try_project(self) -> ::core::result::Result<GammaOp, Self> {
+        match self {
+            CompositeOps::Gamma(inner) => Ok(inner),
+            other => Err(other),
+        }
+    }
+}

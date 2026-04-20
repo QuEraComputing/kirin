@@ -1,5 +1,6 @@
 mod arena;
 mod builder;
+mod compose;
 mod comptime;
 mod detach;
 mod intern;
@@ -20,6 +21,7 @@ pub use builder::error::{
     StagedFunctionError,
 };
 pub use builder::{AsBuildStage, BuilderStageInfo, FinalizeError};
+pub use compose::{Lift, LiftInto, Project, ProjectInto};
 pub use comptime::{CompileTimeValue, Placeholder, Typeof};
 pub use detach::Detach;
 pub use intern::InternTable;
@@ -56,7 +58,10 @@ pub mod prelude {
         HasSignature, HasStageInfo, Pipeline, Region, ResultValue, SSAValue, Signature,
         SignatureSemantics, StageInfo, StageMeta, Statement,
     };
-    pub use crate::{CompileTimeValue, HasProduct, Placeholder, Product, Typeof};
+    pub use crate::{
+        CompileTimeValue, HasProduct, Lift, LiftInto, Placeholder, Product, Project, ProjectInto,
+        Typeof,
+    };
 }
 
 #[cfg(feature = "derive")]

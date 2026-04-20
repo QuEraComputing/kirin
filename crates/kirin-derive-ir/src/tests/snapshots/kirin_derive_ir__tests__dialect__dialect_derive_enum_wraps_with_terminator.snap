@@ -492,3 +492,33 @@ impl ::kirin::ir::HasSignature<Self> for CfOps {
         }
     }
 }
+#[automatically_derived]
+impl ::kirin::ir::Lift<CfOps> for BranchOp {
+    fn lift(self) -> CfOps {
+        CfOps::Branch(self)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Project<BranchOp> for CfOps {
+    fn try_project(self) -> ::core::result::Result<BranchOp, Self> {
+        match self {
+            CfOps::Branch(inner) => Ok(inner),
+            other => Err(other),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Lift<CfOps> for ReturnOp {
+    fn lift(self) -> CfOps {
+        CfOps::Return(self)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Project<ReturnOp> for CfOps {
+    fn try_project(self) -> ::core::result::Result<ReturnOp, Self> {
+        match self {
+            CfOps::Return(inner) => Ok(inner),
+            other => Err(other),
+        }
+    }
+}

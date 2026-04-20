@@ -210,7 +210,9 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
         .add(TraitImplTemplate::marker(&trait_path, &ir.attrs.ir_type))
         .add(crate::has_signature::has_signature_template(crate_path));
 
-    builder.build()
+    let mut output = builder.build()?;
+    output.extend(crate::lift_project::generate_lift_project(&ir, crate_path));
+    Ok(output)
 }
 
 /// Generate a single field-iter derive.

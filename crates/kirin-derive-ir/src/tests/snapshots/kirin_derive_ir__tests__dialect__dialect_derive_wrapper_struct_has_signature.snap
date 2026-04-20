@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-ir/src/tests/dialect.rs
-assertion_line: 241
 expression: code
 ---
 #[automatically_derived]
@@ -355,5 +354,18 @@ impl ::kirin::ir::HasSignature<Self> for WrapperOp {
     fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         let Self(field_0) = self;
         <InnerOp as ::kirin::ir::HasSignature<InnerOp>>::signature(field_0)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Lift<WrapperOp> for InnerOp {
+    fn lift(self) -> WrapperOp {
+        WrapperOp(self)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Project<InnerOp> for WrapperOp {
+    fn try_project(self) -> ::core::result::Result<InnerOp, Self> {
+        let WrapperOp(inner) = self;
+        Ok(inner)
     }
 }

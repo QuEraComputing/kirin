@@ -480,3 +480,33 @@ impl ::kirin::ir::HasSignature<Self> for ArithLanguage {
         }
     }
 }
+#[automatically_derived]
+impl ::kirin::ir::Lift<ArithLanguage> for AddOp {
+    fn lift(self) -> ArithLanguage {
+        ArithLanguage::Add(self)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Project<AddOp> for ArithLanguage {
+    fn try_project(self) -> ::core::result::Result<AddOp, Self> {
+        match self {
+            ArithLanguage::Add(inner) => Ok(inner),
+            other => Err(other),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Lift<ArithLanguage> for SubOp {
+    fn lift(self) -> ArithLanguage {
+        ArithLanguage::Sub(self)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Project<SubOp> for ArithLanguage {
+    fn try_project(self) -> ::core::result::Result<SubOp, Self> {
+        match self {
+            ArithLanguage::Sub(inner) => Ok(inner),
+            other => Err(other),
+        }
+    }
+}
