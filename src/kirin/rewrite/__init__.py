@@ -12,4 +12,5 @@ from .apply_type import ApplyType as ApplyType
 from .compactify import CFGCompactify as CFGCompactify
 from .wrap_const import WrapConst as WrapConst
 from .call2invoke import Call2Invoke as Call2Invoke
+from .sort_blocks import SortBlocks as SortBlocks
 from .type_assert import InlineTypeAssert as InlineTypeAssert
