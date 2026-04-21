@@ -8,25 +8,25 @@ use kirin_arith::{ArithType, ArithValue, CheckedDiv, CheckedRem};
 use kirin_bitwise::{CheckedShl, CheckedShr};
 use kirin_cmp::CompareValue;
 use kirin_interpreter::{AbstractValue, BranchCondition, ProductValue};
-use kirin_interpreter_19::abstract_call_dispatch::AbstractCallDispatch;
-use kirin_interpreter_19::abstract_interp::{
+use kirin_interpreter_20::abstract_call_dispatch::AbstractCallDispatch;
+use kirin_interpreter_20::abstract_interp::{
     AbstractFrame, AbstractInterp, FuncState, FuncSummary, StagedKey, Worklist,
 };
-use kirin_interpreter_19::algebra::Lift;
-use kirin_interpreter_19::block_exec::{BlockExecEnv, JumpOutcome};
-use kirin_interpreter_19::call_dispatch::CallDispatch;
-use kirin_interpreter_19::concrete::ConcreteInterp;
-use kirin_interpreter_19::control::{Control, CursorExt};
-use kirin_interpreter_19::cursor::BlockCursor;
-use kirin_interpreter_19::dispatch::Dispatch;
-use kirin_interpreter_19::env::{AbstractEnv, Env};
-use kirin_interpreter_19::error::InterpreterError;
-use kirin_interpreter_19::execute::{Execute, StackEntry};
-use kirin_interpreter_19::fixpoint_driver::FixpointDriver;
-use kirin_interpreter_19::frame::Frame;
-use kirin_interpreter_19::interpretable::Interpretable;
-use kirin_interpreter_19::pipeline::PipelineHandle;
-use kirin_scf::interpreter19::interpret::ScfSeam;
+use kirin_interpreter_20::algebra::Lift;
+use kirin_interpreter_20::block_exec::{BlockExecEnv, JumpOutcome};
+use kirin_interpreter_20::call_dispatch::CallDispatch;
+use kirin_interpreter_20::concrete::ConcreteInterp;
+use kirin_interpreter_20::control::{Control, CursorExt};
+use kirin_interpreter_20::cursor::BlockCursor;
+use kirin_interpreter_20::dispatch::Dispatch;
+use kirin_interpreter_20::env::{AbstractEnv, Env};
+use kirin_interpreter_20::error::InterpreterError;
+use kirin_interpreter_20::execute::{Execute, StackEntry};
+use kirin_interpreter_20::fixpoint_driver::FixpointDriver;
+use kirin_interpreter_20::frame::Frame;
+use kirin_interpreter_20::interpretable::Interpretable;
+use kirin_interpreter_20::pipeline::PipelineHandle;
+use kirin_scf::interpreter20::interpret::ScfSeam;
 use kirin_scf::{For, ForLoopValue, If};
 use rustc_hash::{FxHashMap, FxHashSet};
 
@@ -267,7 +267,7 @@ impl<'ir, V: Clone> MultiInterp<'ir, V> {
 }
 
 impl<'ir, V: Clone> Env for MultiInterp<'ir, V> {
-    type Mode = kirin_interpreter_19::env::ConcreteMode<MultiCursor<V>>;
+    type Mode = kirin_interpreter_20::env::ConcreteMode<MultiCursor<V>>;
     type Value = V;
     type Ext = CursorExt<MultiCursor<V>>;
     type Error = InterpreterError;
@@ -492,7 +492,7 @@ impl<'ir, V: Clone + AbstractValue> AbstractMultiInterp<'ir, V> {
 }
 
 impl<'ir, V: Clone + AbstractValue> Env for AbstractMultiInterp<'ir, V> {
-    type Mode = kirin_interpreter_19::env::AbstractMode<AbstractMultiCursor<V>>;
+    type Mode = kirin_interpreter_20::env::AbstractMode<AbstractMultiCursor<V>>;
     type Value = V;
     type Ext = CursorExt<AbstractMultiCursor<V>>;
     type Error = InterpreterError;

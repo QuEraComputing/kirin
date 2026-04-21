@@ -2,21 +2,21 @@ use std::collections::{HashMap, HashSet};
 
 use kirin::prelude::*;
 use kirin_interpreter::AbstractValue;
-use kirin_interpreter_19::abstract_interp::AbstractInterp;
-use kirin_interpreter_19::backward::{BackwardFixpoint, BlockTransferBackward};
-use kirin_interpreter_19::concrete::ConcreteInterp;
+use kirin_interpreter_20::abstract_interp::AbstractInterp;
+use kirin_interpreter_20::backward::{BackwardFixpoint, BlockTransferBackward};
+use kirin_interpreter_20::concrete::ConcreteInterp;
 use kirin_interval::Interval;
 
-use crate::interpreter19::cursors::{
+use crate::interpreter20::cursors::{
     AbstractMultiCursor, HighLevelAbstractCursor, HighLevelCursor, LowLevelAbstract,
 };
-use crate::interpreter19::domains::{ConstProp, ToyType};
-use crate::interpreter19::interp::{AbstractMultiInterp, MultiInterp, ToyVal};
+use crate::interpreter20::domains::{ConstProp, ToyType};
+use crate::interpreter20::interp::{AbstractMultiInterp, MultiInterp, ToyVal};
 use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
 
-use kirin_interpreter_19::execute::Execute;
-use kirin_interpreter_19::interpretable::Interpretable;
+use kirin_interpreter_20::execute::Execute;
+use kirin_interpreter_20::interpretable::Interpretable;
 
 // ---------------------------------------------------------------------------
 // Helper functions

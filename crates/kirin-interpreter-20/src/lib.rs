@@ -20,7 +20,10 @@ pub mod pipeline;
 pub mod prelude {
     pub use crate::abstract_call_dispatch::AbstractCallDispatch;
     pub use crate::abstract_interp::AbstractInterp;
-    pub use crate::algebra::{Lift, LiftInto, Project, ProjectInto, SingleStageCursorFor};
+    pub use crate::algebra::{
+        Lift, LiftError, Project, ProjectError, SingleStageCursorFor, TryLift, TryLiftFrom,
+        TryProject, TryProjectTo,
+    };
     pub use crate::backward::{BackwardFixpoint, BlockTransferBackward};
     pub use crate::block_exec::{BlockExecEnv, JumpOutcome};
     pub use crate::call_dispatch::CallDispatch;

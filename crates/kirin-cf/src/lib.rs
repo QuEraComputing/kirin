@@ -49,6 +49,6 @@ pub enum ControlFlow<T: CompileTimeValue> {
 
 mod interpret_impl;
 
-// pub mod interpreter19;  // temporarily disabled: pending lift/project algebra upgrade
+pub mod interpreter20;
 #[cfg(test)]
 mod tests;

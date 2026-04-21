@@ -2,7 +2,9 @@ use kirin_ir::Dialect;
 
 use crate::control::{Control, CursorExt};
 
-pub use kirin_ir::{Lift, LiftInto, Project, ProjectInto};
+pub use kirin_ir::{
+    Lift, LiftError, Project, ProjectError, TryLift, TryLiftFrom, TryProject, TryProjectTo,
+};
 
 /// Marker trait for cursor types that serve a single dialect at a single stage.
 pub trait SingleStageCursorFor<L: Dialect> {}
@@ -17,12 +19,16 @@ where
     }
 }
 
+/// Project a `CursorExt<C>` to `CursorExt<Local>`, returning the original on failure.
+///
+/// Requires `C: TryProjectTo<Local, Error = C>` so that a failed projection returns
+/// the original cursor value (needed to reconstruct `CursorExt::Push(c)`).
 pub fn project_cursor_ext<C, Local>(ext: CursorExt<C>) -> Result<CursorExt<Local>, CursorExt<C>>
 where
-    C: Project<Local>,
+    C: TryProjectTo<Local, Error = C>,
 {
     match ext {
-        CursorExt::Push(c) => match c.try_project() {
+        CursorExt::Push(c) => match c.try_project_to() {
             Ok(local) => Ok(CursorExt::Push(local)),
             Err(c) => Err(CursorExt::Push(c)),
         },
@@ -34,7 +40,7 @@ pub fn project_control<V, Ext, Local>(
     ctrl: Control<V, Ext>,
 ) -> Result<Control<V, Local>, Control<V, Ext>>
 where
-    Ext: Project<Local>,
+    Ext: TryProjectTo<Local, Error = Ext>,
 {
     match ctrl {
         Control::Advance => Ok(Control::Advance),
@@ -53,7 +59,7 @@ where
             args,
             results,
         }),
-        Control::Ext(ext) => match ext.try_project() {
+        Control::Ext(ext) => match ext.try_project_to() {
             Ok(local) => Ok(Control::Ext(local)),
             Err(ext) => Err(Control::Ext(ext)),
         },

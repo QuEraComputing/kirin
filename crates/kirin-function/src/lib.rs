@@ -52,4 +52,4 @@ pub enum Lifted<T: CompileTimeValue> {
     Call(Call<T>),
     Return(Return<T>),
 }
-// pub mod interpreter19;  // temporarily disabled: pending lift/project algebra upgrade
+pub mod interpreter20;

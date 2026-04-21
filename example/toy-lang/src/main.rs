@@ -1,4 +1,4 @@
-// mod interpreter19;  // temporarily disabled: pending lift/project algebra upgrade
+mod interpreter20;
 mod language;
 mod stage;
 

@@ -1,13 +1,13 @@
 use kirin::prelude::HasStageInfo;
-use kirin_interpreter_19::algebra::{Lift, Project, SingleStageCursorFor};
-use kirin_interpreter_19::block_exec::BlockExecEnv;
-use kirin_interpreter_19::control::{Control, CursorExt};
-use kirin_interpreter_19::cursor::BlockCursor;
-use kirin_interpreter_19::env::AbstractEnv;
-use kirin_interpreter_19::error::InterpreterError;
-use kirin_interpreter_19::execute::Execute;
-use kirin_interpreter_19::interpretable::Interpretable;
-use kirin_scf::interpreter19::cursor::{
+use kirin_interpreter_20::algebra::{Lift, SingleStageCursorFor, TryLiftFrom, TryProjectTo};
+use kirin_interpreter_20::block_exec::BlockExecEnv;
+use kirin_interpreter_20::control::{Control, CursorExt};
+use kirin_interpreter_20::cursor::BlockCursor;
+use kirin_interpreter_20::env::AbstractEnv;
+use kirin_interpreter_20::error::InterpreterError;
+use kirin_interpreter_20::execute::Execute;
+use kirin_interpreter_20::interpretable::Interpretable;
+use kirin_scf::interpreter20::cursor::{
     AbstractForCursor, AbstractIfCursor, AbstractSCFCursor, ForCursor, IfCursor, SCFCursor,
 };
 
@@ -26,32 +26,37 @@ pub enum HighLevelCursor<V: Clone> {
     Scf(SCFCursorHigh<V>),
 }
 
-impl<V: Clone> Lift<HighLevelCursor<V>> for BlockCursor<V, HighLevel> {
-    fn lift(self) -> HighLevelCursor<V> {
-        HighLevelCursor::Block(self)
+impl<V: Clone> TryLiftFrom<BlockCursor<V, HighLevel>> for HighLevelCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: BlockCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(HighLevelCursor::Block(c))
     }
 }
 
-impl<V: Clone> Lift<HighLevelCursor<V>> for SCFCursorHigh<V> {
-    fn lift(self) -> HighLevelCursor<V> {
-        HighLevelCursor::Scf(self)
+impl<V: Clone> TryLiftFrom<SCFCursorHigh<V>> for HighLevelCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: SCFCursorHigh<V>) -> Result<Self, Self::Error> {
+        Ok(HighLevelCursor::Scf(c))
     }
 }
 
-impl<V: Clone> Lift<HighLevelCursor<V>> for IfCursor<V, HighLevel> {
-    fn lift(self) -> HighLevelCursor<V> {
-        HighLevelCursor::Scf(SCFCursor::If(self))
+impl<V: Clone> TryLiftFrom<IfCursor<V, HighLevel>> for HighLevelCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: IfCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(HighLevelCursor::Scf(SCFCursor::If(c)))
     }
 }
 
-impl<V: Clone> Lift<HighLevelCursor<V>> for ForCursor<V, HighLevel> {
-    fn lift(self) -> HighLevelCursor<V> {
-        HighLevelCursor::Scf(SCFCursor::For(self))
+impl<V: Clone> TryLiftFrom<ForCursor<V, HighLevel>> for HighLevelCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: ForCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(HighLevelCursor::Scf(SCFCursor::For(c)))
     }
 }
 
-impl<V: Clone> Project<BlockCursor<V, HighLevel>> for HighLevelCursor<V> {
-    fn try_project(self) -> Result<BlockCursor<V, HighLevel>, Self> {
+impl<V: Clone> TryProjectTo<BlockCursor<V, HighLevel>> for HighLevelCursor<V> {
+    type Error = Self;
+    fn try_project_to(self) -> Result<BlockCursor<V, HighLevel>, Self> {
         match self {
             HighLevelCursor::Block(c) => Ok(c),
             other => Err(other),
@@ -83,7 +88,6 @@ where
 
 // ---------------------------------------------------------------------------
 // HighLevelAbstractCursor — abstract coproduct for HighLevel.
-// KEY CHANGE: uses BlockCursor<V, HighLevel>, not AbstractBlockCursor.
 // ---------------------------------------------------------------------------
 
 pub type AbstractSCFCursorHigh<V> = AbstractSCFCursor<V, HighLevel>;
@@ -93,32 +97,37 @@ pub enum HighLevelAbstractCursor<V: Clone> {
     Scf(AbstractSCFCursorHigh<V>),
 }
 
-impl<V: Clone> Lift<HighLevelAbstractCursor<V>> for BlockCursor<V, HighLevel> {
-    fn lift(self) -> HighLevelAbstractCursor<V> {
-        HighLevelAbstractCursor::Block(self)
+impl<V: Clone> TryLiftFrom<BlockCursor<V, HighLevel>> for HighLevelAbstractCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: BlockCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(HighLevelAbstractCursor::Block(c))
     }
 }
 
-impl<V: Clone> Lift<HighLevelAbstractCursor<V>> for AbstractSCFCursorHigh<V> {
-    fn lift(self) -> HighLevelAbstractCursor<V> {
-        HighLevelAbstractCursor::Scf(self)
+impl<V: Clone> TryLiftFrom<AbstractSCFCursorHigh<V>> for HighLevelAbstractCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: AbstractSCFCursorHigh<V>) -> Result<Self, Self::Error> {
+        Ok(HighLevelAbstractCursor::Scf(c))
     }
 }
 
-impl<V: Clone> Lift<HighLevelAbstractCursor<V>> for AbstractIfCursor<V, HighLevel> {
-    fn lift(self) -> HighLevelAbstractCursor<V> {
-        HighLevelAbstractCursor::Scf(AbstractSCFCursor::If(self))
+impl<V: Clone> TryLiftFrom<AbstractIfCursor<V, HighLevel>> for HighLevelAbstractCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: AbstractIfCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(HighLevelAbstractCursor::Scf(AbstractSCFCursor::If(c)))
     }
 }
 
-impl<V: Clone> Lift<HighLevelAbstractCursor<V>> for AbstractForCursor<V, HighLevel> {
-    fn lift(self) -> HighLevelAbstractCursor<V> {
-        HighLevelAbstractCursor::Scf(AbstractSCFCursor::For(self))
+impl<V: Clone> TryLiftFrom<AbstractForCursor<V, HighLevel>> for HighLevelAbstractCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: AbstractForCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(HighLevelAbstractCursor::Scf(AbstractSCFCursor::For(c)))
     }
 }
 
-impl<V: Clone> Project<BlockCursor<V, HighLevel>> for HighLevelAbstractCursor<V> {
-    fn try_project(self) -> Result<BlockCursor<V, HighLevel>, Self> {
+impl<V: Clone> TryProjectTo<BlockCursor<V, HighLevel>> for HighLevelAbstractCursor<V> {
+    type Error = Self;
+    fn try_project_to(self) -> Result<BlockCursor<V, HighLevel>, Self> {
         match self {
             HighLevelAbstractCursor::Block(c) => Ok(c),
             other => Err(other),
@@ -151,7 +160,6 @@ where
 
 // ---------------------------------------------------------------------------
 // LowLevelAbstract — wrapper enabling SingleStageCursorFor<LowLevel>.
-// KEY CHANGE: wraps BlockCursor<V, LowLevel>, not AbstractBlockCursor.
 // ---------------------------------------------------------------------------
 
 pub struct LowLevelAbstract<V: Clone>(pub BlockCursor<V, LowLevel>);
@@ -186,38 +194,44 @@ pub enum MultiCursor<V: Clone> {
     Low(BlockCursor<V, LowLevel>),
 }
 
-impl<V: Clone> Lift<MultiCursor<V>> for BlockCursor<V, HighLevel> {
-    fn lift(self) -> MultiCursor<V> {
-        MultiCursor::High(self)
+impl<V: Clone> TryLiftFrom<BlockCursor<V, HighLevel>> for MultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: BlockCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(MultiCursor::High(c))
     }
 }
 
-impl<V: Clone> Lift<MultiCursor<V>> for IfCursor<V, HighLevel> {
-    fn lift(self) -> MultiCursor<V> {
-        MultiCursor::Scf(SCFCursor::If(self))
+impl<V: Clone> TryLiftFrom<IfCursor<V, HighLevel>> for MultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: IfCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(MultiCursor::Scf(SCFCursor::If(c)))
     }
 }
 
-impl<V: Clone> Lift<MultiCursor<V>> for ForCursor<V, HighLevel> {
-    fn lift(self) -> MultiCursor<V> {
-        MultiCursor::Scf(SCFCursor::For(self))
+impl<V: Clone> TryLiftFrom<ForCursor<V, HighLevel>> for MultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: ForCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(MultiCursor::Scf(SCFCursor::For(c)))
     }
 }
 
-impl<V: Clone> Lift<MultiCursor<V>> for SCFCursorHigh<V> {
-    fn lift(self) -> MultiCursor<V> {
-        MultiCursor::Scf(self)
+impl<V: Clone> TryLiftFrom<SCFCursorHigh<V>> for MultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: SCFCursorHigh<V>) -> Result<Self, Self::Error> {
+        Ok(MultiCursor::Scf(c))
     }
 }
 
-impl<V: Clone> Lift<MultiCursor<V>> for BlockCursor<V, LowLevel> {
-    fn lift(self) -> MultiCursor<V> {
-        MultiCursor::Low(self)
+impl<V: Clone> TryLiftFrom<BlockCursor<V, LowLevel>> for MultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: BlockCursor<V, LowLevel>) -> Result<Self, Self::Error> {
+        Ok(MultiCursor::Low(c))
     }
 }
 
-impl<V: Clone> Project<BlockCursor<V, HighLevel>> for MultiCursor<V> {
-    fn try_project(self) -> Result<BlockCursor<V, HighLevel>, Self> {
+impl<V: Clone> TryProjectTo<BlockCursor<V, HighLevel>> for MultiCursor<V> {
+    type Error = Self;
+    fn try_project_to(self) -> Result<BlockCursor<V, HighLevel>, Self> {
         match self {
             MultiCursor::High(c) => Ok(c),
             other => Err(other),
@@ -225,8 +239,9 @@ impl<V: Clone> Project<BlockCursor<V, HighLevel>> for MultiCursor<V> {
     }
 }
 
-impl<V: Clone> Project<BlockCursor<V, LowLevel>> for MultiCursor<V> {
-    fn try_project(self) -> Result<BlockCursor<V, LowLevel>, Self> {
+impl<V: Clone> TryProjectTo<BlockCursor<V, LowLevel>> for MultiCursor<V> {
+    type Error = Self;
+    fn try_project_to(self) -> Result<BlockCursor<V, LowLevel>, Self> {
         match self {
             MultiCursor::Low(c) => Ok(c),
             other => Err(other),
@@ -259,7 +274,6 @@ where
 
 // ---------------------------------------------------------------------------
 // AbstractMultiCursor — abstract cursor coproduct spanning source and lowered.
-// KEY CHANGE: uses BlockCursor<V, L>, not AbstractBlockCursor<V, L>.
 // ---------------------------------------------------------------------------
 
 pub enum AbstractMultiCursor<V: Clone> {
@@ -268,38 +282,44 @@ pub enum AbstractMultiCursor<V: Clone> {
     Low(BlockCursor<V, LowLevel>),
 }
 
-impl<V: Clone> Lift<AbstractMultiCursor<V>> for BlockCursor<V, HighLevel> {
-    fn lift(self) -> AbstractMultiCursor<V> {
-        AbstractMultiCursor::HighBlock(self)
+impl<V: Clone> TryLiftFrom<BlockCursor<V, HighLevel>> for AbstractMultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: BlockCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(AbstractMultiCursor::HighBlock(c))
     }
 }
 
-impl<V: Clone> Lift<AbstractMultiCursor<V>> for AbstractSCFCursorHigh<V> {
-    fn lift(self) -> AbstractMultiCursor<V> {
-        AbstractMultiCursor::HighScf(self)
+impl<V: Clone> TryLiftFrom<AbstractSCFCursorHigh<V>> for AbstractMultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: AbstractSCFCursorHigh<V>) -> Result<Self, Self::Error> {
+        Ok(AbstractMultiCursor::HighScf(c))
     }
 }
 
-impl<V: Clone> Lift<AbstractMultiCursor<V>> for AbstractIfCursor<V, HighLevel> {
-    fn lift(self) -> AbstractMultiCursor<V> {
-        AbstractMultiCursor::HighScf(AbstractSCFCursor::If(self))
+impl<V: Clone> TryLiftFrom<AbstractIfCursor<V, HighLevel>> for AbstractMultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: AbstractIfCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(AbstractMultiCursor::HighScf(AbstractSCFCursor::If(c)))
     }
 }
 
-impl<V: Clone> Lift<AbstractMultiCursor<V>> for AbstractForCursor<V, HighLevel> {
-    fn lift(self) -> AbstractMultiCursor<V> {
-        AbstractMultiCursor::HighScf(AbstractSCFCursor::For(self))
+impl<V: Clone> TryLiftFrom<AbstractForCursor<V, HighLevel>> for AbstractMultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: AbstractForCursor<V, HighLevel>) -> Result<Self, Self::Error> {
+        Ok(AbstractMultiCursor::HighScf(AbstractSCFCursor::For(c)))
     }
 }
 
-impl<V: Clone> Lift<AbstractMultiCursor<V>> for BlockCursor<V, LowLevel> {
-    fn lift(self) -> AbstractMultiCursor<V> {
-        AbstractMultiCursor::Low(self)
+impl<V: Clone> TryLiftFrom<BlockCursor<V, LowLevel>> for AbstractMultiCursor<V> {
+    type Error = kirin_interpreter_20::algebra::LiftError;
+    fn try_lift_from(c: BlockCursor<V, LowLevel>) -> Result<Self, Self::Error> {
+        Ok(AbstractMultiCursor::Low(c))
     }
 }
 
-impl<V: Clone> Project<BlockCursor<V, HighLevel>> for AbstractMultiCursor<V> {
-    fn try_project(self) -> Result<BlockCursor<V, HighLevel>, Self> {
+impl<V: Clone> TryProjectTo<BlockCursor<V, HighLevel>> for AbstractMultiCursor<V> {
+    type Error = Self;
+    fn try_project_to(self) -> Result<BlockCursor<V, HighLevel>, Self> {
         match self {
             AbstractMultiCursor::HighBlock(c) => Ok(c),
             other => Err(other),
@@ -307,8 +327,9 @@ impl<V: Clone> Project<BlockCursor<V, HighLevel>> for AbstractMultiCursor<V> {
     }
 }
 
-impl<V: Clone> Project<BlockCursor<V, LowLevel>> for AbstractMultiCursor<V> {
-    fn try_project(self) -> Result<BlockCursor<V, LowLevel>, Self> {
+impl<V: Clone> TryProjectTo<BlockCursor<V, LowLevel>> for AbstractMultiCursor<V> {
+    type Error = Self;
+    fn try_project_to(self) -> Result<BlockCursor<V, LowLevel>, Self> {
         match self {
             AbstractMultiCursor::Low(c) => Ok(c),
             other => Err(other),
