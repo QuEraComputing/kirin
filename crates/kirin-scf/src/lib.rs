@@ -99,4 +99,4 @@ pub struct Yield<T: CompileTimeValue> {
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
-pub mod interpreter19;
+// pub mod interpreter19;  // temporarily disabled: pending lift/project algebra upgrade

@@ -284,12 +284,14 @@ fn test_dialect_derive_enum_pure_wrapper_generates_lift_project() {
     };
     let code = generate_dialect_code(input);
     assert!(
-        code.contains("Lift<CompositeOps>"),
-        "pure wrapper enum must generate Lift impls.\nGenerated code:\n{code}"
+        code.contains("TryLiftFrom<AlphaOp>")
+            && code.contains("TryLiftFrom<BetaOp>")
+            && code.contains("TryLiftFrom<GammaOp>"),
+        "pure wrapper enum must generate TryLiftFrom impls.\nGenerated code:\n{code}"
     );
     assert!(
-        code.contains("Project<AlphaOp>") && code.contains("Project<BetaOp>"),
-        "pure wrapper enum must generate Project impls.\nGenerated code:\n{code}"
+        code.contains("TryProjectTo<AlphaOp>") && code.contains("TryProjectTo<BetaOp>"),
+        "pure wrapper enum must generate TryProjectTo impls.\nGenerated code:\n{code}"
     );
     insta::assert_snapshot!(code);
 }
@@ -307,12 +309,12 @@ fn test_dialect_derive_enum_mixed_does_not_generate_lift_project() {
     };
     let code = generate_dialect_code(input);
     assert!(
-        !code.contains("Lift<MixedOps>"),
-        "mixed enum must NOT generate Lift impls.\nGenerated code:\n{code}"
+        !code.contains("TryLiftFrom<AddOp>"),
+        "mixed enum must NOT generate TryLiftFrom impls.\nGenerated code:\n{code}"
     );
     assert!(
-        !code.contains("Project<AddOp>"),
-        "mixed enum must NOT generate Project impls.\nGenerated code:\n{code}"
+        !code.contains("TryProjectTo<AddOp>"),
+        "mixed enum must NOT generate TryProjectTo impls.\nGenerated code:\n{code}"
     );
 }
 
@@ -333,8 +335,8 @@ fn test_dialect_derive_enum_wrapper_with_side_fields_no_lift_project() {
     };
     let code = generate_dialect_code(input);
     assert!(
-        !code.contains("Lift<MixedWraps>"),
-        "wrapper-with-side-fields enum must NOT generate Lift impls.\nGenerated code:\n{code}"
+        !code.contains("TryLiftFrom<SimpleOp>"),
+        "wrapper-with-side-fields enum must NOT generate TryLiftFrom impls.\nGenerated code:\n{code}"
     );
 }
 
@@ -348,11 +350,11 @@ fn test_dialect_derive_wrapper_struct_generates_lift_project() {
     };
     let code = generate_dialect_code(input);
     assert!(
-        code.contains("Lift<WrapperOp>"),
-        "wrapper struct must generate Lift impl.\nGenerated code:\n{code}"
+        code.contains("TryLiftFrom<InnerOp>"),
+        "wrapper struct must generate TryLiftFrom impl.\nGenerated code:\n{code}"
     );
     assert!(
-        code.contains("Project<InnerOp>"),
-        "wrapper struct must generate Project impl.\nGenerated code:\n{code}"
+        code.contains("TryProjectTo<InnerOp>"),
+        "wrapper struct must generate TryProjectTo impl.\nGenerated code:\n{code}"
     );
 }

@@ -569,47 +569,53 @@ impl ::kirin::ir::HasSignature<Self> for CompositeOps {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Lift<CompositeOps> for AlphaOp {
-    fn lift(self) -> CompositeOps {
-        CompositeOps::Alpha(self)
+impl ::kirin::ir::TryLiftFrom<AlphaOp> for CompositeOps {
+    type Error = ::kirin::ir::LiftError;
+    fn try_lift_from(from: AlphaOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(CompositeOps::Alpha(from))
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Project<AlphaOp> for CompositeOps {
-    fn try_project(self) -> ::core::result::Result<AlphaOp, Self> {
+impl ::kirin::ir::TryProjectTo<AlphaOp> for CompositeOps {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<AlphaOp, Self::Error> {
         match self {
             CompositeOps::Alpha(inner) => Ok(inner),
-            other => Err(other),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
         }
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Lift<CompositeOps> for BetaOp {
-    fn lift(self) -> CompositeOps {
-        CompositeOps::Beta(self)
+impl ::kirin::ir::TryLiftFrom<BetaOp> for CompositeOps {
+    type Error = ::kirin::ir::LiftError;
+    fn try_lift_from(from: BetaOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(CompositeOps::Beta(from))
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Project<BetaOp> for CompositeOps {
-    fn try_project(self) -> ::core::result::Result<BetaOp, Self> {
+impl ::kirin::ir::TryProjectTo<BetaOp> for CompositeOps {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<BetaOp, Self::Error> {
         match self {
             CompositeOps::Beta(inner) => Ok(inner),
-            other => Err(other),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
         }
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Lift<CompositeOps> for GammaOp {
-    fn lift(self) -> CompositeOps {
-        CompositeOps::Gamma(self)
+impl ::kirin::ir::TryLiftFrom<GammaOp> for CompositeOps {
+    type Error = ::kirin::ir::LiftError;
+    fn try_lift_from(from: GammaOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(CompositeOps::Gamma(from))
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Project<GammaOp> for CompositeOps {
-    fn try_project(self) -> ::core::result::Result<GammaOp, Self> {
+impl ::kirin::ir::TryProjectTo<GammaOp> for CompositeOps {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<GammaOp, Self::Error> {
         match self {
             CompositeOps::Gamma(inner) => Ok(inner),
-            other => Err(other),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
         }
     }
 }

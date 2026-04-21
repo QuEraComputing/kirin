@@ -493,32 +493,36 @@ impl ::kirin::ir::HasSignature<Self> for CfOps {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Lift<CfOps> for BranchOp {
-    fn lift(self) -> CfOps {
-        CfOps::Branch(self)
+impl ::kirin::ir::TryLiftFrom<BranchOp> for CfOps {
+    type Error = ::kirin::ir::LiftError;
+    fn try_lift_from(from: BranchOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(CfOps::Branch(from))
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Project<BranchOp> for CfOps {
-    fn try_project(self) -> ::core::result::Result<BranchOp, Self> {
+impl ::kirin::ir::TryProjectTo<BranchOp> for CfOps {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<BranchOp, Self::Error> {
         match self {
             CfOps::Branch(inner) => Ok(inner),
-            other => Err(other),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
         }
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Lift<CfOps> for ReturnOp {
-    fn lift(self) -> CfOps {
-        CfOps::Return(self)
+impl ::kirin::ir::TryLiftFrom<ReturnOp> for CfOps {
+    type Error = ::kirin::ir::LiftError;
+    fn try_lift_from(from: ReturnOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(CfOps::Return(from))
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Project<ReturnOp> for CfOps {
-    fn try_project(self) -> ::core::result::Result<ReturnOp, Self> {
+impl ::kirin::ir::TryProjectTo<ReturnOp> for CfOps {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<ReturnOp, Self::Error> {
         match self {
             CfOps::Return(inner) => Ok(inner),
-            other => Err(other),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
         }
     }
 }

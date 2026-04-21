@@ -2,10 +2,11 @@ use kirin_derive_toolkit::ir::{Data, Input, StandardLayout};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-/// Generate `Lift` and `Project` impls for pure wrapper dialects.
+/// Generate `TryLiftFrom` and `TryProjectTo` impls for pure wrapper dialects.
 ///
-/// - **Pure wrapper enum** (all variants have `#[wraps]`): generates one `Lift<Enum>` impl
-///   for each wrapped type, and one `Project<WrappedType>` impl on the enum for each variant.
+/// - **Pure wrapper enum** (all variants have `#[wraps]`): generates one `TryLiftFrom<InnerTy>`
+///   impl on the enum for each wrapped type, and one `TryProjectTo<InnerTy>` impl on the enum
+///   for each variant.
 /// - **Wrapper struct** (struct with `#[wraps]`): same, for the single inner type.
 /// - **Non-pure-wrapper enum or non-wrapper struct**: emits nothing — Lift/Project algebra
 ///   is only derivable when the dialect is a transparent composition of sub-dialects.
@@ -36,22 +37,24 @@ pub(crate) fn generate_lift_project(
 
                     quote! {
                         #[automatically_derived]
-                        impl #impl_generics #crate_path::Lift<#name #ty_generics> for #inner_ty
+                        impl #impl_generics #crate_path::TryLiftFrom<#inner_ty> for #name #ty_generics
                         #where_clause
                         {
-                            fn lift(self) -> #name #ty_generics {
-                                #name::#variant_name(self)
+                            type Error = #crate_path::LiftError;
+                            fn try_lift_from(from: #inner_ty) -> ::core::result::Result<Self, Self::Error> {
+                                Ok(#name::#variant_name(from))
                             }
                         }
 
                         #[automatically_derived]
-                        impl #impl_generics #crate_path::Project<#inner_ty> for #name #ty_generics
+                        impl #impl_generics #crate_path::TryProjectTo<#inner_ty> for #name #ty_generics
                         #where_clause
                         {
-                            fn try_project(self) -> ::core::result::Result<#inner_ty, Self> {
+                            type Error = #crate_path::ProjectError;
+                            fn try_project_to(self) -> ::core::result::Result<#inner_ty, Self::Error> {
                                 match self {
                                     #name::#variant_name(inner) => Ok(inner),
-                                    other => Err(other),
+                                    _ => Err(#crate_path::ProjectError::InvalidVariant),
                                 }
                             }
                         }
@@ -68,28 +71,30 @@ pub(crate) fn generate_lift_project(
             let (lift_body, destruct) = if wrapper.field.ident.is_some() {
                 let field_name = wrapper.field.name();
                 (
-                    quote! { #name { #field_name: self } },
+                    quote! { #name { #field_name: from } },
                     quote! { #name { #field_name: inner } },
                 )
             } else {
-                (quote! { #name(self) }, quote! { #name(inner) })
+                (quote! { #name(from) }, quote! { #name(inner) })
             };
 
             quote! {
                 #[automatically_derived]
-                impl #impl_generics #crate_path::Lift<#name #ty_generics> for #inner_ty
+                impl #impl_generics #crate_path::TryLiftFrom<#inner_ty> for #name #ty_generics
                 #where_clause
                 {
-                    fn lift(self) -> #name #ty_generics {
-                        #lift_body
+                    type Error = #crate_path::LiftError;
+                    fn try_lift_from(from: #inner_ty) -> ::core::result::Result<Self, Self::Error> {
+                        Ok(#lift_body)
                     }
                 }
 
                 #[automatically_derived]
-                impl #impl_generics #crate_path::Project<#inner_ty> for #name #ty_generics
+                impl #impl_generics #crate_path::TryProjectTo<#inner_ty> for #name #ty_generics
                 #where_clause
                 {
-                    fn try_project(self) -> ::core::result::Result<#inner_ty, Self> {
+                    type Error = #crate_path::ProjectError;
+                    fn try_project_to(self) -> ::core::result::Result<#inner_ty, Self::Error> {
                         let #destruct = self;
                         Ok(inner)
                     }

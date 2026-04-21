@@ -481,32 +481,36 @@ impl ::kirin::ir::HasSignature<Self> for ArithLanguage {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Lift<ArithLanguage> for AddOp {
-    fn lift(self) -> ArithLanguage {
-        ArithLanguage::Add(self)
+impl ::kirin::ir::TryLiftFrom<AddOp> for ArithLanguage {
+    type Error = ::kirin::ir::LiftError;
+    fn try_lift_from(from: AddOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(ArithLanguage::Add(from))
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Project<AddOp> for ArithLanguage {
-    fn try_project(self) -> ::core::result::Result<AddOp, Self> {
+impl ::kirin::ir::TryProjectTo<AddOp> for ArithLanguage {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<AddOp, Self::Error> {
         match self {
             ArithLanguage::Add(inner) => Ok(inner),
-            other => Err(other),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
         }
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Lift<ArithLanguage> for SubOp {
-    fn lift(self) -> ArithLanguage {
-        ArithLanguage::Sub(self)
+impl ::kirin::ir::TryLiftFrom<SubOp> for ArithLanguage {
+    type Error = ::kirin::ir::LiftError;
+    fn try_lift_from(from: SubOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(ArithLanguage::Sub(from))
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Project<SubOp> for ArithLanguage {
-    fn try_project(self) -> ::core::result::Result<SubOp, Self> {
+impl ::kirin::ir::TryProjectTo<SubOp> for ArithLanguage {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<SubOp, Self::Error> {
         match self {
             ArithLanguage::Sub(inner) => Ok(inner),
-            other => Err(other),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
         }
     }
 }

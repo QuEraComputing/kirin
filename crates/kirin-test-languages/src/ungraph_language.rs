@@ -347,7 +347,7 @@ mod tests {
             res: test_ssa.into(),
         };
         let lifted = Lift::<UngraphLanguage>::lift(edge.clone());
-        let back: Result<UngraphEdge, UngraphLanguage> = lifted.try_project();
+        let back: Result<UngraphEdge, ProjectError> = lifted.try_project();
         assert_eq!(back, Ok(edge));
 
         let node_a = UngraphNodeA {
@@ -355,21 +355,20 @@ mod tests {
             ports: vec![],
         };
         let lifted = Lift::<UngraphLanguage>::lift(node_a.clone());
-        let back: Result<UngraphNodeA, UngraphLanguage> = lifted.try_project();
+        let back: Result<UngraphNodeA, ProjectError> = lifted.try_project();
         assert_eq!(back, Ok(node_a));
     }
 
-    /// `try_project` on a mismatched variant returns `Err` with the original sum.
+    /// `try_project` on a mismatched variant returns `Err(ProjectError::InvalidVariant)`.
     #[test]
     fn project_wrong_variant_returns_err() {
         let test_ssa: SSAValue = TestSSAValue(0).into();
         let edge = UngraphEdge {
             res: test_ssa.into(),
         };
-        let lifted = Lift::<UngraphLanguage>::lift(edge.clone());
-        // Projecting as NodeA must fail and return the original sum.
-        let result: Result<UngraphNodeA, UngraphLanguage> = lifted.try_project();
-        assert_eq!(result, Err(UngraphLanguage::Edge(edge)));
+        let lifted = Lift::<UngraphLanguage>::lift(edge);
+        let result: Result<UngraphNodeA, ProjectError> = lifted.try_project();
+        assert_eq!(result, Err(ProjectError::InvalidVariant));
     }
 
     /// `try_project` then `lift` on the same variant is the identity.
@@ -385,18 +384,76 @@ mod tests {
         assert_eq!(roundtrip, sum);
     }
 
-    /// `LiftInto` and `ProjectInto` convenience mirrors agree with `lift`/`try_project`.
+    /// `TryLift`/`TryProject` convenience traits agree with `lift`/`try_project`.
     #[test]
-    fn lift_into_project_into_roundtrip() {
+    fn try_lift_try_project_roundtrip() {
         let test_ssa: SSAValue = TestSSAValue(0).into();
         let node_b = UngraphNodeB {
             param0: test_ssa,
             param1: test_ssa,
             ports: vec![],
         };
-        let sum: UngraphLanguage = node_b.clone().lift_into();
-        let back: Result<UngraphNodeB, UngraphLanguage> = sum.project_into();
+        let sum: UngraphLanguage = node_b.clone().lift();
+        let back: Result<UngraphNodeB, ProjectError> = sum.try_project();
         assert_eq!(back, Ok(node_b));
+    }
+
+    /// `try_lift` returns `Ok` for pure wrapper dialects.
+    #[test]
+    fn try_lift_returns_ok_for_dialect() {
+        let test_ssa: SSAValue = TestSSAValue(0).into();
+        let edge = UngraphEdge {
+            res: test_ssa.into(),
+        };
+        let result: Result<UngraphLanguage, _> = edge.clone().try_lift();
+        assert_eq!(result, Ok(UngraphLanguage::Edge(edge)));
+    }
+
+    /// `project` (infallible) succeeds when the variant matches.
+    #[test]
+    fn project_infallible_ok() {
+        let test_ssa: SSAValue = TestSSAValue(0).into();
+        let edge = UngraphEdge {
+            res: test_ssa.into(),
+        };
+        let sum = UngraphLanguage::Edge(edge.clone());
+        let inner: UngraphEdge = sum.project();
+        assert_eq!(inner, edge);
+    }
+
+    /// `project` (infallible) panics when the variant doesn't match.
+    #[test]
+    #[should_panic(expected = "project failed: invalid variant")]
+    fn project_infallible_panics_on_wrong_variant() {
+        let test_ssa: SSAValue = TestSSAValue(0).into();
+        let edge = UngraphEdge {
+            res: test_ssa.into(),
+        };
+        let sum = UngraphLanguage::Edge(edge);
+        let _: UngraphNodeA = sum.project();
+    }
+
+    /// `TryLiftFrom::try_lift_from` core trait is callable directly.
+    #[test]
+    fn core_try_lift_from_direct() {
+        let test_ssa: SSAValue = TestSSAValue(0).into();
+        let edge = UngraphEdge {
+            res: test_ssa.into(),
+        };
+        let result = UngraphLanguage::try_lift_from(edge.clone());
+        assert_eq!(result, Ok(UngraphLanguage::Edge(edge)));
+    }
+
+    /// `TryProjectTo::try_project_to` core trait is callable directly.
+    #[test]
+    fn core_try_project_to_direct() {
+        let test_ssa: SSAValue = TestSSAValue(0).into();
+        let edge = UngraphEdge {
+            res: test_ssa.into(),
+        };
+        let sum = UngraphLanguage::Edge(edge.clone());
+        let result = sum.try_project_to();
+        assert_eq!(result, Ok(edge));
     }
 
     /// Compound node embedded in a block — mixing sequential and graph IR.

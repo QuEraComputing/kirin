@@ -357,14 +357,16 @@ impl ::kirin::ir::HasSignature<Self> for WrapperOp {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Lift<WrapperOp> for InnerOp {
-    fn lift(self) -> WrapperOp {
-        WrapperOp(self)
+impl ::kirin::ir::TryLiftFrom<InnerOp> for WrapperOp {
+    type Error = ::kirin::ir::LiftError;
+    fn try_lift_from(from: InnerOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(WrapperOp(from))
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Project<InnerOp> for WrapperOp {
-    fn try_project(self) -> ::core::result::Result<InnerOp, Self> {
+impl ::kirin::ir::TryProjectTo<InnerOp> for WrapperOp {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<InnerOp, Self::Error> {
         let WrapperOp(inner) = self;
         Ok(inner)
     }

@@ -1,11 +1,11 @@
 mod arena;
 mod builder;
-mod compose;
 mod comptime;
 mod detach;
 mod intern;
 mod language;
 mod lattice;
+mod lift;
 mod node;
 mod pipeline;
 mod product;
@@ -21,7 +21,6 @@ pub use builder::error::{
     StagedFunctionError,
 };
 pub use builder::{AsBuildStage, BuilderStageInfo, FinalizeError};
-pub use compose::{Lift, LiftInto, Project, ProjectInto};
 pub use comptime::{CompileTimeValue, Placeholder, Typeof};
 pub use detach::Detach;
 pub use intern::InternTable;
@@ -32,6 +31,9 @@ pub use language::{
     IsTerminator,
 };
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice, Widen};
+pub use lift::{
+    Lift, LiftError, Project, ProjectError, TryLift, TryLiftFrom, TryProject, TryProjectTo,
+};
 pub use node::{
     Block, BlockArgument, BlockInfo, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CompileStage,
     DeletedSSAValue, DiGraph, DiGraphExtra, DiGraphInfo, Function, FunctionInfo, GlobalSymbol,
@@ -59,8 +61,8 @@ pub mod prelude {
         SignatureSemantics, StageInfo, StageMeta, Statement,
     };
     pub use crate::{
-        CompileTimeValue, HasProduct, Lift, LiftInto, Placeholder, Product, Project, ProjectInto,
-        Typeof,
+        CompileTimeValue, HasProduct, Lift, LiftError, Placeholder, Product, Project, ProjectError,
+        TryLift, TryLiftFrom, TryProject, TryProjectTo, Typeof,
     };
 }
 

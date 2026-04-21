@@ -19,7 +19,7 @@ members = [
   "crates/kirin-derive-toolkit",
   "crates/kirin-function",
   "crates/kirin-interpreter",
-  "crates/kirin-interpreter-19",
+  # "crates/kirin-interpreter-19",  # temporarily disabled: pending lift/project algebra upgrade
   "crates/kirin-interval",
   "crates/kirin-ir",
   "crates/kirin-lexer",
@@ -74,7 +74,7 @@ kirin-derive-prettyless = { path = "crates/kirin-derive-prettyless", version = "
 kirin-derive-toolkit = { path = "crates/kirin-derive-toolkit", version = "0.1.0" }
 kirin-function = { path = "crates/kirin-function", version = "0.1.0" }
 kirin-interpreter = { path = "crates/kirin-interpreter", version = "0.1.0" }
-kirin-interpreter-19 = { path = "crates/kirin-interpreter-19", version = "0.1.0" }
+# kirin-interpreter-19 = { path = "crates/kirin-interpreter-19", version = "0.1.0" }  # temporarily disabled
 kirin-interval = { path = "crates/kirin-interval", version = "0.1.0" }
 # Internal crates
 kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }
