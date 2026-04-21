@@ -9,6 +9,7 @@ pub mod control;
 pub mod cursor;
 pub mod dispatch;
 pub mod env;
+pub mod env_ext;
 pub mod error;
 pub mod execute;
 pub mod fixpoint_driver;
@@ -16,10 +17,11 @@ pub mod frame;
 pub mod frame_stack;
 pub mod interpretable;
 pub mod pipeline;
+pub mod scheduler;
 
 pub mod prelude {
     pub use crate::abstract_call_dispatch::AbstractCallDispatch;
-    pub use crate::abstract_interp::AbstractInterp;
+    pub use crate::abstract_interp::{AbstractInterp, AnalysisResult};
     pub use crate::algebra::{
         Lift, LiftError, Project, ProjectError, SingleStageCursorFor, TryLift, TryLiftFrom,
         TryProject, TryProjectTo,
@@ -32,9 +34,11 @@ pub mod prelude {
     pub use crate::cursor::BlockCursor;
     pub use crate::dispatch::Dispatch;
     pub use crate::env::{AbstractEnv, AbstractMode, ConcreteMode, Env};
+    pub use crate::env_ext::EnvExt;
     pub use crate::error::InterpreterError;
     pub use crate::execute::Execute;
     pub use crate::fixpoint_driver::FixpointDriver;
     pub use crate::interpretable::Interpretable;
     pub use crate::pipeline::PipelineHandle;
+    pub use crate::scheduler::DedupScheduler;
 }

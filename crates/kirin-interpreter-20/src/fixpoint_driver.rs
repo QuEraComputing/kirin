@@ -84,7 +84,7 @@ where
 // analyze_function
 // ---------------------------------------------------------------------------
 
-fn analyze_function<D>(driver: &mut D, key: StagedKey) -> Result<(), D::Error>
+pub(crate) fn analyze_function<D>(driver: &mut D, key: StagedKey) -> Result<(), D::Error>
 where
     D: FixpointDriver,
     D::Value: Clone + AbstractValue + ProductValue,

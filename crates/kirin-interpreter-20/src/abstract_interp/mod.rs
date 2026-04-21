@@ -1,6 +1,6 @@
 pub mod state;
 
-pub use self::state::{AbstractFrame, FuncState, FuncSummary, StagedKey, Worklist};
+pub use self::state::{AbstractFrame, AnalysisResult, FuncState, FuncSummary, StagedKey, Worklist};
 
 use std::marker::PhantomData;
 
@@ -34,6 +34,8 @@ pub struct AbstractInterp<'ir, S: StageMeta, L: Dialect, V, C> {
     pub func_worklist: state::Worklist<StagedKey>,
     pub current_key: Option<StagedKey>,
     pub cursor_stack: Vec<StackEntry<C, V>>,
+    pub narrowing_iterations: usize,
+    pub(crate) narrowing_mode: bool,
     pub _phantom: PhantomData<L>,
 }
 
@@ -106,18 +108,27 @@ where
             return;
         };
 
+        let narrowing_mode = self.narrowing_mode;
         let changed = if let Some(existing) = state.block_in.get(&block) {
             if existing.len() != args.len() {
                 state.block_in.insert(block, args);
                 true
             } else {
-                let widening = self.widening;
-                let visit_count = *state.visit_counts.get(&block).unwrap_or(&0);
-                let new_args: Vec<V> = existing
-                    .iter()
-                    .zip(args.iter())
-                    .map(|(e, a)| widening.merge(e, a, visit_count))
-                    .collect();
+                let new_args: Vec<V> = if narrowing_mode {
+                    existing
+                        .iter()
+                        .zip(args.iter())
+                        .map(|(e, a)| e.narrow(a))
+                        .collect()
+                } else {
+                    let widening = self.widening;
+                    let visit_count = *state.visit_counts.get(&block).unwrap_or(&0);
+                    existing
+                        .iter()
+                        .zip(args.iter())
+                        .map(|(e, a)| widening.merge(e, a, visit_count))
+                        .collect()
+                };
                 let changed = new_args
                     .iter()
                     .zip(existing.iter())
@@ -289,8 +300,15 @@ impl<'ir, S: StageMeta, L: Dialect, V: Clone + AbstractValue, C> AbstractInterp<
             func_worklist: state::Worklist::new(),
             current_key: None,
             cursor_stack: Vec::new(),
+            narrowing_iterations: 0,
+            narrowing_mode: false,
             _phantom: PhantomData,
         }
+    }
+
+    pub fn with_narrowing_iterations(mut self, n: usize) -> Self {
+        self.narrowing_iterations = n;
+        self
     }
 }
 
@@ -310,6 +328,40 @@ where
         stage_id: CompileStage,
         args: Vec<V>,
     ) -> Result<Option<V>, InterpreterError> {
-        FixpointDriver::run_fixpoint(self, entry_fn, stage_id, args)
+        FixpointDriver::run_fixpoint(self, entry_fn, stage_id, args)?;
+        if self.narrowing_iterations > 0 {
+            self.run_narrowing()?;
+        }
+        Ok(self
+            .summaries
+            .get(&(entry_fn, stage_id))
+            .and_then(|s| s.output.clone()))
+    }
+
+    fn run_narrowing(&mut self) -> Result<(), InterpreterError> {
+        self.narrowing_mode = true;
+        let keys: Vec<StagedKey> = self.summaries.keys().cloned().collect();
+        for _ in 0..self.narrowing_iterations {
+            for &key in &keys {
+                crate::fixpoint_driver::analyze_function(self, key)?;
+            }
+        }
+        self.narrowing_mode = false;
+        Ok(())
+    }
+
+    pub fn analysis_result(
+        &self,
+        func: SpecializedFunction,
+        stage_id: CompileStage,
+    ) -> Option<state::AnalysisResult<V>> {
+        let key = (func, stage_id);
+        let func_state = self.func_states.get(&key)?;
+        let return_value = self.summaries.get(&key).and_then(|s| s.output.clone());
+        Some(state::AnalysisResult {
+            block_in: func_state.block_in.clone(),
+            ssa_values: func_state.active_ssa.clone(),
+            return_value,
+        })
     }
 }

@@ -897,6 +897,7 @@ dependencies = [
  "kirin-interpreter",
  "kirin-ir",
  "rustc-hash",
+ "thiserror 2.0.18",
 ]
 
 [[package]]
@@ -1015,6 +1016,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "kirin-interpreter-20",
  "kirin-test-types",
  "smallvec",
 ]

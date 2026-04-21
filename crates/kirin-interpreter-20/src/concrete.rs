@@ -22,6 +22,8 @@ pub struct ConcreteInterp<'ir, S: StageMeta, L: Dialect, V: Clone, C> {
     pub frames: FrameStack<V>,
     pub cursors: Vec<StackEntry<C, V>>,
     pub result: Option<V>,
+    fuel: Option<u64>,
+    max_depth: Option<usize>,
     _phantom: PhantomData<L>,
 }
 
@@ -93,8 +95,20 @@ impl<'ir, S: StageMeta, L: Dialect, V: Clone, C> ConcreteInterp<'ir, S, L, V, C>
             frames: FrameStack::new(),
             cursors: Vec::new(),
             result: None,
+            fuel: None,
+            max_depth: None,
             _phantom: PhantomData,
         }
+    }
+
+    pub fn with_fuel(mut self, fuel: u64) -> Self {
+        self.fuel = Some(fuel);
+        self
+    }
+
+    pub fn with_max_depth(mut self, depth: usize) -> Self {
+        self.max_depth = Some(depth);
+        self
     }
 }
 
@@ -139,6 +153,12 @@ where
     C: Execute<Self>,
 {
     pub fn step(&mut self) -> Result<bool, InterpreterError> {
+        if let Some(ref mut f) = self.fuel {
+            if *f == 0 {
+                return Err(InterpreterError::FuelExhausted);
+            }
+            *f -= 1;
+        }
         let Some(mut entry) = self.cursors.pop() else {
             return Ok(false);
         };
@@ -178,6 +198,11 @@ where
                 args,
                 results,
             } => {
+                if let Some(max) = self.max_depth
+                    && self.frames.depth() >= max
+                {
+                    return Err(InterpreterError::MaxDepthExceeded);
+                }
                 self.cursors.push(entry);
                 let cursor = S::make_call_cursor(self.handle.pipeline, callee, stage, args)?;
                 let frame = Frame::new(callee, stage, results);

@@ -7,3 +7,4 @@ edition = "2024"
 kirin-ir.workspace = true
 kirin-interpreter = { workspace = true }
 rustc-hash = "2.1.2"
+thiserror = { workspace = true }

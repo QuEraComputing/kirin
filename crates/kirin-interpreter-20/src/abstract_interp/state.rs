@@ -4,6 +4,35 @@ use std::collections::VecDeque;
 use std::hash::Hash;
 
 // ---------------------------------------------------------------------------
+// AnalysisResult
+// ---------------------------------------------------------------------------
+
+/// Result of an abstract interpretation run — per-block entry state and return value.
+#[derive(Debug, Clone)]
+pub struct AnalysisResult<V: Clone> {
+    /// Abstract values at entry of each visited block.
+    pub block_in: FxHashMap<Block, Vec<V>>,
+    /// All SSA value bindings from the final analysis pass.
+    pub ssa_values: FxHashMap<SSAValue, V>,
+    /// Joined return value from all Return paths.
+    pub return_value: Option<V>,
+}
+
+impl<V: Clone> AnalysisResult<V> {
+    pub fn ssa_value(&self, ssa: SSAValue) -> Option<&V> {
+        self.ssa_values.get(&ssa)
+    }
+
+    pub fn return_value(&self) -> Option<&V> {
+        self.return_value.as_ref()
+    }
+
+    pub fn visited_blocks(&self) -> impl Iterator<Item = &Block> {
+        self.block_in.keys()
+    }
+}
+
+// ---------------------------------------------------------------------------
 // O(1) deduplicating worklist
 // ---------------------------------------------------------------------------
 
