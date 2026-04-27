@@ -901,6 +901,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-interpreter-new"
+version = "0.1.0"
+dependencies = [
+ "kirin-ir",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "kirin-interval"
 version = "0.1.0"
 dependencies = [
