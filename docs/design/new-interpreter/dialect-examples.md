@@ -155,7 +155,7 @@ manually at first. Macros can reduce this boilerplate later.
 
 ```rust
 pub enum MyFrame<V> {
-    Statement(StatementFrame<MyFrame<V>>),
+    Statement(StatementFrame),
     Block(BlockFrame<V>),
     Region(RegionFrame<V>),
     Call(CallFrame<V>),
@@ -195,7 +195,7 @@ Manual `Frame` dispatch for the total frame type is mechanical:
 ```rust
 impl<I, V, C, E> Frame<I, MyFrame<V>, C, E> for MyFrame<V>
 where
-    StatementFrame<MyFrame<V>>: Frame<I, MyFrame<V>, C, E>,
+    StatementFrame: Frame<I, MyFrame<V>, C, E>,
     BlockFrame<V>: Frame<I, MyFrame<V>, C, E>,
     RegionFrame<V>: Frame<I, MyFrame<V>, C, E>,
     CallFrame<V>: Frame<I, MyFrame<V>, C, E>,

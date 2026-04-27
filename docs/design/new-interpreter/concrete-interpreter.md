@@ -1,7 +1,9 @@
 # Concrete Interpreter Design
 
 The concrete interpreter is a deterministic stack machine. It uses the generic
-`Frame` protocol, but its driver state is a concrete `Vec<F>` plus an env stack.
+`Frame` protocol, but its driver state is a concrete `Vec<F>` plus an env
+store. The common concrete store is stack-shaped because calls push function
+activations.
 
 ## Interpreter Shell
 
@@ -21,6 +23,34 @@ pub struct Interpreter<'ir, S, F, C, E, V> {
 The concrete shell owns pipeline access, stage access, env access, and the frame
 stack. A frame can read and write SSA state through `&mut I` capability traits,
 but it cannot mutate the stack directly.
+
+Env allocation is not tied to block traversal. Blocks and regions usually carry
+the current function activation `EnvIndex`. New envs are created by call/function
+boundaries, or by dialect statements that explicitly introduce a new scope or
+activation-like object.
+
+The common concrete env store is stack-shaped, but that is a concrete helper,
+not part of the shared `Env` trait:
+
+```rust
+pub struct EnvStackStore<V> {
+    // stack of live SSA stores
+}
+```
+
+`EnvStackStore` implements `Env<V>` and exposes concrete stack operations such
+as `push`, `pop`, and `current`. `pop` only removes the top activation.
+
+Concrete block traversal uses a concrete transfer payload:
+
+```rust
+pub enum ConcreteTransfer<V> {
+    Jump {
+        target: Block,
+        args: Vec<V>,
+    },
+}
+```
 
 The concrete driver loop repeatedly steps the top frame and applies the returned
 effect:
@@ -71,10 +101,9 @@ Root completion is success. If the root frame returns
 when a statement returns `StatementEffect::Push(child)`.
 
 ```rust
-pub struct StatementFrame<F> {
+pub struct StatementFrame {
     pub location: Location,
     pub env: EnvIndex,
-    pub child: F,
 }
 ```
 
@@ -87,7 +116,7 @@ The fast path is mandatory:
 - atomic statements return `StatementEffect::Done` and do not allocate a
   `StatementFrame`.
 - non-atomic statements return `StatementEffect::Push(child)`, and `BlockFrame`
-  pushes a `StatementFrame` around the child.
+  returns `FrameEffect::Push { parent: StatementFrame { .. }, child }`.
 
 This keeps common statement execution cheap while still giving complex
 statements an observable frame boundary for tracing, breakpoints, and
@@ -96,7 +125,8 @@ diagnostics.
 ## BlockFrame
 
 `BlockFrame` is the standard linear block traversal frame. It owns the current
-statement cursor and the env activation for that block.
+statement cursor and carries the current activation env. It does not allocate or
+free that env.
 
 ```rust
 pub struct BlockFrame<V> {
@@ -109,6 +139,10 @@ pub struct BlockFrame<V> {
 
 At `Traversal::Entry`, `BlockFrame` binds block arguments into `env` and moves
 to the first statement or `Traversal::Exit`.
+
+Block arguments are written into the existing activation env. In normal
+function bodies, all blocks in the same function share the same env index; a CFG
+jump updates the target block arguments in that env and continues traversal.
 
 At `Traversal::Active(statement)`, `BlockFrame` calls `StatementDispatch`
 directly:
@@ -132,9 +166,8 @@ tick, but explicit exit makes `BlockExit` observable to tracing, breakpoints,
 and diagnostics.
 
 Concrete `BlockFrame` should be implemented only for a concrete transfer type
-that it owns, such as `ConcreteTransfer<V>`. A forward abstract block frame
-should use a different transfer type, such as `ForwardTransfer<V>`, and a
-backward analysis frame should use a backward transfer type.
+that it owns, such as `ConcreteTransfer<V>`. Forward abstract and backward
+analysis frames should use their own transfer payloads.
 
 ## RegionFrame
 
@@ -151,9 +184,10 @@ pub struct RegionFrame<V> {
 }
 ```
 
-The region frame should not duplicate block traversal logic. It enters a block
-by pushing a `BlockFrame`, and it consumes only region-owned completions. Unknown
-completions are bubbled with `FrameEffect::Complete(original)`.
+The region frame should not duplicate block traversal logic or allocate a new
+env by default. It carries the active env into each `BlockFrame`, and it
+consumes only region-owned completions. Unknown completions are bubbled with
+`FrameEffect::Complete(original)`.
 
 ## Graph Frames
 
@@ -216,15 +250,22 @@ pub struct SpecializedFunctionFrame<V> {
 pub enum SpecializedFunctionState<V> {
     Entry { args: Vec<V> },
     Active {
-        traversal: Traversal<Statement>,
         env: EnvIndex,
     },
 }
 ```
 
 `SpecializedFunctionFrame` does not use `Option` for env or args. At entry, it
-has args and no activation yet. During active execution, it has an env and the
-function body traversal state. This makes the state machine explicit.
+has args and no activation yet. During active execution, it has an env and is
+waiting for the body frame to complete. This makes the activation lifecycle
+explicit without baking any body traversal strategy into the function frame.
+
+`SpecializedFunctionFrame` is the standard place where a function-call
+activation env is created. It allocates an env at entry, binds function
+parameters into that env, builds the frame implied by the function body
+semantics, and returns `FrameEffect::Push { parent, child }`, where `parent` is
+the active function frame and `child` is the body frame. On body completion, it
+frees or pops that activation according to the env store policy.
 
 Function lookup follows the location hierarchy:
 
@@ -236,7 +277,7 @@ Function
 ```
 
 Executing the specialized function statement pushes the frame implied by the
-body semantics:
+body semantics, passing the function activation env into that frame:
 
 - block body -> `BlockFrame`
 - region body -> `RegionFrame`

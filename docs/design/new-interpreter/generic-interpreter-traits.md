@@ -67,8 +67,8 @@ do not belong in `Location`. They belong in frame state.
 
 ## Env
 
-SSA activation storage is owned by the interpreter shell. Frames that need an
-activation store carry an `EnvIndex`.
+SSA activation storage is owned by the interpreter shell. Frames that need to
+read or write SSA values carry an `EnvIndex`.
 
 ```rust
 #[derive(Clone, Copy, PartialEq, Eq, Hash, Debug)]
@@ -88,22 +88,23 @@ pub trait Env<V> {
         data: V,
     ) -> Result<(), Self::Error>;
 }
-
-pub trait EnvStack<V>: Env<V> {
-    fn push(&mut self) -> EnvIndex;
-    fn pop(&mut self) -> Result<(), Self::Error>;
-    fn current(&self) -> Result<EnvIndex, Self::Error>;
-}
 ```
 
-`EnvIndex` is an opaque slot index. A plain index is enough for now; it does
-not need a generation counter. The standard env implementation validates that
-an index is live.
+`EnvIndex` is an opaque slot index for a live activation or explicitly
+allocated scope. It is not a block identity. A plain index is enough for now; it
+does not need a generation counter. The standard env implementation validates
+that an index is live.
+
+Most traversal frames do not create envs. Blocks and regions normally share the
+current function activation env. New envs are created at call/function
+boundaries, or by dialect statements whose semantics explicitly introduce a new
+scope, store, or activation-like object.
 
 The base `Env` trait is not stack-shaped. This matters for abstract
-interpreters, where the driver stores frame-node tables rather than a LIFO call
-stack. Concrete interpreters can additionally implement `EnvStack`; in that
-case `pop` only removes the top environment.
+interpreters, where the driver may store summaries, continuation entries, and
+dependency indexes rather than a LIFO call stack. Concrete interpreters can
+provide a stack-shaped env store as a concrete helper, but stack operations do
+not belong in the shared `Env` contract.
 
 `read` and `write` take an explicit `EnvIndex`, and writes are allowed to any
 live environment index. This lets a parent frame resume and continue writing to
@@ -142,7 +143,8 @@ This is needed for frames such as `scf.for`, where receiving a body yield may
 immediately push the next loop-body block frame.
 
 The effect type is driver-neutral. A concrete driver applies it to a `Vec<F>`.
-An abstract driver applies it to frame tables and dependency indexes.
+An abstract driver can use the same effect while evaluating a summary owner
+locally; summary merging and worklist scheduling remain driver policy.
 
 ## Frame
 
@@ -209,7 +211,7 @@ pub trait HasLocation {
 ```
 
 Standard frames should implement `HasLocation`. Helpers can use it to build
-traces, diagnostics, breakpoints, and abstract node keys. Dialect frames should
+traces, diagnostics, breakpoints, and summary-owner keys. Dialect frames should
 implement it when they have a meaningful current traversal location.
 
 ## InterpreterError
@@ -246,7 +248,6 @@ standard frame types.
 
 ```rust
 pub enum StandardCompletion<V> {
-    StatementDone,
     BlockDone,
     RegionDone,
     GraphDone,
@@ -287,31 +288,9 @@ The variants mean:
 - `Transfer(transfer)`: statement-local control transfer handled by the active
   traversal frame.
 
-The transfer payload is specialized to the interpreter/frame family:
-
-```rust
-pub enum ConcreteTransfer<V> {
-    Jump { target: Block, args: Vec<V> },
-}
-
-pub struct BlockTransfer<V> {
-    pub target: Block,
-    pub args: Vec<V>,
-}
-
-pub enum ForwardTransfer<V> {
-    Branch(Vec<BlockTransfer<V>>),
-}
-
-pub enum BackwardTransfer<D> {
-    Branch(Vec<D>),
-}
-```
-
-Concrete can specialize the transfer type to a single `Jump`. Forward abstract
-interpretation can specialize it to a single `Branch`, using a one-edge branch
-for unconditional jumps. Backward analyses can use a transfer payload whose
-dependencies point backward.
+The transfer payload is opaque to the generic statement protocol. Concrete
+interpreters, forward abstract interpreters, and backward analyses each define
+the transfer type consumed by their active traversal frames.
 
 ## Interpretable
 

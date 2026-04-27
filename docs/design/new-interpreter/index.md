@@ -7,8 +7,12 @@
 The new interpreter design fuses the old split between call frames and cursors
 into one generic frame protocol. A frame is a continuation object anchored at an
 IR traversal location. Concrete execution applies frame effects to a stack.
-Abstract execution applies the same frame effects to finite frame tables,
-summary tables, driver-specific dependency indexes, and a worklist.
+Abstract execution can reuse the same frame protocol inside a worklist
+fixpoint driver. A simple abstract interpreter can rebuild frames per summary
+owner, evaluate them over abstract values, and merge candidate summaries with
+join/widen/narrow policies. A more precise abstract interpreter can use a
+generalized continuation store, where the concrete frame stack becomes interned
+continuation entries addressed by owner, resume location, and bounded context.
 
 The interpreter shell is generic over the total frame, completion, and error
 types. The shell owns the immutable program root and the SSA environment store.
@@ -43,17 +47,30 @@ composition. Failed projection for bubbling paths returns the original value.
   - `BlockFrame`
   - `RegionFrame`
   - function and call frames
-- [Abstract Interpreter Generic Traits](abstract/generic-traits.md)
-  - `AbstractState`
-  - dependency indexes
-  - generalized abstract addresses
-  - summaries
+- [Abstract Interpreter Framework](abstract/framework.md)
+  - summary owners
+  - abstract stores
+  - continuation store
+  - push policy
+  - owner semantics
+  - dependency index
+- [Simple Owner-Local Fixpoint](abstract/simple-fixpoint.md)
+  - abstract values
+  - abstract env snapshots
+  - worklist driver
   - widening/narrowing
-- [k-CFA Example](abstract/k-cfa-example.md)
+  - abstract `StatementEffect::Transfer`
+- [k-CFA Specialization](abstract/k-cfa-example.md)
   - call strings
-  - call/function nodes
-  - `KCfaDeps`
-  - generalized frame-node addresses
+  - function owners
+  - call continuations
+  - return dependencies
+  - contextual address allocation
+- [Forward And Backward Dataflow Shapes](abstract/dataflow.md)
+  - constant propagation
+  - liveness
+  - direction-neutral branch transfers
+  - widening/narrowing
 - [Dialect Examples](dialect-examples.md)
   - dialect `Interpretable`
   - SCF frame protocol
@@ -70,8 +87,8 @@ composition. Failed projection for bubbling paths returns the original value.
 - Keep SSA activation storage owned by the interpreter shell, not by dialect
   frames.
 - Keep the concrete driver loop flat and deterministic.
-- Let abstract drivers interpret frame effects as table, dependency-index, and
-  worklist updates.
+- Let abstract drivers reuse the frame protocol inside worklist fixpoint
+  algorithms.
 - Keep `FrameEffect` specific to frame structure, not env mutation.
 - Support both concrete interpretation and abstract interpretation without
   baking either execution strategy into the core frame trait.
@@ -129,14 +146,15 @@ The interpreter crate provides reusable completion variants, but they are not
 privileged by the shell. They compose with dialect completions through the same
 lift/project algebra.
 
-Recommendation: use `StandardCompletion`.
+Recommendation: use `StandardCompletion` for frame-level completions, not
+atomic statement completion.
 
 ### Mandatory Statement Fast Path
 
 Atomic statements should not require an extra `StatementFrame`. `BlockFrame`
 directly executes them through `StatementDispatch`. Non-atomic statements return
-`StatementEffect::Push(child)`, and the block pushes a `StatementFrame` with
-that pending child.
+`StatementEffect::Push(child)`, and the block uses `StatementFrame` as the
+parent continuation for that child.
 
 Recommendation: mandatory fast path from the start.
 
@@ -146,10 +164,10 @@ Statement-local control flow is returned as `StatementEffect::Transfer(T)`, not
 as a completion. The active traversal frame owns traversal order and consumes
 the transfer payload directly.
 
-Concrete interpreters can use `ConcreteTransfer<V>` with only `Jump`. Forward
-abstract interpreters can use `ForwardTransfer<V>` with only `Branch`, using a
-one-edge branch for unconditional jumps. Backward analyses can use their own
-backward transfer payload.
+Concrete interpreters can use a jump-only transfer payload. Forward abstract
+interpreters can use a branch transfer payload, using a one-edge branch for
+unconditional jumps. Backward analyses can use their own backward transfer
+payload.
 
 Recommendation: specialize the transfer type per interpreter/frame family.
 
@@ -185,6 +203,43 @@ Settled names:
 - `Env`
 - `Callee`
 
+### Abstract Continuation Store
+
+Abstract interpreters use a continuation store instead of trying to preserve an
+unbounded concrete frame stack. The store maps continuation addresses to
+interned continuation entries. A continuation address contains the current
+summary owner, resume location, and bounded context token history.
+
+Recommendation: use `KontStore<K, Token, F>` with interned entries.
+
+### Abstract Owner Lifecycle
+
+Summary owners are initialized through one idempotent `ensure_owner` operation.
+This operation creates the owner-specific bottom summary, installs the root
+empty continuation, and initializes dependency-index bookkeeping.
+
+Recommendation: use one `OwnerSemantics` trait for bottom summaries, entry
+frames, owner completion, and summary-to-completion conversion. The driver owns
+`ensure_owner`.
+
+### Abstract Push Policy
+
+Abstract push handling uses one policy to derive owner choice, context token,
+entry summary candidate, and resume kind. This keeps k-CFA-style calls
+consistent because the callee owner, call-string token, callee entry facts, and
+caller resume behavior all come from the same call event.
+
+Recommendation: use a unified `AbstractPushPolicy`.
+
+### Summary Change Scheduling
+
+`Summary::merge` returns a summary-specific change event. A dependency index
+turns that change into work items, including owner reanalysis and waiting
+continuation resumes. The driver does not hard-code self reanalysis as a
+special case.
+
+Recommendation: summary change scheduling belongs to `SummaryDependencyIndex`.
+
 ## Deferred Work
 
 - Add derive or macro support for lift/project composition glue.
@@ -194,7 +249,7 @@ Settled names:
   stable.
 - Move `Location` to `kirin-ir` only if it proves useful outside the
   interpreter crate.
-- Decide whether dependency-index helpers belong in the interpreter crate or
-  stay in abstract-driver-specific modules.
+- Decide which standard dependency-index helpers belong in the interpreter
+  crate and which should stay in abstract-driver-specific modules.
 - Add concrete examples for widening/narrowing strategies once the first
   abstract interpreter is implemented.
