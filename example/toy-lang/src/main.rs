@@ -41,6 +41,9 @@ enum Command {
         /// Run through the experimental interpreter-new framework
         #[arg(long)]
         new_interpreter: bool,
+        /// Run source-stage constant propagation through interpreter-new
+        #[arg(long)]
+        new_constprop: bool,
     },
 }
 
@@ -61,8 +64,16 @@ fn main() -> anyhow::Result<()> {
             function: func_name,
             args,
             new_interpreter,
+            new_constprop,
         } => {
-            run_program(&file, &stage_name, &func_name, &args, new_interpreter)?;
+            run_program(
+                &file,
+                &stage_name,
+                &func_name,
+                &args,
+                new_interpreter,
+                new_constprop,
+            )?;
             Ok(())
         }
     }
@@ -74,6 +85,7 @@ fn run_program(
     func_name: &str,
     cli_args: &[String],
     new_interpreter: bool,
+    new_constprop: bool,
 ) -> anyhow::Result<()> {
     let src = std::fs::read_to_string(file)?;
     let mut pipeline: Pipeline<Stage> = Pipeline::new();
@@ -100,6 +112,21 @@ fn run_program(
         .iter()
         .map(|s| s.parse::<i64>())
         .collect::<Result<_, _>>()?;
+
+    if new_constprop {
+        if stage_name != "source" {
+            anyhow::bail!("interpreter-new constprop currently supports source stage only");
+        }
+        let abstract_args = args
+            .iter()
+            .copied()
+            .map(interpreter_new::ConstProp::Const)
+            .collect::<Vec<_>>();
+        let result =
+            interpreter_new::analyze_source_constprop(&pipeline, func_name, &abstract_args)?;
+        println!("{result:?}");
+        return Ok(());
+    }
 
     if new_interpreter {
         let result = match stage_name {

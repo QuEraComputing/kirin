@@ -3,9 +3,9 @@ use std::marker::PhantomData;
 use kirin::ir::TryLiftFrom;
 use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue, SSAValue};
 use kirin_interpreter_new::{
-    BlockFrame, BranchCondition, ConcreteInterpreter, ConcreteTransfer, Env, EnvIndex, Frame,
-    FrameEffect, HasLocation, Interpretable, InterpreterError, Location, ProductValue,
-    ProjectOrSelf, StatementEffect,
+    AbstractInterpreter, BlockFrame, BranchCondition, ConcreteInterpreter, ConcreteTransfer, Env,
+    EnvIndex, Frame, FrameEffect, HasLocation, Interpretable, InterpreterError, Location,
+    ProductValue, ProjectOrSelf, StatementEffect,
 };
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
@@ -24,6 +24,24 @@ pub trait ScfBlockDispatch<L: Dialect, F, E, V> {
 }
 
 impl<'ir, S, L, F, C, E, V> ScfBlockDispatch<L, F, E, V> for ConcreteInterpreter<'ir, S, F, C, E, V>
+where
+    S: HasStageInfo<L>,
+    L: Dialect,
+    F: From<BlockFrame<L, V>>,
+    V: Clone,
+{
+    fn dispatch_scf_block(
+        &mut self,
+        location: Location,
+        block: Block,
+        env: EnvIndex,
+        args: Vec<V>,
+    ) -> Result<F, E> {
+        Ok(BlockFrame::<L, V>::new(location.stage, block, env, args).into())
+    }
+}
+
+impl<'ir, S, L, F, C, E, V> ScfBlockDispatch<L, F, E, V> for AbstractInterpreter<'ir, S, F, C, E, V>
 where
     S: HasStageInfo<L>,
     L: Dialect,

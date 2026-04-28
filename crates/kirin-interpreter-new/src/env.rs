@@ -8,6 +8,10 @@ use crate::{InterpreterError, ProductValue};
 pub struct EnvIndex(usize);
 
 impl EnvIndex {
+    pub(crate) fn new(index: usize) -> Self {
+        Self(index)
+    }
+
     pub fn raw(self) -> usize {
         self.0
     }
@@ -138,7 +142,7 @@ impl<V> EnvStackStore<V> {
     }
 
     fn alloc_store(&mut self) -> EnvIndex {
-        let index = EnvIndex(self.stores.len());
+        let index = EnvIndex::new(self.stores.len());
         self.stores.push(Some(HashMap::new()));
         index
     }

@@ -3,9 +3,9 @@ use kirin::prelude::{
     CompileTimeValue, Dialect, Function, HasRegionBody, HasStageInfo, SSAValue, Symbol,
 };
 use kirin_interpreter_new::{
-    CallFrame, Callee, ConcreteInterpreter, ConcreteTransfer, Env, EnvIndex, FunctionBodyEntry,
-    Interpretable, InterpreterError, Location, ProductValue, RegionFrame, StageAccess,
-    StandardCompletion, StatementEffect,
+    AbstractInterpreter, CallFrame, Callee, ConcreteInterpreter, ConcreteTransfer, Env, EnvIndex,
+    FunctionBodyEntry, Interpretable, InterpreterError, Location, ProductValue, RegionFrame,
+    StageAccess, StandardCompletion, StatementEffect,
 };
 
 use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
@@ -21,6 +21,27 @@ pub trait CallTargetResolution<L: Dialect> {
 }
 
 impl<'ir, S, L, F, C, E, V> CallTargetResolution<L> for ConcreteInterpreter<'ir, S, F, C, E, V>
+where
+    S: HasStageInfo<L>,
+    L: Dialect,
+    E: From<InterpreterError>,
+{
+    type Error = E;
+
+    fn resolve_call_target(
+        &self,
+        location: Location,
+        target: Symbol,
+    ) -> Result<Function, Self::Error> {
+        let stage = StageAccess::<L>::stage_info(self, location.stage)?;
+        self.pipeline()
+            .resolve_function(stage, target)
+            .ok_or(InterpreterError::MissingCallTarget { location, target })
+            .map_err(E::from)
+    }
+}
+
+impl<'ir, S, L, F, C, E, V> CallTargetResolution<L> for AbstractInterpreter<'ir, S, F, C, E, V>
 where
     S: HasStageInfo<L>,
     L: Dialect,

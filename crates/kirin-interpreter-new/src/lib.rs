@@ -1,3 +1,4 @@
+pub mod abstract_interp;
 pub mod concrete;
 pub mod dispatch;
 pub mod effect;
@@ -8,6 +9,7 @@ pub mod location;
 pub mod standard;
 pub mod value;
 
+pub use abstract_interp::{AbstractEnvStore, AbstractInterpreter, AbstractValue};
 pub use concrete::{ConcreteInterpreter, StepResult};
 pub use dispatch::{Interpretable, StageAccess, StatementDispatch};
 pub use effect::{ConcreteTransfer, FrameEffect, StandardCompletion, StatementEffect};

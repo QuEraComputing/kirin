@@ -1,22 +1,24 @@
 use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
+use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Neg, Not, Sub};
 
 use kirin::ir::TryLiftFrom;
 use kirin::prelude::{Dialect, Function, Pipeline};
-use kirin_arith::{Arith, ArithConversionError, ArithType, ArithValue};
-use kirin_bitwise::Bitwise;
+use kirin_arith::{Arith, ArithConversionError, ArithType, ArithValue, CheckedDiv, CheckedRem};
+use kirin_bitwise::{Bitwise, CheckedShl, CheckedShr};
 use kirin_cf::ControlFlow;
-use kirin_cmp::Cmp;
+use kirin_cmp::{Cmp, CompareValue};
 use kirin_constant::Constant;
 use kirin_function::{Lexical, Lifted};
 use kirin_interpreter_new::{
-    BlockFrame, CallFrame, ConcreteInterpreter, ConcreteTransfer, EnvIndex, Frame, FrameEffect,
-    FunctionBodyEntry, FunctionFrame, HasLocation, Interpretable, InterpreterError, Location,
+    AbstractInterpreter, AbstractValue, BlockFrame, BranchCondition, CallFrame,
+    ConcreteInterpreter, ConcreteTransfer, EnvIndex, Frame, FrameEffect, FunctionBodyEntry,
+    FunctionFrame, HasLocation, Interpretable, InterpreterError, Location, ProductValue,
     ProjectOrSelf, RegionFrame, SpecializedFunctionFrame, StagedFunctionFrame, StandardCompletion,
     StandardFrame, StatementEffect, StatementFrame,
 };
-use kirin_scf::StructuredControlFlow;
 use kirin_scf::interpreter_new::{ForFrame, IfFrame, ScfCompletion, ScfFrame};
+use kirin_scf::{ForLoopValue, StructuredControlFlow};
 
 use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
@@ -239,6 +241,240 @@ impl From<kirin_scf::interpreter_new::LoopStepOverflow> for ToyError {
     }
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ConstProp {
+    Bottom,
+    Const(i64),
+    Top,
+}
+
+impl AbstractValue for ConstProp {
+    fn bottom() -> Self {
+        Self::Bottom
+    }
+
+    fn join(&self, other: &Self) -> Self {
+        match (self, other) {
+            (Self::Bottom, value) | (value, Self::Bottom) => value.clone(),
+            (Self::Const(lhs), Self::Const(rhs)) if lhs == rhs => Self::Const(*lhs),
+            _ => Self::Top,
+        }
+    }
+}
+
+impl BranchCondition for ConstProp {
+    fn is_truthy(&self) -> Option<bool> {
+        match self {
+            Self::Const(0) => Some(false),
+            Self::Const(_) => Some(true),
+            Self::Bottom | Self::Top => None,
+        }
+    }
+}
+
+impl ProductValue for ConstProp {
+    fn new_product(values: Vec<Self>) -> Self {
+        match values.as_slice() {
+            [value] => value.clone(),
+            _ => Self::Top,
+        }
+    }
+
+    fn as_product(&self) -> Option<&[Self]> {
+        None
+    }
+}
+
+impl ForLoopValue for ConstProp {
+    fn loop_condition(&self, end: &Self) -> Option<bool> {
+        match (self, end) {
+            (Self::Const(lhs), Self::Const(rhs)) => Some(lhs < rhs),
+            _ => None,
+        }
+    }
+
+    fn loop_step(&self, step: &Self) -> Option<Self> {
+        match (self, step) {
+            (Self::Const(lhs), Self::Const(rhs)) => lhs.checked_add(*rhs).map(Self::Const),
+            (Self::Bottom, _) | (_, Self::Bottom) => Some(Self::Bottom),
+            _ => Some(Self::Top),
+        }
+    }
+}
+
+impl From<ArithValue> for ConstProp {
+    fn from(value: ArithValue) -> Self {
+        match value {
+            ArithValue::I64(value) => Self::Const(value),
+            _ => Self::Top,
+        }
+    }
+}
+
+impl CompareValue for ConstProp {
+    type Bool = ConstProp;
+
+    fn cmp_eq(&self, other: &Self) -> Self::Bool {
+        compare_const(self, other, |lhs, rhs| lhs == rhs)
+    }
+
+    fn cmp_ne(&self, other: &Self) -> Self::Bool {
+        compare_const(self, other, |lhs, rhs| lhs != rhs)
+    }
+
+    fn cmp_lt(&self, other: &Self) -> Self::Bool {
+        compare_const(self, other, |lhs, rhs| lhs < rhs)
+    }
+
+    fn cmp_le(&self, other: &Self) -> Self::Bool {
+        compare_const(self, other, |lhs, rhs| lhs <= rhs)
+    }
+
+    fn cmp_gt(&self, other: &Self) -> Self::Bool {
+        compare_const(self, other, |lhs, rhs| lhs > rhs)
+    }
+
+    fn cmp_ge(&self, other: &Self) -> Self::Bool {
+        compare_const(self, other, |lhs, rhs| lhs >= rhs)
+    }
+}
+
+fn compare_const(
+    lhs: &ConstProp,
+    rhs: &ConstProp,
+    compare: impl FnOnce(i64, i64) -> bool,
+) -> ConstProp {
+    match (lhs, rhs) {
+        (ConstProp::Const(lhs), ConstProp::Const(rhs)) => {
+            ConstProp::Const(if compare(*lhs, *rhs) { 1 } else { 0 })
+        }
+        (ConstProp::Bottom, _) | (_, ConstProp::Bottom) => ConstProp::Bottom,
+        _ => ConstProp::Top,
+    }
+}
+
+impl Add for ConstProp {
+    type Output = Self;
+
+    fn add(self, rhs: Self) -> Self::Output {
+        binary_const(self, rhs, i64::wrapping_add)
+    }
+}
+
+impl Sub for ConstProp {
+    type Output = Self;
+
+    fn sub(self, rhs: Self) -> Self::Output {
+        binary_const(self, rhs, i64::wrapping_sub)
+    }
+}
+
+impl Mul for ConstProp {
+    type Output = Self;
+
+    fn mul(self, rhs: Self) -> Self::Output {
+        binary_const(self, rhs, i64::wrapping_mul)
+    }
+}
+
+impl Neg for ConstProp {
+    type Output = Self;
+
+    fn neg(self) -> Self::Output {
+        match self {
+            Self::Const(value) => Self::Const(value.wrapping_neg()),
+            value => value,
+        }
+    }
+}
+
+impl Not for ConstProp {
+    type Output = Self;
+
+    fn not(self) -> Self::Output {
+        match self {
+            Self::Const(value) => Self::Const(!value),
+            value => value,
+        }
+    }
+}
+
+impl BitAnd for ConstProp {
+    type Output = Self;
+
+    fn bitand(self, rhs: Self) -> Self::Output {
+        binary_const(self, rhs, |lhs, rhs| lhs & rhs)
+    }
+}
+
+impl BitOr for ConstProp {
+    type Output = Self;
+
+    fn bitor(self, rhs: Self) -> Self::Output {
+        binary_const(self, rhs, |lhs, rhs| lhs | rhs)
+    }
+}
+
+impl BitXor for ConstProp {
+    type Output = Self;
+
+    fn bitxor(self, rhs: Self) -> Self::Output {
+        binary_const(self, rhs, |lhs, rhs| lhs ^ rhs)
+    }
+}
+
+impl CheckedDiv for ConstProp {
+    fn checked_div(self, rhs: Self) -> Option<Self> {
+        match (self, rhs) {
+            (Self::Const(lhs), Self::Const(rhs)) => lhs.checked_div(rhs).map(Self::Const),
+            (Self::Bottom, _) | (_, Self::Bottom) => Some(Self::Bottom),
+            _ => Some(Self::Top),
+        }
+    }
+}
+
+impl CheckedRem for ConstProp {
+    fn checked_rem(self, rhs: Self) -> Option<Self> {
+        match (self, rhs) {
+            (Self::Const(lhs), Self::Const(rhs)) => lhs.checked_rem(rhs).map(Self::Const),
+            (Self::Bottom, _) | (_, Self::Bottom) => Some(Self::Bottom),
+            _ => Some(Self::Top),
+        }
+    }
+}
+
+impl CheckedShl for ConstProp {
+    fn checked_shl(self, rhs: Self) -> Option<Self> {
+        match (self, rhs) {
+            (Self::Const(lhs), Self::Const(rhs)) if (0..64).contains(&rhs) => {
+                Some(Self::Const(lhs << rhs))
+            }
+            (Self::Bottom, _) | (_, Self::Bottom) => Some(Self::Bottom),
+            _ => Some(Self::Top),
+        }
+    }
+}
+
+impl CheckedShr for ConstProp {
+    fn checked_shr(self, rhs: Self) -> Option<Self> {
+        match (self, rhs) {
+            (Self::Const(lhs), Self::Const(rhs)) if (0..64).contains(&rhs) => {
+                Some(Self::Const(lhs >> rhs))
+            }
+            (Self::Bottom, _) | (_, Self::Bottom) => Some(Self::Bottom),
+            _ => Some(Self::Top),
+        }
+    }
+}
+
+fn binary_const(lhs: ConstProp, rhs: ConstProp, op: impl FnOnce(i64, i64) -> i64) -> ConstProp {
+    match (lhs, rhs) {
+        (ConstProp::Const(lhs), ConstProp::Const(rhs)) => ConstProp::Const(op(lhs, rhs)),
+        (ConstProp::Bottom, _) | (_, ConstProp::Bottom) => ConstProp::Bottom,
+        _ => ConstProp::Top,
+    }
+}
+
 impl<I, F, E, V> FunctionBodyEntry<HighLevel, I, F, E, V> for HighLevel
 where
     Lexical<ArithType>: FunctionBodyEntry<HighLevel, I, F, E, V>,
@@ -431,7 +667,7 @@ pub fn run_source_i64(
         i64,
     > = ConcreteInterpreter::new(pipeline);
     interp.push_frame(FunctionFrame::<HighLevel, i64>::new(stage, function, args.to_vec()).into());
-    expect_i64_return(interp.run()?)
+    expect_function_return(interp.run()?)
 }
 
 pub fn run_lowered_i64(
@@ -452,7 +688,30 @@ pub fn run_lowered_i64(
         i64,
     > = ConcreteInterpreter::new(pipeline);
     interp.push_frame(FunctionFrame::<LowLevel, i64>::new(stage, function, args.to_vec()).into());
-    expect_i64_return(interp.run()?)
+    expect_function_return(interp.run()?)
+}
+
+pub fn analyze_source_constprop(
+    pipeline: &Pipeline<Stage>,
+    function_name: &str,
+    args: &[ConstProp],
+) -> Result<ConstProp, ToyError> {
+    let stage = pipeline
+        .stage_by_name("source")
+        .ok_or(InterpreterError::Custom("missing source stage"))?;
+    let function = resolve_function(pipeline, function_name)?;
+    let mut interp: AbstractInterpreter<
+        '_,
+        Stage,
+        ToyFrame<HighLevel, ConstProp>,
+        ToyCompletion<ConstProp>,
+        ToyError,
+        ConstProp,
+    > = AbstractInterpreter::new(pipeline);
+    interp.push_frame(
+        FunctionFrame::<HighLevel, ConstProp>::new(stage, function, args.to_vec()).into(),
+    );
+    expect_function_return(interp.run()?)
 }
 
 fn resolve_function(pipeline: &Pipeline<Stage>, function_name: &str) -> Result<Function, ToyError> {
@@ -465,7 +724,7 @@ fn resolve_function(pipeline: &Pipeline<Stage>, function_name: &str) -> Result<F
         .map_err(ToyError::from)
 }
 
-fn expect_i64_return(completion: ToyCompletion<i64>) -> Result<i64, ToyError> {
+fn expect_function_return<V>(completion: ToyCompletion<V>) -> Result<V, ToyError> {
     match completion {
         ToyCompletion::Standard(StandardCompletion::FunctionReturned(value)) => Ok(value),
         _ => Err(InterpreterError::Custom("expected function return").into()),
@@ -502,5 +761,39 @@ mod tests {
         let pipeline = build_pipeline(include_str!("../programs/factorial.kirin"));
         let result = run_source_i64(&pipeline, "factorial", &[5]).unwrap();
         assert_eq!(result, 120);
+    }
+
+    #[test]
+    fn constprop_source_add() {
+        let pipeline = build_pipeline(include_str!("../programs/add.kirin"));
+        let result = analyze_source_constprop(
+            &pipeline,
+            "main",
+            &[ConstProp::Const(3), ConstProp::Const(5)],
+        )
+        .unwrap();
+        assert_eq!(result, ConstProp::Const(8));
+    }
+
+    #[test]
+    fn constprop_source_add_with_unknown() {
+        let pipeline = build_pipeline(include_str!("../programs/add.kirin"));
+        let result =
+            analyze_source_constprop(&pipeline, "main", &[ConstProp::Top, ConstProp::Const(5)])
+                .unwrap();
+        assert_eq!(result, ConstProp::Top);
+    }
+
+    #[test]
+    fn constprop_source_known_branch() {
+        let pipeline = build_pipeline(include_str!("../programs/branching.kirin"));
+        assert_eq!(
+            analyze_source_constprop(&pipeline, "abs", &[ConstProp::Const(-7)]).unwrap(),
+            ConstProp::Const(7)
+        );
+        assert_eq!(
+            analyze_source_constprop(&pipeline, "abs", &[ConstProp::Const(7)]).unwrap(),
+            ConstProp::Const(7)
+        );
     }
 }
