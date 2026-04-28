@@ -7,6 +7,8 @@ pub trait HasLocation {
 pub trait Frame<I, F, C, E>: HasLocation {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E>;
 
+    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<F, C>, E>;
+
     fn resume(self, completion: C, interp: &mut I) -> Result<FrameEffect<F, C>, E>;
 }
 

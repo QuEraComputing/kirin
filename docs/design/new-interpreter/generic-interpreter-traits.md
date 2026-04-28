@@ -81,12 +81,21 @@ pub trait Env<V> {
     fn free(&mut self, env: EnvIndex) -> Result<(), Self::Error>;
 
     fn read(&self, env: EnvIndex, value: SSAValue) -> Result<V, Self::Error>;
+    fn read_many(&self, env: EnvIndex, values: &[SSAValue]) -> Result<Vec<V>, Self::Error>;
     fn write(
         &mut self,
         env: EnvIndex,
         value: SSAValue,
         data: V,
     ) -> Result<(), Self::Error>;
+    fn write_product(
+        &mut self,
+        env: EnvIndex,
+        values: &[SSAValue],
+        data: V,
+    ) -> Result<(), Self::Error>
+    where
+        V: ProductValue;
 }
 ```
 
@@ -110,6 +119,23 @@ not belong in the shared `Env` contract.
 live environment index. This lets a parent frame resume and continue writing to
 its own activation after a child call has pushed and popped another activation.
 
+The interpreter crate also provides small value-domain hooks used by standard
+helpers:
+
+```rust
+pub trait BranchCondition {
+    fn is_truthy(&self) -> Option<bool>;
+}
+
+pub trait ProductValue: Clone + Sized {
+    fn new_product(values: Vec<Self>) -> Self;
+    fn as_product(&self) -> Option<&[Self]>;
+}
+```
+
+These are not abstract interpretation domains. They are concrete helper
+contracts for reusable branch and product-writing conventions.
+
 ## FrameEffect
 
 `FrameEffect` is only the frame-structure protocol. It does not contain env
@@ -119,6 +145,7 @@ operations, SSA writes, or pipeline access commands.
 pub enum FrameEffect<F, C> {
     Continue(F),
     Push { parent: F, child: F },
+    Done,
     Complete(C),
 }
 ```
@@ -133,6 +160,7 @@ does so over multiple driver ticks.
 ```text
 Continue(f)             => push f
 Push { parent, child }  => push parent, then child
+Done, parent            => resume parent with no completion payload
 Complete(c), parent     => resume parent with c
 Complete(c), root       => final completion
 ```
@@ -155,6 +183,8 @@ Frames are consumed by value during stepping. This avoids a simultaneous
 pub trait Frame<I, F, C, E>: Sized {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E>;
 
+    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<F, C>, E>;
+
     fn resume(
         self,
         completion: C,
@@ -166,6 +196,11 @@ pub trait Frame<I, F, C, E>: Sized {
 `F` is the total frame type, `C` is the total completion type, and `E` is the
 total error type. Standard frames and dialect frames are both written against
 arbitrary total `F`, `C`, and `E`.
+
+`Done` is not a completion value. It is the structural signal used when a child
+frame finishes work that belongs to its parent, such as a call frame completing
+a call statement after writing call results. This keeps `StandardCompletion`
+reserved for frame-level completions.
 
 ## Lift And Project
 
@@ -271,7 +306,7 @@ pub enum StatementEffect<F, C, T> {
     Transfer(T),
 }
 
-pub trait StatementDispatch<F, C, E, T> {
+pub trait StatementDispatch<L: Dialect, F, C, E, T> {
     fn dispatch_statement(
         &mut self,
         location: Location,
@@ -300,9 +335,9 @@ Dialect statement semantics are exposed through `Interpretable::interpret`.
 pub trait Interpretable<I, F, C, E, T>: Dialect {
     fn interpret(
         &self,
-        interp: &mut I,
         location: Location,
         env: EnvIndex,
+        interp: &mut I,
     ) -> Result<StatementEffect<F, C, T>, E>;
 }
 ```
@@ -321,7 +356,7 @@ impl<'ir, S, F, C, E, V, T> StatementDispatch<F, C, E, T>
     ) -> Result<StatementEffect<F, C, T>, E> {
         let statement = location.active_statement()?;
         let definition = self.definition_at(location.stage, statement)?;
-        definition.interpret(self, location, env)
+        definition.interpret(location, env, self)
     }
 }
 ```

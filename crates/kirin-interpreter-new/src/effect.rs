@@ -3,6 +3,7 @@ use kirin_ir::Block;
 pub enum FrameEffect<F, C> {
     Continue(F),
     Push { parent: F, child: F },
+    Done,
     Complete(C),
 }
 

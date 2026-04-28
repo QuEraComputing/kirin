@@ -1,4 +1,4 @@
-use kirin_ir::{CompileStage, Dialect, StageInfo, Statement};
+use kirin_ir::{CompileStage, Dialect, StageInfo};
 
 use crate::{EnvIndex, InterpreterError, Location, StatementEffect};
 
@@ -19,7 +19,7 @@ pub trait StatementDispatch<L: Dialect, F, C, E, T> {
 pub trait Interpretable<I, F, C, E, T>: Dialect {
     fn interpret(
         &self,
-        statement: Statement,
+        location: Location,
         env: EnvIndex,
         interp: &mut I,
     ) -> Result<StatementEffect<F, C, T>, E>;
@@ -43,6 +43,6 @@ where
             let stage_info = self.stage_info(location.stage)?;
             statement.definition(stage_info).clone()
         };
-        definition.interpret(statement, env, self)
+        definition.interpret(location, env, self)
     }
 }

@@ -1,4 +1,4 @@
-use kirin_ir::{CompileStage, SSAValue};
+use kirin_ir::{CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction};
 use thiserror::Error;
 
 use crate::{EnvIndex, Location};
@@ -28,4 +28,37 @@ pub enum InterpreterError {
         location: Location,
         completion: &'static str,
     },
+    #[error("missing function {0:?}")]
+    MissingFunction(Function),
+    #[error("function {function:?} has no staged function for stage {stage:?}")]
+    MissingStagedFunction {
+        function: Function,
+        stage: CompileStage,
+    },
+    #[error("staged function {0:?} has no live specialization")]
+    MissingSpecialization(StagedFunction),
+    #[error("staged function {function:?} has {count} live specializations")]
+    AmbiguousSpecialization {
+        function: StagedFunction,
+        count: usize,
+    },
+    #[error("function body fell through at {0:?}")]
+    FunctionBodyFellThrough(Location),
+    #[error("call result arity mismatch at {location:?}: expected {expected}, got {actual}")]
+    CallResultArityMismatch {
+        location: Location,
+        expected: usize,
+        actual: usize,
+    },
+    #[error("expected product value")]
+    ExpectedProduct,
+    #[error("product arity mismatch: expected {expected}, got {actual}")]
+    ProductArityMismatch { expected: usize, actual: usize },
+    #[error("specialized function {function:?} has no body at stage {stage:?}")]
+    MissingFunctionBody {
+        function: SpecializedFunction,
+        stage: CompileStage,
+    },
+    #[error("{0}")]
+    Custom(&'static str),
 }

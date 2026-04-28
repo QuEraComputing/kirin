@@ -188,7 +188,11 @@ where
         }
     }
 
-    fn resume(self, _completion: C, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
+    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         self.advance_after_active(interp)
+    }
+
+    fn resume(self, completion: C, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
+        Ok(FrameEffect::Complete(completion))
     }
 }

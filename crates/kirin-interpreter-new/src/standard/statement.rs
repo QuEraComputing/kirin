@@ -26,6 +26,10 @@ where
         Err(InterpreterError::UnexpectedStatementFrameStep(self.location).into())
     }
 
+    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
+        Ok(FrameEffect::Done)
+    }
+
     fn resume(self, completion: C, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         Ok(FrameEffect::Complete(completion))
     }

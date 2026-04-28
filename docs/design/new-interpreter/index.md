@@ -153,8 +153,8 @@ atomic statement completion.
 
 Atomic statements should not require an extra `StatementFrame`. `BlockFrame`
 directly executes them through `StatementDispatch`. Non-atomic statements return
-`StatementEffect::Push(child)`, and the block uses `StatementFrame` as the
-parent continuation for that child.
+`StatementEffect::Push(child)`, and the child returns `FrameEffect::Done` when
+the parent statement may advance.
 
 Recommendation: mandatory fast path from the start.
 

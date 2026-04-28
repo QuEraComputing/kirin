@@ -27,6 +27,7 @@
 
 mod interpret_impl;
 pub use interpret_impl::ForLoopValue;
+pub mod interpreter_new;
 
 use kirin::prelude::*;
 

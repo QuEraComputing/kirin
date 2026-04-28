@@ -131,6 +131,10 @@ where
         }
     }
 
+    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
+        Ok(FrameEffect::Done)
+    }
+
     fn resume(self, completion: C, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match completion.project_or_self() {
             Ok(StandardCompletion::BlockDone) => {}

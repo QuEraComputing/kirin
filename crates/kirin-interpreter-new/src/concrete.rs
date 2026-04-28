@@ -94,6 +94,14 @@ impl<'ir, S, F, C, E, V> ConcreteInterpreter<'ir, S, F, C, E, V> {
                 self.frames.push(child);
                 Ok(StepResult::Running)
             }
+            FrameEffect::Done => {
+                if let Some(parent) = self.frames.pop() {
+                    let effect = parent.resume_done(self)?;
+                    self.apply_effect(effect)
+                } else {
+                    Err(InterpreterError::EmptyFrameStack.into())
+                }
+            }
             FrameEffect::Complete(completion) => {
                 if let Some(parent) = self.frames.pop() {
                     let effect = parent.resume(completion, self)?;
@@ -202,6 +210,20 @@ mod tests {
             }
         }
 
+        fn resume_done(
+            self,
+            _interp: &mut ConcreteInterpreter<
+                'ir,
+                (),
+                TestFrame,
+                &'static str,
+                InterpreterError,
+                (),
+            >,
+        ) -> Result<FrameEffect<TestFrame, &'static str>, InterpreterError> {
+            unreachable!("test frames do not use done")
+        }
+
         fn resume(
             self,
             completion: &'static str,
@@ -228,5 +250,86 @@ mod tests {
         interp.push_frame(TestFrame::Root);
 
         assert_eq!(interp.run().unwrap(), "root");
+    }
+
+    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
+    enum DoneFrame {
+        Root,
+        Child,
+    }
+
+    impl HasLocation for DoneFrame {
+        fn location(&self) -> Location {
+            panic!("test frame has no IR location")
+        }
+    }
+
+    impl<'ir>
+        crate::Frame<
+            ConcreteInterpreter<'ir, (), DoneFrame, &'static str, InterpreterError, ()>,
+            DoneFrame,
+            &'static str,
+            InterpreterError,
+        > for DoneFrame
+    {
+        fn step(
+            self,
+            _interp: &mut ConcreteInterpreter<
+                'ir,
+                (),
+                DoneFrame,
+                &'static str,
+                InterpreterError,
+                (),
+            >,
+        ) -> Result<FrameEffect<DoneFrame, &'static str>, InterpreterError> {
+            match self {
+                DoneFrame::Root => Ok(FrameEffect::Push {
+                    parent: DoneFrame::Root,
+                    child: DoneFrame::Child,
+                }),
+                DoneFrame::Child => Ok(FrameEffect::Done),
+            }
+        }
+
+        fn resume_done(
+            self,
+            _interp: &mut ConcreteInterpreter<
+                'ir,
+                (),
+                DoneFrame,
+                &'static str,
+                InterpreterError,
+                (),
+            >,
+        ) -> Result<FrameEffect<DoneFrame, &'static str>, InterpreterError> {
+            assert_eq!(self, DoneFrame::Root);
+            Ok(FrameEffect::Complete("done"))
+        }
+
+        fn resume(
+            self,
+            _completion: &'static str,
+            _interp: &mut ConcreteInterpreter<
+                'ir,
+                (),
+                DoneFrame,
+                &'static str,
+                InterpreterError,
+                (),
+            >,
+        ) -> Result<FrameEffect<DoneFrame, &'static str>, InterpreterError> {
+            unreachable!("done test does not use completion")
+        }
+    }
+
+    #[test]
+    fn run_resumes_parent_after_child_done() {
+        let pipeline = Pipeline::new();
+        let mut interp = ConcreteInterpreter::new(&pipeline);
+
+        interp.push_frame(DoneFrame::Root);
+
+        assert_eq!(interp.run().unwrap(), "done");
     }
 }

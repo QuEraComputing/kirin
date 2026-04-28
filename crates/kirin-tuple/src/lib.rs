@@ -60,6 +60,7 @@
 
 mod interpret_impl;
 pub use interpret_impl::IndexValue;
+pub mod interpreter_new;
 
 pub mod interpreter20;
 

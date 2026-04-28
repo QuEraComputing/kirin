@@ -79,6 +79,15 @@ where
             self.frames.push(child);
             Ok(StepResult::Running)
         }
+        FrameEffect::Done => {
+            match self.frames.pop() {
+                Some(parent) => {
+                    let effect = parent.resume_done(self)?;
+                    self.apply_effect(effect)
+                }
+                None => Err(InterpreterError::EmptyFrameStack.into()),
+            }
+        }
         FrameEffect::Complete(completion) => {
             match self.frames.pop() {
                 Some(parent) => {
@@ -98,7 +107,7 @@ Root completion is success. If the root frame returns
 ## StatementFrame
 
 `StatementFrame` is a standard adapter frame. It preserves a statement boundary
-when a statement returns `StatementEffect::Push(child)`.
+for tools that want an observable statement continuation.
 
 ```rust
 pub struct StatementFrame {
@@ -107,16 +116,16 @@ pub struct StatementFrame {
 }
 ```
 
-Without `StatementFrame`, `BlockFrame` would have to know how every child frame
-completion should map back into statement completion. `StatementFrame` localizes
-that adapter logic.
+Normal child-frame completion uses `FrameEffect::Done`, not a completion value.
+This is what lets a call frame complete a call statement without inventing a
+`StatementDone` completion.
 
 The fast path is mandatory:
 
 - atomic statements return `StatementEffect::Done` and do not allocate a
   `StatementFrame`.
-- non-atomic statements return `StatementEffect::Push(child)`, and `BlockFrame`
-  returns `FrameEffect::Push { parent: StatementFrame { .. }, child }`.
+- non-atomic statements return `StatementEffect::Push(child)`, and the child
+  returns `FrameEffect::Done` when the parent statement may advance.
 
 This keeps common statement execution cheap while still giving complex
 statements an observable frame boundary for tracing, breakpoints, and
@@ -153,7 +162,7 @@ match interp.dispatch_statement(location, env)? {
     StatementEffect::Transfer(ConcreteTransfer::Jump { target, args }) => {
         enter_target_block(target, args)
     }
-    StatementEffect::Push(child) => push_statement_frame_with_child(child),
+    StatementEffect::Push(child) => push_child_frame(child),
     StatementEffect::Complete(completion) => FrameEffect::Complete(completion),
 }
 ```
@@ -286,7 +295,8 @@ body semantics, passing the function activation env into that frame:
 
 Caller results are written by `CallFrame`, not by the callee function frame.
 The function frame returns `StandardCompletion::FunctionReturned(value)`. The
-call frame projects that completion and writes the value into `caller_env` at
-the call results.
+call frame projects that completion, writes the value into `caller_env` at the
+call results, and returns `FrameEffect::Done` so the parent statement traversal
+can advance.
 
 This convention keeps callee execution independent of caller result placement.

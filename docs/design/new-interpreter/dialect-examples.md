@@ -16,9 +16,9 @@ Dialect statement semantics use `Interpretable::interpret`:
 pub trait Interpretable<I, F, C, E, T>: Dialect {
     fn interpret(
         &self,
-        interp: &mut I,
         location: Location,
         env: EnvIndex,
+        interp: &mut I,
     ) -> Result<StatementEffect<F, C, T>, E>;
 }
 ```
