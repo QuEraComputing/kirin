@@ -886,4 +886,11 @@ specialize @lowered fn @sign(i64) -> i64 {
             ConstProp::Const(0)
         );
     }
+
+    #[test]
+    fn constprop_lowered_unknown_cf_branch_returns_top() {
+        let pipeline = build_pipeline(BRANCH_LOWERED);
+        let result = analyze_lowered_constprop(&pipeline, "sign", &[ConstProp::Top]).unwrap();
+        assert_eq!(result, ConstProp::Top);
+    }
 }

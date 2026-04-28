@@ -7,6 +7,8 @@ use crate::{
     Position, StageAccess, StandardCompletion, StatementDispatch, StatementEffect, Traversal,
 };
 
+use super::BlockBranchDispatch;
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockFrame<L, V> {
     pub location: Location,
@@ -160,6 +162,7 @@ impl<I, L, F, C, E, V> Frame<I, F, C, E> for BlockFrame<L, V>
 where
     I: StageAccess<L, Error = E>
         + StatementDispatch<L, F, C, E, ConcreteTransfer<V>>
+        + BlockBranchDispatch<L, F, C, E, V>
         + Env<V, Error = E>,
     L: Dialect,
     F: From<BlockFrame<L, V>>,
@@ -183,6 +186,19 @@ where
                     StatementEffect::Transfer(ConcreteTransfer::Jump { target, arguments }) => {
                         Ok(self.jump(target, arguments))
                     }
+                    StatementEffect::Transfer(ConcreteTransfer::Branch {
+                        true_target,
+                        true_arguments,
+                        false_target,
+                        false_arguments,
+                    }) => interp.dispatch_branch(
+                        self.location.stage,
+                        self.env,
+                        true_target,
+                        true_arguments,
+                        false_target,
+                        false_arguments,
+                    ),
                     StatementEffect::Push(child) => Ok(FrameEffect::Push {
                         parent: self.into(),
                         child,

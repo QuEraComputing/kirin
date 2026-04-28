@@ -18,8 +18,8 @@ pub use error::InterpreterError;
 pub use frame::{Frame, HasLocation, ProjectOrSelf};
 pub use location::{Location, Position, Traversal};
 pub use standard::{
-    BlockFrame, CallFrame, CallResultBinding, Callee, FunctionAccess, FunctionBodyDispatch,
-    FunctionBodyEntry, FunctionFrame, RegionFrame, SpecializedFunctionFrame,
+    BlockBranchDispatch, BlockFrame, CallFrame, CallResultBinding, Callee, FunctionAccess,
+    FunctionBodyDispatch, FunctionBodyEntry, FunctionFrame, RegionFrame, SpecializedFunctionFrame,
     SpecializedFunctionState, StagedFunctionFrame, StandardFrame, StatementFrame,
 };
 pub use value::{BranchCondition, ProductValue};

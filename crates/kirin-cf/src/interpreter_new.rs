@@ -11,7 +11,6 @@ where
     L: Dialect,
     I: Env<V, Error = E>,
     V: BranchCondition + Clone,
-    E: From<IndeterminateBranch>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -38,7 +37,16 @@ where
                 let (target, args) = match interp.read(env, *condition)?.is_truthy() {
                     Some(true) => (true_target.target(), true_args.as_slice()),
                     Some(false) => (false_target.target(), false_args.as_slice()),
-                    None => return Err(IndeterminateBranch.into()),
+                    None => {
+                        let true_arguments = interp.read_many(env, true_args.as_slice())?;
+                        let false_arguments = interp.read_many(env, false_args.as_slice())?;
+                        return Ok(StatementEffect::Transfer(ConcreteTransfer::Branch {
+                            true_target: true_target.target(),
+                            true_arguments,
+                            false_target: false_target.target(),
+                            false_arguments,
+                        }));
+                    }
                 };
                 let arguments = interp.read_many(env, args)?;
                 Ok(StatementEffect::Transfer(ConcreteTransfer::Jump {
