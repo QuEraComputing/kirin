@@ -114,16 +114,20 @@ fn run_program(
         .collect::<Result<_, _>>()?;
 
     if new_constprop {
-        if stage_name != "source" {
-            anyhow::bail!("interpreter-new constprop currently supports source stage only");
-        }
         let abstract_args = args
             .iter()
             .copied()
             .map(interpreter_new::ConstProp::Const)
             .collect::<Vec<_>>();
-        let result =
-            interpreter_new::analyze_source_constprop(&pipeline, func_name, &abstract_args)?;
+        let result = match stage_name {
+            "source" => {
+                interpreter_new::analyze_source_constprop(&pipeline, func_name, &abstract_args)?
+            }
+            "lowered" => {
+                interpreter_new::analyze_lowered_constprop(&pipeline, func_name, &abstract_args)?
+            }
+            other => anyhow::bail!("unknown stage '{}'", other),
+        };
         println!("{result:?}");
         return Ok(());
     }

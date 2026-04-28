@@ -718,6 +718,29 @@ pub fn analyze_source_constprop(
     expect_function_return(interp.run()?)
 }
 
+pub fn analyze_lowered_constprop(
+    pipeline: &Pipeline<Stage>,
+    function_name: &str,
+    args: &[ConstProp],
+) -> Result<ConstProp, ToyError> {
+    let stage = pipeline
+        .stage_by_name("lowered")
+        .ok_or(InterpreterError::Custom("missing lowered stage"))?;
+    let function = resolve_function(pipeline, function_name)?;
+    let mut interp: AbstractInterpreter<
+        '_,
+        Stage,
+        ToyFrame<LowLevel, ConstProp>,
+        ToyCompletion<ConstProp>,
+        ToyError,
+        ConstProp,
+    > = AbstractInterpreter::new(pipeline);
+    interp.push_frame(
+        FunctionFrame::<LowLevel, ConstProp>::new(stage, function, args.to_vec()).into(),
+    );
+    expect_function_return(interp.run()?)
+}
+
 fn resolve_function(pipeline: &Pipeline<Stage>, function_name: &str) -> Result<Function, ToyError> {
     let symbol = pipeline
         .lookup_symbol(function_name)
@@ -739,6 +762,37 @@ fn expect_function_return<V>(completion: ToyCompletion<V>) -> Result<V, ToyError
 mod tests {
     use super::*;
     use kirin::prelude::ParsePipelineText;
+
+    const ADD_LOWERED: &str = r#"
+stage @lowered fn @add(i64, i64) -> i64;
+
+specialize @lowered fn @add(i64, i64) -> i64 {
+  ^entry(%a: i64, %b: i64) {
+    %result = add %a, %b -> i64;
+    ret %result;
+  }
+}
+"#;
+
+    const BRANCH_LOWERED: &str = r#"
+stage @lowered fn @sign(i64) -> i64;
+
+specialize @lowered fn @sign(i64) -> i64 {
+  ^entry(%x: i64) {
+    %zero = constant 0 -> i64;
+    %is_neg = lt %x, %zero -> i64;
+    cond_br %is_neg then=^neg() else=^pos();
+  }
+  ^neg() {
+    %one = constant 1 -> i64;
+    ret %one;
+  }
+  ^pos() {
+    %zero2 = constant 0 -> i64;
+    ret %zero2;
+  }
+}
+"#;
 
     fn build_pipeline(src: &str) -> Pipeline<Stage> {
         let mut pipeline = Pipeline::new();
@@ -806,5 +860,30 @@ mod tests {
         let pipeline = build_pipeline(include_str!("../programs/branching.kirin"));
         let result = analyze_source_constprop(&pipeline, "abs", &[ConstProp::Top]).unwrap();
         assert_eq!(result, ConstProp::Top);
+    }
+
+    #[test]
+    fn constprop_lowered_add() {
+        let pipeline = build_pipeline(ADD_LOWERED);
+        let result = analyze_lowered_constprop(
+            &pipeline,
+            "add",
+            &[ConstProp::Const(2), ConstProp::Const(3)],
+        )
+        .unwrap();
+        assert_eq!(result, ConstProp::Const(5));
+    }
+
+    #[test]
+    fn constprop_lowered_known_cf_branch() {
+        let pipeline = build_pipeline(BRANCH_LOWERED);
+        assert_eq!(
+            analyze_lowered_constprop(&pipeline, "sign", &[ConstProp::Const(-3)]).unwrap(),
+            ConstProp::Const(1)
+        );
+        assert_eq!(
+            analyze_lowered_constprop(&pipeline, "sign", &[ConstProp::Const(5)]).unwrap(),
+            ConstProp::Const(0)
+        );
     }
 }
