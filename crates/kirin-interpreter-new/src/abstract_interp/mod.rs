@@ -1,9 +1,11 @@
+mod context;
 mod domain;
 mod env;
 mod fixpoint;
 mod interp;
 mod summary;
 
+pub use context::{ContextStrategy, NodeContext, SummaryKey};
 pub use domain::AbstractValue;
 pub use env::{AbstractEnv, AbstractEnvStore};
 pub use fixpoint::{
