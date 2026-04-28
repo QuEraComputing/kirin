@@ -53,6 +53,14 @@ impl<'ir, S, F, C, E, V> AbstractInterpreter<'ir, S, F, C, E, V> {
         self.envs.current().map_err(E::from)
     }
 
+    pub fn clone_env(&mut self, index: EnvIndex) -> Result<EnvIndex, E>
+    where
+        E: From<InterpreterError>,
+        V: Clone,
+    {
+        self.envs.clone_store_from(index).map_err(E::from)
+    }
+
     pub fn run(&mut self) -> Result<C, E>
     where
         F: Frame<Self, F, C, E>,
@@ -62,6 +70,22 @@ impl<'ir, S, F, C, E, V> AbstractInterpreter<'ir, S, F, C, E, V> {
             match self.step()? {
                 StepResult::Running => {}
                 StepResult::Complete(completion) => return Ok(completion),
+            }
+        }
+    }
+
+    pub fn run_frame(&mut self, root: F) -> Result<C, E>
+    where
+        F: Frame<Self, F, C, E>,
+        E: From<InterpreterError>,
+    {
+        let mut stack = vec![root];
+
+        loop {
+            let frame = stack.pop().ok_or(InterpreterError::EmptyFrameStack)?;
+            let effect = frame.step(self)?;
+            if let Some(completion) = self.apply_local_effect(&mut stack, effect)? {
+                return Ok(completion);
             }
         }
     }
@@ -105,6 +129,44 @@ impl<'ir, S, F, C, E, V> AbstractInterpreter<'ir, S, F, C, E, V> {
                     self.apply_effect(effect)
                 } else {
                     Ok(StepResult::Complete(completion))
+                }
+            }
+        }
+    }
+
+    fn apply_local_effect(
+        &mut self,
+        stack: &mut Vec<F>,
+        effect: FrameEffect<F, C>,
+    ) -> Result<Option<C>, E>
+    where
+        F: Frame<Self, F, C, E>,
+        E: From<InterpreterError>,
+    {
+        match effect {
+            FrameEffect::Continue(frame) => {
+                stack.push(frame);
+                Ok(None)
+            }
+            FrameEffect::Push { parent, child } => {
+                stack.push(parent);
+                stack.push(child);
+                Ok(None)
+            }
+            FrameEffect::Done => {
+                if let Some(parent) = stack.pop() {
+                    let effect = parent.resume_done(self)?;
+                    self.apply_local_effect(stack, effect)
+                } else {
+                    Err(InterpreterError::EmptyFrameStack.into())
+                }
+            }
+            FrameEffect::Complete(completion) => {
+                if let Some(parent) = stack.pop() {
+                    let effect = parent.resume(completion, self)?;
+                    self.apply_local_effect(stack, effect)
+                } else {
+                    Ok(Some(completion))
                 }
             }
         }

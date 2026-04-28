@@ -1,6 +1,8 @@
 pub trait AbstractValue: Clone + PartialEq {
     fn bottom() -> Self;
 
+    fn top() -> Self;
+
     fn join(&self, other: &Self) -> Self;
 
     fn widen(&self, other: &Self) -> Self {

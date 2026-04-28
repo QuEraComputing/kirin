@@ -84,6 +84,8 @@ The value type `V` is an abstract domain element.
 pub trait AbstractValue: Clone + PartialEq {
     fn bottom() -> Self;
 
+    fn top() -> Self;
+
     fn join(&mut self, other: Self) -> bool;
 
     fn widen(&mut self, other: Self) -> bool {
@@ -100,6 +102,13 @@ pub trait AbstractValue: Clone + PartialEq {
 `join`, `widen`, and `narrow` mutate `self` and return whether it changed.
 Simple finite domains can use the default `widen` and `narrow`. Infinite-height
 domains, such as intervals, override widening and narrowing.
+
+`top` is required for coarse but sound fallback semantics. For example, the
+first abstract SCF implementation can handle an unknown `scf.if` condition by
+writing `top` to the operation results instead of trying to prove both branch
+frames are runnable through the same recursive trait bounds. A more precise
+driver can later evaluate both branches in cloned scratch envs and join their
+yielded values.
 
 ## Abstract Env
 

@@ -253,6 +253,10 @@ impl AbstractValue for ConstProp {
         Self::Bottom
     }
 
+    fn top() -> Self {
+        Self::Top
+    }
+
     fn join(&self, other: &Self) -> Self {
         match (self, other) {
             (Self::Bottom, value) | (value, Self::Bottom) => value.clone(),
@@ -795,5 +799,12 @@ mod tests {
             analyze_source_constprop(&pipeline, "abs", &[ConstProp::Const(7)]).unwrap(),
             ConstProp::Const(7)
         );
+    }
+
+    #[test]
+    fn constprop_source_unknown_branch_joins_yields() {
+        let pipeline = build_pipeline(include_str!("../programs/branching.kirin"));
+        let result = analyze_source_constprop(&pipeline, "abs", &[ConstProp::Top]).unwrap();
+        assert_eq!(result, ConstProp::Top);
     }
 }

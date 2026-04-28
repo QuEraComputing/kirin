@@ -3,9 +3,9 @@ use std::marker::PhantomData;
 use kirin::ir::TryLiftFrom;
 use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue, SSAValue};
 use kirin_interpreter_new::{
-    AbstractInterpreter, BlockFrame, BranchCondition, ConcreteInterpreter, ConcreteTransfer, Env,
-    EnvIndex, Frame, FrameEffect, HasLocation, Interpretable, InterpreterError, Location,
-    ProductValue, ProjectOrSelf, StatementEffect,
+    AbstractInterpreter, AbstractValue, BlockFrame, BranchCondition, ConcreteInterpreter,
+    ConcreteTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, Interpretable,
+    InterpreterError, Location, ProductValue, ProjectOrSelf, StatementEffect,
 };
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
@@ -16,11 +16,22 @@ type ForFrameMarker<L, T> = PhantomData<fn() -> (L, T)>;
 pub trait ScfBlockDispatch<L: Dialect, F, E, V> {
     fn dispatch_scf_block(
         &mut self,
-        location: Location,
+        _location: Location,
         block: Block,
         env: EnvIndex,
         args: Vec<V>,
     ) -> Result<F, E>;
+}
+
+pub trait ScfIfDispatch<L: Dialect, F, C, E, V> {
+    fn dispatch_indeterminate_if(
+        &mut self,
+        _location: Location,
+        env: EnvIndex,
+        then_body: Block,
+        else_body: Block,
+        results: Vec<ResultValue>,
+    ) -> Result<FrameEffect<F, C>, E>;
 }
 
 impl<'ir, S, L, F, C, E, V> ScfBlockDispatch<L, F, E, V> for ConcreteInterpreter<'ir, S, F, C, E, V>
@@ -41,6 +52,23 @@ where
     }
 }
 
+impl<'ir, S, L, F, C, E, V> ScfIfDispatch<L, F, C, E, V> for ConcreteInterpreter<'ir, S, F, C, E, V>
+where
+    L: Dialect,
+    E: From<IndeterminateBranch>,
+{
+    fn dispatch_indeterminate_if(
+        &mut self,
+        _location: Location,
+        _env: EnvIndex,
+        _then_body: Block,
+        _else_body: Block,
+        _results: Vec<ResultValue>,
+    ) -> Result<FrameEffect<F, C>, E> {
+        Err(IndeterminateBranch.into())
+    }
+}
+
 impl<'ir, S, L, F, C, E, V> ScfBlockDispatch<L, F, E, V> for AbstractInterpreter<'ir, S, F, C, E, V>
 where
     S: HasStageInfo<L>,
@@ -56,6 +84,27 @@ where
         args: Vec<V>,
     ) -> Result<F, E> {
         Ok(BlockFrame::<L, V>::new(location.stage, block, env, args).into())
+    }
+}
+
+impl<'ir, S, L, F, C, E, V> ScfIfDispatch<L, F, C, E, V> for AbstractInterpreter<'ir, S, F, C, E, V>
+where
+    S: HasStageInfo<L>,
+    L: Dialect,
+    E: From<InterpreterError>,
+    V: AbstractValue + ProductValue,
+{
+    fn dispatch_indeterminate_if(
+        &mut self,
+        _location: Location,
+        env: EnvIndex,
+        _then_body: Block,
+        _else_body: Block,
+        results: Vec<ResultValue>,
+    ) -> Result<FrameEffect<F, C>, E> {
+        let values = results.iter().map(|_| V::top()).collect();
+        write_results(self, env, results.as_slice(), V::new_product(values))?;
+        Ok(FrameEffect::Done)
     }
 }
 
@@ -166,11 +215,11 @@ impl<L: Dialect, T: CompileTimeValue, V> HasLocation for IfFrame<L, T, V> {
 
 impl<I, L, F, C, E, T, V> Frame<I, F, C, E> for IfFrame<L, T, V>
 where
-    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V>,
+    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V> + ScfIfDispatch<L, F, C, E, V>,
     L: Dialect,
     F: From<IfFrame<L, T, V>>,
     C: ProjectOrSelf<ScfCompletion<V>>,
-    E: From<InterpreterError> + From<IndeterminateBranch>,
+    E: From<InterpreterError>,
     T: CompileTimeValue,
     V: BranchCondition + ProductValue,
 {
@@ -180,7 +229,15 @@ where
                 let block = match interp.read(self.env, self.condition)?.is_truthy() {
                     Some(true) => self.then_body,
                     Some(false) => self.else_body,
-                    None => return Err(IndeterminateBranch.into()),
+                    None => {
+                        return interp.dispatch_indeterminate_if(
+                            self.location,
+                            self.env,
+                            self.then_body,
+                            self.else_body,
+                            self.results,
+                        );
+                    }
                 };
                 let child =
                     interp.dispatch_scf_block(self.location, block, self.env, Vec::new())?;

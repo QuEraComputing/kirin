@@ -45,6 +45,16 @@ impl<V> AbstractEnvStore<V> {
             .ok_or(InterpreterError::EmptyEnvStack)
     }
 
+    pub fn clone_store_from(&mut self, index: EnvIndex) -> Result<EnvIndex, InterpreterError>
+    where
+        V: Clone,
+    {
+        let store = self.store(index)?.clone();
+        let clone = EnvIndex::new(self.stores.len());
+        self.stores.push(Some(store));
+        Ok(clone)
+    }
+
     fn store(&self, index: EnvIndex) -> Result<&HashMap<SSAValue, V>, InterpreterError> {
         self.stores
             .get(index.raw())
