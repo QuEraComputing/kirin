@@ -7,7 +7,7 @@ use kirin_ir::{
 
 use crate::{
     ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError,
-    Location, Position, StandardCompletion, Traversal,
+    Location, Position, StageAccess, StandardCompletion, Traversal,
 };
 
 pub trait FunctionAccess<L: Dialect> {
@@ -94,6 +94,40 @@ pub trait FunctionBodyDispatch<L: Dialect, F, E, V> {
         env: EnvIndex,
         args: Vec<V>,
     ) -> Result<F, E>;
+}
+
+pub trait FunctionBodyEntry<L: Dialect, I, F, E, V>: Dialect {
+    fn enter_function_body(
+        &self,
+        location: Location,
+        env: EnvIndex,
+        interp: &mut I,
+        args: Vec<V>,
+    ) -> Result<F, E>;
+}
+
+impl<'ir, S, L, F, C, E, V> FunctionBodyDispatch<L, F, E, V>
+    for ConcreteInterpreter<'ir, S, F, C, E, V>
+where
+    L: Dialect,
+    L: FunctionBodyEntry<L, Self, F, E, V>,
+    S: HasStageInfo<L>,
+    E: From<InterpreterError>,
+{
+    fn dispatch_function_body(
+        &mut self,
+        location: Location,
+        body: kirin_ir::Statement,
+        env: EnvIndex,
+        args: Vec<V>,
+    ) -> Result<F, E> {
+        let location = Location::new(location.stage, Position::Statement { statement: body });
+        let definition = {
+            let stage = StageAccess::<L>::stage_info(self, location.stage)?;
+            body.definition(stage).clone()
+        };
+        definition.enter_function_body(location, env, self, args)
+    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

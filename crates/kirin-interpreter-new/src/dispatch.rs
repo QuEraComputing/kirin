@@ -16,7 +16,7 @@ pub trait StatementDispatch<L: Dialect, F, C, E, T> {
     ) -> Result<StatementEffect<F, C, T>, E>;
 }
 
-pub trait Interpretable<I, F, C, E, T>: Dialect {
+pub trait Interpretable<L: Dialect, I, F, C, E, T>: Dialect {
     fn interpret(
         &self,
         location: Location,
@@ -28,7 +28,7 @@ pub trait Interpretable<I, F, C, E, T>: Dialect {
 impl<I, L, F, C, E, T> StatementDispatch<L, F, C, E, T> for I
 where
     I: StageAccess<L, Error = E>,
-    L: Interpretable<I, F, C, E, T>,
+    L: Interpretable<L, I, F, C, E, T>,
     E: From<InterpreterError>,
 {
     fn dispatch_statement(

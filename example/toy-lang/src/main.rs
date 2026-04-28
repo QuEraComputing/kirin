@@ -1,4 +1,5 @@
 mod interpreter20;
+mod interpreter_new;
 mod language;
 mod stage;
 
@@ -37,6 +38,9 @@ enum Command {
         /// Arguments to the function (parsed as i64)
         #[arg(allow_negative_numbers = true)]
         args: Vec<String>,
+        /// Run through the experimental interpreter-new framework
+        #[arg(long)]
+        new_interpreter: bool,
     },
 }
 
@@ -56,8 +60,9 @@ fn main() -> anyhow::Result<()> {
             stage: stage_name,
             function: func_name,
             args,
+            new_interpreter,
         } => {
-            run_program(&file, &stage_name, &func_name, &args)?;
+            run_program(&file, &stage_name, &func_name, &args, new_interpreter)?;
             Ok(())
         }
     }
@@ -68,6 +73,7 @@ fn run_program(
     stage_name: &str,
     func_name: &str,
     cli_args: &[String],
+    new_interpreter: bool,
 ) -> anyhow::Result<()> {
     let src = std::fs::read_to_string(file)?;
     let mut pipeline: Pipeline<Stage> = Pipeline::new();
@@ -94,6 +100,16 @@ fn run_program(
         .iter()
         .map(|s| s.parse::<i64>())
         .collect::<Result<_, _>>()?;
+
+    if new_interpreter {
+        let result = match stage_name {
+            "source" => interpreter_new::run_source_i64(&pipeline, func_name, &args)?,
+            "lowered" => interpreter_new::run_lowered_i64(&pipeline, func_name, &args)?,
+            other => anyhow::bail!("unknown stage '{}'", other),
+        };
+        println!("{result}");
+        return Ok(());
+    }
 
     // Dispatch based on stage name.
     match stage_name {

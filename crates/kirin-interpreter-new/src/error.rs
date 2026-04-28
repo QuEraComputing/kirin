@@ -1,4 +1,4 @@
-use kirin_ir::{CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction};
+use kirin_ir::{CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction, Symbol};
 use thiserror::Error;
 
 use crate::{EnvIndex, Location};
@@ -44,6 +44,8 @@ pub enum InterpreterError {
     },
     #[error("function body fell through at {0:?}")]
     FunctionBodyFellThrough(Location),
+    #[error("missing call target {target:?} at {location:?}")]
+    MissingCallTarget { location: Location, target: Symbol },
     #[error("call result arity mismatch at {location:?}: expected {expected}, got {actual}")]
     CallResultArityMismatch {
         location: Location,

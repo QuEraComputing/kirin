@@ -13,7 +13,7 @@ The important split is:
 Dialect statement semantics use `Interpretable::interpret`:
 
 ```rust
-pub trait Interpretable<I, F, C, E, T>: Dialect {
+pub trait Interpretable<L: Dialect, I, F, C, E, T>: Dialect {
     fn interpret(
         &self,
         location: Location,
@@ -22,6 +22,11 @@ pub trait Interpretable<I, F, C, E, T>: Dialect {
     ) -> Result<StatementEffect<F, C, T>, E>;
 }
 ```
+
+`L` is the current composed language for the active stage. A nested dialect
+uses it when it needs to create a frame that will resume in the surrounding
+language, such as `BlockFrame<L, V>` for an SCF body or `CallFrame<L, V>` for a
+function call.
 
 The variants map to driver behavior:
 
@@ -65,9 +70,9 @@ mutation cycle of the SCF frame. Defining `scf.for` alone is not enough.
 SCF can provide its own frame, completion, and error variants:
 
 ```rust
-pub enum ScfFrame<V> {
-    For(ForFrame<V>),
-    If(IfFrame<V>),
+pub enum ScfFrame<L, V> {
+    For(ForFrame<L, V>),
+    If(IfFrame<L, V>),
 }
 
 pub enum ScfCompletion<V> {
@@ -83,9 +88,9 @@ pub enum ScfError {
 The SCF dialect implementation returns statement effects:
 
 ```rust
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, T> for SCF
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, T> for SCF
 where
-    ScfFrame<V>: LiftTo<F>,
+    ScfFrame<L, V>: LiftTo<F>,
     ScfCompletion<V>: LiftTo<C>,
     ScfError: LiftTo<E>,
 {
@@ -155,14 +160,8 @@ manually at first. Macros can reduce this boilerplate later.
 
 ```rust
 pub enum MyFrame<V> {
-    Statement(StatementFrame),
-    Block(BlockFrame<V>),
-    Region(RegionFrame<V>),
-    Call(CallFrame<V>),
-    Function(FunctionFrame<V>),
-    StagedFunction(StagedFunctionFrame<V>),
-    SpecializedFunction(SpecializedFunctionFrame<V>),
-    Scf(ScfFrame<V>),
+    Standard(StandardFrame<MyLang, V>),
+    Scf(ScfFrame<MyLang, V>),
 }
 
 pub enum MyCompletion<V> {
@@ -195,23 +194,20 @@ Manual `Frame` dispatch for the total frame type is mechanical:
 ```rust
 impl<I, V, C, E> Frame<I, MyFrame<V>, C, E> for MyFrame<V>
 where
-    StatementFrame: Frame<I, MyFrame<V>, C, E>,
-    BlockFrame<V>: Frame<I, MyFrame<V>, C, E>,
-    RegionFrame<V>: Frame<I, MyFrame<V>, C, E>,
-    CallFrame<V>: Frame<I, MyFrame<V>, C, E>,
-    FunctionFrame<V>: Frame<I, MyFrame<V>, C, E>,
-    ScfFrame<V>: Frame<I, MyFrame<V>, C, E>,
+    StandardFrame<MyLang, V>: Frame<I, MyFrame<V>, C, E>,
+    ScfFrame<MyLang, V>: Frame<I, MyFrame<V>, C, E>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<MyFrame<V>, C>, E> {
         match self {
-            MyFrame::Statement(frame) => frame.step(interp),
-            MyFrame::Block(frame) => frame.step(interp),
-            MyFrame::Region(frame) => frame.step(interp),
-            MyFrame::Call(frame) => frame.step(interp),
-            MyFrame::Function(frame) => frame.step(interp),
+            MyFrame::Standard(frame) => frame.step(interp),
             MyFrame::Scf(frame) => frame.step(interp),
-            MyFrame::StagedFunction(frame) => frame.step(interp),
-            MyFrame::SpecializedFunction(frame) => frame.step(interp),
+        }
+    }
+
+    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<MyFrame<V>, C>, E> {
+        match self {
+            MyFrame::Standard(frame) => frame.resume_done(interp),
+            MyFrame::Scf(frame) => frame.resume_done(interp),
         }
     }
 
@@ -221,16 +217,8 @@ where
         interp: &mut I,
     ) -> Result<FrameEffect<MyFrame<V>, C>, E> {
         match self {
-            MyFrame::Statement(frame) => frame.resume(completion, interp),
-            MyFrame::Block(frame) => frame.resume(completion, interp),
-            MyFrame::Region(frame) => frame.resume(completion, interp),
-            MyFrame::Call(frame) => frame.resume(completion, interp),
-            MyFrame::Function(frame) => frame.resume(completion, interp),
+            MyFrame::Standard(frame) => frame.resume(completion, interp),
             MyFrame::Scf(frame) => frame.resume(completion, interp),
-            MyFrame::StagedFunction(frame) => frame.resume(completion, interp),
-            MyFrame::SpecializedFunction(frame) => {
-                frame.resume(completion, interp)
-            }
         }
     }
 }

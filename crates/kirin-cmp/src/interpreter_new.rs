@@ -1,10 +1,11 @@
-use kirin::prelude::{CompileTimeValue, SSAValue};
+use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
 use kirin_interpreter_new::{ConcreteTransfer, Env, Interpretable, Location, StatementEffect};
 
 use crate::{Cmp, CompareValue};
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for Cmp<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Cmp<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
     V: CompareValue,
     <V as CompareValue>::Bool: Into<V>,

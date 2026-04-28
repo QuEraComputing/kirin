@@ -1,15 +1,19 @@
 use std::marker::PhantomData;
 
 use kirin::ir::TryLiftFrom;
-use kirin::prelude::{Block, CompileTimeValue, ResultValue, SSAValue};
+use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue, SSAValue};
 use kirin_interpreter_new::{
-    BranchCondition, ConcreteTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation,
-    Interpretable, InterpreterError, Location, ProductValue, ProjectOrSelf, StatementEffect,
+    BlockFrame, BranchCondition, ConcreteInterpreter, ConcreteTransfer, Env, EnvIndex, Frame,
+    FrameEffect, HasLocation, Interpretable, InterpreterError, Location, ProductValue,
+    ProjectOrSelf, StatementEffect,
 };
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
 
-pub trait ScfBlockDispatch<F, E, V> {
+type IfFrameMarker<L, T, V> = PhantomData<fn() -> (L, T, V)>;
+type ForFrameMarker<L, T> = PhantomData<fn() -> (L, T)>;
+
+pub trait ScfBlockDispatch<L: Dialect, F, E, V> {
     fn dispatch_scf_block(
         &mut self,
         location: Location,
@@ -19,30 +23,48 @@ pub trait ScfBlockDispatch<F, E, V> {
     ) -> Result<F, E>;
 }
 
+impl<'ir, S, L, F, C, E, V> ScfBlockDispatch<L, F, E, V> for ConcreteInterpreter<'ir, S, F, C, E, V>
+where
+    S: HasStageInfo<L>,
+    L: Dialect,
+    F: From<BlockFrame<L, V>>,
+    V: Clone,
+{
+    fn dispatch_scf_block(
+        &mut self,
+        location: Location,
+        block: Block,
+        env: EnvIndex,
+        args: Vec<V>,
+    ) -> Result<F, E> {
+        Ok(BlockFrame::<L, V>::new(location.stage, block, env, args).into())
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScfCompletion<V> {
     Yield(V),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ScfFrame<T: CompileTimeValue, V> {
-    If(IfFrame<T, V>),
-    For(ForFrame<T, V>),
+pub enum ScfFrame<L: Dialect, T: CompileTimeValue, V> {
+    If(IfFrame<L, T, V>),
+    For(ForFrame<L, T, V>),
 }
 
-impl<T: CompileTimeValue, V> From<IfFrame<T, V>> for ScfFrame<T, V> {
-    fn from(frame: IfFrame<T, V>) -> Self {
+impl<L: Dialect, T: CompileTimeValue, V> From<IfFrame<L, T, V>> for ScfFrame<L, T, V> {
+    fn from(frame: IfFrame<L, T, V>) -> Self {
         Self::If(frame)
     }
 }
 
-impl<T: CompileTimeValue, V> From<ForFrame<T, V>> for ScfFrame<T, V> {
-    fn from(frame: ForFrame<T, V>) -> Self {
+impl<L: Dialect, T: CompileTimeValue, V> From<ForFrame<L, T, V>> for ScfFrame<L, T, V> {
+    fn from(frame: ForFrame<L, T, V>) -> Self {
         Self::For(frame)
     }
 }
 
-impl<T: CompileTimeValue, V> HasLocation for ScfFrame<T, V> {
+impl<L: Dialect, T: CompileTimeValue, V> HasLocation for ScfFrame<L, T, V> {
     fn location(&self) -> Location {
         match self {
             Self::If(frame) => frame.location(),
@@ -51,11 +73,12 @@ impl<T: CompileTimeValue, V> HasLocation for ScfFrame<T, V> {
     }
 }
 
-impl<I, F, C, E, T, V> Frame<I, F, C, E> for ScfFrame<T, V>
+impl<I, L, F, C, E, T, V> Frame<I, F, C, E> for ScfFrame<L, T, V>
 where
+    L: Dialect,
     T: CompileTimeValue,
-    IfFrame<T, V>: Frame<I, F, C, E>,
-    ForFrame<T, V>: Frame<I, F, C, E>,
+    IfFrame<L, T, V>: Frame<I, F, C, E>,
+    ForFrame<L, T, V>: Frame<I, F, C, E>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self {
@@ -80,7 +103,7 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct IfFrame<T: CompileTimeValue, V> {
+pub struct IfFrame<L: Dialect, T: CompileTimeValue, V> {
     pub location: Location,
     pub env: EnvIndex,
     condition: SSAValue,
@@ -88,7 +111,7 @@ pub struct IfFrame<T: CompileTimeValue, V> {
     else_body: Block,
     results: Vec<ResultValue>,
     phase: IfPhase,
-    _marker: PhantomData<fn() -> (T, V)>,
+    _marker: IfFrameMarker<L, T, V>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -97,7 +120,7 @@ enum IfPhase {
     Active,
 }
 
-impl<T: CompileTimeValue, V> IfFrame<T, V> {
+impl<L: Dialect, T: CompileTimeValue, V> IfFrame<L, T, V> {
     fn new(location: Location, env: EnvIndex, op: &If<T>) -> Self {
         Self {
             location,
@@ -117,16 +140,17 @@ impl<T: CompileTimeValue, V> IfFrame<T, V> {
     }
 }
 
-impl<T: CompileTimeValue, V> HasLocation for IfFrame<T, V> {
+impl<L: Dialect, T: CompileTimeValue, V> HasLocation for IfFrame<L, T, V> {
     fn location(&self) -> Location {
         self.location
     }
 }
 
-impl<I, F, C, E, T, V> Frame<I, F, C, E> for IfFrame<T, V>
+impl<I, L, F, C, E, T, V> Frame<I, F, C, E> for IfFrame<L, T, V>
 where
-    I: Env<V, Error = E> + ScfBlockDispatch<F, E, V>,
-    F: From<IfFrame<T, V>>,
+    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V>,
+    L: Dialect,
+    F: From<IfFrame<L, T, V>>,
     C: ProjectOrSelf<ScfCompletion<V>>,
     E: From<InterpreterError> + From<IndeterminateBranch>,
     T: CompileTimeValue,
@@ -175,7 +199,7 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ForFrame<T: CompileTimeValue, V> {
+pub struct ForFrame<L: Dialect, T: CompileTimeValue, V> {
     pub location: Location,
     pub env: EnvIndex,
     start: SSAValue,
@@ -185,7 +209,7 @@ pub struct ForFrame<T: CompileTimeValue, V> {
     body: Block,
     results: Vec<ResultValue>,
     phase: ForPhase<V>,
-    _marker: PhantomData<fn() -> T>,
+    _marker: ForFrameMarker<L, T>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -194,7 +218,7 @@ enum ForPhase<V> {
     Check { iv: V, end: V, step: V, carried: V },
 }
 
-impl<T: CompileTimeValue, V> ForFrame<T, V> {
+impl<L: Dialect, T: CompileTimeValue, V> ForFrame<L, T, V> {
     fn new(location: Location, env: EnvIndex, op: &For<T>) -> Self {
         Self {
             location,
@@ -211,16 +235,17 @@ impl<T: CompileTimeValue, V> ForFrame<T, V> {
     }
 }
 
-impl<T: CompileTimeValue, V> HasLocation for ForFrame<T, V> {
+impl<L: Dialect, T: CompileTimeValue, V> HasLocation for ForFrame<L, T, V> {
     fn location(&self) -> Location {
         self.location
     }
 }
 
-impl<I, F, C, E, T, V> Frame<I, F, C, E> for ForFrame<T, V>
+impl<I, L, F, C, E, T, V> Frame<I, F, C, E> for ForFrame<L, T, V>
 where
-    I: Env<V, Error = E> + ScfBlockDispatch<F, E, V>,
-    F: From<ForFrame<T, V>>,
+    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V>,
+    L: Dialect,
+    F: From<ForFrame<L, T, V>>,
     C: ProjectOrSelf<ScfCompletion<V>>,
     E: From<InterpreterError> + From<LoopStepOverflow> + From<IndeterminateBranch>,
     T: CompileTimeValue,
@@ -352,9 +377,10 @@ where
     }
 }
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for If<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for If<T>
 where
-    F: From<IfFrame<T, V>>,
+    L: Dialect,
+    F: From<IfFrame<L, T, V>>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -364,14 +390,15 @@ where
         _interp: &mut I,
     ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
         Ok(StatementEffect::Push(
-            IfFrame::new(location, env, self).into(),
+            IfFrame::<L, T, V>::new(location, env, self).into(),
         ))
     }
 }
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for For<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for For<T>
 where
-    F: From<ForFrame<T, V>>,
+    L: Dialect,
+    F: From<ForFrame<L, T, V>>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -381,13 +408,14 @@ where
         _interp: &mut I,
     ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
         Ok(StatementEffect::Push(
-            ForFrame::new(location, env, self).into(),
+            ForFrame::<L, T, V>::new(location, env, self).into(),
         ))
     }
 }
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for Yield<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Yield<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
     C: TryLiftFrom<ScfCompletion<V>>,
     E: From<<C as TryLiftFrom<ScfCompletion<V>>>::Error>,
@@ -407,10 +435,12 @@ where
     }
 }
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for StructuredControlFlow<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>>
+    for StructuredControlFlow<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
-    F: From<IfFrame<T, V>> + From<ForFrame<T, V>>,
+    F: From<IfFrame<L, T, V>> + From<ForFrame<L, T, V>>,
     C: TryLiftFrom<ScfCompletion<V>>,
     E: From<<C as TryLiftFrom<ScfCompletion<V>>>::Error>,
     T: CompileTimeValue,
@@ -423,9 +453,21 @@ where
         interp: &mut I,
     ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
         match self {
-            StructuredControlFlow::If(op) => op.interpret(location, env, interp),
-            StructuredControlFlow::For(op) => op.interpret(location, env, interp),
-            StructuredControlFlow::Yield(op) => op.interpret(location, env, interp),
+            StructuredControlFlow::If(op) => {
+                <If<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                    op, location, env, interp,
+                )
+            }
+            StructuredControlFlow::For(op) => {
+                <For<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                    op, location, env, interp,
+                )
+            }
+            StructuredControlFlow::Yield(op) => {
+                <Yield<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                    op, location, env, interp,
+                )
+            }
         }
     }
 }

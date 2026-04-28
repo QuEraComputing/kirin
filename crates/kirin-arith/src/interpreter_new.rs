@@ -1,14 +1,15 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
-use kirin::prelude::{CompileTimeValue, SSAValue};
+use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
 use kirin_interpreter_new::{
     ConcreteTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
 };
 
 use crate::{Arith, CheckedDiv, CheckedRem};
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for Arith<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Arith<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
     V: Clone
         + Add<Output = V>

@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, SSAValue};
+use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
 use kirin_interpreter_new::{
     ConcreteTransfer, Env, Interpretable, InterpreterError, Location, ProductValue, StatementEffect,
 };
@@ -10,8 +10,9 @@ pub trait TupleIndexValue: Sized {
     fn from_tuple_index(index: usize) -> Self;
 }
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for NewTuple<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for NewTuple<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
     V: ProductValue,
     T: CompileTimeValue,
@@ -32,8 +33,9 @@ where
     }
 }
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for Unpack<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Unpack<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
     V: ProductValue,
     E: From<InterpreterError>,
@@ -57,8 +59,9 @@ where
     }
 }
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for Get<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Get<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
     V: ProductValue + TupleIndexValue,
     E: From<ExpectedTuple> + From<InvalidTupleIndex> + From<TupleIndexOutOfBounds>,
@@ -86,8 +89,9 @@ where
     }
 }
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for Len<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Len<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
     V: ProductValue + TupleIndexValue,
     E: From<ExpectedTuple>,
@@ -106,8 +110,9 @@ where
     }
 }
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for Tuple<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Tuple<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
     V: ProductValue + TupleIndexValue,
     E: From<ExpectedTuple>
@@ -123,10 +128,26 @@ where
         interp: &mut I,
     ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
         match self {
-            Tuple::NewTuple(op) => op.interpret(location, env, interp),
-            Tuple::Unpack(op) => op.interpret(location, env, interp),
-            Tuple::Get(op) => op.interpret(location, env, interp),
-            Tuple::Len(op) => op.interpret(location, env, interp),
+            Tuple::NewTuple(op) => {
+                <NewTuple<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                    op, location, env, interp,
+                )
+            }
+            Tuple::Unpack(op) => {
+                <Unpack<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                    op, location, env, interp,
+                )
+            }
+            Tuple::Get(op) => {
+                <Get<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                    op, location, env, interp,
+                )
+            }
+            Tuple::Len(op) => {
+                <Len<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                    op, location, env, interp,
+                )
+            }
         }
     }
 }

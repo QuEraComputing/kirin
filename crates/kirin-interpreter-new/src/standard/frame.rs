@@ -72,17 +72,24 @@ impl<L, V> HasLocation for StandardFrame<L, V> {
     }
 }
 
-impl<I, L, C, E, V> Frame<I, StandardFrame<L, V>, C, E> for StandardFrame<L, V>
+impl<I, L, F, C, E, V> Frame<I, F, C, E> for StandardFrame<L, V>
 where
-    StatementFrame: Frame<I, StandardFrame<L, V>, C, E>,
-    BlockFrame<L, V>: Frame<I, StandardFrame<L, V>, C, E>,
-    RegionFrame<L, V>: Frame<I, StandardFrame<L, V>, C, E>,
-    CallFrame<L, V>: Frame<I, StandardFrame<L, V>, C, E>,
-    FunctionFrame<L, V>: Frame<I, StandardFrame<L, V>, C, E>,
-    StagedFunctionFrame<L, V>: Frame<I, StandardFrame<L, V>, C, E>,
-    SpecializedFunctionFrame<L, V>: Frame<I, StandardFrame<L, V>, C, E>,
+    F: From<StatementFrame>
+        + From<BlockFrame<L, V>>
+        + From<RegionFrame<L, V>>
+        + From<CallFrame<L, V>>
+        + From<FunctionFrame<L, V>>
+        + From<StagedFunctionFrame<L, V>>
+        + From<SpecializedFunctionFrame<L, V>>,
+    StatementFrame: Frame<I, F, C, E>,
+    BlockFrame<L, V>: Frame<I, F, C, E>,
+    RegionFrame<L, V>: Frame<I, F, C, E>,
+    CallFrame<L, V>: Frame<I, F, C, E>,
+    FunctionFrame<L, V>: Frame<I, F, C, E>,
+    StagedFunctionFrame<L, V>: Frame<I, F, C, E>,
+    SpecializedFunctionFrame<L, V>: Frame<I, F, C, E>,
 {
-    fn step(self, interp: &mut I) -> Result<FrameEffect<StandardFrame<L, V>, C>, E> {
+    fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self {
             Self::Statement(frame) => frame.step(interp),
             Self::Block(frame) => frame.step(interp),
@@ -94,7 +101,7 @@ where
         }
     }
 
-    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<StandardFrame<L, V>, C>, E> {
+    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self {
             Self::Statement(frame) => frame.resume_done(interp),
             Self::Block(frame) => frame.resume_done(interp),
@@ -106,11 +113,7 @@ where
         }
     }
 
-    fn resume(
-        self,
-        completion: C,
-        interp: &mut I,
-    ) -> Result<FrameEffect<StandardFrame<L, V>, C>, E> {
+    fn resume(self, completion: C, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self {
             Self::Statement(frame) => frame.resume(completion, interp),
             Self::Block(frame) => frame.resume(completion, interp),

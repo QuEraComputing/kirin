@@ -29,6 +29,7 @@ pub use lambda::Lambda;
 pub use ret::Return;
 
 mod interpret_impl;
+pub mod interpreter_new;
 
 #[cfg(test)]
 mod tests;

@@ -332,7 +332,7 @@ the transfer type consumed by their active traversal frames.
 Dialect statement semantics are exposed through `Interpretable::interpret`.
 
 ```rust
-pub trait Interpretable<I, F, C, E, T>: Dialect {
+pub trait Interpretable<L: Dialect, I, F, C, E, T>: Dialect {
     fn interpret(
         &self,
         location: Location,
@@ -342,12 +342,21 @@ pub trait Interpretable<I, F, C, E, T>: Dialect {
 }
 ```
 
+`L` is the current outer language for the active stage, not necessarily the
+dialect that owns the statement being interpreted. This matters for statements
+that create child traversal frames. For example, a `kirin-function` call inside
+`ToyLang` creates a `CallFrame<ToyLang, V>`, and an `scf.if` inside `ToyLang`
+creates a `BlockFrame<ToyLang, V>` for its body. Atomic dialects such as
+arithmetic usually ignore `L`.
+
 The interpreter shell provides `StatementDispatch` by resolving an active
 statement location into a statement definition and calling that trait:
 
 ```rust
-impl<'ir, S, F, C, E, V, T> StatementDispatch<F, C, E, T>
+impl<'ir, L, S, F, C, E, V, T> StatementDispatch<L, F, C, E, T>
     for Interpreter<'ir, S, F, C, E, V>
+where
+    L: Interpretable<L, Self, F, C, E, T>,
 {
     fn dispatch_statement(
         &mut self,

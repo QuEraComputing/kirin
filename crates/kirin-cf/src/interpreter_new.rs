@@ -1,4 +1,4 @@
-use kirin::prelude::CompileTimeValue;
+use kirin::prelude::{CompileTimeValue, Dialect};
 use kirin_interpreter_new::{
     BranchCondition, ConcreteTransfer, Env, Interpretable, InterpreterError, Location,
     StatementEffect,
@@ -6,8 +6,9 @@ use kirin_interpreter_new::{
 
 use crate::ControlFlow;
 
-impl<I, F, C, E, V, T> Interpretable<I, F, C, E, ConcreteTransfer<V>> for ControlFlow<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for ControlFlow<T>
 where
+    L: Dialect,
     I: Env<V, Error = E>,
     V: BranchCondition + Clone,
     E: From<IndeterminateBranch>,

@@ -118,7 +118,13 @@ impl<L, V> BlockFrame<L, V> {
         };
         let next_statement = {
             let stage = interp.stage_info(self.location.stage)?;
-            *statement.next(stage)
+            match *statement.next(stage) {
+                Some(next) => Some(next),
+                None if self.block.last_statement(stage) != Some(statement) => {
+                    self.block.last_statement(stage)
+                }
+                None => None,
+            }
         };
         match next_statement {
             Some(statement) => Ok(FrameEffect::Continue(

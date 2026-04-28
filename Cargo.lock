@@ -871,6 +871,7 @@ dependencies = [
  "kirin-constant",
  "kirin-interpreter",
  "kirin-interpreter-20",
+ "kirin-interpreter-new",
  "kirin-test-types",
  "smallvec",
 ]
@@ -1937,6 +1938,7 @@ dependencies = [
  "kirin-function",
  "kirin-interpreter",
  "kirin-interpreter-20",
+ "kirin-interpreter-new",
  "kirin-interval",
  "kirin-prettyless",
  "kirin-scf",
