@@ -1,7 +1,8 @@
 use kirin_ir::Pipeline;
 
-use super::*;
 use crate::{Frame, FrameEffect, HasLocation, InterpreterError, Location};
+
+use super::super::*;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 struct CounterSummary(u8);
