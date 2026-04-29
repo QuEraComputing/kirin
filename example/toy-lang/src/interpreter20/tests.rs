@@ -783,13 +783,13 @@ fn liveness_dead_after_use() {
         3,
         "BRANCH_LOWERED should have 3 blocks"
     );
-    for (_blk, li) in &result.live_in {
+    for li in result.live_in.values() {
         assert!(
             li.is_empty(),
             "no value crosses a block boundary; live_in must be empty"
         );
     }
-    for (_blk, lo) in &result.live_out {
+    for lo in result.live_out.values() {
         assert!(
             lo.is_empty(),
             "no value crosses a block boundary; live_out must be empty"
