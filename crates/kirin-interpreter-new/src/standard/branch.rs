@@ -55,8 +55,9 @@ where
         _false_target: Block,
         _false_arguments: Vec<V>,
     ) -> Result<FrameEffect<F, C>, E> {
-        // The local abstract shell has no dependency graph yet, so an unknown CFG
-        // branch conservatively summarizes the enclosing function result.
+        // Precise abstract branching needs a driver-level continuation effect.
+        // Running branch frames here would make BlockBranchDispatch require
+        // F: Frame, which recursively appears in the BlockFrame Frame impl.
         Ok(FrameEffect::Complete(C::try_lift_from(
             StandardCompletion::FunctionReturned(V::top()),
         )?))

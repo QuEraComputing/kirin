@@ -2,7 +2,7 @@ use std::marker::PhantomData;
 
 use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo};
 
-use crate::{Env, EnvIndex, Frame, FrameEffect, InterpreterError, StepResult};
+use crate::{Env, EnvIndex, ForkEnv, Frame, FrameEffect, InterpreterError, StepResult};
 
 use super::{AbstractEnvStore, AbstractValue};
 
@@ -199,6 +199,16 @@ where
         data: V,
     ) -> Result<(), Self::Error> {
         self.envs.write(index, value, data).map_err(E::from)
+    }
+}
+
+impl<'ir, S, F, C, E, V> ForkEnv<V> for AbstractInterpreter<'ir, S, F, C, E, V>
+where
+    V: AbstractValue,
+    E: From<InterpreterError>,
+{
+    fn fork_env(&mut self, index: EnvIndex) -> Result<EnvIndex, Self::Error> {
+        self.clone_env(index)
     }
 }
 

@@ -17,7 +17,7 @@ pub use abstract_interp::{
 pub use concrete::{ConcreteInterpreter, StepResult};
 pub use dispatch::{Interpretable, StageAccess, StatementDispatch};
 pub use effect::{BlockTransfer, FrameEffect, StandardCompletion, StatementEffect};
-pub use env::{Env, EnvIndex, EnvStackStore};
+pub use env::{Env, EnvIndex, EnvStackStore, ForkEnv};
 pub use error::InterpreterError;
 pub use frame::{Frame, HasLocation, ProjectOrSelf};
 pub use location::{Location, Position, Traversal};

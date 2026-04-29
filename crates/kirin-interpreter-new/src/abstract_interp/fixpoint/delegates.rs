@@ -2,7 +2,7 @@ use std::hash::Hash;
 
 use kirin_ir::{CompileStage, Dialect, HasStageInfo, SSAValue, StageInfo};
 
-use crate::{Env, EnvIndex, InterpreterError, StageAccess};
+use crate::{Env, EnvIndex, ForkEnv, InterpreterError, StageAccess};
 
 use super::{SimpleFixpointInterpreter, Summary};
 
@@ -30,6 +30,19 @@ where
 
     fn write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), Self::Error> {
         self.store.write(index, value, data).map_err(E::from)
+    }
+}
+
+impl<'ir, Stage, K, F, C, E, S, Store, V> ForkEnv<V>
+    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
+where
+    K: Clone + Eq + Hash,
+    S: Summary,
+    Store: ForkEnv<V>,
+    E: From<Store::Error>,
+{
+    fn fork_env(&mut self, index: EnvIndex) -> Result<EnvIndex, Self::Error> {
+        self.store.fork_env(index).map_err(E::from)
     }
 }
 

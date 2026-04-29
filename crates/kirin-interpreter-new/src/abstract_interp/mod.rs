@@ -5,6 +5,9 @@ mod fixpoint;
 mod interp;
 mod summary;
 
+#[cfg(test)]
+mod env_tests;
+
 pub use context::{ContextStrategy, NodeContext, SummaryKey};
 pub use domain::AbstractValue;
 pub use env::{AbstractEnv, AbstractEnvStore};

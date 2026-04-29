@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use kirin_ir::SSAValue;
 
-use crate::{Env, EnvIndex, InterpreterError};
+use crate::{Env, EnvIndex, ForkEnv, InterpreterError};
 
 use super::AbstractValue;
 
@@ -158,5 +158,14 @@ where
     fn write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), Self::Error> {
         self.store_mut(index)?.write(value, data);
         Ok(())
+    }
+}
+
+impl<V> ForkEnv<V> for AbstractEnvStore<V>
+where
+    V: AbstractValue,
+{
+    fn fork_env(&mut self, index: EnvIndex) -> Result<EnvIndex, Self::Error> {
+        self.clone_store_from(index)
     }
 }

@@ -85,6 +85,10 @@ pub trait Env<V> {
     }
 }
 
+pub trait ForkEnv<V>: Env<V> {
+    fn fork_env(&mut self, index: EnvIndex) -> Result<EnvIndex, Self::Error>;
+}
+
 #[derive(Clone, Debug)]
 pub struct EnvStackStore<V> {
     stores: Vec<Option<HashMap<SSAValue, V>>>,
