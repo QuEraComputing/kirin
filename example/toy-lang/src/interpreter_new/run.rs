@@ -1,12 +1,16 @@
 use kirin::prelude::{Function, Pipeline};
+#[cfg(test)]
+use kirin_interpreter_new::AbstractInterpreter;
 use kirin_interpreter_new::{
-    AbstractInterpreter, ConcreteInterpreter, FunctionFrame, InterpreterError, StandardCompletion,
+    ConcreteInterpreter, FunctionFrame, InterpreterError, StandardCompletion,
 };
 
 use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
 
-use super::{ConstProp, ToyCompletion, ToyError, ToyFrame};
+#[cfg(test)]
+use super::ConstProp;
+use super::{ToyCompletion, ToyError, ToyFrame};
 
 pub fn run_source_i64(
     pipeline: &Pipeline<Stage>,
@@ -50,6 +54,7 @@ pub fn run_lowered_i64(
     expect_function_return(interp.run()?)
 }
 
+#[cfg(test)]
 pub fn analyze_source_constprop(
     pipeline: &Pipeline<Stage>,
     function_name: &str,
@@ -73,6 +78,7 @@ pub fn analyze_source_constprop(
     expect_function_return(interp.run()?)
 }
 
+#[cfg(test)]
 pub fn analyze_lowered_constprop(
     pipeline: &Pipeline<Stage>,
     function_name: &str,

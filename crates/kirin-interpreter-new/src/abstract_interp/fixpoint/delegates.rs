@@ -11,7 +11,8 @@ impl<'ir, Stage, K, F, C, E, S, Store, V> Env<V>
 where
     K: Clone + Eq + Hash,
     S: Summary,
-    Store: Env<V, Error = E>,
+    Store: Env<V>,
+    E: From<Store::Error>,
 {
     type Error = E;
 
@@ -20,15 +21,15 @@ where
     }
 
     fn free(&mut self, index: EnvIndex) -> Result<(), Self::Error> {
-        self.store.free(index)
+        self.store.free(index).map_err(E::from)
     }
 
     fn read(&self, index: EnvIndex, value: SSAValue) -> Result<V, Self::Error> {
-        self.store.read(index, value)
+        self.store.read(index, value).map_err(E::from)
     }
 
     fn write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), Self::Error> {
-        self.store.write(index, value, data)
+        self.store.write(index, value, data).map_err(E::from)
     }
 }
 

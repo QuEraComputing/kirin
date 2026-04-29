@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin::ir::TryLiftFrom;
@@ -5,7 +6,8 @@ use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue
 use kirin_interpreter_new::{
     AbstractInterpreter, AbstractValue, BlockFrame, BlockTransfer, BranchCondition,
     ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect, HasLocation, Interpretable,
-    InterpreterError, Location, ProductValue, ProjectOrSelf, StatementEffect,
+    InterpreterError, Location, ProductValue, ProjectOrSelf, SimpleFixpointInterpreter,
+    StatementEffect, Summary,
 };
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
@@ -87,11 +89,57 @@ where
     }
 }
 
+impl<'ir, Stage, K, L, F, C, E, V, Sum, Store> ScfBlockDispatch<L, F, E, V>
+    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store>
+where
+    Stage: HasStageInfo<L>,
+    K: Clone + Eq + Hash,
+    L: Dialect,
+    Sum: Summary,
+    F: From<BlockFrame<L, V>>,
+    V: Clone,
+{
+    fn dispatch_scf_block(
+        &mut self,
+        location: Location,
+        block: Block,
+        env: EnvIndex,
+        args: Vec<V>,
+    ) -> Result<F, E> {
+        Ok(BlockFrame::<L, V>::new(location.stage, block, env, args).into())
+    }
+}
+
 impl<'ir, S, L, F, C, E, V> ScfIfDispatch<L, F, C, E, V> for AbstractInterpreter<'ir, S, F, C, E, V>
 where
     S: HasStageInfo<L>,
     L: Dialect,
     E: From<InterpreterError>,
+    V: AbstractValue + ProductValue,
+{
+    fn dispatch_indeterminate_if(
+        &mut self,
+        _location: Location,
+        env: EnvIndex,
+        _then_body: Block,
+        _else_body: Block,
+        results: Vec<ResultValue>,
+    ) -> Result<FrameEffect<F, C>, E> {
+        let values = results.iter().map(|_| V::top()).collect();
+        write_results(self, env, results.as_slice(), V::new_product(values))?;
+        Ok(FrameEffect::Done)
+    }
+}
+
+impl<'ir, S, K, L, F, C, E, V, Sum, Store> ScfIfDispatch<L, F, C, E, V>
+    for SimpleFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store>
+where
+    S: HasStageInfo<L>,
+    K: Clone + Eq + Hash,
+    L: Dialect,
+    Sum: Summary,
+    Store: Env<V>,
+    E: From<InterpreterError> + From<<Store as Env<V>>::Error>,
     V: AbstractValue + ProductValue,
 {
     fn dispatch_indeterminate_if(

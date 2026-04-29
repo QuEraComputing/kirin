@@ -1,3 +1,5 @@
+use std::hash::Hash;
+
 use kirin::ir::TryLiftFrom;
 use kirin::prelude::{
     CompileTimeValue, Dialect, Function, HasRegionBody, HasStageInfo, SSAValue, Symbol,
@@ -5,7 +7,7 @@ use kirin::prelude::{
 use kirin_interpreter_new::{
     AbstractInterpreter, BlockTransfer, CallFrame, Callee, ConcreteInterpreter, Env, EnvIndex,
     FunctionBodyEntry, Interpretable, InterpreterError, Location, ProductValue, RegionFrame,
-    StageAccess, StandardCompletion, StatementEffect,
+    SimpleFixpointInterpreter, StageAccess, StandardCompletion, StatementEffect, Summary,
 };
 
 use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
@@ -45,6 +47,30 @@ impl<'ir, S, L, F, C, E, V> CallTargetResolution<L> for AbstractInterpreter<'ir,
 where
     S: HasStageInfo<L>,
     L: Dialect,
+    E: From<InterpreterError>,
+{
+    type Error = E;
+
+    fn resolve_call_target(
+        &self,
+        location: Location,
+        target: Symbol,
+    ) -> Result<Function, Self::Error> {
+        let stage = StageAccess::<L>::stage_info(self, location.stage)?;
+        self.pipeline()
+            .resolve_function(stage, target)
+            .ok_or(InterpreterError::MissingCallTarget { location, target })
+            .map_err(E::from)
+    }
+}
+
+impl<'ir, S, K, L, F, C, E, Sum, Store> CallTargetResolution<L>
+    for SimpleFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store>
+where
+    S: HasStageInfo<L>,
+    K: Clone + Eq + Hash,
+    L: Dialect,
+    Sum: Summary,
     E: From<InterpreterError>,
 {
     type Error = E;

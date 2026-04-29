@@ -74,6 +74,25 @@ fn constprop_source_add() {
 }
 
 #[test]
+fn constprop_fixpoint_source_add() {
+    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
+    let result = analyze_source_constprop_fixpoint(
+        &pipeline,
+        "main",
+        &[ConstProp::Const(3), ConstProp::Const(5)],
+    )
+    .unwrap();
+    assert_eq!(result, ConstProp::Const(8));
+}
+
+#[test]
+fn constprop_fixpoint_source_unknown_branch_joins_yields() {
+    let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
+    let result = analyze_source_constprop_fixpoint(&pipeline, "abs", &[ConstProp::Top]).unwrap();
+    assert_eq!(result, ConstProp::Top);
+}
+
+#[test]
 fn constprop_source_add_with_unknown() {
     let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
     let result =
@@ -112,6 +131,25 @@ fn constprop_lowered_add() {
     )
     .unwrap();
     assert_eq!(result, ConstProp::Const(5));
+}
+
+#[test]
+fn constprop_fixpoint_lowered_add() {
+    let pipeline = build_pipeline(ADD_LOWERED);
+    let result = analyze_lowered_constprop_fixpoint(
+        &pipeline,
+        "add",
+        &[ConstProp::Const(2), ConstProp::Const(3)],
+    )
+    .unwrap();
+    assert_eq!(result, ConstProp::Const(5));
+}
+
+#[test]
+fn constprop_fixpoint_lowered_unknown_cf_branch_returns_top() {
+    let pipeline = build_pipeline(BRANCH_LOWERED);
+    let result = analyze_lowered_constprop_fixpoint(&pipeline, "sign", &[ConstProp::Top]).unwrap();
+    assert_eq!(result, ConstProp::Top);
 }
 
 #[test]

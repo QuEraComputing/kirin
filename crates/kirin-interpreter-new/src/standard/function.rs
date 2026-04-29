@@ -1,3 +1,4 @@
+use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
@@ -7,7 +8,8 @@ use kirin_ir::{
 
 use crate::{
     AbstractInterpreter, ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect, HasLocation,
-    InterpreterError, Location, Position, StageAccess, StandardCompletion, Traversal,
+    InterpreterError, Location, Position, SimpleFixpointInterpreter, StageAccess,
+    StandardCompletion, Summary, Traversal,
 };
 
 pub trait FunctionAccess<L: Dialect> {
@@ -140,6 +142,63 @@ where
     }
 }
 
+impl<'ir, Stage, K, F, C, E, Sum, Store, L> FunctionAccess<L>
+    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store>
+where
+    Stage: HasStageInfo<L>,
+    K: Clone + Eq + Hash,
+    L: Dialect,
+    Sum: Summary,
+    E: From<InterpreterError>,
+{
+    type Error = E;
+
+    fn staged_function(
+        &self,
+        stage: kirin_ir::CompileStage,
+        function: Function,
+    ) -> Result<StagedFunction, Self::Error> {
+        let info = self
+            .pipeline()
+            .function_info(function)
+            .ok_or(InterpreterError::MissingFunction(function))?;
+        info.staged_function(stage)
+            .ok_or(InterpreterError::MissingStagedFunction { function, stage })
+            .map_err(E::from)
+    }
+
+    fn specialized_function(
+        &self,
+        stage: kirin_ir::CompileStage,
+        function: StagedFunction,
+    ) -> Result<SpecializedFunction, Self::Error> {
+        let stage_info = crate::StageAccess::<L>::stage_info(self, stage)?;
+        let info = function.expect_info(stage_info);
+        match info.unique_live_specialization() {
+            Ok(function) => Ok(function),
+            Err(UniqueLiveSpecializationError::NoSpecialization) => {
+                Err(InterpreterError::MissingSpecialization(function).into())
+            }
+            Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
+                Err(InterpreterError::AmbiguousSpecialization { function, count }.into())
+            }
+        }
+    }
+
+    fn function_body(
+        &self,
+        stage: kirin_ir::CompileStage,
+        function: SpecializedFunction,
+    ) -> Result<kirin_ir::Statement, Self::Error> {
+        let stage_info = crate::StageAccess::<L>::stage_info(self, stage)?;
+        function
+            .get_info(stage_info)
+            .map(|info| *info.body())
+            .ok_or(InterpreterError::MissingFunctionBody { function, stage })
+            .map_err(E::from)
+    }
+}
+
 pub trait FunctionBodyDispatch<L: Dialect, F, E, V> {
     fn dispatch_function_body(
         &mut self,
@@ -190,6 +249,32 @@ where
     L: Dialect,
     L: FunctionBodyEntry<L, Self, F, E, V>,
     S: HasStageInfo<L>,
+    E: From<InterpreterError>,
+{
+    fn dispatch_function_body(
+        &mut self,
+        location: Location,
+        body: kirin_ir::Statement,
+        env: EnvIndex,
+        args: Vec<V>,
+    ) -> Result<F, E> {
+        let location = Location::new(location.stage, Position::Statement { statement: body });
+        let definition = {
+            let stage = StageAccess::<L>::stage_info(self, location.stage)?;
+            body.definition(stage).clone()
+        };
+        definition.enter_function_body(location, env, self, args)
+    }
+}
+
+impl<'ir, Stage, K, L, F, C, E, V, Sum, Store> FunctionBodyDispatch<L, F, E, V>
+    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store>
+where
+    L: Dialect,
+    L: FunctionBodyEntry<L, Self, F, E, V>,
+    Stage: HasStageInfo<L>,
+    K: Clone + Eq + Hash,
+    Sum: Summary,
     E: From<InterpreterError>,
 {
     fn dispatch_function_body(

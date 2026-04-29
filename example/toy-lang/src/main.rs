@@ -120,12 +120,16 @@ fn run_program(
             .map(interpreter_new::ConstProp::Const)
             .collect::<Vec<_>>();
         let result = match stage_name {
-            "source" => {
-                interpreter_new::analyze_source_constprop(&pipeline, func_name, &abstract_args)?
-            }
-            "lowered" => {
-                interpreter_new::analyze_lowered_constprop(&pipeline, func_name, &abstract_args)?
-            }
+            "source" => interpreter_new::analyze_source_constprop_fixpoint(
+                &pipeline,
+                func_name,
+                &abstract_args,
+            )?,
+            "lowered" => interpreter_new::analyze_lowered_constprop_fixpoint(
+                &pipeline,
+                func_name,
+                &abstract_args,
+            )?,
             other => anyhow::bail!("unknown stage '{}'", other),
         };
         println!("{result:?}");
