@@ -2,12 +2,12 @@ use std::ops::{Add, Mul, Neg, Sub};
 
 use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
 use kirin_interpreter_new::{
-    ConcreteTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
+    BlockTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
 };
 
 use crate::{Arith, CheckedDiv, CheckedRem};
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Arith<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Arith<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -26,7 +26,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         match self {
             Arith::Add {
                 lhs, rhs, result, ..

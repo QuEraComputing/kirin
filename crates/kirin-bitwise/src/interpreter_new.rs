@@ -2,12 +2,12 @@ use std::ops::{BitAnd, BitOr, BitXor, Not};
 
 use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
 use kirin_interpreter_new::{
-    ConcreteTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
+    BlockTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
 };
 
 use crate::{Bitwise, CheckedShl, CheckedShr};
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Bitwise<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Bitwise<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -26,7 +26,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         match self {
             Bitwise::And {
                 lhs, rhs, result, ..

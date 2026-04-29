@@ -3,7 +3,7 @@ use kirin::prelude::{
     CompileTimeValue, Dialect, Function, HasRegionBody, HasStageInfo, SSAValue, Symbol,
 };
 use kirin_interpreter_new::{
-    AbstractInterpreter, CallFrame, Callee, ConcreteInterpreter, ConcreteTransfer, Env, EnvIndex,
+    AbstractInterpreter, BlockTransfer, CallFrame, Callee, ConcreteInterpreter, Env, EnvIndex,
     FunctionBodyEntry, Interpretable, InterpreterError, Location, ProductValue, RegionFrame,
     StageAccess, StandardCompletion, StatementEffect,
 };
@@ -98,7 +98,7 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for FunctionBody<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for FunctionBody<T>
 where
     L: Dialect,
     F: From<RegionFrame<L, V>>,
@@ -110,14 +110,14 @@ where
         location: Location,
         env: EnvIndex,
         _interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         Ok(StatementEffect::Push(
             RegionFrame::<L, V>::new(location.stage, *self.region(), env, Vec::new()).into(),
         ))
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Lambda<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Lambda<T>
 where
     L: Dialect,
     F: From<RegionFrame<L, V>>,
@@ -129,14 +129,14 @@ where
         location: Location,
         env: EnvIndex,
         _interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         Ok(StatementEffect::Push(
             RegionFrame::<L, V>::new(location.stage, *self.region(), env, Vec::new()).into(),
         ))
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Bind<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Bind<T>
 where
     L: Dialect,
     E: From<InterpreterError>,
@@ -147,13 +147,13 @@ where
         _location: Location,
         _env: EnvIndex,
         _interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         let _ = self;
         Err(InterpreterError::Custom("bind is not yet supported in the new interpreter").into())
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Call<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Call<T>
 where
     L: Dialect,
     I: CallTargetResolution<L, Error = E>,
@@ -165,7 +165,7 @@ where
         location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         let function = interp.resolve_call_target(location, self.target())?;
         let args = self.args().to_vec();
         let results = self.results().iter().copied().map(SSAValue::from).collect();
@@ -175,7 +175,7 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Return<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Return<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -189,7 +189,7 @@ where
         _location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         let values = interp.read_many(env, self.values.as_slice())?;
         Ok(StatementEffect::Complete(C::try_lift_from(
             StandardCompletion::FunctionReturned(V::new_product(values)),
@@ -222,13 +222,13 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Lexical<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Lexical<T>
 where
     L: Dialect,
-    FunctionBody<T>: Interpretable<L, I, F, C, E, ConcreteTransfer<V>>,
-    Lambda<T>: Interpretable<L, I, F, C, E, ConcreteTransfer<V>>,
-    Call<T>: Interpretable<L, I, F, C, E, ConcreteTransfer<V>>,
-    Return<T>: Interpretable<L, I, F, C, E, ConcreteTransfer<V>>,
+    FunctionBody<T>: Interpretable<L, I, F, C, E, BlockTransfer<V>>,
+    Lambda<T>: Interpretable<L, I, F, C, E, BlockTransfer<V>>,
+    Call<T>: Interpretable<L, I, F, C, E, BlockTransfer<V>>,
+    Return<T>: Interpretable<L, I, F, C, E, BlockTransfer<V>>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -236,25 +236,25 @@ where
         location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         match self {
             Lexical::FunctionBody(op) => {
-                <FunctionBody<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <FunctionBody<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             Lexical::Lambda(op) => {
-                <Lambda<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Lambda<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             Lexical::Call(op) => {
-                <Call<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Call<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             Lexical::Return(op) => {
-                <Return<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Return<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
@@ -285,13 +285,13 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Lifted<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Lifted<T>
 where
     L: Dialect,
-    FunctionBody<T>: Interpretable<L, I, F, C, E, ConcreteTransfer<V>>,
-    Bind<T>: Interpretable<L, I, F, C, E, ConcreteTransfer<V>>,
-    Call<T>: Interpretable<L, I, F, C, E, ConcreteTransfer<V>>,
-    Return<T>: Interpretable<L, I, F, C, E, ConcreteTransfer<V>>,
+    FunctionBody<T>: Interpretable<L, I, F, C, E, BlockTransfer<V>>,
+    Bind<T>: Interpretable<L, I, F, C, E, BlockTransfer<V>>,
+    Call<T>: Interpretable<L, I, F, C, E, BlockTransfer<V>>,
+    Return<T>: Interpretable<L, I, F, C, E, BlockTransfer<V>>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -299,25 +299,25 @@ where
         location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         match self {
             Lifted::FunctionBody(op) => {
-                <FunctionBody<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <FunctionBody<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             Lifted::Bind(op) => {
-                <Bind<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Bind<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             Lifted::Call(op) => {
-                <Call<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Call<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             Lifted::Return(op) => {
-                <Return<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Return<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }

@@ -179,7 +179,7 @@ pub enum MyError {
 }
 
 pub enum MyTransfer<V> {
-    Concrete(ConcreteTransfer<V>),
+    Block(BlockTransfer<V>),
 }
 
 pub enum MySummary<V> {
@@ -231,7 +231,7 @@ owns its own projection/bubbling behavior.
 ## Specializing For Abstract Interpretation
 
 The same dialect can provide different `Interpretable` impls for different
-interpreter families. Concrete execution may use `ConcreteTransfer<V>`, while a
+interpreter families. Standard block traversal may use `BlockTransfer<V>`, while a
 forward abstract interpreter may use `ForwardTransfer<AbstractValue>`, and a
 backward analysis may use `BackwardTransfer<LivenessRequirement>`.
 

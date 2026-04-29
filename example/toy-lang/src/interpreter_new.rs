@@ -11,11 +11,11 @@ use kirin_cmp::{Cmp, CompareValue};
 use kirin_constant::Constant;
 use kirin_function::{Lexical, Lifted};
 use kirin_interpreter_new::{
-    AbstractInterpreter, AbstractValue, BlockFrame, BranchCondition, CallFrame,
-    ConcreteInterpreter, ConcreteTransfer, EnvIndex, Frame, FrameEffect, FunctionBodyEntry,
-    FunctionFrame, HasLocation, Interpretable, InterpreterError, Location, ProductValue,
-    ProjectOrSelf, RegionFrame, SpecializedFunctionFrame, StagedFunctionFrame, StandardCompletion,
-    StandardFrame, StatementEffect, StatementFrame,
+    AbstractInterpreter, AbstractValue, BlockFrame, BlockTransfer, BranchCondition, CallFrame,
+    ConcreteInterpreter, EnvIndex, Frame, FrameEffect, FunctionBodyEntry, FunctionFrame,
+    HasLocation, Interpretable, InterpreterError, Location, ProductValue, ProjectOrSelf,
+    RegionFrame, SpecializedFunctionFrame, StagedFunctionFrame, StandardCompletion, StandardFrame,
+    StatementEffect, StatementFrame,
 };
 use kirin_scf::interpreter_new::{ForFrame, IfFrame, ScfCompletion, ScfFrame};
 use kirin_scf::{ForLoopValue, StructuredControlFlow};
@@ -498,21 +498,21 @@ where
     }
 }
 
-impl<I, F, C, E, V> Interpretable<HighLevel, I, F, C, E, ConcreteTransfer<V>> for HighLevel
+impl<I, F, C, E, V> Interpretable<HighLevel, I, F, C, E, BlockTransfer<V>> for HighLevel
 where
-    Lexical<ArithType>: Interpretable<HighLevel, I, F, C, E, ConcreteTransfer<V>>,
-    StructuredControlFlow<ArithType>: Interpretable<HighLevel, I, F, C, E, ConcreteTransfer<V>>,
-    Constant<ArithValue, ArithType>: Interpretable<HighLevel, I, F, C, E, ConcreteTransfer<V>>,
-    Arith<ArithType>: Interpretable<HighLevel, I, F, C, E, ConcreteTransfer<V>>,
-    Cmp<ArithType>: Interpretable<HighLevel, I, F, C, E, ConcreteTransfer<V>>,
-    Bitwise<ArithType>: Interpretable<HighLevel, I, F, C, E, ConcreteTransfer<V>>,
+    Lexical<ArithType>: Interpretable<HighLevel, I, F, C, E, BlockTransfer<V>>,
+    StructuredControlFlow<ArithType>: Interpretable<HighLevel, I, F, C, E, BlockTransfer<V>>,
+    Constant<ArithValue, ArithType>: Interpretable<HighLevel, I, F, C, E, BlockTransfer<V>>,
+    Arith<ArithType>: Interpretable<HighLevel, I, F, C, E, BlockTransfer<V>>,
+    Cmp<ArithType>: Interpretable<HighLevel, I, F, C, E, BlockTransfer<V>>,
+    Bitwise<ArithType>: Interpretable<HighLevel, I, F, C, E, BlockTransfer<V>>,
 {
     fn interpret(
         &self,
         location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         match self {
             Self::Lexical(op) => <Lexical<ArithType> as Interpretable<
                 HighLevel,
@@ -520,7 +520,7 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
             Self::Structured(op) => <StructuredControlFlow<ArithType> as Interpretable<
                 HighLevel,
@@ -528,7 +528,7 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
             Self::Constant(op) => <Constant<ArithValue, ArithType> as Interpretable<
                 HighLevel,
@@ -536,7 +536,7 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
             Self::Arith(op) => <Arith<ArithType> as Interpretable<
                 HighLevel,
@@ -544,7 +544,7 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
             Self::Cmp(op) => <Cmp<ArithType> as Interpretable<
                 HighLevel,
@@ -552,7 +552,7 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
             Self::Bitwise(op) => <Bitwise<ArithType> as Interpretable<
                 HighLevel,
@@ -560,7 +560,7 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
         }
     }
@@ -585,21 +585,21 @@ where
     }
 }
 
-impl<I, F, C, E, V> Interpretable<LowLevel, I, F, C, E, ConcreteTransfer<V>> for LowLevel
+impl<I, F, C, E, V> Interpretable<LowLevel, I, F, C, E, BlockTransfer<V>> for LowLevel
 where
-    Lifted<ArithType>: Interpretable<LowLevel, I, F, C, E, ConcreteTransfer<V>>,
-    Constant<ArithValue, ArithType>: Interpretable<LowLevel, I, F, C, E, ConcreteTransfer<V>>,
-    Arith<ArithType>: Interpretable<LowLevel, I, F, C, E, ConcreteTransfer<V>>,
-    Cmp<ArithType>: Interpretable<LowLevel, I, F, C, E, ConcreteTransfer<V>>,
-    Bitwise<ArithType>: Interpretable<LowLevel, I, F, C, E, ConcreteTransfer<V>>,
-    ControlFlow<ArithType>: Interpretable<LowLevel, I, F, C, E, ConcreteTransfer<V>>,
+    Lifted<ArithType>: Interpretable<LowLevel, I, F, C, E, BlockTransfer<V>>,
+    Constant<ArithValue, ArithType>: Interpretable<LowLevel, I, F, C, E, BlockTransfer<V>>,
+    Arith<ArithType>: Interpretable<LowLevel, I, F, C, E, BlockTransfer<V>>,
+    Cmp<ArithType>: Interpretable<LowLevel, I, F, C, E, BlockTransfer<V>>,
+    Bitwise<ArithType>: Interpretable<LowLevel, I, F, C, E, BlockTransfer<V>>,
+    ControlFlow<ArithType>: Interpretable<LowLevel, I, F, C, E, BlockTransfer<V>>,
 {
     fn interpret(
         &self,
         location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         match self {
             Self::Lifted(op) => <Lifted<ArithType> as Interpretable<
                 LowLevel,
@@ -607,7 +607,7 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
             Self::Constant(op) => <Constant<ArithValue, ArithType> as Interpretable<
                 LowLevel,
@@ -615,7 +615,7 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
             Self::Arith(op) => <Arith<ArithType> as Interpretable<
                 LowLevel,
@@ -623,23 +623,20 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
-            Self::Cmp(op) => <Cmp<ArithType> as Interpretable<
-                LowLevel,
-                I,
-                F,
-                C,
-                E,
-                ConcreteTransfer<V>,
-            >>::interpret(op, location, env, interp),
+            Self::Cmp(op) => {
+                <Cmp<ArithType> as Interpretable<LowLevel, I, F, C, E, BlockTransfer<V>>>::interpret(
+                    op, location, env, interp,
+                )
+            }
             Self::Bitwise(op) => <Bitwise<ArithType> as Interpretable<
                 LowLevel,
                 I,
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
             Self::Cf(op) => <ControlFlow<ArithType> as Interpretable<
                 LowLevel,
@@ -647,7 +644,7 @@ where
                 F,
                 C,
                 E,
-                ConcreteTransfer<V>,
+                BlockTransfer<V>,
             >>::interpret(op, location, env, interp),
         }
     }

@@ -3,8 +3,8 @@ use std::marker::PhantomData;
 use kirin::ir::TryLiftFrom;
 use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue, SSAValue};
 use kirin_interpreter_new::{
-    AbstractInterpreter, AbstractValue, BlockFrame, BranchCondition, ConcreteInterpreter,
-    ConcreteTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, Interpretable,
+    AbstractInterpreter, AbstractValue, BlockFrame, BlockTransfer, BranchCondition,
+    ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect, HasLocation, Interpretable,
     InterpreterError, Location, ProductValue, ProjectOrSelf, StatementEffect,
 };
 
@@ -452,7 +452,7 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for If<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for If<T>
 where
     L: Dialect,
     F: From<IfFrame<L, T, V>>,
@@ -463,14 +463,14 @@ where
         location: Location,
         env: EnvIndex,
         _interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         Ok(StatementEffect::Push(
             IfFrame::<L, T, V>::new(location, env, self).into(),
         ))
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for For<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for For<T>
 where
     L: Dialect,
     F: From<ForFrame<L, T, V>>,
@@ -481,14 +481,14 @@ where
         location: Location,
         env: EnvIndex,
         _interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         Ok(StatementEffect::Push(
             ForFrame::<L, T, V>::new(location, env, self).into(),
         ))
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Yield<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Yield<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -502,7 +502,7 @@ where
         _location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         let values = interp.read_many(env, self.values.as_slice())?;
         Ok(StatementEffect::Complete(C::try_lift_from(
             ScfCompletion::Yield(V::new_product(values)),
@@ -510,7 +510,7 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>>
     for StructuredControlFlow<T>
 where
     L: Dialect,
@@ -526,20 +526,20 @@ where
         location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         match self {
             StructuredControlFlow::If(op) => {
-                <If<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <If<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             StructuredControlFlow::For(op) => {
-                <For<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <For<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             StructuredControlFlow::Yield(op) => {
-                <Yield<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Yield<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }

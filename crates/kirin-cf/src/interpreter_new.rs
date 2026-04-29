@@ -1,12 +1,11 @@
 use kirin::prelude::{CompileTimeValue, Dialect};
 use kirin_interpreter_new::{
-    BranchCondition, ConcreteTransfer, Env, Interpretable, InterpreterError, Location,
-    StatementEffect,
+    BlockTransfer, BranchCondition, Env, Interpretable, InterpreterError, Location, StatementEffect,
 };
 
 use crate::ControlFlow;
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for ControlFlow<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for ControlFlow<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -18,11 +17,11 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         match self {
             ControlFlow::Branch { target, args } => {
                 let arguments = interp.read_many(env, args.as_slice())?;
-                Ok(StatementEffect::Transfer(ConcreteTransfer::Jump {
+                Ok(StatementEffect::Transfer(BlockTransfer::Jump {
                     target: target.target(),
                     arguments,
                 }))
@@ -40,7 +39,7 @@ where
                     None => {
                         let true_arguments = interp.read_many(env, true_args.as_slice())?;
                         let false_arguments = interp.read_many(env, false_args.as_slice())?;
-                        return Ok(StatementEffect::Transfer(ConcreteTransfer::Branch {
+                        return Ok(StatementEffect::Transfer(BlockTransfer::Branch {
                             true_target: true_target.target(),
                             true_arguments,
                             false_target: false_target.target(),
@@ -49,7 +48,7 @@ where
                     }
                 };
                 let arguments = interp.read_many(env, args)?;
-                Ok(StatementEffect::Transfer(ConcreteTransfer::Jump {
+                Ok(StatementEffect::Transfer(BlockTransfer::Jump {
                     target,
                     arguments,
                 }))

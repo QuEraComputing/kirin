@@ -23,7 +23,7 @@ pub enum StatementEffect<F, C, T> {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ConcreteTransfer<V> {
+pub enum BlockTransfer<V> {
     Jump {
         target: Block,
         arguments: Vec<V>,

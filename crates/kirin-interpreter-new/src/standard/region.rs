@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use kirin_ir::{Block, Dialect, TryLiftFrom};
 
 use crate::{
-    ConcreteTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError, Location,
+    BlockTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError, Location,
     Position, ProjectOrSelf, StageAccess, StandardCompletion, StatementDispatch, Traversal,
 };
 
@@ -115,7 +115,7 @@ impl<L, V> RegionFrame<L, V> {
 impl<I, L, F, C, E, V> Frame<I, F, C, E> for RegionFrame<L, V>
 where
     I: StageAccess<L, Error = E>
-        + StatementDispatch<L, F, C, E, ConcreteTransfer<V>>
+        + StatementDispatch<L, F, C, E, BlockTransfer<V>>
         + Env<V, Error = E>,
     L: Dialect,
     F: From<RegionFrame<L, V>> + From<BlockFrame<L, V>>,

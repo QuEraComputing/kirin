@@ -3,7 +3,7 @@ use std::marker::PhantomData;
 use kirin_ir::{Block, Dialect, GetInfo, SSAValue, TryLiftFrom};
 
 use crate::{
-    ConcreteTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError, Location,
+    BlockTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError, Location,
     Position, StageAccess, StandardCompletion, StatementDispatch, StatementEffect, Traversal,
 };
 
@@ -161,7 +161,7 @@ impl<L, V> BlockFrame<L, V> {
 impl<I, L, F, C, E, V> Frame<I, F, C, E> for BlockFrame<L, V>
 where
     I: StageAccess<L, Error = E>
-        + StatementDispatch<L, F, C, E, ConcreteTransfer<V>>
+        + StatementDispatch<L, F, C, E, BlockTransfer<V>>
         + BlockBranchDispatch<L, F, C, E, V>
         + Env<V, Error = E>,
     L: Dialect,
@@ -183,10 +183,10 @@ where
                 );
                 match interp.dispatch_statement(location, self.env)? {
                     StatementEffect::Done => self.advance_after_active(interp),
-                    StatementEffect::Transfer(ConcreteTransfer::Jump { target, arguments }) => {
+                    StatementEffect::Transfer(BlockTransfer::Jump { target, arguments }) => {
                         Ok(self.jump(target, arguments))
                     }
-                    StatementEffect::Transfer(ConcreteTransfer::Branch {
+                    StatementEffect::Transfer(BlockTransfer::Branch {
                         true_target,
                         true_arguments,
                         false_target,

@@ -41,13 +41,19 @@ pub struct EnvStackStore<V> {
 `EnvStackStore` implements `Env<V>` and exposes concrete stack operations such
 as `push`, `pop`, and `current`. `pop` only removes the top activation.
 
-Concrete block traversal uses a concrete transfer payload:
+Standard block traversal uses a block transfer payload:
 
 ```rust
-pub enum ConcreteTransfer<V> {
+pub enum BlockTransfer<V> {
     Jump {
         target: Block,
         args: Vec<V>,
+    },
+    Branch {
+        true_target: Block,
+        true_args: Vec<V>,
+        false_target: Block,
+        false_args: Vec<V>,
     },
 }
 ```
@@ -159,8 +165,11 @@ directly:
 ```rust
 match interp.dispatch_statement(location, env)? {
     StatementEffect::Done => advance_to_next_statement_or_exit(),
-    StatementEffect::Transfer(ConcreteTransfer::Jump { target, args }) => {
+    StatementEffect::Transfer(BlockTransfer::Jump { target, args }) => {
         enter_target_block(target, args)
+    }
+    StatementEffect::Transfer(BlockTransfer::Branch { .. }) => {
+        dispatch_branch_transfer()
     }
     StatementEffect::Push(child) => push_child_frame(child),
     StatementEffect::Complete(completion) => FrameEffect::Complete(completion),
@@ -174,9 +183,9 @@ The explicit exit tick is recommended. The alternative is faster by one driver
 tick, but explicit exit makes `BlockExit` observable to tracing, breakpoints,
 and diagnostics.
 
-Concrete `BlockFrame` should be implemented only for a concrete transfer type
-that it owns, such as `ConcreteTransfer<V>`. Forward abstract and backward
-analysis frames should use their own transfer payloads.
+Standard `BlockFrame` is implemented for the block transfer type that it owns,
+`BlockTransfer<V>`. More specialized forward abstract and backward analysis
+frames can still use their own transfer payloads.
 
 ## RegionFrame
 

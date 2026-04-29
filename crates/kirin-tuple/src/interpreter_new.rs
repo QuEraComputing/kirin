@@ -1,6 +1,6 @@
 use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
 use kirin_interpreter_new::{
-    ConcreteTransfer, Env, Interpretable, InterpreterError, Location, ProductValue, StatementEffect,
+    BlockTransfer, Env, Interpretable, InterpreterError, Location, ProductValue, StatementEffect,
 };
 
 use crate::{Get, Len, NewTuple, Tuple, Unpack};
@@ -10,7 +10,7 @@ pub trait TupleIndexValue: Sized {
     fn from_tuple_index(index: usize) -> Self;
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for NewTuple<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for NewTuple<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -22,7 +22,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         let values = self
             .args
             .iter()
@@ -33,7 +33,7 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Unpack<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Unpack<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -46,7 +46,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         let source = interp.read(env, self.source)?;
         let results = self
             .results
@@ -59,7 +59,7 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Get<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Get<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -72,7 +72,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         let source = interp.read(env, self.source)?;
         let index = interp
             .read(env, self.index)?
@@ -89,7 +89,7 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Len<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Len<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -102,7 +102,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         let source = interp.read(env, self.source)?;
         let len = source.as_product().ok_or(ExpectedTuple)?.len();
         interp.write(env, SSAValue::from(self.result), V::from_tuple_index(len))?;
@@ -110,7 +110,7 @@ where
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteTransfer<V>> for Tuple<T>
+impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Tuple<T>
 where
     L: Dialect,
     I: Env<V, Error = E>,
@@ -126,25 +126,25 @@ where
         location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
         match self {
             Tuple::NewTuple(op) => {
-                <NewTuple<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <NewTuple<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             Tuple::Unpack(op) => {
-                <Unpack<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Unpack<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             Tuple::Get(op) => {
-                <Get<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Get<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
             Tuple::Len(op) => {
-                <Len<T> as Interpretable<L, I, F, C, E, ConcreteTransfer<V>>>::interpret(
+                <Len<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
                     op, location, env, interp,
                 )
             }
