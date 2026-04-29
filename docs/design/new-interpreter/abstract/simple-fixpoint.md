@@ -15,7 +15,7 @@ The goal is to show a baseline abstract interpreter that reuses:
 - `StatementEffect`
 - `StatementDispatch`
 - `Interpretable::interpret`
-- `Env`
+- `Env`, when the selected use case is env-shaped
 
 The important distinction is:
 
@@ -35,34 +35,31 @@ convergence boundary.
 
 The abstract interpreter is a fixpoint shell. It repeatedly analyzes summary
 owners, merges candidate summaries, and schedules owners whose summary changed.
+The core shell is store-agnostic: k-CFA, liveness, graph summaries, and
+env-shaped analyses can all choose their own `Store` and `Summary`.
 
 ```rust
-pub struct SimpleFixpointInterpreter<'ir, Stage, F, C, E, V, T> {
+pub struct SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store> {
     pub pipeline: &'ir Pipeline<Stage>,
-    pub summaries: IndexMap<SummaryKey, EnvSummary<V>>,
-    pub envs: AbstractEnvArena<V>,
-    pub worklist: VecDeque<WorkItem>,
+    pub summaries: IndexMap<K, S>,
+    pub store: Store,
+    pub worklist: VecDeque<WorkItem<K>>,
     pub phase: FixpointPhase,
-    pub strategy: WidenNarrowStrategy,
+    pub strategy: S::Strategy,
     pub frame: PhantomData<F>,
     pub completion: PhantomData<C>,
     pub error: PhantomData<E>,
-    pub transfer: PhantomData<T>,
 }
 
-#[derive(Clone, PartialEq, Eq, Hash)]
-pub struct SummaryKey {
-    pub location: Location,
-}
-
-pub enum WorkItem {
-    Analyze(SummaryKey),
+pub enum WorkItem<K> {
+    Analyze(K),
 }
 ```
 
-`SummaryKey` is not "the current frame location." It is the location of the
+The owner key `K` is not "the current frame location." It identifies the
 semantic owner whose summary should converge. The owner is chosen by the parent
-statement/frame semantics.
+statement/frame semantics. `SummaryKey` is a useful standard helper, but the
+driver should stay generic over `K`.
 
 Examples:
 
@@ -103,25 +100,26 @@ pub trait AbstractValue: Clone + PartialEq {
 Simple finite domains can use the default `widen` and `narrow`. Infinite-height
 domains, such as intervals, override widening and narrowing.
 
-`top` is required for coarse but sound fallback semantics. For example, the
-first abstract SCF implementation can handle an unknown `scf.if` condition by
-writing `top` to the operation results instead of trying to prove both branch
-frames are runnable through the same recursive trait bounds. A more precise
-driver can later evaluate both branches in cloned scratch envs and join their
-yielded values.
+`top` is useful for coarse but sound fallback semantics. For example, an early
+SCF implementation can handle an unknown `scf.if` condition by writing `top` to
+the operation results. A more precise standard branch helper can instead fork
+the env, evaluate both branch frames, and join their completions.
 
-## Abstract Env
+## Abstract Env Store As One Use Case
 
-The generic `Env<V>` trait still works, but env allocation in the abstract
-interpreter has two different meanings:
+Some analyses are naturally env-shaped, especially constant propagation and
+abstract execution of SSA-like programs. For those analyses, the generic
+`Env<V>` trait still works, but env allocation in the abstract interpreter has
+two different meanings:
 
 - semantic activation allocation, which happens at call/function boundaries or
   explicit scope-introducing statements,
 - scratch env allocation, which creates a temporary working copy of a summary
   while analyzing one owner.
 
-The scratch env is an implementation detail of local transfer evaluation. It
-does not mean that each block creates a new semantic activation.
+The scratch env is an implementation detail of local transfer evaluation. It is
+not part of the core fixpoint driver, and it does not mean that each block
+creates a new semantic activation.
 
 ```rust
 #[derive(Clone, PartialEq, Eq)]
@@ -156,8 +154,10 @@ pub struct AbstractEnvArena<V> {
 }
 ```
 
-Within one owner analysis, `write` is assignment into the scratch env. Merging
-happens when a boundary produces a candidate for a summary owner.
+Within one owner analysis, `write` is assignment into the scratch env. An
+env-shaped `Store` can also expose `fork_env`/snapshot operations for local
+abstract branching. Merging happens when a boundary produces a candidate for a
+summary owner.
 
 For a function body, blocks normally share the same semantic activation. If the
 body is a single block, only the function owner needs a summary. If the body is
@@ -167,7 +167,7 @@ owners.
 
 ## Summary
 
-The simplest summary stores one abstract env for the semantic owner.
+The simplest env-shaped summary stores one abstract env for the semantic owner.
 
 ```rust
 pub struct EnvSummary<V> {
@@ -186,10 +186,14 @@ defined by the owner:
 - for a graph owner, it may summarize the graph traversal state chosen by the
   graph frame semantics.
 
-The first version can use `EnvSummary<V>`. Later summaries can be richer than a
-single env, for example a graph summary with per-node facts or a region summary
-with internal block facts. That is an extension of the summary type, not a
-change to the frame protocol.
+The first env-shaped use case can use `EnvSummary<V>`. Other use cases should
+use summaries that match their analysis directly:
+
+- k-CFA: return values plus allocated-address facts for an owner/context.
+- liveness: live sets or transfer facts, often without any env store.
+- graph analyses: graph or per-node facts selected by graph semantics.
+
+That is an extension of the summary type, not a change to the frame protocol.
 
 In the full framework, `Summary::merge` returns `Option<Change>`. This simple
 driver can collapse that to `bool` by using `Change = ()`.
@@ -262,35 +266,22 @@ semantics, runs it with abstract values, and lets frames produce candidates for
 summary owners.
 
 ```rust
-impl<'ir, Stage, F, C, E, V, T>
-    SimpleFixpointInterpreter<'ir, Stage, F, C, E, V, T>
+impl<'ir, Stage, K, F, C, E, S, Store>
+    SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
 where
     F: Frame<Self, F, C, E>,
-    V: AbstractValue,
+    K: Clone + Eq + Hash,
+    S: Summary,
 {
     pub fn solve(
         &mut self,
-        entry: SummaryKey,
-        input: AbstractEnv<V>,
+        semantics: &mut impl OwnerSemantics<Self, K, S, F, C, E>,
+        entry: K,
     ) -> Result<(), E> {
-        self.merge_summary_env(entry.clone(), input)?;
-
+        self.ensure_owner(semantics, entry.clone())?;
         self.phase = FixpointPhase::Widen;
-        self.drain_worklist()?;
-
-        if self.strategy.narrow_iterations > 0 {
-            self.phase = FixpointPhase::Narrow;
-            self.seed_narrowing_worklist();
-            self.drain_bounded_narrowing()?;
-        }
-
-        Ok(())
-    }
-
-    fn drain_worklist(&mut self) -> Result<(), E> {
-        while let Some(WorkItem::Analyze(owner)) = self.worklist.pop_front() {
-            self.analyze_owner(owner)?;
-        }
+        self.schedule(entry);
+        self.drain_worklist(semantics)?;
 
         Ok(())
     }
@@ -307,18 +298,20 @@ builds a fresh root frame for one summary owner and runs it locally using the
 same `Frame` protocol as the concrete interpreter.
 
 ```rust
-fn analyze_owner(&mut self, owner: SummaryKey) -> Result<(), E>
+fn analyze_owner(
+    &mut self,
+    semantics: &mut impl OwnerSemantics<Self, K, S, F, C, E>,
+    owner: K,
+) -> Result<(), E>
 where
     F: Frame<Self, F, C, E>,
 {
-    let summary_env = self.summaries[&owner].env.clone();
-    let scratch_env = self.envs.alloc_scratch_from(summary_env);
-    let root = self.frame_for_summary_owner(owner.clone(), scratch_env)?;
+    let summary = self.summaries[&owner].clone();
+    let root = semantics.entry_frame(self, &owner, &summary)?;
 
     let completion = self.run_local_frame(root)?;
-    self.handle_owner_completion(owner.clone(), completion)?;
-    self.summaries[&owner].visits += 1;
-    self.envs.free(scratch_env)?;
+    let effect = semantics.complete_owner(self, owner, completion)?;
+    self.apply_summary_effect(semantics, effect)?;
 
     Ok(())
 }
@@ -339,6 +332,13 @@ where
                 stack.push(parent);
                 stack.push(child);
             }
+            FrameEffect::Done => match stack.pop() {
+                Some(parent) => {
+                    let effect = parent.resume_done(self)?;
+                    apply_local_effect(&mut stack, effect)?;
+                }
+                None => return Err(InterpreterError::EmptyFrameStack.into()),
+            },
             FrameEffect::Complete(completion) => match stack.pop() {
                 Some(parent) => {
                     let effect = parent.resume(completion, self)?;
@@ -354,7 +354,7 @@ where
 The local stack is an implementation detail of evaluating one owner. It is not
 the abstract program state. The abstract program state is the summary table.
 
-`frame_for_summary_owner` is semantic-specific:
+`OwnerSemantics::entry_frame` is semantic-specific:
 
 - a function owner with a block body may build a function frame that pushes a
   block frame;
@@ -371,8 +371,8 @@ The shell implements `StatementDispatch` exactly like the concrete interpreter:
 resolve the active statement and call dialect `Interpretable::interpret`.
 
 ```rust
-impl<'ir, Stage, F, C, E, V, T> StatementDispatch<F, C, E, T>
-    for SimpleFixpointInterpreter<'ir, Stage, F, C, E, V, T>
+impl<'ir, Stage, K, F, C, E, S, Store, T> StatementDispatch<F, C, E, T>
+    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
 {
     fn dispatch_statement(
         &mut self,
@@ -395,21 +395,16 @@ Dialect code does not need a separate abstract trait. It specializes
 branch does not automatically mean "merge into another summary node." The frame
 that owns traversal decides what the transfer means.
 
-For a function with a CFG region body, block transfers are local to the function
-owner:
+For a function with a CFG region body, block transfers can be local to the
+function owner:
 
 ```rust
 match interp.dispatch_statement(location, env)? {
     StatementEffect::Done => advance_to_next_statement_or_exit(),
     StatementEffect::Push(child) => push_statement_frame_with_child(child),
     StatementEffect::Complete(completion) => FrameEffect::Complete(completion),
-    StatementEffect::Transfer(ForwardTransfer::Branch(edges)) => {
-        for edge in edges {
-            bind_block_args(env, edge.target, edge.args);
-            schedule_or_enter_local_block(edge.target, env);
-        }
-
-        continue_region_traversal()
+    StatementEffect::Transfer(BlockTransfer::Branch { .. }) => {
+        fork_envs_and_push_abstract_branch_frame()
     }
 }
 ```
@@ -433,8 +428,8 @@ let loop_owner = SummaryKey {
     },
 };
 
-let candidate = interp.envs.snapshot_loop_entry(env, loop_args);
-interp.merge_summary_env(loop_owner, candidate)?;
+let candidate = interp.store.snapshot_loop_entry(env, loop_args);
+interp.merge_summary(loop_owner, candidate)?;
 ```
 
 This is the general rule:
@@ -449,29 +444,31 @@ transfer/call/loop/graph boundary that has its own summary
 
 ## Scheduling
 
-`merge_summary_env` is the only place that schedules new outer fixpoint work
-for this simple design:
+`merge_summary` is the only place that schedules new outer fixpoint work for
+this simple design. For an env-shaped summary this may delegate to
+`merge_env_summary`; for other summaries it uses that summary's own
+`Summary::merge` implementation:
 
 ```rust
-fn merge_summary_env(
+fn merge_summary(
     &mut self,
-    owner: SummaryKey,
-    candidate: AbstractEnv<V>,
+    semantics: &mut impl OwnerSemantics<Self, K, S, F, C, E>,
+    owner: K,
+    candidate: S,
 ) -> Result<(), E>
 where
-    V: AbstractValue,
+    S: Summary,
 {
-    let summary = self
-        .summaries
-        .entry(owner.clone())
-        .or_insert_with(EnvSummary::bottom);
+    if !self.summaries.contains_key(&owner) {
+        let bottom = semantics.bottom_summary(self, &owner)?;
+        self.summaries.insert(owner.clone(), bottom);
+    }
 
-    let changed = merge_env_summary(
-        summary,
-        candidate,
-        self.phase,
-        &self.strategy,
-    );
+    let summary = self.summaries.get_mut(&owner).unwrap();
+
+    let changed = summary
+        .merge(self.phase, candidate, &mut self.strategy)
+        .is_some();
 
     if changed {
         self.worklist.push_back(WorkItem::Analyze(owner));
@@ -498,13 +495,16 @@ fn seed_narrowing_worklist(&mut self) {
     }
 }
 
-fn drain_bounded_narrowing(&mut self) -> Result<(), E> {
+fn drain_bounded_narrowing(
+    &mut self,
+    semantics: &mut impl OwnerSemantics<Self, K, S, F, C, E>,
+) -> Result<(), E> {
     for _ in 0..self.strategy.narrow_iterations {
         if self.worklist.is_empty() {
             break;
         }
 
-        self.drain_worklist()?;
+        self.drain_worklist(semantics)?;
     }
 
     Ok(())
@@ -522,12 +522,12 @@ The simple fixpoint interpreter does not need new abstract-specific traits.
 - `Frame` is still the stepping/resume protocol.
 - `FrameEffect` still describes local frame structure while evaluating one
   summary owner.
-- `Env<V>` works because `V` is an abstract value.
+- `Env<V>` works for env-shaped analyses because `V` is an abstract value.
 - `StatementDispatch` still resolves statements and delegates to
   `Interpretable::interpret`.
 - `StatementEffect::Transfer(T)` is where abstract control flow enters the
   traversal frame.
-- Widening/narrowing live in `merge_summary_env`, not in dialect statement
+- Widening/narrowing live in summary merge policy, not in dialect statement
   semantics.
 
 This keeps the first abstract interpreter concrete and understandable. More

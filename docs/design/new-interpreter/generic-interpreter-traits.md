@@ -62,6 +62,13 @@ block. For function dispatch, `Function`, `StagedFunction`, and
 `SpecializedFunction` are distinct positions because they represent distinct
 dispatch contexts.
 
+For `SpecializedFunction`, the active child is the body statement selected by
+function semantics. The standard function frame uses this location only to
+record entry/active/exit around activation setup and body delegation; it does
+not traverse the body statements itself. Body traversal belongs to the body
+frame selected by the function body semantics, such as a block, region, graph,
+or dialect-defined frame.
+
 Semantic phases like `ForCondition`, `WaitingForYield`, or `DispatchingCall`
 do not belong in `Location`. They belong in frame state.
 

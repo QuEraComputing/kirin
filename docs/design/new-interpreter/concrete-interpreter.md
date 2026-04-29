@@ -124,7 +124,7 @@ pub struct StatementFrame {
 
 Normal child-frame completion uses `FrameEffect::Done`, not a completion value.
 This is what lets a call frame complete a call statement without inventing a
-`StatementDone` completion.
+separate standard completion variant for atomic statement completion.
 
 The fast path is mandatory:
 
