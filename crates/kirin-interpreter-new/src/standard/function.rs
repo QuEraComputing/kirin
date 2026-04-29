@@ -7,8 +7,8 @@ use kirin_ir::{
 };
 
 use crate::{
-    AbstractInterpreter, ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect, HasLocation,
-    InterpreterError, Location, Position, SimpleFixpointInterpreter, StageAccess,
+    AbstractInterpreterWithStore, ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect,
+    HasLocation, InterpreterError, Location, Position, SimpleFixpointInterpreter, StageAccess,
     StandardCompletion, Summary, Traversal,
 };
 
@@ -88,7 +88,8 @@ where
     }
 }
 
-impl<'ir, S, F, C, E, V, L> FunctionAccess<L> for AbstractInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, F, C, E, Store, L> FunctionAccess<L>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     S: HasStageInfo<L>,
     L: Dialect,
@@ -243,8 +244,8 @@ where
     }
 }
 
-impl<'ir, S, L, F, C, E, V> FunctionBodyDispatch<L, F, E, V>
-    for AbstractInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, L, F, C, E, V, Store> FunctionBodyDispatch<L, F, E, V>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     L: Dialect,
     L: FunctionBodyEntry<L, Self, F, E, V>,

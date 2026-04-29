@@ -14,5 +14,5 @@ pub use env::{AbstractEnv, AbstractEnvStore};
 pub use fixpoint::{
     FixpointPhase, OwnerSemantics, SimpleFixpointInterpreter, Summary, SummaryEffect, WorkItem,
 };
-pub use interp::AbstractInterpreter;
+pub use interp::{AbstractInterpreter, AbstractInterpreterWithStore};
 pub use summary::{EnvSummary, WidenNarrowStrategy};

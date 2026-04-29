@@ -4,29 +4,34 @@ use kirin_ir::{Dialect, TryLiftFrom};
 
 use super::AbstractBranchFrame;
 use crate::{
-    AbstractInterpreter, AbstractValue, BlockFrame, ConcreteInterpreter, Env, Frame, FrameEffect,
-    InterpreterError, ProjectOrSelf, SimpleFixpointInterpreter, StandardCompletion, Summary,
+    AbstractInterpreterWithStore, AbstractValue, BlockFrame, ConcreteInterpreter, Env, Frame,
+    FrameEffect, InterpreterError, ProjectOrSelf, SimpleFixpointInterpreter, StandardCompletion,
+    Summary,
 };
 
-impl<'ir, S, L, F, C, E, V> Frame<AbstractInterpreter<'ir, S, F, C, E, V>, F, C, E>
+impl<'ir, S, L, F, C, E, V, Store>
+    Frame<AbstractInterpreterWithStore<'ir, S, F, C, E, Store>, F, C, E>
     for AbstractBranchFrame<L, V>
 where
     L: Dialect,
     F: From<AbstractBranchFrame<L, V>> + From<BlockFrame<L, V>>,
+    Store: Env<V>,
     C: TryLiftFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
-    E: From<InterpreterError> + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+    E: From<InterpreterError>
+        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>
+        + From<Store::Error>,
     V: AbstractValue,
 {
     fn step(
         self,
-        _interp: &mut AbstractInterpreter<'ir, S, F, C, E, V>,
+        _interp: &mut AbstractInterpreterWithStore<'ir, S, F, C, E, Store>,
     ) -> Result<FrameEffect<F, C>, E> {
         self.step_abstract()
     }
 
     fn resume_done(
         self,
-        _interp: &mut AbstractInterpreter<'ir, S, F, C, E, V>,
+        _interp: &mut AbstractInterpreterWithStore<'ir, S, F, C, E, Store>,
     ) -> Result<FrameEffect<F, C>, E> {
         self.resume_done_abstract()
     }
@@ -34,7 +39,7 @@ where
     fn resume(
         self,
         completion: C,
-        interp: &mut AbstractInterpreter<'ir, S, F, C, E, V>,
+        interp: &mut AbstractInterpreterWithStore<'ir, S, F, C, E, Store>,
     ) -> Result<FrameEffect<F, C>, E> {
         self.resume_abstract(completion, interp)
     }

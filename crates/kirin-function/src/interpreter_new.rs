@@ -5,9 +5,10 @@ use kirin::prelude::{
     CompileTimeValue, Dialect, Function, HasRegionBody, HasStageInfo, SSAValue, Symbol,
 };
 use kirin_interpreter_new::{
-    AbstractInterpreter, BlockTransfer, CallFrame, Callee, ConcreteInterpreter, Env, EnvIndex,
-    FunctionBodyEntry, Interpretable, InterpreterError, Location, ProductValue, RegionFrame,
-    SimpleFixpointInterpreter, StageAccess, StandardCompletion, StatementEffect, Summary,
+    AbstractInterpreterWithStore, BlockTransfer, CallFrame, Callee, ConcreteInterpreter, Env,
+    EnvIndex, FunctionBodyEntry, Interpretable, InterpreterError, Location, ProductValue,
+    RegionFrame, SimpleFixpointInterpreter, StageAccess, StandardCompletion, StatementEffect,
+    Summary,
 };
 
 use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
@@ -43,7 +44,8 @@ where
     }
 }
 
-impl<'ir, S, L, F, C, E, V> CallTargetResolution<L> for AbstractInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, L, F, C, E, Store> CallTargetResolution<L>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     S: HasStageInfo<L>,
     L: Dialect,

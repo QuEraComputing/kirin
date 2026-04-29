@@ -3,8 +3,9 @@ use std::hash::Hash;
 use kirin_ir::{Block, CompileStage, Dialect, TryLiftFrom};
 
 use crate::{
-    AbstractBranchFrame, AbstractInterpreter, AbstractValue, ConcreteInterpreter, Env, EnvIndex,
-    ForkEnv, FrameEffect, InterpreterError, SimpleFixpointInterpreter, StandardCompletion, Summary,
+    AbstractBranchFrame, AbstractInterpreterWithStore, AbstractValue, ConcreteInterpreter, Env,
+    EnvIndex, ForkEnv, FrameEffect, InterpreterError, SimpleFixpointInterpreter,
+    StandardCompletion, Summary,
 };
 
 pub trait BlockBranchDispatch<L: Dialect, F, C, E, V> {
@@ -38,13 +39,16 @@ where
     }
 }
 
-impl<'ir, S, L, F, C, E, V> BlockBranchDispatch<L, F, C, E, V>
-    for AbstractInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, L, F, C, E, V, Store> BlockBranchDispatch<L, F, C, E, V>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     L: Dialect,
     F: From<AbstractBranchFrame<L, V>>,
+    Store: ForkEnv<V>,
     C: TryLiftFrom<StandardCompletion<V>>,
-    E: From<InterpreterError> + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+    E: From<InterpreterError>
+        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>
+        + From<Store::Error>,
     V: AbstractValue,
 {
     fn dispatch_branch(

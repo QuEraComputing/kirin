@@ -4,7 +4,7 @@ use std::marker::PhantomData;
 use kirin::ir::TryLiftFrom;
 use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue, SSAValue};
 use kirin_interpreter_new::{
-    AbstractInterpreter, AbstractValue, BlockFrame, BlockTransfer, BranchCondition,
+    AbstractInterpreterWithStore, AbstractValue, BlockFrame, BlockTransfer, BranchCondition,
     ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect, HasLocation, Interpretable,
     InterpreterError, Location, ProductValue, ProjectOrSelf, SimpleFixpointInterpreter,
     StatementEffect, Summary,
@@ -71,7 +71,8 @@ where
     }
 }
 
-impl<'ir, S, L, F, C, E, V> ScfBlockDispatch<L, F, E, V> for AbstractInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, L, F, C, E, V, Store> ScfBlockDispatch<L, F, E, V>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     S: HasStageInfo<L>,
     L: Dialect,
@@ -110,11 +111,13 @@ where
     }
 }
 
-impl<'ir, S, L, F, C, E, V> ScfIfDispatch<L, F, C, E, V> for AbstractInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, L, F, C, E, V, Store> ScfIfDispatch<L, F, C, E, V>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    E: From<InterpreterError>,
+    Store: Env<V>,
+    E: From<InterpreterError> + From<Store::Error>,
     V: AbstractValue + ProductValue,
 {
     fn dispatch_indeterminate_if(

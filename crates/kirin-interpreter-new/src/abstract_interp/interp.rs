@@ -4,21 +4,24 @@ use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo};
 
 use crate::{Env, EnvIndex, ForkEnv, Frame, FrameEffect, InterpreterError, StepResult};
 
-use super::{AbstractEnvStore, AbstractValue};
+use super::AbstractEnvStore;
 
-pub struct AbstractInterpreter<'ir, S, F, C, E, V> {
+pub type AbstractInterpreter<'ir, S, F, C, E, V> =
+    AbstractInterpreterWithStore<'ir, S, F, C, E, AbstractEnvStore<V>>;
+
+pub struct AbstractInterpreterWithStore<'ir, S, F, C, E, Store> {
     pipeline: &'ir Pipeline<S>,
     frames: Vec<F>,
-    envs: AbstractEnvStore<V>,
+    store: Store,
     _marker: PhantomData<(C, E)>,
 }
 
-impl<'ir, S, F, C, E, V> AbstractInterpreter<'ir, S, F, C, E, V> {
-    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
+impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store> {
+    pub fn with_store(pipeline: &'ir Pipeline<S>, store: Store) -> Self {
         Self {
             pipeline,
             frames: Vec::new(),
-            envs: AbstractEnvStore::new(),
+            store,
             _marker: PhantomData,
         }
     }
@@ -35,30 +38,12 @@ impl<'ir, S, F, C, E, V> AbstractInterpreter<'ir, S, F, C, E, V> {
         self.frames.len()
     }
 
-    pub fn push_env(&mut self) -> EnvIndex {
-        self.envs.push()
+    pub fn store(&self) -> &Store {
+        &self.store
     }
 
-    pub fn pop_env(&mut self) -> Result<EnvIndex, E>
-    where
-        E: From<InterpreterError>,
-    {
-        self.envs.pop().map_err(E::from)
-    }
-
-    pub fn current_env(&self) -> Result<EnvIndex, E>
-    where
-        E: From<InterpreterError>,
-    {
-        self.envs.current().map_err(E::from)
-    }
-
-    pub fn clone_env(&mut self, index: EnvIndex) -> Result<EnvIndex, E>
-    where
-        E: From<InterpreterError>,
-        V: Clone,
-    {
-        self.envs.clone_store_from(index).map_err(E::from)
+    pub fn store_mut(&mut self) -> &mut Store {
+        &mut self.store
     }
 
     pub fn run(&mut self) -> Result<C, E>
@@ -173,23 +158,55 @@ impl<'ir, S, F, C, E, V> AbstractInterpreter<'ir, S, F, C, E, V> {
     }
 }
 
-impl<'ir, S, F, C, E, V> Env<V> for AbstractInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, F, C, E, V> AbstractInterpreter<'ir, S, F, C, E, V> {
+    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
+        Self::with_store(pipeline, AbstractEnvStore::new())
+    }
+
+    pub fn push_env(&mut self) -> EnvIndex {
+        self.store.push()
+    }
+
+    pub fn pop_env(&mut self) -> Result<EnvIndex, E>
+    where
+        E: From<InterpreterError>,
+    {
+        self.store.pop().map_err(E::from)
+    }
+
+    pub fn current_env(&self) -> Result<EnvIndex, E>
+    where
+        E: From<InterpreterError>,
+    {
+        self.store.current().map_err(E::from)
+    }
+
+    pub fn clone_env(&mut self, index: EnvIndex) -> Result<EnvIndex, E>
+    where
+        E: From<InterpreterError>,
+        V: Clone,
+    {
+        self.store.clone_store_from(index).map_err(E::from)
+    }
+}
+
+impl<'ir, S, F, C, E, Store, V> Env<V> for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
-    V: AbstractValue,
-    E: From<InterpreterError>,
+    Store: Env<V>,
+    E: From<Store::Error>,
 {
     type Error = E;
 
     fn alloc(&mut self) -> EnvIndex {
-        self.envs.alloc()
+        self.store.alloc()
     }
 
     fn free(&mut self, index: EnvIndex) -> Result<(), Self::Error> {
-        self.envs.free(index).map_err(E::from)
+        self.store.free(index).map_err(E::from)
     }
 
     fn read(&self, index: EnvIndex, value: kirin_ir::SSAValue) -> Result<V, Self::Error> {
-        self.envs.read(index, value).map_err(E::from)
+        self.store.read(index, value).map_err(E::from)
     }
 
     fn write(
@@ -198,21 +215,22 @@ where
         value: kirin_ir::SSAValue,
         data: V,
     ) -> Result<(), Self::Error> {
-        self.envs.write(index, value, data).map_err(E::from)
+        self.store.write(index, value, data).map_err(E::from)
     }
 }
 
-impl<'ir, S, F, C, E, V> ForkEnv<V> for AbstractInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, F, C, E, Store, V> ForkEnv<V> for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
-    V: AbstractValue,
-    E: From<InterpreterError>,
+    Store: ForkEnv<V>,
+    E: From<Store::Error>,
 {
     fn fork_env(&mut self, index: EnvIndex) -> Result<EnvIndex, Self::Error> {
-        self.clone_env(index)
+        self.store.fork_env(index).map_err(E::from)
     }
 }
 
-impl<'ir, S, F, C, E, V, L> crate::StageAccess<L> for AbstractInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, F, C, E, Store, L> crate::StageAccess<L>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     S: HasStageInfo<L>,
     L: Dialect,

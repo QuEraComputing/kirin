@@ -10,9 +10,9 @@ pub mod standard;
 pub mod value;
 
 pub use abstract_interp::{
-    AbstractEnv, AbstractEnvStore, AbstractInterpreter, AbstractValue, ContextStrategy, EnvSummary,
-    FixpointPhase, NodeContext, OwnerSemantics, SimpleFixpointInterpreter, Summary, SummaryEffect,
-    SummaryKey, WidenNarrowStrategy, WorkItem,
+    AbstractEnv, AbstractEnvStore, AbstractInterpreter, AbstractInterpreterWithStore,
+    AbstractValue, ContextStrategy, EnvSummary, FixpointPhase, NodeContext, OwnerSemantics,
+    SimpleFixpointInterpreter, Summary, SummaryEffect, SummaryKey, WidenNarrowStrategy, WorkItem,
 };
 pub use concrete::{ConcreteInterpreter, StepResult};
 pub use dispatch::{Interpretable, StageAccess, StatementDispatch};
