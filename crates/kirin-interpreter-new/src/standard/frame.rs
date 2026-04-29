@@ -1,13 +1,14 @@
 use crate::{Frame, FrameEffect, HasLocation, Location};
 
 use super::{
-    BlockFrame, CallFrame, FunctionFrame, RegionFrame, SpecializedFunctionFrame,
-    StagedFunctionFrame, StatementFrame,
+    AbstractBranchFrame, BlockFrame, CallFrame, FunctionFrame, RegionFrame,
+    SpecializedFunctionFrame, StagedFunctionFrame, StatementFrame,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StandardFrame<L, V> {
     Statement(StatementFrame),
+    AbstractBranch(AbstractBranchFrame<L, V>),
     Block(BlockFrame<L, V>),
     Region(RegionFrame<L, V>),
     Call(CallFrame<L, V>),
@@ -19,6 +20,12 @@ pub enum StandardFrame<L, V> {
 impl<L, V> From<StatementFrame> for StandardFrame<L, V> {
     fn from(frame: StatementFrame) -> Self {
         Self::Statement(frame)
+    }
+}
+
+impl<L, V> From<AbstractBranchFrame<L, V>> for StandardFrame<L, V> {
+    fn from(frame: AbstractBranchFrame<L, V>) -> Self {
+        Self::AbstractBranch(frame)
     }
 }
 
@@ -62,6 +69,7 @@ impl<L, V> HasLocation for StandardFrame<L, V> {
     fn location(&self) -> Location {
         match self {
             Self::Statement(frame) => frame.location(),
+            Self::AbstractBranch(frame) => frame.location(),
             Self::Block(frame) => frame.location(),
             Self::Region(frame) => frame.location(),
             Self::Call(frame) => frame.location(),
@@ -75,6 +83,7 @@ impl<L, V> HasLocation for StandardFrame<L, V> {
 impl<I, L, F, C, E, V> Frame<I, F, C, E> for StandardFrame<L, V>
 where
     F: From<StatementFrame>
+        + From<AbstractBranchFrame<L, V>>
         + From<BlockFrame<L, V>>
         + From<RegionFrame<L, V>>
         + From<CallFrame<L, V>>
@@ -82,6 +91,7 @@ where
         + From<StagedFunctionFrame<L, V>>
         + From<SpecializedFunctionFrame<L, V>>,
     StatementFrame: Frame<I, F, C, E>,
+    AbstractBranchFrame<L, V>: Frame<I, F, C, E>,
     BlockFrame<L, V>: Frame<I, F, C, E>,
     RegionFrame<L, V>: Frame<I, F, C, E>,
     CallFrame<L, V>: Frame<I, F, C, E>,
@@ -92,6 +102,7 @@ where
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self {
             Self::Statement(frame) => frame.step(interp),
+            Self::AbstractBranch(frame) => frame.step(interp),
             Self::Block(frame) => frame.step(interp),
             Self::Region(frame) => frame.step(interp),
             Self::Call(frame) => frame.step(interp),
@@ -104,6 +115,7 @@ where
     fn resume_done(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self {
             Self::Statement(frame) => frame.resume_done(interp),
+            Self::AbstractBranch(frame) => frame.resume_done(interp),
             Self::Block(frame) => frame.resume_done(interp),
             Self::Region(frame) => frame.resume_done(interp),
             Self::Call(frame) => frame.resume_done(interp),
@@ -116,6 +128,7 @@ where
     fn resume(self, completion: C, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self {
             Self::Statement(frame) => frame.resume(completion, interp),
+            Self::AbstractBranch(frame) => frame.resume(completion, interp),
             Self::Block(frame) => frame.resume(completion, interp),
             Self::Region(frame) => frame.resume(completion, interp),
             Self::Call(frame) => frame.resume(completion, interp),

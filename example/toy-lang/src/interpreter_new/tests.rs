@@ -34,6 +34,19 @@ specialize @lowered fn @sign(i64) -> i64 {
 }
 "#;
 
+const SAME_BRANCH_LOWERED: &str = r#"
+stage @lowered fn @same(i64) -> i64;
+specialize @lowered fn @same(i64) -> i64 {
+  ^entry(%x: i64) {
+    %zero = constant 0 -> i64;
+    %is_neg = lt %x, %zero -> i64;
+    cond_br %is_neg then=^lhs() else=^rhs();
+  }
+  ^lhs() { %one = constant 1 -> i64; ret %one; }
+  ^rhs() { %also_one = constant 1 -> i64; ret %also_one; }
+}
+"#;
+
 fn build_pipeline(src: &str) -> Pipeline<Stage> {
     let mut pipeline = Pipeline::new();
     ParsePipelineText::parse(&mut pipeline, src).expect("parse failed");
@@ -153,6 +166,13 @@ fn constprop_fixpoint_lowered_unknown_cf_branch_returns_top() {
 }
 
 #[test]
+fn constprop_fixpoint_lowered_unknown_cf_branch_joins_matching_returns() {
+    let pipeline = build_pipeline(SAME_BRANCH_LOWERED);
+    let result = analyze_lowered_constprop_fixpoint(&pipeline, "same", &[ConstProp::Top]).unwrap();
+    assert_eq!(result, ConstProp::Const(1));
+}
+
+#[test]
 fn constprop_lowered_known_cf_branch() {
     let pipeline = build_pipeline(BRANCH_LOWERED);
     assert_eq!(
@@ -170,4 +190,11 @@ fn constprop_lowered_unknown_cf_branch_returns_top() {
     let pipeline = build_pipeline(BRANCH_LOWERED);
     let result = analyze_lowered_constprop(&pipeline, "sign", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Top);
+}
+
+#[test]
+fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
+    let pipeline = build_pipeline(SAME_BRANCH_LOWERED);
+    let result = analyze_lowered_constprop(&pipeline, "same", &[ConstProp::Top]).unwrap();
+    assert_eq!(result, ConstProp::Const(1));
 }

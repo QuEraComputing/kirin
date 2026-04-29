@@ -1,8 +1,9 @@
 use kirin::prelude::Dialect;
 use kirin_arith::ArithType;
 use kirin_interpreter_new::{
-    BlockFrame, CallFrame, Frame, FrameEffect, FunctionFrame, HasLocation, Location, RegionFrame,
-    SpecializedFunctionFrame, StagedFunctionFrame, StandardFrame, StatementFrame,
+    AbstractBranchFrame, BlockFrame, CallFrame, Frame, FrameEffect, FunctionFrame, HasLocation,
+    Location, RegionFrame, SpecializedFunctionFrame, StagedFunctionFrame, StandardFrame,
+    StatementFrame,
 };
 use kirin_scf::interpreter_new::{ForFrame, IfFrame, ScfFrame};
 
@@ -20,6 +21,12 @@ impl<L: Dialect, V> From<StandardFrame<L, V>> for ToyFrame<L, V> {
 
 impl<L: Dialect, V> From<StatementFrame> for ToyFrame<L, V> {
     fn from(frame: StatementFrame) -> Self {
+        Self::Standard(frame.into())
+    }
+}
+
+impl<L: Dialect, V> From<AbstractBranchFrame<L, V>> for ToyFrame<L, V> {
+    fn from(frame: AbstractBranchFrame<L, V>) -> Self {
         Self::Standard(frame.into())
     }
 }

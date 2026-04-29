@@ -1,3 +1,4 @@
+mod abstract_branch;
 mod block;
 mod branch;
 mod call;
@@ -6,6 +7,7 @@ mod function;
 mod region;
 mod statement;
 
+pub use abstract_branch::{AbstractBranchFrame, AbstractBranchState};
 pub use block::BlockFrame;
 pub use branch::BlockBranchDispatch;
 pub use call::{CallFrame, CallResultBinding, Callee};
