@@ -13,3 +13,7 @@ refactor-workspace/
 docs/log.md
 docs/log.old.md
 docs/design_principles.md
+
+.autotune
+.autotune.toml
+note.md
