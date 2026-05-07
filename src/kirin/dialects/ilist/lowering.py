@@ -3,6 +3,7 @@ from dataclasses import dataclass
 
 from kirin import types, lowering
 from kirin.dialects import py
+from kirin.dialects.py._comprehension import lower_listcomp_via_desugaring
 
 from . import stmts as ilist
 from ._dialect import dialect
@@ -22,6 +23,11 @@ class PythonLowering(lowering.FromPythonAST):
             typ = types.Any
 
         return state.current_frame.push(ilist.New(values=tuple(elts), elem_type=typ))
+
+    def lower_ListComp(
+        self, state: lowering.State, node: ast.ListComp
+    ) -> lowering.Result:
+        return lower_listcomp_via_desugaring(state, node)
 
     @lowering.akin(ilist.IList)
     def lower_Call_IList(

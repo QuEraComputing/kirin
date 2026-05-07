@@ -11,6 +11,7 @@ from kirin.dialects import cf, scf, func, math, ilist, random, ssacfg, lowering
 from kirin.dialects.py import (
     cmp,
     len,
+    set,
     attr,
     base,
     list,
@@ -60,6 +61,7 @@ def python_basic(self):
     python_basic.union(
         [
             list,
+            set,
             slice,
             cf,
             func,
@@ -85,6 +87,7 @@ def python_no_opt(self):
     python_basic.union(
         [
             ilist,
+            set,
             slice,
             cf,
             func,
@@ -179,6 +182,7 @@ def basic(self):
     python_basic.union(
         [
             ilist,
+            set,
             slice,
             scf,
             cf,
@@ -204,6 +208,7 @@ def structural_no_opt(self):
     python_basic.union(
         [
             ilist,
+            set,
             slice,
             scf,
             cf,
