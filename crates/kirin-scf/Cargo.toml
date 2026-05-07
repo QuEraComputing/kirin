@@ -6,7 +6,6 @@ edition = "2024"
 [dependencies]
 kirin.workspace = true
 kirin-interpreter = { workspace = true }
-kirin-interpreter-20 = { workspace = true }
 kirin-interpreter-new = { workspace = true }
 bon = "3.8"
 smallvec = { workspace = true }

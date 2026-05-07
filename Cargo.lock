@@ -729,7 +729,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-20",
  "kirin-interpreter-new",
  "thiserror 2.0.18",
 ]
@@ -740,7 +739,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-20",
  "kirin-interpreter-new",
  "kirin-test-types",
  "thiserror 2.0.18",
@@ -752,7 +750,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-20",
  "kirin-interpreter-new",
  "kirin-test-types",
  "smallvec",
@@ -782,7 +779,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-20",
  "kirin-interpreter-new",
  "kirin-test-types",
 ]
@@ -793,7 +789,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-20",
  "kirin-interpreter-new",
 ]
 
@@ -872,7 +867,6 @@ dependencies = [
  "kirin-cf",
  "kirin-constant",
  "kirin-interpreter",
- "kirin-interpreter-20",
  "kirin-interpreter-new",
  "kirin-test-types",
  "smallvec",
@@ -895,16 +889,6 @@ dependencies = [
  "kirin-test-utils",
  "rustc-hash",
  "smallvec",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "kirin-interpreter-20"
-version = "0.1.0"
-dependencies = [
- "kirin-interpreter",
- "kirin-ir",
- "rustc-hash",
  "thiserror 2.0.18",
 ]
 
@@ -975,7 +959,6 @@ dependencies = [
  "kirin-constant",
  "kirin-function",
  "kirin-interpreter",
- "kirin-interpreter-20",
  "kirin-interpreter-new",
  "kirin-test-types",
  "smallvec",
@@ -1033,7 +1016,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-20",
  "kirin-interpreter-new",
  "kirin-test-types",
  "smallvec",
@@ -1940,7 +1922,6 @@ dependencies = [
  "kirin-derive-interpreter",
  "kirin-function",
  "kirin-interpreter",
- "kirin-interpreter-20",
  "kirin-interpreter-new",
  "kirin-interval",
  "kirin-prettyless",
