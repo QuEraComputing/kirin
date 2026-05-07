@@ -97,7 +97,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use kirin_ir::TestSSAValue;
+    use kirin_ir::{HasBottom, HasTop, Lattice, TestSSAValue};
 
     use super::*;
 
@@ -108,21 +108,37 @@ mod tests {
         Top,
     }
 
-    impl AbstractValue for TinyValue {
-        fn bottom() -> Self {
-            Self::Bottom
-        }
-
-        fn top() -> Self {
-            Self::Top
-        }
-
+    impl Lattice for TinyValue {
         fn join(&self, other: &Self) -> Self {
             match (self, other) {
                 (Self::Bottom, value) | (value, Self::Bottom) => value.clone(),
                 (Self::Const(lhs), Self::Const(rhs)) if lhs == rhs => Self::Const(*lhs),
                 _ => Self::Top,
             }
+        }
+
+        fn meet(&self, other: &Self) -> Self {
+            match (self, other) {
+                (Self::Top, value) | (value, Self::Top) => value.clone(),
+                (Self::Const(lhs), Self::Const(rhs)) if lhs == rhs => Self::Const(*lhs),
+                _ => Self::Bottom,
+            }
+        }
+
+        fn is_subseteq(&self, other: &Self) -> bool {
+            self.join(other) == *other
+        }
+    }
+
+    impl HasBottom for TinyValue {
+        fn bottom() -> Self {
+            Self::Bottom
+        }
+    }
+
+    impl HasTop for TinyValue {
+        fn top() -> Self {
+            Self::Top
         }
     }
 

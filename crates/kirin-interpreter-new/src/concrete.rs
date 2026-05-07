@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo};
+use kirin_ir::{CompileStage, Dialect, HasStageInfo, LiftFrom, Pipeline, StageInfo};
 
 use crate::{Env, EnvIndex, EnvStackStore, Frame, FrameEffect, InterpreterError};
 
@@ -44,22 +44,22 @@ impl<'ir, S, F, C, E, V> ConcreteInterpreter<'ir, S, F, C, E, V> {
 
     pub fn pop_env(&mut self) -> Result<EnvIndex, E>
     where
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
-        self.envs.pop().map_err(E::from)
+        self.envs.pop().map_err(E::lift_from)
     }
 
     pub fn current_env(&self) -> Result<EnvIndex, E>
     where
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
-        self.envs.current().map_err(E::from)
+        self.envs.current().map_err(E::lift_from)
     }
 
     pub fn run(&mut self) -> Result<C, E>
     where
         F: Frame<Self, F, C, E>,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
         loop {
             match self.step()? {
@@ -72,42 +72,45 @@ impl<'ir, S, F, C, E, V> ConcreteInterpreter<'ir, S, F, C, E, V> {
     pub fn step(&mut self) -> Result<StepResult<C>, E>
     where
         F: Frame<Self, F, C, E>,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
-        let frame = self.frames.pop().ok_or(InterpreterError::EmptyFrameStack)?;
+        let frame = match self.frames.pop() {
+            Some(frame) => frame,
+            None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
+        };
         let effect = frame.step(self)?;
         self.apply_effect(effect)
     }
 
-    fn apply_effect(&mut self, effect: FrameEffect<F, C>) -> Result<StepResult<C>, E>
+    fn apply_effect(&mut self, mut effect: FrameEffect<F, C>) -> Result<StepResult<C>, E>
     where
         F: Frame<Self, F, C, E>,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
-        match effect {
-            FrameEffect::Continue(frame) => {
-                self.frames.push(frame);
-                Ok(StepResult::Running)
-            }
-            FrameEffect::Push { parent, child } => {
-                self.frames.push(parent);
-                self.frames.push(child);
-                Ok(StepResult::Running)
-            }
-            FrameEffect::Done => {
-                if let Some(parent) = self.frames.pop() {
-                    let effect = parent.resume_done(self)?;
-                    self.apply_effect(effect)
-                } else {
-                    Err(InterpreterError::EmptyFrameStack.into())
+        loop {
+            match effect {
+                FrameEffect::Continue(frame) => {
+                    self.frames.push(frame);
+                    return Ok(StepResult::Running);
                 }
-            }
-            FrameEffect::Complete(completion) => {
-                if let Some(parent) = self.frames.pop() {
-                    let effect = parent.resume(completion, self)?;
-                    self.apply_effect(effect)
-                } else {
-                    Ok(StepResult::Complete(completion))
+                FrameEffect::Push { parent, child } => {
+                    self.frames.push(parent);
+                    self.frames.push(child);
+                    return Ok(StepResult::Running);
+                }
+                FrameEffect::Done => {
+                    let parent = match self.frames.pop() {
+                        Some(parent) => parent,
+                        None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
+                    };
+                    effect = parent.resume_done(self)?;
+                }
+                FrameEffect::Complete(completion) => {
+                    if let Some(parent) = self.frames.pop() {
+                        effect = parent.resume(completion, self)?;
+                    } else {
+                        return Ok(StepResult::Complete(completion));
+                    }
                 }
             }
         }
@@ -117,7 +120,7 @@ impl<'ir, S, F, C, E, V> ConcreteInterpreter<'ir, S, F, C, E, V> {
 impl<'ir, S, F, C, E, V> Env<V> for ConcreteInterpreter<'ir, S, F, C, E, V>
 where
     V: Clone,
-    E: From<InterpreterError>,
+    E: LiftFrom<InterpreterError>,
 {
     type Error = E;
 
@@ -126,11 +129,11 @@ where
     }
 
     fn free(&mut self, index: EnvIndex) -> Result<(), Self::Error> {
-        self.envs.free(index).map_err(E::from)
+        self.envs.free(index).map_err(E::lift_from)
     }
 
     fn read(&self, index: EnvIndex, value: kirin_ir::SSAValue) -> Result<V, Self::Error> {
-        self.envs.read(index, value).map_err(E::from)
+        self.envs.read(index, value).map_err(E::lift_from)
     }
 
     fn write(
@@ -139,7 +142,7 @@ where
         value: kirin_ir::SSAValue,
         data: V,
     ) -> Result<(), Self::Error> {
-        self.envs.write(index, value, data).map_err(E::from)
+        self.envs.write(index, value, data).map_err(E::lift_from)
     }
 }
 
@@ -147,7 +150,7 @@ impl<'ir, S, F, C, E, V, L> crate::StageAccess<L> for ConcreteInterpreter<'ir, S
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    E: From<InterpreterError>,
+    E: LiftFrom<InterpreterError>,
 {
     type Error = E;
 
@@ -155,11 +158,11 @@ where
         let stage_info = self
             .pipeline
             .stage(stage)
-            .ok_or(InterpreterError::MissingStage(stage))?;
+            .ok_or_else(|| E::lift_from(InterpreterError::MissingStage(stage)))?;
         stage_info
             .try_stage_info()
             .ok_or(InterpreterError::MissingStageInfo(stage))
-            .map_err(E::from)
+            .map_err(E::lift_from)
     }
 }
 

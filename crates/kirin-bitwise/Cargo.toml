@@ -8,6 +8,7 @@ kirin.workspace = true
 kirin-interpreter = { workspace = true }
 kirin-interpreter-20 = { workspace = true }
 kirin-interpreter-new = { workspace = true }
+thiserror = { workspace = true }
 
 [dev-dependencies]
 kirin-test-types = { path = "../kirin-test-types" }

@@ -1,10 +1,13 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{Dialect, Function, SSAValue, SpecializedFunction, StagedFunction, TryLiftFrom};
+use kirin_ir::{
+    Dialect, Function, LiftFrom, Product, SSAValue, SpecializedFunction, StagedFunction, TryLift,
+    TryLiftFrom,
+};
 
 use crate::{
-    Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError, Location, ProductValue,
-    ProjectOrSelf, StandardCompletion,
+    Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError, Location, ProjectOrSelf,
+    StandardCompletion,
 };
 
 use super::{FunctionFrame, SpecializedFunctionFrame, StagedFunctionFrame};
@@ -16,44 +19,13 @@ pub enum Callee {
     SpecializedFunction(SpecializedFunction),
 }
 
-pub trait CallResultBinding<V> {
-    type Error;
-
-    fn write_call_results(
-        &mut self,
-        location: Location,
-        env: EnvIndex,
-        results: &[SSAValue],
-        value: V,
-    ) -> Result<(), Self::Error>;
-}
-
-impl<I, V> CallResultBinding<V> for I
-where
-    I: Env<V>,
-    V: ProductValue,
-    <I as Env<V>>::Error: From<InterpreterError>,
-{
-    type Error = <I as Env<V>>::Error;
-
-    fn write_call_results(
-        &mut self,
-        _location: Location,
-        env: EnvIndex,
-        results: &[SSAValue],
-        value: V,
-    ) -> Result<(), Self::Error> {
-        self.write_product(env, results, value)
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CallFrame<L, V> {
     pub location: Location,
     pub callee: Callee,
-    pub args: Vec<SSAValue>,
+    pub args: Product<SSAValue>,
     pub caller_env: EnvIndex,
-    pub results: Vec<SSAValue>,
+    pub results: Product<SSAValue>,
     _marker: PhantomData<fn() -> (L, V)>,
 }
 
@@ -61,9 +33,9 @@ impl<L, V> CallFrame<L, V> {
     pub fn new(
         location: Location,
         callee: Callee,
-        args: Vec<SSAValue>,
+        args: Product<SSAValue>,
         caller_env: EnvIndex,
-        results: Vec<SSAValue>,
+        results: Product<SSAValue>,
     ) -> Self {
         Self {
             location,
@@ -84,33 +56,40 @@ impl<L, V> HasLocation for CallFrame<L, V> {
 
 impl<I, L, F, C, E, V> Frame<I, F, C, E> for CallFrame<L, V>
 where
-    I: Env<V, Error = E> + CallResultBinding<V, Error = E>,
+    I: Env<V, Error = E>,
     L: Dialect,
-    F: From<CallFrame<L, V>>
-        + From<FunctionFrame<L, V>>
-        + From<StagedFunctionFrame<L, V>>
-        + From<SpecializedFunctionFrame<L, V>>,
+    F: TryLiftFrom<CallFrame<L, V>>
+        + TryLiftFrom<FunctionFrame<L, V>>
+        + TryLiftFrom<StagedFunctionFrame<L, V>>
+        + TryLiftFrom<SpecializedFunctionFrame<L, V>>,
     C: TryLiftFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
-    E: From<InterpreterError> + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+    E: LiftFrom<InterpreterError>
+        + From<<F as TryLiftFrom<CallFrame<L, V>>>::Error>
+        + From<<F as TryLiftFrom<FunctionFrame<L, V>>>::Error>
+        + From<<F as TryLiftFrom<StagedFunctionFrame<L, V>>>::Error>
+        + From<<F as TryLiftFrom<SpecializedFunctionFrame<L, V>>>::Error>
+        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         let args = self
             .args
             .iter()
             .map(|arg| interp.read(self.caller_env, *arg))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect::<Result<Product<_>, _>>()?;
         let stage = self.location.stage;
         let child = match self.callee {
-            Callee::Function(function) => FunctionFrame::<L, V>::new(stage, function, args).into(),
+            Callee::Function(function) => {
+                FunctionFrame::<L, V>::new(stage, function, args).try_lift()?
+            }
             Callee::StagedFunction(function) => {
-                StagedFunctionFrame::<L, V>::new(stage, function, args).into()
+                StagedFunctionFrame::<L, V>::new(stage, function, args).try_lift()?
             }
             Callee::SpecializedFunction(function) => {
-                SpecializedFunctionFrame::<L, V>::new(stage, function, args).into()
+                SpecializedFunctionFrame::<L, V>::new(stage, function, args).try_lift()?
             }
         };
         Ok(FrameEffect::Push {
-            parent: self.into(),
+            parent: self.try_lift()?,
             child,
         })
     }
@@ -122,15 +101,10 @@ where
     fn resume(self, completion: C, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match completion.project_or_self() {
             Ok(StandardCompletion::FunctionReturned(value)) => {
-                interp.write_call_results(
-                    self.location,
-                    self.caller_env,
-                    self.results.as_slice(),
-                    value,
-                )?;
+                interp.write_product(self.caller_env, self.results.as_slice(), value)?;
                 Ok(FrameEffect::Done)
             }
-            Ok(completion) => Err(InterpreterError::UnexpectedCompletion {
+            Ok(completion) => Err(E::lift_from(InterpreterError::UnexpectedCompletion {
                 location: self.location,
                 completion: match completion {
                     StandardCompletion::BlockDone => "block completion returned to call",
@@ -138,8 +112,7 @@ where
                     StandardCompletion::GraphDone => "graph completion returned to call",
                     StandardCompletion::FunctionReturned(_) => unreachable!(),
                 },
-            }
-            .into()),
+            })),
             Err(completion) => Ok(FrameEffect::Complete(completion)),
         }
     }

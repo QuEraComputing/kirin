@@ -1,10 +1,6 @@
-pub trait AbstractValue: Clone + PartialEq {
-    fn bottom() -> Self;
+use kirin_ir::{HasBottom, HasTop};
 
-    fn top() -> Self;
-
-    fn join(&self, other: &Self) -> Self;
-
+pub trait AbstractValue: HasBottom + HasTop + Clone + PartialEq {
     fn widen(&self, other: &Self) -> Self {
         self.join(other)
     }
@@ -23,3 +19,5 @@ pub trait AbstractValue: Clone + PartialEq {
         }
     }
 }
+
+impl<T> AbstractValue for T where T: HasBottom + HasTop + Clone + PartialEq {}

@@ -7,7 +7,7 @@ use kirin::prelude::*;
 ///
 /// # Design: no explicit `Signature` field
 ///
-/// Unlike [`FunctionBody`](super::FunctionBody), `Lambda` intentionally omits
+/// Unlike [`Function`](super::Function), `Lambda` intentionally omits
 /// a `sig: Signature<T>` field. The reasons are:
 ///
 /// - **Parameters are implicit in block arguments.** A lambda's parameter types
@@ -22,7 +22,7 @@ use kirin::prelude::*;
 ///   *function type* describes its parameter and return types, not its captured
 ///   environment. The `captures` field is separate from the calling convention.
 ///
-/// - **`FunctionBody` needs `sig` for top-level resolution.** Functions defined
+/// - **`Function` needs `sig` for top-level resolution.** Functions defined
 ///   at the pipeline level must declare their signature explicitly because the
 ///   caller resolves them by name, before seeing the body. Lambdas are inline
 ///   and their types flow from their definition site.

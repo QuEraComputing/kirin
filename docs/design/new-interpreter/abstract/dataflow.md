@@ -41,10 +41,10 @@ transfers locally:
 
 ```rust
 pub enum ForwardTransfer<V> {
-    Branch(Vec<BlockTransfer<V>>),
+    Branch(Vec<DataflowBlockTransfer<V>>),
 }
 
-pub struct BlockTransfer<V> {
+pub struct DataflowBlockTransfer<V> {
     pub target: Block,
     pub args: Vec<V>,
 }

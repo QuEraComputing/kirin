@@ -2,7 +2,7 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_derive_interpreter::{CallSemantics, Interpretable};
-use kirin_function::{FunctionBody, Return};
+use kirin_function::{Function as FunctionBody, Return};
 use kirin_ir::*;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, Interpretable, CallSemantics)]

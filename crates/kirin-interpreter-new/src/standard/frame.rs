@@ -1,4 +1,8 @@
-use crate::{Frame, FrameEffect, HasLocation, Location};
+use core::convert::Infallible;
+
+use kirin_ir::TryLiftFrom;
+
+use crate::{ConcreteBlockTransfer, Frame, FrameEffect, HasLocation, Location};
 
 use super::{
     AbstractBranchFrame, BlockFrame, CallFrame, FunctionFrame, RegionFrame,
@@ -6,66 +10,82 @@ use super::{
 };
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum StandardFrame<L, V> {
+pub enum StandardFrame<L, V, T = ConcreteBlockTransfer<V>> {
     Statement(StatementFrame),
     AbstractBranch(AbstractBranchFrame<L, V>),
-    Block(BlockFrame<L, V>),
-    Region(RegionFrame<L, V>),
+    Block(BlockFrame<L, V, T>),
+    Region(RegionFrame<L, V, T>),
     Call(CallFrame<L, V>),
     Function(FunctionFrame<L, V>),
     StagedFunction(StagedFunctionFrame<L, V>),
     SpecializedFunction(SpecializedFunctionFrame<L, V>),
 }
 
-impl<L, V> From<StatementFrame> for StandardFrame<L, V> {
-    fn from(frame: StatementFrame) -> Self {
-        Self::Statement(frame)
+impl<L, V, T> TryLiftFrom<StatementFrame> for StandardFrame<L, V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: StatementFrame) -> Result<Self, Self::Error> {
+        Ok(Self::Statement(frame))
     }
 }
 
-impl<L, V> From<AbstractBranchFrame<L, V>> for StandardFrame<L, V> {
-    fn from(frame: AbstractBranchFrame<L, V>) -> Self {
-        Self::AbstractBranch(frame)
+impl<L, V, T> TryLiftFrom<AbstractBranchFrame<L, V>> for StandardFrame<L, V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: AbstractBranchFrame<L, V>) -> Result<Self, Self::Error> {
+        Ok(Self::AbstractBranch(frame))
     }
 }
 
-impl<L, V> From<BlockFrame<L, V>> for StandardFrame<L, V> {
-    fn from(frame: BlockFrame<L, V>) -> Self {
-        Self::Block(frame)
+impl<L, V, T> TryLiftFrom<BlockFrame<L, V, T>> for StandardFrame<L, V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: BlockFrame<L, V, T>) -> Result<Self, Self::Error> {
+        Ok(Self::Block(frame))
     }
 }
 
-impl<L, V> From<RegionFrame<L, V>> for StandardFrame<L, V> {
-    fn from(frame: RegionFrame<L, V>) -> Self {
-        Self::Region(frame)
+impl<L, V, T> TryLiftFrom<RegionFrame<L, V, T>> for StandardFrame<L, V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: RegionFrame<L, V, T>) -> Result<Self, Self::Error> {
+        Ok(Self::Region(frame))
     }
 }
 
-impl<L, V> From<CallFrame<L, V>> for StandardFrame<L, V> {
-    fn from(frame: CallFrame<L, V>) -> Self {
-        Self::Call(frame)
+impl<L, V, T> TryLiftFrom<CallFrame<L, V>> for StandardFrame<L, V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: CallFrame<L, V>) -> Result<Self, Self::Error> {
+        Ok(Self::Call(frame))
     }
 }
 
-impl<L, V> From<FunctionFrame<L, V>> for StandardFrame<L, V> {
-    fn from(frame: FunctionFrame<L, V>) -> Self {
-        Self::Function(frame)
+impl<L, V, T> TryLiftFrom<FunctionFrame<L, V>> for StandardFrame<L, V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: FunctionFrame<L, V>) -> Result<Self, Self::Error> {
+        Ok(Self::Function(frame))
     }
 }
 
-impl<L, V> From<StagedFunctionFrame<L, V>> for StandardFrame<L, V> {
-    fn from(frame: StagedFunctionFrame<L, V>) -> Self {
-        Self::StagedFunction(frame)
+impl<L, V, T> TryLiftFrom<StagedFunctionFrame<L, V>> for StandardFrame<L, V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: StagedFunctionFrame<L, V>) -> Result<Self, Self::Error> {
+        Ok(Self::StagedFunction(frame))
     }
 }
 
-impl<L, V> From<SpecializedFunctionFrame<L, V>> for StandardFrame<L, V> {
-    fn from(frame: SpecializedFunctionFrame<L, V>) -> Self {
-        Self::SpecializedFunction(frame)
+impl<L, V, T> TryLiftFrom<SpecializedFunctionFrame<L, V>> for StandardFrame<L, V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: SpecializedFunctionFrame<L, V>) -> Result<Self, Self::Error> {
+        Ok(Self::SpecializedFunction(frame))
     }
 }
 
-impl<L, V> HasLocation for StandardFrame<L, V> {
+impl<L, V, T> HasLocation for StandardFrame<L, V, T> {
     fn location(&self) -> Location {
         match self {
             Self::Statement(frame) => frame.location(),
@@ -80,20 +100,12 @@ impl<L, V> HasLocation for StandardFrame<L, V> {
     }
 }
 
-impl<I, L, F, C, E, V> Frame<I, F, C, E> for StandardFrame<L, V>
+impl<I, L, F, C, E, V, T> Frame<I, F, C, E> for StandardFrame<L, V, T>
 where
-    F: From<StatementFrame>
-        + From<AbstractBranchFrame<L, V>>
-        + From<BlockFrame<L, V>>
-        + From<RegionFrame<L, V>>
-        + From<CallFrame<L, V>>
-        + From<FunctionFrame<L, V>>
-        + From<StagedFunctionFrame<L, V>>
-        + From<SpecializedFunctionFrame<L, V>>,
     StatementFrame: Frame<I, F, C, E>,
     AbstractBranchFrame<L, V>: Frame<I, F, C, E>,
-    BlockFrame<L, V>: Frame<I, F, C, E>,
-    RegionFrame<L, V>: Frame<I, F, C, E>,
+    BlockFrame<L, V, T>: Frame<I, F, C, E>,
+    RegionFrame<L, V, T>: Frame<I, F, C, E>,
     CallFrame<L, V>: Frame<I, F, C, E>,
     FunctionFrame<L, V>: Frame<I, F, C, E>,
     StagedFunctionFrame<L, V>: Frame<I, F, C, E>,

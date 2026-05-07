@@ -40,7 +40,7 @@ pub(crate) fn generate_lift_project(
                         impl #impl_generics #crate_path::TryLiftFrom<#inner_ty> for #name #ty_generics
                         #where_clause
                         {
-                            type Error = #crate_path::LiftError;
+                            type Error = ::core::convert::Infallible;
                             fn try_lift_from(from: #inner_ty) -> ::core::result::Result<Self, Self::Error> {
                                 Ok(#name::#variant_name(from))
                             }
@@ -83,7 +83,7 @@ pub(crate) fn generate_lift_project(
                 impl #impl_generics #crate_path::TryLiftFrom<#inner_ty> for #name #ty_generics
                 #where_clause
                 {
-                    type Error = #crate_path::LiftError;
+                    type Error = ::core::convert::Infallible;
                     fn try_lift_from(from: #inner_ty) -> ::core::result::Result<Self, Self::Error> {
                         Ok(#lift_body)
                     }

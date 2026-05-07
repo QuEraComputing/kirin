@@ -6,7 +6,7 @@ use kirin_interpreter_20::env::Env;
 use kirin_interpreter_20::error::InterpreterError;
 use kirin_interpreter_20::interpretable::Interpretable;
 
-use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
+use crate::{Bind, Call, Function, Lambda, Lexical, Lifted, Return};
 
 // ---------------------------------------------------------------------------
 // Structural ops
@@ -30,7 +30,7 @@ macro_rules! structural_error_impl {
 }
 
 structural_error_impl!(
-    FunctionBody,
+    Function,
     "function bodies are structural and should not be stepped directly"
 );
 structural_error_impl!(Bind, "bind is not yet supported in interpreter19");
@@ -92,7 +92,7 @@ where
 {
     fn eval(&self, env: &mut E) -> Result<Control<E::Value, E::Ext>, E::Error> {
         match self {
-            Lexical::FunctionBody(op) => op.eval(env),
+            Lexical::Function(op) => op.eval(env),
             Lexical::Lambda(op) => op.eval(env),
             Lexical::Call(op) => op.eval(env),
             Lexical::Return(op) => op.eval(env),
@@ -113,7 +113,7 @@ where
 {
     fn eval(&self, env: &mut E) -> Result<Control<E::Value, E::Ext>, E::Error> {
         match self {
-            Lifted::FunctionBody(op) => op.eval(env),
+            Lifted::Function(op) => op.eval(env),
             Lifted::Bind(op) => op.eval(env),
             Lifted::Call(op) => op.eval(env),
             Lifted::Return(op) => op.eval(env),

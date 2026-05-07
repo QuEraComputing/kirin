@@ -1,24 +1,26 @@
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 
-use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
+use kirin::prelude::{CompileTimeValue, Dialect, LiftFrom, SSAValue, TryLiftFrom};
 use kirin_interpreter_new::{
     BlockTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
 };
+use thiserror::Error;
 
 use crate::{Bitwise, CheckedShl, CheckedShr};
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Bitwise<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Bitwise<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    V: Clone
-        + BitAnd<Output = V>
-        + BitOr<Output = V>
-        + BitXor<Output = V>
-        + Not<Output = V>
+    I: Env<X::Value, Error = E>,
+    X: BlockTransfer,
+    X::Value: Clone
+        + BitAnd<Output = X::Value>
+        + BitOr<Output = X::Value>
+        + BitXor<Output = X::Value>
+        + Not<Output = X::Value>
         + CheckedShl
         + CheckedShr,
-    E: From<ShiftOverflow>,
+    E: LiftFrom<ShiftOverflow>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -26,7 +28,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         match self {
             Bitwise::And {
                 lhs, rhs, result, ..
@@ -58,7 +60,7 @@ where
                 let value = interp
                     .read(env, *lhs)?
                     .checked_shl(interp.read(env, *rhs)?)
-                    .ok_or(ShiftOverflow)?;
+                    .ok_or_else(|| E::lift_from(ShiftOverflow))?;
                 interp.write(env, SSAValue::from(*result), value)?;
             }
             Bitwise::Shr {
@@ -67,7 +69,7 @@ where
                 let value = interp
                     .read(env, *lhs)?
                     .checked_shr(interp.read(env, *rhs)?)
-                    .ok_or(ShiftOverflow)?;
+                    .ok_or_else(|| E::lift_from(ShiftOverflow))?;
                 interp.write(env, SSAValue::from(*result), value)?;
             }
             Bitwise::__Phantom(..) => unreachable!(),
@@ -76,19 +78,14 @@ where
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[error("shift overflow")]
 pub struct ShiftOverflow;
 
-impl std::fmt::Display for ShiftOverflow {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "shift overflow")
-    }
-}
+impl TryLiftFrom<ShiftOverflow> for InterpreterError {
+    type Error = core::convert::Infallible;
 
-impl std::error::Error for ShiftOverflow {}
-
-impl From<ShiftOverflow> for InterpreterError {
-    fn from(_: ShiftOverflow) -> Self {
-        Self::Custom("shift overflow")
+    fn try_lift_from(_: ShiftOverflow) -> Result<Self, Self::Error> {
+        Ok(Self::Custom("shift overflow"))
     }
 }

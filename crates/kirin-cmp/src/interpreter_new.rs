@@ -3,12 +3,13 @@ use kirin_interpreter_new::{BlockTransfer, Env, Interpretable, Location, Stateme
 
 use crate::{Cmp, CompareValue};
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Cmp<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Cmp<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    V: CompareValue,
-    <V as CompareValue>::Bool: Into<V>,
+    I: Env<X::Value, Error = E>,
+    X: BlockTransfer,
+    X::Value: CompareValue,
+    <X::Value as CompareValue>::Bool: Into<X::Value>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -16,7 +17,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         match self {
             Cmp::Eq {
                 lhs, rhs, result, ..

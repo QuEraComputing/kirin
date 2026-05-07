@@ -9,12 +9,24 @@ use smallvec::SmallVec;
 pub struct Product<T>(pub SmallVec<[T; 2]>);
 
 impl<T> Product<T> {
+    pub fn new() -> Self {
+        Self(SmallVec::new())
+    }
+
+    pub fn from_vec(values: Vec<T>) -> Self {
+        Self(SmallVec::from_vec(values))
+    }
+
     pub fn iter(&self) -> core::slice::Iter<'_, T> {
         self.0.iter()
     }
 
     pub fn iter_mut(&mut self) -> core::slice::IterMut<'_, T> {
         self.0.iter_mut()
+    }
+
+    pub fn as_slice(&self) -> &[T] {
+        self.0.as_slice()
     }
 
     pub fn len(&self) -> usize {
@@ -27,6 +39,12 @@ impl<T> Product<T> {
 
     pub fn get(&self, index: usize) -> Option<&T> {
         self.0.get(index)
+    }
+}
+
+impl<T> Default for Product<T> {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

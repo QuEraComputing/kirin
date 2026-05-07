@@ -18,10 +18,19 @@ pub enum ProjectError {
 /// succeed should use `type Error = `[`core::convert::Infallible`].
 ///
 /// Derive `#[derive(Dialect)]` generates this automatically for each `#[wraps]` variant,
-/// with `type Error = `[`LiftError`].
+/// with `type Error = `[`core::convert::Infallible`].
 pub trait TryLiftFrom<From>: Sized {
     type Error;
     fn try_lift_from(from: From) -> Result<Self, Self::Error>;
+}
+
+/// Infallible lift constructor.
+///
+/// This is the compile-time infallible counterpart to [`TryLiftFrom`]. It is
+/// blanket-implemented for every `TryLiftFrom` implementation whose error type
+/// is [`core::convert::Infallible`].
+pub trait LiftFrom<From>: Sized {
+    fn lift_from(from: From) -> Self;
 }
 
 /// Core project trait: `Self` can be projected into `To`.
@@ -43,6 +52,18 @@ impl<T> TryLiftFrom<T> for T {
     }
 }
 
+impl<F, T> LiftFrom<F> for T
+where
+    T: TryLiftFrom<F, Error = core::convert::Infallible>,
+{
+    fn lift_from(from: F) -> Self {
+        match T::try_lift_from(from) {
+            Ok(value) => value,
+            Err(error) => match error {},
+        }
+    }
+}
+
 impl<T> TryProjectTo<T> for T {
     type Error = core::convert::Infallible;
     fn try_project_to(self) -> Result<T, core::convert::Infallible> {
@@ -52,15 +73,18 @@ impl<T> TryProjectTo<T> for T {
 
 // --- Convenience traits (blanket-implemented via the core traits) ---
 
-/// Infallible lift of `Self` into `To`. Panics if the underlying `TryLiftFrom` returns
-/// an error (only possible in dynamic/effect contexts; pure dialect lifts are always `Ok`).
+/// Infallible lift of `Self` into `To`.
+///
+/// This follows the same convention as [`Into`](core::convert::Into): use
+/// `.lift()` only when the lift is known to be infallible. Use
+/// [`TryLift::try_lift`] when the lift may fail.
 pub trait Lift<To>: Sized {
     fn lift(self) -> To;
 }
 
-impl<F, T: TryLiftFrom<F>> Lift<T> for F {
+impl<F, T: LiftFrom<F>> Lift<T> for F {
     fn lift(self) -> T {
-        T::try_lift_from(self).unwrap_or_else(|_| panic!("lift failed"))
+        T::lift_from(self)
     }
 }
 
@@ -145,8 +169,8 @@ mod tests {
     }
 
     impl TryLiftFrom<Inner> for Outer {
-        type Error = LiftError;
-        fn try_lift_from(from: Inner) -> Result<Outer, LiftError> {
+        type Error = Infallible;
+        fn try_lift_from(from: Inner) -> Result<Outer, Infallible> {
             Ok(Outer::A(from))
         }
     }
@@ -181,7 +205,7 @@ mod tests {
 
     #[test]
     fn try_lift_convenience_ok() {
-        let result: Result<Outer, LiftError> = Inner(7).try_lift();
+        let result: Result<Outer, Infallible> = Inner(7).try_lift();
         assert_eq!(result, Ok(Outer::A(Inner(7))));
     }
 

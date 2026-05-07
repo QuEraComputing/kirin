@@ -1,3 +1,5 @@
+use kirin_ir::LiftFrom;
+
 use crate::{EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError, Location};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -20,10 +22,12 @@ impl HasLocation for StatementFrame {
 
 impl<I, F, C, E> Frame<I, F, C, E> for StatementFrame
 where
-    E: From<InterpreterError>,
+    E: LiftFrom<InterpreterError>,
 {
     fn step(self, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        Err(InterpreterError::UnexpectedStatementFrameStep(self.location).into())
+        Err(E::lift_from(
+            InterpreterError::UnexpectedStatementFrameStep(self.location),
+        ))
     }
 
     fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {

@@ -5,7 +5,7 @@ use kirin_interpreter::{
 };
 use smallvec::smallvec;
 
-use crate::{Bind, Call, FunctionBody, Lambda, Lexical, Lifted, Return};
+use crate::{Bind, Call, Function, Lambda, Lexical, Lifted, Return};
 
 /// Shared interpret logic for any type with a single region body: resolve stage,
 /// find the entry block, and jump to it.
@@ -26,7 +26,7 @@ where
     Ok(Continuation::Jump(entry, smallvec![]))
 }
 
-impl<T: CompileTimeValue> SSACFGRegion for FunctionBody<T> {
+impl<T: CompileTimeValue> SSACFGRegion for Function<T> {
     fn entry_block<L: Dialect>(
         &self,
         stage: &kirin::prelude::StageInfo<L>,
@@ -35,7 +35,7 @@ impl<T: CompileTimeValue> SSACFGRegion for FunctionBody<T> {
     }
 }
 
-impl<'ir, I, T> Interpretable<'ir, I> for FunctionBody<T>
+impl<'ir, I, T> Interpretable<'ir, I> for Function<T>
 where
     I: Interpreter<'ir>,
     T: CompileTimeValue,
@@ -83,7 +83,7 @@ where
         stage: &kirin::prelude::StageInfo<L>,
     ) -> Result<kirin::prelude::Block, InterpreterError> {
         match self {
-            Lexical::FunctionBody(op) => SSACFGRegion::entry_block(op, stage),
+            Lexical::Function(op) => SSACFGRegion::entry_block(op, stage),
             Lexical::Lambda(op) => SSACFGRegion::entry_block(op, stage),
             _ => Err(InterpreterError::missing_entry_block()),
         }
@@ -103,7 +103,7 @@ where
         L: Interpretable<'ir, I> + 'ir,
     {
         match self {
-            Lexical::FunctionBody(op) => op.interpret::<L>(interp),
+            Lexical::Function(op) => op.interpret::<L>(interp),
             Lexical::Lambda(op) => op.interpret::<L>(interp),
             Lexical::Call(op) => op.interpret::<L>(interp),
             Lexical::Return(op) => op.interpret::<L>(interp),
@@ -236,7 +236,7 @@ where
         stage: &kirin::prelude::StageInfo<L>,
     ) -> Result<kirin::prelude::Block, InterpreterError> {
         match self {
-            Lifted::FunctionBody(op) => SSACFGRegion::entry_block(op, stage),
+            Lifted::Function(op) => SSACFGRegion::entry_block(op, stage),
             _ => Err(InterpreterError::missing_entry_block()),
         }
     }
@@ -255,7 +255,7 @@ where
         L: Interpretable<'ir, I> + 'ir,
     {
         match self {
-            Lifted::FunctionBody(op) => op.interpret::<L>(interp),
+            Lifted::Function(op) => op.interpret::<L>(interp),
             Lifted::Bind(op) => op.interpret::<L>(interp),
             Lifted::Call(op) => op.interpret::<L>(interp),
             Lifted::Return(op) => op.interpret::<L>(interp),

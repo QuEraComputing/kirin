@@ -1,27 +1,44 @@
+//! Frame-based semantics for the new interpreter framework.
+//!
+//! This module keeps SCF traversal policy inside SCF-owned frame types while
+//! leaving interpreter-specific scheduling decisions behind small dispatch
+//! traits. `scf.if` and `scf.for` both execute single-block bodies by asking
+//! the interpreter to create a block frame through [`ScfBlockDispatch`]. When a
+//! branch condition is indeterminate, concrete interpreters report
+//! [`InterpreterError::IndeterminateBranch`], while abstract interpreters may
+//! choose a conservative summary or a more precise traversal strategy.
+//!
+//! The standard `scf.for` frame keeps its phase enum private. For custom
+//! abstract interpreters that need to handle an indeterminate loop condition,
+//! [`ForContinuation`] exposes the precise resumable loop state without making
+//! the entire frame state machine public.
+
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use kirin::ir::TryLiftFrom;
+use core::convert::Infallible;
+
+use kirin::ir::{LiftFrom, Product, TryLift, TryLiftFrom};
 use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue, SSAValue};
 use kirin_interpreter_new::{
     AbstractInterpreterWithStore, AbstractValue, BlockFrame, BlockTransfer, BranchCondition,
-    ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect, HasLocation, Interpretable,
-    InterpreterError, Location, ProductValue, ProjectOrSelf, SimpleFixpointInterpreter,
+    ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect, HasLocation,
+    Interpretable, InterpreterError, Location, ProjectOrSelf, SimpleFixpointInterpreter,
     StatementEffect, Summary,
 };
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
 
-type IfFrameMarker<L, T, V> = PhantomData<fn() -> (L, T, V)>;
-type ForFrameMarker<L, T> = PhantomData<fn() -> (L, T)>;
+type IfFrameMarker<L, T, V, X> = PhantomData<fn() -> (L, T, V, X)>;
+type ForFrameMarker<L, T, X> = PhantomData<fn() -> (L, T, X)>;
 
-pub trait ScfBlockDispatch<L: Dialect, F, E, V> {
+pub trait ScfBlockDispatch<L: Dialect, F, E, V, T> {
     fn dispatch_scf_block(
         &mut self,
         _location: Location,
         block: Block,
         env: EnvIndex,
-        args: Vec<V>,
+        args: Product<V>,
     ) -> Result<F, E>;
 }
 
@@ -36,11 +53,20 @@ pub trait ScfIfDispatch<L: Dialect, F, C, E, V> {
     ) -> Result<FrameEffect<F, C>, E>;
 }
 
-impl<'ir, S, L, F, C, E, V> ScfBlockDispatch<L, F, E, V> for ConcreteInterpreter<'ir, S, F, C, E, V>
+pub trait ScfForDispatch<L: Dialect, T: CompileTimeValue, F, C, E, V, X> {
+    fn dispatch_indeterminate_for(
+        &mut self,
+        continuation: ForContinuation<L, T, V, X>,
+    ) -> Result<FrameEffect<F, C>, E>;
+}
+
+impl<'ir, S, L, F, C, E, V, T> ScfBlockDispatch<L, F, E, V, T>
+    for ConcreteInterpreter<'ir, S, F, C, E, V>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    F: From<BlockFrame<L, V>>,
+    F: TryLiftFrom<BlockFrame<L, V, T>>,
+    E: From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>,
     V: Clone,
 {
     fn dispatch_scf_block(
@@ -48,16 +74,18 @@ where
         location: Location,
         block: Block,
         env: EnvIndex,
-        args: Vec<V>,
+        args: Product<V>,
     ) -> Result<F, E> {
-        Ok(BlockFrame::<L, V>::new(location.stage, block, env, args).into())
+        BlockFrame::<L, V, T>::new(location.stage, block, env, args)
+            .try_lift()
+            .map_err(E::from)
     }
 }
 
 impl<'ir, S, L, F, C, E, V> ScfIfDispatch<L, F, C, E, V> for ConcreteInterpreter<'ir, S, F, C, E, V>
 where
     L: Dialect,
-    E: From<IndeterminateBranch>,
+    E: LiftFrom<InterpreterError>,
 {
     fn dispatch_indeterminate_if(
         &mut self,
@@ -67,16 +95,33 @@ where
         _else_body: Block,
         _results: Vec<ResultValue>,
     ) -> Result<FrameEffect<F, C>, E> {
-        Err(IndeterminateBranch.into())
+        Err(E::lift_from(InterpreterError::IndeterminateBranch))
     }
 }
 
-impl<'ir, S, L, F, C, E, V, Store> ScfBlockDispatch<L, F, E, V>
+impl<'ir, S, L, T, F, C, E, V, X> ScfForDispatch<L, T, F, C, E, V, X>
+    for ConcreteInterpreter<'ir, S, F, C, E, V>
+where
+    L: Dialect,
+    T: CompileTimeValue,
+    E: LiftFrom<InterpreterError>,
+    X: BlockTransfer<Value = V>,
+{
+    fn dispatch_indeterminate_for(
+        &mut self,
+        _continuation: ForContinuation<L, T, V, X>,
+    ) -> Result<FrameEffect<F, C>, E> {
+        Err(E::lift_from(InterpreterError::IndeterminateBranch))
+    }
+}
+
+impl<'ir, S, L, F, C, E, V, T, Store> ScfBlockDispatch<L, F, E, V, T>
     for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    F: From<BlockFrame<L, V>>,
+    F: TryLiftFrom<BlockFrame<L, V, T>>,
+    E: From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>,
     V: Clone,
 {
     fn dispatch_scf_block(
@@ -84,20 +129,53 @@ where
         location: Location,
         block: Block,
         env: EnvIndex,
-        args: Vec<V>,
+        args: Product<V>,
     ) -> Result<F, E> {
-        Ok(BlockFrame::<L, V>::new(location.stage, block, env, args).into())
+        BlockFrame::<L, V, T>::new(location.stage, block, env, args)
+            .try_lift()
+            .map_err(E::from)
     }
 }
 
-impl<'ir, Stage, K, L, F, C, E, V, Sum, Store> ScfBlockDispatch<L, F, E, V>
+impl<'ir, S, L, T, F, C, E, V, X, Store> ScfForDispatch<L, T, F, C, E, V, X>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
+where
+    S: HasStageInfo<L>,
+    L: Dialect,
+    T: CompileTimeValue,
+    Store: Env<V>,
+    E: LiftFrom<InterpreterError> + LiftFrom<Store::Error>,
+    V: AbstractValue,
+    X: BlockTransfer<Value = V>,
+{
+    fn dispatch_indeterminate_for(
+        &mut self,
+        continuation: ForContinuation<L, T, V, X>,
+    ) -> Result<FrameEffect<F, C>, E> {
+        let values = continuation
+            .results
+            .iter()
+            .map(|_| V::top())
+            .collect::<Product<_>>();
+        write_results(
+            self,
+            continuation.env,
+            continuation.results.as_slice(),
+            values,
+        )?;
+        Ok(FrameEffect::Done)
+    }
+}
+
+impl<'ir, Stage, K, L, F, C, E, V, T, Sum, Store> ScfBlockDispatch<L, F, E, V, T>
     for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store>
 where
     Stage: HasStageInfo<L>,
     K: Clone + Eq + Hash,
     L: Dialect,
     Sum: Summary,
-    F: From<BlockFrame<L, V>>,
+    F: TryLiftFrom<BlockFrame<L, V, T>>,
+    E: From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>,
     V: Clone,
 {
     fn dispatch_scf_block(
@@ -105,9 +183,43 @@ where
         location: Location,
         block: Block,
         env: EnvIndex,
-        args: Vec<V>,
+        args: Product<V>,
     ) -> Result<F, E> {
-        Ok(BlockFrame::<L, V>::new(location.stage, block, env, args).into())
+        BlockFrame::<L, V, T>::new(location.stage, block, env, args)
+            .try_lift()
+            .map_err(E::from)
+    }
+}
+
+impl<'ir, S, K, L, T, F, C, E, V, X, Sum, Store> ScfForDispatch<L, T, F, C, E, V, X>
+    for SimpleFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store>
+where
+    S: HasStageInfo<L>,
+    K: Clone + Eq + Hash,
+    L: Dialect,
+    T: CompileTimeValue,
+    Sum: Summary,
+    Store: Env<V>,
+    E: LiftFrom<InterpreterError> + LiftFrom<<Store as Env<V>>::Error>,
+    V: AbstractValue,
+    X: BlockTransfer<Value = V>,
+{
+    fn dispatch_indeterminate_for(
+        &mut self,
+        continuation: ForContinuation<L, T, V, X>,
+    ) -> Result<FrameEffect<F, C>, E> {
+        let values = continuation
+            .results
+            .iter()
+            .map(|_| V::top())
+            .collect::<Product<_>>();
+        write_results(
+            self,
+            continuation.env,
+            continuation.results.as_slice(),
+            values,
+        )?;
+        Ok(FrameEffect::Done)
     }
 }
 
@@ -117,8 +229,8 @@ where
     S: HasStageInfo<L>,
     L: Dialect,
     Store: Env<V>,
-    E: From<InterpreterError> + From<Store::Error>,
-    V: AbstractValue + ProductValue,
+    E: LiftFrom<InterpreterError> + LiftFrom<Store::Error>,
+    V: AbstractValue,
 {
     fn dispatch_indeterminate_if(
         &mut self,
@@ -128,8 +240,8 @@ where
         _else_body: Block,
         results: Vec<ResultValue>,
     ) -> Result<FrameEffect<F, C>, E> {
-        let values = results.iter().map(|_| V::top()).collect();
-        write_results(self, env, results.as_slice(), V::new_product(values))?;
+        let values = results.iter().map(|_| V::top()).collect::<Product<_>>();
+        write_results(self, env, results.as_slice(), values)?;
         Ok(FrameEffect::Done)
     }
 }
@@ -142,8 +254,8 @@ where
     L: Dialect,
     Sum: Summary,
     Store: Env<V>,
-    E: From<InterpreterError> + From<<Store as Env<V>>::Error>,
-    V: AbstractValue + ProductValue,
+    E: LiftFrom<InterpreterError> + LiftFrom<<Store as Env<V>>::Error>,
+    V: AbstractValue,
 {
     fn dispatch_indeterminate_if(
         &mut self,
@@ -153,36 +265,44 @@ where
         _else_body: Block,
         results: Vec<ResultValue>,
     ) -> Result<FrameEffect<F, C>, E> {
-        let values = results.iter().map(|_| V::top()).collect();
-        write_results(self, env, results.as_slice(), V::new_product(values))?;
+        let values = results.iter().map(|_| V::top()).collect::<Product<_>>();
+        write_results(self, env, results.as_slice(), values)?;
         Ok(FrameEffect::Done)
     }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ScfCompletion<V> {
-    Yield(V),
+    Yield(Product<V>),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ScfFrame<L: Dialect, T: CompileTimeValue, V> {
-    If(IfFrame<L, T, V>),
-    For(ForFrame<L, T, V>),
+pub enum ScfFrame<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
+    If(IfFrame<L, T, V, X>),
+    For(ForFrame<L, T, V, X>),
 }
 
-impl<L: Dialect, T: CompileTimeValue, V> From<IfFrame<L, T, V>> for ScfFrame<L, T, V> {
-    fn from(frame: IfFrame<L, T, V>) -> Self {
-        Self::If(frame)
+impl<L: Dialect, T: CompileTimeValue, V, X> TryLiftFrom<IfFrame<L, T, V, X>>
+    for ScfFrame<L, T, V, X>
+{
+    type Error = Infallible;
+
+    fn try_lift_from(frame: IfFrame<L, T, V, X>) -> Result<Self, Self::Error> {
+        Ok(Self::If(frame))
     }
 }
 
-impl<L: Dialect, T: CompileTimeValue, V> From<ForFrame<L, T, V>> for ScfFrame<L, T, V> {
-    fn from(frame: ForFrame<L, T, V>) -> Self {
-        Self::For(frame)
+impl<L: Dialect, T: CompileTimeValue, V, X> TryLiftFrom<ForFrame<L, T, V, X>>
+    for ScfFrame<L, T, V, X>
+{
+    type Error = Infallible;
+
+    fn try_lift_from(frame: ForFrame<L, T, V, X>) -> Result<Self, Self::Error> {
+        Ok(Self::For(frame))
     }
 }
 
-impl<L: Dialect, T: CompileTimeValue, V> HasLocation for ScfFrame<L, T, V> {
+impl<L: Dialect, T: CompileTimeValue, V, X> HasLocation for ScfFrame<L, T, V, X> {
     fn location(&self) -> Location {
         match self {
             Self::If(frame) => frame.location(),
@@ -191,12 +311,12 @@ impl<L: Dialect, T: CompileTimeValue, V> HasLocation for ScfFrame<L, T, V> {
     }
 }
 
-impl<I, L, F, C, E, T, V> Frame<I, F, C, E> for ScfFrame<L, T, V>
+impl<I, L, F, C, E, T, V, X> Frame<I, F, C, E> for ScfFrame<L, T, V, X>
 where
     L: Dialect,
     T: CompileTimeValue,
-    IfFrame<L, T, V>: Frame<I, F, C, E>,
-    ForFrame<L, T, V>: Frame<I, F, C, E>,
+    IfFrame<L, T, V, X>: Frame<I, F, C, E>,
+    ForFrame<L, T, V, X>: Frame<I, F, C, E>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self {
@@ -221,7 +341,7 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct IfFrame<L: Dialect, T: CompileTimeValue, V> {
+pub struct IfFrame<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
     pub location: Location,
     pub env: EnvIndex,
     condition: SSAValue,
@@ -229,7 +349,7 @@ pub struct IfFrame<L: Dialect, T: CompileTimeValue, V> {
     else_body: Block,
     results: Vec<ResultValue>,
     phase: IfPhase,
-    _marker: IfFrameMarker<L, T, V>,
+    _marker: IfFrameMarker<L, T, V, X>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -238,7 +358,7 @@ enum IfPhase {
     Active,
 }
 
-impl<L: Dialect, T: CompileTimeValue, V> IfFrame<L, T, V> {
+impl<L: Dialect, T: CompileTimeValue, V, X> IfFrame<L, T, V, X> {
     fn new(location: Location, env: EnvIndex, op: &If<T>) -> Self {
         Self {
             location,
@@ -258,21 +378,22 @@ impl<L: Dialect, T: CompileTimeValue, V> IfFrame<L, T, V> {
     }
 }
 
-impl<L: Dialect, T: CompileTimeValue, V> HasLocation for IfFrame<L, T, V> {
+impl<L: Dialect, T: CompileTimeValue, V, X> HasLocation for IfFrame<L, T, V, X> {
     fn location(&self) -> Location {
         self.location
     }
 }
 
-impl<I, L, F, C, E, T, V> Frame<I, F, C, E> for IfFrame<L, T, V>
+impl<I, L, F, C, E, T, V, X> Frame<I, F, C, E> for IfFrame<L, T, V, X>
 where
-    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V> + ScfIfDispatch<L, F, C, E, V>,
+    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V, X> + ScfIfDispatch<L, F, C, E, V>,
     L: Dialect,
-    F: From<IfFrame<L, T, V>>,
+    F: TryLiftFrom<IfFrame<L, T, V, X>>,
     C: ProjectOrSelf<ScfCompletion<V>>,
-    E: From<InterpreterError>,
+    E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<IfFrame<L, T, V, X>>>::Error>,
     T: CompileTimeValue,
-    V: BranchCondition + ProductValue,
+    V: BranchCondition,
+    X: BlockTransfer<Value = V>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self.phase {
@@ -291,26 +412,24 @@ where
                     }
                 };
                 let child =
-                    interp.dispatch_scf_block(self.location, block, self.env, Vec::new())?;
+                    interp.dispatch_scf_block(self.location, block, self.env, Product::new())?;
                 Ok(FrameEffect::Push {
-                    parent: self.active().into(),
+                    parent: self.active().try_lift()?,
                     child,
                 })
             }
-            IfPhase::Active => Err(InterpreterError::UnexpectedCompletion {
+            IfPhase::Active => Err(E::lift_from(InterpreterError::UnexpectedCompletion {
                 location: self.location,
                 completion: "active scf.if frame stepped",
-            }
-            .into()),
+            })),
         }
     }
 
     fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        Err(InterpreterError::UnexpectedCompletion {
+        Err(E::lift_from(InterpreterError::UnexpectedCompletion {
             location: self.location,
             completion: "scf.if body completed without scf.yield",
-        }
-        .into())
+        }))
     }
 
     fn resume(self, completion: C, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
@@ -325,7 +444,7 @@ where
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ForFrame<L: Dialect, T: CompileTimeValue, V> {
+pub struct ForFrame<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
     pub location: Location,
     pub env: EnvIndex,
     start: SSAValue,
@@ -335,16 +454,132 @@ pub struct ForFrame<L: Dialect, T: CompileTimeValue, V> {
     body: Block,
     results: Vec<ResultValue>,
     phase: ForPhase<V>,
-    _marker: ForFrameMarker<L, T>,
+    _marker: ForFrameMarker<L, T, X>,
+}
+
+/// Public suspension point for an `scf.for` loop at an indeterminate condition.
+///
+/// A [`ForFrame`] normally checks `iv.loop_condition(&end)` to decide whether
+/// to exit or push the loop body. If that condition returns `None`, the frame
+/// cannot make a concrete choice. Instead, it passes a `ForContinuation` to
+/// [`ScfForDispatch::dispatch_indeterminate_for`].
+///
+/// The continuation contains both the static frame context (`location`, `env`,
+/// `body`, `results`, and original SSA slots) and the already-read runtime loop
+/// state (`iv`, `end`, `step`, and `carried`). This lets custom interpreters
+/// implement policies such as "write top and stop", "push the body once", or a
+/// loop-specific fixpoint strategy while still reusing the standard
+/// [`ForFrame`] resume logic.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct ForContinuation<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
+    /// Program location of the `scf.for` operation.
+    pub location: Location,
+    /// Environment activation used by the loop body and loop results.
+    pub env: EnvIndex,
+    /// Original SSA slot for the loop start value.
+    pub start: SSAValue,
+    /// Original SSA slot for the loop end value.
+    pub end_value: SSAValue,
+    /// Original SSA slot for the loop step value.
+    pub step_value: SSAValue,
+    /// Original SSA slots for loop-carried initial values.
+    pub init_args: Vec<SSAValue>,
+    /// Single-block loop body.
+    pub body: Block,
+    /// Result slots of the `scf.for` operation.
+    pub results: Vec<ResultValue>,
+    /// Current induction variable value.
+    pub iv: V,
+    /// Already-read loop end value.
+    pub end: V,
+    /// Already-read loop step value.
+    pub step: V,
+    /// Current loop-carried values.
+    pub carried: Product<V>,
+    _marker: ForFrameMarker<L, T, X>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 enum ForPhase<V> {
     Entry,
-    Check { iv: V, end: V, step: V, carried: V },
+    Check {
+        iv: V,
+        end: V,
+        step: V,
+        carried: Product<V>,
+    },
 }
 
-impl<L: Dialect, T: CompileTimeValue, V> ForFrame<L, T, V> {
+impl<L: Dialect, T: CompileTimeValue, V, X> ForContinuation<L, T, V, X> {
+    fn new(frame: ForFrameParts<T>, iv: V, end: V, step: V, carried: Product<V>) -> Self {
+        Self {
+            location: frame.location,
+            env: frame.env,
+            start: frame.start,
+            end_value: frame.end,
+            step_value: frame.step,
+            init_args: frame.init_args,
+            body: frame.body,
+            results: frame.results,
+            iv,
+            end,
+            step,
+            carried,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Build the block arguments used when entering the loop body.
+    ///
+    /// SCF loop bodies receive the current induction variable followed by the
+    /// current loop-carried values. This helper keeps that calling convention
+    /// centralized so custom dispatch implementations do not duplicate it.
+    pub fn body_args(&self) -> Product<V>
+    where
+        V: Clone,
+    {
+        loop_body_args(self.iv.clone(), self.carried.clone(), self.init_args.len())
+    }
+
+    /// Rebuild the standard `ForFrame` in its check/resume state.
+    ///
+    /// Use this when an interpreter decides to push the loop body and wants the
+    /// normal `ForFrame::resume` logic to handle `scf.yield`, advance the
+    /// induction variable, and return to the condition check.
+    pub fn into_frame(self) -> ForFrame<L, T, V, X> {
+        ForFrame {
+            location: self.location,
+            env: self.env,
+            start: self.start,
+            end: self.end_value,
+            step: self.step_value,
+            init_args: self.init_args,
+            body: self.body,
+            results: self.results,
+            phase: ForPhase::Check {
+                iv: self.iv,
+                end: self.end,
+                step: self.step,
+                carried: self.carried,
+            },
+            _marker: PhantomData,
+        }
+    }
+}
+
+struct ForFrameParts<T: CompileTimeValue> {
+    location: Location,
+    env: EnvIndex,
+    start: SSAValue,
+    end: SSAValue,
+    step: SSAValue,
+    init_args: Vec<SSAValue>,
+    body: Block,
+    results: Vec<ResultValue>,
+    _marker: PhantomData<T>,
+}
+
+impl<L: Dialect, T: CompileTimeValue, V, X> ForFrame<L, T, V, X> {
     fn new(location: Location, env: EnvIndex, op: &For<T>) -> Self {
         Self {
             location,
@@ -361,21 +596,22 @@ impl<L: Dialect, T: CompileTimeValue, V> ForFrame<L, T, V> {
     }
 }
 
-impl<L: Dialect, T: CompileTimeValue, V> HasLocation for ForFrame<L, T, V> {
+impl<L: Dialect, T: CompileTimeValue, V, X> HasLocation for ForFrame<L, T, V, X> {
     fn location(&self) -> Location {
         self.location
     }
 }
 
-impl<I, L, F, C, E, T, V> Frame<I, F, C, E> for ForFrame<L, T, V>
+impl<I, L, F, C, E, T, V, X> Frame<I, F, C, E> for ForFrame<L, T, V, X>
 where
-    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V>,
+    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V, X> + ScfForDispatch<L, T, F, C, E, V, X>,
     L: Dialect,
-    F: From<ForFrame<L, T, V>>,
+    F: TryLiftFrom<ForFrame<L, T, V, X>>,
     C: ProjectOrSelf<ScfCompletion<V>>,
-    E: From<InterpreterError> + From<LoopStepOverflow> + From<IndeterminateBranch>,
+    E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<ForFrame<L, T, V, X>>>::Error>,
     T: CompileTimeValue,
-    V: Clone + ForLoopValue + ProductValue,
+    V: Clone + ForLoopValue,
+    X: BlockTransfer<Value = V>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         let location = self.location;
@@ -387,78 +623,67 @@ where
         let body = self.body;
         let results = self.results;
         let phase = self.phase;
+        let frame = ForFrameParts {
+            location,
+            env,
+            start,
+            end: end_value,
+            step: step_value,
+            init_args,
+            body,
+            results,
+            _marker: PhantomData,
+        };
 
         match phase {
             ForPhase::Entry => {
-                let iv = interp.read(env, start)?;
-                let end = interp.read(env, end_value)?;
-                let step = interp.read(env, step_value)?;
-                let carried = V::new_product(interp.read_many(env, init_args.as_slice())?);
-                Ok(FrameEffect::Continue(
-                    Self {
-                        location,
-                        env,
-                        start,
-                        end: end_value,
-                        step: step_value,
-                        init_args,
-                        body,
-                        results,
-                        phase: ForPhase::Check {
-                            iv,
-                            end,
-                            step,
-                            carried,
-                        },
-                        _marker: PhantomData,
-                    }
-                    .into(),
-                ))
+                let iv = interp.read(frame.env, frame.start)?;
+                let end = interp.read(frame.env, frame.end)?;
+                let step = interp.read(frame.env, frame.step)?;
+                let carried = interp.read_many(frame.env, frame.init_args.as_slice())?;
+                ForContinuation::<L, T, V, X>::new(frame, iv, end, step, carried)
+                    .into_frame()
+                    .try_lift()
+                    .map(FrameEffect::Continue)
+                    .map_err(E::from)
             }
             ForPhase::Check {
                 iv,
                 end,
                 step,
                 carried,
-            } => {
-                if iv.loop_condition(&end) != Some(true) {
-                    write_results(interp, env, results.as_slice(), carried)?;
-                    return Ok(FrameEffect::Done);
+            } => match iv.loop_condition(&end) {
+                Some(false) => {
+                    write_results(interp, env, frame.results.as_slice(), carried)?;
+                    Ok(FrameEffect::Done)
                 }
-
-                let args = loop_body_args(iv.clone(), carried.clone(), init_args.len());
-                let child = interp.dispatch_scf_block(location, body, env, args)?;
-                Ok(FrameEffect::Push {
-                    parent: Self {
-                        location,
-                        env,
-                        start,
-                        end: end_value,
-                        step: step_value,
-                        init_args,
-                        body,
-                        results,
-                        phase: ForPhase::Check {
-                            iv,
-                            end,
-                            step,
-                            carried,
-                        },
-                        _marker: PhantomData,
-                    }
-                    .into(),
-                    child,
-                })
-            }
+                Some(true) => {
+                    let continuation =
+                        ForContinuation::<L, T, V, X>::new(frame, iv, end, step, carried);
+                    let args = continuation.body_args();
+                    let child = interp.dispatch_scf_block(
+                        continuation.location,
+                        continuation.body,
+                        continuation.env,
+                        args,
+                    )?;
+                    Ok(FrameEffect::Push {
+                        parent: continuation.into_frame().try_lift()?,
+                        child,
+                    })
+                }
+                None => interp.dispatch_indeterminate_for(ForContinuation::<L, T, V, X>::new(
+                    frame, iv, end, step, carried,
+                )),
+            },
         }
     }
 
     fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        Err(InterpreterError::UnexpectedCompletion {
+        Err(E::lift_from(InterpreterError::UnexpectedCompletion {
             location: self.location,
             completion: "scf.for body completed without scf.yield",
-        }
-        .into())
+        }))
     }
 
     fn resume(self, completion: C, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
@@ -476,149 +701,148 @@ where
         };
         match completion.project_or_self() {
             Ok(ScfCompletion::Yield(carried)) => {
-                let next_iv = iv.loop_step(&step).ok_or(LoopStepOverflow)?;
-                Ok(FrameEffect::Continue(
-                    Self {
-                        location,
-                        env,
-                        start,
-                        end: end_value,
-                        step: step_value,
-                        init_args,
-                        body,
-                        results,
-                        phase: ForPhase::Check {
-                            iv: next_iv,
-                            end,
-                            step,
-                            carried,
-                        },
-                        _marker: PhantomData,
-                    }
-                    .into(),
-                ))
+                let next_iv = match iv.loop_step(&step) {
+                    Some(next_iv) => next_iv,
+                    None => return Err(E::lift_from(InterpreterError::LoopStepOverflow)),
+                };
+                Self {
+                    location,
+                    env,
+                    start,
+                    end: end_value,
+                    step: step_value,
+                    init_args,
+                    body,
+                    results,
+                    phase: ForPhase::Check {
+                        iv: next_iv,
+                        end,
+                        step,
+                        carried,
+                    },
+                    _marker: PhantomData,
+                }
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from)
             }
             Err(completion) => Ok(FrameEffect::Complete(completion)),
         }
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for If<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for If<T>
 where
     L: Dialect,
-    F: From<IfFrame<L, T, V>>,
+    F: TryLiftFrom<IfFrame<L, T, X::Value, X>>,
+    E: From<<F as TryLiftFrom<IfFrame<L, T, X::Value, X>>>::Error>,
     T: CompileTimeValue,
+    X: BlockTransfer,
 {
     fn interpret(
         &self,
         location: Location,
         env: EnvIndex,
         _interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
-        Ok(StatementEffect::Push(
-            IfFrame::<L, T, V>::new(location, env, self).into(),
-        ))
+    ) -> Result<StatementEffect<F, C, X>, E> {
+        IfFrame::<L, T, X::Value, X>::new(location, env, self)
+            .try_lift()
+            .map(StatementEffect::Push)
+            .map_err(E::from)
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for For<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for For<T>
 where
     L: Dialect,
-    F: From<ForFrame<L, T, V>>,
+    F: TryLiftFrom<ForFrame<L, T, X::Value, X>>,
+    E: From<<F as TryLiftFrom<ForFrame<L, T, X::Value, X>>>::Error>,
     T: CompileTimeValue,
+    X: BlockTransfer,
 {
     fn interpret(
         &self,
         location: Location,
         env: EnvIndex,
         _interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
-        Ok(StatementEffect::Push(
-            ForFrame::<L, T, V>::new(location, env, self).into(),
-        ))
+    ) -> Result<StatementEffect<F, C, X>, E> {
+        ForFrame::<L, T, X::Value, X>::new(location, env, self)
+            .try_lift()
+            .map(StatementEffect::Push)
+            .map_err(E::from)
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Yield<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Yield<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    C: TryLiftFrom<ScfCompletion<V>>,
-    E: From<<C as TryLiftFrom<ScfCompletion<V>>>::Error>,
+    I: Env<X::Value, Error = E>,
+    C: TryLiftFrom<ScfCompletion<X::Value>>,
+    E: From<<C as TryLiftFrom<ScfCompletion<X::Value>>>::Error>,
     T: CompileTimeValue,
-    V: ProductValue,
+    X: BlockTransfer,
 {
     fn interpret(
         &self,
         _location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         let values = interp.read_many(env, self.values.as_slice())?;
         Ok(StatementEffect::Complete(C::try_lift_from(
-            ScfCompletion::Yield(V::new_product(values)),
+            ScfCompletion::Yield(values),
         )?))
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>>
-    for StructuredControlFlow<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for StructuredControlFlow<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    F: From<IfFrame<L, T, V>> + From<ForFrame<L, T, V>>,
-    C: TryLiftFrom<ScfCompletion<V>>,
-    E: From<<C as TryLiftFrom<ScfCompletion<V>>>::Error>,
+    I: Env<X::Value, Error = E>,
+    F: TryLiftFrom<IfFrame<L, T, X::Value, X>> + TryLiftFrom<ForFrame<L, T, X::Value, X>>,
+    C: TryLiftFrom<ScfCompletion<X::Value>>,
+    E: From<<F as TryLiftFrom<IfFrame<L, T, X::Value, X>>>::Error>
+        + From<<F as TryLiftFrom<ForFrame<L, T, X::Value, X>>>::Error>
+        + From<<C as TryLiftFrom<ScfCompletion<X::Value>>>::Error>,
     T: CompileTimeValue,
-    V: ProductValue,
+    X: BlockTransfer,
 {
     fn interpret(
         &self,
         location: Location,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         match self {
             StructuredControlFlow::If(op) => {
-                <If<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
-                    op, location, env, interp,
-                )
+                <If<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
             }
             StructuredControlFlow::For(op) => {
-                <For<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
-                    op, location, env, interp,
-                )
+                <For<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
             }
             StructuredControlFlow::Yield(op) => {
-                <Yield<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
-                    op, location, env, interp,
-                )
+                <Yield<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
             }
         }
     }
 }
 
-fn loop_body_args<V: Clone + ProductValue>(iv: V, carried: V, init_arg_count: usize) -> Vec<V> {
+fn loop_body_args<V: Clone>(iv: V, carried: Product<V>, init_arg_count: usize) -> Product<V> {
     let mut args = Vec::with_capacity(1 + init_arg_count);
     args.push(iv);
-    if let Some(product) = carried.as_product() {
-        args.extend(product.iter().cloned());
-    } else if init_arg_count > 0 {
-        args.push(carried);
-    }
-    args
+    args.extend(carried.into_iter().take(init_arg_count));
+    Product::from_vec(args)
 }
 
 fn write_results<I, V>(
     interp: &mut I,
     env: EnvIndex,
     results: &[ResultValue],
-    value: V,
+    value: Product<V>,
 ) -> Result<(), I::Error>
 where
     I: Env<V>,
-    V: ProductValue,
-    I::Error: From<InterpreterError>,
+    I::Error: LiftFrom<InterpreterError>,
 {
     let results = results
         .iter()
@@ -626,38 +850,4 @@ where
         .map(SSAValue::from)
         .collect::<Vec<_>>();
     interp.write_product(env, results.as_slice(), value)
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct IndeterminateBranch;
-
-impl std::fmt::Display for IndeterminateBranch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "indeterminate scf branch condition")
-    }
-}
-
-impl std::error::Error for IndeterminateBranch {}
-
-impl From<IndeterminateBranch> for InterpreterError {
-    fn from(_: IndeterminateBranch) -> Self {
-        Self::Custom("indeterminate scf branch condition")
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct LoopStepOverflow;
-
-impl std::fmt::Display for LoopStepOverflow {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "scf.for induction variable overflow")
-    }
-}
-
-impl std::error::Error for LoopStepOverflow {}
-
-impl From<LoopStepOverflow> for InterpreterError {
-    fn from(_: LoopStepOverflow) -> Self {
-        Self::Custom("scf.for induction variable overflow")
-    }
 }

@@ -11,7 +11,7 @@
 //!   standalone functions and references are created via `bind`. Suited for
 //!   lowered representations closer to a call graph.
 //!
-//! Both enums share `FunctionBody`, `Call`, and `Return` — they differ only
+//! Both enums share `Function`, `Call`, and `Return` — they differ only
 //! in how functions are *introduced* (inline `Lambda` vs top-level `Bind`).
 
 use kirin::prelude::*;
@@ -23,10 +23,13 @@ pub mod lambda;
 pub mod ret;
 
 pub use bind::Bind;
-pub use body::FunctionBody;
+pub use body::Function;
 pub use call::Call;
 pub use lambda::Lambda;
 pub use ret::Return;
+
+#[deprecated(note = "use Function<T>")]
+pub type FunctionBody<T> = Function<T>;
 
 mod interpret_impl;
 pub mod interpreter_new;
@@ -38,7 +41,7 @@ mod tests;
 #[wraps]
 #[kirin(builders, type = T)]
 pub enum Lexical<T: CompileTimeValue> {
-    FunctionBody(FunctionBody<T>),
+    Function(Function<T>),
     Lambda(Lambda<T>),
     Call(Call<T>),
     Return(Return<T>),
@@ -48,7 +51,7 @@ pub enum Lexical<T: CompileTimeValue> {
 #[wraps]
 #[kirin(builders, type = T)]
 pub enum Lifted<T: CompileTimeValue> {
-    FunctionBody(FunctionBody<T>),
+    Function(Function<T>),
     Bind(Bind<T>),
     Call(Call<T>),
     Return(Return<T>),

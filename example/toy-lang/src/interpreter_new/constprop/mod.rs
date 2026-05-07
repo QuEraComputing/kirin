@@ -1,31 +1,55 @@
 mod ops;
 
+use kirin::ir::{HasBottom, HasTop, Lattice, Product};
 use kirin_arith::ArithValue;
-use kirin_interpreter_new::{AbstractValue, BranchCondition, ProductValue};
+use kirin_interpreter_new::{BranchCondition, HasProductValue};
 use kirin_scf::ForLoopValue;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ConstProp {
     Bottom,
     Const(i64),
+    Product(Box<Product<Self>>),
     Top,
 }
 
-impl AbstractValue for ConstProp {
-    fn bottom() -> Self {
-        Self::Bottom
-    }
-
-    fn top() -> Self {
-        Self::Top
-    }
-
+impl Lattice for ConstProp {
     fn join(&self, other: &Self) -> Self {
         match (self, other) {
             (Self::Bottom, value) | (value, Self::Bottom) => value.clone(),
             (Self::Const(lhs), Self::Const(rhs)) if lhs == rhs => Self::Const(*lhs),
+            (Self::Product(lhs), Self::Product(rhs)) if lhs.len() == rhs.len() => Self::Product(
+                Box::new(lhs.iter().zip(rhs.iter()).map(|(l, r)| l.join(r)).collect()),
+            ),
             _ => Self::Top,
         }
+    }
+
+    fn meet(&self, other: &Self) -> Self {
+        match (self, other) {
+            (Self::Top, value) | (value, Self::Top) => value.clone(),
+            (Self::Const(lhs), Self::Const(rhs)) if lhs == rhs => Self::Const(*lhs),
+            (Self::Product(lhs), Self::Product(rhs)) if lhs.len() == rhs.len() => Self::Product(
+                Box::new(lhs.iter().zip(rhs.iter()).map(|(l, r)| l.meet(r)).collect()),
+            ),
+            _ => Self::Bottom,
+        }
+    }
+
+    fn is_subseteq(&self, other: &Self) -> bool {
+        self.join(other) == *other
+    }
+}
+
+impl HasBottom for ConstProp {
+    fn bottom() -> Self {
+        Self::Bottom
+    }
+}
+
+impl HasTop for ConstProp {
+    fn top() -> Self {
+        Self::Top
     }
 }
 
@@ -34,21 +58,21 @@ impl BranchCondition for ConstProp {
         match self {
             Self::Const(0) => Some(false),
             Self::Const(_) => Some(true),
-            Self::Bottom | Self::Top => None,
+            Self::Bottom | Self::Product(_) | Self::Top => None,
         }
     }
 }
 
-impl ProductValue for ConstProp {
-    fn new_product(values: Vec<Self>) -> Self {
-        match values.as_slice() {
-            [value] => value.clone(),
-            _ => Self::Top,
-        }
+impl HasProductValue for ConstProp {
+    fn from_product(product: Product<Self>) -> Self {
+        Self::Product(Box::new(product))
     }
 
-    fn as_product(&self) -> Option<&[Self]> {
-        None
+    fn as_product(&self) -> Option<&Product<Self>> {
+        match self {
+            Self::Product(product) => Some(product.as_ref()),
+            _ => None,
+        }
     }
 }
 

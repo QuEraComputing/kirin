@@ -1,24 +1,26 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
-use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
+use kirin::prelude::{CompileTimeValue, Dialect, LiftFrom, SSAValue, TryLiftFrom};
 use kirin_interpreter_new::{
     BlockTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
 };
+use thiserror::Error;
 
 use crate::{Arith, CheckedDiv, CheckedRem};
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Arith<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Arith<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    V: Clone
-        + Add<Output = V>
-        + Sub<Output = V>
-        + Mul<Output = V>
-        + Neg<Output = V>
+    I: Env<X::Value, Error = E>,
+    X: BlockTransfer,
+    X::Value: Clone
+        + Add<Output = X::Value>
+        + Sub<Output = X::Value>
+        + Mul<Output = X::Value>
+        + Neg<Output = X::Value>
         + CheckedDiv
         + CheckedRem,
-    E: From<DivisionByZero>,
+    E: LiftFrom<DivisionByZero>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -26,7 +28,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         match self {
             Arith::Add {
                 lhs, rhs, result, ..
@@ -61,7 +63,7 @@ where
                 let value = interp
                     .read(env, *lhs)?
                     .checked_div(interp.read(env, *rhs)?)
-                    .ok_or(DivisionByZero)?;
+                    .ok_or_else(|| E::lift_from(DivisionByZero))?;
                 interp.write(env, SSAValue::from(*result), value)?;
             }
             Arith::Rem {
@@ -70,7 +72,7 @@ where
                 let value = interp
                     .read(env, *lhs)?
                     .checked_rem(interp.read(env, *rhs)?)
-                    .ok_or(DivisionByZero)?;
+                    .ok_or_else(|| E::lift_from(DivisionByZero))?;
                 interp.write(env, SSAValue::from(*result), value)?;
             }
             Arith::Neg {
@@ -85,19 +87,14 @@ where
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[error("division by zero")]
 pub struct DivisionByZero;
 
-impl std::fmt::Display for DivisionByZero {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "division by zero")
-    }
-}
+impl TryLiftFrom<DivisionByZero> for InterpreterError {
+    type Error = core::convert::Infallible;
 
-impl std::error::Error for DivisionByZero {}
-
-impl From<DivisionByZero> for InterpreterError {
-    fn from(_: DivisionByZero) -> Self {
-        Self::Custom("division by zero")
+    fn try_lift_from(_: DivisionByZero) -> Result<Self, Self::Error> {
+        Ok(Self::Custom("division by zero"))
     }
 }

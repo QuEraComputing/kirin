@@ -1,8 +1,8 @@
 use std::collections::HashMap;
 
-use kirin_ir::SSAValue;
+use kirin_ir::{LiftFrom, Product, SSAValue};
 
-use crate::{InterpreterError, ProductValue};
+use crate::InterpreterError;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct EnvIndex(usize);
@@ -25,7 +25,7 @@ pub trait Env<V> {
     fn read(&self, index: EnvIndex, value: SSAValue) -> Result<V, Self::Error>;
     fn write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), Self::Error>;
 
-    fn read_many(&self, index: EnvIndex, values: &[SSAValue]) -> Result<Vec<V>, Self::Error> {
+    fn read_many(&self, index: EnvIndex, values: &[SSAValue]) -> Result<Product<V>, Self::Error> {
         values
             .iter()
             .map(|value| self.read(index, *value))
@@ -36,52 +36,25 @@ pub trait Env<V> {
         &mut self,
         index: EnvIndex,
         values: &[SSAValue],
-        data: V,
+        data: Product<V>,
     ) -> Result<(), Self::Error>
     where
-        V: ProductValue,
-        Self::Error: From<InterpreterError>,
+        Self::Error: LiftFrom<InterpreterError>,
     {
-        match values {
-            [] => match data.as_product() {
-                Some([]) => Ok(()),
-                Some(product) => Err(InterpreterError::ProductArityMismatch {
-                    expected: 0,
-                    actual: product.len(),
-                }
-                .into()),
-                None => Err(InterpreterError::ProductArityMismatch {
-                    expected: 0,
-                    actual: 1,
-                }
-                .into()),
-            },
-            [value] => match data.as_product() {
-                Some(product) if product.len() == 1 => {
-                    self.write(index, *value, product[0].clone())
-                }
-                Some(product) => Err(InterpreterError::ProductArityMismatch {
-                    expected: 1,
-                    actual: product.len(),
-                }
-                .into()),
-                None => self.write(index, *value, data),
-            },
-            values => {
-                let product = data.as_product().ok_or(InterpreterError::ExpectedProduct)?;
-                if product.len() != values.len() {
-                    return Err(InterpreterError::ProductArityMismatch {
-                        expected: values.len(),
-                        actual: product.len(),
-                    }
-                    .into());
-                }
-                for (value, data) in values.iter().copied().zip(product.iter().cloned()) {
-                    self.write(index, value, data)?;
-                }
-                Ok(())
-            }
+        if data.len() != values.len() {
+            return Err(Self::Error::lift_from(
+                InterpreterError::ProductArityMismatch {
+                    expected: values.len(),
+                    actual: data.len(),
+                },
+            ));
         }
+
+        for (value, data) in values.iter().copied().zip(data) {
+            self.write(index, value, data)?;
+        }
+
+        Ok(())
     }
 }
 

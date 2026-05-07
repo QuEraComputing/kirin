@@ -56,6 +56,10 @@ pub enum InterpreterError {
     ExpectedProduct,
     #[error("product arity mismatch: expected {expected}, got {actual}")]
     ProductArityMismatch { expected: usize, actual: usize },
+    #[error("indeterminate branch condition")]
+    IndeterminateBranch,
+    #[error("loop step overflow")]
+    LoopStepOverflow,
     #[error("specialized function {function:?} has no body at stage {stage:?}")]
     MissingFunctionBody {
         function: SpecializedFunction,

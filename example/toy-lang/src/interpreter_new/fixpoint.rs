@@ -1,9 +1,11 @@
 use std::marker::PhantomData;
 
-use kirin::prelude::{CompileStage, Dialect, Function, Pipeline};
+use kirin::prelude::{
+    CompileStage, Dialect, Function, Lattice, LiftFrom, Pipeline, Product, TryLift, TryLiftFrom,
+};
 use kirin_interpreter_new::{
-    AbstractEnvStore, AbstractValue, FunctionFrame, OwnerSemantics, SimpleFixpointInterpreter,
-    Summary, SummaryEffect,
+    AbstractBlockTransfer, AbstractEnvStore, FunctionFrame, OwnerSemantics,
+    SimpleFixpointInterpreter, Summary, SummaryEffect,
 };
 
 use crate::language::{HighLevel, LowLevel};
@@ -69,7 +71,7 @@ type FunctionFixpoint<'ir, L> = SimpleFixpointInterpreter<
     'ir,
     Stage,
     FunctionOwner,
-    ToyFrame<L, ConstProp>,
+    ToyFrame<L, ConstProp, AbstractBlockTransfer<ConstProp>>,
     ToyCompletion<ConstProp>,
     ToyError,
     ReturnSummary,
@@ -81,13 +83,19 @@ impl<'ir, L>
         FunctionFixpoint<'ir, L>,
         FunctionOwner,
         ReturnSummary,
-        ToyFrame<L, ConstProp>,
+        ToyFrame<L, ConstProp, AbstractBlockTransfer<ConstProp>>,
         ToyCompletion<ConstProp>,
         ToyError,
     > for FunctionConstPropSemantics<L>
 where
     L: Dialect,
-    FunctionFrame<L, ConstProp>: Into<ToyFrame<L, ConstProp>>,
+    ToyFrame<L, ConstProp, AbstractBlockTransfer<ConstProp>>:
+        TryLiftFrom<FunctionFrame<L, ConstProp>>,
+    ToyError: From<
+        <ToyFrame<L, ConstProp, AbstractBlockTransfer<ConstProp>> as TryLiftFrom<
+            FunctionFrame<L, ConstProp>,
+        >>::Error,
+    >,
 {
     fn bottom_summary(
         &mut self,
@@ -102,11 +110,14 @@ where
         _interp: &mut FunctionFixpoint<'ir, L>,
         owner: &FunctionOwner,
         _summary: &ReturnSummary,
-    ) -> Result<ToyFrame<L, ConstProp>, ToyError> {
-        Ok(
-            FunctionFrame::<L, ConstProp>::new(owner.stage, owner.function, self.args.clone())
-                .into(),
+    ) -> Result<ToyFrame<L, ConstProp, AbstractBlockTransfer<ConstProp>>, ToyError> {
+        FunctionFrame::<L, ConstProp>::new(
+            owner.stage,
+            owner.function,
+            Product::from_vec(self.args.clone()),
         )
+        .try_lift()
+        .map_err(ToyError::from)
     }
 
     fn complete_owner(
@@ -129,12 +140,14 @@ pub fn analyze_source_constprop_fixpoint(
     function_name: &str,
     args: &[ConstProp],
 ) -> Result<ConstProp, ToyError> {
-    let stage =
-        pipeline
-            .stage_by_name("source")
-            .ok_or(kirin_interpreter_new::InterpreterError::Custom(
-                "missing source stage",
-            ))?;
+    let stage = match pipeline.stage_by_name("source") {
+        Some(stage) => stage,
+        None => {
+            return Err(ToyError::lift_from(
+                kirin_interpreter_new::InterpreterError::Custom("missing source stage"),
+            ));
+        }
+    };
     let function = resolve_function(pipeline, function_name)?;
     let owner = FunctionOwner { stage, function };
     let mut interp: FunctionFixpoint<'_, HighLevel> =
@@ -153,9 +166,14 @@ pub fn analyze_lowered_constprop_fixpoint(
     function_name: &str,
     args: &[ConstProp],
 ) -> Result<ConstProp, ToyError> {
-    let stage = pipeline.stage_by_name("lowered").ok_or(
-        kirin_interpreter_new::InterpreterError::Custom("missing lowered stage"),
-    )?;
+    let stage = match pipeline.stage_by_name("lowered") {
+        Some(stage) => stage,
+        None => {
+            return Err(ToyError::lift_from(
+                kirin_interpreter_new::InterpreterError::Custom("missing lowered stage"),
+            ));
+        }
+    };
     let function = resolve_function(pipeline, function_name)?;
     let owner = FunctionOwner { stage, function };
     let mut interp: FunctionFixpoint<'_, LowLevel> =

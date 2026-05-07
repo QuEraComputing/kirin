@@ -44,17 +44,19 @@ as `push`, `pop`, and `current`. `pop` only removes the top activation.
 Standard block traversal uses a block transfer payload:
 
 ```rust
-pub enum BlockTransfer<V> {
+pub trait BlockTransfer {
+    type Value;
+}
+
+pub enum ConcreteBlockTransfer<V> {
     Jump {
         target: Block,
-        args: Vec<V>,
+        arguments: Product<V>,
     },
-    Branch {
-        true_target: Block,
-        true_args: Vec<V>,
-        false_target: Block,
-        false_args: Vec<V>,
-    },
+}
+
+impl<V> BlockTransfer for ConcreteBlockTransfer<V> {
+    type Value = V;
 }
 ```
 
@@ -165,11 +167,8 @@ directly:
 ```rust
 match interp.dispatch_statement(location, env)? {
     StatementEffect::Done => advance_to_next_statement_or_exit(),
-    StatementEffect::Transfer(BlockTransfer::Jump { target, args }) => {
-        enter_target_block(target, args)
-    }
-    StatementEffect::Transfer(BlockTransfer::Branch { .. }) => {
-        dispatch_branch_transfer()
+    StatementEffect::Transfer(ConcreteBlockTransfer::Jump { target, arguments }) => {
+        enter_target_block(target, arguments)
     }
     StatementEffect::Push(child) => push_child_frame(child),
     StatementEffect::Complete(completion) => FrameEffect::Complete(completion),
@@ -183,9 +182,10 @@ The explicit exit tick is recommended. The alternative is faster by one driver
 tick, but explicit exit makes `BlockExit` observable to tracing, breakpoints,
 and diagnostics.
 
-Standard `BlockFrame` is implemented for the block transfer type that it owns,
-`BlockTransfer<V>`. More specialized forward abstract and backward analysis
-frames can still use their own transfer payloads.
+Standard `BlockFrame` is generic over the block transfer type it receives.
+Concrete interpreters normally use `ConcreteBlockTransfer<V>`, which only has
+`Jump`. Abstract interpreters can use `AbstractBlockTransfer<V>`, which adds
+`Branch`, or define another transfer payload for a different traversal order.
 
 ## RegionFrame
 

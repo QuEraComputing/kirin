@@ -2,7 +2,7 @@ use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use kirin_ir::Pipeline;
+use kirin_ir::{LiftFrom, Pipeline};
 
 use super::{FixpointPhase, OwnerSemantics, Summary, SummaryEffect, WorkItem};
 use crate::{Frame, InterpreterError};
@@ -86,7 +86,7 @@ where
     where
         F: Frame<Self, F, C, E>,
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
         self.ensure_owner(semantics, entry.clone())?;
         self.phase = FixpointPhase::Widen;
@@ -98,7 +98,7 @@ where
     where
         F: Frame<Self, F, C, E>,
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
         self.phase = FixpointPhase::Narrow;
         for owner in self.summaries.keys().cloned().collect::<Vec<_>>() {
@@ -119,7 +119,7 @@ where
     where
         F: Frame<Self, F, C, E>,
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
         while let Some(WorkItem::Analyze(owner)) = self.worklist.pop_front() {
             self.analyze_owner(semantics, owner)?;
@@ -136,7 +136,7 @@ where
     ) -> Result<bool, E>
     where
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
         self.ensure_owner(semantics, owner.clone())?;
         let summary = self
@@ -144,7 +144,8 @@ where
             .get_mut(&owner)
             .ok_or(InterpreterError::Custom(
                 "missing summary after owner initialization",
-            ))?;
+            ))
+            .map_err(E::lift_from)?;
 
         let changed = summary
             .merge(self.phase, candidate, &mut self.strategy)
@@ -159,12 +160,13 @@ where
     where
         F: Frame<Self, F, C, E>,
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
         let summary = self
             .summaries
             .get(&owner)
-            .ok_or(InterpreterError::Custom("missing summary for work item"))?
+            .ok_or(InterpreterError::Custom("missing summary for work item"))
+            .map_err(E::lift_from)?
             .clone();
         let root = semantics.entry_frame(self, &owner, &summary)?;
         let completion = self.run_frame(root)?;
@@ -180,7 +182,7 @@ where
     ) -> Result<(), E>
     where
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
     {
         match effect {
             SummaryEffect::None => Ok(()),

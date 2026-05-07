@@ -1,118 +1,158 @@
 use std::hash::Hash;
 
-use kirin_ir::{Block, CompileStage, Dialect, TryLiftFrom};
+use kirin_ir::{CompileStage, Dialect, LiftFrom, TryLift, TryLiftFrom};
 
 use crate::{
-    AbstractBranchFrame, AbstractInterpreterWithStore, AbstractValue, ConcreteInterpreter, Env,
-    EnvIndex, ForkEnv, FrameEffect, InterpreterError, SimpleFixpointInterpreter,
-    StandardCompletion, Summary,
+    AbstractBlockTransfer, AbstractBranchFrame, AbstractInterpreterWithStore, AbstractValue,
+    ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, ForkEnv, FrameEffect,
+    InterpreterError, SimpleFixpointInterpreter, StandardCompletion, Summary,
 };
 
-pub trait BlockBranchDispatch<L: Dialect, F, C, E, V> {
-    fn dispatch_branch(
+pub trait BlockTransferDispatch<L: Dialect, F, C, E, V, T> {
+    fn dispatch_block_transfer(
         &mut self,
         stage: CompileStage,
         env: EnvIndex,
-        true_target: Block,
-        true_arguments: Vec<V>,
-        false_target: Block,
-        false_arguments: Vec<V>,
+        transfer: T,
     ) -> Result<FrameEffect<F, C>, E>;
 }
 
-impl<'ir, S, L, F, C, E, V> BlockBranchDispatch<L, F, C, E, V>
+impl<'ir, S, L, F, C, E, V> BlockTransferDispatch<L, F, C, E, V, ConcreteBlockTransfer<V>>
     for ConcreteInterpreter<'ir, S, F, C, E, V>
 where
     L: Dialect,
-    E: From<InterpreterError>,
+    F: TryLiftFrom<crate::BlockFrame<L, V, ConcreteBlockTransfer<V>>>,
+    E: LiftFrom<InterpreterError>
+        + From<<F as TryLiftFrom<crate::BlockFrame<L, V, ConcreteBlockTransfer<V>>>>::Error>,
 {
-    fn dispatch_branch(
-        &mut self,
-        _stage: CompileStage,
-        _env: EnvIndex,
-        _true_target: Block,
-        _true_arguments: Vec<V>,
-        _false_target: Block,
-        _false_arguments: Vec<V>,
-    ) -> Result<FrameEffect<F, C>, E> {
-        Err(InterpreterError::Custom("concrete interpreter cannot branch abstractly").into())
-    }
-}
-
-impl<'ir, S, L, F, C, E, V, Store> BlockBranchDispatch<L, F, C, E, V>
-    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
-where
-    L: Dialect,
-    F: From<AbstractBranchFrame<L, V>>,
-    Store: ForkEnv<V>,
-    C: TryLiftFrom<StandardCompletion<V>>,
-    E: From<InterpreterError>
-        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>
-        + From<Store::Error>,
-    V: AbstractValue,
-{
-    fn dispatch_branch(
+    fn dispatch_block_transfer(
         &mut self,
         stage: CompileStage,
         env: EnvIndex,
-        true_target: Block,
-        true_arguments: Vec<V>,
-        false_target: Block,
-        false_arguments: Vec<V>,
+        transfer: ConcreteBlockTransfer<V>,
     ) -> Result<FrameEffect<F, C>, E> {
-        let true_env = self.fork_env(env)?;
-        let false_env = self.fork_env(env)?;
-        Ok(FrameEffect::Continue(
-            AbstractBranchFrame::<L, V>::new(
-                stage,
-                true_env,
-                true_target,
-                true_arguments,
-                false_env,
-                false_target,
-                false_arguments,
-            )
-            .into(),
-        ))
+        match transfer {
+            ConcreteBlockTransfer::Jump { target, arguments } => {
+                crate::BlockFrame::<L, V, ConcreteBlockTransfer<V>>::new(
+                    stage, target, env, arguments,
+                )
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from)
+            }
+        }
     }
 }
 
-impl<'ir, Stage, K, L, F, C, E, V, S, Store> BlockBranchDispatch<L, F, C, E, V>
+impl<'ir, S, L, F, C, E, V, Store> BlockTransferDispatch<L, F, C, E, V, AbstractBlockTransfer<V>>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
+where
+    L: Dialect,
+    F: TryLiftFrom<AbstractBranchFrame<L, V>>,
+    F: TryLiftFrom<crate::BlockFrame<L, V, AbstractBlockTransfer<V>>>,
+    Store: ForkEnv<V>,
+    C: TryLiftFrom<StandardCompletion<V>>,
+    E: LiftFrom<InterpreterError>
+        + From<<F as TryLiftFrom<AbstractBranchFrame<L, V>>>::Error>
+        + From<<F as TryLiftFrom<crate::BlockFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
+        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>
+        + LiftFrom<Store::Error>,
+    V: AbstractValue,
+{
+    fn dispatch_block_transfer(
+        &mut self,
+        stage: CompileStage,
+        env: EnvIndex,
+        transfer: AbstractBlockTransfer<V>,
+    ) -> Result<FrameEffect<F, C>, E> {
+        match transfer {
+            AbstractBlockTransfer::Jump { target, arguments } => {
+                crate::BlockFrame::<L, V, AbstractBlockTransfer<V>>::new(
+                    stage, target, env, arguments,
+                )
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from)
+            }
+            AbstractBlockTransfer::Branch {
+                true_target,
+                true_arguments,
+                false_target,
+                false_arguments,
+            } => {
+                let true_env = self.fork_env(env)?;
+                let false_env = self.fork_env(env)?;
+                AbstractBranchFrame::<L, V>::new(
+                    stage,
+                    true_env,
+                    true_target,
+                    true_arguments,
+                    false_env,
+                    false_target,
+                    false_arguments,
+                )
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from)
+            }
+        }
+    }
+}
+
+impl<'ir, Stage, K, L, F, C, E, V, S, Store>
+    BlockTransferDispatch<L, F, C, E, V, AbstractBlockTransfer<V>>
     for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
 where
     K: Clone + Eq + Hash,
     L: Dialect,
-    F: From<AbstractBranchFrame<L, V>>,
+    F: TryLiftFrom<AbstractBranchFrame<L, V>>,
+    F: TryLiftFrom<crate::BlockFrame<L, V, AbstractBlockTransfer<V>>>,
     S: Summary,
     Store: ForkEnv<V>,
     C: TryLiftFrom<StandardCompletion<V>>,
-    E: From<InterpreterError>
+    E: LiftFrom<InterpreterError>
+        + From<<F as TryLiftFrom<AbstractBranchFrame<L, V>>>::Error>
+        + From<<F as TryLiftFrom<crate::BlockFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
         + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>
-        + From<<Store as Env<V>>::Error>,
+        + LiftFrom<<Store as Env<V>>::Error>,
     V: AbstractValue,
 {
-    fn dispatch_branch(
+    fn dispatch_block_transfer(
         &mut self,
         stage: CompileStage,
         env: EnvIndex,
-        true_target: Block,
-        true_arguments: Vec<V>,
-        false_target: Block,
-        false_arguments: Vec<V>,
+        transfer: AbstractBlockTransfer<V>,
     ) -> Result<FrameEffect<F, C>, E> {
-        let true_env = self.fork_env(env)?;
-        let false_env = self.fork_env(env)?;
-        Ok(FrameEffect::Continue(
-            AbstractBranchFrame::<L, V>::new(
-                stage,
-                true_env,
+        match transfer {
+            AbstractBlockTransfer::Jump { target, arguments } => {
+                crate::BlockFrame::<L, V, AbstractBlockTransfer<V>>::new(
+                    stage, target, env, arguments,
+                )
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from)
+            }
+            AbstractBlockTransfer::Branch {
                 true_target,
                 true_arguments,
-                false_env,
                 false_target,
                 false_arguments,
-            )
-            .into(),
-        ))
+            } => {
+                let true_env = self.fork_env(env)?;
+                let false_env = self.fork_env(env)?;
+                AbstractBranchFrame::<L, V>::new(
+                    stage,
+                    true_env,
+                    true_target,
+                    true_arguments,
+                    false_env,
+                    false_target,
+                    false_arguments,
+                )
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from)
+            }
+        }
     }
 }

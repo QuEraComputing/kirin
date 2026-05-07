@@ -1,7 +1,8 @@
-use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
+use kirin::prelude::{CompileTimeValue, Dialect, LiftFrom, Product, SSAValue, TryLiftFrom};
 use kirin_interpreter_new::{
-    BlockTransfer, Env, Interpretable, InterpreterError, Location, ProductValue, StatementEffect,
+    BlockTransfer, Env, HasProductValue, Interpretable, InterpreterError, Location, StatementEffect,
 };
+use thiserror::Error;
 
 use crate::{Get, Len, NewTuple, Tuple, Unpack};
 
@@ -10,11 +11,12 @@ pub trait TupleIndexValue: Sized {
     fn from_tuple_index(index: usize) -> Self;
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for NewTuple<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for NewTuple<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    V: ProductValue,
+    I: Env<X::Value, Error = E>,
+    X: BlockTransfer,
+    X::Value: HasProductValue,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -22,23 +24,28 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         let values = self
             .args
             .iter()
             .map(|arg| interp.read(env, *arg))
-            .collect::<Result<Vec<_>, _>>()?;
-        interp.write(env, SSAValue::from(self.result), V::new_product(values))?;
+            .collect::<Result<Product<_>, _>>()?;
+        interp.write(
+            env,
+            SSAValue::from(self.result),
+            X::Value::from_product(values),
+        )?;
         Ok(StatementEffect::Done)
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Unpack<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Unpack<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    V: ProductValue,
-    E: From<InterpreterError>,
+    I: Env<X::Value, Error = E>,
+    X: BlockTransfer,
+    X::Value: HasProductValue,
+    E: LiftFrom<ExpectedTuple> + LiftFrom<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -46,7 +53,7 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         let source = interp.read(env, self.source)?;
         let results = self
             .results
@@ -54,17 +61,22 @@ where
             .copied()
             .map(SSAValue::from)
             .collect::<Vec<_>>();
-        interp.write_product(env, results.as_slice(), source)?;
+        let product = source
+            .as_product()
+            .ok_or_else(|| E::lift_from(ExpectedTuple))?
+            .clone();
+        interp.write_product(env, results.as_slice(), product)?;
         Ok(StatementEffect::Done)
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Get<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Get<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    V: ProductValue + TupleIndexValue,
-    E: From<ExpectedTuple> + From<InvalidTupleIndex> + From<TupleIndexOutOfBounds>,
+    I: Env<X::Value, Error = E>,
+    X: BlockTransfer,
+    X::Value: HasProductValue + TupleIndexValue,
+    E: LiftFrom<ExpectedTuple> + LiftFrom<InvalidTupleIndex> + LiftFrom<TupleIndexOutOfBounds>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -72,29 +84,30 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         let source = interp.read(env, self.source)?;
         let index = interp
             .read(env, self.index)?
             .as_tuple_index()
-            .ok_or(InvalidTupleIndex)?;
+            .ok_or_else(|| E::lift_from(InvalidTupleIndex))?;
         let value = source
             .as_product()
-            .ok_or(ExpectedTuple)?
+            .ok_or_else(|| E::lift_from(ExpectedTuple))?
             .get(index)
             .cloned()
-            .ok_or(TupleIndexOutOfBounds)?;
+            .ok_or_else(|| E::lift_from(TupleIndexOutOfBounds))?;
         interp.write(env, SSAValue::from(self.result), value)?;
         Ok(StatementEffect::Done)
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Len<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Len<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    V: ProductValue + TupleIndexValue,
-    E: From<ExpectedTuple>,
+    I: Env<X::Value, Error = E>,
+    X: BlockTransfer,
+    X::Value: HasProductValue + TupleIndexValue,
+    E: LiftFrom<ExpectedTuple>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -102,23 +115,31 @@ where
         _location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         let source = interp.read(env, self.source)?;
-        let len = source.as_product().ok_or(ExpectedTuple)?.len();
-        interp.write(env, SSAValue::from(self.result), V::from_tuple_index(len))?;
+        let len = source
+            .as_product()
+            .ok_or_else(|| E::lift_from(ExpectedTuple))?
+            .len();
+        interp.write(
+            env,
+            SSAValue::from(self.result),
+            X::Value::from_tuple_index(len),
+        )?;
         Ok(StatementEffect::Done)
     }
 }
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, BlockTransfer<V>> for Tuple<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Tuple<T>
 where
     L: Dialect,
-    I: Env<V, Error = E>,
-    V: ProductValue + TupleIndexValue,
-    E: From<ExpectedTuple>
-        + From<InvalidTupleIndex>
-        + From<TupleIndexOutOfBounds>
-        + From<InterpreterError>,
+    I: Env<X::Value, Error = E>,
+    X: BlockTransfer,
+    X::Value: HasProductValue + TupleIndexValue,
+    E: LiftFrom<ExpectedTuple>
+        + LiftFrom<InvalidTupleIndex>
+        + LiftFrom<TupleIndexOutOfBounds>
+        + LiftFrom<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -126,96 +147,68 @@ where
         location: Location,
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, BlockTransfer<V>>, E> {
+    ) -> Result<StatementEffect<F, C, X>, E> {
         match self {
-            Tuple::NewTuple(op) => {
-                <NewTuple<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
-                    op, location, env, interp,
-                )
-            }
+            Tuple::NewTuple(op) => <NewTuple<T> as Interpretable<L, I, F, C, E, X>>::interpret(
+                op, location, env, interp,
+            ),
             Tuple::Unpack(op) => {
-                <Unpack<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
-                    op, location, env, interp,
-                )
+                <Unpack<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
             }
             Tuple::Get(op) => {
-                <Get<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
-                    op, location, env, interp,
-                )
+                <Get<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
             }
             Tuple::Len(op) => {
-                <Len<T> as Interpretable<L, I, F, C, E, BlockTransfer<V>>>::interpret(
-                    op, location, env, interp,
-                )
+                <Len<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
             }
         }
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[error("expected tuple value")]
 pub struct ExpectedTuple;
 
-impl std::fmt::Display for ExpectedTuple {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "expected tuple value")
+impl TryLiftFrom<ExpectedTuple> for InterpreterError {
+    type Error = core::convert::Infallible;
+
+    fn try_lift_from(_: ExpectedTuple) -> Result<Self, Self::Error> {
+        Ok(Self::Custom("expected tuple value"))
     }
 }
 
-impl std::error::Error for ExpectedTuple {}
-
-impl From<ExpectedTuple> for InterpreterError {
-    fn from(_: ExpectedTuple) -> Self {
-        Self::Custom("expected tuple value")
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[error("invalid tuple index")]
 pub struct InvalidTupleIndex;
 
-impl std::fmt::Display for InvalidTupleIndex {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "invalid tuple index")
+impl TryLiftFrom<InvalidTupleIndex> for InterpreterError {
+    type Error = core::convert::Infallible;
+
+    fn try_lift_from(_: InvalidTupleIndex) -> Result<Self, Self::Error> {
+        Ok(Self::Custom("invalid tuple index"))
     }
 }
 
-impl std::error::Error for InvalidTupleIndex {}
-
-impl From<InvalidTupleIndex> for InterpreterError {
-    fn from(_: InvalidTupleIndex) -> Self {
-        Self::Custom("invalid tuple index")
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[error("tuple index out of bounds")]
 pub struct TupleIndexOutOfBounds;
 
-impl std::fmt::Display for TupleIndexOutOfBounds {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "tuple index out of bounds")
+impl TryLiftFrom<TupleIndexOutOfBounds> for InterpreterError {
+    type Error = core::convert::Infallible;
+
+    fn try_lift_from(_: TupleIndexOutOfBounds) -> Result<Self, Self::Error> {
+        Ok(Self::Custom("tuple index out of bounds"))
     }
 }
 
-impl std::error::Error for TupleIndexOutOfBounds {}
-
-impl From<TupleIndexOutOfBounds> for InterpreterError {
-    fn from(_: TupleIndexOutOfBounds) -> Self {
-        Self::Custom("tuple index out of bounds")
-    }
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, Error, PartialEq, Eq)]
+#[error("tuple arity mismatch")]
 pub struct TupleArityMismatch;
 
-impl std::fmt::Display for TupleArityMismatch {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "tuple arity mismatch")
-    }
-}
+impl TryLiftFrom<TupleArityMismatch> for InterpreterError {
+    type Error = core::convert::Infallible;
 
-impl std::error::Error for TupleArityMismatch {}
-
-impl From<TupleArityMismatch> for InterpreterError {
-    fn from(_: TupleArityMismatch) -> Self {
-        Self::Custom("tuple arity mismatch")
+    fn try_lift_from(_: TupleArityMismatch) -> Result<Self, Self::Error> {
+        Ok(Self::Custom("tuple arity mismatch"))
     }
 }

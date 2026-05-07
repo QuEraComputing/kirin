@@ -8,14 +8,14 @@ use kirin::prelude::*;
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = T)]
 #[chumsky(format = "fn {:name}{sig} {body}")]
-pub struct FunctionBody<T: CompileTimeValue> {
+pub struct Function<T: CompileTimeValue> {
     pub(crate) body: Region,
     pub(crate) sig: Signature<T>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
 
-impl<T: CompileTimeValue> HasRegionBody for FunctionBody<T> {
+impl<T: CompileTimeValue> HasRegionBody for Function<T> {
     fn region(&self) -> &Region {
         &self.body
     }

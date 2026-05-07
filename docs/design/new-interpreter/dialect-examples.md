@@ -179,7 +179,8 @@ pub enum MyError {
 }
 
 pub enum MyTransfer<V> {
-    Block(BlockTransfer<V>),
+    ConcreteBlock(ConcreteBlockTransfer<V>),
+    AbstractBlock(AbstractBlockTransfer<V>),
 }
 
 pub enum MySummary<V> {
@@ -231,9 +232,11 @@ owns its own projection/bubbling behavior.
 ## Specializing For Abstract Interpretation
 
 The same dialect can provide different `Interpretable` impls for different
-interpreter families. Standard block traversal may use `BlockTransfer<V>`, while a
-forward abstract interpreter may use `ForwardTransfer<AbstractValue>`, and a
-backward analysis may use `BackwardTransfer<LivenessRequirement>`.
+interpreter families. Standard concrete block traversal may use
+`ConcreteBlockTransfer<V>`, while a forward abstract interpreter may use
+`AbstractBlockTransfer<AbstractValue>` or a dialect-local
+`ForwardTransfer<AbstractValue>`, and a backward analysis may use
+`BackwardTransfer<LivenessRequirement>`.
 
 This means dialect authors can choose different frame types for different
 traversal orders. A backward liveness frame does not have to look like a

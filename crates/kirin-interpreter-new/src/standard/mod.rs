@@ -9,12 +9,12 @@ mod statement;
 
 pub use abstract_branch::{AbstractBranchFrame, AbstractBranchState};
 pub use block::BlockFrame;
-pub use branch::BlockBranchDispatch;
-pub use call::{CallFrame, CallResultBinding, Callee};
+pub use branch::BlockTransferDispatch;
+pub use call::{CallFrame, Callee};
 pub use frame::StandardFrame;
 pub use function::{
-    FunctionAccess, FunctionBodyDispatch, FunctionBodyEntry, FunctionFrame,
-    SpecializedFunctionFrame, SpecializedFunctionState, StagedFunctionFrame,
+    FunctionAccess, FunctionBodyDispatch, FunctionEntry, FunctionFrame, SpecializedFunctionFrame,
+    SpecializedFunctionState, StagedFunctionFrame,
 };
 pub use region::RegionFrame;
 pub use statement::StatementFrame;

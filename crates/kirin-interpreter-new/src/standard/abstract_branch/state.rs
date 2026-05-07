@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use kirin_ir::Block;
+use kirin_ir::{Block, Product};
 
 use crate::{EnvIndex, HasLocation, Location, Position, StandardCompletion, Traversal};
 
@@ -16,10 +16,10 @@ pub enum AbstractBranchState<V> {
     WaitingTrue {
         true_env: EnvIndex,
         true_target: Block,
-        true_arguments: Vec<V>,
+        true_arguments: Product<V>,
         false_env: EnvIndex,
         false_target: Block,
-        false_arguments: Vec<V>,
+        false_arguments: Product<V>,
     },
     WaitingFalse {
         false_env: EnvIndex,
@@ -32,10 +32,10 @@ impl<L, V> AbstractBranchFrame<L, V> {
         stage: kirin_ir::CompileStage,
         true_env: EnvIndex,
         true_target: Block,
-        true_arguments: Vec<V>,
+        true_arguments: Product<V>,
         false_env: EnvIndex,
         false_target: Block,
-        false_arguments: Vec<V>,
+        false_arguments: Product<V>,
     ) -> Self {
         Self {
             location: Location::new(

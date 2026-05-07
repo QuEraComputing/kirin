@@ -27,28 +27,28 @@ pub enum HighLevelCursor<V: Clone> {
 }
 
 impl<V: Clone> TryLiftFrom<BlockCursor<V, HighLevel>> for HighLevelCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: BlockCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(HighLevelCursor::Block(c))
     }
 }
 
 impl<V: Clone> TryLiftFrom<SCFCursorHigh<V>> for HighLevelCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: SCFCursorHigh<V>) -> Result<Self, Self::Error> {
         Ok(HighLevelCursor::Scf(c))
     }
 }
 
 impl<V: Clone> TryLiftFrom<IfCursor<V, HighLevel>> for HighLevelCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: IfCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(HighLevelCursor::Scf(SCFCursor::If(c)))
     }
 }
 
 impl<V: Clone> TryLiftFrom<ForCursor<V, HighLevel>> for HighLevelCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: ForCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(HighLevelCursor::Scf(SCFCursor::For(c)))
     }
@@ -98,28 +98,28 @@ pub enum HighLevelAbstractCursor<V: Clone> {
 }
 
 impl<V: Clone> TryLiftFrom<BlockCursor<V, HighLevel>> for HighLevelAbstractCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: BlockCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(HighLevelAbstractCursor::Block(c))
     }
 }
 
 impl<V: Clone> TryLiftFrom<AbstractSCFCursorHigh<V>> for HighLevelAbstractCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: AbstractSCFCursorHigh<V>) -> Result<Self, Self::Error> {
         Ok(HighLevelAbstractCursor::Scf(c))
     }
 }
 
 impl<V: Clone> TryLiftFrom<AbstractIfCursor<V, HighLevel>> for HighLevelAbstractCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: AbstractIfCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(HighLevelAbstractCursor::Scf(AbstractSCFCursor::If(c)))
     }
 }
 
 impl<V: Clone> TryLiftFrom<AbstractForCursor<V, HighLevel>> for HighLevelAbstractCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: AbstractForCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(HighLevelAbstractCursor::Scf(AbstractSCFCursor::For(c)))
     }
@@ -195,35 +195,35 @@ pub enum MultiCursor<V: Clone> {
 }
 
 impl<V: Clone> TryLiftFrom<BlockCursor<V, HighLevel>> for MultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: BlockCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(MultiCursor::High(c))
     }
 }
 
 impl<V: Clone> TryLiftFrom<IfCursor<V, HighLevel>> for MultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: IfCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(MultiCursor::Scf(SCFCursor::If(c)))
     }
 }
 
 impl<V: Clone> TryLiftFrom<ForCursor<V, HighLevel>> for MultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: ForCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(MultiCursor::Scf(SCFCursor::For(c)))
     }
 }
 
 impl<V: Clone> TryLiftFrom<SCFCursorHigh<V>> for MultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: SCFCursorHigh<V>) -> Result<Self, Self::Error> {
         Ok(MultiCursor::Scf(c))
     }
 }
 
 impl<V: Clone> TryLiftFrom<BlockCursor<V, LowLevel>> for MultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: BlockCursor<V, LowLevel>) -> Result<Self, Self::Error> {
         Ok(MultiCursor::Low(c))
     }
@@ -283,35 +283,35 @@ pub enum AbstractMultiCursor<V: Clone> {
 }
 
 impl<V: Clone> TryLiftFrom<BlockCursor<V, HighLevel>> for AbstractMultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: BlockCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(AbstractMultiCursor::HighBlock(c))
     }
 }
 
 impl<V: Clone> TryLiftFrom<AbstractSCFCursorHigh<V>> for AbstractMultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: AbstractSCFCursorHigh<V>) -> Result<Self, Self::Error> {
         Ok(AbstractMultiCursor::HighScf(c))
     }
 }
 
 impl<V: Clone> TryLiftFrom<AbstractIfCursor<V, HighLevel>> for AbstractMultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: AbstractIfCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(AbstractMultiCursor::HighScf(AbstractSCFCursor::If(c)))
     }
 }
 
 impl<V: Clone> TryLiftFrom<AbstractForCursor<V, HighLevel>> for AbstractMultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: AbstractForCursor<V, HighLevel>) -> Result<Self, Self::Error> {
         Ok(AbstractMultiCursor::HighScf(AbstractSCFCursor::For(c)))
     }
 }
 
 impl<V: Clone> TryLiftFrom<BlockCursor<V, LowLevel>> for AbstractMultiCursor<V> {
-    type Error = kirin_interpreter_20::algebra::LiftError;
+    type Error = core::convert::Infallible;
     fn try_lift_from(c: BlockCursor<V, LowLevel>) -> Result<Self, Self::Error> {
         Ok(AbstractMultiCursor::Low(c))
     }

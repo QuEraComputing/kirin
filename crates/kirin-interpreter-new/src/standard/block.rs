@@ -1,30 +1,31 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{Block, Dialect, GetInfo, SSAValue, TryLiftFrom};
+use kirin_ir::{Block, Dialect, GetInfo, LiftFrom, Product, SSAValue, TryLift, TryLiftFrom};
 
 use crate::{
-    BlockTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError, Location,
-    Position, StageAccess, StandardCompletion, StatementDispatch, StatementEffect, Traversal,
+    ConcreteBlockTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError,
+    Location, Position, StageAccess, StandardCompletion, StatementDispatch, StatementEffect,
+    Traversal,
 };
 
-use super::BlockBranchDispatch;
+use super::BlockTransferDispatch;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-pub struct BlockFrame<L, V> {
+pub struct BlockFrame<L, V, T = ConcreteBlockTransfer<V>> {
     pub location: Location,
     pub block: Block,
     pub traversal: Traversal<kirin_ir::Statement>,
     pub env: EnvIndex,
-    pub incoming_args: Vec<V>,
-    _marker: PhantomData<fn() -> L>,
+    pub incoming_args: Product<V>,
+    _marker: PhantomData<fn() -> (L, T)>,
 }
 
-impl<L, V> BlockFrame<L, V> {
+impl<L, V, T> BlockFrame<L, V, T> {
     pub fn new(
         stage: kirin_ir::CompileStage,
         block: Block,
         env: EnvIndex,
-        incoming_args: Vec<V>,
+        incoming_args: Product<V>,
     ) -> Self {
         let traversal = Traversal::Entry;
         Self {
@@ -47,18 +48,18 @@ impl<L, V> BlockFrame<L, V> {
     }
 }
 
-impl<L, V> HasLocation for BlockFrame<L, V> {
+impl<L, V, T> HasLocation for BlockFrame<L, V, T> {
     fn location(&self) -> Location {
         self.location
     }
 }
 
-impl<L, V> BlockFrame<L, V> {
+impl<L, V, T> BlockFrame<L, V, T> {
     fn bind_block_args<I, E>(&self, interp: &mut I) -> Result<(), E>
     where
         I: StageAccess<L, Error = E> + Env<V, Error = E>,
         L: Dialect,
-        E: From<InterpreterError>,
+        E: LiftFrom<InterpreterError>,
         V: Clone,
     {
         let block_args = {
@@ -67,11 +68,10 @@ impl<L, V> BlockFrame<L, V> {
         };
 
         if block_args.len() != self.incoming_args.len() {
-            return Err(InterpreterError::UnexpectedCompletion {
+            return Err(E::lift_from(InterpreterError::UnexpectedCompletion {
                 location: self.location,
                 completion: "block argument arity mismatch",
-            }
-            .into());
+            }));
         }
 
         for (argument, value) in block_args
@@ -88,8 +88,8 @@ impl<L, V> BlockFrame<L, V> {
     where
         I: StageAccess<L, Error = E> + Env<V, Error = E>,
         L: Dialect,
-        F: From<BlockFrame<L, V>>,
-        E: From<InterpreterError>,
+        F: TryLiftFrom<BlockFrame<L, V, T>>,
+        E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>,
         V: Clone,
     {
         self.bind_block_args(interp)?;
@@ -98,12 +98,16 @@ impl<L, V> BlockFrame<L, V> {
             self.block.first_statement(stage)
         };
         match first_statement {
-            Some(statement) => Ok(FrameEffect::Continue(
-                self.with_traversal(Traversal::Active(statement)).into(),
-            )),
-            None => Ok(FrameEffect::Continue(
-                self.with_traversal(Traversal::Exit).into(),
-            )),
+            Some(statement) => self
+                .with_traversal(Traversal::Active(statement))
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from),
+            None => self
+                .with_traversal(Traversal::Exit)
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from),
         }
     }
 
@@ -111,12 +115,16 @@ impl<L, V> BlockFrame<L, V> {
     where
         I: StageAccess<L, Error = E>,
         L: Dialect,
-        F: From<BlockFrame<L, V>>,
-        E: From<InterpreterError>,
+        F: TryLiftFrom<BlockFrame<L, V, T>>,
+        E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>,
     {
         let statement = match self.traversal {
             Traversal::Active(statement) => statement,
-            _ => return Err(InterpreterError::ExpectedActiveStatement(self.location).into()),
+            _ => {
+                return Err(E::lift_from(InterpreterError::ExpectedActiveStatement(
+                    self.location,
+                )));
+            }
         };
         let next_statement = {
             let stage = interp.stage_info(self.location.stage)?;
@@ -129,12 +137,16 @@ impl<L, V> BlockFrame<L, V> {
             }
         };
         match next_statement {
-            Some(statement) => Ok(FrameEffect::Continue(
-                self.with_traversal(Traversal::Active(statement)).into(),
-            )),
-            None => Ok(FrameEffect::Continue(
-                self.with_traversal(Traversal::Exit).into(),
-            )),
+            Some(statement) => self
+                .with_traversal(Traversal::Active(statement))
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from),
+            None => self
+                .with_traversal(Traversal::Exit)
+                .try_lift()
+                .map(FrameEffect::Continue)
+                .map_err(E::from),
         }
     }
 
@@ -147,27 +159,20 @@ impl<L, V> BlockFrame<L, V> {
             StandardCompletion::BlockDone,
         )?))
     }
-
-    fn jump<F, C>(self, target: Block, arguments: Vec<V>) -> FrameEffect<F, C>
-    where
-        F: From<BlockFrame<L, V>>,
-    {
-        FrameEffect::Continue(
-            BlockFrame::<L, V>::new(self.location.stage, target, self.env, arguments).into(),
-        )
-    }
 }
 
-impl<I, L, F, C, E, V> Frame<I, F, C, E> for BlockFrame<L, V>
+impl<I, L, F, C, E, V, T> Frame<I, F, C, E> for BlockFrame<L, V, T>
 where
     I: StageAccess<L, Error = E>
-        + StatementDispatch<L, F, C, E, BlockTransfer<V>>
-        + BlockBranchDispatch<L, F, C, E, V>
+        + StatementDispatch<L, F, C, E, T>
+        + BlockTransferDispatch<L, F, C, E, V, T>
         + Env<V, Error = E>,
     L: Dialect,
-    F: From<BlockFrame<L, V>>,
+    F: TryLiftFrom<BlockFrame<L, V, T>>,
     C: TryLiftFrom<StandardCompletion<V>>,
-    E: From<InterpreterError> + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+    E: LiftFrom<InterpreterError>
+        + From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>
+        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
     V: Clone,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
@@ -183,24 +188,11 @@ where
                 );
                 match interp.dispatch_statement(location, self.env)? {
                     StatementEffect::Done => self.advance_after_active(interp),
-                    StatementEffect::Transfer(BlockTransfer::Jump { target, arguments }) => {
-                        Ok(self.jump(target, arguments))
+                    StatementEffect::Transfer(transfer) => {
+                        interp.dispatch_block_transfer(self.location.stage, self.env, transfer)
                     }
-                    StatementEffect::Transfer(BlockTransfer::Branch {
-                        true_target,
-                        true_arguments,
-                        false_target,
-                        false_arguments,
-                    }) => interp.dispatch_branch(
-                        self.location.stage,
-                        self.env,
-                        true_target,
-                        true_arguments,
-                        false_target,
-                        false_arguments,
-                    ),
                     StatementEffect::Push(child) => Ok(FrameEffect::Push {
-                        parent: self.into(),
+                        parent: self.try_lift()?,
                         child,
                     }),
                     StatementEffect::Complete(completion) => Ok(FrameEffect::Complete(completion)),

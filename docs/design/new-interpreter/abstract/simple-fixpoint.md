@@ -403,7 +403,7 @@ match interp.dispatch_statement(location, env)? {
     StatementEffect::Done => advance_to_next_statement_or_exit(),
     StatementEffect::Push(child) => push_statement_frame_with_child(child),
     StatementEffect::Complete(completion) => FrameEffect::Complete(completion),
-    StatementEffect::Transfer(BlockTransfer::Branch { .. }) => {
+    StatementEffect::Transfer(AbstractBlockTransfer::Branch { .. }) => {
         fork_envs_and_push_abstract_branch_frame()
     }
 }

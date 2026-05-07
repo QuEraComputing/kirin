@@ -32,7 +32,8 @@ pub use language::{
 };
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice, Widen};
 pub use lift::{
-    Lift, LiftError, Project, ProjectError, TryLift, TryLiftFrom, TryProject, TryProjectTo,
+    Lift, LiftError, LiftFrom, Project, ProjectError, TryLift, TryLiftFrom, TryProject,
+    TryProjectTo,
 };
 pub use node::{
     Block, BlockArgument, BlockInfo, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CompileStage,
@@ -61,8 +62,8 @@ pub mod prelude {
         SignatureSemantics, StageInfo, StageMeta, Statement,
     };
     pub use crate::{
-        CompileTimeValue, HasProduct, Lift, LiftError, Placeholder, Product, Project, ProjectError,
-        TryLift, TryLiftFrom, TryProject, TryProjectTo, Typeof,
+        CompileTimeValue, HasProduct, Lift, LiftError, LiftFrom, Placeholder, Product, Project,
+        ProjectError, TryLift, TryLiftFrom, TryProject, TryProjectTo, Typeof,
     };
 }
 
