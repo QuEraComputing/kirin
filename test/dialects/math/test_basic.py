@@ -237,6 +237,16 @@ def test_lgamma():
 
 
 @basic
+def log_func(x, base):
+    return math.log(x, base)
+
+
+def test_log():
+    truth = pymath.log(0.42, 0.42)
+    assert (log_func(0.42, 0.42) - truth) < 1e-6
+
+
+@basic
 def log10_func(x):
     return math.log10(x)
 
