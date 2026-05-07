@@ -124,6 +124,11 @@ class MathMethodTable(MethodTable):
         values = frame.get_values(stmt.args)
         return (math.lgamma(values[0]),)
 
+    @impl(stmts.log)
+    def log(self, interp, frame: Frame, stmt: stmts.log):
+        values = frame.get_values(stmt.args)
+        return (math.log(values[0], values[1]),)
+
     @impl(stmts.log10)
     def log10(self, interp, frame: Frame, stmt: stmts.log10):
         values = frame.get_values(stmt.args)

@@ -238,6 +238,17 @@ class lgamma(ir.Statement):
 
 
 @statement(dialect=dialect)
+class log(ir.Statement):
+    """log statement, wrapping the math.log function"""
+
+    name = "log"
+    traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
+    x: ir.SSAValue = info.argument(types.Float)
+    base: ir.SSAValue = info.argument(types.Float)
+    result: ir.ResultValue = info.result(types.Float)
+
+
+@statement(dialect=dialect)
 class log10(ir.Statement):
     """log10 statement, wrapping the math.log10 function"""
 
