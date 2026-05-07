@@ -54,8 +54,7 @@ class TypeInference(Forward[types.TypeAttribute]):
             signature: Signature[types.TypeAttribute] | None = trait.get_signature(node)
             if signature is not None:
                 args = (args[0],) + tuple(
-                    input.meet(arg)
-                    for input, arg in zip(signature.inputs, args[1:])
+                    input.meet(arg) for input, arg in zip(signature.inputs, args[1:])
                 )
         else:
             signature = None

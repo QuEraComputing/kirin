@@ -19,7 +19,6 @@ from .value import (
     YieldValue,
     ReturnValue,
     RegionResult,
-    SpecialValue,
     StatementResult,
 )
 from .exceptions import InterpreterError, StackOverflowError
