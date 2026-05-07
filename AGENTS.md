@@ -27,13 +27,9 @@ cargo nextest run -p toy-lang    # Run toy language example tests
 cargo build -p toy-qc            # Build the toy quantum-circuit example binary
 cargo run -p toy-qc -- parse example/toy-qc/programs/bell_pair.kirin  # Parse a toy-qc example program from repo root
 cargo nextest run -p toy-qc      # Run toy-qc example tests
-cargo build -p kirin-interpreter-2  # Build the interpreter-2 runtime crate
-cargo nextest run -p kirin-interpreter-2  # Run interpreter-2 crate tests
-cargo build -p kirin-interpreter-4  # Build the interpreter-4 runtime crate
-cargo nextest run -p kirin-interpreter-4  # Run interpreter-4 crate tests
-cargo nextest run -p kirin-interpreter-4 -E 'test(test_cross_stage_call)'  # Run interpreter-4 multi-stage cross-stage call test
-cargo build -p kirin-interpreter-5  # Build the interpreter-5 runtime crate
-cargo nextest run -p kirin-interpreter-5  # Run interpreter-5 crate tests
+cargo build -p kirin-interpreter-new  # Build the new frame-fusion interpreter crate
+cargo nextest run -p kirin-interpreter-new  # Run new interpreter crate tests
+cargo nextest run -p toy-lang -E 'test(interpreter_new)'  # Run toy-lang new interpreter tests
 ```
 
 Rust edition 2024. No `rust-toolchain.toml`; uses the default toolchain.
@@ -113,7 +109,7 @@ Named subsystem groupings for scoping reviews and refactors:
 | `ir` | kirin-ir |
 | `parser` | kirin-chumsky, kirin-derive-chumsky |
 | `printer` | kirin-prettyless, kirin-derive-prettyless |
-| `interpreter` | kirin-interpreter, kirin-derive-interpreter |
+| `interpreter` | kirin-interpreter, kirin-interpreter-new, kirin-derive-interpreter |
 | `derive` | kirin-derive-toolkit, kirin-derive-ir, kirin-derive-chumsky, kirin-derive-interpreter, kirin-derive-prettyless |
 | `dialects` | kirin-cf, kirin-scf, kirin-constant, kirin-arith, kirin-bitwise, kirin-cmp, kirin-function |
 
@@ -128,7 +124,7 @@ Each dialect crate targets a specific domain. Reviewers (especially the Dialect 
 | kirin-function | PL / Lambda Calculus | Function application, closures, specialization, parametric polymorphism, calling conventions |
 | kirin-constant | Compile-time Evaluation | Constant folding, staged computation, compile-time value semantics |
 | kirin-ir (core) | Compiler IR Design | MLIR (Lattner et al. 2020), SSA form, regions/blocks/operations, arena-based IR |
-| kirin-interpreter | Abstract Interpretation | Cousot & Cousot framework, lattice-based analysis, widening/narrowing, fixpoint computation |
+| kirin-interpreter-new | Abstract Interpretation | Cousot & Cousot framework, lattice-based analysis, widening/narrowing, fixpoint computation |
 
 For user-defined dialects not in this table, ask the user for domain context during review planning.
 
@@ -144,12 +140,9 @@ For user-defined dialects not in this table, ask the user for domain context dur
 - `kirin-derive-chumsky` — `#[derive(HasParser, PrettyPrint)]` (proc-macro + code generation)
 
 **Interpreter:**
-- `kirin-interpreter` — Interpreter traits, `StackInterpreter`, `AbstractInterpreter`
-- `kirin-interpreter-2` — Next-generation interpreter runtime and shell/control APIs
-- `kirin-interpreter-3` — Runtime architecture experiments (machine/effect/value model prototypes)
-- `kirin-interpreter-4` — Current execution-seed runtime iteration (frame/cursor/effect model)
-- `kirin-interpreter-5` — Env/ConcreteDomain/cursor-stack interpreter (single and multi-stage)
-- `kirin-derive-interpreter` — `#[derive(Interpretable, CallSemantics)]`
+- `kirin-interpreter` — legacy interpreter traits, `StackInterpreter`, `AbstractInterpreter`
+- `kirin-interpreter-new` — current frame-fusion interpreter framework for concrete and abstract interpretation
+- `kirin-derive-interpreter` — legacy `#[derive(Interpretable, CallSemantics)]`
 
 **Dialects:**
 - `kirin-cf`, `kirin-scf`, `kirin-constant`, `kirin-arith`, `kirin-bitwise`, `kirin-cmp`, `kirin-function`
@@ -193,17 +186,27 @@ For user-defined dialects not in this table, ask the user for domain context dur
 
 ## Interpreter Conventions
 
-- **Trait decomposition**: The interpreter framework uses three composable sub-traits: `ValueStore` (read/write/write_ssa), `StageAccess<'ir>` (pipeline/active_stage + stage resolution), `BlockEvaluator<'ir>` (eval_block/bind_block_args). `Interpreter<'ir>` is a blanket supertrait auto-implemented for anything implementing `BlockEvaluator<'ir>`. Dialect authors use `I: Interpreter<'ir>`. Custom interpreter developers implement sub-traits individually.
+- **Current framework**: New interpreter work belongs in `kirin-interpreter-new`. Dialect-specific implementations live in `src/interpreter_new.rs` or `src/interpreter_new/mod.rs` inside each dialect crate. The old `kirin-interpreter-20` crate and downstream `interpreter20` modules have been removed; do not add new code against them.
 
-- **`'ir` lifetime pattern**: `StageAccess<'ir>` and `BlockEvaluator<'ir>` are parameterized by `'ir` so that `pipeline()` and `active_stage_info::<L>()` return `&'ir`-lived references. This requires `Self: 'ir` on the traits, which cascades: all type parameters on implementing structs need `'ir` bounds. The `'ir` lifetime is also threaded through `Interpretable<'ir, I>` and `CallSemantics<'ir, I>`. Stage-scoped operations use the `Staged<'a, 'ir, I, L>` builder (constructed via `interp.in_stage::<L>()` or `interp.with_stage(stage)`).
+- **Design source**: The checked-in design for the current framework is under `docs/design/new-interpreter/`. Do not revive stale interpreter-2/interpreter-4/interpreter-9 design documents; update the new-interpreter docs instead.
 
-- **`L` on method, not trait**: `Interpretable<'ir, I>` and `CallSemantics<'ir, I>` have `L` as a method-level generic (on `interpret<L>` and `eval_call<L>`), not a trait parameter. This breaks the E0275 cycle that occurred when `L` was on the trait. Impl-level bounds use `InnerType: Interpretable<'ir, I>` (no `L`, no recursion). Method-level bounds (`L: Interpretable<'ir, I> + 'ir`) are resolved coinductively. `#[derive(Interpretable)]` auto-generates the inner-type bounds — no `#[interpret(where(...))]` needed.
+- **Frame fusion model**: A `Frame` is a continuation object anchored at a semantic-independent `Location`. `ConcreteInterpreter` and abstract drivers own the driver loop; frames consume `self` in `step`, `resume_done`, and `resume`, then return `FrameEffect<F, C>`. This keeps the interpreter stack explicit and avoids using the Rust call stack for interpreter control flow.
 
-- **Stage accessor naming**: `active_stage()` returns `CompileStage` (the stage key), `active_stage_info::<L>()` returns `&'ir StageInfo<L>` (the resolved dialect-specific stage info). Resolve once at the top of a method and pass through to avoid repeated lookups.
+- **Statement dispatch**: Dialect statements implement `Interpretable<L, I, F, C, E, T>` with `Interpretable::interpret`. Atomic statements mutate SSA state through `Env` and return `StatementEffect::Done`. Non-atomic statements return `StatementEffect::Push(frame)`, `StatementEffect::Transfer(transfer)`, or `StatementEffect::Complete(completion)`.
 
-- **`ValueStore` is the home for all value read/write operations**: Any function that reads or writes SSA values/results must be a provided method on `ValueStore`, not a standalone function. This includes `write_product` (auto-destructuring products into result slots). Standalone functions that take `&mut impl ValueStore` violate this convention — they should be methods on the trait instead. The reason: it keeps the API surface discoverable and consistent, and allows dialect authors to override behavior if needed.
+- **Env access**: `Env<V>` is the SSA store capability. It exposes `alloc`, `free`, `read`, `write`, `read_many`, and `write_product` using explicit `EnvIndex` values. `read_many` returns `Product<V>`, not `Vec<V>`. Concrete execution typically uses `EnvStackStore<V>`; abstract execution can use `AbstractEnvStore<V>` or another store through `AbstractInterpreterWithStore`.
 
-- **Product types and multi-result**: Multi-result is syntactic sugar over product types. `Continuation::Return(V)` and `Yield(V)` are single-valued — when a function returns multiple values, `V` is a product. The framework auto-destructures products via `ValueStore::write_product`. `ProductValue` is required on `StackInterpreter` because `eval_block` → `run_nested_calls` handles the "hidden unpack" for multi-result calls. Dialect authors who define `Vec<ResultValue>` fields (e.g., `Call`, `Return`, `Yield`) own the multi-value semantics and must require `ProductValue` on their interpret impls. See `docs/design/multi-result-values.md` for the full design.
+- **Products and multi-result**: `kirin_ir::Product<T>` is the framework packet for call arguments, block arguments, branch arguments, function returns, and SCF yields. `StandardCompletion::FunctionReturned(Product<V>)` and `ScfCompletion::Yield(Product<V>)` carry products directly. Use `Env::write_product` to destructure into SSA result slots. `HasProductValue` is only for value domains that expose an explicit tuple/product runtime value for the tuple dialect; it is not required for ordinary multi-result return/yield plumbing.
+
+- **Concrete vs abstract transfers**: Transfer payloads are frame/interpreter-specific. Concrete CFG execution uses `ConcreteBlockTransfer<V>` with `Jump`. Abstract execution can use `AbstractBlockTransfer<V>` with `Jump` and `Branch`; unknown branches become `Branch` and are handled by abstract branch frames or by a fixpoint owner strategy.
+
+- **Standard frames**: Reuse standard frames from `kirin-interpreter-new::standard` for common IR traversal and call conventions: `StatementFrame`, `BlockFrame`, `RegionFrame`, `CallFrame`, `FunctionFrame`, `StagedFunctionFrame`, and `SpecializedFunctionFrame`. `RegionFrame` follows CFG convention: it enters the entry block and subsequent block movement is driven by block transfers, not by iterating region blocks.
+
+- **Function dialect naming**: `kirin_function::Function<T>` is the standard function statement. `FunctionBody<T>` exists only as a deprecated compatibility alias. New code should use `Function<T>`, `FunctionEntry`, and the standard function/call frames.
+
+- **Lift/project algebra**: Frame, completion, error, and summary composition should use lift/project traits, not `From`/`Into`, when the direction matters. Use `.lift()` only for infallible lifts, like `.into()`, and `.try_lift()` for fallible lifts, like `.try_into()`. Infallible `TryLiftFrom` impls should use `Error = core::convert::Infallible`. Error composition should usually be `E: LiftFrom<SomeError>` and call `E::lift_from(error)`.
+
+- **Abstract interpretation**: `SimpleFixpointInterpreter` is owner-summary based: an owner maps to a `Summary`, `OwnerSemantics` builds the entry frame and merges completions back into summaries, and `Summary::merge` owns join/widen/narrow behavior. Use this for fixpoint analyses; use direct `AbstractInterpreter` only for single abstract executions that do not need owner-summary convergence.
 
 ## Chumsky Parser Conventions
 
@@ -213,7 +216,7 @@ For user-defined dialects not in this table, ask the user for domain context dur
 
 - **`ParseDispatch` for pipeline parsing**: Multi-dialect pipeline parsing uses `ParseDispatch` (a monomorphic dispatch trait) instead of HRTB-based `SupportsStageDispatchMut`. Add `#[derive(ParseDispatch)]` alongside `#[derive(StageMeta)]` on stage enums. Single-dialect pipelines (`Pipeline<StageInfo<L>>`) get a blanket `ParseDispatch` impl. Zero HRTB in the dispatch chain.
 
-- **`#[wraps]` works with Region/Block-containing types**: Dialect types that contain `Region` or `Block` fields (e.g., `Lambda`, `FunctionBody`, SCF operations) can be composed via `#[wraps]` + `HasParser`. See `example/toy-lang/src/language.rs` where `Lexical` (contains `FunctionBody` with Region and `Lambda` with Region) and `StructuredControlFlow` (contains `If`/`For` with Block fields) are both used with `#[wraps]`.
+- **`#[wraps]` works with Region/Block-containing types**: Dialect types that contain `Region` or `Block` fields (e.g., `Lambda`, `Function`, SCF operations) can be composed via `#[wraps]` + `HasParser`. See `example/toy-lang/src/language.rs` where `Lexical` (contains `Function` with Region and `Lambda` with Region) and `StructuredControlFlow` (contains `If`/`For` with Block fields) are both used with `#[wraps]`.
 
 - **`Ctx` default parameter for unified traits**: When the same trait method needs extra context for some implementors (e.g., `CompileStage` for `Pipeline`) but not others (e.g., `StageInfo`), use a default type parameter `Ctx = ()` on the trait. Pair with a blanket `Ext` trait that erases the `()` arg for ergonomic call sites. See `ParseStatementText<L, Ctx>` / `ParseStatementTextExt<L>`.
 
