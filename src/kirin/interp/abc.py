@@ -19,7 +19,6 @@ from .value import (
     YieldValue,
     ReturnValue,
     RegionResult,
-    SpecialValue,
     StatementResult,
 )
 from .exceptions import InterpreterError, StackOverflowError
@@ -296,8 +295,10 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
         method = self.lookup_registry(frame, node)
         if method is not None:
             results = method(self, frame, node)
-            if self.debug and results is not None and not isinstance(
-                results, (tuple, ReturnValue, YieldValue, Successor)
+            if (
+                self.debug
+                and results is not None
+                and not isinstance(results, (tuple, ReturnValue, YieldValue, Successor))
             ):
                 raise InterpreterError(
                     f"method must return tuple or SpecialResult, got {results}"

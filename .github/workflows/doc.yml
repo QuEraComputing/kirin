@@ -14,6 +14,8 @@ jobs:
   documentation:
     name: Deploy preview documentation
     runs-on: ubuntu-latest
+    # Dependabot PRs and forks don't get write access to gh-pages or required secrets.
+    if: github.actor != 'dependabot[bot]' && github.event.pull_request.head.repo.full_name == github.repository
     steps:
       - uses: actions/checkout@v6
       - name: Install uv
