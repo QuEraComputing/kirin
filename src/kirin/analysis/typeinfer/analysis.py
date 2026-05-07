@@ -52,9 +52,10 @@ class TypeInference(Forward[types.TypeAttribute]):
 
         if trait := node.get_trait(ir.HasSignature):
             signature: Signature[types.TypeAttribute] | None = trait.get_signature(node)
-            args = (args[0],) + tuple(
-                input.meet(arg) for input, arg in zip(signature.inputs, args[1:])
-            )
+            if signature is not None:
+                args = (args[0],) + tuple(
+                    input.meet(arg) for input, arg in zip(signature.inputs, args[1:])
+                )
         else:
             signature = None
         ret = self.frame_call_region(frame, node, region, *args)

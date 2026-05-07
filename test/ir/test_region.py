@@ -1,4 +1,9 @@
-from kirin.prelude import basic_no_opt
+import pytest
+
+from kirin.prelude import basic, ilist, basic_no_opt
+from kirin.analysis.cfg import CFG
+from kirin.rewrite.sort_blocks import SortBlocks
+from kirin.passes.aggressive.fold import Fold
 
 
 @basic_no_opt
@@ -13,3 +18,180 @@ def test_region_clone():
     assert factorial.callable_region.clone().is_structurally_equal(
         factorial.callable_region
     )
+
+
+@basic
+def _leaf(a: bool, b: bool, x: int):
+    if a:
+        u = x + 1
+    else:
+        u = x + 2
+    if b:
+        v = u + 3
+    else:
+        v = u + 4
+    return v
+
+
+@basic
+def _level0(flag0: bool, flag1: bool, x: int):
+    base = _leaf(flag0, flag1, x)
+    base2 = _leaf(flag1, flag0, x + 1)
+    if flag0:
+        mix = base + base2
+    else:
+        mix = base2 + base
+    if flag0:
+        out = mix + 30
+    else:
+        out = mix + 40
+
+    def fn(y: int):
+        return y + out
+
+    mapped = ilist.map(fn, ilist.range(3))
+    return mapped[0] + out
+
+
+@basic
+def _level1(flag0: bool, flag1: bool, x: int):
+    base = _level0(flag0, flag1, x)
+    base2 = _level0(flag1, flag0, x + 2)
+    if flag0:
+        mix = base + base2
+    else:
+        mix = base2 + base
+    if flag0:
+        out = mix + 31
+    else:
+        out = mix + 41
+
+    def fn(y: int):
+        return y + out
+
+    mapped = ilist.map(fn, ilist.range(3))
+    return mapped[0] + out
+
+
+@basic
+def _fold_target(flag0: bool, flag1: bool, x: int):
+    return _level1(flag0, flag1, x)
+
+
+def _has_unordered_edges(method):
+    """True if any stmt arg is owned by a stmt in a later block (by index)."""
+    stmt_block = {}
+    for bi, block in enumerate(method.callable_region.blocks):
+        for stmt in block.stmts:
+            stmt_block[stmt] = bi
+    for bi, block in enumerate(method.callable_region.blocks):
+        for stmt in block.stmts:
+            for arg in stmt.args:
+                owner = getattr(arg, "owner", None)
+                owner_bi = stmt_block.get(owner)
+                if owner_bi is not None and owner_bi > bi:
+                    return True
+    return False
+
+
+def _all_owners_in_region(region):
+    """Check every operand in region is owned by a stmt/block inside it."""
+    region_stmts = set()
+    region_blocks = set()
+    for block in region.blocks:
+        region_blocks.add(block)
+        for stmt in block.stmts:
+            region_stmts.add(stmt)
+
+    for block in region.blocks:
+        for stmt in block.stmts:
+            for arg in stmt.args:
+                owner = getattr(arg, "owner", None)
+                if owner is None:
+                    continue
+                # BlockArgument owner is a Block (check first — Block also has parent)
+                if hasattr(owner, "stmts"):
+                    if owner not in region_blocks:
+                        return False
+                # ResultValue owner is a Statement
+                elif hasattr(owner, "parent"):
+                    if owner not in region_stmts:
+                        return False
+    return True
+
+
+def test_region_clone_after_aggressive_fold():
+    """Region.clone must remap all SSA values even when blocks are out of definition order."""
+    mt = _fold_target.similar()
+    fold = Fold(mt.dialects)
+
+    # Run fold until we get unordered edges or it converges
+    for _ in range(8):
+        result = fold.unsafe_run(mt)
+        if _has_unordered_edges(mt):
+            break
+        if not result.has_done_something:
+            break
+
+    # Regardless of whether we got unordered edges, clone must be self-contained
+    cloned = mt.callable_region.clone()
+    assert _all_owners_in_region(
+        cloned
+    ), "Region.clone produced operands owned by statements outside the cloned region"
+    assert cloned.is_structurally_equal(mt.callable_region)
+
+
+def _scramble_blocks(region):
+    """Reverse block order (keeping entry block first) to create out-of-order layout."""
+    blocks = list(region.blocks)
+    if len(blocks) <= 2:
+        return False
+    scrambled = [blocks[0]] + list(reversed(blocks[1:]))
+    region._blocks[:] = scrambled
+    region._block_idx = {block: i for i, block in enumerate(scrambled)}
+    return True
+
+
+@basic
+def _branchy(flag: bool, x: int):
+    if flag:
+        y = x + 1
+    else:
+        y = x + 2
+    return y + 3
+
+
+def test_sort_blocks_fixes_scrambled_region():
+    """SortBlocks must restore RPO order after blocks are scrambled."""
+    mt = _branchy.similar()
+    region = mt.callable_region
+    original_order = list(region.blocks)
+
+    assert _scramble_blocks(region)
+    assert list(region.blocks) != original_order
+
+    cfg = CFG(region)
+    result = SortBlocks(cfg).rewrite_Region(region)
+    assert result.has_done_something
+    # After sorting, clone must produce a self-contained region.
+    cloned = region.clone()
+    assert _all_owners_in_region(cloned)
+
+
+def test_region_clone_raises_on_unsorted_blocks():
+    """Region.clone must raise ValueError when blocks are out of definition order."""
+    mt = _fold_target.similar()
+    fold = Fold(mt.dialects)
+
+    # Fold to produce a complex CFG, then scramble blocks.
+    for _ in range(8):
+        result = fold.unsafe_run(mt)
+        if not result.has_done_something:
+            break
+
+    region = mt.callable_region
+    if not _scramble_blocks(region):
+        pytest.skip("Region has too few blocks to scramble")
+
+    with pytest.raises(ValueError, match="in-region SSA value"):
+        region.clone()

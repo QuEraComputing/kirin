@@ -5,10 +5,10 @@ from kirin.serialization.core.serializationunit import SerializationUnit
 from kirin.serialization.core.serializationmodule import SerializationModule
 
 
-class JSONSerializer:
+class JSONtifiable:
     """
-    JSON serializer/deserializer for SerializationModule
-    and SerializationUnit.
+    Helper class to convert between SerializationModule/SerializationUnit and JSON-serializable dicts.
+    This is used internally by JSONSerializer and BSONSerializer to handle the actual conversion logic.
     """
 
     def _to_jsonifiable(self, obj: Any) -> Any:
@@ -50,6 +50,13 @@ class JSONSerializer:
         if isinstance(obj, list):
             return [self._from_jsonifiable(v) for v in obj]
         return obj
+
+
+class JSONSerializer(JSONtifiable):
+    """
+    JSON serializer/deserializer for SerializationModule
+    and SerializationUnit.
+    """
 
     def encode(self, data: SerializationModule) -> str:
         """

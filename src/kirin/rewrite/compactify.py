@@ -7,6 +7,7 @@ from kirin.analysis.cfg import CFG
 from kirin.rewrite.walk import Walk
 from kirin.rewrite.chain import Chain
 from kirin.rewrite.fixpoint import Fixpoint
+from kirin.rewrite.sort_blocks import SortBlocks
 
 
 @dataclass
@@ -257,10 +258,16 @@ class CompactifyRegion(RewriteRule):
 
     def __init__(self, cfg: CFG):
         self.cfg = cfg
-        self.rule = Fixpoint(
-            Chain(
-                DeadBlock(cfg), Walk(DuplicatedBranch()), SkipBlock(cfg), CFGEdge(cfg)
-            )
+        self.rule = Chain(
+            Fixpoint(
+                Chain(
+                    DeadBlock(cfg),
+                    Walk(DuplicatedBranch()),
+                    SkipBlock(cfg),
+                    CFGEdge(cfg),
+                )
+            ),
+            SortBlocks(cfg),
         )
 
     def rewrite(self, node: ir.IRNode) -> RewriteResult:

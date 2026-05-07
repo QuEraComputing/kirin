@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from collections.abc import Hashable
+
 from kirin import ir, types
 from kirin.interp import Frame, MethodTable, ReturnValue, impl
 from kirin.analysis import const
@@ -30,6 +32,7 @@ class TypeInfer(MethodTable):
         if (
             isinstance(hint := stmt.value.hints.get("const"), const.Value)
             and hint.data is not None
+            and isinstance(hint.data, Hashable)
         ):
             return ReturnValue(types.Literal(hint.data, frame.get(stmt.value)))
         return ReturnValue(frame.get(stmt.value))

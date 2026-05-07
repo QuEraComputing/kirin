@@ -9,6 +9,7 @@ entire Python language.
 from . import (
     cmp as cmp,
     len as len,
+    set as set,
     attr as attr,
     base as base,
     list as list,
