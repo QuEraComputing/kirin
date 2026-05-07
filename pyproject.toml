@@ -1,6 +1,6 @@
 [project]
 name = "kirin-toolchain"
-version = "0.22.9"
+version = "0.22.10"
 description = "The Kirin Toolchain for building compilers and interpreters."
 readme = "README.md"
 requires-python = ">= 3.10"
