@@ -1,6 +1,6 @@
 from kirin.prelude import basic
 from kirin.dialects import ilist
-from kirin.serialization.bsonserializer import BSONSerializer
+from kirin.serialization.bsonserializer import CompressedBSONSerializer
 
 
 @basic
@@ -80,7 +80,7 @@ def round_trip(program):
     encoded = basic.encode(program)
     decoded = basic.decode(encoded)
     assert decoded.code.is_structurally_equal(program.code)
-    bson_serializer = BSONSerializer()
+    bson_serializer = CompressedBSONSerializer()
     bson_encoded = bson_serializer.encode(encoded)
     assert isinstance(bson_encoded, bytes)
     bson_decoded = bson_serializer.decode(bson_encoded)
@@ -114,10 +114,10 @@ def test_round_trip6():
 
 def test_deterministic():
     s1 = basic.encode(loop_ilist)
-    bson_serializer = BSONSerializer()
+    bson_serializer = CompressedBSONSerializer()
     bson_s1 = bson_serializer.encode(s1)
     s2 = basic.encode(loop_ilist)
-    bson_serializer2 = BSONSerializer()
+    bson_serializer2 = CompressedBSONSerializer()
     bson_s2 = bson_serializer2.encode(s2)
     assert bson_s1 == bson_s2
 
@@ -128,10 +128,10 @@ def test_eq():
         x = 0
         return x
 
-    bson_serializer = BSONSerializer()
+    bson_serializer = CompressedBSONSerializer()
     bson_bytes = bson_serializer.encode(basic.encode(main))
 
-    bson_serializer = BSONSerializer()
+    bson_serializer = CompressedBSONSerializer()
     main_des = basic.decode(bson_serializer.decode(bson_bytes))
 
     # without run_passes, we get errors in e.g. main == main_des
