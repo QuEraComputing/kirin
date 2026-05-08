@@ -17,3 +17,6 @@ docs/design_principles.md
 .autotune
 .autotune.toml
 note.md
+.agents/skills/ion-cli
+.claude/skills/ion-cli
+CLAUDE.md

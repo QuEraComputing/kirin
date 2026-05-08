@@ -1,32 +1,7 @@
 [skills]
-brainstorming = { source = "obra/superpowers/brainstorming" }
-executing-plans = { source = "obra/superpowers/executing-plans" }
-finishing-a-development-branch = { source = "obra/superpowers/finishing-a-development-branch" }
-receiving-code-review = { source = "obra/superpowers/receiving-code-review" }
-requesting-code-review = { source = "obra/superpowers/requesting-code-review" }
-simplify = { source = "brianlovin/claude-config/simplify" }
-systematic-debugging = { source = "obra/superpowers/systematic-debugging" }
-test-driven-development = { source = "obra/superpowers/test-driven-development" }
-using-git-worktrees = { source = "obra/superpowers/using-git-worktrees" }
-using-superpowers = { source = "obra/superpowers/using-superpowers" }
-verification-before-completion = { source = "obra/superpowers/verification-before-completion" }
-writing-plans = { source = "obra/superpowers/writing-plans" }
-writing-skills = { source = "obra/superpowers/writing-skills" }
-ask-user-question = { type = "local" }
-insta-snapshot-testing = { type = "local" }
-kirin-derive-macros = { type = "local" }
-kirin-rfc-implementer = { type = "local" }
-kirin-rfc-writer = { type = "local" }
-refactor = { type = "local" }
-test-coverage-review = { type = "local" }
-triage-review = { type = "local" }
 ion-cli = { type = "local" }
-ir-spec-writing = { type = "local" }
-dispatching-parallel-agents = { type = "local", forked-from = "obra/superpowers/dispatching-parallel-agents" }
-subagent-driven-development = { type = "local", forked-from = "obra/superpowers/subagent-driven-development" }
 
 [options]
-skills-dir = "skills"
 
 [options.targets]
 claude = ".claude/skills"
