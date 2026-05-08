@@ -17,7 +17,7 @@ from kirin.serialization.core.serializationmodule import SerializationModule
 class Serializer:
     _ctx: SerializationContext = field(default_factory=SerializationContext, init=False)
 
-    def encode(self, obj: ir.Method) -> SerializationModule:
+    def encode(self, obj: ir.Method, version: str = "") -> SerializationModule:
         self._ctx.clear()
         body = self.serialize_method(obj)
         if getattr(self._ctx, "Method_Symbol", None):
@@ -37,7 +37,9 @@ class Serializer:
             symbol_table: dict[str, MethodSymbolMeta] = st
         else:
             symbol_table = dict[str, MethodSymbolMeta]()
-        return SerializationModule(symbol_table=symbol_table, body=body)
+        return SerializationModule(
+            symbol_table=symbol_table, body=body, version=version
+        )
 
     def serialize(
         self,
