@@ -323,11 +323,11 @@ class DialectGroup(Generic[PassParams]):
     ) -> Self:
         return cast(Self, deserializer.deserialize_dialect_group(serUnit))
 
-    def encode(self, program) -> "SerializationModule":
+    def encode(self, program, version: str = "") -> "SerializationModule":
         from kirin.serialization.base.serializer import Serializer
 
         serializer = Serializer()
-        return serializer.encode(program)
+        return serializer.encode(program, version)
 
     def decode(self, encoded: "SerializationModule") -> Method:
         from kirin.serialization.base.deserializer import Deserializer
@@ -335,12 +335,20 @@ class DialectGroup(Generic[PassParams]):
         deserializer = Deserializer(dialect_group=self)
         return deserializer.decode(encoded)
 
-    def encode_json(self, program: Method) -> str:
-        encoded_module = self.encode(program)
+    def encode_json(self, program: Method, version: str = "") -> str:
+        encoded_module = self.encode(program, version)
         return get_json_serializer().encode(encoded_module)
 
-    def decode_json(self, json_str: str) -> Method:
-        decoded_module = get_json_serializer().decode(json_str)
+    def decode_json(self, json_str: str, expect_version: str | None = None) -> Method:
+        serializer = get_json_serializer()
+        decoded_module = serializer.decode(json_str)
+        if (
+            expect_version is not None
+            and decoded_module.check_version(expect_version) is False
+        ):
+            raise ValueError(
+                f"Version mismatch: expected {expect_version}, got {decoded_module.version}"
+            )
         return self.decode(decoded_module)
 
 

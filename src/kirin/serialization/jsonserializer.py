@@ -15,6 +15,7 @@ class JSONtifiable:
         if isinstance(obj, SerializationModule):
             return {
                 "__serialization_module__": True,
+                "version": obj.version,
                 "symbol_table": self._to_jsonifiable(obj.symbol_table),
                 "body": self._to_jsonifiable(obj.body),
             }
@@ -37,7 +38,10 @@ class JSONtifiable:
             if obj.get("__serialization_module__"):
                 symbol_table = self._from_jsonifiable(obj.get("symbol_table", {}))
                 body = self._from_jsonifiable(obj.get("body"))
-                return SerializationModule(symbol_table=symbol_table, body=body)
+                version = obj.get("version", "")
+                return SerializationModule(
+                    symbol_table=symbol_table, body=body, version=version
+                )
             if obj.get("__serialization_unit__"):
                 data = self._from_jsonifiable(obj.get("data", {}))
                 return SerializationUnit(
