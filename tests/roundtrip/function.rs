@@ -34,7 +34,7 @@ fn test_bind_roundtrip_with_multiple_captures() {
 #[test]
 fn test_call_roundtrip_with_multiple_arguments() {
     roundtrip::assert_statement_roundtrip::<CallableLanguage>(
-        "%r = call @closure(%x, %y) -> i32",
+        "%r = call.named @closure(%x, %y) -> i32",
         &[("x", ArithType::I32), ("y", ArithType::I32)],
     );
 }
@@ -62,7 +62,7 @@ fn test_return_roundtrip_and_terminator_property() {
 fn test_void_call_roundtrip() {
     // Call with no results: no `%r =` prefix, no `-> type` suffix
     roundtrip::assert_statement_roundtrip::<CallableLanguage>(
-        "call @bar(%x)",
+        "call.named @bar(%x)",
         &[("x", ArithType::I32)],
     );
 }
@@ -70,7 +70,7 @@ fn test_void_call_roundtrip() {
 #[test]
 fn test_multi_result_call_roundtrip() {
     roundtrip::assert_statement_roundtrip::<CallableLanguage>(
-        "%a, %b = call @foo(%x) -> i32, f64",
+        "%a, %b = call.named @foo(%x) -> i32, f64",
         &[("x", ArithType::I32)],
     );
 }
@@ -114,7 +114,7 @@ specialize @A fn @closure(i32, i32) -> i32 {
 specialize @A fn @main(i32) -> i32 {
   ^bb0(%x: i32) {
     %f = bind @closure captures(%x) -> i32;
-    %r_call = call @closure(%x, %x) -> i32;
+    %r_call = call.named @closure(%x, %x) -> i32;
     ret %r_call;
   }
 }

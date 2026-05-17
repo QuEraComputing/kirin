@@ -37,7 +37,7 @@ pub enum Continuation<V, Ext = Infallible> {
     ///
     /// The function returns a single value (possibly a product). The framework
     /// auto-destructures the product into the result slots — this is the
-    /// "hidden unpack" that makes `%a, %b = call @f(...)` work.
+    /// "hidden unpack" that makes `%a, %b = call.named @f(...)` work.
     Call {
         callee: SpecializedFunction,
         stage: CompileStage,

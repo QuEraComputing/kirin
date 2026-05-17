@@ -20,9 +20,9 @@ pub enum CallableLanguage {
         sig: Signature<ArithType>,
     },
     #[wraps]
-    Bind(Bind<ArithType>),
-    #[wraps]
     Call(Call<ArithType>),
+    #[wraps]
+    Bind(Bind<ArithType>),
     #[wraps]
     Return(Return<ArithType>),
 }

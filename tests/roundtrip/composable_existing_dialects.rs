@@ -68,7 +68,7 @@ specialize @test fn @main(i64, i64) -> i64 {
         ret %sum;
       }
     } -> i64;
-    %result = call @adder(%x) -> i64;
+    %result = call.named @adder(%x) -> i64;
     ret %result;
   }
 }

@@ -91,7 +91,7 @@ where
     /// by `should_exit`). Nested `Call`s are tracked and their return values
     /// written back automatically. For multi-result calls, the framework
     /// auto-destructures the single return product into the result slots
-    /// (the "hidden unpack" that makes `%a, %b = call @f(...)` work).
+    /// (the "hidden unpack" that makes `%a, %b = call.named @f(...)` work).
     ///
     /// `should_exit(interp, is_yield)` is called after `advance` for each
     /// `Return`/`Yield`. Return `true` to exit the loop with the value.

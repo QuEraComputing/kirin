@@ -52,7 +52,7 @@ fn test_pipeline_function_print() {
     });
 
     // Print the function across both stages
-    let output = func.sprint(&pipeline);
+    let output = PrintExt::sprint(&func, &pipeline);
     insta::assert_snapshot!(output);
 }
 
@@ -84,7 +84,7 @@ fn test_pipeline_unnamed_stage() {
     });
 
     // Should fall back to numeric symbol form: "stage @0"
-    let output = func.sprint(&pipeline);
+    let output = PrintExt::sprint(&func, &pipeline);
     insta::assert_snapshot!(output);
 }
 
@@ -108,6 +108,6 @@ fn test_pipeline_staged_function_no_specialization() {
         .unwrap();
 
     // No specialize() call — staged function has no body / specializations
-    let output = func.sprint(&pipeline);
+    let output = PrintExt::sprint(&func, &pipeline);
     insta::assert_snapshot!(output);
 }

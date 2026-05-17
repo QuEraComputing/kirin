@@ -107,7 +107,7 @@ specialize @source fn @main(i64, i64) -> i64 {
         ret %sum;
       }
     } -> i64;
-    %result = call @adder(%x) -> i64;
+    %result = call.named @adder(%x) -> i64;
     ret %result;
   }
 }
@@ -126,7 +126,7 @@ specialize @lowered fn @main(i64, i64) -> i64 {
   ^entry(%x: i64, %cond: i64) {
     %doubled = add %x, %x -> i64;
     %f = bind @adder captures(%doubled) -> i64;
-    %result = call @adder(%doubled, %x) -> i64;
+    %result = call.named @adder(%doubled, %x) -> i64;
     ret %result;
   }
 }

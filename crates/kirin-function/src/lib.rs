@@ -24,7 +24,7 @@ pub mod ret;
 
 pub use bind::Bind;
 pub use body::Function;
-pub use call::Call;
+pub use call::{Call, CallFunction, CallLike, CallNamed, CallSpecialized, CallStaged};
 pub use lambda::Lambda;
 pub use ret::Return;
 
@@ -42,8 +42,8 @@ mod tests;
 #[kirin(builders, type = T)]
 pub enum Lexical<T: CompileTimeValue> {
     Function(Function<T>),
-    Lambda(Lambda<T>),
     Call(Call<T>),
+    Lambda(Lambda<T>),
     Return(Return<T>),
 }
 
@@ -52,7 +52,7 @@ pub enum Lexical<T: CompileTimeValue> {
 #[kirin(builders, type = T)]
 pub enum Lifted<T: CompileTimeValue> {
     Function(Function<T>),
-    Bind(Bind<T>),
     Call(Call<T>),
+    Bind(Bind<T>),
     Return(Return<T>),
 }

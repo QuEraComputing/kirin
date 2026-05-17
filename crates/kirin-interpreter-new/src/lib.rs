@@ -29,7 +29,7 @@ pub use location::{Location, Position, Traversal};
 pub use standard::{
     AbstractBranchFrame, AbstractBranchState, BlockFrame, BlockTransferDispatch, CallFrame, Callee,
     FunctionAccess, FunctionBodyDispatch, FunctionEntry, FunctionEntryTarget, FunctionFrame,
-    FunctionInvocation, FunctionInvocationFrame, FunctionInvokeBuilder,
+    FunctionInvocation, FunctionInvocationDispatch, FunctionInvocationFrame, FunctionInvokeBuilder,
     FunctionInvokeTargetBuilder, RegionFrame, SpecializedFunctionFrame, SpecializedFunctionState,
     StagedFunctionFrame, StandardFrame, StatementFrame,
 };

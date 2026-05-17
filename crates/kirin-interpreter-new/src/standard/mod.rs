@@ -18,8 +18,8 @@ pub use function::{
     SpecializedFunctionState, StagedFunctionFrame,
 };
 pub use invocation::{
-    FunctionEntryTarget, FunctionInvocation, FunctionInvocationFrame, FunctionInvokeBuilder,
-    FunctionInvokeTargetBuilder,
+    FunctionEntryTarget, FunctionInvocation, FunctionInvocationDispatch, FunctionInvocationFrame,
+    FunctionInvokeBuilder, FunctionInvokeTargetBuilder,
 };
 pub use region::RegionFrame;
 pub use statement::StatementFrame;

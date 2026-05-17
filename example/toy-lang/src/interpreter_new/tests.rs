@@ -82,6 +82,44 @@ specialize @lowered fn @mul(i64, i64) -> i64 {
 }
 "#;
 
+const CROSS_STAGE_CALLS: &str = r#"
+stage @source fn @source_to_lowered_to_source(i64) -> i64;
+stage @source fn @low_then_high(i64) -> i64;
+stage @source fn @source_abs(i64) -> i64;
+stage @lowered fn @low_then_high(i64) -> i64;
+stage @lowered fn @source_abs(i64) -> i64;
+
+specialize @source fn @source_to_lowered_to_source(i64) -> i64 {
+  ^entry(%x: i64) {
+    %result = call.named @low_then_high(%x) -> i64;
+    ret %result;
+  }
+}
+
+specialize @source fn @source_abs(i64) -> i64 {
+  ^entry(%x: i64) {
+    %zero = constant 0 -> i64;
+    %is_neg = lt %x, %zero -> i64;
+    %result = if %is_neg then ^then() {
+      %negated = neg %x -> i64;
+      yield %negated;
+    } else ^else() {
+      yield %x;
+    } -> i64;
+    ret %result;
+  }
+}
+
+specialize @lowered fn @low_then_high(i64) -> i64 {
+  ^entry(%x: i64) {
+    %abs = call.named @source_abs(%x) -> i64;
+    %one = constant 1 -> i64;
+    %result = add %abs, %one -> i64;
+    ret %result;
+  }
+}
+"#;
+
 fn build_pipeline(src: &str) -> Pipeline<Stage> {
     let mut pipeline = Pipeline::new();
     ParsePipelineText::parse(&mut pipeline, src).expect("parse failed");
@@ -235,6 +273,24 @@ fn constprop_fixpoint_source_for_owner_keeps_stable_carried_value() {
     )
     .unwrap();
     assert_eq!(result, ConstProp::Const(0));
+}
+
+#[test]
+fn constprop_fixpoint_cross_stage_calls_between_source_and_lowered() {
+    let pipeline = build_pipeline(CROSS_STAGE_CALLS);
+
+    let source_result = analyze_source_constprop_fixpoint(
+        &pipeline,
+        "source_to_lowered_to_source",
+        &[ConstProp::Const(-7)],
+    )
+    .unwrap();
+    assert_eq!(source_result, ConstProp::Const(8));
+
+    let lowered_result =
+        analyze_lowered_constprop_fixpoint(&pipeline, "low_then_high", &[ConstProp::Const(-4)])
+            .unwrap();
+    assert_eq!(lowered_result, ConstProp::Const(5));
 }
 
 #[test]

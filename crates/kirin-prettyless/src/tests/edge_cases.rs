@@ -76,7 +76,7 @@ fn test_pipeline_function_no_stages() {
     let func = pipeline.function().name("orphan").new().unwrap();
 
     // Function exists but has no staged representations
-    let output = func.sprint(&pipeline);
+    let output = PrintExt::sprint(&func, &pipeline);
     assert_eq!(output, "");
 }
 
@@ -314,7 +314,7 @@ fn test_staged_function_unnamed() {
         ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
     });
 
-    let output = func.sprint(&pipeline);
+    let output = PrintExt::sprint(&func, &pipeline);
     // Should contain "unnamed" since no name was set
     insta::assert_snapshot!(output);
 }
@@ -432,7 +432,9 @@ fn test_function_render_builder_write_to() {
     });
 
     let mut output = Vec::new();
-    func.render(&pipeline).write_to(&mut output).unwrap();
+    PrintExt::render(&func, &pipeline)
+        .write_to(&mut output)
+        .unwrap();
     let text = String::from_utf8(output).unwrap();
     assert!(text.contains("stage @T"), "got: {}", text);
     assert!(text.contains("@fwr"), "got: {}", text);

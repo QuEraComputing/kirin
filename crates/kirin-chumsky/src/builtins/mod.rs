@@ -11,6 +11,7 @@
 //! due to the orphan rule.
 
 mod float;
+mod function_handles;
 mod integer;
 mod primitive;
 mod signature;

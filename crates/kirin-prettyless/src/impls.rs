@@ -1,8 +1,8 @@
 //! PrettyPrint implementations for IR types.
 
 use kirin_ir::{
-    Dialect, GetInfo, GlobalSymbol, ResultValue, SSAValue, SpecializedFunction, StagedFunction,
-    Successor, Symbol,
+    Dialect, Function, GetInfo, GlobalSymbol, Id, ResultValue, SSAValue, SpecializedFunction,
+    StagedFunction, Successor, Symbol,
 };
 use prettyless::DocAllocator;
 
@@ -162,6 +162,19 @@ impl<T: PrettyPrint> PrettyPrint for Option<T> {
             Some(value) => value.pretty_print(doc),
             None => doc.nil(),
         }
+    }
+}
+
+impl PrettyPrint for Function {
+    fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
+        &self,
+        doc: &'a Document<'a, L>,
+        _namespace: &[&str],
+    ) -> ArenaDoc<'a>
+    where
+        L::Type: std::fmt::Display,
+    {
+        doc.text(format!("@<{}>", Id::from(*self).raw()))
     }
 }
 

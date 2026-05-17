@@ -8,7 +8,7 @@ specialize @source fn @factorial(i64) -> i64 {
       yield %one;
     } else ^else() {
       %n_minus_1 = sub %n, %one -> i64;
-      %rec = call @factorial(%n_minus_1) -> i64;
+      %rec = call.named @factorial(%n_minus_1) -> i64;
       %prod = mul %n, %rec -> i64;
       yield %prod;
     } -> i64;

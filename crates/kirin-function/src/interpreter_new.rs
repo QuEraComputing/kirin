@@ -2,17 +2,19 @@ use std::hash::Hash;
 
 use kirin::ir::{LiftFrom, TryLift, TryLiftFrom};
 use kirin::prelude::{
-    CompileTimeValue, Dialect, Function as IrFunction, HasRegionBody, HasStageInfo, Product,
-    SSAValue, Symbol,
+    CompileTimeValue, Dialect, HasRegionBody, HasStageInfo, Product, SSAValue, Symbol,
 };
 use kirin_interpreter_new::{
     AbstractBlockTransfer, AbstractInterpreterWithStore, BlockTransfer, CallFrame, Callee,
-    ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, FunctionEntry, Interpretable,
-    InterpreterError, Location, RegionFrame, StageAccess, StandardCompletion,
+    ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, FunctionEntry, FunctionEntryTarget,
+    Interpretable, InterpreterError, Location, RegionFrame, StageAccess, StandardCompletion,
     StandardFixpointInterpreter, StatementEffect, Summary,
 };
 
-use crate::{Bind, Call, Function, Lambda, Lexical, Lifted, Return};
+use crate::{
+    Bind, Call, CallFunction, CallLike, CallNamed, CallSpecialized, CallStaged, Function, Lambda,
+    Lexical, Lifted, Return,
+};
 
 pub trait CallTargetResolution<L: Dialect> {
     type Error;
@@ -21,7 +23,13 @@ pub trait CallTargetResolution<L: Dialect> {
         &self,
         location: Location,
         target: Symbol,
-    ) -> Result<IrFunction, Self::Error>;
+    ) -> Result<ResolvedCallTarget, Self::Error>;
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct ResolvedCallTarget {
+    pub stage: kirin::prelude::CompileStage,
+    pub target: FunctionEntryTarget,
 }
 
 pub trait FunctionRegionDispatch<L: Dialect, F, E, V> {
@@ -114,12 +122,17 @@ where
         &self,
         location: Location,
         target: Symbol,
-    ) -> Result<IrFunction, Self::Error> {
+    ) -> Result<ResolvedCallTarget, Self::Error> {
         let stage = StageAccess::<L>::stage_info(self, location.stage)?;
-        self.pipeline()
+        let function = self
+            .pipeline()
             .resolve_function(stage, target)
             .ok_or(InterpreterError::MissingCallTarget { location, target })
-            .map_err(E::lift_from)
+            .map_err(E::lift_from)?;
+        Ok(ResolvedCallTarget {
+            stage: location.stage,
+            target: FunctionEntryTarget::Function(function),
+        })
     }
 }
 
@@ -136,36 +149,17 @@ where
         &self,
         location: Location,
         target: Symbol,
-    ) -> Result<IrFunction, Self::Error> {
+    ) -> Result<ResolvedCallTarget, Self::Error> {
         let stage = StageAccess::<L>::stage_info(self, location.stage)?;
-        self.pipeline()
+        let function = self
+            .pipeline()
             .resolve_function(stage, target)
             .ok_or(InterpreterError::MissingCallTarget { location, target })
-            .map_err(E::lift_from)
-    }
-}
-
-impl<'ir, S, K, L, F, C, E, Sum, Store, Deps> CallTargetResolution<L>
-    for StandardFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store, Deps>
-where
-    S: HasStageInfo<L>,
-    K: Clone + Eq + Hash,
-    L: Dialect,
-    Sum: Summary,
-    E: LiftFrom<InterpreterError>,
-{
-    type Error = E;
-
-    fn resolve_call_target(
-        &self,
-        location: Location,
-        target: Symbol,
-    ) -> Result<IrFunction, Self::Error> {
-        let stage = StageAccess::<L>::stage_info(self, location.stage)?;
-        self.pipeline()
-            .resolve_function(stage, target)
-            .ok_or(InterpreterError::MissingCallTarget { location, target })
-            .map_err(E::lift_from)
+            .map_err(E::lift_from)?;
+        Ok(ResolvedCallTarget {
+            stage: location.stage,
+            target: FunctionEntryTarget::Function(function),
+        })
     }
 }
 
@@ -264,7 +258,7 @@ where
     }
 }
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Call<T>
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for CallNamed<T>
 where
     L: Dialect,
     I: CallTargetResolution<L, Error = E>,
@@ -279,13 +273,139 @@ where
         env: EnvIndex,
         interp: &mut I,
     ) -> Result<StatementEffect<F, C, X>, E> {
-        let function = interp.resolve_call_target(location, self.target())?;
+        let target_location =
+            Location::new(self.stage().unwrap_or(location.stage), location.position);
+        let target = interp.resolve_call_target(target_location, self.target())?;
         let args = self.args().iter().copied().collect();
         let results = self.results().iter().copied().map(SSAValue::from).collect();
-        CallFrame::<L, X::Value>::new(location, Callee::Function(function), args, env, results)
+        let callee = match target.target {
+            FunctionEntryTarget::Function(function) => Callee::Function(function),
+            FunctionEntryTarget::StagedFunction(function) => Callee::StagedFunction(function),
+            FunctionEntryTarget::SpecializedFunction(function) => {
+                Callee::SpecializedFunction(function)
+            }
+        };
+        CallFrame::<L, X::Value>::new_in_stage(location, target.stage, callee, args, env, results)
             .try_lift()
             .map(StatementEffect::Push)
             .map_err(E::from)
+    }
+}
+
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for CallFunction<T>
+where
+    L: Dialect,
+    F: TryLiftFrom<CallFrame<L, X::Value>>,
+    E: From<<F as TryLiftFrom<CallFrame<L, X::Value>>>::Error>,
+    T: CompileTimeValue,
+    X: BlockTransfer,
+{
+    fn interpret(
+        &self,
+        location: Location,
+        env: EnvIndex,
+        _interp: &mut I,
+    ) -> Result<StatementEffect<F, C, X>, E> {
+        direct_call_effect::<L, F, C, E, T, X, _>(
+            location,
+            env,
+            self,
+            Callee::Function(self.target()),
+        )
+    }
+}
+
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for CallStaged<T>
+where
+    L: Dialect,
+    F: TryLiftFrom<CallFrame<L, X::Value>>,
+    E: From<<F as TryLiftFrom<CallFrame<L, X::Value>>>::Error>,
+    T: CompileTimeValue,
+    X: BlockTransfer,
+{
+    fn interpret(
+        &self,
+        location: Location,
+        env: EnvIndex,
+        _interp: &mut I,
+    ) -> Result<StatementEffect<F, C, X>, E> {
+        direct_call_effect::<L, F, C, E, T, X, _>(
+            location,
+            env,
+            self,
+            Callee::StagedFunction(self.target()),
+        )
+    }
+}
+
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for CallSpecialized<T>
+where
+    L: Dialect,
+    F: TryLiftFrom<CallFrame<L, X::Value>>,
+    E: From<<F as TryLiftFrom<CallFrame<L, X::Value>>>::Error>,
+    T: CompileTimeValue,
+    X: BlockTransfer,
+{
+    fn interpret(
+        &self,
+        location: Location,
+        env: EnvIndex,
+        _interp: &mut I,
+    ) -> Result<StatementEffect<F, C, X>, E> {
+        direct_call_effect::<L, F, C, E, T, X, _>(
+            location,
+            env,
+            self,
+            Callee::SpecializedFunction(self.target()),
+        )
+    }
+}
+
+fn direct_call_effect<L, F, C, E, T, X, Target>(
+    location: Location,
+    env: EnvIndex,
+    call: &impl CallLike<T, Target = Target>,
+    callee: Callee,
+) -> Result<StatementEffect<F, C, X>, E>
+where
+    L: Dialect,
+    F: TryLiftFrom<CallFrame<L, X::Value>>,
+    E: From<<F as TryLiftFrom<CallFrame<L, X::Value>>>::Error>,
+    T: CompileTimeValue,
+    X: BlockTransfer,
+    Target: Copy,
+{
+    let stage = call.stage().unwrap_or(location.stage);
+    let args = call.args().iter().copied().collect();
+    let results = call.results().iter().copied().map(SSAValue::from).collect();
+    CallFrame::<L, X::Value>::new_in_stage(location, stage, callee, args, env, results)
+        .try_lift()
+        .map(StatementEffect::Push)
+        .map_err(E::from)
+}
+
+impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Call<T>
+where
+    L: Dialect,
+    CallNamed<T>: Interpretable<L, I, F, C, E, X>,
+    CallFunction<T>: Interpretable<L, I, F, C, E, X>,
+    CallStaged<T>: Interpretable<L, I, F, C, E, X>,
+    CallSpecialized<T>: Interpretable<L, I, F, C, E, X>,
+    T: CompileTimeValue,
+    X: BlockTransfer,
+{
+    fn interpret(
+        &self,
+        location: Location,
+        env: EnvIndex,
+        interp: &mut I,
+    ) -> Result<StatementEffect<F, C, X>, E> {
+        match self {
+            Self::Named(call) => call.interpret(location, env, interp),
+            Self::Function(call) => call.interpret(location, env, interp),
+            Self::Staged(call) => call.interpret(location, env, interp),
+            Self::Specialized(call) => call.interpret(location, env, interp),
+        }
     }
 }
 

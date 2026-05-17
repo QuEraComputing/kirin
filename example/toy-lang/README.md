@@ -12,7 +12,7 @@ toy-lang composes several Kirin dialects into two compilation stages:
 - Bitwise: `and`, `or`, `xor`, `not`, `shl`, `shr`
 - Constants: `constant <value> -> <type>`
 - Control flow: `if <cond> then ^then() { ... } else ^else() { ... }`
-- Functions: `call @name(args...) -> <type>`, `ret <value>`
+- Functions: `call.named @name(args...) -> <type>`, `ret <value>`
 
 **Lowered stage** (`@lowered`): unstructured control flow with lifted functions
 - Same arithmetic/comparison/bitwise/constant ops

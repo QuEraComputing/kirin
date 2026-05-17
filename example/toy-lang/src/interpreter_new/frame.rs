@@ -9,6 +9,8 @@ use kirin_interpreter_new::{
 };
 use kirin_scf::interpreter_new::{ForFrame, IfFrame, ScfFrame};
 
+use crate::language::{HighLevel, LowLevel};
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum ToyFrame<L: Dialect, V, T = ConcreteBlockTransfer<V>> {
     Standard(StandardFrame<L, V, T>),
@@ -153,6 +155,124 @@ where
         match self {
             Self::Standard(frame) => frame.resume(completion, interp),
             Self::Scf(frame) => frame.resume(completion, interp),
+        }
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ToyStageFrame<V, T = ConcreteBlockTransfer<V>> {
+    Source(ToyFrame<HighLevel, V, T>),
+    Lowered(ToyFrame<LowLevel, V, T>),
+}
+
+impl<V, T> TryLiftFrom<ToyFrame<HighLevel, V, T>> for ToyStageFrame<V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: ToyFrame<HighLevel, V, T>) -> Result<Self, Self::Error> {
+        Ok(Self::Source(frame))
+    }
+}
+
+impl<V, T> TryLiftFrom<ToyFrame<LowLevel, V, T>> for ToyStageFrame<V, T> {
+    type Error = Infallible;
+
+    fn try_lift_from(frame: ToyFrame<LowLevel, V, T>) -> Result<Self, Self::Error> {
+        Ok(Self::Lowered(frame))
+    }
+}
+
+macro_rules! impl_stage_lift {
+    ($language:ty, $variant:ident, $frame:ty) => {
+        impl<V, T> TryLiftFrom<$frame> for ToyStageFrame<V, T> {
+            type Error = Infallible;
+
+            fn try_lift_from(frame: $frame) -> Result<Self, Self::Error> {
+                frame.try_lift().map(Self::$variant)
+            }
+        }
+    };
+}
+
+impl_stage_lift!(
+    HighLevel,
+    Source,
+    StandardFrame<HighLevel, V, T>
+);
+impl_stage_lift!(
+    LowLevel,
+    Lowered,
+    StandardFrame<LowLevel, V, T>
+);
+impl_stage_lift!(HighLevel, Source, StatementFrame);
+impl_stage_lift!(HighLevel, Source, AbstractBranchFrame<HighLevel, V>);
+impl_stage_lift!(LowLevel, Lowered, AbstractBranchFrame<LowLevel, V>);
+impl_stage_lift!(HighLevel, Source, BlockFrame<HighLevel, V, T>);
+impl_stage_lift!(LowLevel, Lowered, BlockFrame<LowLevel, V, T>);
+impl_stage_lift!(HighLevel, Source, RegionFrame<HighLevel, V, T>);
+impl_stage_lift!(LowLevel, Lowered, RegionFrame<LowLevel, V, T>);
+impl_stage_lift!(HighLevel, Source, CallFrame<HighLevel, V>);
+impl_stage_lift!(LowLevel, Lowered, CallFrame<LowLevel, V>);
+impl_stage_lift!(HighLevel, Source, FunctionFrame<HighLevel, V>);
+impl_stage_lift!(LowLevel, Lowered, FunctionFrame<LowLevel, V>);
+impl_stage_lift!(HighLevel, Source, StagedFunctionFrame<HighLevel, V>);
+impl_stage_lift!(LowLevel, Lowered, StagedFunctionFrame<LowLevel, V>);
+impl_stage_lift!(
+    HighLevel,
+    Source,
+    SpecializedFunctionFrame<HighLevel, V>
+);
+impl_stage_lift!(
+    LowLevel,
+    Lowered,
+    SpecializedFunctionFrame<LowLevel, V>
+);
+impl_stage_lift!(HighLevel, Source, ScfFrame<HighLevel, ArithType, V, T>);
+impl_stage_lift!(HighLevel, Source, IfFrame<HighLevel, ArithType, V, T>);
+impl_stage_lift!(HighLevel, Source, ForFrame<HighLevel, ArithType, V, T>);
+
+impl<V, T> HasLocation for ToyStageFrame<V, T> {
+    fn location(&self) -> Location {
+        match self {
+            Self::Source(frame) => frame.location(),
+            Self::Lowered(frame) => frame.location(),
+        }
+    }
+}
+
+impl<I, C, E, V, T> Frame<I, ToyStageFrame<V, T>, C, E> for ToyStageFrame<V, T>
+where
+    StandardFrame<HighLevel, V, T>: Frame<I, ToyStageFrame<V, T>, C, E>,
+    ScfFrame<HighLevel, ArithType, V, T>: Frame<I, ToyStageFrame<V, T>, C, E>,
+    StandardFrame<LowLevel, V, T>: Frame<I, ToyStageFrame<V, T>, C, E>,
+{
+    fn step(self, interp: &mut I) -> Result<FrameEffect<ToyStageFrame<V, T>, C>, E> {
+        match self {
+            Self::Source(ToyFrame::Standard(frame)) => frame.step(interp),
+            Self::Source(ToyFrame::Scf(frame)) => frame.step(interp),
+            Self::Lowered(ToyFrame::Standard(frame)) => frame.step(interp),
+            Self::Lowered(ToyFrame::Scf(_)) => unreachable!("low-level toy frames do not use scf"),
+        }
+    }
+
+    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<ToyStageFrame<V, T>, C>, E> {
+        match self {
+            Self::Source(ToyFrame::Standard(frame)) => frame.resume_done(interp),
+            Self::Source(ToyFrame::Scf(frame)) => frame.resume_done(interp),
+            Self::Lowered(ToyFrame::Standard(frame)) => frame.resume_done(interp),
+            Self::Lowered(ToyFrame::Scf(_)) => unreachable!("low-level toy frames do not use scf"),
+        }
+    }
+
+    fn resume(
+        self,
+        completion: C,
+        interp: &mut I,
+    ) -> Result<FrameEffect<ToyStageFrame<V, T>, C>, E> {
+        match self {
+            Self::Source(ToyFrame::Standard(frame)) => frame.resume(completion, interp),
+            Self::Source(ToyFrame::Scf(frame)) => frame.resume(completion, interp),
+            Self::Lowered(ToyFrame::Standard(frame)) => frame.resume(completion, interp),
+            Self::Lowered(ToyFrame::Scf(_)) => unreachable!("low-level toy frames do not use scf"),
         }
     }
 }

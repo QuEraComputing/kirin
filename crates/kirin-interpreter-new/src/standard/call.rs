@@ -6,11 +6,10 @@ use kirin_ir::{
 };
 
 use crate::{
-    Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError, Location, ProjectOrSelf,
+    Env, EnvIndex, Frame, FrameEffect, FunctionEntryTarget, FunctionInvocation,
+    FunctionInvocationDispatch, HasLocation, InterpreterError, Location, ProjectOrSelf,
     StandardCompletion,
 };
-
-use super::{FunctionFrame, SpecializedFunctionFrame, StagedFunctionFrame};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Callee {
@@ -22,6 +21,7 @@ pub enum Callee {
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct CallFrame<L, V> {
     pub location: Location,
+    pub callee_stage: kirin_ir::CompileStage,
     pub callee: Callee,
     pub args: Product<SSAValue>,
     pub caller_env: EnvIndex,
@@ -37,8 +37,20 @@ impl<L, V> CallFrame<L, V> {
         caller_env: EnvIndex,
         results: Product<SSAValue>,
     ) -> Self {
+        Self::new_in_stage(location, location.stage, callee, args, caller_env, results)
+    }
+
+    pub fn new_in_stage(
+        location: Location,
+        callee_stage: kirin_ir::CompileStage,
+        callee: Callee,
+        args: Product<SSAValue>,
+        caller_env: EnvIndex,
+        results: Product<SSAValue>,
+    ) -> Self {
         Self {
             location,
+            callee_stage,
             callee,
             args,
             caller_env,
@@ -56,18 +68,12 @@ impl<L, V> HasLocation for CallFrame<L, V> {
 
 impl<I, L, F, C, E, V> Frame<I, F, C, E> for CallFrame<L, V>
 where
-    I: Env<V, Error = E>,
+    I: Env<V, Error = E> + FunctionInvocationDispatch<F, E, V>,
     L: Dialect,
-    F: TryLiftFrom<CallFrame<L, V>>
-        + TryLiftFrom<FunctionFrame<L, V>>
-        + TryLiftFrom<StagedFunctionFrame<L, V>>
-        + TryLiftFrom<SpecializedFunctionFrame<L, V>>,
+    F: TryLiftFrom<CallFrame<L, V>>,
     C: TryLiftFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
     E: LiftFrom<InterpreterError>
         + From<<F as TryLiftFrom<CallFrame<L, V>>>::Error>
-        + From<<F as TryLiftFrom<FunctionFrame<L, V>>>::Error>
-        + From<<F as TryLiftFrom<StagedFunctionFrame<L, V>>>::Error>
-        + From<<F as TryLiftFrom<SpecializedFunctionFrame<L, V>>>::Error>
         + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
@@ -76,18 +82,18 @@ where
             .iter()
             .map(|arg| interp.read(self.caller_env, *arg))
             .collect::<Result<Product<_>, _>>()?;
-        let stage = self.location.stage;
-        let child = match self.callee {
-            Callee::Function(function) => {
-                FunctionFrame::<L, V>::new(stage, function, args).try_lift()?
-            }
-            Callee::StagedFunction(function) => {
-                StagedFunctionFrame::<L, V>::new(stage, function, args).try_lift()?
-            }
+        let target = match self.callee {
+            Callee::Function(function) => FunctionEntryTarget::Function(function),
+            Callee::StagedFunction(function) => FunctionEntryTarget::StagedFunction(function),
             Callee::SpecializedFunction(function) => {
-                SpecializedFunctionFrame::<L, V>::new(stage, function, args).try_lift()?
+                FunctionEntryTarget::SpecializedFunction(function)
             }
         };
+        let child = interp.dispatch_function_invocation(FunctionInvocation::new(
+            self.callee_stage,
+            target,
+            args,
+        ))?;
         Ok(FrameEffect::Push {
             parent: self.try_lift()?,
             child,

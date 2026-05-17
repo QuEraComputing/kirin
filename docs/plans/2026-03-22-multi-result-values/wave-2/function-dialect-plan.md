@@ -70,12 +70,12 @@ The interpret impls must produce `SmallVec`-wrapped Continuation variants and us
 - [ ] **Write roundtrip test for multi-result call**
   In `tests/roundtrip/function.rs`:
   ```
-  %a, %b = call @foo(%x) -> i32, f64
+  %a, %b = call.named @foo(%x) -> i32, f64
   ```
 
 - [ ] **Write roundtrip test for void call (no results)**
   ```
-  call @bar(%x)
+  call.named @bar(%x)
   ```
 
 - [ ] **Write roundtrip test for multi-value return**
@@ -186,7 +186,7 @@ cargo test --doc -p kirin-function            # Expected: all doctests pass
 1. `Call` supports 0-to-N results via `Vec<ResultValue>` with `[...]` optional format section.
 2. `Return` carries `Vec<SSAValue>` for multi-value return.
 3. Interpret impls produce correctly-shaped `Continuation::Call` and `Continuation::Return`.
-4. Void call (`call @bar(%x)` with no results) roundtrips correctly.
+4. Void call (`call.named @bar(%x)` with no results) roundtrips correctly.
 5. Multi-result call roundtrips correctly.
 6. Multi-value return roundtrips correctly.
 7. All existing tests updated and passing.

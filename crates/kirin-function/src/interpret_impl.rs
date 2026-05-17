@@ -5,7 +5,10 @@ use kirin_interpreter::{
 };
 use smallvec::smallvec;
 
-use crate::{Bind, Call, Function, Lambda, Lexical, Lifted, Return};
+use crate::{
+    Bind, Call, CallFunction, CallLike, CallNamed, CallSpecialized, CallStaged, Function, Lambda,
+    Lexical, Lifted, Return,
+};
 
 /// Shared interpret logic for any type with a single region body: resolve stage,
 /// find the entry block, and jump to it.
@@ -130,7 +133,7 @@ where
     }
 }
 
-impl<'ir, I, T> Interpretable<'ir, I> for Call<T>
+impl<'ir, I, T> Interpretable<'ir, I> for CallNamed<T>
 where
     I: Interpreter<'ir>,
     I::Value: Clone,
@@ -142,7 +145,7 @@ where
         I::Error: From<InterpreterError>,
         L: Interpretable<'ir, I> + 'ir,
     {
-        let stage_id = interp.active_stage();
+        let stage_id = self.stage().unwrap_or(interp.active_stage());
         let stage = interp.resolve_stage::<L>()?;
         let target_name = stage
             .symbol_table()
@@ -203,6 +206,171 @@ where
             results: self.results().iter().copied().collect(),
         })
     }
+}
+
+impl<'ir, I, T> Interpretable<'ir, I> for CallFunction<T>
+where
+    I: Interpreter<'ir>,
+    I::Value: Clone,
+    T: kirin::prelude::CompileTimeValue,
+{
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
+        let stage_id = self.stage().unwrap_or(interp.active_stage());
+        let stage = interp.resolve_stage::<L>()?;
+        let function = self.target();
+        let staged_function = interp
+            .pipeline()
+            .function_info(function)
+            .and_then(|info| info.staged_function(stage_id))
+            .ok_or(InterpreterError::StageResolution {
+                stage: stage_id,
+                kind: StageResolutionError::MissingFunction { function },
+            })?;
+        let staged_info =
+            staged_function
+                .get_info(stage)
+                .ok_or(InterpreterError::StageResolution {
+                    stage: stage_id,
+                    kind: StageResolutionError::MissingFunction { function },
+                })?;
+        let callee = staged_info
+            .unique_live_specialization()
+            .map_err(|error| match error {
+                kirin::prelude::UniqueLiveSpecializationError::NoSpecialization => {
+                    InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: StageResolutionError::NoSpecialization { staged_function },
+                    }
+                }
+                kirin::prelude::UniqueLiveSpecializationError::Ambiguous { count } => {
+                    InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: StageResolutionError::AmbiguousSpecialization {
+                            staged_function,
+                            count,
+                        },
+                    }
+                }
+            })?;
+        call_continuation(self, interp, stage_id, callee)
+    }
+}
+
+impl<'ir, I, T> Interpretable<'ir, I> for CallStaged<T>
+where
+    I: Interpreter<'ir>,
+    I::Value: Clone,
+    T: kirin::prelude::CompileTimeValue,
+{
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
+        let stage_id = self.stage().unwrap_or(interp.active_stage());
+        let stage = interp.resolve_stage::<L>()?;
+        let staged_function = self.target();
+        let staged_info =
+            staged_function
+                .get_info(stage)
+                .ok_or(InterpreterError::StageResolution {
+                    stage: stage_id,
+                    kind: StageResolutionError::NoSpecialization { staged_function },
+                })?;
+        let callee = staged_info
+            .unique_live_specialization()
+            .map_err(|error| match error {
+                kirin::prelude::UniqueLiveSpecializationError::NoSpecialization => {
+                    InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: StageResolutionError::NoSpecialization { staged_function },
+                    }
+                }
+                kirin::prelude::UniqueLiveSpecializationError::Ambiguous { count } => {
+                    InterpreterError::StageResolution {
+                        stage: stage_id,
+                        kind: StageResolutionError::AmbiguousSpecialization {
+                            staged_function,
+                            count,
+                        },
+                    }
+                }
+            })?;
+        call_continuation(self, interp, stage_id, callee)
+    }
+}
+
+impl<'ir, I, T> Interpretable<'ir, I> for CallSpecialized<T>
+where
+    I: Interpreter<'ir>,
+    I::Value: Clone,
+    T: kirin::prelude::CompileTimeValue,
+{
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
+        call_continuation(
+            self,
+            interp,
+            self.stage().unwrap_or(interp.active_stage()),
+            self.target(),
+        )
+    }
+}
+
+impl<'ir, I, T> Interpretable<'ir, I> for Call<T>
+where
+    I: Interpreter<'ir>,
+    I::Value: Clone,
+    T: kirin::prelude::CompileTimeValue,
+{
+    fn interpret<L>(&self, interp: &mut I) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+    where
+        I::StageInfo: HasStageInfo<L>,
+        I::Error: From<InterpreterError>,
+        L: Interpretable<'ir, I> + 'ir,
+    {
+        match self {
+            Self::Named(call) => call.interpret::<L>(interp),
+            Self::Function(call) => call.interpret::<L>(interp),
+            Self::Staged(call) => call.interpret::<L>(interp),
+            Self::Specialized(call) => call.interpret::<L>(interp),
+        }
+    }
+}
+
+fn call_continuation<'ir, I, T, C>(
+    call: &C,
+    interp: &mut I,
+    stage: kirin::prelude::CompileStage,
+    callee: kirin::prelude::SpecializedFunction,
+) -> Result<Continuation<I::Value, I::Ext>, I::Error>
+where
+    I: Interpreter<'ir>,
+    I::Value: Clone,
+    T: kirin::prelude::CompileTimeValue,
+    C: CallLike<T>,
+{
+    let args = call
+        .args()
+        .iter()
+        .map(|ssa| interp.read(*ssa))
+        .collect::<Result<kirin_interpreter::Args<I::Value>, _>>()?;
+    Ok(Continuation::Call {
+        callee,
+        stage,
+        args,
+        results: call.results().iter().copied().collect(),
+    })
 }
 
 impl<'ir, I, T> Interpretable<'ir, I> for Return<T>

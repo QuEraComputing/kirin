@@ -28,6 +28,10 @@ pub trait FunctionInvocationFrame<V>: Sized {
     fn from_function_invocation(invocation: FunctionInvocation<V>) -> Result<Self, Self::Error>;
 }
 
+pub trait FunctionInvocationDispatch<F, E, V> {
+    fn dispatch_function_invocation(&mut self, invocation: FunctionInvocation<V>) -> Result<F, E>;
+}
+
 impl<L, V, T> FunctionInvocationFrame<V> for StandardFrame<L, V, T> {
     type Language = L;
     type Error = core::convert::Infallible;
@@ -111,6 +115,29 @@ impl<V> FunctionInvocation<V> {
     }
 }
 
+impl<'ir, S, F, C, E, V> FunctionInvocationDispatch<F, E, V>
+    for ConcreteInterpreter<'ir, S, F, C, E, V>
+where
+    F: FunctionInvocationFrame<V>,
+    E: From<<F as FunctionInvocationFrame<V>>::Error>,
+{
+    fn dispatch_function_invocation(&mut self, invocation: FunctionInvocation<V>) -> Result<F, E> {
+        F::from_function_invocation(invocation).map_err(E::from)
+    }
+}
+
+impl<'ir, S, F, C, E, Store, V> FunctionInvocationDispatch<F, E, V>
+    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
+where
+    Store: Env<V>,
+    F: FunctionInvocationFrame<V>,
+    E: From<<F as FunctionInvocationFrame<V>>::Error>,
+{
+    fn dispatch_function_invocation(&mut self, invocation: FunctionInvocation<V>) -> Result<F, E> {
+        F::from_function_invocation(invocation).map_err(E::from)
+    }
+}
+
 pub struct FunctionInvokeBuilder<'a, I> {
     interp: &'a mut I,
     stage: CompileStage,
@@ -165,8 +192,9 @@ impl<'a, I> FunctionInvokeTargetBuilder<'a, I> {
 impl<'a, 'ir, S, F, C, E, V>
     FunctionInvokeTargetBuilder<'a, ConcreteInterpreter<'ir, S, F, C, E, V>>
 where
-    F: FunctionInvocationFrame<V> + Frame<ConcreteInterpreter<'ir, S, F, C, E, V>, F, C, E>,
-    E: LiftFrom<InterpreterError> + From<<F as FunctionInvocationFrame<V>>::Error>,
+    ConcreteInterpreter<'ir, S, F, C, E, V>: FunctionInvocationDispatch<F, E, V>,
+    F: Frame<ConcreteInterpreter<'ir, S, F, C, E, V>, F, C, E>,
+    E: LiftFrom<InterpreterError>,
 {
     pub fn args<A>(self, args: A) -> Result<C, E>
     where
@@ -174,7 +202,7 @@ where
     {
         let invocation =
             FunctionInvocation::new(self.stage, self.target, args.into_iter().collect());
-        let frame = F::from_function_invocation(invocation).map_err(E::from)?;
+        let frame = self.interp.dispatch_function_invocation(invocation)?;
         self.interp.push_frame(frame);
         self.interp.run()
     }
@@ -186,14 +214,14 @@ impl<'a, 'ir, S, F, C, E, Store>
     pub fn args<V, A>(self, args: A) -> Result<C, E>
     where
         Store: Env<V>,
-        F: FunctionInvocationFrame<V>
-            + Frame<AbstractInterpreterWithStore<'ir, S, F, C, E, Store>, F, C, E>,
-        E: LiftFrom<InterpreterError> + From<<F as FunctionInvocationFrame<V>>::Error>,
+        AbstractInterpreterWithStore<'ir, S, F, C, E, Store>: FunctionInvocationDispatch<F, E, V>,
+        F: Frame<AbstractInterpreterWithStore<'ir, S, F, C, E, Store>, F, C, E>,
+        E: LiftFrom<InterpreterError>,
         A: IntoIterator<Item = V>,
     {
         let invocation =
             FunctionInvocation::new(self.stage, self.target, args.into_iter().collect());
-        let frame = F::from_function_invocation(invocation).map_err(E::from)?;
+        let frame = self.interp.dispatch_function_invocation(invocation)?;
         self.interp.push_frame(frame);
         self.interp.run()
     }
