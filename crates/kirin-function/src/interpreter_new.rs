@@ -8,8 +8,8 @@ use kirin::prelude::{
 use kirin_interpreter_new::{
     AbstractBlockTransfer, AbstractInterpreterWithStore, BlockTransfer, CallFrame, Callee,
     ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, FunctionEntry, Interpretable,
-    InterpreterError, Location, RegionFrame, SimpleFixpointInterpreter, StageAccess,
-    StandardCompletion, StatementEffect, Summary,
+    InterpreterError, Location, RegionFrame, StageAccess, StandardCompletion,
+    StandardFixpointInterpreter, StatementEffect, Summary,
 };
 
 use crate::{Bind, Call, Function, Lambda, Lexical, Lifted, Return};
@@ -78,8 +78,8 @@ where
     }
 }
 
-impl<'ir, S, K, L, F, C, E, V, Sum, Store> FunctionRegionDispatch<L, F, E, V>
-    for SimpleFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store>
+impl<'ir, S, K, L, F, C, E, V, Sum, Store, Deps> FunctionRegionDispatch<L, F, E, V>
+    for StandardFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store, Deps>
 where
     S: HasStageInfo<L>,
     K: Clone + Eq + Hash,
@@ -145,8 +145,8 @@ where
     }
 }
 
-impl<'ir, S, K, L, F, C, E, Sum, Store> CallTargetResolution<L>
-    for SimpleFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store>
+impl<'ir, S, K, L, F, C, E, Sum, Store, Deps> CallTargetResolution<L>
+    for StandardFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store, Deps>
 where
     S: HasStageInfo<L>,
     K: Clone + Eq + Hash,

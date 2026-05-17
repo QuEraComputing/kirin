@@ -58,8 +58,17 @@ impl<I> Frame<I, CounterFrame, u8, InterpreterError> for CounterFrame {
 
 struct CounterSemantics;
 
-type CounterInterp<'ir> =
-    SimpleFixpointInterpreter<'ir, (), u8, CounterFrame, u8, InterpreterError, CounterSummary, ()>;
+type CounterInterp<'ir> = StandardFixpointInterpreter<
+    'ir,
+    (),
+    u8,
+    CounterFrame,
+    u8,
+    InterpreterError,
+    CounterSummary,
+    (),
+    OwnerSummaryDeps<u8>,
+>;
 
 impl<'ir> OwnerSemantics<CounterInterp<'ir>, u8, CounterSummary, CounterFrame, u8, InterpreterError>
     for CounterSemantics

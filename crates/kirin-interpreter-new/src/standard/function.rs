@@ -8,8 +8,8 @@ use kirin_ir::{
 
 use crate::{
     AbstractInterpreterWithStore, ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect,
-    HasLocation, InterpreterError, Location, Position, SimpleFixpointInterpreter, StageAccess,
-    StandardCompletion, Summary, Traversal,
+    HasLocation, InterpreterError, Location, Position, StageAccess, StandardCompletion,
+    StandardFixpointInterpreter, Summary, Traversal,
 };
 
 pub trait FunctionAccess<L: Dialect> {
@@ -149,8 +149,8 @@ where
     }
 }
 
-impl<'ir, Stage, K, F, C, E, Sum, Store, L> FunctionAccess<L>
-    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store>
+impl<'ir, Stage, K, F, C, E, Sum, Store, Deps, L> FunctionAccess<L>
+    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store, Deps>
 where
     Stage: HasStageInfo<L>,
     K: Clone + Eq + Hash,
@@ -277,8 +277,8 @@ where
     }
 }
 
-impl<'ir, Stage, K, L, F, C, E, V, Sum, Store> FunctionBodyDispatch<L, F, E, V>
-    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store>
+impl<'ir, Stage, K, L, F, C, E, V, Sum, Store, Deps> FunctionBodyDispatch<L, F, E, V>
+    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store, Deps>
 where
     L: Dialect,
     L: FunctionEntry<L, Self, F, E, V>,

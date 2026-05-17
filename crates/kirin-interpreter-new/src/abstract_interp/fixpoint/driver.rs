@@ -2,35 +2,52 @@ use std::collections::{HashMap, VecDeque};
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use kirin_ir::{LiftFrom, Pipeline};
+use kirin_ir::Pipeline;
+use smallvec::SmallVec;
 
-use super::{FixpointPhase, OwnerSemantics, Summary, SummaryEffect, WorkItem};
-use crate::{Frame, InterpreterError};
+use super::{FixpointPhase, OwnerSummaryDeps, Summary, SummaryEffect, WorkItem};
 
-pub struct SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
+pub struct StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, Deps>
 where
     S: Summary,
 {
     pub(super) pipeline: &'ir Pipeline<Stage>,
-    summaries: HashMap<K, S>,
+    pub(super) summaries: HashMap<K, S>,
     pub(super) store: Store,
-    worklist: VecDeque<WorkItem<K>>,
-    phase: FixpointPhase,
-    strategy: S::Strategy,
+    pub(super) deps: Deps,
+    pub(super) worklist: VecDeque<WorkItem<K>>,
+    pub(super) frame_stack: SmallVec<[F; 8]>,
+    pub(super) current_owner: Option<K>,
+    pub(super) pending_effects: Vec<SummaryEffect<K, S>>,
+    pub(super) phase: FixpointPhase,
+    pub(super) strategy: S::Strategy,
     _marker: PhantomData<(F, C, E)>,
 }
 
-impl<'ir, Stage, K, F, C, E, S, Store> SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
+pub type SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store> =
+    StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, OwnerSummaryDeps<K>>;
+
+impl<'ir, Stage, K, F, C, E, S, Store, Deps>
+    StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, Deps>
 where
     K: Clone + Eq + Hash,
     S: Summary,
 {
-    pub fn new(pipeline: &'ir Pipeline<Stage>, store: Store, strategy: S::Strategy) -> Self {
+    pub fn with_dependency_index(
+        pipeline: &'ir Pipeline<Stage>,
+        store: Store,
+        strategy: S::Strategy,
+        deps: Deps,
+    ) -> Self {
         Self {
             pipeline,
             summaries: HashMap::new(),
             store,
+            deps,
             worklist: VecDeque::new(),
+            frame_stack: SmallVec::new(),
+            current_owner: None,
+            pending_effects: Vec::new(),
             phase: FixpointPhase::Join,
             strategy,
             _marker: PhantomData,
@@ -47,6 +64,14 @@ where
 
     pub fn store_mut(&mut self) -> &mut Store {
         &mut self.store
+    }
+
+    pub fn dependency_index(&self) -> &Deps {
+        &self.deps
+    }
+
+    pub fn dependency_index_mut(&mut self) -> &mut Deps {
+        &mut self.deps
     }
 
     pub fn phase(&self) -> FixpointPhase {
@@ -69,133 +94,30 @@ where
         self.worklist.push_back(WorkItem::Analyze(owner));
     }
 
-    pub fn ensure_owner<Sem>(&mut self, semantics: &mut Sem, owner: K) -> Result<(), E>
-    where
-        Sem: OwnerSemantics<Self, K, S, F, C, E>,
-    {
-        if self.summaries.contains_key(&owner) {
-            return Ok(());
-        }
-
-        let summary = semantics.bottom_summary(self, &owner)?;
-        self.summaries.insert(owner, summary);
-        Ok(())
+    pub fn frame_stack(&self) -> &[F] {
+        self.frame_stack.as_slice()
     }
 
-    pub fn solve<Sem>(&mut self, semantics: &mut Sem, entry: K) -> Result<(), E>
-    where
-        F: Frame<Self, F, C, E>,
-        Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: LiftFrom<InterpreterError>,
-    {
-        self.ensure_owner(semantics, entry.clone())?;
-        self.phase = FixpointPhase::Widen;
-        self.schedule(entry);
-        self.drain_worklist(semantics)
+    pub fn clear_frame_stack(&mut self) {
+        self.frame_stack.clear();
     }
 
-    pub fn run_narrowing<Sem>(&mut self, semantics: &mut Sem, iterations: usize) -> Result<(), E>
-    where
-        F: Frame<Self, F, C, E>,
-        Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: LiftFrom<InterpreterError>,
-    {
-        self.phase = FixpointPhase::Narrow;
-        for owner in self.summaries.keys().cloned().collect::<Vec<_>>() {
-            self.schedule(owner);
-        }
-
-        for _ in 0..iterations {
-            if self.worklist.is_empty() {
-                break;
-            }
-            self.drain_worklist(semantics)?;
-        }
-
-        Ok(())
+    pub fn current_owner(&self) -> Option<&K> {
+        self.current_owner.as_ref()
     }
 
-    pub fn drain_worklist<Sem>(&mut self, semantics: &mut Sem) -> Result<(), E>
-    where
-        F: Frame<Self, F, C, E>,
-        Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: LiftFrom<InterpreterError>,
-    {
-        while let Some(WorkItem::Analyze(owner)) = self.worklist.pop_front() {
-            self.analyze_owner(semantics, owner)?;
-        }
-
-        Ok(())
+    pub fn push_summary_effect(&mut self, effect: SummaryEffect<K, S>) {
+        self.pending_effects.push(effect);
     }
+}
 
-    pub fn merge_summary<Sem>(
-        &mut self,
-        semantics: &mut Sem,
-        owner: K,
-        candidate: S,
-    ) -> Result<bool, E>
-    where
-        Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: LiftFrom<InterpreterError>,
-    {
-        self.ensure_owner(semantics, owner.clone())?;
-        let summary = self
-            .summaries
-            .get_mut(&owner)
-            .ok_or(InterpreterError::Custom(
-                "missing summary after owner initialization",
-            ))
-            .map_err(E::lift_from)?;
-
-        let changed = summary
-            .merge(self.phase, candidate, &mut self.strategy)
-            .is_some();
-        if changed {
-            self.schedule(owner);
-        }
-        Ok(changed)
-    }
-
-    fn analyze_owner<Sem>(&mut self, semantics: &mut Sem, owner: K) -> Result<(), E>
-    where
-        F: Frame<Self, F, C, E>,
-        Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: LiftFrom<InterpreterError>,
-    {
-        let summary = self
-            .summaries
-            .get(&owner)
-            .ok_or(InterpreterError::Custom("missing summary for work item"))
-            .map_err(E::lift_from)?
-            .clone();
-        let root = semantics.entry_frame(self, &owner, &summary)?;
-        let completion = self.run_frame(root)?;
-        let effect = semantics.complete_owner(self, owner, completion)?;
-        self.apply_summary_effect(semantics, effect)?;
-        Ok(())
-    }
-
-    fn apply_summary_effect<Sem>(
-        &mut self,
-        semantics: &mut Sem,
-        effect: SummaryEffect<K, S>,
-    ) -> Result<(), E>
-    where
-        Sem: OwnerSemantics<Self, K, S, F, C, E>,
-        E: LiftFrom<InterpreterError>,
-    {
-        match effect {
-            SummaryEffect::None => Ok(()),
-            SummaryEffect::Update { owner, candidate } => {
-                self.merge_summary(semantics, owner, candidate)?;
-                Ok(())
-            }
-            SummaryEffect::Many(updates) => {
-                for (owner, candidate) in updates {
-                    self.merge_summary(semantics, owner, candidate)?;
-                }
-                Ok(())
-            }
-        }
+impl<'ir, Stage, K, F, C, E, S, Store>
+    StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, OwnerSummaryDeps<K>>
+where
+    K: Clone + Eq + Hash,
+    S: Summary,
+{
+    pub fn new(pipeline: &'ir Pipeline<Stage>, store: Store, strategy: S::Strategy) -> Self {
+        Self::with_dependency_index(pipeline, store, strategy, OwnerSummaryDeps::new())
     }
 }

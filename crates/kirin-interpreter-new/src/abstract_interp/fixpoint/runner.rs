@@ -4,9 +4,10 @@ use kirin_ir::LiftFrom;
 
 use crate::{Frame, FrameEffect, InterpreterError, StepResult};
 
-use super::{SimpleFixpointInterpreter, Summary};
+use super::{StandardFixpointInterpreter, Summary};
 
-impl<'ir, Stage, K, F, C, E, S, Store> SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
+impl<'ir, Stage, K, F, C, E, S, Store, Deps>
+    StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, Deps>
 where
     K: Clone + Eq + Hash,
     S: Summary,
@@ -16,25 +17,26 @@ where
         F: Frame<Self, F, C, E>,
         E: LiftFrom<InterpreterError>,
     {
-        let mut stack = vec![root];
+        if !self.frame_stack.is_empty() {
+            return Err(E::lift_from(InterpreterError::Custom(
+                "cannot start a frame run with a non-empty frame stack",
+            )));
+        }
+        self.frame_stack.push(root);
 
         loop {
-            let frame = match stack.pop() {
+            let frame = match self.frame_stack.pop() {
                 Some(frame) => frame,
                 None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
             };
             let effect = frame.step(self)?;
-            if let StepResult::Complete(completion) = self.apply_local_effect(&mut stack, effect)? {
+            if let StepResult::Complete(completion) = self.apply_local_effect(effect)? {
                 return Ok(completion);
             }
         }
     }
 
-    fn apply_local_effect(
-        &mut self,
-        stack: &mut Vec<F>,
-        mut effect: FrameEffect<F, C>,
-    ) -> Result<StepResult<C>, E>
+    fn apply_local_effect(&mut self, mut effect: FrameEffect<F, C>) -> Result<StepResult<C>, E>
     where
         F: Frame<Self, F, C, E>,
         E: LiftFrom<InterpreterError>,
@@ -42,23 +44,23 @@ where
         loop {
             match effect {
                 FrameEffect::Continue(frame) => {
-                    stack.push(frame);
+                    self.frame_stack.push(frame);
                     return Ok(StepResult::Running);
                 }
                 FrameEffect::Push { parent, child } => {
-                    stack.push(parent);
-                    stack.push(child);
+                    self.frame_stack.push(parent);
+                    self.frame_stack.push(child);
                     return Ok(StepResult::Running);
                 }
                 FrameEffect::Done => {
-                    let parent = match stack.pop() {
+                    let parent = match self.frame_stack.pop() {
                         Some(parent) => parent,
                         None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
                     };
                     effect = parent.resume_done(self)?;
                 }
                 FrameEffect::Complete(completion) => {
-                    if let Some(parent) = stack.pop() {
+                    if let Some(parent) = self.frame_stack.pop() {
                         effect = parent.resume(completion, self)?;
                     } else {
                         return Ok(StepResult::Complete(completion));

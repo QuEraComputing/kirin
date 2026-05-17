@@ -5,7 +5,7 @@ use kirin_ir::{CompileStage, Dialect, LiftFrom, TryLift, TryLiftFrom};
 use crate::{
     AbstractBlockTransfer, AbstractBranchFrame, AbstractInterpreterWithStore, AbstractValue,
     ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, ForkEnv, FrameEffect,
-    InterpreterError, SimpleFixpointInterpreter, StandardCompletion, Summary,
+    InterpreterError, StandardCompletion, StandardFixpointInterpreter, Summary,
 };
 
 pub trait BlockTransferDispatch<L: Dialect, F, C, E, V, T> {
@@ -99,9 +99,9 @@ where
     }
 }
 
-impl<'ir, Stage, K, L, F, C, E, V, S, Store>
+impl<'ir, Stage, K, L, F, C, E, V, S, Store, Deps>
     BlockTransferDispatch<L, F, C, E, V, AbstractBlockTransfer<V>>
-    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
+    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, Deps>
 where
     K: Clone + Eq + Hash,
     L: Dialect,

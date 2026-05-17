@@ -6,7 +6,7 @@ use super::AbstractBranchFrame;
 use crate::{
     AbstractBlockTransfer, AbstractInterpreterWithStore, AbstractValue, BlockFrame,
     ConcreteInterpreter, Env, Frame, FrameEffect, InterpreterError, ProjectOrSelf,
-    SimpleFixpointInterpreter, StandardCompletion, Summary,
+    StandardCompletion, StandardFixpointInterpreter, Summary,
 };
 
 mod sealed {
@@ -28,15 +28,15 @@ where
 {
 }
 
-impl<'ir, Stage, K, F, C, E, Sum, Store> sealed::Sealed
-    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store>
+impl<'ir, Stage, K, F, C, E, Sum, Store, Deps> sealed::Sealed
+    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store, Deps>
 where
     Sum: Summary,
 {
 }
 
-impl<'ir, Stage, K, F, C, E, V, Sum, Store> AbstractBranchShell<V>
-    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store>
+impl<'ir, Stage, K, F, C, E, V, Sum, Store, Deps> AbstractBranchShell<V>
+    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store, Deps>
 where
     K: Clone + Eq + Hash,
     Sum: Summary,

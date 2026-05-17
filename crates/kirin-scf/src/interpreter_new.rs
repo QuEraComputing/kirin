@@ -23,8 +23,8 @@ use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue
 use kirin_interpreter_new::{
     AbstractInterpreterWithStore, AbstractValue, BlockFrame, BlockTransfer, BranchCondition,
     ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, Frame, FrameEffect, HasLocation,
-    Interpretable, InterpreterError, Location, ProjectOrSelf, SimpleFixpointInterpreter,
-    StatementEffect, Summary,
+    Interpretable, InterpreterError, Location, ProjectOrSelf, StandardFixpointInterpreter,
+    StatementEffect, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
 
 use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
@@ -58,6 +58,17 @@ pub trait ScfForDispatch<L: Dialect, T: CompileTimeValue, F, C, E, V, X> {
         &mut self,
         continuation: ForContinuation<L, T, V, X>,
     ) -> Result<FrameEffect<F, C>, E>;
+}
+
+pub trait ScfForFixpointSummary<L: Dialect, T: CompileTimeValue, V, X, K>: Summary
+where
+    X: BlockTransfer<Value = V>,
+{
+    fn scf_for_owner(continuation: &ForContinuation<L, T, V, X>) -> Option<K>;
+
+    fn scf_for_initial_summary(continuation: &ForContinuation<L, T, V, X>) -> Self;
+
+    fn scf_for_results(&self) -> Option<Product<V>>;
 }
 
 impl<'ir, S, L, F, C, E, V, T> ScfBlockDispatch<L, F, E, V, T>
@@ -167,8 +178,8 @@ where
     }
 }
 
-impl<'ir, Stage, K, L, F, C, E, V, T, Sum, Store> ScfBlockDispatch<L, F, E, V, T>
-    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store>
+impl<'ir, Stage, K, L, F, C, E, V, T, Sum, Store, Deps> ScfBlockDispatch<L, F, E, V, T>
+    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store, Deps>
 where
     Stage: HasStageInfo<L>,
     K: Clone + Eq + Hash,
@@ -191,16 +202,17 @@ where
     }
 }
 
-impl<'ir, S, K, L, T, F, C, E, V, X, Sum, Store> ScfForDispatch<L, T, F, C, E, V, X>
-    for SimpleFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store>
+impl<'ir, S, K, L, T, F, C, E, V, X, Sum, Store, Deps> ScfForDispatch<L, T, F, C, E, V, X>
+    for StandardFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store, Deps>
 where
     S: HasStageInfo<L>,
     K: Clone + Eq + Hash,
     L: Dialect,
     T: CompileTimeValue,
-    Sum: Summary,
+    Sum: ScfForFixpointSummary<L, T, V, X, K>,
     Store: Env<V>,
-    E: LiftFrom<InterpreterError> + LiftFrom<<Store as Env<V>>::Error>,
+    Deps: SummaryDependencyIndex<K>,
+    E: LiftFrom<InterpreterError> + LiftFrom<<Store as Env<V>>::Error> + LiftFrom<Deps::Error>,
     V: AbstractValue,
     X: BlockTransfer<Value = V>,
 {
@@ -208,6 +220,38 @@ where
         &mut self,
         continuation: ForContinuation<L, T, V, X>,
     ) -> Result<FrameEffect<F, C>, E> {
+        if let Some(owner) = Sum::scf_for_owner(&continuation) {
+            let initial = Sum::scf_for_initial_summary(&continuation);
+            let values = self
+                .summary(&owner)
+                .and_then(Sum::scf_for_results)
+                .or_else(|| initial.scf_for_results())
+                .unwrap_or_else(|| {
+                    continuation
+                        .results
+                        .iter()
+                        .map(|_| V::top())
+                        .collect::<Product<_>>()
+                });
+
+            if let Some(current_owner) = self.current_owner().cloned() {
+                self.dependency_index_mut()
+                    .register(&owner, SummaryDependency::Reanalyze(current_owner))
+                    .map_err(E::lift_from)?;
+            }
+            self.push_summary_effect(SummaryEffect::Update {
+                owner,
+                candidate: initial,
+            });
+            write_results(
+                self,
+                continuation.env,
+                continuation.results.as_slice(),
+                values,
+            )?;
+            return Ok(FrameEffect::Done);
+        }
+
         let values = continuation
             .results
             .iter()
@@ -246,8 +290,8 @@ where
     }
 }
 
-impl<'ir, S, K, L, F, C, E, V, Sum, Store> ScfIfDispatch<L, F, C, E, V>
-    for SimpleFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store>
+impl<'ir, S, K, L, F, C, E, V, Sum, Store, Deps> ScfIfDispatch<L, F, C, E, V>
+    for StandardFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store, Deps>
 where
     S: HasStageInfo<L>,
     K: Clone + Eq + Hash,

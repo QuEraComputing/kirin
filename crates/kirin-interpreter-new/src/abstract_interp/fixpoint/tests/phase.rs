@@ -36,8 +36,17 @@ impl HasLocation for PhaseFrame {
     }
 }
 
-type PhaseInterp<'ir> =
-    SimpleFixpointInterpreter<'ir, (), u8, PhaseFrame, u8, InterpreterError, PhaseSummary, ()>;
+type PhaseInterp<'ir> = StandardFixpointInterpreter<
+    'ir,
+    (),
+    u8,
+    PhaseFrame,
+    u8,
+    InterpreterError,
+    PhaseSummary,
+    (),
+    OwnerSummaryDeps<u8>,
+>;
 
 impl<'ir> Frame<PhaseInterp<'ir>, PhaseFrame, u8, InterpreterError> for PhaseFrame {
     fn step(
