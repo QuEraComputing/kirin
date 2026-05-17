@@ -322,7 +322,10 @@ fn build_caller_with_function_call(
     target: &str,
 ) -> Statement {
     let target_symbol = stage.symbol_table_mut().intern(target.to_string());
-    let call = kirin_function::Call::<ArithType>::new(stage, 1, target_symbol, vec![]);
+    let call = kirin_function::Call::<ArithType>::build(stage)
+        .named(target_symbol)
+        .results(1)
+        .insert();
     let ret = Return::<ArithType>::new(stage, vec![call.results[0].into()]);
     let block = stage.block().stmt(call).terminator(ret).new();
     let region = stage.region().add_block(block).new();
@@ -332,6 +335,69 @@ fn build_caller_with_function_call(
         kirin_ir::Signature::new(vec![], ArithType::default(), ()),
     )
     .into()
+}
+
+fn build_caller_with_staged_call(
+    stage: &mut BuilderStageInfo<FunctionCallLang>,
+    target: StagedFunction,
+    target_stage: CompileStage,
+) -> Statement {
+    let call = kirin_function::Call::<ArithType>::build(stage)
+        .in_stage(target_stage)
+        .staged(target)
+        .results(1)
+        .insert();
+    let ret = Return::<ArithType>::new(stage, vec![call.results[0].into()]);
+    let block = stage.block().stmt(call).terminator(ret).new();
+    let region = stage.region().add_block(block).new();
+    FunctionBody::<ArithType>::new(
+        stage,
+        region,
+        kirin_ir::Signature::new(vec![], ArithType::default(), ()),
+    )
+    .into()
+}
+
+#[test]
+fn test_staged_call_uses_explicit_stage_for_specialization_lookup() {
+    let mut pipeline: Pipeline<StageInfo<FunctionCallLang>> = Pipeline::new();
+    let stage_a = pipeline.add_stage().stage(StageInfo::default()).new();
+    let stage_b = pipeline.add_stage().stage(StageInfo::default()).new();
+
+    let callee_func = pipeline.function().name("callee").new().unwrap();
+    let caller_func = pipeline.function().name("caller").new().unwrap();
+
+    let callee_staged_a = pipeline
+        .staged_function::<FunctionCallLang>()
+        .func(callee_func)
+        .stage(stage_a)
+        .new()
+        .unwrap();
+    let caller_staged_b = pipeline
+        .staged_function::<FunctionCallLang>()
+        .func(caller_func)
+        .stage(stage_b)
+        .new()
+        .unwrap();
+
+    {
+        pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
+            specialize_return_const(b, callee_staged_a, 17, false);
+        });
+    }
+
+    let caller_spec = pipeline.stage_mut(stage_b).unwrap().with_builder(|b| {
+        let body = build_caller_with_staged_call(b, callee_staged_a, stage_a);
+        b.specialize()
+            .staged_func(caller_staged_b)
+            .body(body)
+            .new()
+            .unwrap()
+    });
+
+    let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_b);
+    let result = interp.call(caller_spec, stage_b, &[]).unwrap();
+    assert_eq!(result, 17);
 }
 
 #[test]

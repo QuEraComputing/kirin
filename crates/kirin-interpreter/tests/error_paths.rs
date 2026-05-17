@@ -75,7 +75,11 @@ fn build_recursive_func(
 
         // call_block(arg): call rec(arg); ret call_result
         let rec_symbol = b.symbol_table_mut().intern("rec".to_string());
-        let call = kirin_function::Call::<ArithType>::new(b, 1, rec_symbol, vec![call_arg]);
+        let call = kirin_function::Call::<ArithType>::build(b)
+            .named(rec_symbol)
+            .args(vec![call_arg])
+            .results(1)
+            .insert();
         let ret_call = Return::<ArithType>::new(b, vec![call.results[0].into()]);
         {
             let call_stmt: Statement = call.into();
@@ -506,7 +510,10 @@ fn test_halt_during_nested_call() {
 
     let caller_spec = pipeline.stage_mut(stage_id).unwrap().with_builder(|b| {
         let halter_sym = b.symbol_table_mut().intern("halter".to_string());
-        let call = kirin_function::Call::<ArithType>::new(b, 1, halter_sym, vec![]);
+        let call = kirin_function::Call::<ArithType>::build(b)
+            .named(halter_sym)
+            .results(1)
+            .insert();
         let ret = Return::<ArithType>::new(b, vec![call.results[0].into()]);
         let block = b.block().stmt(call).terminator(ret).new();
         let region = b.region().add_block(block).new();

@@ -262,6 +262,9 @@ fn build_fn_body(
         ConstructorBuilder::new_struct(&input.name, is_tuple)
             .build_with_self(&info.fields, field_value)
     };
+    let name = &input.name;
+    let (_, ty_generics, _) = input.generics.split_for_impl();
+    let self_ty = quote! { #name #ty_generics };
 
     let build_result_path = build_result_path(input, info);
     let result_names = result_names(info);
@@ -273,7 +276,7 @@ fn build_fn_body(
 
         stage
             .statement()
-            .definition(#constructor)
+            .definition(<Lang as #crate_path::LiftFrom<#self_ty>>::lift_from(#constructor))
             .new();
 
         #build_result_path {
@@ -416,7 +419,7 @@ pub(super) fn build_fn_for_statement(
         #[allow(clippy::too_many_arguments)]
         pub fn #build_fn_name<Lang>(stage: &mut impl #crate_path::AsBuildStage<Lang>, #(#inputs),*) -> #build_result_path
         where
-            Lang: #crate_path::Dialect + From<#self_ty>,
+            Lang: #crate_path::Dialect + #crate_path::LiftFrom<#self_ty>,
             Lang::Type: From<#ir_type>
             #placeholder_bound
         {

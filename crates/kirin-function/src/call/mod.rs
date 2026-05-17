@@ -1,9 +1,7 @@
 use kirin::prelude::*;
 
-mod parser;
-
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(builders, type = T)]
+#[kirin(type = T)]
 #[chumsky(format = "$named {target}({args})[ -> {results:type}]")]
 pub struct CallNamed<T: CompileTimeValue> {
     target: Symbol,
@@ -16,7 +14,7 @@ pub struct CallNamed<T: CompileTimeValue> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(builders, type = T)]
+#[kirin(type = T)]
 #[chumsky(format = "$function {target}({args})[ -> {results:type}]")]
 pub struct CallFunction<T: CompileTimeValue> {
     target: Function,
@@ -29,7 +27,7 @@ pub struct CallFunction<T: CompileTimeValue> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(builders, type = T)]
+#[kirin(type = T)]
 #[chumsky(format = "$staged {target}({args})[ -> {results:type}]")]
 pub struct CallStaged<T: CompileTimeValue> {
     target: StagedFunction,
@@ -42,7 +40,7 @@ pub struct CallStaged<T: CompileTimeValue> {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
-#[kirin(builders, type = T)]
+#[kirin(type = T)]
 #[chumsky(format = "$specialized {target}({args})[ -> {results:type}]")]
 pub struct CallSpecialized<T: CompileTimeValue> {
     target: SpecializedFunction,
@@ -54,17 +52,14 @@ pub struct CallSpecialized<T: CompileTimeValue> {
     marker: std::marker::PhantomData<T>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, PrettyPrint)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[wraps]
-#[kirin(builders, type = T)]
+#[kirin(type = T)]
+#[chumsky(format = "call")]
 pub enum Call<T: CompileTimeValue> {
-    #[chumsky(format = "call")]
     Named(CallNamed<T>),
-    #[chumsky(format = "call")]
     Function(CallFunction<T>),
-    #[chumsky(format = "call")]
     Staged(CallStaged<T>),
-    #[chumsky(format = "call")]
     Specialized(CallSpecialized<T>),
 }
 
@@ -84,12 +79,10 @@ pub mod call_build_result {
     }
 }
 
-pub trait CallLike<T: CompileTimeValue> {
+pub trait CallLike<T: CompileTimeValue>: for<'a> HasArguments<'a> + for<'a> HasResults<'a> {
     type Target: Copy;
 
     fn target(&self) -> Self::Target;
-    fn args(&self) -> &[SSAValue];
-    fn results(&self) -> &[ResultValue];
     fn stage(&self) -> Option<CompileStage>;
 }
 
@@ -100,14 +93,6 @@ macro_rules! impl_call_like {
 
             fn target(&self) -> Self::Target {
                 self.target
-            }
-
-            fn args(&self) -> &[SSAValue] {
-                &self.args
-            }
-
-            fn results(&self) -> &[ResultValue] {
-                &self.results
             }
 
             fn stage(&self) -> Option<CompileStage> {
@@ -122,24 +107,116 @@ impl_call_like!(CallFunction, Function);
 impl_call_like!(CallStaged, StagedFunction);
 impl_call_like!(CallSpecialized, SpecializedFunction);
 
+macro_rules! impl_call_from {
+    ($variant:ident, $ty:ident) => {
+        impl<T: CompileTimeValue> From<$ty<T>> for Call<T> {
+            fn from(value: $ty<T>) -> Self {
+                Self::$variant(value)
+            }
+        }
+    };
+}
+
+impl_call_from!(Named, CallNamed);
+impl_call_from!(Function, CallFunction);
+impl_call_from!(Staged, CallStaged);
+impl_call_from!(Specialized, CallSpecialized);
+
 impl<T: CompileTimeValue> Call<T> {
-    #[allow(clippy::new_ret_no_self)]
-    pub fn new<Lang>(
-        stage: &mut impl AsBuildStage<Lang>,
-        num_results: usize,
-        target: impl Into<Symbol>,
-        args: impl Into<Vec<SSAValue>>,
-    ) -> call_build_result::Call
+    pub fn build<Lang>(stage: &mut impl AsBuildStage<Lang>) -> CallBuilder<'_, Lang, T>
     where
-        Lang: Dialect + From<Self>,
-        Lang::Type: From<T>,
-        T: Placeholder,
+        Lang: Dialect,
     {
-        let stage = stage.as_build_stage();
-        let statement = stage.statement_arena().next_id();
-        let results: Vec<ResultValue> = (0..num_results)
+        CallBuilder {
+            stage: stage.as_build_stage(),
+            compile_stage: None,
+            marker: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct CallBuilder<'a, Lang, T>
+where
+    Lang: Dialect,
+    T: CompileTimeValue,
+{
+    stage: &'a mut BuilderStageInfo<Lang>,
+    compile_stage: Option<CompileStage>,
+    marker: std::marker::PhantomData<T>,
+}
+
+impl<'a, Lang, T> CallBuilder<'a, Lang, T>
+where
+    Lang: Dialect,
+    T: CompileTimeValue,
+{
+    pub fn in_stage(mut self, stage: CompileStage) -> Self {
+        self.compile_stage = Some(stage);
+        self
+    }
+
+    pub fn named(self, target: impl Into<Symbol>) -> CallTargetBuilder<'a, Lang, T> {
+        self.with_target(CallTarget::Named(target.into()))
+    }
+
+    pub fn function(self, target: Function) -> CallTargetBuilder<'a, Lang, T> {
+        self.with_target(CallTarget::Function(target))
+    }
+
+    pub fn staged(self, target: StagedFunction) -> CallTargetBuilder<'a, Lang, T> {
+        self.with_target(CallTarget::Staged(target))
+    }
+
+    pub fn specialized(self, target: SpecializedFunction) -> CallTargetBuilder<'a, Lang, T> {
+        self.with_target(CallTarget::Specialized(target))
+    }
+
+    fn with_target(self, target: CallTarget) -> CallTargetBuilder<'a, Lang, T> {
+        CallTargetBuilder {
+            stage: self.stage,
+            compile_stage: self.compile_stage,
+            target,
+            args: Vec::new(),
+            result_count: 0,
+            marker: std::marker::PhantomData,
+        }
+    }
+}
+
+pub struct CallTargetBuilder<'a, Lang, T>
+where
+    Lang: Dialect,
+    T: CompileTimeValue,
+{
+    stage: &'a mut BuilderStageInfo<Lang>,
+    compile_stage: Option<CompileStage>,
+    target: CallTarget,
+    args: Vec<SSAValue>,
+    result_count: usize,
+    marker: std::marker::PhantomData<T>,
+}
+
+impl<Lang, T> CallTargetBuilder<'_, Lang, T>
+where
+    Lang: Dialect + LiftFrom<Call<T>>,
+    Lang::Type: From<T>,
+    T: CompileTimeValue + Placeholder,
+{
+    pub fn args(mut self, args: impl Into<Vec<SSAValue>>) -> Self {
+        self.args = args.into();
+        self
+    }
+
+    pub fn results(mut self, count: usize) -> Self {
+        self.result_count = count;
+        self
+    }
+
+    pub fn insert(self) -> call_build_result::Call {
+        let statement = self.stage.statement_arena().next_id();
+        let results: Vec<ResultValue> = (0..self.result_count)
             .map(|index| {
-                stage
+                self.stage
                     .ssa()
                     .ty(T::placeholder().into())
                     .kind(BuilderSSAKind::Result(statement, index))
@@ -147,46 +224,62 @@ impl<T: CompileTimeValue> Call<T> {
                     .into()
             })
             .collect();
-        let target = target.into();
-        let args = args.into();
-        let id = stage
+        let definition = self
+            .target
+            .into_call(self.compile_stage, self.args, results.clone());
+        let id = self
+            .stage
             .statement()
-            .definition(Self::Named(CallNamed {
-                target,
-                args,
-                results: results.clone(),
-                compile_stage: None,
-                marker: std::marker::PhantomData,
-            }))
+            .definition(Lang::lift_from(definition))
             .new();
         debug_assert_eq!(id, statement);
         call_build_result::Call { id, results }
     }
+}
 
-    pub fn args(&self) -> &[SSAValue] {
-        match self {
-            Self::Named(call) => call.args(),
-            Self::Function(call) => call.args(),
-            Self::Staged(call) => call.args(),
-            Self::Specialized(call) => call.args(),
-        }
-    }
+enum CallTarget {
+    Named(Symbol),
+    Function(Function),
+    Staged(StagedFunction),
+    Specialized(SpecializedFunction),
+}
 
-    pub fn results(&self) -> &[ResultValue] {
+impl CallTarget {
+    fn into_call<T: CompileTimeValue>(
+        self,
+        compile_stage: Option<CompileStage>,
+        args: Vec<SSAValue>,
+        results: Vec<ResultValue>,
+    ) -> Call<T> {
         match self {
-            Self::Named(call) => CallLike::results(call),
-            Self::Function(call) => CallLike::results(call),
-            Self::Staged(call) => CallLike::results(call),
-            Self::Specialized(call) => CallLike::results(call),
-        }
-    }
-
-    pub fn stage(&self) -> Option<CompileStage> {
-        match self {
-            Self::Named(call) => call.stage(),
-            Self::Function(call) => call.stage(),
-            Self::Staged(call) => call.stage(),
-            Self::Specialized(call) => call.stage(),
+            Self::Named(target) => Call::Named(CallNamed {
+                target,
+                args,
+                results,
+                compile_stage,
+                marker: std::marker::PhantomData,
+            }),
+            Self::Function(target) => Call::Function(CallFunction {
+                target,
+                args,
+                results,
+                compile_stage,
+                marker: std::marker::PhantomData,
+            }),
+            Self::Staged(target) => Call::Staged(CallStaged {
+                target,
+                args,
+                results,
+                compile_stage,
+                marker: std::marker::PhantomData,
+            }),
+            Self::Specialized(target) => Call::Specialized(CallSpecialized {
+                target,
+                args,
+                results,
+                compile_stage,
+                marker: std::marker::PhantomData,
+            }),
         }
     }
 }

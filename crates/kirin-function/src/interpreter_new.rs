@@ -2,7 +2,8 @@ use std::hash::Hash;
 
 use kirin::ir::{LiftFrom, TryLift, TryLiftFrom};
 use kirin::prelude::{
-    CompileTimeValue, Dialect, HasRegionBody, HasStageInfo, Product, SSAValue, Symbol,
+    CompileTimeValue, Dialect, HasArguments, HasRegionBody, HasResults, HasStageInfo, Product,
+    SSAValue, Symbol,
 };
 use kirin_interpreter_new::{
     AbstractBlockTransfer, AbstractInterpreterWithStore, BlockTransfer, CallFrame, Callee,
@@ -276,8 +277,8 @@ where
         let target_location =
             Location::new(self.stage().unwrap_or(location.stage), location.position);
         let target = interp.resolve_call_target(target_location, self.target())?;
-        let args = self.args().iter().copied().collect();
-        let results = self.results().iter().copied().map(SSAValue::from).collect();
+        let args = self.arguments().copied().collect();
+        let results = self.results().copied().map(SSAValue::from).collect();
         let callee = match target.target {
             FunctionEntryTarget::Function(function) => Callee::Function(function),
             FunctionEntryTarget::StagedFunction(function) => Callee::StagedFunction(function),
@@ -376,8 +377,8 @@ where
     Target: Copy,
 {
     let stage = call.stage().unwrap_or(location.stage);
-    let args = call.args().iter().copied().collect();
-    let results = call.results().iter().copied().map(SSAValue::from).collect();
+    let args = call.arguments().copied().collect();
+    let results = call.results().copied().map(SSAValue::from).collect();
     CallFrame::<L, X::Value>::new_in_stage(location, stage, callee, args, env, results)
         .try_lift()
         .map(StatementEffect::Push)

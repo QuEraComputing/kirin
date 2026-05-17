@@ -1,4 +1,6 @@
-use kirin::prelude::{CompileTimeValue, Dialect, GetInfo, HasRegionBody, HasStageInfo};
+use kirin::prelude::{
+    CompileTimeValue, Dialect, GetInfo, HasArguments, HasRegionBody, HasResults, HasStageInfo,
+};
 use kirin_interpreter::{
     Continuation, Interpretable, Interpreter, InterpreterError, ProductValue, SSACFGRegion,
     StageResolutionError,
@@ -147,6 +149,7 @@ where
     {
         let stage_id = self.stage().unwrap_or(interp.active_stage());
         let stage = interp.resolve_stage::<L>()?;
+        let target_stage = interp.resolve_stage_info::<L>(stage_id)?;
         let target_name = stage
             .symbol_table()
             .resolve(self.target())
@@ -169,7 +172,7 @@ where
             })?;
         let staged_info =
             staged_function
-                .get_info(stage)
+                .get_info(target_stage)
                 .ok_or(InterpreterError::StageResolution {
                     stage: stage_id,
                     kind: StageResolutionError::MissingFunction { function },
@@ -195,15 +198,14 @@ where
             })?;
 
         let args = self
-            .args()
-            .iter()
+            .arguments()
             .map(|ssa| interp.read(*ssa))
             .collect::<Result<kirin_interpreter::Args<I::Value>, _>>()?;
         Ok(Continuation::Call {
             callee,
             stage: stage_id,
             args,
-            results: self.results().iter().copied().collect(),
+            results: self.results().copied().collect(),
         })
     }
 }
@@ -221,7 +223,7 @@ where
         L: Interpretable<'ir, I> + 'ir,
     {
         let stage_id = self.stage().unwrap_or(interp.active_stage());
-        let stage = interp.resolve_stage::<L>()?;
+        let stage = interp.resolve_stage_info::<L>(stage_id)?;
         let function = self.target();
         let staged_function = interp
             .pipeline()
@@ -274,7 +276,7 @@ where
         L: Interpretable<'ir, I> + 'ir,
     {
         let stage_id = self.stage().unwrap_or(interp.active_stage());
-        let stage = interp.resolve_stage::<L>()?;
+        let stage = interp.resolve_stage_info::<L>(stage_id)?;
         let staged_function = self.target();
         let staged_info =
             staged_function
@@ -361,15 +363,14 @@ where
     C: CallLike<T>,
 {
     let args = call
-        .args()
-        .iter()
+        .arguments()
         .map(|ssa| interp.read(*ssa))
         .collect::<Result<kirin_interpreter::Args<I::Value>, _>>()?;
     Ok(Continuation::Call {
         callee,
         stage,
         args,
-        results: call.results().iter().copied().collect(),
+        results: call.results().copied().collect(),
     })
 }
 

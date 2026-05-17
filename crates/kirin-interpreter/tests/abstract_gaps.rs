@@ -74,7 +74,11 @@ fn build_abstract_recursive(
 
         // call_block(arg): call rec(arg); ret call_result
         let rec_sym = b.symbol_table_mut().intern("rec".to_string());
-        let call = kirin_function::Call::<ArithType>::new(b, 1, rec_sym, vec![call_arg]);
+        let call = kirin_function::Call::<ArithType>::build(b)
+            .named(rec_sym)
+            .args(vec![call_arg])
+            .results(1)
+            .insert();
         let ret_call = Return::<ArithType>::new(b, vec![call.results[0].into()]);
         {
             let call_stmt: Statement = call.into();

@@ -1,7 +1,7 @@
 use super::*;
 use kirin::ir::{
-    HasArguments, HasBlocks, HasRegions, HasSuccessors, IsConstant, IsPure, IsSpeculatable,
-    IsTerminator, TestSSAValue,
+    HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
+    IsSpeculatable, IsTerminator, TestSSAValue,
 };
 use kirin_test_types::UnitType;
 
@@ -37,7 +37,7 @@ fn not_speculatable() {
 
 #[test]
 fn has_one_result() {
-    assert_eq!(CallLike::results(&make_call(0)).len(), 1);
+    assert_eq!(make_call(0).results().count(), 1);
 }
 
 #[test]
@@ -64,17 +64,19 @@ fn target_accessor() {
 #[test]
 fn args_accessor_multiple() {
     let call = make_call(3);
-    assert_eq!(call.args().len(), 3);
-    assert_eq!(call.args()[0], TestSSAValue(0).into());
-    assert_eq!(call.args()[1], TestSSAValue(1).into());
-    assert_eq!(call.args()[2], TestSSAValue(2).into());
+    let args: Vec<_> = call.arguments().copied().collect();
+    assert_eq!(args.len(), 3);
+    assert_eq!(args[0], TestSSAValue(0).into());
+    assert_eq!(args[1], TestSSAValue(1).into());
+    assert_eq!(args[2], TestSSAValue(2).into());
 }
 
 #[test]
 fn results_accessor() {
     let call = make_call(0);
-    assert_eq!(CallLike::results(&call).len(), 1);
-    assert_eq!(CallLike::results(&call)[0], TestSSAValue(100).into());
+    let results: Vec<_> = call.results().copied().collect();
+    assert_eq!(results.len(), 1);
+    assert_eq!(results[0], TestSSAValue(100).into());
 }
 
 #[test]

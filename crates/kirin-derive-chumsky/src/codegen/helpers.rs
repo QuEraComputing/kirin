@@ -88,7 +88,7 @@ impl HasGlobalFormat for crate::ChumskyGlobalAttrs {
 
 impl HasGlobalFormat for crate::PrettyGlobalAttrs {
     fn global_format(&self) -> Option<String> {
-        None
+        self.format.clone()
     }
 }
 

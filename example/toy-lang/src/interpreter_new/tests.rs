@@ -1,8 +1,12 @@
-use kirin::prelude::{GetInfo, HasStageInfo, ParsePipelineText, Pipeline, Product, StageInfo};
+use kirin::prelude::{
+    GetInfo, HasStageInfo, ParsePipelineText, Pipeline, Product, Signature, StageInfo,
+};
+use kirin_arith::ArithType;
+use kirin_function::{Call, Function, Return};
 use kirin_interpreter_new::{AbstractBlockTransfer, AbstractInterpreter, FunctionInvocation};
 
 use super::*;
-use crate::language::HighLevel;
+use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
 
 const ADD_LOWERED: &str = r#"
@@ -120,9 +124,84 @@ specialize @lowered fn @low_then_high(i64) -> i64 {
 }
 "#;
 
+const CROSS_STAGE_SPECIALIZED_CALLS: &str = r#"
+stage @source fn @source_direct_specialized(i64) -> i64;
+stage @source fn @dual_impl(i64) -> i64;
+stage @lowered fn @dual_impl(i64) -> i64;
+
+specialize @source fn @dual_impl(i64) -> i64 {
+  ^entry(%x: i64) {
+    %one = constant 1 -> i64;
+    %result = add %x, %one -> i64;
+    ret %result;
+  }
+}
+
+specialize @lowered fn @dual_impl(i64) -> i64 {
+  ^entry(%x: i64) {
+    %hundred = constant 100 -> i64;
+    %result = add %x, %hundred -> i64;
+    ret %result;
+  }
+}
+"#;
+
 fn build_pipeline(src: &str) -> Pipeline<Stage> {
     let mut pipeline = Pipeline::new();
     ParsePipelineText::parse(&mut pipeline, src).expect("parse failed");
+    pipeline
+}
+
+fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
+    let mut pipeline = build_pipeline(CROSS_STAGE_SPECIALIZED_CALLS);
+    let source_stage = pipeline.stage_by_name("source").unwrap();
+    let lowered_stage = pipeline.stage_by_name("lowered").unwrap();
+    let caller = pipeline
+        .resolve_staged_function("source_direct_specialized", source_stage)
+        .unwrap();
+    let lowered_dual_impl = pipeline
+        .resolve_staged_function("dual_impl", lowered_stage)
+        .unwrap();
+    let lowered_stage_meta = pipeline.stage(lowered_stage).unwrap();
+    let lowered_info: &StageInfo<LowLevel> = lowered_stage_meta.try_stage_info().unwrap();
+    let lowered_specialized = lowered_dual_impl
+        .get_info(lowered_info)
+        .unwrap()
+        .unique_live_specialization()
+        .unwrap();
+
+    let Stage::Source(source_info) = pipeline.stage_mut(source_stage).unwrap() else {
+        unreachable!("source stage id resolved to a non-source stage");
+    };
+    source_info.with_builder(|builder| {
+        let x = builder.block_argument().index(0).into();
+        let call = Call::<ArithType>::build(builder)
+            .in_stage(lowered_stage)
+            .specialized(lowered_specialized)
+            .args(vec![x])
+            .results(1)
+            .insert();
+        let ret = Return::<ArithType>::new(builder, vec![call.results[0].into()]);
+        let block = builder
+            .block()
+            .argument(ArithType::I64)
+            .stmt(call)
+            .terminator(ret)
+            .new();
+        let region = builder.region().add_block(block).new();
+        let body = Function::<ArithType>::new(
+            builder,
+            region,
+            Signature::new(vec![ArithType::I64], ArithType::I64, ()),
+        );
+        builder
+            .specialize()
+            .staged_func(caller)
+            .body(body)
+            .new()
+            .unwrap();
+    });
+
     pipeline
 }
 
@@ -291,6 +370,20 @@ fn constprop_fixpoint_cross_stage_calls_between_source_and_lowered() {
         analyze_lowered_constprop_fixpoint(&pipeline, "low_then_high", &[ConstProp::Const(-4)])
             .unwrap();
     assert_eq!(lowered_result, ConstProp::Const(5));
+}
+
+#[test]
+fn constprop_fixpoint_cross_stage_call_specialized_uses_direct_target() {
+    let pipeline = build_cross_stage_specialized_pipeline();
+
+    let result = analyze_source_constprop_fixpoint(
+        &pipeline,
+        "source_direct_specialized",
+        &[ConstProp::Const(5)],
+    )
+    .unwrap();
+
+    assert_eq!(result, ConstProp::Const(105));
 }
 
 #[test]

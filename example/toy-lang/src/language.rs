@@ -5,7 +5,7 @@ use kirin_cf::ControlFlow;
 use kirin_cmp::Cmp;
 use kirin_constant::Constant;
 use kirin_derive_interpreter::{Interpretable, SSACFGRegion};
-use kirin_function::{Lexical, Lifted};
+use kirin_function::{Call, Function, Lexical, Lifted, Return};
 use kirin_scf::StructuredControlFlow;
 
 /// Source-stage language: structured control flow + lexical lambdas.
@@ -33,6 +33,30 @@ pub enum HighLevel {
     Bitwise(Bitwise<ArithType>),
 }
 
+impl TryLiftFrom<Function<ArithType>> for HighLevel {
+    type Error = core::convert::Infallible;
+
+    fn try_lift_from(value: Function<ArithType>) -> Result<Self, Self::Error> {
+        Ok(Self::lift_from(Lexical::lift_from(value)))
+    }
+}
+
+impl TryLiftFrom<Call<ArithType>> for HighLevel {
+    type Error = core::convert::Infallible;
+
+    fn try_lift_from(value: Call<ArithType>) -> Result<Self, Self::Error> {
+        Ok(Self::lift_from(Lexical::lift_from(value)))
+    }
+}
+
+impl TryLiftFrom<Return<ArithType>> for HighLevel {
+    type Error = core::convert::Infallible;
+
+    fn try_lift_from(value: Return<ArithType>) -> Result<Self, Self::Error> {
+        Ok(Self::lift_from(Lexical::lift_from(value)))
+    }
+}
+
 /// Lowered-stage language: unstructured CF + lifted functions.
 #[derive(
     Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable, SSACFGRegion,
@@ -52,4 +76,28 @@ pub enum LowLevel {
     Bitwise(Bitwise<ArithType>),
     #[wraps]
     Cf(ControlFlow<ArithType>),
+}
+
+impl TryLiftFrom<Function<ArithType>> for LowLevel {
+    type Error = core::convert::Infallible;
+
+    fn try_lift_from(value: Function<ArithType>) -> Result<Self, Self::Error> {
+        Ok(Self::lift_from(Lifted::lift_from(value)))
+    }
+}
+
+impl TryLiftFrom<Call<ArithType>> for LowLevel {
+    type Error = core::convert::Infallible;
+
+    fn try_lift_from(value: Call<ArithType>) -> Result<Self, Self::Error> {
+        Ok(Self::lift_from(Lifted::lift_from(value)))
+    }
+}
+
+impl TryLiftFrom<Return<ArithType>> for LowLevel {
+    type Error = core::convert::Infallible;
+
+    fn try_lift_from(value: Return<ArithType>) -> Result<Self, Self::Error> {
+        Ok(Self::lift_from(Lifted::lift_from(value)))
+    }
 }

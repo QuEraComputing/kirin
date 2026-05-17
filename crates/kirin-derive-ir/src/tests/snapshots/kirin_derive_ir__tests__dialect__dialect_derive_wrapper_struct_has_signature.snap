@@ -1,5 +1,6 @@
 ---
 source: crates/kirin-derive-ir/src/tests/dialect.rs
+assertion_line: 241
 expression: code
 ---
 #[automatically_derived]
@@ -358,7 +359,7 @@ impl ::kirin::ir::HasSignature<Self> for WrapperOp {
 }
 #[automatically_derived]
 impl ::kirin::ir::TryLiftFrom<InnerOp> for WrapperOp {
-    type Error = ::kirin::ir::LiftError;
+    type Error = ::core::convert::Infallible;
     fn try_lift_from(from: InnerOp) -> ::core::result::Result<Self, Self::Error> {
         Ok(WrapperOp(from))
     }

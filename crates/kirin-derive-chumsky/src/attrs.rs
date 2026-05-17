@@ -36,13 +36,40 @@ pub struct ChumskyFieldAttrs {
     // Currently no field-level chumsky attributes
 }
 
-/// Global attributes for the `PrettyPrint` derive macro via `#[pretty(...)]`.
-#[derive(Debug, Clone, FromDeriveInput)]
-#[darling(attributes(pretty))]
+/// Global attributes for the `PrettyPrint` derive macro.
+///
+/// Pretty printing intentionally reuses `#[chumsky(format = ...)]` for layout,
+/// while `#[pretty(crate = ...)]` remains the crate-path override.
+#[derive(Debug, Clone)]
 pub struct PrettyGlobalAttrs {
     /// The path to the kirin-prettyless crate.
-    #[darling(rename = "crate")]
     pub crate_path: Option<syn::Path>,
+    /// Default format string for all variants/statements, read from `#[chumsky(format = ...)]`.
+    pub format: Option<String>,
+}
+
+impl FromDeriveInput for PrettyGlobalAttrs {
+    fn from_derive_input(input: &syn::DeriveInput) -> darling::Result<Self> {
+        #[derive(FromDeriveInput)]
+        #[darling(attributes(pretty), allow_unknown_fields)]
+        struct PrettyAttrs {
+            #[darling(rename = "crate")]
+            crate_path: Option<syn::Path>,
+        }
+
+        #[derive(FromDeriveInput)]
+        #[darling(attributes(chumsky), allow_unknown_fields)]
+        struct ChumskyAttrs {
+            format: Option<String>,
+        }
+
+        let pretty = PrettyAttrs::from_derive_input(input)?;
+        let chumsky = ChumskyAttrs::from_derive_input(input)?;
+        Ok(Self {
+            crate_path: pretty.crate_path,
+            format: chumsky.format,
+        })
+    }
 }
 
 impl HasCratePath for PrettyGlobalAttrs {
