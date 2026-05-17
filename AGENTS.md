@@ -23,6 +23,8 @@ cargo insta review               # Review snapshot test changes
 cargo build -p toy-lang          # Build the toy language example binary
 cargo run -p toy-lang -- parse example/toy-lang/programs/add.kirin  # Parse an example program from repo root
 cargo run -p toy-lang -- run example/toy-lang/programs/add.kirin --stage source --function main 3 5  # Execute toy-lang main with i64 args
+cargo run -p toy-lang -- run example/toy-lang/programs/add.kirin --stage source --function main --new-interpreter 3 5  # Execute via interpreter-new concrete path
+cargo run -p toy-lang -- run example/toy-lang/programs/branching.kirin --stage source --function abs --new-constprop 7  # Run interpreter-new constprop fixpoint analysis
 cargo nextest run -p toy-lang    # Run toy language example tests
 cargo build -p toy-qc            # Build the toy quantum-circuit example binary
 cargo run -p toy-qc -- parse example/toy-qc/programs/bell_pair.kirin  # Parse a toy-qc example program from repo root
