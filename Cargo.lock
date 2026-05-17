@@ -897,6 +897,7 @@ name = "kirin-interpreter-new"
 version = "0.1.0"
 dependencies = [
  "kirin-ir",
+ "smallvec",
  "thiserror 2.0.18",
 ]
 

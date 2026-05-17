@@ -14,6 +14,10 @@ pub use frame::ToyFrame;
 pub use run::{run_lowered_i64, run_source_i64};
 
 #[cfg(test)]
+pub(crate) use fixpoint::{
+    analyze_lowered_constprop_backward_dependencies, analyze_lowered_constprop_forward_dependencies,
+};
+#[cfg(test)]
 pub use run::{analyze_lowered_constprop, analyze_source_constprop};
 
 #[cfg(test)]

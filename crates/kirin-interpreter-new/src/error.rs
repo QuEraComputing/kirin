@@ -1,4 +1,8 @@
-use kirin_ir::{CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction, Symbol};
+use std::convert::Infallible;
+
+use kirin_ir::{
+    CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction, Symbol, TryLiftFrom,
+};
 use thiserror::Error;
 
 use crate::{EnvIndex, Location};
@@ -67,4 +71,12 @@ pub enum InterpreterError {
     },
     #[error("{0}")]
     Custom(&'static str),
+}
+
+impl TryLiftFrom<Infallible> for InterpreterError {
+    type Error = Infallible;
+
+    fn try_lift_from(error: Infallible) -> Result<Self, Self::Error> {
+        match error {}
+    }
 }

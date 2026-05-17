@@ -47,6 +47,39 @@ specialize @lowered fn @same(i64) -> i64 {
 }
 "#;
 
+const SOURCE_FOR_CARRIED_STABLE: &str = r#"
+stage @source fn @stable(i64, i64, i64) -> i64;
+
+specialize @source fn @stable(i64, i64, i64) -> i64 {
+  ^entry(%lo: i64, %hi: i64, %s: i64) {
+    %init = constant 0 -> i64;
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+      yield %acc;
+    } -> i64;
+    ret %sum;
+  }
+}
+"#;
+
+const DIRECTIONAL_LOWERED: &str = r#"
+stage @lowered fn @add(i64, i64) -> i64;
+stage @lowered fn @mul(i64, i64) -> i64;
+
+specialize @lowered fn @add(i64, i64) -> i64 {
+  ^entry(%a: i64, %b: i64) {
+    %result = add %a, %b -> i64;
+    ret %result;
+  }
+}
+
+specialize @lowered fn @mul(i64, i64) -> i64 {
+  ^entry(%a: i64, %b: i64) {
+    %result = mul %a, %b -> i64;
+    ret %result;
+  }
+}
+"#;
+
 fn build_pipeline(src: &str) -> Pipeline<Stage> {
     let mut pipeline = Pipeline::new();
     ParsePipelineText::parse(&mut pipeline, src).expect("parse failed");
@@ -103,6 +136,18 @@ fn constprop_fixpoint_source_unknown_branch_joins_yields() {
     let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
     let result = analyze_source_constprop_fixpoint(&pipeline, "abs", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Top);
+}
+
+#[test]
+fn constprop_fixpoint_source_for_owner_keeps_stable_carried_value() {
+    let pipeline = build_pipeline(SOURCE_FOR_CARRIED_STABLE);
+    let result = analyze_source_constprop_fixpoint(
+        &pipeline,
+        "stable",
+        &[ConstProp::Const(0), ConstProp::Top, ConstProp::Const(1)],
+    )
+    .unwrap();
+    assert_eq!(result, ConstProp::Const(0));
 }
 
 #[test]
@@ -170,6 +215,42 @@ fn constprop_fixpoint_lowered_unknown_cf_branch_joins_matching_returns() {
     let pipeline = build_pipeline(SAME_BRANCH_LOWERED);
     let result = analyze_lowered_constprop_fixpoint(&pipeline, "same", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Const(1));
+}
+
+#[test]
+fn constprop_fixpoint_forward_dependencies_run_real_toy_functions() {
+    let pipeline = build_pipeline(DIRECTIONAL_LOWERED);
+    let result = analyze_lowered_constprop_forward_dependencies(
+        &pipeline,
+        "add",
+        &[ConstProp::Const(2), ConstProp::Const(3)],
+        "mul",
+        &[ConstProp::Const(4), ConstProp::Const(5)],
+    )
+    .unwrap();
+
+    assert_eq!(result.source_value, ConstProp::Const(5));
+    assert_eq!(result.target_value, ConstProp::Const(20));
+    assert_eq!(result.source_visits, 1);
+    assert_eq!(result.target_visits, 1);
+}
+
+#[test]
+fn constprop_fixpoint_backward_dependencies_run_real_toy_functions() {
+    let pipeline = build_pipeline(DIRECTIONAL_LOWERED);
+    let result = analyze_lowered_constprop_backward_dependencies(
+        &pipeline,
+        "add",
+        &[ConstProp::Const(2), ConstProp::Const(3)],
+        "mul",
+        &[ConstProp::Const(4), ConstProp::Const(5)],
+    )
+    .unwrap();
+
+    assert_eq!(result.source_value, ConstProp::Const(5));
+    assert_eq!(result.target_value, ConstProp::Const(20));
+    assert_eq!(result.source_visits, 1);
+    assert_eq!(result.target_visits, 1);
 }
 
 #[test]

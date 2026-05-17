@@ -4,10 +4,10 @@ use kirin_ir::{CompileStage, Dialect, HasStageInfo, LiftFrom, SSAValue, StageInf
 
 use crate::{Env, EnvIndex, ForkEnv, InterpreterError, StageAccess};
 
-use super::{SimpleFixpointInterpreter, Summary};
+use super::{StandardFixpointInterpreter, Summary};
 
-impl<'ir, Stage, K, F, C, E, S, Store, V> Env<V>
-    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
+impl<'ir, Stage, K, F, C, E, S, Store, Deps, V> Env<V>
+    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, Deps>
 where
     K: Clone + Eq + Hash,
     S: Summary,
@@ -33,8 +33,8 @@ where
     }
 }
 
-impl<'ir, Stage, K, F, C, E, S, Store, V> ForkEnv<V>
-    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
+impl<'ir, Stage, K, F, C, E, S, Store, Deps, V> ForkEnv<V>
+    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, Deps>
 where
     K: Clone + Eq + Hash,
     S: Summary,
@@ -46,8 +46,8 @@ where
     }
 }
 
-impl<'ir, Stage, K, F, C, E, S, Store, L> StageAccess<L>
-    for SimpleFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store>
+impl<'ir, Stage, K, F, C, E, S, Store, Deps, L> StageAccess<L>
+    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, Deps>
 where
     Stage: HasStageInfo<L>,
     K: Clone + Eq + Hash,

@@ -5,4 +5,5 @@ edition = "2024"
 
 [dependencies]
 kirin-ir = { workspace = true }
+smallvec = { workspace = true }
 thiserror = { workspace = true }
