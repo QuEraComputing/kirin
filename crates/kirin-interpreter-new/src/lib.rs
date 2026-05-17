@@ -28,8 +28,9 @@ pub use frame::{Frame, HasLocation, ProjectOrSelf};
 pub use location::{Location, Position, Traversal};
 pub use standard::{
     AbstractBranchFrame, AbstractBranchState, BlockFrame, BlockTransferDispatch, CallFrame, Callee,
-    FunctionAccess, FunctionBodyDispatch, FunctionEntry, FunctionFrame, RegionFrame,
-    SpecializedFunctionFrame, SpecializedFunctionState, StagedFunctionFrame, StandardFrame,
-    StatementFrame,
+    FunctionAccess, FunctionBodyDispatch, FunctionEntry, FunctionEntryTarget, FunctionFrame,
+    FunctionInvocation, FunctionInvocationFrame, FunctionInvokeBuilder,
+    FunctionInvokeTargetBuilder, RegionFrame, SpecializedFunctionFrame, SpecializedFunctionState,
+    StagedFunctionFrame, StandardFrame, StatementFrame,
 };
 pub use value::{BranchCondition, HasProductValue};

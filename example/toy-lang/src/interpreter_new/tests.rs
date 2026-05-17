@@ -1,6 +1,8 @@
-use kirin::prelude::{ParsePipelineText, Pipeline};
+use kirin::prelude::{GetInfo, HasStageInfo, ParsePipelineText, Pipeline, Product, StageInfo};
+use kirin_interpreter_new::{AbstractBlockTransfer, AbstractInterpreter, FunctionInvocation};
 
 use super::*;
+use crate::language::HighLevel;
 use crate::stage::Stage;
 
 const ADD_LOWERED: &str = r#"
@@ -129,6 +131,91 @@ fn constprop_fixpoint_source_add() {
     )
     .unwrap();
     assert_eq!(result, ConstProp::Const(8));
+}
+
+#[test]
+fn constprop_fixpoint_source_entry_variants() {
+    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
+    let stage = pipeline.stage_by_name("source").unwrap();
+    let symbol = pipeline.lookup_symbol("main").unwrap();
+    let function = pipeline.function_by_name(symbol).unwrap();
+    let staged = pipeline.resolve_staged_function("main", stage).unwrap();
+    let stage_meta = pipeline.stage(stage).unwrap();
+    let stage_info: &StageInfo<HighLevel> = stage_meta.try_stage_info().unwrap();
+    let specialized = staged
+        .get_info(stage_info)
+        .unwrap()
+        .specializations()
+        .iter()
+        .find(|specialization| !specialization.is_invalidated())
+        .unwrap()
+        .id();
+    let args = || Product::from_vec(vec![ConstProp::Const(3), ConstProp::Const(5)]);
+
+    assert_eq!(
+        super::fixpoint::analyze_source_constprop_invocation(
+            &pipeline,
+            FunctionInvocation::function(stage, function, args())
+        )
+        .unwrap(),
+        ConstProp::Const(8)
+    );
+    assert_eq!(
+        super::fixpoint::analyze_source_constprop_invocation(
+            &pipeline,
+            FunctionInvocation::staged_function(stage, staged, args())
+        )
+        .unwrap(),
+        ConstProp::Const(8)
+    );
+    assert_eq!(
+        super::fixpoint::analyze_source_constprop_invocation(
+            &pipeline,
+            FunctionInvocation::specialized_function(stage, specialized, args())
+        )
+        .unwrap(),
+        ConstProp::Const(8)
+    );
+
+    let mut staged_interp: AbstractInterpreter<
+        '_,
+        Stage,
+        ToyFrame<HighLevel, ConstProp, AbstractBlockTransfer<ConstProp>>,
+        ToyCompletion<ConstProp>,
+        ToyError,
+        ConstProp,
+    > = AbstractInterpreter::new(&pipeline);
+    assert_eq!(
+        super::run::expect_function_return(
+            staged_interp
+                .invoke(stage)
+                .staged(staged)
+                .args(args())
+                .unwrap()
+        )
+        .unwrap(),
+        ConstProp::Const(8)
+    );
+
+    let mut specialized_interp: AbstractInterpreter<
+        '_,
+        Stage,
+        ToyFrame<HighLevel, ConstProp, AbstractBlockTransfer<ConstProp>>,
+        ToyCompletion<ConstProp>,
+        ToyError,
+        ConstProp,
+    > = AbstractInterpreter::new(&pipeline);
+    assert_eq!(
+        super::run::expect_function_return(
+            specialized_interp
+                .invoke(stage)
+                .specialized(specialized)
+                .args(args())
+                .unwrap()
+        )
+        .unwrap(),
+        ConstProp::Const(8)
+    );
 }
 
 #[test]

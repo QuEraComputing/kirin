@@ -4,8 +4,8 @@ use kirin::prelude::{Dialect, TryLift, TryLiftFrom};
 use kirin_arith::ArithType;
 use kirin_interpreter_new::{
     AbstractBranchFrame, BlockFrame, CallFrame, ConcreteBlockTransfer, Frame, FrameEffect,
-    FunctionFrame, HasLocation, Location, RegionFrame, SpecializedFunctionFrame,
-    StagedFunctionFrame, StandardFrame, StatementFrame,
+    FunctionFrame, FunctionInvocation, FunctionInvocationFrame, HasLocation, Location, RegionFrame,
+    SpecializedFunctionFrame, StagedFunctionFrame, StandardFrame, StatementFrame,
 };
 use kirin_scf::interpreter_new::{ForFrame, IfFrame, ScfFrame};
 
@@ -108,6 +108,15 @@ impl<L: Dialect, V, T> TryLiftFrom<ForFrame<L, ArithType, V, T>> for ToyFrame<L,
 
     fn try_lift_from(frame: ForFrame<L, ArithType, V, T>) -> Result<Self, Self::Error> {
         frame.try_lift().map(Self::Scf)
+    }
+}
+
+impl<L: Dialect, V, T> FunctionInvocationFrame<V> for ToyFrame<L, V, T> {
+    type Language = L;
+    type Error = Infallible;
+
+    fn from_function_invocation(invocation: FunctionInvocation<V>) -> Result<Self, Self::Error> {
+        invocation.into_root_frame::<L, Self, Self::Error>()
     }
 }
 

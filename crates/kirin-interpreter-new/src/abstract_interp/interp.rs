@@ -2,7 +2,10 @@ use std::marker::PhantomData;
 
 use kirin_ir::{CompileStage, Dialect, HasStageInfo, LiftFrom, Pipeline, StageInfo};
 
-use crate::{Env, EnvIndex, ForkEnv, Frame, FrameEffect, InterpreterError, StepResult};
+use crate::{
+    Env, EnvIndex, ForkEnv, Frame, FrameEffect, FunctionInvocation, FunctionInvocationFrame,
+    FunctionInvokeBuilder, InterpreterError, StepResult,
+};
 
 use super::AbstractEnvStore;
 
@@ -46,6 +49,10 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
         &mut self.store
     }
 
+    pub fn invoke(&mut self, stage: CompileStage) -> FunctionInvokeBuilder<'_, Self> {
+        FunctionInvokeBuilder::new(self, stage)
+    }
+
     pub fn run(&mut self) -> Result<C, E>
     where
         F: Frame<Self, F, C, E>,
@@ -57,6 +64,16 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
                 StepResult::Complete(completion) => return Ok(completion),
             }
         }
+    }
+
+    pub fn run_function_invocation<V>(&mut self, invocation: FunctionInvocation<V>) -> Result<C, E>
+    where
+        Store: Env<V>,
+        F: FunctionInvocationFrame<V> + Frame<Self, F, C, E>,
+        E: LiftFrom<InterpreterError> + From<<F as FunctionInvocationFrame<V>>::Error>,
+    {
+        self.push_frame(F::from_function_invocation(invocation).map_err(E::from)?);
+        self.run()
     }
 
     pub fn run_frame(&mut self, root: F) -> Result<C, E>

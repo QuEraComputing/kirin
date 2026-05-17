@@ -2,7 +2,10 @@ use std::marker::PhantomData;
 
 use kirin_ir::{CompileStage, Dialect, HasStageInfo, LiftFrom, Pipeline, StageInfo};
 
-use crate::{Env, EnvIndex, EnvStackStore, Frame, FrameEffect, InterpreterError};
+use crate::{
+    Env, EnvIndex, EnvStackStore, Frame, FrameEffect, FunctionInvocation, FunctionInvocationFrame,
+    FunctionInvokeBuilder, InterpreterError,
+};
 
 pub enum StepResult<C> {
     Running,
@@ -38,6 +41,10 @@ impl<'ir, S, F, C, E, V> ConcreteInterpreter<'ir, S, F, C, E, V> {
         self.frames.len()
     }
 
+    pub fn invoke(&mut self, stage: CompileStage) -> FunctionInvokeBuilder<'_, Self> {
+        FunctionInvokeBuilder::new(self, stage)
+    }
+
     pub fn push_env(&mut self) -> EnvIndex {
         self.envs.push()
     }
@@ -67,6 +74,15 @@ impl<'ir, S, F, C, E, V> ConcreteInterpreter<'ir, S, F, C, E, V> {
                 StepResult::Complete(completion) => return Ok(completion),
             }
         }
+    }
+
+    pub fn run_function_invocation(&mut self, invocation: FunctionInvocation<V>) -> Result<C, E>
+    where
+        F: FunctionInvocationFrame<V> + Frame<Self, F, C, E>,
+        E: LiftFrom<InterpreterError> + From<<F as FunctionInvocationFrame<V>>::Error>,
+    {
+        self.push_frame(F::from_function_invocation(invocation).map_err(E::from)?);
+        self.run()
     }
 
     pub fn step(&mut self) -> Result<StepResult<C>, E>

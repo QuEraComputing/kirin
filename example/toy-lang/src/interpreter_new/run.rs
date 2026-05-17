@@ -1,9 +1,7 @@
-use kirin::prelude::{Function, LiftFrom, Pipeline, Product, TryLift};
+use kirin::prelude::{Function, LiftFrom, Pipeline};
 #[cfg(test)]
 use kirin_interpreter_new::{AbstractBlockTransfer, AbstractInterpreter};
-use kirin_interpreter_new::{
-    ConcreteInterpreter, FunctionFrame, InterpreterError, StandardCompletion,
-};
+use kirin_interpreter_new::{ConcreteInterpreter, InterpreterError, StandardCompletion};
 
 use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
@@ -34,11 +32,12 @@ pub fn run_source_i64(
         ToyError,
         i64,
     > = ConcreteInterpreter::new(pipeline);
-    interp.push_frame(
-        FunctionFrame::<HighLevel, i64>::new(stage, function, Product::from_vec(args.to_vec()))
-            .try_lift()?,
-    );
-    expect_function_return(interp.run()?)
+    expect_function_return(
+        interp
+            .invoke(stage)
+            .function(function)
+            .args(args.iter().copied())?,
+    )
 }
 
 pub fn run_lowered_i64(
@@ -63,11 +62,12 @@ pub fn run_lowered_i64(
         ToyError,
         i64,
     > = ConcreteInterpreter::new(pipeline);
-    interp.push_frame(
-        FunctionFrame::<LowLevel, i64>::new(stage, function, Product::from_vec(args.to_vec()))
-            .try_lift()?,
-    );
-    expect_function_return(interp.run()?)
+    expect_function_return(
+        interp
+            .invoke(stage)
+            .function(function)
+            .args(args.iter().copied())?,
+    )
 }
 
 #[cfg(test)]
@@ -93,15 +93,12 @@ pub fn analyze_source_constprop(
         ToyError,
         ConstProp,
     > = AbstractInterpreter::new(pipeline);
-    interp.push_frame(
-        FunctionFrame::<HighLevel, ConstProp>::new(
-            stage,
-            function,
-            Product::from_vec(args.to_vec()),
-        )
-        .try_lift()?,
-    );
-    expect_function_return(interp.run()?)
+    expect_function_return(
+        interp
+            .invoke(stage)
+            .function(function)
+            .args(args.iter().cloned())?,
+    )
 }
 
 #[cfg(test)]
@@ -127,15 +124,12 @@ pub fn analyze_lowered_constprop(
         ToyError,
         ConstProp,
     > = AbstractInterpreter::new(pipeline);
-    interp.push_frame(
-        FunctionFrame::<LowLevel, ConstProp>::new(
-            stage,
-            function,
-            Product::from_vec(args.to_vec()),
-        )
-        .try_lift()?,
-    );
-    expect_function_return(interp.run()?)
+    expect_function_return(
+        interp
+            .invoke(stage)
+            .function(function)
+            .args(args.iter().cloned())?,
+    )
 }
 
 pub(crate) fn resolve_function(
