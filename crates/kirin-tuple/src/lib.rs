@@ -63,6 +63,7 @@ pub use interpret_impl::IndexValue;
 pub mod interpreter_new;
 
 use kirin::prelude::*;
+use kirin_interpreter_new::Interpretable;
 
 #[cfg(test)]
 mod tests;
@@ -71,7 +72,7 @@ mod tests;
 ///
 /// Use `#[wraps]` delegation so that each variant's `Dialect` impl is
 /// forwarded to the inner type.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[wraps]
 #[kirin(builders, type = T)]
 pub enum Tuple<T: CompileTimeValue> {

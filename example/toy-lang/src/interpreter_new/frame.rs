@@ -4,14 +4,14 @@ use kirin::prelude::{Dialect, TryLift, TryLiftFrom};
 use kirin_arith::ArithType;
 use kirin_interpreter_new::{
     AbstractBranchFrame, BlockFrame, CallFrame, ConcreteBlockTransfer, Frame, FrameEffect,
-    FunctionFrame, FunctionInvocation, FunctionInvocationFrame, HasLocation, Location, RegionFrame,
+    FunctionFrame, FunctionInvocation, FunctionInvocationFrame, HasLocation, RegionFrame,
     SpecializedFunctionFrame, StagedFunctionFrame, StandardFrame, StatementFrame,
 };
 use kirin_scf::interpreter_new::{ForFrame, IfFrame, ScfFrame};
 
 use crate::language::{HighLevel, LowLevel};
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, HasLocation, Frame)]
 pub enum ToyFrame<L: Dialect, V, T = ConcreteBlockTransfer<V>> {
     Standard(StandardFrame<L, V, T>),
     Scf(ScfFrame<L, ArithType, V, T>),
@@ -122,44 +122,7 @@ impl<L: Dialect, V, T> FunctionInvocationFrame<V> for ToyFrame<L, V, T> {
     }
 }
 
-impl<L: Dialect, V, T> HasLocation for ToyFrame<L, V, T> {
-    fn location(&self) -> Location {
-        match self {
-            Self::Standard(frame) => frame.location(),
-            Self::Scf(frame) => frame.location(),
-        }
-    }
-}
-
-impl<I, L, C, E, V, T> Frame<I, ToyFrame<L, V, T>, C, E> for ToyFrame<L, V, T>
-where
-    L: Dialect,
-    StandardFrame<L, V, T>: Frame<I, ToyFrame<L, V, T>, C, E>,
-    ScfFrame<L, ArithType, V, T>: Frame<I, ToyFrame<L, V, T>, C, E>,
-{
-    fn step(self, interp: &mut I) -> Result<FrameEffect<ToyFrame<L, V, T>, C>, E> {
-        match self {
-            Self::Standard(frame) => frame.step(interp),
-            Self::Scf(frame) => frame.step(interp),
-        }
-    }
-
-    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<ToyFrame<L, V, T>, C>, E> {
-        match self {
-            Self::Standard(frame) => frame.resume_done(interp),
-            Self::Scf(frame) => frame.resume_done(interp),
-        }
-    }
-
-    fn resume(self, completion: C, interp: &mut I) -> Result<FrameEffect<ToyFrame<L, V, T>, C>, E> {
-        match self {
-            Self::Standard(frame) => frame.resume(completion, interp),
-            Self::Scf(frame) => frame.resume(completion, interp),
-        }
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, HasLocation)]
 pub enum ToyStageFrame<V, T = ConcreteBlockTransfer<V>> {
     Source(ToyFrame<HighLevel, V, T>),
     Lowered(ToyFrame<LowLevel, V, T>),
@@ -229,15 +192,6 @@ impl_stage_lift!(
 impl_stage_lift!(HighLevel, Source, ScfFrame<HighLevel, ArithType, V, T>);
 impl_stage_lift!(HighLevel, Source, IfFrame<HighLevel, ArithType, V, T>);
 impl_stage_lift!(HighLevel, Source, ForFrame<HighLevel, ArithType, V, T>);
-
-impl<V, T> HasLocation for ToyStageFrame<V, T> {
-    fn location(&self) -> Location {
-        match self {
-            Self::Source(frame) => frame.location(),
-            Self::Lowered(frame) => frame.location(),
-        }
-    }
-}
 
 impl<I, C, E, V, T> Frame<I, ToyStageFrame<V, T>, C, E> for ToyStageFrame<V, T>
 where

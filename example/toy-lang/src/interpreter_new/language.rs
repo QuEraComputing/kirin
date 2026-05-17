@@ -1,38 +1,13 @@
-use kirin::prelude::{LiftFrom, Product};
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_bitwise::Bitwise;
 use kirin_cf::ControlFlow;
 use kirin_cmp::Cmp;
 use kirin_constant::Constant;
 use kirin_function::{Lexical, Lifted};
-use kirin_interpreter_new::{
-    BlockTransfer, EnvIndex, FunctionEntry, Interpretable, InterpreterError, Location,
-    StatementEffect,
-};
+use kirin_interpreter_new::{BlockTransfer, EnvIndex, Interpretable, Location, StatementEffect};
 use kirin_scf::StructuredControlFlow;
 
 use crate::language::{HighLevel, LowLevel};
-
-impl<I, F, E, V> FunctionEntry<HighLevel, I, F, E, V> for HighLevel
-where
-    Lexical<ArithType>: FunctionEntry<HighLevel, I, F, E, V>,
-    E: LiftFrom<InterpreterError>,
-{
-    fn enter_function_body(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        interp: &mut I,
-        args: Product<V>,
-    ) -> Result<F, E> {
-        match self {
-            Self::Lexical(op) => op.enter_function_body(location, env, interp, args),
-            _ => Err(E::lift_from(InterpreterError::Custom(
-                "expected high-level function body",
-            ))),
-        }
-    }
-}
 
 impl<I, F, C, E, X> Interpretable<HighLevel, I, F, C, E, X> for HighLevel
 where
@@ -87,27 +62,6 @@ where
                     op, location, env, interp,
                 )
             }
-        }
-    }
-}
-
-impl<I, F, E, V> FunctionEntry<LowLevel, I, F, E, V> for LowLevel
-where
-    Lifted<ArithType>: FunctionEntry<LowLevel, I, F, E, V>,
-    E: LiftFrom<InterpreterError>,
-{
-    fn enter_function_body(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        interp: &mut I,
-        args: Product<V>,
-    ) -> Result<F, E> {
-        match self {
-            Self::Lifted(op) => op.enter_function_body(location, env, interp, args),
-            _ => Err(E::lift_from(InterpreterError::Custom(
-                "expected low-level function body",
-            ))),
         }
     }
 }

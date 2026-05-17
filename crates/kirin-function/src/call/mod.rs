@@ -1,4 +1,5 @@
 use kirin::prelude::*;
+use kirin_interpreter_new::Interpretable;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(type = T)]
@@ -52,7 +53,7 @@ pub struct CallSpecialized<T: CompileTimeValue> {
     marker: std::marker::PhantomData<T>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[wraps]
 #[kirin(type = T)]
 #[chumsky(format = "call")]

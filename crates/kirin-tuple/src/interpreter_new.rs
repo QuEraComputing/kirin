@@ -4,7 +4,7 @@ use kirin_interpreter_new::{
 };
 use thiserror::Error;
 
-use crate::{Get, Len, NewTuple, Tuple, Unpack};
+use crate::{Get, Len, NewTuple, Unpack};
 
 pub trait TupleIndexValue: Sized {
     fn as_tuple_index(&self) -> Option<usize>;
@@ -127,41 +127,6 @@ where
             X::Value::from_tuple_index(len),
         )?;
         Ok(StatementEffect::Done)
-    }
-}
-
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Tuple<T>
-where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    X: BlockTransfer,
-    X::Value: HasProductValue + TupleIndexValue,
-    E: LiftFrom<ExpectedTuple>
-        + LiftFrom<InvalidTupleIndex>
-        + LiftFrom<TupleIndexOutOfBounds>
-        + LiftFrom<InterpreterError>,
-    T: CompileTimeValue,
-{
-    fn interpret(
-        &self,
-        location: Location,
-        env: kirin_interpreter_new::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        match self {
-            Tuple::NewTuple(op) => <NewTuple<T> as Interpretable<L, I, F, C, E, X>>::interpret(
-                op, location, env, interp,
-            ),
-            Tuple::Unpack(op) => {
-                <Unpack<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-            Tuple::Get(op) => {
-                <Get<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-            Tuple::Len(op) => {
-                <Len<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-        }
     }
 }
 

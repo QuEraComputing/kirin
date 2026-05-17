@@ -13,8 +13,7 @@ use kirin_interpreter_new::{
 };
 
 use crate::{
-    Bind, Call, CallFunction, CallLike, CallNamed, CallSpecialized, CallStaged, Function, Lambda,
-    Lexical, Lifted, Return,
+    Bind, CallFunction, CallLike, CallNamed, CallSpecialized, CallStaged, Function, Lambda, Return,
 };
 
 pub trait CallTargetResolution<L: Dialect> {
@@ -385,31 +384,6 @@ where
         .map_err(E::from)
 }
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Call<T>
-where
-    L: Dialect,
-    CallNamed<T>: Interpretable<L, I, F, C, E, X>,
-    CallFunction<T>: Interpretable<L, I, F, C, E, X>,
-    CallStaged<T>: Interpretable<L, I, F, C, E, X>,
-    CallSpecialized<T>: Interpretable<L, I, F, C, E, X>,
-    T: CompileTimeValue,
-    X: BlockTransfer,
-{
-    fn interpret(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        match self {
-            Self::Named(call) => call.interpret(location, env, interp),
-            Self::Function(call) => call.interpret(location, env, interp),
-            Self::Staged(call) => call.interpret(location, env, interp),
-            Self::Specialized(call) => call.interpret(location, env, interp),
-        }
-    }
-}
-
 impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Return<T>
 where
     L: Dialect,
@@ -429,119 +403,5 @@ where
         Ok(StatementEffect::Complete(C::try_lift_from(
             StandardCompletion::FunctionReturned(values),
         )?))
-    }
-}
-
-impl<L, I, F, E, V, T> FunctionEntry<L, I, F, E, V> for Lexical<T>
-where
-    L: Dialect,
-    Function<T>: FunctionEntry<L, I, F, E, V>,
-    Lambda<T>: FunctionEntry<L, I, F, E, V>,
-    E: LiftFrom<InterpreterError>,
-    T: CompileTimeValue,
-{
-    fn enter_function_body(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        interp: &mut I,
-        args: Product<V>,
-    ) -> Result<F, E> {
-        match self {
-            Lexical::Function(op) => op.enter_function_body(location, env, interp, args),
-            Lexical::Lambda(op) => op.enter_function_body(location, env, interp, args),
-            Lexical::Call(_) | Lexical::Return(_) => Err(E::lift_from(InterpreterError::Custom(
-                "expected function body statement",
-            ))),
-        }
-    }
-}
-
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Lexical<T>
-where
-    L: Dialect,
-    Function<T>: Interpretable<L, I, F, C, E, X>,
-    Lambda<T>: Interpretable<L, I, F, C, E, X>,
-    Call<T>: Interpretable<L, I, F, C, E, X>,
-    Return<T>: Interpretable<L, I, F, C, E, X>,
-    T: CompileTimeValue,
-    X: BlockTransfer,
-{
-    fn interpret(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        match self {
-            Lexical::Function(op) => <Function<T> as Interpretable<L, I, F, C, E, X>>::interpret(
-                op, location, env, interp,
-            ),
-            Lexical::Lambda(op) => {
-                <Lambda<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-            Lexical::Call(op) => {
-                <Call<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-            Lexical::Return(op) => {
-                <Return<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-        }
-    }
-}
-
-impl<L, I, F, E, V, T> FunctionEntry<L, I, F, E, V> for Lifted<T>
-where
-    L: Dialect,
-    Function<T>: FunctionEntry<L, I, F, E, V>,
-    E: LiftFrom<InterpreterError>,
-    T: CompileTimeValue,
-{
-    fn enter_function_body(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        interp: &mut I,
-        args: Product<V>,
-    ) -> Result<F, E> {
-        match self {
-            Lifted::Function(op) => op.enter_function_body(location, env, interp, args),
-            Lifted::Bind(_) | Lifted::Call(_) | Lifted::Return(_) => Err(E::lift_from(
-                InterpreterError::Custom("expected function body statement"),
-            )),
-        }
-    }
-}
-
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Lifted<T>
-where
-    L: Dialect,
-    Function<T>: Interpretable<L, I, F, C, E, X>,
-    Bind<T>: Interpretable<L, I, F, C, E, X>,
-    Call<T>: Interpretable<L, I, F, C, E, X>,
-    Return<T>: Interpretable<L, I, F, C, E, X>,
-    T: CompileTimeValue,
-    X: BlockTransfer,
-{
-    fn interpret(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        match self {
-            Lifted::Function(op) => <Function<T> as Interpretable<L, I, F, C, E, X>>::interpret(
-                op, location, env, interp,
-            ),
-            Lifted::Bind(op) => {
-                <Bind<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-            Lifted::Call(op) => {
-                <Call<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-            Lifted::Return(op) => {
-                <Return<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-        }
     }
 }

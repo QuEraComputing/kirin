@@ -5,5 +5,9 @@ edition = "2024"
 
 [dependencies]
 kirin-ir = { workspace = true }
+kirin-derive-interpreter-new = { workspace = true, optional = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }
+
+[features]
+derive = ["dep:kirin-derive-interpreter-new"]

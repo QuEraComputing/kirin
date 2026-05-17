@@ -821,6 +821,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-derive-interpreter-new"
+version = "0.1.0"
+dependencies = [
+ "insta",
+ "kirin-derive-toolkit",
+ "kirin-test-utils",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "kirin-derive-ir"
 version = "0.1.0"
 dependencies = [
@@ -896,6 +908,7 @@ dependencies = [
 name = "kirin-interpreter-new"
 version = "0.1.0"
 dependencies = [
+ "kirin-derive-interpreter-new",
  "kirin-ir",
  "smallvec",
  "thiserror 2.0.18",

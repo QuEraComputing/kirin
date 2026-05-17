@@ -14,6 +14,7 @@ members = [
   "crates/kirin-constant",
   "crates/kirin-derive-chumsky",
   "crates/kirin-derive-interpreter",
+  "crates/kirin-derive-interpreter-new",
   "crates/kirin-derive-ir",
   "crates/kirin-derive-prettyless",
   "crates/kirin-derive-toolkit",
@@ -69,6 +70,7 @@ kirin-cmp = { path = "crates/kirin-cmp", version = "0.1.0" }
 kirin-constant = { path = "crates/kirin-constant", version = "0.1.0" }
 kirin-derive-chumsky = { path = "crates/kirin-derive-chumsky", version = "0.1.0" }
 kirin-derive-interpreter = { path = "crates/kirin-derive-interpreter", version = "0.1.0" }
+kirin-derive-interpreter-new = { path = "crates/kirin-derive-interpreter-new", version = "0.1.0" }
 kirin-derive-ir = { path = "crates/kirin-derive-ir", version = "0.1.0" }
 kirin-derive-prettyless = { path = "crates/kirin-derive-prettyless", version = "0.1.0" }
 kirin-derive-toolkit = { path = "crates/kirin-derive-toolkit", version = "0.1.0" }

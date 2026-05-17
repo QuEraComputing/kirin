@@ -27,7 +27,7 @@ use kirin_interpreter_new::{
     StatementEffect, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
 
-use crate::{For, ForLoopValue, If, StructuredControlFlow, Yield};
+use crate::{For, ForLoopValue, If, Yield};
 
 type IfFrameMarker<L, T, V, X> = PhantomData<fn() -> (L, T, V, X)>;
 type ForFrameMarker<L, T, X> = PhantomData<fn() -> (L, T, X)>;
@@ -320,7 +320,7 @@ pub enum ScfCompletion<V> {
     Yield(Product<V>),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, HasLocation, Frame)]
 pub enum ScfFrame<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
     If(IfFrame<L, T, V, X>),
     For(ForFrame<L, T, V, X>),
@@ -343,44 +343,6 @@ impl<L: Dialect, T: CompileTimeValue, V, X> TryLiftFrom<ForFrame<L, T, V, X>>
 
     fn try_lift_from(frame: ForFrame<L, T, V, X>) -> Result<Self, Self::Error> {
         Ok(Self::For(frame))
-    }
-}
-
-impl<L: Dialect, T: CompileTimeValue, V, X> HasLocation for ScfFrame<L, T, V, X> {
-    fn location(&self) -> Location {
-        match self {
-            Self::If(frame) => frame.location(),
-            Self::For(frame) => frame.location(),
-        }
-    }
-}
-
-impl<I, L, F, C, E, T, V, X> Frame<I, F, C, E> for ScfFrame<L, T, V, X>
-where
-    L: Dialect,
-    T: CompileTimeValue,
-    IfFrame<L, T, V, X>: Frame<I, F, C, E>,
-    ForFrame<L, T, V, X>: Frame<I, F, C, E>,
-{
-    fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        match self {
-            Self::If(frame) => frame.step(interp),
-            Self::For(frame) => frame.step(interp),
-        }
-    }
-
-    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        match self {
-            Self::If(frame) => frame.resume_done(interp),
-            Self::For(frame) => frame.resume_done(interp),
-        }
-    }
-
-    fn resume(self, completion: C, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        match self {
-            Self::If(frame) => frame.resume(completion, interp),
-            Self::For(frame) => frame.resume(completion, interp),
-        }
     }
 }
 
@@ -836,38 +798,6 @@ where
         Ok(StatementEffect::Complete(C::try_lift_from(
             ScfCompletion::Yield(values),
         )?))
-    }
-}
-
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for StructuredControlFlow<T>
-where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    F: TryLiftFrom<IfFrame<L, T, X::Value, X>> + TryLiftFrom<ForFrame<L, T, X::Value, X>>,
-    C: TryLiftFrom<ScfCompletion<X::Value>>,
-    E: From<<F as TryLiftFrom<IfFrame<L, T, X::Value, X>>>::Error>
-        + From<<F as TryLiftFrom<ForFrame<L, T, X::Value, X>>>::Error>
-        + From<<C as TryLiftFrom<ScfCompletion<X::Value>>>::Error>,
-    T: CompileTimeValue,
-    X: BlockTransfer,
-{
-    fn interpret(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        match self {
-            StructuredControlFlow::If(op) => {
-                <If<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-            StructuredControlFlow::For(op) => {
-                <For<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-            StructuredControlFlow::Yield(op) => {
-                <Yield<T> as Interpretable<L, I, F, C, E, X>>::interpret(op, location, env, interp)
-            }
-        }
     }
 }
 

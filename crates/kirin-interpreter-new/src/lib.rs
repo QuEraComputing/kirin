@@ -34,3 +34,6 @@ pub use standard::{
     StagedFunctionFrame, StandardFrame, StatementFrame,
 };
 pub use value::{BranchCondition, HasProductValue};
+
+#[cfg(feature = "derive")]
+pub use kirin_derive_interpreter_new::{Frame, FunctionEntry, HasLocation, Interpretable};

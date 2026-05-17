@@ -1,0 +1,41 @@
+---
+source: crates/kirin-derive-interpreter-new/src/frame.rs
+expression: generate_frame_code(input)
+---
+#[automatically_derived]
+impl<__FrameI, L: Dialect, V, T, __FrameF, __FrameC, __FrameE>
+    ::kirin_interpreter_new::Frame<__FrameI, __FrameF, __FrameC, __FrameE> for ToyFrame<L, V, T>
+where
+    StandardFrame<L, V, T>: ::kirin_interpreter_new::Frame<__FrameI, __FrameF, __FrameC, __FrameE>,
+    ScfFrame<L, ArithType, V, T>:
+        ::kirin_interpreter_new::Frame<__FrameI, __FrameF, __FrameC, __FrameE>,
+{
+    fn step(
+        self,
+        interp: &mut __FrameI,
+    ) -> Result<::kirin_interpreter_new::FrameEffect<__FrameF, __FrameC>, __FrameE> {
+        match self {
+            Self::Standard(__frame) => __frame.step(interp),
+            Self::Scf(__frame) => __frame.step(interp),
+        }
+    }
+    fn resume_done(
+        self,
+        interp: &mut __FrameI,
+    ) -> Result<::kirin_interpreter_new::FrameEffect<__FrameF, __FrameC>, __FrameE> {
+        match self {
+            Self::Standard(__frame) => __frame.resume_done(interp),
+            Self::Scf(__frame) => __frame.resume_done(interp),
+        }
+    }
+    fn resume(
+        self,
+        completion: __FrameC,
+        interp: &mut __FrameI,
+    ) -> Result<::kirin_interpreter_new::FrameEffect<__FrameF, __FrameC>, __FrameE> {
+        match self {
+            Self::Standard(__frame) => __frame.resume(completion, interp),
+            Self::Scf(__frame) => __frame.resume(completion, interp),
+        }
+    }
+}

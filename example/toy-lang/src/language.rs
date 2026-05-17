@@ -6,6 +6,7 @@ use kirin_cmp::Cmp;
 use kirin_constant::Constant;
 use kirin_derive_interpreter::{Interpretable, SSACFGRegion};
 use kirin_function::{Call, Function, Lexical, Lifted, Return};
+use kirin_interpreter_new::FunctionEntry;
 use kirin_scf::StructuredControlFlow;
 
 /// Source-stage language: structured control flow + lexical lambdas.
@@ -14,7 +15,17 @@ use kirin_scf::StructuredControlFlow;
 /// `#[derive(SSACFGRegion)]` delegates `entry_block` to `#[callable]` variants,
 /// which provides blanket `CallSemantics` via the Lexical variant.
 #[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable, SSACFGRegion,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Dialect,
+    FunctionEntry,
+    HasParser,
+    PrettyPrint,
+    Interpretable,
+    SSACFGRegion,
 )]
 #[kirin(builders, type = ArithType)]
 pub enum HighLevel {
@@ -59,7 +70,17 @@ impl TryLiftFrom<Return<ArithType>> for HighLevel {
 
 /// Lowered-stage language: unstructured CF + lifted functions.
 #[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable, SSACFGRegion,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    Dialect,
+    FunctionEntry,
+    HasParser,
+    PrettyPrint,
+    Interpretable,
+    SSACFGRegion,
 )]
 #[kirin(builders, type = ArithType)]
 pub enum LowLevel {
