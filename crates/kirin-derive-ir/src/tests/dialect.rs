@@ -8,6 +8,11 @@ fn generate_dialect_code(input: syn::DeriveInput) -> String {
     rustfmt(tokens.to_string())
 }
 
+fn generate_lift_project_code(input: syn::DeriveInput) -> String {
+    let tokens = generate_lift_project(&input).expect("Failed to generate LiftProject derive");
+    rustfmt(tokens.to_string())
+}
+
 #[test]
 fn test_dialect_derive_struct_with_ssa_fields() {
     let input: syn::DeriveInput = syn::parse_quote! {
@@ -357,4 +362,47 @@ fn test_dialect_derive_wrapper_struct_generates_lift_project() {
         code.contains("TryProjectTo<InnerOp>"),
         "wrapper struct must generate TryProjectTo impl.\nGenerated code:\n{code}"
     );
+}
+
+/// `#[wraps(lift_project_from(...))]` bridges through the wrapped type.
+#[test]
+fn test_dialect_derive_wrapper_struct_generates_lift_project_bridge() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType)]
+        #[wraps(lift_project_from(LeafOp, OtherLeafOp))]
+        struct WrapperOp(InnerOp);
+    };
+    let code = generate_dialect_code(input);
+    assert!(
+        code.contains("TryLiftFrom<LeafOp>")
+            && code.contains("TryProjectTo<LeafOp>")
+            && code.contains("TryLiftFrom<OtherLeafOp>")
+            && code.contains("TryProjectTo<OtherLeafOp>"),
+        "wrapper bridge must generate transitive Lift/Project impls.\nGenerated code:\n{code}"
+    );
+    insta::assert_snapshot!(code);
+}
+
+/// Standalone `LiftProject` does not require `#[kirin(type = ...)]`.
+#[test]
+fn test_lift_project_derive_enum_pure_wrapper_without_dialect() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        enum WrapperLanguage {
+            #[wraps(lift_project_from(LeafOp))]
+            Inner(InnerOp),
+            #[wraps]
+            Other(OtherOp),
+        }
+    };
+    let code = generate_lift_project_code(input);
+    assert!(
+        code.contains("TryLiftFrom<InnerOp>")
+            && code.contains("TryProjectTo<InnerOp>")
+            && code.contains("TryLiftFrom<OtherOp>")
+            && code.contains("TryProjectTo<OtherOp>")
+            && code.contains("TryLiftFrom<LeafOp>")
+            && code.contains("TryProjectTo<LeafOp>"),
+        "standalone LiftProject must generate direct and bridge impls.\nGenerated code:\n{code}"
+    );
+    insta::assert_snapshot!(code);
 }

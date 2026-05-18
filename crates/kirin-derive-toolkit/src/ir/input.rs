@@ -4,7 +4,7 @@ use darling::FromDeriveInput;
 
 use super::{
     attrs::GlobalOptions,
-    fields::Wrapper,
+    fields::{Wrapper, WrapperOptions},
     layout::{HasCratePath, Layout},
     statement::Statement,
 };
@@ -57,6 +57,7 @@ impl<L: Layout> Input<L> {
                 Data::Struct(DataStruct(Statement::from_derive_input(input, ir_type)?))
             }
             syn::Data::Enum(data) => {
+                let wraps = WrapperOptions::from_attrs(&input.attrs)?;
                 let has_hidden_variants = data
                     .variants
                     .iter()
@@ -65,13 +66,7 @@ impl<L: Layout> Input<L> {
                     .variants
                     .iter()
                     .filter(|v| !v.ident.to_string().starts_with("__"))
-                    .map(|v| {
-                        Statement::from_variant(
-                            input.attrs.iter().any(|f| f.path().is_ident("wraps")),
-                            v,
-                            ir_type,
-                        )
-                    })
+                    .map(|v| Statement::from_variant(wraps.clone(), v, ir_type))
                     .collect::<darling::Result<Vec<_>>>()?;
                 Data::Enum(DataEnum {
                     variants,

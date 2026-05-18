@@ -1,0 +1,59 @@
+---
+source: crates/kirin-derive-ir/src/tests/dialect.rs
+assertion_line: 407
+expression: code
+---
+#[automatically_derived]
+impl ::kirin::ir::TryLiftFrom<InnerOp> for WrapperLanguage {
+    type Error = ::core::convert::Infallible;
+    fn try_lift_from(from: InnerOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(WrapperLanguage::Inner(from))
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::TryProjectTo<InnerOp> for WrapperLanguage {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<InnerOp, Self::Error> {
+        match self {
+            WrapperLanguage::Inner(inner) => Ok(inner),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::TryLiftFrom<LeafOp> for WrapperLanguage {
+    type Error = <InnerOp as ::kirin::ir::TryLiftFrom<LeafOp>>::Error;
+    fn try_lift_from(from: LeafOp) -> ::core::result::Result<Self, Self::Error> {
+        let from = <InnerOp as ::kirin::ir::TryLiftFrom<LeafOp>>::try_lift_from(from)?;
+        Ok(WrapperLanguage::Inner(from))
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::TryProjectTo<LeafOp> for WrapperLanguage {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<LeafOp, Self::Error> {
+        let inner = match self {
+            WrapperLanguage::Inner(inner) => inner,
+            _ => return Err(::kirin::ir::ProjectError::InvalidVariant),
+        };
+        <InnerOp as ::kirin::ir::TryProjectTo<LeafOp>>::try_project_to(inner)
+            .map_err(|_| ::kirin::ir::ProjectError::InvalidVariant)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::TryLiftFrom<OtherOp> for WrapperLanguage {
+    type Error = ::core::convert::Infallible;
+    fn try_lift_from(from: OtherOp) -> ::core::result::Result<Self, Self::Error> {
+        Ok(WrapperLanguage::Other(from))
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::TryProjectTo<OtherOp> for WrapperLanguage {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<OtherOp, Self::Error> {
+        match self {
+            WrapperLanguage::Other(inner) => Ok(inner),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
+        }
+    }
+}

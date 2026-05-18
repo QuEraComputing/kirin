@@ -24,4 +24,4 @@ pub use collection::Collection;
 pub use data::{FieldCategory, FieldData};
 pub use index::FieldIndex;
 pub use info::FieldInfo;
-pub use wrapper::Wrapper;
+pub use wrapper::{Wrapper, WrapperOptions};

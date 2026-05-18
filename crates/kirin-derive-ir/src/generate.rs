@@ -215,6 +215,36 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
     Ok(output)
 }
 
+/// Generate only the Lift/Project algebra output.
+pub(crate) fn generate_lift_project(ast: &syn::DeriveInput) -> darling::Result<TokenStream> {
+    let mut ast = ast.clone();
+    if !has_kirin_type_attr(&ast) {
+        ast.attrs
+            .push(syn::parse_quote!(#[kirin(type = __KirinLiftProjectType)]));
+    }
+
+    let ir = Input::<StandardLayout>::from_derive_input(&ast)?;
+    let default_crate: syn::Path = syn::parse_quote!(::kirin::ir);
+    let crate_path = ir.attrs.crate_path.as_ref().unwrap_or(&default_crate);
+    Ok(crate::lift_project::generate_lift_project(&ir, crate_path))
+}
+
+fn has_kirin_type_attr(ast: &syn::DeriveInput) -> bool {
+    ast.attrs
+        .iter()
+        .filter(|attr| attr.path().is_ident("kirin"))
+        .any(|attr| {
+            let mut has_type = false;
+            let _ = attr.parse_nested_meta(|meta| {
+                if meta.path.is_ident("type") {
+                    has_type = true;
+                }
+                Ok(())
+            });
+            has_type
+        })
+}
+
 /// Generate a single field-iter derive.
 pub(crate) fn generate_field_iter(
     ast: &syn::DeriveInput,

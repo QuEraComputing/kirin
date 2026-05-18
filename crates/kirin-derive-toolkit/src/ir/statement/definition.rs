@@ -84,7 +84,7 @@ impl<L: Layout> Statement<L> {
             input.attrs.clone(),
         )
         .update_fields(
-            input.attrs.iter().any(|attr| attr.path().is_ident("wraps")),
+            WrapperOptions::from_attrs(&input.attrs)?,
             &data.fields,
             ir_type,
         )
@@ -94,13 +94,14 @@ impl<L: Layout> Statement<L> {
     ///
     /// `wraps` indicates whether the parent enum has a top-level `#[wraps]` attribute.
     pub fn from_variant(
-        wraps: bool,
+        wraps: Option<WrapperOptions>,
         variant: &syn::Variant,
         ir_type: &syn::Path,
     ) -> darling::Result<Self> {
         let attrs = StatementOptions::from_variant(variant)?;
         let extra = L::StatementExtra::from_variant(variant)?;
         let extra_attrs = L::ExtraStatementAttrs::from_variant(variant)?;
+        let variant_wraps = WrapperOptions::from_attrs(&variant.attrs)?;
         Statement::new(
             variant.ident.clone(),
             attrs,
@@ -109,11 +110,7 @@ impl<L: Layout> Statement<L> {
             variant.attrs.clone(),
         )
         .update_fields(
-            wraps
-                || variant
-                    .attrs
-                    .iter()
-                    .any(|attr| attr.path().is_ident("wraps")),
+            merge_wrapper_options(wraps, variant_wraps),
             &variant.fields,
             ir_type,
         )
@@ -121,24 +118,29 @@ impl<L: Layout> Statement<L> {
 
     fn update_fields(
         mut self,
-        wraps: bool,
+        wraps: Option<WrapperOptions>,
         fields: &syn::Fields,
         ir_type: &syn::Path,
     ) -> darling::Result<Self> {
         let mut errors = darling::Error::accumulator();
+        let field_wraps = fields
+            .iter()
+            .map(|field| WrapperOptions::from_attrs(&field.attrs))
+            .collect::<darling::Result<Vec<_>>>()?;
 
-        if wraps
-            || fields
-                .iter()
-                .any(|f| f.attrs.iter().any(|attr| attr.path().is_ident("wraps")))
-        {
+        if wraps.is_some() || field_wraps.iter().any(Option::is_some) {
             if fields.len() == 1 {
-                self.wraps = Some(Wrapper::new(0, fields.iter().next().unwrap()));
+                let field = fields.iter().next().unwrap();
+                let options = merge_wrapper_options(wraps, field_wraps.into_iter().next().unwrap())
+                    .unwrap_or_default();
+                self.wraps = Some(Wrapper::new_with_options(0, field, options));
             } else {
-                for (i, f) in fields.iter().enumerate() {
+                for (i, (f, field_options)) in fields.iter().zip(field_wraps).enumerate() {
                     errors.handle_in(|| {
-                        if f.attrs.iter().any(|attr| attr.path().is_ident("wraps")) {
-                            self.wraps = Some(Wrapper::new(i, f));
+                        if let Some(field_options) = field_options {
+                            let options = merge_wrapper_options(wraps.clone(), Some(field_options))
+                                .unwrap_or_default();
+                            self.wraps = Some(Wrapper::new_with_options(i, f, options));
                         } else {
                             self.fields.push(Self::parse_field(i, f, ir_type)?);
                         }
@@ -280,5 +282,20 @@ impl<L: Layout> Statement<L> {
                 extra,
             },
         })
+    }
+}
+
+fn merge_wrapper_options(
+    parent: Option<WrapperOptions>,
+    child: Option<WrapperOptions>,
+) -> Option<WrapperOptions> {
+    match (parent, child) {
+        (Some(mut parent), Some(child)) => {
+            parent.extend(child);
+            Some(parent)
+        }
+        (Some(parent), None) => Some(parent),
+        (None, Some(child)) => Some(child),
+        (None, None) => None,
     }
 }

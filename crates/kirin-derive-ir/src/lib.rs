@@ -21,6 +21,15 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
     }
 }
 
+#[proc_macro_derive(LiftProject, attributes(kirin, wraps))]
+pub fn derive_lift_project(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match generate_lift_project(&ast) {
+        Ok(tokens) => TokenStream::from(tokens),
+        Err(e) => TokenStream::from(e.write_errors()),
+    }
+}
+
 fn do_derive_field_iter(input: TokenStream, config: LocalFieldIterConfig) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     match generate_field_iter(&ast, config) {
