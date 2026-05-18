@@ -55,8 +55,8 @@ pub mod tokens;
 
 pub mod prelude {
     pub use crate::codegen::{
-        self, ConstructorBuilder, FieldBindings, GenericsBuilder, combine_where_clauses,
-        deduplicate_types,
+        self, ConstructorBuilder, FieldBindings, GenericsBuilder, SingleField,
+        combine_where_clauses, deduplicate_types,
     };
     pub use crate::context::{DeriveContext, InputMeta, PathBuilder, StatementContext};
     pub use crate::hygiene::Hygiene;

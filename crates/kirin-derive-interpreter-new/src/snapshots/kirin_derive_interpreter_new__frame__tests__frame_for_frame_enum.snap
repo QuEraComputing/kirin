@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-interpreter-new/src/frame.rs
-assertion_line: 290
+assertion_line: 289
 expression: generate_frame_code(input)
 ---
 #[automatically_derived]
@@ -57,24 +57,26 @@ impl<L: Dialect, V, T> ::kirin::ir::TryLiftFrom<ScfFrame<L, ArithType, V, T>>
     }
 }
 #[automatically_derived]
-impl<L: Dialect, V, T> ::kirin::ir::TryProjectTo<StandardFrame<L, V, T>> for ToyFrame<L, V, T> {
-    type Error = ::kirin::ir::ProjectError;
-    fn try_project_to(self) -> Result<StandardFrame<L, V, T>, Self::Error> {
+impl<L: Dialect, V, T> ::kirin_interpreter_new::ProjectOrSelf<StandardFrame<L, V, T>>
+    for ToyFrame<L, V, T>
+{
+    type Error = ::core::convert::Infallible;
+    fn project_or_self(self) -> ::core::result::Result<StandardFrame<L, V, T>, Self> {
         match self {
             Self::Standard(__frame) => Ok(__frame),
-            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
+            other => Err(other),
         }
     }
 }
 #[automatically_derived]
-impl<L: Dialect, V, T> ::kirin::ir::TryProjectTo<ScfFrame<L, ArithType, V, T>>
+impl<L: Dialect, V, T> ::kirin_interpreter_new::ProjectOrSelf<ScfFrame<L, ArithType, V, T>>
     for ToyFrame<L, V, T>
 {
-    type Error = ::kirin::ir::ProjectError;
-    fn try_project_to(self) -> Result<ScfFrame<L, ArithType, V, T>, Self::Error> {
+    type Error = ::core::convert::Infallible;
+    fn project_or_self(self) -> ::core::result::Result<ScfFrame<L, ArithType, V, T>, Self> {
         match self {
             Self::Scf(__frame) => Ok(__frame),
-            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
+            other => Err(other),
         }
     }
 }

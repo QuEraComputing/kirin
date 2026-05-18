@@ -1,4 +1,7 @@
-use kirin_derive_toolkit::ir::{Data, Input, StandardLayout};
+use kirin_derive_toolkit::{
+    codegen::SingleField,
+    ir::{Data, Input, StandardLayout},
+};
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -15,7 +18,7 @@ pub(crate) fn generate_lift_project(
     crate_path: &syn::Path,
 ) -> TokenStream {
     let name = &ir.name;
-    let (impl_generics, ty_generics, where_clause) = ir.generics.split_for_impl();
+    let builder = LiftProjectImplBuilder::new(name, &ir.generics, crate_path);
 
     match &ir.data {
         Data::Enum(data) => {
@@ -36,6 +39,7 @@ pub(crate) fn generate_lift_project(
                     let inner_ty = &wrapper.ty;
                     let constructor = enum_variant_constructor(name, variant_name, wrapper);
                     let pattern = enum_variant_pattern(name, variant_name, wrapper);
+                    let direct = builder.direct(&constructor, &pattern, inner_ty);
                     let bridge = wrapper
                         .lift_project_from
                         .iter()
@@ -46,44 +50,17 @@ pub(crate) fn generate_lift_project(
                                     _ => return Err(#crate_path::ProjectError::InvalidVariant),
                                 };
                             };
-                            generate_bridge_lift_project(
-                                name,
+                            builder.bridge(
                                 &quote! { #constructor },
                                 &project_inner,
                                 inner_ty,
                                 from_ty,
-                                crate_path,
-                                &impl_generics,
-                                &ty_generics,
-                                where_clause,
                             )
                         })
                         .collect::<TokenStream>();
 
                     quote! {
-                        #[automatically_derived]
-                        impl #impl_generics #crate_path::TryLiftFrom<#inner_ty> for #name #ty_generics
-                        #where_clause
-                        {
-                            type Error = ::core::convert::Infallible;
-                            fn try_lift_from(from: #inner_ty) -> ::core::result::Result<Self, Self::Error> {
-                                Ok(#constructor)
-                            }
-                        }
-
-                        #[automatically_derived]
-                        impl #impl_generics #crate_path::TryProjectTo<#inner_ty> for #name #ty_generics
-                        #where_clause
-                        {
-                            type Error = #crate_path::ProjectError;
-                            fn try_project_to(self) -> ::core::result::Result<#inner_ty, Self::Error> {
-                                match self {
-                                    #pattern => Ok(inner),
-                                    _ => Err(#crate_path::ProjectError::InvalidVariant),
-                                }
-                            }
-                        }
-
+                        #direct
                         #bridge
                     }
                 })
@@ -97,6 +74,7 @@ pub(crate) fn generate_lift_project(
                 return TokenStream::new();
             }
             let inner_ty = &wrapper.ty;
+            let (impl_generics, ty_generics, where_clause) = ir.generics.split_for_impl();
 
             let (lift_body, destruct) = if wrapper.field.ident.is_some() {
                 let field_name = wrapper.field.name();
@@ -114,17 +92,7 @@ pub(crate) fn generate_lift_project(
                     let project_inner = quote! {
                         let #destruct = self;
                     };
-                    generate_bridge_lift_project(
-                        name,
-                        &lift_body,
-                        &project_inner,
-                        inner_ty,
-                        from_ty,
-                        crate_path,
-                        &impl_generics,
-                        &ty_generics,
-                        where_clause,
-                    )
+                    builder.bridge(&lift_body, &project_inner, inner_ty, from_ty)
                 })
                 .collect::<TokenStream>();
 
@@ -156,6 +124,41 @@ pub(crate) fn generate_lift_project(
     }
 }
 
+pub(crate) fn generate_wrapper_enum_direct(
+    input: &syn::DeriveInput,
+    crate_path: &syn::Path,
+) -> syn::Result<TokenStream> {
+    let name = &input.ident;
+    let builder = LiftProjectImplBuilder::new(name, &input.generics, crate_path);
+    let syn::Data::Enum(data) = &input.data else {
+        return Err(syn::Error::new_spanned(
+            input,
+            "derivation only supports enum inputs",
+        ));
+    };
+
+    let impls = data
+        .variants
+        .iter()
+        .map(|variant| {
+            let field = SingleField::from_fields(&variant.fields)?;
+            let variant_name = &variant.ident;
+            let inner_ty = &field.ty;
+            let binding = syn::Ident::new("from", variant_name.span());
+            let inner = syn::Ident::new("inner", variant_name.span());
+            let constructor = field.constructor(&binding);
+            let pattern = field.pattern(&inner);
+            let lift_body = quote! { Self::#variant_name #constructor };
+            let project_pattern = quote! { Self::#variant_name #pattern };
+            Ok(builder.direct(&lift_body, &project_pattern, inner_ty))
+        })
+        .collect::<syn::Result<Vec<_>>>()?;
+
+    Ok(quote! {
+        #(#impls)*
+    })
+}
+
 fn enum_variant_constructor(
     name: &syn::Ident,
     variant_name: &syn::Ident,
@@ -182,41 +185,101 @@ fn enum_variant_pattern(
     }
 }
 
-#[allow(clippy::too_many_arguments)]
-fn generate_bridge_lift_project(
-    name: &syn::Ident,
-    lift_body: &TokenStream,
-    project_inner: &TokenStream,
-    inner_ty: &syn::Type,
-    from_ty: &syn::Path,
-    crate_path: &syn::Path,
-    impl_generics: &syn::ImplGenerics<'_>,
-    ty_generics: &syn::TypeGenerics<'_>,
-    where_clause: Option<&syn::WhereClause>,
-) -> TokenStream {
-    quote! {
-        #[automatically_derived]
-        impl #impl_generics #crate_path::TryLiftFrom<#from_ty> for #name #ty_generics
-        #where_clause
-        {
-            type Error = <#inner_ty as #crate_path::TryLiftFrom<#from_ty>>::Error;
+struct LiftProjectImplBuilder<'a> {
+    name: &'a syn::Ident,
+    crate_path: &'a syn::Path,
+    impl_generics: syn::ImplGenerics<'a>,
+    ty_generics: syn::TypeGenerics<'a>,
+    where_clause: Option<&'a syn::WhereClause>,
+}
 
-            fn try_lift_from(from: #from_ty) -> ::core::result::Result<Self, Self::Error> {
-                let from = <#inner_ty as #crate_path::TryLiftFrom<#from_ty>>::try_lift_from(from)?;
-                Ok(#lift_body)
+impl<'a> LiftProjectImplBuilder<'a> {
+    fn new(name: &'a syn::Ident, generics: &'a syn::Generics, crate_path: &'a syn::Path) -> Self {
+        let (impl_generics, ty_generics, where_clause) = generics.split_for_impl();
+        Self {
+            name,
+            crate_path,
+            impl_generics,
+            ty_generics,
+            where_clause,
+        }
+    }
+
+    fn direct(
+        &self,
+        lift_body: &TokenStream,
+        project_pattern: &TokenStream,
+        inner_ty: &syn::Type,
+    ) -> TokenStream {
+        let name = self.name;
+        let crate_path = self.crate_path;
+        let impl_generics = &self.impl_generics;
+        let ty_generics = &self.ty_generics;
+        let where_clause = self.where_clause;
+
+        quote! {
+            #[automatically_derived]
+            impl #impl_generics #crate_path::TryLiftFrom<#inner_ty> for #name #ty_generics
+            #where_clause
+            {
+                type Error = ::core::convert::Infallible;
+                fn try_lift_from(from: #inner_ty) -> ::core::result::Result<Self, Self::Error> {
+                    Ok(#lift_body)
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics #crate_path::TryProjectTo<#inner_ty> for #name #ty_generics
+            #where_clause
+            {
+                type Error = #crate_path::ProjectError;
+                fn try_project_to(self) -> ::core::result::Result<#inner_ty, Self::Error> {
+                    match self {
+                        #project_pattern => Ok(inner),
+                        _ => Err(#crate_path::ProjectError::InvalidVariant),
+                    }
+                }
             }
         }
+    }
 
-        #[automatically_derived]
-        impl #impl_generics #crate_path::TryProjectTo<#from_ty> for #name #ty_generics
-        #where_clause
-        {
-            type Error = #crate_path::ProjectError;
+    fn bridge(
+        &self,
+        lift_body: &TokenStream,
+        project_inner: &TokenStream,
+        inner_ty: &syn::Type,
+        from_ty: &syn::Path,
+    ) -> TokenStream {
+        let name = self.name;
+        let crate_path = self.crate_path;
+        let impl_generics = &self.impl_generics;
+        let ty_generics = &self.ty_generics;
+        let where_clause = self.where_clause;
 
-            fn try_project_to(self) -> ::core::result::Result<#from_ty, Self::Error> {
-                #project_inner
-                <#inner_ty as #crate_path::TryProjectTo<#from_ty>>::try_project_to(inner)
-                    .map_err(|_| #crate_path::ProjectError::InvalidVariant)
+        quote! {
+            #[automatically_derived]
+            impl #impl_generics #crate_path::TryLiftFrom<#from_ty> for #name #ty_generics
+            #where_clause
+            {
+                type Error = <#inner_ty as #crate_path::TryLiftFrom<#from_ty>>::Error;
+
+                fn try_lift_from(from: #from_ty) -> ::core::result::Result<Self, Self::Error> {
+                    let from = <#inner_ty as #crate_path::TryLiftFrom<#from_ty>>::try_lift_from(from)?;
+                    Ok(#lift_body)
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics #crate_path::TryProjectTo<#from_ty> for #name #ty_generics
+            #where_clause
+            {
+                type Error = #crate_path::ProjectError;
+
+                fn try_project_to(self) -> ::core::result::Result<#from_ty, Self::Error> {
+                    #project_inner
+                    <#inner_ty as #crate_path::TryProjectTo<#from_ty>>::try_project_to(inner)
+                        .map_err(|_| #crate_path::ProjectError::InvalidVariant)
+                }
             }
         }
     }

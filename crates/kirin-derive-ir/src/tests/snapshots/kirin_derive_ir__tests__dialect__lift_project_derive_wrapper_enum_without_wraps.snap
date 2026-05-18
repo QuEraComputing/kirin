@@ -1,0 +1,39 @@
+---
+source: crates/kirin-derive-ir/src/tests/dialect.rs
+assertion_line: 426
+expression: code
+---
+#[automatically_derived]
+impl<L, V> ::kirin::ir::TryLiftFrom<StandardFrame<L, V>> for WrapperFrame<L, V> {
+    type Error = ::core::convert::Infallible;
+    fn try_lift_from(from: StandardFrame<L, V>) -> ::core::result::Result<Self, Self::Error> {
+        Ok(Self::Standard(from))
+    }
+}
+#[automatically_derived]
+impl<L, V> ::kirin::ir::TryProjectTo<StandardFrame<L, V>> for WrapperFrame<L, V> {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<StandardFrame<L, V>, Self::Error> {
+        match self {
+            Self::Standard(inner) => Ok(inner),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
+        }
+    }
+}
+#[automatically_derived]
+impl<L, V> ::kirin::ir::TryLiftFrom<ScfFrame<L, V>> for WrapperFrame<L, V> {
+    type Error = ::core::convert::Infallible;
+    fn try_lift_from(from: ScfFrame<L, V>) -> ::core::result::Result<Self, Self::Error> {
+        Ok(Self::Scf { frame: from })
+    }
+}
+#[automatically_derived]
+impl<L, V> ::kirin::ir::TryProjectTo<ScfFrame<L, V>> for WrapperFrame<L, V> {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<ScfFrame<L, V>, Self::Error> {
+        match self {
+            Self::Scf { frame: inner } => Ok(inner),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
+        }
+    }
+}

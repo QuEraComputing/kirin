@@ -406,3 +406,39 @@ fn test_lift_project_derive_enum_pure_wrapper_without_dialect() {
     );
     insta::assert_snapshot!(code);
 }
+
+#[test]
+fn test_lift_project_derive_wrapper_enum_without_wraps() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        enum WrapperFrame<L, V> {
+            Standard(StandardFrame<L, V>),
+            Scf { frame: ScfFrame<L, V> },
+        }
+    };
+    let code = generate_lift_project_code(input);
+    assert!(
+        code.contains("TryLiftFrom<StandardFrame<L, V>>")
+            && code.contains("TryLiftFrom<ScfFrame<L, V>>")
+            && code.contains("TryProjectTo<StandardFrame<L, V>>")
+            && code.contains("TryProjectTo<ScfFrame<L, V>>"),
+        "LiftProject must generate direct TryLiftFrom and TryProjectTo impls for wrapper enums.\nGenerated code:\n{code}"
+    );
+    insta::assert_snapshot!(code);
+}
+
+#[test]
+fn test_lift_project_derive_rejects_non_wrapper_enum() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        enum MixedFrame {
+            Standard(StandardFrame),
+            Empty,
+        }
+    };
+    let error = generate_lift_project(&input).unwrap_err();
+    assert!(
+        error
+            .to_string()
+            .contains("derivation only supports variants with exactly one field"),
+        "unexpected error: {error}"
+    );
+}

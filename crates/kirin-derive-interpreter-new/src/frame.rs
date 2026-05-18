@@ -1,3 +1,4 @@
+use kirin_derive_toolkit::codegen::SingleField;
 use proc_macro2::TokenStream;
 use quote::quote;
 
@@ -13,7 +14,7 @@ pub fn do_derive_has_location(input: &syn::DeriveInput) -> syn::Result<TokenStre
     let arms = variants.iter().map(|variant| {
         let name = &variant.ident;
         let binding = &variant.binding;
-        let pattern = &variant.pattern;
+        let pattern = variant.field.pattern(binding);
         quote! { Self::#name #pattern => #binding.location() }
     });
 
@@ -52,7 +53,7 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
 
     let mut predicates: Vec<syn::WherePredicate> = Vec::new();
     for variant in &variants {
-        let ty = &variant.ty;
+        let ty = &variant.field.ty;
         predicates.push(syn::parse_quote! {
             #ty: #interp_crate::Frame<__FrameI, __FrameF, __FrameC, __FrameE>
         });
@@ -68,26 +69,26 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
     let step_arms = variants.iter().map(|variant| {
         let name = &variant.ident;
         let binding = &variant.binding;
-        let pattern = &variant.owned_pattern;
+        let pattern = variant.field.pattern(binding);
         quote! { Self::#name #pattern => #binding.step(interp) }
     });
     let resume_done_arms = variants.iter().map(|variant| {
         let name = &variant.ident;
         let binding = &variant.binding;
-        let pattern = &variant.owned_pattern;
+        let pattern = variant.field.pattern(binding);
         quote! { Self::#name #pattern => #binding.resume_done(interp) }
     });
     let resume_arms = variants.iter().map(|variant| {
         let name = &variant.ident;
         let binding = &variant.binding;
-        let pattern = &variant.owned_pattern;
+        let pattern = variant.field.pattern(binding);
         quote! { Self::#name #pattern => #binding.resume(completion, interp) }
     });
     let lift_impls = variants.iter().map(|variant| {
         let name = &variant.ident;
-        let ty = &variant.ty;
+        let ty = &variant.field.ty;
         let binding = &variant.binding;
-        let constructor = &variant.constructor;
+        let constructor = variant.field.constructor(binding);
         quote! {
             #[automatically_derived]
             impl #original_impl_generics #ir_crate::TryLiftFrom<#ty> for #type_name #ty_generics #original_where {
@@ -99,26 +100,25 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
             }
         }
     });
-    let project_impls = variants.iter().map(|variant| {
+    let project_or_self_impls = variants.iter().map(|variant| {
         let name = &variant.ident;
-        let ty = &variant.ty;
+        let ty = &variant.field.ty;
         let binding = &variant.binding;
-        let pattern = &variant.owned_pattern;
+        let pattern = variant.field.pattern(binding);
         quote! {
             #[automatically_derived]
-            impl #original_impl_generics #ir_crate::TryProjectTo<#ty> for #type_name #ty_generics #original_where {
-                type Error = #ir_crate::ProjectError;
+            impl #original_impl_generics #interp_crate::ProjectOrSelf<#ty> for #type_name #ty_generics #original_where {
+                type Error = ::core::convert::Infallible;
 
-                fn try_project_to(self) -> Result<#ty, Self::Error> {
+                fn project_or_self(self) -> ::core::result::Result<#ty, Self> {
                     match self {
                         Self::#name #pattern => Ok(#binding),
-                        _ => Err(#ir_crate::ProjectError::InvalidVariant),
+                        other => Err(other),
                     }
                 }
             }
         }
     });
-
     Ok(quote! {
         #[automatically_derived]
         impl #impl_generics #interp_crate::Frame<__FrameI, __FrameF, __FrameC, __FrameE>
@@ -156,61 +156,32 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
 
         #(#lift_impls)*
 
-        #(#project_impls)*
+        #(#project_or_self_impls)*
     })
 }
 
 struct WrapperVariant {
     ident: syn::Ident,
-    ty: syn::Type,
+    field: SingleField,
     binding: syn::Ident,
-    pattern: TokenStream,
-    owned_pattern: TokenStream,
-    constructor: TokenStream,
 }
 
 fn wrapper_variants(input: &syn::DeriveInput) -> syn::Result<Vec<WrapperVariant>> {
     let syn::Data::Enum(data) = &input.data else {
         return Err(syn::Error::new_spanned(
             input,
-            "derive only supports single-field enum variants",
+            "derivation only supports enum inputs",
         ));
     };
 
     data.variants
         .iter()
         .map(|variant| {
-            let binding = syn::Ident::new("__frame", variant.ident.span());
-            match &variant.fields {
-                syn::Fields::Unnamed(fields) if fields.unnamed.len() == 1 => {
-                    let ty = fields.unnamed[0].ty.clone();
-                    Ok(WrapperVariant {
-                        ident: variant.ident.clone(),
-                        ty,
-                        binding: binding.clone(),
-                        pattern: quote! { (#binding) },
-                        owned_pattern: quote! { (#binding) },
-                        constructor: quote! { (#binding) },
-                    })
-                }
-                syn::Fields::Named(fields) if fields.named.len() == 1 => {
-                    let field = fields.named.iter().next().unwrap();
-                    let ident = field.ident.clone().unwrap();
-                    let ty = field.ty.clone();
-                    Ok(WrapperVariant {
-                        ident: variant.ident.clone(),
-                        ty,
-                        binding: binding.clone(),
-                        pattern: quote! { { #ident: #binding } },
-                        owned_pattern: quote! { { #ident: #binding } },
-                        constructor: quote! { { #ident: #binding } },
-                    })
-                }
-                _ => Err(syn::Error::new_spanned(
-                    variant,
-                    "derive only supports variants with exactly one field",
-                )),
-            }
+            Ok(WrapperVariant {
+                ident: variant.ident.clone(),
+                field: SingleField::from_fields(&variant.fields)?,
+                binding: syn::Ident::new("__frame", variant.ident.span()),
+            })
         })
         .collect()
 }
