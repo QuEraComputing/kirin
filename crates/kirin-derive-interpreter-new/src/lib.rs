@@ -35,7 +35,7 @@ pub fn derive_has_location(input: TokenStream) -> TokenStream {
     }
 }
 
-#[proc_macro_derive(Frame, attributes(interpret))]
+#[proc_macro_derive(Frame, attributes(kirin, interpret))]
 pub fn derive_frame(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     match frame::do_derive_frame(&ast) {

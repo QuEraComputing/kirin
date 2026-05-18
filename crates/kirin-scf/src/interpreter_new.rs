@@ -16,8 +16,6 @@
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use core::convert::Infallible;
-
 use kirin::ir::{LiftFrom, Product, TryLift, TryLiftFrom};
 use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue, SSAValue};
 use kirin_interpreter_new::{
@@ -324,26 +322,6 @@ pub enum ScfCompletion<V> {
 pub enum ScfFrame<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
     If(IfFrame<L, T, V, X>),
     For(ForFrame<L, T, V, X>),
-}
-
-impl<L: Dialect, T: CompileTimeValue, V, X> TryLiftFrom<IfFrame<L, T, V, X>>
-    for ScfFrame<L, T, V, X>
-{
-    type Error = Infallible;
-
-    fn try_lift_from(frame: IfFrame<L, T, V, X>) -> Result<Self, Self::Error> {
-        Ok(Self::If(frame))
-    }
-}
-
-impl<L: Dialect, T: CompileTimeValue, V, X> TryLiftFrom<ForFrame<L, T, V, X>>
-    for ScfFrame<L, T, V, X>
-{
-    type Error = Infallible;
-
-    fn try_lift_from(frame: ForFrame<L, T, V, X>) -> Result<Self, Self::Error> {
-        Ok(Self::For(frame))
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

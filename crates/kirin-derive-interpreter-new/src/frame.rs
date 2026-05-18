@@ -2,6 +2,7 @@ use proc_macro2::TokenStream;
 use quote::quote;
 
 const DEFAULT_INTERP_CRATE: &str = "::kirin_interpreter_new";
+const DEFAULT_IR_CRATE: &str = "::kirin::ir";
 
 pub fn do_derive_has_location(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
     let interp_crate = parse_interpret_crate_path(input)?;
@@ -30,6 +31,7 @@ pub fn do_derive_has_location(input: &syn::DeriveInput) -> syn::Result<TokenStre
 
 pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
     let interp_crate = parse_interpret_crate_path(input)?;
+    let ir_crate = parse_kirin_crate_path(input)?;
     let variants = wrapper_variants(input)?;
     let type_name = &input.ident;
     let mut generics = input.generics.clone();
@@ -46,7 +48,7 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
         .params
         .push(syn::GenericParam::Type(syn::parse_quote!(__FrameE)));
     let (impl_generics, _, _) = generics.split_for_impl();
-    let (_, ty_generics, original_where) = input.generics.split_for_impl();
+    let (original_impl_generics, ty_generics, original_where) = input.generics.split_for_impl();
 
     let mut predicates: Vec<syn::WherePredicate> = Vec::new();
     for variant in &variants {
@@ -80,6 +82,41 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
         let binding = &variant.binding;
         let pattern = &variant.owned_pattern;
         quote! { Self::#name #pattern => #binding.resume(completion, interp) }
+    });
+    let lift_impls = variants.iter().map(|variant| {
+        let name = &variant.ident;
+        let ty = &variant.ty;
+        let binding = &variant.binding;
+        let constructor = &variant.constructor;
+        quote! {
+            #[automatically_derived]
+            impl #original_impl_generics #ir_crate::TryLiftFrom<#ty> for #type_name #ty_generics #original_where {
+                type Error = ::core::convert::Infallible;
+
+                fn try_lift_from(#binding: #ty) -> Result<Self, Self::Error> {
+                    Ok(Self::#name #constructor)
+                }
+            }
+        }
+    });
+    let project_impls = variants.iter().map(|variant| {
+        let name = &variant.ident;
+        let ty = &variant.ty;
+        let binding = &variant.binding;
+        let pattern = &variant.owned_pattern;
+        quote! {
+            #[automatically_derived]
+            impl #original_impl_generics #ir_crate::TryProjectTo<#ty> for #type_name #ty_generics #original_where {
+                type Error = #ir_crate::ProjectError;
+
+                fn try_project_to(self) -> Result<#ty, Self::Error> {
+                    match self {
+                        Self::#name #pattern => Ok(#binding),
+                        _ => Err(#ir_crate::ProjectError::InvalidVariant),
+                    }
+                }
+            }
+        }
     });
 
     Ok(quote! {
@@ -116,6 +153,10 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
                 }
             }
         }
+
+        #(#lift_impls)*
+
+        #(#project_impls)*
     })
 }
 
@@ -125,6 +166,7 @@ struct WrapperVariant {
     binding: syn::Ident,
     pattern: TokenStream,
     owned_pattern: TokenStream,
+    constructor: TokenStream,
 }
 
 fn wrapper_variants(input: &syn::DeriveInput) -> syn::Result<Vec<WrapperVariant>> {
@@ -148,6 +190,7 @@ fn wrapper_variants(input: &syn::DeriveInput) -> syn::Result<Vec<WrapperVariant>
                         binding: binding.clone(),
                         pattern: quote! { (#binding) },
                         owned_pattern: quote! { (#binding) },
+                        constructor: quote! { (#binding) },
                     })
                 }
                 syn::Fields::Named(fields) if fields.named.len() == 1 => {
@@ -160,6 +203,7 @@ fn wrapper_variants(input: &syn::DeriveInput) -> syn::Result<Vec<WrapperVariant>
                         binding: binding.clone(),
                         pattern: quote! { { #ident: #binding } },
                         owned_pattern: quote! { { #ident: #binding } },
+                        constructor: quote! { { #ident: #binding } },
                     })
                 }
                 _ => Err(syn::Error::new_spanned(
@@ -188,6 +232,25 @@ fn parse_interpret_crate_path(input: &syn::DeriveInput) -> syn::Result<syn::Path
         })?;
     }
     Ok(crate_path.unwrap_or_else(|| syn::parse_str(DEFAULT_INTERP_CRATE).unwrap()))
+}
+
+fn parse_kirin_crate_path(input: &syn::DeriveInput) -> syn::Result<syn::Path> {
+    let mut crate_path = None;
+    for attr in &input.attrs {
+        if !attr.path().is_ident("kirin") {
+            continue;
+        }
+        attr.parse_nested_meta(|meta| {
+            if meta.path.is_ident("crate") {
+                let value = meta.value()?;
+                crate_path = Some(value.parse()?);
+                Ok(())
+            } else {
+                Err(meta.error("unsupported attribute for #[kirin(...)]"))
+            }
+        })?;
+    }
+    Ok(crate_path.unwrap_or_else(|| syn::parse_str(DEFAULT_IR_CRATE).unwrap()))
 }
 
 #[cfg(test)]

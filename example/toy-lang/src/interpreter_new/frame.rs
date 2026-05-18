@@ -17,14 +17,6 @@ pub enum ToyFrame<L: Dialect, V, T = ConcreteBlockTransfer<V>> {
     Scf(ScfFrame<L, ArithType, V, T>),
 }
 
-impl<L: Dialect, V, T> TryLiftFrom<StandardFrame<L, V, T>> for ToyFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: StandardFrame<L, V, T>) -> Result<Self, Self::Error> {
-        Ok(Self::Standard(frame))
-    }
-}
-
 impl<L: Dialect, V, T> TryLiftFrom<StatementFrame> for ToyFrame<L, V, T> {
     type Error = Infallible;
 
@@ -86,14 +78,6 @@ impl<L: Dialect, V, T> TryLiftFrom<SpecializedFunctionFrame<L, V>> for ToyFrame<
 
     fn try_lift_from(frame: SpecializedFunctionFrame<L, V>) -> Result<Self, Self::Error> {
         frame.try_lift().map(Self::Standard)
-    }
-}
-
-impl<L: Dialect, V, T> TryLiftFrom<ScfFrame<L, ArithType, V, T>> for ToyFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: ScfFrame<L, ArithType, V, T>) -> Result<Self, Self::Error> {
-        Ok(Self::Scf(frame))
     }
 }
 
