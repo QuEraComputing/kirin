@@ -36,4 +36,6 @@ pub use standard::{
 pub use value::{BranchCondition, HasProductValue};
 
 #[cfg(feature = "derive")]
-pub use kirin_derive_interpreter_new::{Frame, FunctionEntry, HasLocation, Interpretable};
+pub use kirin_derive_interpreter_new::{
+    Completion, Frame, FunctionEntry, HasLocation, Interpretable,
+};

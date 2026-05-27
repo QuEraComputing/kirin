@@ -229,8 +229,8 @@ pub trait FunctionEntry<L: Dialect, I, F, E, V>: Dialect {
     ) -> Result<F, E>;
 }
 
-impl<'ir, S, L, F, C, E, V> FunctionBodyDispatch<L, F, E, V>
-    for ConcreteInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, L, F, C, E, V, RootF> FunctionBodyDispatch<L, F, E, V>
+    for ConcreteInterpreter<'ir, S, RootF, C, E, V>
 where
     L: Dialect,
     L: FunctionEntry<L, Self, F, E, V>,
@@ -253,8 +253,8 @@ where
     }
 }
 
-impl<'ir, S, L, F, C, E, V, Store> FunctionBodyDispatch<L, F, E, V>
-    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
+impl<'ir, S, L, F, C, E, V, Store, RootF> FunctionBodyDispatch<L, F, E, V>
+    for AbstractInterpreterWithStore<'ir, S, RootF, C, E, Store>
 where
     L: Dialect,
     L: FunctionEntry<L, Self, F, E, V>,
@@ -277,8 +277,8 @@ where
     }
 }
 
-impl<'ir, Stage, K, L, F, C, E, V, Sum, Store, Deps> FunctionBodyDispatch<L, F, E, V>
-    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, Sum, Store, Deps>
+impl<'ir, Stage, K, L, F, C, E, V, Sum, Store, Deps, RootF> FunctionBodyDispatch<L, F, E, V>
+    for StandardFixpointInterpreter<'ir, Stage, K, RootF, C, E, Sum, Store, Deps>
 where
     L: Dialect,
     L: FunctionEntry<L, Self, F, E, V>,

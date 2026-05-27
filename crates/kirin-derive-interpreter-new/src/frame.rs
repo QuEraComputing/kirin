@@ -160,6 +160,55 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
     })
 }
 
+pub fn do_derive_completion(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
+    let interp_crate = parse_interpret_crate_path(input)?;
+    let ir_crate = parse_kirin_crate_path(input)?;
+    let variants = wrapper_variants(input)?;
+    let type_name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+    let lift_impls = variants.iter().map(|variant| {
+        let name = &variant.ident;
+        let ty = &variant.field.ty;
+        let binding = &variant.binding;
+        let constructor = variant.field.constructor(binding);
+        quote! {
+            #[automatically_derived]
+            impl #impl_generics #ir_crate::TryLiftFrom<#ty> for #type_name #ty_generics #where_clause {
+                type Error = ::core::convert::Infallible;
+
+                fn try_lift_from(#binding: #ty) -> Result<Self, Self::Error> {
+                    Ok(Self::#name #constructor)
+                }
+            }
+        }
+    });
+    let project_or_self_impls = variants.iter().map(|variant| {
+        let name = &variant.ident;
+        let ty = &variant.field.ty;
+        let binding = &variant.binding;
+        let pattern = variant.field.pattern(binding);
+        quote! {
+            #[automatically_derived]
+            impl #impl_generics #interp_crate::ProjectOrSelf<#ty> for #type_name #ty_generics #where_clause {
+                type Error = ::core::convert::Infallible;
+
+                fn project_or_self(self) -> ::core::result::Result<#ty, Self> {
+                    match self {
+                        Self::#name #pattern => Ok(#binding),
+                        other => Err(other),
+                    }
+                }
+            }
+        }
+    });
+
+    Ok(quote! {
+        #(#lift_impls)*
+
+        #(#project_or_self_impls)*
+    })
+}
+
 struct WrapperVariant {
     ident: syn::Ident,
     field: SingleField,
@@ -239,6 +288,11 @@ mod tests {
         rustfmt(tokens.to_string())
     }
 
+    fn generate_completion_code(input: syn::DeriveInput) -> String {
+        let tokens = do_derive_completion(&input).expect("failed to generate Completion");
+        rustfmt(tokens.to_string())
+    }
+
     #[test]
     fn has_location_for_frame_enum() {
         let input: syn::DeriveInput = syn::parse_quote! {
@@ -259,5 +313,16 @@ mod tests {
             }
         };
         insta::assert_snapshot!(generate_frame_code(input));
+    }
+
+    #[test]
+    fn completion_for_completion_enum() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            enum ToyCompletion<V> {
+                Standard(StandardCompletion<V>),
+                Scf(ScfCompletion<V>),
+            }
+        };
+        insta::assert_snapshot!(generate_completion_code(input));
     }
 }

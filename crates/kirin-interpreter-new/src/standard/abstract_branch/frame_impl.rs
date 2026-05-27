@@ -6,18 +6,16 @@ use super::join::join_standard_completion;
 use super::{AbstractBranchFrame, AbstractBranchState};
 use crate::{
     AbstractBlockTransfer, AbstractValue, BlockFrame, Env, FrameEffect, InterpreterError,
-    ProjectOrSelf, StandardCompletion,
+    ProjectOrSelf, StandardCompletion, StandardFrame,
 };
 
 impl<L, V> AbstractBranchFrame<L, V> {
     pub(super) fn step_abstract<F, C, E>(self) -> Result<FrameEffect<F, C>, E>
     where
         L: Dialect,
-        F: TryLiftFrom<AbstractBranchFrame<L, V>>
-            + TryLiftFrom<BlockFrame<L, V, AbstractBlockTransfer<V>>>,
+        F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
         E: LiftFrom<InterpreterError>
-            + From<<F as TryLiftFrom<AbstractBranchFrame<L, V>>>::Error>
-            + From<<F as TryLiftFrom<BlockFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
+            + From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
         V: AbstractValue,
     {
         let (true_env, true_target, true_arguments) = match &self.state {
@@ -42,8 +40,8 @@ impl<L, V> AbstractBranchFrame<L, V> {
             true_arguments,
         );
         Ok(FrameEffect::Push {
-            parent: self.try_lift()?,
-            child: child.try_lift()?,
+            parent: StandardFrame::AbstractBranch(self).try_lift()?,
+            child: StandardFrame::Block(child).try_lift()?,
         })
     }
 
@@ -65,12 +63,10 @@ impl<L, V> AbstractBranchFrame<L, V> {
     where
         I: Env<V, Error = E>,
         L: Dialect,
-        F: TryLiftFrom<AbstractBranchFrame<L, V>>
-            + TryLiftFrom<BlockFrame<L, V, AbstractBlockTransfer<V>>>,
+        F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
         C: TryLiftFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
         E: LiftFrom<InterpreterError>
-            + From<<F as TryLiftFrom<AbstractBranchFrame<L, V>>>::Error>
-            + From<<F as TryLiftFrom<BlockFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
+            + From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
             + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
         V: AbstractValue,
     {
@@ -104,8 +100,9 @@ impl<L, V> AbstractBranchFrame<L, V> {
                         },
                         marker: PhantomData,
                     }
+                    .into_standard_frame()
                     .try_lift()?,
-                    child: child.try_lift()?,
+                    child: StandardFrame::Block(child).try_lift()?,
                 })
             }
             AbstractBranchState::WaitingFalse {
@@ -126,5 +123,11 @@ impl<L, V> AbstractBranchFrame<L, V> {
                 )?))
             }
         }
+    }
+}
+
+impl<L, V> AbstractBranchFrame<L, V> {
+    fn into_standard_frame(self) -> StandardFrame<L, V, AbstractBlockTransfer<V>> {
+        StandardFrame::AbstractBranch(self)
     }
 }

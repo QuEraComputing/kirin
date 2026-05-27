@@ -43,3 +43,12 @@ pub fn derive_frame(input: TokenStream) -> TokenStream {
         Err(e) => e.into_compile_error().into(),
     }
 }
+
+#[proc_macro_derive(Completion, attributes(kirin, interpret))]
+pub fn derive_completion(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match frame::do_derive_completion(&ast) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.into_compile_error().into(),
+    }
+}

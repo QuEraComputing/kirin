@@ -1,7 +1,9 @@
+mod analyzer;
 mod shell;
 mod summary;
 mod value;
 
+pub use analyzer::{ConstPropAnalyzerHelper, ConstPropFunctionFixpoint};
 pub use shell::{ConstPropDomain, ConstPropFixpointInterpreter, ConstPropInterpreterShell};
 pub use summary::{
     ConstPropFunctionOwner, ConstPropFunctionSummary, ConstPropLocationSummary, ConstPropOwner,

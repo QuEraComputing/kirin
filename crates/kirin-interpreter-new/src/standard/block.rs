@@ -8,7 +8,7 @@ use crate::{
     Traversal,
 };
 
-use super::BlockTransferDispatch;
+use super::{BlockTransferDispatch, StandardFrame};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockFrame<L, V, T = ConcreteBlockTransfer<V>> {
@@ -84,12 +84,16 @@ impl<L, V, T> BlockFrame<L, V, T> {
         Ok(())
     }
 
+    pub(super) fn into_standard_frame(self) -> StandardFrame<L, V, T> {
+        StandardFrame::Block(self)
+    }
+
     fn enter<I, F, C, E>(self, interp: &mut I) -> Result<FrameEffect<F, C>, E>
     where
         I: StageAccess<L, Error = E> + Env<V, Error = E>,
         L: Dialect,
-        F: TryLiftFrom<BlockFrame<L, V, T>>,
-        E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>,
+        F: TryLiftFrom<StandardFrame<L, V, T>>,
+        E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>,
         V: Clone,
     {
         self.bind_block_args(interp)?;
@@ -100,11 +104,13 @@ impl<L, V, T> BlockFrame<L, V, T> {
         match first_statement {
             Some(statement) => self
                 .with_traversal(Traversal::Active(statement))
+                .into_standard_frame()
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
             None => self
                 .with_traversal(Traversal::Exit)
+                .into_standard_frame()
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
@@ -115,8 +121,8 @@ impl<L, V, T> BlockFrame<L, V, T> {
     where
         I: StageAccess<L, Error = E>,
         L: Dialect,
-        F: TryLiftFrom<BlockFrame<L, V, T>>,
-        E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>,
+        F: TryLiftFrom<StandardFrame<L, V, T>>,
+        E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>,
     {
         let statement = match self.traversal {
             Traversal::Active(statement) => statement,
@@ -139,11 +145,13 @@ impl<L, V, T> BlockFrame<L, V, T> {
         match next_statement {
             Some(statement) => self
                 .with_traversal(Traversal::Active(statement))
+                .into_standard_frame()
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
             None => self
                 .with_traversal(Traversal::Exit)
+                .into_standard_frame()
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
@@ -168,10 +176,10 @@ where
         + BlockTransferDispatch<L, F, C, E, V, T>
         + Env<V, Error = E>,
     L: Dialect,
-    F: TryLiftFrom<BlockFrame<L, V, T>>,
+    F: TryLiftFrom<StandardFrame<L, V, T>>,
     C: TryLiftFrom<StandardCompletion<V>>,
     E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>
+        + From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>
         + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
     V: Clone,
 {
@@ -192,7 +200,7 @@ where
                         interp.dispatch_block_transfer(self.location.stage, self.env, transfer)
                     }
                     StatementEffect::Push(child) => Ok(FrameEffect::Push {
-                        parent: self.try_lift()?,
+                        parent: self.into_standard_frame().try_lift()?,
                         child,
                     }),
                     StatementEffect::Complete(completion) => Ok(FrameEffect::Complete(completion)),

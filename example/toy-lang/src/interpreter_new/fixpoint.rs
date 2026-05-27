@@ -1,25 +1,25 @@
 #[cfg(test)]
 use std::collections::HashMap;
 
-#[cfg(test)]
-use kirin::prelude::TryLiftFrom;
 use kirin::prelude::{
     CompileStage, Dialect, GetInfo, HasStageInfo, LiftFrom, Pipeline, Product, StageMeta, Symbol,
     TryLift,
 };
 #[cfg(test)]
+use kirin_constprop::ConstPropFixpointInterpreter;
+#[cfg(test)]
 use kirin_constprop::ConstPropFunctionOwner;
-use kirin_constprop::{ConstPropFixpointInterpreter, ConstPropOwner};
+use kirin_constprop::{ConstPropAnalyzerHelper, ConstPropFunctionFixpoint, ConstPropOwner};
 use kirin_function::interpreter_new::{CallTargetResolution, ResolvedCallTarget};
 use kirin_interpreter_new::{
-    AbstractBlockTransfer, AbstractEnvStore, BlockFrame, Env, FunctionEntryTarget,
-    FunctionInvocation, FunctionInvocationDispatch, InterpreterError, Location, OwnerSemantics,
-    StageAccess, SummaryEffect,
+    AbstractBlockTransfer, BlockFrame, Env, FunctionEntryTarget, FunctionInvocation,
+    FunctionInvocationDispatch, FunctionInvocationFrame, InterpreterError, Location,
+    OwnerSemantics, StageAccess, StandardFrame, SummaryEffect,
 };
 #[cfg(test)]
 use kirin_interpreter_new::{
-    BackwardSummaryDeps, ForwardSummaryDeps, FunctionFrame, SpecializedFunctionFrame,
-    StagedFunctionFrame, SummaryDependency, SummaryDependencyIndex,
+    AbstractEnvStore, BackwardSummaryDeps, ForwardSummaryDeps, SummaryDependency,
+    SummaryDependencyIndex,
 };
 
 use crate::language::{HighLevel, LowLevel};
@@ -28,7 +28,6 @@ use crate::stage::Stage;
 use kirin_scf::interpreter_new::ScfCompletion;
 use kirin_scf::{ForLoopValue, ScfForConstPropSummary};
 
-#[cfg(test)]
 use super::ToyFrame;
 use super::run::expect_function_return;
 use super::run::resolve_function;
@@ -55,14 +54,14 @@ impl ConstPropSemantics {
     }
 }
 
-type FunctionFixpoint<'ir> = ConstPropFixpointInterpreter<
+type FunctionFixpoint<'ir> = ConstPropFunctionFixpoint<
     'ir,
     Stage,
-    ConstPropOwner,
     ToyStageFrame<ConstProp, AbstractBlockTransfer<ConstProp>>,
     ToyCompletion<ConstProp>,
     ToyError,
-    ToyConstPropSummary,
+    ConstProp,
+    ScfForConstPropSummary<ConstProp>,
 >;
 
 type ToyConstPropSummary =
@@ -93,8 +92,16 @@ impl<'ir>
         invocation: FunctionInvocation<ConstProp>,
     ) -> Result<ToyStageFrame<ConstProp, AbstractBlockTransfer<ConstProp>>, ToyError> {
         match self.pipeline().stage(invocation.stage()) {
-            Some(Stage::Source(_)) => invocation.into_root_frame::<HighLevel, _, ToyError>(),
-            Some(Stage::Lowered(_)) => invocation.into_root_frame::<LowLevel, _, ToyError>(),
+            Some(Stage::Source(_)) => {
+                ToyFrame::<HighLevel, _, _>::from_function_invocation(invocation)?
+                    .try_lift()
+                    .map_err(ToyError::from)
+            }
+            Some(Stage::Lowered(_)) => {
+                ToyFrame::<LowLevel, _, _>::from_function_invocation(invocation)?
+                    .try_lift()
+                    .map_err(ToyError::from)
+            }
             None => Err(ToyError::lift_from(InterpreterError::MissingStage(
                 invocation.stage(),
             ))),
@@ -114,7 +121,7 @@ impl<'ir, Deps>
         &mut self,
         invocation: FunctionInvocation<ConstProp>,
     ) -> Result<ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>>, ToyError> {
-        invocation.into_root_frame::<LowLevel, _, ToyError>()
+        ToyFrame::<LowLevel, _, _>::from_function_invocation(invocation).map_err(ToyError::from)
     }
 }
 
@@ -272,15 +279,18 @@ impl<'ir>
                 })?;
                 let env = interp.alloc();
                 match interp.pipeline().stage(owner.stage()) {
-                    Some(Stage::Source(_)) => BlockFrame::<
-                        HighLevel,
-                        ConstProp,
-                        AbstractBlockTransfer<ConstProp>,
-                    >::new(
-                        owner.stage(), state.body, env, state.body_args()
-                    )
-                    .try_lift()
-                    .map_err(ToyError::from),
+                    Some(Stage::Source(_)) => {
+                        let standard: StandardFrame<
+                            HighLevel,
+                            ConstProp,
+                            AbstractBlockTransfer<ConstProp>,
+                        > = BlockFrame::new(owner.stage(), state.body, env, state.body_args())
+                            .try_lift()
+                            .map_err(ToyError::from)?;
+                        let toy: ToyFrame<HighLevel, ConstProp, AbstractBlockTransfer<ConstProp>> =
+                            standard.try_lift().map_err(ToyError::from)?;
+                        toy.try_lift().map_err(ToyError::from)
+                    }
                     Some(Stage::Lowered(_)) => Err(ToyError::lift_from(InterpreterError::Custom(
                         "scf.for fixpoint owner cannot run at lowered stage",
                     ))),
@@ -356,23 +366,6 @@ impl<'ir, Deps>
         ToyCompletion<ConstProp>,
         ToyError,
     > for DirectionalConstPropSemantics
-where
-    ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>>: TryLiftFrom<FunctionFrame<LowLevel, ConstProp>>
-        + TryLiftFrom<StagedFunctionFrame<LowLevel, ConstProp>>
-        + TryLiftFrom<SpecializedFunctionFrame<LowLevel, ConstProp>>,
-    ToyError: From<
-            <ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>> as TryLiftFrom<
-                FunctionFrame<LowLevel, ConstProp>,
-            >>::Error,
-        > + From<
-            <ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>> as TryLiftFrom<
-                StagedFunctionFrame<LowLevel, ConstProp>,
-            >>::Error,
-        > + From<
-            <ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>> as TryLiftFrom<
-                SpecializedFunctionFrame<LowLevel, ConstProp>,
-            >>::Error,
-        >,
 {
     fn bottom_summary(
         &mut self,
@@ -402,8 +395,10 @@ where
                 "directional const-prop expected function owner",
             )));
         };
-        FunctionInvocation::new(owner.stage, owner.target, Product::from_vec(args))
-            .into_root_frame()
+        ToyFrame::<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>>::from_function_invocation(
+            FunctionInvocation::new(owner.stage, owner.target, Product::from_vec(args)),
+        )
+        .map_err(ToyError::from)
     }
 
     fn complete_owner(
@@ -432,18 +427,17 @@ pub fn analyze_source_constprop_invocation(
     pipeline: &Pipeline<Stage>,
     invocation: FunctionInvocation<ConstProp>,
 ) -> Result<ConstProp, ToyError> {
-    let owner = ConstPropOwner::function(invocation.stage(), invocation.target());
-    let args = invocation.args().iter().cloned().collect::<Vec<_>>();
-    let mut interp: FunctionFixpoint<'_> =
-        FunctionFixpoint::new(pipeline, AbstractEnvStore::new(), ());
-    let mut semantics = ConstPropSemantics::new(&args);
-
-    interp.solve(&mut semantics, owner)?;
-    Ok(interp
-        .summary(&owner)
-        .and_then(ToyConstPropSummary::function_value)
-        .cloned()
-        .unwrap_or(ConstProp::Bottom))
+    ConstPropAnalyzerHelper::new(pipeline)
+        .stage(invocation.stage())
+        .target(invocation.target())
+        .args(invocation.args().iter().cloned())
+        .analyze_return_with::<
+            ToyStageFrame<ConstProp, AbstractBlockTransfer<ConstProp>>,
+            ToyCompletion<ConstProp>,
+            ToyError,
+            ScfForConstPropSummary<ConstProp>,
+            ConstPropSemantics,
+        >(|args| ConstPropSemantics::new(args.as_slice()))
 }
 
 pub fn analyze_source_constprop_fixpoint(
@@ -610,16 +604,15 @@ pub fn analyze_lowered_constprop_invocation(
     pipeline: &Pipeline<Stage>,
     invocation: FunctionInvocation<ConstProp>,
 ) -> Result<ConstProp, ToyError> {
-    let owner = ConstPropOwner::function(invocation.stage(), invocation.target());
-    let args = invocation.args().iter().cloned().collect::<Vec<_>>();
-    let mut interp: FunctionFixpoint<'_> =
-        FunctionFixpoint::new(pipeline, AbstractEnvStore::new(), ());
-    let mut semantics = ConstPropSemantics::new(&args);
-
-    interp.solve(&mut semantics, owner)?;
-    Ok(interp
-        .summary(&owner)
-        .and_then(ToyConstPropSummary::function_value)
-        .cloned()
-        .unwrap_or(ConstProp::Bottom))
+    ConstPropAnalyzerHelper::new(pipeline)
+        .stage(invocation.stage())
+        .target(invocation.target())
+        .args(invocation.args().iter().cloned())
+        .analyze_return_with::<
+            ToyStageFrame<ConstProp, AbstractBlockTransfer<ConstProp>>,
+            ToyCompletion<ConstProp>,
+            ToyError,
+            ScfForConstPropSummary<ConstProp>,
+            ConstPropSemantics,
+        >(|args| ConstPropSemantics::new(args.as_slice()))
 }
