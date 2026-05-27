@@ -1,11 +1,12 @@
 use kirin::prelude::{Block, CompileTimeValue, Dialect, HasBottom, HasTop, Lattice, Product};
 use kirin_constprop::{
-    ConstPropLocationSummary, ConstPropOwner, ConstPropSummary, ConstPropValue, join_product,
+    AdvanceableLocationSummary, ConstPropLocationSummary, ConstPropOwner, ConstPropSummary,
+    ConstPropValue, join_product,
 };
 use kirin_interpreter_new::BlockTransfer;
 
 use crate::ForLoopValue;
-use crate::interpreter_new::{ForContinuation, ScfForFixpointSummary};
+use crate::interpreter_new::{ForContinuation, ScfCompletion, ScfForFixpointSummary};
 
 impl<S, F> ForLoopValue for ConstPropValue<i64, S, F>
 where
@@ -80,6 +81,34 @@ where
         }
 
         changed
+    }
+}
+
+impl<V> AdvanceableLocationSummary<V> for ScfForConstPropSummary<V>
+where
+    V: HasBottom + HasTop + Clone + PartialEq + ForLoopValue,
+{
+    type Completion = ScfCompletion<V>;
+
+    fn body(&self) -> Block {
+        self.body
+    }
+
+    fn body_args(&self) -> Product<V>
+    where
+        V: Clone,
+    {
+        self.body_args()
+    }
+
+    fn advance_with_carried(self, carried: Product<V>) -> Option<Self> {
+        self.advance_with(carried, ForLoopValue::loop_step)
+    }
+
+    fn carry_from_completion(completion: Self::Completion) -> Option<Product<V>> {
+        match completion {
+            ScfCompletion::Yield(product) => Some(product),
+        }
     }
 }
 

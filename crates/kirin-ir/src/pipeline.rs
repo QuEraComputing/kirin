@@ -137,6 +137,14 @@ impl<S> Pipeline<S> {
         self.global_symbols.lookup(name)
     }
 
+    /// Resolve a function name to its [`Function`] id by chaining
+    /// [`lookup_symbol`](Self::lookup_symbol) and
+    /// [`function_by_name`](Self::function_by_name).
+    pub fn lookup_function_by_name(&self, name: &str) -> Option<Function> {
+        let sym = self.lookup_symbol(name)?;
+        self.function_by_name(sym)
+    }
+
     /// Get a reference to the global symbol table.
     pub fn global_symbols(&self) -> &InternTable<String, GlobalSymbol> {
         &self.global_symbols

@@ -1,4 +1,6 @@
-use kirin_ir::{Block, Product};
+use kirin_ir::{Block, LiftFrom, Product};
+
+use crate::{InterpreterError, ProjectOrSelf};
 
 pub enum FrameEffect<F, C> {
     Continue(F),
@@ -13,6 +15,31 @@ pub enum StandardCompletion<V> {
     RegionDone,
     GraphDone,
     FunctionReturned(Product<V>),
+}
+
+pub fn expect_single_function_return<V, C, E>(completion: C) -> Result<V, E>
+where
+    C: ProjectOrSelf<StandardCompletion<V>>,
+    E: LiftFrom<InterpreterError>,
+{
+    match completion.project_or_self() {
+        Ok(StandardCompletion::FunctionReturned(product)) => {
+            if product.len() == 1 {
+                Ok(product.into_iter().next().unwrap())
+            } else {
+                Err(E::lift_from(InterpreterError::ProductArityMismatch {
+                    expected: 1,
+                    actual: product.len(),
+                }))
+            }
+        }
+        Ok(_) => Err(E::lift_from(InterpreterError::ExpectedFunctionReturn(
+            "non-function completion",
+        ))),
+        Err(_) => Err(E::lift_from(InterpreterError::ExpectedFunctionReturn(
+            "completion did not project to StandardCompletion",
+        ))),
+    }
 }
 
 pub enum StatementEffect<F, C, T> {

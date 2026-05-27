@@ -85,6 +85,34 @@ impl<'ir, S, F, C, E, V> ConcreteInterpreter<'ir, S, F, C, E, V> {
         self.run()
     }
 
+    /// Resolve a function by name in the given stage and run it with the
+    /// given arguments. Returns the raw completion produced by the function.
+    pub fn run_function_by_name<A>(
+        &mut self,
+        stage_name: &str,
+        function_name: &str,
+        args: A,
+    ) -> Result<C, E>
+    where
+        S: kirin_ir::StageMeta,
+        Self: crate::FunctionInvocationDispatch<F, E, V>,
+        F: Frame<Self, F, C, E>,
+        E: LiftFrom<InterpreterError>,
+        A: IntoIterator<Item = V>,
+    {
+        let stage = self
+            .pipeline
+            .stage_by_name(stage_name)
+            .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))
+            .map_err(E::lift_from)?;
+        let function = self
+            .pipeline
+            .lookup_function_by_name(function_name)
+            .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))
+            .map_err(E::lift_from)?;
+        self.invoke(stage).function(function).args(args)
+    }
+
     pub fn step(&mut self) -> Result<StepResult<C>, E>
     where
         F: Frame<Self, F, C, E>,

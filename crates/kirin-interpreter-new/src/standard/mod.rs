@@ -6,6 +6,7 @@ mod frame;
 mod function;
 mod invocation;
 mod region;
+mod stage_block;
 mod statement;
 
 pub use abstract_branch::{AbstractBranchFrame, AbstractBranchState};
@@ -22,4 +23,5 @@ pub use invocation::{
     FunctionInvokeBuilder, FunctionInvokeTargetBuilder,
 };
 pub use region::RegionFrame;
+pub use stage_block::StageBlockDispatch;
 pub use statement::StatementFrame;

@@ -20,7 +20,7 @@ pub use concrete::{ConcreteInterpreter, StepResult};
 pub use dispatch::{Interpretable, StageAccess, StatementDispatch};
 pub use effect::{
     AbstractBlockTransfer, BlockTransfer, ConcreteBlockTransfer, FrameEffect, StandardCompletion,
-    StatementEffect,
+    StatementEffect, expect_single_function_return,
 };
 pub use env::{Env, EnvIndex, EnvStackStore, ForkEnv};
 pub use error::InterpreterError;
@@ -31,11 +31,11 @@ pub use standard::{
     FunctionAccess, FunctionBodyDispatch, FunctionEntry, FunctionEntryTarget, FunctionFrame,
     FunctionInvocation, FunctionInvocationDispatch, FunctionInvocationFrame, FunctionInvokeBuilder,
     FunctionInvokeTargetBuilder, RegionFrame, SpecializedFunctionFrame, SpecializedFunctionState,
-    StagedFunctionFrame, StandardFrame, StatementFrame,
+    StageBlockDispatch, StagedFunctionFrame, StandardFrame, StatementFrame,
 };
 pub use value::{BranchCondition, HasProductValue};
 
 #[cfg(feature = "derive")]
 pub use kirin_derive_interpreter_new::{
-    Completion, Frame, FunctionEntry, HasLocation, Interpretable,
+    Completion, Frame, FunctionEntry, HasLocation, Interpretable, LiftError,
 };

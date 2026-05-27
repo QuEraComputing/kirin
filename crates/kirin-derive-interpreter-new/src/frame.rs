@@ -160,6 +160,65 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
     })
 }
 
+pub fn do_derive_lift_error(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
+    let ir_crate = parse_kirin_crate_path(input)?;
+    let variants = wrapper_variants(input)?;
+    let type_name = &input.ident;
+    let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
+
+    let per_variant = variants.iter().map(|variant| {
+        let name = &variant.ident;
+        let ty = &variant.field.ty;
+        let binding = &variant.binding;
+        let constructor = variant.field.constructor(binding);
+        quote! {
+            #[automatically_derived]
+            impl #impl_generics ::core::convert::From<#ty> for #type_name #ty_generics #where_clause {
+                fn from(#binding: #ty) -> Self {
+                    Self::#name #constructor
+                }
+            }
+
+            #[automatically_derived]
+            impl #impl_generics #ir_crate::TryLiftFrom<#ty> for #type_name #ty_generics #where_clause {
+                type Error = ::core::convert::Infallible;
+
+                fn try_lift_from(#binding: #ty) -> ::core::result::Result<Self, Self::Error> {
+                    Ok(Self::#name #constructor)
+                }
+            }
+        }
+    });
+
+    Ok(quote! {
+        #(#per_variant)*
+
+        #[automatically_derived]
+        impl #impl_generics ::core::convert::From<::core::convert::Infallible>
+            for #type_name #ty_generics
+        #where_clause
+        {
+            fn from(error: ::core::convert::Infallible) -> Self {
+                match error {}
+            }
+        }
+
+        #[automatically_derived]
+        impl #impl_generics #ir_crate::TryLiftFrom<::core::convert::Infallible>
+            for #type_name #ty_generics
+        #where_clause
+        {
+            type Error = ::core::convert::Infallible;
+
+            fn try_lift_from(
+                error: ::core::convert::Infallible,
+            ) -> ::core::result::Result<Self, Self::Error> {
+                match error {}
+            }
+        }
+    })
+}
+
 pub fn do_derive_completion(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
     let interp_crate = parse_interpret_crate_path(input)?;
     let ir_crate = parse_kirin_crate_path(input)?;
@@ -313,6 +372,22 @@ mod tests {
             }
         };
         insta::assert_snapshot!(generate_frame_code(input));
+    }
+
+    fn generate_lift_error_code(input: syn::DeriveInput) -> String {
+        let tokens = do_derive_lift_error(&input).expect("failed to generate LiftError");
+        rustfmt(tokens.to_string())
+    }
+
+    #[test]
+    fn lift_error_for_error_enum() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            enum ToyError {
+                Core(InterpreterError),
+                ArithConversion(ArithConversionError),
+            }
+        };
+        insta::assert_snapshot!(generate_lift_error_code(input));
     }
 
     #[test]

@@ -1,0 +1,45 @@
+---
+source: crates/kirin-derive-interpreter-new/src/frame.rs
+expression: generate_lift_error_code(input)
+---
+#[automatically_derived]
+impl ::core::convert::From<InterpreterError> for ToyError {
+    fn from(__frame: InterpreterError) -> Self {
+        Self::Core(__frame)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::TryLiftFrom<InterpreterError> for ToyError {
+    type Error = ::core::convert::Infallible;
+    fn try_lift_from(__frame: InterpreterError) -> ::core::result::Result<Self, Self::Error> {
+        Ok(Self::Core(__frame))
+    }
+}
+#[automatically_derived]
+impl ::core::convert::From<ArithConversionError> for ToyError {
+    fn from(__frame: ArithConversionError) -> Self {
+        Self::ArithConversion(__frame)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::TryLiftFrom<ArithConversionError> for ToyError {
+    type Error = ::core::convert::Infallible;
+    fn try_lift_from(__frame: ArithConversionError) -> ::core::result::Result<Self, Self::Error> {
+        Ok(Self::ArithConversion(__frame))
+    }
+}
+#[automatically_derived]
+impl ::core::convert::From<::core::convert::Infallible> for ToyError {
+    fn from(error: ::core::convert::Infallible) -> Self {
+        match error {}
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::TryLiftFrom<::core::convert::Infallible> for ToyError {
+    type Error = ::core::convert::Infallible;
+    fn try_lift_from(
+        error: ::core::convert::Infallible,
+    ) -> ::core::result::Result<Self, Self::Error> {
+        match error {}
+    }
+}

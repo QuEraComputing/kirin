@@ -3,7 +3,9 @@ use kirin::prelude::{
 };
 use kirin_arith::ArithType;
 use kirin_function::{Call, Function, Return};
-use kirin_interpreter_new::{AbstractBlockTransfer, AbstractInterpreter, FunctionInvocation};
+use kirin_interpreter_new::{
+    AbstractBlockTransfer, AbstractInterpreter, FunctionInvocation, expect_single_function_return,
+};
 
 use super::*;
 use crate::language::{HighLevel, LowLevel};
@@ -303,7 +305,7 @@ fn constprop_fixpoint_source_entry_variants() {
         ConstProp,
     > = AbstractInterpreter::new(&pipeline);
     assert_eq!(
-        super::run::expect_function_return(
+        expect_single_function_return::<_, _, ToyError>(
             staged_interp
                 .invoke(stage)
                 .staged(staged)
@@ -323,7 +325,7 @@ fn constprop_fixpoint_source_entry_variants() {
         ConstProp,
     > = AbstractInterpreter::new(&pipeline);
     assert_eq!(
-        super::run::expect_function_return(
+        expect_single_function_return::<_, _, ToyError>(
             specialized_interp
                 .invoke(stage)
                 .specialized(specialized)

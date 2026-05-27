@@ -69,6 +69,12 @@ pub enum InterpreterError {
         function: SpecializedFunction,
         stage: CompileStage,
     },
+    #[error("missing stage named {0:?}")]
+    MissingStageName(String),
+    #[error("missing function named {0:?}")]
+    MissingFunctionName(String),
+    #[error("expected function return, got {0}")]
+    ExpectedFunctionReturn(&'static str),
     #[error("{0}")]
     Custom(&'static str),
 }

@@ -1,10 +1,15 @@
 mod analyzer;
+mod default_semantics;
 mod shell;
 mod summary;
 mod value;
 
-pub use analyzer::{ConstPropAnalyzerHelper, ConstPropFunctionFixpoint};
-pub use shell::{ConstPropDomain, ConstPropFixpointInterpreter, ConstPropInterpreterShell};
+pub use analyzer::ConstPropFunctionFixpoint;
+pub use default_semantics::{
+    AdvanceableLocationSummary, DefaultConstPropCompletion, DefaultConstPropSemantics,
+    expect_function_return,
+};
+pub use shell::{ConstPropDomain, ConstPropDriver, ConstPropFixpointInterpreter};
 pub use summary::{
     ConstPropFunctionOwner, ConstPropFunctionSummary, ConstPropLocationSummary, ConstPropOwner,
     ConstPropSummary, join_product,
