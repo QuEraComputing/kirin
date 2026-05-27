@@ -1,0 +1,39 @@
+---
+source: crates/kirin-derive-interpreter-new/src/frame.rs
+assertion_line: 326
+expression: generate_completion_code(input)
+---
+#[automatically_derived]
+impl<V> ::kirin::ir::TryLiftFrom<StandardCompletion<V>> for ToyCompletion<V> {
+    type Error = ::core::convert::Infallible;
+    fn try_lift_from(__frame: StandardCompletion<V>) -> Result<Self, Self::Error> {
+        Ok(Self::Standard(__frame))
+    }
+}
+#[automatically_derived]
+impl<V> ::kirin::ir::TryLiftFrom<ScfCompletion<V>> for ToyCompletion<V> {
+    type Error = ::core::convert::Infallible;
+    fn try_lift_from(__frame: ScfCompletion<V>) -> Result<Self, Self::Error> {
+        Ok(Self::Scf(__frame))
+    }
+}
+#[automatically_derived]
+impl<V> ::kirin_interpreter_new::ProjectOrSelf<StandardCompletion<V>> for ToyCompletion<V> {
+    type Error = ::core::convert::Infallible;
+    fn project_or_self(self) -> ::core::result::Result<StandardCompletion<V>, Self> {
+        match self {
+            Self::Standard(__frame) => Ok(__frame),
+            other => Err(other),
+        }
+    }
+}
+#[automatically_derived]
+impl<V> ::kirin_interpreter_new::ProjectOrSelf<ScfCompletion<V>> for ToyCompletion<V> {
+    type Error = ::core::convert::Infallible;
+    fn project_or_self(self) -> ::core::result::Result<ScfCompletion<V>, Self> {
+        match self {
+            Self::Scf(__frame) => Ok(__frame),
+            other => Err(other),
+        }
+    }
+}

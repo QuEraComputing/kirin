@@ -5,7 +5,7 @@ use kirin_ir::{CompileStage, Dialect, LiftFrom, TryLift, TryLiftFrom};
 use crate::{
     AbstractBlockTransfer, AbstractBranchFrame, AbstractInterpreterWithStore, AbstractValue,
     ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, ForkEnv, FrameEffect,
-    InterpreterError, StandardCompletion, StandardFixpointInterpreter, Summary,
+    InterpreterError, StandardCompletion, StandardFixpointInterpreter, StandardFrame, Summary,
 };
 
 pub trait BlockTransferDispatch<L: Dialect, F, C, E, V, T> {
@@ -17,13 +17,13 @@ pub trait BlockTransferDispatch<L: Dialect, F, C, E, V, T> {
     ) -> Result<FrameEffect<F, C>, E>;
 }
 
-impl<'ir, S, L, F, C, E, V> BlockTransferDispatch<L, F, C, E, V, ConcreteBlockTransfer<V>>
-    for ConcreteInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, L, F, C, E, V, RootF> BlockTransferDispatch<L, F, C, E, V, ConcreteBlockTransfer<V>>
+    for ConcreteInterpreter<'ir, S, RootF, C, E, V>
 where
     L: Dialect,
-    F: TryLiftFrom<crate::BlockFrame<L, V, ConcreteBlockTransfer<V>>>,
+    F: TryLiftFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>,
     E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<crate::BlockFrame<L, V, ConcreteBlockTransfer<V>>>>::Error>,
+        + From<<F as TryLiftFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>>::Error>,
 {
     fn dispatch_block_transfer(
         &mut self,
@@ -33,9 +33,9 @@ where
     ) -> Result<FrameEffect<F, C>, E> {
         match transfer {
             ConcreteBlockTransfer::Jump { target, arguments } => {
-                crate::BlockFrame::<L, V, ConcreteBlockTransfer<V>>::new(
+                StandardFrame::Block(crate::BlockFrame::<L, V, ConcreteBlockTransfer<V>>::new(
                     stage, target, env, arguments,
-                )
+                ))
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)
@@ -44,17 +44,16 @@ where
     }
 }
 
-impl<'ir, S, L, F, C, E, V, Store> BlockTransferDispatch<L, F, C, E, V, AbstractBlockTransfer<V>>
-    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
+impl<'ir, S, L, F, C, E, V, Store, RootF>
+    BlockTransferDispatch<L, F, C, E, V, AbstractBlockTransfer<V>>
+    for AbstractInterpreterWithStore<'ir, S, RootF, C, E, Store>
 where
     L: Dialect,
-    F: TryLiftFrom<AbstractBranchFrame<L, V>>,
-    F: TryLiftFrom<crate::BlockFrame<L, V, AbstractBlockTransfer<V>>>,
+    F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
     Store: ForkEnv<V>,
     C: TryLiftFrom<StandardCompletion<V>>,
     E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<AbstractBranchFrame<L, V>>>::Error>
-        + From<<F as TryLiftFrom<crate::BlockFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
+        + From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
         + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>
         + LiftFrom<Store::Error>,
     V: AbstractValue,
@@ -67,9 +66,9 @@ where
     ) -> Result<FrameEffect<F, C>, E> {
         match transfer {
             AbstractBlockTransfer::Jump { target, arguments } => {
-                crate::BlockFrame::<L, V, AbstractBlockTransfer<V>>::new(
+                StandardFrame::Block(crate::BlockFrame::<L, V, AbstractBlockTransfer<V>>::new(
                     stage, target, env, arguments,
-                )
+                ))
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)
@@ -82,7 +81,7 @@ where
             } => {
                 let true_env = self.fork_env(env)?;
                 let false_env = self.fork_env(env)?;
-                AbstractBranchFrame::<L, V>::new(
+                StandardFrame::AbstractBranch(AbstractBranchFrame::<L, V>::new(
                     stage,
                     true_env,
                     true_target,
@@ -90,7 +89,7 @@ where
                     false_env,
                     false_target,
                     false_arguments,
-                )
+                ))
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)
@@ -99,20 +98,18 @@ where
     }
 }
 
-impl<'ir, Stage, K, L, F, C, E, V, S, Store, Deps>
+impl<'ir, Stage, K, L, F, C, E, V, S, Store, Deps, RootF>
     BlockTransferDispatch<L, F, C, E, V, AbstractBlockTransfer<V>>
-    for StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, Deps>
+    for StandardFixpointInterpreter<'ir, Stage, K, RootF, C, E, S, Store, Deps>
 where
     K: Clone + Eq + Hash,
     L: Dialect,
-    F: TryLiftFrom<AbstractBranchFrame<L, V>>,
-    F: TryLiftFrom<crate::BlockFrame<L, V, AbstractBlockTransfer<V>>>,
+    F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
     S: Summary,
     Store: ForkEnv<V>,
     C: TryLiftFrom<StandardCompletion<V>>,
     E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<AbstractBranchFrame<L, V>>>::Error>
-        + From<<F as TryLiftFrom<crate::BlockFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
+        + From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
         + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>
         + LiftFrom<<Store as Env<V>>::Error>,
     V: AbstractValue,
@@ -125,9 +122,9 @@ where
     ) -> Result<FrameEffect<F, C>, E> {
         match transfer {
             AbstractBlockTransfer::Jump { target, arguments } => {
-                crate::BlockFrame::<L, V, AbstractBlockTransfer<V>>::new(
+                StandardFrame::Block(crate::BlockFrame::<L, V, AbstractBlockTransfer<V>>::new(
                     stage, target, env, arguments,
-                )
+                ))
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)
@@ -140,7 +137,7 @@ where
             } => {
                 let true_env = self.fork_env(env)?;
                 let false_env = self.fork_env(env)?;
-                AbstractBranchFrame::<L, V>::new(
+                StandardFrame::AbstractBranch(AbstractBranchFrame::<L, V>::new(
                     stage,
                     true_env,
                     true_target,
@@ -148,7 +145,7 @@ where
                     false_env,
                     false_target,
                     false_arguments,
-                )
+                ))
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)

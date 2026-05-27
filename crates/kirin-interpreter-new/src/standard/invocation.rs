@@ -115,8 +115,8 @@ impl<V> FunctionInvocation<V> {
     }
 }
 
-impl<'ir, S, F, C, E, V> FunctionInvocationDispatch<F, E, V>
-    for ConcreteInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, F, C, E, V, RootF> FunctionInvocationDispatch<F, E, V>
+    for ConcreteInterpreter<'ir, S, RootF, C, E, V>
 where
     F: FunctionInvocationFrame<V>,
     E: From<<F as FunctionInvocationFrame<V>>::Error>,
@@ -126,8 +126,8 @@ where
     }
 }
 
-impl<'ir, S, F, C, E, Store, V> FunctionInvocationDispatch<F, E, V>
-    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
+impl<'ir, S, F, C, E, Store, V, RootF> FunctionInvocationDispatch<F, E, V>
+    for AbstractInterpreterWithStore<'ir, S, RootF, C, E, Store>
 where
     Store: Env<V>,
     F: FunctionInvocationFrame<V>,

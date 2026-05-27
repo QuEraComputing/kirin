@@ -9,7 +9,7 @@ use kirin_interpreter_new::{
     AbstractBlockTransfer, AbstractInterpreterWithStore, BlockTransfer, CallFrame, Callee,
     ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, FunctionEntry, FunctionEntryTarget,
     Interpretable, InterpreterError, Location, RegionFrame, StageAccess, StandardCompletion,
-    StandardFixpointInterpreter, StatementEffect, Summary,
+    StandardFixpointInterpreter, StandardFrame, StatementEffect, Summary,
 };
 
 use crate::{
@@ -42,13 +42,13 @@ pub trait FunctionRegionDispatch<L: Dialect, F, E, V> {
     ) -> Result<F, E>;
 }
 
-impl<'ir, S, L, F, C, E, V> FunctionRegionDispatch<L, F, E, V>
-    for ConcreteInterpreter<'ir, S, F, C, E, V>
+impl<'ir, S, L, F, C, E, V, RootF> FunctionRegionDispatch<L, F, E, V>
+    for ConcreteInterpreter<'ir, S, RootF, C, E, V>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    F: TryLiftFrom<RegionFrame<L, V, ConcreteBlockTransfer<V>>>,
-    E: From<<F as TryLiftFrom<RegionFrame<L, V, ConcreteBlockTransfer<V>>>>::Error>,
+    F: TryLiftFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>,
+    E: From<<F as TryLiftFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>>::Error>,
     V: Clone,
 {
     fn dispatch_function_region(
@@ -58,19 +58,24 @@ where
         env: EnvIndex,
         args: Product<V>,
     ) -> Result<F, E> {
-        RegionFrame::<L, V, ConcreteBlockTransfer<V>>::new(location.stage, region, env, args)
-            .try_lift()
-            .map_err(E::from)
+        StandardFrame::Region(RegionFrame::<L, V, ConcreteBlockTransfer<V>>::new(
+            location.stage,
+            region,
+            env,
+            args,
+        ))
+        .try_lift()
+        .map_err(E::from)
     }
 }
 
-impl<'ir, S, L, F, C, E, V, Store> FunctionRegionDispatch<L, F, E, V>
-    for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
+impl<'ir, S, L, F, C, E, V, Store, RootF> FunctionRegionDispatch<L, F, E, V>
+    for AbstractInterpreterWithStore<'ir, S, RootF, C, E, Store>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    F: TryLiftFrom<RegionFrame<L, V, AbstractBlockTransfer<V>>>,
-    E: From<<F as TryLiftFrom<RegionFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
+    F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
+    E: From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
     V: Clone,
 {
     fn dispatch_function_region(
@@ -80,21 +85,26 @@ where
         env: EnvIndex,
         args: Product<V>,
     ) -> Result<F, E> {
-        RegionFrame::<L, V, AbstractBlockTransfer<V>>::new(location.stage, region, env, args)
-            .try_lift()
-            .map_err(E::from)
+        StandardFrame::Region(RegionFrame::<L, V, AbstractBlockTransfer<V>>::new(
+            location.stage,
+            region,
+            env,
+            args,
+        ))
+        .try_lift()
+        .map_err(E::from)
     }
 }
 
-impl<'ir, S, K, L, F, C, E, V, Sum, Store, Deps> FunctionRegionDispatch<L, F, E, V>
-    for StandardFixpointInterpreter<'ir, S, K, F, C, E, Sum, Store, Deps>
+impl<'ir, S, K, L, F, C, E, V, Sum, Store, Deps, RootF> FunctionRegionDispatch<L, F, E, V>
+    for StandardFixpointInterpreter<'ir, S, K, RootF, C, E, Sum, Store, Deps>
 where
     S: HasStageInfo<L>,
     K: Clone + Eq + Hash,
     L: Dialect,
     Sum: Summary,
-    F: TryLiftFrom<RegionFrame<L, V, AbstractBlockTransfer<V>>>,
-    E: From<<F as TryLiftFrom<RegionFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
+    F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
+    E: From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
     V: Clone,
 {
     fn dispatch_function_region(
@@ -104,9 +114,14 @@ where
         env: EnvIndex,
         args: Product<V>,
     ) -> Result<F, E> {
-        RegionFrame::<L, V, AbstractBlockTransfer<V>>::new(location.stage, region, env, args)
-            .try_lift()
-            .map_err(E::from)
+        StandardFrame::Region(RegionFrame::<L, V, AbstractBlockTransfer<V>>::new(
+            location.stage,
+            region,
+            env,
+            args,
+        ))
+        .try_lift()
+        .map_err(E::from)
     }
 }
 

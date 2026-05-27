@@ -8,7 +8,7 @@ use crate::{
     Traversal,
 };
 
-use super::{BlockFrame, BlockTransferDispatch};
+use super::{BlockFrame, BlockTransferDispatch, StandardFrame};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RegionFrame<L, V, T = ConcreteBlockTransfer<V>> {
@@ -59,9 +59,8 @@ impl<L, V, T> RegionFrame<L, V, T> {
     where
         I: StageAccess<L, Error = E>,
         L: Dialect,
-        F: TryLiftFrom<RegionFrame<L, V, T>> + TryLiftFrom<BlockFrame<L, V, T>>,
-        E: From<<F as TryLiftFrom<RegionFrame<L, V, T>>>::Error>
-            + From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>,
+        F: TryLiftFrom<StandardFrame<L, V, T>>,
+        E: From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>,
         V: Clone,
     {
         let first_block = {
@@ -75,6 +74,7 @@ impl<L, V, T> RegionFrame<L, V, T> {
             }
             None => self
                 .with_traversal(Traversal::Exit)
+                .into_standard_frame()
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
@@ -87,15 +87,23 @@ impl<L, V, T> RegionFrame<L, V, T> {
         incoming_args: Product<V>,
     ) -> Result<FrameEffect<F, C>, E>
     where
-        F: TryLiftFrom<RegionFrame<L, V, T>> + TryLiftFrom<BlockFrame<L, V, T>>,
-        E: From<<F as TryLiftFrom<RegionFrame<L, V, T>>>::Error>
-            + From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>,
+        F: TryLiftFrom<StandardFrame<L, V, T>>,
+        E: From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>,
     {
         let stage = self.location.stage;
         let env = self.env;
-        let parent = self.with_traversal(Traversal::Active(block)).try_lift()?;
-        let child = BlockFrame::<L, V, T>::new(stage, block, env, incoming_args).try_lift()?;
+        let parent = self
+            .with_traversal(Traversal::Active(block))
+            .into_standard_frame()
+            .try_lift()?;
+        let child = BlockFrame::<L, V, T>::new(stage, block, env, incoming_args)
+            .into_standard_frame()
+            .try_lift()?;
         Ok(FrameEffect::Push { parent, child })
+    }
+
+    fn into_standard_frame(self) -> StandardFrame<L, V, T> {
+        StandardFrame::Region(self)
     }
 
     fn complete<F, C, E>(self) -> Result<FrameEffect<F, C>, E>
@@ -116,11 +124,10 @@ where
         + BlockTransferDispatch<L, F, C, E, V, T>
         + Env<V, Error = E>,
     L: Dialect,
-    F: TryLiftFrom<RegionFrame<L, V, T>> + TryLiftFrom<BlockFrame<L, V, T>>,
+    F: TryLiftFrom<StandardFrame<L, V, T>>,
     C: TryLiftFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
     E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<RegionFrame<L, V, T>>>::Error>
-        + From<<F as TryLiftFrom<BlockFrame<L, V, T>>>::Error>
+        + From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>
         + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
     V: Clone,
 {
@@ -148,6 +155,7 @@ where
         match self.traversal {
             Traversal::Active(_) => self
                 .with_traversal(Traversal::Exit)
+                .into_standard_frame()
                 .try_lift()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
