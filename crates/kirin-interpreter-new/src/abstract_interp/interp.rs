@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{CompileStage, Dialect, HasStageInfo, LiftFrom, Pipeline, StageInfo};
+use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo};
 
 use crate::{
     Env, EnvIndex, ForkEnv, Frame, FrameEffect, FunctionInvocation, FunctionInvocationFrame,
@@ -56,7 +56,7 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
     pub fn run(&mut self) -> Result<C, E>
     where
         F: Frame<Self, F, C, E>,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
         loop {
             match self.step()? {
@@ -70,7 +70,7 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
     where
         Store: Env<V>,
         F: FunctionInvocationFrame<V> + Frame<Self, F, C, E>,
-        E: LiftFrom<InterpreterError> + From<<F as FunctionInvocationFrame<V>>::Error>,
+        E: From<InterpreterError> + From<<F as FunctionInvocationFrame<V>>::Error>,
     {
         self.push_frame(F::from_function_invocation(invocation).map_err(E::from)?);
         self.run()
@@ -89,33 +89,33 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
         Store: Env<V>,
         Self: crate::FunctionInvocationDispatch<F, E, V>,
         F: Frame<Self, F, C, E>,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
         A: IntoIterator<Item = V>,
     {
         let stage = self
             .pipeline
             .stage_by_name(stage_name)
             .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))
-            .map_err(E::lift_from)?;
+            .map_err(E::from)?;
         let function = self
             .pipeline
             .lookup_function_by_name(function_name)
             .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))
-            .map_err(E::lift_from)?;
+            .map_err(E::from)?;
         self.invoke(stage).function(function).args(args)
     }
 
     pub fn run_frame(&mut self, root: F) -> Result<C, E>
     where
         F: Frame<Self, F, C, E>,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
         let mut stack = vec![root];
 
         loop {
             let frame = match stack.pop() {
                 Some(frame) => frame,
-                None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
+                None => return Err(E::from(InterpreterError::EmptyFrameStack)),
             };
             let effect = frame.step(self)?;
             if let Some(completion) = self.apply_local_effect(&mut stack, effect)? {
@@ -127,11 +127,11 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
     pub fn step(&mut self) -> Result<StepResult<C>, E>
     where
         F: Frame<Self, F, C, E>,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
         let frame = match self.frames.pop() {
             Some(frame) => frame,
-            None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
+            None => return Err(E::from(InterpreterError::EmptyFrameStack)),
         };
         let effect = frame.step(self)?;
         self.apply_effect(effect)
@@ -140,7 +140,7 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
     fn apply_effect(&mut self, mut effect: FrameEffect<F, C>) -> Result<StepResult<C>, E>
     where
         F: Frame<Self, F, C, E>,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
         loop {
             match effect {
@@ -156,7 +156,7 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
                 FrameEffect::Done => {
                     let parent = match self.frames.pop() {
                         Some(parent) => parent,
-                        None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
+                        None => return Err(E::from(InterpreterError::EmptyFrameStack)),
                     };
                     effect = parent.resume_done(self)?;
                 }
@@ -178,7 +178,7 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
     ) -> Result<Option<C>, E>
     where
         F: Frame<Self, F, C, E>,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
         loop {
             match effect {
@@ -194,7 +194,7 @@ impl<'ir, S, F, C, E, Store> AbstractInterpreterWithStore<'ir, S, F, C, E, Store
                 FrameEffect::Done => {
                     let parent = match stack.pop() {
                         Some(parent) => parent,
-                        None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
+                        None => return Err(E::from(InterpreterError::EmptyFrameStack)),
                     };
                     effect = parent.resume_done(self)?;
                 }
@@ -221,31 +221,31 @@ impl<'ir, S, F, C, E, V> AbstractInterpreter<'ir, S, F, C, E, V> {
 
     pub fn pop_env(&mut self) -> Result<EnvIndex, E>
     where
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
-        self.store.pop().map_err(E::lift_from)
+        self.store.pop().map_err(E::from)
     }
 
     pub fn current_env(&self) -> Result<EnvIndex, E>
     where
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
-        self.store.current().map_err(E::lift_from)
+        self.store.current().map_err(E::from)
     }
 
     pub fn clone_env(&mut self, index: EnvIndex) -> Result<EnvIndex, E>
     where
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
         V: Clone,
     {
-        self.store.clone_store_from(index).map_err(E::lift_from)
+        self.store.clone_store_from(index).map_err(E::from)
     }
 }
 
 impl<'ir, S, F, C, E, Store, V> Env<V> for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     Store: Env<V>,
-    E: LiftFrom<Store::Error>,
+    E: From<Store::Error>,
 {
     type Error = E;
 
@@ -254,11 +254,11 @@ where
     }
 
     fn free(&mut self, index: EnvIndex) -> Result<(), Self::Error> {
-        self.store.free(index).map_err(E::lift_from)
+        self.store.free(index).map_err(E::from)
     }
 
     fn read(&self, index: EnvIndex, value: kirin_ir::SSAValue) -> Result<V, Self::Error> {
-        self.store.read(index, value).map_err(E::lift_from)
+        self.store.read(index, value).map_err(E::from)
     }
 
     fn write(
@@ -267,17 +267,17 @@ where
         value: kirin_ir::SSAValue,
         data: V,
     ) -> Result<(), Self::Error> {
-        self.store.write(index, value, data).map_err(E::lift_from)
+        self.store.write(index, value, data).map_err(E::from)
     }
 }
 
 impl<'ir, S, F, C, E, Store, V> ForkEnv<V> for AbstractInterpreterWithStore<'ir, S, F, C, E, Store>
 where
     Store: ForkEnv<V>,
-    E: LiftFrom<Store::Error>,
+    E: From<Store::Error>,
 {
     fn fork_env(&mut self, index: EnvIndex) -> Result<EnvIndex, Self::Error> {
-        self.store.fork_env(index).map_err(E::lift_from)
+        self.store.fork_env(index).map_err(E::from)
     }
 }
 
@@ -286,7 +286,7 @@ impl<'ir, S, F, C, E, Store, L> crate::StageAccess<L>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     type Error = E;
 
@@ -294,10 +294,10 @@ where
         let stage_info = self
             .pipeline
             .stage(stage)
-            .ok_or_else(|| E::lift_from(InterpreterError::MissingStage(stage)))?;
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
         stage_info
             .try_stage_info()
             .ok_or(InterpreterError::MissingStageInfo(stage))
-            .map_err(E::lift_from)
+            .map_err(E::from)
     }
 }

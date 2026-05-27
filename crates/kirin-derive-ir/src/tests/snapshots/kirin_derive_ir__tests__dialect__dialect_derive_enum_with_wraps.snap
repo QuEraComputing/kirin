@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-ir/src/tests/dialect.rs
-assertion_line: 84
 expression: generate_dialect_code(input)
 ---
 #[automatically_derived]
@@ -482,10 +481,9 @@ impl ::kirin::ir::HasSignature<Self> for ArithLanguage {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<AddOp> for ArithLanguage {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: AddOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(ArithLanguage::Add(from))
+impl ::core::convert::From<AddOp> for ArithLanguage {
+    fn from(from: AddOp) -> Self {
+        ArithLanguage::Add(from)
     }
 }
 #[automatically_derived]
@@ -499,10 +497,9 @@ impl ::kirin::ir::TryProjectTo<AddOp> for ArithLanguage {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<SubOp> for ArithLanguage {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: SubOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(ArithLanguage::Sub(from))
+impl ::core::convert::From<SubOp> for ArithLanguage {
+    fn from(from: SubOp) -> Self {
+        ArithLanguage::Sub(from)
     }
 }
 #[automatically_derived]

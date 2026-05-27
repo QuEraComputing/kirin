@@ -1,7 +1,5 @@
 use std::hash::Hash;
 
-use kirin_ir::LiftFrom;
-
 use crate::{Frame, FrameEffect, InterpreterError, StepResult};
 
 use super::{StandardFixpointInterpreter, Summary};
@@ -15,10 +13,10 @@ where
     pub fn run_frame(&mut self, root: F) -> Result<C, E>
     where
         F: Frame<Self, F, C, E>,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
         if !self.frame_stack.is_empty() {
-            return Err(E::lift_from(InterpreterError::Custom(
+            return Err(E::from(InterpreterError::Custom(
                 "cannot start a frame run with a non-empty frame stack",
             )));
         }
@@ -27,7 +25,7 @@ where
         loop {
             let frame = match self.frame_stack.pop() {
                 Some(frame) => frame,
-                None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
+                None => return Err(E::from(InterpreterError::EmptyFrameStack)),
             };
             let effect = frame.step(self)?;
             if let StepResult::Complete(completion) = self.apply_local_effect(effect)? {
@@ -39,7 +37,7 @@ where
     fn apply_local_effect(&mut self, mut effect: FrameEffect<F, C>) -> Result<StepResult<C>, E>
     where
         F: Frame<Self, F, C, E>,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
         loop {
             match effect {
@@ -55,7 +53,7 @@ where
                 FrameEffect::Done => {
                     let parent = match self.frame_stack.pop() {
                         Some(parent) => parent,
-                        None => return Err(E::lift_from(InterpreterError::EmptyFrameStack)),
+                        None => return Err(E::from(InterpreterError::EmptyFrameStack)),
                     };
                     effect = parent.resume_done(self)?;
                 }

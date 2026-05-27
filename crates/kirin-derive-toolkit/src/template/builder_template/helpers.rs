@@ -276,7 +276,7 @@ fn build_fn_body(
 
         stage
             .statement()
-            .definition(<Lang as #crate_path::LiftFrom<#self_ty>>::lift_from(#constructor))
+            .definition(<Lang as ::core::convert::From<#self_ty>>::from(#constructor))
             .new();
 
         #build_result_path {
@@ -419,7 +419,7 @@ pub(super) fn build_fn_for_statement(
         #[allow(clippy::too_many_arguments)]
         pub fn #build_fn_name<Lang>(stage: &mut impl #crate_path::AsBuildStage<Lang>, #(#inputs),*) -> #build_result_path
         where
-            Lang: #crate_path::Dialect + #crate_path::LiftFrom<#self_ty>,
+            Lang: #crate_path::Dialect + ::core::convert::From<#self_ty>,
             Lang::Type: From<#ir_type>
             #placeholder_bound
         {

@@ -1,7 +1,3 @@
-use core::convert::Infallible;
-
-use kirin_ir::TryLiftFrom;
-
 use crate::{ConcreteBlockTransfer, Frame, FrameEffect, HasLocation, Location};
 
 use super::{
@@ -21,67 +17,51 @@ pub enum StandardFrame<L, V, T = ConcreteBlockTransfer<V>> {
     SpecializedFunction(SpecializedFunctionFrame<L, V>),
 }
 
-impl<L, V, T> TryLiftFrom<StatementFrame> for StandardFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: StatementFrame) -> Result<Self, Self::Error> {
-        Ok(Self::Statement(frame))
+impl<L, V, T> From<StatementFrame> for StandardFrame<L, V, T> {
+    fn from(frame: StatementFrame) -> Self {
+        Self::Statement(frame)
     }
 }
 
-impl<L, V, T> TryLiftFrom<AbstractBranchFrame<L, V>> for StandardFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: AbstractBranchFrame<L, V>) -> Result<Self, Self::Error> {
-        Ok(Self::AbstractBranch(frame))
+impl<L, V, T> From<AbstractBranchFrame<L, V>> for StandardFrame<L, V, T> {
+    fn from(frame: AbstractBranchFrame<L, V>) -> Self {
+        Self::AbstractBranch(frame)
     }
 }
 
-impl<L, V, T> TryLiftFrom<BlockFrame<L, V, T>> for StandardFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: BlockFrame<L, V, T>) -> Result<Self, Self::Error> {
-        Ok(Self::Block(frame))
+impl<L, V, T> From<BlockFrame<L, V, T>> for StandardFrame<L, V, T> {
+    fn from(frame: BlockFrame<L, V, T>) -> Self {
+        Self::Block(frame)
     }
 }
 
-impl<L, V, T> TryLiftFrom<RegionFrame<L, V, T>> for StandardFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: RegionFrame<L, V, T>) -> Result<Self, Self::Error> {
-        Ok(Self::Region(frame))
+impl<L, V, T> From<RegionFrame<L, V, T>> for StandardFrame<L, V, T> {
+    fn from(frame: RegionFrame<L, V, T>) -> Self {
+        Self::Region(frame)
     }
 }
 
-impl<L, V, T> TryLiftFrom<CallFrame<L, V>> for StandardFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: CallFrame<L, V>) -> Result<Self, Self::Error> {
-        Ok(Self::Call(frame))
+impl<L, V, T> From<CallFrame<L, V>> for StandardFrame<L, V, T> {
+    fn from(frame: CallFrame<L, V>) -> Self {
+        Self::Call(frame)
     }
 }
 
-impl<L, V, T> TryLiftFrom<FunctionFrame<L, V>> for StandardFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: FunctionFrame<L, V>) -> Result<Self, Self::Error> {
-        Ok(Self::Function(frame))
+impl<L, V, T> From<FunctionFrame<L, V>> for StandardFrame<L, V, T> {
+    fn from(frame: FunctionFrame<L, V>) -> Self {
+        Self::Function(frame)
     }
 }
 
-impl<L, V, T> TryLiftFrom<StagedFunctionFrame<L, V>> for StandardFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: StagedFunctionFrame<L, V>) -> Result<Self, Self::Error> {
-        Ok(Self::StagedFunction(frame))
+impl<L, V, T> From<StagedFunctionFrame<L, V>> for StandardFrame<L, V, T> {
+    fn from(frame: StagedFunctionFrame<L, V>) -> Self {
+        Self::StagedFunction(frame)
     }
 }
 
-impl<L, V, T> TryLiftFrom<SpecializedFunctionFrame<L, V>> for StandardFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: SpecializedFunctionFrame<L, V>) -> Result<Self, Self::Error> {
-        Ok(Self::SpecializedFunction(frame))
+impl<L, V, T> From<SpecializedFunctionFrame<L, V>> for StandardFrame<L, V, T> {
+    fn from(frame: SpecializedFunctionFrame<L, V>) -> Self {
+        Self::SpecializedFunction(frame)
     }
 }
 

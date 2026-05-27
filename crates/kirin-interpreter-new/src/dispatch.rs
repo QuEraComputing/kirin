@@ -1,4 +1,4 @@
-use kirin_ir::{CompileStage, Dialect, LiftFrom, StageInfo};
+use kirin_ir::{CompileStage, Dialect, StageInfo};
 
 use crate::{EnvIndex, InterpreterError, Location, StatementEffect};
 
@@ -29,7 +29,7 @@ impl<I, L, F, C, E, T> StatementDispatch<L, F, C, E, T> for I
 where
     I: StageAccess<L, Error = E>,
     L: Interpretable<L, I, F, C, E, T>,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     fn dispatch_statement(
         &mut self,
@@ -38,7 +38,7 @@ where
     ) -> Result<StatementEffect<F, C, T>, E> {
         let statement = location
             .active_statement()
-            .ok_or_else(|| E::lift_from(InterpreterError::ExpectedActiveStatement(location)))?;
+            .ok_or_else(|| E::from(InterpreterError::ExpectedActiveStatement(location)))?;
         let definition = {
             let stage_info = self.stage_info(location.stage)?;
             statement.definition(stage_info).clone()

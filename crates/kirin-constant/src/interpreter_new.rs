@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, Dialect, LiftFrom, PrettyPrint, SSAValue, Typeof};
+use kirin::prelude::{CompileTimeValue, Dialect, PrettyPrint, SSAValue, Typeof};
 use kirin_interpreter_new::{BlockTransfer, Env, Interpretable, Location, StatementEffect};
 
 use crate::Constant;
@@ -9,7 +9,7 @@ where
     I: Env<X::Value, Error = E>,
     X: BlockTransfer,
     X::Value: TryFrom<T>,
-    E: LiftFrom<<X::Value as TryFrom<T>>::Error>,
+    E: From<<X::Value as TryFrom<T>>::Error>,
     T: CompileTimeValue + Typeof<Ty> + Clone + PrettyPrint,
     Ty: CompileTimeValue,
 {
@@ -19,7 +19,7 @@ where
         env: kirin_interpreter_new::EnvIndex,
         interp: &mut I,
     ) -> Result<StatementEffect<F, C, X>, E> {
-        let value = X::Value::try_from(self.value.clone()).map_err(E::lift_from)?;
+        let value = X::Value::try_from(self.value.clone()).map_err(E::from)?;
         interp.write(env, SSAValue::from(self.result), value)?;
         Ok(StatementEffect::Done)
     }

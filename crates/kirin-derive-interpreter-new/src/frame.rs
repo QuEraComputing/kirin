@@ -32,7 +32,7 @@ pub fn do_derive_has_location(input: &syn::DeriveInput) -> syn::Result<TokenStre
 
 pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
     let interp_crate = parse_interpret_crate_path(input)?;
-    let ir_crate = parse_kirin_crate_path(input)?;
+    let _ir_crate = parse_kirin_crate_path(input)?;
     let variants = wrapper_variants(input)?;
     let type_name = &input.ident;
     let mut generics = input.generics.clone();
@@ -91,11 +91,9 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
         let constructor = variant.field.constructor(binding);
         quote! {
             #[automatically_derived]
-            impl #original_impl_generics #ir_crate::TryLiftFrom<#ty> for #type_name #ty_generics #original_where {
-                type Error = ::core::convert::Infallible;
-
-                fn try_lift_from(#binding: #ty) -> Result<Self, Self::Error> {
-                    Ok(Self::#name #constructor)
+            impl #original_impl_generics ::core::convert::From<#ty> for #type_name #ty_generics #original_where {
+                fn from(#binding: #ty) -> Self {
+                    Self::#name #constructor
                 }
             }
         }
@@ -161,7 +159,7 @@ pub fn do_derive_frame(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
 }
 
 pub fn do_derive_lift_error(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
-    let ir_crate = parse_kirin_crate_path(input)?;
+    let _ir_crate = parse_kirin_crate_path(input)?;
     let variants = wrapper_variants(input)?;
     let type_name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -176,15 +174,6 @@ pub fn do_derive_lift_error(input: &syn::DeriveInput) -> syn::Result<TokenStream
             impl #impl_generics ::core::convert::From<#ty> for #type_name #ty_generics #where_clause {
                 fn from(#binding: #ty) -> Self {
                     Self::#name #constructor
-                }
-            }
-
-            #[automatically_derived]
-            impl #impl_generics #ir_crate::TryLiftFrom<#ty> for #type_name #ty_generics #where_clause {
-                type Error = ::core::convert::Infallible;
-
-                fn try_lift_from(#binding: #ty) -> ::core::result::Result<Self, Self::Error> {
-                    Ok(Self::#name #constructor)
                 }
             }
         }
@@ -202,26 +191,12 @@ pub fn do_derive_lift_error(input: &syn::DeriveInput) -> syn::Result<TokenStream
                 match error {}
             }
         }
-
-        #[automatically_derived]
-        impl #impl_generics #ir_crate::TryLiftFrom<::core::convert::Infallible>
-            for #type_name #ty_generics
-        #where_clause
-        {
-            type Error = ::core::convert::Infallible;
-
-            fn try_lift_from(
-                error: ::core::convert::Infallible,
-            ) -> ::core::result::Result<Self, Self::Error> {
-                match error {}
-            }
-        }
     })
 }
 
 pub fn do_derive_completion(input: &syn::DeriveInput) -> syn::Result<TokenStream> {
     let interp_crate = parse_interpret_crate_path(input)?;
-    let ir_crate = parse_kirin_crate_path(input)?;
+    let _ir_crate = parse_kirin_crate_path(input)?;
     let variants = wrapper_variants(input)?;
     let type_name = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
@@ -232,11 +207,9 @@ pub fn do_derive_completion(input: &syn::DeriveInput) -> syn::Result<TokenStream
         let constructor = variant.field.constructor(binding);
         quote! {
             #[automatically_derived]
-            impl #impl_generics #ir_crate::TryLiftFrom<#ty> for #type_name #ty_generics #where_clause {
-                type Error = ::core::convert::Infallible;
-
-                fn try_lift_from(#binding: #ty) -> Result<Self, Self::Error> {
-                    Ok(Self::#name #constructor)
+            impl #impl_generics ::core::convert::From<#ty> for #type_name #ty_generics #where_clause {
+                fn from(#binding: #ty) -> Self {
+                    Self::#name #constructor
                 }
             }
         }

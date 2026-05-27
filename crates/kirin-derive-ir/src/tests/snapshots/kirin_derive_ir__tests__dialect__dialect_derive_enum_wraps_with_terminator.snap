@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-ir/src/tests/dialect.rs
-assertion_line: 99
 expression: generate_dialect_code(input)
 ---
 #[automatically_derived]
@@ -494,10 +493,9 @@ impl ::kirin::ir::HasSignature<Self> for CfOps {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<BranchOp> for CfOps {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: BranchOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(CfOps::Branch(from))
+impl ::core::convert::From<BranchOp> for CfOps {
+    fn from(from: BranchOp) -> Self {
+        CfOps::Branch(from)
     }
 }
 #[automatically_derived]
@@ -511,10 +509,9 @@ impl ::kirin::ir::TryProjectTo<BranchOp> for CfOps {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<ReturnOp> for CfOps {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: ReturnOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(CfOps::Return(from))
+impl ::core::convert::From<ReturnOp> for CfOps {
+    fn from(from: ReturnOp) -> Self {
+        CfOps::Return(from)
     }
 }
 #[automatically_derived]

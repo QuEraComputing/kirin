@@ -1,13 +1,11 @@
 ---
 source: crates/kirin-derive-ir/src/tests/dialect.rs
-assertion_line: 407
 expression: code
 ---
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<InnerOp> for WrapperLanguage {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: InnerOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(WrapperLanguage::Inner(from))
+impl ::core::convert::From<InnerOp> for WrapperLanguage {
+    fn from(from: InnerOp) -> Self {
+        WrapperLanguage::Inner(from)
     }
 }
 #[automatically_derived]
@@ -21,11 +19,10 @@ impl ::kirin::ir::TryProjectTo<InnerOp> for WrapperLanguage {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<LeafOp> for WrapperLanguage {
-    type Error = <InnerOp as ::kirin::ir::TryLiftFrom<LeafOp>>::Error;
-    fn try_lift_from(from: LeafOp) -> ::core::result::Result<Self, Self::Error> {
-        let from = <InnerOp as ::kirin::ir::TryLiftFrom<LeafOp>>::try_lift_from(from)?;
-        Ok(WrapperLanguage::Inner(from))
+impl ::core::convert::From<LeafOp> for WrapperLanguage {
+    fn from(from: LeafOp) -> Self {
+        let from = <InnerOp as ::core::convert::From<LeafOp>>::from(from);
+        WrapperLanguage::Inner(from)
     }
 }
 #[automatically_derived]
@@ -41,10 +38,9 @@ impl ::kirin::ir::TryProjectTo<LeafOp> for WrapperLanguage {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<OtherOp> for WrapperLanguage {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: OtherOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(WrapperLanguage::Other(from))
+impl ::core::convert::From<OtherOp> for WrapperLanguage {
+    fn from(from: OtherOp) -> Self {
+        WrapperLanguage::Other(from)
     }
 }
 #[automatically_derived]

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use kirin_ir::{LiftFrom, Product, SSAValue};
+use kirin_ir::{Product, SSAValue};
 
 use crate::InterpreterError;
 
@@ -39,15 +39,13 @@ pub trait Env<V> {
         data: Product<V>,
     ) -> Result<(), Self::Error>
     where
-        Self::Error: LiftFrom<InterpreterError>,
+        Self::Error: From<InterpreterError>,
     {
         if data.len() != values.len() {
-            return Err(Self::Error::lift_from(
-                InterpreterError::ProductArityMismatch {
-                    expected: values.len(),
-                    actual: data.len(),
-                },
-            ));
+            return Err(Self::Error::from(InterpreterError::ProductArityMismatch {
+                expected: values.len(),
+                actual: data.len(),
+            }));
         }
 
         for (value, data) in values.iter().copied().zip(data) {

@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, Dialect, LiftFrom, Product, SSAValue, TryLiftFrom};
+use kirin::prelude::{CompileTimeValue, Dialect, Product, SSAValue};
 use kirin_interpreter_new::{
     BlockTransfer, Env, HasProductValue, Interpretable, InterpreterError, Location, StatementEffect,
 };
@@ -45,7 +45,7 @@ where
     I: Env<X::Value, Error = E>,
     X: BlockTransfer,
     X::Value: HasProductValue,
-    E: LiftFrom<ExpectedTuple> + LiftFrom<InterpreterError>,
+    E: From<ExpectedTuple> + From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -63,7 +63,7 @@ where
             .collect::<Vec<_>>();
         let product = source
             .as_product()
-            .ok_or_else(|| E::lift_from(ExpectedTuple))?
+            .ok_or_else(|| E::from(ExpectedTuple))?
             .clone();
         interp.write_product(env, results.as_slice(), product)?;
         Ok(StatementEffect::Done)
@@ -76,7 +76,7 @@ where
     I: Env<X::Value, Error = E>,
     X: BlockTransfer,
     X::Value: HasProductValue + TupleIndexValue,
-    E: LiftFrom<ExpectedTuple> + LiftFrom<InvalidTupleIndex> + LiftFrom<TupleIndexOutOfBounds>,
+    E: From<ExpectedTuple> + From<InvalidTupleIndex> + From<TupleIndexOutOfBounds>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -89,13 +89,13 @@ where
         let index = interp
             .read(env, self.index)?
             .as_tuple_index()
-            .ok_or_else(|| E::lift_from(InvalidTupleIndex))?;
+            .ok_or_else(|| E::from(InvalidTupleIndex))?;
         let value = source
             .as_product()
-            .ok_or_else(|| E::lift_from(ExpectedTuple))?
+            .ok_or_else(|| E::from(ExpectedTuple))?
             .get(index)
             .cloned()
-            .ok_or_else(|| E::lift_from(TupleIndexOutOfBounds))?;
+            .ok_or_else(|| E::from(TupleIndexOutOfBounds))?;
         interp.write(env, SSAValue::from(self.result), value)?;
         Ok(StatementEffect::Done)
     }
@@ -107,7 +107,7 @@ where
     I: Env<X::Value, Error = E>,
     X: BlockTransfer,
     X::Value: HasProductValue + TupleIndexValue,
-    E: LiftFrom<ExpectedTuple>,
+    E: From<ExpectedTuple>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -119,7 +119,7 @@ where
         let source = interp.read(env, self.source)?;
         let len = source
             .as_product()
-            .ok_or_else(|| E::lift_from(ExpectedTuple))?
+            .ok_or_else(|| E::from(ExpectedTuple))?
             .len();
         interp.write(
             env,
@@ -134,11 +134,9 @@ where
 #[error("expected tuple value")]
 pub struct ExpectedTuple;
 
-impl TryLiftFrom<ExpectedTuple> for InterpreterError {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(_: ExpectedTuple) -> Result<Self, Self::Error> {
-        Ok(Self::Custom("expected tuple value"))
+impl From<ExpectedTuple> for InterpreterError {
+    fn from(_: ExpectedTuple) -> Self {
+        Self::Custom("expected tuple value")
     }
 }
 
@@ -146,11 +144,9 @@ impl TryLiftFrom<ExpectedTuple> for InterpreterError {
 #[error("invalid tuple index")]
 pub struct InvalidTupleIndex;
 
-impl TryLiftFrom<InvalidTupleIndex> for InterpreterError {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(_: InvalidTupleIndex) -> Result<Self, Self::Error> {
-        Ok(Self::Custom("invalid tuple index"))
+impl From<InvalidTupleIndex> for InterpreterError {
+    fn from(_: InvalidTupleIndex) -> Self {
+        Self::Custom("invalid tuple index")
     }
 }
 
@@ -158,11 +154,9 @@ impl TryLiftFrom<InvalidTupleIndex> for InterpreterError {
 #[error("tuple index out of bounds")]
 pub struct TupleIndexOutOfBounds;
 
-impl TryLiftFrom<TupleIndexOutOfBounds> for InterpreterError {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(_: TupleIndexOutOfBounds) -> Result<Self, Self::Error> {
-        Ok(Self::Custom("tuple index out of bounds"))
+impl From<TupleIndexOutOfBounds> for InterpreterError {
+    fn from(_: TupleIndexOutOfBounds) -> Self {
+        Self::Custom("tuple index out of bounds")
     }
 }
 
@@ -170,10 +164,8 @@ impl TryLiftFrom<TupleIndexOutOfBounds> for InterpreterError {
 #[error("tuple arity mismatch")]
 pub struct TupleArityMismatch;
 
-impl TryLiftFrom<TupleArityMismatch> for InterpreterError {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(_: TupleArityMismatch) -> Result<Self, Self::Error> {
-        Ok(Self::Custom("tuple arity mismatch"))
+impl From<TupleArityMismatch> for InterpreterError {
+    fn from(_: TupleArityMismatch) -> Self {
+        Self::Custom("tuple arity mismatch")
     }
 }

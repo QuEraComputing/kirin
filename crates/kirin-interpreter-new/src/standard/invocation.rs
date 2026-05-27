@@ -1,7 +1,4 @@
-use kirin_ir::{
-    CompileStage, Function, LiftFrom, Product, SpecializedFunction, StagedFunction, TryLift,
-    TryLiftFrom,
-};
+use kirin_ir::{CompileStage, Function, Product, SpecializedFunction, StagedFunction};
 
 use crate::{AbstractInterpreterWithStore, ConcreteInterpreter, Env, Frame, InterpreterError};
 
@@ -88,27 +85,27 @@ impl<V> FunctionInvocation<V> {
 
     pub fn into_root_frame<L, F, E>(self) -> Result<F, E>
     where
-        F: TryLiftFrom<FunctionFrame<L, V>>
-            + TryLiftFrom<StagedFunctionFrame<L, V>>
-            + TryLiftFrom<SpecializedFunctionFrame<L, V>>,
-        E: From<<F as TryLiftFrom<FunctionFrame<L, V>>>::Error>
-            + From<<F as TryLiftFrom<StagedFunctionFrame<L, V>>>::Error>
-            + From<<F as TryLiftFrom<SpecializedFunctionFrame<L, V>>>::Error>,
+        F: TryFrom<FunctionFrame<L, V>>
+            + TryFrom<StagedFunctionFrame<L, V>>
+            + TryFrom<SpecializedFunctionFrame<L, V>>,
+        E: From<<F as TryFrom<FunctionFrame<L, V>>>::Error>
+            + From<<F as TryFrom<StagedFunctionFrame<L, V>>>::Error>
+            + From<<F as TryFrom<SpecializedFunctionFrame<L, V>>>::Error>,
     {
         match self.target {
             FunctionEntryTarget::Function(function) => {
                 FunctionFrame::<L, V>::new(self.stage, function, self.args)
-                    .try_lift()
+                    .try_into()
                     .map_err(E::from)
             }
             FunctionEntryTarget::StagedFunction(function) => {
                 StagedFunctionFrame::<L, V>::new(self.stage, function, self.args)
-                    .try_lift()
+                    .try_into()
                     .map_err(E::from)
             }
             FunctionEntryTarget::SpecializedFunction(function) => {
                 SpecializedFunctionFrame::<L, V>::new(self.stage, function, self.args)
-                    .try_lift()
+                    .try_into()
                     .map_err(E::from)
             }
         }
@@ -194,7 +191,7 @@ impl<'a, 'ir, S, F, C, E, V>
 where
     ConcreteInterpreter<'ir, S, F, C, E, V>: FunctionInvocationDispatch<F, E, V>,
     F: Frame<ConcreteInterpreter<'ir, S, F, C, E, V>, F, C, E>,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     pub fn args<A>(self, args: A) -> Result<C, E>
     where
@@ -216,7 +213,7 @@ impl<'a, 'ir, S, F, C, E, Store>
         Store: Env<V>,
         AbstractInterpreterWithStore<'ir, S, F, C, E, Store>: FunctionInvocationDispatch<F, E, V>,
         F: Frame<AbstractInterpreterWithStore<'ir, S, F, C, E, Store>, F, C, E>,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
         A: IntoIterator<Item = V>,
     {
         let invocation =

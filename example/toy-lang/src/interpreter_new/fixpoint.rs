@@ -1,6 +1,5 @@
 use kirin::prelude::{
-    Block, CompileStage, Dialect, GetInfo, HasStageInfo, LiftFrom, Pipeline, Product, StageMeta,
-    Symbol, TryLift,
+    Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, Product, StageMeta, Symbol,
 };
 use kirin_constprop::{ConstPropDriver, ConstPropFunctionFixpoint};
 #[cfg(test)]
@@ -59,16 +58,12 @@ impl<'ir> FunctionInvocationDispatch<ToyStageFrameType, ToyError, ConstProp>
     ) -> Result<ToyStageFrameType, ToyError> {
         match self.pipeline().stage(invocation.stage()) {
             Some(Stage::Source(_)) => {
-                ToyFrame::<HighLevel, _, _>::from_function_invocation(invocation)?
-                    .try_lift()
-                    .map_err(ToyError::from)
+                Ok(ToyFrame::<HighLevel, _, _>::from_function_invocation(invocation)?.into())
             }
             Some(Stage::Lowered(_)) => {
-                ToyFrame::<LowLevel, _, _>::from_function_invocation(invocation)?
-                    .try_lift()
-                    .map_err(ToyError::from)
+                Ok(ToyFrame::<LowLevel, _, _>::from_function_invocation(invocation)?.into())
             }
-            None => Err(ToyError::lift_from(InterpreterError::MissingStage(
+            None => Err(ToyError::from(InterpreterError::MissingStage(
                 invocation.stage(),
             ))),
         }
@@ -89,23 +84,19 @@ impl<'ir> StageBlockDispatch<ToyStageFrameType, ToyError, ConstProp> for Functio
                     HighLevel,
                     ConstProp,
                     AbstractBlockTransfer<ConstProp>,
-                > = BlockFrame::new(stage, block, env, args)
-                    .try_lift()
-                    .map_err(ToyError::from)?;
+                > = BlockFrame::new(stage, block, env, args).into();
                 let toy: ToyFrame<HighLevel, ConstProp, AbstractBlockTransfer<ConstProp>> =
-                    standard.try_lift().map_err(ToyError::from)?;
-                toy.try_lift().map_err(ToyError::from)
+                    standard.into();
+                Ok(toy.into())
             }
             Some(Stage::Lowered(_)) => {
                 let standard: StandardFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>> =
-                    BlockFrame::new(stage, block, env, args)
-                        .try_lift()
-                        .map_err(ToyError::from)?;
+                    BlockFrame::new(stage, block, env, args).into();
                 let toy: ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>> =
-                    standard.try_lift().map_err(ToyError::from)?;
-                toy.try_lift().map_err(ToyError::from)
+                    standard.into();
+                Ok(toy.into())
             }
-            None => Err(ToyError::lift_from(InterpreterError::MissingStage(stage))),
+            None => Err(ToyError::from(InterpreterError::MissingStage(stage))),
         }
     }
 }
@@ -141,7 +132,7 @@ impl<'ir, Deps>
         _env: EnvIndex,
         _args: Product<ConstProp>,
     ) -> Result<ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>>, ToyError> {
-        Err(ToyError::lift_from(InterpreterError::Custom(
+        Err(ToyError::from(InterpreterError::Custom(
             "directional const-prop does not support scf.for location owners",
         )))
     }
@@ -199,7 +190,7 @@ where
         .pipeline()
         .resolve_function(stage, target)
         .ok_or(InterpreterError::MissingCallTarget { location, target })
-        .map_err(ToyError::lift_from)?;
+        .map_err(ToyError::from)?;
     Ok(ResolvedCallTarget {
         stage: location.stage,
         target: FunctionEntryTarget::Function(function),
@@ -220,7 +211,7 @@ where
         .pipeline()
         .resolve_function(stage, target)
         .ok_or(InterpreterError::MissingCallTarget { location, target })
-        .map_err(ToyError::lift_from)?;
+        .map_err(ToyError::from)?;
     if let Some(target) = live_specialization_at_stage(interp.pipeline(), location.stage, function)
     {
         return Ok(target);
@@ -363,7 +354,7 @@ fn run_lowered_directional_constprop<Deps>(
 ) -> Result<DirectionalConstPropResult, ToyError>
 where
     Deps: kirin_interpreter_new::SummaryDependencyIndex<ConstPropOwner>,
-    ToyError: LiftFrom<Deps::Error>,
+    ToyError: From<Deps::Error>,
 {
     let mut interp = DirectionalFunctionFixpoint::with_dependency_index(
         pipeline,
@@ -399,7 +390,7 @@ where
 #[cfg(test)]
 fn lowered_stage(pipeline: &Pipeline<Stage>) -> Result<CompileStage, ToyError> {
     pipeline.stage_by_name("lowered").ok_or_else(|| {
-        ToyError::lift_from(kirin_interpreter_new::InterpreterError::Custom(
+        ToyError::from(kirin_interpreter_new::InterpreterError::Custom(
             "missing lowered stage",
         ))
     })
@@ -414,7 +405,7 @@ fn resolve_staged_owner(
     let function = pipeline
         .resolve_staged_function(function_name, stage)
         .ok_or(InterpreterError::Custom("missing staged function"))
-        .map_err(ToyError::lift_from)?;
+        .map_err(ToyError::from)?;
     Ok(ConstPropFunctionOwner {
         stage,
         target: FunctionEntryTarget::StagedFunction(function),

@@ -44,27 +44,21 @@ pub enum HighLevel {
     Bitwise(Bitwise<ArithType>),
 }
 
-impl TryLiftFrom<Function<ArithType>> for HighLevel {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(value: Function<ArithType>) -> Result<Self, Self::Error> {
-        Ok(Self::lift_from(Lexical::lift_from(value)))
+impl From<Function<ArithType>> for HighLevel {
+    fn from(value: Function<ArithType>) -> Self {
+        Self::from(Lexical::from(value))
     }
 }
 
-impl TryLiftFrom<Call<ArithType>> for HighLevel {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(value: Call<ArithType>) -> Result<Self, Self::Error> {
-        Ok(Self::lift_from(Lexical::lift_from(value)))
+impl From<Call<ArithType>> for HighLevel {
+    fn from(value: Call<ArithType>) -> Self {
+        Self::from(Lexical::from(value))
     }
 }
 
-impl TryLiftFrom<Return<ArithType>> for HighLevel {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(value: Return<ArithType>) -> Result<Self, Self::Error> {
-        Ok(Self::lift_from(Lexical::lift_from(value)))
+impl From<Return<ArithType>> for HighLevel {
+    fn from(value: Return<ArithType>) -> Self {
+        Self::from(Lexical::from(value))
     }
 }
 
@@ -99,26 +93,20 @@ pub enum LowLevel {
     Cf(ControlFlow<ArithType>),
 }
 
-impl TryLiftFrom<Function<ArithType>> for LowLevel {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(value: Function<ArithType>) -> Result<Self, Self::Error> {
-        Ok(Self::lift_from(Lifted::lift_from(value)))
+impl From<Function<ArithType>> for LowLevel {
+    fn from(value: Function<ArithType>) -> Self {
+        Self::from(Lifted::from(value))
     }
 }
 
-impl TryLiftFrom<Call<ArithType>> for LowLevel {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(value: Call<ArithType>) -> Result<Self, Self::Error> {
-        Ok(Self::lift_from(Lifted::lift_from(value)))
+impl From<Call<ArithType>> for LowLevel {
+    fn from(value: Call<ArithType>) -> Self {
+        Self::from(Lifted::from(value))
     }
 }
 
-impl TryLiftFrom<Return<ArithType>> for LowLevel {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(value: Return<ArithType>) -> Result<Self, Self::Error> {
-        Ok(Self::lift_from(Lifted::lift_from(value)))
+impl From<Return<ArithType>> for LowLevel {
+    fn from(value: Return<ArithType>) -> Self {
+        Self::from(Lifted::from(value))
     }
 }

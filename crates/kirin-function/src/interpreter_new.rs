@@ -1,6 +1,5 @@
 use std::hash::Hash;
 
-use kirin::ir::{LiftFrom, TryLift, TryLiftFrom};
 use kirin::prelude::{
     CompileTimeValue, Dialect, HasArguments, HasRegionBody, HasResults, HasStageInfo, Product,
     SSAValue, Symbol,
@@ -47,8 +46,8 @@ impl<'ir, S, L, F, C, E, V, RootF> FunctionRegionDispatch<L, F, E, V>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    F: TryLiftFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>,
-    E: From<<F as TryLiftFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>>::Error>,
+    F: TryFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>,
+    E: From<<F as TryFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>>::Error>,
     V: Clone,
 {
     fn dispatch_function_region(
@@ -64,7 +63,7 @@ where
             env,
             args,
         ))
-        .try_lift()
+        .try_into()
         .map_err(E::from)
     }
 }
@@ -74,8 +73,8 @@ impl<'ir, S, L, F, C, E, V, Store, RootF> FunctionRegionDispatch<L, F, E, V>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
-    E: From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
+    F: TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
+    E: From<<F as TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
     V: Clone,
 {
     fn dispatch_function_region(
@@ -91,7 +90,7 @@ where
             env,
             args,
         ))
-        .try_lift()
+        .try_into()
         .map_err(E::from)
     }
 }
@@ -103,8 +102,8 @@ where
     K: Clone + Eq + Hash,
     L: Dialect,
     Sum: Summary,
-    F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
-    E: From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
+    F: TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
+    E: From<<F as TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
     V: Clone,
 {
     fn dispatch_function_region(
@@ -120,7 +119,7 @@ where
             env,
             args,
         ))
-        .try_lift()
+        .try_into()
         .map_err(E::from)
     }
 }
@@ -129,7 +128,7 @@ impl<'ir, S, L, F, C, E, V> CallTargetResolution<L> for ConcreteInterpreter<'ir,
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     type Error = E;
 
@@ -143,7 +142,7 @@ where
             .pipeline()
             .resolve_function(stage, target)
             .ok_or(InterpreterError::MissingCallTarget { location, target })
-            .map_err(E::lift_from)?;
+            .map_err(E::from)?;
         Ok(ResolvedCallTarget {
             stage: location.stage,
             target: FunctionEntryTarget::Function(function),
@@ -156,7 +155,7 @@ impl<'ir, S, L, F, C, E, Store> CallTargetResolution<L>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     type Error = E;
 
@@ -170,7 +169,7 @@ where
             .pipeline()
             .resolve_function(stage, target)
             .ok_or(InterpreterError::MissingCallTarget { location, target })
-            .map_err(E::lift_from)?;
+            .map_err(E::from)?;
         Ok(ResolvedCallTarget {
             stage: location.stage,
             target: FunctionEntryTarget::Function(function),
@@ -257,7 +256,7 @@ where
 impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Bind<T>
 where
     L: Dialect,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -267,7 +266,7 @@ where
         _interp: &mut I,
     ) -> Result<StatementEffect<F, C, X>, E> {
         let _ = self;
-        Err(E::lift_from(InterpreterError::Custom(
+        Err(E::from(InterpreterError::Custom(
             "bind is not yet supported in the new interpreter",
         )))
     }
@@ -277,8 +276,8 @@ impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for CallNamed<T>
 where
     L: Dialect,
     I: CallTargetResolution<L, Error = E>,
-    F: TryLiftFrom<CallFrame<L, X::Value>>,
-    E: From<<F as TryLiftFrom<CallFrame<L, X::Value>>>::Error>,
+    F: TryFrom<CallFrame<L, X::Value>>,
+    E: From<<F as TryFrom<CallFrame<L, X::Value>>>::Error>,
     T: CompileTimeValue,
     X: BlockTransfer,
 {
@@ -301,7 +300,7 @@ where
             }
         };
         CallFrame::<L, X::Value>::new_in_stage(location, target.stage, callee, args, env, results)
-            .try_lift()
+            .try_into()
             .map(StatementEffect::Push)
             .map_err(E::from)
     }
@@ -310,8 +309,8 @@ where
 impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for CallFunction<T>
 where
     L: Dialect,
-    F: TryLiftFrom<CallFrame<L, X::Value>>,
-    E: From<<F as TryLiftFrom<CallFrame<L, X::Value>>>::Error>,
+    F: TryFrom<CallFrame<L, X::Value>>,
+    E: From<<F as TryFrom<CallFrame<L, X::Value>>>::Error>,
     T: CompileTimeValue,
     X: BlockTransfer,
 {
@@ -333,8 +332,8 @@ where
 impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for CallStaged<T>
 where
     L: Dialect,
-    F: TryLiftFrom<CallFrame<L, X::Value>>,
-    E: From<<F as TryLiftFrom<CallFrame<L, X::Value>>>::Error>,
+    F: TryFrom<CallFrame<L, X::Value>>,
+    E: From<<F as TryFrom<CallFrame<L, X::Value>>>::Error>,
     T: CompileTimeValue,
     X: BlockTransfer,
 {
@@ -356,8 +355,8 @@ where
 impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for CallSpecialized<T>
 where
     L: Dialect,
-    F: TryLiftFrom<CallFrame<L, X::Value>>,
-    E: From<<F as TryLiftFrom<CallFrame<L, X::Value>>>::Error>,
+    F: TryFrom<CallFrame<L, X::Value>>,
+    E: From<<F as TryFrom<CallFrame<L, X::Value>>>::Error>,
     T: CompileTimeValue,
     X: BlockTransfer,
 {
@@ -384,8 +383,8 @@ fn direct_call_effect<L, F, C, E, T, X, Target>(
 ) -> Result<StatementEffect<F, C, X>, E>
 where
     L: Dialect,
-    F: TryLiftFrom<CallFrame<L, X::Value>>,
-    E: From<<F as TryLiftFrom<CallFrame<L, X::Value>>>::Error>,
+    F: TryFrom<CallFrame<L, X::Value>>,
+    E: From<<F as TryFrom<CallFrame<L, X::Value>>>::Error>,
     T: CompileTimeValue,
     X: BlockTransfer,
     Target: Copy,
@@ -394,7 +393,7 @@ where
     let args = call.arguments().copied().collect();
     let results = call.results().copied().map(SSAValue::from).collect();
     CallFrame::<L, X::Value>::new_in_stage(location, stage, callee, args, env, results)
-        .try_lift()
+        .try_into()
         .map(StatementEffect::Push)
         .map_err(E::from)
 }
@@ -403,8 +402,8 @@ impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Return<T>
 where
     L: Dialect,
     I: Env<X::Value, Error = E>,
-    C: TryLiftFrom<StandardCompletion<X::Value>>,
-    E: From<<C as TryLiftFrom<StandardCompletion<X::Value>>>::Error>,
+    C: TryFrom<StandardCompletion<X::Value>>,
+    E: From<<C as TryFrom<StandardCompletion<X::Value>>>::Error>,
     T: CompileTimeValue,
     X: BlockTransfer,
 {
@@ -415,7 +414,7 @@ where
         interp: &mut I,
     ) -> Result<StatementEffect<F, C, X>, E> {
         let values = interp.read_many(env, self.values.as_slice())?;
-        Ok(StatementEffect::Complete(C::try_lift_from(
+        Ok(StatementEffect::Complete(C::try_from(
             StandardCompletion::FunctionReturned(values),
         )?))
     }

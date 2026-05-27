@@ -17,7 +17,7 @@ use kirin_interpreter_new::{
     Env, FunctionInvocation, FunctionInvocationDispatch, InterpreterError, OwnerSemantics,
     ProjectOrSelf, StageBlockDispatch, StandardCompletion, SummaryEffect,
 };
-use kirin_ir::{HasBottom, HasTop, LiftFrom, Product};
+use kirin_ir::{HasBottom, HasTop, Product};
 
 use crate::{ConstPropFunctionOwner, ConstPropLocationSummary, ConstPropOwner, ConstPropSummary};
 
@@ -127,7 +127,7 @@ where
     C: DefaultConstPropCompletion<V> + ProjectOrSelf<Loc::Completion, Error = Infallible>,
     Loc: AdvanceableLocationSummary<V>,
     V: HasBottom + HasTop + Clone + PartialEq,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     fn bottom_summary(
         &mut self,
@@ -151,7 +151,7 @@ where
         match owner {
             ConstPropOwner::Function(function_owner) => {
                 let args = self.args.get(function_owner).cloned().ok_or_else(|| {
-                    E::lift_from(InterpreterError::Custom(
+                    E::from(InterpreterError::Custom(
                         "missing entry args for const-prop function owner",
                     ))
                 })?;
@@ -163,7 +163,7 @@ where
             }
             ConstPropOwner::Location(location) => {
                 let state = summary.location_state().ok_or_else(|| {
-                    E::lift_from(InterpreterError::Custom(
+                    E::from(InterpreterError::Custom(
                         "missing location summary for const-prop location owner",
                     ))
                 })?;
@@ -195,26 +195,26 @@ where
                         ConstPropSummary::Function(_) => None,
                     })
                     .ok_or_else(|| {
-                        E::lift_from(InterpreterError::Custom(
+                        E::from(InterpreterError::Custom(
                             "missing const-prop location summary during completion",
                         ))
                     })?;
                 let inner = match completion.project_or_self() {
                     Ok(inner) => inner,
                     Err(_) => {
-                        return Err(E::lift_from(InterpreterError::Custom(
+                        return Err(E::from(InterpreterError::Custom(
                             "expected location yield completion for const-prop location owner",
                         )));
                     }
                 };
                 let carried = Loc::carry_from_completion(inner).ok_or_else(|| {
-                    E::lift_from(InterpreterError::Custom(
+                    E::from(InterpreterError::Custom(
                         "expected location yield completion for const-prop location owner",
                     ))
                 })?;
                 let next = current
                     .advance_with_carried(carried)
-                    .ok_or_else(|| E::lift_from(InterpreterError::LoopStepOverflow))?;
+                    .ok_or_else(|| E::from(InterpreterError::LoopStepOverflow))?;
                 Ok(SummaryEffect::Update {
                     owner,
                     candidate: ConstPropSummary::location(next),
@@ -232,12 +232,12 @@ where
 pub fn expect_function_return<C, V, E>(completion: C) -> Result<V, E>
 where
     C: ProjectOrSelf<StandardCompletion<V>, Error = Infallible>,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     let standard = match completion.project_or_self() {
         Ok(standard) => standard,
         Err(_) => {
-            return Err(E::lift_from(InterpreterError::Custom(
+            return Err(E::from(InterpreterError::Custom(
                 "expected function return completion",
             )));
         }
@@ -245,14 +245,14 @@ where
     match standard {
         StandardCompletion::FunctionReturned(product) => {
             if product.len() != 1 {
-                return Err(E::lift_from(InterpreterError::ProductArityMismatch {
+                return Err(E::from(InterpreterError::ProductArityMismatch {
                     expected: 1,
                     actual: product.len(),
                 }));
             }
             Ok(product.into_iter().next().unwrap())
         }
-        _ => Err(E::lift_from(InterpreterError::Custom(
+        _ => Err(E::from(InterpreterError::Custom(
             "expected function return completion",
         ))),
     }

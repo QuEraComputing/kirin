@@ -1,6 +1,6 @@
 use core::convert::Infallible;
 
-use kirin::prelude::{Dialect, TryLift, TryLiftFrom};
+use kirin::prelude::Dialect;
 use kirin_arith::ArithType;
 use kirin_interpreter_new::{
     CallFrame, ConcreteBlockTransfer, Frame, FunctionFrame, FunctionInvocation,
@@ -22,41 +22,33 @@ impl<L: Dialect, V, T> FunctionInvocationFrame<V> for ToyFrame<L, V, T> {
     type Error = Infallible;
 
     fn from_function_invocation(invocation: FunctionInvocation<V>) -> Result<Self, Self::Error> {
-        invocation
+        Ok(invocation
             .into_root_frame::<L, StandardFrame<L, V, T>, Self::Error>()?
-            .try_lift()
+            .into())
     }
 }
 
-impl<L: Dialect, V, T> TryLiftFrom<CallFrame<L, V>> for ToyFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: CallFrame<L, V>) -> Result<Self, Self::Error> {
-        Ok(Self::Standard(StandardFrame::Call(frame)))
+impl<L: Dialect, V, T> From<CallFrame<L, V>> for ToyFrame<L, V, T> {
+    fn from(frame: CallFrame<L, V>) -> Self {
+        Self::Standard(StandardFrame::Call(frame))
     }
 }
 
-impl<L: Dialect, V, T> TryLiftFrom<FunctionFrame<L, V>> for ToyFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: FunctionFrame<L, V>) -> Result<Self, Self::Error> {
-        Ok(Self::Standard(StandardFrame::Function(frame)))
+impl<L: Dialect, V, T> From<FunctionFrame<L, V>> for ToyFrame<L, V, T> {
+    fn from(frame: FunctionFrame<L, V>) -> Self {
+        Self::Standard(StandardFrame::Function(frame))
     }
 }
 
-impl<L: Dialect, V, T> TryLiftFrom<StagedFunctionFrame<L, V>> for ToyFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: StagedFunctionFrame<L, V>) -> Result<Self, Self::Error> {
-        Ok(Self::Standard(StandardFrame::StagedFunction(frame)))
+impl<L: Dialect, V, T> From<StagedFunctionFrame<L, V>> for ToyFrame<L, V, T> {
+    fn from(frame: StagedFunctionFrame<L, V>) -> Self {
+        Self::Standard(StandardFrame::StagedFunction(frame))
     }
 }
 
-impl<L: Dialect, V, T> TryLiftFrom<SpecializedFunctionFrame<L, V>> for ToyFrame<L, V, T> {
-    type Error = Infallible;
-
-    fn try_lift_from(frame: SpecializedFunctionFrame<L, V>) -> Result<Self, Self::Error> {
-        Ok(Self::Standard(StandardFrame::SpecializedFunction(frame)))
+impl<L: Dialect, V, T> From<SpecializedFunctionFrame<L, V>> for ToyFrame<L, V, T> {
+    fn from(frame: SpecializedFunctionFrame<L, V>) -> Self {
+        Self::Standard(StandardFrame::SpecializedFunction(frame))
     }
 }
 
@@ -67,42 +59,24 @@ pub enum ToyStageFrame<V, T = ConcreteBlockTransfer<V>> {
 }
 
 macro_rules! impl_stage_lift {
-    ($language:ty, $variant:ident, $frame:ty) => {
-        impl<V, T> TryLiftFrom<$frame> for ToyStageFrame<V, T> {
-            type Error = Infallible;
-
-            fn try_lift_from(frame: $frame) -> Result<Self, Self::Error> {
-                frame.try_lift().map(Self::$variant)
+    ($variant:ident, $frame:ty) => {
+        impl<V, T> From<$frame> for ToyStageFrame<V, T> {
+            fn from(frame: $frame) -> Self {
+                Self::$variant(frame.into())
             }
         }
     };
 }
 
-impl_stage_lift!(
-    HighLevel,
-    Source,
-    StandardFrame<HighLevel, V, T>
-);
-impl_stage_lift!(
-    LowLevel,
-    Lowered,
-    StandardFrame<LowLevel, V, T>
-);
-impl_stage_lift!(HighLevel, Source, CallFrame<HighLevel, V>);
-impl_stage_lift!(LowLevel, Lowered, CallFrame<LowLevel, V>);
-impl_stage_lift!(HighLevel, Source, FunctionFrame<HighLevel, V>);
-impl_stage_lift!(LowLevel, Lowered, FunctionFrame<LowLevel, V>);
-impl_stage_lift!(HighLevel, Source, StagedFunctionFrame<HighLevel, V>);
-impl_stage_lift!(LowLevel, Lowered, StagedFunctionFrame<LowLevel, V>);
-impl_stage_lift!(
-    HighLevel,
-    Source,
-    SpecializedFunctionFrame<HighLevel, V>
-);
-impl_stage_lift!(
-    LowLevel,
-    Lowered,
-    SpecializedFunctionFrame<LowLevel, V>
-);
-impl_stage_lift!(HighLevel, Source, ScfFrame<HighLevel, ArithType, V, T>);
-impl_stage_lift!(LowLevel, Lowered, ScfFrame<LowLevel, ArithType, V, T>);
+impl_stage_lift!(Source, StandardFrame<HighLevel, V, T>);
+impl_stage_lift!(Lowered, StandardFrame<LowLevel, V, T>);
+impl_stage_lift!(Source, CallFrame<HighLevel, V>);
+impl_stage_lift!(Lowered, CallFrame<LowLevel, V>);
+impl_stage_lift!(Source, FunctionFrame<HighLevel, V>);
+impl_stage_lift!(Lowered, FunctionFrame<LowLevel, V>);
+impl_stage_lift!(Source, StagedFunctionFrame<HighLevel, V>);
+impl_stage_lift!(Lowered, StagedFunctionFrame<LowLevel, V>);
+impl_stage_lift!(Source, SpecializedFunctionFrame<HighLevel, V>);
+impl_stage_lift!(Lowered, SpecializedFunctionFrame<LowLevel, V>);
+impl_stage_lift!(Source, ScfFrame<HighLevel, ArithType, V, T>);
+impl_stage_lift!(Lowered, ScfFrame<LowLevel, ArithType, V, T>);

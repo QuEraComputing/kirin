@@ -13,7 +13,7 @@ use kirin_interpreter_new::{
     InterpreterError, OwnerSummaryDeps, ProjectOrSelf, StageBlockDispatch,
     StandardFixpointInterpreter, SummaryDependencyIndex,
 };
-use kirin_ir::{CompileStage, Function, HasBottom, HasTop, LiftFrom, Pipeline, StageMeta};
+use kirin_ir::{CompileStage, Function, HasBottom, HasTop, Pipeline, StageMeta};
 
 use crate::{
     AdvanceableLocationSummary, ConstPropFunctionOwner, ConstPropOwner, ConstPropSummary,
@@ -93,19 +93,19 @@ pub trait ConstPropDriver<V>: Env<V> {
     ) -> Result<V, <Self as Env<V>>::Error>
     where
         Self::Stage: StageMeta,
-        <Self as Env<V>>::Error: LiftFrom<InterpreterError>,
+        <Self as Env<V>>::Error: From<InterpreterError>,
         A: IntoIterator<Item = V>,
     {
         let stage = self
             .pipeline()
             .stage_by_name(stage_name)
             .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))
-            .map_err(<Self as Env<V>>::Error::lift_from)?;
+            .map_err(<Self as Env<V>>::Error::from)?;
         let function = self
             .pipeline()
             .lookup_function_by_name(function_name)
             .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))
-            .map_err(<Self as Env<V>>::Error::lift_from)?;
+            .map_err(<Self as Env<V>>::Error::from)?;
         self.analyze_function_id(stage, function, args)
     }
 }
@@ -129,7 +129,7 @@ where
     C: DefaultConstPropCompletion<V> + ProjectOrSelf<Loc::Completion, Error = Infallible>,
     Self: FunctionInvocationDispatch<F, E, V> + StageBlockDispatch<F, E, V> + Env<V, Error = E>,
     Deps: SummaryDependencyIndex<ConstPropOwner>,
-    E: LiftFrom<InterpreterError> + LiftFrom<Infallible> + LiftFrom<Deps::Error>,
+    E: From<InterpreterError> + From<Infallible> + From<Deps::Error>,
 {
     type Stage = Stage;
 

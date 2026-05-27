@@ -5,7 +5,7 @@ use syn::parse_macro_input;
 
 mod generate;
 mod has_signature;
-mod lift_project;
+mod project;
 
 #[cfg(test)]
 mod tests;
@@ -24,7 +24,7 @@ pub fn derive_statement(input: TokenStream) -> TokenStream {
 #[proc_macro_derive(LiftProject, attributes(kirin, wraps))]
 pub fn derive_lift_project(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    match generate_lift_project(&ast) {
+    match generate_project(&ast) {
         Ok(tokens) => TokenStream::from(tokens),
         Err(e) => TokenStream::from(e.write_errors()),
     }

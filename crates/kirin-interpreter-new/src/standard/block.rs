@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{Block, Dialect, GetInfo, LiftFrom, Product, SSAValue, TryLift, TryLiftFrom};
+use kirin_ir::{Block, Dialect, GetInfo, Product, SSAValue};
 
 use crate::{
     ConcreteBlockTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError,
@@ -59,7 +59,7 @@ impl<L, V, T> BlockFrame<L, V, T> {
     where
         I: StageAccess<L, Error = E> + Env<V, Error = E>,
         L: Dialect,
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
         V: Clone,
     {
         let block_args = {
@@ -68,7 +68,7 @@ impl<L, V, T> BlockFrame<L, V, T> {
         };
 
         if block_args.len() != self.incoming_args.len() {
-            return Err(E::lift_from(InterpreterError::UnexpectedCompletion {
+            return Err(E::from(InterpreterError::UnexpectedCompletion {
                 location: self.location,
                 completion: "block argument arity mismatch",
             }));
@@ -92,8 +92,8 @@ impl<L, V, T> BlockFrame<L, V, T> {
     where
         I: StageAccess<L, Error = E> + Env<V, Error = E>,
         L: Dialect,
-        F: TryLiftFrom<StandardFrame<L, V, T>>,
-        E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>,
+        F: TryFrom<StandardFrame<L, V, T>>,
+        E: From<InterpreterError> + From<<F as TryFrom<StandardFrame<L, V, T>>>::Error>,
         V: Clone,
     {
         self.bind_block_args(interp)?;
@@ -105,13 +105,13 @@ impl<L, V, T> BlockFrame<L, V, T> {
             Some(statement) => self
                 .with_traversal(Traversal::Active(statement))
                 .into_standard_frame()
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
             None => self
                 .with_traversal(Traversal::Exit)
                 .into_standard_frame()
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
         }
@@ -121,13 +121,13 @@ impl<L, V, T> BlockFrame<L, V, T> {
     where
         I: StageAccess<L, Error = E>,
         L: Dialect,
-        F: TryLiftFrom<StandardFrame<L, V, T>>,
-        E: LiftFrom<InterpreterError> + From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>,
+        F: TryFrom<StandardFrame<L, V, T>>,
+        E: From<InterpreterError> + From<<F as TryFrom<StandardFrame<L, V, T>>>::Error>,
     {
         let statement = match self.traversal {
             Traversal::Active(statement) => statement,
             _ => {
-                return Err(E::lift_from(InterpreterError::ExpectedActiveStatement(
+                return Err(E::from(InterpreterError::ExpectedActiveStatement(
                     self.location,
                 )));
             }
@@ -146,13 +146,13 @@ impl<L, V, T> BlockFrame<L, V, T> {
             Some(statement) => self
                 .with_traversal(Traversal::Active(statement))
                 .into_standard_frame()
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
             None => self
                 .with_traversal(Traversal::Exit)
                 .into_standard_frame()
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
         }
@@ -160,10 +160,10 @@ impl<L, V, T> BlockFrame<L, V, T> {
 
     fn complete<F, C, E>(self) -> Result<FrameEffect<F, C>, E>
     where
-        C: TryLiftFrom<StandardCompletion<V>>,
-        E: From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+        C: TryFrom<StandardCompletion<V>>,
+        E: From<<C as TryFrom<StandardCompletion<V>>>::Error>,
     {
-        Ok(FrameEffect::Complete(C::try_lift_from(
+        Ok(FrameEffect::Complete(C::try_from(
             StandardCompletion::BlockDone,
         )?))
     }
@@ -176,11 +176,11 @@ where
         + BlockTransferDispatch<L, F, C, E, V, T>
         + Env<V, Error = E>,
     L: Dialect,
-    F: TryLiftFrom<StandardFrame<L, V, T>>,
-    C: TryLiftFrom<StandardCompletion<V>>,
-    E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>
-        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+    F: TryFrom<StandardFrame<L, V, T>>,
+    C: TryFrom<StandardCompletion<V>>,
+    E: From<InterpreterError>
+        + From<<F as TryFrom<StandardFrame<L, V, T>>>::Error>
+        + From<<C as TryFrom<StandardCompletion<V>>>::Error>,
     V: Clone,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
@@ -200,7 +200,7 @@ where
                         interp.dispatch_block_transfer(self.location.stage, self.env, transfer)
                     }
                     StatementEffect::Push(child) => Ok(FrameEffect::Push {
-                        parent: self.into_standard_frame().try_lift()?,
+                        parent: self.into_standard_frame().try_into()?,
                         child,
                     }),
                     StatementEffect::Complete(completion) => Ok(FrameEffect::Complete(completion)),

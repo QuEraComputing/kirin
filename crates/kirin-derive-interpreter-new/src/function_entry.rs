@@ -57,7 +57,7 @@ fn emit_function_entry(
 
     let mut predicates: Vec<syn::WherePredicate> = vec![
         syn::parse_quote! { __EntryL: #ir_crate::Dialect },
-        syn::parse_quote! { __EntryE: #ir_crate::LiftFrom<#interp_crate::InterpreterError> },
+        syn::parse_quote! { __EntryE: ::core::convert::From<#interp_crate::InterpreterError> },
     ];
     for wrapper_ty in callable_wrappers {
         predicates.push(syn::parse_quote! {
@@ -101,7 +101,7 @@ fn emit_function_entry(
             });
         } else {
             arms.push(quote! {
-                #arm_pattern => Err(__EntryE::lift_from(
+                #arm_pattern => Err(__EntryE::from(
                     #interp_crate::InterpreterError::Custom("expected function body statement")
                 ))
             });

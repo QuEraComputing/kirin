@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use kirin_ir::{CompileStage, Dialect, HasStageInfo, LiftFrom, SSAValue, StageInfo};
+use kirin_ir::{CompileStage, Dialect, HasStageInfo, SSAValue, StageInfo};
 
 use crate::{Env, EnvIndex, ForkEnv, InterpreterError, StageAccess};
 
@@ -12,7 +12,7 @@ where
     K: Clone + Eq + Hash,
     S: Summary,
     Store: Env<V>,
-    E: LiftFrom<Store::Error>,
+    E: From<Store::Error>,
 {
     type Error = E;
 
@@ -21,15 +21,15 @@ where
     }
 
     fn free(&mut self, index: EnvIndex) -> Result<(), Self::Error> {
-        self.store.free(index).map_err(E::lift_from)
+        self.store.free(index).map_err(E::from)
     }
 
     fn read(&self, index: EnvIndex, value: SSAValue) -> Result<V, Self::Error> {
-        self.store.read(index, value).map_err(E::lift_from)
+        self.store.read(index, value).map_err(E::from)
     }
 
     fn write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), Self::Error> {
-        self.store.write(index, value, data).map_err(E::lift_from)
+        self.store.write(index, value, data).map_err(E::from)
     }
 }
 
@@ -39,10 +39,10 @@ where
     K: Clone + Eq + Hash,
     S: Summary,
     Store: ForkEnv<V>,
-    E: LiftFrom<Store::Error>,
+    E: From<Store::Error>,
 {
     fn fork_env(&mut self, index: EnvIndex) -> Result<EnvIndex, Self::Error> {
-        self.store.fork_env(index).map_err(E::lift_from)
+        self.store.fork_env(index).map_err(E::from)
     }
 }
 
@@ -53,7 +53,7 @@ where
     K: Clone + Eq + Hash,
     L: Dialect,
     S: Summary,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     type Error = E;
 
@@ -61,10 +61,10 @@ where
         let stage_info = self
             .pipeline
             .stage(stage)
-            .ok_or_else(|| E::lift_from(InterpreterError::MissingStage(stage)))?;
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
         stage_info
             .try_stage_info()
             .ok_or(InterpreterError::MissingStageInfo(stage))
-            .map_err(E::lift_from)
+            .map_err(E::from)
     }
 }

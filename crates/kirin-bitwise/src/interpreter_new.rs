@@ -1,6 +1,6 @@
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 
-use kirin::prelude::{CompileTimeValue, Dialect, LiftFrom, SSAValue, TryLiftFrom};
+use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
 use kirin_interpreter_new::{
     BlockTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
 };
@@ -20,7 +20,7 @@ where
         + Not<Output = X::Value>
         + CheckedShl
         + CheckedShr,
-    E: LiftFrom<ShiftOverflow>,
+    E: From<ShiftOverflow>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -60,7 +60,7 @@ where
                 let value = interp
                     .read(env, *lhs)?
                     .checked_shl(interp.read(env, *rhs)?)
-                    .ok_or_else(|| E::lift_from(ShiftOverflow))?;
+                    .ok_or_else(|| E::from(ShiftOverflow))?;
                 interp.write(env, SSAValue::from(*result), value)?;
             }
             Bitwise::Shr {
@@ -69,7 +69,7 @@ where
                 let value = interp
                     .read(env, *lhs)?
                     .checked_shr(interp.read(env, *rhs)?)
-                    .ok_or_else(|| E::lift_from(ShiftOverflow))?;
+                    .ok_or_else(|| E::from(ShiftOverflow))?;
                 interp.write(env, SSAValue::from(*result), value)?;
             }
             Bitwise::__Phantom(..) => unreachable!(),
@@ -82,10 +82,8 @@ where
 #[error("shift overflow")]
 pub struct ShiftOverflow;
 
-impl TryLiftFrom<ShiftOverflow> for InterpreterError {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(_: ShiftOverflow) -> Result<Self, Self::Error> {
-        Ok(Self::Custom("shift overflow"))
+impl From<ShiftOverflow> for InterpreterError {
+    fn from(_: ShiftOverflow) -> Self {
+        Self::Custom("shift overflow")
     }
 }

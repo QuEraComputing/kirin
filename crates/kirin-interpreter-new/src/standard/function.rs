@@ -2,8 +2,8 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Dialect, Function, GetInfo, HasStageInfo, LiftFrom, Product, SpecializedFunction,
-    StagedFunction, TryLift, TryLiftFrom, UniqueLiveSpecializationError,
+    Dialect, Function, GetInfo, HasStageInfo, Product, SpecializedFunction, StagedFunction,
+    UniqueLiveSpecializationError,
 };
 
 use crate::{
@@ -38,7 +38,7 @@ impl<'ir, S, F, C, E, V, L> FunctionAccess<L> for ConcreteInterpreter<'ir, S, F,
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     type Error = E;
 
@@ -50,10 +50,10 @@ where
         let info = self
             .pipeline()
             .function_info(function)
-            .ok_or_else(|| E::lift_from(InterpreterError::MissingFunction(function)))?;
+            .ok_or_else(|| E::from(InterpreterError::MissingFunction(function)))?;
         info.staged_function(stage)
             .ok_or(InterpreterError::MissingStagedFunction { function, stage })
-            .map_err(E::lift_from)
+            .map_err(E::from)
     }
 
     fn specialized_function(
@@ -65,11 +65,11 @@ where
         let info = function.expect_info(stage_info);
         match info.unique_live_specialization() {
             Ok(function) => Ok(function),
-            Err(UniqueLiveSpecializationError::NoSpecialization) => Err(E::lift_from(
-                InterpreterError::MissingSpecialization(function),
-            )),
+            Err(UniqueLiveSpecializationError::NoSpecialization) => {
+                Err(E::from(InterpreterError::MissingSpecialization(function)))
+            }
             Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
-                Err(E::lift_from(InterpreterError::AmbiguousSpecialization {
+                Err(E::from(InterpreterError::AmbiguousSpecialization {
                     function,
                     count,
                 }))
@@ -87,7 +87,7 @@ where
             .get_info(stage_info)
             .map(|info| *info.body())
             .ok_or(InterpreterError::MissingFunctionBody { function, stage })
-            .map_err(E::lift_from)
+            .map_err(E::from)
     }
 }
 
@@ -96,7 +96,7 @@ impl<'ir, S, F, C, E, Store, L> FunctionAccess<L>
 where
     S: HasStageInfo<L>,
     L: Dialect,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     type Error = E;
 
@@ -108,10 +108,10 @@ where
         let info = self
             .pipeline()
             .function_info(function)
-            .ok_or_else(|| E::lift_from(InterpreterError::MissingFunction(function)))?;
+            .ok_or_else(|| E::from(InterpreterError::MissingFunction(function)))?;
         info.staged_function(stage)
             .ok_or(InterpreterError::MissingStagedFunction { function, stage })
-            .map_err(E::lift_from)
+            .map_err(E::from)
     }
 
     fn specialized_function(
@@ -123,11 +123,11 @@ where
         let info = function.expect_info(stage_info);
         match info.unique_live_specialization() {
             Ok(function) => Ok(function),
-            Err(UniqueLiveSpecializationError::NoSpecialization) => Err(E::lift_from(
-                InterpreterError::MissingSpecialization(function),
-            )),
+            Err(UniqueLiveSpecializationError::NoSpecialization) => {
+                Err(E::from(InterpreterError::MissingSpecialization(function)))
+            }
             Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
-                Err(E::lift_from(InterpreterError::AmbiguousSpecialization {
+                Err(E::from(InterpreterError::AmbiguousSpecialization {
                     function,
                     count,
                 }))
@@ -145,7 +145,7 @@ where
             .get_info(stage_info)
             .map(|info| *info.body())
             .ok_or(InterpreterError::MissingFunctionBody { function, stage })
-            .map_err(E::lift_from)
+            .map_err(E::from)
     }
 }
 
@@ -156,7 +156,7 @@ where
     K: Clone + Eq + Hash,
     L: Dialect,
     Sum: Summary,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     type Error = E;
 
@@ -168,10 +168,10 @@ where
         let info = self
             .pipeline()
             .function_info(function)
-            .ok_or_else(|| E::lift_from(InterpreterError::MissingFunction(function)))?;
+            .ok_or_else(|| E::from(InterpreterError::MissingFunction(function)))?;
         info.staged_function(stage)
             .ok_or(InterpreterError::MissingStagedFunction { function, stage })
-            .map_err(E::lift_from)
+            .map_err(E::from)
     }
 
     fn specialized_function(
@@ -183,11 +183,11 @@ where
         let info = function.expect_info(stage_info);
         match info.unique_live_specialization() {
             Ok(function) => Ok(function),
-            Err(UniqueLiveSpecializationError::NoSpecialization) => Err(E::lift_from(
-                InterpreterError::MissingSpecialization(function),
-            )),
+            Err(UniqueLiveSpecializationError::NoSpecialization) => {
+                Err(E::from(InterpreterError::MissingSpecialization(function)))
+            }
             Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
-                Err(E::lift_from(InterpreterError::AmbiguousSpecialization {
+                Err(E::from(InterpreterError::AmbiguousSpecialization {
                     function,
                     count,
                 }))
@@ -205,7 +205,7 @@ where
             .get_info(stage_info)
             .map(|info| *info.body())
             .ok_or(InterpreterError::MissingFunctionBody { function, stage })
-            .map_err(E::lift_from)
+            .map_err(E::from)
     }
 }
 
@@ -235,7 +235,7 @@ where
     L: Dialect,
     L: FunctionEntry<L, Self, F, E, V>,
     S: HasStageInfo<L>,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     fn dispatch_function_body(
         &mut self,
@@ -259,7 +259,7 @@ where
     L: Dialect,
     L: FunctionEntry<L, Self, F, E, V>,
     S: HasStageInfo<L>,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     fn dispatch_function_body(
         &mut self,
@@ -285,7 +285,7 @@ where
     Stage: HasStageInfo<L>,
     K: Clone + Eq + Hash,
     Sum: Summary,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
 {
     fn dispatch_function_body(
         &mut self,
@@ -338,13 +338,13 @@ impl<I, L, F, C, E, V> Frame<I, F, C, E> for FunctionFrame<L, V>
 where
     I: FunctionAccess<L, Error = E>,
     L: Dialect,
-    F: TryLiftFrom<StagedFunctionFrame<L, V>>,
-    E: From<<F as TryLiftFrom<StagedFunctionFrame<L, V>>>::Error>,
+    F: TryFrom<StagedFunctionFrame<L, V>>,
+    E: From<<F as TryFrom<StagedFunctionFrame<L, V>>>::Error>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         let staged = interp.staged_function(self.location.stage, self.function)?;
         StagedFunctionFrame::<L, V>::new(self.location.stage, staged, self.args)
-            .try_lift()
+            .try_into()
             .map(FrameEffect::Continue)
             .map_err(E::from)
     }
@@ -393,13 +393,13 @@ impl<I, L, F, C, E, V> Frame<I, F, C, E> for StagedFunctionFrame<L, V>
 where
     I: FunctionAccess<L, Error = E>,
     L: Dialect,
-    F: TryLiftFrom<SpecializedFunctionFrame<L, V>>,
-    E: From<<F as TryLiftFrom<SpecializedFunctionFrame<L, V>>>::Error>,
+    F: TryFrom<SpecializedFunctionFrame<L, V>>,
+    E: From<<F as TryFrom<SpecializedFunctionFrame<L, V>>>::Error>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         let specialized = interp.specialized_function(self.location.stage, self.function)?;
         SpecializedFunctionFrame::<L, V>::new(self.location.stage, specialized, self.args)
-            .try_lift()
+            .try_into()
             .map(FrameEffect::Continue)
             .map_err(E::from)
     }
@@ -473,17 +473,17 @@ impl<I, L, F, C, E, V> Frame<I, F, C, E> for SpecializedFunctionFrame<L, V>
 where
     I: Env<V, Error = E> + FunctionAccess<L, Error = E> + FunctionBodyDispatch<L, F, E, V>,
     L: Dialect,
-    F: TryLiftFrom<SpecializedFunctionFrame<L, V>>,
-    C: TryLiftFrom<StandardCompletion<V>> + crate::ProjectOrSelf<StandardCompletion<V>>,
-    E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<SpecializedFunctionFrame<L, V>>>::Error>
-        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+    F: TryFrom<SpecializedFunctionFrame<L, V>>,
+    C: TryFrom<StandardCompletion<V>> + crate::ProjectOrSelf<StandardCompletion<V>>,
+    E: From<InterpreterError>
+        + From<<F as TryFrom<SpecializedFunctionFrame<L, V>>>::Error>
+        + From<<C as TryFrom<StandardCompletion<V>>>::Error>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         let location = self.location;
         let function = self.function;
         let SpecializedFunctionState::Entry { args } = self.state else {
-            return Err(E::lift_from(InterpreterError::UnexpectedCompletion {
+            return Err(E::from(InterpreterError::UnexpectedCompletion {
                 location,
                 completion: "active specialized function frame stepped",
             }));
@@ -493,13 +493,13 @@ where
         let body = interp.function_body(location.stage, function)?;
         let child = interp.dispatch_function_body(location, body, env, args)?;
         Ok(FrameEffect::Push {
-            parent: Self::active(location, function, env).try_lift()?,
+            parent: Self::active(location, function, env).try_into()?,
             child,
         })
     }
 
     fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        Err(E::lift_from(InterpreterError::FunctionBodyFellThrough(
+        Err(E::from(InterpreterError::FunctionBodyFellThrough(
             self.location,
         )))
     }
@@ -512,13 +512,13 @@ where
 
         match completion.project_or_self() {
             Ok(StandardCompletion::FunctionReturned(value)) => Ok(FrameEffect::Complete(
-                C::try_lift_from(StandardCompletion::FunctionReturned(value))?,
+                C::try_from(StandardCompletion::FunctionReturned(value))?,
             )),
             Ok(
                 StandardCompletion::BlockDone
                 | StandardCompletion::RegionDone
                 | StandardCompletion::GraphDone,
-            ) => Err(E::lift_from(InterpreterError::FunctionBodyFellThrough(
+            ) => Err(E::from(InterpreterError::FunctionBodyFellThrough(
                 self.location,
             ))),
             Err(completion) => Ok(FrameEffect::Complete(completion)),

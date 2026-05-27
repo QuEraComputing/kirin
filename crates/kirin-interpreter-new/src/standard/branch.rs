@@ -1,6 +1,6 @@
 use std::hash::Hash;
 
-use kirin_ir::{CompileStage, Dialect, LiftFrom, TryLift, TryLiftFrom};
+use kirin_ir::{CompileStage, Dialect};
 
 use crate::{
     AbstractBlockTransfer, AbstractBranchFrame, AbstractInterpreterWithStore, AbstractValue,
@@ -21,9 +21,9 @@ impl<'ir, S, L, F, C, E, V, RootF> BlockTransferDispatch<L, F, C, E, V, Concrete
     for ConcreteInterpreter<'ir, S, RootF, C, E, V>
 where
     L: Dialect,
-    F: TryLiftFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>,
-    E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>>::Error>,
+    F: TryFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>,
+    E: From<InterpreterError>
+        + From<<F as TryFrom<StandardFrame<L, V, ConcreteBlockTransfer<V>>>>::Error>,
 {
     fn dispatch_block_transfer(
         &mut self,
@@ -36,7 +36,7 @@ where
                 StandardFrame::Block(crate::BlockFrame::<L, V, ConcreteBlockTransfer<V>>::new(
                     stage, target, env, arguments,
                 ))
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)
             }
@@ -49,13 +49,13 @@ impl<'ir, S, L, F, C, E, V, Store, RootF>
     for AbstractInterpreterWithStore<'ir, S, RootF, C, E, Store>
 where
     L: Dialect,
-    F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
+    F: TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
     Store: ForkEnv<V>,
-    C: TryLiftFrom<StandardCompletion<V>>,
-    E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
-        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>
-        + LiftFrom<Store::Error>,
+    C: TryFrom<StandardCompletion<V>>,
+    E: From<InterpreterError>
+        + From<<F as TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
+        + From<<C as TryFrom<StandardCompletion<V>>>::Error>
+        + From<Store::Error>,
     V: AbstractValue,
 {
     fn dispatch_block_transfer(
@@ -69,7 +69,7 @@ where
                 StandardFrame::Block(crate::BlockFrame::<L, V, AbstractBlockTransfer<V>>::new(
                     stage, target, env, arguments,
                 ))
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)
             }
@@ -90,7 +90,7 @@ where
                     false_target,
                     false_arguments,
                 ))
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)
             }
@@ -104,14 +104,14 @@ impl<'ir, Stage, K, L, F, C, E, V, S, Store, Deps, RootF>
 where
     K: Clone + Eq + Hash,
     L: Dialect,
-    F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
+    F: TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
     S: Summary,
     Store: ForkEnv<V>,
-    C: TryLiftFrom<StandardCompletion<V>>,
-    E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
-        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>
-        + LiftFrom<<Store as Env<V>>::Error>,
+    C: TryFrom<StandardCompletion<V>>,
+    E: From<InterpreterError>
+        + From<<F as TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
+        + From<<C as TryFrom<StandardCompletion<V>>>::Error>
+        + From<<Store as Env<V>>::Error>,
     V: AbstractValue,
 {
     fn dispatch_block_transfer(
@@ -125,7 +125,7 @@ where
                 StandardFrame::Block(crate::BlockFrame::<L, V, AbstractBlockTransfer<V>>::new(
                     stage, target, env, arguments,
                 ))
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)
             }
@@ -146,7 +146,7 @@ where
                     false_target,
                     false_arguments,
                 ))
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from)
             }

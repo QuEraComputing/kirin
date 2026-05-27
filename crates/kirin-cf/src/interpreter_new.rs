@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, Dialect, LiftFrom};
+use kirin::prelude::{CompileTimeValue, Dialect};
 use kirin_interpreter_new::{
     AbstractBlockTransfer, BranchCondition, ConcreteBlockTransfer, Env, Interpretable,
     InterpreterError, Location, StatementEffect,
@@ -11,7 +11,7 @@ where
     L: Dialect,
     I: Env<V, Error = E>,
     V: BranchCondition + Clone,
-    E: LiftFrom<InterpreterError>,
+    E: From<InterpreterError>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -38,7 +38,7 @@ where
                 let (target, args) = match interp.read(env, *condition)?.is_truthy() {
                     Some(true) => (true_target.target(), true_args.as_slice()),
                     Some(false) => (false_target.target(), false_args.as_slice()),
-                    None => return Err(E::lift_from(InterpreterError::IndeterminateBranch)),
+                    None => return Err(E::from(InterpreterError::IndeterminateBranch)),
                 };
                 let arguments = interp.read_many(env, args)?;
                 Ok(StatementEffect::Transfer(ConcreteBlockTransfer::Jump {

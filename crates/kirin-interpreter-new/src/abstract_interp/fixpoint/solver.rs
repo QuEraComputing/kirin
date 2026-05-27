@@ -1,7 +1,5 @@
 use std::hash::Hash;
 
-use kirin_ir::LiftFrom;
-
 use crate::{Frame, InterpreterError};
 
 use super::{
@@ -19,7 +17,7 @@ where
     where
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
         Deps: SummaryDependencyIndex<K>,
-        E: LiftFrom<Deps::Error>,
+        E: From<Deps::Error>,
     {
         if self.summaries.contains_key(&owner) {
             return Ok(());
@@ -27,7 +25,7 @@ where
 
         let summary = semantics.bottom_summary(self, &owner)?;
         self.summaries.insert(owner.clone(), summary);
-        self.deps.ensure_owner(&owner).map_err(E::lift_from)?;
+        self.deps.ensure_owner(&owner).map_err(E::from)?;
         Ok(())
     }
 
@@ -36,7 +34,7 @@ where
         F: Frame<Self, F, C, E>,
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
         Deps: SummaryDependencyIndex<K>,
-        E: LiftFrom<InterpreterError> + LiftFrom<Deps::Error>,
+        E: From<InterpreterError> + From<Deps::Error>,
     {
         self.ensure_owner(semantics, entry.clone())?;
         self.phase = FixpointPhase::Widen;
@@ -49,7 +47,7 @@ where
         F: Frame<Self, F, C, E>,
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
         Deps: SummaryDependencyIndex<K>,
-        E: LiftFrom<InterpreterError> + LiftFrom<Deps::Error>,
+        E: From<InterpreterError> + From<Deps::Error>,
     {
         self.phase = FixpointPhase::Narrow;
         for owner in self.summaries.keys().cloned().collect::<Vec<_>>() {
@@ -71,7 +69,7 @@ where
         F: Frame<Self, F, C, E>,
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
         Deps: SummaryDependencyIndex<K>,
-        E: LiftFrom<InterpreterError> + LiftFrom<Deps::Error>,
+        E: From<InterpreterError> + From<Deps::Error>,
     {
         while let Some(WorkItem::Analyze(owner)) = self.worklist.pop_front() {
             self.analyze_owner(semantics, owner)?;
@@ -89,7 +87,7 @@ where
     where
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
         Deps: SummaryDependencyIndex<K>,
-        E: LiftFrom<InterpreterError> + LiftFrom<Deps::Error>,
+        E: From<InterpreterError> + From<Deps::Error>,
     {
         self.ensure_owner(semantics, owner.clone())?;
         let summary = self
@@ -98,7 +96,7 @@ where
             .ok_or(InterpreterError::Custom(
                 "missing summary after owner initialization",
             ))
-            .map_err(E::lift_from)?;
+            .map_err(E::from)?;
 
         let change = summary.merge(self.phase, candidate, &mut self.strategy);
         let changed = change.is_some();
@@ -106,7 +104,7 @@ where
             let deps = self
                 .deps
                 .on_summary_changed(&owner, change)
-                .map_err(E::lift_from)?;
+                .map_err(E::from)?;
             self.schedule_dependencies(semantics, deps)?;
         }
         Ok(changed)
@@ -120,7 +118,7 @@ where
     where
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
         Deps: SummaryDependencyIndex<K>,
-        E: LiftFrom<Deps::Error>,
+        E: From<Deps::Error>,
     {
         for dep in deps {
             match dep {
@@ -138,13 +136,13 @@ where
         F: Frame<Self, F, C, E>,
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
         Deps: SummaryDependencyIndex<K>,
-        E: LiftFrom<InterpreterError> + LiftFrom<Deps::Error>,
+        E: From<InterpreterError> + From<Deps::Error>,
     {
         let summary = self
             .summaries
             .get(&owner)
             .ok_or(InterpreterError::Custom("missing summary for work item"))
-            .map_err(E::lift_from)?
+            .map_err(E::from)?
             .clone();
         self.current_owner = Some(owner.clone());
         let root = match semantics.entry_frame(self, &owner, &summary) {
@@ -176,7 +174,7 @@ where
     where
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
         Deps: SummaryDependencyIndex<K>,
-        E: LiftFrom<InterpreterError> + LiftFrom<Deps::Error>,
+        E: From<InterpreterError> + From<Deps::Error>,
     {
         match effect {
             SummaryEffect::None => Ok(()),
@@ -197,7 +195,7 @@ where
     where
         Sem: OwnerSemantics<Self, K, S, F, C, E>,
         Deps: SummaryDependencyIndex<K>,
-        E: LiftFrom<InterpreterError> + LiftFrom<Deps::Error>,
+        E: From<InterpreterError> + From<Deps::Error>,
     {
         let effects = std::mem::take(&mut self.pending_effects);
         for effect in effects {

@@ -336,7 +336,7 @@ mod tests {
         assert_eq!(inner_info.graph().node_count(), 1, "inner has NodeB");
     }
 
-    // --- Lift/Project roundtrip tests (derive-generated impls) ---
+    // --- Into/Project roundtrip tests (derive-generated impls) ---
 
     /// `lift` then `try_project` on the same variant is the identity.
     #[test]
@@ -346,7 +346,7 @@ mod tests {
         let edge = UngraphEdge {
             res: test_ssa.into(),
         };
-        let lifted = Lift::<UngraphLanguage>::lift(edge.clone());
+        let lifted = <_ as Into<UngraphLanguage>>::into(edge.clone());
         let back: Result<UngraphEdge, ProjectError> = lifted.try_project();
         assert_eq!(back, Ok(edge));
 
@@ -354,7 +354,7 @@ mod tests {
             param: test_ssa,
             ports: vec![],
         };
-        let lifted = Lift::<UngraphLanguage>::lift(node_a.clone());
+        let lifted = <_ as Into<UngraphLanguage>>::into(node_a.clone());
         let back: Result<UngraphNodeA, ProjectError> = lifted.try_project();
         assert_eq!(back, Ok(node_a));
     }
@@ -366,7 +366,7 @@ mod tests {
         let edge = UngraphEdge {
             res: test_ssa.into(),
         };
-        let lifted = Lift::<UngraphLanguage>::lift(edge);
+        let lifted = <_ as Into<UngraphLanguage>>::into(edge);
         let result: Result<UngraphNodeA, ProjectError> = lifted.try_project();
         assert_eq!(result, Err(ProjectError::InvalidVariant));
     }
@@ -380,11 +380,11 @@ mod tests {
         };
         let sum = UngraphLanguage::Edge(edge);
         let inner: UngraphEdge = sum.clone().try_project().unwrap();
-        let roundtrip = Lift::<UngraphLanguage>::lift(inner);
+        let roundtrip = <_ as Into<UngraphLanguage>>::into(inner);
         assert_eq!(roundtrip, sum);
     }
 
-    /// `TryLift`/`TryProject` convenience traits agree with `lift`/`try_project`.
+    /// `TryInto`/`TryProject` convenience traits agree with `lift`/`try_project`.
     #[test]
     fn try_lift_try_project_roundtrip() {
         let test_ssa: SSAValue = TestSSAValue(0).into();
@@ -393,7 +393,7 @@ mod tests {
             param1: test_ssa,
             ports: vec![],
         };
-        let sum: UngraphLanguage = node_b.clone().lift();
+        let sum: UngraphLanguage = node_b.clone().into();
         let back: Result<UngraphNodeB, ProjectError> = sum.try_project();
         assert_eq!(back, Ok(node_b));
     }
@@ -405,7 +405,7 @@ mod tests {
         let edge = UngraphEdge {
             res: test_ssa.into(),
         };
-        let result: Result<UngraphLanguage, _> = edge.clone().try_lift();
+        let result: Result<UngraphLanguage, _> = edge.clone().try_into();
         assert_eq!(result, Ok(UngraphLanguage::Edge(edge)));
     }
 
@@ -433,14 +433,14 @@ mod tests {
         let _: UngraphNodeA = sum.project();
     }
 
-    /// `TryLiftFrom::try_lift_from` core trait is callable directly.
+    /// `TryFrom::try_from` core trait is callable directly.
     #[test]
     fn core_try_lift_from_direct() {
         let test_ssa: SSAValue = TestSSAValue(0).into();
         let edge = UngraphEdge {
             res: test_ssa.into(),
         };
-        let result = UngraphLanguage::try_lift_from(edge.clone());
+        let result = UngraphLanguage::try_from(edge.clone());
         assert_eq!(result, Ok(UngraphLanguage::Edge(edge)));
     }
 

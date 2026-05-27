@@ -8,7 +8,7 @@ impl<__EntryL, T: CompileTimeValue, __EntryI, __EntryF, __EntryE, __EntryV>
     for Lexical<T>
 where
     __EntryL: ::kirin::ir::Dialect,
-    __EntryE: ::kirin::ir::LiftFrom<::kirin_interpreter_new::InterpreterError>,
+    __EntryE: ::core::convert::From<::kirin_interpreter_new::InterpreterError>,
     Function<T>:
         ::kirin_interpreter_new::FunctionEntry<__EntryL, __EntryI, __EntryF, __EntryE, __EntryV>,
     Lambda<T>:
@@ -23,13 +23,13 @@ where
     ) -> Result<__EntryF, __EntryE> {
         match self {
             Self::Function(field_0) => field_0.enter_function_body(location, env, interp, args),
-            Self::Call(field_0) => Err(__EntryE::lift_from(
+            Self::Call(field_0) => Err(__EntryE::from(
                 ::kirin_interpreter_new::InterpreterError::Custom(
                     "expected function body statement",
                 ),
             )),
             Self::Lambda(field_0) => field_0.enter_function_body(location, env, interp, args),
-            Self::Return(field_0) => Err(__EntryE::lift_from(
+            Self::Return(field_0) => Err(__EntryE::from(
                 ::kirin_interpreter_new::InterpreterError::Custom(
                     "expected function body statement",
                 ),

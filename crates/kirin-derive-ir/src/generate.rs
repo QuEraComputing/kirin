@@ -211,12 +211,12 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
         .add(crate::has_signature::has_signature_template(crate_path));
 
     let mut output = builder.build()?;
-    output.extend(crate::lift_project::generate_lift_project(&ir, crate_path));
+    output.extend(crate::project::generate_project(&ir, crate_path));
     Ok(output)
 }
 
-/// Generate only the Lift/Project algebra output.
-pub(crate) fn generate_lift_project(ast: &syn::DeriveInput) -> darling::Result<TokenStream> {
+/// Generate only the Into/Project algebra output.
+pub(crate) fn generate_project(ast: &syn::DeriveInput) -> darling::Result<TokenStream> {
     let mut ast = ast.clone();
     if !has_kirin_type_attr(&ast) {
         ast.attrs
@@ -226,10 +226,9 @@ pub(crate) fn generate_lift_project(ast: &syn::DeriveInput) -> darling::Result<T
     let ir = Input::<StandardLayout>::from_derive_input(&ast)?;
     let default_crate: syn::Path = syn::parse_quote!(::kirin::ir);
     let crate_path = ir.attrs.crate_path.as_ref().unwrap_or(&default_crate);
-    let output = crate::lift_project::generate_lift_project(&ir, crate_path);
+    let output = crate::project::generate_project(&ir, crate_path);
     if output.is_empty() {
-        crate::lift_project::generate_wrapper_enum_direct(&ast, crate_path)
-            .map_err(darling::Error::from)
+        crate::project::generate_wrapper_enum_direct(&ast, crate_path).map_err(darling::Error::from)
     } else {
         Ok(output)
     }

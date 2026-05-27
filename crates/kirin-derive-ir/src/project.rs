@@ -5,20 +5,21 @@ use kirin_derive_toolkit::{
 use proc_macro2::TokenStream;
 use quote::quote;
 
-/// Generate `TryLiftFrom` and `TryProjectTo` impls for pure wrapper dialects.
+/// Generate `TryFrom` and `TryProjectTo` impls for pure wrapper dialects.
 ///
-/// - **Pure wrapper enum** (all variants have `#[wraps]`): generates one `TryLiftFrom<InnerTy>`
+/// - **Pure wrapper enum** (all variants have `#[wraps]`): generates one `TryFrom<InnerTy>`
 ///   impl on the enum for each wrapped type, and one `TryProjectTo<InnerTy>` impl on the enum
 ///   for each variant.
 /// - **Wrapper struct** (struct with `#[wraps]`): same, for the single inner type.
-/// - **Non-pure-wrapper enum or non-wrapper struct**: emits nothing — Lift/Project algebra
+/// - **Non-pure-wrapper enum or non-wrapper struct**: emits nothing — Into/Project algebra
 ///   is only derivable when the dialect is a transparent composition of sub-dialects.
-pub(crate) fn generate_lift_project(
-    ir: &Input<StandardLayout>,
-    crate_path: &syn::Path,
-) -> TokenStream {
+pub(crate) fn generate_project(ir: &Input<StandardLayout>, crate_path: &syn::Path) -> TokenStream {
     let name = &ir.name;
     let builder = LiftProjectImplBuilder::new(name, &ir.generics, crate_path);
+    // When `#[kirin(builders)]` is enabled, the builder template emits
+    // `impl From<Inner> for Self` for each wrapper variant. Skip emitting
+    // it here to avoid coherence conflicts; otherwise emit it ourselves.
+    let emit_direct_from = ir.attrs.builder.is_none();
 
     match &ir.data {
         Data::Enum(data) => {
@@ -39,7 +40,7 @@ pub(crate) fn generate_lift_project(
                     let inner_ty = &wrapper.ty;
                     let constructor = enum_variant_constructor(name, variant_name, wrapper);
                     let pattern = enum_variant_pattern(name, variant_name, wrapper);
-                    let direct = builder.direct(&constructor, &pattern, inner_ty);
+                    let direct = builder.direct(&constructor, &pattern, inner_ty, emit_direct_from);
                     let bridge = wrapper
                         .lift_project_from
                         .iter()
@@ -96,16 +97,23 @@ pub(crate) fn generate_lift_project(
                 })
                 .collect::<TokenStream>();
 
-            quote! {
-                #[automatically_derived]
-                impl #impl_generics #crate_path::TryLiftFrom<#inner_ty> for #name #ty_generics
-                #where_clause
-                {
-                    type Error = ::core::convert::Infallible;
-                    fn try_lift_from(from: #inner_ty) -> ::core::result::Result<Self, Self::Error> {
-                        Ok(#lift_body)
+            let from_impl = if emit_direct_from {
+                quote! {
+                    #[automatically_derived]
+                    impl #impl_generics ::core::convert::From<#inner_ty> for #name #ty_generics
+                    #where_clause
+                    {
+                        fn from(from: #inner_ty) -> Self {
+                            #lift_body
+                        }
                     }
                 }
+            } else {
+                quote! {}
+            };
+
+            quote! {
+                #from_impl
 
                 #[automatically_derived]
                 impl #impl_generics #crate_path::TryProjectTo<#inner_ty> for #name #ty_generics
@@ -150,7 +158,7 @@ pub(crate) fn generate_wrapper_enum_direct(
             let pattern = field.pattern(&inner);
             let lift_body = quote! { Self::#variant_name #constructor };
             let project_pattern = quote! { Self::#variant_name #pattern };
-            Ok(builder.direct(&lift_body, &project_pattern, inner_ty))
+            Ok(builder.direct(&lift_body, &project_pattern, inner_ty, true))
         })
         .collect::<syn::Result<Vec<_>>>()?;
 
@@ -210,6 +218,7 @@ impl<'a> LiftProjectImplBuilder<'a> {
         lift_body: &TokenStream,
         project_pattern: &TokenStream,
         inner_ty: &syn::Type,
+        emit_from: bool,
     ) -> TokenStream {
         let name = self.name;
         let crate_path = self.crate_path;
@@ -217,16 +226,23 @@ impl<'a> LiftProjectImplBuilder<'a> {
         let ty_generics = &self.ty_generics;
         let where_clause = self.where_clause;
 
-        quote! {
-            #[automatically_derived]
-            impl #impl_generics #crate_path::TryLiftFrom<#inner_ty> for #name #ty_generics
-            #where_clause
-            {
-                type Error = ::core::convert::Infallible;
-                fn try_lift_from(from: #inner_ty) -> ::core::result::Result<Self, Self::Error> {
-                    Ok(#lift_body)
+        let from_impl = if emit_from {
+            quote! {
+                #[automatically_derived]
+                impl #impl_generics ::core::convert::From<#inner_ty> for #name #ty_generics
+                #where_clause
+                {
+                    fn from(from: #inner_ty) -> Self {
+                        #lift_body
+                    }
                 }
             }
+        } else {
+            quote! {}
+        };
+
+        quote! {
+            #from_impl
 
             #[automatically_derived]
             impl #impl_generics #crate_path::TryProjectTo<#inner_ty> for #name #ty_generics
@@ -258,14 +274,12 @@ impl<'a> LiftProjectImplBuilder<'a> {
 
         quote! {
             #[automatically_derived]
-            impl #impl_generics #crate_path::TryLiftFrom<#from_ty> for #name #ty_generics
+            impl #impl_generics ::core::convert::From<#from_ty> for #name #ty_generics
             #where_clause
             {
-                type Error = <#inner_ty as #crate_path::TryLiftFrom<#from_ty>>::Error;
-
-                fn try_lift_from(from: #from_ty) -> ::core::result::Result<Self, Self::Error> {
-                    let from = <#inner_ty as #crate_path::TryLiftFrom<#from_ty>>::try_lift_from(from)?;
-                    Ok(#lift_body)
+                fn from(from: #from_ty) -> Self {
+                    let from = <#inner_ty as ::core::convert::From<#from_ty>>::from(from);
+                    #lift_body
                 }
             }
 

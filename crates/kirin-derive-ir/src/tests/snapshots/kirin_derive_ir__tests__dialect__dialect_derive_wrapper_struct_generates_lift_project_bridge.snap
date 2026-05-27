@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-ir/src/tests/dialect.rs
-assertion_line: 383
 expression: code
 ---
 #[automatically_derived]
@@ -358,10 +357,9 @@ impl ::kirin::ir::HasSignature<Self> for WrapperOp {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<InnerOp> for WrapperOp {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: InnerOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(WrapperOp(from))
+impl ::core::convert::From<InnerOp> for WrapperOp {
+    fn from(from: InnerOp) -> Self {
+        WrapperOp(from)
     }
 }
 #[automatically_derived]
@@ -373,11 +371,10 @@ impl ::kirin::ir::TryProjectTo<InnerOp> for WrapperOp {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<LeafOp> for WrapperOp {
-    type Error = <InnerOp as ::kirin::ir::TryLiftFrom<LeafOp>>::Error;
-    fn try_lift_from(from: LeafOp) -> ::core::result::Result<Self, Self::Error> {
-        let from = <InnerOp as ::kirin::ir::TryLiftFrom<LeafOp>>::try_lift_from(from)?;
-        Ok(WrapperOp(from))
+impl ::core::convert::From<LeafOp> for WrapperOp {
+    fn from(from: LeafOp) -> Self {
+        let from = <InnerOp as ::core::convert::From<LeafOp>>::from(from);
+        WrapperOp(from)
     }
 }
 #[automatically_derived]
@@ -390,11 +387,10 @@ impl ::kirin::ir::TryProjectTo<LeafOp> for WrapperOp {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<OtherLeafOp> for WrapperOp {
-    type Error = <InnerOp as ::kirin::ir::TryLiftFrom<OtherLeafOp>>::Error;
-    fn try_lift_from(from: OtherLeafOp) -> ::core::result::Result<Self, Self::Error> {
-        let from = <InnerOp as ::kirin::ir::TryLiftFrom<OtherLeafOp>>::try_lift_from(from)?;
-        Ok(WrapperOp(from))
+impl ::core::convert::From<OtherLeafOp> for WrapperOp {
+    fn from(from: OtherLeafOp) -> Self {
+        let from = <InnerOp as ::core::convert::From<OtherLeafOp>>::from(from);
+        WrapperOp(from)
     }
 }
 #[automatically_derived]

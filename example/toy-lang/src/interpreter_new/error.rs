@@ -1,7 +1,5 @@
-use std::convert::Infallible;
 use std::fmt::{Display, Formatter};
 
-use kirin::prelude::TryLiftFrom;
 use kirin_arith::ArithConversionError;
 use kirin_interpreter_new::{InterpreterError, LiftError};
 
@@ -22,22 +20,14 @@ impl Display for ToyError {
 
 impl std::error::Error for ToyError {}
 
-impl TryLiftFrom<kirin_arith::interpreter_new::DivisionByZero> for ToyError {
-    type Error = Infallible;
-
-    fn try_lift_from(
-        error: kirin_arith::interpreter_new::DivisionByZero,
-    ) -> Result<Self, Self::Error> {
-        Ok(Self::Core(InterpreterError::try_lift_from(error)?))
+impl From<kirin_arith::interpreter_new::DivisionByZero> for ToyError {
+    fn from(error: kirin_arith::interpreter_new::DivisionByZero) -> Self {
+        Self::Core(error.into())
     }
 }
 
-impl TryLiftFrom<kirin_bitwise::interpreter_new::ShiftOverflow> for ToyError {
-    type Error = Infallible;
-
-    fn try_lift_from(
-        error: kirin_bitwise::interpreter_new::ShiftOverflow,
-    ) -> Result<Self, Self::Error> {
-        Ok(Self::Core(InterpreterError::try_lift_from(error)?))
+impl From<kirin_bitwise::interpreter_new::ShiftOverflow> for ToyError {
+    fn from(error: kirin_bitwise::interpreter_new::ShiftOverflow) -> Self {
+        Self::Core(error.into())
     }
 }

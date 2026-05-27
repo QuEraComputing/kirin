@@ -1,6 +1,6 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
-use kirin::prelude::{CompileTimeValue, Dialect, LiftFrom, SSAValue, TryLiftFrom};
+use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
 use kirin_interpreter_new::{
     BlockTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
 };
@@ -20,7 +20,7 @@ where
         + Neg<Output = X::Value>
         + CheckedDiv
         + CheckedRem,
-    E: LiftFrom<DivisionByZero>,
+    E: From<DivisionByZero>,
     T: CompileTimeValue,
 {
     fn interpret(
@@ -63,7 +63,7 @@ where
                 let value = interp
                     .read(env, *lhs)?
                     .checked_div(interp.read(env, *rhs)?)
-                    .ok_or_else(|| E::lift_from(DivisionByZero))?;
+                    .ok_or_else(|| E::from(DivisionByZero))?;
                 interp.write(env, SSAValue::from(*result), value)?;
             }
             Arith::Rem {
@@ -72,7 +72,7 @@ where
                 let value = interp
                     .read(env, *lhs)?
                     .checked_rem(interp.read(env, *rhs)?)
-                    .ok_or_else(|| E::lift_from(DivisionByZero))?;
+                    .ok_or_else(|| E::from(DivisionByZero))?;
                 interp.write(env, SSAValue::from(*result), value)?;
             }
             Arith::Neg {
@@ -91,10 +91,8 @@ where
 #[error("division by zero")]
 pub struct DivisionByZero;
 
-impl TryLiftFrom<DivisionByZero> for InterpreterError {
-    type Error = core::convert::Infallible;
-
-    fn try_lift_from(_: DivisionByZero) -> Result<Self, Self::Error> {
-        Ok(Self::Custom("division by zero"))
+impl From<DivisionByZero> for InterpreterError {
+    fn from(_: DivisionByZero) -> Self {
+        Self::Custom("division by zero")
     }
 }

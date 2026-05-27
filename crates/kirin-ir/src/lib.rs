@@ -5,10 +5,10 @@ mod detach;
 mod intern;
 mod language;
 mod lattice;
-mod lift;
 mod node;
 mod pipeline;
 mod product;
+mod project;
 mod signature;
 mod stage;
 
@@ -31,10 +31,6 @@ pub use language::{
     IsTerminator,
 };
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice, Widen};
-pub use lift::{
-    Lift, LiftError, LiftFrom, Project, ProjectError, TryLift, TryLiftFrom, TryProject,
-    TryProjectTo,
-};
 pub use node::{
     Block, BlockArgument, BlockInfo, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CompileStage,
     DeletedSSAValue, DiGraph, DiGraphExtra, DiGraphInfo, Function, FunctionInfo, GlobalSymbol,
@@ -45,6 +41,7 @@ pub use node::{
 };
 pub use pipeline::Pipeline;
 pub use product::{HasProduct, Product};
+pub use project::{Project, ProjectError, TryProject, TryProjectTo};
 pub use signature::{
     ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
@@ -62,8 +59,8 @@ pub mod prelude {
         SignatureSemantics, StageInfo, StageMeta, Statement,
     };
     pub use crate::{
-        CompileTimeValue, HasProduct, Lift, LiftError, LiftFrom, Placeholder, Product, Project,
-        ProjectError, TryLift, TryLiftFrom, TryProject, TryProjectTo, Typeof,
+        CompileTimeValue, HasProduct, Placeholder, Product, Project, ProjectError, TryProject,
+        TryProjectTo, Typeof,
     };
 }
 

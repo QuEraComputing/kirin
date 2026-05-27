@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{Block, Dialect, LiftFrom, Product, TryLift, TryLiftFrom};
+use kirin_ir::{Block, Dialect, Product};
 
 use crate::{
     ConcreteBlockTransfer, Env, EnvIndex, Frame, FrameEffect, HasLocation, InterpreterError,
@@ -59,8 +59,8 @@ impl<L, V, T> RegionFrame<L, V, T> {
     where
         I: StageAccess<L, Error = E>,
         L: Dialect,
-        F: TryLiftFrom<StandardFrame<L, V, T>>,
-        E: From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>,
+        F: TryFrom<StandardFrame<L, V, T>>,
+        E: From<<F as TryFrom<StandardFrame<L, V, T>>>::Error>,
         V: Clone,
     {
         let first_block = {
@@ -75,7 +75,7 @@ impl<L, V, T> RegionFrame<L, V, T> {
             None => self
                 .with_traversal(Traversal::Exit)
                 .into_standard_frame()
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
         }
@@ -87,18 +87,18 @@ impl<L, V, T> RegionFrame<L, V, T> {
         incoming_args: Product<V>,
     ) -> Result<FrameEffect<F, C>, E>
     where
-        F: TryLiftFrom<StandardFrame<L, V, T>>,
-        E: From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>,
+        F: TryFrom<StandardFrame<L, V, T>>,
+        E: From<<F as TryFrom<StandardFrame<L, V, T>>>::Error>,
     {
         let stage = self.location.stage;
         let env = self.env;
         let parent = self
             .with_traversal(Traversal::Active(block))
             .into_standard_frame()
-            .try_lift()?;
+            .try_into()?;
         let child = BlockFrame::<L, V, T>::new(stage, block, env, incoming_args)
             .into_standard_frame()
-            .try_lift()?;
+            .try_into()?;
         Ok(FrameEffect::Push { parent, child })
     }
 
@@ -108,10 +108,10 @@ impl<L, V, T> RegionFrame<L, V, T> {
 
     fn complete<F, C, E>(self) -> Result<FrameEffect<F, C>, E>
     where
-        C: TryLiftFrom<StandardCompletion<V>>,
-        E: From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+        C: TryFrom<StandardCompletion<V>>,
+        E: From<<C as TryFrom<StandardCompletion<V>>>::Error>,
     {
-        Ok(FrameEffect::Complete(C::try_lift_from(
+        Ok(FrameEffect::Complete(C::try_from(
             StandardCompletion::RegionDone,
         )?))
     }
@@ -124,17 +124,17 @@ where
         + BlockTransferDispatch<L, F, C, E, V, T>
         + Env<V, Error = E>,
     L: Dialect,
-    F: TryLiftFrom<StandardFrame<L, V, T>>,
-    C: TryLiftFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
-    E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<StandardFrame<L, V, T>>>::Error>
-        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+    F: TryFrom<StandardFrame<L, V, T>>,
+    C: TryFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
+    E: From<InterpreterError>
+        + From<<F as TryFrom<StandardFrame<L, V, T>>>::Error>
+        + From<<C as TryFrom<StandardCompletion<V>>>::Error>,
     V: Clone,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match self.traversal {
             Traversal::Entry => self.enter(interp),
-            Traversal::Active(_) => Err(E::lift_from(InterpreterError::Custom(
+            Traversal::Active(_) => Err(E::from(InterpreterError::Custom(
                 "region frame is waiting for block completion",
             ))),
             Traversal::Exit => self.complete(),
@@ -148,7 +148,7 @@ where
     fn resume(self, completion: C, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         match completion.project_or_self() {
             Ok(StandardCompletion::BlockDone) => {}
-            Ok(completion) => return Ok(FrameEffect::Complete(C::try_lift_from(completion)?)),
+            Ok(completion) => return Ok(FrameEffect::Complete(C::try_from(completion)?)),
             Err(completion) => return Ok(FrameEffect::Complete(completion)),
         }
 
@@ -156,10 +156,10 @@ where
             Traversal::Active(_) => self
                 .with_traversal(Traversal::Exit)
                 .into_standard_frame()
-                .try_lift()
+                .try_into()
                 .map(FrameEffect::Continue)
                 .map_err(E::from),
-            _ => Err(E::lift_from(InterpreterError::ExpectedActiveBlock(
+            _ => Err(E::from(InterpreterError::ExpectedActiveBlock(
                 self.location,
             ))),
         }

@@ -1,9 +1,6 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{
-    Dialect, Function, LiftFrom, Product, SSAValue, SpecializedFunction, StagedFunction, TryLift,
-    TryLiftFrom,
-};
+use kirin_ir::{Dialect, Function, Product, SSAValue, SpecializedFunction, StagedFunction};
 
 use crate::{
     Env, EnvIndex, Frame, FrameEffect, FunctionEntryTarget, FunctionInvocation,
@@ -70,11 +67,11 @@ impl<I, L, F, C, E, V> Frame<I, F, C, E> for CallFrame<L, V>
 where
     I: Env<V, Error = E> + FunctionInvocationDispatch<F, E, V>,
     L: Dialect,
-    F: TryLiftFrom<CallFrame<L, V>>,
-    C: TryLiftFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
-    E: LiftFrom<InterpreterError>
-        + From<<F as TryLiftFrom<CallFrame<L, V>>>::Error>
-        + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+    F: TryFrom<CallFrame<L, V>>,
+    C: TryFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
+    E: From<InterpreterError>
+        + From<<F as TryFrom<CallFrame<L, V>>>::Error>
+        + From<<C as TryFrom<StandardCompletion<V>>>::Error>,
 {
     fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
         let args = self
@@ -95,7 +92,7 @@ where
             args,
         ))?;
         Ok(FrameEffect::Push {
-            parent: self.try_lift()?,
+            parent: self.try_into()?,
             child,
         })
     }
@@ -110,7 +107,7 @@ where
                 interp.write_product(self.caller_env, self.results.as_slice(), value)?;
                 Ok(FrameEffect::Done)
             }
-            Ok(completion) => Err(E::lift_from(InterpreterError::UnexpectedCompletion {
+            Ok(completion) => Err(E::from(InterpreterError::UnexpectedCompletion {
                 location: self.location,
                 completion: match completion {
                     StandardCompletion::BlockDone => "block completion returned to call",

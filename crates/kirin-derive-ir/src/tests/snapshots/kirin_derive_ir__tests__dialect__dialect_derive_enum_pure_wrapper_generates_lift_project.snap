@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-ir/src/tests/dialect.rs
-assertion_line: 296
 expression: code
 ---
 #[automatically_derived]
@@ -570,10 +569,9 @@ impl ::kirin::ir::HasSignature<Self> for CompositeOps {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<AlphaOp> for CompositeOps {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: AlphaOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(CompositeOps::Alpha(from))
+impl ::core::convert::From<AlphaOp> for CompositeOps {
+    fn from(from: AlphaOp) -> Self {
+        CompositeOps::Alpha(from)
     }
 }
 #[automatically_derived]
@@ -587,10 +585,9 @@ impl ::kirin::ir::TryProjectTo<AlphaOp> for CompositeOps {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<BetaOp> for CompositeOps {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: BetaOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(CompositeOps::Beta(from))
+impl ::core::convert::From<BetaOp> for CompositeOps {
+    fn from(from: BetaOp) -> Self {
+        CompositeOps::Beta(from)
     }
 }
 #[automatically_derived]
@@ -604,10 +601,9 @@ impl ::kirin::ir::TryProjectTo<BetaOp> for CompositeOps {
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::TryLiftFrom<GammaOp> for CompositeOps {
-    type Error = ::core::convert::Infallible;
-    fn try_lift_from(from: GammaOp) -> ::core::result::Result<Self, Self::Error> {
-        Ok(CompositeOps::Gamma(from))
+impl ::core::convert::From<GammaOp> for CompositeOps {
+    fn from(from: GammaOp) -> Self {
+        CompositeOps::Gamma(from)
     }
 }
 #[automatically_derived]

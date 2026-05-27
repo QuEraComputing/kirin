@@ -108,21 +108,6 @@ impl_call_like!(CallFunction, Function);
 impl_call_like!(CallStaged, StagedFunction);
 impl_call_like!(CallSpecialized, SpecializedFunction);
 
-macro_rules! impl_call_from {
-    ($variant:ident, $ty:ident) => {
-        impl<T: CompileTimeValue> From<$ty<T>> for Call<T> {
-            fn from(value: $ty<T>) -> Self {
-                Self::$variant(value)
-            }
-        }
-    };
-}
-
-impl_call_from!(Named, CallNamed);
-impl_call_from!(Function, CallFunction);
-impl_call_from!(Staged, CallStaged);
-impl_call_from!(Specialized, CallSpecialized);
-
 impl<T: CompileTimeValue> Call<T> {
     pub fn build<Lang>(stage: &mut impl AsBuildStage<Lang>) -> CallBuilder<'_, Lang, T>
     where
@@ -199,7 +184,7 @@ where
 
 impl<Lang, T> CallTargetBuilder<'_, Lang, T>
 where
-    Lang: Dialect + LiftFrom<Call<T>>,
+    Lang: Dialect + From<Call<T>>,
     Lang::Type: From<T>,
     T: CompileTimeValue + Placeholder,
 {
@@ -231,7 +216,7 @@ where
         let id = self
             .stage
             .statement()
-            .definition(Lang::lift_from(definition))
+            .definition(Lang::from(definition))
             .new();
         debug_assert_eq!(id, statement);
         call_build_result::Call { id, results }

@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{Dialect, LiftFrom, TryLift, TryLiftFrom};
+use kirin_ir::Dialect;
 
 use super::join::join_standard_completion;
 use super::{AbstractBranchFrame, AbstractBranchState};
@@ -13,9 +13,9 @@ impl<L, V> AbstractBranchFrame<L, V> {
     pub(super) fn step_abstract<F, C, E>(self) -> Result<FrameEffect<F, C>, E>
     where
         L: Dialect,
-        F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
-        E: LiftFrom<InterpreterError>
-            + From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
+        F: TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
+        E: From<InterpreterError>
+            + From<<F as TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>,
         V: AbstractValue,
     {
         let (true_env, true_target, true_arguments) = match &self.state {
@@ -26,7 +26,7 @@ impl<L, V> AbstractBranchFrame<L, V> {
                 ..
             } => (*true_env, *true_target, true_arguments.clone()),
             AbstractBranchState::WaitingFalse { .. } => {
-                return Err(E::lift_from(InterpreterError::UnexpectedCompletion {
+                return Err(E::from(InterpreterError::UnexpectedCompletion {
                     location: self.location,
                     completion: "abstract branch frame stepped after true branch",
                 }));
@@ -40,16 +40,16 @@ impl<L, V> AbstractBranchFrame<L, V> {
             true_arguments,
         );
         Ok(FrameEffect::Push {
-            parent: StandardFrame::AbstractBranch(self).try_lift()?,
-            child: StandardFrame::Block(child).try_lift()?,
+            parent: StandardFrame::AbstractBranch(self).try_into()?,
+            child: StandardFrame::Block(child).try_into()?,
         })
     }
 
     pub(super) fn resume_done_abstract<F, C, E>(self) -> Result<FrameEffect<F, C>, E>
     where
-        E: LiftFrom<InterpreterError>,
+        E: From<InterpreterError>,
     {
-        Err(E::lift_from(InterpreterError::UnexpectedCompletion {
+        Err(E::from(InterpreterError::UnexpectedCompletion {
             location: self.location,
             completion: "abstract branch child finished without completion",
         }))
@@ -63,11 +63,11 @@ impl<L, V> AbstractBranchFrame<L, V> {
     where
         I: Env<V, Error = E>,
         L: Dialect,
-        F: TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
-        C: TryLiftFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
-        E: LiftFrom<InterpreterError>
-            + From<<F as TryLiftFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
-            + From<<C as TryLiftFrom<StandardCompletion<V>>>::Error>,
+        F: TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>,
+        C: TryFrom<StandardCompletion<V>> + ProjectOrSelf<StandardCompletion<V>>,
+        E: From<InterpreterError>
+            + From<<F as TryFrom<StandardFrame<L, V, AbstractBlockTransfer<V>>>>::Error>
+            + From<<C as TryFrom<StandardCompletion<V>>>::Error>,
         V: AbstractValue,
     {
         match self.state {
@@ -80,7 +80,7 @@ impl<L, V> AbstractBranchFrame<L, V> {
             } => {
                 interp.free(true_env)?;
                 let true_completion = completion.project_or_self().map_err(|_| -> E {
-                    E::lift_from(InterpreterError::UnexpectedCompletion {
+                    E::from(InterpreterError::UnexpectedCompletion {
                         location: self.location,
                         completion: "abstract branch true path returned dialect completion",
                     })
@@ -101,8 +101,8 @@ impl<L, V> AbstractBranchFrame<L, V> {
                         marker: PhantomData,
                     }
                     .into_standard_frame()
-                    .try_lift()?,
-                    child: StandardFrame::Block(child).try_lift()?,
+                    .try_into()?,
+                    child: StandardFrame::Block(child).try_into()?,
                 })
             }
             AbstractBranchState::WaitingFalse {
@@ -112,14 +112,13 @@ impl<L, V> AbstractBranchFrame<L, V> {
             } => {
                 interp.free(false_env)?;
                 let false_completion = completion.project_or_self().map_err(|_| -> E {
-                    E::lift_from(InterpreterError::UnexpectedCompletion {
+                    E::from(InterpreterError::UnexpectedCompletion {
                         location: self.location,
                         completion: "abstract branch false path returned dialect completion",
                     })
                 })?;
-                Ok(FrameEffect::Complete(C::try_lift_from(
-                    join_standard_completion(true_completion, false_completion)
-                        .map_err(E::lift_from)?,
+                Ok(FrameEffect::Complete(C::try_from(
+                    join_standard_completion(true_completion, false_completion).map_err(E::from)?,
                 )?))
             }
         }
