@@ -31,6 +31,8 @@ cargo run -p toy-qc -- parse example/toy-qc/programs/bell_pair.kirin  # Parse a 
 cargo nextest run -p toy-qc      # Run toy-qc example tests
 cargo build -p kirin-interpreter-new  # Build the new frame-fusion interpreter crate
 cargo nextest run -p kirin-interpreter-new  # Run new interpreter crate tests
+cargo build -p kirin-derive-interpreter-new  # Build interpreter-new derive proc-macro crate
+cargo nextest run -p kirin-derive-interpreter-new  # Run derive crate snapshot/unit tests
 cargo nextest run -p toy-lang -E 'test(interpreter_new)'  # Run toy-lang new interpreter tests
 ```
 
@@ -61,8 +63,8 @@ Named subsystem groupings for scoping implementation, review, and maintenance wo
 | `ir` | kirin-ir |
 | `parser` | kirin-chumsky, kirin-derive-chumsky |
 | `printer` | kirin-prettyless, kirin-derive-prettyless |
-| `interpreter` | kirin-interpreter, kirin-interpreter-new, kirin-derive-interpreter |
-| `derive` | kirin-derive-toolkit, kirin-derive-ir, kirin-derive-chumsky, kirin-derive-interpreter, kirin-derive-prettyless |
+| `interpreter` | kirin-interpreter, kirin-interpreter-new, kirin-derive-interpreter, kirin-derive-interpreter-new |
+| `derive` | kirin-derive-toolkit, kirin-derive-ir, kirin-derive-chumsky, kirin-derive-interpreter, kirin-derive-interpreter-new, kirin-derive-prettyless |
 | `dialects` | kirin-cf, kirin-scf, kirin-constant, kirin-arith, kirin-bitwise, kirin-cmp, kirin-function |
 
 ### Dialect Domain Context
@@ -102,6 +104,7 @@ For user-defined dialects not in this table, ask the user for domain context dur
 **Derive Infrastructure:**
 - `kirin-derive-toolkit` — Shared derive utilities (IR model, darling re-export, template system)
 - `kirin-derive-ir` — `#[derive(Dialect, StageMeta)]` and IR property traits
+- `kirin-derive-interpreter-new` — `kirin-interpreter-new` derive proc macros (`#[derive(Frame)]`, `#[derive(Interpretable)]`, `#[derive(FunctionEntry)]`)
 - `kirin-derive-prettyless` — `#[derive(RenderDispatch)]` (proc-macro)
 
 **Analysis:**
