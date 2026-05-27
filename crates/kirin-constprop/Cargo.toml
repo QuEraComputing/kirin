@@ -1,0 +1,14 @@
+[package]
+name = "kirin-constprop"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-arith = { workspace = true }
+kirin-bitwise = { workspace = true }
+kirin-cmp = { workspace = true }
+kirin-interpreter-new = { workspace = true }
+kirin-ir = { workspace = true }
+
+[dev-dependencies]
+kirin-test-utils = { workspace = true }

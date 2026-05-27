@@ -14,8 +14,9 @@ kirin-bitwise = { workspace = true }
 kirin-cf = { workspace = true }
 kirin-cmp = { workspace = true }
 kirin-constant = { workspace = true }
+kirin-constprop = { workspace = true }
 kirin-function = { workspace = true }
-kirin-scf = { workspace = true }
+kirin-scf = { workspace = true, features = ["constprop"] }
 kirin-interpreter = { workspace = true }
 kirin-interpreter-new = { workspace = true, features = ["derive"] }
 kirin-interval = { workspace = true, features = ["interpreter", "arith", "bitwise", "cmp", "scf"] }

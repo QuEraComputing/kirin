@@ -27,6 +27,10 @@
 
 mod interpret_impl;
 pub use interpret_impl::ForLoopValue;
+#[cfg(feature = "constprop")]
+mod constprop_impl;
+#[cfg(feature = "constprop")]
+pub use constprop_impl::ScfForConstPropSummary;
 pub mod interpreter_new;
 
 use kirin::prelude::*;

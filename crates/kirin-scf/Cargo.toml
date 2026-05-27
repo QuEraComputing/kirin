@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 kirin.workspace = true
+kirin-constprop = { workspace = true, optional = true }
 kirin-interpreter = { workspace = true }
 kirin-interpreter-new = { workspace = true, features = ["derive"] }
 bon = "3.8"
@@ -15,3 +16,7 @@ kirin-arith = { workspace = true }
 kirin-constant = { workspace = true }
 kirin-function = { workspace = true }
 kirin-test-types = { path = "../kirin-test-types" }
+
+[features]
+default = []
+constprop = ["dep:kirin-constprop"]

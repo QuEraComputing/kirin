@@ -116,7 +116,7 @@ fn run_program(
         let abstract_args = args
             .iter()
             .copied()
-            .map(interpreter_new::ConstProp::Const)
+            .map(kirin_constprop::ConstPropValue::Const)
             .collect::<Vec<_>>();
         let result = match stage_name {
             "source" => interpreter_new::analyze_source_constprop_fixpoint(

@@ -4,14 +4,17 @@ use std::collections::HashMap;
 #[cfg(test)]
 use kirin::prelude::TryLiftFrom;
 use kirin::prelude::{
-    Block, CompileStage, CompileTimeValue, Dialect, GetInfo, HasStageInfo, Lattice, LiftFrom,
-    Pipeline, Product, StageMeta, Symbol, TryLift,
+    CompileStage, Dialect, GetInfo, HasStageInfo, LiftFrom, Pipeline, Product, StageMeta, Symbol,
+    TryLift,
 };
+#[cfg(test)]
+use kirin_constprop::ConstPropFunctionOwner;
+use kirin_constprop::{ConstPropFixpointInterpreter, ConstPropOwner};
 use kirin_function::interpreter_new::{CallTargetResolution, ResolvedCallTarget};
 use kirin_interpreter_new::{
-    AbstractBlockTransfer, AbstractEnvStore, BlockFrame, BlockTransfer, Env, FunctionEntryTarget,
+    AbstractBlockTransfer, AbstractEnvStore, BlockFrame, Env, FunctionEntryTarget,
     FunctionInvocation, FunctionInvocationDispatch, InterpreterError, Location, OwnerSemantics,
-    OwnerSummaryDeps, StageAccess, StandardFixpointInterpreter, Summary, SummaryEffect,
+    StageAccess, SummaryEffect,
 };
 #[cfg(test)]
 use kirin_interpreter_new::{
@@ -22,177 +25,14 @@ use kirin_interpreter_new::{
 use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
 
-use kirin_scf::ForLoopValue;
-use kirin_scf::interpreter_new::{ForContinuation, ScfCompletion, ScfForFixpointSummary};
+use kirin_scf::interpreter_new::ScfCompletion;
+use kirin_scf::{ForLoopValue, ScfForConstPropSummary};
 
 #[cfg(test)]
 use super::ToyFrame;
 use super::run::expect_function_return;
 use super::run::resolve_function;
 use super::{ConstProp, ToyCompletion, ToyError, ToyStageFrame};
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-struct FunctionOwner {
-    stage: CompileStage,
-    target: FunctionEntryTarget,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-enum ConstPropOwner {
-    Function(FunctionOwner),
-    ScfFor { location: Location },
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-struct ScfForSummary {
-    body: Block,
-    init_arg_count: usize,
-    iv: ConstProp,
-    end: ConstProp,
-    step: ConstProp,
-    carried: Product<ConstProp>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum ConstPropSummary {
-    Function { value: ConstProp },
-    ScfFor { state: Option<ScfForSummary> },
-}
-
-impl ConstPropSummary {
-    fn function_bottom() -> Self {
-        Self::Function {
-            value: ConstProp::Bottom,
-        }
-    }
-
-    fn scf_for_bottom() -> Self {
-        Self::ScfFor { state: None }
-    }
-
-    fn function_value(&self) -> Option<&ConstProp> {
-        match self {
-            Self::Function { value } => Some(value),
-            Self::ScfFor { .. } => None,
-        }
-    }
-
-    fn scf_for_state(&self) -> Option<&ScfForSummary> {
-        match self {
-            Self::ScfFor { state } => state.as_ref(),
-            Self::Function { .. } => None,
-        }
-    }
-}
-
-impl Summary for ConstPropSummary {
-    type Strategy = ();
-    type Change = ();
-
-    fn merge(
-        &mut self,
-        _phase: kirin_interpreter_new::FixpointPhase,
-        candidate: Self,
-        _strategy: &mut Self::Strategy,
-    ) -> Option<Self::Change> {
-        match (self, candidate) {
-            (Self::Function { value }, Self::Function { value: candidate }) => {
-                let joined = value.join(&candidate);
-                if *value == joined {
-                    None
-                } else {
-                    *value = joined;
-                    Some(())
-                }
-            }
-            (
-                Self::ScfFor { state },
-                Self::ScfFor {
-                    state: Some(candidate),
-                },
-            ) => merge_scf_for_summary(state, candidate),
-            (Self::ScfFor { .. }, Self::ScfFor { state: None }) => None,
-            _ => None,
-        }
-    }
-}
-
-impl<L, T, X> ScfForFixpointSummary<L, T, ConstProp, X, ConstPropOwner> for ConstPropSummary
-where
-    L: Dialect,
-    T: CompileTimeValue,
-    X: BlockTransfer<Value = ConstProp>,
-{
-    fn scf_for_owner(continuation: &ForContinuation<L, T, ConstProp, X>) -> Option<ConstPropOwner> {
-        Some(ConstPropOwner::ScfFor {
-            location: continuation.location,
-        })
-    }
-
-    fn scf_for_initial_summary(continuation: &ForContinuation<L, T, ConstProp, X>) -> Self {
-        Self::ScfFor {
-            state: Some(ScfForSummary {
-                body: continuation.body,
-                init_arg_count: continuation.init_args.len(),
-                iv: continuation.iv.clone(),
-                end: continuation.end.clone(),
-                step: continuation.step.clone(),
-                carried: continuation.carried.clone(),
-            }),
-        }
-    }
-
-    fn scf_for_results(&self) -> Option<Product<ConstProp>> {
-        self.scf_for_state().map(|state| state.carried.clone())
-    }
-}
-
-fn merge_scf_for_summary(
-    state: &mut Option<ScfForSummary>,
-    candidate: ScfForSummary,
-) -> Option<()> {
-    let Some(current) = state else {
-        *state = Some(candidate);
-        return Some(());
-    };
-
-    let joined_iv = current.iv.join(&candidate.iv);
-    let joined_end = current.end.join(&candidate.end);
-    let joined_step = current.step.join(&candidate.step);
-    let joined_carried = current
-        .carried
-        .iter()
-        .zip(candidate.carried.iter())
-        .map(|(current, candidate)| current.join(candidate))
-        .collect::<Product<_>>();
-    if current.iv == joined_iv
-        && current.end == joined_end
-        && current.step == joined_step
-        && current.carried == joined_carried
-    {
-        None
-    } else {
-        current.iv = joined_iv;
-        current.end = joined_end;
-        current.step = joined_step;
-        current.carried = joined_carried;
-        Some(())
-    }
-}
-
-fn scf_for_body_args(state: &ScfForSummary) -> Product<ConstProp> {
-    let mut args = Vec::with_capacity(1 + state.init_arg_count);
-    args.push(state.iv.clone());
-    args.extend(state.carried.iter().take(state.init_arg_count).cloned());
-    Product::from_vec(args)
-}
-
-fn owner_stage(owner: &ConstPropOwner) -> CompileStage {
-    match owner {
-        ConstPropOwner::Function(owner) => owner.stage,
-        ConstPropOwner::ScfFor { location } => location.stage,
-    }
-}
 
 fn expect_scf_yield(completion: ToyCompletion<ConstProp>) -> Result<Product<ConstProp>, ToyError> {
     match completion {
@@ -215,27 +55,28 @@ impl ConstPropSemantics {
     }
 }
 
-type FunctionFixpoint<'ir> = StandardFixpointInterpreter<
+type FunctionFixpoint<'ir> = ConstPropFixpointInterpreter<
     'ir,
     Stage,
     ConstPropOwner,
     ToyStageFrame<ConstProp, AbstractBlockTransfer<ConstProp>>,
     ToyCompletion<ConstProp>,
     ToyError,
-    ConstPropSummary,
-    AbstractEnvStore<ConstProp>,
-    OwnerSummaryDeps<ConstPropOwner>,
+    ToyConstPropSummary,
 >;
 
+type ToyConstPropSummary =
+    kirin_constprop::ConstPropSummary<ConstProp, ScfForConstPropSummary<ConstProp>>;
+
 #[cfg(test)]
-type DirectionalFunctionFixpoint<'ir, Deps> = StandardFixpointInterpreter<
+type DirectionalFunctionFixpoint<'ir, Deps> = ConstPropFixpointInterpreter<
     'ir,
     Stage,
     ConstPropOwner,
     ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>>,
     ToyCompletion<ConstProp>,
     ToyError,
-    ConstPropSummary,
+    ToyConstPropSummary,
     AbstractEnvStore<ConstProp>,
     Deps,
 >;
@@ -394,7 +235,7 @@ impl<'ir>
     OwnerSemantics<
         FunctionFixpoint<'ir>,
         ConstPropOwner,
-        ConstPropSummary,
+        ToyConstPropSummary,
         ToyStageFrame<ConstProp, AbstractBlockTransfer<ConstProp>>,
         ToyCompletion<ConstProp>,
         ToyError,
@@ -404,10 +245,10 @@ impl<'ir>
         &mut self,
         _interp: &mut FunctionFixpoint<'ir>,
         owner: &ConstPropOwner,
-    ) -> Result<ConstPropSummary, ToyError> {
+    ) -> Result<ToyConstPropSummary, ToyError> {
         Ok(match owner {
-            ConstPropOwner::Function(_) => ConstPropSummary::function_bottom(),
-            ConstPropOwner::ScfFor { .. } => ConstPropSummary::scf_for_bottom(),
+            ConstPropOwner::Function(_) => ToyConstPropSummary::function_bottom(),
+            ConstPropOwner::Location(_) => ToyConstPropSummary::location_bottom(),
         })
     }
 
@@ -415,7 +256,7 @@ impl<'ir>
         &mut self,
         interp: &mut FunctionFixpoint<'ir>,
         owner: &ConstPropOwner,
-        summary: &ConstPropSummary,
+        summary: &ToyConstPropSummary,
     ) -> Result<ToyStageFrame<ConstProp, AbstractBlockTransfer<ConstProp>>, ToyError> {
         match owner {
             ConstPropOwner::Function(owner) => {
@@ -425,27 +266,26 @@ impl<'ir>
                     Product::from_vec(self.args.clone()),
                 ))
             }
-            ConstPropOwner::ScfFor { .. } => {
-                let state = summary.scf_for_state().ok_or_else(|| {
+            ConstPropOwner::Location(_) => {
+                let state = summary.location_state().ok_or_else(|| {
                     ToyError::lift_from(InterpreterError::Custom("missing scf.for summary state"))
                 })?;
                 let env = interp.alloc();
-                match interp.pipeline().stage(owner_stage(owner)) {
-                    Some(Stage::Source(_)) => {
-                        BlockFrame::<HighLevel, ConstProp, AbstractBlockTransfer<ConstProp>>::new(
-                            owner_stage(owner),
-                            state.body,
-                            env,
-                            scf_for_body_args(state),
-                        )
-                        .try_lift()
-                        .map_err(ToyError::from)
-                    }
+                match interp.pipeline().stage(owner.stage()) {
+                    Some(Stage::Source(_)) => BlockFrame::<
+                        HighLevel,
+                        ConstProp,
+                        AbstractBlockTransfer<ConstProp>,
+                    >::new(
+                        owner.stage(), state.body, env, state.body_args()
+                    )
+                    .try_lift()
+                    .map_err(ToyError::from),
                     Some(Stage::Lowered(_)) => Err(ToyError::lift_from(InterpreterError::Custom(
                         "scf.for fixpoint owner cannot run at lowered stage",
                     ))),
                     None => Err(ToyError::lift_from(InterpreterError::MissingStage(
-                        owner_stage(owner),
+                        owner.stage(),
                     ))),
                 }
             }
@@ -457,18 +297,16 @@ impl<'ir>
         interp: &mut FunctionFixpoint<'ir>,
         owner: ConstPropOwner,
         completion: ToyCompletion<ConstProp>,
-    ) -> Result<SummaryEffect<ConstPropOwner, ConstPropSummary>, ToyError> {
+    ) -> Result<SummaryEffect<ConstPropOwner, ToyConstPropSummary>, ToyError> {
         match owner {
             ConstPropOwner::Function(_) => Ok(SummaryEffect::Update {
                 owner,
-                candidate: ConstPropSummary::Function {
-                    value: expect_function_return(completion)?,
-                },
+                candidate: ToyConstPropSummary::function(expect_function_return(completion)?),
             }),
-            ConstPropOwner::ScfFor { .. } => {
+            ConstPropOwner::Location(_) => {
                 let current = interp
                     .summary(&owner)
-                    .and_then(ConstPropSummary::scf_for_state)
+                    .and_then(ToyConstPropSummary::location_state)
                     .cloned()
                     .ok_or_else(|| {
                         ToyError::lift_from(InterpreterError::Custom(
@@ -476,19 +314,12 @@ impl<'ir>
                         ))
                     })?;
                 let carried = expect_scf_yield(completion)?;
-                let next_iv = current
-                    .iv
-                    .loop_step(&current.step)
+                let next = current
+                    .advance_with(carried, ForLoopValue::loop_step)
                     .ok_or_else(|| ToyError::lift_from(InterpreterError::LoopStepOverflow))?;
                 Ok(SummaryEffect::Update {
                     owner,
-                    candidate: ConstPropSummary::ScfFor {
-                        state: Some(ScfForSummary {
-                            iv: next_iv,
-                            carried,
-                            ..current
-                        }),
-                    },
+                    candidate: ToyConstPropSummary::location(next),
                 })
             }
         }
@@ -520,7 +351,7 @@ impl<'ir, Deps>
     OwnerSemantics<
         DirectionalFunctionFixpoint<'ir, Deps>,
         ConstPropOwner,
-        ConstPropSummary,
+        ToyConstPropSummary,
         ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>>,
         ToyCompletion<ConstProp>,
         ToyError,
@@ -547,10 +378,10 @@ where
         &mut self,
         _interp: &mut DirectionalFunctionFixpoint<'ir, Deps>,
         owner: &ConstPropOwner,
-    ) -> Result<ConstPropSummary, ToyError> {
+    ) -> Result<ToyConstPropSummary, ToyError> {
         Ok(match owner {
-            ConstPropOwner::Function(_) => ConstPropSummary::function_bottom(),
-            ConstPropOwner::ScfFor { .. } => ConstPropSummary::scf_for_bottom(),
+            ConstPropOwner::Function(_) => ToyConstPropSummary::function_bottom(),
+            ConstPropOwner::Location(_) => ToyConstPropSummary::location_bottom(),
         })
     }
 
@@ -558,7 +389,7 @@ where
         &mut self,
         _interp: &mut DirectionalFunctionFixpoint<'ir, Deps>,
         owner: &ConstPropOwner,
-        _summary: &ConstPropSummary,
+        _summary: &ToyConstPropSummary,
     ) -> Result<ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>>, ToyError> {
         *self.visits_by_owner.entry(owner.clone()).or_default() += 1;
         let args = self.args_by_owner.get(owner).cloned().ok_or_else(|| {
@@ -580,12 +411,10 @@ where
         _interp: &mut DirectionalFunctionFixpoint<'ir, Deps>,
         owner: ConstPropOwner,
         completion: ToyCompletion<ConstProp>,
-    ) -> Result<SummaryEffect<ConstPropOwner, ConstPropSummary>, ToyError> {
+    ) -> Result<SummaryEffect<ConstPropOwner, ToyConstPropSummary>, ToyError> {
         Ok(SummaryEffect::Update {
             owner,
-            candidate: ConstPropSummary::Function {
-                value: expect_function_return(completion)?,
-            },
+            candidate: ToyConstPropSummary::function(expect_function_return(completion)?),
         })
     }
 }
@@ -603,19 +432,16 @@ pub fn analyze_source_constprop_invocation(
     pipeline: &Pipeline<Stage>,
     invocation: FunctionInvocation<ConstProp>,
 ) -> Result<ConstProp, ToyError> {
-    let owner = ConstPropOwner::Function(FunctionOwner {
-        stage: invocation.stage(),
-        target: invocation.target(),
-    });
+    let owner = ConstPropOwner::function(invocation.stage(), invocation.target());
     let args = invocation.args().iter().cloned().collect::<Vec<_>>();
     let mut interp: FunctionFixpoint<'_> =
-        StandardFixpointInterpreter::new(pipeline, AbstractEnvStore::new(), ());
+        FunctionFixpoint::new(pipeline, AbstractEnvStore::new(), ());
     let mut semantics = ConstPropSemantics::new(&args);
 
     interp.solve(&mut semantics, owner)?;
     Ok(interp
         .summary(&owner)
-        .and_then(ConstPropSummary::function_value)
+        .and_then(ToyConstPropSummary::function_value)
         .cloned()
         .unwrap_or(ConstProp::Bottom))
 }
@@ -718,12 +544,12 @@ where
     interp.solve(&mut semantics, entry)?;
     let source_value = interp
         .summary(&source)
-        .and_then(ConstPropSummary::function_value)
+        .and_then(ToyConstPropSummary::function_value)
         .cloned()
         .unwrap_or(ConstProp::Bottom);
     let target_value = interp
         .summary(&target)
-        .and_then(ConstPropSummary::function_value)
+        .and_then(ToyConstPropSummary::function_value)
         .cloned()
         .unwrap_or(ConstProp::Bottom);
 
@@ -749,12 +575,12 @@ fn resolve_staged_owner(
     pipeline: &Pipeline<Stage>,
     stage: CompileStage,
     function_name: &str,
-) -> Result<FunctionOwner, ToyError> {
+) -> Result<ConstPropFunctionOwner, ToyError> {
     let function = pipeline
         .resolve_staged_function(function_name, stage)
         .ok_or(InterpreterError::Custom("missing staged function"))
         .map_err(ToyError::lift_from)?;
-    Ok(FunctionOwner {
+    Ok(ConstPropFunctionOwner {
         stage,
         target: FunctionEntryTarget::StagedFunction(function),
     })
@@ -784,19 +610,16 @@ pub fn analyze_lowered_constprop_invocation(
     pipeline: &Pipeline<Stage>,
     invocation: FunctionInvocation<ConstProp>,
 ) -> Result<ConstProp, ToyError> {
-    let owner = ConstPropOwner::Function(FunctionOwner {
-        stage: invocation.stage(),
-        target: invocation.target(),
-    });
+    let owner = ConstPropOwner::function(invocation.stage(), invocation.target());
     let args = invocation.args().iter().cloned().collect::<Vec<_>>();
     let mut interp: FunctionFixpoint<'_> =
-        StandardFixpointInterpreter::new(pipeline, AbstractEnvStore::new(), ());
+        FunctionFixpoint::new(pipeline, AbstractEnvStore::new(), ());
     let mut semantics = ConstPropSemantics::new(&args);
 
     interp.solve(&mut semantics, owner)?;
     Ok(interp
         .summary(&owner)
-        .and_then(ConstPropSummary::function_value)
+        .and_then(ToyConstPropSummary::function_value)
         .cloned()
         .unwrap_or(ConstProp::Bottom))
 }

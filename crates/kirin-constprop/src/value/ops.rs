@@ -4,61 +4,81 @@ use kirin_arith::{CheckedDiv, CheckedRem};
 use kirin_bitwise::{CheckedShl, CheckedShr};
 use kirin_cmp::CompareValue;
 
-use super::ConstProp;
+use super::ConstPropValue;
 
-impl CompareValue for ConstProp {
-    type Bool = ConstProp;
+impl<S, F> ConstPropValue<i64, S, F> {
+    fn binary_const(self, rhs: Self, op: impl FnOnce(i64, i64) -> i64) -> Self {
+        match (self, rhs) {
+            (Self::Const(lhs), Self::Const(rhs)) => Self::Const(op(lhs, rhs)),
+            (Self::Bottom, _) | (_, Self::Bottom) => Self::Bottom,
+            _ => Self::Top,
+        }
+    }
+
+    fn compare_const(&self, rhs: &Self, compare: impl FnOnce(i64, i64) -> bool) -> Self {
+        match (self, rhs) {
+            (Self::Const(lhs), Self::Const(rhs)) => {
+                Self::Const(if compare(*lhs, *rhs) { 1 } else { 0 })
+            }
+            (Self::Bottom, _) | (_, Self::Bottom) => Self::Bottom,
+            _ => Self::Top,
+        }
+    }
+}
+
+impl<S, F> CompareValue for ConstPropValue<i64, S, F> {
+    type Bool = Self;
 
     fn cmp_eq(&self, other: &Self) -> Self::Bool {
-        compare_const(self, other, |lhs, rhs| lhs == rhs)
+        self.compare_const(other, |lhs, rhs| lhs == rhs)
     }
 
     fn cmp_ne(&self, other: &Self) -> Self::Bool {
-        compare_const(self, other, |lhs, rhs| lhs != rhs)
+        self.compare_const(other, |lhs, rhs| lhs != rhs)
     }
 
     fn cmp_lt(&self, other: &Self) -> Self::Bool {
-        compare_const(self, other, |lhs, rhs| lhs < rhs)
+        self.compare_const(other, |lhs, rhs| lhs < rhs)
     }
 
     fn cmp_le(&self, other: &Self) -> Self::Bool {
-        compare_const(self, other, |lhs, rhs| lhs <= rhs)
+        self.compare_const(other, |lhs, rhs| lhs <= rhs)
     }
 
     fn cmp_gt(&self, other: &Self) -> Self::Bool {
-        compare_const(self, other, |lhs, rhs| lhs > rhs)
+        self.compare_const(other, |lhs, rhs| lhs > rhs)
     }
 
     fn cmp_ge(&self, other: &Self) -> Self::Bool {
-        compare_const(self, other, |lhs, rhs| lhs >= rhs)
+        self.compare_const(other, |lhs, rhs| lhs >= rhs)
     }
 }
 
-impl Add for ConstProp {
+impl<S, F> Add for ConstPropValue<i64, S, F> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        binary_const(self, rhs, i64::wrapping_add)
+        self.binary_const(rhs, i64::wrapping_add)
     }
 }
 
-impl Sub for ConstProp {
+impl<S, F> Sub for ConstPropValue<i64, S, F> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        binary_const(self, rhs, i64::wrapping_sub)
+        self.binary_const(rhs, i64::wrapping_sub)
     }
 }
 
-impl Mul for ConstProp {
+impl<S, F> Mul for ConstPropValue<i64, S, F> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        binary_const(self, rhs, i64::wrapping_mul)
+        self.binary_const(rhs, i64::wrapping_mul)
     }
 }
 
-impl Neg for ConstProp {
+impl<S, F> Neg for ConstPropValue<i64, S, F> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
@@ -69,7 +89,7 @@ impl Neg for ConstProp {
     }
 }
 
-impl Not for ConstProp {
+impl<S, F> Not for ConstPropValue<i64, S, F> {
     type Output = Self;
 
     fn not(self) -> Self::Output {
@@ -80,31 +100,31 @@ impl Not for ConstProp {
     }
 }
 
-impl BitAnd for ConstProp {
+impl<S, F> BitAnd for ConstPropValue<i64, S, F> {
     type Output = Self;
 
     fn bitand(self, rhs: Self) -> Self::Output {
-        binary_const(self, rhs, |lhs, rhs| lhs & rhs)
+        self.binary_const(rhs, |lhs, rhs| lhs & rhs)
     }
 }
 
-impl BitOr for ConstProp {
+impl<S, F> BitOr for ConstPropValue<i64, S, F> {
     type Output = Self;
 
     fn bitor(self, rhs: Self) -> Self::Output {
-        binary_const(self, rhs, |lhs, rhs| lhs | rhs)
+        self.binary_const(rhs, |lhs, rhs| lhs | rhs)
     }
 }
 
-impl BitXor for ConstProp {
+impl<S, F> BitXor for ConstPropValue<i64, S, F> {
     type Output = Self;
 
     fn bitxor(self, rhs: Self) -> Self::Output {
-        binary_const(self, rhs, |lhs, rhs| lhs ^ rhs)
+        self.binary_const(rhs, |lhs, rhs| lhs ^ rhs)
     }
 }
 
-impl CheckedDiv for ConstProp {
+impl<S, F> CheckedDiv for ConstPropValue<i64, S, F> {
     fn checked_div(self, rhs: Self) -> Option<Self> {
         match (self, rhs) {
             (Self::Const(lhs), Self::Const(rhs)) => lhs.checked_div(rhs).map(Self::Const),
@@ -114,7 +134,7 @@ impl CheckedDiv for ConstProp {
     }
 }
 
-impl CheckedRem for ConstProp {
+impl<S, F> CheckedRem for ConstPropValue<i64, S, F> {
     fn checked_rem(self, rhs: Self) -> Option<Self> {
         match (self, rhs) {
             (Self::Const(lhs), Self::Const(rhs)) => lhs.checked_rem(rhs).map(Self::Const),
@@ -124,7 +144,7 @@ impl CheckedRem for ConstProp {
     }
 }
 
-impl CheckedShl for ConstProp {
+impl<S, F> CheckedShl for ConstPropValue<i64, S, F> {
     fn checked_shl(self, rhs: Self) -> Option<Self> {
         match (self, rhs) {
             (Self::Const(lhs), Self::Const(rhs)) if (0..64).contains(&rhs) => {
@@ -136,7 +156,7 @@ impl CheckedShl for ConstProp {
     }
 }
 
-impl CheckedShr for ConstProp {
+impl<S, F> CheckedShr for ConstPropValue<i64, S, F> {
     fn checked_shr(self, rhs: Self) -> Option<Self> {
         match (self, rhs) {
             (Self::Const(lhs), Self::Const(rhs)) if (0..64).contains(&rhs) => {
@@ -145,27 +165,5 @@ impl CheckedShr for ConstProp {
             (Self::Bottom, _) | (_, Self::Bottom) => Some(Self::Bottom),
             _ => Some(Self::Top),
         }
-    }
-}
-
-fn compare_const(
-    lhs: &ConstProp,
-    rhs: &ConstProp,
-    compare: impl FnOnce(i64, i64) -> bool,
-) -> ConstProp {
-    match (lhs, rhs) {
-        (ConstProp::Const(lhs), ConstProp::Const(rhs)) => {
-            ConstProp::Const(if compare(*lhs, *rhs) { 1 } else { 0 })
-        }
-        (ConstProp::Bottom, _) | (_, ConstProp::Bottom) => ConstProp::Bottom,
-        _ => ConstProp::Top,
-    }
-}
-
-fn binary_const(lhs: ConstProp, rhs: ConstProp, op: impl FnOnce(i64, i64) -> i64) -> ConstProp {
-    match (lhs, rhs) {
-        (ConstProp::Const(lhs), ConstProp::Const(rhs)) => ConstProp::Const(op(lhs, rhs)),
-        (ConstProp::Bottom, _) | (_, ConstProp::Bottom) => ConstProp::Bottom,
-        _ => ConstProp::Top,
     }
 }
