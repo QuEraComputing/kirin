@@ -10,7 +10,7 @@ use kirin_function::interpreter_new::{CallTargetResolution, ResolvedCallTarget};
 use kirin_interpreter_new::{
     AbstractBlockTransfer, AbstractEnvStore, BlockFrame, EnvIndex, FunctionEntryTarget,
     FunctionInvocation, FunctionInvocationDispatch, FunctionInvocationFrame, InterpreterError,
-    Location, StageAccess, StageBlockDispatch, StandardFrame,
+    Location, StageAccess, StageBlockDispatch,
 };
 #[cfg(test)]
 use kirin_interpreter_new::{BackwardSummaryDeps, ForwardSummaryDeps};
@@ -80,21 +80,10 @@ impl<'ir> StageBlockDispatch<ToyStageFrameType, ToyError, ConstProp> for Functio
     ) -> Result<ToyStageFrameType, ToyError> {
         match self.pipeline().stage(stage) {
             Some(Stage::Source(_)) => {
-                let standard: StandardFrame<
-                    HighLevel,
-                    ConstProp,
-                    AbstractBlockTransfer<ConstProp>,
-                > = BlockFrame::new(stage, block, env, args).into();
-                let toy: ToyFrame<HighLevel, ConstProp, AbstractBlockTransfer<ConstProp>> =
-                    standard.into();
-                Ok(toy.into())
+                Ok(BlockFrame::<HighLevel, _, _>::new(stage, block, env, args).into())
             }
             Some(Stage::Lowered(_)) => {
-                let standard: StandardFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>> =
-                    BlockFrame::new(stage, block, env, args).into();
-                let toy: ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>> =
-                    standard.into();
-                Ok(toy.into())
+                Ok(BlockFrame::<LowLevel, _, _>::new(stage, block, env, args).into())
             }
             None => Err(ToyError::from(InterpreterError::MissingStage(stage))),
         }

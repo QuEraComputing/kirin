@@ -3,9 +3,9 @@ use core::convert::Infallible;
 use kirin::prelude::Dialect;
 use kirin_arith::ArithType;
 use kirin_interpreter_new::{
-    CallFrame, ConcreteBlockTransfer, Frame, FunctionFrame, FunctionInvocation,
-    FunctionInvocationFrame, HasLocation, SpecializedFunctionFrame, StagedFunctionFrame,
-    StandardFrame,
+    AbstractBranchFrame, BlockFrame, CallFrame, ConcreteBlockTransfer, Frame, FunctionFrame,
+    FunctionInvocation, FunctionInvocationFrame, HasLocation, RegionFrame,
+    SpecializedFunctionFrame, StagedFunctionFrame, StandardFrame, StatementFrame, forward_through,
 };
 use kirin_scf::interpreter_new::ScfFrame;
 
@@ -28,27 +28,17 @@ impl<L: Dialect, V, T> FunctionInvocationFrame<V> for ToyFrame<L, V, T> {
     }
 }
 
-impl<L: Dialect, V, T> From<CallFrame<L, V>> for ToyFrame<L, V, T> {
-    fn from(frame: CallFrame<L, V>) -> Self {
-        Self::Standard(StandardFrame::Call(frame))
-    }
-}
-
-impl<L: Dialect, V, T> From<FunctionFrame<L, V>> for ToyFrame<L, V, T> {
-    fn from(frame: FunctionFrame<L, V>) -> Self {
-        Self::Standard(StandardFrame::Function(frame))
-    }
-}
-
-impl<L: Dialect, V, T> From<StagedFunctionFrame<L, V>> for ToyFrame<L, V, T> {
-    fn from(frame: StagedFunctionFrame<L, V>) -> Self {
-        Self::Standard(StandardFrame::StagedFunction(frame))
-    }
-}
-
-impl<L: Dialect, V, T> From<SpecializedFunctionFrame<L, V>> for ToyFrame<L, V, T> {
-    fn from(frame: SpecializedFunctionFrame<L, V>) -> Self {
-        Self::Standard(StandardFrame::SpecializedFunction(frame))
+forward_through! {
+    impl[L: Dialect, V, T] for [ToyFrame<L, V, T>] via [StandardFrame<L, V, T>]
+    from {
+        StatementFrame,
+        AbstractBranchFrame<L, V>,
+        BlockFrame<L, V, T>,
+        RegionFrame<L, V, T>,
+        CallFrame<L, V>,
+        FunctionFrame<L, V>,
+        StagedFunctionFrame<L, V>,
+        SpecializedFunctionFrame<L, V>,
     }
 }
 
@@ -58,25 +48,36 @@ pub enum ToyStageFrame<V, T = ConcreteBlockTransfer<V>> {
     Lowered(ToyFrame<LowLevel, V, T>),
 }
 
-macro_rules! impl_stage_lift {
-    ($variant:ident, $frame:ty) => {
-        impl<V, T> From<$frame> for ToyStageFrame<V, T> {
-            fn from(frame: $frame) -> Self {
-                Self::$variant(frame.into())
-            }
-        }
-    };
+// StatementFrame is intentionally omitted from the ToyStageFrame lifts: it has no
+// language tag, so a direct lift would be ambiguous between Source and Lowered.
+// Callers must pick a stage by routing through ToyFrame<HighLevel> or ToyFrame<LowLevel>.
+
+forward_through! {
+    impl[V, T] for [ToyStageFrame<V, T>] via [ToyFrame<HighLevel, V, T>]
+    from {
+        StandardFrame<HighLevel, V, T>,
+        ScfFrame<HighLevel, ArithType, V, T>,
+        AbstractBranchFrame<HighLevel, V>,
+        BlockFrame<HighLevel, V, T>,
+        RegionFrame<HighLevel, V, T>,
+        CallFrame<HighLevel, V>,
+        FunctionFrame<HighLevel, V>,
+        StagedFunctionFrame<HighLevel, V>,
+        SpecializedFunctionFrame<HighLevel, V>,
+    }
 }
 
-impl_stage_lift!(Source, StandardFrame<HighLevel, V, T>);
-impl_stage_lift!(Lowered, StandardFrame<LowLevel, V, T>);
-impl_stage_lift!(Source, CallFrame<HighLevel, V>);
-impl_stage_lift!(Lowered, CallFrame<LowLevel, V>);
-impl_stage_lift!(Source, FunctionFrame<HighLevel, V>);
-impl_stage_lift!(Lowered, FunctionFrame<LowLevel, V>);
-impl_stage_lift!(Source, StagedFunctionFrame<HighLevel, V>);
-impl_stage_lift!(Lowered, StagedFunctionFrame<LowLevel, V>);
-impl_stage_lift!(Source, SpecializedFunctionFrame<HighLevel, V>);
-impl_stage_lift!(Lowered, SpecializedFunctionFrame<LowLevel, V>);
-impl_stage_lift!(Source, ScfFrame<HighLevel, ArithType, V, T>);
-impl_stage_lift!(Lowered, ScfFrame<LowLevel, ArithType, V, T>);
+forward_through! {
+    impl[V, T] for [ToyStageFrame<V, T>] via [ToyFrame<LowLevel, V, T>]
+    from {
+        StandardFrame<LowLevel, V, T>,
+        ScfFrame<LowLevel, ArithType, V, T>,
+        AbstractBranchFrame<LowLevel, V>,
+        BlockFrame<LowLevel, V, T>,
+        RegionFrame<LowLevel, V, T>,
+        CallFrame<LowLevel, V>,
+        FunctionFrame<LowLevel, V>,
+        StagedFunctionFrame<LowLevel, V>,
+        SpecializedFunctionFrame<LowLevel, V>,
+    }
+}

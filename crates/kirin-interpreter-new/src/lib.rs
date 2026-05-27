@@ -6,6 +6,8 @@ pub mod env;
 pub mod error;
 pub mod frame;
 pub mod location;
+#[macro_use]
+mod macros;
 pub mod standard;
 pub mod value;
 
