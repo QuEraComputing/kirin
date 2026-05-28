@@ -1,366 +1,319 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{
-    Block, CompileStage, Dialect, HasStageInfo, Pipeline, SSAValue, SpecializedFunction, StageInfo,
-    StageMeta,
-};
-use rustc_hash::FxHashMap;
+use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo};
 
-use super::{FixpointState, SummaryCache};
-use crate::result::AnalysisResult;
-use crate::widening::WideningStrategy;
 use crate::{
-    AbstractValue, BlockEvaluator, Continuation, FrameStack, Interpretable, InterpreterError,
-    StageAccess, ValueStore,
+    Env, EnvIndex, ForkEnv, Frame, FrameEffect, FunctionInvocation, FunctionInvokeBuilder,
+    InterpreterError, InterpreterProfile, StageFrame, StepResult,
 };
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub(crate) struct SummaryKey {
-    pub(crate) stage: CompileStage,
-    pub(crate) callee: SpecializedFunction,
+use super::AbstractEnvStore;
+
+pub type AbstractInterpreter<'ir, P> =
+    AbstractInterpreterWithStore<'ir, P, AbstractEnvStore<<P as InterpreterProfile>::Value>>;
+
+pub struct AbstractInterpreterWithStore<'ir, P: InterpreterProfile, Store> {
+    pipeline: &'ir Pipeline<P::Stage>,
+    frames: Vec<P::Frame>,
+    store: Store,
+    _marker: PhantomData<P>,
 }
 
-/// Worklist-based abstract interpreter for fixpoint computation.
-///
-/// Unlike [`crate::StackInterpreter`] which follows a single concrete execution
-/// path, `AbstractInterpreter` explores all reachable paths by joining abstract
-/// states at block entry points and iterating until a fixpoint is reached.
-///
-/// Widening is applied at join points to guarantee termination for infinite
-/// abstract domains.
-pub struct AbstractInterpreter<'ir, V, S, E = InterpreterError, G = ()>
-where
-    S: StageMeta,
-{
-    pub(crate) pipeline: &'ir Pipeline<S>,
-    pub(crate) root_stage: CompileStage,
-    pub(crate) global: G,
-    pub(crate) frames: FrameStack<V, FixpointState>,
-    pub(crate) widening_strategy: WideningStrategy,
-    pub(crate) max_iterations: usize,
-    pub(crate) narrowing_iterations: usize,
-    pub(crate) summaries: FxHashMap<SummaryKey, SummaryCache<V>>,
-    pub(crate) max_summary_iterations: usize,
-    /// Type-erased call handler installed by [`analyze`](Self::analyze) so that
-    /// [`interpret_block`] can dispatch nested calls through [`CallSemantics`]
-    /// without requiring `L: CallSemantics` in its own bounds.
-    #[allow(clippy::type_complexity)]
-    pub(crate) call_handler: Option<
-        fn(
-            &mut AbstractInterpreter<'ir, V, S, E, G>,
-            SpecializedFunction,
-            CompileStage,
-            &[V],
-        ) -> Result<AnalysisResult<V>, E>,
-    >,
-    pub(crate) _error: PhantomData<E>,
-}
-
-/// Builder for inserting function summaries into an [`AbstractInterpreter`].
-///
-/// Obtained via [`Staged::insert_summary`](crate::Staged::insert_summary).
-pub struct SummaryInserter<'a, 'ir, V, S, E, G>
-where
-    S: StageMeta,
-{
-    interp: &'a mut AbstractInterpreter<'ir, V, S, E, G>,
-    key: SummaryKey,
-}
-
-impl<V: Clone, S: StageMeta, E, G> SummaryInserter<'_, '_, V, S, E, G> {
-    /// Insert an immutable summary. Analysis will never re-analyze this function.
-    pub fn fixed(self, result: AnalysisResult<V>) {
-        self.interp
-            .summaries
-            .entry(self.key)
-            .or_default()
-            .set_fixed(result);
-    }
-
-    /// Insert a refinable seed. Analysis may improve upon this summary.
-    pub fn seed(self, args: Vec<V>, result: AnalysisResult<V>) {
-        self.interp
-            .summaries
-            .entry(self.key)
-            .or_default()
-            .push_entry(args, result);
-    }
-}
-
-// -- Constructors -----------------------------------------------------------
-
-impl<'ir, V, S, E> AbstractInterpreter<'ir, V, S, E, ()>
-where
-    S: StageMeta,
-{
-    /// Create an abstract interpreter with unit global state.
-    ///
-    /// The interpreter is rooted at `stage` when no frame is active.
-    pub fn new(pipeline: &'ir Pipeline<S>, stage: CompileStage) -> Self {
-        Self::new_with_global(pipeline, stage, ())
-    }
-}
-
-impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
-where
-    S: StageMeta,
-{
-    /// Create an abstract interpreter with explicit global state.
-    ///
-    /// The interpreter is rooted at `stage` when no frame is active.
-    pub fn new_with_global(pipeline: &'ir Pipeline<S>, stage: CompileStage, global: G) -> Self {
+impl<'ir, P: InterpreterProfile, Store> AbstractInterpreterWithStore<'ir, P, Store> {
+    pub fn with_store(pipeline: &'ir Pipeline<P::Stage>, store: Store) -> Self {
         Self {
             pipeline,
-            root_stage: stage,
-            global,
-            widening_strategy: WideningStrategy::AllJoins,
-            max_iterations: 1000,
-            narrowing_iterations: 3,
-            frames: FrameStack::new(),
-            summaries: FxHashMap::default(),
-            max_summary_iterations: 100,
-            call_handler: None,
-            _error: PhantomData,
-        }
-    }
-}
-
-// -- Builder methods --------------------------------------------------------
-
-impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
-where
-    S: StageMeta,
-{
-    /// Configure widening behavior used at fixpoint join points.
-    pub fn with_widening(mut self, strategy: WideningStrategy) -> Self {
-        self.widening_strategy = strategy;
-        self
-    }
-
-    /// Configure the maximum worklist iterations in one `run_forward` pass.
-    pub fn with_max_iterations(mut self, max: usize) -> Self {
-        self.max_iterations = max;
-        self
-    }
-
-    /// Configure post-fixpoint narrowing iterations.
-    pub fn with_narrowing_iterations(mut self, n: usize) -> Self {
-        self.narrowing_iterations = n;
-        self
-    }
-
-    /// Configure maximum frame depth for recursive analysis.
-    pub fn with_max_depth(mut self, depth: usize) -> Self {
-        self.frames = self.frames.with_max_depth(depth);
-        self
-    }
-
-    /// Configure maximum outer summary refinement iterations per function.
-    pub fn with_max_summary_iterations(mut self, n: usize) -> Self {
-        self.max_summary_iterations = n;
-        self
-    }
-}
-
-// -- Accessors --------------------------------------------------------------
-
-impl<'ir, V, S, E, G> AbstractInterpreter<'ir, V, S, E, G>
-where
-    S: StageMeta,
-{
-    /// Borrow immutable interpreter-global state.
-    pub fn global(&self) -> &G {
-        &self.global
-    }
-
-    /// Borrow mutable interpreter-global state.
-    pub fn global_mut(&mut self) -> &mut G {
-        &mut self.global
-    }
-
-    pub(crate) fn summary_key(stage: CompileStage, callee: SpecializedFunction) -> SummaryKey {
-        SummaryKey { stage, callee }
-    }
-
-    pub(super) fn cache_mut(
-        &mut self,
-        stage: CompileStage,
-        callee: SpecializedFunction,
-    ) -> &mut SummaryCache<V> {
-        self.summaries
-            .entry(Self::summary_key(stage, callee))
-            .or_default()
-    }
-
-    /// Look up the best cached summary for `(stage, callee)` given `args`.
-    pub(crate) fn summary_in_stage(
-        &self,
-        stage: CompileStage,
-        callee: SpecializedFunction,
-        args: &[V],
-    ) -> Option<&AnalysisResult<V>>
-    where
-        V: AbstractValue + Clone,
-    {
-        self.summaries
-            .get(&Self::summary_key(stage, callee))?
-            .lookup(args)
-    }
-
-    /// Look up the full summary cache for `(stage, callee)`.
-    pub(crate) fn summary_cache_in_stage(
-        &self,
-        stage: CompileStage,
-        callee: SpecializedFunction,
-    ) -> Option<&SummaryCache<V>> {
-        self.summaries.get(&Self::summary_key(stage, callee))
-    }
-
-    /// Return a builder for inserting a function summary in `stage`.
-    pub(crate) fn insert_summary_in_stage(
-        &mut self,
-        stage: CompileStage,
-        callee: SpecializedFunction,
-    ) -> SummaryInserter<'_, 'ir, V, S, E, G> {
-        SummaryInserter {
-            interp: self,
-            key: Self::summary_key(stage, callee),
+            frames: Vec::new(),
+            store,
+            _marker: PhantomData,
         }
     }
 
-    /// Mark all computed entries for `(stage, callee)` as invalidated.
-    pub(crate) fn invalidate_summary_in_stage(
-        &mut self,
-        stage: CompileStage,
-        callee: SpecializedFunction,
-    ) -> usize {
-        let Some(cache) = self.summaries.get_mut(&Self::summary_key(stage, callee)) else {
-            return 0;
-        };
-        cache.invalidate()
-    }
-
-    /// Remove invalidated entries across all functions, freeing memory.
-    pub fn gc_summaries(&mut self) {
-        for cache in self.summaries.values_mut() {
-            cache.gc();
-        }
-        self.summaries.retain(|_, cache| !cache.is_empty());
-    }
-
-    /// Unconditionally remove all summaries (including user-fixed) for
-    /// `(stage, callee)`.
-    pub(crate) fn remove_summary_in_stage(
-        &mut self,
-        stage: CompileStage,
-        callee: SpecializedFunction,
-    ) -> bool {
-        self.summaries
-            .remove(&Self::summary_key(stage, callee))
-            .is_some()
-    }
-}
-
-// -- Interpreter trait impl -------------------------------------------------
-
-impl<'ir, V, S, E, G> ValueStore for AbstractInterpreter<'ir, V, S, E, G>
-where
-    V: AbstractValue + Clone + 'ir,
-    E: From<InterpreterError> + 'ir,
-    S: StageMeta + 'ir,
-    G: 'ir,
-{
-    type Value = V;
-    type Error = E;
-
-    fn read(&self, value: SSAValue) -> Result<V, E> {
-        self.frames.read(value).cloned()
-    }
-
-    fn write(&mut self, target: impl Into<SSAValue>, value: V) -> Result<(), E> {
-        self.frames.write_ssa(target.into(), value)
-    }
-}
-
-impl<'ir, V, S, E, G> StageAccess<'ir> for AbstractInterpreter<'ir, V, S, E, G>
-where
-    V: AbstractValue + Clone + 'ir,
-    E: From<InterpreterError> + 'ir,
-    S: StageMeta + 'ir,
-    G: 'ir,
-{
-    type StageInfo = S;
-
-    fn pipeline(&self) -> &'ir Pipeline<S> {
+    pub fn pipeline(&self) -> &'ir Pipeline<P::Stage> {
         self.pipeline
     }
 
-    fn active_stage(&self) -> CompileStage {
-        self.frames.active_stage_or(self.root_stage)
+    pub fn push_frame(&mut self, frame: P::Frame) {
+        self.frames.push(frame);
+    }
+
+    pub fn frame_depth(&self) -> usize {
+        self.frames.len()
+    }
+
+    pub fn store(&self) -> &Store {
+        &self.store
+    }
+
+    pub fn store_mut(&mut self) -> &mut Store {
+        &mut self.store
+    }
+
+    pub fn invoke(&mut self, stage: CompileStage) -> FunctionInvokeBuilder<'_, Self> {
+        FunctionInvokeBuilder::new(self, stage)
+    }
+
+    pub fn run(&mut self) -> Result<P::Completion, P::Error>
+    where
+        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
+        P::Error: From<InterpreterError>,
+    {
+        loop {
+            match self.step()? {
+                StepResult::Running => {}
+                StepResult::Complete(completion) => return Ok(completion),
+            }
+        }
+    }
+
+    pub fn run_function_invocation(
+        &mut self,
+        invocation: FunctionInvocation<P::Value>,
+    ) -> Result<P::Completion, P::Error>
+    where
+        Store: Env<P::Value>,
+        P::Frame: StageFrame<P::Stage, P::Value> + Frame<Self, P::Frame, P::Completion, P::Error>,
+        P::Error:
+            From<InterpreterError> + From<<P::Frame as StageFrame<P::Stage, P::Value>>::Error>,
+    {
+        let stage = invocation.stage();
+        let stage_info = self
+            .pipeline
+            .stage(stage)
+            .ok_or(InterpreterError::MissingStage(stage))?;
+        let frame =
+            P::Frame::from_function_invocation(stage_info, invocation).map_err(P::Error::from)?;
+        self.push_frame(frame);
+        self.run()
+    }
+
+    /// Resolve a function by name in the given stage and run it with the
+    /// given arguments. Returns the raw completion produced by the function.
+    pub fn run_function_by_name<A>(
+        &mut self,
+        stage_name: &str,
+        function_name: &str,
+        args: A,
+    ) -> Result<P::Completion, P::Error>
+    where
+        P::Stage: kirin_ir::StageMeta,
+        Store: Env<P::Value>,
+        Self: crate::FrameDispatch<P::Frame, P::Value, P::Error>,
+        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
+        P::Error: From<InterpreterError>,
+        A: IntoIterator<Item = P::Value>,
+    {
+        let stage = self
+            .pipeline
+            .stage_by_name(stage_name)
+            .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))
+            .map_err(P::Error::from)?;
+        let function = self
+            .pipeline
+            .lookup_function_by_name(function_name)
+            .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))
+            .map_err(P::Error::from)?;
+        self.invoke(stage).function(function).args(args)
+    }
+
+    pub fn run_frame(&mut self, root: P::Frame) -> Result<P::Completion, P::Error>
+    where
+        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
+        P::Error: From<InterpreterError>,
+    {
+        let mut stack = vec![root];
+
+        loop {
+            let frame = match stack.pop() {
+                Some(frame) => frame,
+                None => return Err(P::Error::from(InterpreterError::EmptyFrameStack)),
+            };
+            let effect = frame.step(self)?;
+            if let Some(completion) = self.apply_local_effect(&mut stack, effect)? {
+                return Ok(completion);
+            }
+        }
+    }
+
+    pub fn step(&mut self) -> Result<StepResult<P::Completion>, P::Error>
+    where
+        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
+        P::Error: From<InterpreterError>,
+    {
+        let frame = match self.frames.pop() {
+            Some(frame) => frame,
+            None => return Err(P::Error::from(InterpreterError::EmptyFrameStack)),
+        };
+        let effect = frame.step(self)?;
+        self.apply_effect(effect)
+    }
+
+    fn apply_effect(
+        &mut self,
+        mut effect: FrameEffect<P::Frame, P::Completion>,
+    ) -> Result<StepResult<P::Completion>, P::Error>
+    where
+        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
+        P::Error: From<InterpreterError>,
+    {
+        loop {
+            match effect {
+                FrameEffect::Continue(frame) => {
+                    self.frames.push(frame);
+                    return Ok(StepResult::Running);
+                }
+                FrameEffect::Push { parent, child } => {
+                    self.frames.push(parent);
+                    self.frames.push(child);
+                    return Ok(StepResult::Running);
+                }
+                FrameEffect::Done => {
+                    let parent = match self.frames.pop() {
+                        Some(parent) => parent,
+                        None => return Err(P::Error::from(InterpreterError::EmptyFrameStack)),
+                    };
+                    effect = parent.resume_done(self)?;
+                }
+                FrameEffect::Complete(completion) => {
+                    if let Some(parent) = self.frames.pop() {
+                        effect = parent.resume(completion, self)?;
+                    } else {
+                        return Ok(StepResult::Complete(completion));
+                    }
+                }
+            }
+        }
+    }
+
+    fn apply_local_effect(
+        &mut self,
+        stack: &mut Vec<P::Frame>,
+        mut effect: FrameEffect<P::Frame, P::Completion>,
+    ) -> Result<Option<P::Completion>, P::Error>
+    where
+        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
+        P::Error: From<InterpreterError>,
+    {
+        loop {
+            match effect {
+                FrameEffect::Continue(frame) => {
+                    stack.push(frame);
+                    return Ok(None);
+                }
+                FrameEffect::Push { parent, child } => {
+                    stack.push(parent);
+                    stack.push(child);
+                    return Ok(None);
+                }
+                FrameEffect::Done => {
+                    let parent = match stack.pop() {
+                        Some(parent) => parent,
+                        None => return Err(P::Error::from(InterpreterError::EmptyFrameStack)),
+                    };
+                    effect = parent.resume_done(self)?;
+                }
+                FrameEffect::Complete(completion) => {
+                    if let Some(parent) = stack.pop() {
+                        effect = parent.resume(completion, self)?;
+                    } else {
+                        return Ok(Some(completion));
+                    }
+                }
+            }
+        }
     }
 }
 
-impl<'ir, V, S, E, G> BlockEvaluator<'ir> for AbstractInterpreter<'ir, V, S, E, G>
-where
-    V: AbstractValue + Clone + 'ir,
-    E: From<InterpreterError> + 'ir,
-    S: StageMeta + 'ir,
-    G: 'ir,
-{
-    type Ext = std::convert::Infallible;
+impl<'ir, P: InterpreterProfile> AbstractInterpreter<'ir, P> {
+    pub fn new(pipeline: &'ir Pipeline<P::Stage>) -> Self {
+        Self::with_store(pipeline, AbstractEnvStore::new())
+    }
 
-    #[allow(clippy::multiple_bound_locations)] // L: Dialect on method + where clause
-    fn eval_block<L: Dialect>(
-        &mut self,
-        stage: &'ir StageInfo<L>,
-        block: Block,
-    ) -> Result<Continuation<V, std::convert::Infallible>, E>
+    pub fn push_env(&mut self) -> EnvIndex {
+        self.store.push()
+    }
+
+    pub fn pop_env(&mut self) -> Result<EnvIndex, P::Error>
     where
-        S: HasStageInfo<L>,
-        L: Interpretable<'ir, Self> + 'ir,
+        P::Error: From<InterpreterError>,
     {
-        for stmt in block.statements(stage) {
-            let def: &L = stmt.definition(stage);
-            let control = def.interpret::<L>(self)?;
-            match control {
-                Continuation::Continue => {}
-                Continuation::Call {
-                    callee,
-                    stage: callee_stage,
-                    args,
-                    results,
-                } => {
-                    let handler = self.call_handler.ok_or_else(|| {
-                        InterpreterError::UnexpectedControl(
-                            "call_handler not set: analyze() must be used as entry point".into(),
-                        )
-                    })?;
-                    let analysis = handler(self, callee, callee_stage, &args)?;
-                    match analysis.return_value() {
-                        Some(return_val) => {
-                            // Write the single return value to all result slots.
-                            // For multi-result, the abstract value is a product
-                            // in the lattice — the dialect's AbstractValue handles it.
-                            for rv in &results {
-                                self.write(*rv, return_val.clone())?;
-                            }
-                        }
-                        None => {
-                            for rv in &results {
-                                self.write(*rv, V::bottom())?;
-                            }
-                        }
-                    }
-                }
-                other => return Ok(other),
-            }
-        }
-        if let Some(term) = block.terminator(stage) {
-            let def: &L = term.definition(stage);
-            let control = def.interpret::<L>(self)?;
-            Ok(control)
-        } else {
-            Err(InterpreterError::missing_terminator().into())
-        }
+        self.store.pop().map_err(P::Error::from)
+    }
+
+    pub fn current_env(&self) -> Result<EnvIndex, P::Error>
+    where
+        P::Error: From<InterpreterError>,
+    {
+        self.store.current().map_err(P::Error::from)
+    }
+
+    pub fn clone_env(&mut self, index: EnvIndex) -> Result<EnvIndex, P::Error>
+    where
+        P::Error: From<InterpreterError>,
+        P::Value: Clone,
+    {
+        self.store.clone_store_from(index).map_err(P::Error::from)
+    }
+}
+
+impl<'ir, P, Store> Env<P::Value> for AbstractInterpreterWithStore<'ir, P, Store>
+where
+    P: InterpreterProfile,
+    Store: Env<P::Value>,
+    P::Error: From<Store::Error>,
+{
+    type Error = P::Error;
+
+    fn alloc(&mut self) -> EnvIndex {
+        self.store.alloc()
+    }
+
+    fn free(&mut self, index: EnvIndex) -> Result<(), Self::Error> {
+        self.store.free(index).map_err(P::Error::from)
+    }
+
+    fn read(&self, index: EnvIndex, value: kirin_ir::SSAValue) -> Result<P::Value, Self::Error> {
+        self.store.read(index, value).map_err(P::Error::from)
+    }
+
+    fn write(
+        &mut self,
+        index: EnvIndex,
+        value: kirin_ir::SSAValue,
+        data: P::Value,
+    ) -> Result<(), Self::Error> {
+        self.store.write(index, value, data).map_err(P::Error::from)
+    }
+}
+
+impl<'ir, P, Store> ForkEnv<P::Value> for AbstractInterpreterWithStore<'ir, P, Store>
+where
+    P: InterpreterProfile,
+    Store: ForkEnv<P::Value>,
+    P::Error: From<Store::Error>,
+{
+    fn fork_env(&mut self, index: EnvIndex) -> Result<EnvIndex, Self::Error> {
+        self.store.fork_env(index).map_err(P::Error::from)
+    }
+}
+
+impl<'ir, P, Store, L> crate::StageAccess<L> for AbstractInterpreterWithStore<'ir, P, Store>
+where
+    P: InterpreterProfile,
+    P::Stage: HasStageInfo<L>,
+    L: Dialect,
+    P::Error: From<InterpreterError>,
+{
+    type Error = P::Error;
+
+    fn stage_info(&self, stage: CompileStage) -> Result<&StageInfo<L>, Self::Error> {
+        let stage_info = self
+            .pipeline
+            .stage(stage)
+            .ok_or_else(|| P::Error::from(InterpreterError::MissingStage(stage)))?;
+        stage_info
+            .try_stage_info()
+            .ok_or(InterpreterError::MissingStageInfo(stage))
+            .map_err(P::Error::from)
     }
 }

@@ -13,9 +13,9 @@
 use core::convert::Infallible;
 use std::collections::HashMap;
 
-use kirin_interpreter_new::{
-    Env, FunctionInvocation, FunctionInvocationDispatch, InterpreterError, OwnerSemantics,
-    ProjectOrSelf, StageBlockDispatch, StandardCompletion, SummaryEffect,
+use kirin_interpreter::{
+    Env, FrameDispatch, FunctionInvocation, InterpreterError, OwnerSemantics, ProjectOrSelf,
+    StandardCompletion, SummaryEffect,
 };
 use kirin_ir::{HasBottom, HasTop, Product};
 
@@ -87,7 +87,7 @@ impl<V, Loc> Default for DefaultConstPropSemantics<V, Loc> {
 impl<V, Loc> DefaultConstPropSemantics<V, Loc> {
     /// Build empty semantics. Use [`with_args`](Self::with_args) to register
     /// per-owner entry arguments before calling
-    /// [`StandardFixpointInterpreter::solve`](kirin_interpreter_new::StandardFixpointInterpreter::solve).
+    /// [`StandardFixpointInterpreter::solve`](kirin_interpreter::StandardFixpointInterpreter::solve).
     pub fn empty() -> Self {
         Self {
             args: HashMap::new(),
@@ -123,7 +123,7 @@ impl<V, Loc> DefaultConstPropSemantics<V, Loc> {
 impl<I, F, C, E, V, Loc> OwnerSemantics<I, ConstPropOwner, ConstPropSummary<V, Loc>, F, C, E>
     for DefaultConstPropSemantics<V, Loc>
 where
-    I: FunctionInvocationDispatch<F, E, V> + StageBlockDispatch<F, E, V> + Env<V, Error = E>,
+    I: FrameDispatch<F, V, E> + Env<V, Error = E>,
     C: DefaultConstPropCompletion<V> + ProjectOrSelf<Loc::Completion, Error = Infallible>,
     Loc: AdvanceableLocationSummary<V>,
     V: HasBottom + HasTop + Clone + PartialEq,
@@ -168,7 +168,7 @@ where
                     ))
                 })?;
                 let env = interp.alloc();
-                interp.dispatch_stage_block(location.stage, state.body(), env, state.body_args())
+                interp.dispatch_block(location.stage, state.body(), env, state.body_args())
             }
         }
     }

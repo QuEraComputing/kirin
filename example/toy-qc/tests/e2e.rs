@@ -66,8 +66,13 @@ fn roundtrip(program: &str) {
     assert!(first.status.success(), "first parse failed");
     let first_output = String::from_utf8(first.stdout).unwrap();
 
-    // Write to temp file and re-parse
-    let tmp = std::env::temp_dir().join(format!("toy_qc_roundtrip_{program}"));
+    // Write to a process-unique temp file and re-parse. Including the PID
+    // avoids collisions when multiple nextest worker processes run roundtrip
+    // tests concurrently against the same `program` name.
+    let tmp = std::env::temp_dir().join(format!(
+        "toy_qc_roundtrip_{pid}_{program}",
+        pid = std::process::id()
+    ));
     std::fs::write(&tmp, &first_output).unwrap();
 
     let second = toy_qc()

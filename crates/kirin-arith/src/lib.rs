@@ -43,8 +43,7 @@
 //! defining your own type/value pair and instantiate `Arith<YourType>`.
 
 mod checked_ops;
-mod interpret_impl;
-pub mod interpreter_new;
+pub mod interpreter;
 
 mod types;
 

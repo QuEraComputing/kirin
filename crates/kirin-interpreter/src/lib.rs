@@ -1,61 +1,45 @@
-mod abstract_interp;
-mod block_eval;
-mod call;
-mod control;
+pub mod abstract_interp;
+pub mod concrete;
 pub mod dispatch;
-mod error;
-pub mod ext;
-mod frame;
-mod frame_stack;
-mod interpretable;
-mod interpreter;
-mod product_value;
-mod result;
-mod scheduler;
-mod stack;
-mod stage;
-mod stage_access;
-mod value;
-mod value_store;
-mod widening;
+pub mod effect;
+pub mod env;
+pub mod error;
+pub mod frame;
+pub mod location;
+#[macro_use]
+mod macros;
+pub mod profile;
+pub mod standard;
+pub mod value;
 
 pub use abstract_interp::{
-    AbstractInterpreter, FixpointState, SummaryCache, SummaryEntry, SummaryInserter,
+    AbstractEnv, AbstractEnvStore, AbstractInterpreter, AbstractInterpreterWithStore,
+    AbstractValue, BackwardSummaryDeps, ContextStrategy, EnvSummary, FixpointPhase,
+    ForwardSummaryDeps, NodeContext, OwnerSemantics, OwnerSummaryDeps, SimpleFixpointInterpreter,
+    StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
+    SummaryKey, WidenNarrowStrategy, WorkItem,
 };
-pub use block_eval::BlockEvaluator;
-pub use call::{CallSemantics, SSACFGRegion};
-pub use control::{Args, ConcreteExt, Continuation};
-pub use error::{InterpreterError, MissingEntryError, StageResolutionError};
-pub use ext::InterpreterExt;
-pub use frame::Frame;
-pub use frame_stack::FrameStack;
-pub use interpretable::Interpretable;
-pub use interpreter::Interpreter;
-pub use product_value::ProductValue;
-pub use result::AnalysisResult;
-pub use scheduler::DedupScheduler;
-pub use stack::StackInterpreter;
-pub use stage::Staged;
-pub use stage_access::StageAccess;
-pub use value::{AbstractValue, BranchCondition};
-pub use value_store::ValueStore;
-pub use widening::WideningStrategy;
-
-/// Essentials for dialect authors implementing operational semantics.
-pub mod prelude {
-    pub use crate::{
-        BranchCondition, CallSemantics, Continuation, Interpretable, Interpreter, InterpreterError,
-        InterpreterExt, SSACFGRegion, ValueStore,
-    };
-}
-
-/// Types for abstract interpretation and fixpoint analysis.
-pub mod analysis {
-    pub use crate::{
-        AbstractValue, AnalysisResult, DedupScheduler, FixpointState, SummaryCache, SummaryEntry,
-        WideningStrategy,
-    };
-}
+pub use concrete::{ConcreteInterpreter, StepResult};
+pub use dispatch::{Interpretable, StageAccess, StatementDispatch};
+pub use effect::{
+    AbstractBlockTransfer, BlockTransfer, ConcreteBlockTransfer, FrameEffect, StandardCompletion,
+    StatementEffect, expect_single_function_return,
+};
+pub use env::{Env, EnvIndex, EnvStackStore, ForkEnv};
+pub use error::InterpreterError;
+pub use frame::{Frame, HasLocation, ProjectOrSelf};
+pub use location::{Location, Position, Traversal};
+pub use profile::{FixpointProfile, InterpreterProfile};
+pub use standard::{
+    AbstractBranchFrame, AbstractBranchState, BlockFrame, BlockTransferDispatch, CallFrame, Callee,
+    FrameDispatch, FunctionAccess, FunctionBodyDispatch, FunctionEntry, FunctionEntryTarget,
+    FunctionFrame, FunctionInvocation, FunctionInvokeBuilder, FunctionInvokeTargetBuilder,
+    RegionFrame, SpecializedFunctionFrame, SpecializedFunctionState, StageFrame,
+    StagedFunctionFrame, StandardFrame, StatementFrame,
+};
+pub use value::{BranchCondition, HasProductValue};
 
 #[cfg(feature = "derive")]
-pub use kirin_derive_interpreter::CallSemantics;
+pub use kirin_derive_interpreter::{
+    Completion, Frame, FunctionEntry, HasLocation, Interpretable, LiftError, StageFrame,
+};

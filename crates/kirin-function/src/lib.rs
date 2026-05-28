@@ -15,7 +15,7 @@
 //! in how functions are *introduced* (inline `Lambda` vs top-level `Bind`).
 
 use kirin::prelude::*;
-use kirin_interpreter_new::{FunctionEntry, Interpretable};
+use kirin_interpreter::{FunctionEntry, Interpretable};
 
 pub mod bind;
 pub mod body;
@@ -32,8 +32,7 @@ pub use ret::Return;
 #[deprecated(note = "use Function<T>")]
 pub type FunctionBody<T> = Function<T>;
 
-mod interpret_impl;
-pub mod interpreter_new;
+pub mod interpreter;
 
 #[cfg(test)]
 mod tests;

@@ -1,0 +1,77 @@
+---
+source: crates/kirin-derive-interpreter-new/src/frame.rs
+expression: generate_frame_code(input)
+---
+#[automatically_derived]
+impl<__FrameI, L: Dialect, V, T, __FrameF, __FrameC, __FrameE>
+    ::kirin_interpreter::Frame<__FrameI, __FrameF, __FrameC, __FrameE> for ToyFrame<L, V, T>
+where
+    StandardFrame<L, V, T>: ::kirin_interpreter::Frame<__FrameI, __FrameF, __FrameC, __FrameE>,
+    ScfFrame<L, ArithType, V, T>:
+        ::kirin_interpreter::Frame<__FrameI, __FrameF, __FrameC, __FrameE>,
+{
+    fn step(
+        self,
+        interp: &mut __FrameI,
+    ) -> Result<::kirin_interpreter::FrameEffect<__FrameF, __FrameC>, __FrameE> {
+        match self {
+            Self::Standard(__frame) => __frame.step(interp),
+            Self::Scf(__frame) => __frame.step(interp),
+        }
+    }
+    fn resume_done(
+        self,
+        interp: &mut __FrameI,
+    ) -> Result<::kirin_interpreter::FrameEffect<__FrameF, __FrameC>, __FrameE> {
+        match self {
+            Self::Standard(__frame) => __frame.resume_done(interp),
+            Self::Scf(__frame) => __frame.resume_done(interp),
+        }
+    }
+    fn resume(
+        self,
+        completion: __FrameC,
+        interp: &mut __FrameI,
+    ) -> Result<::kirin_interpreter::FrameEffect<__FrameF, __FrameC>, __FrameE> {
+        match self {
+            Self::Standard(__frame) => __frame.resume(completion, interp),
+            Self::Scf(__frame) => __frame.resume(completion, interp),
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect, V, T> ::core::convert::From<StandardFrame<L, V, T>> for ToyFrame<L, V, T> {
+    fn from(__frame: StandardFrame<L, V, T>) -> Self {
+        Self::Standard(__frame)
+    }
+}
+#[automatically_derived]
+impl<L: Dialect, V, T> ::core::convert::From<ScfFrame<L, ArithType, V, T>> for ToyFrame<L, V, T> {
+    fn from(__frame: ScfFrame<L, ArithType, V, T>) -> Self {
+        Self::Scf(__frame)
+    }
+}
+#[automatically_derived]
+impl<L: Dialect, V, T> ::kirin_interpreter::ProjectOrSelf<StandardFrame<L, V, T>>
+    for ToyFrame<L, V, T>
+{
+    type Error = ::core::convert::Infallible;
+    fn project_or_self(self) -> ::core::result::Result<StandardFrame<L, V, T>, Self> {
+        match self {
+            Self::Standard(__frame) => Ok(__frame),
+            other => Err(other),
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect, V, T> ::kirin_interpreter::ProjectOrSelf<ScfFrame<L, ArithType, V, T>>
+    for ToyFrame<L, V, T>
+{
+    type Error = ::core::convert::Infallible;
+    fn project_or_self(self) -> ::core::result::Result<ScfFrame<L, ArithType, V, T>, Self> {
+        match self {
+            Self::Scf(__frame) => Ok(__frame),
+            other => Err(other),
+        }
+    }
+}

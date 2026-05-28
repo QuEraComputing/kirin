@@ -1,5 +1,4 @@
-mod interpret_impl;
-pub mod interpreter_new;
+pub mod interpreter;
 
 use kirin::prelude::*;
 

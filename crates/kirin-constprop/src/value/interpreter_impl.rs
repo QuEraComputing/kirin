@@ -1,5 +1,5 @@
 use kirin_arith::ArithValue;
-use kirin_interpreter_new::{BranchCondition, HasProductValue};
+use kirin_interpreter::{BranchCondition, HasProductValue};
 use kirin_ir::Product;
 
 use super::ConstPropValue;

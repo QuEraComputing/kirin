@@ -47,8 +47,7 @@ pub enum ControlFlow<T: CompileTimeValue> {
     __Phantom(std::marker::PhantomData<T>),
 }
 
-mod interpret_impl;
-pub mod interpreter_new;
+pub mod interpreter;
 
 #[cfg(test)]
 mod tests;

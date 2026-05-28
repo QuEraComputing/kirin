@@ -2,9 +2,6 @@ pub mod lattice;
 mod rustfmt;
 mod ssa;
 
-#[cfg(feature = "interpreter")]
-pub mod ir_fixtures;
-
 #[cfg(feature = "parser")]
 pub mod parser;
 
@@ -14,18 +11,6 @@ pub mod roundtrip;
 pub use kirin_test_types::UnitType;
 pub use rustfmt::{rustfmt, rustfmt_display};
 pub use ssa::new_test_ssa;
-
-/// Dump a specialized function's IR using the builtin pretty printer.
-#[cfg(feature = "interpreter")]
-pub fn dump_function(
-    spec_fn: kirin_ir::SpecializedFunction,
-    pipeline: &kirin_ir::Pipeline<kirin_ir::StageInfo<kirin_test_languages::CompositeLanguage>>,
-    stage_id: kirin_ir::CompileStage,
-) -> String {
-    use kirin_prettyless::PrettyPrintExt;
-    let stage = pipeline.stage(stage_id).unwrap();
-    spec_fn.sprint(stage)
-}
 
 #[cfg(feature = "parser")]
 #[macro_export]

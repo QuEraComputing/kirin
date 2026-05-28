@@ -1,7 +1,7 @@
 use kirin_arith::{CheckedDiv, CheckedRem};
 use kirin_bitwise::{CheckedShl, CheckedShr};
 use kirin_cmp::CompareValue;
-use kirin_interpreter_new::{BranchCondition, HasProductValue};
+use kirin_interpreter::{BranchCondition, HasProductValue};
 use kirin_ir::{Lattice, Product};
 use kirin_test_utils::lattice::assert_finite_lattice_laws;
 

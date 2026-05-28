@@ -1,8 +1,10 @@
 extern crate proc_macro;
 
-mod eval_call;
+mod frame;
+mod function_entry;
 mod interpretable;
-mod ssa_cfg_region;
+mod layout;
+mod stage_frame;
 
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
@@ -16,20 +18,56 @@ pub fn derive_interpretable(input: TokenStream) -> TokenStream {
     }
 }
 
-#[proc_macro_derive(CallSemantics, attributes(wraps, callable, kirin))]
-pub fn derive_call_semantics(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(FunctionEntry, attributes(wraps, callable, kirin, interpret))]
+pub fn derive_function_entry(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    match eval_call::do_derive_eval_call(&ast) {
+    match function_entry::do_derive_function_entry(&ast) {
         Ok(tokens) => tokens.into(),
         Err(e) => e.write_errors().into(),
     }
 }
 
-#[proc_macro_derive(SSACFGRegion, attributes(wraps, callable, kirin))]
-pub fn derive_ssa_cfg_region(input: TokenStream) -> TokenStream {
+#[proc_macro_derive(HasLocation, attributes(interpret))]
+pub fn derive_has_location(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
-    match ssa_cfg_region::do_derive_ssa_cfg_region(&ast) {
+    match frame::do_derive_has_location(&ast) {
         Ok(tokens) => tokens.into(),
-        Err(e) => e.write_errors().into(),
+        Err(e) => e.into_compile_error().into(),
+    }
+}
+
+#[proc_macro_derive(Frame, attributes(kirin, interpret))]
+pub fn derive_frame(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match frame::do_derive_frame(&ast) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.into_compile_error().into(),
+    }
+}
+
+#[proc_macro_derive(Completion, attributes(kirin, interpret))]
+pub fn derive_completion(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match frame::do_derive_completion(&ast) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.into_compile_error().into(),
+    }
+}
+
+#[proc_macro_derive(LiftError, attributes(kirin))]
+pub fn derive_lift_error(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match frame::do_derive_lift_error(&ast) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.into_compile_error().into(),
+    }
+}
+
+#[proc_macro_derive(StageFrame, attributes(stage_frame, interpret))]
+pub fn derive_stage_frame(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match stage_frame::do_derive_stage_frame(&ast) {
+        Ok(tokens) => tokens.into(),
+        Err(e) => e.into_compile_error().into(),
     }
 }

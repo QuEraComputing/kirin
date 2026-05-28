@@ -58,12 +58,10 @@
 //! Dialect authors implement [`TupleValue`] on their value types to define
 //! how tuple packing/unpacking works at the interpreter level.
 
-mod interpret_impl;
-pub use interpret_impl::IndexValue;
-pub mod interpreter_new;
+pub mod interpreter;
 
 use kirin::prelude::*;
-use kirin_interpreter_new::Interpretable;
+use kirin_interpreter::Interpretable;
 
 #[cfg(test)]
 mod tests;

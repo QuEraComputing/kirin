@@ -1,100 +1,84 @@
-use kirin_ir::{CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction};
+use std::convert::Infallible;
 
-/// Detailed reason for a stage/pipeline resolution failure.
-#[derive(Debug, thiserror::Error)]
-pub enum StageResolutionError {
-    #[error("missing compile stage")]
-    MissingStage,
-    #[error("stage does not contain the requested dialect")]
-    MissingDialect,
-    #[error("typed API stage mismatch: dialect not present")]
-    TypeMismatch,
-    #[error("function {function:?} has no staged function mapping")]
-    MissingFunction { function: Function },
-    #[error("unknown function target '{name}'")]
-    UnknownTarget { name: String },
-    #[error("no live specialization for {staged_function:?}")]
-    NoSpecialization { staged_function: StagedFunction },
-    #[error("ambiguous: {count} live specializations for {staged_function:?}")]
+use kirin_ir::{CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction, Symbol};
+use thiserror::Error;
+
+use crate::{EnvIndex, Location};
+
+#[derive(Clone, Debug, Error, PartialEq, Eq)]
+pub enum InterpreterError {
+    #[error("invalid environment index {0:?}")]
+    InvalidEnvIndex(EnvIndex),
+    #[error("unbound SSA value {value} in environment {index:?}")]
+    UnboundValue { index: EnvIndex, value: SSAValue },
+    #[error("environment stack is empty")]
+    EmptyEnvStack,
+    #[error("frame stack is empty")]
+    EmptyFrameStack,
+    #[error("missing stage {0:?}")]
+    MissingStage(CompileStage),
+    #[error("missing stage info for stage {0:?}")]
+    MissingStageInfo(CompileStage),
+    #[error("expected an active statement at {0:?}")]
+    ExpectedActiveStatement(Location),
+    #[error("expected an active block at {0:?}")]
+    ExpectedActiveBlock(Location),
+    #[error("statement frame cannot be stepped directly at {0:?}")]
+    UnexpectedStatementFrameStep(Location),
+    #[error("unexpected completion at {location:?}: {completion}")]
+    UnexpectedCompletion {
+        location: Location,
+        completion: &'static str,
+    },
+    #[error("missing function {0:?}")]
+    MissingFunction(Function),
+    #[error("function {function:?} has no staged function for stage {stage:?}")]
+    MissingStagedFunction {
+        function: Function,
+        stage: CompileStage,
+    },
+    #[error("staged function {0:?} has no live specialization")]
+    MissingSpecialization(StagedFunction),
+    #[error("staged function {function:?} has {count} live specializations")]
     AmbiguousSpecialization {
-        staged_function: StagedFunction,
+        function: StagedFunction,
         count: usize,
     },
-    #[error("callee {callee:?} is not defined")]
-    MissingCallee { callee: SpecializedFunction },
-}
-
-/// Detailed reason for a missing entry failure.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, thiserror::Error)]
-pub enum MissingEntryError {
-    /// The region has no entry block.
-    #[error("entry block not found")]
-    EntryBlock,
-    /// A block has no terminator statement.
-    #[error("block terminator not found")]
-    BlockTerminator,
-    /// A callable body did not resolve to a function entry.
-    #[error("function entry not found")]
-    FunctionEntry,
-}
-
-/// Error type for interpreter failures.
-///
-/// Framework errors cover common interpreter failure modes. User-defined
-/// errors (e.g. division by zero, type errors) go in the [`Custom`](Self::Custom)
-/// variant via [`InterpreterError::custom`].
-#[derive(Debug, thiserror::Error)]
-pub enum InterpreterError {
-    /// No call frame on the stack.
-    #[error("no active call frame")]
-    NoFrame,
-    /// An SSA value was read before being written.
-    #[error("unbound SSA value: {0:?}")]
-    UnboundValue(SSAValue),
-    /// Step fuel has been exhausted.
-    #[error("step fuel exhausted")]
-    FuelExhausted,
-    /// Call depth exceeded the configured maximum.
-    #[error("call depth exceeded maximum")]
-    MaxDepthExceeded,
-    /// An entry-related lookup failed.
-    #[error("{0}")]
-    MissingEntry(MissingEntryError),
-    /// Argument count does not match block/function parameter count.
-    #[error("arity mismatch: expected {expected} arguments, got {got}")]
-    ArityMismatch { expected: usize, got: usize },
-    /// Stage or pipeline resolution failure.
-    #[error("stage resolution error at {stage:?}: {kind}")]
-    StageResolution {
-        stage: CompileStage,
-        kind: StageResolutionError,
+    #[error("function body fell through at {0:?}")]
+    FunctionBodyFellThrough(Location),
+    #[error("missing call target {target:?} at {location:?}")]
+    MissingCallTarget { location: Location, target: Symbol },
+    #[error("call result arity mismatch at {location:?}: expected {expected}, got {actual}")]
+    CallResultArityMismatch {
+        location: Location,
+        expected: usize,
+        actual: usize,
     },
-    /// An unexpected control flow action was encountered.
-    #[error("unexpected control flow: {0}")]
-    UnexpectedControl(String),
-    /// User-defined error.
-    #[error(transparent)]
-    Custom(Box<dyn std::error::Error + Send + Sync>),
+    #[error("expected product value")]
+    ExpectedProduct,
+    #[error("product arity mismatch: expected {expected}, got {actual}")]
+    ProductArityMismatch { expected: usize, actual: usize },
+    #[error("indeterminate branch condition")]
+    IndeterminateBranch,
+    #[error("loop step overflow")]
+    LoopStepOverflow,
+    #[error("specialized function {function:?} has no body at stage {stage:?}")]
+    MissingFunctionBody {
+        function: SpecializedFunction,
+        stage: CompileStage,
+    },
+    #[error("missing stage named {0:?}")]
+    MissingStageName(String),
+    #[error("missing function named {0:?}")]
+    MissingFunctionName(String),
+    #[error("expected function return, got {0}")]
+    ExpectedFunctionReturn(&'static str),
+    #[error("{0}")]
+    Custom(&'static str),
 }
 
-impl InterpreterError {
-    /// Wrap an arbitrary error as [`InterpreterError::Custom`].
-    pub fn custom(error: impl std::error::Error + Send + Sync + 'static) -> Self {
-        InterpreterError::Custom(Box::new(error))
-    }
-
-    /// The region has no entry block.
-    pub fn missing_entry_block() -> Self {
-        Self::MissingEntry(MissingEntryError::EntryBlock)
-    }
-
-    /// A block has no terminator statement.
-    pub fn missing_terminator() -> Self {
-        Self::MissingEntry(MissingEntryError::BlockTerminator)
-    }
-
-    /// A callable body did not resolve to a function entry.
-    pub fn missing_function_entry() -> Self {
-        Self::MissingEntry(MissingEntryError::FunctionEntry)
+impl From<Infallible> for InterpreterError {
+    fn from(error: Infallible) -> Self {
+        match error {}
     }
 }

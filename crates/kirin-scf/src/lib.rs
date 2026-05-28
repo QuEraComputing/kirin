@@ -25,16 +25,16 @@
 //! - `For` ↔ `scf.for`
 //! - `Yield` ↔ `scf.yield`
 
-mod interpret_impl;
-pub use interpret_impl::ForLoopValue;
+mod value;
+pub use value::ForLoopValue;
 #[cfg(feature = "constprop")]
 mod constprop_impl;
 #[cfg(feature = "constprop")]
 pub use constprop_impl::ScfForConstPropSummary;
-pub mod interpreter_new;
+pub mod interpreter;
 
 use kirin::prelude::*;
-use kirin_interpreter_new::Interpretable;
+use kirin_interpreter::Interpretable;
 
 #[cfg(test)]
 mod tests;

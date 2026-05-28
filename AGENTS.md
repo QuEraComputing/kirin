@@ -23,17 +23,16 @@ cargo insta review               # Review snapshot test changes
 cargo build -p toy-lang          # Build the toy language example binary
 cargo run -p toy-lang -- parse example/toy-lang/programs/add.kirin  # Parse an example program from repo root
 cargo run -p toy-lang -- run example/toy-lang/programs/add.kirin --stage source --function main 3 5  # Execute toy-lang main with i64 args
-cargo run -p toy-lang -- run example/toy-lang/programs/add.kirin --stage source --function main --new-interpreter 3 5  # Execute via interpreter-new concrete path
-cargo run -p toy-lang -- run example/toy-lang/programs/branching.kirin --stage source --function abs --new-constprop 7  # Run interpreter-new constprop fixpoint analysis
+cargo run -p toy-lang -- run example/toy-lang/programs/branching.kirin --stage source --function abs --constprop 7  # Run constprop fixpoint analysis on toy-lang
 cargo nextest run -p toy-lang    # Run toy language example tests
 cargo build -p toy-qc            # Build the toy quantum-circuit example binary
 cargo run -p toy-qc -- parse example/toy-qc/programs/bell_pair.kirin  # Parse a toy-qc example program from repo root
 cargo nextest run -p toy-qc      # Run toy-qc example tests
-cargo build -p kirin-interpreter-new  # Build the new frame-fusion interpreter crate
-cargo nextest run -p kirin-interpreter-new  # Run new interpreter crate tests
-cargo build -p kirin-derive-interpreter-new  # Build interpreter-new derive proc-macro crate
-cargo nextest run -p kirin-derive-interpreter-new  # Run derive crate snapshot/unit tests
-cargo nextest run -p toy-lang -E 'test(interpreter_new)'  # Run toy-lang new interpreter tests
+cargo build -p kirin-interpreter  # Build the frame-fusion interpreter crate
+cargo nextest run -p kirin-interpreter  # Run interpreter crate tests
+cargo build -p kirin-derive-interpreter  # Build interpreter derive proc-macro crate
+cargo nextest run -p kirin-derive-interpreter  # Run derive crate snapshot/unit tests
+cargo nextest run -p toy-lang -E 'test(interpreter)'  # Run toy-lang interpreter tests
 ```
 
 Rust edition 2024. No `rust-toolchain.toml`; uses the default toolchain.
@@ -63,8 +62,8 @@ Named subsystem groupings for scoping implementation, review, and maintenance wo
 | `ir` | kirin-ir |
 | `parser` | kirin-chumsky, kirin-derive-chumsky |
 | `printer` | kirin-prettyless, kirin-derive-prettyless |
-| `interpreter` | kirin-interpreter, kirin-interpreter-new, kirin-derive-interpreter, kirin-derive-interpreter-new |
-| `derive` | kirin-derive-toolkit, kirin-derive-ir, kirin-derive-chumsky, kirin-derive-interpreter, kirin-derive-interpreter-new, kirin-derive-prettyless |
+| `interpreter` | kirin-interpreter, kirin-derive-interpreter |
+| `derive` | kirin-derive-toolkit, kirin-derive-ir, kirin-derive-chumsky, kirin-derive-interpreter, kirin-derive-prettyless |
 | `dialects` | kirin-cf, kirin-scf, kirin-constant, kirin-arith, kirin-bitwise, kirin-cmp, kirin-function |
 
 ### Dialect Domain Context
@@ -78,7 +77,7 @@ Each dialect crate targets a specific domain. Use this context when reviewing or
 | kirin-function | PL / Lambda Calculus | Function application, closures, specialization, parametric polymorphism, calling conventions |
 | kirin-constant | Compile-time Evaluation | Constant folding, staged computation, compile-time value semantics |
 | kirin-ir (core) | Compiler IR Design | MLIR (Lattner et al. 2020), SSA form, regions/blocks/operations, arena-based IR |
-| kirin-interpreter-new | Abstract Interpretation | Cousot & Cousot framework, lattice-based analysis, widening/narrowing, fixpoint computation |
+| kirin-interpreter | Abstract Interpretation | Cousot & Cousot framework, lattice-based analysis, widening/narrowing, fixpoint computation; frame-fusion driver |
 
 For user-defined dialects not in this table, ask the user for domain context during review planning.
 
@@ -94,9 +93,7 @@ For user-defined dialects not in this table, ask the user for domain context dur
 - `kirin-derive-chumsky` — `#[derive(HasParser, PrettyPrint)]` (proc-macro + code generation)
 
 **Interpreter:**
-- `kirin-interpreter` — legacy interpreter traits, `StackInterpreter`, `AbstractInterpreter`
-- `kirin-interpreter-new` — current frame-fusion interpreter framework for concrete and abstract interpretation
-- `kirin-derive-interpreter` — legacy `#[derive(Interpretable, CallSemantics)]`
+- `kirin-interpreter` — frame-fusion interpreter framework for concrete and abstract interpretation (`ConcreteInterpreter`, `AbstractInterpreter`, `StandardFixpointInterpreter`, standard frames)
 
 **Dialects:**
 - `kirin-cf`, `kirin-scf`, `kirin-constant`, `kirin-arith`, `kirin-bitwise`, `kirin-cmp`, `kirin-function`
@@ -104,7 +101,7 @@ For user-defined dialects not in this table, ask the user for domain context dur
 **Derive Infrastructure:**
 - `kirin-derive-toolkit` — Shared derive utilities (IR model, darling re-export, template system)
 - `kirin-derive-ir` — `#[derive(Dialect, StageMeta)]` and IR property traits
-- `kirin-derive-interpreter-new` — `kirin-interpreter-new` derive proc macros (`#[derive(Frame)]`, `#[derive(Interpretable)]`, `#[derive(FunctionEntry)]`)
+- `kirin-derive-interpreter` — `kirin-interpreter` derive proc macros (`#[derive(Frame)]`, `#[derive(Interpretable)]`, `#[derive(FunctionEntry)]`, `#[derive(Completion)]`, `#[derive(LiftError)]`, `#[derive(HasLocation)]`)
 - `kirin-derive-prettyless` — `#[derive(RenderDispatch)]` (proc-macro)
 
 **Analysis:**
@@ -112,7 +109,7 @@ For user-defined dialects not in this table, ask the user for domain context dur
 
 **Testing:**
 - `kirin-test-types` — Pure test type definitions (`UnitType`, `SimpleType`, `Value`)
-- `kirin-test-languages` — Test language/dialect enums (`SimpleLanguage`, `CompositeLanguage`, `ArithFunctionLanguage`, etc.)
+- `kirin-test-languages` — Test language/dialect enums (`SimpleLanguage`, `ArithFunctionLanguage`, etc.)
 - `kirin-test-utils` — Shared test helpers (`roundtrip`, `parser`, `lattice`, `rustfmt`)
 
 ## Derive Infrastructure Conventions
@@ -141,7 +138,7 @@ For user-defined dialects not in this table, ask the user for domain context dur
 
 ## Interpreter Conventions
 
-- **Current framework**: New interpreter work belongs in `kirin-interpreter-new`. Dialect-specific implementations live in `src/interpreter_new.rs` or `src/interpreter_new/mod.rs` inside each dialect crate. The old `kirin-interpreter-20` crate and downstream `interpreter20` modules have been removed; do not add new code against them.
+- **Current framework**: Interpreter work belongs in `kirin-interpreter`. Dialect-specific implementations live in `src/interpreter.rs` or `src/interpreter/mod.rs` inside each dialect crate. The previous `kirin-interpreter-20` and `interpreter-new`/legacy `kirin-interpreter` crates have been removed; do not add new code against them.
 
 - **Design source**: The checked-in design for the current framework is under `docs/design/new-interpreter/`. Do not revive stale interpreter-2/interpreter-4/interpreter-9 design documents; update the new-interpreter docs instead.
 
@@ -155,7 +152,9 @@ For user-defined dialects not in this table, ask the user for domain context dur
 
 - **Concrete vs abstract transfers**: Transfer payloads are frame/interpreter-specific. Concrete CFG execution uses `ConcreteBlockTransfer<V>` with `Jump`. Abstract execution can use `AbstractBlockTransfer<V>` with `Jump` and `Branch`; unknown branches become `Branch` and are handled by abstract branch frames or by a fixpoint owner strategy.
 
-- **Standard frames**: Reuse standard frames from `kirin-interpreter-new::standard` for common IR traversal and call conventions: `StatementFrame`, `BlockFrame`, `RegionFrame`, `CallFrame`, `FunctionFrame`, `StagedFunctionFrame`, and `SpecializedFunctionFrame`. `RegionFrame` follows CFG convention: it enters the entry block and subsequent block movement is driven by block transfers, not by iterating region blocks.
+- **Standard frames**: Reuse standard frames from `kirin_interpreter::standard` for common IR traversal and call conventions: `StatementFrame`, `BlockFrame`, `RegionFrame`, `CallFrame`, `FunctionFrame`, `StagedFunctionFrame`, and `SpecializedFunctionFrame`. `RegionFrame` follows CFG convention: it enters the entry block and subsequent block movement is driven by block transfers, not by iterating region blocks.
+
+- **Frame construction & dispatch**: There are exactly two traits, one per side of the boundary. The frame side implements [`StageFrame<S, V>`](crate::StageFrame) with `from_function_invocation(&S, …)` and `from_block(&S, …)`; single-language frames receive a blanket impl via `StandardFrame<L, V, T>`, multi-stage frames are emitted by `#[derive(StageFrame)]` (single-language enums need no attribute; multi-stage enums use `#[stage_frame(stage = StageEnum)]`). The interpreter side implements [`FrameDispatch<F, V, E>`](crate::FrameDispatch), which exposes `dispatch_function_invocation` and `dispatch_block`; the framework provides blanket impls for `ConcreteInterpreter`, `AbstractInterpreterWithStore`, and `StandardFixpointInterpreter` whenever the frame satisfies `StageFrame`. **Do not** add new dispatch traits that duplicate either of these — `StageFrame` covers all frame-side construction, `FrameDispatch` covers all interpreter-side dispatch.
 
 - **Function dialect naming**: `kirin_function::Function<T>` is the standard function statement. `FunctionBody<T>` exists only as a deprecated compatibility alias. New code should use `Function<T>`, `FunctionEntry`, and the standard function/call frames.
 

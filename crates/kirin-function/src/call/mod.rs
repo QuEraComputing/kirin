@@ -1,5 +1,5 @@
 use kirin::prelude::*;
-use kirin_interpreter_new::Interpretable;
+use kirin_interpreter::Interpretable;
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(type = T)]

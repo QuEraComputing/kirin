@@ -1,0 +1,33 @@
+---
+source: crates/kirin-derive-interpreter/src/stage_frame.rs
+expression: generate(input)
+---
+#[automatically_derived]
+impl<L: Dialect, V, T, __StageFrameS> ::kirin_interpreter::StageFrame<__StageFrameS, V>
+    for ToyFrame<L, V, T>
+{
+    type Error = ::core::convert::Infallible;
+    fn from_function_invocation(
+        stage_info: &__StageFrameS,
+        invocation: ::kirin_interpreter::FunctionInvocation<V>,
+    ) -> ::core::result::Result<Self, Self::Error> {
+        <::kirin_interpreter::StandardFrame<L, V, T> as ::kirin_interpreter::StageFrame<
+            __StageFrameS,
+            V,
+        >>::from_function_invocation(stage_info, invocation)
+        .map(::core::convert::Into::into)
+    }
+    fn from_block(
+        stage_info: &__StageFrameS,
+        stage: ::kirin::ir::CompileStage,
+        block: ::kirin::ir::Block,
+        env: ::kirin_interpreter::EnvIndex,
+        args: ::kirin::ir::Product<V>,
+    ) -> ::core::result::Result<Self, Self::Error> {
+        <::kirin_interpreter::StandardFrame<L, V, T> as ::kirin_interpreter::StageFrame<
+            __StageFrameS,
+            V,
+        >>::from_block(stage_info, stage, block, env, args)
+        .map(::core::convert::Into::into)
+    }
+}

@@ -8,9 +8,9 @@
 
 use core::convert::Infallible;
 
-use kirin_interpreter_new::{
-    AbstractValue, Env, Frame, FunctionEntryTarget, FunctionInvocationDispatch, HasProductValue,
-    InterpreterError, OwnerSummaryDeps, ProjectOrSelf, StageBlockDispatch,
+use kirin_interpreter::{
+    AbstractValue, Env, FixpointProfile, Frame, FrameDispatch, FunctionEntryTarget,
+    HasProductValue, InterpreterError, OwnerSummaryDeps, ProjectOrSelf,
     StandardFixpointInterpreter, SummaryDependencyIndex,
 };
 use kirin_ir::{CompileStage, Function, HasBottom, HasTop, Pipeline, StageMeta};
@@ -25,15 +25,10 @@ use crate::{
 /// dependency index.
 pub type ConstPropFixpointInterpreter<
     'ir,
-    Stage,
-    K,
-    F,
-    C,
-    E,
-    S,
+    P,
     Store,
-    Deps = OwnerSummaryDeps<K>,
-> = StandardFixpointInterpreter<'ir, Stage, K, F, C, E, S, Store, Deps>;
+    Deps = OwnerSummaryDeps<<P as FixpointProfile>::SummaryKey>,
+> = StandardFixpointInterpreter<'ir, P, Store, Deps>;
 
 /// Value domain compatible with the standard const-prop framework.
 ///
@@ -110,28 +105,23 @@ pub trait ConstPropDriver<V>: Env<V> {
     }
 }
 
-impl<'ir, Stage, F, C, E, V, Loc, Store, Deps> ConstPropDriver<V>
-    for StandardFixpointInterpreter<
-        'ir,
-        Stage,
-        ConstPropOwner,
-        F,
-        C,
-        E,
-        ConstPropSummary<V, Loc>,
-        Store,
-        Deps,
-    >
+impl<'ir, P, Store, Deps, Loc> ConstPropDriver<P::Value>
+    for StandardFixpointInterpreter<'ir, P, Store, Deps>
 where
-    V: HasBottom + HasTop + Clone + PartialEq,
-    Loc: AdvanceableLocationSummary<V>,
-    F: Frame<Self, F, C, E>,
-    C: DefaultConstPropCompletion<V> + ProjectOrSelf<Loc::Completion, Error = Infallible>,
-    Self: FunctionInvocationDispatch<F, E, V> + StageBlockDispatch<F, E, V> + Env<V, Error = E>,
+    P: FixpointProfile<
+            SummaryKey = ConstPropOwner,
+            Summary = ConstPropSummary<<P as kirin_interpreter::InterpreterProfile>::Value, Loc>,
+        >,
+    P::Value: HasBottom + HasTop + Clone + PartialEq,
+    Loc: AdvanceableLocationSummary<P::Value>,
+    P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
+    P::Completion:
+        DefaultConstPropCompletion<P::Value> + ProjectOrSelf<Loc::Completion, Error = Infallible>,
+    Self: FrameDispatch<P::Frame, P::Value, P::Error> + Env<P::Value, Error = P::Error>,
     Deps: SummaryDependencyIndex<ConstPropOwner>,
-    E: From<InterpreterError> + From<Infallible> + From<Deps::Error>,
+    P::Error: From<InterpreterError> + From<Infallible> + From<Deps::Error>,
 {
-    type Stage = Stage;
+    type Stage = P::Stage;
 
     fn pipeline(&self) -> &Pipeline<Self::Stage> {
         StandardFixpointInterpreter::pipeline(self)
@@ -142,13 +132,13 @@ where
         stage: CompileStage,
         target: FunctionEntryTarget,
         args: A,
-    ) -> Result<V, E>
+    ) -> Result<P::Value, P::Error>
     where
-        A: IntoIterator<Item = V>,
+        A: IntoIterator<Item = P::Value>,
     {
         let function_owner = ConstPropFunctionOwner::new(stage, target);
         let owner = ConstPropOwner::Function(function_owner);
-        let mut semantics: DefaultConstPropSemantics<V, Loc> =
+        let mut semantics: DefaultConstPropSemantics<P::Value, Loc> =
             DefaultConstPropSemantics::new(function_owner, args);
 
         self.solve(&mut semantics, owner)?;
@@ -156,6 +146,6 @@ where
             .summary(&owner)
             .and_then(ConstPropSummary::function_value)
             .cloned()
-            .unwrap_or_else(V::bottom))
+            .unwrap_or_else(<P::Value as HasBottom>::bottom))
     }
 }

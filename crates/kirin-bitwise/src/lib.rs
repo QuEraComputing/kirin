@@ -42,8 +42,7 @@
 //!   RFC rule that shift count type must match the shifted value type.
 
 mod checked_ops;
-mod interpret_impl;
-pub mod interpreter_new;
+pub mod interpreter;
 
 use kirin::prelude::*;
 

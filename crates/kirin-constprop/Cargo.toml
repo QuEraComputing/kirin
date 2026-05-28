@@ -7,7 +7,7 @@ edition = "2024"
 kirin-arith = { workspace = true }
 kirin-bitwise = { workspace = true }
 kirin-cmp = { workspace = true }
-kirin-interpreter-new = { workspace = true }
+kirin-interpreter = { workspace = true }
 kirin-ir = { workspace = true }
 
 [dev-dependencies]

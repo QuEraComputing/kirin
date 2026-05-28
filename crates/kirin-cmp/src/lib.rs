@@ -1,6 +1,6 @@
-mod interpret_impl;
-pub mod interpreter_new;
-pub use interpret_impl::CompareValue;
+pub mod interpreter;
+mod value;
+pub use value::CompareValue;
 
 use kirin::prelude::*;
 

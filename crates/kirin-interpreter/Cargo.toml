@@ -4,23 +4,10 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-kirin-ir = { workspace = true, features = ["derive"] }
+kirin-ir = { workspace = true }
 kirin-derive-interpreter = { workspace = true, optional = true }
-rustc-hash = "2.1.1"
 smallvec = { workspace = true }
 thiserror = { workspace = true }
 
 [features]
 derive = ["dep:kirin-derive-interpreter"]
-
-[dev-dependencies]
-kirin-arith = { workspace = true }
-kirin-cf = { workspace = true }
-kirin-constant = { workspace = true }
-kirin-function = { workspace = true }
-kirin-derive-ir = { workspace = true }
-kirin-derive-interpreter = { workspace = true }
-kirin-interval = { workspace = true, features = ["interpreter", "arith"] }
-kirin-test-languages = { workspace = true, features = ["composite-language"] }
-kirin-test-utils = { workspace = true, features = ["interpreter"] }
-insta = { workspace = true }

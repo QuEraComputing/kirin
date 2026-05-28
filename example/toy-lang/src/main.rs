@@ -1,13 +1,11 @@
-mod interpreter_new;
+mod interpreter;
 mod language;
 mod stage;
 
 use clap::{Parser, Subcommand};
-use kirin::interpreter::{StackInterpreter, StageAccess};
 use kirin::prelude::*;
 use kirin::pretty::PipelinePrintExt;
 
-use language::{HighLevel, LowLevel};
 use stage::Stage;
 
 #[derive(Parser)]
@@ -37,12 +35,9 @@ enum Command {
         /// Arguments to the function (parsed as i64)
         #[arg(allow_negative_numbers = true)]
         args: Vec<String>,
-        /// Run through the experimental interpreter-new framework
+        /// Run constant propagation instead of concrete execution.
         #[arg(long)]
-        new_interpreter: bool,
-        /// Run source-stage constant propagation through interpreter-new
-        #[arg(long)]
-        new_constprop: bool,
+        constprop: bool,
     },
 }
 
@@ -62,19 +57,8 @@ fn main() -> anyhow::Result<()> {
             stage: stage_name,
             function: func_name,
             args,
-            new_interpreter,
-            new_constprop,
-        } => {
-            run_program(
-                &file,
-                &stage_name,
-                &func_name,
-                &args,
-                new_interpreter,
-                new_constprop,
-            )?;
-            Ok(())
-        }
+            constprop,
+        } => run_program(&file, &stage_name, &func_name, &args, constprop),
     }
 }
 
@@ -83,48 +67,30 @@ fn run_program(
     stage_name: &str,
     func_name: &str,
     cli_args: &[String],
-    new_interpreter: bool,
-    new_constprop: bool,
+    constprop: bool,
 ) -> anyhow::Result<()> {
     let src = std::fs::read_to_string(file)?;
     let mut pipeline: Pipeline<Stage> = Pipeline::new();
     ParsePipelineText::parse(&mut pipeline, &src)?;
 
-    // Find the stage by name.
-    let stage_id = pipeline
-        .stage_by_name(stage_name)
-        .ok_or_else(|| anyhow::anyhow!("stage '{}' not found", stage_name))?;
-
-    // Find the function by name at the given stage.
-    let staged_function = pipeline
-        .resolve_staged_function(func_name, stage_id)
-        .ok_or_else(|| {
-            anyhow::anyhow!(
-                "function '{}' not found in stage '{}'",
-                func_name,
-                stage_name
-            )
-        })?;
-
-    // Parse CLI args as i64.
     let args: Vec<i64> = cli_args
         .iter()
         .map(|s| s.parse::<i64>())
         .collect::<Result<_, _>>()?;
 
-    if new_constprop {
+    if constprop {
         let abstract_args = args
             .iter()
             .copied()
             .map(kirin_constprop::ConstPropValue::Const)
             .collect::<Vec<_>>();
         let result = match stage_name {
-            "source" => interpreter_new::analyze_source_constprop_fixpoint(
+            "source" => interpreter::analyze_source_constprop_fixpoint(
                 &pipeline,
                 func_name,
                 &abstract_args,
             )?,
-            "lowered" => interpreter_new::analyze_lowered_constprop_fixpoint(
+            "lowered" => interpreter::analyze_lowered_constprop_fixpoint(
                 &pipeline,
                 func_name,
                 &abstract_args,
@@ -135,70 +101,11 @@ fn run_program(
         return Ok(());
     }
 
-    if new_interpreter {
-        let result = match stage_name {
-            "source" => interpreter_new::run_source_i64(&pipeline, func_name, &args)?,
-            "lowered" => interpreter_new::run_lowered_i64(&pipeline, func_name, &args)?,
-            other => anyhow::bail!("unknown stage '{}'", other),
-        };
-        println!("{result}");
-        return Ok(());
-    }
-
-    // Dispatch based on stage name.
-    match stage_name {
-        "source" => {
-            let spec = resolve_specialization::<HighLevel>(
-                &pipeline,
-                stage_id,
-                staged_function,
-                func_name,
-            )?;
-            let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
-            let result = interp.in_stage::<HighLevel>().call(spec, &args)?;
-            println!("{result}");
-        }
-        "lowered" => {
-            let spec = resolve_specialization::<LowLevel>(
-                &pipeline,
-                stage_id,
-                staged_function,
-                func_name,
-            )?;
-            let mut interp: StackInterpreter<i64, _> = StackInterpreter::new(&pipeline, stage_id);
-            let result = interp.in_stage::<LowLevel>().call(spec, &args)?;
-            println!("{result}");
-        }
-        other => {
-            anyhow::bail!("unknown stage '{}'", other);
-        }
-    }
-
+    let result = match stage_name {
+        "source" => interpreter::run_source_i64(&pipeline, func_name, &args)?,
+        "lowered" => interpreter::run_lowered_i64(&pipeline, func_name, &args)?,
+        other => anyhow::bail!("unknown stage '{}'", other),
+    };
+    println!("{result}");
     Ok(())
-}
-
-fn resolve_specialization<L: Dialect>(
-    pipeline: &Pipeline<Stage>,
-    stage_id: CompileStage,
-    staged_function: StagedFunction,
-    func_name: &str,
-) -> anyhow::Result<SpecializedFunction>
-where
-    Stage: HasStageInfo<L>,
-{
-    let stage_meta = pipeline
-        .stage(stage_id)
-        .ok_or_else(|| anyhow::anyhow!("stage not found"))?;
-    let stage_info: &StageInfo<L> = stage_meta
-        .try_stage_info()
-        .ok_or_else(|| anyhow::anyhow!("stage type mismatch"))?;
-    let staged_info = staged_function
-        .get_info(stage_info)
-        .ok_or_else(|| anyhow::anyhow!("function '{}' has no staged info", func_name))?;
-    let spec = staged_info
-        .specializations()
-        .iter()
-        .find(|s| !s.is_invalidated())
-        .ok_or_else(|| anyhow::anyhow!("function '{}' has no active specialization", func_name))?;
-    Ok(spec.id())
 }

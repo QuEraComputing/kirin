@@ -15,13 +15,11 @@ members = [
   "crates/kirin-constprop",
   "crates/kirin-derive-chumsky",
   "crates/kirin-derive-interpreter",
-  "crates/kirin-derive-interpreter-new",
   "crates/kirin-derive-ir",
   "crates/kirin-derive-prettyless",
   "crates/kirin-derive-toolkit",
   "crates/kirin-function",
   "crates/kirin-interpreter",
-  "crates/kirin-interpreter-new",
   "crates/kirin-interval",
   "crates/kirin-ir",
   "crates/kirin-lexer",
@@ -72,13 +70,11 @@ kirin-constant = { path = "crates/kirin-constant", version = "0.1.0" }
 kirin-constprop = { path = "crates/kirin-constprop", version = "0.1.0" }
 kirin-derive-chumsky = { path = "crates/kirin-derive-chumsky", version = "0.1.0" }
 kirin-derive-interpreter = { path = "crates/kirin-derive-interpreter", version = "0.1.0" }
-kirin-derive-interpreter-new = { path = "crates/kirin-derive-interpreter-new", version = "0.1.0" }
 kirin-derive-ir = { path = "crates/kirin-derive-ir", version = "0.1.0" }
 kirin-derive-prettyless = { path = "crates/kirin-derive-prettyless", version = "0.1.0" }
 kirin-derive-toolkit = { path = "crates/kirin-derive-toolkit", version = "0.1.0" }
 kirin-function = { path = "crates/kirin-function", version = "0.1.0" }
 kirin-interpreter = { path = "crates/kirin-interpreter", version = "0.1.0" }
-kirin-interpreter-new = { path = "crates/kirin-interpreter-new", version = "0.1.0" }
 kirin-interval = { path = "crates/kirin-interval", version = "0.1.0" }
 # Internal crates
 kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }
@@ -99,9 +95,6 @@ path = "example/simple.rs"
 
 [dependencies]
 kirin-chumsky = { path = "crates/kirin-chumsky", version = "0.1.0", features = [
-  "derive"
-], optional = true }
-kirin-interpreter = { path = "crates/kirin-interpreter", version = "0.1.0", features = [
   "derive"
 ], optional = true }
 kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }
@@ -136,8 +129,7 @@ kirin-tuple = { workspace = true }
 trybuild = { workspace = true }
 
 [features]
-default = ["interpret", "parser", "pretty"]
-interpret = ["dep:kirin-interpreter"]
+default = ["parser", "pretty"]
 parser = ["dep:chumsky", "dep:kirin-chumsky", "dep:kirin-lexer"]
 pretty = ["dep:kirin-prettyless"]
 serde = ["dep:serde"]

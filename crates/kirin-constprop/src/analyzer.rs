@@ -1,20 +1,11 @@
-use kirin_interpreter_new::AbstractEnvStore;
+use kirin_interpreter::{AbstractEnvStore, InterpreterProfile};
 
-use crate::{ConstPropFixpointInterpreter, ConstPropOwner, ConstPropSummary, ConstPropValue};
+use crate::ConstPropFixpointInterpreter;
 
 /// Standard const-prop function fixpoint alias.
 ///
-/// Pins the [`ConstPropFixpointInterpreter`] to use [`ConstPropOwner`] as
-/// the owner type, [`ConstPropSummary`] as the summary type, and the
-/// default [`AbstractEnvStore`] for the SSA store.
-pub type ConstPropFunctionFixpoint<'ir, Stage, F, C, E, V = ConstPropValue, L = ()> =
-    ConstPropFixpointInterpreter<
-        'ir,
-        Stage,
-        ConstPropOwner,
-        F,
-        C,
-        E,
-        ConstPropSummary<V, L>,
-        AbstractEnvStore<V>,
-    >;
+/// Wraps [`ConstPropFixpointInterpreter`] with the default
+/// [`AbstractEnvStore`] for the SSA store. The supplied profile is expected
+/// to bind `SummaryKey = ConstPropOwner` and `Summary = ConstPropSummary<...>`.
+pub type ConstPropFunctionFixpoint<'ir, P> =
+    ConstPropFixpointInterpreter<'ir, P, AbstractEnvStore<<P as InterpreterProfile>::Value>>;

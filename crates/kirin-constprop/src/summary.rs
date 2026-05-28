@@ -1,4 +1,4 @@
-use kirin_interpreter_new::{FixpointPhase, FunctionEntryTarget, Location, Summary};
+use kirin_interpreter::{FixpointPhase, FunctionEntryTarget, Location, Summary};
 use kirin_ir::{CompileStage, HasBottom, HasTop, Lattice, Product};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -176,7 +176,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use kirin_interpreter_new::{FixpointPhase, Summary};
+    use kirin_interpreter::{FixpointPhase, Summary};
     use kirin_ir::Product;
 
     use crate::ConstPropValue;

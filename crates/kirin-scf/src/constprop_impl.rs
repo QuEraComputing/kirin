@@ -3,10 +3,10 @@ use kirin_constprop::{
     AdvanceableLocationSummary, ConstPropLocationSummary, ConstPropOwner, ConstPropSummary,
     ConstPropValue, join_product,
 };
-use kirin_interpreter_new::BlockTransfer;
+use kirin_interpreter::BlockTransfer;
 
 use crate::ForLoopValue;
-use crate::interpreter_new::{ForContinuation, ScfCompletion, ScfForFixpointSummary};
+use crate::interpreter::{ForContinuation, ScfCompletion, ScfForFixpointSummary};
 
 impl<S, F> ForLoopValue for ConstPropValue<i64, S, F>
 where

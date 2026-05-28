@@ -711,7 +711,6 @@ dependencies = [
  "kirin-cmp",
  "kirin-constant",
  "kirin-function",
- "kirin-interpreter",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
@@ -729,7 +728,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-new",
  "thiserror 2.0.18",
 ]
 
@@ -739,7 +737,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-new",
  "kirin-test-types",
  "thiserror 2.0.18",
 ]
@@ -750,7 +747,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-new",
  "kirin-test-types",
  "smallvec",
 ]
@@ -779,7 +775,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-new",
  "kirin-test-types",
 ]
 
@@ -789,7 +784,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-new",
 ]
 
 [[package]]
@@ -799,7 +793,7 @@ dependencies = [
  "kirin-arith",
  "kirin-bitwise",
  "kirin-cmp",
- "kirin-interpreter-new",
+ "kirin-interpreter",
  "kirin-ir",
  "kirin-test-utils",
 ]
@@ -822,18 +816,6 @@ dependencies = [
 
 [[package]]
 name = "kirin-derive-interpreter"
-version = "0.1.0"
-dependencies = [
- "insta",
- "kirin-derive-toolkit",
- "kirin-test-utils",
- "proc-macro2",
- "quote",
- "syn",
-]
-
-[[package]]
-name = "kirin-derive-interpreter-new"
 version = "0.1.0"
 dependencies = [
  "insta",
@@ -891,7 +873,6 @@ dependencies = [
  "kirin-cf",
  "kirin-constant",
  "kirin-interpreter",
- "kirin-interpreter-new",
  "kirin-test-types",
  "smallvec",
 ]
@@ -900,27 +881,7 @@ dependencies = [
 name = "kirin-interpreter"
 version = "0.1.0"
 dependencies = [
- "insta",
- "kirin-arith",
- "kirin-cf",
- "kirin-constant",
  "kirin-derive-interpreter",
- "kirin-derive-ir",
- "kirin-function",
- "kirin-interval",
- "kirin-ir",
- "kirin-test-languages",
- "kirin-test-utils",
- "rustc-hash",
- "smallvec",
- "thiserror 2.0.18",
-]
-
-[[package]]
-name = "kirin-interpreter-new"
-version = "0.1.0"
-dependencies = [
- "kirin-derive-interpreter-new",
  "kirin-ir",
  "smallvec",
  "thiserror 2.0.18",
@@ -933,7 +894,6 @@ dependencies = [
  "kirin-arith",
  "kirin-bitwise",
  "kirin-cmp",
- "kirin-interpreter",
  "kirin-ir",
  "kirin-scf",
  "kirin-test-utils",
@@ -986,7 +946,6 @@ dependencies = [
  "kirin-constprop",
  "kirin-function",
  "kirin-interpreter",
- "kirin-interpreter-new",
  "kirin-test-types",
  "smallvec",
 ]
@@ -1001,10 +960,7 @@ dependencies = [
  "kirin-chumsky",
  "kirin-constant",
  "kirin-derive-chumsky",
- "kirin-derive-interpreter",
- "kirin-derive-ir",
  "kirin-function",
- "kirin-interpreter",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
@@ -1025,15 +981,10 @@ dependencies = [
 name = "kirin-test-utils"
 version = "0.1.0"
 dependencies = [
- "kirin-arith",
- "kirin-cf",
  "kirin-chumsky",
- "kirin-constant",
- "kirin-function",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
- "kirin-test-languages",
  "kirin-test-types",
 ]
 
@@ -1043,7 +994,6 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
- "kirin-interpreter-new",
  "kirin-test-types",
  "smallvec",
  "thiserror 2.0.18",
@@ -1947,11 +1897,8 @@ dependencies = [
  "kirin-cmp",
  "kirin-constant",
  "kirin-constprop",
- "kirin-derive-interpreter",
  "kirin-function",
  "kirin-interpreter",
- "kirin-interpreter-new",
- "kirin-interval",
  "kirin-prettyless",
  "kirin-scf",
  "predicates",

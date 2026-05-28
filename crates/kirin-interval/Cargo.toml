@@ -5,7 +5,6 @@ edition = "2024"
 
 [dependencies]
 kirin-ir = { version = "0.1.0", path = "../kirin-ir", default-features = false }
-kirin-interpreter = { workspace = true, optional = true }
 kirin-arith = { workspace = true, optional = true }
 kirin-bitwise = { workspace = true, optional = true }
 kirin-cmp = { workspace = true, optional = true }
@@ -16,8 +15,7 @@ kirin-test-utils = { path = "../kirin-test-utils" }
 
 [features]
 default = []
-interpreter = ["kirin-interpreter"]
 arith = ["kirin-arith"]
 bitwise = ["kirin-bitwise"]
 cmp = ["kirin-cmp"]
-scf = ["kirin-scf", "kirin-cmp", "kirin-interpreter"]
+scf = ["kirin-scf", "kirin-cmp"]

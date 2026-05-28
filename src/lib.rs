@@ -7,9 +7,6 @@ pub use kirin_chumsky as parsers;
 #[cfg(feature = "pretty")]
 pub use kirin_prettyless as pretty;
 
-#[cfg(feature = "interpret")]
-pub use kirin_interpreter as interpreter;
-
 pub mod prelude {
     #[cfg(feature = "parser")]
     pub use kirin_chumsky::prelude::*;
