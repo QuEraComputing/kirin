@@ -1,0 +1,41 @@
+[package]
+name = "kirin-py-frontend"
+version = "0.1.0"
+edition = "2024"
+
+[lib]
+# Clean Rust import name: tests/consumers write `use kirin_py_frontend::…`.
+# The Python module is still `_kirin_py` — the `#[pymodule] fn _kirin_py` in
+# lib.rs provides `PyInit__kirin_py`, and maturin renames the built cdylib to
+# `_kirin_py` per `module-name = "kirin_rs._kirin_py"` in pyproject.toml.
+name = "kirin_py_frontend"
+# `rlib` so `cargo test`/`cargo build --workspace` can build & link it normally
+# (libpython linked); `cdylib` is what maturin packages into a wheel.
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+# Lowering core (Python AST → Kirin IR) — these were the `kirin-lower` deps.
+kirin = { workspace = true }
+kirin-arith = { workspace = true }
+kirin-cmp = { workspace = true }
+kirin-constant = { workspace = true }
+kirin-function = { workspace = true }
+kirin-scf = { workspace = true }
+kirin-chumsky = { workspace = true }
+kirin-prettyless = { workspace = true }
+# Makes the lowered IR executable (frame/completion/error derives + driver).
+kirin-interpreter = { workspace = true, features = ["derive"] }
+rustc-hash = "2.1.2"
+thiserror = { workspace = true }
+# PyO3 bridge. `extension-module` is intentionally OFF by default so
+# `cargo test`/`cargo build` link libpython and work normally; maturin enables it
+# for the wheel build (disables libpython linking + macOS dynamic_lookup args).
+pyo3 = "0.28"
+
+[features]
+extension-module = ["pyo3/extension-module"]
+
+[dev-dependencies]
+# `auto-initialize` lets `cargo test` spin up an embedded interpreter for the
+# PyO3 bridge tests. (`kirin` is already a normal dep, used for parse-back roundtrip.)
+pyo3 = { version = "0.28", features = ["auto-initialize"] }

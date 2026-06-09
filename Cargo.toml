@@ -24,6 +24,7 @@ members = [
   "crates/kirin-ir",
   "crates/kirin-lexer",
   "crates/kirin-prettyless",
+  "crates/kirin-py-frontend",
   "crates/kirin-scf",
   "crates/kirin-test-languages",
   "crates/kirin-test-types",

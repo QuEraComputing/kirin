@@ -1,0 +1,7 @@
+# maturin / Python build artifacts
+*.so
+*.pyc
+__pycache__/
+*.egg-info/
+build/
+dist/

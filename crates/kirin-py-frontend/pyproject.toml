@@ -1,0 +1,19 @@
+[build-system]
+requires = ["maturin>=1.7,<2"]
+build-backend = "maturin"
+
+[project]
+name = "kirin_rs"
+version = "0.1.0"
+description = "Lower a subset of Python kernels to Kirin 2.0 .kirin IR (Rust front-end)."
+requires-python = ">=3.9"
+
+[tool.maturin]
+# This pyproject sits next to the crate's Cargo.toml, so maturin uses that
+# manifest by default. The compiled module is placed inside the `kirin_rs`
+# package whose pure-Python source lives in ./python/.
+module-name = "kirin_rs._kirin_py"
+python-source = "python"
+# maturin enables the extension-module feature (sets PYO3_BUILD_EXTENSION_MODULE
+# and the macOS `-undefined dynamic_lookup` link args) for the wheel build.
+features = ["extension-module"]

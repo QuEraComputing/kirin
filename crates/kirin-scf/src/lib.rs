@@ -99,7 +99,7 @@ pub struct For<T: CompileTimeValue> {
 /// Supports zero values (void-if) through N values (multi-result).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$yield[ {values}]")]
-#[kirin(terminator, type = T)]
+#[kirin(terminator, builders, type = T)]
 pub struct Yield<T: CompileTimeValue> {
     values: Vec<SSAValue>,
     #[kirin(default)]
