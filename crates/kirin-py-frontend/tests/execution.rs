@@ -5,7 +5,9 @@
 
 mod common;
 
-use common::{add_module, call_module, factorial_module, pick_module, sum_to_module};
+use common::{
+    add_module, call_module, factorial_module, if_without_else_module, pick_module, sum_to_module,
+};
 use kirin_py_frontend::{lower_to_pipeline, run_i64};
 
 /// Lower `module`, then run `function`(`args`) and return its `i64` result.
@@ -24,6 +26,15 @@ fn executes_if_else_both_branches() {
     // pick(c, a, b) = a + b if c > 0 else a - b
     assert_eq!(run(pick_module(), "pick", &[1, 5, 3]), 8); // then-branch
     assert_eq!(run(pick_module(), "pick", &[-1, 5, 3]), 2); // else-branch
+}
+
+#[test]
+fn executes_if_without_else() {
+    // f(x): y starts at 0 and is overwritten to 100 only when x > 0; the
+    // (implicit) else path must carry the prior y = 0 through the join.
+    assert_eq!(run(if_without_else_module(), "f", &[1]), 100);
+    assert_eq!(run(if_without_else_module(), "f", &[-1]), 0);
+    assert_eq!(run(if_without_else_module(), "f", &[0]), 0); // boundary: x > 0 false
 }
 
 #[test]

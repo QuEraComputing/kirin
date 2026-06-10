@@ -25,6 +25,21 @@ fn assert_roundtrips(ir: &str) {
     assert_eq!(ir.trim_end(), pipeline.sprint().trim_end());
 }
 
+/// The slice of `ir` for one lowered kernel: its `stage` decl plus its
+/// `specialize` body, up to where the next kernel's decl begins — so an
+/// assertion can target a single function rather than the whole module.
+fn func<'a>(ir: &'a str, name: &str) -> &'a str {
+    let marker = format!("stage @source fn @{name}(");
+    let start = ir
+        .find(&marker)
+        .unwrap_or_else(|| panic!("no declaration for @{name}:\n{ir}"));
+    let after = start + marker.len();
+    let end = ir[after..]
+        .find("stage @source fn @")
+        .map_or(ir.len(), |i| after + i);
+    &ir[start..end]
+}
+
 #[test]
 fn arith_dialect() {
     let ir = lower(include_str!("kernels/arith.py"));
@@ -32,7 +47,7 @@ fn arith_dialect() {
         assert!(ir.contains(&format!("{op} %")), "missing arith.{op}:\n{ir}");
     }
     assert!(ir.contains("constant "), "missing constant op:\n{ir}");
-    assert_roundtrips(&ir);
+    assert_roundtrips(&ir); 
 }
 
 #[test]
@@ -53,6 +68,39 @@ fn scf_dialect() {
     assert!(ir.contains("for %"), "missing scf.for:\n{ir}");
     assert!(ir.contains("iter_args"), "missing iter_args:\n{ir}");
     assert!(ir.contains("yield"), "missing yield:\n{ir}");
+    assert_roundtrips(&ir);
+}
+
+#[test]
+fn scf_if_without_else() {
+    // An `if` with no `else` over a variable defined beforehand. Through real
+    // CPython parsing the missing else arrives as `orelse=[]`; the lowering must
+    // still produce an scf.if *result* that merges the conditional write with
+    // the fall-through prior value. Regression test for the join set — a write
+    // in only one branch used to be dropped, so the result was never carried.
+    let ir = lower(include_str!("kernels/scf.py"));
+
+    // relu: `y = 0; if x > 0: y = x; return y`
+    let relu = func(&ir, "relu");
+    assert!(
+        relu.contains("= if "),
+        "relu's if must produce a result:\n{relu}"
+    );
+    assert_eq!(
+        relu.matches("yield ").count(),
+        2,
+        "both branches (incl. the empty else) must yield a value:\n{relu}"
+    );
+
+    // count_positive: if-without-else updating a loop-carried accumulator —
+    // the nested if produces a result that the loop body then yields.
+    let cp = func(&ir, "count_positive");
+    assert!(cp.contains("for %"), "missing scf.for:\n{cp}");
+    assert!(
+        cp.contains("= if "),
+        "nested if-without-else must produce a result:\n{cp}"
+    );
+
     assert_roundtrips(&ir);
 }
 

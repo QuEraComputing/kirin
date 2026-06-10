@@ -110,6 +110,49 @@ pub fn pick_module() -> Module {
     }
 }
 
+/// An `if` with **no `else`** that conditionally overwrites a variable defined
+/// before it. The join must carry `y` out of the `if` (the path that doesn't
+/// assign it falls through to the prior value) even though only one branch
+/// writes it.
+///
+/// ```text
+/// def f(x: int) -> int:
+///     y = 0
+///     if x > 0:
+///         y = 100
+///     return y
+/// ```
+pub fn if_without_else_module() -> Module {
+    Module {
+        body: vec![FunctionDef {
+            name: "f".into(),
+            args: vec![int_arg("x")],
+            returns: Some(PyType::Int),
+            body: vec![
+                Stmt::Assign {
+                    target: "y".into(),
+                    value: Expr::Constant(Const::Int(0)),
+                },
+                Stmt::If {
+                    test: Expr::Compare {
+                        op: CmpOp::Gt,
+                        lhs: Box::new(name("x")),
+                        rhs: Box::new(Expr::Constant(Const::Int(0))),
+                    },
+                    body: vec![Stmt::Assign {
+                        target: "y".into(),
+                        value: Expr::Constant(Const::Int(100)),
+                    }],
+                    orelse: vec![],
+                },
+                Stmt::Return {
+                    value: Some(name("y")),
+                },
+            ],
+        }],
+    }
+}
+
 /// `def sum_to(n): s = 0; for i in range(0, n): s = s + i; return s`
 pub fn sum_to_module() -> Module {
     Module {
@@ -175,6 +218,123 @@ pub fn call_module() -> Module {
     }
 }
 
+/// Nested call: a call result feeds directly into another call's argument.
+///
+/// ```text
+/// def inc(x: int) -> int:    return x + 1
+/// def main(y: int) -> int:   return inc(inc(y))
+/// ```
+pub fn nested_call_module() -> Module {
+    Module {
+        body: vec![
+            FunctionDef {
+                name: "inc".into(),
+                args: vec![int_arg("x")],
+                returns: Some(PyType::Int),
+                body: vec![Stmt::Return {
+                    value: Some(binop(BinOp::Add, name("x"), Expr::Constant(Const::Int(1)))),
+                }],
+            },
+            FunctionDef {
+                name: "main".into(),
+                args: vec![int_arg("y")],
+                returns: Some(PyType::Int),
+                body: vec![Stmt::Return {
+                    value: Some(Expr::Call {
+                        func: "inc".into(),
+                        args: vec![Expr::Call {
+                            func: "inc".into(),
+                            args: vec![name("y")],
+                        }],
+                    }),
+                }],
+            },
+        ],
+    }
+}
+
+/// Multi-arg call with *computed* arguments whose result is consumed by
+/// arithmetic — exercises operand evaluation order and call-result threading.
+///
+/// ```text
+/// def combine(a: int, b: int) -> int:  return a * b
+/// def main(x: int) -> int:
+///     z = combine(x + 1, x - 1)
+///     return z + z
+/// ```
+pub fn combine_call_module() -> Module {
+    Module {
+        body: vec![
+            FunctionDef {
+                name: "combine".into(),
+                args: vec![int_arg("a"), int_arg("b")],
+                returns: Some(PyType::Int),
+                body: vec![Stmt::Return {
+                    value: Some(binop(BinOp::Mul, name("a"), name("b"))),
+                }],
+            },
+            FunctionDef {
+                name: "main".into(),
+                args: vec![int_arg("x")],
+                returns: Some(PyType::Int),
+                body: vec![
+                    Stmt::Assign {
+                        target: "z".into(),
+                        value: Expr::Call {
+                            func: "combine".into(),
+                            args: vec![
+                                binop(BinOp::Add, name("x"), Expr::Constant(Const::Int(1))),
+                                binop(BinOp::Sub, name("x"), Expr::Constant(Const::Int(1))),
+                            ],
+                        },
+                    },
+                    Stmt::Return {
+                        value: Some(binop(BinOp::Add, name("z"), name("z"))),
+                    },
+                ],
+            },
+        ],
+    }
+}
+
+/// A call in bare-expression-statement position: its result is discarded and
+/// the function returns its own argument instead.
+///
+/// ```text
+/// def effect(x: int) -> int:  return x + x
+/// def main(y: int) -> int:
+///     effect(y)
+///     return y
+/// ```
+pub fn discarded_call_module() -> Module {
+    Module {
+        body: vec![
+            FunctionDef {
+                name: "effect".into(),
+                args: vec![int_arg("x")],
+                returns: Some(PyType::Int),
+                body: vec![Stmt::Return {
+                    value: Some(binop(BinOp::Add, name("x"), name("x"))),
+                }],
+            },
+            FunctionDef {
+                name: "main".into(),
+                args: vec![int_arg("y")],
+                returns: Some(PyType::Int),
+                body: vec![
+                    Stmt::Expr(Expr::Call {
+                        func: "effect".into(),
+                        args: vec![name("y")],
+                    }),
+                    Stmt::Return {
+                        value: Some(name("y")),
+                    },
+                ],
+            },
+        ],
+    }
+}
+
 /// `def factorial(n): if n <= 1: r = 1 else: r = n * factorial(n - 1); return r`
 /// Recursion expressed via if/else value-merge (no early return).
 pub fn factorial_module() -> Module {
@@ -224,8 +384,12 @@ pub fn all_modules() -> Vec<Module> {
         add_module(),
         arith_chain_module(),
         pick_module(),
+        if_without_else_module(),
         sum_to_module(),
         call_module(),
+        nested_call_module(),
+        combine_call_module(),
+        discarded_call_module(),
         factorial_module(),
     ]
 }

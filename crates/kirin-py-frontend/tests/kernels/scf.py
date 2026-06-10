@@ -40,3 +40,22 @@ def matrix_count(rows: int, cols: int) -> int:
         for j in range(0, cols):
             total = total + 1
     return total
+
+
+def relu(x: int) -> int:
+    # `if` with no `else`: on the false path `y` keeps its prior value (0), so
+    # the scf.if must still produce a result that merges both paths.
+    y = 0
+    if x > 0:
+        y = x
+    return y
+
+
+def count_positive(n: int) -> int:
+    # `if`-without-`else` inside a loop, conditionally updating the loop-carried
+    # accumulator `total` (only the then-branch writes it).
+    total = 0
+    for i in range(0, n):
+        if i > 2:
+            total = total + i
+    return total

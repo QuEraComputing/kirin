@@ -32,13 +32,24 @@ pub(crate) fn lower_if(
 ) -> Result<(), LowerError> {
     let cond = super::expr::lower_expr(ctx, test, frame, buf)?;
 
-    // Live-out join set: names assigned on both paths, in a deterministic order.
+    // Live-out join set, in a deterministic order: a name is carried out of the
+    // `if` when it holds a defined value on *both* exit paths — assigned on that
+    // path, or already defined before the `if` (so the branch that doesn't
+    // assign it falls through to the prior value). Assigned-in-both subsumes the
+    // no-prior-definition case (e.g. `pick`/`factorial`, where `r` is bound in
+    // each branch); a name assigned in only one branch (e.g. an `if` with no
+    // `else`) is carried only if it was defined beforehand.
     let mut then_assigned = BTreeSet::new();
     assigned_names(body, &mut then_assigned);
     let mut else_assigned = BTreeSet::new();
     assigned_names(orelse, &mut else_assigned);
     let joined: Vec<String> = then_assigned
-        .intersection(&else_assigned)
+        .union(&else_assigned)
+        .filter(|name| {
+            let defined_before = frame.lookup(name).is_some();
+            (then_assigned.contains(*name) || defined_before)
+                && (else_assigned.contains(*name) || defined_before)
+        })
         .cloned()
         .collect();
 
