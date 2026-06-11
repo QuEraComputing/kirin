@@ -26,7 +26,10 @@ enum Command {
     Run {
         /// Path to the .kirin file
         file: std::path::PathBuf,
-        /// Stage name (e.g. "source" or "lowered")
+        /// Stage name to enter at (e.g. "source" or "lowered").
+        ///
+        /// Calls from the entered function may cross into other stages
+        /// unless `--per-language` is set.
         #[arg(long)]
         stage: String,
         /// Function name (e.g. "main")
@@ -38,6 +41,11 @@ enum Command {
         /// Run constant propagation instead of concrete execution.
         #[arg(long)]
         constprop: bool,
+        /// Restrict execution to the entry stage's language; reject calls
+        /// that would dispatch into a different stage. Default is cross-
+        /// language.
+        #[arg(long)]
+        per_language: bool,
     },
 }
 
@@ -58,7 +66,15 @@ fn main() -> anyhow::Result<()> {
             function: func_name,
             args,
             constprop,
-        } => run_program(&file, &stage_name, &func_name, &args, constprop),
+            per_language,
+        } => run_program(
+            &file,
+            &stage_name,
+            &func_name,
+            &args,
+            constprop,
+            per_language,
+        ),
     }
 }
 
@@ -68,6 +84,7 @@ fn run_program(
     func_name: &str,
     cli_args: &[String],
     constprop: bool,
+    per_language: bool,
 ) -> anyhow::Result<()> {
     let src = std::fs::read_to_string(file)?;
     let mut pipeline: Pipeline<Stage> = Pipeline::new();
@@ -101,10 +118,14 @@ fn run_program(
         return Ok(());
     }
 
-    let result = match stage_name {
-        "source" => interpreter::run_source_i64(&pipeline, func_name, &args)?,
-        "lowered" => interpreter::run_lowered_i64(&pipeline, func_name, &args)?,
-        other => anyhow::bail!("unknown stage '{}'", other),
+    let result = if per_language {
+        match stage_name {
+            "source" => interpreter::run_source_i64(&pipeline, func_name, &args)?,
+            "lowered" => interpreter::run_lowered_i64(&pipeline, func_name, &args)?,
+            other => anyhow::bail!("unknown stage '{}'", other),
+        }
+    } else {
+        interpreter::run_i64(&pipeline, stage_name, func_name, &args)?
     };
     println!("{result}");
     Ok(())

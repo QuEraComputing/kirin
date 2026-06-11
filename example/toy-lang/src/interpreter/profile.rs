@@ -36,32 +36,6 @@ impl InterpreterProfile for ToyLoweredConcrete {
     type Error = ToyError;
 }
 
-/// Abstract const-prop execution at the source (HighLevel) stage (single run).
-#[cfg(test)]
-pub struct ToySourceConstProp;
-
-#[cfg(test)]
-impl InterpreterProfile for ToySourceConstProp {
-    type Stage = Stage;
-    type Value = ConstProp;
-    type Frame = ToyFrame<HighLevel, ConstProp, AbstractBlockTransfer<ConstProp>>;
-    type Completion = ToyCompletion<ConstProp>;
-    type Error = ToyError;
-}
-
-/// Abstract const-prop execution at the lowered stage (single run).
-#[cfg(test)]
-pub struct ToyLoweredConstProp;
-
-#[cfg(test)]
-impl InterpreterProfile for ToyLoweredConstProp {
-    type Stage = Stage;
-    type Value = ConstProp;
-    type Frame = ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>>;
-    type Completion = ToyCompletion<ConstProp>;
-    type Error = ToyError;
-}
-
 /// Const-prop fixpoint analysis that traverses both stages via [`ToyStageFrame`].
 pub struct ToyConstPropFunction;
 
@@ -74,25 +48,6 @@ impl InterpreterProfile for ToyConstPropFunction {
 }
 
 impl FixpointProfile for ToyConstPropFunction {
-    type SummaryKey = ConstPropOwner;
-    type Summary = ConstPropSummary<ConstProp, ScfForConstPropSummary<ConstProp>>;
-}
-
-/// Const-prop fixpoint analysis pinned to the lowered stage.
-#[cfg(test)]
-pub struct ToyConstPropLowered;
-
-#[cfg(test)]
-impl InterpreterProfile for ToyConstPropLowered {
-    type Stage = Stage;
-    type Value = ConstProp;
-    type Frame = ToyFrame<LowLevel, ConstProp, AbstractBlockTransfer<ConstProp>>;
-    type Completion = ToyCompletion<ConstProp>;
-    type Error = ToyError;
-}
-
-#[cfg(test)]
-impl FixpointProfile for ToyConstPropLowered {
     type SummaryKey = ConstPropOwner;
     type Summary = ConstPropSummary<ConstProp, ScfForConstPropSummary<ConstProp>>;
 }

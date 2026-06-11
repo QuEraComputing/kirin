@@ -5,9 +5,20 @@ use kirin_arith::ArithType;
 use kirin_function::{Call, Function, Return};
 use kirin_interpreter::{AbstractInterpreter, FunctionInvocation, expect_single_function_return};
 
-use super::*;
+use crate::interpreter::{
+    ConstProp, ToyError, analyze_lowered_constprop_fixpoint, analyze_source_constprop_fixpoint,
+    run_i64, run_source_i64,
+};
 use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
+
+use super::directional::{
+    analyze_lowered_constprop_backward_dependencies, analyze_lowered_constprop_forward_dependencies,
+};
+use super::profile::ToySourceConstProp;
+use super::single_run::{
+    analyze_lowered_constprop, analyze_source_constprop, analyze_source_constprop_invocation,
+};
 
 const ADD_LOWERED: &str = r#"
 stage @lowered fn @add(i64, i64) -> i64;
@@ -207,28 +218,28 @@ fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
 
 #[test]
 fn runs_source_add() {
-    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/add.kirin"));
     let result = run_source_i64(&pipeline, "main", &[3, 5]).unwrap();
     assert_eq!(result, 8);
 }
 
 #[test]
 fn runs_source_branching() {
-    let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/branching.kirin"));
     assert_eq!(run_source_i64(&pipeline, "abs", &[-7]).unwrap(), 7);
     assert_eq!(run_source_i64(&pipeline, "abs", &[7]).unwrap(), 7);
 }
 
 #[test]
 fn runs_source_recursive_factorial() {
-    let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/factorial.kirin"));
     let result = run_source_i64(&pipeline, "factorial", &[5]).unwrap();
     assert_eq!(result, 120);
 }
 
 #[test]
 fn constprop_source_add() {
-    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/add.kirin"));
     let result = analyze_source_constprop(
         &pipeline,
         "main",
@@ -240,7 +251,7 @@ fn constprop_source_add() {
 
 #[test]
 fn constprop_fixpoint_source_add() {
-    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/add.kirin"));
     let result = analyze_source_constprop_fixpoint(
         &pipeline,
         "main",
@@ -252,7 +263,7 @@ fn constprop_fixpoint_source_add() {
 
 #[test]
 fn constprop_fixpoint_source_entry_variants() {
-    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/add.kirin"));
     let stage = pipeline.stage_by_name("source").unwrap();
     let symbol = pipeline.lookup_symbol("main").unwrap();
     let function = pipeline.function_by_name(symbol).unwrap();
@@ -270,7 +281,7 @@ fn constprop_fixpoint_source_entry_variants() {
     let args = || Product::from_vec(vec![ConstProp::Const(3), ConstProp::Const(5)]);
 
     assert_eq!(
-        super::fixpoint::analyze_source_constprop_invocation(
+        analyze_source_constprop_invocation(
             &pipeline,
             FunctionInvocation::function(stage, function, args())
         )
@@ -278,7 +289,7 @@ fn constprop_fixpoint_source_entry_variants() {
         ConstProp::Const(8)
     );
     assert_eq!(
-        super::fixpoint::analyze_source_constprop_invocation(
+        analyze_source_constprop_invocation(
             &pipeline,
             FunctionInvocation::staged_function(stage, staged, args())
         )
@@ -286,7 +297,7 @@ fn constprop_fixpoint_source_entry_variants() {
         ConstProp::Const(8)
     );
     assert_eq!(
-        super::fixpoint::analyze_source_constprop_invocation(
+        analyze_source_constprop_invocation(
             &pipeline,
             FunctionInvocation::specialized_function(stage, specialized, args())
         )
@@ -294,8 +305,7 @@ fn constprop_fixpoint_source_entry_variants() {
         ConstProp::Const(8)
     );
 
-    let mut staged_interp =
-        AbstractInterpreter::<super::profile::ToySourceConstProp>::new(&pipeline);
+    let mut staged_interp = AbstractInterpreter::<ToySourceConstProp>::new(&pipeline);
     assert_eq!(
         expect_single_function_return::<_, _, ToyError>(
             staged_interp
@@ -308,8 +318,7 @@ fn constprop_fixpoint_source_entry_variants() {
         ConstProp::Const(8)
     );
 
-    let mut specialized_interp =
-        AbstractInterpreter::<super::profile::ToySourceConstProp>::new(&pipeline);
+    let mut specialized_interp = AbstractInterpreter::<ToySourceConstProp>::new(&pipeline);
     assert_eq!(
         expect_single_function_return::<_, _, ToyError>(
             specialized_interp
@@ -325,7 +334,7 @@ fn constprop_fixpoint_source_entry_variants() {
 
 #[test]
 fn constprop_fixpoint_source_unknown_branch_joins_yields() {
-    let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/branching.kirin"));
     let result = analyze_source_constprop_fixpoint(&pipeline, "abs", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Top);
 }
@@ -340,6 +349,20 @@ fn constprop_fixpoint_source_for_owner_keeps_stable_carried_value() {
     )
     .unwrap();
     assert_eq!(result, ConstProp::Const(0));
+}
+
+#[test]
+fn runs_cross_stage_source_to_lowered_to_source_concretely() {
+    let pipeline = build_pipeline(CROSS_STAGE_CALLS);
+
+    // source_to_lowered_to_source(-7) calls @low_then_high (bodied at
+    // lowered) which calls @source_abs (bodied at source). The cross-stage
+    // concrete runner must route both calls to their bodied stages.
+    let result = run_i64(&pipeline, "source", "source_to_lowered_to_source", &[-7]).unwrap();
+    assert_eq!(result, 8);
+
+    let lowered_result = run_i64(&pipeline, "lowered", "low_then_high", &[-4]).unwrap();
+    assert_eq!(lowered_result, 5);
 }
 
 #[test]
@@ -376,7 +399,7 @@ fn constprop_fixpoint_cross_stage_call_specialized_uses_direct_target() {
 
 #[test]
 fn constprop_source_add_with_unknown() {
-    let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/add.kirin"));
     let result =
         analyze_source_constprop(&pipeline, "main", &[ConstProp::Top, ConstProp::Const(5)])
             .unwrap();
@@ -385,7 +408,7 @@ fn constprop_source_add_with_unknown() {
 
 #[test]
 fn constprop_source_known_branch() {
-    let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/branching.kirin"));
     assert_eq!(
         analyze_source_constprop(&pipeline, "abs", &[ConstProp::Const(-7)]).unwrap(),
         ConstProp::Const(7)
@@ -398,7 +421,7 @@ fn constprop_source_known_branch() {
 
 #[test]
 fn constprop_source_unknown_branch_joins_yields() {
-    let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
+    let pipeline = build_pipeline(include_str!("../../../programs/branching.kirin"));
     let result = analyze_source_constprop(&pipeline, "abs", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Top);
 }
