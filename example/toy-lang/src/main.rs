@@ -101,19 +101,8 @@ fn run_program(
             .copied()
             .map(kirin_constprop::ConstPropValue::Const)
             .collect::<Vec<_>>();
-        let result = match stage_name {
-            "source" => interpreter::analyze_source_constprop_fixpoint(
-                &pipeline,
-                func_name,
-                &abstract_args,
-            )?,
-            "lowered" => interpreter::analyze_lowered_constprop_fixpoint(
-                &pipeline,
-                func_name,
-                &abstract_args,
-            )?,
-            other => anyhow::bail!("unknown stage '{}'", other),
-        };
+        let result =
+            interpreter::analyze_constprop(&pipeline, stage_name, func_name, &abstract_args)?;
         println!("{result:?}");
         return Ok(());
     }

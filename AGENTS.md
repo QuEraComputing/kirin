@@ -93,7 +93,7 @@ For user-defined dialects not in this table, ask the user for domain context dur
 - `kirin-derive-chumsky` — `#[derive(HasParser, PrettyPrint)]` (proc-macro + code generation)
 
 **Interpreter:**
-- `kirin-interpreter` — frame-fusion interpreter framework for concrete and abstract interpretation (`ConcreteInterpreter`, `AbstractInterpreter`, `StandardFixpointInterpreter`, standard frames)
+- `kirin-interpreter` — effect-algebra interpreter framework for concrete and abstract interpretation (`Interpretable`/`Ctx`/`Effect` for dialect authors; `ConcreteInterpreter`, `AbstractInterpreter`, and `Linker` components for compiler authors)
 
 **Dialects:**
 - `kirin-cf`, `kirin-scf`, `kirin-constant`, `kirin-arith`, `kirin-bitwise`, `kirin-cmp`, `kirin-function`
@@ -101,7 +101,7 @@ For user-defined dialects not in this table, ask the user for domain context dur
 **Derive Infrastructure:**
 - `kirin-derive-toolkit` — Shared derive utilities (IR model, darling re-export, template system)
 - `kirin-derive-ir` — `#[derive(Dialect, StageMeta)]` and IR property traits
-- `kirin-derive-interpreter` — `kirin-interpreter` derive proc macros (`#[derive(Frame)]`, `#[derive(Interpretable)]`, `#[derive(FunctionEntry)]`, `#[derive(Completion)]`, `#[derive(LiftError)]`, `#[derive(HasLocation)]`)
+- `kirin-derive-interpreter` — `kirin-interpreter` derive proc macros (`#[derive(Interpretable)]`, `#[derive(FunctionEntry)]`, `#[derive(InterpDispatch)]`)
 - `kirin-derive-prettyless` — `#[derive(RenderDispatch)]` (proc-macro)
 
 **Analysis:**
@@ -138,29 +138,29 @@ For user-defined dialects not in this table, ask the user for domain context dur
 
 ## Interpreter Conventions
 
-- **Current framework**: Interpreter work belongs in `kirin-interpreter`. Dialect-specific implementations live in `src/interpreter.rs` or `src/interpreter/mod.rs` inside each dialect crate. The previous `kirin-interpreter-20` and `interpreter-new`/legacy `kirin-interpreter` crates have been removed; do not add new code against them.
+- **Current framework**: Interpreter work belongs in `kirin-interpreter`. Dialect-specific implementations live in `src/interpreter.rs` inside each dialect crate. The design doc is `docs/design/interpreter/index.md`; update it when the framework changes.
 
-- **Design source**: The checked-in design for the current framework is under `docs/design/new-interpreter/`. Do not revive stale interpreter-2/interpreter-4/interpreter-9 design documents; update the new-interpreter docs instead.
+- **Two-persona contract**: Dialect authors implement `Interpretable<I>` (and `FunctionEntry<I>` for callable statements) using only `Ctx`, the `Effect` algebra, and value-domain bounds on `I::Value`. Compiler authors compose language enums with derives, pick a value type, error type, engine, and linker — they never implement framework traits by hand. Imports come from `kirin_interpreter::dialect` and `kirin_interpreter::engine` respectively.
 
-- **Frame fusion model**: A `Frame` is a continuation object anchored at a semantic-independent `Location`. `ConcreteInterpreter` and abstract drivers own the driver loop; frames consume `self` in `step`, `resume_done`, and `resume`, then return `FrameEffect<F, C>`. This keeps the interpreter stack explicit and avoids using the Rust call stack for interpreter control flow.
+- **Statement dispatch**: Dialect statements implement `Interpretable<I: Interp>` — one generic parameter; `I::Value`/`I::Error` are associated types. Atomic statements read/write SSA state through `Ctx` (`ctx.read`, `ctx.write`, `ctx.read_many`, `ctx.write_results`) and return `Effect::Next`. Control statements return `Jump`/`Branch` (CFG edges), `Call`, `Yield`/`Return` (completions), or `Enter`/`EnterAny` (structured scopes).
 
-- **Statement dispatch**: Dialect statements implement `Interpretable<L, I, F, C, E, T>` with `Interpretable::interpret`. Atomic statements mutate SSA state through `Env` and return `StatementEffect::Done`. Non-atomic statements return `StatementEffect::Push(frame)`, `StatementEffect::Transfer(transfer)`, or `StatementEffect::Complete(completion)`.
+- **Dialects are engine-blind**: one `Interpretable` impl serves concrete execution and abstract interpretation; the value domain decides. Undecided conditions (`BranchCondition::is_truthy` / `ForLoopValue::loop_condition` returning `None`) surface as the undecided effect variants (`Branch`, `EnterAny`, `ScopeStep::RepeatOrFinish`); concrete engines reject them, the abstract engine explores and joins. Never write per-engine dialect impls or new engine-capability dispatch traits.
 
-- **Env access**: `Env<V>` is the SSA store capability. It exposes `alloc`, `free`, `read`, `write`, `read_many`, and `write_product` using explicit `EnvIndex` values. `read_many` returns `Product<V>`, not `Vec<V>`. Concrete execution typically uses `EnvStackStore<V>`; abstract execution can use `AbstractEnvStore<V>` or another store through `AbstractInterpreterWithStore`.
+- **Structured control flow**: scf-style operations build `Scope::block(..)` values — `.args(..)` for entry arguments, `.bind(..)` for result slots, `.on_yield(hook)` for loop policy. Without a hook, the first yield finishes the scope (the `if` shape). `ScopeHook::on_yield` receives the *current entry product* (joined state under abstract interpretation) and must derive iteration state from it, not from captured values. Loop fixpoints (join/widen until stable) are engine-owned.
 
-- **Products and multi-result**: `kirin_ir::Product<T>` is the framework packet for call arguments, block arguments, branch arguments, function returns, and SCF yields. `StandardCompletion::FunctionReturned(Product<V>)` and `ScfCompletion::Yield(Product<V>)` carry products directly. Use `Env::write_product` to destructure into SSA result slots. `HasProductValue` is only for value domains that expose an explicit tuple/product runtime value for the tuple dialect; it is not required for ordinary multi-result return/yield plumbing.
+- **Calling conventions are linkers**: `Linker<S>` resolves `Callee` to a `(stage, specialization, body)` target and is passed to engines by value (`.with_linker(..)`). `SameStageLinker` is the default; `CrossStageLinker` routes calls to whichever stage has a live specialization, which is all that cross-language execution *and* cross-language analysis require. Policy must be a component (field), never a trait impl on an engine type.
 
-- **Concrete vs abstract transfers**: Transfer payloads are frame/interpreter-specific. Concrete CFG execution uses `ConcreteBlockTransfer<V>` with `Jump`. Abstract execution can use `AbstractBlockTransfer<V>` with `Jump` and `Branch`; unknown branches become `Branch` and are handled by abstract branch frames or by a fixpoint owner strategy.
+- **Engines**: `ConcreteInterpreter<'ir, S, V, E, Lk>` executes with an explicit scope stack (no Rust-stack recursion for interpreter control flow). `AbstractInterpreter<'ir, S, V, E, Lk>` is the fixpoint analyzer over a lattice `V: Widen` (reads of unbound values are `bottom`): block-worklist CFG evaluation with widening, scope re-entry until stable, and interprocedural entry/return `Product<V>` function summaries with caller re-enqueueing. Analysis crates are a lattice plus an `AbstractInterpreter` type alias (see `kirin-constprop`).
 
-- **Standard frames**: Reuse standard frames from `kirin_interpreter::standard` for common IR traversal and call conventions: `StatementFrame`, `BlockFrame`, `RegionFrame`, `CallFrame`, `FunctionFrame`, `StagedFunctionFrame`, and `SpecializedFunctionFrame`. `RegionFrame` follows CFG convention: it enters the entry block and subsequent block movement is driven by block transfers, not by iterating region blocks.
+- **Stage dispatch**: stage enums add `#[derive(InterpDispatch)]` next to `StageMeta`/`ParseDispatch`; single-language pipelines get a blanket impl. Engine-internal IR queries (block params, statement order, region entry, specialization, symbols) go through `StageQuery`, a bound bundle over kirin-ir's `StageAction` dispatch — satisfied automatically by any stage enum.
 
-- **Frame construction & dispatch**: There are exactly two traits, one per side of the boundary. The frame side implements [`StageFrame<S, V>`](crate::StageFrame) with `from_function_invocation(&S, …)` and `from_block(&S, …)`; single-language frames receive a blanket impl via `StandardFrame<L, V, T>`, multi-stage frames are emitted by `#[derive(StageFrame)]` (single-language enums need no attribute; multi-stage enums use `#[stage_frame(stage = StageEnum)]`). The interpreter side implements [`FrameDispatch<F, V, E>`](crate::FrameDispatch), which exposes `dispatch_function_invocation` and `dispatch_block`; the framework provides blanket impls for `ConcreteInterpreter`, `AbstractInterpreterWithStore`, and `StandardFixpointInterpreter` whenever the frame satisfies `StageFrame`. **Do not** add new dispatch traits that duplicate either of these — `StageFrame` covers all frame-side construction, `FrameDispatch` covers all interpreter-side dispatch.
+- **Products and multi-result**: `kirin_ir::Product<T>` is the framework packet for call/block/branch arguments, function returns, and SCF yields. `HasProductValue` is only for value domains that expose an explicit tuple runtime value (the tuple dialect); it is not needed for ordinary multi-result plumbing.
 
-- **Function dialect naming**: `kirin_function::Function<T>` is the standard function statement. `FunctionBody<T>` exists only as a deprecated compatibility alias. New code should use `Function<T>`, `FunctionEntry`, and the standard function/call frames.
+- **Derive naming rule**: every interpreter derive is named after the trait it implements (`Interpretable`, `FunctionEntry`, `InterpDispatch`). Do not add derives whose names are not trait names.
 
-- **Lift/project algebra**: Frame, completion, error, and summary composition should use lift/project traits, not `From`/`Into`, when the direction matters. Use `.lift()` only for infallible lifts, like `.into()`, and `.try_lift()` for fallible lifts, like `.try_into()`. Infallible `TryLiftFrom` impls should use `Error = core::convert::Infallible`. Error composition should usually be `E: LiftFrom<SomeError>` and call `E::lift_from(error)`.
+- **Function dialect naming**: `kirin_function::Function<T>` is the standard function statement. New code should use `Function<T>` with `FunctionEntry` and `Effect::Call`/`Effect::Return`.
 
-- **Abstract interpretation**: `SimpleFixpointInterpreter` is owner-summary based: an owner maps to a `Summary`, `OwnerSemantics` builds the entry frame and merges completions back into summaries, and `Summary::merge` owns join/widen/narrow behavior. Use this for fixpoint analyses; use direct `AbstractInterpreter` only for single abstract executions that do not need owner-summary convergence.
+- **Backward analyses**: liveness-style backward dataflow is out of scope for this framework (it solves flow equations, it does not execute). It belongs in a separate direction-parametric dataflow solver sharing the lattice traits; do not force it through `Interpretable`/`Effect`.
 
 ## Chumsky Parser Conventions
 

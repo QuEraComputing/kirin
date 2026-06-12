@@ -1,80 +1,55 @@
-use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
-use kirin_interpreter::{BlockTransfer, Env, Interpretable, Location, StatementEffect};
+use kirin::prelude::CompileTimeValue;
+use kirin_interpreter::dialect::{Ctx, Effect, Interp, Interpretable};
 
 use crate::{Cmp, CompareValue};
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Cmp<T>
+impl<I, T> Interpretable<I> for Cmp<T>
 where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    X: BlockTransfer,
-    X::Value: CompareValue,
-    <X::Value as CompareValue>::Bool: Into<X::Value>,
+    I: Interp,
+    I::Value: CompareValue,
+    <I::Value as CompareValue>::Bool: Into<I::Value>,
     T: CompileTimeValue,
 {
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
+    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<Effect<I::Value, I::Error>, I::Error> {
         match self {
             Cmp::Eq {
                 lhs, rhs, result, ..
             } => {
-                let value = interp
-                    .read(env, *lhs)?
-                    .cmp_eq(&interp.read(env, *rhs)?)
-                    .into();
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = ctx.read(*lhs)?.cmp_eq(&ctx.read(*rhs)?).into();
+                ctx.write(*result, value)?;
             }
             Cmp::Ne {
                 lhs, rhs, result, ..
             } => {
-                let value = interp
-                    .read(env, *lhs)?
-                    .cmp_ne(&interp.read(env, *rhs)?)
-                    .into();
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = ctx.read(*lhs)?.cmp_ne(&ctx.read(*rhs)?).into();
+                ctx.write(*result, value)?;
             }
             Cmp::Lt {
                 lhs, rhs, result, ..
             } => {
-                let value = interp
-                    .read(env, *lhs)?
-                    .cmp_lt(&interp.read(env, *rhs)?)
-                    .into();
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = ctx.read(*lhs)?.cmp_lt(&ctx.read(*rhs)?).into();
+                ctx.write(*result, value)?;
             }
             Cmp::Le {
                 lhs, rhs, result, ..
             } => {
-                let value = interp
-                    .read(env, *lhs)?
-                    .cmp_le(&interp.read(env, *rhs)?)
-                    .into();
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = ctx.read(*lhs)?.cmp_le(&ctx.read(*rhs)?).into();
+                ctx.write(*result, value)?;
             }
             Cmp::Gt {
                 lhs, rhs, result, ..
             } => {
-                let value = interp
-                    .read(env, *lhs)?
-                    .cmp_gt(&interp.read(env, *rhs)?)
-                    .into();
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = ctx.read(*lhs)?.cmp_gt(&ctx.read(*rhs)?).into();
+                ctx.write(*result, value)?;
             }
             Cmp::Ge {
                 lhs, rhs, result, ..
             } => {
-                let value = interp
-                    .read(env, *lhs)?
-                    .cmp_ge(&interp.read(env, *rhs)?)
-                    .into();
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = ctx.read(*lhs)?.cmp_ge(&ctx.read(*rhs)?).into();
+                ctx.write(*result, value)?;
             }
             Cmp::__Phantom(..) => unreachable!(),
         }
-        Ok(StatementEffect::Done)
+        Ok(Effect::Next)
     }
 }

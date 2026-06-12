@@ -1,45 +1,62 @@
-pub mod abstract_interp;
-pub mod concrete;
-pub mod dispatch;
-pub mod effect;
-pub mod env;
-pub mod error;
-pub mod frame;
-pub mod location;
-#[macro_use]
-mod macros;
-pub mod profile;
-pub mod standard;
-pub mod value;
+//! Interpreter framework for Kirin IR.
+//!
+//! The framework is organized around a two-persona contract:
+//!
+//! - **Dialect authors** implement [`Interpretable`] (and [`FunctionEntry`]
+//!   for callable statements). They see three concepts: the interpreter
+//!   context [`Interp`]/[`Ctx`], the closed [`Effect`] algebra, and plain
+//!   value-domain bounds on `I::Value`. Structured dialects additionally use
+//!   [`Scope`]/[`ScopeHook`].
+//! - **Compiler authors** compose languages into stage enums (deriving
+//!   [`InterpDispatch`] alongside `StageMeta`) and run engines:
+//!   [`ConcreteInterpreter`] for execution, [`AbstractInterpreter`] for
+//!   lattice-based fixpoint analysis. Calling conventions are [`Linker`]
+//!   components passed by value — [`SameStageLinker`] (default) or
+//!   [`CrossStageLinker`] for multi-language pipelines.
+//!
+//! Engines interpret the same dialect rules: concrete and abstract execution
+//! differ only in the value domain and in how undecided control flow
+//! ([`Effect::Branch`], [`Effect::EnterAny`], [`ScopeStep::RepeatOrFinish`])
+//! is driven.
 
-pub use abstract_interp::{
-    AbstractEnv, AbstractEnvStore, AbstractInterpreter, AbstractInterpreterWithStore,
-    AbstractValue, BackwardSummaryDeps, ContextStrategy, EnvSummary, FixpointPhase,
-    ForwardSummaryDeps, NodeContext, OwnerSemantics, OwnerSummaryDeps, SimpleFixpointInterpreter,
-    StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
-    SummaryKey, WidenNarrowStrategy, WorkItem,
-};
-pub use concrete::{ConcreteInterpreter, StepResult};
-pub use dispatch::{Interpretable, StageAccess, StatementDispatch};
-pub use effect::{
-    AbstractBlockTransfer, BlockTransfer, ConcreteBlockTransfer, FrameEffect, StandardCompletion,
-    StatementEffect, expect_single_function_return,
-};
-pub use env::{Env, EnvIndex, EnvStackStore, ForkEnv};
+mod abstract_interp;
+mod concrete;
+mod ctx;
+mod dispatch;
+mod effect;
+mod env;
+mod error;
+mod linker;
+mod query;
+mod value;
+
+pub use abstract_interp::AbstractInterpreter;
+pub use concrete::ConcreteInterpreter;
+pub use ctx::{Ctx, EnvOps, Interp};
+pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
+pub use effect::{CallEffect, Callee, Edge, Effect, Scope, ScopeBody, ScopeHook, ScopeStep};
+pub use env::{Env, EnvIndex, EnvStackStore};
+
 pub use error::InterpreterError;
-pub use frame::{Frame, HasLocation, ProjectOrSelf};
-pub use location::{Location, Position, Traversal};
-pub use profile::{FixpointProfile, InterpreterProfile};
-pub use standard::{
-    AbstractBranchFrame, AbstractBranchState, BlockFrame, BlockTransferDispatch, CallFrame, Callee,
-    FrameDispatch, FunctionAccess, FunctionBodyDispatch, FunctionEntry, FunctionEntryTarget,
-    FunctionFrame, FunctionInvocation, FunctionInvokeBuilder, FunctionInvokeTargetBuilder,
-    RegionFrame, SpecializedFunctionFrame, SpecializedFunctionState, StageFrame,
-    StagedFunctionFrame, StandardFrame, StatementFrame,
-};
-pub use value::{BranchCondition, HasProductValue};
+pub use linker::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
+pub use query::StageQuery;
+pub use value::{BranchCondition, HasProductValue, expect_single};
 
 #[cfg(feature = "derive")]
-pub use kirin_derive_interpreter::{
-    Completion, Frame, FunctionEntry, HasLocation, Interpretable, LiftError, StageFrame,
-};
+pub use kirin_derive_interpreter::{FunctionEntry, InterpDispatch, Interpretable};
+
+/// Everything a dialect author needs to implement interpretation.
+pub mod dialect {
+    pub use crate::{
+        BranchCondition, CallEffect, Callee, Ctx, Edge, Effect, EnvOps, FunctionEntry,
+        HasProductValue, Interp, Interpretable, InterpreterError, Scope, ScopeHook, ScopeStep,
+    };
+}
+
+/// Everything a compiler author needs to run interpreters and analyses.
+pub mod engine {
+    pub use crate::{
+        AbstractInterpreter, Callee, ConcreteInterpreter, CrossStageLinker, FunctionTarget,
+        InterpDispatch, InterpreterError, Linker, SameStageLinker, expect_single,
+    };
+}

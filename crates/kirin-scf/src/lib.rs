@@ -27,10 +27,6 @@
 
 mod value;
 pub use value::ForLoopValue;
-#[cfg(feature = "constprop")]
-mod constprop_impl;
-#[cfg(feature = "constprop")]
-pub use constprop_impl::ScfForConstPropSummary;
 pub mod interpreter;
 
 use kirin::prelude::*;

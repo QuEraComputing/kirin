@@ -1,26 +1,19 @@
-use kirin::prelude::{CompileTimeValue, Dialect, PrettyPrint, SSAValue, Typeof};
-use kirin_interpreter::{BlockTransfer, Env, Interpretable, Location, StatementEffect};
+use kirin::prelude::{CompileTimeValue, PrettyPrint, Typeof};
+use kirin_interpreter::dialect::{Ctx, Effect, Interp, Interpretable};
 
 use crate::Constant;
 
-impl<L, I, F, C, E, T, Ty, X> Interpretable<L, I, F, C, E, X> for Constant<T, Ty>
+impl<I, T, Ty> Interpretable<I> for Constant<T, Ty>
 where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    X: BlockTransfer,
-    X::Value: TryFrom<T>,
-    E: From<<X::Value as TryFrom<T>>::Error>,
+    I: Interp,
+    I::Value: TryFrom<T>,
+    I::Error: From<<I::Value as TryFrom<T>>::Error>,
     T: CompileTimeValue + Typeof<Ty> + Clone + PrettyPrint,
     Ty: CompileTimeValue,
 {
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        let value = X::Value::try_from(self.value.clone()).map_err(E::from)?;
-        interp.write(env, SSAValue::from(self.result), value)?;
-        Ok(StatementEffect::Done)
+    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<Effect<I::Value, I::Error>, I::Error> {
+        let value = I::Value::try_from(self.value.clone()).map_err(I::Error::from)?;
+        ctx.write(self.result, value)?;
+        Ok(Effect::Next)
     }
 }

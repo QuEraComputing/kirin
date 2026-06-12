@@ -1,376 +1,373 @@
-use std::marker::PhantomData;
+use kirin_ir::{Block, CompileStage, Pipeline, Product, SSAValue, StageMeta, Statement};
 
-use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo};
-
+use crate::ctx::EngineEnv;
 use crate::{
-    Env, EnvIndex, EnvStackStore, Frame, FrameEffect, FunctionInvocation, FunctionInvokeBuilder,
-    InterpreterError, InterpreterProfile, StageFrame,
+    Callee, Effect, Env, EnvIndex, EnvStackStore, FunctionTarget, Interp, InterpDispatch,
+    InterpreterError, Linker, SameStageLinker, Scope, ScopeBody, ScopeHook, ScopeStep, StageQuery,
+    query,
 };
 
-pub enum StepResult<C> {
-    Running,
-    Complete(C),
+/// Concrete executor: runs IR statements over a concrete value domain with an
+/// explicit scope stack (no Rust-stack recursion for interpreter control flow).
+///
+/// ```ignore
+/// let mut interp = ConcreteInterpreter::<Stage, i64, MyError>::new(&pipeline)
+///     .with_linker(CrossStageLinker);
+/// let result = interp.call_by_name("source", "main", [3, 5])?;
+/// ```
+pub struct ConcreteInterpreter<'ir, S: StageMeta, V, E, Lk = SameStageLinker> {
+    pipeline: &'ir Pipeline<S>,
+    linker: Lk,
+    store: EnvStackStore<V>,
+    frames: Vec<Frame<V, E>>,
 }
 
-pub struct ConcreteInterpreter<'ir, P: InterpreterProfile> {
-    pipeline: &'ir Pipeline<P::Stage>,
-    frames: Vec<P::Frame>,
-    envs: EnvStackStore<P::Value>,
-    _marker: PhantomData<P>,
+enum Frame<V, E> {
+    Scope(ScopeFrame<V, E>),
+    /// Awaiting a `Return` from the function scope above; binds the returned
+    /// product into the caller's activation.
+    Call {
+        env: EnvIndex,
+        results: Product<SSAValue>,
+    },
 }
 
-impl<'ir, P: InterpreterProfile> ConcreteInterpreter<'ir, P> {
-    pub fn new(pipeline: &'ir Pipeline<P::Stage>) -> Self {
+struct ScopeFrame<V, E> {
+    stage: CompileStage,
+    env: EnvIndex,
+    owns_env: bool,
+    function_boundary: bool,
+    /// Entry block of the scope body, for hook-driven re-entry.
+    entry_block: Block,
+    /// Entry arguments currently bound to the body parameters.
+    entry_args: Product<V>,
+    block: Block,
+    cursor: Option<Statement>,
+    results: Product<SSAValue>,
+    hook: Option<Box<dyn ScopeHook<V, E>>>,
+}
+
+impl<'ir, S: StageMeta, V, E> ConcreteInterpreter<'ir, S, V, E> {
+    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
             pipeline,
+            linker: SameStageLinker,
+            store: EnvStackStore::new(),
             frames: Vec::new(),
-            envs: EnvStackStore::new(),
-            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'ir, S: StageMeta, V, E, Lk> ConcreteInterpreter<'ir, S, V, E, Lk> {
+    /// Swap the calling-convention component.
+    pub fn with_linker<Lk2>(self, linker: Lk2) -> ConcreteInterpreter<'ir, S, V, E, Lk2> {
+        ConcreteInterpreter {
+            pipeline: self.pipeline,
+            linker,
+            store: self.store,
+            frames: self.frames,
         }
     }
 
-    pub fn pipeline(&self) -> &'ir Pipeline<P::Stage> {
+    pub fn pipeline(&self) -> &'ir Pipeline<S> {
         self.pipeline
     }
+}
 
-    pub fn push_frame(&mut self, frame: P::Frame) {
-        self.frames.push(frame);
+impl<'ir, S, V, E, Lk> Interp for ConcreteInterpreter<'ir, S, V, E, Lk>
+where
+    S: StageMeta,
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    type Value = V;
+    type Error = E;
+
+    fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<V, E> {
+        self.store.read(env, value).map_err(E::from)
     }
 
-    pub fn frame_depth(&self) -> usize {
-        self.frames.len()
+    fn env_write(&mut self, env: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
+        self.store.write(env, value, data).map_err(E::from)
     }
+}
 
-    pub fn invoke(&mut self, stage: CompileStage) -> FunctionInvokeBuilder<'_, Self> {
-        FunctionInvokeBuilder::new(self, stage)
-    }
-
-    pub fn push_env(&mut self) -> EnvIndex {
-        self.envs.push()
-    }
-
-    pub fn pop_env(&mut self) -> Result<EnvIndex, P::Error>
-    where
-        P::Error: From<InterpreterError>,
-    {
-        self.envs.pop().map_err(P::Error::from)
-    }
-
-    pub fn current_env(&self) -> Result<EnvIndex, P::Error>
-    where
-        P::Error: From<InterpreterError>,
-    {
-        self.envs.current().map_err(P::Error::from)
-    }
-
-    pub fn run(&mut self) -> Result<P::Completion, P::Error>
-    where
-        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error: From<InterpreterError>,
-    {
-        loop {
-            match self.step()? {
-                StepResult::Running => {}
-                StepResult::Complete(completion) => return Ok(completion),
-            }
-        }
-    }
-
-    pub fn run_function_invocation(
-        &mut self,
-        invocation: FunctionInvocation<P::Value>,
-    ) -> Result<P::Completion, P::Error>
-    where
-        P::Frame: StageFrame<P::Stage, P::Value> + Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error:
-            From<InterpreterError> + From<<P::Frame as StageFrame<P::Stage, P::Value>>::Error>,
-    {
-        let stage = invocation.stage();
-        let stage_info = self
-            .pipeline
-            .stage(stage)
-            .ok_or(InterpreterError::MissingStage(stage))?;
-        let frame =
-            P::Frame::from_function_invocation(stage_info, invocation).map_err(P::Error::from)?;
-        self.push_frame(frame);
-        self.run()
-    }
-
-    /// Resolve a function by name in the given stage and run it with the
-    /// given arguments. Returns the raw completion produced by the function.
-    pub fn run_function_by_name<A>(
+impl<'ir, S, V, E, Lk> ConcreteInterpreter<'ir, S, V, E, Lk>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
+    /// Resolve `stage`/`function` by name and execute.
+    pub fn call_by_name(
         &mut self,
         stage_name: &str,
         function_name: &str,
-        args: A,
-    ) -> Result<P::Completion, P::Error>
-    where
-        P::Stage: kirin_ir::StageMeta,
-        Self: crate::FrameDispatch<P::Frame, P::Value, P::Error>,
-        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error: From<InterpreterError>,
-        A: IntoIterator<Item = P::Value>,
-    {
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
         let stage = self
             .pipeline
             .stage_by_name(stage_name)
-            .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))
-            .map_err(P::Error::from)?;
+            .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
         let function = self
             .pipeline
             .lookup_function_by_name(function_name)
-            .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))
-            .map_err(P::Error::from)?;
-        self.invoke(stage).function(function).args(args)
+            .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
+        self.call(stage, Callee::Function(function), args)
     }
 
-    pub fn step(&mut self) -> Result<StepResult<P::Completion>, P::Error>
-    where
-        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error: From<InterpreterError>,
-    {
-        let frame = match self.frames.pop() {
-            Some(frame) => frame,
-            None => return Err(P::Error::from(InterpreterError::EmptyFrameStack)),
-        };
-        let effect = frame.step(self)?;
-        self.apply_effect(effect)
-    }
-
-    fn apply_effect(
+    /// Execute a function to completion and return its return product.
+    pub fn call(
         &mut self,
-        mut effect: FrameEffect<P::Frame, P::Completion>,
-    ) -> Result<StepResult<P::Completion>, P::Error>
-    where
-        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error: From<InterpreterError>,
-    {
+        stage: CompileStage,
+        callee: Callee,
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        let target = self
+            .linker
+            .resolve(self.pipeline, stage, &callee)
+            .map_err(E::from)?;
+        self.push_function_scope(target, args.into_iter().collect())?;
+        self.run()
+    }
+
+    fn dispatch(
+        &mut self,
+        stage: CompileStage,
+        statement: Statement,
+        env: EnvIndex,
+    ) -> Result<Effect<V, E>, E> {
+        let pipeline = self.pipeline;
+        let info = pipeline
+            .stage(stage)
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
+        info.dispatch_statement(stage, statement, env, self)
+    }
+
+    fn push_function_scope(&mut self, target: FunctionTarget, args: Product<V>) -> Result<(), E> {
+        let env = self.store.alloc();
+        let pipeline = self.pipeline;
+        let info = pipeline
+            .stage(target.stage)
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(target.stage)))?;
+        let scope = info.dispatch_function_entry(target.stage, target.body, args, env, self)?;
+        self.push_scope(target.stage, env, true, true, scope)
+    }
+
+    fn push_scope(
+        &mut self,
+        stage: CompileStage,
+        env: EnvIndex,
+        owns_env: bool,
+        function_boundary: bool,
+        scope: Scope<V, E>,
+    ) -> Result<(), E> {
+        let entry_block = match scope.body {
+            ScopeBody::Block(block) => block,
+            ScopeBody::Region(region) => query::region_entry(self.pipeline, stage, region)
+                .map_err(E::from)?
+                .ok_or_else(|| E::from(InterpreterError::EmptyRegion))?,
+            ScopeBody::Immediate => {
+                // No body: the scope's args are its results.
+                return self.write_results(env, &scope.results, scope.args);
+            }
+        };
+        self.bind_block_args(stage, env, entry_block, &scope.args)?;
+        let cursor = query::first_statement(self.pipeline, stage, entry_block).map_err(E::from)?;
+        self.frames.push(Frame::Scope(ScopeFrame {
+            stage,
+            env,
+            owns_env,
+            function_boundary,
+            entry_block,
+            entry_args: scope.args,
+            block: entry_block,
+            cursor,
+            results: scope.results,
+            hook: scope.hook,
+        }));
+        Ok(())
+    }
+
+    fn bind_block_args(
+        &mut self,
+        stage: CompileStage,
+        env: EnvIndex,
+        block: Block,
+        args: &Product<V>,
+    ) -> Result<(), E> {
+        let params = query::block_params(self.pipeline, stage, block).map_err(E::from)?;
+        if params.len() != args.len() {
+            return Err(E::from(InterpreterError::BlockArityMismatch {
+                block,
+                expected: params.len(),
+                actual: args.len(),
+            }));
+        }
+        for (param, value) in params.into_iter().zip(args.iter().cloned()) {
+            self.env_write(env, param, value)?;
+        }
+        Ok(())
+    }
+
+    fn write_results(
+        &mut self,
+        env: EnvIndex,
+        results: &Product<SSAValue>,
+        values: Product<V>,
+    ) -> Result<(), E> {
+        if results.len() != values.len() {
+            return Err(E::from(InterpreterError::ProductArityMismatch {
+                expected: results.len(),
+                actual: values.len(),
+            }));
+        }
+        for (slot, value) in results.iter().copied().zip(values) {
+            self.env_write(env, slot, value)?;
+        }
+        Ok(())
+    }
+
+    fn run(&mut self) -> Result<Product<V>, E> {
         loop {
-            match effect {
-                FrameEffect::Continue(frame) => {
-                    self.frames.push(frame);
-                    return Ok(StepResult::Running);
+            // Take the next statement from the top scope frame.
+            let (stage, env, block, statement) = {
+                let Some(Frame::Scope(frame)) = self.frames.last() else {
+                    return Err(E::from(InterpreterError::EmptyFrameStack));
+                };
+                match frame.cursor {
+                    Some(statement) => (frame.stage, frame.env, frame.block, statement),
+                    None => {
+                        return Err(E::from(if frame.function_boundary {
+                            InterpreterError::FunctionBodyFellThrough
+                        } else {
+                            InterpreterError::BlockFellThrough(frame.block)
+                        }));
+                    }
                 }
-                FrameEffect::Push { parent, child } => {
-                    self.frames.push(parent);
-                    self.frames.push(child);
-                    return Ok(StepResult::Running);
-                }
-                FrameEffect::Done => {
-                    let parent = match self.frames.pop() {
-                        Some(parent) => parent,
-                        None => return Err(P::Error::from(InterpreterError::EmptyFrameStack)),
+            };
+            let next =
+                query::next_statement(self.pipeline, stage, block, statement).map_err(E::from)?;
+            if let Some(Frame::Scope(frame)) = self.frames.last_mut() {
+                frame.cursor = next;
+            }
+
+            match self.dispatch(stage, statement, env)? {
+                Effect::Next => {}
+                Effect::Jump(edge) => {
+                    self.bind_block_args(stage, env, edge.target, &edge.args)?;
+                    let cursor = query::first_statement(self.pipeline, stage, edge.target)
+                        .map_err(E::from)?;
+                    let Some(Frame::Scope(frame)) = self.frames.last_mut() else {
+                        return Err(E::from(InterpreterError::EmptyFrameStack));
                     };
-                    effect = parent.resume_done(self)?;
+                    frame.block = edge.target;
+                    frame.cursor = cursor;
                 }
-                FrameEffect::Complete(completion) => {
-                    if let Some(parent) = self.frames.pop() {
-                        effect = parent.resume(completion, self)?;
-                    } else {
-                        return Ok(StepResult::Complete(completion));
+                Effect::Branch(_) | Effect::EnterAny(_) => {
+                    return Err(E::from(InterpreterError::IndeterminateBranch));
+                }
+                Effect::Enter(scope) => {
+                    self.push_scope(stage, env, false, false, scope)?;
+                }
+                Effect::Call(call) => {
+                    let resolve_stage = call.stage.unwrap_or(stage);
+                    let target = self
+                        .linker
+                        .resolve(self.pipeline, resolve_stage, &call.callee)
+                        .map_err(E::from)?;
+                    self.frames.push(Frame::Call {
+                        env,
+                        results: call.results,
+                    });
+                    self.push_function_scope(target, call.args)?;
+                }
+                Effect::Yield(values) => self.apply_yield(values)?,
+                Effect::Return(values) => {
+                    if let Some(result) = self.apply_return(values)? {
+                        return Ok(result);
                     }
                 }
             }
         }
     }
-}
 
-impl<'ir, P> Env<P::Value> for ConcreteInterpreter<'ir, P>
-where
-    P: InterpreterProfile,
-    P::Value: Clone,
-    P::Error: From<InterpreterError>,
-{
-    type Error = P::Error;
-
-    fn alloc(&mut self) -> EnvIndex {
-        self.envs.alloc()
-    }
-
-    fn free(&mut self, index: EnvIndex) -> Result<(), Self::Error> {
-        self.envs.free(index).map_err(P::Error::from)
-    }
-
-    fn read(&self, index: EnvIndex, value: kirin_ir::SSAValue) -> Result<P::Value, Self::Error> {
-        self.envs.read(index, value).map_err(P::Error::from)
-    }
-
-    fn write(
-        &mut self,
-        index: EnvIndex,
-        value: kirin_ir::SSAValue,
-        data: P::Value,
-    ) -> Result<(), Self::Error> {
-        self.envs.write(index, value, data).map_err(P::Error::from)
-    }
-}
-
-impl<'ir, P, L> crate::StageAccess<L> for ConcreteInterpreter<'ir, P>
-where
-    P: InterpreterProfile,
-    P::Stage: HasStageInfo<L>,
-    L: Dialect,
-    P::Error: From<InterpreterError>,
-{
-    type Error = P::Error;
-
-    fn stage_info(&self, stage: CompileStage) -> Result<&StageInfo<L>, Self::Error> {
-        let stage_info = self
-            .pipeline
-            .stage(stage)
-            .ok_or_else(|| P::Error::from(InterpreterError::MissingStage(stage)))?;
-        stage_info
-            .try_stage_info()
-            .ok_or(InterpreterError::MissingStageInfo(stage))
-            .map_err(P::Error::from)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use kirin_ir::Pipeline;
-
-    use super::*;
-    use crate::{FrameEffect, HasLocation, Location};
-
-    struct TestProfile;
-
-    impl InterpreterProfile for TestProfile {
-        type Stage = ();
-        type Value = ();
-        type Frame = TestFrame;
-        type Completion = &'static str;
-        type Error = InterpreterError;
-    }
-
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    enum TestFrame {
-        Root,
-        Child,
-    }
-
-    impl HasLocation for TestFrame {
-        fn location(&self) -> Location {
-            panic!("test frame has no IR location")
+    fn apply_yield(&mut self, values: Product<V>) -> Result<(), E> {
+        let Some(Frame::Scope(mut frame)) = self.frames.pop() else {
+            return Err(E::from(InterpreterError::EmptyFrameStack));
+        };
+        if frame.function_boundary {
+            return Err(E::from(InterpreterError::Custom(
+                "yield reached a function boundary",
+            )));
         }
-    }
-
-    impl<'ir>
-        crate::Frame<
-            ConcreteInterpreter<'ir, TestProfile>,
-            TestFrame,
-            &'static str,
-            InterpreterError,
-        > for TestFrame
-    {
-        fn step(
-            self,
-            _interp: &mut ConcreteInterpreter<'ir, TestProfile>,
-        ) -> Result<FrameEffect<TestFrame, &'static str>, InterpreterError> {
-            match self {
-                TestFrame::Root => Ok(FrameEffect::Push {
-                    parent: TestFrame::Root,
-                    child: TestFrame::Child,
-                }),
-                TestFrame::Child => Ok(FrameEffect::Complete("child")),
+        match frame.hook.take() {
+            None => self.write_results(frame.env, &frame.results, values),
+            Some(hook) => {
+                let step = hook.on_yield(
+                    &frame.entry_args,
+                    values,
+                    &mut EngineEnv {
+                        interp: self,
+                        env: frame.env,
+                    },
+                )?;
+                match step {
+                    ScopeStep::Finish(results) => {
+                        self.write_results(frame.env, &frame.results, results)
+                    }
+                    ScopeStep::Repeat { args, hook } => {
+                        self.bind_block_args(frame.stage, frame.env, frame.entry_block, &args)?;
+                        frame.cursor =
+                            query::first_statement(self.pipeline, frame.stage, frame.entry_block)
+                                .map_err(E::from)?;
+                        frame.block = frame.entry_block;
+                        frame.entry_args = args;
+                        frame.hook = Some(hook);
+                        self.frames.push(Frame::Scope(frame));
+                        Ok(())
+                    }
+                    ScopeStep::RepeatOrFinish { .. } => {
+                        Err(E::from(InterpreterError::IndeterminateBranch))
+                    }
+                }
             }
         }
-
-        fn resume_done(
-            self,
-            _interp: &mut ConcreteInterpreter<'ir, TestProfile>,
-        ) -> Result<FrameEffect<TestFrame, &'static str>, InterpreterError> {
-            unreachable!("test frames do not use done")
-        }
-
-        fn resume(
-            self,
-            completion: &'static str,
-            _interp: &mut ConcreteInterpreter<'ir, TestProfile>,
-        ) -> Result<FrameEffect<TestFrame, &'static str>, InterpreterError> {
-            assert_eq!(self, TestFrame::Root);
-            assert_eq!(completion, "child");
-            Ok(FrameEffect::Complete("root"))
-        }
     }
 
-    #[test]
-    fn run_resumes_parent_after_child_completion() {
-        let pipeline = Pipeline::new();
-        let mut interp = ConcreteInterpreter::<TestProfile>::new(&pipeline);
-
-        interp.push_frame(TestFrame::Root);
-
-        assert_eq!(interp.run().unwrap(), "root");
-    }
-
-    struct DoneProfile;
-
-    impl InterpreterProfile for DoneProfile {
-        type Stage = ();
-        type Value = ();
-        type Frame = DoneFrame;
-        type Completion = &'static str;
-        type Error = InterpreterError;
-    }
-
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    enum DoneFrame {
-        Root,
-        Child,
-    }
-
-    impl HasLocation for DoneFrame {
-        fn location(&self) -> Location {
-            panic!("test frame has no IR location")
-        }
-    }
-
-    impl<'ir>
-        crate::Frame<
-            ConcreteInterpreter<'ir, DoneProfile>,
-            DoneFrame,
-            &'static str,
-            InterpreterError,
-        > for DoneFrame
-    {
-        fn step(
-            self,
-            _interp: &mut ConcreteInterpreter<'ir, DoneProfile>,
-        ) -> Result<FrameEffect<DoneFrame, &'static str>, InterpreterError> {
-            match self {
-                DoneFrame::Root => Ok(FrameEffect::Push {
-                    parent: DoneFrame::Root,
-                    child: DoneFrame::Child,
-                }),
-                DoneFrame::Child => Ok(FrameEffect::Done),
+    /// Unwind to the enclosing function boundary. Returns `Some(values)` when
+    /// the returning function was the root invocation.
+    fn apply_return(&mut self, values: Product<V>) -> Result<Option<Product<V>>, E> {
+        loop {
+            match self.frames.pop() {
+                Some(Frame::Scope(frame)) if frame.function_boundary => {
+                    if frame.owns_env {
+                        self.store.free(frame.env).map_err(E::from)?;
+                    }
+                    break;
+                }
+                Some(Frame::Scope(_)) => continue,
+                Some(Frame::Call { .. }) | None => {
+                    return Err(E::from(InterpreterError::Custom(
+                        "return without an enclosing function scope",
+                    )));
+                }
             }
         }
-
-        fn resume_done(
-            self,
-            _interp: &mut ConcreteInterpreter<'ir, DoneProfile>,
-        ) -> Result<FrameEffect<DoneFrame, &'static str>, InterpreterError> {
-            assert_eq!(self, DoneFrame::Root);
-            Ok(FrameEffect::Complete("done"))
+        match self.frames.pop() {
+            Some(Frame::Call { env, results }) => {
+                self.write_results(env, &results, values)?;
+                Ok(None)
+            }
+            Some(frame) => {
+                // Not a call frame: put it back and report the protocol error.
+                self.frames.push(frame);
+                Err(E::from(InterpreterError::Custom(
+                    "function scope without a pending call",
+                )))
+            }
+            None => Ok(Some(values)),
         }
-
-        fn resume(
-            self,
-            _completion: &'static str,
-            _interp: &mut ConcreteInterpreter<'ir, DoneProfile>,
-        ) -> Result<FrameEffect<DoneFrame, &'static str>, InterpreterError> {
-            unreachable!("done test does not use completion")
-        }
-    }
-
-    #[test]
-    fn run_resumes_parent_after_child_done() {
-        let pipeline = Pipeline::new();
-        let mut interp = ConcreteInterpreter::<DoneProfile>::new(&pipeline);
-
-        interp.push_frame(DoneFrame::Root);
-
-        assert_eq!(interp.run().unwrap(), "done");
     }
 }
