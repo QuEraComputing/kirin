@@ -26,6 +26,9 @@ nav:
         - Structural Control Flow: dialects/scf.md
         - Immutable List: dialects/ilist.md
       - Compiler 101: 101.md
+      - FAQ:
+        - faq/index.md
+        - Class methods in kernels: faq/class_methods.md
       # - Comparison: comparison.md
       - Contributing: contrib.md
   - Cookbook:
