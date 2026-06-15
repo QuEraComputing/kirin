@@ -13,6 +13,11 @@ The design is organized as a **two-persona contract**:
   components: an engine, a value domain, an error type, and a linker. They
   never implement framework traits beyond derives.
 
+Customizing *traversal* — a custom total frame type, or custom abstract
+summary-key / join-widen policies — is an opt-in extension covered under
+[Advanced](#advanced-custom-traversal-and-policies); it is not a separate
+persona.
+
 Every derive macro is named after the trait it implements
 (`#[derive(Interpretable)]` → `trait Interpretable`), so learning the derive
 is learning the trait.
@@ -177,33 +182,46 @@ belongs to.
 
 ## Engines
 
-### `ConcreteInterpreter<'ir, S, V, E, Lk>`
+### `ConcreteInterpreter<'ir, S, V, E, Lk, F = StandardFrame<V, E>>`
 
-Explicit scope-stack executor (no Rust-stack recursion for interpreter
-control flow). Frames are engine-internal: a scope frame (stage, activation,
-block cursor, result bindings, optional hook) and a call frame (caller
-activation + result slots awaiting `Return`). `Jump` retargets the current
-scope frame; `Return` unwinds inline scopes to the function boundary.
+A generic **frame-stack driver**: it pops the top frame, calls `Frame::step`,
+and applies the returned `FrameEffect` (`Continue` / `Push` / `Done` /
+`Complete`) — it owns *no* traversal logic itself. Traversal lives in the
+frames. The default total frame type `StandardFrame<V, E>` wraps the standard
+`ScopeFrame` (block/region/hook-driven scope traversal — `Jump` retargets it,
+`Yield`/`Return` complete it) and `CallFrame` (dispatch a callee, await its
+`Return`). The dialect-produced `Effect` is consumed by `ScopeFrame`, which
+maps it to a `FrameEffect`. A custom `F`
+([Advanced](#advanced-custom-traversal-and-policies)) replaces traversal
+without touching the engine.
 
-### `AbstractInterpreter<'ir, S, V, E, Lk>`
+### `AbstractInterpreter<'ir, S, V, E, Lk, P = DefaultPolicy>`
 
 Interprocedural fixpoint analyzer over a lattice `V: Widen + Lattice +
-HasBottom`. Reads of unbound SSA values are `bottom` (unreached). Three
-nested fixpoints, all engine-owned:
+HasBottom`. Reads of unbound SSA values are `bottom` (unreached). The policy
+`P` (`CallContext` for summary keys + `AbstractControl` for join/widen,
+defaulting to the context-insensitive `DefaultPolicy`) is the customizable
+seam ([Advanced](#advanced-custom-traversal-and-policies)); everything else is
+engine-owned. Three nested fixpoints:
 
 - **CFG**: each function body region is a block worklist; block parameters
   join across incoming edges and widen after `widen_after` visits — `cf`
   back-edge loops converge.
 - **Scopes**: hook-driven scopes re-run with joined/widened entry arguments
   until stable — `scf.for` loops converge.
-- **Functions**: each resolved call target `(stage, specialization)` has an
+- **Functions**: each resolved call target is summarized under a key chosen by
+  the `CallContext` policy (`DefaultPolicy` → `(stage, specialization)`), with an
   entry/return `Product<V>` summary. Calls join arguments into the callee's
   entry (enqueueing it on change) and read its current return summary
   (`bottom` until it converges); return-summary changes re-enqueue recorded
-  callers. Recursion converges by monotone iteration from `bottom`.
+  callers — *including same-key (self-)recursion*, so a recursive function's
+  rising return propagates back to its own call site (without this, recursion
+  sees only the base case). Recursion converges by monotone iteration from
+  `bottom`.
 
-Analysis crates are then trivial: `kirin-constprop` is the `ConstPropValue`
-lattice plus `pub type ConstProp<..> = AbstractInterpreter<.., ConstPropValue, ..>`.
+Analysis crates stay small: `kirin-constprop` is the `ConstPropValue` lattice, a
+`ConstPropContext` policy (bounded arg-tuple context sensitivity), and
+`pub type ConstProp<..> = AbstractInterpreter<.., ConstPropValue, .., ConstPropContext>`.
 
 ### Engine internals: stage dispatch and IR queries
 
@@ -216,6 +234,63 @@ Two mechanisms keep engines generic over stage enums without HRTBs:
   machinery for language-independent IR facts (block parameters, statement
   order, region entry, specialization lookup, symbol resolution). Satisfied
   automatically by any stage enum; used by engines and linkers internally.
+
+## Custom traversal and policies
+
+Two seams let an analysis customize *how* the engine traverses, without forking
+it. Neither is visible to dialect authors.
+
+### The frame layer — `Frame` / `FrameEffect` / `FrameBuild`
+
+```rust
+pub enum FrameEffect<F, C> { Continue(F), Push { parent: F, child: F }, Done, Complete(C) }
+
+pub trait Frame<I: Interp>: Sized {            // implemented by the *total* frame enum
+    type Completion;
+    fn step(self, &mut I)        -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
+    fn resume_done(self, &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
+    fn resume(self, Self::Completion, &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
+}
+
+pub trait FrameBuild<V, E> { fn from_scope(ScopeFrame<V, E>) -> Self; fn from_call(CallFrame<V>) -> Self; }
+```
+
+`ConcreteInterpreter` is generic over the total frame type `F` (default
+`StandardFrame`). A custom analysis defines its own enum, reuses the standard
+`ScopeFrame`/`CallFrame` traversal through `FrameBuild` and their `*_into`
+delegating methods, adds its own observation or variants, and instantiates the
+engine with that `F` — the engine is not forked. Frames consume the dialect
+`Effect` and decide traversal; the engine just runs the stack. **Frame generics
+never leak into `Interpretable<I>`**, so dialect authors are unaffected.
+
+The capability surface a frame needs from its engine is `FrameDriver: Interp`
+(env alloc/free, IR queries, statement dispatch, call resolution); both engines
+implement it, so the same standard frames can drive both. This is also the
+natural seam for a future **backward** (liveness) traversal: a new frame variant
+over the same `FrameDriver`, not a new `Effect`.
+
+(Example: a `TracingFrame { Scope(ScopeFrame), Call(CallFrame) }` that counts
+call/scope visitation while running the real program correctly — see
+`example/toy-lang`'s `interpreter::tests::advanced`.)
+
+### Abstract policies — `CallContext` and `AbstractControl`
+
+`AbstractInterpreter` is generic over a policy `P` providing two decisions:
+
+```rust
+pub trait CallContext<V>     { type Key: Eq + Hash + Clone;
+                               fn key(&mut self, stage, function, args: &Product<V>) -> Self::Key; }
+pub trait AbstractControl<V> { fn merge(&self, current, incoming, visits) -> Result<Product<V>, _>; }
+```
+
+`DefaultPolicy` is context-insensitive (`Key = (stage, specialization)`) and
+joins-then-widens after `widen_after` visits. `kirin-constprop`'s
+`ConstPropContext` keys distinct fully-constant argument tuples to distinct
+summaries — bounded by a per-function budget, with overflow and non-constant
+arguments collapsing to one shared `Unknown` context (joined → sound `Top`).
+That is what makes recursive constant propagation precise
+(`factorial(Const(5)) → Const(120)`) while staying sound and terminating on
+unknown inputs.
 
 ## Design rules
 
@@ -239,10 +314,17 @@ Two mechanisms keep engines generic over stage enums without HRTBs:
   in a separate direction-parametric dataflow solver sharing the lattice
   traits and use/def facts derivable from the IR model (`HasArguments`/
   `HasResults`). Planned as `kirin-dataflow`.
-- The abstract engine's function summaries are context-insensitive (one
-  entry/return summary per specialization, arguments joined across call
-  sites). Context sensitivity (k-CFA-style summary keys) can be added as an
-  engine knob without touching dialect code.
+- Function-summary context sensitivity is a pluggable `CallContext` policy.
+  `DefaultPolicy` is context-insensitive; `ConstPropContext` provides bounded
+  arg-tuple keys (precise recursion; sound, terminating cap to `Unknown`).
+  Unbounded call-string (k-CFA) policies remain future work — another
+  `CallContext` impl, no engine change.
+- The abstract engine exposes its join/widen and summary-key *policies* as
+  components, but still owns the worklist *iteration* (CFG block worklist,
+  scope loop, interprocedural worklist) inline rather than as `Frame`s.
+  Unifying the abstract engine onto the same frame-stack driver as
+  `ConcreteInterpreter` — so abstract explore/join lives in dedicated abstract
+  frames reused via `FrameBuild` — is deferred.
 - Inline `Scope::region(..)` bodies inside the abstract interpreter are not
   yet supported (function-entry regions are); no current dialect emits them.
 - First-class function values (`Lambda`/`Bind` as values, `Callee` from an

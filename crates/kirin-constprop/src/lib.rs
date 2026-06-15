@@ -18,11 +18,16 @@
 //! let result = analysis.analyze_by_name("source", "abs", [7.into()])?;
 //! ```
 
+mod context;
 mod value;
 
+pub use context::{CallCtx, ConstPropContext};
 pub use value::{ConstPropValue, PartialStruct, PartialTuple};
 
 /// Constant propagation as an [`AbstractInterpreter`](kirin_interpreter::AbstractInterpreter)
-/// instantiated at the [`ConstPropValue`] lattice.
+/// instantiated at the [`ConstPropValue`] lattice, with bounded arg-tuple
+/// context sensitivity ([`ConstPropContext`]) so recursion over distinct
+/// constants stays precise (e.g. `factorial(Const(5)) → Const(120)`) while
+/// remaining sound and terminating on unknown/over-budget arguments.
 pub type ConstProp<'ir, S, E, Lk = kirin_interpreter::SameStageLinker> =
-    kirin_interpreter::AbstractInterpreter<'ir, S, ConstPropValue, E, Lk>;
+    kirin_interpreter::AbstractInterpreter<'ir, S, ConstPropValue, E, Lk, ConstPropContext>;

@@ -207,6 +207,29 @@ fn runs_source_recursive_factorial() {
 }
 
 #[test]
+fn constprop_source_recursive_factorial() {
+    // Bounded arg-tuple context sensitivity unfolds factorial(5) → 4 → 3 → 2 → 1
+    // under distinct summary keys, so the analysis folds the result back
+    // precisely instead of collapsing the entry argument to Top.
+    let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
+    let result =
+        analyze_constprop(&pipeline, "source", "factorial", &[ConstProp::Const(5)]).unwrap();
+    assert_eq!(result, ConstProp::Const(120));
+}
+
+#[test]
+fn constprop_source_recursive_factorial_unknown_is_top() {
+    // An unknown argument keys the single shared (Unknown) context, so the
+    // recursive call lands on the *same* key. The self-dependency fix (a
+    // same-key caller re-enqueues its own summary as the return value rises)
+    // converges this soundly to `Top` — not a bogus `Const` from seeing only
+    // the base case — and terminates.
+    let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
+    let result = analyze_constprop(&pipeline, "source", "factorial", &[ConstProp::Top]).unwrap();
+    assert_eq!(result, ConstProp::Top);
+}
+
+#[test]
 fn constprop_source_add() {
     let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
     let result = analyze_constprop(
@@ -355,4 +378,163 @@ fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
     let pipeline = build_pipeline(SAME_BRANCH_LOWERED);
     let result = analyze_constprop(&pipeline, "lowered", "same", &[ConstProp::Top]).unwrap();
     assert_eq!(result, ConstProp::Const(1));
+}
+
+/// Advanced compiler/analysis-author surface: a *custom total frame enum* used
+/// as the engine's `F` parameter (frame generalization), and a *custom abstract
+/// policy* budget (summary-key generalization). Both reuse the standard engine
+/// — no fork.
+mod advanced {
+    use std::cell::RefCell;
+
+    use kirin_constprop::{ConstPropContext, ConstPropValue};
+    use kirin_interpreter::engine::{
+        AbstractInterpreter, CallFrame, Completion, ConcreteInterpreter, CrossStageLinker, Frame,
+        FrameBuild, FrameDriver, FrameEffect, InterpreterError, SameStageLinker, ScopeFrame,
+        expect_single,
+    };
+
+    use super::build_pipeline;
+    use crate::interpreter::ToyError;
+    use crate::stage::Stage;
+
+    // --- A custom total frame enum -----------------------------------------
+    //
+    // It reuses the standard `ScopeFrame`/`CallFrame` traversal verbatim (via
+    // `FrameBuild` + the delegating `*_into` methods) and adds *observation*:
+    // every call and every scope step is counted in a side log. The engine is
+    // not forked — only `ConcreteInterpreter`'s `F` type parameter changes.
+
+    thread_local! {
+        static TRACE: RefCell<Trace> = const { RefCell::new(Trace { calls: 0, scope_steps: 0 }) };
+    }
+
+    #[derive(Clone, Copy, Default)]
+    struct Trace {
+        calls: usize,
+        scope_steps: usize,
+    }
+
+    enum TracingFrame<V, E> {
+        Scope(ScopeFrame<V, E>),
+        Call(CallFrame<V>),
+    }
+
+    impl<V, E> FrameBuild<V, E> for TracingFrame<V, E> {
+        fn from_scope(frame: ScopeFrame<V, E>) -> Self {
+            TracingFrame::Scope(frame)
+        }
+        fn from_call(frame: CallFrame<V>) -> Self {
+            TracingFrame::Call(frame)
+        }
+    }
+
+    impl<I> Frame<I> for TracingFrame<I::Value, I::Error>
+    where
+        I: FrameDriver,
+        I::Value: Clone,
+        I::Error: From<InterpreterError>,
+    {
+        type Completion = Completion<I::Value>;
+
+        fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+            match self {
+                TracingFrame::Scope(frame) => {
+                    TRACE.with(|t| t.borrow_mut().scope_steps += 1);
+                    frame.step_into::<I, Self>(interp)
+                }
+                TracingFrame::Call(frame) => {
+                    TRACE.with(|t| t.borrow_mut().calls += 1);
+                    frame.step_into::<I, Self>(interp)
+                }
+            }
+        }
+
+        fn resume_done(
+            self,
+            _interp: &mut I,
+        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+            match self {
+                TracingFrame::Scope(frame) => Ok(frame.resume_done_into::<Self>()),
+                TracingFrame::Call(frame) => {
+                    frame.resume_done_into::<Self>().map_err(I::Error::from)
+                }
+            }
+        }
+
+        fn resume(
+            self,
+            completion: Self::Completion,
+            interp: &mut I,
+        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+            match self {
+                TracingFrame::Scope(frame) => frame.resume_into::<I, Self>(completion, interp),
+                TracingFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
+            }
+        }
+    }
+
+    type TracingInterpreter<'ir> = ConcreteInterpreter<
+        'ir,
+        Stage,
+        i64,
+        ToyError,
+        CrossStageLinker,
+        TracingFrame<i64, ToyError>,
+    >;
+
+    #[test]
+    fn custom_frame_runs_program_and_observes_traversal() {
+        TRACE.with(|t| *t.borrow_mut() = Trace::default());
+        let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
+
+        // ConcreteInterpreter parameterized by the *custom* frame enum.
+        let mut interp: TracingInterpreter<'_> =
+            ConcreteInterpreter::new(&pipeline).with_linker(CrossStageLinker);
+        let result = expect_single::<i64, ToyError>(
+            interp.call_by_name("source", "factorial", [5]).unwrap(),
+        )
+        .unwrap();
+
+        // (1)+(2): the custom frame ran the real program correctly by reusing
+        // the standard ScopeFrame/CallFrame traversal (no engine fork).
+        assert_eq!(result, 120);
+
+        // (3): traversal is observable through the custom frame. factorial(5)
+        // makes 4 recursive calls (5→4→3→2→1; the base case at 1 makes none),
+        // all routed through the custom Call arm; body statements run through
+        // its Scope arm.
+        let trace = TRACE.with(|t| *t.borrow());
+        assert_eq!(trace.calls, 4);
+        assert!(trace.scope_steps > 0);
+    }
+
+    // --- A capped custom abstract policy -----------------------------------
+
+    #[test]
+    fn constprop_context_budget_overflow_falls_back_to_top() {
+        // Budget 2 admits the [5] and [4] contexts; [3]/[2]/[1] overflow to the
+        // shared `Unknown` context (joined → Top). The result is soundly `Top`
+        // (capping degrades precision, not soundness) — and it terminates,
+        // which exercises the same-key self-dependency convergence.
+        let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
+        let base: AbstractInterpreter<
+            '_,
+            Stage,
+            ConstPropValue,
+            ToyError,
+            SameStageLinker,
+            ConstPropContext,
+        > = AbstractInterpreter::new(&pipeline);
+        let mut analysis = base
+            .with_policy(ConstPropContext::with_budget(2))
+            .with_linker(CrossStageLinker);
+        let result = expect_single::<ConstPropValue, ToyError>(
+            analysis
+                .analyze_by_name("source", "factorial", [ConstPropValue::Const(5)])
+                .unwrap(),
+        )
+        .unwrap();
+        assert_eq!(result, ConstPropValue::Top);
+    }
 }

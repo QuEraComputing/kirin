@@ -26,11 +26,12 @@ mod dispatch;
 mod effect;
 mod env;
 mod error;
+mod frame;
 mod linker;
 mod query;
 mod value;
 
-pub use abstract_interp::AbstractInterpreter;
+pub use abstract_interp::{AbstractControl, AbstractInterpreter, CallContext, DefaultPolicy};
 pub use concrete::ConcreteInterpreter;
 pub use ctx::{Ctx, EnvOps, Interp};
 pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
@@ -38,6 +39,9 @@ pub use effect::{CallEffect, Callee, Edge, Effect, Scope, ScopeBody, ScopeHook, 
 pub use env::{Env, EnvIndex, EnvStackStore};
 
 pub use error::InterpreterError;
+pub use frame::{
+    CallFrame, Completion, Frame, FrameBuild, FrameDriver, FrameEffect, ScopeFrame, StandardFrame,
+};
 pub use linker::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
 pub use query::StageQuery;
 pub use value::{BranchCondition, HasProductValue, expect_single};
@@ -56,7 +60,9 @@ pub mod dialect {
 /// Everything a compiler author needs to run interpreters and analyses.
 pub mod engine {
     pub use crate::{
-        AbstractInterpreter, Callee, ConcreteInterpreter, CrossStageLinker, FunctionTarget,
-        InterpDispatch, InterpreterError, Linker, SameStageLinker, expect_single,
+        AbstractControl, AbstractInterpreter, CallContext, CallFrame, Callee, Completion,
+        ConcreteInterpreter, CrossStageLinker, DefaultPolicy, Frame, FrameBuild, FrameDriver,
+        FrameEffect, FunctionTarget, InterpDispatch, InterpreterError, Linker, SameStageLinker,
+        ScopeFrame, StandardFrame, expect_single,
     };
 }
