@@ -4,8 +4,8 @@
 
 If you try to call a standard Python class method, such as
 `self.get_move_kernel()`, from inside a function decorated with
-`@kirin_flair.kernel` or `@kernel`, the compiler will fail. Historically, before
-Kirin v0.16.8, this could appear as an `AttributeError` about `arg_names`.
+`@basic` or `@structural`, the compiler will fail. Historically, before Kirin
+v0.16.8, this could appear as an `AttributeError` about `arg_names`.
 
 ## Why this happens
 
@@ -27,18 +27,23 @@ variable as a constant.
 This tries to evaluate the method inside the device kernel.
 
 ```python
-class Foo:
-    def get_move_buffer_kernel(self):
+from kirin.prelude import basic
 
-        @kernel
-        def get_move_buffer():
+
+class Offset:
+    def __init__(self, value: int):
+        self.value = value
+
+    def get_value(self) -> int:
+        return self.value
+
+    def bad_method(self):
+        @basic
+        def add_offset(x: int) -> int:
             # ERROR: Kirin cannot evaluate arbitrary Python class methods.
-            move_kernel = self.get_move_kernel()
-            move_sequence = move_kernel()
-            # ...
-            return bufr
+            return x + self.get_value()
 
-        return get_move_buffer
+        return add_offset
 ```
 
 ### Correct
@@ -46,18 +51,25 @@ class Foo:
 Resolve the method on the host side, then capture it in the kernel closure.
 
 ```python
-class Foo:
-    def get_move_buffer_kernel(self):
+from kirin.prelude import basic
+
+
+class Offset:
+    def __init__(self, value: int):
+        self.value = value
+
+    def get_value(self) -> int:
+        return self.value
+
+    def method(self):
         # 1. Resolve the method in host Python code.
-        move_kernel = self.get_move_kernel()
+        offset = self.get_value()
 
         # 2. Define the device kernel.
-        @kernel
-        def get_move_buffer(a, b, c):
-            # 3. Call the captured constant inside the kernel.
-            move_kernel(a, b, c)
-            # ...
-            return bufr
+        @basic
+        def add_offset(x: int) -> int:
+            # 3. Use the captured constant inside the kernel.
+            return x + offset
 
-        return get_move_buffer
+        return add_offset
 ```
