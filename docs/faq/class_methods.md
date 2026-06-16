@@ -3,7 +3,7 @@
 ## The problem
 
 If you try to call a standard Python class method, such as
-`self.get_move_kernel()`, from inside a function decorated with
+`self.get_value()`, from inside a function decorated with
 `@basic` or `@structural`, the compiler will fail. Historically, before Kirin
 v0.16.8, this could appear as an `AttributeError` about `arg_names`.
 
