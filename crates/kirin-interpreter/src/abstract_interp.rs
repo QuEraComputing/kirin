@@ -14,26 +14,26 @@ use crate::{
 };
 
 // ===========================================================================
-// Pluggable policy seams
+// Pluggable analysis seams
 //
 // The abstract engine owns the interprocedural worklist, but the two
 // decisions a custom analysis needs to control are factored out so they are
 // not hard-coded in the engine:
 //
 //   * `CallContext` — how function summaries are *keyed* (context sensitivity).
-//   * `AbstractControl` — how abstract states are *combined* at merge points
+//   * `WideningStrategy` — how abstract states are *combined* at merge points
 //     (the join/widen operator that drives explore/join and termination).
 //
-// One policy object implements both; the default is context-insensitive with
+// One analysis object implements both; the default is context-insensitive with
 // join-then-widen, reproducing the engine's prior behavior exactly.
 // ===========================================================================
 
-/// Summary-key policy: maps a resolved call target plus its abstract arguments
+/// Summary-key strategy: maps a resolved call target plus its abstract arguments
 /// to the key under which that function's entry/return summary is tracked.
 ///
-/// The default ([`DefaultPolicy`]) is context-*insensitive*
+/// The default ([`ContextInsensitive`]) is context-*insensitive*
 /// (`Key = (stage, specialization)`), so all call sites of a function share one
-/// summary. A context-*sensitive* policy returns distinct keys for distinct
+/// summary. A context-*sensitive* strategy returns distinct keys for distinct
 /// argument abstractions (see the bounded-arg-tuple policy used by constprop),
 /// which is what makes precise recursive analysis possible.
 pub trait CallContext<V> {
@@ -47,13 +47,13 @@ pub trait CallContext<V> {
     ) -> Self::Key;
 }
 
-/// Explore/join policy: combines an `incoming` abstract state into the
+/// Explore/join strategy: combines an `incoming` abstract state into the
 /// `current` state at a merge point (block entry, loop head, function entry),
 /// deciding join vs. widening from the number of prior merges (`visits`).
 ///
 /// Factored out of the engine so the lattice-combination + widening strategy is
 /// swappable and not hard-coded into the traversal.
-pub trait AbstractControl<V> {
+pub trait WideningStrategy<V> {
     fn merge(
         &self,
         current: &Product<V>,
@@ -62,20 +62,20 @@ pub trait AbstractControl<V> {
     ) -> Result<Product<V>, InterpreterError>;
 }
 
-/// Default abstract policy: context-insensitive keys and join-until-`widen_after`
+/// Default analysis: context-insensitive keys and join-until-`widen_after`
 /// then widen. Reproduces the engine's prior behavior.
 #[derive(Clone, Copy, Debug)]
-pub struct DefaultPolicy {
+pub struct ContextInsensitive {
     pub widen_after: usize,
 }
 
-impl Default for DefaultPolicy {
+impl Default for ContextInsensitive {
     fn default() -> Self {
         Self { widen_after: 3 }
     }
 }
 
-impl<V> CallContext<V> for DefaultPolicy {
+impl<V> CallContext<V> for ContextInsensitive {
     type Key = (CompileStage, SpecializedFunction);
 
     fn key(
@@ -88,7 +88,7 @@ impl<V> CallContext<V> for DefaultPolicy {
     }
 }
 
-impl<V> AbstractControl<V> for DefaultPolicy
+impl<V> WideningStrategy<V> for ContextInsensitive
 where
     V: Clone + Widen,
 {
@@ -108,16 +108,22 @@ where
 /// [`ConcreteInterpreter`](crate::ConcreteInterpreter), over a lattice value
 /// domain `V: Widen + Lattice`. The engine owns every fixpoint (CFG block
 /// worklists, hook-driven scope loops, interprocedural summaries); the two
-/// customizable decisions — summary keying and join/widen — are the policy `P`
-/// ([`CallContext`] + [`AbstractControl`]), defaulting to [`DefaultPolicy`].
+/// customizable decisions — summary keying and join/widen — are the analysis `P`
+/// ([`CallContext`] + [`WideningStrategy`]), defaulting to [`ContextInsensitive`].
 ///
 /// ```ignore
 /// let mut analysis = AbstractInterpreter::<Stage, ConstPropValue, MyError>::new(&pipeline)
 ///     .with_linker(CrossStageLinker);
 /// let result = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(7)])?;
 /// ```
-pub struct AbstractInterpreter<'ir, S: StageMeta, V, E, Lk = SameStageLinker, P = DefaultPolicy>
-where
+pub struct AbstractInterpreter<
+    'ir,
+    S: StageMeta,
+    V,
+    E,
+    Lk = SameStageLinker,
+    P = ContextInsensitive,
+> where
     P: CallContext<V>,
 {
     pipeline: &'ir Pipeline<S>,
@@ -126,7 +132,7 @@ where
     summaries: HashMap<<P as CallContext<V>>::Key, FnInfo<V, <P as CallContext<V>>::Key>>,
     worklist: VecDeque<<P as CallContext<V>>::Key>,
     queued: HashSet<<P as CallContext<V>>::Key>,
-    policy: P,
+    analysis: P,
     max_iterations: usize,
     current: Option<<P as CallContext<V>>::Key>,
     _marker: PhantomData<fn() -> E>,
@@ -153,7 +159,7 @@ where
             summaries: HashMap::new(),
             worklist: VecDeque::new(),
             queued: HashSet::new(),
-            policy: P::default(),
+            analysis: P::default(),
             max_iterations: 1000,
             current: None,
             _marker: PhantomData,
@@ -174,16 +180,16 @@ where
             summaries: self.summaries,
             worklist: self.worklist,
             queued: self.queued,
-            policy: self.policy,
+            analysis: self.analysis,
             max_iterations: self.max_iterations,
             current: self.current,
             _marker: PhantomData,
         }
     }
 
-    /// Swap the summary-key / join-widen policy. Changes the [`CallContext::Key`]
+    /// Swap the analysis (context abstraction + join/widen). Changes the [`CallContext::Key`]
     /// type, so this resets the (empty) summary tables.
-    pub fn with_policy<P2>(self, policy: P2) -> AbstractInterpreter<'ir, S, V, E, Lk, P2>
+    pub fn with_analysis<P2>(self, analysis: P2) -> AbstractInterpreter<'ir, S, V, E, Lk, P2>
     where
         P2: CallContext<V>,
     {
@@ -194,7 +200,7 @@ where
             summaries: HashMap::new(),
             worklist: VecDeque::new(),
             queued: HashSet::new(),
-            policy,
+            analysis,
             max_iterations: self.max_iterations,
             current: None,
             _marker: PhantomData,
@@ -206,11 +212,11 @@ where
     }
 }
 
-impl<'ir, S: StageMeta, V, E, Lk> AbstractInterpreter<'ir, S, V, E, Lk, DefaultPolicy> {
+impl<'ir, S: StageMeta, V, E, Lk> AbstractInterpreter<'ir, S, V, E, Lk, ContextInsensitive> {
     /// Number of joins at a loop head or function entry before switching from
-    /// join to widening (only available with the [`DefaultPolicy`]).
+    /// join to widening (only available with the [`ContextInsensitive`]).
     pub fn widen_after(mut self, joins: usize) -> Self {
-        self.policy.widen_after = joins;
+        self.analysis.widen_after = joins;
         self
     }
 
@@ -265,7 +271,7 @@ where
     V: Clone + PartialEq + Widen,
     E: From<InterpreterError>,
     Lk: Linker<S>,
-    P: CallContext<V> + AbstractControl<V>,
+    P: CallContext<V> + WideningStrategy<V>,
 {
     /// Resolve `stage`/`function` by name and analyze. Returns the function's
     /// inferred return product at the fixpoint (empty if it never returns).
@@ -298,7 +304,7 @@ where
             .resolve(self.pipeline, stage, &callee)
             .map_err(E::from)?;
         let args: Product<V> = args.into_iter().collect();
-        let key = self.policy.key(target.stage, target.function, &args);
+        let key = self.analysis.key(target.stage, target.function, &args);
         self.join_entry(key.clone(), target.stage, target.body, args)?;
 
         let mut iterations = 0usize;
@@ -331,7 +337,10 @@ where
         match acc {
             None => *acc = Some(incoming),
             Some(current) => {
-                *current = self.policy.merge(current, &incoming, 0).map_err(E::from)?
+                *current = self
+                    .analysis
+                    .merge(current, &incoming, 0)
+                    .map_err(E::from)?
             }
         }
         Ok(())
@@ -364,7 +373,7 @@ where
                 info.entry_joins += 1;
                 let visits = info.entry_joins;
                 let joined = self
-                    .policy
+                    .analysis
                     .merge(&info.entry, &args, visits)
                     .map_err(E::from)?;
                 if joined != info.entry {
@@ -408,7 +417,7 @@ where
             };
             let merged = match self.summaries.get(&key).and_then(|info| info.ret.clone()) {
                 None => new_ret,
-                Some(old) => self.policy.merge(&old, &new_ret, 0).map_err(E::from)?,
+                Some(old) => self.analysis.merge(&old, &new_ret, 0).map_err(E::from)?,
             };
             let info = self
                 .summaries
@@ -543,7 +552,7 @@ where
         Ok(())
     }
 
-    /// Join edge arguments into a successor's entry state via the policy,
+    /// Join edge arguments into a successor's entry state via the analysis,
     /// enqueueing it when the state changes.
     fn flow(
         &self,
@@ -562,7 +571,7 @@ where
             Some(old) => {
                 let count = visits.entry(target).or_insert(0);
                 *count += 1;
-                let joined = self.policy.merge(old, &args, *count).map_err(E::from)?;
+                let joined = self.analysis.merge(old, &args, *count).map_err(E::from)?;
                 if joined != *old {
                     *old = joined;
                     true
@@ -632,7 +641,7 @@ where
                         }
                     };
                     let joined = self
-                        .policy
+                        .analysis
                         .merge(&entry, &args, iterations)
                         .map_err(E::from)?;
                     if joined == entry {
@@ -716,7 +725,7 @@ where
         Err(E::from(InterpreterError::BlockFellThrough(block)))
     }
 
-    /// Summarize a call: key it through the policy, join arguments into the
+    /// Summarize a call: key it through the analysis, join arguments into the
     /// callee's entry summary, and read its current return summary (bottom
     /// until the callee converges).
     fn eval_call(
@@ -730,7 +739,7 @@ where
             .linker
             .resolve(self.pipeline, resolve_stage, &call.callee)
             .map_err(E::from)?;
-        let key = self.policy.key(target.stage, target.function, &call.args);
+        let key = self.analysis.key(target.stage, target.function, &call.args);
         self.join_entry(key.clone(), target.stage, target.body, call.args)?;
         // Register the caller — including same-key (self-)recursion. When a
         // recursive summary's return value rises, its own call site must be

@@ -31,7 +31,7 @@ mod linker;
 mod query;
 mod value;
 
-pub use abstract_interp::{AbstractControl, AbstractInterpreter, CallContext, DefaultPolicy};
+pub use abstract_interp::{AbstractInterpreter, CallContext, ContextInsensitive, WideningStrategy};
 pub use concrete::ConcreteInterpreter;
 pub use ctx::{Ctx, EnvOps, Interp};
 pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
@@ -60,9 +60,9 @@ pub mod dialect {
 /// Everything a compiler author needs to run interpreters and analyses.
 pub mod engine {
     pub use crate::{
-        AbstractControl, AbstractInterpreter, CallContext, CallFrame, Callee, Completion,
-        ConcreteInterpreter, CrossStageLinker, DefaultPolicy, Frame, FrameBuild, FrameDriver,
-        FrameEffect, FunctionTarget, InterpDispatch, InterpreterError, Linker, SameStageLinker,
-        ScopeFrame, StandardFrame, expect_single,
+        AbstractInterpreter, CallContext, CallFrame, Callee, Completion, ConcreteInterpreter,
+        ContextInsensitive, CrossStageLinker, Frame, FrameBuild, FrameDriver, FrameEffect,
+        FunctionTarget, InterpDispatch, InterpreterError, Linker, SameStageLinker, ScopeFrame,
+        StandardFrame, WideningStrategy, expect_single,
     };
 }

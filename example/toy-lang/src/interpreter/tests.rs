@@ -230,6 +230,38 @@ fn constprop_source_recursive_factorial_unknown_is_top() {
 }
 
 #[test]
+fn runs_source_recursive_fibonacci() {
+    let pipeline = build_pipeline(include_str!("../../programs/fibonacci.kirin"));
+    let result = run_source_i64(&pipeline, "fib", &[10]).unwrap();
+    assert_eq!(result, 55);
+}
+
+#[test]
+fn constprop_source_recursive_fibonacci() {
+    // Fibonacci recursion is an overlapping-subproblem DAG: fib(n-1) and fib(n-2)
+    // both recompute fib(n-3), fib(n-4), ... Bounded arg-tuple context sensitivity
+    // keys each fib(k) under a distinct summary, so every constant argument is
+    // analyzed once and folded back precisely (fib(10) = 55) — the two recursive
+    // call sites reuse the memoized per-constant summaries instead of joining
+    // their entry arguments to Top.
+    let pipeline = build_pipeline(include_str!("../../programs/fibonacci.kirin"));
+    let result = analyze_constprop(&pipeline, "source", "fib", &[ConstProp::Const(10)]).unwrap();
+    assert_eq!(result, ConstProp::Const(55));
+}
+
+#[test]
+fn constprop_source_recursive_fibonacci_unknown_is_top() {
+    // An unknown argument keys the single shared (Unknown) context. Both
+    // recursive call sites (fib(n-1), fib(n-2)) land back on that same key, so
+    // the self-dependency fix re-enqueues the summary as its return value rises
+    // and converges soundly to `Top` (and terminates), rather than reporting a
+    // bogus `Const` from seeing only the base case.
+    let pipeline = build_pipeline(include_str!("../../programs/fibonacci.kirin"));
+    let result = analyze_constprop(&pipeline, "source", "fib", &[ConstProp::Top]).unwrap();
+    assert_eq!(result, ConstProp::Top);
+}
+
+#[test]
 fn constprop_source_add() {
     let pipeline = build_pipeline(include_str!("../../programs/add.kirin"));
     let result = analyze_constprop(
@@ -527,7 +559,7 @@ mod advanced {
             ConstPropContext,
         > = AbstractInterpreter::new(&pipeline);
         let mut analysis = base
-            .with_policy(ConstPropContext::with_budget(2))
+            .with_analysis(ConstPropContext::with_budget(2))
             .with_linker(CrossStageLinker);
         let result = expect_single::<ConstPropValue, ToyError>(
             analysis

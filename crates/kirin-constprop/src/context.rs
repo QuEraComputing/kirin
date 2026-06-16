@@ -1,8 +1,8 @@
 //! Context-sensitive summary keying for constant propagation.
 //!
 //! The abstract engine keys function summaries through a
-//! [`CallContext`](kirin_interpreter::CallContext) policy. The default
-//! ([`DefaultPolicy`](kirin_interpreter::DefaultPolicy)) is context-insensitive
+//! [`CallContext`](kirin_interpreter::CallContext) strategy. The default
+//! ([`ContextInsensitive`](kirin_interpreter::ContextInsensitive)) is context-insensitive
 //! — every call site of a function shares one summary — which collapses
 //! recursion over distinct constants (e.g. `factorial(5)` and `factorial(4)`
 //! join their entry arguments to `Top`).
@@ -17,11 +17,11 @@
 //!
 //! The shared `Unknown` summary is where same-key recursion converges (joined →
 //! sound `Top`); the join/widen operator itself is delegated unchanged to
-//! [`DefaultPolicy`].
+//! [`ContextInsensitive`].
 
 use std::collections::{HashMap, HashSet};
 
-use kirin_interpreter::{AbstractControl, CallContext, DefaultPolicy, InterpreterError};
+use kirin_interpreter::{CallContext, ContextInsensitive, InterpreterError, WideningStrategy};
 use kirin_ir::{CompileStage, Product, SpecializedFunction};
 
 use crate::ConstPropValue;
@@ -39,7 +39,7 @@ pub enum CallCtx {
 /// Bounded arg-tuple context sensitivity for constant propagation.
 #[derive(Clone, Debug)]
 pub struct ConstPropContext {
-    control: DefaultPolicy,
+    control: ContextInsensitive,
     max_contexts: usize,
     admitted: HashMap<(CompileStage, SpecializedFunction), HashSet<Vec<i64>>>,
 }
@@ -57,7 +57,7 @@ impl ConstPropContext {
 impl Default for ConstPropContext {
     fn default() -> Self {
         Self {
-            control: DefaultPolicy::default(),
+            control: ContextInsensitive::default(),
             max_contexts: 64,
             admitted: HashMap::new(),
         }
@@ -92,7 +92,7 @@ impl CallContext<ConstPropValue> for ConstPropContext {
     }
 }
 
-impl AbstractControl<ConstPropValue> for ConstPropContext {
+impl WideningStrategy<ConstPropValue> for ConstPropContext {
     fn merge(
         &self,
         current: &Product<ConstPropValue>,

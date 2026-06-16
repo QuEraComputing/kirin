@@ -195,12 +195,12 @@ maps it to a `FrameEffect`. A custom `F`
 ([Advanced](#advanced-custom-traversal-and-policies)) replaces traversal
 without touching the engine.
 
-### `AbstractInterpreter<'ir, S, V, E, Lk, P = DefaultPolicy>`
+### `AbstractInterpreter<'ir, S, V, E, Lk, P = ContextInsensitive>`
 
 Interprocedural fixpoint analyzer over a lattice `V: Widen + Lattice +
-HasBottom`. Reads of unbound SSA values are `bottom` (unreached). The policy
-`P` (`CallContext` for summary keys + `AbstractControl` for join/widen,
-defaulting to the context-insensitive `DefaultPolicy`) is the customizable
+HasBottom`. Reads of unbound SSA values are `bottom` (unreached). The analysis
+`P` (`CallContext` for summary keys + `WideningStrategy` for join/widen,
+defaulting to `ContextInsensitive`) is the customizable
 seam ([Advanced](#advanced-custom-traversal-and-policies)); everything else is
 engine-owned. Three nested fixpoints:
 
@@ -210,7 +210,7 @@ engine-owned. Three nested fixpoints:
 - **Scopes**: hook-driven scopes re-run with joined/widened entry arguments
   until stable — `scf.for` loops converge.
 - **Functions**: each resolved call target is summarized under a key chosen by
-  the `CallContext` policy (`DefaultPolicy` → `(stage, specialization)`), with an
+  the `CallContext` strategy (`ContextInsensitive` → `(stage, specialization)`), with an
   entry/return `Product<V>` summary. Calls join arguments into the callee's
   entry (enqueueing it on change) and read its current return summary
   (`bottom` until it converges); return-summary changes re-enqueue recorded
@@ -220,7 +220,7 @@ engine-owned. Three nested fixpoints:
   `bottom`.
 
 Analysis crates stay small: `kirin-constprop` is the `ConstPropValue` lattice, a
-`ConstPropContext` policy (bounded arg-tuple context sensitivity), and
+`ConstPropContext` strategy (bounded arg-tuple context sensitivity), and
 `pub type ConstProp<..> = AbstractInterpreter<.., ConstPropValue, .., ConstPropContext>`.
 
 ### Engine internals: stage dispatch and IR queries
@@ -273,24 +273,28 @@ over the same `FrameDriver`, not a new `Effect`.
 call/scope visitation while running the real program correctly — see
 `example/toy-lang`'s `interpreter::tests::advanced`.)
 
-### Abstract policies — `CallContext` and `AbstractControl`
+### Abstract policies — `CallContext` and `WideningStrategy`
 
-`AbstractInterpreter` is generic over a policy `P` providing two decisions:
+`AbstractInterpreter` is generic over an analysis parameter `P` providing two decisions:
 
 ```rust
 pub trait CallContext<V>     { type Key: Eq + Hash + Clone;
                                fn key(&mut self, stage, function, args: &Product<V>) -> Self::Key; }
-pub trait AbstractControl<V> { fn merge(&self, current, incoming, visits) -> Result<Product<V>, _>; }
+pub trait WideningStrategy<V> { fn merge(&self, current, incoming, visits) -> Result<Product<V>, _>; }
 ```
 
-`DefaultPolicy` is context-insensitive (`Key = (stage, specialization)`) and
-joins-then-widens after `widen_after` visits. `kirin-constprop`'s
+`ContextInsensitive` keys by `(stage, specialization)` — every call site of a
+function shares one summary — and joins-then-widens after `widen_after` visits.
+`kirin-constprop`'s
 `ConstPropContext` keys distinct fully-constant argument tuples to distinct
 summaries — bounded by a per-function budget, with overflow and non-constant
 arguments collapsing to one shared `Unknown` context (joined → sound `Top`).
-That is what makes recursive constant propagation precise
-(`factorial(Const(5)) → Const(120)`) while staying sound and terminating on
-unknown inputs.
+That is what makes recursive constant propagation precise on both linear
+recursion (`factorial(Const(5)) → Const(120)`) and overlapping-subproblem
+recursion, where per-constant summaries memoize each call so the analysis stays
+precise *and* non-explosive (`fib(Const(10)) → Const(55)`) — while still sound
+and terminating on unknown inputs (both fold to `Top`). Runnable as
+`example/toy-lang/programs/{factorial,fibonacci}.kirin`.
 
 ## Design rules
 
@@ -314,8 +318,8 @@ unknown inputs.
   in a separate direction-parametric dataflow solver sharing the lattice
   traits and use/def facts derivable from the IR model (`HasArguments`/
   `HasResults`). Planned as `kirin-dataflow`.
-- Function-summary context sensitivity is a pluggable `CallContext` policy.
-  `DefaultPolicy` is context-insensitive; `ConstPropContext` provides bounded
+- Function-summary context sensitivity is a pluggable `CallContext` strategy.
+  `ContextInsensitive` is the context-insensitive baseline; `ConstPropContext` provides bounded
   arg-tuple keys (precise recursion; sound, terminating cap to `Unknown`).
   Unbounded call-string (k-CFA) policies remain future work — another
   `CallContext` impl, no engine change.
