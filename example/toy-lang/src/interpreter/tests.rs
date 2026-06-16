@@ -412,7 +412,7 @@ fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
     assert_eq!(result, ConstProp::Const(1));
 }
 
-/// Advanced compiler/analysis-author surface: a *custom total frame enum* used
+/// Compiler/analysis-author surface: a *custom total frame enum* used
 /// as the engine's `F` parameter (frame generalization), and a *custom abstract
 /// policy* budget (summary-key generalization). Both reuse the standard engine
 /// — no fork.
