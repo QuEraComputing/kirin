@@ -800,6 +800,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-dataflow"
+version = "0.1.0"
+dependencies = [
+ "kirin-arith",
+ "kirin-cf",
+ "kirin-chumsky",
+ "kirin-cmp",
+ "kirin-constant",
+ "kirin-function",
+ "kirin-ir",
+ "kirin-scf",
+ "kirin-test-languages",
+ "kirin-test-utils",
+ "thiserror 2.0.18",
+]
+
+[[package]]
 name = "kirin-derive-chumsky"
 version = "0.1.0"
 dependencies = [
@@ -958,12 +975,14 @@ dependencies = [
  "kirin-bitwise",
  "kirin-cf",
  "kirin-chumsky",
+ "kirin-cmp",
  "kirin-constant",
  "kirin-derive-chumsky",
  "kirin-function",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
+ "kirin-scf",
  "kirin-test-types",
 ]
 

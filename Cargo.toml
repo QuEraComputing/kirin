@@ -13,6 +13,7 @@ members = [
   "crates/kirin-cmp",
   "crates/kirin-constant",
   "crates/kirin-constprop",
+  "crates/kirin-dataflow",
   "crates/kirin-derive-chumsky",
   "crates/kirin-derive-interpreter",
   "crates/kirin-derive-ir",
@@ -68,6 +69,7 @@ kirin-chumsky = { path = "crates/kirin-chumsky", version = "0.1.0" }
 kirin-cmp = { path = "crates/kirin-cmp", version = "0.1.0" }
 kirin-constant = { path = "crates/kirin-constant", version = "0.1.0" }
 kirin-constprop = { path = "crates/kirin-constprop", version = "0.1.0" }
+kirin-dataflow = { path = "crates/kirin-dataflow", version = "0.1.0" }
 kirin-derive-chumsky = { path = "crates/kirin-derive-chumsky", version = "0.1.0" }
 kirin-derive-interpreter = { path = "crates/kirin-derive-interpreter", version = "0.1.0" }
 kirin-derive-ir = { path = "crates/kirin-derive-ir", version = "0.1.0" }

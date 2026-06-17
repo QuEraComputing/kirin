@@ -7,16 +7,17 @@ including analyses that cross language boundaries in multi-stage pipelines.
 The design is organized as a **two-persona contract**:
 
 - **Dialect authors** describe what each statement *means*, once, in a small
-  fixed vocabulary. They never see engines, stages, pipelines, frames, or
+  fixed vocabulary — `Interpretable`/`Ctx`/`Effect`, plus `Scope`/`ScopeHook`
+  for structured control. They never see engines, stages, pipelines, frames, or
   fixpoints.
 - **Compiler authors** compose languages into pipelines and *select*
-  components: an engine, a value domain, an error type, and a linker. They
-  never implement framework traits beyond derives.
-
-Customizing *traversal* — a custom total frame type, or custom abstract
-summary-key / join-widen policies — is an opt-in extension covered under
-[Advanced](#advanced-custom-traversal-and-policies); it is not a separate
-persona.
+  components: an engine, a value domain, an error type, and a linker. When they
+  need more control, the same compiler-author surface also includes opt-in
+  traversal and analysis components: custom concrete frames
+  (`ConcreteInterpreter<.., F>`), custom abstract frames
+  (`AbstractInterpreter<.., P, F>`), and abstract policies `P`
+  (`CallContext` + `WideningStrategy`). These extensions do not change the
+  dialect contract — frames never appear in `Interpretable`.
 
 Every derive macro is named after the trait it implements
 (`#[derive(Interpretable)]` → `trait Interpretable`), so learning the derive
@@ -133,7 +134,7 @@ return the scope to enter on invocation. On language enums it is derived;
 ## Compiler-author surface
 
 Everything is exported from `kirin_interpreter::engine`. Compiler authors
-write zero framework-trait impls:
+usually write zero framework-trait impls:
 
 1. **Language enums** — the same `#[wraps]` enums used for parsing/printing,
    with `Interpretable` (and `FunctionEntry` + `#[callable]`) added to the
@@ -192,17 +193,24 @@ frames. The default total frame type `StandardFrame<V, E>` wraps the standard
 `Yield`/`Return` complete it) and `CallFrame` (dispatch a callee, await its
 `Return`). The dialect-produced `Effect` is consumed by `ScopeFrame`, which
 maps it to a `FrameEffect`. A custom `F`
-([Advanced](#advanced-custom-traversal-and-policies)) replaces traversal
-without touching the engine.
+([Custom traversal and policies](#custom-traversal-and-policies)) replaces
+traversal without touching the engine.
 
-### `AbstractInterpreter<'ir, S, V, E, Lk, P = ContextInsensitive>`
+### `AbstractInterpreter<'ir, S, V, E, Lk, P = ContextInsensitive, F = StandardAbstractFrame<..>>`
 
 Interprocedural fixpoint analyzer over a lattice `V: Widen + Lattice +
-HasBottom`. Reads of unbound SSA values are `bottom` (unreached). The analysis
-`P` (`CallContext` for summary keys + `WideningStrategy` for join/widen,
-defaulting to `ContextInsensitive`) is the customizable
-seam ([Advanced](#advanced-custom-traversal-and-policies)); everything else is
-engine-owned. Three nested fixpoints:
+HasBottom`. Reads of unbound SSA values are `bottom` (unreached). Like the
+concrete engine, it is a generic **frame-stack driver**: the total abstract
+frame type `F` (default `StandardAbstractFrame`) owns the traversal — CFG block
+worklist, branch exploration, scope fixpoints, and call summarization — and the
+engine just runs the stack (`run_frames`). A custom `F`
+([Custom traversal and policies](#custom-traversal-and-policies))
+customizes/observes abstract traversal without forking the engine. The
+*orthogonal* analysis policy `P` (`CallContext` for summary keys +
+`WideningStrategy` for join/widen, default `ContextInsensitive`) controls
+keying and merge; the interprocedural protocol (summary tables, caller
+recording) stays atomic in the engine. Three nested fixpoints, expressed as
+frames:
 
 - **CFG**: each function body region is a block worklist; block parameters
   join across incoming edges and widen after `widen_after` visits — `cf`
@@ -237,10 +245,14 @@ Two mechanisms keep engines generic over stage enums without HRTBs:
 
 ## Custom traversal and policies
 
-Two seams let an analysis customize *how* the engine traverses, without forking
-it. Neither is visible to dialect authors.
+Both engines are frame-stack drivers over one **shared protocol**. Compiler
+authors can customize *how* an engine traverses (a custom frame type) or *how
+precisely* an abstract analysis summarizes (a custom policy `P`), without
+forking an engine. This is part of the compiler-author surface. None of it is
+visible to dialect authors — **frame generics never leak into
+`Interpretable<I>`**.
 
-### The frame layer — `Frame` / `FrameEffect` / `FrameBuild`
+### The shared protocol — `Frame` / `FrameEffect` / `FrameDriver`
 
 ```rust
 pub enum FrameEffect<F, C> { Continue(F), Push { parent: F, child: F }, Done, Complete(C) }
@@ -252,26 +264,43 @@ pub trait Frame<I: Interp>: Sized {            // implemented by the *total* fra
     fn resume(self, Self::Completion, &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
 }
 
-pub trait FrameBuild<V, E> { fn from_scope(ScopeFrame<V, E>) -> Self; fn from_call(CallFrame<V>) -> Self; }
+pub trait FrameDriver: Interp { /* env alloc/free, IR queries, statement dispatch, call resolution */ }
 ```
 
+The engine owns a `Vec<F>`, pops the top frame, `step`s it, and applies the
+returned `FrameEffect`. `FrameDriver: Interp` is the capability surface frames
+call; **both engines implement it**. The concrete and abstract standard frames
+are two *implementations* of this one protocol — not parallel frameworks.
+
+### Concrete frames — `ScopeFrame` / `CallFrame` / `StandardFrame`
+
 `ConcreteInterpreter` is generic over the total frame type `F` (default
-`StandardFrame`). A custom analysis defines its own enum, reuses the standard
-`ScopeFrame`/`CallFrame` traversal through `FrameBuild` and their `*_into`
-delegating methods, adds its own observation or variants, and instantiates the
-engine with that `F` — the engine is not forked. Frames consume the dialect
-`Effect` and decide traversal; the engine just runs the stack. **Frame generics
-never leak into `Interpretable<I>`**, so dialect authors are unaffected.
-
-The capability surface a frame needs from its engine is `FrameDriver: Interp`
-(env alloc/free, IR queries, statement dispatch, call resolution); both engines
-implement it, so the same standard frames can drive both. This is also the
-natural seam for a future **backward** (liveness) traversal: a new frame variant
-over the same `FrameDriver`, not a new `Effect`.
-
-(Example: a `TracingFrame { Scope(ScopeFrame), Call(CallFrame) }` that counts
-call/scope visitation while running the real program correctly — see
+`StandardFrame`). A custom enum reuses the standard `ScopeFrame`/`CallFrame`
+single-path traversal through `FrameBuild` (`from_scope`/`from_call`) and their
+`*_into` delegating methods, adds observation or variants, and instantiates the
+engine with that `F`. (Example: a `TracingFrame { Scope(ScopeFrame), Call(CallFrame) }`
+counting call/scope visitation while running the real program — see
 `example/toy-lang`'s `interpreter::tests::advanced`.)
+
+### Abstract frames — `StandardAbstractFrame` / `AbstractFrameBuild` / `AbstractFrameDriver`
+
+`AbstractInterpreter` is symmetrically generic over a total abstract frame type
+`F` (default `StandardAbstractFrame`). The standard abstract frames
+(`AbstractFunctionFrame`, `AbstractCfgFrame`, `AbstractScopeFrame`,
+`AbstractScopeAlternativesFrame`, `AbstractCallFrame`) implement the *same*
+`Frame` protocol, but their traversal is the abstract one: a CFG block worklist
+that joins/widens at merge points, `Branch`/`EnterAny` exploration, scope
+fixpoints to stability, and per-key call summarization. A custom enum reuses
+them through `AbstractFrameBuild` and the `*_into` methods — exactly mirroring
+the concrete pattern (see `TracingAbstractFrame` in the same test module).
+
+Abstract frames need a few capabilities beyond `FrameDriver`, on
+`AbstractFrameDriver: FrameDriver` — `analysis_merge`, `contribute_return`, and
+`summarize_call`. The interprocedural protocol stays **atomic in the engine**:
+`summarize_call` performs resolve → key → join-into-callee-entry → record-caller
+(*including same-key recursion*) → read-return-summary in one step, so a custom
+frame chooses *what to traverse* but cannot reorder the summary protocol and
+break soundness.
 
 ### Abstract policies — `CallContext` and `WideningStrategy`
 
@@ -313,22 +342,23 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
 
 ## Status and deferred work
 
-- Backward dataflow analyses (liveness) are deliberately *not* expressed in
-  this framework: they solve flow equations rather than execute, and belong
-  in a separate direction-parametric dataflow solver sharing the lattice
-  traits and use/def facts derivable from the IR model (`HasArguments`/
-  `HasResults`). Planned as `kirin-dataflow`.
+- Both engines are now frame-parametric over the shared `Frame`/`FrameDriver`
+  protocol: `ConcreteInterpreter<.., F>` (default `StandardFrame`) and
+  `AbstractInterpreter<.., P, F>` (default `StandardAbstractFrame`). Abstract
+  explore/join/summarize lives in dedicated abstract frames reused via
+  `AbstractFrameBuild`; there is no longer an un-framed abstract worklist.
+- Backward dataflow analyses (liveness) remain a deliberate **follow-up**, not
+  yet implemented: they solve flow equations rather than execute. The
+  frame-parametric protocol is the natural seam for them (a new backward frame
+  family over `FrameDriver`, not a new `Effect`), but they likely belong in a
+  separate direction-parametric solver sharing the lattice traits and use/def
+  facts from the IR model (`HasArguments`/`HasResults`). Planned as
+  `kirin-dataflow`.
 - Function-summary context sensitivity is a pluggable `CallContext` strategy.
   `ContextInsensitive` is the context-insensitive baseline; `ConstPropContext` provides bounded
   arg-tuple keys (precise recursion; sound, terminating cap to `Unknown`).
   Unbounded call-string (k-CFA) policies remain future work — another
   `CallContext` impl, no engine change.
-- The abstract engine exposes its join/widen and summary-key *policies* as
-  components, but still owns the worklist *iteration* (CFG block worklist,
-  scope loop, interprocedural worklist) inline rather than as `Frame`s.
-  Unifying the abstract engine onto the same frame-stack driver as
-  `ConcreteInterpreter` — so abstract explore/join lives in dedicated abstract
-  frames reused via `FrameBuild` — is deferred.
 - Inline `Scope::region(..)` bodies inside the abstract interpreter are not
   yet supported (function-entry regions are); no current dialect emits them.
 - First-class function values (`Lambda`/`Bind` as values, `Callee` from an

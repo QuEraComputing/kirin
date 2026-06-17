@@ -418,12 +418,15 @@ fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
 /// — no fork.
 mod advanced {
     use std::cell::RefCell;
+    use std::hash::Hash;
 
     use kirin_constprop::{ConstPropContext, ConstPropValue};
     use kirin_interpreter::engine::{
-        AbstractInterpreter, CallFrame, Completion, ConcreteInterpreter, CrossStageLinker, Frame,
-        FrameBuild, FrameDriver, FrameEffect, InterpreterError, SameStageLinker, ScopeFrame,
-        expect_single,
+        AbstractCallFrame, AbstractCfgFrame, AbstractCompletion, AbstractFrameBuild,
+        AbstractFrameDriver, AbstractFunctionFrame, AbstractInterpreter,
+        AbstractScopeAlternativesFrame, AbstractScopeFrame, CallContext, CallFrame, Completion,
+        ConcreteInterpreter, CrossStageLinker, Frame, FrameBuild, FrameDriver, FrameEffect,
+        InterpreterError, SameStageLinker, ScopeFrame, expect_single,
     };
 
     use super::build_pipeline;
@@ -568,5 +571,169 @@ mod advanced {
         )
         .unwrap();
         assert_eq!(result, ConstPropValue::Top);
+    }
+
+    // --- A custom total ABSTRACT frame enum --------------------------------
+    //
+    // The abstract analogue of `TracingFrame`: it reuses the standard abstract
+    // frames verbatim (via `AbstractFrameBuild` + the `*_into` methods) and adds
+    // observation. The engine is not forked — only `AbstractInterpreter`'s `F`
+    // type parameter changes. This proves abstract *traversal* is frame-
+    // parametric, distinct from the analysis-policy `P` budget customized above.
+
+    thread_local! {
+        static ATRACE: RefCell<AbstractTrace> = const {
+            RefCell::new(AbstractTrace {
+                function_steps: 0,
+                cfg_steps: 0,
+                scope_steps: 0,
+                alt_steps: 0,
+                calls: 0,
+            })
+        };
+    }
+
+    #[derive(Clone, Copy, Default)]
+    struct AbstractTrace {
+        function_steps: usize,
+        cfg_steps: usize,
+        scope_steps: usize,
+        alt_steps: usize,
+        calls: usize,
+    }
+
+    enum TracingAbstractFrame<V, E, K> {
+        Function(AbstractFunctionFrame<V, E, K>),
+        Cfg(AbstractCfgFrame<V, E, K>),
+        Scope(AbstractScopeFrame<V, E, K>),
+        Alternatives(AbstractScopeAlternativesFrame<V, E, K>),
+        Call(AbstractCallFrame<V, E, K>),
+    }
+
+    impl<V, E, K> AbstractFrameBuild<V, E, K> for TracingAbstractFrame<V, E, K> {
+        fn from_function(frame: AbstractFunctionFrame<V, E, K>) -> Self {
+            TracingAbstractFrame::Function(frame)
+        }
+        fn from_cfg(frame: AbstractCfgFrame<V, E, K>) -> Self {
+            TracingAbstractFrame::Cfg(frame)
+        }
+        fn from_scope(frame: AbstractScopeFrame<V, E, K>) -> Self {
+            TracingAbstractFrame::Scope(frame)
+        }
+        fn from_scope_alternatives(frame: AbstractScopeAlternativesFrame<V, E, K>) -> Self {
+            TracingAbstractFrame::Alternatives(frame)
+        }
+        fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
+            TracingAbstractFrame::Call(frame)
+        }
+    }
+
+    impl<I> Frame<I> for TracingAbstractFrame<I::Value, I::Error, I::SummaryKey>
+    where
+        I: AbstractFrameDriver,
+        I::Value: Clone + PartialEq,
+        I::Error: From<InterpreterError>,
+        I::SummaryKey: Clone + Eq + Hash,
+    {
+        type Completion = AbstractCompletion<I::Value>;
+
+        fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+            match self {
+                TracingAbstractFrame::Function(frame) => {
+                    ATRACE.with(|t| t.borrow_mut().function_steps += 1);
+                    frame.step_into::<I, Self>(interp)
+                }
+                TracingAbstractFrame::Cfg(frame) => {
+                    ATRACE.with(|t| t.borrow_mut().cfg_steps += 1);
+                    frame.step_into::<I, Self>(interp)
+                }
+                TracingAbstractFrame::Scope(frame) => {
+                    ATRACE.with(|t| t.borrow_mut().scope_steps += 1);
+                    frame.step_into::<I, Self>(interp)
+                }
+                TracingAbstractFrame::Alternatives(frame) => {
+                    ATRACE.with(|t| t.borrow_mut().alt_steps += 1);
+                    frame.step_into::<I, Self>(interp)
+                }
+                TracingAbstractFrame::Call(frame) => {
+                    ATRACE.with(|t| t.borrow_mut().calls += 1);
+                    frame.step_into::<I, Self>(interp)
+                }
+            }
+        }
+
+        fn resume_done(
+            self,
+            _interp: &mut I,
+        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+            match self {
+                TracingAbstractFrame::Function(frame) => Ok(frame.resume_done_into::<Self>()),
+                TracingAbstractFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
+                TracingAbstractFrame::Scope(frame) => Ok(frame.resume_done_into::<Self>()),
+                TracingAbstractFrame::Alternatives(frame) => frame.resume_done_into::<Self>(),
+                TracingAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
+            }
+        }
+
+        fn resume(
+            self,
+            completion: Self::Completion,
+            interp: &mut I,
+        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+            match self {
+                TracingAbstractFrame::Function(frame) => frame.resume_into::<Self>(completion),
+                TracingAbstractFrame::Cfg(frame) => {
+                    frame.resume_into::<I, Self>(completion, interp)
+                }
+                TracingAbstractFrame::Scope(frame) => {
+                    frame.resume_into::<I, Self>(completion, interp)
+                }
+                TracingAbstractFrame::Alternatives(frame) => {
+                    frame.resume_into::<I, Self>(completion, interp)
+                }
+                TracingAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
+            }
+        }
+    }
+
+    type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
+
+    type TracingAnalysis<'ir> = AbstractInterpreter<
+        'ir,
+        Stage,
+        ConstPropValue,
+        ToyError,
+        CrossStageLinker,
+        ConstPropContext,
+        TracingAbstractFrame<ConstPropValue, ToyError, CpKey>,
+    >;
+
+    #[test]
+    fn custom_abstract_frame_analyzes_program_and_observes_traversal() {
+        ATRACE.with(|t| *t.borrow_mut() = AbstractTrace::default());
+        let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
+
+        // AbstractInterpreter parameterized by the *custom* abstract frame enum.
+        let mut analysis: TracingAnalysis<'_> =
+            AbstractInterpreter::new(&pipeline).with_linker(CrossStageLinker);
+        let result = expect_single::<ConstPropValue, ToyError>(
+            analysis
+                .analyze_by_name("source", "factorial", [ConstPropValue::Const(5)])
+                .unwrap(),
+        )
+        .unwrap();
+
+        // (1)+(2): the custom abstract frame ran the real interprocedural fixpoint
+        // correctly by reusing the standard abstract frames — precise recursive
+        // constant propagation, no engine fork.
+        assert_eq!(result, ConstPropValue::Const(120));
+
+        // (3): abstract traversal is observable through the custom frame — a real
+        // frame type `F`, not merely a custom analysis policy `P`. Counts are not
+        // pinned (the interprocedural fixpoint re-enqueues summaries).
+        let trace = ATRACE.with(|t| *t.borrow());
+        assert!(trace.function_steps > 0, "function frames must be stepped");
+        assert!(trace.cfg_steps > 0, "CFG frames must be stepped");
+        assert!(trace.calls > 0, "call frames must be stepped");
     }
 }

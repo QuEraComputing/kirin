@@ -7,6 +7,8 @@ mod arith_function_language;
 mod bitwise_function_language;
 #[cfg(feature = "callable-language")]
 mod callable_language;
+#[cfg(feature = "dataflow-language")]
+mod dataflow_language;
 #[cfg(feature = "namespaced-language")]
 mod namespaced_language;
 #[cfg(feature = "simple-language")]
@@ -20,6 +22,8 @@ pub use arith_function_language::ArithFunctionLanguage;
 pub use bitwise_function_language::BitwiseFunctionLanguage;
 #[cfg(feature = "callable-language")]
 pub use callable_language::CallableLanguage;
+#[cfg(feature = "dataflow-language")]
+pub use dataflow_language::DataflowLanguage;
 #[cfg(feature = "namespaced-language")]
 pub use namespaced_language::NamespacedLanguage;
 #[cfg(feature = "simple-language")]

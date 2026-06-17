@@ -19,8 +19,10 @@
 //! ([`Effect::Branch`], [`Effect::EnterAny`], [`ScopeStep::RepeatOrFinish`])
 //! is driven.
 
+mod abstract_frame;
 mod abstract_interp;
 mod concrete;
+mod concrete_frame;
 mod ctx;
 mod dispatch;
 mod effect;
@@ -39,8 +41,15 @@ pub use effect::{CallEffect, Callee, Edge, Effect, Scope, ScopeBody, ScopeHook, 
 pub use env::{Env, EnvIndex, EnvStackStore};
 
 pub use error::InterpreterError;
-pub use frame::{
-    CallFrame, Completion, Frame, FrameBuild, FrameDriver, FrameEffect, ScopeFrame, StandardFrame,
+// The shared frame protocol (concrete + abstract implement it).
+pub use frame::{AbstractFrameDriver, Frame, FrameDriver, FrameEffect};
+// Concrete standard frames.
+pub use concrete_frame::{CallFrame, Completion, FrameBuild, ScopeFrame, StandardFrame};
+// Abstract standard frames.
+pub use abstract_frame::{
+    AbstractCallFrame, AbstractCfgFrame, AbstractCompletion, AbstractFrameBuild,
+    AbstractFunctionFrame, AbstractScopeAlternativesFrame, AbstractScopeFrame,
+    StandardAbstractFrame,
 };
 pub use linker::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
 pub use query::StageQuery;
@@ -58,11 +67,22 @@ pub mod dialect {
 }
 
 /// Everything a compiler author needs to run interpreters and analyses.
+///
+/// Ordinary users need only the engines + [`Linker`] + value/error domain.
+/// Advanced compiler/analysis authors customize *traversal* with a custom frame
+/// type: concrete via `ConcreteInterpreter<.., F>` reusing [`ScopeFrame`]/
+/// [`CallFrame`] through [`FrameBuild`]; abstract via `AbstractInterpreter<.., P, F>`
+/// reusing the `Abstract*Frame`s through [`AbstractFrameBuild`]. Both implement
+/// the shared [`Frame`]/[`FrameDriver`] protocol ([`AbstractFrameDriver`] adds the
+/// abstract-only capabilities). Analysis *policy* is [`CallContext`] + [`WideningStrategy`].
 pub mod engine {
     pub use crate::{
-        AbstractInterpreter, CallContext, CallFrame, Callee, Completion, ConcreteInterpreter,
-        ContextInsensitive, CrossStageLinker, Frame, FrameBuild, FrameDriver, FrameEffect,
-        FunctionTarget, InterpDispatch, InterpreterError, Linker, SameStageLinker, ScopeFrame,
-        StandardFrame, WideningStrategy, expect_single,
+        AbstractCallFrame, AbstractCfgFrame, AbstractCompletion, AbstractFrameBuild,
+        AbstractFrameDriver, AbstractFunctionFrame, AbstractInterpreter,
+        AbstractScopeAlternativesFrame, AbstractScopeFrame, CallContext, CallFrame, Callee,
+        Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker, Frame, FrameBuild,
+        FrameDriver, FrameEffect, FunctionTarget, InterpDispatch, InterpreterError, Linker,
+        SameStageLinker, ScopeFrame, StandardAbstractFrame, StandardFrame, WideningStrategy,
+        expect_single,
     };
 }
