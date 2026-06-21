@@ -1,14 +1,13 @@
 from kirin import ir, types
-from kirin.rewrite import Walk
 from kirin.dialects.py import Add, Div, Sub, Mult, BinOp
 from kirin.rewrite.abc import RewriteRule, RewriteResult
-from kirin.ir.nodes.base import IRNode
 from kirin.dialects.ilist import IListType
 
 from ..stmts import add as vadd, div as vdiv, sub as vsub, mult as vmult
 from .._dialect import dialect
 
 
+@dialect.post_inference
 class DesugarBinOp(RewriteRule):
     """
     Convert py.BinOp statements with one scalar arg and one IList arg
@@ -55,14 +54,3 @@ class DesugarBinOp(RewriteRule):
                 return RewriteResult(has_done_something=True)
             case _:
                 return RewriteResult()
-
-
-@dialect.post_inference
-class WalkDesugarBinop(RewriteRule):
-    """
-    Walks DesugarBinop. Needed for correct behavior when
-    registering as a post-inference rewrite.
-    """
-
-    def rewrite(self, node: IRNode):
-        return Walk(DesugarBinOp()).rewrite(node)

@@ -5,15 +5,15 @@ from kirin.dialects import ilist
 
 def test_infer_lambda():
     @structural(typeinfer=True, fold=False, no_raise=False)
-    def main(n):
+    def main(n, m: int):
         def map_func(i):
             return n + 1
 
-        return ilist.map(map_func, ilist.range(4))
+        return ilist.map(map_func, ilist.range(m))
 
     map_stmt = main.callable_region.blocks[0].stmts.at(-2)
     assert isinstance(map_stmt, ilist.Map)
-    assert map_stmt.result.type == ilist.IListType[types.Int, types.Literal(4)]
+    assert map_stmt.result.type == ilist.IListType[types.Int, types.Any]
 
 
 def test_infer_method_type_hint_call():
