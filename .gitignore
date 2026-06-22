@@ -1,4 +1,6 @@
 /target
+__pycache__/
+*.py[cod]
 skills-lock.json
 docs/superpowers/
 refactor-workspace/

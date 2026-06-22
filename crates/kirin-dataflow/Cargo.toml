@@ -1,0 +1,19 @@
+[package]
+name = "kirin-dataflow"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-ir = { workspace = true }
+kirin-cf = { workspace = true }
+kirin-scf = { workspace = true }
+kirin-function = { workspace = true }
+thiserror = { workspace = true }
+
+[dev-dependencies]
+kirin-test-languages = { workspace = true, features = ["dataflow-language", "parser", "pretty"] }
+kirin-test-utils = { workspace = true, features = ["roundtrip"] }
+kirin-chumsky = { workspace = true, features = ["derive"] }
+kirin-arith = { workspace = true }
+kirin-cmp = { workspace = true }
+kirin-constant = { workspace = true }

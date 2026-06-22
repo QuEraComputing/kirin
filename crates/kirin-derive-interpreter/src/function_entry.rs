@@ -5,9 +5,9 @@ use kirin_derive_toolkit::prelude::darling;
 use proc_macro2::TokenStream;
 use quote::quote;
 
+use crate::interpretable::parse_interpret_crate_path;
 use crate::layout::InterpreterLayout;
 
-const DEFAULT_INTERP_CRATE: &str = "::kirin_interpreter";
 const DEFAULT_IR_CRATE: &str = "::kirin::ir";
 
 pub fn do_derive_function_entry(input: &syn::DeriveInput) -> darling::Result<TokenStream> {
@@ -37,37 +37,17 @@ fn emit_function_entry(
     let mut impl_generics = ctx.meta.generics.clone();
     impl_generics
         .params
-        .insert(0, syn::GenericParam::Type(syn::parse_quote!(__EntryL)));
-    impl_generics
-        .params
         .push(syn::GenericParam::Type(syn::parse_quote!(__EntryI)));
-    impl_generics
-        .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__EntryF)));
-    impl_generics
-        .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__EntryE)));
-    impl_generics
-        .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__EntryV)));
 
     let (impl_generics, _, _) = impl_generics.split_for_impl();
     let (_, ty_generics, original_where) = ctx.meta.generics.split_for_impl();
     let callable_wrappers = collect_callable_wrappers(ctx);
 
-    let mut predicates: Vec<syn::WherePredicate> = vec![
-        syn::parse_quote! { __EntryL: #ir_crate::Dialect },
-        syn::parse_quote! { __EntryE: ::core::convert::From<#interp_crate::InterpreterError> },
-    ];
+    let mut predicates: Vec<syn::WherePredicate> =
+        vec![syn::parse_quote! { __EntryI: #interp_crate::Interp }];
     for wrapper_ty in callable_wrappers {
         predicates.push(syn::parse_quote! {
-            #wrapper_ty: #interp_crate::FunctionEntry<
-                __EntryL,
-                __EntryI,
-                __EntryF,
-                __EntryE,
-                __EntryV
-            >
+            #wrapper_ty: #interp_crate::FunctionEntry<__EntryI>
         });
     }
     let extra_where: syn::WhereClause = syn::parse_quote! { where #(#predicates),* };
@@ -85,24 +65,24 @@ fn emit_function_entry(
             .get(&variant.name.to_string())
             .ok_or_else(|| darling::Error::custom("missing statement context"))?;
         let variant_name = &variant.name;
-        let pattern = &stmt_ctx.pattern;
-        let arm_pattern = if stmt_ctx.pattern.is_empty() {
-            quote! { Self::#variant_name }
-        } else {
-            quote! { Self::#variant_name #pattern }
-        };
         if is_entry_forwarding(ctx, stmt_ctx) {
+            let pattern = &stmt_ctx.pattern;
+            let arm_pattern = if stmt_ctx.pattern.is_empty() {
+                quote! { Self::#variant_name }
+            } else {
+                quote! { Self::#variant_name #pattern }
+            };
             let binding = stmt_ctx
                 .wrapper_binding
                 .as_ref()
                 .ok_or_else(|| darling::Error::custom("expected wrapper binding"))?;
             arms.push(quote! {
-                #arm_pattern => #binding.enter_function_body(location, env, interp, args)
+                #arm_pattern => #binding.function_entry(args, ctx)
             });
         } else {
             arms.push(quote! {
-                #arm_pattern => Err(__EntryE::from(
-                    #interp_crate::InterpreterError::Custom("expected function body statement")
+                Self::#variant_name { .. } => Err(<__EntryI as #interp_crate::Interp>::Error::from(
+                    #interp_crate::InterpreterError::NotCallable(ctx.statement())
                 ))
             });
         }
@@ -125,20 +105,18 @@ fn emit_function_entry(
 
     Ok(vec![quote! {
         #[automatically_derived]
-        impl #impl_generics #interp_crate::FunctionEntry<
-            __EntryL,
-            __EntryI,
-            __EntryF,
-            __EntryE,
-            __EntryV
-        > for #type_name #ty_generics #where_clause {
-            fn enter_function_body(
+        impl #impl_generics #interp_crate::FunctionEntry<__EntryI> for #type_name #ty_generics #where_clause {
+            fn function_entry(
                 &self,
-                location: #interp_crate::Location,
-                env: #interp_crate::EnvIndex,
-                interp: &mut __EntryI,
-                args: #ir_crate::Product<__EntryV>,
-            ) -> Result<__EntryF, __EntryE> {
+                args: #ir_crate::Product<<__EntryI as #interp_crate::Interp>::Value>,
+                ctx: &mut #interp_crate::Ctx<'_, __EntryI>,
+            ) -> Result<
+                #interp_crate::Scope<
+                    <__EntryI as #interp_crate::Interp>::Value,
+                    <__EntryI as #interp_crate::Interp>::Error,
+                >,
+                <__EntryI as #interp_crate::Interp>::Error,
+            > {
                 #body
             }
         }
@@ -177,25 +155,6 @@ fn collect_callable_wrappers<'a>(
         .filter(|stmt_ctx| is_entry_forwarding(ctx, stmt_ctx))
         .filter_map(|stmt_ctx| stmt_ctx.wrapper_type)
         .collect()
-}
-
-fn parse_interpret_crate_path(input: &syn::DeriveInput) -> darling::Result<syn::Path> {
-    let mut crate_path = None;
-    for attr in &input.attrs {
-        if !attr.path().is_ident("interpret") {
-            continue;
-        }
-        attr.parse_nested_meta(|meta| {
-            if meta.path.is_ident("crate") {
-                let value = meta.value()?;
-                crate_path = Some(value.parse()?);
-                Ok(())
-            } else {
-                Err(meta.error("unsupported attribute for #[interpret(...)]"))
-            }
-        })?;
-    }
-    Ok(crate_path.unwrap_or_else(|| from_str(DEFAULT_INTERP_CRATE)))
 }
 
 #[cfg(test)]

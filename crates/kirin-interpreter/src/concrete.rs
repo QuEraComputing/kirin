@@ -1,376 +1,245 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{CompileStage, Dialect, HasStageInfo, Pipeline, StageInfo};
+use kirin_ir::{Block, CompileStage, Pipeline, Product, Region, SSAValue, StageMeta, Statement};
 
 use crate::{
-    Env, EnvIndex, EnvStackStore, Frame, FrameEffect, FunctionInvocation, FunctionInvokeBuilder,
-    InterpreterError, InterpreterProfile, StageFrame,
+    Callee, Completion, Effect, Env, EnvIndex, EnvStackStore, Frame, FrameBuild, FrameDriver,
+    FrameEffect, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker, SameStageLinker,
+    Scope, ScopeFrame, StageQuery, StandardFrame, query,
 };
 
-pub enum StepResult<C> {
-    Running,
-    Complete(C),
+/// Concrete executor: runs IR over a concrete value domain with an explicit
+/// frame stack (no Rust-stack recursion for interpreter control flow).
+///
+/// Traversal lives in [`Frame`]s, not in the engine: the driver pops a frame,
+/// steps it, and applies the returned [`FrameEffect`]. The total frame type `F`
+/// defaults to [`StandardFrame`]; a compiler author can supply a custom frame
+/// enum — reusing the standard frames via [`FrameBuild`] — to customize
+/// traversal without forking the engine.
+///
+/// ```ignore
+/// let mut interp = ConcreteInterpreter::<Stage, i64, MyError>::new(&pipeline)
+///     .with_linker(CrossStageLinker);
+/// let result = interp.call_by_name("source", "main", [3, 5])?;
+/// ```
+pub struct ConcreteInterpreter<
+    'ir,
+    S: StageMeta,
+    V,
+    E,
+    Lk = SameStageLinker,
+    F = StandardFrame<V, E>,
+> {
+    pipeline: &'ir Pipeline<S>,
+    linker: Lk,
+    store: EnvStackStore<V>,
+    frames: Vec<F>,
+    _marker: PhantomData<fn() -> E>,
 }
 
-pub struct ConcreteInterpreter<'ir, P: InterpreterProfile> {
-    pipeline: &'ir Pipeline<P::Stage>,
-    frames: Vec<P::Frame>,
-    envs: EnvStackStore<P::Value>,
-    _marker: PhantomData<P>,
-}
-
-impl<'ir, P: InterpreterProfile> ConcreteInterpreter<'ir, P> {
-    pub fn new(pipeline: &'ir Pipeline<P::Stage>) -> Self {
+impl<'ir, S: StageMeta, V, E, F> ConcreteInterpreter<'ir, S, V, E, SameStageLinker, F> {
+    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
             pipeline,
+            linker: SameStageLinker,
+            store: EnvStackStore::new(),
             frames: Vec::new(),
-            envs: EnvStackStore::new(),
+            _marker: PhantomData,
+        }
+    }
+}
+
+impl<'ir, S: StageMeta, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F> {
+    /// Swap the calling-convention component (the [`Linker`]).
+    pub fn with_linker<Lk2>(self, linker: Lk2) -> ConcreteInterpreter<'ir, S, V, E, Lk2, F> {
+        ConcreteInterpreter {
+            pipeline: self.pipeline,
+            linker,
+            store: self.store,
+            frames: self.frames,
             _marker: PhantomData,
         }
     }
 
-    pub fn pipeline(&self) -> &'ir Pipeline<P::Stage> {
+    pub fn pipeline(&self) -> &'ir Pipeline<S> {
         self.pipeline
     }
+}
 
-    pub fn push_frame(&mut self, frame: P::Frame) {
-        self.frames.push(frame);
+impl<'ir, S, V, E, Lk, F> Interp for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageMeta,
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    type Value = V;
+    type Error = E;
+
+    fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<V, E> {
+        self.store.read(env, value).map_err(E::from)
     }
 
-    pub fn frame_depth(&self) -> usize {
-        self.frames.len()
+    fn env_write(&mut self, env: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
+        self.store.write(env, value, data).map_err(E::from)
+    }
+}
+
+impl<'ir, S, V, E, Lk, F> FrameDriver for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
+    fn alloc_env(&mut self) -> EnvIndex {
+        self.store.alloc()
     }
 
-    pub fn invoke(&mut self, stage: CompileStage) -> FunctionInvokeBuilder<'_, Self> {
-        FunctionInvokeBuilder::new(self, stage)
+    fn free_env(&mut self, env: EnvIndex) -> Result<(), E> {
+        self.store.free(env).map_err(E::from)
     }
 
-    pub fn push_env(&mut self) -> EnvIndex {
-        self.envs.push()
+    fn resolve_call(&self, stage: CompileStage, callee: &Callee) -> Result<FunctionTarget, E> {
+        self.linker
+            .resolve(self.pipeline, stage, callee)
+            .map_err(E::from)
     }
 
-    pub fn pop_env(&mut self) -> Result<EnvIndex, P::Error>
-    where
-        P::Error: From<InterpreterError>,
-    {
-        self.envs.pop().map_err(P::Error::from)
-    }
-
-    pub fn current_env(&self) -> Result<EnvIndex, P::Error>
-    where
-        P::Error: From<InterpreterError>,
-    {
-        self.envs.current().map_err(P::Error::from)
-    }
-
-    pub fn run(&mut self) -> Result<P::Completion, P::Error>
-    where
-        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error: From<InterpreterError>,
-    {
-        loop {
-            match self.step()? {
-                StepResult::Running => {}
-                StepResult::Complete(completion) => return Ok(completion),
-            }
-        }
-    }
-
-    pub fn run_function_invocation(
+    fn run_statement(
         &mut self,
-        invocation: FunctionInvocation<P::Value>,
-    ) -> Result<P::Completion, P::Error>
-    where
-        P::Frame: StageFrame<P::Stage, P::Value> + Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error:
-            From<InterpreterError> + From<<P::Frame as StageFrame<P::Stage, P::Value>>::Error>,
-    {
-        let stage = invocation.stage();
-        let stage_info = self
-            .pipeline
+        stage: CompileStage,
+        statement: Statement,
+        env: EnvIndex,
+    ) -> Result<Effect<V, E>, E> {
+        let pipeline = self.pipeline;
+        let info = pipeline
             .stage(stage)
-            .ok_or(InterpreterError::MissingStage(stage))?;
-        let frame =
-            P::Frame::from_function_invocation(stage_info, invocation).map_err(P::Error::from)?;
-        self.push_frame(frame);
-        self.run()
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
+        info.dispatch_statement(stage, statement, env, self)
     }
 
-    /// Resolve a function by name in the given stage and run it with the
-    /// given arguments. Returns the raw completion produced by the function.
-    pub fn run_function_by_name<A>(
+    fn enter_function(
+        &mut self,
+        stage: CompileStage,
+        body: Statement,
+        args: Product<V>,
+        env: EnvIndex,
+    ) -> Result<Scope<V, E>, E> {
+        let pipeline = self.pipeline;
+        let info = pipeline
+            .stage(stage)
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
+        info.dispatch_function_entry(stage, body, args, env, self)
+    }
+
+    fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
+        query::block_params(self.pipeline, stage, block).map_err(E::from)
+    }
+
+    fn first_statement(&self, stage: CompileStage, block: Block) -> Result<Option<Statement>, E> {
+        query::first_statement(self.pipeline, stage, block).map_err(E::from)
+    }
+
+    fn next_statement(
+        &self,
+        stage: CompileStage,
+        block: Block,
+        after: Statement,
+    ) -> Result<Option<Statement>, E> {
+        query::next_statement(self.pipeline, stage, block, after).map_err(E::from)
+    }
+
+    fn region_entry(&self, stage: CompileStage, region: Region) -> Result<Option<Block>, E> {
+        query::region_entry(self.pipeline, stage, region).map_err(E::from)
+    }
+}
+
+impl<'ir, S, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    F: Frame<Self, Completion = Completion<V>> + FrameBuild<V, E>,
+{
+    /// Resolve `stage`/`function` by name and execute it to completion.
+    pub fn call_by_name(
         &mut self,
         stage_name: &str,
         function_name: &str,
-        args: A,
-    ) -> Result<P::Completion, P::Error>
-    where
-        P::Stage: kirin_ir::StageMeta,
-        Self: crate::FrameDispatch<P::Frame, P::Value, P::Error>,
-        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error: From<InterpreterError>,
-        A: IntoIterator<Item = P::Value>,
-    {
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
         let stage = self
             .pipeline
             .stage_by_name(stage_name)
-            .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))
-            .map_err(P::Error::from)?;
+            .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
         let function = self
             .pipeline
             .lookup_function_by_name(function_name)
-            .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))
-            .map_err(P::Error::from)?;
-        self.invoke(stage).function(function).args(args)
+            .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
+        self.call(stage, Callee::Function(function), args)
     }
 
-    pub fn step(&mut self) -> Result<StepResult<P::Completion>, P::Error>
-    where
-        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error: From<InterpreterError>,
-    {
-        let frame = match self.frames.pop() {
-            Some(frame) => frame,
-            None => return Err(P::Error::from(InterpreterError::EmptyFrameStack)),
-        };
-        let effect = frame.step(self)?;
-        self.apply_effect(effect)
-    }
-
-    fn apply_effect(
+    /// Execute a function to completion and return its return product.
+    pub fn call(
         &mut self,
-        mut effect: FrameEffect<P::Frame, P::Completion>,
-    ) -> Result<StepResult<P::Completion>, P::Error>
-    where
-        P::Frame: Frame<Self, P::Frame, P::Completion, P::Error>,
-        P::Error: From<InterpreterError>,
-    {
+        stage: CompileStage,
+        callee: Callee,
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        let target = self.resolve_call(stage, &callee)?;
+        let env = self.alloc_env();
+        let args: Product<V> = args.into_iter().collect();
+        let scope = self.enter_function(target.stage, target.body, args, env)?;
+        match ScopeFrame::enter(self, target.stage, env, true, true, scope)? {
+            Some(body) => self.frames.push(F::from_scope(body)),
+            None => {
+                self.free_env(env)?;
+                return Err(E::from(InterpreterError::FunctionBodyFellThrough));
+            }
+        }
+        self.run()
+    }
+
+    /// The generic driver loop: pop the top frame, step it, and apply the
+    /// resulting [`FrameEffect`]. `Done`/`Complete` bubble synchronously
+    /// through parents until one continues or the stack empties.
+    fn run(&mut self) -> Result<Product<V>, E> {
         loop {
-            match effect {
-                FrameEffect::Continue(frame) => {
-                    self.frames.push(frame);
-                    return Ok(StepResult::Running);
-                }
-                FrameEffect::Push { parent, child } => {
-                    self.frames.push(parent);
-                    self.frames.push(child);
-                    return Ok(StepResult::Running);
-                }
-                FrameEffect::Done => {
-                    let parent = match self.frames.pop() {
-                        Some(parent) => parent,
-                        None => return Err(P::Error::from(InterpreterError::EmptyFrameStack)),
-                    };
-                    effect = parent.resume_done(self)?;
-                }
-                FrameEffect::Complete(completion) => {
-                    if let Some(parent) = self.frames.pop() {
-                        effect = parent.resume(completion, self)?;
-                    } else {
-                        return Ok(StepResult::Complete(completion));
+            let frame = self
+                .frames
+                .pop()
+                .ok_or_else(|| E::from(InterpreterError::EmptyFrameStack))?;
+            let mut effect = frame.step(self)?;
+            loop {
+                match effect {
+                    FrameEffect::Continue(frame) => {
+                        self.frames.push(frame);
+                        break;
                     }
+                    FrameEffect::Push { parent, child } => {
+                        self.frames.push(parent);
+                        self.frames.push(child);
+                        break;
+                    }
+                    FrameEffect::Done => {
+                        let parent = self
+                            .frames
+                            .pop()
+                            .ok_or_else(|| E::from(InterpreterError::EmptyFrameStack))?;
+                        effect = parent.resume_done(self)?;
+                    }
+                    FrameEffect::Complete(completion) => match self.frames.pop() {
+                        Some(parent) => {
+                            effect = parent.resume(completion, self)?;
+                        }
+                        None => {
+                            let Completion::Returned(values) = completion;
+                            return Ok(values);
+                        }
+                    },
                 }
             }
         }
-    }
-}
-
-impl<'ir, P> Env<P::Value> for ConcreteInterpreter<'ir, P>
-where
-    P: InterpreterProfile,
-    P::Value: Clone,
-    P::Error: From<InterpreterError>,
-{
-    type Error = P::Error;
-
-    fn alloc(&mut self) -> EnvIndex {
-        self.envs.alloc()
-    }
-
-    fn free(&mut self, index: EnvIndex) -> Result<(), Self::Error> {
-        self.envs.free(index).map_err(P::Error::from)
-    }
-
-    fn read(&self, index: EnvIndex, value: kirin_ir::SSAValue) -> Result<P::Value, Self::Error> {
-        self.envs.read(index, value).map_err(P::Error::from)
-    }
-
-    fn write(
-        &mut self,
-        index: EnvIndex,
-        value: kirin_ir::SSAValue,
-        data: P::Value,
-    ) -> Result<(), Self::Error> {
-        self.envs.write(index, value, data).map_err(P::Error::from)
-    }
-}
-
-impl<'ir, P, L> crate::StageAccess<L> for ConcreteInterpreter<'ir, P>
-where
-    P: InterpreterProfile,
-    P::Stage: HasStageInfo<L>,
-    L: Dialect,
-    P::Error: From<InterpreterError>,
-{
-    type Error = P::Error;
-
-    fn stage_info(&self, stage: CompileStage) -> Result<&StageInfo<L>, Self::Error> {
-        let stage_info = self
-            .pipeline
-            .stage(stage)
-            .ok_or_else(|| P::Error::from(InterpreterError::MissingStage(stage)))?;
-        stage_info
-            .try_stage_info()
-            .ok_or(InterpreterError::MissingStageInfo(stage))
-            .map_err(P::Error::from)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use kirin_ir::Pipeline;
-
-    use super::*;
-    use crate::{FrameEffect, HasLocation, Location};
-
-    struct TestProfile;
-
-    impl InterpreterProfile for TestProfile {
-        type Stage = ();
-        type Value = ();
-        type Frame = TestFrame;
-        type Completion = &'static str;
-        type Error = InterpreterError;
-    }
-
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    enum TestFrame {
-        Root,
-        Child,
-    }
-
-    impl HasLocation for TestFrame {
-        fn location(&self) -> Location {
-            panic!("test frame has no IR location")
-        }
-    }
-
-    impl<'ir>
-        crate::Frame<
-            ConcreteInterpreter<'ir, TestProfile>,
-            TestFrame,
-            &'static str,
-            InterpreterError,
-        > for TestFrame
-    {
-        fn step(
-            self,
-            _interp: &mut ConcreteInterpreter<'ir, TestProfile>,
-        ) -> Result<FrameEffect<TestFrame, &'static str>, InterpreterError> {
-            match self {
-                TestFrame::Root => Ok(FrameEffect::Push {
-                    parent: TestFrame::Root,
-                    child: TestFrame::Child,
-                }),
-                TestFrame::Child => Ok(FrameEffect::Complete("child")),
-            }
-        }
-
-        fn resume_done(
-            self,
-            _interp: &mut ConcreteInterpreter<'ir, TestProfile>,
-        ) -> Result<FrameEffect<TestFrame, &'static str>, InterpreterError> {
-            unreachable!("test frames do not use done")
-        }
-
-        fn resume(
-            self,
-            completion: &'static str,
-            _interp: &mut ConcreteInterpreter<'ir, TestProfile>,
-        ) -> Result<FrameEffect<TestFrame, &'static str>, InterpreterError> {
-            assert_eq!(self, TestFrame::Root);
-            assert_eq!(completion, "child");
-            Ok(FrameEffect::Complete("root"))
-        }
-    }
-
-    #[test]
-    fn run_resumes_parent_after_child_completion() {
-        let pipeline = Pipeline::new();
-        let mut interp = ConcreteInterpreter::<TestProfile>::new(&pipeline);
-
-        interp.push_frame(TestFrame::Root);
-
-        assert_eq!(interp.run().unwrap(), "root");
-    }
-
-    struct DoneProfile;
-
-    impl InterpreterProfile for DoneProfile {
-        type Stage = ();
-        type Value = ();
-        type Frame = DoneFrame;
-        type Completion = &'static str;
-        type Error = InterpreterError;
-    }
-
-    #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-    enum DoneFrame {
-        Root,
-        Child,
-    }
-
-    impl HasLocation for DoneFrame {
-        fn location(&self) -> Location {
-            panic!("test frame has no IR location")
-        }
-    }
-
-    impl<'ir>
-        crate::Frame<
-            ConcreteInterpreter<'ir, DoneProfile>,
-            DoneFrame,
-            &'static str,
-            InterpreterError,
-        > for DoneFrame
-    {
-        fn step(
-            self,
-            _interp: &mut ConcreteInterpreter<'ir, DoneProfile>,
-        ) -> Result<FrameEffect<DoneFrame, &'static str>, InterpreterError> {
-            match self {
-                DoneFrame::Root => Ok(FrameEffect::Push {
-                    parent: DoneFrame::Root,
-                    child: DoneFrame::Child,
-                }),
-                DoneFrame::Child => Ok(FrameEffect::Done),
-            }
-        }
-
-        fn resume_done(
-            self,
-            _interp: &mut ConcreteInterpreter<'ir, DoneProfile>,
-        ) -> Result<FrameEffect<DoneFrame, &'static str>, InterpreterError> {
-            assert_eq!(self, DoneFrame::Root);
-            Ok(FrameEffect::Complete("done"))
-        }
-
-        fn resume(
-            self,
-            _completion: &'static str,
-            _interp: &mut ConcreteInterpreter<'ir, DoneProfile>,
-        ) -> Result<FrameEffect<DoneFrame, &'static str>, InterpreterError> {
-            unreachable!("done test does not use completion")
-        }
-    }
-
-    #[test]
-    fn run_resumes_parent_after_child_done() {
-        let pipeline = Pipeline::new();
-        let mut interp = ConcreteInterpreter::<DoneProfile>::new(&pipeline);
-
-        interp.push_frame(DoneFrame::Root);
-
-        assert_eq!(interp.run().unwrap(), "done");
     }
 }
