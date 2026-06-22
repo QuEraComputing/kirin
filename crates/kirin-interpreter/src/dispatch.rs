@@ -1,48 +1,85 @@
-use kirin_ir::{CompileStage, Dialect, StageInfo};
+use kirin_ir::{CompileStage, Dialect, Product, StageInfo, StageMeta, Statement};
 
-use crate::{EnvIndex, InterpreterError, Location, StatementEffect};
+use crate::{Ctx, EnvIndex, Interp, Scope};
 
-pub trait StageAccess<L: Dialect> {
-    type Error;
-
-    fn stage_info(&self, stage: CompileStage) -> Result<&StageInfo<L>, Self::Error>;
+/// Statement semantics. The single trait dialect authors implement.
+///
+/// Generic over the interpreter/analysis driver `I`, producing `I::Effect` (the
+/// analysis-specific effect algebra) through `I::Ctx`. Forward rules bound
+/// `I: ForwardInterp` (so `I::Effect` is [`ForwardEffect`](crate::ForwardEffect))
+/// and constrain only the value domain (`I::Value: Add + ...`) and error lifting
+/// (`I::Error: From<MyError>`) — the same impl drives concrete execution and
+/// forward abstract interpretation, the difference living in the value type. A
+/// future analysis implements `Interpretable<I>` for its own driver/effect.
+pub trait Interpretable<I: Interp>: Dialect {
+    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error>;
 }
 
-pub trait StatementDispatch<L: Dialect, F, C, E, T> {
-    fn dispatch_statement(
-        &mut self,
-        location: Location,
-        env: EnvIndex,
-    ) -> Result<StatementEffect<F, C, T>, E>;
-}
-
-pub trait Interpretable<L: Dialect, I, F, C, E, T>: Dialect {
-    fn interpret(
+/// Function-entry semantics for callable statements.
+///
+/// Implemented by statements that define function bodies (e.g.
+/// `kirin_function::Function`); describes the scope an engine enters when the
+/// function is invoked. Derived on language enums with `#[derive(FunctionEntry)]`
+/// where `#[callable]` marks the variants that wrap callable statements.
+pub trait FunctionEntry<I: Interp>: Dialect {
+    fn function_entry(
         &self,
-        location: Location,
+        args: Product<I::Value>,
+        ctx: &mut Ctx<'_, I>,
+    ) -> Result<Scope<I::Value, I::Error>, I::Error>;
+}
+
+/// Monomorphic statement dispatch over a stage enum.
+///
+/// Mirrors `ParseDispatch` from the parser: multi-stage pipelines add
+/// `#[derive(InterpDispatch)]` to their stage enum; single-language pipelines
+/// (`Pipeline<StageInfo<L>>`) get the blanket impl below. Engines route every
+/// statement execution and function entry through this trait; compiler
+/// authors derive it and never call it.
+pub trait InterpDispatch<I: Interp>: StageMeta {
+    fn dispatch_statement(
+        &self,
+        stage: CompileStage,
+        statement: Statement,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, T>, E>;
+    ) -> Result<I::Effect, I::Error>;
+
+    fn dispatch_function_entry(
+        &self,
+        stage: CompileStage,
+        body: Statement,
+        args: Product<I::Value>,
+        env: EnvIndex,
+        interp: &mut I,
+    ) -> Result<Scope<I::Value, I::Error>, I::Error>;
 }
 
-impl<I, L, F, C, E, T> StatementDispatch<L, F, C, E, T> for I
+impl<I, L> InterpDispatch<I> for StageInfo<L>
 where
-    I: StageAccess<L, Error = E>,
-    L: Interpretable<L, I, F, C, E, T>,
-    E: From<InterpreterError>,
+    I: Interp,
+    L: Dialect + Interpretable<I> + FunctionEntry<I>,
 {
     fn dispatch_statement(
-        &mut self,
-        location: Location,
+        &self,
+        stage: CompileStage,
+        statement: Statement,
         env: EnvIndex,
-    ) -> Result<StatementEffect<F, C, T>, E> {
-        let statement = location
-            .active_statement()
-            .ok_or_else(|| E::from(InterpreterError::ExpectedActiveStatement(location)))?;
-        let definition = {
-            let stage_info = self.stage_info(location.stage)?;
-            statement.definition(stage_info).clone()
-        };
-        definition.interpret(location, env, self)
+        interp: &mut I,
+    ) -> Result<I::Effect, I::Error> {
+        let definition = statement.definition(self).clone();
+        definition.interpret(&mut Ctx::new(interp, stage, statement, env))
+    }
+
+    fn dispatch_function_entry(
+        &self,
+        stage: CompileStage,
+        body: Statement,
+        args: Product<I::Value>,
+        env: EnvIndex,
+        interp: &mut I,
+    ) -> Result<Scope<I::Value, I::Error>, I::Error> {
+        let definition = body.definition(self).clone();
+        definition.function_entry(args, &mut Ctx::new(interp, stage, body, env))
     }
 }

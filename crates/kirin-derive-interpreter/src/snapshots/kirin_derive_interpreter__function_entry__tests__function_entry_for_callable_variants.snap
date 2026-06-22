@@ -3,31 +3,31 @@ source: crates/kirin-derive-interpreter/src/function_entry.rs
 expression: generate_function_entry_code(input)
 ---
 #[automatically_derived]
-impl<__EntryL, T: CompileTimeValue, __EntryI, __EntryF, __EntryE, __EntryV>
-    ::kirin_interpreter::FunctionEntry<__EntryL, __EntryI, __EntryF, __EntryE, __EntryV>
-    for Lexical<T>
+impl<T: CompileTimeValue, __EntryI> ::kirin_interpreter::FunctionEntry<__EntryI> for Lexical<T>
 where
-    __EntryL: ::kirin::ir::Dialect,
-    __EntryE: ::core::convert::From<::kirin_interpreter::InterpreterError>,
-    Function<T>:
-        ::kirin_interpreter::FunctionEntry<__EntryL, __EntryI, __EntryF, __EntryE, __EntryV>,
-    Lambda<T>: ::kirin_interpreter::FunctionEntry<__EntryL, __EntryI, __EntryF, __EntryE, __EntryV>,
+    __EntryI: ::kirin_interpreter::Interp,
+    Function<T>: ::kirin_interpreter::FunctionEntry<__EntryI>,
+    Lambda<T>: ::kirin_interpreter::FunctionEntry<__EntryI>,
 {
-    fn enter_function_body(
+    fn function_entry(
         &self,
-        location: ::kirin_interpreter::Location,
-        env: ::kirin_interpreter::EnvIndex,
-        interp: &mut __EntryI,
-        args: ::kirin::ir::Product<__EntryV>,
-    ) -> Result<__EntryF, __EntryE> {
+        args: ::kirin::ir::Product<<__EntryI as ::kirin_interpreter::Interp>::Value>,
+        ctx: &mut ::kirin_interpreter::Ctx<'_, __EntryI>,
+    ) -> Result<
+        ::kirin_interpreter::Scope<
+            <__EntryI as ::kirin_interpreter::Interp>::Value,
+            <__EntryI as ::kirin_interpreter::Interp>::Error,
+        >,
+        <__EntryI as ::kirin_interpreter::Interp>::Error,
+    > {
         match self {
-            Self::Function(field_0) => field_0.enter_function_body(location, env, interp, args),
-            Self::Call(field_0) => Err(__EntryE::from(
-                ::kirin_interpreter::InterpreterError::Custom("expected function body statement"),
+            Self::Function(field_0) => field_0.function_entry(args, ctx),
+            Self::Call { .. } => Err(<__EntryI as ::kirin_interpreter::Interp>::Error::from(
+                ::kirin_interpreter::InterpreterError::NotCallable(ctx.statement()),
             )),
-            Self::Lambda(field_0) => field_0.enter_function_body(location, env, interp, args),
-            Self::Return(field_0) => Err(__EntryE::from(
-                ::kirin_interpreter::InterpreterError::Custom("expected function body statement"),
+            Self::Lambda(field_0) => field_0.function_entry(args, ctx),
+            Self::Return { .. } => Err(<__EntryI as ::kirin_interpreter::Interp>::Error::from(
+                ::kirin_interpreter::InterpreterError::NotCallable(ctx.statement()),
             )),
         }
     }

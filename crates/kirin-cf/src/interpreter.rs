@@ -1,104 +1,47 @@
-use kirin::prelude::{CompileTimeValue, Dialect};
-use kirin_interpreter::{
-    AbstractBlockTransfer, BranchCondition, ConcreteBlockTransfer, Env, Interpretable,
-    InterpreterError, Location, StatementEffect,
+use kirin::prelude::CompileTimeValue;
+use kirin_interpreter::dialect::{
+    BranchCondition, Ctx, Edge, ForwardEffect, ForwardInterp, Interpretable,
 };
 
 use crate::ControlFlow;
 
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, ConcreteBlockTransfer<V>> for ControlFlow<T>
+/// One impl serves concrete and abstract execution: when the condition is
+/// decided in the value domain we emit a [`ForwardEffect::Jump`]; when it is not
+/// ([`BranchCondition::is_truthy`] returns `None`) we emit both edges and the
+/// engine's policy decides (error under concrete execution, explore-and-join
+/// under abstract interpretation).
+impl<I, T> Interpretable<I> for ControlFlow<T>
 where
-    L: Dialect,
-    I: Env<V, Error = E>,
-    V: BranchCondition + Clone,
-    E: From<InterpreterError>,
+    I: ForwardInterp,
+    I::Value: BranchCondition,
     T: CompileTimeValue,
 {
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, ConcreteBlockTransfer<V>>, E> {
+    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
         match self {
-            ControlFlow::Branch { target, args } => {
-                let arguments = interp.read_many(env, args.as_slice())?;
-                Ok(StatementEffect::Transfer(ConcreteBlockTransfer::Jump {
-                    target: target.target(),
-                    arguments,
-                }))
-            }
+            ControlFlow::Branch { target, args } => Ok(ForwardEffect::Jump(Edge::new(
+                target.target(),
+                ctx.read_many(args.as_slice())?,
+            ))),
             ControlFlow::ConditionalBranch {
                 condition,
                 true_target,
                 true_args,
                 false_target,
                 false_args,
-            } => {
-                let (target, args) = match interp.read(env, *condition)?.is_truthy() {
-                    Some(true) => (true_target.target(), true_args.as_slice()),
-                    Some(false) => (false_target.target(), false_args.as_slice()),
-                    None => return Err(E::from(InterpreterError::IndeterminateBranch)),
-                };
-                let arguments = interp.read_many(env, args)?;
-                Ok(StatementEffect::Transfer(ConcreteBlockTransfer::Jump {
-                    target,
-                    arguments,
-                }))
-            }
-            ControlFlow::__Phantom(..) => unreachable!(),
-        }
-    }
-}
-
-impl<L, I, F, C, E, V, T> Interpretable<L, I, F, C, E, AbstractBlockTransfer<V>> for ControlFlow<T>
-where
-    L: Dialect,
-    I: Env<V, Error = E>,
-    V: BranchCondition + Clone,
-    T: CompileTimeValue,
-{
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, AbstractBlockTransfer<V>>, E> {
-        match self {
-            ControlFlow::Branch { target, args } => {
-                let arguments = interp.read_many(env, args.as_slice())?;
-                Ok(StatementEffect::Transfer(AbstractBlockTransfer::Jump {
-                    target: target.target(),
-                    arguments,
-                }))
-            }
-            ControlFlow::ConditionalBranch {
-                condition,
-                true_target,
-                true_args,
-                false_target,
-                false_args,
-            } => {
-                let (target, args) = match interp.read(env, *condition)?.is_truthy() {
-                    Some(true) => (true_target.target(), true_args.as_slice()),
-                    Some(false) => (false_target.target(), false_args.as_slice()),
-                    None => {
-                        let true_arguments = interp.read_many(env, true_args.as_slice())?;
-                        let false_arguments = interp.read_many(env, false_args.as_slice())?;
-                        return Ok(StatementEffect::Transfer(AbstractBlockTransfer::Branch {
-                            true_target: true_target.target(),
-                            true_arguments,
-                            false_target: false_target.target(),
-                            false_arguments,
-                        }));
-                    }
-                };
-                let arguments = interp.read_many(env, args)?;
-                Ok(StatementEffect::Transfer(AbstractBlockTransfer::Jump {
-                    target,
-                    arguments,
-                }))
-            }
+            } => match ctx.read(*condition)?.is_truthy() {
+                Some(true) => Ok(ForwardEffect::Jump(Edge::new(
+                    true_target.target(),
+                    ctx.read_many(true_args.as_slice())?,
+                ))),
+                Some(false) => Ok(ForwardEffect::Jump(Edge::new(
+                    false_target.target(),
+                    ctx.read_many(false_args.as_slice())?,
+                ))),
+                None => Ok(ForwardEffect::Branch(vec![
+                    Edge::new(true_target.target(), ctx.read_many(true_args.as_slice())?),
+                    Edge::new(false_target.target(), ctx.read_many(false_args.as_slice())?),
+                ])),
+            },
             ControlFlow::__Phantom(..) => unreachable!(),
         }
     }

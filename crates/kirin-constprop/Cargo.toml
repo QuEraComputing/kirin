@@ -5,6 +5,7 @@ edition = "2024"
 
 [dependencies]
 kirin-arith = { workspace = true }
+kirin-scf = { workspace = true }
 kirin-bitwise = { workspace = true }
 kirin-cmp = { workspace = true }
 kirin-interpreter = { workspace = true }

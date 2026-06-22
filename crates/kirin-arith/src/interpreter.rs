@@ -1,89 +1,72 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
-use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
-use kirin_interpreter::{
-    BlockTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
+use kirin::prelude::CompileTimeValue;
+use kirin_interpreter::dialect::{
+    Ctx, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
 };
 use thiserror::Error;
 
 use crate::{Arith, CheckedDiv, CheckedRem};
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Arith<T>
+impl<I, T> Interpretable<I> for Arith<T>
 where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    X: BlockTransfer,
-    X::Value: Clone
-        + Add<Output = X::Value>
-        + Sub<Output = X::Value>
-        + Mul<Output = X::Value>
-        + Neg<Output = X::Value>
+    I: ForwardInterp,
+    I::Value: Add<Output = I::Value>
+        + Sub<Output = I::Value>
+        + Mul<Output = I::Value>
+        + Neg<Output = I::Value>
         + CheckedDiv
         + CheckedRem,
-    E: From<DivisionByZero>,
+    I::Error: From<DivisionByZero>,
     T: CompileTimeValue,
 {
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
+    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
         match self {
             Arith::Add {
                 lhs, rhs, result, ..
             } => {
-                interp.write(
-                    env,
-                    SSAValue::from(*result),
-                    interp.read(env, *lhs)? + interp.read(env, *rhs)?,
-                )?;
+                let value = ctx.read(*lhs)? + ctx.read(*rhs)?;
+                ctx.write(*result, value)?;
             }
             Arith::Sub {
                 lhs, rhs, result, ..
             } => {
-                interp.write(
-                    env,
-                    SSAValue::from(*result),
-                    interp.read(env, *lhs)? - interp.read(env, *rhs)?,
-                )?;
+                let value = ctx.read(*lhs)? - ctx.read(*rhs)?;
+                ctx.write(*result, value)?;
             }
             Arith::Mul {
                 lhs, rhs, result, ..
             } => {
-                interp.write(
-                    env,
-                    SSAValue::from(*result),
-                    interp.read(env, *lhs)? * interp.read(env, *rhs)?,
-                )?;
+                let value = ctx.read(*lhs)? * ctx.read(*rhs)?;
+                ctx.write(*result, value)?;
             }
             Arith::Div {
                 lhs, rhs, result, ..
             } => {
-                let value = interp
-                    .read(env, *lhs)?
-                    .checked_div(interp.read(env, *rhs)?)
-                    .ok_or_else(|| E::from(DivisionByZero))?;
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = ctx
+                    .read(*lhs)?
+                    .checked_div(ctx.read(*rhs)?)
+                    .ok_or_else(|| I::Error::from(DivisionByZero))?;
+                ctx.write(*result, value)?;
             }
             Arith::Rem {
                 lhs, rhs, result, ..
             } => {
-                let value = interp
-                    .read(env, *lhs)?
-                    .checked_rem(interp.read(env, *rhs)?)
-                    .ok_or_else(|| E::from(DivisionByZero))?;
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = ctx
+                    .read(*lhs)?
+                    .checked_rem(ctx.read(*rhs)?)
+                    .ok_or_else(|| I::Error::from(DivisionByZero))?;
+                ctx.write(*result, value)?;
             }
             Arith::Neg {
                 operand, result, ..
             } => {
-                let value = -interp.read(env, *operand)?;
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = -ctx.read(*operand)?;
+                ctx.write(*result, value)?;
             }
             Arith::__Phantom(..) => unreachable!(),
         }
-        Ok(StatementEffect::Done)
+        Ok(ForwardEffect::Next)
     }
 }
 

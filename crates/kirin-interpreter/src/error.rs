@@ -1,9 +1,9 @@
 use std::convert::Infallible;
 
-use kirin_ir::{CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction, Symbol};
+use kirin_ir::{Block, CompileStage, Function, SSAValue, StagedFunction, Statement, Symbol};
 use thiserror::Error;
 
-use crate::{EnvIndex, Location};
+use crate::EnvIndex;
 
 #[derive(Clone, Debug, Error, PartialEq, Eq)]
 pub enum InterpreterError {
@@ -19,17 +19,8 @@ pub enum InterpreterError {
     MissingStage(CompileStage),
     #[error("missing stage info for stage {0:?}")]
     MissingStageInfo(CompileStage),
-    #[error("expected an active statement at {0:?}")]
-    ExpectedActiveStatement(Location),
-    #[error("expected an active block at {0:?}")]
-    ExpectedActiveBlock(Location),
-    #[error("statement frame cannot be stepped directly at {0:?}")]
-    UnexpectedStatementFrameStep(Location),
-    #[error("unexpected completion at {location:?}: {completion}")]
-    UnexpectedCompletion {
-        location: Location,
-        completion: &'static str,
-    },
+    #[error("missing block info for block {0:?}")]
+    MissingBlock(Block),
     #[error("missing function {0:?}")]
     MissingFunction(Function),
     #[error("function {function:?} has no staged function for stage {stage:?}")]
@@ -44,35 +35,38 @@ pub enum InterpreterError {
         function: StagedFunction,
         count: usize,
     },
-    #[error("function body fell through at {0:?}")]
-    FunctionBodyFellThrough(Location),
-    #[error("missing call target {target:?} at {location:?}")]
-    MissingCallTarget { location: Location, target: Symbol },
-    #[error("call result arity mismatch at {location:?}: expected {expected}, got {actual}")]
-    CallResultArityMismatch {
-        location: Location,
+    #[error("missing call target {0:?}")]
+    MissingCallTarget(Symbol),
+    #[error("region has no entry block")]
+    EmptyRegion,
+    #[error("block {0:?} fell through without a terminator effect")]
+    BlockFellThrough(Block),
+    #[error("function body fell through without returning")]
+    FunctionBodyFellThrough,
+    #[error("yield outside of an enclosing scope at {0:?}")]
+    UnexpectedYield(Statement),
+    #[error("statement {0:?} is not callable")]
+    NotCallable(Statement),
+    #[error("block argument arity mismatch at {block:?}: expected {expected}, got {actual}")]
+    BlockArityMismatch {
+        block: Block,
         expected: usize,
         actual: usize,
     },
-    #[error("expected product value")]
-    ExpectedProduct,
     #[error("product arity mismatch: expected {expected}, got {actual}")]
     ProductArityMismatch { expected: usize, actual: usize },
     #[error("indeterminate branch condition")]
     IndeterminateBranch,
     #[error("loop step overflow")]
     LoopStepOverflow,
-    #[error("specialized function {function:?} has no body at stage {stage:?}")]
-    MissingFunctionBody {
-        function: SpecializedFunction,
-        stage: CompileStage,
-    },
+    #[error("fixpoint iteration limit exceeded")]
+    FixpointDiverged,
     #[error("missing stage named {0:?}")]
     MissingStageName(String),
     #[error("missing function named {0:?}")]
     MissingFunctionName(String),
-    #[error("expected function return, got {0}")]
-    ExpectedFunctionReturn(&'static str),
+    #[error("expected a single function return value, got {0}")]
+    ExpectedSingleReturn(usize),
     #[error("{0}")]
     Custom(&'static str),
 }

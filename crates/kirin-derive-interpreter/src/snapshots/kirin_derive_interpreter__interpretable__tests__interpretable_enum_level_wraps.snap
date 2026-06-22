@@ -1,76 +1,34 @@
 ---
-source: crates/kirin-derive-interpreter-new/src/interpretable.rs
+source: crates/kirin-derive-interpreter/src/interpretable.rs
 expression: generate_interpretable_code(input)
 ---
 #[automatically_derived]
-impl<__InterpL, T: CompileTimeValue, __InterpI, __InterpF, __InterpC, __InterpE, __InterpT>
-    ::kirin_interpreter::Interpretable<
-        __InterpL,
-        __InterpI,
-        __InterpF,
-        __InterpC,
-        __InterpE,
-        __InterpT,
-    > for Lexical<T>
+impl<T: CompileTimeValue, __InterpI> ::kirin_interpreter::Interpretable<__InterpI> for Lexical<T>
 where
-    __InterpL: ::kirin::ir::Dialect,
-    Function<T>: ::kirin_interpreter::Interpretable<
-        __InterpL,
-        __InterpI,
-        __InterpF,
-        __InterpC,
-        __InterpE,
-        __InterpT,
-    >,
-    Call<T>: ::kirin_interpreter::Interpretable<
-        __InterpL,
-        __InterpI,
-        __InterpF,
-        __InterpC,
-        __InterpE,
-        __InterpT,
-    >,
-    Return<T>: ::kirin_interpreter::Interpretable<
-        __InterpL,
-        __InterpI,
-        __InterpF,
-        __InterpC,
-        __InterpE,
-        __InterpT,
-    >,
+    __InterpI: ::kirin_interpreter::Interp,
+    Function<T>: ::kirin_interpreter::Interpretable<__InterpI>,
+    Call<T>: ::kirin_interpreter::Interpretable<__InterpI>,
+    Return<T>: ::kirin_interpreter::Interpretable<__InterpI>,
 {
     fn interpret(
         &self,
-        location: ::kirin_interpreter::Location,
-        env: ::kirin_interpreter::EnvIndex,
-        interp: &mut __InterpI,
-    ) -> Result<::kirin_interpreter::StatementEffect<__InterpF, __InterpC, __InterpT>, __InterpE>
-    {
+        ctx: &mut ::kirin_interpreter::Ctx<'_, __InterpI>,
+    ) -> Result<
+        <__InterpI as ::kirin_interpreter::Interp>::Effect,
+        <__InterpI as ::kirin_interpreter::Interp>::Error,
+    > {
         match self {
             Self::Function(field_0) => <Function<T> as ::kirin_interpreter::Interpretable<
-                __InterpL,
                 __InterpI,
-                __InterpF,
-                __InterpC,
-                __InterpE,
-                __InterpT,
-            >>::interpret(field_0, location, env, interp),
-            Self::Call(field_0) => <Call<T> as ::kirin_interpreter::Interpretable<
-                __InterpL,
-                __InterpI,
-                __InterpF,
-                __InterpC,
-                __InterpE,
-                __InterpT,
-            >>::interpret(field_0, location, env, interp),
-            Self::Return(field_0) => <Return<T> as ::kirin_interpreter::Interpretable<
-                __InterpL,
-                __InterpI,
-                __InterpF,
-                __InterpC,
-                __InterpE,
-                __InterpT,
-            >>::interpret(field_0, location, env, interp),
+            >>::interpret(field_0, ctx),
+            Self::Call(field_0) => {
+                <Call<T> as ::kirin_interpreter::Interpretable<__InterpI>>::interpret(field_0, ctx)
+            }
+            Self::Return(field_0) => {
+                <Return<T> as ::kirin_interpreter::Interpretable<__InterpI>>::interpret(
+                    field_0, ctx,
+                )
+            }
         }
     }
 }
