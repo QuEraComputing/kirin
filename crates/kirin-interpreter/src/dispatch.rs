@@ -1,6 +1,6 @@
 use kirin_ir::{CompileStage, Dialect, Product, StageInfo, StageMeta, Statement};
 
-use crate::{Ctx, EnvIndex, Interp, Scope};
+use crate::{Ctx, EnvIndex, FunctionBody, Interp};
 
 /// Statement semantics. The single trait dialect authors implement.
 ///
@@ -18,15 +18,16 @@ pub trait Interpretable<I: Interp>: Dialect {
 /// Function-entry semantics for callable statements.
 ///
 /// Implemented by statements that define function bodies (e.g.
-/// `kirin_function::Function`); describes the scope an engine enters when the
-/// function is invoked. Derived on language enums with `#[derive(FunctionEntry)]`
-/// where `#[callable]` marks the variants that wrap callable statements.
+/// `kirin_function::Function`); describes the [`FunctionBody`] an engine enters
+/// when the function is invoked. Derived on language enums with
+/// `#[derive(FunctionEntry)]` where `#[callable]` marks the variants that wrap
+/// callable statements.
 pub trait FunctionEntry<I: Interp>: Dialect {
     fn function_entry(
         &self,
         args: Product<I::Value>,
         ctx: &mut Ctx<'_, I>,
-    ) -> Result<Scope<I::Value, I::Error>, I::Error>;
+    ) -> Result<FunctionBody<I::Value>, I::Error>;
 }
 
 /// Monomorphic statement dispatch over a stage enum.
@@ -52,7 +53,7 @@ pub trait InterpDispatch<I: Interp>: StageMeta {
         args: Product<I::Value>,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<Scope<I::Value, I::Error>, I::Error>;
+    ) -> Result<FunctionBody<I::Value>, I::Error>;
 }
 
 impl<I, L> InterpDispatch<I> for StageInfo<L>
@@ -78,7 +79,7 @@ where
         args: Product<I::Value>,
         env: EnvIndex,
         interp: &mut I,
-    ) -> Result<Scope<I::Value, I::Error>, I::Error> {
+    ) -> Result<FunctionBody<I::Value>, I::Error> {
         let definition = body.definition(self).clone();
         definition.function_entry(args, &mut Ctx::new(interp, stage, body, env))
     }

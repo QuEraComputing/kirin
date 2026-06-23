@@ -7,17 +7,20 @@ including analyses that cross language boundaries in multi-stage pipelines.
 The design is organized as a **two-persona contract**:
 
 - **Dialect authors** describe what each statement *means*, once, in a small
-  fixed vocabulary — `Interpretable`/`Ctx`/`ForwardEffect`, plus `Scope`/`ScopeHook`
-  for structured control. They never see engines, stages, pipelines, frames, or
-  fixpoints.
+  fixed vocabulary — `Interpretable`/`Ctx`/`ForwardEffect`. There is no framework
+  "scope": a statement whose operation owns structured control runs a
+  sub-computation by *pushing a frame the dialect owns* (`ForwardEffect::Push`),
+  built per-engine through a small dialect dispatch capability. Ordinary
+  (non-control) dialects never push frames at all.
 - **Compiler authors** compose languages into pipelines and *select*
   components: an engine, a value domain, an error type, and a linker. When they
   need more control, the same compiler-author surface also includes opt-in
   traversal and analysis components: custom concrete frames
   (`ConcreteInterpreter<.., F>`), custom abstract frames
   (`AbstractInterpreter<.., P, F>`), and abstract policies `P`
-  (`CallContext` + `WideningStrategy`). These extensions do not change the
-  dialect contract — frames never appear in `Interpretable`.
+  (`CallContext` + `WideningStrategy`). A language that uses a structured-control
+  dialect composes its own total frame type embedding the standard frames plus
+  that dialect's frames. Ordinary dialects never name a frame type.
 
 Every derive macro is named after the trait it implements
 (`#[derive(Interpretable)]` → `trait Interpretable`), so learning the derive
@@ -49,8 +52,11 @@ the **analysis-specific** effect algebra — not a single universal enum. (The
 frame type stays the engine's own `F` generic, e.g. `ConcreteInterpreter<.., F>`,
 so traversal is customizable without an unused associated type on `Interp`.)
 Forward rules bound `I: ForwardInterp`, the flavor of `Interp` whose
-`Effect = ForwardEffect<I::Value, I::Error>`, so they build and return
-`ForwardEffect` values (which are `I::Effect`). They constrain only:
+`Effect = ForwardEffect<I::Value, I::Frame>`, so they build and return
+`ForwardEffect` values (which are `I::Effect`). `I::Frame` is the engine's total
+frame type, re-exposed by `ForwardInterp` only so a structured dialect can name
+the frame it pushes; ordinary dialects never mention it (it is inferred from
+`I::Effect`). They constrain only:
 
 - the value domain, with plain Rust bounds — `I::Value: Add<Output = I::Value>`
   (kirin-arith), `I::Value: BranchCondition` (kirin-cf), `I::Value:
@@ -73,80 +79,78 @@ algebra among potential several**: a future analysis defines its own `I::Effect`
 rather than adding variants here.
 
 ```rust
-pub enum ForwardEffect<V, E> {
-    Next,                       // atomic statement done
-    Jump(Edge<V>),              // decided CFG transfer
-    Branch(Vec<Edge<V>>),       // undecided CFG transfer
-    Call(CallEffect<V>),        // function invocation (resolved by the linker)
-    Yield(Product<V>),          // terminate the innermost scope body
-    Return(Product<V>),         // return from the enclosing function
-    Enter(Scope<V, E>),         // run a structured sub-computation
-    EnterAny(Vec<Scope<V, E>>), // undecided structured branch
+pub enum ForwardEffect<V, F> {
+    Next,                                          // atomic statement done
+    Jump(Edge<V>),                                 // decided CFG transfer
+    Branch(Vec<Edge<V>>),                          // undecided CFG transfer
+    Call(CallEffect<V>),                           // function invocation (resolved by the linker)
+    Yield(Product<V>),                             // terminate the innermost body block
+    Return(Product<V>),                            // return from the enclosing function
+    Push { frame: F, results: Product<SSAValue> }, // run a dialect-owned frame; bind its finish values
 }
 ```
 
-The undecided variants encode the concrete/abstract split *in the value
-domain*, not in the dialect: a dialect asks the value
-(`BranchCondition::is_truthy() -> Option<bool>`) and emits the decided form
-when it gets an answer, the undecided form when it does not. Concrete engines
-reject undecided effects (`IndeterminateBranch`); abstract engines explore
-every alternative and join. Dialects therefore have exactly one impl and no
+`F` is the engine's total frame type. The frame-free variants don't name it, so
+ordinary dialects never see it; only a dialect whose operations own structured
+traversal builds `Push` (naming the frame via `ForwardInterp::Frame`). The pushed
+`frame` is whatever traversal the dialect decided on — there is no framework-owned
+"scope", and no framework "explore alternatives" effect (a dialect frame that
+needs to explore several bodies pushes them one at a time and joins itself).
+
+`Branch` encodes the concrete/abstract split *in the value domain* for cf-style
+CFG transfers: a dialect asks the value (`BranchCondition::is_truthy() ->
+Option<bool>`) and emits `Jump` when decided, `Branch` when not. Concrete engines
+reject `Branch` (`IndeterminateBranch`); the abstract CFG frame explores every
+edge and joins. Control dialects pass the same `Option<bool>` to their own frame
+(see SCF below). Dialects therefore have exactly one `Interpretable` impl and no
 knowledge of which engine is running.
 
-### `Scope` and `ScopeHook` — structured control flow
+### Structured control flow — dialect-owned frames
 
-A `Scope` is a body (`Block` for scf-style operations, `Region` for function
-bodies, or `Immediate` for "skip" alternatives), entry arguments, result
-bindings, and an optional hook:
+The framework has no "scope" type. A dialect whose operation owns structured
+traversal builds a **frame it owns** (per-engine, through a small dialect
+dispatch capability) and returns it as `ForwardEffect::Push { frame, results }`.
+SCF has two such operations:
 
-```rust
-Scope::block(self.then_body).bind(self.results.iter().copied())          // scf.if arm
-Scope::block(self.body).args(...).bind(...).on_yield(ForHook { ... })    // scf.for
-Scope::immediate(inits).bind(...)                                        // for with 0 iterations
-Scope::region(self.body).args(args)                                      // function entry
-```
+- **`scf.if`** → `kirin_scf::ScfIfFrame` (concrete) / `AbstractScfIfFrame`
+  (abstract), built via `ScfIfDispatch::scf_if_frame(.., decided)`. The rule
+  reads the condition value and hands the `Option<bool>` decision to the frame;
+  the **frame** picks the arm (concrete; undecided is `IndeterminateBranch`) or
+  explores both arms and **joins** their finish results (abstract). It walks each
+  arm by pushing the framework `BodyFrame`/`AbstractBlockFrame` building block.
 
-Without a hook, the first `Yield` finishes the scope (the `if` shape). With a
-hook, the dialect decides on each yield:
+- **`scf.for`** → `ScfForFrame` / `AbstractScfForFrame`, built via
+  `ScfForDispatch`. The frame pushes a body frame each iteration, advances the
+  induction variable on each yield, and decides repeat/finish in the value
+  domain. The **loop-carried fixpoint lives in the abstract loop frame**: it
+  joins (then widens) the entry state across iterations until stable,
+  accumulating finish values across exits — so `scf.for` over a lattice
+  converges, with no framework "scope hook".
 
-```rust
-pub trait ScopeHook<V, E> {
-    fn on_yield(self: Box<Self>, entry: &Product<V>, yielded: Product<V>,
-                env: &mut dyn EnvOps<V, E>) -> Result<ScopeStep<V, E>, E>;
-}
-
-pub enum ScopeStep<V, E> {
-    Finish(Product<V>),
-    Repeat { args: Product<V>, hook: Box<dyn ScopeHook<V, E>> },
-    RepeatOrFinish { args: Product<V>, results: Product<V>, hook: Box<dyn ScopeHook<V, E>> },
-}
-```
-
-`entry` is the product currently bound to the body parameters. Under abstract
-interpretation it is the *joined* entry state, so hooks must derive iteration
-state from it (e.g. `scf.for` reads the induction variable from `entry[0]`),
-never from captured per-iteration values. `RepeatOrFinish` is the
-loop-condition analogue of `Branch`: undecided in the value domain.
-
-Crucially, **the engine owns the loop fixpoint**. The concrete engine re-binds
-and re-runs the body while the hook says `Repeat`; the abstract engine joins
-(then widens) the entry arguments across `Repeat`s and re-runs until the entry
-state is stable, accumulating `Finish` results. The dialect contributes only
-the one-step relation.
+The framework `BodyFrame`/`AbstractBlockFrame` (single-block body walkers,
+completing on `Yield`) are reusable **building blocks**, not framework-owned
+structured semantics: the SCF frames build them to walk a chosen body, but the
+structured *decision* and result binding stay in the SCF frame. A language that
+uses SCF composes a total frame type embedding the standard frames plus
+`ScfIfFrame`/`ScfForFrame` (via `BuildScfIf`/`BuildScfFor` and the abstract
+equivalents); see `example/toy-lang`'s `ToyFrame`/`ToyAbstractFrame`. Future
+structured dialects would follow the same pattern; only the existing SCF
+operations are implemented.
 
 ### `FunctionEntry<I>` — callable statements
 
 ```rust
 pub trait FunctionEntry<I: Interp>: Dialect {
     fn function_entry(&self, args: Product<I::Value>, ctx: &mut Ctx<'_, I>)
-        -> Result<Scope<I::Value, I::Error>, I::Error>;
+        -> Result<FunctionBody<I::Value>, I::Error>;
 }
 ```
 
 Statements that define function bodies (e.g. `kirin_function::Function`)
-return the scope to enter on invocation. On language enums it is derived;
-`#[callable]` marks the variants that forward, all others report
-`NotCallable`.
+return the `FunctionBody { region, args }` to enter on invocation (the
+function-call entry descriptor — not a structured-control abstraction). On
+language enums it is derived; `#[callable]` marks the variants that forward, all
+others report `NotCallable`.
 
 ## Compiler-author surface
 
@@ -206,12 +210,14 @@ A generic **frame-stack driver**: it pops the top frame, calls `Frame::step`,
 and applies the returned `FrameEffect` (`Continue` / `Push` / `Done` /
 `Complete`) — it owns *no* traversal logic itself. Traversal lives in the
 frames. The default total frame type `StandardFrame<V, E>` wraps the standard
-`ScopeFrame` (block/region/hook-driven scope traversal — `Jump` retargets it,
-`Yield`/`Return` complete it) and `CallFrame` (dispatch a callee, await its
-`Return`). The dialect-produced `ForwardEffect` is consumed by `ScopeFrame`, which
-maps it to a `FrameEffect`. A custom `F`
-([Custom traversal and policies](#custom-traversal-and-policies)) replaces
-traversal without touching the engine.
+`BodyFrame` (walks a function-body region CFG, or a single body block that
+completes on `Yield` — `Jump` retargets it, `Return` completes it) and
+`CallFrame` (dispatch a callee, await its `Return`). The dialect-produced
+`ForwardEffect` is consumed by `BodyFrame`, which maps it to a `FrameEffect`
+(handling `Push` by pushing the carried frame). `StandardFrame` is
+structured-control-free; a custom `F`
+([Custom traversal and policies](#custom-traversal-and-policies)) adds dialect
+frames or replaces traversal without touching the engine.
 
 ### `AbstractInterpreter<'ir, S, V, E, Lk, P = ContextInsensitive, F = StandardAbstractFrame<..>>`
 
@@ -232,8 +238,10 @@ frames:
 - **CFG**: each function body region is a block worklist; block parameters
   join across incoming edges and widen after `widen_after` visits — `cf`
   back-edge loops converge.
-- **Scopes**: hook-driven scopes re-run with joined/widened entry arguments
-  until stable — `scf.for` loops converge.
+- **Pushed loop frames**: a dialect loop frame (e.g. `scf.for`'s
+  `AbstractScfForFrame`) re-runs its body with joined/widened entry arguments
+  until stable — `scf.for` loops converge. The fixpoint is the dialect frame's,
+  using the engine's `analysis_merge`.
 - **Functions**: each resolved call target is summarized under a key chosen by
   the `CallContext` strategy (`ContextInsensitive` → `(stage, specialization)`), with an
   entry/return `Product<V>` summary. Calls join arguments into the callee's
@@ -265,9 +273,10 @@ Two mechanisms keep engines generic over stage enums without HRTBs:
 Both engines are frame-stack drivers over one **shared protocol**. Compiler
 authors can customize *how* an engine traverses (a custom frame type) or *how
 precisely* an abstract analysis summarizes (a custom policy `P`), without
-forking an engine. This is part of the compiler-author surface. None of it is
-visible to dialect authors — **frame generics never leak into
-`Interpretable<I>`**.
+forking an engine. This is part of the compiler-author surface. The total frame
+type `F` is the engine's generic; it is named in `Interpretable<I>` *only* by a
+structured dialect building `ForwardEffect::Push` (through `ForwardInterp::Frame`)
+— ordinary dialects never mention it.
 
 ### The shared protocol — `FrameEngine` / `Frame` / `drive_frames` / `FrameDriver`
 
@@ -301,27 +310,30 @@ value interpretation and reusable by other analyses. Every `Interp` is a
 abstract standard frames are two *implementations* of this one protocol — not
 parallel frameworks.
 
-### Concrete frames — `ScopeFrame` / `CallFrame` / `StandardFrame`
+### Concrete frames — `BodyFrame` / `CallFrame` / `StandardFrame`
 
 `ConcreteInterpreter` is generic over the total frame type `F` (default
-`StandardFrame`). A custom enum reuses the standard `ScopeFrame`/`CallFrame`
-single-path traversal through `FrameBuild` (`from_scope`/`from_call`) and their
-`*_into` delegating methods, adds observation or variants, and instantiates the
-engine with that `F`. (Example: a `TracingFrame { Scope(ScopeFrame), Call(CallFrame) }`
-counting call/scope visitation while running the real program — see
+`StandardFrame`). A custom enum reuses the standard `BodyFrame`/`CallFrame`
+single-path traversal through `FrameBuild` (`from_body`/`from_call`) and their
+`*_into` delegating methods, adds dialect frames / observation, and instantiates
+the engine with that `F`. (Examples: `example/toy-lang`'s `ToyFrame`, which adds
+`kirin_scf`'s `ScfIfFrame`/`ScfForFrame` via `BuildScfIf`/`BuildScfFor`; and a
+`TracingFrame` counting call/body visitation while running the real program — see
 `example/toy-lang`'s `interpreter::tests::advanced`.)
 
 ### Abstract frames — `StandardAbstractFrame` / `AbstractFrameBuild` / `AbstractFrameDriver`
 
 `AbstractInterpreter` is symmetrically generic over a total abstract frame type
 `F` (default `StandardAbstractFrame`). The standard abstract frames
-(`AbstractFunctionFrame`, `AbstractCfgFrame`, `AbstractScopeFrame`,
-`AbstractScopeAlternativesFrame`, `AbstractCallFrame`) implement the *same*
+(`AbstractFunctionFrame`, `AbstractCfgFrame`, `AbstractBlockFrame`,
+`AbstractCallFrame`) implement the *same*
 `Frame` protocol, but their traversal is the abstract one: a CFG block worklist
-that joins/widens at merge points, `Branch`/`EnterAny` exploration, scope
-fixpoints to stability, and per-key call summarization. A custom enum reuses
-them through `AbstractFrameBuild` and the `*_into` methods — exactly mirroring
-the concrete pattern (see `TracingAbstractFrame` in the same test module).
+that joins/widens at merge points, `Branch` exploration, single-block
+body walks that complete on `Yield`, and per-key call summarization. A custom
+enum reuses them through `AbstractFrameBuild` and the `*_into` methods — exactly
+mirroring the concrete pattern (see `ToyAbstractFrame`, which adds
+`AbstractScfIfFrame`/`AbstractScfForFrame`, and `TracingAbstractFrame` in the
+same test module).
 
 Abstract frames need a few capabilities beyond `FrameDriver`, on
 `AbstractFrameDriver: FrameDriver` — `analysis_merge`, `contribute_return`, and
@@ -357,9 +369,11 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
 ## Design rules
 
 1. **Dialects are engine-blind.** Undecidedness is expressed by the value
-   domain (`is_truthy`/`loop_condition` returning `None`) and surfaces as the
-   undecided `ForwardEffect`/`ScopeStep` variants. Never write per-engine dialect
-   impls or engine-specific dispatch traits.
+   domain (`is_truthy`/`loop_condition` returning `None`); for cf it surfaces as
+   `ForwardEffect::Branch`, for control dialects it is handed to the dialect's own
+   frame. One `Interpretable` impl serves every engine; a control dialect's
+   *frames* may have separate concrete/abstract forms, built per-engine through a
+   dialect dispatch trait.
 2. **Policy is a component, not an impl.** Anything a compiler author might
    swap (linkers, widening thresholds) is a value passed to the engine.
    Blanket impls on engine types are forbidden as extension points because
@@ -391,7 +405,5 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
   arg-tuple keys (precise recursion; sound, terminating cap to `Unknown`).
   Unbounded call-string (k-CFA) policies remain future work — another
   `CallContext` impl, no engine change.
-- Inline `Scope::region(..)` bodies inside the abstract interpreter are not
-  yet supported (function-entry regions are); no current dialect emits them.
 - First-class function values (`Lambda`/`Bind` as values, `Callee` from an
   SSA value) are not yet supported by either engine.

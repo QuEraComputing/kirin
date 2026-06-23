@@ -3,18 +3,24 @@ use kirin_ir::{
     Symbol,
 };
 
-use crate::EnvOps;
-
-/// The closed control algebra a statement can produce.
+/// The closed forward control algebra a statement produces.
 ///
 /// Atomic statements read operands, write results, and return [`ForwardEffect::Next`].
-/// Control statements name successor edges, calls, or scopes; the engine owns
-/// how each is driven. Undecided variants ([`ForwardEffect::Branch`],
-/// [`ForwardEffect::EnterAny`]) are errors under concrete execution and explored
-/// exhaustively (then joined) under abstract interpretation — dialects emit
-/// them based on the *value* (`BranchCondition::is_truthy` returning `None`),
-/// never based on which engine is running.
-pub enum ForwardEffect<V, E> {
+/// Control statements name successor edges, calls, or returns; the engine owns
+/// how each is driven. Structured dialects do **not** get a framework "scope"
+/// concept: when a statement needs to run a sub-computation it [pushes a
+/// frame](ForwardEffect::Push) it owns (or is handed by the engine), so all
+/// structured traversal lives in dialect/engine frames, never in this enum.
+///
+/// `F` is the engine's total frame type (the same `F` that parameterizes
+/// [`ConcreteInterpreter`](crate::ConcreteInterpreter)/[`AbstractInterpreter`](crate::AbstractInterpreter)).
+/// Ordinary dialect rules never name `F`: they only build the frame-free
+/// variants, so `F` is inferred from `I::Effect`. Only a dialect whose operations
+/// own structured traversal (e.g. `kirin-scf`'s `scf.if`/`scf.for`) builds
+/// [`Push`](ForwardEffect::Push), carrying a frame **it owns**. The framework has
+/// no "explore alternatives" effect: a dialect frame that needs to explore
+/// several bodies pushes them one at a time and joins their results itself.
+pub enum ForwardEffect<V, F> {
     /// Statement done; continue with the next statement.
     Next,
     /// Unconditional transfer to a block in the current region.
@@ -23,14 +29,20 @@ pub enum ForwardEffect<V, E> {
     Branch(Vec<Edge<V>>),
     /// Invoke a function through the engine's [`Linker`](crate::Linker).
     Call(CallEffect<V>),
-    /// Terminate the innermost enclosing scope body with carried values.
+    /// Terminate the innermost enclosing body block with carried values
+    /// (the message a structured-body frame waits for).
     Yield(Product<V>),
-    /// Return from the enclosing function, unwinding inline scopes.
+    /// Return from the enclosing function, unwinding inline frames.
     Return(Product<V>),
-    /// Run a structured sub-computation (e.g. an `scf.if`/`scf.for` body).
-    Enter(Scope<V, E>),
-    /// Run one of several scopes whose selector is undecided; results join.
-    EnterAny(Vec<Scope<V, E>>),
+    /// Run a sub-computation by pushing a dialect-owned `frame`; when it
+    /// finishes, its values land in `results`. This is the frame-push /
+    /// delegation effect that replaces any framework "enter a scope" concept:
+    /// the pushed `frame` is whatever traversal the dialect decided on, opaque
+    /// to this enum.
+    Push {
+        frame: F,
+        results: Product<SSAValue>,
+    },
 }
 
 /// A control-flow edge: target block plus the values for its parameters.
@@ -73,114 +85,29 @@ pub enum Callee {
     Specialized(SpecializedFunction),
 }
 
-/// A structured sub-computation: a body, entry arguments, result bindings,
-/// and an optional [`ScopeHook`] deciding what happens when the body yields.
+/// The body a callable statement enters when invoked: a CFG region plus the
+/// entry arguments bound to its entry block.
 ///
-/// Without a hook, the first yield finishes the scope with the yielded values
-/// (the `scf.if` shape). With a hook, the dialect decides whether to repeat
-/// the body (the `scf.for` shape).
-pub struct Scope<V, E> {
-    pub(crate) body: ScopeBody,
-    pub(crate) args: Product<V>,
-    pub(crate) results: Product<SSAValue>,
-    pub(crate) hook: Option<Box<dyn ScopeHook<V, E>>>,
+/// This is the function-call entry descriptor — the call mechanism, not a
+/// structured-control abstraction. A [`FunctionEntry`](crate::FunctionEntry)
+/// rule returns one; the engine builds the body frame that walks the region.
+pub struct FunctionBody<V> {
+    pub region: Region,
+    pub args: Product<V>,
 }
 
-/// What a [`Scope`] executes.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum ScopeBody {
-    /// A single block terminated by a yield.
-    Block(Block),
-    /// A multi-block CFG region (function bodies).
-    Region(Region),
-    /// No body: finish immediately with the scope's `args` as results.
-    Immediate,
-}
-
-impl<V, E> Scope<V, E> {
-    /// Scope over a single body block (scf-style).
-    pub fn block(body: Block) -> Self {
+impl<V> FunctionBody<V> {
+    /// A function body over `region`, with no entry arguments yet.
+    pub fn new(region: Region) -> Self {
         Self {
-            body: ScopeBody::Block(body),
+            region,
             args: Product::new(),
-            results: Product::new(),
-            hook: None,
         }
     }
 
-    /// Scope over a multi-block region (function bodies).
-    pub fn region(body: Region) -> Self {
-        Self {
-            body: ScopeBody::Region(body),
-            args: Product::new(),
-            results: Product::new(),
-            hook: None,
-        }
-    }
-
-    /// Scope that finishes immediately with `values` as its results.
-    /// Useful as an [`ForwardEffect::EnterAny`] alternative for "skip" paths.
-    pub fn immediate(values: Product<V>) -> Self {
-        Self {
-            body: ScopeBody::Immediate,
-            args: values,
-            results: Product::new(),
-            hook: None,
-        }
-    }
-
-    /// Entry arguments bound to the body block's parameters.
+    /// Entry arguments bound to the region entry block's parameters.
     pub fn args(mut self, args: impl IntoIterator<Item = V>) -> Self {
         self.args = args.into_iter().collect();
         self
     }
-
-    /// Result slots written when the scope finishes.
-    pub fn bind<T: Into<SSAValue>>(mut self, results: impl IntoIterator<Item = T>) -> Self {
-        self.results = results.into_iter().map(Into::into).collect();
-        self
-    }
-
-    /// Install a hook deciding what happens when the body yields.
-    pub fn on_yield(mut self, hook: impl ScopeHook<V, E> + 'static) -> Self {
-        self.hook = Some(Box::new(hook));
-        self
-    }
-
-    pub fn body(&self) -> ScopeBody {
-        self.body
-    }
-}
-
-/// Dialect-side policy for a yielding scope body.
-///
-/// Called when the scope body terminates with a yield. `entry` is the
-/// product currently bound to the body's parameters (under abstract
-/// interpretation this is the joined entry state, so hooks should derive
-/// iteration state from it rather than from captured per-iteration values).
-pub trait ScopeHook<V, E> {
-    fn on_yield(
-        self: Box<Self>,
-        entry: &Product<V>,
-        yielded: Product<V>,
-        env: &mut dyn EnvOps<V, E>,
-    ) -> Result<ScopeStep<V, E>, E>;
-}
-
-/// A [`ScopeHook`]'s verdict after a yield.
-pub enum ScopeStep<V, E> {
-    /// The scope is done; write `Finish.0` to its result bindings.
-    Finish(Product<V>),
-    /// Re-enter the body with new entry arguments.
-    Repeat {
-        args: Product<V>,
-        hook: Box<dyn ScopeHook<V, E>>,
-    },
-    /// The continue/finish condition is undecided in the value domain.
-    /// Concrete engines reject this; abstract engines explore both.
-    RepeatOrFinish {
-        args: Product<V>,
-        results: Product<V>,
-        hook: Box<dyn ScopeHook<V, E>>,
-    },
 }

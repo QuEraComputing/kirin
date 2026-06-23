@@ -66,6 +66,45 @@ specialize @source fn @stable(i64, i64, i64) -> i64 {
 }
 "#;
 
+// An `scf.if` whose condition is the (unknown-under-constprop) argument, both
+// arms yielding the *same* constant. Exercises `AbstractScfIfFrame` exploring
+// both arms and joining identical finishes -> `Const(1)`.
+const SOURCE_IF_SAME_CONST: &str = r#"
+stage @source fn @if_same(i64) -> i64;
+
+specialize @source fn @if_same(i64) -> i64 {
+  ^entry(%cond: i64) {
+    %result = if %cond then ^then() {
+      %a = constant 1 -> i64;
+      yield %a;
+    } else ^else() {
+      %b = constant 1 -> i64;
+      yield %b;
+    } -> i64;
+    ret %result;
+  }
+}
+"#;
+
+// The same shape, but the arms yield *different* constants: joining them is
+// `Top`.
+const SOURCE_IF_DIFF_CONST: &str = r#"
+stage @source fn @if_diff(i64) -> i64;
+
+specialize @source fn @if_diff(i64) -> i64 {
+  ^entry(%cond: i64) {
+    %result = if %cond then ^then() {
+      %a = constant 1 -> i64;
+      yield %a;
+    } else ^else() {
+      %b = constant 2 -> i64;
+      yield %b;
+    } -> i64;
+    ret %result;
+  }
+}
+"#;
+
 const CROSS_STAGE_CALLS: &str = r#"
 stage @source fn @source_to_lowered_to_source(i64) -> i64;
 stage @source fn @low_then_high(i64) -> i64;
@@ -307,6 +346,26 @@ fn constprop_source_unknown_branch_joins_yields() {
     assert_eq!(result, ConstProp::Top);
 }
 
+// `AbstractScfIfFrame` owns the "explore both arms + join" behavior that used to
+// live in the removed `ForwardEffect::EnterAny` / framework alternatives frame.
+// With an unknown condition both arms are explored and their finishes joined.
+
+#[test]
+fn constprop_unknown_if_same_constant_joins_to_that_constant() {
+    // if %unknown { yield 1 } else { yield 1 } -> join(Const(1), Const(1)) = Const(1)
+    let pipeline = build_pipeline(SOURCE_IF_SAME_CONST);
+    let result = analyze_constprop(&pipeline, "source", "if_same", &[ConstProp::Top]).unwrap();
+    assert_eq!(result, ConstProp::Const(1));
+}
+
+#[test]
+fn constprop_unknown_if_different_constants_join_to_top() {
+    // if %unknown { yield 1 } else { yield 2 } -> join(Const(1), Const(2)) = Top
+    let pipeline = build_pipeline(SOURCE_IF_DIFF_CONST);
+    let result = analyze_constprop(&pipeline, "source", "if_diff", &[ConstProp::Top]).unwrap();
+    assert_eq!(result, ConstProp::Top);
+}
+
 #[test]
 fn constprop_source_for_keeps_stable_carried_value() {
     let pipeline = build_pipeline(SOURCE_FOR_CARRIED_STABLE);
@@ -422,11 +481,15 @@ mod advanced {
 
     use kirin_constprop::{ConstPropContext, ConstPropValue};
     use kirin_interpreter::engine::{
-        AbstractCallFrame, AbstractCfgFrame, AbstractCompletion, AbstractFrameBuild,
-        AbstractFrameDriver, AbstractFunctionFrame, AbstractInterpreter,
-        AbstractScopeAlternativesFrame, AbstractScopeFrame, CallContext, CallFrame, Completion,
-        ConcreteInterpreter, CrossStageLinker, Frame, FrameBuild, FrameDriver, FrameEffect,
-        InterpreterError, SameStageLinker, ScopeFrame, expect_single,
+        AbstractBlockFrame, AbstractCallFrame, AbstractCfgFrame, AbstractCompletion,
+        AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, AbstractInterpreter,
+        BodyFrame, CallContext, CallFrame, Completion, ConcreteInterpreter, CrossStageLinker,
+        ForwardInterp, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
+        expect_single,
+    };
+    use kirin_scf::{
+        AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf,
+        BuildScfFor, BuildScfIf, ForLoopValue, ScfForFrame, ScfIfFrame,
     };
 
     use super::build_pipeline;
@@ -435,53 +498,70 @@ mod advanced {
 
     // --- A custom total frame enum -----------------------------------------
     //
-    // It reuses the standard `ScopeFrame`/`CallFrame` traversal verbatim (via
-    // `FrameBuild` + the delegating `*_into` methods) and adds *observation*:
-    // every call and every scope step is counted in a side log. The engine is
-    // not forked — only `ConcreteInterpreter`'s `F` type parameter changes.
+    // It reuses the standard `BodyFrame`/`CallFrame` traversal (and the SCF loop
+    // frame) verbatim via `FrameBuild`/`BuildScfFor` + the delegating `*_into`
+    // methods, and adds *observation*: every call and every body step is counted
+    // in a side log. The engine is not forked — only `ConcreteInterpreter`'s `F`
+    // type parameter changes.
 
     thread_local! {
-        static TRACE: RefCell<Trace> = const { RefCell::new(Trace { calls: 0, scope_steps: 0 }) };
+        static TRACE: RefCell<Trace> = const { RefCell::new(Trace { calls: 0, body_steps: 0 }) };
     }
 
     #[derive(Clone, Copy, Default)]
     struct Trace {
         calls: usize,
-        scope_steps: usize,
+        body_steps: usize,
     }
 
     enum TracingFrame<V, E> {
-        Scope(ScopeFrame<V, E>),
+        Body(BodyFrame<V, E>),
         Call(CallFrame<V>),
+        ScfIf(ScfIfFrame<V, E>),
+        ScfFor(ScfForFrame<V, E>),
     }
 
     impl<V, E> FrameBuild<V, E> for TracingFrame<V, E> {
-        fn from_scope(frame: ScopeFrame<V, E>) -> Self {
-            TracingFrame::Scope(frame)
+        fn from_body(frame: BodyFrame<V, E>) -> Self {
+            TracingFrame::Body(frame)
         }
         fn from_call(frame: CallFrame<V>) -> Self {
             TracingFrame::Call(frame)
         }
     }
 
-    impl<I> Frame<I> for TracingFrame<I::Value, I::Error>
+    impl<V, E> BuildScfIf<V, E> for TracingFrame<V, E> {
+        fn scf_if(frame: ScfIfFrame<V, E>) -> Self {
+            TracingFrame::ScfIf(frame)
+        }
+    }
+
+    impl<V, E> BuildScfFor<V, E> for TracingFrame<V, E> {
+        fn scf_for(frame: ScfForFrame<V, E>) -> Self {
+            TracingFrame::ScfFor(frame)
+        }
+    }
+
+    impl<I, V, E> Frame<I> for TracingFrame<V, E>
     where
-        I: FrameDriver,
-        I::Value: Clone,
-        I::Error: From<InterpreterError>,
+        I: FrameDriver<Value = V, Error = E> + ForwardInterp<Frame = TracingFrame<V, E>>,
+        V: Clone + ForLoopValue,
+        E: From<InterpreterError>,
     {
-        type Completion = Completion<I::Value>;
+        type Completion = Completion<V>;
 
         fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
-                TracingFrame::Scope(frame) => {
-                    TRACE.with(|t| t.borrow_mut().scope_steps += 1);
+                TracingFrame::Body(frame) => {
+                    TRACE.with(|t| t.borrow_mut().body_steps += 1);
                     frame.step_into::<I, Self>(interp)
                 }
                 TracingFrame::Call(frame) => {
                     TRACE.with(|t| t.borrow_mut().calls += 1);
                     frame.step_into::<I, Self>(interp)
                 }
+                TracingFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
+                TracingFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
             }
         }
 
@@ -490,10 +570,12 @@ mod advanced {
             _interp: &mut I,
         ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
-                TracingFrame::Scope(frame) => Ok(frame.resume_done_into::<Self>()),
+                TracingFrame::Body(frame) => Ok(frame.resume_done_into::<Self>()),
                 TracingFrame::Call(frame) => {
                     frame.resume_done_into::<Self>().map_err(I::Error::from)
                 }
+                TracingFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
+                TracingFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
             }
         }
 
@@ -503,8 +585,10 @@ mod advanced {
             interp: &mut I,
         ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
-                TracingFrame::Scope(frame) => frame.resume_into::<I, Self>(completion, interp),
+                TracingFrame::Body(frame) => frame.resume_into::<I, Self>(completion, interp),
                 TracingFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
+                TracingFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),
+                TracingFrame::ScfFor(frame) => frame.resume_into::<I, Self>(completion, interp),
             }
         }
     }
@@ -532,16 +616,16 @@ mod advanced {
         .unwrap();
 
         // (1)+(2): the custom frame ran the real program correctly by reusing
-        // the standard ScopeFrame/CallFrame traversal (no engine fork).
+        // the standard BodyFrame/CallFrame traversal (no engine fork).
         assert_eq!(result, 120);
 
         // (3): traversal is observable through the custom frame. factorial(5)
         // makes 4 recursive calls (5→4→3→2→1; the base case at 1 makes none),
         // all routed through the custom Call arm; body statements run through
-        // its Scope arm.
+        // its Body arm.
         let trace = TRACE.with(|t| *t.borrow());
         assert_eq!(trace.calls, 4);
-        assert!(trace.scope_steps > 0);
+        assert!(trace.body_steps > 0);
     }
 
     // --- A capped custom abstract policy -----------------------------------
@@ -553,16 +637,8 @@ mod advanced {
         // (capping degrades precision, not soundness) — and it terminates,
         // which exercises the same-key self-dependency convergence.
         let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
-        let base: AbstractInterpreter<
-            '_,
-            Stage,
-            ConstPropValue,
-            ToyError,
-            SameStageLinker,
-            ConstPropContext,
-        > = AbstractInterpreter::new(&pipeline);
-        let mut analysis = base
-            .with_analysis(ConstPropContext::with_budget(2))
+        let mut analysis = crate::interpreter::ToyConstProp::new(&pipeline)
+            .with_policy(ConstPropContext::with_budget(2))
             .with_linker(CrossStageLinker);
         let result = expect_single::<ConstPropValue, ToyError>(
             analysis
@@ -586,8 +662,8 @@ mod advanced {
             RefCell::new(AbstractTrace {
                 function_steps: 0,
                 cfg_steps: 0,
-                scope_steps: 0,
-                alt_steps: 0,
+                block_steps: 0,
+                if_steps: 0,
                 calls: 0,
             })
         };
@@ -597,17 +673,18 @@ mod advanced {
     struct AbstractTrace {
         function_steps: usize,
         cfg_steps: usize,
-        scope_steps: usize,
-        alt_steps: usize,
+        block_steps: usize,
+        if_steps: usize,
         calls: usize,
     }
 
     enum TracingAbstractFrame<V, E, K> {
         Function(AbstractFunctionFrame<V, E, K>),
         Cfg(AbstractCfgFrame<V, E, K>),
-        Scope(AbstractScopeFrame<V, E, K>),
-        Alternatives(AbstractScopeAlternativesFrame<V, E, K>),
+        Block(AbstractBlockFrame<V, E, K>),
         Call(AbstractCallFrame<V, E, K>),
+        ScfIf(AbstractScfIfFrame<V, E, K>),
+        ScfFor(AbstractScfForFrame<V, E, K>),
     }
 
     impl<V, E, K> AbstractFrameBuild<V, E, K> for TracingAbstractFrame<V, E, K> {
@@ -617,25 +694,35 @@ mod advanced {
         fn from_cfg(frame: AbstractCfgFrame<V, E, K>) -> Self {
             TracingAbstractFrame::Cfg(frame)
         }
-        fn from_scope(frame: AbstractScopeFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::Scope(frame)
-        }
-        fn from_scope_alternatives(frame: AbstractScopeAlternativesFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::Alternatives(frame)
+        fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
+            TracingAbstractFrame::Block(frame)
         }
         fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
             TracingAbstractFrame::Call(frame)
         }
     }
 
-    impl<I> Frame<I> for TracingAbstractFrame<I::Value, I::Error, I::SummaryKey>
+    impl<V, E, K> BuildAbstractScfIf<V, E, K> for TracingAbstractFrame<V, E, K> {
+        fn scf_if(frame: AbstractScfIfFrame<V, E, K>) -> Self {
+            TracingAbstractFrame::ScfIf(frame)
+        }
+    }
+
+    impl<V, E, K> BuildAbstractScfFor<V, E, K> for TracingAbstractFrame<V, E, K> {
+        fn scf_for(frame: AbstractScfForFrame<V, E, K>) -> Self {
+            TracingAbstractFrame::ScfFor(frame)
+        }
+    }
+
+    impl<I, V, E, K> Frame<I> for TracingAbstractFrame<V, E, K>
     where
-        I: AbstractFrameDriver,
-        I::Value: Clone + PartialEq,
-        I::Error: From<InterpreterError>,
-        I::SummaryKey: Clone + Eq + Hash,
+        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
+            + ForwardInterp<Frame = TracingAbstractFrame<V, E, K>>,
+        V: Clone + PartialEq + ForLoopValue,
+        E: From<InterpreterError>,
+        K: Clone + Eq + Hash,
     {
-        type Completion = AbstractCompletion<I::Value>;
+        type Completion = AbstractCompletion<V>;
 
         fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
@@ -647,18 +734,19 @@ mod advanced {
                     ATRACE.with(|t| t.borrow_mut().cfg_steps += 1);
                     frame.step_into::<I, Self>(interp)
                 }
-                TracingAbstractFrame::Scope(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().scope_steps += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingAbstractFrame::Alternatives(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().alt_steps += 1);
+                TracingAbstractFrame::Block(frame) => {
+                    ATRACE.with(|t| t.borrow_mut().block_steps += 1);
                     frame.step_into::<I, Self>(interp)
                 }
                 TracingAbstractFrame::Call(frame) => {
                     ATRACE.with(|t| t.borrow_mut().calls += 1);
                     frame.step_into::<I, Self>(interp)
                 }
+                TracingAbstractFrame::ScfIf(frame) => {
+                    ATRACE.with(|t| t.borrow_mut().if_steps += 1);
+                    frame.step_into::<I, Self>(interp)
+                }
+                TracingAbstractFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
             }
         }
 
@@ -669,9 +757,10 @@ mod advanced {
             match self {
                 TracingAbstractFrame::Function(frame) => Ok(frame.resume_done_into::<Self>()),
                 TracingAbstractFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingAbstractFrame::Scope(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingAbstractFrame::Alternatives(frame) => frame.resume_done_into::<Self>(),
+                TracingAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
                 TracingAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
+                TracingAbstractFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
+                TracingAbstractFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
             }
         }
 
@@ -685,13 +774,16 @@ mod advanced {
                 TracingAbstractFrame::Cfg(frame) => {
                     frame.resume_into::<I, Self>(completion, interp)
                 }
-                TracingAbstractFrame::Scope(frame) => {
-                    frame.resume_into::<I, Self>(completion, interp)
-                }
-                TracingAbstractFrame::Alternatives(frame) => {
+                TracingAbstractFrame::Block(frame) => {
                     frame.resume_into::<I, Self>(completion, interp)
                 }
                 TracingAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
+                TracingAbstractFrame::ScfIf(frame) => {
+                    frame.resume_into::<I, Self>(completion, interp)
+                }
+                TracingAbstractFrame::ScfFor(frame) => {
+                    frame.resume_into::<I, Self>(completion, interp)
+                }
             }
         }
     }

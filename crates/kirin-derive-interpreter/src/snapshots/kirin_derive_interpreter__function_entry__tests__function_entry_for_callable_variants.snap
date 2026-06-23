@@ -14,10 +14,7 @@ where
         args: ::kirin::ir::Product<<__EntryI as ::kirin_interpreter::Interp>::Value>,
         ctx: &mut ::kirin_interpreter::Ctx<'_, __EntryI>,
     ) -> Result<
-        ::kirin_interpreter::Scope<
-            <__EntryI as ::kirin_interpreter::Interp>::Value,
-            <__EntryI as ::kirin_interpreter::Interp>::Error,
-        >,
+        ::kirin_interpreter::FunctionBody<<__EntryI as ::kirin_interpreter::Interp>::Value>,
         <__EntryI as ::kirin_interpreter::Interp>::Error,
     > {
         match self {

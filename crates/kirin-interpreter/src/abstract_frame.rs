@@ -1,20 +1,22 @@
 //! Customizable frame-based traversal for the **abstract** engine.
 //!
 //! This is the abstract analogue of [`frame`](crate::frame): the dialect API
-//! still produces a closed [`ForwardEffect`] per statement, and these frames decide how
-//! the [`AbstractInterpreter`](crate::AbstractInterpreter) *traverses* — CFG
-//! block worklists with join/widen, branch exploration, hook-driven scope
-//! fixpoints, undecided scope alternatives, and call summarization. The engine
-//! just runs a stack of frames (`run_frames`), so a compiler/analysis author can
-//! supply a custom total frame enum — reusing these standard frames via
+//! still produces a closed [`ForwardEffect`] per statement, and these frames
+//! decide how the [`AbstractInterpreter`](crate::AbstractInterpreter)
+//! *traverses* — CFG block worklists with join/widen, branch exploration,
+//! single-block body walks, and call summarization. The
+//! engine just runs a stack of frames (`run_frames`), so a language can supply a
+//! custom total frame enum — reusing these standard frames via
 //! [`AbstractFrameBuild`] — to observe or replace traversal without forking the
 //! engine.
 //!
-//! Frames are *traversal*, never dialect semantics: [`Scope`]/[`ScopeHook`] are
-//! consumed here, not replaced. The interprocedural *policy* (summary keying,
-//! join/widen, caller recording — including same-key recursion) stays atomic in
-//! the engine behind [`AbstractFrameDriver`]; frames only choose what to step
-//! next.
+//! The framework owns no structured-control concept: a structured dialect pushes
+//! a frame **it owns** ([`ForwardEffect::Push`]), and all loop/branch/alternative
+//! policy lives in that dialect frame (it may reuse [`AbstractBlockFrame`] to
+//! walk a chosen body). The interprocedural
+//! *policy* (summary keying, join/widen, caller recording — including same-key
+//! recursion) stays atomic in the engine behind [`AbstractFrameDriver`]; frames
+//! only choose what to step next.
 
 use std::collections::{HashMap, HashSet, VecDeque};
 use std::hash::Hash;
@@ -22,20 +24,16 @@ use std::marker::PhantomData;
 
 use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
 
-use crate::ctx::EngineEnv;
 use crate::{
-    AbstractFrameDriver, CallEffect, EnvIndex, ForwardEffect, Frame, FrameEffect, InterpreterError,
-    Scope, ScopeBody, ScopeStep,
+    AbstractFrameDriver, CallEffect, EnvIndex, ForwardEffect, ForwardInterp, Frame, FrameEffect,
+    InterpreterError,
 };
 
 /// Completion payloads produced by the standard abstract frames.
-///
-/// `#[non_exhaustive]` so custom abstract frames can add payloads later.
-#[non_exhaustive]
 pub enum AbstractCompletion<V> {
-    /// A scope (or scope-alternatives) reached its local fixpoint with these
-    /// joined finish results, or `None` if no path through it finished.
-    ScopeFinished(Option<Product<V>>),
+    /// A pushed frame finished with these finish values, or `None` if no path
+    /// through it finished (e.g. it returned).
+    Finished(Option<Product<V>>),
     /// The whole function body has been analyzed. The return product is in the
     /// engine's accumulator; this only signals the inner driver loop to stop.
     FunctionDone,
@@ -46,8 +44,7 @@ pub enum AbstractCompletion<V> {
 pub trait AbstractFrameBuild<V, E, K>: Sized {
     fn from_function(frame: AbstractFunctionFrame<V, E, K>) -> Self;
     fn from_cfg(frame: AbstractCfgFrame<V, E, K>) -> Self;
-    fn from_scope(frame: AbstractScopeFrame<V, E, K>) -> Self;
-    fn from_scope_alternatives(frame: AbstractScopeAlternativesFrame<V, E, K>) -> Self;
+    fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self;
     fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self;
 }
 
@@ -55,8 +52,8 @@ pub trait AbstractFrameBuild<V, E, K>: Sized {
 // Function-entry frame (root of one function evaluation)
 // ===========================================================================
 
-/// Root frame of one function evaluation: build the entry [`Scope`] and descend
-/// into the body CFG (or contribute an immediate return).
+/// Root frame of one function evaluation: build the entry [`FunctionBody`](crate::FunctionBody)
+/// and descend into the body CFG.
 pub struct AbstractFunctionFrame<V, E, K> {
     stage: CompileStage,
     body: Statement,
@@ -86,38 +83,18 @@ where
         I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
         F: AbstractFrameBuild<V, E, K>,
     {
-        let scope = interp.enter_function(self.stage, self.body, self.args, self.env)?;
-        let body = scope.body();
-        let Scope { args, .. } = scope;
-        match body {
-            ScopeBody::Region(region) => {
-                let entry = interp
-                    .region_entry(self.stage, region)?
-                    .ok_or_else(|| E::from(InterpreterError::EmptyRegion))?;
-                let cfg = AbstractCfgFrame::enter(self.stage, self.env, entry, args);
-                Ok(FrameEffect::Push {
-                    parent: F::from_function(Self {
-                        args: Product::new(),
-                        ..self
-                    }),
-                    child: F::from_cfg(cfg),
-                })
-            }
-            ScopeBody::Block(block) => {
-                let cfg = AbstractCfgFrame::enter(self.stage, self.env, block, args);
-                Ok(FrameEffect::Push {
-                    parent: F::from_function(Self {
-                        args: Product::new(),
-                        ..self
-                    }),
-                    child: F::from_cfg(cfg),
-                })
-            }
-            ScopeBody::Immediate => {
-                interp.contribute_return(args)?;
-                Ok(FrameEffect::Complete(AbstractCompletion::FunctionDone))
-            }
-        }
+        let body = interp.enter_function(self.stage, self.body, self.args, self.env)?;
+        let entry = interp
+            .region_entry(self.stage, body.region)?
+            .ok_or_else(|| E::from(InterpreterError::EmptyRegion))?;
+        let cfg = AbstractCfgFrame::enter(self.stage, self.env, entry, body.args);
+        Ok(FrameEffect::Push {
+            parent: F::from_function(Self {
+                args: Product::new(),
+                ..self
+            }),
+            child: F::from_cfg(cfg),
+        })
     }
 
     /// The body CFG drained: the function is fully analyzed.
@@ -130,7 +107,7 @@ where
         _completion: AbstractCompletion<V>,
     ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         Err(E::from(InterpreterError::Custom(
-            "function frame resumed with a scope completion",
+            "function frame resumed with a body completion",
         )))
     }
 }
@@ -152,7 +129,7 @@ pub struct AbstractCfgFrame<V, E, K> {
     /// The block currently being walked, plus its statement cursor.
     current: Option<(Block, Option<Statement>)>,
     iterations: usize,
-    /// Result slots awaiting a pushed scope/alternatives completion.
+    /// Result slots awaiting a pushed frame's completion.
     resume_slots: Option<Product<SSAValue>>,
     _marker: PhantomData<fn() -> (E, K)>,
 }
@@ -219,7 +196,7 @@ where
         interp: &mut I,
     ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
     where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + ForwardInterp<Frame = F>,
         F: AbstractFrameBuild<V, E, K>,
     {
         let (block, cursor) = match self.current.take() {
@@ -279,31 +256,11 @@ where
                     child: F::from_call(call_frame),
                 })
             }
-            ForwardEffect::Enter(scope) => {
-                let slots = scope.results.clone();
-                if matches!(scope.body(), ScopeBody::Immediate) {
-                    let Scope { args, .. } = scope;
-                    interp.write_results(self.env, &slots, args)?;
-                    Ok(FrameEffect::Continue(F::from_cfg(self)))
-                } else {
-                    self.resume_slots = Some(slots);
-                    let child = AbstractScopeFrame::enter(interp, self.stage, self.env, scope)?;
-                    Ok(FrameEffect::Push {
-                        parent: F::from_cfg(self),
-                        child: F::from_scope(child),
-                    })
-                }
-            }
-            ForwardEffect::EnterAny(scopes) => {
-                let slots = scopes
-                    .first()
-                    .map(|scope| scope.results.clone())
-                    .unwrap_or_default();
-                self.resume_slots = Some(slots);
-                let child = AbstractScopeAlternativesFrame::new(self.stage, self.env, scopes);
+            ForwardEffect::Push { frame, results } => {
+                self.resume_slots = Some(results);
                 Ok(FrameEffect::Push {
                     parent: F::from_cfg(self),
-                    child: F::from_scope_alternatives(child),
+                    child: frame,
                 })
             }
         }
@@ -328,15 +285,15 @@ where
         F: AbstractFrameBuild<V, E, K>,
     {
         match completion {
-            AbstractCompletion::ScopeFinished(Some(values)) => {
+            AbstractCompletion::Finished(Some(values)) => {
                 let slots = self.resume_slots.take().ok_or_else(|| {
                     E::from(InterpreterError::Custom("cfg resume without result slots"))
                 })?;
                 interp.write_results(self.env, &slots, values)?;
                 Ok(FrameEffect::Continue(F::from_cfg(self)))
             }
-            AbstractCompletion::ScopeFinished(None) => {
-                // No path through the scope finished: this block path is done.
+            AbstractCompletion::Finished(None) => {
+                // No path through the pushed frame finished: this block path is done.
                 self.resume_slots = None;
                 self.current = None;
                 Ok(FrameEffect::Continue(F::from_cfg(self)))
@@ -349,82 +306,43 @@ where
 }
 
 // ===========================================================================
-// Scope frame: hook-driven structured scope fixpoint (folds the body walk)
+// Block frame: walk one body block (scf-style), completing on yield
 // ===========================================================================
 
-/// Evaluate one hook-driven structured scope to its local fixpoint: walk the
-/// body block, and on yield run the [`ScopeHook`](crate::ScopeHook) to decide
-/// finish vs. (joined/widened) re-entry until the entry state is stable.
-pub struct AbstractScopeFrame<V, E, K> {
+/// Evaluate one structured body block: walk it once and, on yield, complete
+/// with the yielded product. Loop/branch policy is **not** here — a dialect's
+/// own frame re-pushes a block frame to iterate. Nested pushes/calls are driven
+/// like the CFG frame.
+pub struct AbstractBlockFrame<V, E, K> {
     stage: CompileStage,
     env: EnvIndex,
     block: Block,
-    entry: Product<V>,
-    hook: Option<Box<dyn crate::ScopeHook<V, E>>>,
-    finish: Option<Product<V>>,
-    iterations: usize,
     cursor: Option<Statement>,
+    /// Entry arguments not yet bound — bound on the first step, so building the
+    /// frame needs no engine access (see [`BodyFrame`](crate::BodyFrame)).
+    pending: Option<Product<V>>,
     resume_slots: Option<Product<SSAValue>>,
-    _marker: PhantomData<fn() -> K>,
+    _marker: PhantomData<fn() -> (E, K)>,
 }
 
-impl<V, E, K> AbstractScopeFrame<V, E, K>
+impl<V, E, K> AbstractBlockFrame<V, E, K>
 where
     V: Clone + PartialEq,
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,
 {
-    /// Build a scope frame for a single-block scope and bind its first body pass.
-    pub fn enter<I>(
-        interp: &mut I,
-        stage: CompileStage,
-        env: EnvIndex,
-        scope: Scope<V, E>,
-    ) -> Result<Self, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E>,
-    {
-        let block = match scope.body() {
-            ScopeBody::Block(block) => block,
-            ScopeBody::Immediate => {
-                return Err(E::from(InterpreterError::Custom(
-                    "immediate scope must be finished by the caller",
-                )));
-            }
-            ScopeBody::Region(_) => {
-                return Err(E::from(InterpreterError::Custom(
-                    "inline region scopes are not supported by the abstract interpreter",
-                )));
-            }
-        };
-        let Scope { args, hook, .. } = scope;
-        interp.bind_block_args(stage, env, block, &args)?;
-        let cursor = interp.first_statement(stage, block)?;
-        Ok(Self {
+    /// A block frame that binds its entry parameters on the first step. Pure
+    /// construction — needs no engine access.
+    pub fn new(stage: CompileStage, env: EnvIndex, block: Block, args: Product<V>) -> Self {
+        Self {
             stage,
             env,
             block,
-            entry: args,
-            hook,
-            finish: None,
-            iterations: 1,
-            cursor,
+            cursor: None,
+            pending: Some(args),
             resume_slots: None,
             _marker: PhantomData,
-        })
-    }
-
-    /// Join a finish/contribution into the scope's result accumulator (never widens).
-    fn join_finish<I>(&mut self, interp: &mut I, values: Product<V>) -> Result<(), E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E>,
-    {
-        let merged = match self.finish.take() {
-            None => values,
-            Some(current) => interp.analysis_merge(&current, &values, 0)?,
-        };
-        self.finish = Some(merged);
-        Ok(())
+        }
     }
 
     pub fn step_into<I, F>(
@@ -432,122 +350,47 @@ where
         interp: &mut I,
     ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
     where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + ForwardInterp<Frame = F>,
         F: AbstractFrameBuild<V, E, K>,
     {
+        // Bind entry arguments lazily on the first step.
+        if let Some(args) = self.pending.take() {
+            interp.bind_block_args(self.stage, self.env, self.block, &args)?;
+            self.cursor = interp.first_statement(self.stage, self.block)?;
+            return Ok(FrameEffect::Continue(F::from_block(self)));
+        }
         let Some(statement) = self.cursor else {
             return Err(E::from(InterpreterError::BlockFellThrough(self.block)));
         };
         self.cursor = interp.next_statement(self.stage, self.block, statement)?;
 
         match interp.run_statement(self.stage, statement, self.env)? {
-            ForwardEffect::Next => Ok(FrameEffect::Continue(F::from_scope(self))),
-            ForwardEffect::Yield(values) => self.on_yield::<I, F>(interp, values),
+            ForwardEffect::Next => Ok(FrameEffect::Continue(F::from_block(self))),
+            ForwardEffect::Yield(values) => Ok(FrameEffect::Complete(
+                AbstractCompletion::Finished(Some(values)),
+            )),
             ForwardEffect::Return(values) => {
                 interp.contribute_return(values)?;
-                Ok(FrameEffect::Complete(AbstractCompletion::ScopeFinished(
-                    self.finish,
-                )))
+                Ok(FrameEffect::Complete(AbstractCompletion::Finished(None)))
             }
             ForwardEffect::Call(call) => {
                 let call_frame = AbstractCallFrame::new(self.stage, call, self.env);
                 Ok(FrameEffect::Push {
-                    parent: F::from_scope(self),
+                    parent: F::from_block(self),
                     child: F::from_call(call_frame),
                 })
             }
-            ForwardEffect::Enter(scope) => {
-                let slots = scope.results.clone();
-                if matches!(scope.body(), ScopeBody::Immediate) {
-                    let Scope { args, .. } = scope;
-                    interp.write_results(self.env, &slots, args)?;
-                    Ok(FrameEffect::Continue(F::from_scope(self)))
-                } else {
-                    self.resume_slots = Some(slots);
-                    let child = AbstractScopeFrame::enter(interp, self.stage, self.env, scope)?;
-                    Ok(FrameEffect::Push {
-                        parent: F::from_scope(self),
-                        child: F::from_scope(child),
-                    })
-                }
-            }
-            ForwardEffect::EnterAny(scopes) => {
-                let slots = scopes
-                    .first()
-                    .map(|scope| scope.results.clone())
-                    .unwrap_or_default();
-                self.resume_slots = Some(slots);
-                let child = AbstractScopeAlternativesFrame::new(self.stage, self.env, scopes);
+            ForwardEffect::Push { frame, results } => {
+                self.resume_slots = Some(results);
                 Ok(FrameEffect::Push {
-                    parent: F::from_scope(self),
-                    child: F::from_scope_alternatives(child),
+                    parent: F::from_block(self),
+                    child: frame,
                 })
             }
             ForwardEffect::Jump(_) | ForwardEffect::Branch(_) => Err(E::from(
-                InterpreterError::Custom("CFG transfer inside a structured scope body"),
+                InterpreterError::Custom("CFG transfer inside a structured body block"),
             )),
         }
-    }
-
-    fn on_yield<I, F>(
-        mut self,
-        interp: &mut I,
-        values: Product<V>,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
-        let (args, next_hook) = match self.hook.take() {
-            None => {
-                self.join_finish(interp, values)?;
-                return Ok(FrameEffect::Complete(AbstractCompletion::ScopeFinished(
-                    self.finish,
-                )));
-            }
-            Some(hook) => {
-                let step = {
-                    let mut env = EngineEnv {
-                        interp: &mut *interp,
-                        env: self.env,
-                    };
-                    hook.on_yield(&self.entry, values, &mut env)?
-                };
-                match step {
-                    ScopeStep::Finish(results) => {
-                        self.join_finish(interp, results)?;
-                        return Ok(FrameEffect::Complete(AbstractCompletion::ScopeFinished(
-                            self.finish,
-                        )));
-                    }
-                    ScopeStep::Repeat { args, hook } => (args, hook),
-                    ScopeStep::RepeatOrFinish {
-                        args,
-                        results,
-                        hook,
-                    } => {
-                        self.join_finish(interp, results)?;
-                        (args, hook)
-                    }
-                }
-            }
-        };
-        let joined = interp.analysis_merge(&self.entry, &args, self.iterations)?;
-        if joined == self.entry {
-            // Stable entry state: re-running the body adds nothing.
-            return Ok(FrameEffect::Complete(AbstractCompletion::ScopeFinished(
-                self.finish,
-            )));
-        }
-        self.entry = joined;
-        self.hook = Some(next_hook);
-        self.iterations += 1;
-        if self.iterations > interp.max_iterations() {
-            return Err(E::from(InterpreterError::FixpointDiverged));
-        }
-        interp.bind_block_args(self.stage, self.env, self.block, &self.entry)?;
-        self.cursor = interp.first_statement(self.stage, self.block)?;
-        Ok(FrameEffect::Continue(F::from_scope(self)))
     }
 
     /// A pushed call frame finished: continue walking the body.
@@ -555,7 +398,7 @@ where
     where
         F: AbstractFrameBuild<V, E, K>,
     {
-        FrameEffect::Continue(F::from_scope(self))
+        FrameEffect::Continue(F::from_block(self))
     }
 
     pub fn resume_into<I, F>(
@@ -568,123 +411,22 @@ where
         F: AbstractFrameBuild<V, E, K>,
     {
         match completion {
-            AbstractCompletion::ScopeFinished(Some(values)) => {
+            AbstractCompletion::Finished(Some(values)) => {
                 let slots = self.resume_slots.take().ok_or_else(|| {
                     E::from(InterpreterError::Custom(
-                        "scope resume without result slots",
+                        "block resume without result slots",
                     ))
                 })?;
                 interp.write_results(self.env, &slots, values)?;
-                Ok(FrameEffect::Continue(F::from_scope(self)))
+                Ok(FrameEffect::Continue(F::from_block(self)))
             }
-            AbstractCompletion::ScopeFinished(None) => {
-                // A nested scope returned without finishing: this body pass left
-                // via return, so the scope completes with its finish accumulator.
-                Ok(FrameEffect::Complete(AbstractCompletion::ScopeFinished(
-                    self.finish,
-                )))
+            // A nested push returned without finishing: this body pass left via
+            // return, so the block completes without a finish value.
+            AbstractCompletion::Finished(None) => {
+                Ok(FrameEffect::Complete(AbstractCompletion::Finished(None)))
             }
             AbstractCompletion::FunctionDone => Err(E::from(InterpreterError::Custom(
-                "scope frame resumed with a function completion",
-            ))),
-        }
-    }
-}
-
-// ===========================================================================
-// Scope-alternatives frame: undecided structured branch (EnterAny)
-// ===========================================================================
-
-/// Evaluate each alternative scope and join their finish results. The parent
-/// writes the joined product into the shared result slots.
-pub struct AbstractScopeAlternativesFrame<V, E, K> {
-    stage: CompileStage,
-    env: EnvIndex,
-    remaining: VecDeque<Scope<V, E>>,
-    acc: Option<Product<V>>,
-    _marker: PhantomData<fn() -> K>,
-}
-
-impl<V, E, K> AbstractScopeAlternativesFrame<V, E, K>
-where
-    V: Clone + PartialEq,
-    E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
-{
-    pub fn new(stage: CompileStage, env: EnvIndex, scopes: Vec<Scope<V, E>>) -> Self {
-        Self {
-            stage,
-            env,
-            remaining: scopes.into(),
-            acc: None,
-            _marker: PhantomData,
-        }
-    }
-
-    fn join_acc<I>(&mut self, interp: &mut I, values: Product<V>) -> Result<(), E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E>,
-    {
-        let merged = match self.acc.take() {
-            None => values,
-            Some(current) => interp.analysis_merge(&current, &values, 0)?,
-        };
-        self.acc = Some(merged);
-        Ok(())
-    }
-
-    pub fn step_into<I, F>(
-        mut self,
-        interp: &mut I,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
-        let Some(scope) = self.remaining.pop_front() else {
-            return Ok(FrameEffect::Complete(AbstractCompletion::ScopeFinished(
-                self.acc,
-            )));
-        };
-        if matches!(scope.body(), ScopeBody::Immediate) {
-            let Scope { args, .. } = scope;
-            self.join_acc(interp, args)?;
-            Ok(FrameEffect::Continue(F::from_scope_alternatives(self)))
-        } else {
-            let child = AbstractScopeFrame::enter(interp, self.stage, self.env, scope)?;
-            Ok(FrameEffect::Push {
-                parent: F::from_scope_alternatives(self),
-                child: F::from_scope(child),
-            })
-        }
-    }
-
-    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
-        Err(E::from(InterpreterError::Custom(
-            "scope-alternatives frame resumed without a scope completion",
-        )))
-    }
-
-    pub fn resume_into<I, F>(
-        mut self,
-        completion: AbstractCompletion<V>,
-        interp: &mut I,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
-        match completion {
-            AbstractCompletion::ScopeFinished(Some(values)) => {
-                self.join_acc(interp, values)?;
-                Ok(FrameEffect::Continue(F::from_scope_alternatives(self)))
-            }
-            // This alternative did not finish: skip it and try the next.
-            AbstractCompletion::ScopeFinished(None) => {
-                Ok(FrameEffect::Continue(F::from_scope_alternatives(self)))
-            }
-            AbstractCompletion::FunctionDone => Err(E::from(InterpreterError::Custom(
-                "scope-alternatives frame resumed with a function completion",
+                "block frame resumed with a function completion",
             ))),
         }
     }
@@ -748,13 +490,13 @@ where
 // The default total abstract frame enum
 // ===========================================================================
 
-/// The default total abstract frame enum: standard abstract traversal. A custom
-/// analysis can define its own enum reusing these via [`AbstractFrameBuild`].
+/// The default total abstract frame enum: standard abstract traversal (no
+/// structured-control dialect frames). A language adding such a dialect defines
+/// its own enum reusing these via [`AbstractFrameBuild`].
 pub enum StandardAbstractFrame<V, E, K> {
     Function(AbstractFunctionFrame<V, E, K>),
     Cfg(AbstractCfgFrame<V, E, K>),
-    Scope(AbstractScopeFrame<V, E, K>),
-    Alternatives(AbstractScopeAlternativesFrame<V, E, K>),
+    Block(AbstractBlockFrame<V, E, K>),
     Call(AbstractCallFrame<V, E, K>),
 }
 
@@ -765,32 +507,29 @@ impl<V, E, K> AbstractFrameBuild<V, E, K> for StandardAbstractFrame<V, E, K> {
     fn from_cfg(frame: AbstractCfgFrame<V, E, K>) -> Self {
         StandardAbstractFrame::Cfg(frame)
     }
-    fn from_scope(frame: AbstractScopeFrame<V, E, K>) -> Self {
-        StandardAbstractFrame::Scope(frame)
-    }
-    fn from_scope_alternatives(frame: AbstractScopeAlternativesFrame<V, E, K>) -> Self {
-        StandardAbstractFrame::Alternatives(frame)
+    fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
+        StandardAbstractFrame::Block(frame)
     }
     fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
         StandardAbstractFrame::Call(frame)
     }
 }
 
-impl<I> Frame<I> for StandardAbstractFrame<I::Value, I::Error, I::SummaryKey>
+impl<I, V, E, K> Frame<I> for StandardAbstractFrame<V, E, K>
 where
-    I: AbstractFrameDriver,
-    I::Value: Clone + PartialEq,
-    I::Error: From<InterpreterError>,
-    I::SummaryKey: Clone + Eq + Hash,
+    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
+        + ForwardInterp<Frame = StandardAbstractFrame<V, E, K>>,
+    V: Clone + PartialEq,
+    E: From<InterpreterError>,
+    K: Clone + Eq + Hash,
 {
-    type Completion = AbstractCompletion<I::Value>;
+    type Completion = AbstractCompletion<V>;
 
     fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
             StandardAbstractFrame::Function(frame) => frame.step_into::<I, Self>(interp),
             StandardAbstractFrame::Cfg(frame) => frame.step_into::<I, Self>(interp),
-            StandardAbstractFrame::Scope(frame) => frame.step_into::<I, Self>(interp),
-            StandardAbstractFrame::Alternatives(frame) => frame.step_into::<I, Self>(interp),
+            StandardAbstractFrame::Block(frame) => frame.step_into::<I, Self>(interp),
             StandardAbstractFrame::Call(frame) => frame.step_into::<I, Self>(interp),
         }
     }
@@ -799,8 +538,7 @@ where
         match self {
             StandardAbstractFrame::Function(frame) => Ok(frame.resume_done_into::<Self>()),
             StandardAbstractFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
-            StandardAbstractFrame::Scope(frame) => Ok(frame.resume_done_into::<Self>()),
-            StandardAbstractFrame::Alternatives(frame) => frame.resume_done_into::<Self>(),
+            StandardAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
             StandardAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
         }
     }
@@ -813,10 +551,7 @@ where
         match self {
             StandardAbstractFrame::Function(frame) => frame.resume_into::<Self>(completion),
             StandardAbstractFrame::Cfg(frame) => frame.resume_into::<I, Self>(completion, interp),
-            StandardAbstractFrame::Scope(frame) => frame.resume_into::<I, Self>(completion, interp),
-            StandardAbstractFrame::Alternatives(frame) => {
-                frame.resume_into::<I, Self>(completion, interp)
-            }
+            StandardAbstractFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
             StandardAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
         }
     }

@@ -1,7 +1,7 @@
 use kirin::prelude::{CompileTimeValue, HasRegionBody, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    CallEffect, Callee, Ctx, ForwardEffect, ForwardInterp, FunctionEntry, Interp, Interpretable,
-    InterpreterError, Scope,
+    CallEffect, Callee, Ctx, ForwardEffect, ForwardInterp, FunctionBody, FunctionEntry, Interp,
+    Interpretable, InterpreterError,
 };
 
 use crate::{
@@ -17,8 +17,8 @@ where
         &self,
         args: Product<I::Value>,
         _ctx: &mut Ctx<'_, I>,
-    ) -> Result<Scope<I::Value, I::Error>, I::Error> {
-        Ok(Scope::region(*self.region()).args(args))
+    ) -> Result<FunctionBody<I::Value>, I::Error> {
+        Ok(FunctionBody::new(*self.region()).args(args))
     }
 }
 
@@ -31,8 +31,8 @@ where
         &self,
         args: Product<I::Value>,
         _ctx: &mut Ctx<'_, I>,
-    ) -> Result<Scope<I::Value, I::Error>, I::Error> {
-        Ok(Scope::region(*self.region()).args(args))
+    ) -> Result<FunctionBody<I::Value>, I::Error> {
+        Ok(FunctionBody::new(*self.region()).args(args))
     }
 }
 

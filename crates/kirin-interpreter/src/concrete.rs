@@ -3,9 +3,9 @@ use std::marker::PhantomData;
 use kirin_ir::{Block, CompileStage, Pipeline, Product, Region, SSAValue, StageMeta, Statement};
 
 use crate::{
-    Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame, FrameBuild,
-    FrameDriver, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker, SameStageLinker,
-    Scope, ScopeFrame, StageQuery, StandardFrame, drive_frames, query,
+    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame, FrameBuild,
+    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
+    SameStageLinker, StageQuery, StandardFrame, drive_frames, query,
 };
 
 /// Concrete executor: runs IR over a concrete value domain with an explicit
@@ -74,7 +74,7 @@ where
 {
     type Value = V;
     type Error = E;
-    type Effect = ForwardEffect<V, E>;
+    type Effect = ForwardEffect<V, F>;
 
     fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<V, E> {
         self.store.read(env, value).map_err(E::from)
@@ -111,7 +111,7 @@ where
         stage: CompileStage,
         statement: Statement,
         env: EnvIndex,
-    ) -> Result<ForwardEffect<V, E>, E> {
+    ) -> Result<Self::Effect, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
@@ -125,7 +125,7 @@ where
         body: Statement,
         args: Product<V>,
         env: EnvIndex,
-    ) -> Result<Scope<V, E>, E> {
+    ) -> Result<FunctionBody<V>, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
@@ -191,14 +191,9 @@ where
         let target = self.resolve_call(stage, &callee)?;
         let env = self.alloc_env();
         let args: Product<V> = args.into_iter().collect();
-        let scope = self.enter_function(target.stage, target.body, args, env)?;
-        match ScopeFrame::enter(self, target.stage, env, true, true, scope)? {
-            Some(body) => self.frames.push(F::from_scope(body)),
-            None => {
-                self.free_env(env)?;
-                return Err(E::from(InterpreterError::FunctionBodyFellThrough));
-            }
-        }
+        let body = self.enter_function(target.stage, target.body, args, env)?;
+        let frame = BodyFrame::function(self, target.stage, env, body.region, body.args)?;
+        self.frames.push(F::from_body(frame));
         self.run()
     }
 
@@ -209,7 +204,11 @@ where
         let mut frames = std::mem::take(&mut self.frames);
         let completion = drive_frames(self, &mut frames);
         self.frames = frames;
-        let Completion::Returned(values) = completion?;
-        Ok(values)
+        match completion? {
+            Completion::Returned(values) => Ok(values),
+            Completion::Finished(_) => Err(E::from(InterpreterError::Custom(
+                "body completion reached the frame-stack root",
+            ))),
+        }
     }
 }

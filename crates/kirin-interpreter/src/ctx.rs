@@ -49,17 +49,24 @@ pub trait Interp: Sized {
 ///
 /// Forward dialect rules bound `I: ForwardInterp` so they can build and return
 /// `ForwardEffect` values where the trait expects `I::Effect` (the two are the
-/// same type for a `ForwardInterp`). A blanket impl makes every such `Interp` a
+/// same type for a `ForwardInterp`). The associated [`Frame`](ForwardInterp::Frame)
+/// is the engine's total frame type — exposed here so a structured dialect can
+/// name it (e.g. to build a [`ForwardEffect::Push`]) without it leaking into
+/// the [`Interp`] base trait. A blanket impl makes every such `Interp` a
 /// `ForwardInterp` automatically; nobody implements it by hand. Backward
 /// analyses define their own `Interp` flavor with a different `Effect`.
 pub trait ForwardInterp:
-    Interp<Effect = ForwardEffect<<Self as Interp>::Value, <Self as Interp>::Error>>
+    Interp<Effect = ForwardEffect<<Self as Interp>::Value, Self::Frame>>
 {
+    /// The engine's total frame type, carried by [`ForwardEffect::Push`].
+    type Frame;
 }
 
-impl<I> ForwardInterp for I where
-    I: Interp<Effect = ForwardEffect<<I as Interp>::Value, <I as Interp>::Error>>
+impl<V, F, I> ForwardInterp for I
+where
+    I: Interp<Value = V, Effect = ForwardEffect<V, F>>,
 {
+    type Frame = F;
 }
 
 /// Per-statement execution context handed to
@@ -141,38 +148,5 @@ impl<'a, I: Interp> Ctx<'a, I> {
             self.write(*value, data)?;
         }
         Ok(())
-    }
-}
-
-/// Narrow SSA environment view handed to [`ScopeHook`](crate::ScopeHook)
-/// implementations: read/write access to the scope's activation, nothing else.
-pub trait EnvOps<V, E> {
-    fn read(&self, value: SSAValue) -> Result<V, E>;
-    fn write(&mut self, value: SSAValue, data: V) -> Result<(), E>;
-}
-
-impl<I: Interp> EnvOps<I::Value, I::Error> for Ctx<'_, I> {
-    fn read(&self, value: SSAValue) -> Result<I::Value, I::Error> {
-        Ctx::read(self, value)
-    }
-
-    fn write(&mut self, value: SSAValue, data: I::Value) -> Result<(), I::Error> {
-        Ctx::write(self, value, data)
-    }
-}
-
-/// Engine-internal [`EnvOps`] over a specific activation.
-pub(crate) struct EngineEnv<'a, I> {
-    pub(crate) interp: &'a mut I,
-    pub(crate) env: EnvIndex,
-}
-
-impl<I: Interp> EnvOps<I::Value, I::Error> for EngineEnv<'_, I> {
-    fn read(&self, value: SSAValue) -> Result<I::Value, I::Error> {
-        self.interp.env_read(self.env, value)
-    }
-
-    fn write(&mut self, value: SSAValue, data: I::Value) -> Result<(), I::Error> {
-        self.interp.env_write(self.env, value, data)
     }
 }

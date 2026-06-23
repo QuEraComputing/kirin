@@ -114,10 +114,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
                 env: #interp_crate::EnvIndex,
                 interp: &mut __InterpI,
             ) -> Result<
-                #interp_crate::Scope<
-                    <__InterpI as #interp_crate::Interp>::Value,
-                    <__InterpI as #interp_crate::Interp>::Error,
-                >,
+                #interp_crate::FunctionBody<<__InterpI as #interp_crate::Interp>::Value>,
                 <__InterpI as #interp_crate::Interp>::Error,
             > {
                 match self {

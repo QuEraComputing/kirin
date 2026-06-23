@@ -6,27 +6,42 @@
 //! a linker choice: [`CrossStageLinker`].
 
 mod error;
+mod frame;
 
 #[cfg(test)]
 mod tests;
 
 pub use error::ToyError;
+pub use frame::{ToyAbstractFrame, ToyFrame};
 
 use kirin::prelude::Pipeline;
-use kirin_constprop::ConstPropValue;
+use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_interpreter::engine::{
-    ConcreteInterpreter, CrossStageLinker, SameStageLinker, expect_single,
+    AbstractInterpreter, CallContext, ConcreteInterpreter, CrossStageLinker, SameStageLinker,
+    expect_single,
 };
 
 use crate::stage::Stage;
 
-/// Concrete cross-language interpreter over machine integers.
-pub type ToyInterpreter<'ir, Lk = CrossStageLinker> =
-    ConcreteInterpreter<'ir, Stage, i64, ToyError, Lk>;
+/// Summary key of the constant-propagation analysis policy.
+type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
 
-/// Cross-language constant propagation.
-pub type ToyConstProp<'ir, Lk = CrossStageLinker> =
-    kirin_constprop::ConstProp<'ir, Stage, ToyError, Lk>;
+/// Concrete cross-language interpreter over machine integers. Its frame type
+/// embeds the SCF loop frame (the toy language uses `scf.for`).
+pub type ToyInterpreter<'ir, Lk = CrossStageLinker> =
+    ConcreteInterpreter<'ir, Stage, i64, ToyError, Lk, ToyFrame<i64, ToyError>>;
+
+/// Cross-language constant propagation, with a frame type embedding the SCF
+/// loop frame.
+pub type ToyConstProp<'ir, Lk = CrossStageLinker> = AbstractInterpreter<
+    'ir,
+    Stage,
+    ConstPropValue,
+    ToyError,
+    Lk,
+    ConstPropContext,
+    ToyAbstractFrame<ConstPropValue, ToyError, CpKey>,
+>;
 
 /// Execute `function_name` starting at `stage_name`, following calls across
 /// language boundaries.

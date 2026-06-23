@@ -2,120 +2,148 @@
 //! protocol.
 //!
 //! These are the default total frames for [`ConcreteInterpreter`](crate::ConcreteInterpreter):
-//! [`ScopeFrame`] (block, region, or hook-driven scope traversal) and
+//! [`BodyFrame`] (walks a function-body CFG region or a single body block) and
 //! [`CallFrame`] (call/return). They implement the shared [`Frame`] trait by
-//! consuming the dialect [`ForwardEffect`] and driving a single deterministic path. A
-//! compiler/analysis author can define a *custom* total frame enum reusing these
-//! via [`FrameBuild`], without forking the engine. The abstract analogue lives
-//! in [`abstract_frame`](crate::abstract_frame).
+//! consuming the dialect [`ForwardEffect`] and driving a single deterministic
+//! path. Structured-control dialects do not get a framework "scope": they push
+//! a frame **they own** through [`ForwardEffect::Push`] (that frame may build a
+//! [`BodyFrame`] to walk a chosen body — a reusable building block, not
+//! framework-owned structured semantics). A language that combines such a
+//! dialect defines its own total frame enum embedding [`BodyFrame`]/[`CallFrame`]
+//! via [`FrameBuild`] plus its dialect frames. The abstract analogue lives in
+//! [`abstract_frame`](crate::abstract_frame).
 
-use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
+use kirin_ir::{Block, CompileStage, Product, Region, SSAValue, Statement};
 
-use crate::ctx::EngineEnv;
 use crate::{
-    CallEffect, Callee, EnvIndex, ForwardEffect, Frame, FrameDriver, FrameEffect, InterpreterError,
-    Scope, ScopeBody, ScopeHook, ScopeStep,
+    CallEffect, Callee, EnvIndex, ForwardEffect, ForwardInterp, Frame, FrameDriver, FrameEffect,
+    InterpreterError,
 };
 
 /// Completion payloads produced by the standard concrete frames.
 ///
-/// The only payload that bubbles across frames is a function return; scope
-/// yields and block exits are handled inside [`ScopeFrame`] itself. Marked
-/// `#[non_exhaustive]` so custom frames can add payloads later without breaking
-/// downstream matches.
-#[non_exhaustive]
+/// `Returned` bubbles a function return across frames to the enclosing
+/// [`CallFrame`]; `Finished` carries the values a pushed body frame yielded back
+/// to whoever pushed it (written into that push's result slots).
 pub enum Completion<V> {
     /// A function returned these values; bubbles to the enclosing
     /// [`CallFrame`], or finishes the run at the root.
     Returned(Product<V>),
+    /// A pushed body frame yielded these values to its pusher.
+    Finished(Product<V>),
 }
 
 /// Construction trait letting any total frame enum embed the standard concrete
 /// frames.
 ///
-/// The default [`StandardFrame`] implements it trivially; a custom enum
-/// implements it to reuse [`ScopeFrame`]/[`CallFrame`] traversal while adding
-/// its own variants — the standard frames build successors through this trait,
-/// so they are not pinned to [`StandardFrame`].
+/// The default [`StandardFrame`] implements it trivially; a language that adds
+/// structured-control dialects implements it on its own enum to reuse
+/// [`BodyFrame`]/[`CallFrame`] traversal while adding its own dialect frames.
 pub trait FrameBuild<V, E>: Sized {
-    fn from_scope(frame: ScopeFrame<V, E>) -> Self;
+    fn from_body(frame: BodyFrame<V, E>) -> Self;
     fn from_call(frame: CallFrame<V>) -> Self;
 }
 
-/// Traversal of one scope body: a block (scf-style), a region's CFG (function
-/// bodies), with optional hook-driven re-entry (loops).
-pub struct ScopeFrame<V, E> {
+/// Traversal of one body: a function-body CFG region (multi-block, with jumps)
+/// or a single body block (scf-style, terminated by a yield).
+pub struct BodyFrame<V, E> {
     stage: CompileStage,
     env: EnvIndex,
     owns_env: bool,
     function_boundary: bool,
-    entry_block: Block,
-    entry_args: Product<V>,
     block: Block,
     cursor: Option<Statement>,
-    results: Product<SSAValue>,
-    hook: Option<Box<dyn ScopeHook<V, E>>>,
+    /// Entry arguments not yet bound. A body frame built by a dialect frame is
+    /// constructed without engine access — it binds on its first `step`, so
+    /// building it requires no [`FrameDriver`] (a dialect frame builds these as
+    /// plain values, no engine capability or trait-resolution cycle).
+    pending: Option<Product<V>>,
+    /// Result slots awaiting a pushed body frame's `Finished` completion.
+    resume_slots: Option<Product<SSAValue>>,
+    _marker: std::marker::PhantomData<fn() -> (V, E)>,
 }
 
-impl<V, E> ScopeFrame<V, E>
+impl<V, E> BodyFrame<V, E>
 where
     V: Clone,
     E: From<InterpreterError>,
 {
-    /// Enter a [`Scope`], producing the frame to push. Returns `Ok(None)` for an
-    /// [`ScopeBody::Immediate`] scope (its results are written immediately and
-    /// no frame is needed).
-    pub fn enter<I>(
+    /// Walk a function body: start at the entry block of `region`, binding
+    /// `args` to its parameters. Owns the activation and is the return boundary.
+    pub fn function<I>(
         interp: &mut I,
         stage: CompileStage,
         env: EnvIndex,
-        owns_env: bool,
-        function_boundary: bool,
-        scope: Scope<V, E>,
-    ) -> Result<Option<Self>, E>
+        region: Region,
+        args: Product<V>,
+    ) -> Result<Self, E>
     where
         I: FrameDriver<Value = V, Error = E>,
     {
-        let entry_block = match scope.body() {
-            ScopeBody::Block(block) => block,
-            ScopeBody::Region(region) => interp
-                .region_entry(stage, region)?
-                .ok_or_else(|| E::from(InterpreterError::EmptyRegion))?,
-            ScopeBody::Immediate => {
-                let Scope { args, results, .. } = scope;
-                interp.write_results(env, &results, args)?;
-                return Ok(None);
-            }
-        };
-        let Scope {
-            args,
-            results,
-            hook,
-            ..
-        } = scope;
-        interp.bind_block_args(stage, env, entry_block, &args)?;
-        let cursor = interp.first_statement(stage, entry_block)?;
-        Ok(Some(Self {
+        let entry = interp
+            .region_entry(stage, region)?
+            .ok_or_else(|| E::from(InterpreterError::EmptyRegion))?;
+        Self::start(interp, stage, env, entry, args, true, true)
+    }
+
+    /// A single body block (scf-style), to bind `args` to its parameters on the
+    /// first step. Borrows the caller's activation and is not a return boundary.
+    /// Pure construction — needs no engine access.
+    pub fn block(stage: CompileStage, env: EnvIndex, block: Block, args: Product<V>) -> Self {
+        Self {
+            stage,
+            env,
+            owns_env: false,
+            function_boundary: false,
+            block,
+            cursor: None,
+            pending: Some(args),
+            resume_slots: None,
+            _marker: std::marker::PhantomData,
+        }
+    }
+
+    fn start<I>(
+        interp: &mut I,
+        stage: CompileStage,
+        env: EnvIndex,
+        block: Block,
+        args: Product<V>,
+        owns_env: bool,
+        function_boundary: bool,
+    ) -> Result<Self, E>
+    where
+        I: FrameDriver<Value = V, Error = E>,
+    {
+        interp.bind_block_args(stage, env, block, &args)?;
+        let cursor = interp.first_statement(stage, block)?;
+        Ok(Self {
             stage,
             env,
             owns_env,
             function_boundary,
-            entry_block,
-            entry_args: args,
-            block: entry_block,
+            block,
             cursor,
-            results,
-            hook,
-        }))
+            pending: None,
+            resume_slots: None,
+            _marker: std::marker::PhantomData,
+        })
     }
 
     /// Execute the next statement and translate its [`ForwardEffect`] into a
     /// [`FrameEffect`] over the total frame type `F`.
     pub fn step_into<I, F>(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
     where
-        I: FrameDriver<Value = V, Error = E>,
+        I: FrameDriver<Value = V, Error = E> + ForwardInterp<Frame = F>,
         F: FrameBuild<V, E>,
     {
+        // Bind entry arguments lazily on the first step (a dialect-built body
+        // frame carries them unbound).
+        if let Some(args) = self.pending.take() {
+            interp.bind_block_args(self.stage, self.env, self.block, &args)?;
+            self.cursor = interp.first_statement(self.stage, self.block)?;
+            return Ok(FrameEffect::Continue(F::from_body(self)));
+        }
         let Some(statement) = self.cursor else {
             return Err(E::from(if self.function_boundary {
                 InterpreterError::FunctionBodyFellThrough
@@ -126,101 +154,54 @@ where
         self.cursor = interp.next_statement(self.stage, self.block, statement)?;
 
         match interp.run_statement(self.stage, statement, self.env)? {
-            ForwardEffect::Next => Ok(FrameEffect::Continue(F::from_scope(self))),
+            ForwardEffect::Next => Ok(FrameEffect::Continue(F::from_body(self))),
             ForwardEffect::Jump(edge) => {
                 interp.bind_block_args(self.stage, self.env, edge.target, &edge.args)?;
                 self.cursor = interp.first_statement(self.stage, edge.target)?;
                 self.block = edge.target;
-                Ok(FrameEffect::Continue(F::from_scope(self)))
+                Ok(FrameEffect::Continue(F::from_body(self)))
             }
-            ForwardEffect::Branch(_) | ForwardEffect::EnterAny(_) => {
-                Err(E::from(InterpreterError::IndeterminateBranch))
-            }
-            ForwardEffect::Enter(scope) => {
-                let stage = self.stage;
-                let env = self.env;
-                match ScopeFrame::enter(interp, stage, env, false, false, scope)? {
-                    Some(child) => Ok(FrameEffect::Push {
-                        parent: F::from_scope(self),
-                        child: F::from_scope(child),
-                    }),
-                    // Immediate scope already wrote its results; just continue.
-                    None => Ok(FrameEffect::Continue(F::from_scope(self))),
-                }
+            ForwardEffect::Branch(_) => Err(E::from(InterpreterError::IndeterminateBranch)),
+            ForwardEffect::Push { frame, results } => {
+                self.resume_slots = Some(results);
+                Ok(FrameEffect::Push {
+                    parent: F::from_body(self),
+                    child: frame,
+                })
             }
             ForwardEffect::Call(call) => {
                 let pending = CallFrame::pending(self.stage, self.env, call);
                 Ok(FrameEffect::Push {
-                    parent: F::from_scope(self),
+                    parent: F::from_body(self),
                     child: F::from_call(pending),
                 })
             }
-            ForwardEffect::Yield(values) => self.on_yield::<I, F>(interp, values),
+            ForwardEffect::Yield(values) => {
+                if self.function_boundary {
+                    return Err(E::from(InterpreterError::Custom(
+                        "yield reached a function boundary",
+                    )));
+                }
+                Ok(FrameEffect::Complete(Completion::Finished(values)))
+            }
             ForwardEffect::Return(values) => self.finish_return::<I, F>(interp, values),
         }
     }
 
-    fn on_yield<I, F>(
-        mut self,
-        interp: &mut I,
-        values: Product<V>,
-    ) -> Result<FrameEffect<F, Completion<V>>, E>
-    where
-        I: FrameDriver<Value = V, Error = E>,
-        F: FrameBuild<V, E>,
-    {
-        if self.function_boundary {
-            return Err(E::from(InterpreterError::Custom(
-                "yield reached a function boundary",
-            )));
-        }
-        match self.hook.take() {
-            None => {
-                interp.write_results(self.env, &self.results, values)?;
-                Ok(FrameEffect::Done)
-            }
-            Some(hook) => {
-                let step = {
-                    let mut env = EngineEnv {
-                        interp: &mut *interp,
-                        env: self.env,
-                    };
-                    hook.on_yield(&self.entry_args, values, &mut env)?
-                };
-                match step {
-                    ScopeStep::Finish(results) => {
-                        interp.write_results(self.env, &self.results, results)?;
-                        Ok(FrameEffect::Done)
-                    }
-                    ScopeStep::Repeat { args, hook } => {
-                        interp.bind_block_args(self.stage, self.env, self.entry_block, &args)?;
-                        self.cursor = interp.first_statement(self.stage, self.entry_block)?;
-                        self.block = self.entry_block;
-                        self.entry_args = args;
-                        self.hook = Some(hook);
-                        Ok(FrameEffect::Continue(F::from_scope(self)))
-                    }
-                    ScopeStep::RepeatOrFinish { .. } => {
-                        Err(E::from(InterpreterError::IndeterminateBranch))
-                    }
-                }
-            }
-        }
-    }
-
-    /// A child frame finished without a payload (its results are already in the
-    /// shared env): resume traversal at the advanced cursor.
+    /// A child finished without a payload (its results are already in the
+    /// shared env, e.g. a returned call): resume at the advanced cursor.
     pub fn resume_done_into<F>(self) -> FrameEffect<F, Completion<V>>
     where
         F: FrameBuild<V, E>,
     {
-        FrameEffect::Continue(F::from_scope(self))
+        FrameEffect::Continue(F::from_body(self))
     }
 
-    /// A child bubbled a completion. The standard completion is a function
-    /// return, which keeps bubbling (freeing the env at the function boundary).
+    /// A child bubbled a completion: a pushed body frame `Finished` (write its
+    /// values into the pending slots and continue) or a `Returned` (a return
+    /// happened in the child — keep bubbling).
     pub fn resume_into<I, F>(
-        self,
+        mut self,
         completion: Completion<V>,
         interp: &mut I,
     ) -> Result<FrameEffect<F, Completion<V>>, E>
@@ -229,6 +210,13 @@ where
         F: FrameBuild<V, E>,
     {
         match completion {
+            Completion::Finished(values) => {
+                let slots = self.resume_slots.take().ok_or_else(|| {
+                    E::from(InterpreterError::Custom("body resume without result slots"))
+                })?;
+                interp.write_results(self.env, &slots, values)?;
+                Ok(FrameEffect::Continue(F::from_body(self)))
+            }
             Completion::Returned(values) => self.finish_return::<I, F>(interp, values),
         }
     }
@@ -300,20 +288,15 @@ where
             } => {
                 let target = interp.resolve_call(resolve_stage, &callee)?;
                 let env = interp.alloc_env();
-                let scope = interp.enter_function(target.stage, target.body, args, env)?;
-                match ScopeFrame::enter(interp, target.stage, env, true, true, scope)? {
-                    Some(body) => Ok(FrameEffect::Push {
-                        parent: F::from_call(CallFrame::Awaiting {
-                            caller_env,
-                            results,
-                        }),
-                        child: F::from_scope(body),
+                let body = interp.enter_function(target.stage, target.body, args, env)?;
+                let frame = BodyFrame::function(interp, target.stage, env, body.region, body.args)?;
+                Ok(FrameEffect::Push {
+                    parent: F::from_call(CallFrame::Awaiting {
+                        caller_env,
+                        results,
                     }),
-                    None => {
-                        interp.free_env(env)?;
-                        Err(I::Error::from(InterpreterError::FunctionBodyFellThrough))
-                    }
-                }
+                    child: F::from_body(frame),
+                })
             }
             CallFrame::Awaiting { .. } => Err(I::Error::from(InterpreterError::Custom(
                 "call frame stepped while awaiting a return",
@@ -348,6 +331,9 @@ where
                 interp.write_results(caller_env, &results, values)?;
                 Ok(FrameEffect::Done)
             }
+            (CallFrame::Awaiting { .. }, Completion::Finished(_)) => Err(I::Error::from(
+                InterpreterError::Custom("call frame resumed with a body completion"),
+            )),
             (CallFrame::Pending { .. }, _) => Err(I::Error::from(InterpreterError::Custom(
                 "call frame resumed before dispatch",
             ))),
@@ -355,39 +341,40 @@ where
     }
 }
 
-/// The default total concrete frame enum: standard concrete traversal.
+/// The default total concrete frame enum: standard concrete traversal (no
+/// structured-control dialect frames).
 pub enum StandardFrame<V, E> {
-    Scope(ScopeFrame<V, E>),
+    Body(BodyFrame<V, E>),
     Call(CallFrame<V>),
 }
 
 impl<V, E> FrameBuild<V, E> for StandardFrame<V, E> {
-    fn from_scope(frame: ScopeFrame<V, E>) -> Self {
-        StandardFrame::Scope(frame)
+    fn from_body(frame: BodyFrame<V, E>) -> Self {
+        StandardFrame::Body(frame)
     }
     fn from_call(frame: CallFrame<V>) -> Self {
         StandardFrame::Call(frame)
     }
 }
 
-impl<I> Frame<I> for StandardFrame<I::Value, I::Error>
+impl<I, V, E> Frame<I> for StandardFrame<V, E>
 where
-    I: FrameDriver,
-    I::Value: Clone,
-    I::Error: From<InterpreterError>,
+    I: FrameDriver<Value = V, Error = E> + ForwardInterp<Frame = StandardFrame<V, E>>,
+    V: Clone,
+    E: From<InterpreterError>,
 {
-    type Completion = Completion<I::Value>;
+    type Completion = Completion<V>;
 
     fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
-            StandardFrame::Scope(frame) => frame.step_into::<I, Self>(interp),
+            StandardFrame::Body(frame) => frame.step_into::<I, Self>(interp),
             StandardFrame::Call(frame) => frame.step_into::<I, Self>(interp),
         }
     }
 
     fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
-            StandardFrame::Scope(frame) => Ok(frame.resume_done_into::<Self>()),
+            StandardFrame::Body(frame) => Ok(frame.resume_done_into::<Self>()),
             StandardFrame::Call(frame) => frame.resume_done_into::<Self>().map_err(I::Error::from),
         }
     }
@@ -398,7 +385,7 @@ where
         interp: &mut I,
     ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
-            StandardFrame::Scope(frame) => frame.resume_into::<I, Self>(completion, interp),
+            StandardFrame::Body(frame) => frame.resume_into::<I, Self>(completion, interp),
             StandardFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
         }
     }

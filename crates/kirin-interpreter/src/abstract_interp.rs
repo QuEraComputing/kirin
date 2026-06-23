@@ -9,8 +9,8 @@ use kirin_ir::{
 
 use crate::{
     AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, CallEffect,
-    Callee, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame, FrameDriver, FunctionTarget,
-    Interp, InterpDispatch, InterpreterError, Linker, SameStageLinker, Scope, StageQuery,
+    Callee, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame, FrameDriver, FunctionBody,
+    FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker, SameStageLinker, StageQuery,
     StandardAbstractFrame, drive_frames, query,
 };
 
@@ -227,6 +227,21 @@ where
         }
     }
 
+    /// Replace the analysis policy *value* while keeping its type (and so the
+    /// [`CallContext::Key`] and the frame type `F`). Use this to configure a
+    /// policy — e.g. a budget — on an engine that already has a custom frame
+    /// type, which [`with_analysis`](Self::with_analysis) cannot preserve.
+    pub fn with_policy(mut self, analysis: P) -> Self {
+        self.analysis = analysis;
+        self.summaries = HashMap::new();
+        self.worklist = VecDeque::new();
+        self.queued = HashSet::new();
+        self.current = None;
+        self.frames = Vec::new();
+        self.ret_acc = None;
+        self
+    }
+
     pub fn pipeline(&self) -> &'ir Pipeline<S> {
         self.pipeline
     }
@@ -262,7 +277,7 @@ where
 {
     type Value = V;
     type Error = E;
-    type Effect = ForwardEffect<V, E>;
+    type Effect = ForwardEffect<V, F>;
 
     /// Reads of values not yet bound are `bottom` (unreached code).
     fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<V, E> {
@@ -308,7 +323,7 @@ where
         stage: CompileStage,
         statement: Statement,
         env: EnvIndex,
-    ) -> Result<ForwardEffect<V, E>, E> {
+    ) -> Result<Self::Effect, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
@@ -322,7 +337,7 @@ where
         body: Statement,
         args: Product<V>,
         env: EnvIndex,
-    ) -> Result<Scope<V, E>, E> {
+    ) -> Result<FunctionBody<V>, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
@@ -635,8 +650,8 @@ where
         self.frames = frames;
         match completion? {
             AbstractCompletion::FunctionDone => Ok(()),
-            AbstractCompletion::ScopeFinished(_) => Err(E::from(InterpreterError::Custom(
-                "scope completion reached the frame-stack root",
+            AbstractCompletion::Finished(_) => Err(E::from(InterpreterError::Custom(
+                "body completion reached the frame-stack root",
             ))),
         }
     }

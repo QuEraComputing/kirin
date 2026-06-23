@@ -28,6 +28,10 @@
 mod value;
 pub use value::ForLoopValue;
 pub mod interpreter;
+pub use interpreter::{
+    AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf, BuildScfFor,
+    BuildScfIf, ScfForDispatch, ScfForFrame, ScfIfDispatch, ScfIfFrame,
+};
 
 use kirin::prelude::*;
 use kirin_interpreter::Interpretable;

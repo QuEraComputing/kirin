@@ -8,14 +8,17 @@
 //!
 //! - [`Frame`] is the continuation trait. The *total* frame type `F` (an enum
 //!   of frame kinds) implements it; the engine owns a `Vec<F>` and applies the
-//!   returned [`FrameEffect`]. Frame generics never appear in
-//!   [`Interpretable`](crate::Interpretable).
+//!   returned [`FrameEffect`]. The frame type is the engine's `F` generic; it is
+//!   named in [`Interpretable`](crate::Interpretable) only by a structured
+//!   dialect building a [`ForwardEffect::Push`](crate::ForwardEffect::Push)
+//!   (through [`ForwardInterp::Frame`](crate::ForwardInterp::Frame)) — ordinary
+//!   dialects never mention it.
 //! - [`FrameDriver`] is the capability surface every frame needs from its engine
 //!   (env alloc/free, IR queries, statement dispatch, call resolution). Both
 //!   engines implement it.
 //! - [`AbstractFrameDriver`] adds the abstract-only capabilities (analysis
 //!   merge, return accumulation, atomic call summarization).
-//! - The **concrete** implementation — [`ScopeFrame`](crate::ScopeFrame),
+//! - The **concrete** implementation — [`BodyFrame`](crate::BodyFrame),
 //!   [`CallFrame`](crate::CallFrame), [`StandardFrame`](crate::StandardFrame) —
 //!   lives in [`concrete_frame`](crate::concrete_frame); the **abstract**
 //!   implementation lives in [`abstract_frame`](crate::abstract_frame). Both are
@@ -25,9 +28,7 @@ use std::hash::Hash;
 
 use kirin_ir::{Block, CompileStage, Product, Region, SSAValue, Statement};
 
-use crate::{
-    CallEffect, Callee, EnvIndex, ForwardEffect, FunctionTarget, Interp, InterpreterError, Scope,
-};
+use crate::{CallEffect, Callee, EnvIndex, FunctionBody, FunctionTarget, Interp, InterpreterError};
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
 pub enum FrameEffect<F, C> {
@@ -143,21 +144,22 @@ pub trait FrameDriver: Interp {
         callee: &Callee,
     ) -> Result<FunctionTarget, Self::Error>;
     /// Dispatch one statement to its dialect [`Interpretable`](crate::Interpretable)
-    /// rule, producing an [`ForwardEffect`].
+    /// rule, producing this engine's [`Effect`](Interp::Effect) (a
+    /// [`ForwardEffect`](crate::ForwardEffect) for the value engines).
     fn run_statement(
         &mut self,
         stage: CompileStage,
         statement: Statement,
         env: EnvIndex,
-    ) -> Result<ForwardEffect<Self::Value, Self::Error>, Self::Error>;
-    /// Build the entry [`Scope`] a callable statement enters on invocation.
+    ) -> Result<Self::Effect, Self::Error>;
+    /// Build the [`FunctionBody`] a callable statement enters on invocation.
     fn enter_function(
         &mut self,
         stage: CompileStage,
         body: Statement,
         args: Product<Self::Value>,
         env: EnvIndex,
-    ) -> Result<Scope<Self::Value, Self::Error>, Self::Error>;
+    ) -> Result<FunctionBody<Self::Value>, Self::Error>;
 
     fn block_params(&self, stage: CompileStage, block: Block)
     -> Result<Vec<SSAValue>, Self::Error>;
