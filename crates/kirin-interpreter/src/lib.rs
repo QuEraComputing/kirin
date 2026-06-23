@@ -3,11 +3,15 @@
 //! The framework is organized around a two-persona contract:
 //!
 //! - **Dialect authors** implement [`Interpretable`] (and [`FunctionEntry`]
-//!   for callable statements). They see three concepts: the interpreter
-//!   context [`Interp`]/[`Ctx`], the closed [`ForwardEffect`] algebra, and plain
-//!   value-domain bounds on `I::Value`. A dialect with structured control runs
-//!   a sub-computation by [pushing a frame](ForwardEffect::Push) it owns (or one
-//!   the engine builds via [`BuildBodyFrame`]) — there is no framework "scope".
+//!   for callable statements), specialized on a **context type** — the forward
+//!   context [`ForwardContext`] for execution/abstract interpretation. They see three
+//!   concepts: the context API ([`ForwardCtx`] read/write on [`ForwardContext`]), the closed
+//!   [`ForwardEffect`] algebra they return, and plain value-domain bounds on
+//!   `I::Value`. A dialect with structured control runs a sub-computation by
+//!   [pushing a frame](ForwardEffect::Push) it owns — there is no framework
+//!   "scope". A future analysis (e.g. liveness) is a *distinct* context type, so
+//!   its rules never overlap the forward ones — the context type, not the engine
+//!   type, is the specialization boundary.
 //! - **Compiler authors** compose languages into stage enums (deriving
 //!   [`InterpDispatch`] alongside `StageMeta`) and run engines:
 //!   [`ConcreteInterpreter`] for execution, [`AbstractInterpreter`] for
@@ -38,7 +42,7 @@ mod value;
 
 pub use abstract_interp::{AbstractInterpreter, CallContext, ContextInsensitive, WideningStrategy};
 pub use concrete::ConcreteInterpreter;
-pub use ctx::{Ctx, ForwardInterp, Interp};
+pub use ctx::{ForwardContext, ForwardCtx, ForwardInterp, Interp, InterpretCtx};
 pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
 pub use effect::{CallEffect, Callee, Edge, ForwardEffect, FunctionBody};
 pub use env::{Env, EnvIndex, EnvStackStore};
@@ -62,13 +66,14 @@ pub use kirin_derive_interpreter::{FunctionEntry, InterpDispatch, Interpretable}
 
 /// Everything a dialect author needs to implement interpretation.
 ///
-/// A forward statement rule is `impl<I: ForwardInterp, ..> Interpretable<I> for Op`,
-/// reading/writing through [`Ctx`] and returning `I::Effect` (the forward control
-/// algebra [`ForwardEffect`]).
+/// A forward statement rule is `impl<I: ForwardInterp, ..> Interpretable<ForwardContext<'_, I>> for Op`,
+/// reading/writing through [`ForwardContext`]'s [`ForwardCtx`] helpers and returning
+/// `I::Effect` (the forward control algebra [`ForwardEffect`]).
 pub mod dialect {
     pub use crate::{
-        BranchCondition, CallEffect, Callee, Ctx, Edge, ForwardEffect, ForwardInterp, FunctionBody,
-        FunctionEntry, HasProductValue, Interp, Interpretable, InterpreterError,
+        BranchCondition, CallEffect, Callee, Edge, ForwardContext, ForwardCtx, ForwardEffect,
+        ForwardInterp, FunctionBody, FunctionEntry, HasProductValue, Interp, InterpretCtx,
+        Interpretable, InterpreterError,
     };
 }
 

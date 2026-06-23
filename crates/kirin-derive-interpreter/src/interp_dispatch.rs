@@ -60,9 +60,12 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         vec![syn::parse_quote! { __InterpI: #interp_crate::Interp }];
     for v in &variants {
         let dialect_ty = &v.dialect_ty;
+        // The dialect traits are specialized on the forward context
+        // `ForwardContext<'_, I>`; the engine builds that context for any borrow
+        // lifetime, so the bound is higher-ranked over the context lifetime.
         predicates.push(syn::parse_quote! {
-            #dialect_ty: #interp_crate::Interpretable<__InterpI>
-                + #interp_crate::FunctionEntry<__InterpI>
+            #dialect_ty: for<'__ctx> #interp_crate::Interpretable<#interp_crate::ForwardContext<'__ctx, __InterpI>>
+                + for<'__ctx> #interp_crate::FunctionEntry<#interp_crate::ForwardContext<'__ctx, __InterpI>>
         });
     }
     let mut where_clause = original_where.cloned().unwrap_or_else(|| syn::WhereClause {

@@ -3,16 +3,20 @@ source: crates/kirin-derive-interpreter/src/function_entry.rs
 expression: generate_function_entry_code(input)
 ---
 #[automatically_derived]
-impl<T: CompileTimeValue, __EntryI> ::kirin_interpreter::FunctionEntry<__EntryI> for Lexical<T>
+impl<'__ctx, T: CompileTimeValue, __EntryI>
+    ::kirin_interpreter::FunctionEntry<::kirin_interpreter::ForwardContext<'__ctx, __EntryI>>
+    for Lexical<T>
 where
     __EntryI: ::kirin_interpreter::Interp,
-    Function<T>: ::kirin_interpreter::FunctionEntry<__EntryI>,
-    Lambda<T>: ::kirin_interpreter::FunctionEntry<__EntryI>,
+    Function<T>:
+        ::kirin_interpreter::FunctionEntry<::kirin_interpreter::ForwardContext<'__ctx, __EntryI>>,
+    Lambda<T>:
+        ::kirin_interpreter::FunctionEntry<::kirin_interpreter::ForwardContext<'__ctx, __EntryI>>,
 {
     fn function_entry(
         &self,
         args: ::kirin::ir::Product<<__EntryI as ::kirin_interpreter::Interp>::Value>,
-        ctx: &mut ::kirin_interpreter::Ctx<'_, __EntryI>,
+        ctx: &mut ::kirin_interpreter::ForwardContext<'__ctx, __EntryI>,
     ) -> Result<
         ::kirin_interpreter::FunctionBody<<__EntryI as ::kirin_interpreter::Interp>::Value>,
         <__EntryI as ::kirin_interpreter::Interp>::Error,

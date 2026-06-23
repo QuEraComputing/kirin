@@ -2,13 +2,13 @@ use std::ops::{BitAnd, BitOr, BitXor, Not};
 
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::dialect::{
-    Ctx, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
+    ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
 };
 use thiserror::Error;
 
 use crate::{Bitwise, CheckedShl, CheckedShr};
 
-impl<I, T> Interpretable<I> for Bitwise<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for Bitwise<T>
 where
     I: ForwardInterp,
     I::Value: BitAnd<Output = I::Value>
@@ -20,7 +20,7 @@ where
     I::Error: From<ShiftOverflow>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         match self {
             Bitwise::And {
                 lhs, rhs, result, ..

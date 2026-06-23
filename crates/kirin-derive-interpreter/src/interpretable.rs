@@ -24,6 +24,12 @@ fn emit_interpretable(
 
     let type_name = &ctx.meta.name;
     let mut impl_generics = ctx.meta.generics.clone();
+    // The dialect trait is specialized on the *context* type `ForwardContext<'__ctx, I>`,
+    // so the delegating wrapper impl carries the context lifetime up front
+    // (lifetimes must precede type params) and the engine type after.
+    impl_generics
+        .params
+        .insert(0, syn::GenericParam::Lifetime(syn::parse_quote!('__ctx)));
     impl_generics
         .params
         .push(syn::GenericParam::Type(syn::parse_quote!(__InterpI)));
@@ -36,7 +42,7 @@ fn emit_interpretable(
     for stmt_ctx in ctx.statements.values() {
         if let Some(wrapper_ty) = stmt_ctx.wrapper_type {
             predicates.push(syn::parse_quote! {
-                #wrapper_ty: #interp_crate::Interpretable<__InterpI>
+                #wrapper_ty: #interp_crate::Interpretable<#interp_crate::ForwardContext<'__ctx, __InterpI>>
             });
         }
     }
@@ -69,7 +75,7 @@ fn emit_interpretable(
             quote! { Self::#variant_name #pattern }
         };
         arms.push(quote! {
-            #arm_pattern => <#wrapper_ty as #interp_crate::Interpretable<__InterpI>>::interpret(
+            #arm_pattern => <#wrapper_ty as #interp_crate::Interpretable<#interp_crate::ForwardContext<'__ctx, __InterpI>>>::interpret(
                 #binding, ctx,
             )
         });
@@ -92,10 +98,10 @@ fn emit_interpretable(
 
     Ok(vec![quote! {
         #[automatically_derived]
-        impl #impl_generics #interp_crate::Interpretable<__InterpI> for #type_name #ty_generics #where_clause {
+        impl #impl_generics #interp_crate::Interpretable<#interp_crate::ForwardContext<'__ctx, __InterpI>> for #type_name #ty_generics #where_clause {
             fn interpret(
                 &self,
-                ctx: &mut #interp_crate::Ctx<'_, __InterpI>,
+                ctx: &mut #interp_crate::ForwardContext<'__ctx, __InterpI>,
             ) -> Result<
                 <__InterpI as #interp_crate::Interp>::Effect,
                 <__InterpI as #interp_crate::Interp>::Error,

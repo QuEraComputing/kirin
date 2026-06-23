@@ -35,6 +35,11 @@ fn emit_function_entry(
 
     let type_name = &ctx.meta.name;
     let mut impl_generics = ctx.meta.generics.clone();
+    // Specialized on the *context* type `ForwardContext<'__ctx, I>` (lifetime first, engine
+    // type after), mirroring `Interpretable`.
+    impl_generics
+        .params
+        .insert(0, syn::GenericParam::Lifetime(syn::parse_quote!('__ctx)));
     impl_generics
         .params
         .push(syn::GenericParam::Type(syn::parse_quote!(__EntryI)));
@@ -47,7 +52,7 @@ fn emit_function_entry(
         vec![syn::parse_quote! { __EntryI: #interp_crate::Interp }];
     for wrapper_ty in callable_wrappers {
         predicates.push(syn::parse_quote! {
-            #wrapper_ty: #interp_crate::FunctionEntry<__EntryI>
+            #wrapper_ty: #interp_crate::FunctionEntry<#interp_crate::ForwardContext<'__ctx, __EntryI>>
         });
     }
     let extra_where: syn::WhereClause = syn::parse_quote! { where #(#predicates),* };
@@ -105,11 +110,11 @@ fn emit_function_entry(
 
     Ok(vec![quote! {
         #[automatically_derived]
-        impl #impl_generics #interp_crate::FunctionEntry<__EntryI> for #type_name #ty_generics #where_clause {
+        impl #impl_generics #interp_crate::FunctionEntry<#interp_crate::ForwardContext<'__ctx, __EntryI>> for #type_name #ty_generics #where_clause {
             fn function_entry(
                 &self,
                 args: #ir_crate::Product<<__EntryI as #interp_crate::Interp>::Value>,
-                ctx: &mut #interp_crate::Ctx<'_, __EntryI>,
+                ctx: &mut #interp_crate::ForwardContext<'__ctx, __EntryI>,
             ) -> Result<
                 #interp_crate::FunctionBody<<__EntryI as #interp_crate::Interp>::Value>,
                 <__EntryI as #interp_crate::Interp>::Error,

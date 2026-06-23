@@ -1,6 +1,6 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::dialect::{
-    BranchCondition, Ctx, Edge, ForwardEffect, ForwardInterp, Interpretable,
+    BranchCondition, Edge, ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, Interpretable,
 };
 
 use crate::ControlFlow;
@@ -10,13 +10,13 @@ use crate::ControlFlow;
 /// ([`BranchCondition::is_truthy`] returns `None`) we emit both edges and the
 /// engine's policy decides (error under concrete execution, explore-and-join
 /// under abstract interpretation).
-impl<I, T> Interpretable<I> for ControlFlow<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for ControlFlow<T>
 where
     I: ForwardInterp,
     I::Value: BranchCondition,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         match self {
             ControlFlow::Branch { target, args } => Ok(ForwardEffect::Jump(Edge::new(
                 target.target(),

@@ -7,7 +7,8 @@ including analyses that cross language boundaries in multi-stage pipelines.
 The design is organized as a **two-persona contract**:
 
 - **Dialect authors** describe what each statement *means*, once, in a small
-  fixed vocabulary — `Interpretable`/`Ctx`/`ForwardEffect`. There is no framework
+  fixed vocabulary — `Interpretable<ForwardContext<'_, I>>`/`ForwardContext`/`ForwardEffect`,
+  specializing on the forward *context* type rather than the engine. There is no framework
   "scope": a statement whose operation owns structured control runs a
   sub-computation by *pushing a frame the dialect owns* (`ForwardEffect::Push`),
   built per-engine through a small dialect dispatch capability. Ordinary
@@ -30,29 +31,51 @@ is learning the trait.
 
 Everything is exported from `kirin_interpreter::dialect`.
 
-### `Interp` and `Interpretable<I>` — statement semantics
+### `Interp`, `InterpretCtx`, and `Interpretable<C>` — statement semantics
 
 ```rust
-pub trait Interp: Sized {
+pub trait Interp: Sized {               // the engine-side driver
     type Value: Clone;                  // the value domain
     type Error: From<InterpreterError>; // the total error
     type Effect;                        // analysis-specific per-statement effect
     fn env_read(..); fn env_write(..);
 }
 
-pub trait Interpretable<I: Interp>: Dialect {
-    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error>;
+// What every interpretation *context* exposes — the dialect-impl specialization boundary.
+pub trait InterpretCtx { type Value: Clone; type Error: From<InterpreterError>; type Effect; }
+
+// The forward context's SSA read/write helpers (a future liveness context exposes its own).
+pub trait ForwardCtx: InterpretCtx {
+    fn read(..); fn read_many(..); fn write(..); fn write_results(..);
+}
+
+// The single dialect trait — specialized on the CONTEXT type `C`, not the engine `I`.
+pub trait Interpretable<C: InterpretCtx>: Dialect {
+    fn interpret(&self, ctx: &mut C) -> Result<C::Effect, C::Error>;
 }
 ```
 
+A forward statement rule is `impl<I: ForwardInterp, ..> Interpretable<ForwardContext<'_, I>>
+for Op`: it specializes on the concrete forward context `ForwardContext<'_, I>`,
+reads/writes through that context's [`ForwardCtx`] helpers, and returns `I::Effect`
+(= `ForwardEffect`). **The context type is the specialization boundary, not the
+engine.** A future backward analysis (liveness) implements
+`Interpretable<LivenessContext<'_, I>>` for its *own distinct* context type, so its
+dialect impls never overlap the forward ones (no `E0119`) — even though both are
+generic over the engine `I`. (Two impls keyed on `I` alone, differing only in a
+`where I: ForwardInterp` vs `where I: LiveInterp` bound, *do* overlap, because
+coherence ignores those bounds — which is exactly why the distinction is carried by
+the context *type*, a different type constructor per analysis, rather than an engine
+bound.)
+
 `Interp` is the interpreter/analysis **driver**: it exposes the value domain, the
 error type, and the per-statement effect — replacing the old
-`Interpretable<L, I, F, C, E, T>` parameter soup. A rule produces `I::Effect` —
-the **analysis-specific** effect algebra — not a single universal enum. (The
-frame type stays the engine's own `F` generic, e.g. `ConcreteInterpreter<.., F>`,
-so traversal is customizable without an unused associated type on `Interp`.)
-Forward rules bound `I: ForwardInterp`, the flavor of `Interp` whose
-`Effect = ForwardEffect<I::Value, I::Frame>`, so they build and return
+`Interpretable<L, I, F, C, E, T>` parameter soup. A rule produces `C::Effect`
+(= `I::Effect` for the forward context) — the **analysis-specific** effect algebra —
+not a single universal enum. (The frame type stays the engine's own `F` generic, e.g.
+`ConcreteInterpreter<.., F>`, so traversal is customizable without an unused
+associated type on `Interp`.) Forward rules bound `I: ForwardInterp`, the flavor of
+`Interp` whose `Effect = ForwardEffect<I::Value, I::Frame>`, so they build and return
 `ForwardEffect` values (which are `I::Effect`). `I::Frame` is the engine's total
 frame type, re-exposed by `ForwardInterp` only so a structured dialect can name
 the frame it pushes; ordinary dialects never mention it (it is inferred from
@@ -68,9 +91,15 @@ both execution and analysis**: `kirin-arith`'s `Add` rule computes `3 + 5`
 under `ConcreteInterpreter<.., i64, ..>` and folds `Const(3) + Const(5)`
 under constant propagation, with no analysis-specific code in the dialect.
 
-`Ctx` hides environment indices and locations: `ctx.read(ssa)`,
+`ForwardContext<'_, I>` is the **forward context** type: it implements `InterpretCtx`
+(carrying the engine's `Value`/`Error`/`Effect`) and `ForwardCtx` (the SSA
+read/write helpers), and hides environment indices and locations: `ctx.read(ssa)`,
 `ctx.write(result, value)`, `ctx.read_many(&values)`,
-`ctx.write_results(&results, product)`.
+`ctx.write_results(&results, product)`. A structured dialect reaches the engine
+through `ctx.interp()` to build the frame it pushes (see SCF below). A future
+liveness context would be a *different* type exposing *different* helpers (e.g.
+`live_after`/`use_def`/`transfer`) and returning its own effect — never these
+forward read/write helpers.
 
 ### `ForwardEffect` — the forward control algebra
 
@@ -137,14 +166,17 @@ equivalents); see `example/toy-lang`'s `ToyFrame`/`ToyAbstractFrame`. Future
 structured dialects would follow the same pattern; only the existing SCF
 operations are implemented.
 
-### `FunctionEntry<I>` — callable statements
+### `FunctionEntry<C>` — callable statements
 
 ```rust
-pub trait FunctionEntry<I: Interp>: Dialect {
-    fn function_entry(&self, args: Product<I::Value>, ctx: &mut Ctx<'_, I>)
-        -> Result<FunctionBody<I::Value>, I::Error>;
+pub trait FunctionEntry<C: InterpretCtx>: Dialect {
+    fn function_entry(&self, args: Product<C::Value>, ctx: &mut C)
+        -> Result<FunctionBody<C::Value>, C::Error>;
 }
 ```
+
+Like `Interpretable`, it is specialized on the context type `C` (the forward
+context `ForwardContext<'_, I>`).
 
 Statements that define function bodies (e.g. `kirin_function::Function`)
 return the `FunctionBody { region, args }` to enter on invocation (the
@@ -258,11 +290,15 @@ Analysis crates stay small: `kirin-constprop` is the `ConstPropValue` lattice, a
 
 ### Engine internals: stage dispatch and IR queries
 
-Two mechanisms keep engines generic over stage enums without HRTBs:
+Two mechanisms keep engines generic over stage enums:
 
 - `InterpDispatch<I>` (derived) — monomorphic dispatch of statement
   interpretation and function entry to each stage's language, mirroring
-  `ParseDispatch`.
+  `ParseDispatch`. It stays parameterized by the **engine** `I` (it is the
+  engine seam), constructs the forward `ForwardContext<'_, I>`, and calls the
+  context-specialized `Interpretable`/`FunctionEntry` rules; its only
+  higher-ranked bound is `for<'a> Interpretable<ForwardContext<'a, I>>` — "the rule holds
+  for any context-borrow lifetime" — which every dialect impl satisfies.
 - `StageQuery` — a bound bundle over kirin-ir's `StageDispatch`/`StageAction`
   machinery for language-independent IR facts (block parameters, statement
   order, region entry, specialization lookup, symbol resolution). Satisfied
@@ -274,9 +310,9 @@ Both engines are frame-stack drivers over one **shared protocol**. Compiler
 authors can customize *how* an engine traverses (a custom frame type) or *how
 precisely* an abstract analysis summarizes (a custom policy `P`), without
 forking an engine. This is part of the compiler-author surface. The total frame
-type `F` is the engine's generic; it is named in `Interpretable<I>` *only* by a
-structured dialect building `ForwardEffect::Push` (through `ForwardInterp::Frame`)
-— ordinary dialects never mention it.
+type `F` is the engine's generic; it is named in `Interpretable<ForwardContext<'_, I>>`
+*only* by a structured dialect building `ForwardEffect::Push` (through
+`ForwardInterp::Frame`) — ordinary dialects never mention it.
 
 ### The shared protocol — `FrameEngine` / `Frame` / `drive_frames` / `FrameDriver`
 
@@ -392,13 +428,20 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
   abstract frames reused via `AbstractFrameBuild`; there is no longer an un-framed
   abstract worklist. `Frame` is anchored on `FrameEngine` (a total error), not on
   `Interp`, so the protocol is reusable beyond forward value interpretation.
-- The per-statement effect is the associated type `I::Effect`, **per analysis**
-  — forward execution/abstract interpretation use `ForwardEffect`. A future
-  analysis (e.g. backward liveness) defines its **own** `Interp` flavor and its
-  **own** `Effect` algebra (reusing the same frame protocol), rather than
-  widening `ForwardEffect` or routing through it. Implementing such an analysis
-  is deliberately **out of scope** here; this pass only consolidated the trait
-  surface and *prepared* the seam (associated `Effect`, frames decoupled from
+- The per-statement effect is the associated type `C::Effect`, **per analysis**
+  — forward execution/abstract interpretation use the forward context
+  `ForwardContext` whose `Effect` is `ForwardEffect`. A future analysis (e.g.
+  backward liveness) defines its **own** context type (`LivenessContext<'_, I>`),
+  implementing `InterpretCtx` with its **own** `Effect` algebra and a
+  liveness-specific helper trait (e.g. `live_after`/`use_def`/`transfer`) instead
+  of `ForwardCtx`. Its `Interpretable<LivenessContext<'_, I>>` dialect impls do
+  **not** overlap the forward `Interpretable<ForwardContext<'_, I>>` impls — the
+  **context type is the
+  specialization boundary**, so the two analyses share statements without `E0119`
+  even though both are generic over the engine. It reuses the same frame
+  protocol. Implementing such an analysis is deliberately **out of scope** here;
+  this pass only consolidated the trait surface and *prepared* the seam
+  (context-typed `Interpretable`, associated `Effect`, frames decoupled from
   `Interp`).
 - Function-summary context sensitivity is a pluggable `CallContext` strategy.
   `ContextInsensitive` is the context-insensitive baseline; `ConstPropContext` provides bounded

@@ -1,14 +1,14 @@
 use kirin::prelude::{CompileTimeValue, HasRegionBody, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    CallEffect, Callee, Ctx, ForwardEffect, ForwardInterp, FunctionBody, FunctionEntry, Interp,
-    Interpretable, InterpreterError,
+    CallEffect, Callee, ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, FunctionBody,
+    FunctionEntry, Interp, Interpretable, InterpreterError,
 };
 
 use crate::{
     Bind, CallFunction, CallLike, CallNamed, CallSpecialized, CallStaged, Function, Lambda, Return,
 };
 
-impl<I, T> FunctionEntry<I> for Function<T>
+impl<I, T> FunctionEntry<ForwardContext<'_, I>> for Function<T>
 where
     I: Interp,
     T: CompileTimeValue,
@@ -16,13 +16,13 @@ where
     fn function_entry(
         &self,
         args: Product<I::Value>,
-        _ctx: &mut Ctx<'_, I>,
+        _ctx: &mut ForwardContext<'_, I>,
     ) -> Result<FunctionBody<I::Value>, I::Error> {
         Ok(FunctionBody::new(*self.region()).args(args))
     }
 }
 
-impl<I, T> FunctionEntry<I> for Lambda<T>
+impl<I, T> FunctionEntry<ForwardContext<'_, I>> for Lambda<T>
 where
     I: Interp,
     T: CompileTimeValue,
@@ -30,7 +30,7 @@ where
     fn function_entry(
         &self,
         args: Product<I::Value>,
-        _ctx: &mut Ctx<'_, I>,
+        _ctx: &mut ForwardContext<'_, I>,
     ) -> Result<FunctionBody<I::Value>, I::Error> {
         Ok(FunctionBody::new(*self.region()).args(args))
     }
@@ -39,34 +39,34 @@ where
 /// Function definitions are inert at runtime: defining a function does not
 /// execute its body. Bodies run when the function is invoked (via
 /// [`FunctionEntry`]).
-impl<I, T> Interpretable<I> for Function<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for Function<T>
 where
     I: ForwardInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, _ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, _ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         Ok(ForwardEffect::Next)
     }
 }
 
-impl<I, T> Interpretable<I> for Lambda<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for Lambda<T>
 where
     I: ForwardInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, _ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, _ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         Err(I::Error::from(InterpreterError::Custom(
             "first-class lambda values are not yet supported",
         )))
     }
 }
 
-impl<I, T> Interpretable<I> for Bind<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for Bind<T>
 where
     I: ForwardInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, _ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, _ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         Err(I::Error::from(InterpreterError::Custom(
             "bind is not yet supported by the interpreter",
         )))
@@ -76,7 +76,7 @@ where
 fn call_effect<I, T, C>(
     call: &C,
     callee: Callee,
-    ctx: &mut Ctx<'_, I>,
+    ctx: &mut ForwardContext<'_, I>,
 ) -> Result<I::Effect, I::Error>
 where
     I: ForwardInterp,
@@ -96,52 +96,52 @@ where
     }))
 }
 
-impl<I, T> Interpretable<I> for CallNamed<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for CallNamed<T>
 where
     I: ForwardInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         call_effect(self, Callee::Named(self.target()), ctx)
     }
 }
 
-impl<I, T> Interpretable<I> for CallFunction<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for CallFunction<T>
 where
     I: ForwardInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         call_effect(self, Callee::Function(self.target()), ctx)
     }
 }
 
-impl<I, T> Interpretable<I> for CallStaged<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for CallStaged<T>
 where
     I: ForwardInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         call_effect(self, Callee::Staged(self.target()), ctx)
     }
 }
 
-impl<I, T> Interpretable<I> for CallSpecialized<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for CallSpecialized<T>
 where
     I: ForwardInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         call_effect(self, Callee::Specialized(self.target()), ctx)
     }
 }
 
-impl<I, T> Interpretable<I> for Return<T>
+impl<I, T> Interpretable<ForwardContext<'_, I>> for Return<T>
 where
     I: ForwardInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         Ok(ForwardEffect::Return(
             ctx.read_many(self.values.as_slice())?,
         ))
