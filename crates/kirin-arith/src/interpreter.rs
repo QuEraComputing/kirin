@@ -2,7 +2,7 @@ use std::ops::{Add, Mul, Neg, Sub};
 
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::dialect::{
-    ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
+    ForwardContext, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
 };
 use thiserror::Error;
 
@@ -102,7 +102,7 @@ mod liveness_context_disjoint {
 
     /// A stand-in for a future liveness context: a *distinct* concrete context
     /// type exposing its own effect (here a trivial live-set) — deliberately not a
-    /// `ForwardCtx`, so it never offers forward read/write.
+    /// forward context, so it never offers forward read/write.
     struct LivenessContext<'a, I>(PhantomData<&'a mut I>);
 
     impl<'a, I> InterpretCtx for LivenessContext<'a, I> {

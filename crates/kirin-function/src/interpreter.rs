@@ -1,7 +1,7 @@
 use kirin::prelude::{CompileTimeValue, HasRegionBody, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    CallEffect, Callee, ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, FunctionBody,
-    FunctionEntry, Interp, Interpretable, InterpreterError,
+    CallEffect, Callee, ForwardContext, ForwardEffect, ForwardInterp, FunctionBody, FunctionEntry,
+    Interp, Interpretable, InterpreterError,
 };
 
 use crate::{

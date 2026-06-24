@@ -22,8 +22,7 @@ use std::marker::PhantomData;
 
 use kirin::prelude::{Block, CompileStage, CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    BranchCondition, ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, Interpretable,
-    InterpreterError,
+    BranchCondition, ForwardContext, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
 };
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver,

@@ -1,6 +1,6 @@
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::dialect::{
-    BranchCondition, Edge, ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, Interpretable,
+    BranchCondition, Edge, ForwardContext, ForwardEffect, ForwardInterp, Interpretable,
 };
 
 use crate::ControlFlow;

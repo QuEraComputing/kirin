@@ -1,7 +1,7 @@
 use kirin::prelude::{CompileTimeValue, Product};
 use kirin_interpreter::InterpreterError;
 use kirin_interpreter::dialect::{
-    ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, HasProductValue, Interpretable,
+    ForwardContext, ForwardEffect, ForwardInterp, HasProductValue, Interpretable,
 };
 use thiserror::Error;
 

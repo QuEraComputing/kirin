@@ -1,7 +1,5 @@
 use kirin::prelude::CompileTimeValue;
-use kirin_interpreter::dialect::{
-    ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, Interpretable,
-};
+use kirin_interpreter::dialect::{ForwardContext, ForwardEffect, ForwardInterp, Interpretable};
 
 use crate::{Cmp, CompareValue};
 

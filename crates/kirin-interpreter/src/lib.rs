@@ -5,7 +5,8 @@
 //! - **Dialect authors** implement [`Interpretable`] (and [`FunctionEntry`]
 //!   for callable statements), specialized on a **context type** — the forward
 //!   context [`ForwardContext`] for execution/abstract interpretation. They see three
-//!   concepts: the context API ([`ForwardCtx`] read/write on [`ForwardContext`]), the closed
+//!   concepts: the context API (the **inherent** `ctx.read`/`ctx.write` helpers on
+//!   [`ForwardContext`] — no trait import needed), the closed
 //!   [`ForwardEffect`] algebra they return, and plain value-domain bounds on
 //!   `I::Value`. A dialect with structured control runs a sub-computation by
 //!   [pushing a frame](ForwardEffect::Push) it owns — there is no framework
@@ -42,7 +43,7 @@ mod value;
 
 pub use abstract_interp::{AbstractInterpreter, CallContext, ContextInsensitive, WideningStrategy};
 pub use concrete::ConcreteInterpreter;
-pub use ctx::{ForwardContext, ForwardCtx, ForwardInterp, Interp, InterpretCtx};
+pub use ctx::{ForwardContext, ForwardEnv, ForwardInterp, Interp, InterpretCtx};
 pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
 pub use effect::{CallEffect, Callee, Edge, ForwardEffect, FunctionBody};
 pub use env::{Env, EnvIndex, EnvStackStore};
@@ -67,13 +68,13 @@ pub use kirin_derive_interpreter::{FunctionEntry, InterpDispatch, Interpretable}
 /// Everything a dialect author needs to implement interpretation.
 ///
 /// A forward statement rule is `impl<I: ForwardInterp, ..> Interpretable<ForwardContext<'_, I>> for Op`,
-/// reading/writing through [`ForwardContext`]'s [`ForwardCtx`] helpers and returning
-/// `I::Effect` (the forward control algebra [`ForwardEffect`]).
+/// reading/writing through [`ForwardContext`]'s **inherent** `ctx.read`/`ctx.write`
+/// helpers and returning `I::Effect` (the forward control algebra [`ForwardEffect`]).
 pub mod dialect {
     pub use crate::{
-        BranchCondition, CallEffect, Callee, Edge, ForwardContext, ForwardCtx, ForwardEffect,
-        ForwardInterp, FunctionBody, FunctionEntry, HasProductValue, Interp, InterpretCtx,
-        Interpretable, InterpreterError,
+        BranchCondition, CallEffect, Callee, Edge, ForwardContext, ForwardEffect, ForwardInterp,
+        FunctionBody, FunctionEntry, HasProductValue, Interp, InterpretCtx, Interpretable,
+        InterpreterError,
     };
 }
 
@@ -91,9 +92,9 @@ pub mod engine {
         AbstractBlockFrame, AbstractCallFrame, AbstractCfgFrame, AbstractCompletion,
         AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, AbstractInterpreter,
         BodyFrame, CallContext, CallFrame, Callee, Completion, ConcreteInterpreter,
-        ContextInsensitive, CrossStageLinker, ForwardInterp, Frame, FrameBuild, FrameDriver,
-        FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
-        SameStageLinker, StandardAbstractFrame, StandardFrame, WideningStrategy, drive_frames,
-        expect_single,
+        ContextInsensitive, CrossStageLinker, ForwardEnv, ForwardInterp, Frame, FrameBuild,
+        FrameDriver, FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch,
+        InterpreterError, Linker, SameStageLinker, StandardAbstractFrame, StandardFrame,
+        WideningStrategy, drive_frames, expect_single,
     };
 }

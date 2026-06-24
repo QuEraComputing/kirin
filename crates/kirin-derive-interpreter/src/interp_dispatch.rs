@@ -52,20 +52,21 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let mut impl_generics = input.generics.clone();
     impl_generics
         .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__InterpI)));
+        .push(syn::GenericParam::Type(syn::parse_quote!(__Ctx)));
     let (impl_generics, _, _) = impl_generics.split_for_impl();
     let (_, ty_generics, original_where) = input.generics.split_for_impl();
 
     let mut predicates: Vec<syn::WherePredicate> =
-        vec![syn::parse_quote! { __InterpI: #interp_crate::Interp }];
+        vec![syn::parse_quote! { __Ctx: #interp_crate::InterpretCtx }];
     for v in &variants {
         let dialect_ty = &v.dialect_ty;
-        // The dialect traits are specialized on the forward context
-        // `ForwardContext<'_, I>`; the engine builds that context for any borrow
-        // lifetime, so the bound is higher-ranked over the context lifetime.
+        // Dispatch is keyed on the *context type* `__Ctx`, not the engine: the
+        // engine builds its context and passes it in. So each language need only be
+        // interpretable in that context — no higher-ranked GAT projection (which
+        // would spuriously require `'static`); the forward engines instantiate
+        // `__Ctx = ForwardContext<'_, I>` in their `FrameDriver` bound.
         predicates.push(syn::parse_quote! {
-            #dialect_ty: for<'__ctx> #interp_crate::Interpretable<#interp_crate::ForwardContext<'__ctx, __InterpI>>
-                + for<'__ctx> #interp_crate::FunctionEntry<#interp_crate::ForwardContext<'__ctx, __InterpI>>
+            #dialect_ty: #interp_crate::Interpretable<__Ctx> + #interp_crate::FunctionEntry<__Ctx>
         });
     }
     let mut where_clause = original_where.cloned().unwrap_or_else(|| syn::WhereClause {
@@ -77,32 +78,30 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let statement_arms = build_arms(&variants, enum_ident, |_| {
         quote! {
             #interp_crate::InterpDispatch::dispatch_statement(
-                stage_info, stage, statement, env, interp,
+                stage_info, statement, ctx,
             )
         }
     });
     let entry_arms = build_arms(&variants, enum_ident, |_| {
         quote! {
             #interp_crate::InterpDispatch::dispatch_function_entry(
-                stage_info, stage, body, args, env, interp,
+                stage_info, body, args, ctx,
             )
         }
     });
 
     Ok(quote! {
         #[automatically_derived]
-        impl #impl_generics #interp_crate::InterpDispatch<__InterpI> for #enum_ident #ty_generics
+        impl #impl_generics #interp_crate::InterpDispatch<__Ctx> for #enum_ident #ty_generics
         #where_clause
         {
             fn dispatch_statement(
                 &self,
-                stage: #ir_crate::CompileStage,
                 statement: #ir_crate::Statement,
-                env: #interp_crate::EnvIndex,
-                interp: &mut __InterpI,
+                ctx: &mut __Ctx,
             ) -> Result<
-                <__InterpI as #interp_crate::Interp>::Effect,
-                <__InterpI as #interp_crate::Interp>::Error,
+                <__Ctx as #interp_crate::InterpretCtx>::Effect,
+                <__Ctx as #interp_crate::InterpretCtx>::Error,
             > {
                 match self {
                     #statement_arms
@@ -111,14 +110,12 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 
             fn dispatch_function_entry(
                 &self,
-                stage: #ir_crate::CompileStage,
                 body: #ir_crate::Statement,
-                args: #ir_crate::Product<<__InterpI as #interp_crate::Interp>::Value>,
-                env: #interp_crate::EnvIndex,
-                interp: &mut __InterpI,
+                args: #ir_crate::Product<<__Ctx as #interp_crate::InterpretCtx>::Value>,
+                ctx: &mut __Ctx,
             ) -> Result<
-                #interp_crate::FunctionBody<<__InterpI as #interp_crate::Interp>::Value>,
-                <__InterpI as #interp_crate::Interp>::Error,
+                #interp_crate::FunctionBody<<__Ctx as #interp_crate::InterpretCtx>::Value>,
+                <__Ctx as #interp_crate::InterpretCtx>::Error,
             > {
                 match self {
                     #entry_arms

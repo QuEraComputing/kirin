@@ -2,7 +2,7 @@ use std::ops::{BitAnd, BitOr, BitXor, Not};
 
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::dialect::{
-    ForwardContext, ForwardCtx, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
+    ForwardContext, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
 };
 use thiserror::Error;
 

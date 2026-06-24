@@ -3,9 +3,10 @@ use std::marker::PhantomData;
 use kirin_ir::{Block, CompileStage, Pipeline, Product, Region, SSAValue, StageMeta, Statement};
 
 use crate::{
-    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame, FrameBuild,
-    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
-    SameStageLinker, StageQuery, StandardFrame, drive_frames, query,
+    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardContext, ForwardEffect,
+    ForwardEnv, Frame, FrameBuild, FrameDriver, FunctionBody, FunctionTarget, Interp,
+    InterpDispatch, InterpreterError, Linker, SameStageLinker, StageQuery, StandardFrame,
+    drive_frames, query,
 };
 
 /// Concrete executor: runs IR over a concrete value domain with an explicit
@@ -76,6 +77,27 @@ where
     type Error = E;
     type Effect = ForwardEffect<V, F>;
 
+    type Context<'a>
+        = ForwardContext<'a, Self>
+    where
+        Self: 'a;
+
+    fn context<'a>(
+        &'a mut self,
+        stage: CompileStage,
+        statement: Statement,
+        env: EnvIndex,
+    ) -> Self::Context<'a> {
+        ForwardContext::new(self, stage, statement, env)
+    }
+}
+
+impl<'ir, S, V, E, Lk, F> ForwardEnv for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageMeta,
+    V: Clone,
+    E: From<InterpreterError>,
+{
     fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<V, E> {
         self.store.read(env, value).map_err(E::from)
     }
@@ -87,7 +109,7 @@ where
 
 impl<'ir, S, V, E, Lk, F> FrameDriver for ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
-    S: StageQuery + InterpDispatch<Self>,
+    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -116,7 +138,8 @@ where
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        info.dispatch_statement(stage, statement, env, self)
+        let mut ctx = self.context(stage, statement, env);
+        info.dispatch_statement(statement, &mut ctx)
     }
 
     fn enter_function(
@@ -130,7 +153,8 @@ where
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        info.dispatch_function_entry(stage, body, args, env, self)
+        let mut ctx = self.context(stage, body, env);
+        info.dispatch_function_entry(body, args, &mut ctx)
     }
 
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
@@ -157,7 +181,7 @@ where
 
 impl<'ir, S, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
-    S: StageQuery + InterpDispatch<Self>,
+    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,

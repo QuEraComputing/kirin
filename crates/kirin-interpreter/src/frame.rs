@@ -28,7 +28,10 @@ use std::hash::Hash;
 
 use kirin_ir::{Block, CompileStage, Product, Region, SSAValue, Statement};
 
-use crate::{CallEffect, Callee, EnvIndex, FunctionBody, FunctionTarget, Interp, InterpreterError};
+use crate::{
+    CallEffect, Callee, EnvIndex, ForwardEnv, FunctionBody, FunctionTarget, Interp,
+    InterpreterError,
+};
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
 pub enum FrameEffect<F, C> {
@@ -126,13 +129,19 @@ where
     }
 }
 
-/// Capabilities a frame needs from its engine, beyond [`Interp`]'s env access.
+/// Capabilities a forward frame needs from its engine, beyond [`ForwardEnv`]'s
+/// SSA read/write.
 ///
-/// Implemented by both engines ([`ConcreteInterpreter`](crate::ConcreteInterpreter)
-/// and [`AbstractInterpreter`](crate::AbstractInterpreter)), so the standard
-/// frames are generic over `I: FrameDriver` and a custom frame can drive any
-/// engine providing these capabilities.
-pub trait FrameDriver: Interp {
+/// Forward frames bind block parameters and write results, so this is a
+/// **forward** capability surface: it requires [`ForwardEnv`] (the
+/// `env_read`/`env_write` the default `bind_block_args`/`write_results` use) on top
+/// of the base [`Interp`] contract. Implemented by both forward engines
+/// ([`ConcreteInterpreter`](crate::ConcreteInterpreter) and
+/// [`AbstractInterpreter`](crate::AbstractInterpreter)), so the standard frames are
+/// generic over `I: FrameDriver` and a custom frame can drive any engine providing
+/// these capabilities. (Frames that consume the [`ForwardEffect`](crate::ForwardEffect)
+/// algebra add `+ ForwardInterp` in their own impls.)
+pub trait FrameDriver: ForwardEnv {
     /// Allocate a fresh SSA activation record.
     fn alloc_env(&mut self) -> EnvIndex;
     /// Free an activation record.

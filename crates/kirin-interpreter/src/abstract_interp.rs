@@ -9,9 +9,9 @@ use kirin_ir::{
 
 use crate::{
     AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, CallEffect,
-    Callee, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame, FrameDriver, FunctionBody,
-    FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker, SameStageLinker, StageQuery,
-    StandardAbstractFrame, drive_frames, query,
+    Callee, Env, EnvIndex, EnvStackStore, ForwardContext, ForwardEffect, ForwardEnv, Frame,
+    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
+    SameStageLinker, StageQuery, StandardAbstractFrame, drive_frames, query,
 };
 
 // ===========================================================================
@@ -279,6 +279,28 @@ where
     type Error = E;
     type Effect = ForwardEffect<V, F>;
 
+    type Context<'a>
+        = ForwardContext<'a, Self>
+    where
+        Self: 'a;
+
+    fn context<'a>(
+        &'a mut self,
+        stage: CompileStage,
+        statement: Statement,
+        env: EnvIndex,
+    ) -> Self::Context<'a> {
+        ForwardContext::new(self, stage, statement, env)
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F> ForwardEnv for AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+where
+    S: StageMeta,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    P: CallContext<V>,
+{
     /// Reads of values not yet bound are `bottom` (unreached code).
     fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<V, E> {
         match self.store.read(env, value) {
@@ -298,7 +320,7 @@ where
 // the same linker component.
 impl<'ir, S, V, E, Lk, P, F> FrameDriver for AbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    S: StageQuery + InterpDispatch<Self>,
+    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -328,7 +350,8 @@ where
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        info.dispatch_statement(stage, statement, env, self)
+        let mut ctx = self.context(stage, statement, env);
+        info.dispatch_statement(statement, &mut ctx)
     }
 
     fn enter_function(
@@ -342,7 +365,8 @@ where
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        info.dispatch_function_entry(stage, body, args, env, self)
+        let mut ctx = self.context(stage, body, env);
+        info.dispatch_function_entry(body, args, &mut ctx)
     }
 
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
@@ -372,7 +396,7 @@ where
 // authors cannot break the self-recursion / summary invariants.
 impl<'ir, S, V, E, Lk, P, F> AbstractFrameDriver for AbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    S: StageQuery + InterpDispatch<Self>,
+    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -527,7 +551,7 @@ where
 
 impl<'ir, S, V, E, Lk, P, F> AbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    S: StageQuery + InterpDispatch<Self>,
+    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,

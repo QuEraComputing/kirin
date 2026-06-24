@@ -11,11 +11,28 @@ use crate::{EnvIndex, ForwardEffect, InterpreterError};
 /// last of which is **analysis-specific**, so different analyses do not share one
 /// universal effect enum.
 ///
+/// `Interp` is deliberately **analysis-agnostic**: it carries only the shared
+/// engine/context contract (the value/error/effect domains and the engine's own
+/// context type). Forward *value-interpretation* capabilities — SSA env read/write
+/// — live on the separate [`ForwardEnv`] trait, not here, so a future backward
+/// analysis (e.g. liveness) can be an `Interp` without faking forward env access.
+///
 /// Dialect rules are not implemented against `I` directly: they specialize on a
 /// *context type* ([`Interpretable<ForwardContext<'_, I>>`](crate::Interpretable)). Forward
 /// rules bound `I: ForwardInterp` (which pins `I::Effect` to [`ForwardEffect`])
 /// and constrain `I::Value` with plain value-domain bounds (`Add`,
 /// `BranchCondition`, ...) and `I::Error` with `From<TheirError>`.
+///
+/// **Each engine *owns* its context type.** `I` declares, as the associated type
+/// [`Context`](Interp::Context), the concrete dialect-facing API its rules target,
+/// and builds one per statement through [`context`](Interp::context). The context
+/// is the *short-lived, dialect-facing* half of the engine/context pair; the
+/// engine (`Self`) is the *long-lived, compiler-author/internal* half holding the
+/// env store, frame stack, and summaries. Dispatch never hardcodes a context: it
+/// asks `I` to build `I::Context<'_>` (the forward engines choose
+/// [`ForwardContext`]), so the context type — being a distinct type constructor
+/// per analysis — is the specialization boundary that keeps a future analysis's
+/// rules disjoint from the forward ones without `E0119`.
 ///
 /// Traversal types stay out of `Interp`: the frame type is the engine's own `F`
 /// generic parameter (e.g. `ConcreteInterpreter<.., F>`), so frames remain
@@ -34,9 +51,44 @@ pub trait Interp: Sized {
     /// framework or other analyses.
     type Effect;
 
-    /// Read an SSA value from an activation. Prefer [`ForwardCtx::read`].
+    /// The concrete **context** type this engine hands to dialect rules — the
+    /// short-lived, dialect-facing API associated with (chosen by) the engine.
+    /// The forward engines pick [`ForwardContext<'a, Self>`](ForwardContext); a
+    /// future backward analysis would pick its own distinct context type. Its
+    /// `Value`/`Error`/`Effect` are pinned to the engine's, so dispatch can return
+    /// `I::Effect`/`I::Error` after running a rule through the context.
+    type Context<'a>: InterpretCtx<Value = Self::Value, Error = Self::Error, Effect = Self::Effect>
+    where
+        Self: 'a;
+
+    /// Build the per-statement context dispatch hands to a dialect rule. The
+    /// engine borrows itself into the context for the duration of one statement,
+    /// bundling the current stage, statement, and SSA activation. This is the
+    /// seam dispatch uses instead of naming a concrete context: it asks `I` to
+    /// construct *its* context.
+    fn context<'a>(
+        &'a mut self,
+        stage: CompileStage,
+        statement: Statement,
+        env: EnvIndex,
+    ) -> Self::Context<'a>;
+}
+
+/// **Forward value-interpretation** storage access: read/write SSA values in an
+/// activation record. This is the engine-internal, compiler-facing capability the
+/// [`ForwardContext`] helpers delegate to; dialect authors never call it directly
+/// (they use [`ForwardContext::read`]/[`ForwardContext::write`]).
+///
+/// Split out of [`Interp`] on purpose: env access is a *forward* notion (a
+/// backward analysis tracks live-sets, not SSA values), so keeping it here leaves
+/// the base [`Interp`] analysis-agnostic. Both forward engines
+/// ([`ConcreteInterpreter`](crate::ConcreteInterpreter),
+/// [`AbstractInterpreter`](crate::AbstractInterpreter)) implement it; a future
+/// backward analysis would not.
+pub trait ForwardEnv: Interp {
+    /// Read an SSA value from an activation.
     fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<Self::Value, Self::Error>;
-    /// Write an SSA value into an activation. Prefer [`ForwardCtx::write`].
+    /// Write an SSA value into an activation.
     fn env_write(
         &mut self,
         env: EnvIndex,
@@ -46,18 +98,21 @@ pub trait Interp: Sized {
 }
 
 /// The **forward** value-interpretation flavor of [`Interp`]: one whose
-/// [`Effect`](Interp::Effect) is the forward control algebra [`ForwardEffect`].
+/// [`Effect`](Interp::Effect) is the forward control algebra [`ForwardEffect`] and
+/// which provides forward env access via [`ForwardEnv`].
 ///
 /// Forward dialect rules bound `I: ForwardInterp` so they can build and return
 /// `ForwardEffect` values where the trait expects `I::Effect` (the two are the
 /// same type for a `ForwardInterp`). The associated [`Frame`](ForwardInterp::Frame)
 /// is the engine's total frame type — exposed here so a structured dialect can
 /// name it (e.g. to build a [`ForwardEffect::Push`]) without it leaking into
-/// the [`Interp`] base trait. A blanket impl makes every such `Interp` a
-/// `ForwardInterp` automatically; nobody implements it by hand. Backward
-/// analyses define their own `Interp` flavor with a different `Effect`.
+/// the [`Interp`] base trait. (`Frame` stays on the *forward* flavor precisely
+/// because [`ForwardEffect::Push`] carries a forward frame.) A blanket impl makes
+/// every forward-env `Interp` a `ForwardInterp` automatically; nobody implements it
+/// by hand. Backward analyses define their own `Interp` flavor with a different
+/// `Effect`.
 pub trait ForwardInterp:
-    Interp<Effect = ForwardEffect<<Self as Interp>::Value, Self::Frame>>
+    ForwardEnv + Interp<Effect = ForwardEffect<<Self as Interp>::Value, Self::Frame>>
 {
     /// The engine's total frame type, carried by [`ForwardEffect::Push`].
     type Frame;
@@ -65,7 +120,7 @@ pub trait ForwardInterp:
 
 impl<V, F, I> ForwardInterp for I
 where
-    I: Interp<Value = V, Effect = ForwardEffect<V, F>>,
+    I: ForwardEnv + Interp<Value = V, Effect = ForwardEffect<V, F>>,
 {
     type Frame = F;
 }
@@ -96,40 +151,20 @@ pub trait InterpretCtx {
     type Effect;
 }
 
-/// A **forward-execution** context: the capabilities a forward dialect rule uses
-/// to read/write SSA state. The forward context type [`ForwardContext`] implements it; a
-/// future liveness context would *not* — it would expose its own helpers
-/// (e.g. `live_after`/`use_def`/`transfer`) instead. Keeping these helpers on a
-/// context trait (rather than the engine) is what lets the two analyses share
-/// dialect statements while exposing disjoint, direction-appropriate APIs.
-pub trait ForwardCtx: InterpretCtx {
-    /// Read one SSA value.
-    fn read(&self, value: impl Into<SSAValue>) -> Result<Self::Value, Self::Error>;
-
-    /// Read a list of SSA values into a [`Product`].
-    fn read_many(&self, values: &[SSAValue]) -> Result<Product<Self::Value>, Self::Error>;
-
-    /// Write one SSA value.
-    fn write(&mut self, value: impl Into<SSAValue>, data: Self::Value) -> Result<(), Self::Error>;
-
-    /// Destructure a [`Product`] into result slots, checking arity.
-    fn write_results<T: Into<SSAValue> + Copy>(
-        &mut self,
-        values: &[T],
-        data: Product<Self::Value>,
-    ) -> Result<(), Self::Error>;
-}
-
 /// Per-statement **forward** execution context handed to
 /// [`Interpretable::interpret`](crate::Interpretable::interpret) when running a
 /// forward rule (`impl Interpretable<ForwardContext<'_, I>> for Op`).
 ///
 /// Bundles the interpreter with the current stage, statement, and SSA
 /// activation so dialect code reads and writes values without tracking
-/// environment indices or locations. It is the concrete forward context: it
-/// implements [`InterpretCtx`] (carrying `I`'s `Value`/`Error`/`Effect`) and
-/// [`ForwardCtx`] (the read/write helpers). A future backward analysis defines
-/// its own context wrapper type so its dialect rules do not overlap these.
+/// environment indices or locations. The read/write helpers
+/// ([`read`](ForwardContext::read), [`read_many`](ForwardContext::read_many),
+/// [`write`](ForwardContext::write), [`write_results`](ForwardContext::write_results))
+/// are **inherent methods**, so dialect rules call them without importing any trait;
+/// they delegate to the engine's [`ForwardEnv`] storage access. It also implements
+/// [`InterpretCtx`] (carrying `I`'s `Value`/`Error`/`Effect`). A future backward
+/// analysis defines its own context wrapper type, exposing its own
+/// direction-appropriate helpers, so its dialect rules do not overlap these.
 pub struct ForwardContext<'a, I> {
     interp: &'a mut I,
     stage: CompileStage,
@@ -180,20 +215,27 @@ impl<'a, I: Interp> InterpretCtx for ForwardContext<'a, I> {
     type Effect = I::Effect;
 }
 
-impl<'a, I: Interp> ForwardCtx for ForwardContext<'a, I> {
-    fn read(&self, value: impl Into<SSAValue>) -> Result<I::Value, I::Error> {
+/// Forward SSA read/write — the **inherent** dialect-facing API. Dialect rules use
+/// these (`ctx.read(..)`, `ctx.write(..)`, ...) directly; no trait import needed.
+/// They delegate to the engine's [`ForwardEnv`] storage access.
+impl<'a, I: ForwardEnv> ForwardContext<'a, I> {
+    /// Read one SSA value.
+    pub fn read(&self, value: impl Into<SSAValue>) -> Result<I::Value, I::Error> {
         self.interp.env_read(self.env, value.into())
     }
 
-    fn read_many(&self, values: &[SSAValue]) -> Result<Product<I::Value>, I::Error> {
+    /// Read a list of SSA values into a [`Product`].
+    pub fn read_many(&self, values: &[SSAValue]) -> Result<Product<I::Value>, I::Error> {
         values.iter().map(|value| self.read(*value)).collect()
     }
 
-    fn write(&mut self, value: impl Into<SSAValue>, data: I::Value) -> Result<(), I::Error> {
+    /// Write one SSA value.
+    pub fn write(&mut self, value: impl Into<SSAValue>, data: I::Value) -> Result<(), I::Error> {
         self.interp.env_write(self.env, value.into(), data)
     }
 
-    fn write_results<T: Into<SSAValue> + Copy>(
+    /// Destructure a [`Product`] into result slots, checking arity.
+    pub fn write_results<T: Into<SSAValue> + Copy>(
         &mut self,
         values: &[T],
         data: Product<I::Value>,
