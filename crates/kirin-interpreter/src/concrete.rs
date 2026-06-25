@@ -3,10 +3,9 @@ use std::marker::PhantomData;
 use kirin_ir::{Block, CompileStage, Pipeline, Product, Region, SSAValue, StageMeta, Statement};
 
 use crate::{
-    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardContext, ForwardEffect,
-    Frame, FrameBuild, FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch,
-    InterpreterError, Linker, SameStageLinker, StageQuery, StandardFrame, Store, drive_frames,
-    query,
+    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame, FrameBuild,
+    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
+    SameStageLinker, StageQuery, StandardFrame, Store, ValueContext, drive_frames, query,
 };
 
 /// Concrete executor: runs IR over a concrete value domain with an explicit
@@ -78,7 +77,7 @@ where
     type Effect = ForwardEffect<V, F>;
 
     type Context<'a>
-        = ForwardContext<'a, Self>
+        = ValueContext<'a, Self>
     where
         Self: 'a;
 
@@ -88,7 +87,7 @@ where
         statement: Statement,
         index: EnvIndex,
     ) -> Self::Context<'a> {
-        ForwardContext::new(self, stage, statement, index)
+        ValueContext::new(self, stage, statement, index)
     }
 }
 
@@ -109,7 +108,7 @@ where
 
 impl<'ir, S, V, E, Lk, F> FrameDriver for ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
+    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -181,7 +180,7 @@ where
 
 impl<'ir, S, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
+    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,

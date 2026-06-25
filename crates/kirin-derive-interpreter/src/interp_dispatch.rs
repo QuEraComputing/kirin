@@ -64,7 +64,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         // engine builds its context and passes it in. So each language need only be
         // interpretable in that context — no higher-ranked GAT projection (which
         // would spuriously require `'static`); the forward engines instantiate
-        // `__Ctx = ForwardContext<'_, I>` in their `FrameDriver` bound.
+        // `__Ctx = ValueContext<'_, I>` in their `FrameDriver` bound.
         predicates.push(syn::parse_quote! {
             #dialect_ty: #interp_crate::Interpretable<__Ctx> + #interp_crate::FunctionEntry<__Ctx>
         });

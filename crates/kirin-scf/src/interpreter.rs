@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 
 use kirin::prelude::{Block, CompileStage, CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    BranchCondition, ForwardContext, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
+    BranchCondition, ForwardEffect, ForwardInterp, Interpretable, InterpreterError, ValueContext,
 };
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BodyFrame,
@@ -36,13 +36,13 @@ use crate::{For, ForLoopValue, If, Yield};
 // scf.if — push a dialect-owned if frame
 // ===========================================================================
 
-impl<I, T> Interpretable<ForwardContext<'_, I>> for If<T>
+impl<I, T> Interpretable<ValueContext<'_, I>> for If<T>
 where
     I: ForwardInterp + ScfIfDispatch,
     I::Value: BranchCondition,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
         let stage = ctx.stage();
         let index = ctx.index();
         let results: Product<SSAValue> = self.results.iter().copied().map(Into::into).collect();
@@ -61,13 +61,13 @@ where
 // scf.for — push a dialect-owned loop frame
 // ===========================================================================
 
-impl<I, T> Interpretable<ForwardContext<'_, I>> for For<T>
+impl<I, T> Interpretable<ValueContext<'_, I>> for For<T>
 where
     I: ForwardInterp + ScfForDispatch,
     I::Value: ForLoopValue + Clone + 'static,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
         let stage = ctx.stage();
         let index = ctx.index();
         let induction = ctx.read(self.start)?;
@@ -87,12 +87,12 @@ where
     }
 }
 
-impl<I, T> Interpretable<ForwardContext<'_, I>> for Yield<T>
+impl<I, T> Interpretable<ValueContext<'_, I>> for Yield<T>
 where
     I: ForwardInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
         Ok(ForwardEffect::Yield(ctx.read_many(self.values.as_slice())?))
     }
 }

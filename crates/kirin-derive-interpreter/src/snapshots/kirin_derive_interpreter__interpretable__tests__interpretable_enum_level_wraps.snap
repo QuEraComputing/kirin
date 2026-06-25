@@ -4,33 +4,33 @@ expression: generate_interpretable_code(input)
 ---
 #[automatically_derived]
 impl<'__ctx, T: CompileTimeValue, __InterpI>
-    ::kirin_interpreter::Interpretable<::kirin_interpreter::ForwardContext<'__ctx, __InterpI>>
+    ::kirin_interpreter::Interpretable<::kirin_interpreter::ValueContext<'__ctx, __InterpI>>
     for Lexical<T>
 where
     __InterpI: ::kirin_interpreter::Interp,
     Function<T>:
-        ::kirin_interpreter::Interpretable<::kirin_interpreter::ForwardContext<'__ctx, __InterpI>>,
+        ::kirin_interpreter::Interpretable<::kirin_interpreter::ValueContext<'__ctx, __InterpI>>,
     Call<T>:
-        ::kirin_interpreter::Interpretable<::kirin_interpreter::ForwardContext<'__ctx, __InterpI>>,
+        ::kirin_interpreter::Interpretable<::kirin_interpreter::ValueContext<'__ctx, __InterpI>>,
     Return<T>:
-        ::kirin_interpreter::Interpretable<::kirin_interpreter::ForwardContext<'__ctx, __InterpI>>,
+        ::kirin_interpreter::Interpretable<::kirin_interpreter::ValueContext<'__ctx, __InterpI>>,
 {
     fn interpret(
         &self,
-        ctx: &mut ::kirin_interpreter::ForwardContext<'__ctx, __InterpI>,
+        ctx: &mut ::kirin_interpreter::ValueContext<'__ctx, __InterpI>,
     ) -> Result<
         <__InterpI as ::kirin_interpreter::Interp>::Effect,
         <__InterpI as ::kirin_interpreter::Interp>::Error,
     > {
         match self {
             Self::Function(field_0) => <Function<T> as ::kirin_interpreter::Interpretable<
-                ::kirin_interpreter::ForwardContext<'__ctx, __InterpI>,
+                ::kirin_interpreter::ValueContext<'__ctx, __InterpI>,
             >>::interpret(field_0, ctx),
             Self::Call(field_0) => <Call<T> as ::kirin_interpreter::Interpretable<
-                ::kirin_interpreter::ForwardContext<'__ctx, __InterpI>,
+                ::kirin_interpreter::ValueContext<'__ctx, __InterpI>,
             >>::interpret(field_0, ctx),
             Self::Return(field_0) => <Return<T> as ::kirin_interpreter::Interpretable<
-                ::kirin_interpreter::ForwardContext<'__ctx, __InterpI>,
+                ::kirin_interpreter::ValueContext<'__ctx, __InterpI>,
             >>::interpret(field_0, ctx),
         }
     }

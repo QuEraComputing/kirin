@@ -1,16 +1,16 @@
 use kirin::prelude::CompileTimeValue;
-use kirin_interpreter::dialect::{ForwardContext, ForwardEffect, ForwardInterp, Interpretable};
+use kirin_interpreter::dialect::{ForwardEffect, ForwardInterp, Interpretable, ValueContext};
 
 use crate::{Cmp, CompareValue};
 
-impl<I, T> Interpretable<ForwardContext<'_, I>> for Cmp<T>
+impl<I, T> Interpretable<ValueContext<'_, I>> for Cmp<T>
 where
     I: ForwardInterp,
     I::Value: CompareValue,
     <I::Value as CompareValue>::Bool: Into<I::Value>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
         match self {
             Cmp::Eq {
                 lhs, rhs, result, ..

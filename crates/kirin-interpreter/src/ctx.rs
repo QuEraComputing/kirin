@@ -1,4 +1,4 @@
-use kirin_ir::{CompileStage, HasBottom, HasTop, Product, SSAValue, Statement};
+use kirin_ir::{CompileStage, Product, SSAValue, Statement};
 
 use crate::{EnvIndex, ForwardEffect, InterpreterError};
 
@@ -33,14 +33,13 @@ pub trait Interp: Sized {
 /// Marker trait for lattice-valued abstract interpretation engines.
 ///
 /// This intentionally does not require forward env access, widening, or a
-/// universal join API; those belong to concrete engine specializations.
-pub trait AbstractInterpreter: Interp
-where
-    Self::Value: Clone + HasBottom + HasTop,
-{
-}
+/// universal join API; those belong to concrete engine specializations. The
+/// value domain only needs to be `Clone`; lattice operations like
+/// [`HasBottom`](kirin_ir::HasBottom)/[`HasTop`](kirin_ir::HasTop) are required
+/// by concrete engine specializations, not by this marker.
+pub trait AbstractInterpreter: Interp {}
 
-/// SSA storage access used by [`ForwardContext`].
+/// SSA storage access used by [`ValueContext`].
 pub trait Env: Interp {
     /// Read an SSA value from an activation.
     fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<Self::Value, Self::Error>;
@@ -82,18 +81,18 @@ pub trait InterpretCtx {
     type Effect;
 }
 
-/// Per-statement forward context.
+/// Per-statement value context.
 ///
 /// Dialect rules use this to read and write SSA values without handling
 /// activation indices directly.
-pub struct ForwardContext<'a, I> {
+pub struct ValueContext<'a, I> {
     interp: &'a mut I,
     stage: CompileStage,
     statement: Statement,
     index: EnvIndex,
 }
 
-impl<'a, I: Interp> ForwardContext<'a, I> {
+impl<'a, I: Interp> ValueContext<'a, I> {
     pub fn new(
         interp: &'a mut I,
         stage: CompileStage,
@@ -130,14 +129,14 @@ impl<'a, I: Interp> ForwardContext<'a, I> {
     }
 }
 
-impl<'a, I: Interp> InterpretCtx for ForwardContext<'a, I> {
+impl<'a, I: Interp> InterpretCtx for ValueContext<'a, I> {
     type Value = I::Value;
     type Error = I::Error;
     type Effect = I::Effect;
 }
 
-/// Forward SSA read/write helpers used by dialect rules.
-impl<'a, I: Env> ForwardContext<'a, I> {
+/// SSA value read/write helpers used by dialect rules.
+impl<'a, I: Env> ValueContext<'a, I> {
     /// Read one SSA value.
     pub fn read(&self, value: impl Into<SSAValue>) -> Result<I::Value, I::Error> {
         self.interp.env_read(self.index, value.into())

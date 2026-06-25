@@ -2,13 +2,13 @@ use std::ops::{Add, Mul, Neg, Sub};
 
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::dialect::{
-    ForwardContext, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
+    ForwardEffect, ForwardInterp, Interpretable, InterpreterError, ValueContext,
 };
 use thiserror::Error;
 
 use crate::{Arith, CheckedDiv, CheckedRem};
 
-impl<I, T> Interpretable<ForwardContext<'_, I>> for Arith<T>
+impl<I, T> Interpretable<ValueContext<'_, I>> for Arith<T>
 where
     I: ForwardInterp,
     I::Value: Add<Output = I::Value>
@@ -20,7 +20,7 @@ where
     I::Error: From<DivisionByZero>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
         match self {
             Arith::Add {
                 lhs, rhs, result, ..

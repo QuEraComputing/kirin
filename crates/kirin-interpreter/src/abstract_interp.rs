@@ -3,16 +3,15 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CompileStage, HasBottom, HasTop, Pipeline, Product, Region, SSAValue,
-    SpecializedFunction, StageMeta, Statement, Widen,
+    Block, CompileStage, HasBottom, Pipeline, Product, Region, SSAValue, SpecializedFunction,
+    StageMeta, Statement, Widen,
 };
 
 use crate::{
     AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame,
-    AbstractInterpreter, CallEffect, Callee, Env, EnvIndex, EnvStackStore, ForwardContext,
-    ForwardEffect, Frame, FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch,
-    InterpreterError, Linker, SameStageLinker, StageQuery, StandardAbstractFrame, Store,
-    drive_frames, query,
+    AbstractInterpreter, CallEffect, Callee, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame,
+    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
+    SameStageLinker, StageQuery, StandardAbstractFrame, Store, ValueContext, drive_frames, query,
 };
 
 // ===========================================================================
@@ -105,7 +104,7 @@ where
 
 /// Forward lattice-based abstract interpreter.
 ///
-/// Uses [`ForwardContext`] and [`ForwardEffect`] like concrete execution, but runs
+/// Uses [`ValueContext`] and [`ForwardEffect`] like concrete execution, but runs
 /// over an abstract value domain. Traversal is owned by the total frame type `F`;
 /// summary keying and merge/widen behavior are owned by the policy `P`.
 ///
@@ -280,7 +279,7 @@ where
     type Effect = ForwardEffect<V, F>;
 
     type Context<'a>
-        = ForwardContext<'a, Self>
+        = ValueContext<'a, Self>
     where
         Self: 'a;
 
@@ -290,7 +289,7 @@ where
         statement: Statement,
         index: EnvIndex,
     ) -> Self::Context<'a> {
-        ForwardContext::new(self, stage, statement, index)
+        ValueContext::new(self, stage, statement, index)
     }
 }
 
@@ -319,7 +318,7 @@ impl<'ir, S, V, E, Lk, P, F> AbstractInterpreter
     for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     S: StageMeta,
-    V: Clone + HasBottom + HasTop,
+    V: Clone + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
 {
@@ -330,7 +329,7 @@ where
 // the same linker component.
 impl<'ir, S, V, E, Lk, P, F> FrameDriver for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
+    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -407,7 +406,7 @@ where
 impl<'ir, S, V, E, Lk, P, F> AbstractFrameDriver
     for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
+    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -562,7 +561,7 @@ where
 
 impl<'ir, S, V, E, Lk, P, F> ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
+    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,

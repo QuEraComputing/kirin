@@ -1,7 +1,7 @@
 use kirin::prelude::{CompileTimeValue, Product};
 use kirin_interpreter::InterpreterError;
 use kirin_interpreter::dialect::{
-    ForwardContext, ForwardEffect, ForwardInterp, HasProductValue, Interpretable,
+    ForwardEffect, ForwardInterp, HasProductValue, Interpretable, ValueContext,
 };
 use thiserror::Error;
 
@@ -12,13 +12,13 @@ pub trait TupleIndexValue: Sized {
     fn from_tuple_index(index: usize) -> Self;
 }
 
-impl<I, T> Interpretable<ForwardContext<'_, I>> for NewTuple<T>
+impl<I, T> Interpretable<ValueContext<'_, I>> for NewTuple<T>
 where
     I: ForwardInterp,
     I::Value: HasProductValue,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
         let values = self
             .args
             .iter()
@@ -29,14 +29,14 @@ where
     }
 }
 
-impl<I, T> Interpretable<ForwardContext<'_, I>> for Unpack<T>
+impl<I, T> Interpretable<ValueContext<'_, I>> for Unpack<T>
 where
     I: ForwardInterp,
     I::Value: HasProductValue,
     I::Error: From<ExpectedTuple>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
         let source = ctx.read(self.source)?;
         let product = source
             .as_product()
@@ -47,14 +47,14 @@ where
     }
 }
 
-impl<I, T> Interpretable<ForwardContext<'_, I>> for Get<T>
+impl<I, T> Interpretable<ValueContext<'_, I>> for Get<T>
 where
     I: ForwardInterp,
     I::Value: HasProductValue + TupleIndexValue,
     I::Error: From<ExpectedTuple> + From<InvalidTupleIndex> + From<TupleIndexOutOfBounds>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
         let source = ctx.read(self.source)?;
         let index = ctx
             .read(self.index)?
@@ -71,14 +71,14 @@ where
     }
 }
 
-impl<I, T> Interpretable<ForwardContext<'_, I>> for Len<T>
+impl<I, T> Interpretable<ValueContext<'_, I>> for Len<T>
 where
     I: ForwardInterp,
     I::Value: HasProductValue + TupleIndexValue,
     I::Error: From<ExpectedTuple>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
         let source = ctx.read(self.source)?;
         let len = source
             .as_product()

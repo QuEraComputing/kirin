@@ -5,7 +5,7 @@
 //! - **Shared framework** ([`Interp`], [`InterpretCtx`],
 //!   [`Interpretable`], [`Frame`]/[`FrameEngine`]/[`FrameEffect`]/[`drive_frames`]):
 //!   engine/context traits plus the direction-neutral frame driver loop.
-//! - **Forward specialization** ([`ForwardContext`], [`Env`],
+//! - **Forward specialization** ([`ValueContext`], [`Env`],
 //!   [`ForwardEffect`], [`ConcreteInterpreter`], [`ForwardAbstractInterpreter`]):
 //!   concrete execution and forward lattice analysis.
 //! - **Future backward specialization**: expected to define its own context,
@@ -16,7 +16,7 @@
 //!
 //! - **Dialect authors** implement [`Interpretable`] (and [`FunctionEntry`] for
 //!   callable statements) against a context type. Forward rules use
-//!   [`ForwardContext`] and return [`ForwardEffect`]. Structured dialects may push
+//!   [`ValueContext`] and return [`ForwardEffect`]. Structured dialects may push
 //!   dialect-owned frames.
 //! - **Compiler authors** compose languages into stage enums (deriving
 //!   [`InterpDispatch`] alongside `StageMeta`) and run engines:
@@ -48,7 +48,7 @@ pub use abstract_interp::{
     CallContext, ContextInsensitive, ForwardAbstractInterpreter, WideningStrategy,
 };
 pub use concrete::ConcreteInterpreter;
-pub use ctx::{AbstractInterpreter, Env, ForwardContext, ForwardInterp, Interp, InterpretCtx};
+pub use ctx::{AbstractInterpreter, Env, ForwardInterp, Interp, InterpretCtx, ValueContext};
 pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
 pub use effect::{CallEffect, Callee, Edge, ForwardEffect, FunctionBody};
 pub use env::{EnvIndex, EnvStackStore, Store};
@@ -81,9 +81,9 @@ pub use kirin_derive_interpreter::{FunctionEntry, InterpDispatch, Interpretable}
 /// Everything a dialect author needs to implement forward statement semantics.
 pub mod dialect {
     pub use crate::{
-        BranchCondition, CallEffect, Callee, Edge, ForwardContext, ForwardEffect, ForwardInterp,
-        FunctionBody, FunctionEntry, HasProductValue, Interp, InterpretCtx, Interpretable,
-        InterpreterError,
+        BranchCondition, CallEffect, Callee, Edge, ForwardEffect, ForwardInterp, FunctionBody,
+        FunctionEntry, HasProductValue, Interp, InterpretCtx, Interpretable, InterpreterError,
+        ValueContext,
     };
 }
 

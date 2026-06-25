@@ -5,7 +5,7 @@ use crate::{FunctionBody, InterpretCtx};
 /// Statement semantics. The single trait dialect authors implement.
 ///
 /// The type parameter is the context API a rule receives. Forward rules use
-/// [`ForwardContext`](crate::ForwardContext); another analysis can define a
+/// [`ValueContext`](crate::ValueContext); another analysis can define a
 /// different context with different helpers and effect type.
 pub trait Interpretable<C: InterpretCtx>: Dialect {
     fn interpret(&self, ctx: &mut C) -> Result<C::Effect, C::Error>;
@@ -79,8 +79,8 @@ mod tests {
     use kirin_ir::{CompileStage, Dialect, HasBottom, HasTop, Lattice, Statement as IrStatement};
 
     use crate::{
-        AbstractInterpreter, EnvIndex, ForwardContext, ForwardEffect, ForwardInterp, Interp,
-        InterpretCtx, Interpretable, InterpreterError,
+        AbstractInterpreter, EnvIndex, ForwardEffect, ForwardInterp, Interp, InterpretCtx,
+        Interpretable, InterpreterError, ValueContext,
     };
 
     #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -158,11 +158,11 @@ mod tests {
 
     impl AbstractInterpreter for MockBackwardInterp {}
 
-    impl<I> Interpretable<ForwardContext<'_, I>> for MockDialect
+    impl<I> Interpretable<ValueContext<'_, I>> for MockDialect
     where
         I: ForwardInterp,
     {
-        fn interpret(&self, _ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
+        fn interpret(&self, _ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
             Ok(ForwardEffect::Next)
         }
     }
@@ -181,11 +181,7 @@ mod tests {
         // - `MockBackwardInterp` is an `Interp + AbstractInterpreter`;
         // - it does not need `Env`.
         fn assert_interp<T: Interp>() {}
-        fn assert_abstract<T: AbstractInterpreter>()
-        where
-            T::Value: HasBottom + HasTop,
-        {
-        }
+        fn assert_abstract<T: AbstractInterpreter>() {}
 
         assert_interp::<MockBackwardInterp>();
         assert_abstract::<MockBackwardInterp>();

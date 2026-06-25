@@ -7,7 +7,7 @@ including analyses that cross language boundaries in multi-stage pipelines.
 The design is organized as a **two-persona contract**:
 
 - **Dialect authors** describe what each statement *means*, once, in a small
-  fixed vocabulary — `Interpretable<ForwardContext<'_, I>>`/`ForwardContext`/`ForwardEffect`,
+  fixed vocabulary — `Interpretable<ValueContext<'_, I>>`/`ValueContext`/`ForwardEffect`,
   specializing on the forward *context* type rather than the engine. There is no framework
   "scope": a statement whose operation owns structured control runs a
   sub-computation by *pushing a frame the dialect owns* (`ForwardEffect::Push`),
@@ -60,7 +60,7 @@ pub trait Interpretable<C: InterpretCtx>: Dialect {
 }
 ```
 
-`ForwardContext<'_, I>` exposes the forward read/write helpers — `read`, `read_many`,
+`ValueContext<'_, I>` exposes the forward read/write helpers — `read`, `read_many`,
 `write`, `write_results` — as **inherent methods** (they delegate to the engine's
 [`Env`] storage access), so dialect rules call `ctx.read(..)` / `ctx.write(..)`
 **without importing any trait**. (There is no `ForwardCtx` trait — the helpers are
@@ -68,7 +68,7 @@ inherent.) A future liveness context would expose its own inherent helpers
 (`live_after`/`use_def`/`transfer`) instead.
 
 A forward statement rule is `impl<I: ForwardInterp, ..>
-Interpretable<ForwardContext<'_, I>> for Op`: it reads/writes through
+Interpretable<ValueContext<'_, I>> for Op`: it reads/writes through
 `ctx.read`/`ctx.write` and returns `I::Effect` (= `ForwardEffect`). A future
 backward analysis uses a different context type, such as
 `LivenessContext<'_, I>`, with its own helpers and effect.
@@ -80,7 +80,7 @@ old `Interpretable<L, I, F, C, E, T>` parameter soup. **The engine owns its cont
 type**: the context is the *short-lived, dialect-facing* half of the pair (it borrows
 the engine for one statement), while the engine is the *long-lived,
 compiler-author/internal* half (env store, frame stack, summaries). The forward
-engines set `type Context<'a> = ForwardContext<'a, Self>`; dispatch never names a
+engines set `type Context<'a> = ValueContext<'a, Self>`; dispatch never names a
 concrete context — it asks the engine to build `I::Context<'_>`. A rule produces
 `C::Effect` (= `I::Effect` for the forward context) — the **analysis-specific** effect
 algebra — not a single universal enum. (The frame type stays the engine's own `F`
@@ -102,7 +102,7 @@ both execution and analysis**: `kirin-arith`'s `Add` rule computes `3 + 5`
 under `ConcreteInterpreter<.., i64, ..>` and folds `Const(3) + Const(5)`
 under constant propagation, with no analysis-specific code in the dialect.
 
-`ForwardContext<'_, I>` is the **forward context** type: it implements `InterpretCtx`
+`ValueContext<'_, I>` is the **forward context** type: it implements `InterpretCtx`
 (carrying the engine's `Value`/`Error`/`Effect`) and exposes the SSA read/write
 helpers as **inherent methods**, hiding environment indices and locations:
 `ctx.read(ssa)`, `ctx.write(result, value)`, `ctx.read_many(&values)`,
@@ -188,7 +188,7 @@ pub trait FunctionEntry<C: InterpretCtx>: Dialect {
 ```
 
 Like `Interpretable`, it is specialized on the context type `C` (the forward
-context `ForwardContext<'_, I>`).
+context `ValueContext<'_, I>`).
 
 Statements that define function bodies (e.g. `kirin_function::Function`)
 return the `FunctionBody { region, args }` to enter on invocation (the
@@ -267,7 +267,7 @@ frames or replaces traversal without touching the engine.
 
 The **forward dataflow** engine — a lattice-based forward abstract interpreter,
 and one *specialization* of the shared framework in the forward direction (it sets
-`Effect = ForwardEffect`, builds a `ForwardContext`, stores SSA activations via
+`Effect = ForwardEffect`, builds a `ValueContext`, stores SSA activations via
 `Env`, and drives forward frames). The name
 `AbstractInterpreter` is reserved for the shared trait implemented by
 lattice-valued abstract engines. `ForwardAbstractInterpreter` is the current
@@ -332,7 +332,7 @@ Both engines are frame-stack drivers over one **shared protocol**. Compiler
 authors can customize *how* an engine traverses (a custom frame type) or *how
 precisely* an abstract analysis summarizes (a custom policy `P`), without
 forking an engine. This is part of the compiler-author surface. The total frame
-type `F` is the engine's generic; it is named in `Interpretable<ForwardContext<'_, I>>`
+type `F` is the engine's generic; it is named in `Interpretable<ValueContext<'_, I>>`
 *only* by a structured dialect building `ForwardEffect::Push` (through
 `ForwardInterp::Frame`) — ordinary dialects never mention it.
 
@@ -467,7 +467,7 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
   `Interp`, so the protocol is reusable beyond forward value interpretation.
 - The per-statement effect is the associated type `C::Effect`, **per analysis**
   — forward execution/abstract interpretation use the forward context
-  `ForwardContext` whose `Effect` is `ForwardEffect`. A future analysis (e.g.
+  `ValueContext` whose `Effect` is `ForwardEffect`. A future analysis (e.g.
   backward liveness) defines its **own** context type (`LivenessContext<'_, I>`),
   implementing `InterpretCtx` with its **own** `Effect` algebra and its own inherent
   liveness-specific helpers (e.g. `live_after`/`use_def`/`transfer`) instead of the
