@@ -17,7 +17,7 @@ impl EnvIndex {
     }
 }
 
-pub trait Env<V> {
+pub trait Store<V> {
     type Error;
 
     fn alloc(&mut self) -> EnvIndex;
@@ -54,10 +54,6 @@ pub trait Env<V> {
 
         Ok(())
     }
-}
-
-pub trait ForkEnv<V>: Env<V> {
-    fn fork_env(&mut self, index: EnvIndex) -> Result<EnvIndex, Self::Error>;
 }
 
 #[derive(Clone, Debug)]
@@ -135,7 +131,7 @@ impl<V> EnvStackStore<V> {
     }
 }
 
-impl<V: Clone> Env<V> for EnvStackStore<V> {
+impl<V: Clone> Store<V> for EnvStackStore<V> {
     type Error = InterpreterError;
 
     fn alloc(&mut self) -> EnvIndex {

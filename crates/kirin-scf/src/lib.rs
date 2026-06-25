@@ -27,11 +27,11 @@
 
 mod value;
 pub use value::ForLoopValue;
-#[cfg(feature = "constprop")]
-mod constprop_impl;
-#[cfg(feature = "constprop")]
-pub use constprop_impl::ScfForConstPropSummary;
 pub mod interpreter;
+pub use interpreter::{
+    AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf, BuildScfFor,
+    BuildScfIf, ScfForDispatch, ScfForFrame, ScfIfDispatch, ScfIfFrame,
+};
 
 use kirin::prelude::*;
 use kirin_interpreter::Interpretable;
@@ -70,6 +70,28 @@ pub struct If<T: CompileTimeValue> {
     marker: std::marker::PhantomData<T>,
 }
 
+impl<T: CompileTimeValue> If<T> {
+    /// The SSA value driving the branch decision.
+    pub fn condition(&self) -> SSAValue {
+        self.condition
+    }
+
+    /// The `then` arm body (a single block terminated by `yield`).
+    pub fn then_block(&self) -> Block {
+        self.then_body
+    }
+
+    /// The `else` arm body (a single block terminated by `yield`).
+    pub fn else_block(&self) -> Block {
+        self.else_body
+    }
+
+    /// The result slots produced by the conditional (one per yielded value).
+    pub fn results(&self) -> &[ResultValue] {
+        &self.results
+    }
+}
+
 /// Counted loop with an induction variable ranging from `start` to `end`
 /// (exclusive) with a given `step`. The `body` block receives the current
 /// induction variable as a block argument.
@@ -93,6 +115,46 @@ pub struct For<T: CompileTimeValue> {
     marker: std::marker::PhantomData<T>,
 }
 
+impl<T: CompileTimeValue> For<T> {
+    /// The induction variable (also the first block argument of `body`).
+    pub fn induction_var(&self) -> SSAValue {
+        self.induction_var
+    }
+
+    /// Lower bound of the induction range.
+    pub fn start(&self) -> SSAValue {
+        self.start
+    }
+
+    /// Upper bound (exclusive) of the induction range.
+    pub fn end(&self) -> SSAValue {
+        self.end
+    }
+
+    /// Induction step.
+    pub fn step(&self) -> SSAValue {
+        self.step
+    }
+
+    /// Initial loop-carried values, positionally matched to the body's
+    /// carried block arguments (`body` args after the induction variable),
+    /// the body's `yield` values, and `results`.
+    pub fn init_args(&self) -> &[SSAValue] {
+        &self.init_args
+    }
+
+    /// The loop body (a single block terminated by `yield`). Its first block
+    /// argument is the induction variable; the rest are loop-carried.
+    pub fn body(&self) -> Block {
+        self.body
+    }
+
+    /// The result slots produced by the loop (final loop-carried values).
+    pub fn results(&self) -> &[ResultValue] {
+        &self.results
+    }
+}
+
 /// Terminates an SCF body block, yielding values back to the parent
 /// `If` or `For` operation. Analogous to MLIR's `scf.yield`.
 ///
@@ -104,4 +166,13 @@ pub struct Yield<T: CompileTimeValue> {
     values: Vec<SSAValue>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
+}
+
+impl<T: CompileTimeValue> Yield<T> {
+    /// The values yielded back to the parent `If`/`For`, positionally matched
+    /// to the parent's result slots (and, for a loop, the next iteration's
+    /// loop-carried block arguments).
+    pub fn values(&self) -> &[SSAValue] {
+        &self.values
+    }
 }

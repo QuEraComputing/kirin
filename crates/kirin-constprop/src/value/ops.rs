@@ -167,3 +167,24 @@ impl<S, F> CheckedShr for ConstPropValue<i64, S, F> {
         }
     }
 }
+
+impl<S, F> kirin_scf::ForLoopValue for ConstPropValue<i64, S, F>
+where
+    S: Clone + PartialEq,
+    F: Clone + PartialEq,
+{
+    fn loop_condition(&self, end: &Self) -> Option<bool> {
+        match (self, end) {
+            (Self::Const(lhs), Self::Const(rhs)) => Some(*lhs < *rhs),
+            _ => None,
+        }
+    }
+
+    fn loop_step(&self, step: &Self) -> Option<Self> {
+        match (self, step) {
+            (Self::Const(lhs), Self::Const(rhs)) => lhs.checked_add(*rhs).map(Self::Const),
+            (Self::Bottom, _) | (_, Self::Bottom) => Some(Self::Bottom),
+            _ => Some(Self::Top),
+        }
+    }
+}

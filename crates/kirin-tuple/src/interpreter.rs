@@ -1,6 +1,7 @@
-use kirin::prelude::{CompileTimeValue, Dialect, Product, SSAValue};
-use kirin_interpreter::{
-    BlockTransfer, Env, HasProductValue, Interpretable, InterpreterError, Location, StatementEffect,
+use kirin::prelude::{CompileTimeValue, Product};
+use kirin_interpreter::InterpreterError;
+use kirin_interpreter::dialect::{
+    ForwardEffect, ForwardEval, ForwardEvalInterp, HasProductValue, Interpretable,
 };
 use thiserror::Error;
 
@@ -11,122 +12,80 @@ pub trait TupleIndexValue: Sized {
     fn from_tuple_index(index: usize) -> Self;
 }
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for NewTuple<T>
+impl<I, T> Interpretable<I, ForwardEval> for NewTuple<T>
 where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    X: BlockTransfer,
-    X::Value: HasProductValue,
+    I: ForwardEvalInterp,
+    I::Value: HasProductValue,
     T: CompileTimeValue,
 {
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
         let values = self
             .args
             .iter()
-            .map(|arg| interp.read(env, *arg))
+            .map(|arg| interp.read(*arg))
             .collect::<Result<Product<_>, _>>()?;
-        interp.write(
-            env,
-            SSAValue::from(self.result),
-            X::Value::from_product(values),
-        )?;
-        Ok(StatementEffect::Done)
+        interp.write(self.result, I::Value::from_product(values))?;
+        Ok(ForwardEffect::Next)
     }
 }
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Unpack<T>
+impl<I, T> Interpretable<I, ForwardEval> for Unpack<T>
 where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    X: BlockTransfer,
-    X::Value: HasProductValue,
-    E: From<ExpectedTuple> + From<InterpreterError>,
+    I: ForwardEvalInterp,
+    I::Value: HasProductValue,
+    I::Error: From<ExpectedTuple>,
     T: CompileTimeValue,
 {
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        let source = interp.read(env, self.source)?;
-        let results = self
-            .results
-            .iter()
-            .copied()
-            .map(SSAValue::from)
-            .collect::<Vec<_>>();
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let source = interp.read(self.source)?;
         let product = source
             .as_product()
-            .ok_or_else(|| E::from(ExpectedTuple))?
+            .ok_or_else(|| I::Error::from(ExpectedTuple))?
             .clone();
-        interp.write_product(env, results.as_slice(), product)?;
-        Ok(StatementEffect::Done)
+        interp.write_results(self.results.as_slice(), product)?;
+        Ok(ForwardEffect::Next)
     }
 }
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Get<T>
+impl<I, T> Interpretable<I, ForwardEval> for Get<T>
 where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    X: BlockTransfer,
-    X::Value: HasProductValue + TupleIndexValue,
-    E: From<ExpectedTuple> + From<InvalidTupleIndex> + From<TupleIndexOutOfBounds>,
+    I: ForwardEvalInterp,
+    I::Value: HasProductValue + TupleIndexValue,
+    I::Error: From<ExpectedTuple> + From<InvalidTupleIndex> + From<TupleIndexOutOfBounds>,
     T: CompileTimeValue,
 {
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        let source = interp.read(env, self.source)?;
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let source = interp.read(self.source)?;
         let index = interp
-            .read(env, self.index)?
+            .read(self.index)?
             .as_tuple_index()
-            .ok_or_else(|| E::from(InvalidTupleIndex))?;
+            .ok_or_else(|| I::Error::from(InvalidTupleIndex))?;
         let value = source
             .as_product()
-            .ok_or_else(|| E::from(ExpectedTuple))?
+            .ok_or_else(|| I::Error::from(ExpectedTuple))?
             .get(index)
             .cloned()
-            .ok_or_else(|| E::from(TupleIndexOutOfBounds))?;
-        interp.write(env, SSAValue::from(self.result), value)?;
-        Ok(StatementEffect::Done)
+            .ok_or_else(|| I::Error::from(TupleIndexOutOfBounds))?;
+        interp.write(self.result, value)?;
+        Ok(ForwardEffect::Next)
     }
 }
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Len<T>
+impl<I, T> Interpretable<I, ForwardEval> for Len<T>
 where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    X: BlockTransfer,
-    X::Value: HasProductValue + TupleIndexValue,
-    E: From<ExpectedTuple>,
+    I: ForwardEvalInterp,
+    I::Value: HasProductValue + TupleIndexValue,
+    I::Error: From<ExpectedTuple>,
     T: CompileTimeValue,
 {
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        let source = interp.read(env, self.source)?;
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let source = interp.read(self.source)?;
         let len = source
             .as_product()
-            .ok_or_else(|| E::from(ExpectedTuple))?
+            .ok_or_else(|| I::Error::from(ExpectedTuple))?
             .len();
-        interp.write(
-            env,
-            SSAValue::from(self.result),
-            X::Value::from_tuple_index(len),
-        )?;
-        Ok(StatementEffect::Done)
+        interp.write(self.result, I::Value::from_tuple_index(len))?;
+        Ok(ForwardEffect::Next)
     }
 }
 
