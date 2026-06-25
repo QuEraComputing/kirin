@@ -3,9 +3,10 @@ use std::marker::PhantomData;
 use kirin_ir::{Block, CompileStage, Pipeline, Product, Region, SSAValue, StageMeta, Statement};
 
 use crate::{
-    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame, FrameBuild,
-    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
-    SameStageLinker, StageQuery, StandardFrame, Store, ValueContext, drive_frames, query,
+    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEffect, ForwardEval, Frame,
+    FrameBuild, FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpLocation,
+    InterpreterError, Linker, SameStageLinker, StageQuery, StandardFrame, Store, drive_frames,
+    query,
 };
 
 /// Concrete executor: runs IR over a concrete value domain with an explicit
@@ -34,6 +35,9 @@ pub struct ConcreteInterpreter<
     linker: Lk,
     store: EnvStackStore<V>,
     frames: Vec<F>,
+    /// The statement location currently being dispatched, exposed to dialect
+    /// rules through [`Interp::stage`]/[`Interp::statement`]/[`Interp::index`].
+    location: Option<InterpLocation>,
     _marker: PhantomData<fn() -> E>,
 }
 
@@ -44,6 +48,7 @@ impl<'ir, S: StageMeta, V, E, F> ConcreteInterpreter<'ir, S, V, E, SameStageLink
             linker: SameStageLinker,
             store: EnvStackStore::new(),
             frames: Vec::new(),
+            location: None,
             _marker: PhantomData,
         }
     }
@@ -57,6 +62,7 @@ impl<'ir, S: StageMeta, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F> {
             linker,
             store: self.store,
             frames: self.frames,
+            location: self.location,
             _marker: PhantomData,
         }
     }
@@ -75,19 +81,18 @@ where
     type Value = V;
     type Error = E;
     type Effect = ForwardEffect<V, F>;
+    type Kind = ForwardEval;
 
-    type Context<'a>
-        = ValueContext<'a, Self>
-    where
-        Self: 'a;
+    fn stage(&self) -> CompileStage {
+        self.location.expect("interp location not set").stage
+    }
 
-    fn context<'a>(
-        &'a mut self,
-        stage: CompileStage,
-        statement: Statement,
-        index: EnvIndex,
-    ) -> Self::Context<'a> {
-        ValueContext::new(self, stage, statement, index)
+    fn statement(&self) -> Statement {
+        self.location.expect("interp location not set").statement
+    }
+
+    fn index(&self) -> EnvIndex {
+        self.location.expect("interp location not set").index
     }
 }
 
@@ -108,7 +113,7 @@ where
 
 impl<'ir, S, V, E, Lk, F> FrameDriver for ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
+    S: StageQuery + InterpDispatch<Self, ForwardEval>,
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -137,8 +142,14 @@ where
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let mut ctx = self.context(stage, statement, index);
-        info.dispatch_statement(statement, &mut ctx)
+        let previous = self.location.replace(InterpLocation {
+            stage,
+            statement,
+            index,
+        });
+        let result = info.dispatch_statement(statement, self);
+        self.location = previous;
+        result
     }
 
     fn enter_function(
@@ -152,8 +163,14 @@ where
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let mut ctx = self.context(stage, body, index);
-        info.dispatch_function_entry(body, args, &mut ctx)
+        let previous = self.location.replace(InterpLocation {
+            stage,
+            statement: body,
+            index,
+        });
+        let result = info.dispatch_function_entry(body, args, self);
+        self.location = previous;
+        result
     }
 
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
@@ -180,7 +197,7 @@ where
 
 impl<'ir, S, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
+    S: StageQuery + InterpDispatch<Self, ForwardEval>,
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,

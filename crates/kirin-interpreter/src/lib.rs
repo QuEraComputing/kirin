@@ -2,22 +2,29 @@
 //!
 //! # Framework shape
 //!
-//! - **Shared framework** ([`Interp`], [`InterpretCtx`],
+//! - **Shared framework** ([`Interp`],
 //!   [`Interpretable`], [`Frame`]/[`FrameEngine`]/[`FrameEffect`]/[`drive_frames`]):
-//!   engine/context traits plus the direction-neutral frame driver loop.
-//! - **Forward specialization** ([`ValueContext`], [`Env`],
+//!   the engine trait plus the direction-neutral frame driver loop. Statement
+//!   semantics are selected by a compile-time [`Kind`](Interp::Kind) marker —
+//!   [`ForwardEval`] today (covering concrete execution, constant propagation,
+//!   and interval analysis), [`BackwardLiveness`] reserved for the future.
+//! - **Forward specialization** ([`ForwardEvalInterp`], [`Env`],
 //!   [`ForwardEffect`], [`ConcreteInterpreter`], [`ForwardAbstractInterpreter`]):
 //!   concrete execution and forward lattice analysis.
-//! - **Future backward specialization**: expected to define its own context,
+//! - **Future sibling modes** would each add a marker + engine trait without
+//!   touching `ForwardEval`: `ForwardType`/`ForwardTypeInterp` (type inference),
+//!   `BackwardDataflow`/`BackwardDataflowInterp`, and
+//!   [`BackwardLiveness`]/`BackwardLivenessInterp` — each defining its own
 //!   effect/result, fact store, and frame-driver capability while reusing the
 //!   shared framework.
 //!
 //! # Two-persona contract
 //!
-//! - **Dialect authors** implement [`Interpretable`] (and [`FunctionEntry`] for
-//!   callable statements) against a context type. Forward rules use
-//!   [`ValueContext`] and return [`ForwardEffect`]. Structured dialects may push
-//!   dialect-owned frames.
+//! - **Dialect authors** implement [`Interpretable<I, ForwardEval>`](Interpretable)
+//!   (and [`FunctionEntry`] for callable statements). A rule receives the engine
+//!   `interp` directly, reads/writes SSA values through the
+//!   [`ForwardEvalInterp`] helpers (`interp.read`/`interp.write`), and returns
+//!   [`ForwardEffect`]. Structured dialects may push dialect-owned frames.
 //! - **Compiler authors** compose languages into stage enums (deriving
 //!   [`InterpDispatch`] alongside `StageMeta`) and run engines:
 //!   [`ConcreteInterpreter`] for execution, [`ForwardAbstractInterpreter`] for
@@ -30,25 +37,28 @@
 //! (cf's [`ForwardEffect::Branch`], or a control dialect's own pushed frame) is
 //! driven.
 
-mod abstract_frame;
-mod abstract_interp;
-mod concrete;
-mod concrete_frame;
-mod ctx;
+mod concrete_frames;
+mod concrete_interp;
 mod dispatch;
 mod effect;
 mod env;
 mod error;
+mod forward_abstract_frames;
+mod forward_abstract_interp;
 mod frame;
+mod interp;
 mod linker;
 mod query;
 mod value;
 
-pub use abstract_interp::{
+pub use forward_abstract_interp::{
     CallContext, ContextInsensitive, ForwardAbstractInterpreter, WideningStrategy,
 };
-pub use concrete::ConcreteInterpreter;
-pub use ctx::{AbstractInterpreter, Env, ForwardInterp, Interp, InterpretCtx, ValueContext};
+pub use concrete_interp::ConcreteInterpreter;
+pub use interp::{
+    AbstractInterpreter, BackwardLiveness, Env, ForwardEval, ForwardEvalInterp, Interp,
+    InterpLocation,
+};
 pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
 pub use effect::{CallEffect, Callee, Edge, ForwardEffect, FunctionBody};
 pub use env::{EnvIndex, EnvStackStore, Store};
@@ -63,9 +73,9 @@ pub use frame::{
 pub use frame::ForwardDataflowFrameDriver as AbstractFrameDriver;
 pub use frame::ForwardFrameDriver as FrameDriver;
 // Concrete standard frames.
-pub use concrete_frame::{BodyFrame, CallFrame, Completion, FrameBuild, StandardFrame};
+pub use concrete_frames::{BodyFrame, CallFrame, Completion, FrameBuild, StandardFrame};
 // Abstract standard frames.
-pub use abstract_frame::{
+pub use forward_abstract_frames::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCfgFrame, AbstractCompletion,
     AbstractFrameBuild, AbstractFunctionFrame, StandardAbstractFrame,
 };
@@ -81,9 +91,9 @@ pub use kirin_derive_interpreter::{FunctionEntry, InterpDispatch, Interpretable}
 /// Everything a dialect author needs to implement forward statement semantics.
 pub mod dialect {
     pub use crate::{
-        BranchCondition, CallEffect, Callee, Edge, ForwardEffect, ForwardInterp, FunctionBody,
-        FunctionEntry, HasProductValue, Interp, InterpretCtx, Interpretable, InterpreterError,
-        ValueContext,
+        BackwardLiveness, BranchCondition, CallEffect, Callee, Edge, ForwardEffect, ForwardEval,
+        ForwardEvalInterp, FunctionBody, FunctionEntry, HasProductValue, Interp, Interpretable,
+        InterpreterError,
     };
 }
 
@@ -94,7 +104,7 @@ pub mod engine {
         AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, AbstractInterpreter,
         BodyFrame, CallContext, CallFrame, Callee, Completion, ConcreteInterpreter,
         ContextInsensitive, CrossStageLinker, Env, ForwardAbstractInterpreter,
-        ForwardDataflowFrameDriver, ForwardFrameDriver, ForwardInterp, Frame, FrameBuild,
+        ForwardDataflowFrameDriver, ForwardEvalInterp, ForwardFrameDriver, Frame, FrameBuild,
         FrameDriver, FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch,
         InterpreterError, Linker, SameStageLinker, StandardAbstractFrame, StandardFrame,
         WideningStrategy, drive_frames, expect_single,

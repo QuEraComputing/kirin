@@ -3,35 +3,34 @@ source: crates/kirin-derive-interpreter/src/interpretable.rs
 expression: generate_interpretable_code(input)
 ---
 #[automatically_derived]
-impl<'__ctx, T: CompileTimeValue, __InterpI>
-    ::kirin_interpreter::Interpretable<::kirin_interpreter::ValueContext<'__ctx, __InterpI>>
-    for Lexical<T>
+impl<T: CompileTimeValue, __InterpI>
+    ::kirin_interpreter::Interpretable<__InterpI, ::kirin_interpreter::ForwardEval> for Lexical<T>
 where
     __InterpI: ::kirin_interpreter::Interp,
-    Function<T>:
-        ::kirin_interpreter::Interpretable<::kirin_interpreter::ValueContext<'__ctx, __InterpI>>,
-    Call<T>:
-        ::kirin_interpreter::Interpretable<::kirin_interpreter::ValueContext<'__ctx, __InterpI>>,
-    Return<T>:
-        ::kirin_interpreter::Interpretable<::kirin_interpreter::ValueContext<'__ctx, __InterpI>>,
+    Function<T>: ::kirin_interpreter::Interpretable<__InterpI, ::kirin_interpreter::ForwardEval>,
+    Call<T>: ::kirin_interpreter::Interpretable<__InterpI, ::kirin_interpreter::ForwardEval>,
+    Return<T>: ::kirin_interpreter::Interpretable<__InterpI, ::kirin_interpreter::ForwardEval>,
 {
     fn interpret(
         &self,
-        ctx: &mut ::kirin_interpreter::ValueContext<'__ctx, __InterpI>,
+        interp: &mut __InterpI,
     ) -> Result<
         <__InterpI as ::kirin_interpreter::Interp>::Effect,
         <__InterpI as ::kirin_interpreter::Interp>::Error,
     > {
         match self {
             Self::Function(field_0) => <Function<T> as ::kirin_interpreter::Interpretable<
-                ::kirin_interpreter::ValueContext<'__ctx, __InterpI>,
-            >>::interpret(field_0, ctx),
+                __InterpI,
+                ::kirin_interpreter::ForwardEval,
+            >>::interpret(field_0, interp),
             Self::Call(field_0) => <Call<T> as ::kirin_interpreter::Interpretable<
-                ::kirin_interpreter::ValueContext<'__ctx, __InterpI>,
-            >>::interpret(field_0, ctx),
+                __InterpI,
+                ::kirin_interpreter::ForwardEval,
+            >>::interpret(field_0, interp),
             Self::Return(field_0) => <Return<T> as ::kirin_interpreter::Interpretable<
-                ::kirin_interpreter::ValueContext<'__ctx, __InterpI>,
-            >>::interpret(field_0, ctx),
+                __InterpI,
+                ::kirin_interpreter::ForwardEval,
+            >>::interpret(field_0, interp),
         }
     }
 }

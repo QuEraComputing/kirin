@@ -9,9 +9,10 @@ use kirin_ir::{
 
 use crate::{
     AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame,
-    AbstractInterpreter, CallEffect, Callee, Env, EnvIndex, EnvStackStore, ForwardEffect, Frame,
-    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
-    SameStageLinker, StageQuery, StandardAbstractFrame, Store, ValueContext, drive_frames, query,
+    AbstractInterpreter, CallEffect, Callee, Env, EnvIndex, EnvStackStore, ForwardEffect,
+    ForwardEval, Frame, FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch,
+    InterpLocation, InterpreterError, Linker, SameStageLinker, StageQuery, StandardAbstractFrame,
+    Store, drive_frames, query,
 };
 
 // ===========================================================================
@@ -104,8 +105,9 @@ where
 
 /// Forward lattice-based abstract interpreter.
 ///
-/// Uses [`ValueContext`] and [`ForwardEffect`] like concrete execution, but runs
-/// over an abstract value domain. Traversal is owned by the total frame type `F`;
+/// Drives the same forward dialect rules (`Interpretable<I, ForwardEval>`) and
+/// [`ForwardEffect`] as concrete execution, but runs over an abstract value
+/// domain. Traversal is owned by the total frame type `F`;
 /// summary keying and merge/widen behavior are owned by the policy `P`.
 ///
 /// This implements [`AbstractInterpreter`].
@@ -135,6 +137,9 @@ pub struct ForwardAbstractInterpreter<
     analysis: P,
     max_iterations: usize,
     current: Option<<P as CallContext<V>>::Key>,
+    /// The statement location currently being dispatched, exposed to dialect
+    /// rules through [`Interp::stage`]/[`Interp::statement`]/[`Interp::index`].
+    location: Option<InterpLocation>,
     /// The per-function frame stack driven by `run_frames` (empty between
     /// interprocedural worklist items).
     frames: Vec<F>,
@@ -168,6 +173,7 @@ where
             analysis: P::default(),
             max_iterations: 1000,
             current: None,
+            location: None,
             frames: Vec::new(),
             ret_acc: None,
             _marker: PhantomData,
@@ -195,6 +201,7 @@ where
             analysis: self.analysis,
             max_iterations: self.max_iterations,
             current: self.current,
+            location: self.location,
             frames: self.frames,
             ret_acc: self.ret_acc,
             _marker: PhantomData,
@@ -218,6 +225,7 @@ where
             analysis,
             max_iterations: self.max_iterations,
             current: None,
+            location: None,
             frames: Vec::new(),
             ret_acc: None,
             _marker: PhantomData,
@@ -277,19 +285,18 @@ where
     type Value = V;
     type Error = E;
     type Effect = ForwardEffect<V, F>;
+    type Kind = ForwardEval;
 
-    type Context<'a>
-        = ValueContext<'a, Self>
-    where
-        Self: 'a;
+    fn stage(&self) -> CompileStage {
+        self.location.expect("interp location not set").stage
+    }
 
-    fn context<'a>(
-        &'a mut self,
-        stage: CompileStage,
-        statement: Statement,
-        index: EnvIndex,
-    ) -> Self::Context<'a> {
-        ValueContext::new(self, stage, statement, index)
+    fn statement(&self) -> Statement {
+        self.location.expect("interp location not set").statement
+    }
+
+    fn index(&self) -> EnvIndex {
+        self.location.expect("interp location not set").index
     }
 }
 
@@ -329,7 +336,7 @@ where
 // the same linker component.
 impl<'ir, S, V, E, Lk, P, F> FrameDriver for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
+    S: StageQuery + InterpDispatch<Self, ForwardEval>,
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -359,8 +366,14 @@ where
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let mut ctx = self.context(stage, statement, index);
-        info.dispatch_statement(statement, &mut ctx)
+        let previous = self.location.replace(InterpLocation {
+            stage,
+            statement,
+            index,
+        });
+        let result = info.dispatch_statement(statement, self);
+        self.location = previous;
+        result
     }
 
     fn enter_function(
@@ -374,8 +387,14 @@ where
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let mut ctx = self.context(stage, body, index);
-        info.dispatch_function_entry(body, args, &mut ctx)
+        let previous = self.location.replace(InterpLocation {
+            stage,
+            statement: body,
+            index,
+        });
+        let result = info.dispatch_function_entry(body, args, self);
+        self.location = previous;
+        result
     }
 
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
@@ -406,7 +425,7 @@ where
 impl<'ir, S, V, E, Lk, P, F> AbstractFrameDriver
     for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
+    S: StageQuery + InterpDispatch<Self, ForwardEval>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -561,7 +580,7 @@ where
 
 impl<'ir, S, V, E, Lk, P, F> ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    S: StageQuery + for<'b> InterpDispatch<ValueContext<'b, Self>>,
+    S: StageQuery + InterpDispatch<Self, ForwardEval>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,

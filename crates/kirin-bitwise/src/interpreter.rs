@@ -2,15 +2,15 @@ use std::ops::{BitAnd, BitOr, BitXor, Not};
 
 use kirin::prelude::CompileTimeValue;
 use kirin_interpreter::dialect::{
-    ForwardEffect, ForwardInterp, Interpretable, InterpreterError, ValueContext,
+    ForwardEffect, ForwardEval, ForwardEvalInterp, Interpretable, InterpreterError,
 };
 use thiserror::Error;
 
 use crate::{Bitwise, CheckedShl, CheckedShr};
 
-impl<I, T> Interpretable<ValueContext<'_, I>> for Bitwise<T>
+impl<I, T> Interpretable<I, ForwardEval> for Bitwise<T>
 where
-    I: ForwardInterp,
+    I: ForwardEvalInterp,
     I::Value: BitAnd<Output = I::Value>
         + BitOr<Output = I::Value>
         + BitXor<Output = I::Value>
@@ -20,49 +20,49 @@ where
     I::Error: From<ShiftOverflow>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
         match self {
             Bitwise::And {
                 lhs, rhs, result, ..
             } => {
-                let value = ctx.read(*lhs)? & ctx.read(*rhs)?;
-                ctx.write(*result, value)?;
+                let value = interp.read(*lhs)? & interp.read(*rhs)?;
+                interp.write(*result, value)?;
             }
             Bitwise::Or {
                 lhs, rhs, result, ..
             } => {
-                let value = ctx.read(*lhs)? | ctx.read(*rhs)?;
-                ctx.write(*result, value)?;
+                let value = interp.read(*lhs)? | interp.read(*rhs)?;
+                interp.write(*result, value)?;
             }
             Bitwise::Xor {
                 lhs, rhs, result, ..
             } => {
-                let value = ctx.read(*lhs)? ^ ctx.read(*rhs)?;
-                ctx.write(*result, value)?;
+                let value = interp.read(*lhs)? ^ interp.read(*rhs)?;
+                interp.write(*result, value)?;
             }
             Bitwise::Not {
                 operand, result, ..
             } => {
-                let value = !ctx.read(*operand)?;
-                ctx.write(*result, value)?;
+                let value = !interp.read(*operand)?;
+                interp.write(*result, value)?;
             }
             Bitwise::Shl {
                 lhs, rhs, result, ..
             } => {
-                let value = ctx
+                let value = interp
                     .read(*lhs)?
-                    .checked_shl(ctx.read(*rhs)?)
+                    .checked_shl(interp.read(*rhs)?)
                     .ok_or_else(|| I::Error::from(ShiftOverflow))?;
-                ctx.write(*result, value)?;
+                interp.write(*result, value)?;
             }
             Bitwise::Shr {
                 lhs, rhs, result, ..
             } => {
-                let value = ctx
+                let value = interp
                     .read(*lhs)?
-                    .checked_shr(ctx.read(*rhs)?)
+                    .checked_shr(interp.read(*rhs)?)
                     .ok_or_else(|| I::Error::from(ShiftOverflow))?;
-                ctx.write(*result, value)?;
+                interp.write(*result, value)?;
             }
             Bitwise::__Phantom(..) => unreachable!(),
         }

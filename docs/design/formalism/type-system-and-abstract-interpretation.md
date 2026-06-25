@@ -8,7 +8,7 @@ concrete API references for the current `AbstractInterpreter` implementation.
 ## Reading Recipe
 
 - **Formal read:** Read lattice/order claims (`⊑`, join/widen, fixpoint) as obligations on abstract domains and merge behavior consumed by the interpreter.
-- **API read:** Inspect `crates/kirin-ir/src/{comptime.rs,lattice.rs}` for domain interfaces, then `crates/kirin-interpreter/src/abstract_interp.rs` (`CallContext`, `WideningStrategy`, `with_analysis`, `analyze_by_name`, `eval_cfg`, `eval_scope`) and example domains in `crates/{kirin-constprop,kirin-interval}`.
+- **API read:** Inspect `crates/kirin-ir/src/{comptime.rs,lattice.rs}` for domain interfaces, then `crates/kirin-interpreter/src/forward_abstract_interp.rs` (`CallContext`, `WideningStrategy`, `with_analysis`, `analyze_by_name`, `eval_cfg`) and example domains in `crates/{kirin-constprop,kirin-interval}`.
 
 ## IV.0 Symbol-to-code mapping
 
@@ -21,13 +21,12 @@ concrete API references for the current `AbstractInterpreter` implementation.
 | Bottom element | `HasBottom` | [`crates/kirin-ir/src/lattice.rs`](../../../crates/kirin-ir/src/lattice.rs) |
 | Top element | `HasTop` | [`crates/kirin-ir/src/lattice.rs`](../../../crates/kirin-ir/src/lattice.rs) |
 | Widening operator | `Widen` | [`crates/kirin-ir/src/lattice.rs`](../../../crates/kirin-ir/src/lattice.rs) |
-| Context abstraction (summary-key strategy) | `CallContext<V>` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
-| Merge/widen behavior | `WideningStrategy<V>` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
-| Context-insensitive baseline (API name) | `ContextInsensitive` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
-| Abstract engine | `AbstractInterpreter<...>` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
-| Analysis entrypoint | `AbstractInterpreter::analyze_by_name` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
-| CFG fixpoint kernel | `AbstractInterpreter::eval_cfg` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
-| Scope fixpoint kernel | `AbstractInterpreter::eval_scope` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
+| Context abstraction (summary-key strategy) | `CallContext<V>` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Merge/widen behavior | `WideningStrategy<V>` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Context-insensitive baseline (API name) | `ContextInsensitive` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Forward abstract engine | `ForwardAbstractInterpreter<...>` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Analysis entrypoint | `ForwardAbstractInterpreter::analyze_by_name` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| CFG fixpoint kernel | `ForwardAbstractInterpreter::eval_cfg` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
 | Constprop analysis crate | `kirin-constprop` | [`crates/kirin-constprop/src/lib.rs`](../../../crates/kirin-constprop/src/lib.rs) |
 | Interval analysis crate | `kirin-interval` | [`crates/kirin-interval/src/lib.rs`](../../../crates/kirin-interval/src/lib.rs) |
 

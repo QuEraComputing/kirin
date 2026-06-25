@@ -484,7 +484,7 @@ mod advanced {
         AbstractBlockFrame, AbstractCallFrame, AbstractCfgFrame, AbstractCompletion,
         AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, BodyFrame, CallContext,
         CallFrame, Completion, ConcreteInterpreter, CrossStageLinker, ForwardAbstractInterpreter,
-        ForwardInterp, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
+        ForwardEvalInterp, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
         expect_single,
     };
     use kirin_scf::{
@@ -544,7 +544,7 @@ mod advanced {
 
     impl<I, V, E> Frame<I> for TracingFrame<V, E>
     where
-        I: FrameDriver<Value = V, Error = E> + ForwardInterp<Frame = TracingFrame<V, E>>,
+        I: FrameDriver<Value = V, Error = E> + ForwardEvalInterp<Frame = TracingFrame<V, E>>,
         V: Clone + ForLoopValue,
         E: From<InterpreterError>,
     {
@@ -717,7 +717,7 @@ mod advanced {
     impl<I, V, E, K> Frame<I> for TracingAbstractFrame<V, E, K>
     where
         I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-            + ForwardInterp<Frame = TracingAbstractFrame<V, E, K>>,
+            + ForwardEvalInterp<Frame = TracingAbstractFrame<V, E, K>>,
         V: Clone + PartialEq + ForLoopValue,
         E: From<InterpreterError>,
         K: Clone + Eq + Hash,

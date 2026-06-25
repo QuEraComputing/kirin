@@ -7,7 +7,7 @@
 
 Kirin interpreter behavior is defined by a two-persona split:
 
-- **Dialect authors** implement statement meaning once, in `interpret(&mut Ctx<'_, I>)`.
+- **Dialect authors** implement statement meaning once, in `interpret(&mut I)`.
 - **Compiler authors** pick a stage enum, value domain, error, engine, and linker.
 
 One dialect implementation serves both execution and analysis because it is
@@ -44,15 +44,15 @@ where:
 - `ρ` is the active `EnvIndex`
 - `σ` is the pre-state store view
 - `σ'` is the post-state store view
-- `ι` is the concrete engine instance supplying `Ctx<'_, I>`
+- `ι` is the concrete engine instance supplied as `&mut I`
 - `φ` is the emitted `Effect<I::Value, I::Error>`
 - `ε` is an error in the `Result::Err` branch
 
 Interpretation of this judgment against Rust API:
 
 - `interpret` returns `Result<Effect<...>, ...>` directly.
-- `σ -> σ'` is implicit, induced by `Ctx` reads/writes through the engine's
-  `Interp` implementation.
+- `σ -> σ'` is implicit, induced by `ForwardEvalInterp` reads/writes through
+  the engine's `Env` implementation.
 - concrete and abstract engines then consume `φ` using different global drivers
   (frame stack vs fixpoint worklists).
 
@@ -60,13 +60,13 @@ Interpretation of this judgment against Rust API:
 
 Statement-level rule (Rust):
 
-`Interpretable::interpret(&self, ctx: &mut Ctx<'_, I>) -> Result<Effect<I::Value, I::Error>, I::Error>`
+`Interpretable::interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error>`
 
 Operational reading:
 
-- input state is carried in `ctx` (`stage`, `statement`, `env`) and engine store
+- input state is carried in `interp` (`stage`, `statement`, `index`) and engine store
 - output control is `Effect`
-- output store is whatever changed through `ctx.write`/`ctx.write_results`
+- output store is whatever changed through `interp.write`/`interp.write_results`
 - errors propagate through `Result::Err`
 
 ## Part Structure
@@ -75,7 +75,7 @@ Operational reading:
   - SSA/stage model and dialect composition
   - operation classes and dispatch surface
 - [Part II - State & Environment Model](state-environment-model.md)
-  - `Interp`, `Ctx`, environment semantics, activation lifecycle
+  - `Interp`, `InterpLocation`, environment semantics, activation lifecycle
 - [Part III - Operational Semantics](operational-semantics.md)
   - `Effect` algebra, concrete frame-stepping, abstract worklists
 - [Part IV - Type System & Abstract Interpretation](type-system-and-abstract-interpretation.md)

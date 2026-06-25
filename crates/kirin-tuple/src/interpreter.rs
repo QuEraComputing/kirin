@@ -1,7 +1,7 @@
 use kirin::prelude::{CompileTimeValue, Product};
 use kirin_interpreter::InterpreterError;
 use kirin_interpreter::dialect::{
-    ForwardEffect, ForwardInterp, HasProductValue, Interpretable, ValueContext,
+    ForwardEffect, ForwardEval, ForwardEvalInterp, HasProductValue, Interpretable,
 };
 use thiserror::Error;
 
@@ -12,51 +12,51 @@ pub trait TupleIndexValue: Sized {
     fn from_tuple_index(index: usize) -> Self;
 }
 
-impl<I, T> Interpretable<ValueContext<'_, I>> for NewTuple<T>
+impl<I, T> Interpretable<I, ForwardEval> for NewTuple<T>
 where
-    I: ForwardInterp,
+    I: ForwardEvalInterp,
     I::Value: HasProductValue,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
         let values = self
             .args
             .iter()
-            .map(|arg| ctx.read(*arg))
+            .map(|arg| interp.read(*arg))
             .collect::<Result<Product<_>, _>>()?;
-        ctx.write(self.result, I::Value::from_product(values))?;
+        interp.write(self.result, I::Value::from_product(values))?;
         Ok(ForwardEffect::Next)
     }
 }
 
-impl<I, T> Interpretable<ValueContext<'_, I>> for Unpack<T>
+impl<I, T> Interpretable<I, ForwardEval> for Unpack<T>
 where
-    I: ForwardInterp,
+    I: ForwardEvalInterp,
     I::Value: HasProductValue,
     I::Error: From<ExpectedTuple>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
-        let source = ctx.read(self.source)?;
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let source = interp.read(self.source)?;
         let product = source
             .as_product()
             .ok_or_else(|| I::Error::from(ExpectedTuple))?
             .clone();
-        ctx.write_results(self.results.as_slice(), product)?;
+        interp.write_results(self.results.as_slice(), product)?;
         Ok(ForwardEffect::Next)
     }
 }
 
-impl<I, T> Interpretable<ValueContext<'_, I>> for Get<T>
+impl<I, T> Interpretable<I, ForwardEval> for Get<T>
 where
-    I: ForwardInterp,
+    I: ForwardEvalInterp,
     I::Value: HasProductValue + TupleIndexValue,
     I::Error: From<ExpectedTuple> + From<InvalidTupleIndex> + From<TupleIndexOutOfBounds>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
-        let source = ctx.read(self.source)?;
-        let index = ctx
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let source = interp.read(self.source)?;
+        let index = interp
             .read(self.index)?
             .as_tuple_index()
             .ok_or_else(|| I::Error::from(InvalidTupleIndex))?;
@@ -66,25 +66,25 @@ where
             .get(index)
             .cloned()
             .ok_or_else(|| I::Error::from(TupleIndexOutOfBounds))?;
-        ctx.write(self.result, value)?;
+        interp.write(self.result, value)?;
         Ok(ForwardEffect::Next)
     }
 }
 
-impl<I, T> Interpretable<ValueContext<'_, I>> for Len<T>
+impl<I, T> Interpretable<I, ForwardEval> for Len<T>
 where
-    I: ForwardInterp,
+    I: ForwardEvalInterp,
     I::Value: HasProductValue + TupleIndexValue,
     I::Error: From<ExpectedTuple>,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
-        let source = ctx.read(self.source)?;
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let source = interp.read(self.source)?;
         let len = source
             .as_product()
             .ok_or_else(|| I::Error::from(ExpectedTuple))?
             .len();
-        ctx.write(self.result, I::Value::from_tuple_index(len))?;
+        interp.write(self.result, I::Value::from_tuple_index(len))?;
         Ok(ForwardEffect::Next)
     }
 }

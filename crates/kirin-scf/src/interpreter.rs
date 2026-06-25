@@ -22,7 +22,7 @@ use std::marker::PhantomData;
 
 use kirin::prelude::{Block, CompileStage, CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    BranchCondition, ForwardEffect, ForwardInterp, Interpretable, InterpreterError, ValueContext,
+    BranchCondition, ForwardEffect, ForwardEval, ForwardEvalInterp, Interpretable, InterpreterError,
 };
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BodyFrame,
@@ -36,23 +36,21 @@ use crate::{For, ForLoopValue, If, Yield};
 // scf.if — push a dialect-owned if frame
 // ===========================================================================
 
-impl<I, T> Interpretable<ValueContext<'_, I>> for If<T>
+impl<I, T> Interpretable<I, ForwardEval> for If<T>
 where
-    I: ForwardInterp + ScfIfDispatch,
+    I: ForwardEvalInterp + ScfIfDispatch,
     I::Value: BranchCondition,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
-        let stage = ctx.stage();
-        let index = ctx.index();
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let stage = interp.stage();
+        let index = interp.index();
         let results: Product<SSAValue> = self.results.iter().copied().map(Into::into).collect();
         // The decision is value-domain (decided concretely, undecided as `None`
         // under abstract interpretation); the SCF if frame owns what to do with
         // it — pick an arm or explore both and join.
-        let decided = ctx.read(self.condition)?.is_truthy();
-        let frame =
-            ctx.interp()
-                .scf_if_frame(stage, index, self.then_body, self.else_body, decided)?;
+        let decided = interp.read(self.condition)?.is_truthy();
+        let frame = interp.scf_if_frame(stage, index, self.then_body, self.else_body, decided)?;
         Ok(ForwardEffect::Push { frame, results })
     }
 }
@@ -61,19 +59,19 @@ where
 // scf.for — push a dialect-owned loop frame
 // ===========================================================================
 
-impl<I, T> Interpretable<ValueContext<'_, I>> for For<T>
+impl<I, T> Interpretable<I, ForwardEval> for For<T>
 where
-    I: ForwardInterp + ScfForDispatch,
+    I: ForwardEvalInterp + ScfForDispatch,
     I::Value: ForLoopValue + Clone + 'static,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
-        let stage = ctx.stage();
-        let index = ctx.index();
-        let induction = ctx.read(self.start)?;
-        let carried = ctx.read_many(self.init_args.as_slice())?;
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let stage = interp.stage();
+        let index = interp.index();
+        let induction = interp.read(self.start)?;
+        let carried = interp.read_many(self.init_args.as_slice())?;
         let results: Product<SSAValue> = self.results.iter().copied().map(Into::into).collect();
-        let frame = ctx.interp().scf_for_frame(
+        let frame = interp.scf_for_frame(
             stage,
             index,
             self.body,
@@ -87,13 +85,15 @@ where
     }
 }
 
-impl<I, T> Interpretable<ValueContext<'_, I>> for Yield<T>
+impl<I, T> Interpretable<I, ForwardEval> for Yield<T>
 where
-    I: ForwardInterp,
+    I: ForwardEvalInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, ctx: &mut ValueContext<'_, I>) -> Result<I::Effect, I::Error> {
-        Ok(ForwardEffect::Yield(ctx.read_many(self.values.as_slice())?))
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        Ok(ForwardEffect::Yield(
+            interp.read_many(self.values.as_slice())?,
+        ))
     }
 }
 
@@ -104,7 +104,7 @@ where
 // ===========================================================================
 
 /// Capability the `scf.for` rule uses to obtain this engine's loop frame.
-pub trait ScfForDispatch: ForwardInterp {
+pub trait ScfForDispatch: ForwardEvalInterp {
     #[allow(clippy::too_many_arguments)]
     fn scf_for_frame(
         &mut self,
@@ -185,7 +185,7 @@ where
 // ===========================================================================
 
 /// Capability the `scf.if` rule uses to obtain this engine's if frame.
-pub trait ScfIfDispatch: ForwardInterp {
+pub trait ScfIfDispatch: ForwardEvalInterp {
     fn scf_if_frame(
         &mut self,
         stage: CompileStage,

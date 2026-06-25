@@ -10,14 +10,14 @@
 //! [`BodyFrame`] to walk a chosen body — a reusable building block, not
 //! framework-owned structured semantics). A language that combines such a
 //! dialect defines its own total frame enum embedding [`BodyFrame`]/[`CallFrame`]
-//! via [`FrameBuild`] plus its dialect frames. The abstract analogue lives in
-//! [`abstract_frame`](crate::abstract_frame).
+//! via [`FrameBuild`] plus its dialect frames. The forward abstract analogue
+//! lives in [`forward_abstract_frames`](crate::forward_abstract_frames).
 
 use kirin_ir::{Block, CompileStage, Product, Region, SSAValue, Statement};
 
 use crate::{
-    CallEffect, Callee, EnvIndex, ForwardEffect, ForwardInterp, Frame, FrameDriver, FrameEffect,
-    InterpreterError,
+    CallEffect, Callee, EnvIndex, ForwardEffect, ForwardEvalInterp, Frame, FrameDriver,
+    FrameEffect, InterpreterError,
 };
 
 /// Completion payloads produced by the standard concrete frames.
@@ -134,7 +134,7 @@ where
     /// [`FrameEffect`] over the total frame type `F`.
     pub fn step_into<I, F>(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
     where
-        I: FrameDriver<Value = V, Error = E> + ForwardInterp<Frame = F>,
+        I: FrameDriver<Value = V, Error = E> + ForwardEvalInterp<Frame = F>,
         F: FrameBuild<V, E>,
     {
         // Bind entry arguments lazily on the first step (a dialect-built body
@@ -360,7 +360,7 @@ impl<V, E> FrameBuild<V, E> for StandardFrame<V, E> {
 
 impl<I, V, E> Frame<I> for StandardFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + ForwardInterp<Frame = StandardFrame<V, E>>,
+    I: FrameDriver<Value = V, Error = E> + ForwardEvalInterp<Frame = StandardFrame<V, E>>,
     V: Clone,
     E: From<InterpreterError>,
 {

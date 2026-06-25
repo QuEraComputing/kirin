@@ -12,7 +12,7 @@ use std::hash::Hash;
 use kirin_interpreter::engine::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCfgFrame, AbstractCompletion,
     AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, BodyFrame, CallFrame,
-    Completion, ForwardInterp, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
+    Completion, ForwardEvalInterp, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
 };
 use kirin_scf::{
     AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf, BuildScfFor,
@@ -54,7 +54,7 @@ impl<V, E> BuildScfFor<V, E> for ToyFrame<V, E> {
 
 impl<I, V, E> Frame<I> for ToyFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + ForwardInterp<Frame = ToyFrame<V, E>>,
+    I: FrameDriver<Value = V, Error = E> + ForwardEvalInterp<Frame = ToyFrame<V, E>>,
     V: Clone + ForLoopValue,
     E: From<InterpreterError>,
 {
@@ -136,7 +136,7 @@ impl<V, E, K> BuildAbstractScfFor<V, E, K> for ToyAbstractFrame<V, E, K> {
 impl<I, V, E, K> Frame<I> for ToyAbstractFrame<V, E, K>
 where
     I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-        + ForwardInterp<Frame = ToyAbstractFrame<V, E, K>>,
+        + ForwardEvalInterp<Frame = ToyAbstractFrame<V, E, K>>,
     V: Clone + PartialEq + ForLoopValue,
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,

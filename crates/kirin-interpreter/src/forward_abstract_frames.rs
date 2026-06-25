@@ -25,8 +25,8 @@ use std::marker::PhantomData;
 use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
 
 use crate::{
-    AbstractFrameDriver, CallEffect, EnvIndex, ForwardEffect, ForwardInterp, Frame, FrameEffect,
-    InterpreterError,
+    AbstractFrameDriver, CallEffect, EnvIndex, ForwardEffect, ForwardEvalInterp, Frame,
+    FrameEffect, InterpreterError,
 };
 
 /// Completion payloads produced by the standard abstract frames.
@@ -196,7 +196,7 @@ where
         interp: &mut I,
     ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
     where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + ForwardInterp<Frame = F>,
+        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + ForwardEvalInterp<Frame = F>,
         F: AbstractFrameBuild<V, E, K>,
     {
         let (block, cursor) = match self.current.take() {
@@ -350,7 +350,7 @@ where
         interp: &mut I,
     ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
     where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + ForwardInterp<Frame = F>,
+        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + ForwardEvalInterp<Frame = F>,
         F: AbstractFrameBuild<V, E, K>,
     {
         // Bind entry arguments lazily on the first step.
@@ -518,7 +518,7 @@ impl<V, E, K> AbstractFrameBuild<V, E, K> for StandardAbstractFrame<V, E, K> {
 impl<I, V, E, K> Frame<I> for StandardAbstractFrame<V, E, K>
 where
     I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-        + ForwardInterp<Frame = StandardAbstractFrame<V, E, K>>,
+        + ForwardEvalInterp<Frame = StandardAbstractFrame<V, E, K>>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,

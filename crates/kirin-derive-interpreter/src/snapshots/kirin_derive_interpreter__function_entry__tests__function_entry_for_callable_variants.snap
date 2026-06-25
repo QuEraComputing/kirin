@@ -3,32 +3,32 @@ source: crates/kirin-derive-interpreter/src/function_entry.rs
 expression: generate_function_entry_code(input)
 ---
 #[automatically_derived]
-impl<'__ctx, T: CompileTimeValue, __EntryI>
-    ::kirin_interpreter::FunctionEntry<::kirin_interpreter::ValueContext<'__ctx, __EntryI>>
-    for Lexical<T>
+impl<T: CompileTimeValue, __EntryI> ::kirin_interpreter::FunctionEntry<__EntryI> for Lexical<T>
 where
     __EntryI: ::kirin_interpreter::Interp,
-    Function<T>:
-        ::kirin_interpreter::FunctionEntry<::kirin_interpreter::ValueContext<'__ctx, __EntryI>>,
-    Lambda<T>:
-        ::kirin_interpreter::FunctionEntry<::kirin_interpreter::ValueContext<'__ctx, __EntryI>>,
+    Function<T>: ::kirin_interpreter::FunctionEntry<__EntryI>,
+    Lambda<T>: ::kirin_interpreter::FunctionEntry<__EntryI>,
 {
     fn function_entry(
         &self,
         args: ::kirin::ir::Product<<__EntryI as ::kirin_interpreter::Interp>::Value>,
-        ctx: &mut ::kirin_interpreter::ValueContext<'__ctx, __EntryI>,
+        interp: &mut __EntryI,
     ) -> Result<
         ::kirin_interpreter::FunctionBody<<__EntryI as ::kirin_interpreter::Interp>::Value>,
         <__EntryI as ::kirin_interpreter::Interp>::Error,
     > {
         match self {
-            Self::Function(field_0) => field_0.function_entry(args, ctx),
+            Self::Function(field_0) => field_0.function_entry(args, interp),
             Self::Call { .. } => Err(<__EntryI as ::kirin_interpreter::Interp>::Error::from(
-                ::kirin_interpreter::InterpreterError::NotCallable(ctx.statement()),
+                ::kirin_interpreter::InterpreterError::NotCallable(
+                    <__EntryI as ::kirin_interpreter::Interp>::statement(interp),
+                ),
             )),
-            Self::Lambda(field_0) => field_0.function_entry(args, ctx),
+            Self::Lambda(field_0) => field_0.function_entry(args, interp),
             Self::Return { .. } => Err(<__EntryI as ::kirin_interpreter::Interp>::Error::from(
-                ::kirin_interpreter::InterpreterError::NotCallable(ctx.statement()),
+                ::kirin_interpreter::InterpreterError::NotCallable(
+                    <__EntryI as ::kirin_interpreter::Interp>::statement(interp),
+                ),
             )),
         }
     }

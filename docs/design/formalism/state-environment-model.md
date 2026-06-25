@@ -3,25 +3,25 @@
 > Part of the [Rust Interpreter Formalism](index.md).
 
 This part uses both shorthand (`σ`, `ρ`) and direct API names (`EnvIndex`,
-`EnvStackStore`, `Ctx`) to keep proofs and implementation traces aligned.
+`EnvStackStore`, `Interp`) to keep proofs and implementation traces aligned.
 
 ## Reading Recipe
 
 - **Formal read:** Read this as the state transformer substrate for `⟨s, ρ, σ⟩ ⇓_ι ...`, with `σ` and `ρ` defining where values live and how they evolve.
-- **API read:** Inspect `crates/kirin-interpreter/src/{ctx.rs,env.rs}` first, then concrete/abstract `Interp` impls in `crates/kirin-interpreter/src/{concrete.rs,abstract_interp.rs}` for `env_read/env_write` behavior.
+- **API read:** Inspect `crates/kirin-interpreter/src/{interp.rs,env.rs}` first, then concrete/forward-abstract `Interp` impls in `crates/kirin-interpreter/src/{concrete_interp.rs,forward_abstract_interp.rs}` for `env_read/env_write` behavior.
 
 ## II.0 Symbol-to-code mapping
 
 | Formal symbol / concept | Rust type / function | Code |
 | --- | --- | --- |
-| Interpreter interface | `Interp` | [`crates/kirin-interpreter/src/ctx.rs`](../../../crates/kirin-interpreter/src/ctx.rs) |
-| Statement runtime context | `Ctx<'_, I>` | [`crates/kirin-interpreter/src/ctx.rs`](../../../crates/kirin-interpreter/src/ctx.rs) |
-| Scope env view | `EnvOps<V, E>` | [`crates/kirin-interpreter/src/ctx.rs`](../../../crates/kirin-interpreter/src/ctx.rs) |
+| Interpreter interface | `Interp` | [`crates/kirin-interpreter/src/interp.rs`](../../../crates/kirin-interpreter/src/interp.rs) |
+| Statement location | `InterpLocation` | [`crates/kirin-interpreter/src/interp.rs`](../../../crates/kirin-interpreter/src/interp.rs) |
+| Forward eval helpers | `ForwardEvalInterp` | [`crates/kirin-interpreter/src/interp.rs`](../../../crates/kirin-interpreter/src/interp.rs) |
 | Environment capability | `EnvIndex` | [`crates/kirin-interpreter/src/env.rs`](../../../crates/kirin-interpreter/src/env.rs) |
 | Environment trait | `Env<V>` | [`crates/kirin-interpreter/src/env.rs`](../../../crates/kirin-interpreter/src/env.rs) |
 | Concrete store | `EnvStackStore<V>` | [`crates/kirin-interpreter/src/env.rs`](../../../crates/kirin-interpreter/src/env.rs) |
-| Concrete `env_read` semantics | `ConcreteInterpreter` impl of `Interp` | [`crates/kirin-interpreter/src/concrete.rs`](../../../crates/kirin-interpreter/src/concrete.rs) |
-| Abstract `env_read` semantics | `AbstractInterpreter` impl of `Interp` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
+| Concrete `env_read` semantics | `ConcreteInterpreter` impl of `Env` | [`crates/kirin-interpreter/src/concrete_interp.rs`](../../../crates/kirin-interpreter/src/concrete_interp.rs) |
+| Forward abstract `env_read` semantics | `ForwardAbstractInterpreter` impl of `Env` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
 | Structured scope carrier | `Scope<V, E>`, `ScopeBody`, `ScopeHook`, `ScopeStep` | [`crates/kirin-interpreter/src/effect.rs`](../../../crates/kirin-interpreter/src/effect.rs) |
 | Value tuple packet | `Product<T>` | [`crates/kirin-ir/src/product.rs`](../../../crates/kirin-ir/src/product.rs) |
 
@@ -33,34 +33,33 @@ The engine-facing runtime interface is `Interp`:
 pub trait Interp: Sized {
     type Value: Clone;
     type Error: From<InterpreterError>;
+    type Effect;
+    type Kind;
 
-    fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<Self::Value, Self::Error>;
-    fn env_write(
-        &mut self,
-        env: EnvIndex,
-        value: SSAValue,
-        data: Self::Value,
-    ) -> Result<(), Self::Error>;
+    fn stage(&self) -> CompileStage;
+    fn statement(&self) -> Statement;
+    fn index(&self) -> EnvIndex;
 }
 ```
 
-Dialect code never manipulates store internals directly. It sees `Ctx<'_, I>`,
-which bundles `(interp, stage, statement, env)` and provides:
+Forward-evaluation dialect code never manipulates store internals directly. It
+receives `&mut I`, where `I: ForwardEvalInterp`; the engine has already stashed
+the current `(stage, statement, env)` as an `InterpLocation` and exposes:
 
-- `ctx.read(x)`
-- `ctx.read_many(xs)`
-- `ctx.write(x, v)`
-- `ctx.write_results(results, product)`
+- `interp.read(x)`
+- `interp.read_many(xs)`
+- `interp.write(x, v)`
+- `interp.write_results(results, product)`
 
 So the formal transition `σ -> σ'` for a statement is realized operationally by
-mutations performed through `Ctx` over `Interp::env_write`; it is not a separate
-explicit return value from `interpret`.
+mutations performed through `ForwardEvalInterp` helpers over `Env::env_write`;
+it is not a separate explicit return value from `interpret`.
 
 API-level correspondence:
 
-- `ρ` corresponds to `Ctx::env()` / `EnvIndex`
+- `ρ` corresponds to `interp.index()` / `EnvIndex`
 - `σ` corresponds to engine-owned `EnvStackStore<V>`
-- `σ[ρ, x] = v` corresponds to `ctx.write(x, v)` or `env_write(ρ, x, v)`
+- `σ[ρ, x] = v` corresponds to `interp.write(x, v)` or `env_write(ρ, x, v)`
 
 ## II.2 Environment Store
 

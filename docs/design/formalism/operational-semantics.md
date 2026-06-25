@@ -5,7 +5,7 @@
 ## Reading Recipe
 
 - **Formal read:** Use `⟨s, ρ, σ⟩ ⇓_ι Result<(σ', φ), ε>` for statement meaning and interpret engine behavior as transitions over continuations/worklists that consume `φ`.
-- **API read:** Follow `dispatch_statement` (`dispatch.rs`) -> `Interpretable::interpret` (dialect `*/interpreter.rs`) -> `Effect` (`effect.rs`) -> concrete frame driver (`frame.rs`, `concrete.rs`) or abstract fixpoint driver (`abstract_interp.rs`).
+- **API read:** Follow `dispatch_statement` (`dispatch.rs`) -> `Interpretable::interpret` (dialect `*/interpreter.rs`) -> `Effect` (`effect.rs`) -> concrete frame driver (`frame.rs`, `concrete_interp.rs`) or forward abstract fixpoint driver (`forward_abstract_interp.rs`).
 
 ## III.0 Symbol-to-code mapping
 
@@ -16,18 +16,17 @@
 | Call effect | `CallEffect<V>` | [`crates/kirin-interpreter/src/effect.rs`](../../../crates/kirin-interpreter/src/effect.rs) |
 | Structured scope | `Scope<V, E>`, `ScopeBody` | [`crates/kirin-interpreter/src/effect.rs`](../../../crates/kirin-interpreter/src/effect.rs) |
 | Loop transition strategy | `ScopeHook`, `ScopeStep` | [`crates/kirin-interpreter/src/effect.rs`](../../../crates/kirin-interpreter/src/effect.rs) |
-| Statement dispatch | `Interpretable<I>`, `InterpDispatch<I>` | [`crates/kirin-interpreter/src/dispatch.rs`](../../../crates/kirin-interpreter/src/dispatch.rs) |
-| Runtime context | `Ctx<'_, I>` | [`crates/kirin-interpreter/src/ctx.rs`](../../../crates/kirin-interpreter/src/ctx.rs) |
+| Statement dispatch | `Interpretable<I, Kind>`, `InterpDispatch<I, Kind>` | [`crates/kirin-interpreter/src/dispatch.rs`](../../../crates/kirin-interpreter/src/dispatch.rs) |
+| Current statement location | `InterpLocation` | [`crates/kirin-interpreter/src/interp.rs`](../../../crates/kirin-interpreter/src/interp.rs) |
 | Frame protocol | `Frame<I>`, `FrameDriver` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |
 | Scope continuation frame | `ScopeFrame<V, E>` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |
 | Call continuation frame | `CallFrame<V>` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |
 | Total frame enum | `StandardFrame<V, E>` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |
-| Concrete driver entry | `ConcreteInterpreter::call_by_name` | [`crates/kirin-interpreter/src/concrete.rs`](../../../crates/kirin-interpreter/src/concrete.rs) |
-| Concrete driver loop | `ConcreteInterpreter::run` | [`crates/kirin-interpreter/src/concrete.rs`](../../../crates/kirin-interpreter/src/concrete.rs) |
-| Abstract driver entry | `AbstractInterpreter::analyze_by_name` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
-| Abstract CFG fixpoint | `AbstractInterpreter::eval_cfg` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
-| Abstract scope fixpoint | `AbstractInterpreter::eval_scope` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
-| Abstract statement dispatch helper | `AbstractInterpreter::dispatch` | [`crates/kirin-interpreter/src/abstract_interp.rs`](../../../crates/kirin-interpreter/src/abstract_interp.rs) |
+| Concrete driver entry | `ConcreteInterpreter::call_by_name` | [`crates/kirin-interpreter/src/concrete_interp.rs`](../../../crates/kirin-interpreter/src/concrete_interp.rs) |
+| Concrete driver loop | `ConcreteInterpreter::run` | [`crates/kirin-interpreter/src/concrete_interp.rs`](../../../crates/kirin-interpreter/src/concrete_interp.rs) |
+| Forward abstract driver entry | `ForwardAbstractInterpreter::analyze_by_name` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Forward abstract CFG fixpoint | `ForwardAbstractInterpreter::eval_cfg` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Forward abstract statement dispatch helper | `ForwardAbstractInterpreter` dispatch path | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
 
 ## III.1 Statement Semantics Judgment
 
@@ -41,19 +40,20 @@ where:
 - `ρ` is the active environment capability (`EnvIndex`)
 - `σ` is the pre-state store view
 - `σ'` is the post-state store view
-- `ι` is the engine instance (materialized in Rust as `Ctx<'_, I>`)
+- `ι` is the engine instance (materialized in Rust as `&mut I`)
 - `φ` is `Effect<I::Value, I::Error>`
 - `ε` is the interpreter error in `Result::Err`
 
 Important correspondence note: in Rust, `Interpretable::interpret` returns
 `Result<Effect<...>, ...>`; `σ'` is not returned explicitly. Instead, `σ -> σ'`
-is induced by side effects through `Ctx` (`ctx.read`, `ctx.write`,
-`ctx.write_results`) over the engine's `env_read`/`env_write` implementation.
+is induced by side effects through `ForwardEvalInterp` helpers (`interp.read`,
+`interp.write`, `interp.write_results`) over the engine's `env_read`/`env_write`
+implementation.
 
 API-level statement rule (canonical):
 
-1. engine dispatches to `definition.interpret(&mut Ctx::new(...))`
-2. dialect impl may mutate store via `ctx.write` / `ctx.write_results`
+1. engine records its current `InterpLocation` and dispatches to `definition.interpret(self)`
+2. dialect impl may mutate store via `interp.write` / `interp.write_results`
 3. dialect impl returns `Result<Effect<...>, ...>`
 4. engine consumes returned `Effect`
 
@@ -93,8 +93,8 @@ For each statement step, use this mapping:
 
 - `⟨s, ρ, σ⟩ ⇓_ι Result<(σ', φ), ε>`
   - `s`: `statement.definition(stage_info).clone()`
-  - `ρ`: `Ctx::env()`
-  - `σ -> σ'`: induced by `ctx.write*` calls
+  - `ρ`: `interp.index()`
+  - `σ -> σ'`: induced by `interp.write*` calls
   - `φ`: returned `Effect`
   - `ε`: returned error
 
@@ -165,7 +165,7 @@ Dispatch path for any statement:
 
 1. engine calls `info.dispatch_statement(stage, statement, env, self)`
 2. stage dispatch resolves language enum variant
-3. wrapped dialect impl `interpret(&mut Ctx<'_, I>)` runs
+3. wrapped dialect impl `interpret(&mut I)` runs
 4. emitted `Effect` re-enters engine protocol
 
 Thus mixed dialect programs (`cmp`, `arith`, `scf`, `cf`, `function`) run in one

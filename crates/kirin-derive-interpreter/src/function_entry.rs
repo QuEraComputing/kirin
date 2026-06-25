@@ -35,11 +35,7 @@ fn emit_function_entry(
 
     let type_name = &ctx.meta.name;
     let mut impl_generics = ctx.meta.generics.clone();
-    // Specialized on the *context* type `ValueContext<'__ctx, I>` (lifetime first, engine
-    // type after), mirroring `Interpretable`.
-    impl_generics
-        .params
-        .insert(0, syn::GenericParam::Lifetime(syn::parse_quote!('__ctx)));
+    // Specialized on the engine type `__EntryI`, mirroring `Interpretable`.
     impl_generics
         .params
         .push(syn::GenericParam::Type(syn::parse_quote!(__EntryI)));
@@ -52,7 +48,7 @@ fn emit_function_entry(
         vec![syn::parse_quote! { __EntryI: #interp_crate::Interp }];
     for wrapper_ty in callable_wrappers {
         predicates.push(syn::parse_quote! {
-            #wrapper_ty: #interp_crate::FunctionEntry<#interp_crate::ValueContext<'__ctx, __EntryI>>
+            #wrapper_ty: #interp_crate::FunctionEntry<__EntryI>
         });
     }
     let extra_where: syn::WhereClause = syn::parse_quote! { where #(#predicates),* };
@@ -82,12 +78,14 @@ fn emit_function_entry(
                 .as_ref()
                 .ok_or_else(|| darling::Error::custom("expected wrapper binding"))?;
             arms.push(quote! {
-                #arm_pattern => #binding.function_entry(args, ctx)
+                #arm_pattern => #binding.function_entry(args, interp)
             });
         } else {
             arms.push(quote! {
                 Self::#variant_name { .. } => Err(<__EntryI as #interp_crate::Interp>::Error::from(
-                    #interp_crate::InterpreterError::NotCallable(ctx.statement())
+                    #interp_crate::InterpreterError::NotCallable(
+                        <__EntryI as #interp_crate::Interp>::statement(interp)
+                    )
                 ))
             });
         }
@@ -110,11 +108,11 @@ fn emit_function_entry(
 
     Ok(vec![quote! {
         #[automatically_derived]
-        impl #impl_generics #interp_crate::FunctionEntry<#interp_crate::ValueContext<'__ctx, __EntryI>> for #type_name #ty_generics #where_clause {
+        impl #impl_generics #interp_crate::FunctionEntry<__EntryI> for #type_name #ty_generics #where_clause {
             fn function_entry(
                 &self,
                 args: #ir_crate::Product<<__EntryI as #interp_crate::Interp>::Value>,
-                ctx: &mut #interp_crate::ValueContext<'__ctx, __EntryI>,
+                interp: &mut __EntryI,
             ) -> Result<
                 #interp_crate::FunctionBody<<__EntryI as #interp_crate::Interp>::Value>,
                 <__EntryI as #interp_crate::Interp>::Error,

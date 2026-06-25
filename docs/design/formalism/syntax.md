@@ -101,7 +101,7 @@ Given statement `s`:
 
 1. fetch definition at `(stage, statement)`
 2. dispatch by stage language via `InterpDispatch`
-3. call dialect `interpret(&mut Ctx<'_, I>)`
+3. call dialect `interpret(&mut I)`
 4. obtain `Effect`
 5. engine applies global control semantics
 
