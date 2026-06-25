@@ -1,36 +1,16 @@
-//! The shared frame-based traversal **protocol**.
+//! Shared frame protocol plus forward frame-driver capabilities.
 //!
-//! The dialect API ([`Interpretable`](crate::Interpretable)) produces a closed
-//! [`ForwardEffect`] per statement. This module is the layer *between* that dialect
-//! algebra and the engines: a **frame** consumes effects and decides traversal,
-//! and an engine just runs a stack of frames. This module owns only the
-//! protocol; the two implementations of it live alongside:
-//!
-//! - [`Frame`] is the continuation trait. The *total* frame type `F` (an enum
-//!   of frame kinds) implements it; the engine owns a `Vec<F>` and applies the
-//!   returned [`FrameEffect`]. The frame type is the engine's `F` generic; it is
-//!   named in [`Interpretable`](crate::Interpretable) only by a structured
-//!   dialect building a [`ForwardEffect::Push`](crate::ForwardEffect::Push)
-//!   (through [`ForwardInterp::Frame`](crate::ForwardInterp::Frame)) — ordinary
-//!   dialects never mention it.
-//! - [`FrameDriver`] is the capability surface every frame needs from its engine
-//!   (env alloc/free, IR queries, statement dispatch, call resolution). Both
-//!   engines implement it.
-//! - [`AbstractFrameDriver`] adds the abstract-only capabilities (analysis
-//!   merge, return accumulation, atomic call summarization).
-//! - The **concrete** implementation — [`BodyFrame`](crate::BodyFrame),
-//!   [`CallFrame`](crate::CallFrame), [`StandardFrame`](crate::StandardFrame) —
-//!   lives in [`concrete_frame`](crate::concrete_frame); the **abstract**
-//!   implementation lives in [`abstract_frame`](crate::abstract_frame). Both are
-//!   implementations of *this* protocol, not parallel frameworks.
+//! [`Frame`], [`FrameEngine`], [`FrameEffect`], and [`drive_frames`] are
+//! direction-neutral. Forward engines add [`ForwardFrameDriver`] and
+//! [`ForwardDataflowFrameDriver`] for env access, IR queries, calls, and abstract
+//! merge/summarization.
 
 use std::hash::Hash;
 
 use kirin_ir::{Block, CompileStage, Product, Region, SSAValue, Statement};
 
 use crate::{
-    CallEffect, Callee, EnvIndex, ForwardEnv, FunctionBody, FunctionTarget, Interp,
-    InterpreterError,
+    CallEffect, Callee, Env, EnvIndex, FunctionBody, FunctionTarget, Interp, InterpreterError,
 };
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
@@ -47,12 +27,7 @@ pub enum FrameEffect<F, C> {
     Complete(C),
 }
 
-/// The minimal capability a [`Frame`] stack needs from the engine driving it:
-/// just a total error type. This is the *direction-neutral* anchor of the frame
-/// protocol — deliberately saying nothing about a value domain — so a frame
-/// family is decoupled from the forward value engine ([`Interp`]). Every
-/// [`Interp`] is a `FrameEngine` (blanket impl below); a future engine that is
-/// not an `Interp` can implement this directly.
+/// Minimal capability a [`Frame`] stack needs from the engine driving it.
 pub trait FrameEngine {
     /// The total error type produced while stepping frames.
     type Error;
@@ -62,14 +37,10 @@ impl<T: Interp> FrameEngine for T {
     type Error = <T as Interp>::Error;
 }
 
-/// A continuation frame anchored in an IR traversal. Implemented by the *total*
-/// frame type `F`; each method consumes `self` and returns the next structural
-/// move as a [`FrameEffect`].
+/// A continuation frame anchored in an IR traversal.
 ///
-/// `I` is the engine, constrained only by [`FrameEngine`] here (a total error
-/// type) — frames do not require the forward [`Interp`] value engine. Standard
-/// frames additionally require [`FrameDriver`]/[`AbstractFrameDriver`] in their
-/// own impls, so the trait itself does not leak engine capabilities.
+/// Implemented by the total frame enum `F`. Each method consumes `self` and
+/// returns the next structural move as a [`FrameEffect`].
 pub trait Frame<I: FrameEngine>: Sized {
     /// The completion payload this frame family bubbles to parents/root.
     type Completion;
@@ -83,13 +54,7 @@ pub trait Frame<I: FrameEngine>: Sized {
     ) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
 }
 
-/// The shared frame-stepping driver loop, used by every engine instead of each
-/// re-implementing the same worklist: pop the top frame, [`step`](Frame::step)
-/// it, and apply the returned [`FrameEffect`]. `Continue`/`Push` adjust the
-/// stack; `Done`/`Complete` bubble through parents via
-/// [`resume_done`](Frame::resume_done)/[`resume`](Frame::resume) until one
-/// continues or the stack empties. A `Complete` at the root returns its
-/// completion to the caller.
+/// Shared frame-stepping loop.
 pub fn drive_frames<I, F>(engine: &mut I, frames: &mut Vec<F>) -> Result<F::Completion, I::Error>
 where
     I: FrameEngine,
@@ -129,23 +94,14 @@ where
     }
 }
 
-/// Capabilities a forward frame needs from its engine, beyond [`ForwardEnv`]'s
-/// SSA read/write.
+/// Capabilities required by forward frames.
 ///
-/// Forward frames bind block parameters and write results, so this is a
-/// **forward** capability surface: it requires [`ForwardEnv`] (the
-/// `env_read`/`env_write` the default `bind_block_args`/`write_results` use) on top
-/// of the base [`Interp`] contract. Implemented by both forward engines
-/// ([`ConcreteInterpreter`](crate::ConcreteInterpreter) and
-/// [`AbstractInterpreter`](crate::AbstractInterpreter)), so the standard frames are
-/// generic over `I: FrameDriver` and a custom frame can drive any engine providing
-/// these capabilities. (Frames that consume the [`ForwardEffect`](crate::ForwardEffect)
-/// algebra add `+ ForwardInterp` in their own impls.)
-pub trait FrameDriver: ForwardEnv {
+/// Re-exported as [`FrameDriver`](crate::FrameDriver).
+pub trait ForwardFrameDriver: Env {
     /// Allocate a fresh SSA activation record.
     fn alloc_env(&mut self) -> EnvIndex;
     /// Free an activation record.
-    fn free_env(&mut self, env: EnvIndex) -> Result<(), Self::Error>;
+    fn free_env(&mut self, index: EnvIndex) -> Result<(), Self::Error>;
     /// Resolve a callee to a concrete function target via the engine's linker.
     fn resolve_call(
         &self,
@@ -159,7 +115,7 @@ pub trait FrameDriver: ForwardEnv {
         &mut self,
         stage: CompileStage,
         statement: Statement,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Result<Self::Effect, Self::Error>;
     /// Build the [`FunctionBody`] a callable statement enters on invocation.
     fn enter_function(
@@ -167,7 +123,7 @@ pub trait FrameDriver: ForwardEnv {
         stage: CompileStage,
         body: Statement,
         args: Product<Self::Value>,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Result<FunctionBody<Self::Value>, Self::Error>;
 
     fn block_params(&self, stage: CompileStage, block: Block)
@@ -193,7 +149,7 @@ pub trait FrameDriver: ForwardEnv {
     fn bind_block_args(
         &mut self,
         stage: CompileStage,
-        env: EnvIndex,
+        index: EnvIndex,
         block: Block,
         args: &Product<Self::Value>,
     ) -> Result<(), Self::Error> {
@@ -206,7 +162,7 @@ pub trait FrameDriver: ForwardEnv {
             }));
         }
         for (param, value) in params.into_iter().zip(args.iter().cloned()) {
-            self.env_write(env, param, value)?;
+            self.env_write(index, param, value)?;
         }
         Ok(())
     }
@@ -214,7 +170,7 @@ pub trait FrameDriver: ForwardEnv {
     /// Destructure `values` into `results` slots in `env` (arity-checked).
     fn write_results(
         &mut self,
-        env: EnvIndex,
+        index: EnvIndex,
         results: &Product<SSAValue>,
         values: Product<Self::Value>,
     ) -> Result<(), Self::Error> {
@@ -225,18 +181,20 @@ pub trait FrameDriver: ForwardEnv {
             }));
         }
         for (slot, value) in results.iter().copied().zip(values) {
-            self.env_write(env, slot, value)?;
+            self.env_write(index, slot, value)?;
         }
         Ok(())
     }
 }
 
-/// Capabilities the **abstract** frames need from the abstract engine, beyond
-/// the shared [`FrameDriver`] IR queries.
+/// The **forward dataflow** frame-driver capability surface: what the forward
+/// abstract frames need from the engine, beyond the [`ForwardFrameDriver`] IR
+/// queries.
 ///
-/// Implemented by [`AbstractInterpreter`](crate::AbstractInterpreter). The
-/// standard abstract frames are generic over `I: AbstractFrameDriver`, so a
-/// custom abstract frame can drive any engine providing these capabilities.
+/// Implemented by [`ForwardAbstractInterpreter`](crate::ForwardAbstractInterpreter).
+/// The standard abstract frames are generic over `I: ForwardDataflowFrameDriver`,
+/// so a custom forward-dataflow frame can drive any engine providing these
+/// capabilities.
 ///
 /// The interprocedural protocol stays **atomic in the engine**: `summarize_call`
 /// performs the whole call-summarization step (resolve, key, join arguments into
@@ -244,7 +202,10 @@ pub trait FrameDriver: ForwardEnv {
 /// self-recursion* — and read the current return summary or `bottom`), so a
 /// custom frame cannot reorder it and break soundness. Frames only decide
 /// *traversal*: which frame to step next.
-pub trait AbstractFrameDriver: FrameDriver {
+///
+/// Re-exported as [`AbstractFrameDriver`](crate::AbstractFrameDriver) for backward
+/// compatibility.
+pub trait ForwardDataflowFrameDriver: ForwardFrameDriver {
     /// The key under which function entry/return summaries are tracked
     /// (the analysis [`CallContext::Key`](crate::CallContext::Key)).
     type SummaryKey: Clone + Eq + Hash;
@@ -273,7 +234,7 @@ pub trait AbstractFrameDriver: FrameDriver {
         &mut self,
         stage: CompileStage,
         call: CallEffect<Self::Value>,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Result<(), Self::Error>;
 
     /// The per-fixpoint iteration cap (divergence guard).

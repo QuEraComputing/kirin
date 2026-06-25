@@ -2,7 +2,7 @@
 //!
 //! This is the abstract analogue of [`frame`](crate::frame): the dialect API
 //! still produces a closed [`ForwardEffect`] per statement, and these frames
-//! decide how the [`AbstractInterpreter`](crate::AbstractInterpreter)
+//! decide how the [`ForwardAbstractInterpreter`](crate::ForwardAbstractInterpreter)
 //! *traverses* — CFG block worklists with join/widen, branch exploration,
 //! single-block body walks, and call summarization. The
 //! engine just runs a stack of frames (`run_frames`), so a language can supply a
@@ -58,7 +58,7 @@ pub struct AbstractFunctionFrame<V, E, K> {
     stage: CompileStage,
     body: Statement,
     args: Product<V>,
-    env: EnvIndex,
+    index: EnvIndex,
     _marker: PhantomData<fn() -> (E, K)>,
 }
 
@@ -68,12 +68,12 @@ where
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,
 {
-    pub fn new(stage: CompileStage, body: Statement, args: Product<V>, env: EnvIndex) -> Self {
+    pub fn new(stage: CompileStage, body: Statement, args: Product<V>, index: EnvIndex) -> Self {
         Self {
             stage,
             body,
             args,
-            env,
+            index,
             _marker: PhantomData,
         }
     }
@@ -83,11 +83,11 @@ where
         I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
         F: AbstractFrameBuild<V, E, K>,
     {
-        let body = interp.enter_function(self.stage, self.body, self.args, self.env)?;
+        let body = interp.enter_function(self.stage, self.body, self.args, self.index)?;
         let entry = interp
             .region_entry(self.stage, body.region)?
             .ok_or_else(|| E::from(InterpreterError::EmptyRegion))?;
-        let cfg = AbstractCfgFrame::enter(self.stage, self.env, entry, body.args);
+        let cfg = AbstractCfgFrame::enter(self.stage, self.index, entry, body.args);
         Ok(FrameEffect::Push {
             parent: F::from_function(Self {
                 args: Product::new(),
@@ -121,7 +121,7 @@ where
 /// stepped per `step` so a wrapping frame observes every move.
 pub struct AbstractCfgFrame<V, E, K> {
     stage: CompileStage,
-    env: EnvIndex,
+    index: EnvIndex,
     block_in: HashMap<Block, Product<V>>,
     visits: HashMap<Block, usize>,
     pending: VecDeque<Block>,
@@ -140,7 +140,7 @@ where
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,
 {
-    pub fn enter(stage: CompileStage, env: EnvIndex, entry: Block, args: Product<V>) -> Self {
+    pub fn enter(stage: CompileStage, index: EnvIndex, entry: Block, args: Product<V>) -> Self {
         let mut block_in = HashMap::new();
         let mut pending = VecDeque::new();
         let mut queued = HashSet::new();
@@ -149,7 +149,7 @@ where
         queued.insert(entry);
         Self {
             stage,
-            env,
+            index,
             block_in,
             visits: HashMap::new(),
             pending,
@@ -214,7 +214,7 @@ where
                 let in_args = self.block_in.get(&block).cloned().ok_or_else(|| {
                     E::from(InterpreterError::Custom("missing block entry state"))
                 })?;
-                interp.bind_block_args(self.stage, self.env, block, &in_args)?;
+                interp.bind_block_args(self.stage, self.index, block, &in_args)?;
                 let cursor = interp.first_statement(self.stage, block)?;
                 self.current = Some((block, cursor));
                 return Ok(FrameEffect::Continue(F::from_cfg(self)));
@@ -229,7 +229,7 @@ where
         let next = interp.next_statement(self.stage, block, statement)?;
         self.current = Some((block, next));
 
-        match interp.run_statement(self.stage, statement, self.env)? {
+        match interp.run_statement(self.stage, statement, self.index)? {
             ForwardEffect::Next => Ok(FrameEffect::Continue(F::from_cfg(self))),
             ForwardEffect::Jump(edge) => {
                 self.flow(interp, edge.target, edge.args)?;
@@ -250,7 +250,7 @@ where
             }
             ForwardEffect::Yield(_) => Err(E::from(InterpreterError::UnexpectedYield(statement))),
             ForwardEffect::Call(call) => {
-                let call_frame = AbstractCallFrame::new(self.stage, call, self.env);
+                let call_frame = AbstractCallFrame::new(self.stage, call, self.index);
                 Ok(FrameEffect::Push {
                     parent: F::from_cfg(self),
                     child: F::from_call(call_frame),
@@ -289,7 +289,7 @@ where
                 let slots = self.resume_slots.take().ok_or_else(|| {
                     E::from(InterpreterError::Custom("cfg resume without result slots"))
                 })?;
-                interp.write_results(self.env, &slots, values)?;
+                interp.write_results(self.index, &slots, values)?;
                 Ok(FrameEffect::Continue(F::from_cfg(self)))
             }
             AbstractCompletion::Finished(None) => {
@@ -315,7 +315,7 @@ where
 /// like the CFG frame.
 pub struct AbstractBlockFrame<V, E, K> {
     stage: CompileStage,
-    env: EnvIndex,
+    index: EnvIndex,
     block: Block,
     cursor: Option<Statement>,
     /// Entry arguments not yet bound — bound on the first step, so building the
@@ -333,10 +333,10 @@ where
 {
     /// A block frame that binds its entry parameters on the first step. Pure
     /// construction — needs no engine access.
-    pub fn new(stage: CompileStage, env: EnvIndex, block: Block, args: Product<V>) -> Self {
+    pub fn new(stage: CompileStage, index: EnvIndex, block: Block, args: Product<V>) -> Self {
         Self {
             stage,
-            env,
+            index,
             block,
             cursor: None,
             pending: Some(args),
@@ -355,7 +355,7 @@ where
     {
         // Bind entry arguments lazily on the first step.
         if let Some(args) = self.pending.take() {
-            interp.bind_block_args(self.stage, self.env, self.block, &args)?;
+            interp.bind_block_args(self.stage, self.index, self.block, &args)?;
             self.cursor = interp.first_statement(self.stage, self.block)?;
             return Ok(FrameEffect::Continue(F::from_block(self)));
         }
@@ -364,7 +364,7 @@ where
         };
         self.cursor = interp.next_statement(self.stage, self.block, statement)?;
 
-        match interp.run_statement(self.stage, statement, self.env)? {
+        match interp.run_statement(self.stage, statement, self.index)? {
             ForwardEffect::Next => Ok(FrameEffect::Continue(F::from_block(self))),
             ForwardEffect::Yield(values) => Ok(FrameEffect::Complete(
                 AbstractCompletion::Finished(Some(values)),
@@ -374,7 +374,7 @@ where
                 Ok(FrameEffect::Complete(AbstractCompletion::Finished(None)))
             }
             ForwardEffect::Call(call) => {
-                let call_frame = AbstractCallFrame::new(self.stage, call, self.env);
+                let call_frame = AbstractCallFrame::new(self.stage, call, self.index);
                 Ok(FrameEffect::Push {
                     parent: F::from_block(self),
                     child: F::from_call(call_frame),
@@ -417,7 +417,7 @@ where
                         "block resume without result slots",
                     ))
                 })?;
-                interp.write_results(self.env, &slots, values)?;
+                interp.write_results(self.index, &slots, values)?;
                 Ok(FrameEffect::Continue(F::from_block(self)))
             }
             // A nested push returned without finishing: this body pass left via
@@ -442,7 +442,7 @@ where
 pub struct AbstractCallFrame<V, E, K> {
     stage: CompileStage,
     call: CallEffect<V>,
-    env: EnvIndex,
+    index: EnvIndex,
     _marker: PhantomData<fn() -> (E, K)>,
 }
 
@@ -452,11 +452,11 @@ where
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,
 {
-    pub fn new(stage: CompileStage, call: CallEffect<V>, env: EnvIndex) -> Self {
+    pub fn new(stage: CompileStage, call: CallEffect<V>, index: EnvIndex) -> Self {
         Self {
             stage,
             call,
-            env,
+            index,
             _marker: PhantomData,
         }
     }
@@ -466,7 +466,7 @@ where
         I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
         F: AbstractFrameBuild<V, E, K>,
     {
-        interp.summarize_call(self.stage, self.call, self.env)?;
+        interp.summarize_call(self.stage, self.call, self.index)?;
         Ok(FrameEffect::Done)
     }
 

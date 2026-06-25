@@ -48,7 +48,7 @@ pub trait FrameBuild<V, E>: Sized {
 /// or a single body block (scf-style, terminated by a yield).
 pub struct BodyFrame<V, E> {
     stage: CompileStage,
-    env: EnvIndex,
+    index: EnvIndex,
     owns_env: bool,
     function_boundary: bool,
     block: Block,
@@ -73,7 +73,7 @@ where
     pub fn function<I>(
         interp: &mut I,
         stage: CompileStage,
-        env: EnvIndex,
+        index: EnvIndex,
         region: Region,
         args: Product<V>,
     ) -> Result<Self, E>
@@ -83,16 +83,16 @@ where
         let entry = interp
             .region_entry(stage, region)?
             .ok_or_else(|| E::from(InterpreterError::EmptyRegion))?;
-        Self::start(interp, stage, env, entry, args, true, true)
+        Self::start(interp, stage, index, entry, args, true, true)
     }
 
     /// A single body block (scf-style), to bind `args` to its parameters on the
     /// first step. Borrows the caller's activation and is not a return boundary.
     /// Pure construction — needs no engine access.
-    pub fn block(stage: CompileStage, env: EnvIndex, block: Block, args: Product<V>) -> Self {
+    pub fn block(stage: CompileStage, index: EnvIndex, block: Block, args: Product<V>) -> Self {
         Self {
             stage,
-            env,
+            index,
             owns_env: false,
             function_boundary: false,
             block,
@@ -106,7 +106,7 @@ where
     fn start<I>(
         interp: &mut I,
         stage: CompileStage,
-        env: EnvIndex,
+        index: EnvIndex,
         block: Block,
         args: Product<V>,
         owns_env: bool,
@@ -115,11 +115,11 @@ where
     where
         I: FrameDriver<Value = V, Error = E>,
     {
-        interp.bind_block_args(stage, env, block, &args)?;
+        interp.bind_block_args(stage, index, block, &args)?;
         let cursor = interp.first_statement(stage, block)?;
         Ok(Self {
             stage,
-            env,
+            index,
             owns_env,
             function_boundary,
             block,
@@ -140,7 +140,7 @@ where
         // Bind entry arguments lazily on the first step (a dialect-built body
         // frame carries them unbound).
         if let Some(args) = self.pending.take() {
-            interp.bind_block_args(self.stage, self.env, self.block, &args)?;
+            interp.bind_block_args(self.stage, self.index, self.block, &args)?;
             self.cursor = interp.first_statement(self.stage, self.block)?;
             return Ok(FrameEffect::Continue(F::from_body(self)));
         }
@@ -153,10 +153,10 @@ where
         };
         self.cursor = interp.next_statement(self.stage, self.block, statement)?;
 
-        match interp.run_statement(self.stage, statement, self.env)? {
+        match interp.run_statement(self.stage, statement, self.index)? {
             ForwardEffect::Next => Ok(FrameEffect::Continue(F::from_body(self))),
             ForwardEffect::Jump(edge) => {
-                interp.bind_block_args(self.stage, self.env, edge.target, &edge.args)?;
+                interp.bind_block_args(self.stage, self.index, edge.target, &edge.args)?;
                 self.cursor = interp.first_statement(self.stage, edge.target)?;
                 self.block = edge.target;
                 Ok(FrameEffect::Continue(F::from_body(self)))
@@ -170,7 +170,7 @@ where
                 })
             }
             ForwardEffect::Call(call) => {
-                let pending = CallFrame::pending(self.stage, self.env, call);
+                let pending = CallFrame::pending(self.stage, self.index, call);
                 Ok(FrameEffect::Push {
                     parent: F::from_body(self),
                     child: F::from_call(pending),
@@ -189,7 +189,7 @@ where
     }
 
     /// A child finished without a payload (its results are already in the
-    /// shared env, e.g. a returned call): resume at the advanced cursor.
+    /// shared index, e.g. a returned call): resume at the advanced cursor.
     pub fn resume_done_into<F>(self) -> FrameEffect<F, Completion<V>>
     where
         F: FrameBuild<V, E>,
@@ -214,7 +214,7 @@ where
                 let slots = self.resume_slots.take().ok_or_else(|| {
                     E::from(InterpreterError::Custom("body resume without result slots"))
                 })?;
-                interp.write_results(self.env, &slots, values)?;
+                interp.write_results(self.index, &slots, values)?;
                 Ok(FrameEffect::Continue(F::from_body(self)))
             }
             Completion::Returned(values) => self.finish_return::<I, F>(interp, values),
@@ -233,7 +233,7 @@ where
         F: FrameBuild<V, E>,
     {
         if self.function_boundary && self.owns_env {
-            interp.free_env(self.env)?;
+            interp.free_env(self.index)?;
         }
         Ok(FrameEffect::Complete(Completion::Returned(values)))
     }
@@ -287,9 +287,10 @@ where
                 results,
             } => {
                 let target = interp.resolve_call(resolve_stage, &callee)?;
-                let env = interp.alloc_env();
-                let body = interp.enter_function(target.stage, target.body, args, env)?;
-                let frame = BodyFrame::function(interp, target.stage, env, body.region, body.args)?;
+                let index = interp.alloc_env();
+                let body = interp.enter_function(target.stage, target.body, args, index)?;
+                let frame =
+                    BodyFrame::function(interp, target.stage, index, body.region, body.args)?;
                 Ok(FrameEffect::Push {
                     parent: F::from_call(CallFrame::Awaiting {
                         caller_env,

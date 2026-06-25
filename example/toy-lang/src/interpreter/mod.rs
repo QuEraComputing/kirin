@@ -17,8 +17,8 @@ pub use frame::{ToyAbstractFrame, ToyFrame};
 use kirin::prelude::Pipeline;
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_interpreter::engine::{
-    AbstractInterpreter, CallContext, ConcreteInterpreter, CrossStageLinker, SameStageLinker,
-    expect_single,
+    CallContext, ConcreteInterpreter, CrossStageLinker, ForwardAbstractInterpreter,
+    SameStageLinker, expect_single,
 };
 
 use crate::stage::Stage;
@@ -33,7 +33,7 @@ pub type ToyInterpreter<'ir, Lk = CrossStageLinker> =
 
 /// Cross-language constant propagation, with a frame type embedding the SCF
 /// loop frame.
-pub type ToyConstProp<'ir, Lk = CrossStageLinker> = AbstractInterpreter<
+pub type ToyConstProp<'ir, Lk = CrossStageLinker> = ForwardAbstractInterpreter<
     'ir,
     Stage,
     ConstPropValue,

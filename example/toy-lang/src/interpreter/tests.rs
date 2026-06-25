@@ -482,8 +482,8 @@ mod advanced {
     use kirin_constprop::{ConstPropContext, ConstPropValue};
     use kirin_interpreter::engine::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCfgFrame, AbstractCompletion,
-        AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, AbstractInterpreter,
-        BodyFrame, CallContext, CallFrame, Completion, ConcreteInterpreter, CrossStageLinker,
+        AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, BodyFrame, CallContext,
+        CallFrame, Completion, ConcreteInterpreter, CrossStageLinker, ForwardAbstractInterpreter,
         ForwardInterp, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
         expect_single,
     };
@@ -653,7 +653,7 @@ mod advanced {
     //
     // The abstract analogue of `TracingFrame`: it reuses the standard abstract
     // frames verbatim (via `AbstractFrameBuild` + the `*_into` methods) and adds
-    // observation. The engine is not forked — only `AbstractInterpreter`'s `F`
+    // observation. The engine is not forked — only `ForwardAbstractInterpreter`'s `F`
     // type parameter changes. This proves abstract *traversal* is frame-
     // parametric, distinct from the analysis-policy `P` budget customized above.
 
@@ -790,7 +790,7 @@ mod advanced {
 
     type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
 
-    type TracingAnalysis<'ir> = AbstractInterpreter<
+    type TracingAnalysis<'ir> = ForwardAbstractInterpreter<
         'ir,
         Stage,
         ConstPropValue,
@@ -805,9 +805,9 @@ mod advanced {
         ATRACE.with(|t| *t.borrow_mut() = AbstractTrace::default());
         let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
 
-        // AbstractInterpreter parameterized by the *custom* abstract frame enum.
+        // ForwardAbstractInterpreter parameterized by the *custom* abstract frame enum.
         let mut analysis: TracingAnalysis<'_> =
-            AbstractInterpreter::new(&pipeline).with_linker(CrossStageLinker);
+            ForwardAbstractInterpreter::new(&pipeline).with_linker(CrossStageLinker);
         let result = expect_single::<ConstPropValue, ToyError>(
             analysis
                 .analyze_by_name("source", "factorial", [ConstPropValue::Const(5)])

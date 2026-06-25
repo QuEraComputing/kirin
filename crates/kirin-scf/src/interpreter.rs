@@ -25,9 +25,9 @@ use kirin_interpreter::dialect::{
     BranchCondition, ForwardContext, ForwardEffect, ForwardInterp, Interpretable, InterpreterError,
 };
 use kirin_interpreter::{
-    AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver,
-    AbstractInterpreter, BodyFrame, CallContext, Completion, ConcreteInterpreter, EnvIndex,
-    FrameBuild, FrameDriver, FrameEffect,
+    AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BodyFrame,
+    CallContext, Completion, ConcreteInterpreter, EnvIndex, ForwardAbstractInterpreter, FrameBuild,
+    FrameDriver, FrameEffect,
 };
 
 use crate::{For, ForLoopValue, If, Yield};
@@ -44,7 +44,7 @@ where
 {
     fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         let stage = ctx.stage();
-        let env = ctx.env();
+        let index = ctx.index();
         let results: Product<SSAValue> = self.results.iter().copied().map(Into::into).collect();
         // The decision is value-domain (decided concretely, undecided as `None`
         // under abstract interpretation); the SCF if frame owns what to do with
@@ -52,7 +52,7 @@ where
         let decided = ctx.read(self.condition)?.is_truthy();
         let frame =
             ctx.interp()
-                .scf_if_frame(stage, env, self.then_body, self.else_body, decided)?;
+                .scf_if_frame(stage, index, self.then_body, self.else_body, decided)?;
         Ok(ForwardEffect::Push { frame, results })
     }
 }
@@ -69,13 +69,13 @@ where
 {
     fn interpret(&self, ctx: &mut ForwardContext<'_, I>) -> Result<I::Effect, I::Error> {
         let stage = ctx.stage();
-        let env = ctx.env();
+        let index = ctx.index();
         let induction = ctx.read(self.start)?;
         let carried = ctx.read_many(self.init_args.as_slice())?;
         let results: Product<SSAValue> = self.results.iter().copied().map(Into::into).collect();
         let frame = ctx.interp().scf_for_frame(
             stage,
-            env,
+            index,
             self.body,
             induction,
             self.end,
@@ -154,7 +154,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> ScfForDispatch for AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F> ScfForDispatch for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     S: kirin::prelude::StageMeta,
     V: Clone + PartialEq + ForLoopValue + HasBottom,
@@ -228,7 +228,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> ScfIfDispatch for AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F> ScfIfDispatch for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     S: kirin::prelude::StageMeta,
     V: Clone + PartialEq + HasBottom,

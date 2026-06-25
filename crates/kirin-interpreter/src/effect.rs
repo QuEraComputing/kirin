@@ -13,7 +13,8 @@ use kirin_ir::{
 /// structured traversal lives in dialect/engine frames, never in this enum.
 ///
 /// `F` is the engine's total frame type (the same `F` that parameterizes
-/// [`ConcreteInterpreter`](crate::ConcreteInterpreter)/[`AbstractInterpreter`](crate::AbstractInterpreter)).
+/// [`ConcreteInterpreter`](crate::ConcreteInterpreter)/
+/// [`ForwardAbstractInterpreter`](crate::ForwardAbstractInterpreter)).
 /// Ordinary dialect rules never name `F`: they only build the frame-free
 /// variants, so `F` is inferred from `I::Effect`. Only a dialect whose operations
 /// own structured traversal (e.g. `kirin-scf`'s `scf.if`/`scf.for`) builds

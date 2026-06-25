@@ -2,10 +2,12 @@
 //!
 //! This crate is intentionally small: it provides the constant-propagation
 //! *lattice* ([`ConstPropValue`]) and a ready-to-run analysis alias
-//! ([`ConstProp`]). All traversal, loop fixpoints, and interprocedural
-//! summarization live in the engine
-//! ([`AbstractInterpreter`](kirin_interpreter::AbstractInterpreter)); all
-//! transfer rules live in the dialect crates' ordinary `Interpretable` impls,
+//! ([`ConstProp`]). Constant propagation is a **forward dataflow / forward
+//! abstract interpretation** specialization of the interpreter framework: all
+//! traversal, loop fixpoints, and interprocedural summarization live in the
+//! forward dataflow engine
+//! ([`ForwardAbstractInterpreter`](kirin_interpreter::ForwardAbstractInterpreter));
+//! all transfer rules live in the dialect crates' ordinary `Interpretable` impls,
 //! which are generic over the value domain and therefore apply to
 //! [`ConstPropValue`] unchanged.
 //!
@@ -24,10 +26,12 @@ mod value;
 pub use context::{CallCtx, ConstPropContext};
 pub use value::{ConstPropValue, PartialStruct, PartialTuple};
 
-/// Constant propagation as an [`AbstractInterpreter`](kirin_interpreter::AbstractInterpreter)
-/// instantiated at the [`ConstPropValue`] lattice, with bounded arg-tuple
-/// context sensitivity ([`ConstPropContext`]) so recursion over distinct
-/// constants stays precise (e.g. `factorial(Const(5)) → Const(120)`) while
-/// remaining sound and terminating on unknown/over-budget arguments.
+/// Constant propagation as a
+/// [`ForwardAbstractInterpreter`](kirin_interpreter::ForwardAbstractInterpreter)
+/// — the forward dataflow / forward abstract-interpretation engine — instantiated
+/// at the [`ConstPropValue`] lattice, with bounded arg-tuple context sensitivity
+/// ([`ConstPropContext`]) so recursion over distinct constants stays precise (e.g.
+/// `factorial(Const(5)) → Const(120)`) while remaining sound and terminating on
+/// unknown/over-budget arguments.
 pub type ConstProp<'ir, S, E, Lk = kirin_interpreter::SameStageLinker> =
-    kirin_interpreter::AbstractInterpreter<'ir, S, ConstPropValue, E, Lk, ConstPropContext>;
+    kirin_interpreter::ForwardAbstractInterpreter<'ir, S, ConstPropValue, E, Lk, ConstPropContext>;

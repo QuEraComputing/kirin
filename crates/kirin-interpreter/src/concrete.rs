@@ -4,9 +4,9 @@ use kirin_ir::{Block, CompileStage, Pipeline, Product, Region, SSAValue, StageMe
 
 use crate::{
     BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardContext, ForwardEffect,
-    ForwardEnv, Frame, FrameBuild, FrameDriver, FunctionBody, FunctionTarget, Interp,
-    InterpDispatch, InterpreterError, Linker, SameStageLinker, StageQuery, StandardFrame,
-    drive_frames, query,
+    Frame, FrameBuild, FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch,
+    InterpreterError, Linker, SameStageLinker, StageQuery, StandardFrame, Store, drive_frames,
+    query,
 };
 
 /// Concrete executor: runs IR over a concrete value domain with an explicit
@@ -86,24 +86,24 @@ where
         &'a mut self,
         stage: CompileStage,
         statement: Statement,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Self::Context<'a> {
-        ForwardContext::new(self, stage, statement, env)
+        ForwardContext::new(self, stage, statement, index)
     }
 }
 
-impl<'ir, S, V, E, Lk, F> ForwardEnv for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> Env for ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
     S: StageMeta,
     V: Clone,
     E: From<InterpreterError>,
 {
-    fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<V, E> {
-        self.store.read(env, value).map_err(E::from)
+    fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<V, E> {
+        self.store.read(index, value).map_err(E::from)
     }
 
-    fn env_write(&mut self, env: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
-        self.store.write(env, value, data).map_err(E::from)
+    fn env_write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
+        self.store.write(index, value, data).map_err(E::from)
     }
 }
 
@@ -118,8 +118,8 @@ where
         self.store.alloc()
     }
 
-    fn free_env(&mut self, env: EnvIndex) -> Result<(), E> {
-        self.store.free(env).map_err(E::from)
+    fn free_env(&mut self, index: EnvIndex) -> Result<(), E> {
+        self.store.free(index).map_err(E::from)
     }
 
     fn resolve_call(&self, stage: CompileStage, callee: &Callee) -> Result<FunctionTarget, E> {
@@ -132,13 +132,13 @@ where
         &mut self,
         stage: CompileStage,
         statement: Statement,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Result<Self::Effect, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let mut ctx = self.context(stage, statement, env);
+        let mut ctx = self.context(stage, statement, index);
         info.dispatch_statement(statement, &mut ctx)
     }
 
@@ -147,13 +147,13 @@ where
         stage: CompileStage,
         body: Statement,
         args: Product<V>,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Result<FunctionBody<V>, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let mut ctx = self.context(stage, body, env);
+        let mut ctx = self.context(stage, body, index);
         info.dispatch_function_entry(body, args, &mut ctx)
     }
 
@@ -213,10 +213,10 @@ where
         args: impl IntoIterator<Item = V>,
     ) -> Result<Product<V>, E> {
         let target = self.resolve_call(stage, &callee)?;
-        let env = self.alloc_env();
+        let index = self.alloc_env();
         let args: Product<V> = args.into_iter().collect();
-        let body = self.enter_function(target.stage, target.body, args, env)?;
-        let frame = BodyFrame::function(self, target.stage, env, body.region, body.args)?;
+        let body = self.enter_function(target.stage, target.body, args, index)?;
+        let frame = BodyFrame::function(self, target.stage, index, body.region, body.args)?;
         self.frames.push(F::from_body(frame));
         self.run()
     }

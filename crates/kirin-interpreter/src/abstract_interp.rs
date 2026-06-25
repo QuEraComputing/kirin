@@ -3,15 +3,16 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CompileStage, HasBottom, Pipeline, Product, Region, SSAValue, SpecializedFunction,
-    StageMeta, Statement, Widen,
+    Block, CompileStage, HasBottom, HasTop, Pipeline, Product, Region, SSAValue,
+    SpecializedFunction, StageMeta, Statement, Widen,
 };
 
 use crate::{
-    AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, CallEffect,
-    Callee, Env, EnvIndex, EnvStackStore, ForwardContext, ForwardEffect, ForwardEnv, Frame,
-    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
-    SameStageLinker, StageQuery, StandardAbstractFrame, drive_frames, query,
+    AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame,
+    AbstractInterpreter, CallEffect, Callee, Env, EnvIndex, EnvStackStore, ForwardContext,
+    ForwardEffect, Frame, FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch,
+    InterpreterError, Linker, SameStageLinker, StageQuery, StandardAbstractFrame, Store,
+    drive_frames, query,
 };
 
 // ===========================================================================
@@ -102,26 +103,20 @@ where
     }
 }
 
-/// Lattice-based abstract interpreter with interprocedural fixpoint solving.
+/// Forward lattice-based abstract interpreter.
 ///
-/// Runs the same dialect [`Interpretable`](crate::Interpretable) rules as
-/// [`ConcreteInterpreter`](crate::ConcreteInterpreter), over a lattice value
-/// domain `V: Widen + Lattice`. Like the concrete engine, traversal lives in
-/// frames: the total abstract frame type `F` (default
-/// [`StandardAbstractFrame`]) owns the CFG block worklist, branch exploration,
-/// scope fixpoints, and call summarization, and the engine just runs the frame
-/// stack (`run_frames`). A custom `F` (its own enum reusing the standard frames
-/// via [`AbstractFrameBuild`]) customizes/observes abstract traversal without
-/// forking the engine. The orthogonal *analysis policy* `P` ([`CallContext`] +
-/// [`WideningStrategy`], default [`ContextInsensitive`]) controls summary keying
-/// and join/widen; the interprocedural protocol stays atomic in the engine.
+/// Uses [`ForwardContext`] and [`ForwardEffect`] like concrete execution, but runs
+/// over an abstract value domain. Traversal is owned by the total frame type `F`;
+/// summary keying and merge/widen behavior are owned by the policy `P`.
+///
+/// This implements [`AbstractInterpreter`].
 ///
 /// ```ignore
-/// let mut analysis = AbstractInterpreter::<Stage, ConstPropValue, MyError>::new(&pipeline)
+/// let mut analysis = ForwardAbstractInterpreter::<Stage, ConstPropValue, MyError>::new(&pipeline)
 ///     .with_linker(CrossStageLinker);
 /// let result = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(7)])?;
 /// ```
-pub struct AbstractInterpreter<
+pub struct ForwardAbstractInterpreter<
     'ir,
     S: StageMeta,
     V,
@@ -159,7 +154,7 @@ struct FnInfo<V, K> {
     callers: HashSet<K>,
 }
 
-impl<'ir, S: StageMeta, V, E, P, F> AbstractInterpreter<'ir, S, V, E, SameStageLinker, P, F>
+impl<'ir, S: StageMeta, V, E, P, F> ForwardAbstractInterpreter<'ir, S, V, E, SameStageLinker, P, F>
 where
     P: CallContext<V> + Default,
 {
@@ -181,14 +176,17 @@ where
     }
 }
 
-impl<'ir, S: StageMeta, V, E, Lk, P, F> AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S: StageMeta, V, E, Lk, P, F> ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     P: CallContext<V>,
 {
     /// Swap the calling-convention component (the [`Linker`]). Preserves the
     /// frame type `F`.
-    pub fn with_linker<Lk2>(self, linker: Lk2) -> AbstractInterpreter<'ir, S, V, E, Lk2, P, F> {
-        AbstractInterpreter {
+    pub fn with_linker<Lk2>(
+        self,
+        linker: Lk2,
+    ) -> ForwardAbstractInterpreter<'ir, S, V, E, Lk2, P, F> {
+        ForwardAbstractInterpreter {
             pipeline: self.pipeline,
             linker,
             store: self.store,
@@ -207,11 +205,11 @@ where
     /// Swap the analysis policy (context abstraction + join/widen). Changes the
     /// [`CallContext::Key`] type, so this resets the (empty) summary tables and
     /// the (default) frame type.
-    pub fn with_analysis<P2>(self, analysis: P2) -> AbstractInterpreter<'ir, S, V, E, Lk, P2>
+    pub fn with_analysis<P2>(self, analysis: P2) -> ForwardAbstractInterpreter<'ir, S, V, E, Lk, P2>
     where
         P2: CallContext<V>,
     {
-        AbstractInterpreter {
+        ForwardAbstractInterpreter {
             pipeline: self.pipeline,
             linker: self.linker,
             store: self.store,
@@ -247,7 +245,9 @@ where
     }
 }
 
-impl<'ir, S: StageMeta, V, E, Lk, F> AbstractInterpreter<'ir, S, V, E, Lk, ContextInsensitive, F> {
+impl<'ir, S: StageMeta, V, E, Lk, F>
+    ForwardAbstractInterpreter<'ir, S, V, E, Lk, ContextInsensitive, F>
+{
     /// Number of joins at a loop head or function entry before switching from
     /// join to widening (only available with the [`ContextInsensitive`]).
     pub fn widen_after(mut self, joins: usize) -> Self {
@@ -268,7 +268,7 @@ impl<'ir, S: StageMeta, V, E, Lk, F> AbstractInterpreter<'ir, S, V, E, Lk, Conte
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> Interp for AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F> Interp for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     S: StageMeta,
     V: Clone + HasBottom,
@@ -288,13 +288,13 @@ where
         &'a mut self,
         stage: CompileStage,
         statement: Statement,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Self::Context<'a> {
-        ForwardContext::new(self, stage, statement, env)
+        ForwardContext::new(self, stage, statement, index)
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> ForwardEnv for AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F> Env for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     S: StageMeta,
     V: Clone + HasBottom,
@@ -302,23 +302,33 @@ where
     P: CallContext<V>,
 {
     /// Reads of values not yet bound are `bottom` (unreached code).
-    fn env_read(&self, env: EnvIndex, value: SSAValue) -> Result<V, E> {
-        match self.store.read(env, value) {
+    fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<V, E> {
+        match self.store.read(index, value) {
             Ok(value) => Ok(value),
             Err(InterpreterError::UnboundValue { .. }) => Ok(V::bottom()),
             Err(error) => Err(E::from(error)),
         }
     }
 
-    fn env_write(&mut self, env: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
-        self.store.write(env, value, data).map_err(E::from)
+    fn env_write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
+        self.store.write(index, value, data).map_err(E::from)
     }
+}
+
+impl<'ir, S, V, E, Lk, P, F> AbstractInterpreter
+    for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
+where
+    S: StageMeta,
+    V: Clone + HasBottom + HasTop,
+    E: From<InterpreterError>,
+    P: CallContext<V>,
+{
 }
 
 // The IR-query / dispatch capability surface shared with the concrete engine.
 // Identical in shape to `ConcreteInterpreter`'s; `resolve_call` routes through
 // the same linker component.
-impl<'ir, S, V, E, Lk, P, F> FrameDriver for AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F> FrameDriver for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
     V: Clone + HasBottom,
@@ -330,8 +340,8 @@ where
         self.store.alloc()
     }
 
-    fn free_env(&mut self, env: EnvIndex) -> Result<(), E> {
-        self.store.free(env).map_err(E::from)
+    fn free_env(&mut self, index: EnvIndex) -> Result<(), E> {
+        self.store.free(index).map_err(E::from)
     }
 
     fn resolve_call(&self, stage: CompileStage, callee: &Callee) -> Result<FunctionTarget, E> {
@@ -344,13 +354,13 @@ where
         &mut self,
         stage: CompileStage,
         statement: Statement,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Result<Self::Effect, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let mut ctx = self.context(stage, statement, env);
+        let mut ctx = self.context(stage, statement, index);
         info.dispatch_statement(statement, &mut ctx)
     }
 
@@ -359,13 +369,13 @@ where
         stage: CompileStage,
         body: Statement,
         args: Product<V>,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Result<FunctionBody<V>, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let mut ctx = self.context(stage, body, env);
+        let mut ctx = self.context(stage, body, index);
         info.dispatch_function_entry(body, args, &mut ctx)
     }
 
@@ -394,7 +404,8 @@ where
 // The abstract-only capability surface the abstract frames drive. The
 // interprocedural protocol (`summarize_call`) stays atomic here so frame
 // authors cannot break the self-recursion / summary invariants.
-impl<'ir, S, V, E, Lk, P, F> AbstractFrameDriver for AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F> AbstractFrameDriver
+    for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
     V: Clone + PartialEq + Widen + HasBottom,
@@ -435,7 +446,7 @@ where
         &mut self,
         stage: CompileStage,
         call: CallEffect<V>,
-        env: EnvIndex,
+        index: EnvIndex,
     ) -> Result<(), E> {
         let CallEffect {
             callee,
@@ -462,11 +473,11 @@ where
         }
         let ret = self.summaries.get(&key).and_then(|info| info.ret.clone());
         match ret {
-            Some(values) => self.write_results(env, &results, values),
+            Some(values) => self.write_results(index, &results, values),
             None => {
                 // Callee has not converged yet: results are unreached.
                 for slot in results.iter().copied() {
-                    self.env_write(env, slot, V::bottom())?;
+                    self.env_write(index, slot, V::bottom())?;
                 }
                 Ok(())
             }
@@ -481,7 +492,7 @@ where
 // Interprocedural summary bookkeeping, shared by the frame-driver capability
 // impl and the analyze loop (no frame-type bound — these are policy, not
 // traversal).
-impl<'ir, S: StageMeta, V, E, Lk, P, F> AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S: StageMeta, V, E, Lk, P, F> ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     V: Clone + PartialEq + Widen,
     E: From<InterpreterError>,
@@ -549,7 +560,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> AbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F> ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
     S: StageQuery + for<'b> InterpDispatch<ForwardContext<'b, Self>>,
     V: Clone + PartialEq + Widen + HasBottom,
@@ -623,14 +634,14 @@ where
         let entry = info.entry.clone();
 
         let previous = self.current.replace(key.clone());
-        let env = self.store.alloc();
+        let index = self.store.alloc();
         self.ret_acc = None;
         self.frames
             .push(F::from_function(AbstractFunctionFrame::new(
-                stage, body, entry, env,
+                stage, body, entry, index,
             )));
         let result = self.run_frames();
-        self.store.free(env).map_err(E::from)?;
+        self.store.free(index).map_err(E::from)?;
         self.current = previous;
         let ret_acc = self.ret_acc.take();
         result?;

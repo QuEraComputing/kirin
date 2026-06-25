@@ -17,7 +17,7 @@ impl EnvIndex {
     }
 }
 
-pub trait Env<V> {
+pub trait Store<V> {
     type Error;
 
     fn alloc(&mut self) -> EnvIndex;
@@ -131,7 +131,7 @@ impl<V> EnvStackStore<V> {
     }
 }
 
-impl<V: Clone> Env<V> for EnvStackStore<V> {
+impl<V: Clone> Store<V> for EnvStackStore<V> {
     type Error = InterpreterError;
 
     fn alloc(&mut self) -> EnvIndex {
