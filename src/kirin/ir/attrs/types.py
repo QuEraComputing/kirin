@@ -881,6 +881,9 @@ class FunctionType(TypeAttribute):
     def is_subseteq_Union(self, other: Union) -> bool:
         return any(self.is_subseteq(t) for t in other.types)
 
+    def is_subseteq_TypeVar(self, other: "TypeVar") -> bool:
+        return self.is_subseteq(other.bound)
+
     def is_subseteq_fallback(self, other: TypeAttribute) -> bool:
         return False
 
