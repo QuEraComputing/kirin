@@ -103,6 +103,10 @@ fn run_program(
         .map(|s| s.parse::<i64>())
         .collect::<Result<_, _>>()?;
 
+    if liveness && constprop {
+        anyhow::bail!("--liveness and --constprop are mutually exclusive");
+    }
+
     if liveness {
         let (demand, dense) = interpreter::analyze_liveness(&pipeline, stage_name, func_name)?;
         println!("demanded: {:?}", demand.demanded());
