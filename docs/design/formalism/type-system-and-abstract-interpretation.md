@@ -24,9 +24,9 @@ concrete API references for the current `AbstractInterpreter` implementation.
 | Context abstraction (summary-key strategy) | `CallContext<V>` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
 | Merge/widen behavior | `WideningStrategy<V>` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
 | Context-insensitive baseline (API name) | `ContextInsensitive` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
-| Forward abstract engine | `ForwardAbstractInterpreter<...>` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
-| Analysis entrypoint | `ForwardAbstractInterpreter::analyze_by_name` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
-| CFG fixpoint kernel | `ForwardAbstractInterpreter::eval_cfg` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Forward abstract engine | `SparseForwardInterpreter<...>` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Analysis entrypoint | `SparseForwardInterpreter::analyze_by_name` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| CFG fixpoint kernel | `SparseForwardInterpreter::eval_cfg` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
 | Constprop analysis crate | `kirin-constprop` | [`crates/kirin-constprop/src/lib.rs`](../../../crates/kirin-constprop/src/lib.rs) |
 | Interval analysis crate | `kirin-interval` | [`crates/kirin-interval/src/lib.rs`](../../../crates/kirin-interval/src/lib.rs) |
 

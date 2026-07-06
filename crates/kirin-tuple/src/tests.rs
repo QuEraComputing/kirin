@@ -30,8 +30,10 @@ fn new_tuple_not_terminator() {
 }
 
 #[test]
-fn new_tuple_not_pure() {
-    assert!(!make_new_tuple().is_pure());
+fn new_tuple_pure() {
+    // Tuple ops are pure data ops (`#[kirin(pure)]`): under backward demand
+    // their operands are live only when a result is live.
+    assert!(make_new_tuple().is_pure());
 }
 
 #[test]
@@ -83,8 +85,9 @@ fn unpack_not_terminator() {
 }
 
 #[test]
-fn unpack_not_pure() {
-    assert!(!make_unpack().is_pure());
+fn unpack_pure() {
+    // See `new_tuple_pure`: tuple ops are pure data ops.
+    assert!(make_unpack().is_pure());
 }
 
 #[test]

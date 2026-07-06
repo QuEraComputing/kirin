@@ -72,7 +72,7 @@ mod tests;
 /// forwarded to the inner type.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[wraps]
-#[kirin(builders, type = T)]
+#[kirin(pure, builders, type = T)]
 pub enum Tuple<T: CompileTimeValue> {
     NewTuple(NewTuple<T>),
     Unpack(Unpack<T>),
@@ -85,7 +85,7 @@ pub enum Tuple<T: CompileTimeValue> {
 /// The result is a single `ResultValue` holding the packed tuple.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$new_tuple({args}) -> {result:type}")]
-#[kirin(builders, type = T)]
+#[kirin(pure, builders, type = T)]
 pub struct NewTuple<T: CompileTimeValue> {
     args: Vec<SSAValue>,
     result: ResultValue,
@@ -103,7 +103,7 @@ pub struct NewTuple<T: CompileTimeValue> {
 /// Uses `Vec<ResultValue>` to support an arbitrary number of output values.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$unpack {source} -> {results:type}")]
-#[kirin(builders, type = T)]
+#[kirin(pure, builders, type = T)]
 pub struct Unpack<T: CompileTimeValue> {
     source: SSAValue,
     results: Vec<ResultValue>,
@@ -123,7 +123,7 @@ pub struct Unpack<T: CompileTimeValue> {
 /// mlir-tuple-dialect `tuple.get`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$get {source}, {index} -> {result:type}")]
-#[kirin(builders, type = T)]
+#[kirin(pure, builders, type = T)]
 pub struct Get<T: CompileTimeValue> {
     source: SSAValue,
     index: SSAValue,
@@ -138,7 +138,7 @@ pub struct Get<T: CompileTimeValue> {
 /// abstract interpretation and dynamic dispatch over tuple structures.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$len {source} -> {result:type}")]
-#[kirin(builders, type = T)]
+#[kirin(pure, builders, type = T)]
 pub struct Len<T: CompileTimeValue> {
     source: SSAValue,
     result: ResultValue,

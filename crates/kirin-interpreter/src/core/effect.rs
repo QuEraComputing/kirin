@@ -5,23 +5,23 @@ use kirin_ir::{
 
 /// The closed forward control algebra a statement produces.
 ///
-/// Atomic statements read operands, write results, and return [`ForwardEffect::Next`].
+/// Atomic statements read operands, write results, and return [`SparseForwardEffect::Next`].
 /// Control statements name successor edges, calls, or returns; the engine owns
 /// how each is driven. Structured dialects do **not** get a framework "scope"
 /// concept: when a statement needs to run a sub-computation it [pushes a
-/// frame](ForwardEffect::Push) it owns (or is handed by the engine), so all
+/// frame](SparseForwardEffect::Push) it owns (or is handed by the engine), so all
 /// structured traversal lives in dialect/engine frames, never in this enum.
 ///
 /// `F` is the engine's total frame type (the same `F` that parameterizes
 /// [`ConcreteInterpreter`](crate::ConcreteInterpreter)/
-/// [`ForwardAbstractInterpreter`](crate::ForwardAbstractInterpreter)).
+/// [`SparseForwardInterpreter`](crate::SparseForwardInterpreter)).
 /// Ordinary dialect rules never name `F`: they only build the frame-free
 /// variants, so `F` is inferred from `I::Effect`. Only a dialect whose operations
 /// own structured traversal (e.g. `kirin-scf`'s `scf.if`/`scf.for`) builds
-/// [`Push`](ForwardEffect::Push), carrying a frame **it owns**. The framework has
+/// [`Push`](SparseForwardEffect::Push), carrying a frame **it owns**. The framework has
 /// no "explore alternatives" effect: a dialect frame that needs to explore
 /// several bodies pushes them one at a time and joins their results itself.
-pub enum ForwardEffect<V, F> {
+pub enum SparseForwardEffect<V, F> {
     /// Statement done; continue with the next statement.
     Next,
     /// Unconditional transfer to a block in the current region.

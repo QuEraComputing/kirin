@@ -7,11 +7,11 @@ including analyses that cross language boundaries in multi-stage pipelines.
 The design is organized as a **two-persona contract**:
 
 - **Dialect authors** describe what each statement *means*, once, in a small
-  fixed vocabulary — `Interpretable<I, ForwardEval>`/`ForwardEvalInterp`/`ForwardEffect`,
+  fixed vocabulary — `Interpretable<I, SparseForward>`/`SparseForwardInterp`/`SparseForwardEffect`,
   receiving the engine directly and selecting semantics by a compile-time `Kind`
   marker. There is no framework
   "scope": a statement whose operation owns structured control runs a
-  sub-computation by *pushing a frame the dialect owns* (`ForwardEffect::Push`),
+  sub-computation by *pushing a frame the dialect owns* (`SparseForwardEffect::Push`),
   built per-engine through a small dialect dispatch capability. Ordinary
   (non-control) dialects never push frames at all.
 - **Compiler authors** compose languages into pipelines and *select*
@@ -19,7 +19,7 @@ The design is organized as a **two-persona contract**:
   need more control, the same compiler-author surface also includes opt-in
   traversal and analysis components: custom concrete frames
   (`ConcreteInterpreter<.., F>`), custom forward-dataflow frames
-  (`ForwardAbstractInterpreter<.., P, F>`), and abstract policies `P`
+  (`SparseForwardInterpreter<.., P, F>`), and abstract policies `P`
   (`CallContext` + `WideningStrategy`). A language that uses a structured-control
   dialect composes its own total frame type embedding the standard frames plus
   that dialect's frames. Ordinary dialects never name a frame type.
@@ -39,7 +39,7 @@ pub trait Interp: Sized {               // the engine-side driver — ANALYSIS-A
     type Value: Clone;                  // the value domain
     type Error: From<InterpreterError>; // the total error
     type Effect;                        // analysis-specific per-statement effect
-    type Kind;                          // compile-time semantics marker (ForwardEval, ...)
+    type Kind;                          // compile-time semantics marker (SparseForward, ...)
     fn stage(&self) -> CompileStage;    // the current statement's location, set by the engine
     fn statement(&self) -> Statement;   //   before each dispatch and read back by rules
     fn index(&self) -> EnvIndex;        //   (the SSA activation)
@@ -61,14 +61,14 @@ pub trait Interpretable<I: Interp, Kind>: Dialect {
 ```
 
 A rule receives the engine `interp: &mut I` directly. Forward rules bound
-`I: ForwardEvalInterp`, which provides the read/write helpers — `read`,
+`I: SparseForwardInterp`, which provides the read/write helpers — `read`,
 `read_many`, `write`, `write_results` — as **default methods** that operate on the
 engine's current activation (`interp.index()`) and delegate to the engine's
 [`Env`] storage access. So a forward rule calls `interp.read(..)` / `interp.write(..)`
 directly. There is **no** `ValueContext`/`ForwardCtx` object: the engine *is* the
 context.
 
-`ForwardEval` is a pure compile-time **semantics marker** — never instantiated —
+`SparseForward` is a pure compile-time **semantics marker** — never instantiated —
 that selects *which* semantics an impl describes. It names *forward evaluation*
 (read operands, compute a semantic/lattice value, write results), so one mode
 covers concrete execution, constant propagation, and interval analysis — they
@@ -76,18 +76,27 @@ differ only in the value domain, not the rule shape. It is deliberately not
 `ForwardValue`: a future forward **type inference** mode also attaches facts to
 SSA values but should expose a different rule API, so the name reflects the
 evaluation semantics rather than "operates on values". A forward statement rule
-is `impl<I: ForwardEvalInterp, ..> Interpretable<I, ForwardEval> for Op`: it
+is `impl<I: SparseForwardInterp, ..> Interpretable<I, SparseForward> for Op`: it
 reads/writes through `interp.read`/`interp.write` and returns `I::Effect`
-(= `ForwardEffect`). A future backward analysis adds a `BackwardLiveness` marker
-and writes `impl Interpretable<I, BackwardLiveness> for Op` with its own engine
-trait, helpers, and effect — the two impls coexist on the same dialect type
-because the `Kind` parameter distinguishes them (no coherence conflict).
+(= `SparseForwardEffect`). The backward analyses follow the same shape with
+their own markers, engine traits, and effects — the impls coexist on the same
+dialect type because the `Kind` parameter distinguishes them (no coherence
+conflict):
+
+- `SparseBackward` / `SparseBackwardInterp` / `SparseBackwardEffect` — per-SSA
+  demand (strong liveness). Rules read converged facts (`is_demanded`), raise
+  demands (`demand`), and end with `interp.effect()`; ordinary dialects are the
+  one-liner `interp.transfer_ordinary(self)` (purity-aware neededness via
+  `IsPure`).
+- `DenseBackward` / `DenseBackwardInterp` / `DenseBackwardEffect` — classic
+  per-point liveness. Rules transform the current point state (`gen_fact`/
+  `kill_fact`); ordinary dialects (and calls — purity is irrelevant to dense
+  sets) are `interp.transfer_classic(self)`; CFG terminators name their edges
+  (`Edges`), structured dialects push dense frames (`Push`).
 
 Future sibling modes (not yet implemented) each get their own marker + engine
-trait, leaving `ForwardEval` untouched: `ForwardType` / `ForwardTypeInterp`
-(forward type inference), `BackwardDataflow` / `BackwardDataflowInterp` (generic
-backward dataflow), and `BackwardLiveness` / `BackwardLivenessInterp` (backward
-liveness).
+trait the same way, e.g. `ForwardType` (forward type inference) or
+`DenseForward` (typestate).
 
 `Interp` is the interpreter/analysis **driver**: it exposes the value domain, the
 error type, the per-statement effect, the semantics [`Kind`], and the current
@@ -97,10 +106,10 @@ restores it afterward, so a rule can read it back without a separate context
 object. A rule produces `I::Effect` — the **analysis-specific** effect algebra —
 not a single universal enum. (The frame type stays the engine's own `F` generic,
 e.g. `ConcreteInterpreter<.., F>`, so traversal is customizable without an unused
-associated type on `Interp`.) Forward rules bound `I: ForwardEvalInterp`, the
-flavor of `Interp` whose `Kind = ForwardEval` and `Effect = ForwardEffect<I::Value,
-I::Frame>`, so they build and return `ForwardEffect` values (which are `I::Effect`).
-`I::Frame` is the engine's total frame type, re-exposed by `ForwardEvalInterp`
+associated type on `Interp`.) Forward rules bound `I: SparseForwardInterp`, the
+flavor of `Interp` whose `Kind = SparseForward` and `Effect = SparseForwardEffect<I::Value,
+I::Frame>`, so they build and return `SparseForwardEffect` values (which are `I::Effect`).
+`I::Frame` is the engine's total frame type, re-exposed by `SparseForwardInterp`
 only so a structured dialect can name the frame it pushes; ordinary dialects never
 mention it (it is inferred from `I::Effect`). They constrain only:
 
@@ -114,25 +123,26 @@ both execution and analysis**: `kirin-arith`'s `Add` rule computes `3 + 5`
 under `ConcreteInterpreter<.., i64, ..>` and folds `Const(3) + Const(5)`
 under constant propagation, with no analysis-specific code in the dialect.
 
-`ForwardEvalInterp` is the **forward engine** trait: it requires `Env` and
-`Kind = ForwardEval`, and exposes the SSA read/write helpers as **default
+`SparseForwardInterp` is the **forward engine** trait: it requires `Env` and
+`Kind = SparseForward`, and exposes the SSA read/write helpers as **default
 methods**, hiding environment indices and locations: `interp.read(ssa)`,
 `interp.write(result, value)`, `interp.read_many(&values)`,
 `interp.write_results(&results, product)`. They delegate to the engine's [`Env`]
 storage access (`env_read`/`env_write`) at the engine's current activation
 (`interp.index()`). A structured dialect calls its own dispatch capability
-(e.g. `interp.scf_if_frame(..)`) to build the frame it pushes (see SCF below). A
-future liveness engine trait can choose its own helper API and effect without
-adding variants to `ForwardEffect`.
+(e.g. `interp.scf_if_frame(..)`) to build the frame it pushes (see SCF below).
+The backward engine traits chose their own helper APIs and effects the same way
+— demand facts for `SparseBackwardInterp`, point states for
+`DenseBackwardInterp` — without adding variants to `SparseForwardEffect`.
 
-### `ForwardEffect` — the forward control algebra
+### `SparseForwardEffect` — the forward control algebra
 
-This is the `Effect` for the *forward* mode (`ForwardEvalInterp::Effect`). It is **one
+This is the `Effect` for the *forward* mode (`SparseForwardInterp::Effect`). It is **one
 algebra among potential several**: a future analysis defines its own `I::Effect`
 rather than adding variants here.
 
 ```rust
-pub enum ForwardEffect<V, F> {
+pub enum SparseForwardEffect<V, F> {
     Next,                                          // atomic statement done
     Jump(Edge<V>),                                 // decided CFG transfer
     Branch(Vec<Edge<V>>),                          // undecided CFG transfer
@@ -145,7 +155,7 @@ pub enum ForwardEffect<V, F> {
 
 `F` is the engine's total frame type. The frame-free variants don't name it, so
 ordinary dialects never see it; only a dialect whose operations own structured
-traversal builds `Push` (naming the frame via `ForwardEvalInterp::Frame`). The pushed
+traversal builds `Push` (naming the frame via `SparseForwardInterp::Frame`). The pushed
 `frame` is whatever traversal the dialect decided on — there is no framework-owned
 "scope", and no framework "explore alternatives" effect (a dialect frame that
 needs to explore several bodies pushes them one at a time and joins itself).
@@ -162,7 +172,7 @@ knowledge of which engine is running.
 
 The framework has no "scope" type. A dialect whose operation owns structured
 traversal builds a **frame it owns** (per-engine, through a small dialect
-dispatch capability) and returns it as `ForwardEffect::Push { frame, results }`.
+dispatch capability) and returns it as `SparseForwardEffect::Push { frame, results }`.
 SCF has two such operations:
 
 - **`scf.if`** → `kirin_scf::ScfIfFrame` (concrete) / `AbstractScfIfFrame`
@@ -254,7 +264,7 @@ coherence rule: policies must be swappable without newtype-cloning a driver.
 
 Because the linker is shared by all engines, cross-language *analysis* is the
 same one-line choice as cross-language *execution*: the abstract engine calls
-the linker at `ForwardEffect::Call`, and the analysis lattice flows through
+the linker at `SparseForwardEffect::Call`, and the analysis lattice flows through
 `Product<V>` function summaries regardless of which language the callee
 belongs to.
 
@@ -269,24 +279,25 @@ frames. The default total frame type `StandardFrame<V, E>` wraps the standard
 `BodyFrame` (walks a function-body region CFG, or a single body block that
 completes on `Yield` — `Jump` retargets it, `Return` completes it) and
 `CallFrame` (dispatch a callee, await its `Return`). The dialect-produced
-`ForwardEffect` is consumed by `BodyFrame`, which maps it to a `FrameEffect`
+`SparseForwardEffect` is consumed by `BodyFrame`, which maps it to a `FrameEffect`
 (handling `Push` by pushing the carried frame). `StandardFrame` is
 structured-control-free; a custom `F`
 ([Custom traversal and policies](#custom-traversal-and-policies)) adds dialect
 frames or replaces traversal without touching the engine.
 
-### `ForwardAbstractInterpreter<'ir, S, V, E, Lk, P = ContextInsensitive, F = StandardAbstractFrame<..>>`
+### `SparseForwardInterpreter<'ir, S, V, E, Lk, P = ContextInsensitive, F = StandardAbstractFrame<..>>`
 
 The **forward dataflow** engine — a lattice-based forward abstract interpreter,
 and one *specialization* of the shared framework in the forward direction (it sets
-`Effect = ForwardEffect` and `Kind = ForwardEval`, stores SSA activations via
+`Effect = SparseForwardEffect` and `Kind = SparseForward`, stores SSA activations via
 `Env`, and drives forward frames). The name
 `AbstractInterpreter` is reserved for the shared trait implemented by
-lattice-valued abstract engines. `ForwardAbstractInterpreter` is the current
-forward engine. A future `BackwardAbstractInterpreter` (liveness/backward
-dataflow) is a different specialization with its own context, fact store,
-effect/result, and frame-driver capability, reusing the same framework and also
-implementing `AbstractInterpreter`.
+lattice-valued abstract engines. `SparseForwardInterpreter` is the forward
+engine; `SparseBackwardInterpreter` (per-SSA demand / strong liveness) and
+`DenseBackwardInterpreter` (classic per-point liveness) are the backward
+specializations — each with its own fact store, effect, and frame-driver
+capability, reusing the same framework (fixpoint driver + `*Transfer` inner
+`Interp`) and also implementing `AbstractInterpreter`.
 
 Interprocedural fixpoint analyzer over a lattice `V: Widen + Lattice +
 HasBottom`. Reads of unbound SSA values are `bottom` (unreached). Like the
@@ -321,7 +332,7 @@ frames:
 
 Analysis crates stay small: `kirin-constprop` is the `ConstPropValue` lattice, a
 `ConstPropContext` strategy (bounded arg-tuple context sensitivity), and
-`pub type ConstProp<..> = ForwardAbstractInterpreter<.., ConstPropValue, .., ConstPropContext>`
+`pub type ConstProp<..> = SparseForwardInterpreter<.., ConstPropValue, .., ConstPropContext>`
 — constant propagation is a forward dataflow / forward abstract-interpretation
 specialization.
 
@@ -344,22 +355,24 @@ Both engines are frame-stack drivers over one **shared protocol**. Compiler
 authors can customize *how* an engine traverses (a custom frame type) or *how
 precisely* an abstract analysis summarizes (a custom policy `P`), without
 forking an engine. This is part of the compiler-author surface. The total frame
-type `F` is the engine's generic; it is named in `Interpretable<I, ForwardEval>`
-*only* by a structured dialect building `ForwardEffect::Push` (through
-`ForwardEvalInterp::Frame`) — ordinary dialects never mention it.
+type `F` is the engine's generic; it is named in `Interpretable<I, SparseForward>`
+*only* by a structured dialect building `SparseForwardEffect::Push` (through
+`SparseForwardInterp::Frame`) — ordinary dialects never mention it.
 
 ### Shared protocol vs. forward frame drivers
 
 `Frame`, `FrameEngine`, `FrameEffect`, and `drive_frames` are **shared and
-direction-neutral** — they say nothing about a value domain or direction, so a
-future backward dataflow engine reuses them as-is. On top of that neutral protocol
-sit the **forward** frame-driver capability surfaces: `ForwardFrameDriver` is the
-forward-frame driver capability, and `ForwardDataflowFrameDriver` is the
-forward-dataflow frame-driver capability. They require `Env`, run `ForwardEffect`,
-bind block args, write forward results, and summarize forward calls.
-(`FrameDriver` and `AbstractFrameDriver` are retained as compatibility aliases
-for the two.) A future backward dataflow engine can define its own driver
-capability if these forward-frame operations are not the right fit.
+direction-neutral** — they say nothing about a value domain or direction, and
+the backward engines reuse them as-is. On top of that neutral protocol sit the
+per-direction frame-driver capability surfaces: `ForwardFrameDriver` /
+`ForwardDataflowFrameDriver` for the forward engines (they require `Env`, run
+`SparseForwardEffect`, bind block args, write forward results, and summarize
+forward calls; `FrameDriver` and `AbstractFrameDriver` are retained as
+compatibility aliases), and `DenseBackwardFrameDriver` for the dense backward
+engine (statement dispatch, point-state access, edge absorption against the
+converged summaries, per-point recording). The sparse backward engine needs no
+frame-driver surface at all — its `DemandFrame` dispatches rules directly on
+the driver.
 
 ```rust
 pub enum FrameEffect<F, C> { Continue(F), Push { parent: F, child: F }, Done, Complete(C) }
@@ -407,7 +420,7 @@ the engine with that `F`. (Examples: `example/toy-lang`'s `ToyFrame`, which adds
 
 ### Abstract frames — `StandardAbstractFrame` / `AbstractFrameBuild` / `ForwardDataflowFrameDriver`
 
-`ForwardAbstractInterpreter` is symmetrically generic over a total abstract frame type
+`SparseForwardInterpreter` is symmetrically generic over a total abstract frame type
 `F` (default `StandardAbstractFrame`). The standard abstract frames
 (`AbstractFunctionFrame`, `AbstractCfgFrame`, `AbstractBlockFrame`,
 `AbstractCallFrame`) implement the *same*
@@ -430,7 +443,7 @@ break soundness.
 
 ### Abstract policies — `CallContext` and `WideningStrategy`
 
-`ForwardAbstractInterpreter` is generic over an analysis parameter `P` providing two decisions:
+`SparseForwardInterpreter` is generic over an analysis parameter `P` providing two decisions:
 
 ```rust
 pub trait CallContext<V>     { type Key: Eq + Hash + Clone;
@@ -455,7 +468,7 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
 
 1. **Dialects are engine-blind.** Undecidedness is expressed by the value
    domain (`is_truthy`/`loop_condition` returning `None`); for cf it surfaces as
-   `ForwardEffect::Branch`, for control dialects it is handed to the dialect's own
+   `SparseForwardEffect::Branch`, for control dialects it is handed to the dialect's own
    frame. One `Interpretable` impl serves every engine; a control dialect's
    *frames* may have separate concrete/abstract forms, built per-engine through a
    dialect dispatch trait.
@@ -472,27 +485,35 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
 
 - Both engines are frame-parametric over the shared, direction-neutral
   `FrameEngine`/`Frame`/`drive_frames` protocol: `ConcreteInterpreter<.., F>`
-  (default `StandardFrame`) and `ForwardAbstractInterpreter<.., P, F>`
+  (default `StandardFrame`) and `SparseForwardInterpreter<.., P, F>`
   (default `StandardAbstractFrame`). Abstract explore/join/summarize lives in dedicated
   abstract frames reused via `AbstractFrameBuild`; there is no longer an un-framed
   abstract worklist. `Frame` is anchored on `FrameEngine` (a total error), not on
   `Interp`, so the protocol is reusable beyond forward value interpretation.
 - The per-statement effect is the associated type `I::Effect`, **per analysis**
-  — forward execution/abstract interpretation use the `ForwardEval` semantics
-  whose `Effect` is `ForwardEffect`. A future analysis (e.g. backward liveness)
-  adds a `BackwardLiveness` `Kind` marker and writes `impl Interpretable<I,
-  BackwardLiveness>`, with its **own** engine trait, its **own** `Effect` algebra
-  and its own liveness-specific helpers (e.g. `live_after`/`use_def`/`transfer`)
-  instead of the forward read/write helpers. It also chooses its own fact store
-  and its own backward frames through `Frame`/`drive_frames`. The target shape is:
-  `BackwardAbstractInterpreter: Interp + AbstractInterpreter` with
-  `Kind = BackwardLiveness`, `Value = LiveSet`, program-point facts such as
-  `live_before`/`live_after`/`block_in`/`block_out`, and a backward effect/result
-  algebra that is not forced into `ForwardEffect`. Because the `Kind` parameter
-  distinguishes impls, a dialect can carry both its forward and backward rules at
-  once.
-  Implementing such an analysis is deliberately **out of scope** here; this pass
-  only prepares the framework seam. A compile-time readiness proof lives in
+  — forward execution/abstract interpretation use the `SparseForward` semantics
+  whose `Effect` is `SparseForwardEffect`. The backward analyses are
+  **implemented** on this seam, as two distinct kinds (deliberate deviations
+  from the earlier sketch noted inline):
+  - **Strong liveness / demand** (`SparseBackward`,
+    `SparseBackwardInterpreter`): `Interp::Value` is the *per-SSA-value* demand
+    fact (`kirin_liveness::Live`), not a `LiveSet` — the sparse fact anchors to
+    values, mirroring the forward per-value model. Helpers are
+    `is_demanded`/`demand`/`effect()` plus the purity-aware `transfer_ordinary`
+    (rather than the sketched `live_after`/`use_def` names); the effect is
+    `SparseBackwardEffect::Demands`. Summary owners ARE scope-qualified SSA
+    values, so the fixpoint driver's default self-dependent index is the demand
+    worklist; scf converges loop-carried demand with **no frames**.
+  - **Classic per-point liveness** (`DenseBackward`,
+    `DenseBackwardInterpreter`): here `Interp::Value` *is* the point state
+    (`LiveSet`), realizing the sketch's `Value = LiveSet` — with the textbook
+    kill/gen transfer (`transfer_classic`, purity-irrelevant). Block owners
+    converge boundary summaries; `live_before`/`live_after` are reconstructed
+    per point on demand (never persisted by the fixpoint); scf owns dense
+    frames (arm-join, loop fixpoint).
+  Strong per-point sets are the composition `dense ∩ demanded`, not a third
+  analysis. Because the `Kind` parameter distinguishes impls, one dialect
+  carries all three rules at once — the compile-time proof lives in
   `kirin-interpreter::dispatch::tests`.
 - Function-summary context sensitivity is a pluggable `CallContext` strategy.
   `ContextInsensitive` is the context-insensitive baseline; `ConstPropContext` provides bounded

@@ -16,12 +16,12 @@ This part uses both shorthand (`σ`, `ρ`) and direct API names (`EnvIndex`,
 | --- | --- | --- |
 | Interpreter interface | `Interp` | [`crates/kirin-interpreter/src/interp.rs`](../../../crates/kirin-interpreter/src/interp.rs) |
 | Statement location | `InterpLocation` | [`crates/kirin-interpreter/src/interp.rs`](../../../crates/kirin-interpreter/src/interp.rs) |
-| Forward eval helpers | `ForwardEvalInterp` | [`crates/kirin-interpreter/src/interp.rs`](../../../crates/kirin-interpreter/src/interp.rs) |
+| Forward eval helpers | `SparseForwardInterp` | [`crates/kirin-interpreter/src/interp.rs`](../../../crates/kirin-interpreter/src/interp.rs) |
 | Environment capability | `EnvIndex` | [`crates/kirin-interpreter/src/env.rs`](../../../crates/kirin-interpreter/src/env.rs) |
 | Environment trait | `Env<V>` | [`crates/kirin-interpreter/src/env.rs`](../../../crates/kirin-interpreter/src/env.rs) |
 | Concrete store | `EnvStackStore<V>` | [`crates/kirin-interpreter/src/env.rs`](../../../crates/kirin-interpreter/src/env.rs) |
 | Concrete `env_read` semantics | `ConcreteInterpreter` impl of `Env` | [`crates/kirin-interpreter/src/concrete_interp.rs`](../../../crates/kirin-interpreter/src/concrete_interp.rs) |
-| Forward abstract `env_read` semantics | `ForwardAbstractInterpreter` impl of `Env` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Forward abstract `env_read` semantics | `SparseForwardInterpreter` impl of `Env` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
 | Structured scope carrier | `Scope<V, E>`, `ScopeBody`, `ScopeHook`, `ScopeStep` | [`crates/kirin-interpreter/src/effect.rs`](../../../crates/kirin-interpreter/src/effect.rs) |
 | Value tuple packet | `Product<T>` | [`crates/kirin-ir/src/product.rs`](../../../crates/kirin-ir/src/product.rs) |
 
@@ -43,7 +43,7 @@ pub trait Interp: Sized {
 ```
 
 Forward-evaluation dialect code never manipulates store internals directly. It
-receives `&mut I`, where `I: ForwardEvalInterp`; the engine has already stashed
+receives `&mut I`, where `I: SparseForwardInterp`; the engine has already stashed
 the current `(stage, statement, env)` as an `InterpLocation` and exposes:
 
 - `interp.read(x)`
@@ -52,7 +52,7 @@ the current `(stage, statement, env)` as an `InterpLocation` and exposes:
 - `interp.write_results(results, product)`
 
 So the formal transition `σ -> σ'` for a statement is realized operationally by
-mutations performed through `ForwardEvalInterp` helpers over `Env::env_write`;
+mutations performed through `SparseForwardInterp` helpers over `Env::env_write`;
 it is not a separate explicit return value from `interpret`.
 
 API-level correspondence:

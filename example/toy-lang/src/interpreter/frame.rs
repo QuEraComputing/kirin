@@ -10,9 +10,9 @@
 use std::hash::Hash;
 
 use kirin_interpreter::engine::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCfgFrame, AbstractCompletion,
-    AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, BodyFrame, CallFrame,
-    Completion, ForwardEvalInterp, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
+    AbstractFrameDriver, BodyFrame, CallFrame, Completion, Frame, FrameBuild, FrameDriver,
+    FrameEffect, InterpreterError, SparseForwardInterp,
 };
 use kirin_scf::{
     AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf, BuildScfFor,
@@ -54,7 +54,7 @@ impl<V, E> BuildScfFor<V, E> for ToyFrame<V, E> {
 
 impl<I, V, E> Frame<I> for ToyFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + ForwardEvalInterp<Frame = ToyFrame<V, E>>,
+    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = ToyFrame<V, E>>,
     V: Clone + ForLoopValue,
     E: From<InterpreterError>,
 {
@@ -98,8 +98,6 @@ where
 
 /// Abstract total frame: standard abstract traversal plus the SCF if/for frames.
 pub enum ToyAbstractFrame<V, E, K> {
-    Function(AbstractFunctionFrame<V, E, K>),
-    Cfg(AbstractCfgFrame<V, E, K>),
     Block(AbstractBlockFrame<V, E, K>),
     Call(AbstractCallFrame<V, E, K>),
     ScfIf(AbstractScfIfFrame<V, E, K>),
@@ -107,12 +105,6 @@ pub enum ToyAbstractFrame<V, E, K> {
 }
 
 impl<V, E, K> AbstractFrameBuild<V, E, K> for ToyAbstractFrame<V, E, K> {
-    fn from_function(frame: AbstractFunctionFrame<V, E, K>) -> Self {
-        ToyAbstractFrame::Function(frame)
-    }
-    fn from_cfg(frame: AbstractCfgFrame<V, E, K>) -> Self {
-        ToyAbstractFrame::Cfg(frame)
-    }
     fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
         ToyAbstractFrame::Block(frame)
     }
@@ -136,7 +128,7 @@ impl<V, E, K> BuildAbstractScfFor<V, E, K> for ToyAbstractFrame<V, E, K> {
 impl<I, V, E, K> Frame<I> for ToyAbstractFrame<V, E, K>
 where
     I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-        + ForwardEvalInterp<Frame = ToyAbstractFrame<V, E, K>>,
+        + SparseForwardInterp<Frame = ToyAbstractFrame<V, E, K>>,
     V: Clone + PartialEq + ForLoopValue,
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,
@@ -145,8 +137,6 @@ where
 
     fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
-            ToyAbstractFrame::Function(frame) => frame.step_into::<I, Self>(interp),
-            ToyAbstractFrame::Cfg(frame) => frame.step_into::<I, Self>(interp),
             ToyAbstractFrame::Block(frame) => frame.step_into::<I, Self>(interp),
             ToyAbstractFrame::Call(frame) => frame.step_into::<I, Self>(interp),
             ToyAbstractFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
@@ -156,8 +146,6 @@ where
 
     fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
-            ToyAbstractFrame::Function(frame) => Ok(frame.resume_done_into::<Self>()),
-            ToyAbstractFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
             ToyAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
             ToyAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
             ToyAbstractFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
@@ -171,12 +159,87 @@ where
         interp: &mut I,
     ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
-            ToyAbstractFrame::Function(frame) => frame.resume_into::<Self>(completion),
-            ToyAbstractFrame::Cfg(frame) => frame.resume_into::<I, Self>(completion, interp),
             ToyAbstractFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
             ToyAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
             ToyAbstractFrame::ScfIf(frame) => frame.resume_into::<I, Self>(completion, interp),
             ToyAbstractFrame::ScfFor(frame) => frame.resume_into::<I, Self>(completion, interp),
+        }
+    }
+}
+
+// ===========================================================================
+// Dense backward (classic per-point liveness)
+// ===========================================================================
+
+use kirin_interpreter::PointFacts;
+use kirin_interpreter::engine::{
+    DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBlockFrame, DenseFrameBuild,
+};
+use kirin_scf::{BuildDenseScfFor, BuildDenseScfIf, DenseScfForFrame, DenseScfIfFrame};
+
+use kirin::prelude::Lattice;
+
+/// Dense backward total frame: the standard block walk plus the SCF dense
+/// frames (arm-join for `scf.if`, the loop-carried fixpoint for `scf.for`).
+pub enum ToyDenseBackwardFrame<V, E> {
+    Block(DenseBlockFrame<V, E>),
+    ScfIf(DenseScfIfFrame<V, E>),
+    ScfFor(DenseScfForFrame<V, E>),
+}
+
+impl<V, E> DenseFrameBuild<V, E> for ToyDenseBackwardFrame<V, E> {
+    fn from_block(frame: DenseBlockFrame<V, E>) -> Self {
+        ToyDenseBackwardFrame::Block(frame)
+    }
+}
+
+impl<V, E> BuildDenseScfIf<V, E> for ToyDenseBackwardFrame<V, E> {
+    fn scf_if(frame: DenseScfIfFrame<V, E>) -> Self {
+        ToyDenseBackwardFrame::ScfIf(frame)
+    }
+}
+
+impl<V, E> BuildDenseScfFor<V, E> for ToyDenseBackwardFrame<V, E> {
+    fn scf_for(frame: DenseScfForFrame<V, E>) -> Self {
+        ToyDenseBackwardFrame::ScfFor(frame)
+    }
+}
+
+impl<I, V, E> Frame<I> for ToyDenseBackwardFrame<V, E>
+where
+    I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = ToyDenseBackwardFrame<V, E>>,
+    V: Clone + PartialEq + Lattice + PointFacts,
+    E: From<InterpreterError>,
+{
+    type Completion = DenseBackwardCompletion<V>;
+
+    fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+        match self {
+            ToyDenseBackwardFrame::Block(frame) => frame.step_into::<I, Self>(interp),
+            ToyDenseBackwardFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
+            ToyDenseBackwardFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
+        }
+    }
+
+    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+        match self {
+            ToyDenseBackwardFrame::Block(frame) => frame.resume_done_into::<Self>(),
+            ToyDenseBackwardFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
+            ToyDenseBackwardFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
+        }
+    }
+
+    fn resume(
+        self,
+        completion: Self::Completion,
+        interp: &mut I,
+    ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+        match self {
+            ToyDenseBackwardFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
+            ToyDenseBackwardFrame::ScfIf(frame) => frame.resume_into::<I, Self>(completion, interp),
+            ToyDenseBackwardFrame::ScfFor(frame) => {
+                frame.resume_into::<I, Self>(completion, interp)
+            }
         }
     }
 }

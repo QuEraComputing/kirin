@@ -1,0 +1,17 @@
+[package]
+name = "kirin-liveness"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-interpreter = { workspace = true }
+kirin-ir = { workspace = true }
+
+[dev-dependencies]
+kirin = { workspace = true }
+kirin-arith = { workspace = true }
+kirin-test-languages = { workspace = true, features = [
+  "arith-function-language",
+  "parser",
+  "interpreter",
+] }

@@ -1,16 +1,41 @@
 use std::ops::{Add, Mul, Neg, Sub};
 
-use kirin::prelude::CompileTimeValue;
+use kirin::prelude::{CompileTimeValue, HasBottom};
 use kirin_interpreter::dialect::{
-    ForwardEffect, ForwardEval, ForwardEvalInterp, Interpretable, InterpreterError,
+    DenseBackward, DenseBackwardInterp, Interpretable, InterpreterError, SparseBackward,
+    SparseBackwardInterp, SparseForward, SparseForwardEffect, SparseForwardInterp,
 };
 use thiserror::Error;
 
 use crate::{Arith, CheckedDiv, CheckedRem};
 
-impl<I, T> Interpretable<I, ForwardEval> for Arith<T>
+/// Classic (weak) per-point liveness: kill the result, gen all operands.
+impl<I, T> Interpretable<I, DenseBackward> for Arith<T>
 where
-    I: ForwardEvalInterp,
+    I: DenseBackwardInterp,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        interp.transfer_classic(self)
+    }
+}
+
+/// Backward demand: purity-aware neededness. `Arith` is `#[kirin(pure)]`, so
+/// operands are demanded only when a result is demanded.
+impl<I, T> Interpretable<I, SparseBackward> for Arith<T>
+where
+    I: SparseBackwardInterp,
+    I::Value: HasBottom + PartialEq,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        interp.transfer_ordinary(self)
+    }
+}
+
+impl<I, T> Interpretable<I, SparseForward> for Arith<T>
+where
+    I: SparseForwardInterp,
     I::Value: Add<Output = I::Value>
         + Sub<Output = I::Value>
         + Mul<Output = I::Value>
@@ -66,7 +91,7 @@ where
             }
             Arith::__Phantom(..) => unreachable!(),
         }
-        Ok(ForwardEffect::Next)
+        Ok(SparseForwardEffect::Next)
     }
 }
 

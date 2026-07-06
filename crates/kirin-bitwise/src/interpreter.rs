@@ -1,16 +1,41 @@
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 
-use kirin::prelude::CompileTimeValue;
+use kirin::prelude::{CompileTimeValue, HasBottom};
 use kirin_interpreter::dialect::{
-    ForwardEffect, ForwardEval, ForwardEvalInterp, Interpretable, InterpreterError,
+    DenseBackward, DenseBackwardInterp, Interpretable, InterpreterError, SparseBackward,
+    SparseBackwardInterp, SparseForward, SparseForwardEffect, SparseForwardInterp,
 };
 use thiserror::Error;
 
 use crate::{Bitwise, CheckedShl, CheckedShr};
 
-impl<I, T> Interpretable<I, ForwardEval> for Bitwise<T>
+/// Classic (weak) per-point liveness: kill the result, gen all operands.
+impl<I, T> Interpretable<I, DenseBackward> for Bitwise<T>
 where
-    I: ForwardEvalInterp,
+    I: DenseBackwardInterp,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        interp.transfer_classic(self)
+    }
+}
+
+/// Backward demand: purity-aware neededness. `Bitwise` is `#[kirin(pure)]`, so
+/// operands are demanded only when a result is demanded.
+impl<I, T> Interpretable<I, SparseBackward> for Bitwise<T>
+where
+    I: SparseBackwardInterp,
+    I::Value: HasBottom + PartialEq,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        interp.transfer_ordinary(self)
+    }
+}
+
+impl<I, T> Interpretable<I, SparseForward> for Bitwise<T>
+where
+    I: SparseForwardInterp,
     I::Value: BitAnd<Output = I::Value>
         + BitOr<Output = I::Value>
         + BitXor<Output = I::Value>
@@ -66,7 +91,7 @@ where
             }
             Bitwise::__Phantom(..) => unreachable!(),
         }
-        Ok(ForwardEffect::Next)
+        Ok(SparseForwardEffect::Next)
     }
 }
 

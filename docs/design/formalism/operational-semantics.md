@@ -24,9 +24,9 @@
 | Total frame enum | `StandardFrame<V, E>` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |
 | Concrete driver entry | `ConcreteInterpreter::call_by_name` | [`crates/kirin-interpreter/src/concrete_interp.rs`](../../../crates/kirin-interpreter/src/concrete_interp.rs) |
 | Concrete driver loop | `ConcreteInterpreter::run` | [`crates/kirin-interpreter/src/concrete_interp.rs`](../../../crates/kirin-interpreter/src/concrete_interp.rs) |
-| Forward abstract driver entry | `ForwardAbstractInterpreter::analyze_by_name` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
-| Forward abstract CFG fixpoint | `ForwardAbstractInterpreter::eval_cfg` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
-| Forward abstract statement dispatch helper | `ForwardAbstractInterpreter` dispatch path | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Forward abstract driver entry | `SparseForwardInterpreter::analyze_by_name` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Forward abstract CFG fixpoint | `SparseForwardInterpreter::eval_cfg` | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
+| Forward abstract statement dispatch helper | `SparseForwardInterpreter` dispatch path | [`crates/kirin-interpreter/src/forward_abstract_interp.rs`](../../../crates/kirin-interpreter/src/forward_abstract_interp.rs) |
 
 ## III.1 Statement Semantics Judgment
 
@@ -46,7 +46,7 @@ where:
 
 Important correspondence note: in Rust, `Interpretable::interpret` returns
 `Result<Effect<...>, ...>`; `σ'` is not returned explicitly. Instead, `σ -> σ'`
-is induced by side effects through `ForwardEvalInterp` helpers (`interp.read`,
+is induced by side effects through `SparseForwardInterp` helpers (`interp.read`,
 `interp.write`, `interp.write_results`) over the engine's `env_read`/`env_write`
 implementation.
 

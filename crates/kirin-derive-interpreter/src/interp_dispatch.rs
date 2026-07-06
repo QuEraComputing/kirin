@@ -66,7 +66,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         // Dispatch is keyed on the engine `__InterpI` and the semantics marker
         // `__Kind`: the engine passes itself in. So each language need only be
         // interpretable for that engine/semantics — no higher-ranked GAT
-        // projection. The forward engines instantiate `__Kind = ForwardEval` in
+        // projection. The forward engines instantiate `__Kind = SparseForward` in
         // their `FrameDriver` bound.
         predicates.push(syn::parse_quote! {
             #dialect_ty: #interp_crate::Interpretable<__InterpI, __Kind> + #interp_crate::FunctionEntry<__InterpI>

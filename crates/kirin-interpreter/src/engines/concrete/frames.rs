@@ -4,20 +4,20 @@
 //! These are the default total frames for [`ConcreteInterpreter`](crate::ConcreteInterpreter):
 //! [`BodyFrame`] (walks a function-body CFG region or a single body block) and
 //! [`CallFrame`] (call/return). They implement the shared [`Frame`] trait by
-//! consuming the dialect [`ForwardEffect`] and driving a single deterministic
+//! consuming the dialect [`SparseForwardEffect`] and driving a single deterministic
 //! path. Structured-control dialects do not get a framework "scope": they push
-//! a frame **they own** through [`ForwardEffect::Push`] (that frame may build a
+//! a frame **they own** through [`SparseForwardEffect::Push`] (that frame may build a
 //! [`BodyFrame`] to walk a chosen body — a reusable building block, not
 //! framework-owned structured semantics). A language that combines such a
 //! dialect defines its own total frame enum embedding [`BodyFrame`]/[`CallFrame`]
 //! via [`FrameBuild`] plus its dialect frames. The forward abstract analogue
-//! lives in [`forward_abstract_frames`](crate::forward_abstract_frames).
+//! lives in [`sparse_forward_frames`](crate::sparse_forward_frames).
 
 use kirin_ir::{Block, CompileStage, Product, Region, SSAValue, Statement};
 
 use crate::{
-    CallEffect, Callee, EnvIndex, ForwardEffect, ForwardEvalInterp, Frame, FrameDriver,
-    FrameEffect, InterpreterError,
+    CallEffect, Callee, EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError,
+    SparseForwardEffect, SparseForwardInterp,
 };
 
 /// Completion payloads produced by the standard concrete frames.
@@ -130,11 +130,11 @@ where
         })
     }
 
-    /// Execute the next statement and translate its [`ForwardEffect`] into a
+    /// Execute the next statement and translate its [`SparseForwardEffect`] into a
     /// [`FrameEffect`] over the total frame type `F`.
     pub fn step_into<I, F>(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
     where
-        I: FrameDriver<Value = V, Error = E> + ForwardEvalInterp<Frame = F>,
+        I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
         F: FrameBuild<V, E>,
     {
         // Bind entry arguments lazily on the first step (a dialect-built body
@@ -154,29 +154,29 @@ where
         self.cursor = interp.next_statement(self.stage, self.block, statement)?;
 
         match interp.run_statement(self.stage, statement, self.index)? {
-            ForwardEffect::Next => Ok(FrameEffect::Continue(F::from_body(self))),
-            ForwardEffect::Jump(edge) => {
+            SparseForwardEffect::Next => Ok(FrameEffect::Continue(F::from_body(self))),
+            SparseForwardEffect::Jump(edge) => {
                 interp.bind_block_args(self.stage, self.index, edge.target, &edge.args)?;
                 self.cursor = interp.first_statement(self.stage, edge.target)?;
                 self.block = edge.target;
                 Ok(FrameEffect::Continue(F::from_body(self)))
             }
-            ForwardEffect::Branch(_) => Err(E::from(InterpreterError::IndeterminateBranch)),
-            ForwardEffect::Push { frame, results } => {
+            SparseForwardEffect::Branch(_) => Err(E::from(InterpreterError::IndeterminateBranch)),
+            SparseForwardEffect::Push { frame, results } => {
                 self.resume_slots = Some(results);
                 Ok(FrameEffect::Push {
                     parent: F::from_body(self),
                     child: frame,
                 })
             }
-            ForwardEffect::Call(call) => {
+            SparseForwardEffect::Call(call) => {
                 let pending = CallFrame::pending(self.stage, self.index, call);
                 Ok(FrameEffect::Push {
                     parent: F::from_body(self),
                     child: F::from_call(pending),
                 })
             }
-            ForwardEffect::Yield(values) => {
+            SparseForwardEffect::Yield(values) => {
                 if self.function_boundary {
                     return Err(E::from(InterpreterError::Custom(
                         "yield reached a function boundary",
@@ -184,7 +184,7 @@ where
                 }
                 Ok(FrameEffect::Complete(Completion::Finished(values)))
             }
-            ForwardEffect::Return(values) => self.finish_return::<I, F>(interp, values),
+            SparseForwardEffect::Return(values) => self.finish_return::<I, F>(interp, values),
         }
     }
 
@@ -360,7 +360,7 @@ impl<V, E> FrameBuild<V, E> for StandardFrame<V, E> {
 
 impl<I, V, E> Frame<I> for StandardFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + ForwardEvalInterp<Frame = StandardFrame<V, E>>,
+    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = StandardFrame<V, E>>,
     V: Clone,
     E: From<InterpreterError>,
 {

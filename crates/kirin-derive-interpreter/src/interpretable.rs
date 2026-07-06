@@ -25,11 +25,17 @@ fn emit_interpretable(
     let type_name = &ctx.meta.name;
     let mut impl_generics = ctx.meta.generics.clone();
     // The dialect trait is specialized on the engine type `__InterpI` and the
-    // forward-value semantics marker; the delegating wrapper impl is generic over
-    // the engine.
+    // semantics marker `__Kind`; the delegating wrapper impl is generic over
+    // both, so one derive serves every semantics the wrapped types implement
+    // (forward evaluation, backward demand, dense liveness, ...). A deriving
+    // enum therefore cannot also hand-write a per-`Kind` enum-level impl;
+    // customization belongs on the wrapped types.
     impl_generics
         .params
         .push(syn::GenericParam::Type(syn::parse_quote!(__InterpI)));
+    impl_generics
+        .params
+        .push(syn::GenericParam::Type(syn::parse_quote!(__Kind)));
 
     let (impl_generics, _, _) = impl_generics.split_for_impl();
     let (_, ty_generics, original_where) = ctx.meta.generics.split_for_impl();
@@ -39,7 +45,7 @@ fn emit_interpretable(
     for stmt_ctx in ctx.statements.values() {
         if let Some(wrapper_ty) = stmt_ctx.wrapper_type {
             predicates.push(syn::parse_quote! {
-                #wrapper_ty: #interp_crate::Interpretable<__InterpI, #interp_crate::ForwardEval>
+                #wrapper_ty: #interp_crate::Interpretable<__InterpI, __Kind>
             });
         }
     }
@@ -72,7 +78,7 @@ fn emit_interpretable(
             quote! { Self::#variant_name #pattern }
         };
         arms.push(quote! {
-            #arm_pattern => <#wrapper_ty as #interp_crate::Interpretable<__InterpI, #interp_crate::ForwardEval>>::interpret(
+            #arm_pattern => <#wrapper_ty as #interp_crate::Interpretable<__InterpI, __Kind>>::interpret(
                 #binding, interp,
             )
         });
@@ -95,7 +101,7 @@ fn emit_interpretable(
 
     Ok(vec![quote! {
         #[automatically_derived]
-        impl #impl_generics #interp_crate::Interpretable<__InterpI, #interp_crate::ForwardEval> for #type_name #ty_generics #where_clause {
+        impl #impl_generics #interp_crate::Interpretable<__InterpI, __Kind> for #type_name #ty_generics #where_clause {
             fn interpret(
                 &self,
                 interp: &mut __InterpI,

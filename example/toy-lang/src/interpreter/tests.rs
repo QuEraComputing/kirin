@@ -52,6 +52,61 @@ specialize @lowered fn @same(i64) -> i64 {
 }
 "#;
 
+// A successor block that directly uses `%v` — defined in the dominating `^entry`
+// block and **not** passed as a block argument (a direct dominated cross-block
+// SSA use, which Kirin supports). Guards that block-owner convergence reschedules
+// on directly-read external facts, not only on block-parameter edges.
+const CROSS_BLOCK_DIRECT_USE: &str = r#"
+stage @lowered fn @cross(i64) -> i64;
+
+specialize @lowered fn @cross(i64) -> i64 {
+  ^entry(%x: i64) {
+    %v = add %x, %x -> i64;
+    %zero = constant 0 -> i64;
+    %is_neg = lt %x, %zero -> i64;
+    cond_br %is_neg then=^then() else=^else();
+  }
+  ^then() {
+    ret %v;
+  }
+  ^else() {
+    ret %v;
+  }
+}
+"#;
+
+// A loop where a value defined in the loop head (`%doubled`, NOT a block param)
+// is read directly in the exit block, and *rises* across iterations as the
+// loop-carried `%acc` widens to `Top`. The exit block has no parameters, so its
+// block-entry never changes — under CFG-successor-edge scheduling alone it runs
+// once (reading the early `%doubled`) and is never rerun when `%doubled` rises.
+// Sound analysis must still return `Top`. This is the M3b acceptance stress test
+// for value/def-use deps; it exposes the gap the retained `AbstractCfgFrame`
+// worklist has, which M3b's Block owners + value-reader deps close.
+const LOOP_CARRIED_CROSS_BLOCK_RISE: &str = r#"
+stage @lowered fn @rise(i64) -> i64;
+
+specialize @lowered fn @rise(i64) -> i64 {
+  ^entry(%n: i64) {
+    %z = constant 0 -> i64;
+    br ^head(%z);
+  }
+  ^head(%acc: i64) {
+    %doubled = add %acc, %acc -> i64;
+    %lt = lt %acc, %n -> i64;
+    cond_br %lt then=^body() else=^exit();
+  }
+  ^body() {
+    %one = constant 1 -> i64;
+    %next = add %acc, %one -> i64;
+    br ^head(%next);
+  }
+  ^exit() {
+    ret %doubled;
+  }
+}
+"#;
+
 const SOURCE_FOR_CARRIED_STABLE: &str = r#"
 stage @source fn @stable(i64, i64, i64) -> i64;
 
@@ -327,6 +382,35 @@ fn constprop_source_add_with_unknown() {
 }
 
 #[test]
+fn constprop_direct_dominated_cross_block_use() {
+    // `^then`/`^else` read `%v` directly from the dominating `^entry` block
+    // without it being a block argument. Constprop must propagate the fact across
+    // the CFG edge: `%v = %x + %x`, so `@cross(Const(3)) == Const(6)`, and an
+    // unknown input widens to `Top`. (Regression for M3b block-owner convergence:
+    // a directly-read external fact must reach the reading block.)
+    let pipeline = build_pipeline(CROSS_BLOCK_DIRECT_USE);
+    assert_eq!(
+        analyze_constprop(&pipeline, "lowered", "cross", &[ConstProp::Const(3)]).unwrap(),
+        ConstProp::Const(6)
+    );
+    assert_eq!(
+        analyze_constprop(&pipeline, "lowered", "cross", &[ConstProp::Top]).unwrap(),
+        ConstProp::Top
+    );
+}
+
+#[test]
+fn constprop_loop_carried_cross_block_rise_is_top() {
+    let pipeline = build_pipeline(LOOP_CARRIED_CROSS_BLOCK_RISE);
+    // `%acc` widens to Top, so `%doubled = %acc + %acc` is Top, and `ret %doubled`
+    // must be Top. (M3a returns a stale early constant — the gap M3b closes.)
+    assert_eq!(
+        analyze_constprop(&pipeline, "lowered", "rise", &[ConstProp::Top]).unwrap(),
+        ConstProp::Top
+    );
+}
+
+#[test]
 fn constprop_source_known_branch() {
     let pipeline = build_pipeline(include_str!("../../programs/branching.kirin"));
     assert_eq!(
@@ -347,7 +431,7 @@ fn constprop_source_unknown_branch_joins_yields() {
 }
 
 // `AbstractScfIfFrame` owns the "explore both arms + join" behavior that used to
-// live in the removed `ForwardEffect::EnterAny` / framework alternatives frame.
+// live in the removed `SparseForwardEffect::EnterAny` / framework alternatives frame.
 // With an unknown condition both arms are explored and their finishes joined.
 
 #[test]
@@ -481,11 +565,10 @@ mod advanced {
 
     use kirin_constprop::{ConstPropContext, ConstPropValue};
     use kirin_interpreter::engine::{
-        AbstractBlockFrame, AbstractCallFrame, AbstractCfgFrame, AbstractCompletion,
-        AbstractFrameBuild, AbstractFrameDriver, AbstractFunctionFrame, BodyFrame, CallContext,
-        CallFrame, Completion, ConcreteInterpreter, CrossStageLinker, ForwardAbstractInterpreter,
-        ForwardEvalInterp, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
-        expect_single,
+        AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
+        AbstractFrameDriver, BodyFrame, CallContext, CallFrame, Completion, ConcreteInterpreter,
+        CrossStageLinker, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
+        SparseForwardInterp, SparseForwardInterpreter, expect_single,
     };
     use kirin_scf::{
         AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf,
@@ -544,7 +627,7 @@ mod advanced {
 
     impl<I, V, E> Frame<I> for TracingFrame<V, E>
     where
-        I: FrameDriver<Value = V, Error = E> + ForwardEvalInterp<Frame = TracingFrame<V, E>>,
+        I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = TracingFrame<V, E>>,
         V: Clone + ForLoopValue,
         E: From<InterpreterError>,
     {
@@ -653,15 +736,13 @@ mod advanced {
     //
     // The abstract analogue of `TracingFrame`: it reuses the standard abstract
     // frames verbatim (via `AbstractFrameBuild` + the `*_into` methods) and adds
-    // observation. The engine is not forked — only `ForwardAbstractInterpreter`'s `F`
+    // observation. The engine is not forked — only `SparseForwardInterpreter`'s `F`
     // type parameter changes. This proves abstract *traversal* is frame-
     // parametric, distinct from the analysis-policy `P` budget customized above.
 
     thread_local! {
         static ATRACE: RefCell<AbstractTrace> = const {
             RefCell::new(AbstractTrace {
-                function_steps: 0,
-                cfg_steps: 0,
                 block_steps: 0,
                 if_steps: 0,
                 calls: 0,
@@ -671,16 +752,12 @@ mod advanced {
 
     #[derive(Clone, Copy, Default)]
     struct AbstractTrace {
-        function_steps: usize,
-        cfg_steps: usize,
         block_steps: usize,
         if_steps: usize,
         calls: usize,
     }
 
     enum TracingAbstractFrame<V, E, K> {
-        Function(AbstractFunctionFrame<V, E, K>),
-        Cfg(AbstractCfgFrame<V, E, K>),
         Block(AbstractBlockFrame<V, E, K>),
         Call(AbstractCallFrame<V, E, K>),
         ScfIf(AbstractScfIfFrame<V, E, K>),
@@ -688,12 +765,6 @@ mod advanced {
     }
 
     impl<V, E, K> AbstractFrameBuild<V, E, K> for TracingAbstractFrame<V, E, K> {
-        fn from_function(frame: AbstractFunctionFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::Function(frame)
-        }
-        fn from_cfg(frame: AbstractCfgFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::Cfg(frame)
-        }
         fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
             TracingAbstractFrame::Block(frame)
         }
@@ -717,7 +788,7 @@ mod advanced {
     impl<I, V, E, K> Frame<I> for TracingAbstractFrame<V, E, K>
     where
         I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-            + ForwardEvalInterp<Frame = TracingAbstractFrame<V, E, K>>,
+            + SparseForwardInterp<Frame = TracingAbstractFrame<V, E, K>>,
         V: Clone + PartialEq + ForLoopValue,
         E: From<InterpreterError>,
         K: Clone + Eq + Hash,
@@ -726,14 +797,6 @@ mod advanced {
 
         fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
-                TracingAbstractFrame::Function(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().function_steps += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingAbstractFrame::Cfg(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().cfg_steps += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
                 TracingAbstractFrame::Block(frame) => {
                     ATRACE.with(|t| t.borrow_mut().block_steps += 1);
                     frame.step_into::<I, Self>(interp)
@@ -755,8 +818,6 @@ mod advanced {
             _interp: &mut I,
         ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
-                TracingAbstractFrame::Function(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingAbstractFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
                 TracingAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
                 TracingAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
                 TracingAbstractFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
@@ -770,10 +831,6 @@ mod advanced {
             interp: &mut I,
         ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
-                TracingAbstractFrame::Function(frame) => frame.resume_into::<Self>(completion),
-                TracingAbstractFrame::Cfg(frame) => {
-                    frame.resume_into::<I, Self>(completion, interp)
-                }
                 TracingAbstractFrame::Block(frame) => {
                     frame.resume_into::<I, Self>(completion, interp)
                 }
@@ -790,7 +847,7 @@ mod advanced {
 
     type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
 
-    type TracingAnalysis<'ir> = ForwardAbstractInterpreter<
+    type TracingAnalysis<'ir> = SparseForwardInterpreter<
         'ir,
         Stage,
         ConstPropValue,
@@ -805,9 +862,9 @@ mod advanced {
         ATRACE.with(|t| *t.borrow_mut() = AbstractTrace::default());
         let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
 
-        // ForwardAbstractInterpreter parameterized by the *custom* abstract frame enum.
+        // SparseForwardInterpreter parameterized by the *custom* abstract frame enum.
         let mut analysis: TracingAnalysis<'_> =
-            ForwardAbstractInterpreter::new(&pipeline).with_linker(CrossStageLinker);
+            SparseForwardInterpreter::new(&pipeline).with_linker(CrossStageLinker);
         let result = expect_single::<ConstPropValue, ToyError>(
             analysis
                 .analyze_by_name("source", "factorial", [ConstPropValue::Const(5)])
@@ -822,10 +879,511 @@ mod advanced {
 
         // (3): abstract traversal is observable through the custom frame — a real
         // frame type `F`, not merely a custom analysis policy `P`. Counts are not
-        // pinned (the interprocedural fixpoint re-enqueues summaries).
+        // pinned (the interprocedural fixpoint re-enqueues summaries). Since M3b,
+        // CFG convergence is owner-based: each block is a block owner walked by a
+        // block frame, so traversal shows up as block + call steps.
         let trace = ATRACE.with(|t| *t.borrow());
-        assert!(trace.function_steps > 0, "function frames must be stepped");
-        assert!(trace.cfg_steps > 0, "CFG frames must be stepped");
+        assert!(trace.block_steps > 0, "block frames must be stepped");
         assert!(trace.calls > 0, "call frames must be stepped");
+    }
+}
+
+// ===========================================================================
+// Strong liveness (sparse backward demand) over source-stage programs with
+// structured control flow — transfer dispatched through the dialects'
+// `Interpretable<I, SparseBackward>` rules, scf handled by rules alone (the
+// value worklist converges loop-carried demand without frames).
+// ===========================================================================
+
+mod demand {
+    use kirin::prelude::{
+        CompileStage, GetInfo, HasRegionBody, HasResults, ParsePipelineText, Pipeline, Region,
+        SSAValue,
+    };
+    use kirin_arith::{Arith, ArithValue};
+    use kirin_function::Lexical;
+    use kirin_liveness::analyze_demand;
+
+    use crate::language::HighLevel;
+    use crate::stage::Stage;
+
+    pub(super) fn parse(program: &str) -> Pipeline<Stage> {
+        let mut pipeline: Pipeline<Stage> = Pipeline::new();
+        ParsePipelineText::parse(&mut pipeline, program).expect("program parses");
+        pipeline
+    }
+
+    /// The source stage id, its info, and the body region of `name`.
+    pub(super) fn source_region(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, Region) {
+        let stage_id = pipeline.stage_by_name("source").expect("source stage");
+        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
+            panic!("source stage holds HighLevel");
+        };
+        let sf = pipeline
+            .resolve_staged_function(name, stage_id)
+            .expect("staged function");
+        let sf_info = sf.get_info(info).expect("staged function info");
+        let body = *sf_info.specializations()[0].body();
+        let region = match body.definition(info) {
+            HighLevel::Lexical(Lexical::Function(function)) => *function.region(),
+            other => panic!("expected a function body, got {other:?}"),
+        };
+        (stage_id, region)
+    }
+
+    /// The parameters of the region's entry block.
+    pub(super) fn entry_params(pipeline: &Pipeline<Stage>, region: Region) -> Vec<SSAValue> {
+        let stage_id = pipeline.stage_by_name("source").expect("source stage");
+        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
+            panic!("source stage holds HighLevel");
+        };
+        let block = region.blocks(info).next().expect("entry block");
+        block
+            .expect_info(info)
+            .arguments
+            .iter()
+            .copied()
+            .map(SSAValue::from)
+            .collect()
+    }
+
+    /// Find something by matching statement definitions anywhere in the
+    /// region (including scf bodies, via the topology's nested-block
+    /// enumeration).
+    pub(super) fn find_value<R>(
+        pipeline: &Pipeline<Stage>,
+        region: Region,
+        select: impl Fn(&HighLevel) -> Option<R>,
+    ) -> R {
+        let stage_id = pipeline.stage_by_name("source").expect("source stage");
+        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
+            panic!("source stage holds HighLevel");
+        };
+        let topology = kirin_interpreter::region_topology(info, &region);
+        for block in &topology.blocks {
+            for &stmt in &block.stmts {
+                if let Some(value) = select(stmt.definition(info)) {
+                    return value;
+                }
+            }
+        }
+        panic!("no matching statement in region");
+    }
+
+    /// The result of the `constant <value> -> i64` statement.
+    pub(super) fn constant_result(
+        pipeline: &Pipeline<Stage>,
+        region: Region,
+        value: i64,
+    ) -> SSAValue {
+        find_value(pipeline, region, |definition| match definition {
+            HighLevel::Constant(constant) if constant.value == ArithValue::I64(value) => {
+                Some(constant.result.into())
+            }
+            _ => None,
+        })
+    }
+
+    const IF_BODY_DEMAND: &str = r#"
+stage @source fn @if_body(i64) -> i64;
+
+specialize @source fn @if_body(i64) -> i64 {
+  ^entry(%cond: i64) {
+    %result = if %cond then ^then() {
+      %a = constant 1 -> i64;
+      %junk = constant 9 -> i64;
+      yield %a;
+    } else ^else() {
+      %b = constant 2 -> i64;
+      yield %b;
+    } -> i64;
+    ret %result;
+  }
+}
+"#;
+
+    /// Values used only inside scf bodies are demanded when the result is —
+    /// the old structural liveness never looked inside bodies at all — while
+    /// a body-interior dead statement stays dead.
+    #[test]
+    fn scf_if_body_demand_follows_result_demand() {
+        let pipeline = parse(IF_BODY_DEMAND);
+        let (stage, region) = source_region(&pipeline, "if_body");
+        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+
+        let cond = entry_params(&pipeline, region)[0];
+        let if_result = find_value(&pipeline, region, |definition| match definition {
+            HighLevel::Structured(_) => definition.results().next().map(|r| SSAValue::from(*r)),
+            _ => None,
+        });
+
+        assert!(result.is_demanded(if_result), "ret demands the if result");
+        assert!(result.is_demanded(cond), "condition is a control root");
+        assert!(
+            result.is_demanded(constant_result(&pipeline, region, 1)),
+            "then-arm yield operand feeds the demanded result"
+        );
+        assert!(
+            result.is_demanded(constant_result(&pipeline, region, 2)),
+            "else-arm yield operand feeds the demanded result"
+        );
+        assert!(
+            !result.is_demanded(constant_result(&pipeline, region, 9)),
+            "a dead constant inside a body stays dead"
+        );
+    }
+
+    pub(super) const IF_DEAD_RESULT: &str = r#"
+stage @source fn @if_dead(i64) -> i64;
+
+specialize @source fn @if_dead(i64) -> i64 {
+  ^entry(%cond: i64) {
+    %result = if %cond then ^then() {
+      %a = constant 1 -> i64;
+      yield %a;
+    } else ^else() {
+      %b = constant 2 -> i64;
+      yield %b;
+    } -> i64;
+    %zero = constant 0 -> i64;
+    ret %zero;
+  }
+}
+"#;
+
+    /// A dead-result `scf.if` keeps only its condition live (the condition is
+    /// an unconditional control root, consistent with `cf.cond_br`); the
+    /// yield operands and body interiors stay dead.
+    #[test]
+    fn scf_if_dead_result_keeps_only_condition() {
+        let pipeline = parse(IF_DEAD_RESULT);
+        let (stage, region) = source_region(&pipeline, "if_dead");
+        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+
+        let cond = entry_params(&pipeline, region)[0];
+        let if_result = find_value(&pipeline, region, |definition| match definition {
+            HighLevel::Structured(_) => definition.results().next().map(|r| SSAValue::from(*r)),
+            _ => None,
+        });
+
+        assert!(result.is_demanded(cond), "condition is a control root");
+        assert!(result.is_demanded(constant_result(&pipeline, region, 0)));
+        assert!(!result.is_demanded(if_result));
+        assert!(!result.is_demanded(constant_result(&pipeline, region, 1)));
+        assert!(!result.is_demanded(constant_result(&pipeline, region, 2)));
+    }
+
+    pub(super) const FOR_CARRIED_DEMAND: &str = r#"
+stage @source fn @loop_sum(i64, i64, i64) -> i64;
+
+specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
+  ^entry(%lo: i64, %hi: i64, %s: i64) {
+    %init = constant 0 -> i64;
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+      %one = constant 1 -> i64;
+      %next = add %acc, %one -> i64;
+      yield %next;
+    } -> i64;
+    ret %sum;
+  }
+}
+"#;
+
+    /// Loop-carried demand converges through the value worklist: the demanded
+    /// result demands the yield slot, whose `add` demands the carried
+    /// parameter, which re-runs the `for` rule and demands the initial value
+    /// and the yield slot again (idempotent). The unused induction variable
+    /// stays dead even though the loop runs.
+    #[test]
+    fn scf_for_loop_carried_demand_converges() {
+        let pipeline = parse(FOR_CARRIED_DEMAND);
+        let (stage, region) = source_region(&pipeline, "loop_sum");
+        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+
+        let params = entry_params(&pipeline, region);
+        let (lo, hi, step) = (params[0], params[1], params[2]);
+        let next = find_value(&pipeline, region, |definition| match definition {
+            HighLevel::Arith(Arith::Add { result, .. }) => Some(SSAValue::from(*result)),
+            _ => None,
+        });
+        // Body params: [induction var, carried].
+        let (induction, carried) = {
+            let stage_id = pipeline.stage_by_name("source").expect("source stage");
+            let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
+                panic!("source stage holds HighLevel");
+            };
+            let body = find_value(&pipeline, region, |definition| match definition {
+                HighLevel::Structured(kirin_scf::StructuredControlFlow::For(op)) => Some(op.body()),
+                _ => None,
+            });
+            let params: Vec<SSAValue> = body
+                .expect_info(info)
+                .arguments
+                .iter()
+                .copied()
+                .map(SSAValue::from)
+                .collect();
+            (params[0], params[1])
+        };
+
+        assert!(
+            result.is_demanded(constant_result(&pipeline, region, 0)),
+            "init"
+        );
+        assert!(
+            result.is_demanded(constant_result(&pipeline, region, 1)),
+            "one"
+        );
+        assert!(result.is_demanded(next), "yield slot");
+        assert!(result.is_demanded(carried), "carried param feeds the add");
+        assert!(
+            !result.is_demanded(induction),
+            "the unused induction variable stays dead"
+        );
+        assert!(result.is_demanded(lo) && result.is_demanded(hi) && result.is_demanded(step));
+    }
+
+    const FOR_DEAD_RESULT: &str = r#"
+stage @source fn @loop_dead(i64, i64, i64) -> i64;
+
+specialize @source fn @loop_dead(i64, i64, i64) -> i64 {
+  ^entry(%lo: i64, %hi: i64, %s: i64) {
+    %init = constant 0 -> i64;
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+      %one = constant 1 -> i64;
+      %next = add %acc, %one -> i64;
+      yield %next;
+    } -> i64;
+    %seven = constant 7 -> i64;
+    ret %seven;
+  }
+}
+"#;
+
+    /// A dead-result loop keeps only its bounds live: the carried chain
+    /// (init, yield slot, body interior) stays dead.
+    #[test]
+    fn scf_for_dead_result_keeps_only_bounds() {
+        let pipeline = parse(FOR_DEAD_RESULT);
+        let (stage, region) = source_region(&pipeline, "loop_dead");
+        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+
+        let params = entry_params(&pipeline, region);
+        let next = find_value(&pipeline, region, |definition| match definition {
+            HighLevel::Arith(Arith::Add { result, .. }) => Some(SSAValue::from(*result)),
+            _ => None,
+        });
+
+        assert!(result.is_demanded(params[0]), "bounds are control roots");
+        assert!(result.is_demanded(params[1]));
+        assert!(result.is_demanded(params[2]));
+        assert!(result.is_demanded(constant_result(&pipeline, region, 7)));
+        assert!(
+            !result.is_demanded(constant_result(&pipeline, region, 0)),
+            "init dead"
+        );
+        assert!(
+            !result.is_demanded(constant_result(&pipeline, region, 1)),
+            "body interior dead"
+        );
+        assert!(!result.is_demanded(next), "yield slot dead");
+    }
+
+    const CALL_PURITY: &str = r#"
+stage @source fn @callee(i64) -> i64;
+stage @source fn @main(i64, i64) -> i64;
+
+specialize @source fn @callee(i64) -> i64 {
+  ^entry(%v: i64) {
+    ret %v;
+  }
+}
+
+specialize @source fn @main(i64, i64) -> i64 {
+  ^entry(%x: i64, %y: i64) {
+    %unused = call.named @callee(%x) -> i64;
+    %deadsum = add %y, %y -> i64;
+    %zero = constant 0 -> i64;
+    ret %zero;
+  }
+}
+"#;
+
+    /// Calls are unmarked (impure), so their arguments are unconditional
+    /// demand roots even when the call result is unused; a pure `add` beside
+    /// it with a dead result demands nothing.
+    #[test]
+    fn call_arguments_are_demand_roots() {
+        let pipeline = parse(CALL_PURITY);
+        let (stage, region) = source_region(&pipeline, "main");
+        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+
+        let params = entry_params(&pipeline, region);
+        let (x, y) = (params[0], params[1]);
+        let unused = find_value(&pipeline, region, |definition| match definition {
+            HighLevel::Lexical(Lexical::Call(_)) => {
+                definition.results().next().map(|r| SSAValue::from(*r))
+            }
+            _ => None,
+        });
+        let deadsum = find_value(&pipeline, region, |definition| match definition {
+            HighLevel::Arith(Arith::Add { result, .. }) => Some(SSAValue::from(*result)),
+            _ => None,
+        });
+
+        assert!(result.is_demanded(x), "call args are roots (impure)");
+        assert!(result.is_demanded(constant_result(&pipeline, region, 0)));
+        assert!(!result.is_demanded(unused), "the call result is unused");
+        assert!(!result.is_demanded(y), "pure add with dead result");
+        assert!(!result.is_demanded(deadsum));
+    }
+}
+
+// ===========================================================================
+// Classic (dense, per-point) liveness through scf's dialect-owned dense
+// frames: arm-join for `scf.if`, the loop-carried fixpoint for `scf.for`, and
+// per-point reconstruction inside structured bodies.
+// ===========================================================================
+
+mod dense {
+    use kirin::prelude::{CompileStage, Pipeline, Region, SSAValue, Statement};
+    use kirin_arith::{Arith, ArithValue};
+    use kirin_liveness::{DenseLivenessResult, LiveSet, analyze_demand};
+
+    use super::demand::{FOR_CARRIED_DEMAND, IF_DEAD_RESULT};
+    use super::demand::{constant_result, entry_params, find_value, parse, source_region};
+    use crate::interpreter::ToyDenseLiveness;
+    use crate::language::HighLevel;
+    use crate::stage::Stage;
+
+    /// Run classic dense liveness with the toy total frame (scf frames
+    /// embedded).
+    fn analyze_dense_toy(
+        pipeline: &Pipeline<Stage>,
+        stage: CompileStage,
+        region: Region,
+    ) -> DenseLivenessResult {
+        let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
+        engine.analyze(stage, region).expect("analysis succeeds");
+        DenseLivenessResult::from_engine(&mut engine, stage, region)
+            .expect("reconstruction succeeds")
+    }
+
+    /// The statement whose definition matches `select` (anywhere in the
+    /// region, including scf bodies).
+    fn find_statement(
+        pipeline: &Pipeline<Stage>,
+        region: Region,
+        select: impl Fn(&HighLevel) -> bool,
+    ) -> Statement {
+        let stage_id = pipeline.stage_by_name("source").expect("source stage");
+        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
+            panic!("source stage holds HighLevel");
+        };
+        let topology = kirin_interpreter::region_topology(info, &region);
+        for block in &topology.blocks {
+            for &stmt in &block.stmts {
+                if select(stmt.definition(info)) {
+                    return stmt;
+                }
+            }
+        }
+        panic!("no matching statement in region");
+    }
+
+    fn live_set(values: &[SSAValue]) -> LiveSet {
+        values.iter().copied().collect()
+    }
+
+    /// Per-point sets inside an `scf.if` arm follow classic semantics (the
+    /// yield's operand is live after its def even though the result is dead),
+    /// and intersecting with the demand set recovers the strong view.
+    #[test]
+    fn dense_per_point_inside_scf_if_arm() {
+        let pipeline = parse(IF_DEAD_RESULT);
+        let (stage, region) = source_region(&pipeline, "if_dead");
+        let dense = analyze_dense_toy(&pipeline, stage, region);
+        let demand = analyze_demand(&pipeline, stage, region).expect("demand succeeds");
+
+        let cond = entry_params(&pipeline, region)[0];
+        let a = constant_result(&pipeline, region, 1);
+        let a_const = find_statement(&pipeline, region, |definition| match definition {
+            HighLevel::Constant(constant) => constant.value == ArithValue::I64(1),
+            _ => None::<()>.is_some(),
+        });
+
+        // Classic: after `%a = constant 1`, %a is live (the yield uses it)
+        // and %cond flows through the arm; before it, %a is killed.
+        assert_eq!(dense.live_after(a_const), Some(&live_set(&[cond, a])));
+        assert_eq!(dense.live_before(a_const), Some(&live_set(&[cond])));
+
+        // The if's own points: its dead result is live after it (classic
+        // records what the walk saw: nothing uses it, so it is NOT live), and
+        // before it only the condition survives the arm join.
+        let if_stmt = find_statement(&pipeline, region, |definition| {
+            matches!(definition, HighLevel::Structured(_))
+        });
+        assert_eq!(dense.live_before(if_stmt), Some(&live_set(&[cond])));
+
+        // Strong per-point view: %a is classically live after its def but not
+        // demanded (the if result is dead), so the composition drops it.
+        let strong = dense
+            .strong_live_after(a_const, &demand)
+            .expect("point reconstructed");
+        assert_eq!(strong, live_set(&[cond]));
+    }
+
+    /// The scf.for dense frame iterates the body walk to the loop-carried
+    /// fixpoint: the yield slot is live after the add (carried into the next
+    /// iteration), the carried parameter is live before it, and the state
+    /// before the loop is exactly bounds + initial values.
+    #[test]
+    fn dense_loop_carried_fixpoint() {
+        let pipeline = parse(FOR_CARRIED_DEMAND);
+        let (stage, region) = source_region(&pipeline, "loop_sum");
+        let dense = analyze_dense_toy(&pipeline, stage, region);
+
+        let params = entry_params(&pipeline, region);
+        let (lo, hi, step) = (params[0], params[1], params[2]);
+        let init = constant_result(&pipeline, region, 0);
+        let one = constant_result(&pipeline, region, 1);
+        let (next, acc) = find_value(&pipeline, region, |definition| match definition {
+            HighLevel::Arith(Arith::Add { lhs, result, .. }) => {
+                Some((SSAValue::from(*result), *lhs))
+            }
+            _ => None,
+        });
+        let for_stmt = find_statement(&pipeline, region, |definition| {
+            matches!(definition, HighLevel::Structured(_))
+        });
+        let add_stmt = find_statement(&pipeline, region, |definition| {
+            matches!(definition, HighLevel::Arith(Arith::Add { .. }))
+        });
+        let sum = find_value(&pipeline, region, |definition| match definition {
+            HighLevel::Structured(_) => {
+                use kirin::prelude::HasResults;
+                definition.results().next().map(|r| SSAValue::from(*r))
+            }
+            _ => None,
+        });
+
+        // Around the loop.
+        assert_eq!(dense.live_after(for_stmt), Some(&live_set(&[sum])));
+        assert_eq!(
+            dense.live_before(for_stmt),
+            Some(&live_set(&[lo, hi, step, init]))
+        );
+
+        // Inside the body, at the stable iteration: the carried param and the
+        // constant are live before the add; the yield slot is live after it
+        // (it feeds the next iteration through the carry).
+        assert_eq!(
+            dense.live_before(add_stmt),
+            Some(&live_set(&[lo, hi, step, init, acc, one]))
+        );
+        assert_eq!(
+            dense.live_after(add_stmt),
+            Some(&live_set(&[lo, hi, step, init, next]))
+        );
     }
 }
