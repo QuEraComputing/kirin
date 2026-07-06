@@ -1,6 +1,6 @@
 //! Integration tests: strong liveness (sparse backward demand) over real
 //! parsed programs, with transfer dispatched through the dialects'
-//! `Interpretable<I, SparseBackward>` rules.
+//! `Interpretable<I, StrongDemand>` rules.
 
 use kirin::prelude::{GetInfo, ParsePipelineText, Pipeline, SSAValue, StageInfo};
 use kirin_arith::Arith;

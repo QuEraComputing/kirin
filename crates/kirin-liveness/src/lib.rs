@@ -7,7 +7,7 @@
 //! Roots are return/terminator operands and impure statements (calls demand
 //! their arguments even when their results are unused); a dead pure statement
 //! demands nothing, so DCE can consume [`DemandResult::is_demanded`] directly.
-//! Transfer comes from each dialect's `Interpretable<I, SparseBackward>` rule —
+//! Transfer comes from each dialect's `Interpretable<I, StrongDemand>` rule —
 //! there is no structural fallback.
 //!
 //! Classic per-program-point liveness (a [`LiveSet`] per point — the
@@ -26,9 +26,8 @@ pub use live::{Live, LiveSet};
 pub use result::{DemandResult, DenseLivenessResult};
 
 use kirin_interpreter::{
-    DenseBackward, DenseBackwardInterpreter, DenseBackwardTransfer, InterpDispatch,
-    InterpreterError, SparseBackward, SparseBackwardDriver, SparseBackwardInterpreter, StageQuery,
-    StandardDenseBackwardFrame,
+    DenseBackwardInterpreter, DenseBackwardTransfer, InterpDispatch, InterpreterError,
+    SparseBackwardDriver, SparseBackwardInterpreter, StageQuery, StandardDenseBackwardFrame,
 };
 use kirin_ir::{CompileStage, Pipeline, Region, StageMeta};
 
@@ -51,7 +50,7 @@ pub fn analyze_demand<'ir, S>(
 where
     S: StageMeta
         + StageQuery
-        + InterpDispatch<SparseBackwardDriver<'ir, S, Live, InterpreterError>, SparseBackward>,
+        + InterpDispatch<SparseBackwardDriver<'ir, S, Live, InterpreterError>>,
 {
     let mut engine = Demand::<S>::new(pipeline);
     engine.analyze(stage, region)?;
@@ -78,7 +77,6 @@ where
                 InterpreterError,
                 StandardDenseBackwardFrame<LiveSet, InterpreterError>,
             >,
-            DenseBackward,
         >,
 {
     let mut engine = DenseLiveness::<S>::new(pipeline);

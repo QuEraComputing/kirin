@@ -1,6 +1,7 @@
 use kirin_ir::{CompileStage, Pipeline, SpecializedFunction, StageMeta, Statement};
 
-use crate::{Callee, InterpreterError, StageQuery, query};
+use super::query;
+use crate::{Callee, InterpreterError, StageQuery};
 
 /// A fully resolved call target: the stage to execute in, the specialization,
 /// and its body statement.

@@ -891,7 +891,7 @@ mod advanced {
 // ===========================================================================
 // Strong liveness (sparse backward demand) over source-stage programs with
 // structured control flow — transfer dispatched through the dialects'
-// `Interpretable<I, SparseBackward>` rules, scf handled by rules alone (the
+// `Interpretable<I, StrongDemand>` rules, scf handled by rules alone (the
 // value worklist converges loop-carried demand without frames).
 // ===========================================================================
 

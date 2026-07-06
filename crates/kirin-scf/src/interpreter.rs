@@ -23,9 +23,9 @@ use std::marker::PhantomData;
 use kirin::prelude::Lattice;
 use kirin::prelude::{Block, CompileStage, CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    BranchCondition, DenseBackward, DenseBackwardEffect, DenseBackwardInterp, Interpretable,
-    InterpreterError, SparseBackward, SparseBackwardInterp, SparseForward, SparseForwardEffect,
-    SparseForwardInterp,
+    BranchCondition, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
+    ForwardEval, Interpretable, InterpreterError, SparseForwardEffect, SparseForwardInterp,
+    StrongDemand,
 };
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BodyFrame,
@@ -40,7 +40,7 @@ use crate::{For, ForLoopValue, If, Yield};
 // scf.if — push a dialect-owned if frame
 // ===========================================================================
 
-impl<I, T> Interpretable<I, SparseForward> for If<T>
+impl<I, T> Interpretable<I, ForwardEval> for If<T>
 where
     I: SparseForwardInterp + ScfIfDispatch,
     I::Value: BranchCondition,
@@ -63,7 +63,7 @@ where
 // scf.for — push a dialect-owned loop frame
 // ===========================================================================
 
-impl<I, T> Interpretable<I, SparseForward> for For<T>
+impl<I, T> Interpretable<I, ForwardEval> for For<T>
 where
     I: SparseForwardInterp + ScfForDispatch,
     I::Value: ForLoopValue + Clone + 'static,
@@ -89,7 +89,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for Yield<T>
+impl<I, T> Interpretable<I, ForwardEval> for Yield<T>
 where
     I: SparseForwardInterp,
     T: CompileTimeValue,
@@ -113,9 +113,9 @@ where
 /// Backward demand for `scf.if`: the condition is an unconditional control
 /// root (consistent with `cf.cond_br`); a body's yield slot is demanded iff
 /// the matching result is demanded.
-impl<I, T> Interpretable<I, SparseBackward> for If<T>
+impl<I, T> Interpretable<I, StrongDemand> for If<T>
 where
-    I: SparseBackwardInterp,
+    I: DemandInterp,
     I::Value: HasBottom + PartialEq,
     T: CompileTimeValue,
 {
@@ -143,9 +143,9 @@ where
 /// zero-iteration case flows `init_args[i]` straight to the result) or when
 /// the carried parameter is demanded inside the body; either demands both the
 /// initial value and the yield slot that feeds the next iteration.
-impl<I, T> Interpretable<I, SparseBackward> for For<T>
+impl<I, T> Interpretable<I, StrongDemand> for For<T>
 where
-    I: SparseBackwardInterp,
+    I: DemandInterp,
     I::Value: HasBottom + PartialEq,
     T: CompileTimeValue,
 {
@@ -178,9 +178,9 @@ where
 
 /// Backward demand for `scf.yield`: inert — its operands are demanded by the
 /// owning `scf.if`/`scf.for` rule, which knows the result/slot correspondence.
-impl<I, T> Interpretable<I, SparseBackward> for Yield<T>
+impl<I, T> Interpretable<I, StrongDemand> for Yield<T>
 where
-    I: SparseBackwardInterp,
+    I: DemandInterp,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
@@ -201,18 +201,18 @@ where
 /// Classic per-point liveness for `scf.if`: kill the results, gen the
 /// condition (a use), and push a frame that walks both arms from the saved
 /// after-state and joins their entry states.
-impl<I, T> Interpretable<I, DenseBackward> for If<T>
+impl<I, T> Interpretable<I, ClassicLiveness> for If<T>
 where
-    I: DenseBackwardInterp,
+    I: ClassicLivenessInterp,
     I::Frame: BuildDenseScfIf<I::Value, I::Error>,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
         let stage = interp.stage();
         for result in &self.results {
-            interp.kill_fact(*result)?;
+            interp.kill_def(*result)?;
         }
-        interp.gen_fact(self.condition)?;
+        interp.gen_live(self.condition)?;
         Ok(DenseBackwardEffect::Push {
             frame: I::Frame::scf_if(DenseScfIfFrame::new(stage, self.then_body, self.else_body)),
         })
@@ -223,22 +223,22 @@ where
 /// operand uses (bounds and initial carried values — classic liveness gens
 /// uses unconditionally), and push the loop frame that iterates the body walk
 /// to its loop-carried fixpoint.
-impl<I, T> Interpretable<I, DenseBackward> for For<T>
+impl<I, T> Interpretable<I, ClassicLiveness> for For<T>
 where
-    I: DenseBackwardInterp,
+    I: ClassicLivenessInterp,
     I::Frame: BuildDenseScfFor<I::Value, I::Error>,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
         let stage = interp.stage();
         for result in &self.results {
-            interp.kill_fact(*result)?;
+            interp.kill_def(*result)?;
         }
-        interp.gen_fact(self.start)?;
-        interp.gen_fact(self.end)?;
-        interp.gen_fact(self.step)?;
+        interp.gen_live(self.start)?;
+        interp.gen_live(self.end)?;
+        interp.gen_live(self.step)?;
         for init in &self.init_args {
-            interp.gen_fact(*init)?;
+            interp.gen_live(*init)?;
         }
         Ok(DenseBackwardEffect::Push {
             frame: I::Frame::scf_for(DenseScfForFrame::new(stage, self.body)),
@@ -248,14 +248,14 @@ where
 
 /// Classic per-point liveness for `scf.yield`: its operands are plain uses
 /// inside the body walk.
-impl<I, T> Interpretable<I, DenseBackward> for Yield<T>
+impl<I, T> Interpretable<I, ClassicLiveness> for Yield<T>
 where
-    I: DenseBackwardInterp,
+    I: ClassicLivenessInterp,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
         for value in &self.values {
-            interp.gen_fact(*value)?;
+            interp.gen_live(*value)?;
         }
         Ok(DenseBackwardEffect::Next)
     }

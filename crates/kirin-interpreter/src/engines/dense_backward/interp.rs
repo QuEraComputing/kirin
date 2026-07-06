@@ -18,8 +18,10 @@
 //!
 //! - **[`DenseBackwardTransfer`]** is the [`Interp`] delegate: pipeline access,
 //!   the real dispatch location, and the *current point state* the dialect
-//!   rules transform through [`DenseBackwardInterp::gen_fact`] /
-//!   [`DenseBackwardInterp::kill_fact`].
+//!   rules transform through the shape-generic
+//!   [`DenseBackwardInterp::insert_fact`] / [`DenseBackwardInterp::remove_fact`]
+//!   (liveness rules use the [`ClassicLivenessInterp`] `gen_live`/`kill_def`
+//!   spellings).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the block-boundary
 //!   summaries ([`BlockLiveness`], keyed by [`Scoped`] blocks), the block
 //!   worklist, and [`BackwardSummaryDeps`] (successor changed → reanalyse
@@ -30,7 +32,7 @@
 //!
 //! A [`DenseBlockFrame`](crate::DenseBlockFrame) walks the block's statements
 //! in reverse, dispatching each through its dialect
-//! `Interpretable<I, DenseBackward>` rule. The terminator runs first: its rule
+//! `Interpretable<I, ClassicLiveness>` rule. The terminator runs first: its rule
 //! gens its own root uses and names its CFG edges
 //! ([`DenseBackwardEffect::Edges`]); the driver absorbs them — mapping each
 //! successor's converged live-in across the edge (parameter → matching
@@ -48,13 +50,14 @@ use kirin_ir::{
     StageMeta, Statement,
 };
 
-use crate::dense_backward_frames::{DenseBlockFrame, DenseFrameBuild};
-use crate::sparse_backward_interp::RegionScope;
+use super::frames::{DenseBlockFrame, DenseFrameBuild};
+use crate::core::query;
+use crate::engines::sparse_backward::RegionScope;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, DenseBackward, DensePointStore, EnvIndex,
-    FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
-    OwnerSemantics, ProgramPoint, RegionTopology, Scoped, StageQuery, StandardFixpointInterpreter,
-    Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect, query,
+    AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic,
+    DensePointStore, EnvIndex, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
+    InterpreterError, OwnerSemantics, ProgramPoint, RegionTopology, Scoped, StageQuery,
+    StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
 
 // ===========================================================================
@@ -97,40 +100,69 @@ pub trait PointFacts {
     fn values(&self) -> Vec<SSAValue>;
 }
 
-/// Dense-backward engine flavor: point-state access plus
-/// [`DenseBackwardEffect`].
+/// [`DenseBackwardShape`](crate::DenseBackwardShape)-engine flavor: the
+/// *shape-generic* point-state mechanics plus [`DenseBackwardEffect`]. Any
+/// dense-backward semantics shares this surface: rules transform the *current*
+/// point state — the state after the statement on entry to the rule, the
+/// state before it on exit.
 ///
-/// Dense backward rules (`impl Interpretable<I, DenseBackward>`) bound on this
-/// trait and transform the *current* point state — the state after the
-/// statement on entry to the rule, the state before it on exit.
+/// Semantics-specific vocabulary lives in helper traits on top — classic
+/// liveness's is [`ClassicLivenessInterp`].
 pub trait DenseBackwardInterp:
-    Interp<Kind = DenseBackward, Effect = DenseBackwardEffect<<Self as DenseBackwardInterp>::Frame>>
+    Interp<Effect = DenseBackwardEffect<<Self as DenseBackwardInterp>::Frame>>
 {
     /// The engine's total backward frame type, carried by
     /// [`DenseBackwardEffect::Push`]. Ordinary dialects never name it.
     type Frame;
 
-    /// Gen: insert `value` into the current point state.
-    fn gen_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
+    /// Insert `value` into the current point state.
+    fn insert_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
+
+    /// Remove `value` from the current point state.
+    fn remove_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
+}
+
+/// [`ClassicLiveness`]'s helper vocabulary on top of the shape-generic
+/// [`DenseBackwardInterp`]: gen/kill are liveness's names for the point-state
+/// mutations, and the classic kill-defs/gen-all-uses transfer is the
+/// ordinary-dialect one-liner. Classic-liveness rules
+/// (`impl Interpretable<I, ClassicLiveness>`) bound on this trait.
+///
+/// Pinned to `Semantics = ClassicLiveness` via the supertrait (rustc
+/// elaborates supertraits, so rules bounding `I: ClassicLivenessInterp` need
+/// no extra clauses), and blanket-implemented for every classic-liveness
+/// dense-backward engine.
+pub trait ClassicLivenessInterp: DenseBackwardInterp + Interp<Semantics = ClassicLiveness> {
+    /// Gen: mark `value` live at the current point (a use).
+    fn gen_live(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error> {
+        self.insert_fact(value)
+    }
 
     /// Kill: remove `value` (a definition) from the current point state.
-    fn kill_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
+    fn kill_def(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error> {
+        self.remove_fact(value)
+    }
 
     /// The classic (weak) liveness transfer for an ordinary statement: kill
     /// the results, gen **all** operands — purity-irrelevant, so this also
     /// serves calls.
-    fn transfer_classic<T>(&mut self, stmt: &T) -> Result<Self::Effect, Self::Error>
+    fn gen_uses_kill_defs<T>(&mut self, stmt: &T) -> Result<Self::Effect, Self::Error>
     where
         T: for<'a> HasArguments<'a> + for<'a> HasResults<'a>,
     {
         for result in stmt.results() {
-            self.kill_fact(*result)?;
+            self.kill_def(*result)?;
         }
         for argument in stmt.arguments() {
-            self.gen_fact(*argument)?;
+            self.gen_live(*argument)?;
         }
         Ok(DenseBackwardEffect::Next)
     }
+}
+
+impl<I> ClassicLivenessInterp for I where
+    I: DenseBackwardInterp + Interp<Semantics = ClassicLiveness>
+{
 }
 
 // ===========================================================================
@@ -139,7 +171,7 @@ pub trait DenseBackwardInterp:
 
 /// The summary-free transfer of the dense backward engine: pipeline access,
 /// the real dispatch location, and the current point state.
-pub struct DenseBackwardTransfer<'ir, S: StageMeta, V, E, F> {
+pub struct DenseBackwardTransfer<'ir, S: StageMeta, V, E, F, Sem = ClassicLiveness> {
     pipeline: &'ir Pipeline<S>,
     location: Option<InterpLocation>,
     /// The point state the currently walked position sees (the state *after*
@@ -147,10 +179,10 @@ pub struct DenseBackwardTransfer<'ir, S: StageMeta, V, E, F> {
     state: V,
     activation: EnvIndex,
     #[allow(clippy::type_complexity)]
-    _marker: PhantomData<fn() -> (E, F)>,
+    _marker: PhantomData<fn() -> (E, F, Sem)>,
 }
 
-impl<'ir, S: StageMeta, V, E, F> DenseBackwardTransfer<'ir, S, V, E, F>
+impl<'ir, S: StageMeta, V, E, F, Sem> DenseBackwardTransfer<'ir, S, V, E, F, Sem>
 where
     V: HasBottom,
 {
@@ -165,22 +197,23 @@ where
     }
 }
 
-impl<'ir, S: StageMeta, V, E, F> DenseBackwardTransfer<'ir, S, V, E, F> {
+impl<'ir, S: StageMeta, V, E, F, Sem> DenseBackwardTransfer<'ir, S, V, E, F, Sem> {
     pub fn pipeline(&self) -> &'ir Pipeline<S> {
         self.pipeline
     }
 }
 
-impl<'ir, S, V, E, F> Interp for DenseBackwardTransfer<'ir, S, V, E, F>
+impl<'ir, S, V, E, F, Sem> Interp for DenseBackwardTransfer<'ir, S, V, E, F, Sem>
 where
     S: StageMeta,
     V: Clone,
     E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
 {
     type Value = V;
     type Error = E;
     type Effect = DenseBackwardEffect<F>;
-    type Kind = DenseBackward;
+    type Semantics = Sem;
 
     fn stage(&self) -> CompileStage {
         self.location.expect("interp location not set").stage
@@ -195,28 +228,30 @@ where
     }
 }
 
-impl<'ir, S, V, E, F> AbstractInterpreter for DenseBackwardTransfer<'ir, S, V, E, F>
+impl<'ir, S, V, E, F, Sem> AbstractInterpreter for DenseBackwardTransfer<'ir, S, V, E, F, Sem>
 where
     S: StageMeta,
     V: Clone,
     E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
 {
 }
 
-impl<'ir, S, V, E, F> DenseBackwardInterp for DenseBackwardTransfer<'ir, S, V, E, F>
+impl<'ir, S, V, E, F, Sem> DenseBackwardInterp for DenseBackwardTransfer<'ir, S, V, E, F, Sem>
 where
     S: StageMeta,
     V: Clone + PointFacts,
     E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
 {
     type Frame = F;
 
-    fn gen_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
+    fn insert_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
         self.state.insert(value.into());
         Ok(())
     }
 
-    fn kill_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
+    fn remove_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
         self.state.remove(value.into());
         Ok(())
     }
@@ -278,12 +313,13 @@ pub struct DenseBackwardProfile<V, E, F> {
     _marker: PhantomData<fn() -> (V, E, F)>,
 }
 
-impl<'ir, S, V, E, F> FixpointProfile<DenseBackwardTransfer<'ir, S, V, E, F>>
+impl<'ir, S, V, E, F, Sem> FixpointProfile<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>
     for DenseBackwardProfile<V, E, F>
 where
     S: StageMeta,
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
 {
     type SummaryKey = Scoped<RegionScope, Block>;
     type Summary = BlockLiveness<V>;
@@ -322,8 +358,8 @@ impl<V> Default for DenseAnalysisState<V> {
 /// The dense backward driver: a [`StandardFixpointInterpreter`] over
 /// [`DenseBackwardTransfer`] with scope-qualified block owners and
 /// successor→predecessor dependencies.
-pub type DenseBackwardDriver<'ir, S, V, E, F> = StandardFixpointInterpreter<
-    DenseBackwardTransfer<'ir, S, V, E, F>,
+pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardFixpointInterpreter<
+    DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
     DenseAnalysisState<V>,
     BackwardSummaryDeps<Scoped<RegionScope, Block>>,
@@ -335,9 +371,7 @@ pub type DenseBackwardDriver<'ir, S, V, E, F> = StandardFixpointInterpreter<
 
 /// The dense-backward frame-driver capability surface: what the dense frames
 /// need from the engine. Implemented on the driver (it needs the summaries).
-pub trait DenseBackwardFrameDriver:
-    Interp<Kind = DenseBackward, Effect = DenseBackwardEffect<Self::Frame>>
-{
+pub trait DenseBackwardFrameDriver: Interp<Effect = DenseBackwardEffect<Self::Frame>> {
     /// The engine's total backward frame type.
     type Frame;
 
@@ -391,13 +425,12 @@ pub trait DenseBackwardFrameDriver:
     ) -> Result<Self::Value, Self::Error>;
 }
 
-impl<'ir, S, V, E, F> DenseBackwardFrameDriver for DenseBackwardDriver<'ir, S, V, E, F>
+impl<'ir, S, V, E, F, Sem> DenseBackwardFrameDriver for DenseBackwardDriver<'ir, S, V, E, F, Sem>
 where
-    S: StageMeta
-        + StageQuery
-        + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F>, DenseBackward>,
+    S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
     E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
 {
     type Frame = F;
 
@@ -512,9 +545,9 @@ where
 
 struct DenseBackwardSemantics;
 
-impl<'ir, S, V, E, F>
+impl<'ir, S, V, E, F, Sem>
     OwnerSemantics<
-        DenseBackwardDriver<'ir, S, V, E, F>,
+        DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         Scoped<RegionScope, Block>,
         BlockLiveness<V>,
         F,
@@ -522,16 +555,15 @@ impl<'ir, S, V, E, F>
         E,
     > for DenseBackwardSemantics
 where
-    S: StageMeta
-        + StageQuery
-        + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F>, DenseBackward>,
+    S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
     E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
     F: DenseFrameBuild<V, E>,
 {
     fn bottom_summary(
         &mut self,
-        _interp: &mut DenseBackwardDriver<'ir, S, V, E, F>,
+        _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         _owner: &Scoped<RegionScope, Block>,
     ) -> Result<BlockLiveness<V>, E> {
         Ok(BlockLiveness::bottom())
@@ -539,7 +571,7 @@ where
 
     fn entry_frame(
         &mut self,
-        interp: &mut DenseBackwardDriver<'ir, S, V, E, F>,
+        interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         owner: &Scoped<RegionScope, Block>,
         _summary: &BlockLiveness<V>,
     ) -> Result<F, E> {
@@ -552,7 +584,7 @@ where
 
     fn complete_owner(
         &mut self,
-        _interp: &mut DenseBackwardDriver<'ir, S, V, E, F>,
+        _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         owner: Scoped<RegionScope, Block>,
         completion: DenseBackwardCompletion<V>,
     ) -> Result<SummaryEffect<Scoped<RegionScope, Block>, BlockLiveness<V>>, E> {
@@ -585,18 +617,22 @@ pub struct DenseBackwardInterpreter<
     V,
     E = InterpreterError,
     F = crate::StandardDenseBackwardFrame<V, E>,
+    Sem = ClassicLiveness,
 > where
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
+    Sem: DenseBackwardSemantic,
 {
-    driver: DenseBackwardDriver<'ir, S, V, E, F>,
+    driver: DenseBackwardDriver<'ir, S, V, E, F, Sem>,
 }
 
-impl<'ir, S, V, E, F> DenseBackwardInterpreter<'ir, S, V, E, F>
+impl<'ir, S, V, E, F, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Sem>
 where
     S: StageMeta,
     V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
 {
     pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
@@ -635,14 +671,13 @@ where
     }
 }
 
-impl<'ir, S, V, E, F> DenseBackwardInterpreter<'ir, S, V, E, F>
+impl<'ir, S, V, E, F, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Sem>
 where
-    S: StageMeta
-        + StageQuery
-        + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F>, DenseBackward>,
+    S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
     E: From<InterpreterError>,
-    F: Frame<DenseBackwardDriver<'ir, S, V, E, F>, Completion = DenseBackwardCompletion<V>>
+    Sem: DenseBackwardSemantic,
+    F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, Completion = DenseBackwardCompletion<V>>
         + DenseFrameBuild<V, E>,
 {
     /// Run the block-boundary fixpoint over `region` in `stage`: seed every

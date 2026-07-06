@@ -7,8 +7,8 @@ including analyses that cross language boundaries in multi-stage pipelines.
 The design is organized as a **two-persona contract**:
 
 - **Dialect authors** describe what each statement *means*, once, in a small
-  fixed vocabulary — `Interpretable<I, SparseForward>`/`SparseForwardInterp`/`SparseForwardEffect`,
-  receiving the engine directly and selecting semantics by a compile-time `Kind`
+  fixed vocabulary — `Interpretable<I, ForwardEval>`/`SparseForwardInterp`/`SparseForwardEffect`,
+  receiving the engine directly and selecting semantics by a compile-time semantic
   marker. There is no framework
   "scope": a statement whose operation owns structured control runs a
   sub-computation by *pushing a frame the dialect owns* (`SparseForwardEffect::Push`),
@@ -32,14 +32,14 @@ is learning the trait.
 
 Everything is exported from `kirin_interpreter::dialect`.
 
-### `Interp` and `Interpretable<I, Kind>` — statement semantics
+### `Interp` and `Interpretable<I, Semantics>` — statement semantics
 
 ```rust
 pub trait Interp: Sized {               // the engine-side driver — ANALYSIS-AGNOSTIC
     type Value: Clone;                  // the value domain
     type Error: From<InterpreterError>; // the total error
     type Effect;                        // analysis-specific per-statement effect
-    type Kind;                          // compile-time semantics marker (SparseForward, ...)
+    type Semantics: SemanticKey;        // compile-time semantic key (ForwardEval, ...)
     fn stage(&self) -> CompileStage;    // the current statement's location, set by the engine
     fn statement(&self) -> Statement;   //   before each dispatch and read back by rules
     fn index(&self) -> EnvIndex;        //   (the SSA activation)
@@ -54,8 +54,8 @@ pub trait Env: Interp {
 
 ```rust
 // The single dialect trait — specialized on the engine `I` and a compile-time
-// semantics marker `Kind` (NOT a runtime context object).
-pub trait Interpretable<I: Interp, Kind>: Dialect {
+// semantic key `Semantics` (NOT a runtime context object, NOT a solver shape).
+pub trait Interpretable<I: Interp, Semantics>: Dialect {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error>;
 }
 ```
@@ -68,7 +68,9 @@ engine's current activation (`interp.index()`) and delegate to the engine's
 directly. There is **no** `ValueContext`/`ForwardCtx` object: the engine *is* the
 context.
 
-`SparseForward` is a pure compile-time **semantics marker** — never instantiated —
+`ForwardEval` is a pure compile-time **semantic key** — never instantiated — that
+declares its solver shape (`SemanticKey::Shape = SparseForwardShape`; shapes name
+mechanics only and are never dispatch tags) —
 that selects *which* semantics an impl describes. It names *forward evaluation*
 (read operands, compute a semantic/lattice value, write results), so one mode
 covers concrete execution, constant propagation, and interval analysis — they
@@ -76,30 +78,46 @@ differ only in the value domain, not the rule shape. It is deliberately not
 `ForwardValue`: a future forward **type inference** mode also attaches facts to
 SSA values but should expose a different rule API, so the name reflects the
 evaluation semantics rather than "operates on values". A forward statement rule
-is `impl<I: SparseForwardInterp, ..> Interpretable<I, SparseForward> for Op`: it
+is `impl<I: SparseForwardInterp, ..> Interpretable<I, ForwardEval> for Op`: it
 reads/writes through `interp.read`/`interp.write` and returns `I::Effect`
 (= `SparseForwardEffect`). The backward analyses follow the same shape with
 their own markers, engine traits, and effects — the impls coexist on the same
-dialect type because the `Kind` parameter distinguishes them (no coherence
+dialect type because the `Semantics` parameter distinguishes them (no coherence
 conflict):
 
-- `SparseBackward` / `SparseBackwardInterp` / `SparseBackwardEffect` — per-SSA
-  demand (strong liveness). Rules read converged facts (`is_demanded`), raise
-  demands (`demand`), and end with `interp.effect()`; ordinary dialects are the
-  one-liner `interp.transfer_ordinary(self)` (purity-aware neededness via
-  `IsPure`).
-- `DenseBackward` / `DenseBackwardInterp` / `DenseBackwardEffect` — classic
-  per-point liveness. Rules transform the current point state (`gen_fact`/
-  `kill_fact`); ordinary dialects (and calls — purity is irrelevant to dense
-  sets) are `interp.transfer_classic(self)`; CFG terminators name their edges
-  (`Edges`), structured dialects push dense frames (`Push`).
+- `StrongDemand` (on `SparseBackwardShape`) — engine surface split in two:
+  the shape-generic `SparseBackwardInterp` (`fact`/`raise_fact`/`effect` plus
+  the block-topology queries) serves any sparse-backward key, and
+  `DemandInterp` (pinned to `StrongDemand` via its supertrait) adds the demand
+  vocabulary. Rules bind `DemandInterp`: read converged facts (`is_demanded`),
+  raise demands (`demand`), and end with `interp.effect()`
+  (= `SparseBackwardEffect`); ordinary dialects are the one-liner
+  `interp.demand_uses_if_observable(self)` (purity-aware neededness via `IsPure`).
+- `ClassicLiveness` (on `DenseBackwardShape`) — likewise split: the
+  shape-generic `DenseBackwardInterp` (`insert_fact`/`remove_fact` point-state
+  mechanics) serves any dense-backward key, and `ClassicLivenessInterp` adds
+  liveness's spellings. Rules bind `ClassicLivenessInterp`: `gen_live`/
+  `kill_def`; ordinary dialects (and calls — purity is irrelevant to dense
+  sets) are `interp.gen_uses_kill_defs(self)`; CFG terminators name their edges
+  (`Edges`, in `DenseBackwardEffect`), structured dialects push dense frames
+  (`Push`).
+
+The engines/transfers are generic over the semantic key with the canonical
+default (`SparseForwardTransfer<..., Sem = ForwardEval>`,
+`SparseBackwardInterpreter<..., Sem = StrongDemand>`,
+`DenseBackwardInterpreter<..., Sem = ClassicLiveness>`; `Sem` bounded by the
+shape's *family* trait, e.g. `SparseForwardSemantic`), so a downstream key
+reuses an engine by instantiating `Sem` — and `InterpDispatch<I>` always
+dispatches `I::Semantics`, so a stage can never be paired with a foreign
+key's rules.
 
 Future sibling modes (not yet implemented) each get their own marker + engine
 trait the same way, e.g. `ForwardType` (forward type inference) or
-`DenseForward` (typestate).
+a key on `DenseForwardShape` (typestate); two keys may also share an existing
+shape without colliding.
 
 `Interp` is the interpreter/analysis **driver**: it exposes the value domain, the
-error type, the per-statement effect, the semantics [`Kind`], and the current
+error type, the per-statement effect, the semantic key `Semantics`, and the current
 statement location (`stage()`/`statement()`/`index()`). The engine stashes the
 location before dispatching each rule (`run_statement`/`enter_function`) and
 restores it afterward, so a rule can read it back without a separate context
@@ -107,7 +125,7 @@ object. A rule produces `I::Effect` — the **analysis-specific** effect algebra
 not a single universal enum. (The frame type stays the engine's own `F` generic,
 e.g. `ConcreteInterpreter<.., F>`, so traversal is customizable without an unused
 associated type on `Interp`.) Forward rules bound `I: SparseForwardInterp`, the
-flavor of `Interp` whose `Kind = SparseForward` and `Effect = SparseForwardEffect<I::Value,
+flavor of `Interp` whose `Semantics = ForwardEval` and `Effect = SparseForwardEffect<I::Value,
 I::Frame>`, so they build and return `SparseForwardEffect` values (which are `I::Effect`).
 `I::Frame` is the engine's total frame type, re-exposed by `SparseForwardInterp`
 only so a structured dialect can name the frame it pushes; ordinary dialects never
@@ -124,7 +142,7 @@ under `ConcreteInterpreter<.., i64, ..>` and folds `Const(3) + Const(5)`
 under constant propagation, with no analysis-specific code in the dialect.
 
 `SparseForwardInterp` is the **forward engine** trait: it requires `Env` and
-`Kind = SparseForward`, and exposes the SSA read/write helpers as **default
+`Semantics = ForwardEval`, and exposes the SSA read/write helpers as **default
 methods**, hiding environment indices and locations: `interp.read(ssa)`,
 `interp.write(result, value)`, `interp.read_many(&values)`,
 `interp.write_results(&results, product)`. They delegate to the engine's [`Env`]
@@ -132,8 +150,9 @@ storage access (`env_read`/`env_write`) at the engine's current activation
 (`interp.index()`). A structured dialect calls its own dispatch capability
 (e.g. `interp.scf_if_frame(..)`) to build the frame it pushes (see SCF below).
 The backward engine traits chose their own helper APIs and effects the same way
-— demand facts for `SparseBackwardInterp`, point states for
-`DenseBackwardInterp` — without adding variants to `SparseForwardEffect`.
+— per-value facts for `SparseBackwardInterp` (with `DemandInterp` sugar),
+point states for `DenseBackwardInterp` (with `ClassicLivenessInterp` sugar) —
+without adding variants to `SparseForwardEffect`.
 
 ### `SparseForwardEffect` — the forward control algebra
 
@@ -210,7 +229,7 @@ pub trait FunctionEntry<I: Interp>: Dialect {
 ```
 
 Like `Interpretable`, it receives the engine `interp` directly (function entry is
-forward-only, so there is no `Kind` parameter).
+forward-only, so there is no `Semantics` parameter).
 
 Statements that define function bodies (e.g. `kirin_function::Function`)
 return the `FunctionBody { region, args }` to enter on invocation (the
@@ -289,7 +308,7 @@ frames or replaces traversal without touching the engine.
 
 The **forward dataflow** engine — a lattice-based forward abstract interpreter,
 and one *specialization* of the shared framework in the forward direction (it sets
-`Effect = SparseForwardEffect` and `Kind = SparseForward`, stores SSA activations via
+`Effect = SparseForwardEffect` and `Semantics = ForwardEval`, stores SSA activations via
 `Env`, and drives forward frames). The name
 `AbstractInterpreter` is reserved for the shared trait implemented by
 lattice-valued abstract engines. `SparseForwardInterpreter` is the forward
@@ -355,7 +374,7 @@ Both engines are frame-stack drivers over one **shared protocol**. Compiler
 authors can customize *how* an engine traverses (a custom frame type) or *how
 precisely* an abstract analysis summarizes (a custom policy `P`), without
 forking an engine. This is part of the compiler-author surface. The total frame
-type `F` is the engine's generic; it is named in `Interpretable<I, SparseForward>`
+type `F` is the engine's generic; it is named in `Interpretable<I, ForwardEval>`
 *only* by a structured dialect building `SparseForwardEffect::Push` (through
 `SparseForwardInterp::Frame`) — ordinary dialects never mention it.
 
@@ -491,30 +510,29 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
   abstract worklist. `Frame` is anchored on `FrameEngine` (a total error), not on
   `Interp`, so the protocol is reusable beyond forward value interpretation.
 - The per-statement effect is the associated type `I::Effect`, **per analysis**
-  — forward execution/abstract interpretation use the `SparseForward` semantics
+  — forward execution/abstract interpretation use the `ForwardEval` semantics
   whose `Effect` is `SparseForwardEffect`. The backward analyses are
   **implemented** on this seam, as two distinct kinds (deliberate deviations
   from the earlier sketch noted inline):
-  - **Strong liveness / demand** (`SparseBackward`,
+  - **Strong liveness / demand** (`StrongDemand`,
     `SparseBackwardInterpreter`): `Interp::Value` is the *per-SSA-value* demand
     fact (`kirin_liveness::Live`), not a `LiveSet` — the sparse fact anchors to
     values, mirroring the forward per-value model. Helpers are
-    `is_demanded`/`demand`/`effect()` plus the purity-aware `transfer_ordinary`
+    `is_demanded`/`demand` (on `DemandInterp`)/`effect()` plus the purity-aware `demand_uses_if_observable`
     (rather than the sketched `live_after`/`use_def` names); the effect is
     `SparseBackwardEffect::Demands`. Summary owners ARE scope-qualified SSA
     values, so the fixpoint driver's default self-dependent index is the demand
     worklist; scf converges loop-carried demand with **no frames**.
-  - **Classic per-point liveness** (`DenseBackward`,
+  - **Classic per-point liveness** (`ClassicLiveness`,
     `DenseBackwardInterpreter`): here `Interp::Value` *is* the point state
     (`LiveSet`), realizing the sketch's `Value = LiveSet` — with the textbook
-    kill/gen transfer (`transfer_classic`, purity-irrelevant). Block owners
+    kill/gen transfer (`gen_uses_kill_defs`, purity-irrelevant). Block owners
     converge boundary summaries; `live_before`/`live_after` are reconstructed
     per point on demand (never persisted by the fixpoint); scf owns dense
     frames (arm-join, loop fixpoint).
   Strong per-point sets are the composition `dense ∩ demanded`, not a third
-  analysis. Because the `Kind` parameter distinguishes impls, one dialect
-  carries all three rules at once — the compile-time proof lives in
-  `kirin-interpreter::dispatch::tests`.
+  analysis. Because the `Semantics` parameter distinguishes impls, one dialect
+  carries all three rules at once, as every shipped dialect demonstrates.
 - Function-summary context sensitivity is a pluggable `CallContext` strategy.
   `ContextInsensitive` is the context-insensitive baseline; `ConstPropContext` provides bounded
   arg-tuple keys (precise recursion; sound, terminating cap to `Unknown`).

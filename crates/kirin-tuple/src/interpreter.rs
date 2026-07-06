@@ -1,8 +1,8 @@
 use kirin::prelude::{CompileTimeValue, HasBottom, Product};
 use kirin_interpreter::InterpreterError;
 use kirin_interpreter::dialect::{
-    DenseBackward, DenseBackwardInterp, HasProductValue, Interpretable, SparseBackward,
-    SparseBackwardInterp, SparseForward, SparseForwardEffect, SparseForwardInterp,
+    ClassicLiveness, ClassicLivenessInterp, DemandInterp, ForwardEval, HasProductValue,
+    Interpretable, SparseForwardEffect, SparseForwardInterp, StrongDemand,
 };
 use thiserror::Error;
 
@@ -13,24 +13,24 @@ use crate::{Get, Len, NewTuple, Unpack};
 /// result is demanded). Dense: the classic kill-defs/gen-uses transfer.
 macro_rules! backward_ordinary {
     ($ty:ident) => {
-        impl<I, T> Interpretable<I, SparseBackward> for $ty<T>
+        impl<I, T> Interpretable<I, StrongDemand> for $ty<T>
         where
-            I: SparseBackwardInterp,
+            I: DemandInterp,
             I::Value: HasBottom + PartialEq,
             T: CompileTimeValue,
         {
             fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-                interp.transfer_ordinary(self)
+                interp.demand_uses_if_observable(self)
             }
         }
 
-        impl<I, T> Interpretable<I, DenseBackward> for $ty<T>
+        impl<I, T> Interpretable<I, ClassicLiveness> for $ty<T>
         where
-            I: DenseBackwardInterp,
+            I: ClassicLivenessInterp,
             T: CompileTimeValue,
         {
             fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-                interp.transfer_classic(self)
+                interp.gen_uses_kill_defs(self)
             }
         }
     };
@@ -46,7 +46,7 @@ pub trait TupleIndexValue: Sized {
     fn from_tuple_index(index: usize) -> Self;
 }
 
-impl<I, T> Interpretable<I, SparseForward> for NewTuple<T>
+impl<I, T> Interpretable<I, ForwardEval> for NewTuple<T>
 where
     I: SparseForwardInterp,
     I::Value: HasProductValue,
@@ -63,7 +63,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for Unpack<T>
+impl<I, T> Interpretable<I, ForwardEval> for Unpack<T>
 where
     I: SparseForwardInterp,
     I::Value: HasProductValue,
@@ -81,7 +81,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for Get<T>
+impl<I, T> Interpretable<I, ForwardEval> for Get<T>
 where
     I: SparseForwardInterp,
     I::Value: HasProductValue + TupleIndexValue,
@@ -105,7 +105,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for Len<T>
+impl<I, T> Interpretable<I, ForwardEval> for Len<T>
 where
     I: SparseForwardInterp,
     I::Value: HasProductValue + TupleIndexValue,

@@ -4,7 +4,7 @@
 //! it to an owner-summary fixpoint: one work item per summary owner, intra-owner
 //! traversal on the shared frame stack, inter-owner convergence via a pluggable
 //! [`SummaryDependencyIndex`]. The wrapped interpreter stays the single source of
-//! value/error/effect/kind; a [`FixpointProfile`] adds only the owner-summary
+//! value/error/effect/semantics; a [`FixpointProfile`] adds only the owner-summary
 //! types (owner key, summary, frame, completion).
 
 mod delegates;

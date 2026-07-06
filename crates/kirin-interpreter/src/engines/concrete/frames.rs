@@ -1,4 +1,4 @@
-//! The **concrete** implementation of the shared [`frame`](crate::frame)
+//! The **concrete** implementation of the shared [`frame`](crate::core::frame)
 //! protocol.
 //!
 //! These are the default total frames for [`ConcreteInterpreter`](crate::ConcreteInterpreter):
@@ -11,7 +11,7 @@
 //! framework-owned structured semantics). A language that combines such a
 //! dialect defines its own total frame enum embedding [`BodyFrame`]/[`CallFrame`]
 //! via [`FrameBuild`] plus its dialect frames. The forward abstract analogue
-//! lives in [`sparse_forward_frames`](crate::sparse_forward_frames).
+//! lives in [`sparse_forward::frames`](crate::engines::sparse_forward::frames).
 
 use kirin_ir::{Block, CompileStage, Product, Region, SSAValue, Statement};
 

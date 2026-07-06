@@ -34,8 +34,8 @@ pub enum ArithFunctionLanguage {
 #[cfg(feature = "interpreter")]
 mod interpreter {
     use kirin_interpreter::dialect::{
-        DenseBackward, DenseBackwardEffect, DenseBackwardInterp, FunctionBody, FunctionEntry,
-        Interp, Interpretable, InterpreterError, SparseBackward, SparseBackwardInterp,
+        ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, FunctionBody,
+        FunctionEntry, Interp, Interpretable, InterpreterError, StrongDemand,
     };
     use kirin_ir::{HasBottom, Product};
 
@@ -43,9 +43,9 @@ mod interpreter {
 
     /// Backward demand: `Function` defines a body and is inert for demand;
     /// the wrapped dialects delegate to their own backward rules.
-    impl<I> Interpretable<I, SparseBackward> for ArithFunctionLanguage
+    impl<I> Interpretable<I, StrongDemand> for ArithFunctionLanguage
     where
-        I: SparseBackwardInterp,
+        I: DemandInterp,
         I::Value: HasBottom + PartialEq,
     {
         fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
@@ -60,9 +60,9 @@ mod interpreter {
 
     /// Classic per-point liveness: `Function` has no SSA operands (inert);
     /// the wrapped dialects delegate to their own dense rules.
-    impl<I> Interpretable<I, DenseBackward> for ArithFunctionLanguage
+    impl<I> Interpretable<I, ClassicLiveness> for ArithFunctionLanguage
     where
-        I: DenseBackwardInterp,
+        I: ClassicLivenessInterp,
     {
         fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
             match self {

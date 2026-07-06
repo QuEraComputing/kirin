@@ -37,14 +37,15 @@ use kirin_ir::{
     StageMeta, Statement, Widen,
 };
 
+use crate::core::query;
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver,
     AbstractInterpreter, CallEffect, Callee, Env, EnvIndex, EnvStackStore, FixpointProfile,
-    ForwardFrameDriver, ForwardSummaryDeps, Frame, FunctionBody, FunctionTarget, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics, SameStageLinker,
-    SparseForward, SparseForwardEffect, StageQuery, StandardAbstractFrame,
+    ForwardEval, ForwardFrameDriver, ForwardSummaryDeps, Frame, FunctionBody, FunctionTarget,
+    Interp, InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics,
+    SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
     StandardFixpointInterpreter, Store, Summary, SummaryDependency, SummaryDependencyIndex,
-    SummaryEffect, query,
+    SummaryEffect,
 };
 
 // ===========================================================================
@@ -321,13 +322,15 @@ pub struct SparseForwardProfile<V, E, K, F> {
     _marker: PhantomData<fn() -> (V, E, K, F)>,
 }
 
-impl<'ir, S, V, E, Lk, P, F> FixpointProfile<SparseForwardTransfer<'ir, S, V, E, Lk, P, F>>
+impl<'ir, S, V, E, Lk, P, F, Sem>
+    FixpointProfile<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>
     for SparseForwardProfile<V, E, <P as CallContext<V>>::Key, F>
 where
     S: StageMeta,
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
     type SummaryKey = Owner<<P as CallContext<V>>::Key>;
     type Summary = ForwardSummary<V>;
@@ -338,8 +341,8 @@ where
 /// The forward driver: a [`StandardFixpointInterpreter`] over [`SparseForwardTransfer`]
 /// with owner summaries, forward dependencies, and the owner-local
 /// [`ForwardStore`].
-type ForwardDriver<'ir, S, V, E, Lk, P, F> = StandardFixpointInterpreter<
-    SparseForwardTransfer<'ir, S, V, E, Lk, P, F>,
+type ForwardDriver<'ir, S, V, E, Lk, P, F, Sem> = StandardFixpointInterpreter<
+    SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>,
     SparseForwardProfile<V, E, <P as CallContext<V>>::Key, F>,
     ForwardStore<<P as CallContext<V>>::Key, V>,
     ForwardSummaryDeps<Owner<<P as CallContext<V>>::Key>>,
@@ -358,8 +361,10 @@ pub struct SparseForwardTransfer<
     Lk = SameStageLinker,
     P = ContextInsensitive,
     F = StandardAbstractFrame<V, E, <P as CallContext<V>>::Key>,
+    Sem = ForwardEval,
 > where
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
     pipeline: &'ir Pipeline<S>,
     linker: Lk,
@@ -375,12 +380,15 @@ pub struct SparseForwardTransfer<
     write_log: Vec<SSAValue>,
     /// Whether read/write logging is active (only during a block-owner walk).
     logging: bool,
-    _marker: PhantomData<fn() -> (E, F)>,
+    #[allow(clippy::type_complexity)]
+    _marker: PhantomData<fn() -> (E, F, Sem)>,
 }
 
-impl<'ir, S: StageMeta, V, E, P, F> SparseForwardTransfer<'ir, S, V, E, SameStageLinker, P, F>
+impl<'ir, S: StageMeta, V, E, P, F, Sem>
+    SparseForwardTransfer<'ir, S, V, E, SameStageLinker, P, F, Sem>
 where
     P: CallContext<V> + Default,
+    Sem: SparseForwardSemantic,
 {
     fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
@@ -399,11 +407,12 @@ where
     }
 }
 
-impl<'ir, S: StageMeta, V, E, Lk, P, F> SparseForwardTransfer<'ir, S, V, E, Lk, P, F>
+impl<'ir, S: StageMeta, V, E, Lk, P, F, Sem> SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
-    fn with_linker<Lk2>(self, linker: Lk2) -> SparseForwardTransfer<'ir, S, V, E, Lk2, P, F> {
+    fn with_linker<Lk2>(self, linker: Lk2) -> SparseForwardTransfer<'ir, S, V, E, Lk2, P, F, Sem> {
         SparseForwardTransfer {
             pipeline: self.pipeline,
             linker,
@@ -419,7 +428,20 @@ where
         }
     }
 
-    fn with_analysis<P2>(self, analysis: P2) -> SparseForwardTransfer<'ir, S, V, E, Lk, P2>
+    #[allow(clippy::type_complexity)]
+    fn with_analysis<P2>(
+        self,
+        analysis: P2,
+    ) -> SparseForwardTransfer<
+        'ir,
+        S,
+        V,
+        E,
+        Lk,
+        P2,
+        StandardAbstractFrame<V, E, <P2 as CallContext<V>>::Key>,
+        Sem,
+    >
     where
         P2: CallContext<V>,
     {
@@ -464,11 +486,12 @@ where
 
 // Policy-driven merge + return accumulation, kept on the transfer (the analysis `P`
 // lives here). The driver's `AbstractFrameDriver` impl delegates to these.
-impl<'ir, S: StageMeta, V, E, Lk, P, F> SparseForwardTransfer<'ir, S, V, E, Lk, P, F>
+impl<'ir, S: StageMeta, V, E, Lk, P, F, Sem> SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
     V: Clone + PartialEq + Widen,
     E: From<InterpreterError>,
     P: CallContext<V> + WideningStrategy<V>,
+    Sem: SparseForwardSemantic,
 {
     fn merge_products(
         &self,
@@ -511,17 +534,18 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> Interp for SparseForwardTransfer<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F, Sem> Interp for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageMeta,
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
     type Value = V;
     type Error = E;
     type Effect = SparseForwardEffect<V, F>;
-    type Kind = SparseForward;
+    type Semantics = Sem;
 
     fn stage(&self) -> CompileStage {
         self.location.expect("interp location not set").stage
@@ -536,12 +560,13 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> Env for SparseForwardTransfer<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F, Sem> Env for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageMeta,
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
     fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<V, E> {
         // Log the read regardless of whether it resolves to a bound value or
@@ -565,23 +590,27 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> AbstractInterpreter for SparseForwardTransfer<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F, Sem> AbstractInterpreter
+    for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageMeta,
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
 }
 
 // The IR-query / dispatch capability surface. Dialect rules dispatch on the transfer.
-impl<'ir, S, V, E, Lk, P, F> ForwardFrameDriver for SparseForwardTransfer<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F, Sem> ForwardFrameDriver
+    for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
-    S: StageQuery + InterpDispatch<Self, SparseForward>,
+    S: StageQuery + InterpDispatch<Self>,
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
     fn alloc_env(&mut self) -> EnvIndex {
         self.store.alloc()
@@ -664,13 +693,14 @@ where
 // Driver capability impls (frames run on the driver, which delegates to the transfer)
 // ===========================================================================
 
-impl<'ir, S, V, E, Lk, P, F> ForwardFrameDriver for ForwardDriver<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F, Sem> ForwardFrameDriver for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
 where
-    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F>, SparseForward>,
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
     fn alloc_env(&mut self) -> EnvIndex {
         self.inner_mut().alloc_env()
@@ -725,13 +755,14 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> AbstractFrameDriver for ForwardDriver<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F, Sem> AbstractFrameDriver for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
 where
-    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F>, SparseForward>,
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
     P: CallContext<V> + WideningStrategy<V>,
+    Sem: SparseForwardSemantic,
 {
     type SummaryKey = <P as CallContext<V>>::Key;
 
@@ -812,13 +843,14 @@ where
 
 // The single mutation/scheduling path (constraint 5): every summary/fact change
 // and every reschedule flows through `apply_update`.
-impl<'ir, S, V, E, Lk, P, F> ForwardDriver<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F, Sem> ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
 where
-    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F>, SparseForward>,
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
     P: CallContext<V> + WideningStrategy<V>,
+    Sem: SparseForwardSemantic,
 {
     fn apply_update(
         &mut self,
@@ -1055,9 +1087,9 @@ impl<V> SparseForwardSemantics<V> {
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F, Sem>
     OwnerSemantics<
-        ForwardDriver<'ir, S, V, E, Lk, P, F>,
+        ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
         Owner<<P as CallContext<V>>::Key>,
         ForwardSummary<V>,
         F,
@@ -1065,16 +1097,17 @@ impl<'ir, S, V, E, Lk, P, F>
         E,
     > for SparseForwardSemantics<V>
 where
-    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F>, SparseForward>,
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
     P: CallContext<V> + WideningStrategy<V>,
+    Sem: SparseForwardSemantic,
     F: AbstractFrameBuild<V, E, <P as CallContext<V>>::Key>,
 {
     fn bottom_summary(
         &mut self,
-        _interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F>,
+        _interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
         owner: &Owner<<P as CallContext<V>>::Key>,
     ) -> Result<ForwardSummary<V>, E> {
         // `apply_update` seeds real summaries before scheduling; this is only a
@@ -1087,7 +1120,7 @@ where
 
     fn entry_frame(
         &mut self,
-        interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F>,
+        interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
         owner: &Owner<<P as CallContext<V>>::Key>,
         summary: &ForwardSummary<V>,
     ) -> Result<F, E> {
@@ -1134,7 +1167,7 @@ where
 
     fn complete_owner(
         &mut self,
-        interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F>,
+        interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
         owner: Owner<<P as CallContext<V>>::Key>,
         completion: AbstractCompletion<V>,
     ) -> Result<SummaryEffect<Owner<<P as CallContext<V>>::Key>, ForwardSummary<V>>, E> {
@@ -1217,7 +1250,7 @@ where
 
 /// Forward lattice-based abstract interpreter.
 ///
-/// Drives the same forward dialect rules (`Interpretable<I, SparseForward>`) and
+/// Drives the same forward dialect rules (`Interpretable<I, ForwardEval>`) and
 /// [`SparseForwardEffect`] as concrete execution, over an abstract value domain.
 /// Traversal is owned by the total frame type `F`; summary keying and merge/widen
 /// behavior are owned by the policy `P`.
@@ -1235,19 +1268,23 @@ pub struct SparseForwardInterpreter<
     Lk = SameStageLinker,
     P = ContextInsensitive,
     F = StandardAbstractFrame<V, E, <P as CallContext<V>>::Key>,
+    Sem = ForwardEval,
 > where
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
-    driver: ForwardDriver<'ir, S, V, E, Lk, P, F>,
+    driver: ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
 }
 
-impl<'ir, S: StageMeta, V, E, P, F> SparseForwardInterpreter<'ir, S, V, E, SameStageLinker, P, F>
+impl<'ir, S: StageMeta, V, E, P, F, Sem>
+    SparseForwardInterpreter<'ir, S, V, E, SameStageLinker, P, F, Sem>
 where
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V> + Default,
+    Sem: SparseForwardSemantic,
 {
     pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
@@ -1261,18 +1298,19 @@ where
     }
 }
 
-impl<'ir, S: StageMeta, V, E, Lk, P, F> SparseForwardInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S: StageMeta, V, E, Lk, P, F, Sem> SparseForwardInterpreter<'ir, S, V, E, Lk, P, F, Sem>
 where
     V: Clone + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
+    Sem: SparseForwardSemantic,
 {
     /// Swap the calling-convention component (the [`Linker`]). Preserves the frame
     /// type `F`; resets the (empty) summary tables.
     pub fn with_linker<Lk2>(
         self,
         linker: Lk2,
-    ) -> SparseForwardInterpreter<'ir, S, V, E, Lk2, P, F> {
+    ) -> SparseForwardInterpreter<'ir, S, V, E, Lk2, P, F, Sem> {
         let transfer = self.driver.into_inner().with_linker(linker);
         SparseForwardInterpreter {
             driver: StandardFixpointInterpreter::with_dependency_index(
@@ -1286,7 +1324,20 @@ where
 
     /// Swap the analysis policy (context abstraction + join/widen). Changes the
     /// [`CallContext::Key`] type, so this resets the summary tables and frame type.
-    pub fn with_analysis<P2>(self, analysis: P2) -> SparseForwardInterpreter<'ir, S, V, E, Lk, P2>
+    #[allow(clippy::type_complexity)]
+    pub fn with_analysis<P2>(
+        self,
+        analysis: P2,
+    ) -> SparseForwardInterpreter<
+        'ir,
+        S,
+        V,
+        E,
+        Lk,
+        P2,
+        StandardAbstractFrame<V, E, <P2 as CallContext<V>>::Key>,
+        Sem,
+    >
     where
         P2: CallContext<V>,
     {
@@ -1321,11 +1372,12 @@ where
     }
 }
 
-impl<'ir, S: StageMeta, V, E, Lk, F>
-    SparseForwardInterpreter<'ir, S, V, E, Lk, ContextInsensitive, F>
+impl<'ir, S: StageMeta, V, E, Lk, F, Sem>
+    SparseForwardInterpreter<'ir, S, V, E, Lk, ContextInsensitive, F, Sem>
 where
     V: Clone + HasBottom,
     E: From<InterpreterError>,
+    Sem: SparseForwardSemantic,
 {
     /// Number of joins at a merge point before switching from join to widening
     /// (only available with [`ContextInsensitive`]).
@@ -1348,14 +1400,15 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> SparseForwardInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F, Sem> SparseForwardInterpreter<'ir, S, V, E, Lk, P, F, Sem>
 where
-    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F>, SparseForward>,
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + PartialEq + Widen + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
     P: CallContext<V> + WideningStrategy<V>,
-    F: Frame<ForwardDriver<'ir, S, V, E, Lk, P, F>, Completion = AbstractCompletion<V>>
+    Sem: SparseForwardSemantic,
+    F: Frame<ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>, Completion = AbstractCompletion<V>>
         + AbstractFrameBuild<V, E, <P as CallContext<V>>::Key>,
 {
     /// Resolve `stage`/`function` by name and analyze. Returns the function's

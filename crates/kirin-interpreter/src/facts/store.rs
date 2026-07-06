@@ -15,7 +15,7 @@ use std::collections::HashMap;
 
 use kirin_ir::SSAValue;
 
-use crate::anchor::{Change, DenseAnchor, LatticeAnchor, ProgramPoint, Scoped};
+use super::anchor::{Change, DenseAnchor, LatticeAnchor, ProgramPoint, Scoped};
 
 /// One dataflow fact per lattice anchor.
 ///
@@ -96,9 +96,9 @@ impl<A: LatticeAnchor, F: PartialEq> FactStore<A, F> {
     }
 }
 
-/// A sparse store keyed by SSA values, for
-/// [`SparseForward`](crate::SparseForward) and
-/// [`SparseBackward`](crate::SparseBackward) analyses.
+/// A sparse store keyed by SSA values, for sparse-shaped analyses
+/// ([`SparseForwardShape`](crate::SparseForwardShape) /
+/// [`SparseBackwardShape`](crate::SparseBackwardShape)).
 pub type SparseStore<F> = FactStore<SSAValue, F>;
 
 /// A sparse store whose SSA-value anchors are scope-qualified: the same value

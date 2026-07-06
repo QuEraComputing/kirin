@@ -1,7 +1,7 @@
 use kirin::prelude::{Block, CompileTimeValue, HasBottom, SSAValue};
 use kirin_interpreter::dialect::{
-    BranchCondition, DenseBackward, DenseBackwardEffect, DenseBackwardInterp, Edge, Interpretable,
-    SparseBackward, SparseBackwardInterp, SparseForward, SparseForwardEffect, SparseForwardInterp,
+    BranchCondition, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
+    Edge, ForwardEval, Interpretable, SparseForwardEffect, SparseForwardInterp, StrongDemand,
     SuccessorEdge,
 };
 
@@ -10,9 +10,9 @@ use crate::ControlFlow;
 /// Classic (weak) per-point liveness: the branch condition is a use (gen'd);
 /// edge arguments are mapped at the block boundary from the successors'
 /// converged live-in sets, so the rule only *names* its edges.
-impl<I, T> Interpretable<I, DenseBackward> for ControlFlow<T>
+impl<I, T> Interpretable<I, ClassicLiveness> for ControlFlow<T>
 where
-    I: DenseBackwardInterp,
+    I: ClassicLivenessInterp,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
@@ -30,7 +30,7 @@ where
                 false_target,
                 false_args,
             } => {
-                interp.gen_fact(*condition)?;
+                interp.gen_live(*condition)?;
                 Ok(DenseBackwardEffect::Edges(vec![
                     SuccessorEdge {
                         target: true_target.target(),
@@ -50,7 +50,7 @@ where
 /// Demand the edge arguments whose matching successor parameters are demanded.
 fn demand_edge_args<I>(interp: &mut I, target: Block, args: &[SSAValue]) -> Result<(), I::Error>
 where
-    I: SparseBackwardInterp,
+    I: DemandInterp,
     I::Value: HasBottom + PartialEq,
 {
     let params = interp.block_params(target)?;
@@ -66,9 +66,9 @@ where
 /// edge argument is demanded iff its matching successor block parameter is
 /// demanded. The rule knows its own edge layout, so no positional operand
 /// grouping is ever guessed.
-impl<I, T> Interpretable<I, SparseBackward> for ControlFlow<T>
+impl<I, T> Interpretable<I, StrongDemand> for ControlFlow<T>
 where
-    I: SparseBackwardInterp,
+    I: DemandInterp,
     I::Value: HasBottom + PartialEq,
     T: CompileTimeValue,
 {
@@ -99,7 +99,7 @@ where
 /// ([`BranchCondition::is_truthy`] returns `None`) we emit both edges and the
 /// engine's policy decides (error under concrete execution, explore-and-join
 /// under abstract interpretation).
-impl<I, T> Interpretable<I, SparseForward> for ControlFlow<T>
+impl<I, T> Interpretable<I, ForwardEval> for ControlFlow<T>
 where
     I: SparseForwardInterp,
     I::Value: BranchCondition,

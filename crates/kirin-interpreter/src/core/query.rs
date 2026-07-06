@@ -14,7 +14,7 @@ use kirin_ir::{
 };
 
 use crate::InterpreterError;
-use crate::topology::{self, RegionTopology};
+use crate::facts::topology::{self, RegionTopology};
 
 /// Block parameters as SSA values.
 pub struct BlockParams(pub Block);

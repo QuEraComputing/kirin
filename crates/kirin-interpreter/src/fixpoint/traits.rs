@@ -6,7 +6,7 @@
 //! [`Summary`] (the facts at an owner, plus how they merge under a
 //! [`FixpointPhase`]), [`OwnerSemantics`] (how to seed, enter, and complete an
 //! owner), and [`SummaryEffect`] (the summary updates an owner produces). The
-//! value/error/effect/kind of the analysis stay on the wrapped
+//! value/error/effect/semantics of the analysis stay on the wrapped
 //! [`Interp`](crate::Interp).
 
 /// The convergence phase the driver is in.

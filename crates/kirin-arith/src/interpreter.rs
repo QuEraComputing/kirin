@@ -2,38 +2,38 @@ use std::ops::{Add, Mul, Neg, Sub};
 
 use kirin::prelude::{CompileTimeValue, HasBottom};
 use kirin_interpreter::dialect::{
-    DenseBackward, DenseBackwardInterp, Interpretable, InterpreterError, SparseBackward,
-    SparseBackwardInterp, SparseForward, SparseForwardEffect, SparseForwardInterp,
+    ClassicLiveness, ClassicLivenessInterp, DemandInterp, ForwardEval, Interpretable,
+    InterpreterError, SparseForwardEffect, SparseForwardInterp, StrongDemand,
 };
 use thiserror::Error;
 
 use crate::{Arith, CheckedDiv, CheckedRem};
 
 /// Classic (weak) per-point liveness: kill the result, gen all operands.
-impl<I, T> Interpretable<I, DenseBackward> for Arith<T>
+impl<I, T> Interpretable<I, ClassicLiveness> for Arith<T>
 where
-    I: DenseBackwardInterp,
+    I: ClassicLivenessInterp,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        interp.transfer_classic(self)
+        interp.gen_uses_kill_defs(self)
     }
 }
 
 /// Backward demand: purity-aware neededness. `Arith` is `#[kirin(pure)]`, so
 /// operands are demanded only when a result is demanded.
-impl<I, T> Interpretable<I, SparseBackward> for Arith<T>
+impl<I, T> Interpretable<I, StrongDemand> for Arith<T>
 where
-    I: SparseBackwardInterp,
+    I: DemandInterp,
     I::Value: HasBottom + PartialEq,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        interp.transfer_ordinary(self)
+        interp.demand_uses_if_observable(self)
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for Arith<T>
+impl<I, T> Interpretable<I, ForwardEval> for Arith<T>
 where
     I: SparseForwardInterp,
     I::Value: Add<Output = I::Value>

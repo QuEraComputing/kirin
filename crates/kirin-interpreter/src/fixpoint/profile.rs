@@ -4,7 +4,7 @@
 //! call sites don't spell them out individually. Crucially it is parameterised by
 //! the wrapped interpreter `I` and does **not** re-declare `I`'s associated types
 //! ([`Value`](crate::Interp::Value) / [`Error`](crate::Interp::Error) /
-//! [`Effect`](crate::Interp::Effect) / [`Kind`](crate::Interp::Kind)): the
+//! [`Effect`](crate::Interp::Effect) / [`Semantics`](crate::Interp::Semantics)): the
 //! interpreter stays the single source of those. A profile owns only the
 //! convergence vocabulary.
 

@@ -5,32 +5,46 @@
 //! - **Shared framework** ([`Interp`],
 //!   [`Interpretable`], [`Frame`]/[`FrameEngine`]/[`FrameEffect`]/[`drive_frames`],
 //!   [`StandardFixpointInterpreter`]): the engine trait, the direction-neutral
-//!   frame driver loop, and the owner-summary fixpoint driver. Statement
-//!   semantics are selected by a compile-time [`Kind`](Interp::Kind) marker —
-//!   one dialect type carries one [`Interpretable`] rule per kind without
+//!   frame driver loop, and the owner-summary fixpoint driver.
+//! - **Semantics vs shape** ([`semantics`]): statement rules are selected by a
+//!   compile-time [`SemanticKey`] — [`ForwardEval`], [`StrongDemand`],
+//!   [`ClassicLiveness`], or a downstream key — naming *what* a rule means.
+//!   Each key declares the [`AnalysisShape`] its solver runs on
+//!   ([`SparseForwardShape`], [`SparseBackwardShape`], [`DenseForwardShape`],
+//!   [`DenseBackwardShape`]) — the *mechanics*: anchoring, direction, store,
+//!   and fixpoint discipline — and joins that shape's *family*
+//!   ([`SparseForwardSemantic`] et al.), which is what the generic engines
+//!   bound their key parameter with. One dialect type carries one
+//!   [`Interpretable`] rule per key, and two keys may share one shape, without
 //!   coherence conflicts.
-//! - **[`SparseForward`]** ([`SparseForwardInterp`], [`Env`],
-//!   [`SparseForwardEffect`], [`ConcreteInterpreter`], [`SparseForwardInterpreter`]):
-//!   forward evaluation — concrete execution, constant propagation, interval
-//!   analysis.
-//! - **[`SparseBackward`]** ([`SparseBackwardInterp`], [`SparseBackwardEffect`],
-//!   [`SparseBackwardInterpreter`]): backward demand — strong (true) liveness,
-//!   one fact per SSA value, propagated value-by-value along def links.
-//! - **[`DenseBackward`]** ([`DenseBackwardInterp`], [`DenseBackwardEffect`],
-//!   [`DenseBackwardInterpreter`]): classic per-program-point liveness —
-//!   block-boundary set summaries plus on-demand per-point reconstruction.
-//! - **Future sibling modes** (e.g. `DenseForward` typestate) each add a marker
-//!   + engine trait + effect algebra without touching the existing ones.
+//! - **[`SparseForwardShape`] engines** ([`SparseForwardInterp`], [`Env`],
+//!   [`SparseForwardEffect`]; [`ConcreteInterpreter`], and
+//!   [`SparseForwardInterpreter`]`<..., Sem = ForwardEval>`):
+//!   [`ForwardEval`] — concrete execution, constant propagation, interval
+//!   analysis (the value domain, not the key, distinguishes them).
+//! - **[`SparseBackwardShape`] engine** (shape-generic [`SparseBackwardInterp`]
+//!   with [`StrongDemand`]'s helper [`DemandInterp`], [`SparseBackwardEffect`],
+//!   [`SparseBackwardInterpreter`]`<..., Sem = StrongDemand>`): strong (true)
+//!   liveness, one fact per SSA value, propagated value-by-value along def
+//!   links.
+//! - **[`DenseBackwardShape`] engine** (shape-generic [`DenseBackwardInterp`]
+//!   with [`ClassicLiveness`]'s helper [`ClassicLivenessInterp`],
+//!   [`DenseBackwardEffect`],
+//!   [`DenseBackwardInterpreter`]`<..., Sem = ClassicLiveness>`):
+//!   per-program-point liveness with block-boundary set summaries plus
+//!   on-demand per-point reconstruction.
 //!
 //! # Two-persona contract
 //!
-//! - **Dialect authors** implement [`Interpretable<I, Kind>`](Interpretable)
-//!   per semantics (and [`FunctionEntry`] for callable statements). A rule
-//!   receives the engine `interp` directly and uses that kind's helpers:
-//!   forward rules read/write SSA values ([`SparseForwardInterp`]), demand
-//!   rules read/raise demand facts ([`SparseBackwardInterp`], with
-//!   `transfer_ordinary` as the purity-aware one-liner), dense rules gen/kill
-//!   the point state ([`DenseBackwardInterp`], with `transfer_classic`).
+//! - **Dialect authors** implement [`Interpretable<I, Semantics>`](Interpretable)
+//!   per semantic key (and [`FunctionEntry`] for callable statements). A rule
+//!   receives the engine `interp` directly. Shape-generic mechanics live on
+//!   the engine traits (read/write on [`SparseForwardInterp`];
+//!   fact/raise-fact on [`SparseBackwardInterp`]; insert/remove point facts on
+//!   [`DenseBackwardInterp`]); semantics-specific vocabulary lives in helper
+//!   traits — demand rules bind [`DemandInterp`]
+//!   (`demand`/`is_demanded`/`demand_uses_if_observable`), classic-liveness rules bind
+//!   [`ClassicLivenessInterp`] (`gen_live`/`kill_def`/`gen_uses_kill_defs`).
 //!   Structured dialects may push dialect-owned frames.
 //! - **Compiler authors** compose languages into stage enums (deriving
 //!   [`InterpDispatch`] alongside `StageMeta`) and run engines:
@@ -44,104 +58,98 @@
 //! (cf's [`SparseForwardEffect::Branch`], or a control dialect's own pushed frame) is
 //! driven.
 
-mod anchor;
-mod concrete_frames;
-mod concrete_interp;
-mod dense_backward_frames;
-mod dense_backward_interp;
-mod dispatch;
-mod effect;
-mod env;
-mod error;
+mod core;
+mod engines;
+mod facts;
 mod fixpoint;
-mod frame;
-mod interp;
-mod linker;
-mod query;
-mod sparse_backward_interp;
-mod sparse_forward_frames;
-mod sparse_forward_interp;
-mod store;
-mod topology;
-mod value;
+mod semantics;
 
-pub use concrete_interp::ConcreteInterpreter;
-pub use dense_backward_frames::{
-    DenseBlockFrame, DenseBlockMode, DenseFrameBuild, StandardDenseBackwardFrame,
-};
-pub use dense_backward_interp::{
-    BlockLiveness, DenseAnalysisState, DenseBackwardCompletion, DenseBackwardDriver,
-    DenseBackwardEffect, DenseBackwardFrameDriver, DenseBackwardInterp, DenseBackwardInterpreter,
-    DenseBackwardProfile, DenseBackwardTransfer, PointFacts, SuccessorEdge,
-};
-pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
-pub use effect::{CallEffect, Callee, Edge, FunctionBody, SparseForwardEffect};
-pub use env::{EnvIndex, EnvStackStore, Store};
-pub use interp::{AbstractInterpreter, Env, Interp, InterpLocation, SparseForwardInterp};
-pub use sparse_backward_interp::{
-    BackwardAnalysisState, DemandFrame, DemandSummary, RegionScope, SparseBackwardDriver,
-    SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter, SparseBackwardProfile,
-    SparseBackwardTransfer,
-};
-pub use sparse_forward_interp::{
-    CallContext, ContextInsensitive, Owner, SparseForwardInterpreter, SparseForwardTransfer,
-    WideningStrategy,
-};
-
-pub use error::InterpreterError;
+// The shared chassis: engine trait + dialect dispatch, effect types,
+// activation storage, calling conventions, errors, and IR queries.
+pub use self::core::{AbstractInterpreter, Env, Interp, InterpLocation, SparseForwardInterp};
+pub use self::core::{BranchCondition, HasProductValue, expect_single};
+pub use self::core::{CallEffect, Callee, Edge, FunctionBody, SparseForwardEffect};
+pub use self::core::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
+pub use self::core::{EnvIndex, EnvStackStore, Store};
+pub use self::core::{FunctionEntry, InterpDispatch, Interpretable};
+pub use self::core::{InterpreterError, StageQuery};
 // The shared, direction-neutral frame protocol (`Frame`/`FrameEngine`/
 // `FrameEffect`/`drive_frames`) plus the forward frame-driver capability surfaces.
-pub use frame::{
+pub use self::core::{
     ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameEffect, FrameEngine, drive_frames,
 };
 // Backward-compatible aliases for the forward frame-driver capability surfaces.
-pub use frame::ForwardDataflowFrameDriver as AbstractFrameDriver;
-pub use frame::ForwardFrameDriver as FrameDriver;
-// Concrete standard frames.
-pub use concrete_frames::{BodyFrame, CallFrame, Completion, FrameBuild, StandardFrame};
-// Abstract standard frames.
-pub use sparse_forward_frames::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-    StandardAbstractFrame,
+pub use self::core::ForwardDataflowFrameDriver as AbstractFrameDriver;
+pub use self::core::ForwardFrameDriver as FrameDriver;
+
+// Concrete execution engine + the concrete standard frames.
+pub use engines::concrete::{
+    BodyFrame, CallFrame, Completion, ConcreteInterpreter, FrameBuild, StandardFrame,
 };
-// The lattice-anchor-polymorphic dataflow vocabulary: sparse/dense anchors,
-// kind markers, scope qualification, and kind-specific stores. Analyses
-// converge on the owner-summary framework below ([`StandardFixpointInterpreter`]).
-pub use anchor::{
-    AnalysisKind, Change, DenseAnchor, DenseBackward, DenseForward, LatticeAnchor, ProgramPoint,
-    Scoped, SparseBackward, SparseForward,
+// Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
+pub use engines::sparse_forward::{
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, CallContext,
+    ContextInsensitive, Owner, SparseForwardInterpreter, SparseForwardTransfer,
+    StandardAbstractFrame, WideningStrategy,
 };
-pub use linker::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
-pub use query::StageQuery;
+// Sparse backward engine (`Sem = StrongDemand`).
+pub use engines::sparse_backward::{
+    BackwardAnalysisState, DemandFrame, DemandInterp, DemandSummary, RegionScope,
+    SparseBackwardDriver, SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter,
+    SparseBackwardProfile, SparseBackwardTransfer,
+};
+// Dense backward engine (`Sem = ClassicLiveness`) + the dense standard frames.
+pub use engines::dense_backward::{
+    BlockLiveness, ClassicLivenessInterp, DenseAnalysisState, DenseBackwardCompletion,
+    DenseBackwardDriver, DenseBackwardEffect, DenseBackwardFrameDriver, DenseBackwardInterp,
+    DenseBackwardInterpreter, DenseBackwardProfile, DenseBackwardTransfer, DenseBlockFrame,
+    DenseBlockMode, DenseFrameBuild, PointFacts, StandardDenseBackwardFrame, SuccessorEdge,
+};
+
+// Lattice anchors (*where* facts attach), scope qualification, the polymorphic
+// fact stores, and region topology enumeration. Anchor family is a property of
+// the solver shape; dispatch meaning lives in `semantics`.
+pub use facts::{
+    BlockTopology, Change, DenseAnchor, DenseBlockStore, DensePointStore, FactStore, LatticeAnchor,
+    ProgramPoint, RegionTopology, Scoped, ScopedSparseStore, SparseStore, region_topology,
+};
+
+// Semantic keys (*what* a rule means — the `Interpretable`/`Interp::Semantics`
+// dispatch tags) and the solver shapes each key runs on.
+pub use semantics::{
+    AnalysisShape, ClassicLiveness, DenseBackwardSemantic, DenseBackwardShape,
+    DenseForwardSemantic, DenseForwardShape, ForwardEval, SemanticKey, SparseBackwardSemantic,
+    SparseBackwardShape, SparseForwardSemantic, SparseForwardShape, StrongDemand,
+};
+
 // The owner-summary fixpoint framework: a [`StandardFixpointInterpreter`] wraps
 // any [`Interp`] and drives it to an owner-summary fixpoint (one work item per
 // owner, intra-owner traversal on the frame stack, inter-owner convergence via a
 // pluggable [`SummaryDependencyIndex`]). The wrapped interpreter stays the single
-// source of value/error/effect/kind; a [`FixpointProfile`] adds only the
+// source of value/error/effect/semantics; a [`FixpointProfile`] adds only the
 // owner-summary types.
 pub use fixpoint::{
     BackwardSummaryDeps, FixpointPhase, FixpointProfile, ForwardSummaryDeps, OwnerSemantics,
     OwnerSummaryDeps, SimpleFixpointInterpreter, StandardFixpointInterpreter, Summary,
     SummaryDependencies, SummaryDependency, SummaryDependencyIndex, SummaryEffect, WorkItem,
 };
-pub use store::{DenseBlockStore, DensePointStore, FactStore, ScopedSparseStore, SparseStore};
-pub use topology::{BlockTopology, RegionTopology, region_topology};
-pub use value::{BranchCondition, HasProductValue, expect_single};
 
 #[cfg(feature = "derive")]
 pub use kirin_derive_interpreter::{FunctionEntry, InterpDispatch, Interpretable};
 
 /// Everything a dialect author needs to implement statement semantics —
-/// forward evaluation (`Interpretable<I, SparseForward>`), backward demand
-/// (`Interpretable<I, SparseBackward>`), and dense backward liveness
-/// (`Interpretable<I, DenseBackward>`).
+/// forward evaluation (`Interpretable<I, ForwardEval>`), backward demand
+/// (`Interpretable<I, StrongDemand>`), classic per-point liveness
+/// (`Interpretable<I, ClassicLiveness>`), and downstream semantic keys
+/// (`impl SemanticKey for MyKey { type Shape = ...; }`).
 pub mod dialect {
     pub use crate::{
-        BranchCondition, CallEffect, Callee, DenseBackward, DenseBackwardEffect,
-        DenseBackwardInterp, Edge, FunctionBody, FunctionEntry, HasProductValue, Interp,
-        Interpretable, InterpreterError, PointFacts, SparseBackward, SparseBackwardEffect,
-        SparseBackwardInterp, SparseForward, SparseForwardEffect, SparseForwardInterp,
-        SuccessorEdge,
+        AnalysisShape, BranchCondition, CallEffect, Callee, ClassicLiveness, ClassicLivenessInterp,
+        DemandInterp, DenseBackwardEffect, DenseBackwardInterp, DenseBackwardShape,
+        DenseForwardShape, Edge, ForwardEval, FunctionBody, FunctionEntry, HasProductValue, Interp,
+        Interpretable, InterpreterError, PointFacts, SemanticKey, SparseBackwardEffect,
+        SparseBackwardInterp, SparseBackwardShape, SparseForwardEffect, SparseForwardInterp,
+        SparseForwardShape, StrongDemand, SuccessorEdge,
     };
 }
 

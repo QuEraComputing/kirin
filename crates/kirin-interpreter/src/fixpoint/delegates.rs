@@ -2,7 +2,8 @@
 //!
 //! The driver keeps the interpreter model intact: `inner: I` remains the single
 //! source of [`Value`](Interp::Value) / [`Error`](Interp::Error) /
-//! [`Effect`](Interp::Effect) / [`Kind`](Interp::Kind) and the current location.
+//! [`Effect`](Interp::Effect) / [`Semantics`](Interp::Semantics) and the current
+//! location.
 //! Because the driver also delegates [`Env`] (when `I: Env`) and reports
 //! `Effect = I::Effect`, a forward `inner` transparently gives the driver the
 //! blanket [`SparseForwardInterp`](crate::SparseForwardInterp) impl and its
@@ -22,7 +23,7 @@ where
     type Value = I::Value;
     type Error = I::Error;
     type Effect = I::Effect;
-    type Kind = I::Kind;
+    type Semantics = I::Semantics;
 
     fn stage(&self) -> CompileStage {
         self.inner.stage()

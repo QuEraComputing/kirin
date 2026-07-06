@@ -2,9 +2,9 @@
 //! per-point sets (classic liveness), plus their composition.
 
 use kirin_interpreter::{
-    DenseBackward, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardInterpreter,
-    DenseBackwardTransfer, DenseBlockStore, DenseFrameBuild, DensePointStore, Frame,
-    InterpDispatch, InterpreterError, ProgramPoint, SparseBackwardInterpreter, StageQuery,
+    DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardInterpreter, DenseBackwardTransfer,
+    DenseBlockStore, DenseFrameBuild, DensePointStore, Frame, InterpDispatch, InterpreterError,
+    ProgramPoint, SparseBackwardInterpreter, StageQuery,
 };
 use kirin_ir::{Block, CompileStage, Lattice, Region, SSAValue, StageMeta, Statement};
 
@@ -69,10 +69,7 @@ impl DenseLivenessResult {
     where
         S: StageMeta
             + StageQuery
-            + InterpDispatch<
-                DenseBackwardTransfer<'ir, S, LiveSet, InterpreterError, F>,
-                DenseBackward,
-            >,
+            + InterpDispatch<DenseBackwardTransfer<'ir, S, LiveSet, InterpreterError, F>>,
         F: Frame<
                 DenseBackwardDriver<'ir, S, LiveSet, InterpreterError, F>,
                 Completion = DenseBackwardCompletion<LiveSet>,

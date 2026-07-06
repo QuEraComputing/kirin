@@ -1,8 +1,8 @@
 use kirin::prelude::{CompileTimeValue, HasBottom, HasRegionBody, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    CallEffect, Callee, DenseBackward, DenseBackwardEffect, DenseBackwardInterp, FunctionBody,
-    FunctionEntry, Interp, Interpretable, InterpreterError, SparseBackward, SparseBackwardInterp,
-    SparseForward, SparseForwardEffect, SparseForwardInterp,
+    CallEffect, Callee, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
+    ForwardEval, FunctionBody, FunctionEntry, Interp, Interpretable, InterpreterError,
+    SparseForwardEffect, SparseForwardInterp, StrongDemand,
 };
 
 use crate::{
@@ -14,14 +14,14 @@ use crate::{
 /// `Function`/`Lambda` have no SSA operands, so their rules are inert.
 macro_rules! backward_ordinary {
     ($ty:ident) => {
-        impl<I, T> Interpretable<I, SparseBackward> for $ty<T>
+        impl<I, T> Interpretable<I, StrongDemand> for $ty<T>
         where
-            I: SparseBackwardInterp,
+            I: DemandInterp,
             I::Value: HasBottom + PartialEq,
             T: CompileTimeValue,
         {
             fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-                interp.transfer_ordinary(self)
+                interp.demand_uses_if_observable(self)
             }
         }
     };
@@ -39,13 +39,13 @@ backward_ordinary!(CallSpecialized);
 /// transfer for calls (purity is irrelevant to per-point live sets).
 macro_rules! dense_classic {
     ($ty:ident) => {
-        impl<I, T> Interpretable<I, DenseBackward> for $ty<T>
+        impl<I, T> Interpretable<I, ClassicLiveness> for $ty<T>
         where
-            I: DenseBackwardInterp,
+            I: ClassicLivenessInterp,
             T: CompileTimeValue,
         {
             fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-                interp.transfer_classic(self)
+                interp.gen_uses_kill_defs(self)
             }
         }
     };
@@ -61,14 +61,14 @@ dense_classic!(CallSpecialized);
 
 /// Classic per-point liveness for `ret`: gen the returned values; a function
 /// boundary has no CFG edges.
-impl<I, T> Interpretable<I, DenseBackward> for Return<T>
+impl<I, T> Interpretable<I, ClassicLiveness> for Return<T>
 where
-    I: DenseBackwardInterp,
+    I: ClassicLivenessInterp,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
         for value in &self.values {
-            interp.gen_fact(*value)?;
+            interp.gen_live(*value)?;
         }
         Ok(DenseBackwardEffect::Edges(Vec::new()))
     }
@@ -76,9 +76,9 @@ where
 
 /// Backward demand: return operands are unconditional roots — they are the
 /// function's observable outputs.
-impl<I, T> Interpretable<I, SparseBackward> for Return<T>
+impl<I, T> Interpretable<I, StrongDemand> for Return<T>
 where
-    I: SparseBackwardInterp,
+    I: DemandInterp,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
@@ -120,7 +120,7 @@ where
 /// Function definitions are inert at runtime: defining a function does not
 /// execute its body. Bodies run when the function is invoked (via
 /// [`FunctionEntry`]).
-impl<I, T> Interpretable<I, SparseForward> for Function<T>
+impl<I, T> Interpretable<I, ForwardEval> for Function<T>
 where
     I: SparseForwardInterp,
     T: CompileTimeValue,
@@ -130,7 +130,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for Lambda<T>
+impl<I, T> Interpretable<I, ForwardEval> for Lambda<T>
 where
     I: SparseForwardInterp,
     T: CompileTimeValue,
@@ -142,7 +142,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for Bind<T>
+impl<I, T> Interpretable<I, ForwardEval> for Bind<T>
 where
     I: SparseForwardInterp,
     T: CompileTimeValue,
@@ -173,7 +173,7 @@ where
     }))
 }
 
-impl<I, T> Interpretable<I, SparseForward> for CallNamed<T>
+impl<I, T> Interpretable<I, ForwardEval> for CallNamed<T>
 where
     I: SparseForwardInterp,
     T: CompileTimeValue,
@@ -183,7 +183,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for CallFunction<T>
+impl<I, T> Interpretable<I, ForwardEval> for CallFunction<T>
 where
     I: SparseForwardInterp,
     T: CompileTimeValue,
@@ -193,7 +193,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for CallStaged<T>
+impl<I, T> Interpretable<I, ForwardEval> for CallStaged<T>
 where
     I: SparseForwardInterp,
     T: CompileTimeValue,
@@ -203,7 +203,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for CallSpecialized<T>
+impl<I, T> Interpretable<I, ForwardEval> for CallSpecialized<T>
 where
     I: SparseForwardInterp,
     T: CompileTimeValue,
@@ -213,7 +213,7 @@ where
     }
 }
 
-impl<I, T> Interpretable<I, SparseForward> for Return<T>
+impl<I, T> Interpretable<I, ForwardEval> for Return<T>
 where
     I: SparseForwardInterp,
     T: CompileTimeValue,

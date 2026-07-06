@@ -2,21 +2,22 @@
 
 use kirin_ir::{CompileStage, Statement};
 
-use crate::{EnvIndex, Interp, InterpreterError};
+use crate::{EnvIndex, ForwardEval, Interp, InterpreterError};
 
 /// A minimal [`Interp`] used as the wrapped `inner` for backbone tests.
 ///
 /// The backbone tests exercise only the owner/summary/dependency machinery;
 /// their frames complete synthetically without dispatching a dialect rule, so
-/// the location accessors are unreachable (mirrors the liveness interps, whose
-/// structural analyses never dispatch through `Interpretable`).
+/// the location accessors are unreachable.
 pub(super) struct UnitInterp;
 
 impl Interp for UnitInterp {
     type Value = ();
     type Error = InterpreterError;
     type Effect = ();
-    type Kind = ();
+    // The backbone is semantics-agnostic; any key works. Use the canonical
+    // shipped key rather than minting a test-local one.
+    type Semantics = ForwardEval;
 
     fn stage(&self) -> CompileStage {
         unimplemented!("backbone test interp has no IR location")

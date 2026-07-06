@@ -1,16 +1,15 @@
-//! Dataflow vocabulary: analysis kinds, lattice anchors, scope qualification,
+//! Lattice anchors: *where* dataflow facts attach — plus scope qualification
 //! and change detection.
 //!
-//! Kirin models dataflow on two orthogonal axes — *lattice-anchor style*
-//! (sparse vs dense) and *direction* (forward vs backward) — giving four
-//! [analysis kinds](AnalysisKind). Following MLIR's terminology, a lattice fact
-//! is attached to a *lattice anchor*: sparse analyses anchor facts to
-//! [`SSAValue`]s, dense analyses anchor facts to blocks, edges, or program
-//! points. The kind markers double as the [`Interp::Kind`](crate::Interp::Kind)
-//! dialect-dispatch tags: `SparseForward` is the operational forward-evaluation
-//! path (concrete execution, constprop, interval), `SparseBackward` is the
-//! use-def-structured backward demand path (strong liveness), and
-//! `DenseBackward` is the program-point backward path (classic liveness).
+//! Following MLIR's terminology, a lattice fact is attached to a *lattice
+//! anchor*: sparse analyses anchor facts to [`SSAValue`]s; dense analyses
+//! anchor facts to blocks, program points, or edges. Which anchor family an
+//! analysis uses is part of its solver *shape*
+//! ([`AnalysisShape`](crate::AnalysisShape) — see
+//! [`semantics`](crate::semantics)); anchors themselves carry no dispatch
+//! meaning. What a rule *means* is a separate concern entirely: the
+//! [`SemanticKey`](crate::SemanticKey) dispatch tags live in
+//! [`semantics`](crate::semantics), not here.
 //!
 //! Framework-level fact keys are never bare anchors: [`Scoped`] qualifies an
 //! anchor with the scope/context it belongs to, so the same anchor under two
@@ -19,40 +18,6 @@
 use std::hash::Hash;
 
 use kirin_ir::{Block, SSAValue, Statement};
-
-// ===========================================================================
-// Analysis kinds (lattice-anchor style × direction)
-// ===========================================================================
-
-/// Marker trait for the four dataflow analysis kinds.
-///
-/// The kind selects which lattice-anchor vocabulary and store are valid for an
-/// analysis. The same markers double as the [`Interp::Kind`](crate::Interp::Kind)
-/// dialect-dispatch tag, so one dialect type carries one
-/// [`Interpretable`](crate::Interpretable) rule per kind without coherence
-/// conflicts.
-pub trait AnalysisKind {}
-
-/// Facts attach to SSA values and propagate forward through def-use chains.
-/// Concrete execution, constprop, and interval analysis are `SparseForward`.
-pub struct SparseForward;
-
-/// Facts attach to SSA values and propagate backward through use-def structure.
-/// Strong (true) liveness, neededness, and demand are `SparseBackward`.
-pub struct SparseBackward;
-
-/// Facts attach to block/edge/program-point anchors and propagate forward.
-/// Typestate and initialization are usually `DenseForward`.
-pub struct DenseForward;
-
-/// Facts attach to block/edge/program-point anchors and propagate backward.
-/// Classic per-point liveness is `DenseBackward`.
-pub struct DenseBackward;
-
-impl AnalysisKind for SparseForward {}
-impl AnalysisKind for SparseBackward {}
-impl AnalysisKind for DenseForward {}
-impl AnalysisKind for DenseBackward {}
 
 // ===========================================================================
 // Lattice anchors

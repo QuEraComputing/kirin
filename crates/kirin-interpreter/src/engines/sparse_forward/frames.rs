@@ -1,6 +1,6 @@
 //! Customizable frame-based traversal for the **abstract** engine.
 //!
-//! This is the abstract analogue of [`frame`](crate::frame): the dialect API
+//! This is the abstract analogue of [`frame`](crate::core::frame): the dialect API
 //! still produces a closed [`SparseForwardEffect`] per statement, and these frames
 //! decide how the [`SparseForwardInterpreter`](crate::SparseForwardInterpreter)
 //! *traverses* — CFG block worklists with join/widen, branch exploration,
