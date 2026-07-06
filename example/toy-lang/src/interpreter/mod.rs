@@ -14,7 +14,7 @@ mod tests;
 pub use error::ToyError;
 pub use frame::{ToyAbstractFrame, ToyDenseBackwardFrame, ToyFrame};
 
-use kirin::prelude::{CompileStage, GetInfo, Pipeline, Region};
+use kirin::prelude::{CompileStage, GetInfo, Pipeline, Region, UniqueLiveSpecializationError};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::{Lexical, Lifted};
 use kirin_interpreter::InterpreterError;
@@ -134,11 +134,22 @@ fn function_region(
             let staged_info = staged
                 .get_info(info)
                 .ok_or(InterpreterError::MissingSpecialization(staged))?;
-            let spec = staged_info
-                .specializations()
-                .first()
-                .ok_or(InterpreterError::MissingSpecialization(staged))?;
-            match spec.body().definition(info) {
+            let spec = match staged_info.unique_live_specialization() {
+                Ok(spec) => spec,
+                Err(UniqueLiveSpecializationError::NoSpecialization) => {
+                    return Err(InterpreterError::MissingSpecialization(staged));
+                }
+                Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
+                    return Err(InterpreterError::AmbiguousSpecialization {
+                        function: staged,
+                        count,
+                    });
+                }
+            };
+            let spec_info = spec
+                .get_info(info)
+                .ok_or(InterpreterError::Custom("specialized function has no body"))?;
+            match spec_info.body().definition(info) {
                 HighLevel::Lexical(Lexical::Function(function)) => {
                     use kirin::prelude::HasRegionBody;
                     *function.region()
@@ -150,11 +161,22 @@ fn function_region(
             let staged_info = staged
                 .get_info(info)
                 .ok_or(InterpreterError::MissingSpecialization(staged))?;
-            let spec = staged_info
-                .specializations()
-                .first()
-                .ok_or(InterpreterError::MissingSpecialization(staged))?;
-            match spec.body().definition(info) {
+            let spec = match staged_info.unique_live_specialization() {
+                Ok(spec) => spec,
+                Err(UniqueLiveSpecializationError::NoSpecialization) => {
+                    return Err(InterpreterError::MissingSpecialization(staged));
+                }
+                Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
+                    return Err(InterpreterError::AmbiguousSpecialization {
+                        function: staged,
+                        count,
+                    });
+                }
+            };
+            let spec_info = spec
+                .get_info(info)
+                .ok_or(InterpreterError::Custom("specialized function has no body"))?;
+            match spec_info.body().definition(info) {
                 LowLevel::Lifted(Lifted::Function(function)) => {
                     use kirin::prelude::HasRegionBody;
                     *function.region()
