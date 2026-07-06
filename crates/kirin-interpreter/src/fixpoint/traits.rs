@@ -15,8 +15,10 @@
 /// constant-propagation analyses use them to force and then refine termination.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum FixpointPhase {
-    /// Least-upper-bound merge; used until an owner has been visited enough to
-    /// widen.
+    /// Least-upper-bound merge.
+    ///
+    /// Note: the driver may start directly in `Widen` (or switch phases
+    /// explicitly) depending on the analysis' convergence policy.
     Join,
     /// Accelerate towards a post-fixpoint with a widening operator.
     Widen,
