@@ -1,0 +1,503 @@
+# Interpreter Framework
+
+The interpreter framework (`kirin-interpreter`) supports concrete execution
+and lattice-based abstract interpretation over the same dialect semantics,
+including analyses that cross language boundaries in multi-stage pipelines.
+
+The design is organized as a **two-persona contract**:
+
+- **Dialect authors** describe what each statement *means*, once, in a small
+  fixed vocabulary — `Interpretable<I, ForwardEval>`/`ForwardEvalInterp`/`ForwardEffect`,
+  receiving the engine directly and selecting semantics by a compile-time `Kind`
+  marker. There is no framework
+  "scope": a statement whose operation owns structured control runs a
+  sub-computation by *pushing a frame the dialect owns* (`ForwardEffect::Push`),
+  built per-engine through a small dialect dispatch capability. Ordinary
+  (non-control) dialects never push frames at all.
+- **Compiler authors** compose languages into pipelines and *select*
+  components: an engine, a value domain, an error type, and a linker. When they
+  need more control, the same compiler-author surface also includes opt-in
+  traversal and analysis components: custom concrete frames
+  (`ConcreteInterpreter<.., F>`), custom forward-dataflow frames
+  (`ForwardAbstractInterpreter<.., P, F>`), and abstract policies `P`
+  (`CallContext` + `WideningStrategy`). A language that uses a structured-control
+  dialect composes its own total frame type embedding the standard frames plus
+  that dialect's frames. Ordinary dialects never name a frame type.
+
+Every derive macro is named after the trait it implements
+(`#[derive(Interpretable)]` → `trait Interpretable`), so learning the derive
+is learning the trait.
+
+## Dialect-author surface
+
+Everything is exported from `kirin_interpreter::dialect`.
+
+### `Interp` and `Interpretable<I, Kind>` — statement semantics
+
+```rust
+pub trait Interp: Sized {               // the engine-side driver — ANALYSIS-AGNOSTIC
+    type Value: Clone;                  // the value domain
+    type Error: From<InterpreterError>; // the total error
+    type Effect;                        // analysis-specific per-statement effect
+    type Kind;                          // compile-time semantics marker (ForwardEval, ...)
+    fn stage(&self) -> CompileStage;    // the current statement's location, set by the engine
+    fn statement(&self) -> Statement;   //   before each dispatch and read back by rules
+    fn index(&self) -> EnvIndex;        //   (the SSA activation)
+}
+
+// SSA environment access used by forward engines.
+pub trait Env: Interp {
+    fn env_read(..) -> Result<Self::Value, Self::Error>;
+    fn env_write(..) -> Result<(), Self::Error>;
+}
+```
+
+```rust
+// The single dialect trait — specialized on the engine `I` and a compile-time
+// semantics marker `Kind` (NOT a runtime context object).
+pub trait Interpretable<I: Interp, Kind>: Dialect {
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error>;
+}
+```
+
+A rule receives the engine `interp: &mut I` directly. Forward rules bound
+`I: ForwardEvalInterp`, which provides the read/write helpers — `read`,
+`read_many`, `write`, `write_results` — as **default methods** that operate on the
+engine's current activation (`interp.index()`) and delegate to the engine's
+[`Env`] storage access. So a forward rule calls `interp.read(..)` / `interp.write(..)`
+directly. There is **no** `ValueContext`/`ForwardCtx` object: the engine *is* the
+context.
+
+`ForwardEval` is a pure compile-time **semantics marker** — never instantiated —
+that selects *which* semantics an impl describes. It names *forward evaluation*
+(read operands, compute a semantic/lattice value, write results), so one mode
+covers concrete execution, constant propagation, and interval analysis — they
+differ only in the value domain, not the rule shape. It is deliberately not
+`ForwardValue`: a future forward **type inference** mode also attaches facts to
+SSA values but should expose a different rule API, so the name reflects the
+evaluation semantics rather than "operates on values". A forward statement rule
+is `impl<I: ForwardEvalInterp, ..> Interpretable<I, ForwardEval> for Op`: it
+reads/writes through `interp.read`/`interp.write` and returns `I::Effect`
+(= `ForwardEffect`). A future backward analysis adds a `BackwardLiveness` marker
+and writes `impl Interpretable<I, BackwardLiveness> for Op` with its own engine
+trait, helpers, and effect — the two impls coexist on the same dialect type
+because the `Kind` parameter distinguishes them (no coherence conflict).
+
+Future sibling modes (not yet implemented) each get their own marker + engine
+trait, leaving `ForwardEval` untouched: `ForwardType` / `ForwardTypeInterp`
+(forward type inference), `BackwardDataflow` / `BackwardDataflowInterp` (generic
+backward dataflow), and `BackwardLiveness` / `BackwardLivenessInterp` (backward
+liveness).
+
+`Interp` is the interpreter/analysis **driver**: it exposes the value domain, the
+error type, the per-statement effect, the semantics [`Kind`], and the current
+statement location (`stage()`/`statement()`/`index()`). The engine stashes the
+location before dispatching each rule (`run_statement`/`enter_function`) and
+restores it afterward, so a rule can read it back without a separate context
+object. A rule produces `I::Effect` — the **analysis-specific** effect algebra —
+not a single universal enum. (The frame type stays the engine's own `F` generic,
+e.g. `ConcreteInterpreter<.., F>`, so traversal is customizable without an unused
+associated type on `Interp`.) Forward rules bound `I: ForwardEvalInterp`, the
+flavor of `Interp` whose `Kind = ForwardEval` and `Effect = ForwardEffect<I::Value,
+I::Frame>`, so they build and return `ForwardEffect` values (which are `I::Effect`).
+`I::Frame` is the engine's total frame type, re-exposed by `ForwardEvalInterp`
+only so a structured dialect can name the frame it pushes; ordinary dialects never
+mention it (it is inferred from `I::Effect`). They constrain only:
+
+- the value domain, with plain Rust bounds — `I::Value: Add<Output = I::Value>`
+  (kirin-arith), `I::Value: BranchCondition` (kirin-cf), `I::Value:
+  ForLoopValue` (kirin-scf);
+- error lifting — `I::Error: From<DivisionByZero>`.
+
+Because the impl is generic over the value domain, **one transfer rule serves
+both execution and analysis**: `kirin-arith`'s `Add` rule computes `3 + 5`
+under `ConcreteInterpreter<.., i64, ..>` and folds `Const(3) + Const(5)`
+under constant propagation, with no analysis-specific code in the dialect.
+
+`ForwardEvalInterp` is the **forward engine** trait: it requires `Env` and
+`Kind = ForwardEval`, and exposes the SSA read/write helpers as **default
+methods**, hiding environment indices and locations: `interp.read(ssa)`,
+`interp.write(result, value)`, `interp.read_many(&values)`,
+`interp.write_results(&results, product)`. They delegate to the engine's [`Env`]
+storage access (`env_read`/`env_write`) at the engine's current activation
+(`interp.index()`). A structured dialect calls its own dispatch capability
+(e.g. `interp.scf_if_frame(..)`) to build the frame it pushes (see SCF below). A
+future liveness engine trait can choose its own helper API and effect without
+adding variants to `ForwardEffect`.
+
+### `ForwardEffect` — the forward control algebra
+
+This is the `Effect` for the *forward* mode (`ForwardEvalInterp::Effect`). It is **one
+algebra among potential several**: a future analysis defines its own `I::Effect`
+rather than adding variants here.
+
+```rust
+pub enum ForwardEffect<V, F> {
+    Next,                                          // atomic statement done
+    Jump(Edge<V>),                                 // decided CFG transfer
+    Branch(Vec<Edge<V>>),                          // undecided CFG transfer
+    Call(CallEffect<V>),                           // function invocation (resolved by the linker)
+    Yield(Product<V>),                             // terminate the innermost body block
+    Return(Product<V>),                            // return from the enclosing function
+    Push { frame: F, results: Product<SSAValue> }, // run a dialect-owned frame; bind its finish values
+}
+```
+
+`F` is the engine's total frame type. The frame-free variants don't name it, so
+ordinary dialects never see it; only a dialect whose operations own structured
+traversal builds `Push` (naming the frame via `ForwardEvalInterp::Frame`). The pushed
+`frame` is whatever traversal the dialect decided on — there is no framework-owned
+"scope", and no framework "explore alternatives" effect (a dialect frame that
+needs to explore several bodies pushes them one at a time and joins itself).
+
+`Branch` encodes the concrete/abstract split *in the value domain* for cf-style
+CFG transfers: a dialect asks the value (`BranchCondition::is_truthy() ->
+Option<bool>`) and emits `Jump` when decided, `Branch` when not. Concrete engines
+reject `Branch` (`IndeterminateBranch`); the abstract CFG frame explores every
+edge and joins. Control dialects pass the same `Option<bool>` to their own frame
+(see SCF below). Dialects therefore have exactly one `Interpretable` impl and no
+knowledge of which engine is running.
+
+### Structured control flow — dialect-owned frames
+
+The framework has no "scope" type. A dialect whose operation owns structured
+traversal builds a **frame it owns** (per-engine, through a small dialect
+dispatch capability) and returns it as `ForwardEffect::Push { frame, results }`.
+SCF has two such operations:
+
+- **`scf.if`** → `kirin_scf::ScfIfFrame` (concrete) / `AbstractScfIfFrame`
+  (abstract), built via `ScfIfDispatch::scf_if_frame(.., decided)`. The rule
+  reads the condition value and hands the `Option<bool>` decision to the frame;
+  the **frame** picks the arm (concrete; undecided is `IndeterminateBranch`) or
+  explores both arms and **joins** their finish results (abstract). It walks each
+  arm by pushing the framework `BodyFrame`/`AbstractBlockFrame` building block.
+
+- **`scf.for`** → `ScfForFrame` / `AbstractScfForFrame`, built via
+  `ScfForDispatch`. The frame pushes a body frame each iteration, advances the
+  induction variable on each yield, and decides repeat/finish in the value
+  domain. The **loop-carried fixpoint lives in the abstract loop frame**: it
+  joins (then widens) the entry state across iterations until stable,
+  accumulating finish values across exits — so `scf.for` over a lattice
+  converges, with no framework "scope hook".
+
+The framework `BodyFrame`/`AbstractBlockFrame` (single-block body walkers,
+completing on `Yield`) are reusable **building blocks**, not framework-owned
+structured semantics: the SCF frames build them to walk a chosen body, but the
+structured *decision* and result binding stay in the SCF frame. A language that
+uses SCF composes a total frame type embedding the standard frames plus
+`ScfIfFrame`/`ScfForFrame` (via `BuildScfIf`/`BuildScfFor` and the abstract
+equivalents); see `example/toy-lang`'s `ToyFrame`/`ToyAbstractFrame`. Future
+structured dialects would follow the same pattern; only the existing SCF
+operations are implemented.
+
+### `FunctionEntry<I>` — callable statements
+
+```rust
+pub trait FunctionEntry<I: Interp>: Dialect {
+    fn function_entry(&self, args: Product<I::Value>, interp: &mut I)
+        -> Result<FunctionBody<I::Value>, I::Error>;
+}
+```
+
+Like `Interpretable`, it receives the engine `interp` directly (function entry is
+forward-only, so there is no `Kind` parameter).
+
+Statements that define function bodies (e.g. `kirin_function::Function`)
+return the `FunctionBody { region, args }` to enter on invocation (the
+function-call entry descriptor — not a structured-control abstraction). On
+language enums it is derived; `#[callable]` marks the variants that forward, all
+others report `NotCallable`.
+
+## Compiler-author surface
+
+Everything is exported from `kirin_interpreter::engine`. Compiler authors
+usually write zero framework-trait impls:
+
+1. **Language enums** — the same `#[wraps]` enums used for parsing/printing,
+   with `Interpretable` (and `FunctionEntry` + `#[callable]`) added to the
+   derive list.
+2. **Stage enum** — add `#[derive(InterpDispatch)]` next to `StageMeta` and
+   `ParseDispatch`. Single-language pipelines (`Pipeline<StageInfo<L>>`) get a
+   blanket impl.
+3. **Value and error types** — plain Rust: a value type with the operator
+   impls the dialects need, an error enum with `From` impls for
+   `InterpreterError` and the dialect errors in use.
+4. **Engine + linker** — components selected by value:
+
+```rust
+let mut interp = ConcreteInterpreter::<Stage, i64, ToyError>::new(&pipeline)
+    .with_linker(CrossStageLinker);
+let result = expect_single(interp.call_by_name("source", "main", [3, 5])?)?;
+
+let mut analysis = ConstProp::<Stage, ToyError>::new(&pipeline)
+    .with_linker(CrossStageLinker);
+let value = expect_single(analysis.analyze_by_name("source", "abs", [Const(7)])?)?;
+```
+
+### Linkers: calling conventions as components
+
+```rust
+pub trait Linker<S: StageMeta> {
+    fn resolve(&self, pipeline: &Pipeline<S>, caller_stage: CompileStage, callee: &Callee)
+        -> Result<FunctionTarget, InterpreterError>;
+}
+```
+
+A linker resolves `Callee::{Named, Function, Staged, Specialized}` to a
+`(stage, specialization, body)` target. It is a *field of the engine*, never
+a trait the user implements on the engine type — this is a deliberate
+coherence rule: policies must be swappable without newtype-cloning a driver.
+
+- `SameStageLinker` (default): resolve within the caller's stage.
+- `CrossStageLinker`: prefer a live specialization at the caller's stage,
+  otherwise any stage that has one.
+
+Because the linker is shared by all engines, cross-language *analysis* is the
+same one-line choice as cross-language *execution*: the abstract engine calls
+the linker at `ForwardEffect::Call`, and the analysis lattice flows through
+`Product<V>` function summaries regardless of which language the callee
+belongs to.
+
+## Engines
+
+### `ConcreteInterpreter<'ir, S, V, E, Lk, F = StandardFrame<V, E>>`
+
+A generic **frame-stack driver**: it pops the top frame, calls `Frame::step`,
+and applies the returned `FrameEffect` (`Continue` / `Push` / `Done` /
+`Complete`) — it owns *no* traversal logic itself. Traversal lives in the
+frames. The default total frame type `StandardFrame<V, E>` wraps the standard
+`BodyFrame` (walks a function-body region CFG, or a single body block that
+completes on `Yield` — `Jump` retargets it, `Return` completes it) and
+`CallFrame` (dispatch a callee, await its `Return`). The dialect-produced
+`ForwardEffect` is consumed by `BodyFrame`, which maps it to a `FrameEffect`
+(handling `Push` by pushing the carried frame). `StandardFrame` is
+structured-control-free; a custom `F`
+([Custom traversal and policies](#custom-traversal-and-policies)) adds dialect
+frames or replaces traversal without touching the engine.
+
+### `ForwardAbstractInterpreter<'ir, S, V, E, Lk, P = ContextInsensitive, F = StandardAbstractFrame<..>>`
+
+The **forward dataflow** engine — a lattice-based forward abstract interpreter,
+and one *specialization* of the shared framework in the forward direction (it sets
+`Effect = ForwardEffect` and `Kind = ForwardEval`, stores SSA activations via
+`Env`, and drives forward frames). The name
+`AbstractInterpreter` is reserved for the shared trait implemented by
+lattice-valued abstract engines. `ForwardAbstractInterpreter` is the current
+forward engine. A future `BackwardAbstractInterpreter` (liveness/backward
+dataflow) is a different specialization with its own context, fact store,
+effect/result, and frame-driver capability, reusing the same framework and also
+implementing `AbstractInterpreter`.
+
+Interprocedural fixpoint analyzer over a lattice `V: Widen + Lattice +
+HasBottom`. Reads of unbound SSA values are `bottom` (unreached). Like the
+concrete engine, it is a generic **frame-stack driver**: the total abstract
+frame type `F` (default `StandardAbstractFrame`) owns the traversal — CFG block
+worklist, branch exploration, scope fixpoints, and call summarization — and the
+engine just runs the stack (`run_frames`). A custom `F`
+([Custom traversal and policies](#custom-traversal-and-policies))
+customizes/observes abstract traversal without forking the engine. The
+*orthogonal* analysis policy `P` (`CallContext` for summary keys +
+`WideningStrategy` for join/widen, default `ContextInsensitive`) controls
+keying and merge; the interprocedural protocol (summary tables, caller
+recording) stays atomic in the engine. Three nested fixpoints, expressed as
+frames:
+
+- **CFG**: each function body region is a block worklist; block parameters
+  join across incoming edges and widen after `widen_after` visits — `cf`
+  back-edge loops converge.
+- **Pushed loop frames**: a dialect loop frame (e.g. `scf.for`'s
+  `AbstractScfForFrame`) re-runs its body with joined/widened entry arguments
+  until stable — `scf.for` loops converge. The fixpoint is the dialect frame's,
+  using the engine's `analysis_merge`.
+- **Functions**: each resolved call target is summarized under a key chosen by
+  the `CallContext` strategy (`ContextInsensitive` → `(stage, specialization)`), with an
+  entry/return `Product<V>` summary. Calls join arguments into the callee's
+  entry (enqueueing it on change) and read its current return summary
+  (`bottom` until it converges); return-summary changes re-enqueue recorded
+  callers — *including same-key (self-)recursion*, so a recursive function's
+  rising return propagates back to its own call site (without this, recursion
+  sees only the base case). Recursion converges by monotone iteration from
+  `bottom`.
+
+Analysis crates stay small: `kirin-constprop` is the `ConstPropValue` lattice, a
+`ConstPropContext` strategy (bounded arg-tuple context sensitivity), and
+`pub type ConstProp<..> = ForwardAbstractInterpreter<.., ConstPropValue, .., ConstPropContext>`
+— constant propagation is a forward dataflow / forward abstract-interpretation
+specialization.
+
+### Engine internals: stage dispatch and IR queries
+
+Two mechanisms keep engines generic over stage enums:
+
+- `InterpDispatch<C>` (derived) — monomorphic dispatch of statement
+  interpretation and function entry to each stage's language, mirroring
+  `ParseDispatch`. The engine builds its context and dispatch forwards it to the
+  matching `Interpretable`/`FunctionEntry` rule.
+- `StageQuery` — a bound bundle over kirin-ir's `StageDispatch`/`StageAction`
+  machinery for language-independent IR facts (block parameters, statement
+  order, region entry, specialization lookup, symbol resolution). Satisfied
+  automatically by any stage enum; used by engines and linkers internally.
+
+## Custom traversal and policies
+
+Both engines are frame-stack drivers over one **shared protocol**. Compiler
+authors can customize *how* an engine traverses (a custom frame type) or *how
+precisely* an abstract analysis summarizes (a custom policy `P`), without
+forking an engine. This is part of the compiler-author surface. The total frame
+type `F` is the engine's generic; it is named in `Interpretable<I, ForwardEval>`
+*only* by a structured dialect building `ForwardEffect::Push` (through
+`ForwardEvalInterp::Frame`) — ordinary dialects never mention it.
+
+### Shared protocol vs. forward frame drivers
+
+`Frame`, `FrameEngine`, `FrameEffect`, and `drive_frames` are **shared and
+direction-neutral** — they say nothing about a value domain or direction, so a
+future backward dataflow engine reuses them as-is. On top of that neutral protocol
+sit the **forward** frame-driver capability surfaces: `ForwardFrameDriver` is the
+forward-frame driver capability, and `ForwardDataflowFrameDriver` is the
+forward-dataflow frame-driver capability. They require `Env`, run `ForwardEffect`,
+bind block args, write forward results, and summarize forward calls.
+(`FrameDriver` and `AbstractFrameDriver` are retained as compatibility aliases
+for the two.) A future backward dataflow engine can define its own driver
+capability if these forward-frame operations are not the right fit.
+
+```rust
+pub enum FrameEffect<F, C> { Continue(F), Push { parent: F, child: F }, Done, Complete(C) }
+
+pub trait FrameEngine { type Error; }          // direction-neutral anchor (no value domain)
+impl<T: Interp> FrameEngine for T { type Error = <T as Interp>::Error; }
+
+pub trait Frame<I: FrameEngine>: Sized {       // implemented by the *total* frame enum
+    type Completion;
+    fn step(self, &mut I)        -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
+    fn resume_done(self, &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
+    fn resume(self, Self::Completion, &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
+}
+
+// The one shared, direction-neutral driver loop, used by every engine:
+pub fn drive_frames<I: FrameEngine, F: Frame<I>>(engine: &mut I, frames: &mut Vec<F>)
+    -> Result<F::Completion, I::Error>;
+
+// Forward-specific capability surface (alias: FrameDriver):
+pub trait ForwardFrameDriver: Env { /* env alloc/free, IR queries, dispatch, resolution */ }
+```
+
+`Frame` is anchored only on `FrameEngine` (a total `Error`), **not** on the
+forward value engine `Interp` — so the frame protocol is decoupled from forward
+value interpretation and reusable by other analyses. Every `Interp` is a
+`FrameEngine` by blanket impl. The engine owns a `Vec<F>` and calls
+`drive_frames`, which pops the top frame, `step`s it, and applies the returned
+`FrameEffect`. `ForwardFrameDriver: Env` is the richer **forward** capability
+surface the *forward* frames call (it requires `Env` because the default
+`bind_block_args`/`write_results` use `env_write`); **both forward engines implement
+it**. The concrete and
+abstract standard frames are two *implementations* of this one protocol — not
+parallel frameworks.
+
+### Concrete frames — `BodyFrame` / `CallFrame` / `StandardFrame`
+
+`ConcreteInterpreter` is generic over the total frame type `F` (default
+`StandardFrame`). A custom enum reuses the standard `BodyFrame`/`CallFrame`
+single-path traversal through `FrameBuild` (`from_body`/`from_call`) and their
+`*_into` delegating methods, adds dialect frames / observation, and instantiates
+the engine with that `F`. (Examples: `example/toy-lang`'s `ToyFrame`, which adds
+`kirin_scf`'s `ScfIfFrame`/`ScfForFrame` via `BuildScfIf`/`BuildScfFor`; and a
+`TracingFrame` counting call/body visitation while running the real program — see
+`example/toy-lang`'s `interpreter::tests::advanced`.)
+
+### Abstract frames — `StandardAbstractFrame` / `AbstractFrameBuild` / `ForwardDataflowFrameDriver`
+
+`ForwardAbstractInterpreter` is symmetrically generic over a total abstract frame type
+`F` (default `StandardAbstractFrame`). The standard abstract frames
+(`AbstractFunctionFrame`, `AbstractCfgFrame`, `AbstractBlockFrame`,
+`AbstractCallFrame`) implement the *same*
+`Frame` protocol, but their traversal is the abstract one: a CFG block worklist
+that joins/widens at merge points, `Branch` exploration, single-block
+body walks that complete on `Yield`, and per-key call summarization. A custom
+enum reuses them through `AbstractFrameBuild` and the `*_into` methods — exactly
+mirroring the concrete pattern (see `ToyAbstractFrame`, which adds
+`AbstractScfIfFrame`/`AbstractScfForFrame`, and `TracingAbstractFrame` in the
+same test module).
+
+Abstract frames need a few capabilities beyond `ForwardFrameDriver`, on
+`ForwardDataflowFrameDriver: ForwardFrameDriver` (alias: `AbstractFrameDriver`) —
+`analysis_merge`, `contribute_return`, and
+`summarize_call`. The interprocedural protocol stays **atomic in the engine**:
+`summarize_call` performs resolve → key → join-into-callee-entry → record-caller
+(*including same-key recursion*) → read-return-summary in one step, so a custom
+frame chooses *what to traverse* but cannot reorder the summary protocol and
+break soundness.
+
+### Abstract policies — `CallContext` and `WideningStrategy`
+
+`ForwardAbstractInterpreter` is generic over an analysis parameter `P` providing two decisions:
+
+```rust
+pub trait CallContext<V>     { type Key: Eq + Hash + Clone;
+                               fn key(&mut self, stage, function, args: &Product<V>) -> Self::Key; }
+pub trait WideningStrategy<V> { fn merge(&self, current, incoming, visits) -> Result<Product<V>, _>; }
+```
+
+`ContextInsensitive` keys by `(stage, specialization)` — every call site of a
+function shares one summary — and joins-then-widens after `widen_after` visits.
+`kirin-constprop`'s
+`ConstPropContext` keys distinct fully-constant argument tuples to distinct
+summaries — bounded by a per-function budget, with overflow and non-constant
+arguments collapsing to one shared `Unknown` context (joined → sound `Top`).
+That is what makes recursive constant propagation precise on both linear
+recursion (`factorial(Const(5)) → Const(120)`) and overlapping-subproblem
+recursion, where per-constant summaries memoize each call so the analysis stays
+precise *and* non-explosive (`fib(Const(10)) → Const(55)`) — while still sound
+and terminating on unknown inputs (both fold to `Top`). Runnable as
+`example/toy-lang/programs/{factorial,fibonacci}.kirin`.
+
+## Design rules
+
+1. **Dialects are engine-blind.** Undecidedness is expressed by the value
+   domain (`is_truthy`/`loop_condition` returning `None`); for cf it surfaces as
+   `ForwardEffect::Branch`, for control dialects it is handed to the dialect's own
+   frame. One `Interpretable` impl serves every engine; a control dialect's
+   *frames* may have separate concrete/abstract forms, built per-engine through a
+   dialect dispatch trait.
+2. **Policy is a component, not an impl.** Anything a compiler author might
+   swap (linkers, widening thresholds) is a value passed to the engine.
+   Blanket impls on engine types are forbidden as extension points because
+   coherence makes them unoverridable.
+3. **Fixpoints live in engines.** Dialects contribute one-step transfer
+   relations; joins, widening, summaries, and convergence are engine code.
+4. **Derives are named after traits.** A new derive name is a new concept;
+   only introduce one alongside a trait of the same name.
+
+## Status and deferred work
+
+- Both engines are frame-parametric over the shared, direction-neutral
+  `FrameEngine`/`Frame`/`drive_frames` protocol: `ConcreteInterpreter<.., F>`
+  (default `StandardFrame`) and `ForwardAbstractInterpreter<.., P, F>`
+  (default `StandardAbstractFrame`). Abstract explore/join/summarize lives in dedicated
+  abstract frames reused via `AbstractFrameBuild`; there is no longer an un-framed
+  abstract worklist. `Frame` is anchored on `FrameEngine` (a total error), not on
+  `Interp`, so the protocol is reusable beyond forward value interpretation.
+- The per-statement effect is the associated type `I::Effect`, **per analysis**
+  — forward execution/abstract interpretation use the `ForwardEval` semantics
+  whose `Effect` is `ForwardEffect`. A future analysis (e.g. backward liveness)
+  adds a `BackwardLiveness` `Kind` marker and writes `impl Interpretable<I,
+  BackwardLiveness>`, with its **own** engine trait, its **own** `Effect` algebra
+  and its own liveness-specific helpers (e.g. `live_after`/`use_def`/`transfer`)
+  instead of the forward read/write helpers. It also chooses its own fact store
+  and its own backward frames through `Frame`/`drive_frames`. The target shape is:
+  `BackwardAbstractInterpreter: Interp + AbstractInterpreter` with
+  `Kind = BackwardLiveness`, `Value = LiveSet`, program-point facts such as
+  `live_before`/`live_after`/`block_in`/`block_out`, and a backward effect/result
+  algebra that is not forced into `ForwardEffect`. Because the `Kind` parameter
+  distinguishes impls, a dialect can carry both its forward and backward rules at
+  once.
+  Implementing such an analysis is deliberately **out of scope** here; this pass
+  only prepares the framework seam. A compile-time readiness proof lives in
+  `kirin-interpreter::dispatch::tests`.
+- Function-summary context sensitivity is a pluggable `CallContext` strategy.
+  `ContextInsensitive` is the context-insensitive baseline; `ConstPropContext` provides bounded
+  arg-tuple keys (precise recursion; sound, terminating cap to `Unknown`).
+  Unbounded call-string (k-CFA) policies remain future work — another
+  `CallContext` impl, no engine change.
+- First-class function values (`Lambda`/`Bind` as values, `Callee` from an
+  SSA value) are not yet supported by either engine.

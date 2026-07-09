@@ -1,0 +1,20 @@
+stage @source fn @fib(i64) -> i64;
+
+specialize @source fn @fib(i64) -> i64 {
+  ^entry(%n: i64) {
+    %one = constant 1 -> i64;
+    %is_base = le %n, %one -> i64;
+    %result = if %is_base then ^base() {
+      yield %n;
+    } else ^rec() {
+      %two = constant 2 -> i64;
+      %n1 = sub %n, %one -> i64;
+      %n2 = sub %n, %two -> i64;
+      %a = call.named @fib(%n1) -> i64;
+      %b = call.named @fib(%n2) -> i64;
+      %sum = add %a, %b -> i64;
+      yield %sum;
+    } -> i64;
+    ret %result;
+  }
+}

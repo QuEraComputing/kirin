@@ -1,528 +1,472 @@
-//! Frame-based semantics for the new interpreter framework.
+//! Interpretation for structured control flow.
 //!
-//! This module keeps SCF traversal policy inside SCF-owned frame types while
-//! leaving interpreter-specific scheduling decisions behind small dispatch
-//! traits. `scf.if` and `scf.for` both execute single-block bodies by asking
-//! the interpreter to create a block frame through [`ScfBlockDispatch`]. When a
-//! branch condition is indeterminate, concrete interpreters report
-//! [`InterpreterError::IndeterminateBranch`], while abstract interpreters may
-//! choose a conservative summary or a more precise traversal strategy.
+//! SCF traversal is **dialect-local**: the framework owns no "scope" concept.
+//! Each structured `scf` operation owns its traversal in an SCF frame, built
+//! per-engine through a small dispatch capability and pushed with
+//! [`ForwardEffect::Push`]:
 //!
-//! The standard `scf.for` frame keeps its phase enum private. For custom
-//! abstract interpreters that need to handle an indeterminate loop condition,
-//! [`ForContinuation`] exposes the precise resumable loop state without making
-//! the entire frame state machine public.
+//! - `scf.if` -> [`ScfIfFrame`] (concrete) / [`AbstractScfIfFrame`] (abstract),
+//!   via [`ScfIfDispatch`]. The frame chooses the arm (concrete) or explores
+//!   both arms and joins their results (abstract).
+//! - `scf.for` -> [`ScfForFrame`] / [`AbstractScfForFrame`], via [`ScfForDispatch`].
+//!
+//! Both reuse the framework's generic [`BodyFrame`]/[`AbstractBlockFrame`] to
+//! *walk* a chosen body block — those are reusable building blocks, not
+//! framework-owned structured semantics — but the structured *decision* and
+//! result binding are owned by the SCF frame. A language that uses `scf`
+//! composes a total frame type embedding these via [`BuildScfIf`]/[`BuildScfFor`]
+//! (and the abstract equivalents [`BuildAbstractScfIf`]/[`BuildAbstractScfFor`]).
 
+use std::collections::VecDeque;
 use std::marker::PhantomData;
 
-use kirin::ir::Product;
-use kirin::prelude::{Block, CompileTimeValue, Dialect, HasStageInfo, ResultValue, SSAValue};
+use kirin::prelude::{Block, CompileStage, CompileTimeValue, HasBottom, Product, SSAValue};
+use kirin_interpreter::dialect::{
+    BranchCondition, ForwardEffect, ForwardEval, ForwardEvalInterp, Interpretable, InterpreterError,
+};
 use kirin_interpreter::{
-    AbstractInterpreterWithStore, AbstractValue, BlockFrame, BlockTransfer, BranchCondition,
-    ConcreteBlockTransfer, ConcreteInterpreter, Env, EnvIndex, FixpointProfile, Frame, FrameEffect,
-    HasLocation, Interpretable, InterpreterError, InterpreterProfile, Location, ProjectOrSelf,
-    StandardFixpointInterpreter, StandardFrame, StatementEffect, Summary, SummaryDependency,
-    SummaryDependencyIndex, SummaryEffect,
+    AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BodyFrame,
+    CallContext, Completion, ConcreteInterpreter, EnvIndex, ForwardAbstractInterpreter, FrameBuild,
+    FrameDriver, FrameEffect,
 };
 
 use crate::{For, ForLoopValue, If, Yield};
 
-type IfFrameMarker<L, T, V, X> = PhantomData<fn() -> (L, T, V, X)>;
-type ForFrameMarker<L, T, X> = PhantomData<fn() -> (L, T, X)>;
+// ===========================================================================
+// scf.if — push a dialect-owned if frame
+// ===========================================================================
 
-pub trait ScfBlockDispatch<L: Dialect, F, E, V, T> {
-    fn dispatch_scf_block(
-        &mut self,
-        _location: Location,
-        block: Block,
-        env: EnvIndex,
-        args: Product<V>,
-    ) -> Result<F, E>;
+impl<I, T> Interpretable<I, ForwardEval> for If<T>
+where
+    I: ForwardEvalInterp + ScfIfDispatch,
+    I::Value: BranchCondition,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let stage = interp.stage();
+        let index = interp.index();
+        let results: Product<SSAValue> = self.results.iter().copied().map(Into::into).collect();
+        // The decision is value-domain (decided concretely, undecided as `None`
+        // under abstract interpretation); the SCF if frame owns what to do with
+        // it — pick an arm or explore both and join.
+        let decided = interp.read(self.condition)?.is_truthy();
+        let frame = interp.scf_if_frame(stage, index, self.then_body, self.else_body, decided)?;
+        Ok(ForwardEffect::Push { frame, results })
+    }
 }
 
-pub trait ScfIfDispatch<L: Dialect, F, C, E, V> {
-    fn dispatch_indeterminate_if(
+// ===========================================================================
+// scf.for — push a dialect-owned loop frame
+// ===========================================================================
+
+impl<I, T> Interpretable<I, ForwardEval> for For<T>
+where
+    I: ForwardEvalInterp + ScfForDispatch,
+    I::Value: ForLoopValue + Clone + 'static,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let stage = interp.stage();
+        let index = interp.index();
+        let induction = interp.read(self.start)?;
+        let carried = interp.read_many(self.init_args.as_slice())?;
+        let results: Product<SSAValue> = self.results.iter().copied().map(Into::into).collect();
+        let frame = interp.scf_for_frame(
+            stage,
+            index,
+            self.body,
+            induction,
+            self.end,
+            self.step,
+            carried,
+            self.results.len(),
+        )?;
+        Ok(ForwardEffect::Push { frame, results })
+    }
+}
+
+impl<I, T> Interpretable<I, ForwardEval> for Yield<T>
+where
+    I: ForwardEvalInterp,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        Ok(ForwardEffect::Yield(
+            interp.read_many(self.values.as_slice())?,
+        ))
+    }
+}
+
+// ===========================================================================
+// Per-engine construction of the loop frame (the minimal "push a dialect frame"
+// dispatch). Concrete and abstract engines build their own loop frame, so the
+// `For` rule stays engine-blind.
+// ===========================================================================
+
+/// Capability the `scf.for` rule uses to obtain this engine's loop frame.
+pub trait ScfForDispatch: ForwardEvalInterp {
+    #[allow(clippy::too_many_arguments)]
+    fn scf_for_frame(
         &mut self,
-        _location: Location,
+        stage: CompileStage,
+        env: EnvIndex,
+        body: Block,
+        induction: Self::Value,
+        end: SSAValue,
+        step: SSAValue,
+        carried: Product<Self::Value>,
+        results_arity: usize,
+    ) -> Result<Self::Frame, Self::Error>;
+}
+
+/// Embed the concrete [`ScfForFrame`] into a language's total frame type.
+pub trait BuildScfFor<V, E>: Sized {
+    fn scf_for(frame: ScfForFrame<V, E>) -> Self;
+}
+
+/// Embed the abstract [`AbstractScfForFrame`] into a language's total abstract
+/// frame type.
+pub trait BuildAbstractScfFor<V, E, K>: Sized {
+    fn scf_for(frame: AbstractScfForFrame<V, E, K>) -> Self;
+}
+
+impl<'ir, S, V, E, Lk, F> ScfForDispatch for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: kirin::prelude::StageMeta,
+    V: Clone + ForLoopValue + 'static,
+    E: From<InterpreterError>,
+    F: FrameBuild<V, E> + BuildScfFor<V, E>,
+{
+    fn scf_for_frame(
+        &mut self,
+        stage: CompileStage,
+        env: EnvIndex,
+        body: Block,
+        induction: V,
+        end: SSAValue,
+        step: SSAValue,
+        carried: Product<V>,
+        _results_arity: usize,
+    ) -> Result<F, E> {
+        Ok(F::scf_for(ScfForFrame::new(
+            stage, env, body, induction, end, step, carried,
+        )))
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F> ScfForDispatch for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
+where
+    S: kirin::prelude::StageMeta,
+    V: Clone + PartialEq + ForLoopValue + HasBottom,
+    E: From<InterpreterError>,
+    P: CallContext<V>,
+    F: AbstractFrameBuild<V, E, <P as CallContext<V>>::Key>
+        + BuildAbstractScfFor<V, E, <P as CallContext<V>>::Key>,
+{
+    fn scf_for_frame(
+        &mut self,
+        stage: CompileStage,
+        env: EnvIndex,
+        body: Block,
+        induction: V,
+        end: SSAValue,
+        step: SSAValue,
+        carried: Product<V>,
+        _results_arity: usize,
+    ) -> Result<F, E> {
+        Ok(F::scf_for(AbstractScfForFrame::new(
+            stage, env, body, induction, end, step, carried,
+        )))
+    }
+}
+
+// ===========================================================================
+// Per-engine construction of the if frame (mirrors the loop dispatch).
+// ===========================================================================
+
+/// Capability the `scf.if` rule uses to obtain this engine's if frame.
+pub trait ScfIfDispatch: ForwardEvalInterp {
+    fn scf_if_frame(
+        &mut self,
+        stage: CompileStage,
         env: EnvIndex,
         then_body: Block,
         else_body: Block,
-        results: Vec<ResultValue>,
-    ) -> Result<FrameEffect<F, C>, E>;
+        decided: Option<bool>,
+    ) -> Result<Self::Frame, Self::Error>;
 }
 
-pub trait ScfForDispatch<L: Dialect, T: CompileTimeValue, F, C, E, V, X> {
-    fn dispatch_indeterminate_for(
-        &mut self,
-        continuation: ForContinuation<L, T, V, X>,
-    ) -> Result<FrameEffect<F, C>, E>;
+/// Embed the concrete [`ScfIfFrame`] into a language's total frame type.
+pub trait BuildScfIf<V, E>: Sized {
+    fn scf_if(frame: ScfIfFrame<V, E>) -> Self;
 }
 
-pub trait ScfForFixpointSummary<L: Dialect, T: CompileTimeValue, V, X, K>: Summary
+/// Embed the abstract [`AbstractScfIfFrame`] into a language's total abstract
+/// frame type.
+pub trait BuildAbstractScfIf<V, E, K>: Sized {
+    fn scf_if(frame: AbstractScfIfFrame<V, E, K>) -> Self;
+}
+
+impl<'ir, S, V, E, Lk, F> ScfIfDispatch for ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
-    X: BlockTransfer<Value = V>,
-{
-    fn scf_for_owner(continuation: &ForContinuation<L, T, V, X>) -> Option<K>;
-
-    fn scf_for_initial_summary(continuation: &ForContinuation<L, T, V, X>) -> Self;
-
-    fn scf_for_results(&self) -> Option<Product<V>>;
-}
-
-impl<'ir, P, L, F, E, V, T> ScfBlockDispatch<L, F, E, V, T> for ConcreteInterpreter<'ir, P>
-where
-    P: InterpreterProfile,
-    P::Stage: HasStageInfo<L>,
-    L: Dialect,
-    F: TryFrom<StandardFrame<L, V, T>>,
-    E: From<<F as TryFrom<StandardFrame<L, V, T>>>::Error>,
+    S: kirin::prelude::StageMeta,
     V: Clone,
+    E: From<InterpreterError>,
+    F: FrameBuild<V, E> + BuildScfIf<V, E>,
 {
-    fn dispatch_scf_block(
+    fn scf_if_frame(
         &mut self,
-        location: Location,
-        block: Block,
+        stage: CompileStage,
         env: EnvIndex,
-        args: Product<V>,
+        then_body: Block,
+        else_body: Block,
+        decided: Option<bool>,
     ) -> Result<F, E> {
-        StandardFrame::Block(BlockFrame::<L, V, T>::new(location.stage, block, env, args))
-            .try_into()
-            .map_err(E::from)
+        Ok(F::scf_if(ScfIfFrame::new(
+            stage, env, then_body, else_body, decided,
+        )))
     }
 }
 
-impl<'ir, P, L, F, C, E, V> ScfIfDispatch<L, F, C, E, V> for ConcreteInterpreter<'ir, P>
+impl<'ir, S, V, E, Lk, P, F> ScfIfDispatch for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
 where
-    P: InterpreterProfile,
-    L: Dialect,
+    S: kirin::prelude::StageMeta,
+    V: Clone + PartialEq + HasBottom,
     E: From<InterpreterError>,
+    P: CallContext<V>,
+    F: AbstractFrameBuild<V, E, <P as CallContext<V>>::Key>
+        + BuildAbstractScfIf<V, E, <P as CallContext<V>>::Key>,
 {
-    fn dispatch_indeterminate_if(
+    fn scf_if_frame(
         &mut self,
-        _location: Location,
-        _env: EnvIndex,
-        _then_body: Block,
-        _else_body: Block,
-        _results: Vec<ResultValue>,
-    ) -> Result<FrameEffect<F, C>, E> {
-        Err(E::from(InterpreterError::IndeterminateBranch))
-    }
-}
-
-impl<'ir, P, L, T, F, C, E, V, X> ScfForDispatch<L, T, F, C, E, V, X>
-    for ConcreteInterpreter<'ir, P>
-where
-    P: InterpreterProfile,
-    L: Dialect,
-    T: CompileTimeValue,
-    E: From<InterpreterError>,
-    X: BlockTransfer<Value = V>,
-{
-    fn dispatch_indeterminate_for(
-        &mut self,
-        _continuation: ForContinuation<L, T, V, X>,
-    ) -> Result<FrameEffect<F, C>, E> {
-        Err(E::from(InterpreterError::IndeterminateBranch))
-    }
-}
-
-impl<'ir, P, L, F, V, T, Store> ScfBlockDispatch<L, F, P::Error, V, T>
-    for AbstractInterpreterWithStore<'ir, P, Store>
-where
-    P: InterpreterProfile,
-    P::Stage: HasStageInfo<L>,
-    L: Dialect,
-    F: TryFrom<StandardFrame<L, V, T>>,
-    P::Error: From<<F as TryFrom<StandardFrame<L, V, T>>>::Error>,
-    V: Clone,
-{
-    fn dispatch_scf_block(
-        &mut self,
-        location: Location,
-        block: Block,
+        stage: CompileStage,
         env: EnvIndex,
-        args: Product<V>,
-    ) -> Result<F, P::Error> {
-        StandardFrame::Block(BlockFrame::<L, V, T>::new(location.stage, block, env, args))
-            .try_into()
-            .map_err(P::Error::from)
+        then_body: Block,
+        else_body: Block,
+        decided: Option<bool>,
+    ) -> Result<F, E> {
+        Ok(F::scf_if(AbstractScfIfFrame::new(
+            stage, env, then_body, else_body, decided,
+        )))
     }
 }
 
-impl<'ir, P, L, T, F, C, X, Store> ScfForDispatch<L, T, F, C, P::Error, P::Value, X>
-    for AbstractInterpreterWithStore<'ir, P, Store>
-where
-    P: InterpreterProfile,
-    P::Stage: HasStageInfo<L>,
-    L: Dialect,
-    T: CompileTimeValue,
-    Store: Env<P::Value>,
-    P::Error: From<InterpreterError> + From<Store::Error>,
-    P::Value: AbstractValue,
-    X: BlockTransfer<Value = P::Value>,
-{
-    fn dispatch_indeterminate_for(
-        &mut self,
-        continuation: ForContinuation<L, T, P::Value, X>,
-    ) -> Result<FrameEffect<F, C>, P::Error> {
-        let values = continuation
-            .results
-            .iter()
-            .map(|_| <P::Value as kirin::prelude::HasTop>::top())
-            .collect::<Product<_>>();
-        write_results(
-            self,
-            continuation.env,
-            continuation.results.as_slice(),
-            values,
-        )?;
-        Ok(FrameEffect::Done)
-    }
-}
+// ===========================================================================
+// Concrete if frame: pick the decided arm, relay its completion.
+// ===========================================================================
 
-impl<'ir, P, L, F, V, T, Store, Deps> ScfBlockDispatch<L, F, P::Error, V, T>
-    for StandardFixpointInterpreter<'ir, P, Store, Deps>
-where
-    P: FixpointProfile,
-    P::Stage: HasStageInfo<L>,
-    L: Dialect,
-    F: TryFrom<StandardFrame<L, V, T>>,
-    P::Error: From<<F as TryFrom<StandardFrame<L, V, T>>>::Error>,
-    V: Clone,
-{
-    fn dispatch_scf_block(
-        &mut self,
-        location: Location,
-        block: Block,
-        env: EnvIndex,
-        args: Product<V>,
-    ) -> Result<F, P::Error> {
-        StandardFrame::Block(BlockFrame::<L, V, T>::new(location.stage, block, env, args))
-            .try_into()
-            .map_err(P::Error::from)
-    }
-}
-
-impl<'ir, P, L, T, F, C, X, Store, Deps> ScfForDispatch<L, T, F, C, P::Error, P::Value, X>
-    for StandardFixpointInterpreter<'ir, P, Store, Deps>
-where
-    P: FixpointProfile,
-    P::Stage: HasStageInfo<L>,
-    L: Dialect,
-    T: CompileTimeValue,
-    P::Summary: ScfForFixpointSummary<L, T, P::Value, X, P::SummaryKey>,
-    Store: Env<P::Value>,
-    Deps: SummaryDependencyIndex<P::SummaryKey>,
-    P::Error: From<InterpreterError> + From<<Store as Env<P::Value>>::Error> + From<Deps::Error>,
-    P::Value: AbstractValue,
-    X: BlockTransfer<Value = P::Value>,
-{
-    fn dispatch_indeterminate_for(
-        &mut self,
-        continuation: ForContinuation<L, T, P::Value, X>,
-    ) -> Result<FrameEffect<F, C>, P::Error> {
-        if let Some(owner) =
-            <P::Summary as ScfForFixpointSummary<L, T, P::Value, X, P::SummaryKey>>::scf_for_owner(
-                &continuation,
-            )
-        {
-            let initial = <P::Summary as ScfForFixpointSummary<L, T, P::Value, X, P::SummaryKey>>::scf_for_initial_summary(&continuation);
-            let values = self
-                .summary(&owner)
-                .and_then(<P::Summary as ScfForFixpointSummary<L, T, P::Value, X, P::SummaryKey>>::scf_for_results)
-                .or_else(|| <P::Summary as ScfForFixpointSummary<L, T, P::Value, X, P::SummaryKey>>::scf_for_results(&initial))
-                .unwrap_or_else(|| {
-                    continuation
-                        .results
-                        .iter()
-                        .map(|_| <P::Value as kirin::prelude::HasTop>::top())
-                        .collect::<Product<_>>()
-                });
-
-            if let Some(current_owner) = self.current_owner().cloned() {
-                self.dependency_index_mut()
-                    .register(&owner, SummaryDependency::Reanalyze(current_owner))
-                    .map_err(P::Error::from)?;
-            }
-            self.push_summary_effect(SummaryEffect::Update {
-                owner,
-                candidate: initial,
-            });
-            write_results(
-                self,
-                continuation.env,
-                continuation.results.as_slice(),
-                values,
-            )?;
-            return Ok(FrameEffect::Done);
-        }
-
-        let values = continuation
-            .results
-            .iter()
-            .map(|_| <P::Value as kirin::prelude::HasTop>::top())
-            .collect::<Product<_>>();
-        write_results(
-            self,
-            continuation.env,
-            continuation.results.as_slice(),
-            values,
-        )?;
-        Ok(FrameEffect::Done)
-    }
-}
-
-impl<'ir, P, L, F, C, Store> ScfIfDispatch<L, F, C, P::Error, P::Value>
-    for AbstractInterpreterWithStore<'ir, P, Store>
-where
-    P: InterpreterProfile,
-    P::Stage: HasStageInfo<L>,
-    L: Dialect,
-    Store: Env<P::Value>,
-    P::Error: From<InterpreterError> + From<Store::Error>,
-    P::Value: AbstractValue,
-{
-    fn dispatch_indeterminate_if(
-        &mut self,
-        _location: Location,
-        env: EnvIndex,
-        _then_body: Block,
-        _else_body: Block,
-        results: Vec<ResultValue>,
-    ) -> Result<FrameEffect<F, C>, P::Error> {
-        let values = results
-            .iter()
-            .map(|_| <P::Value as kirin::prelude::HasTop>::top())
-            .collect::<Product<_>>();
-        write_results(self, env, results.as_slice(), values)?;
-        Ok(FrameEffect::Done)
-    }
-}
-
-impl<'ir, P, L, F, C, Store, Deps> ScfIfDispatch<L, F, C, P::Error, P::Value>
-    for StandardFixpointInterpreter<'ir, P, Store, Deps>
-where
-    P: FixpointProfile,
-    P::Stage: HasStageInfo<L>,
-    L: Dialect,
-    Store: Env<P::Value>,
-    P::Error: From<InterpreterError> + From<<Store as Env<P::Value>>::Error>,
-    P::Value: AbstractValue,
-{
-    fn dispatch_indeterminate_if(
-        &mut self,
-        _location: Location,
-        env: EnvIndex,
-        _then_body: Block,
-        _else_body: Block,
-        results: Vec<ResultValue>,
-    ) -> Result<FrameEffect<F, C>, P::Error> {
-        let values = results
-            .iter()
-            .map(|_| <P::Value as kirin::prelude::HasTop>::top())
-            .collect::<Product<_>>();
-        write_results(self, env, results.as_slice(), values)?;
-        Ok(FrameEffect::Done)
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum ScfCompletion<V> {
-    Yield(Product<V>),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, HasLocation, Frame)]
-pub enum ScfFrame<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
-    If(IfFrame<L, T, V, X>),
-    For(ForFrame<L, T, V, X>),
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct IfFrame<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
-    pub location: Location,
-    pub env: EnvIndex,
-    condition: SSAValue,
+/// Concrete `scf.if` traversal: push the framework [`BodyFrame`] for the decided
+/// arm and relay its completion to the pusher. The structured *decision* (which
+/// arm) is owned here; an undecided condition is impossible under concrete
+/// execution (`IndeterminateBranch`).
+pub struct ScfIfFrame<V, E> {
+    stage: CompileStage,
+    env: EnvIndex,
     then_body: Block,
     else_body: Block,
-    results: Vec<ResultValue>,
-    phase: IfPhase,
-    _marker: IfFrameMarker<L, T, V, X>,
+    decided: Option<bool>,
+    _marker: PhantomData<fn() -> (V, E)>,
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-enum IfPhase {
-    Entry,
-    Active,
-}
-
-impl<L: Dialect, T: CompileTimeValue, V, X> IfFrame<L, T, V, X> {
-    fn new(location: Location, env: EnvIndex, op: &If<T>) -> Self {
+impl<V, E> ScfIfFrame<V, E>
+where
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    pub fn new(
+        stage: CompileStage,
+        env: EnvIndex,
+        then_body: Block,
+        else_body: Block,
+        decided: Option<bool>,
+    ) -> Self {
         Self {
-            location,
+            stage,
             env,
-            condition: op.condition,
-            then_body: op.then_body,
-            else_body: op.else_body,
-            results: op.results.clone(),
-            phase: IfPhase::Entry,
+            then_body,
+            else_body,
+            decided,
             _marker: PhantomData,
         }
     }
 
-    fn active(mut self) -> Self {
-        self.phase = IfPhase::Active;
-        self
+    pub fn step_into<I, F>(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
+    where
+        I: FrameDriver<Value = V, Error = E>,
+        F: FrameBuild<V, E> + BuildScfIf<V, E>,
+    {
+        let arm = match self.decided {
+            Some(true) => self.then_body,
+            Some(false) => self.else_body,
+            None => return Err(E::from(InterpreterError::IndeterminateBranch)),
+        };
+        let body = BodyFrame::block(self.stage, self.env, arm, Product::new());
+        Ok(FrameEffect::Push {
+            parent: F::scf_if(self),
+            child: F::from_body(body),
+        })
     }
 
-    fn into_scf_frame(self) -> ScfFrame<L, T, V, X> {
-        ScfFrame::If(self)
+    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, Completion<V>>, E> {
+        Err(E::from(InterpreterError::Custom(
+            "scf.if frame resumed without a body completion",
+        )))
+    }
+
+    pub fn resume_into<F>(
+        self,
+        completion: Completion<V>,
+    ) -> Result<FrameEffect<F, Completion<V>>, E> {
+        // Relay the chosen arm's completion (yield-finish or function return).
+        Ok(FrameEffect::Complete(completion))
     }
 }
 
-impl<L: Dialect, T: CompileTimeValue, V, X> HasLocation for IfFrame<L, T, V, X> {
-    fn location(&self) -> Location {
-        self.location
-    }
+// ===========================================================================
+// Abstract if frame: explore the live arm(s) and join their finish results.
+// ===========================================================================
+
+/// Abstract `scf.if` traversal: explore the decided arm, or — when the
+/// condition is undecided in the value domain — both arms, joining their finish
+/// results. The "both arms + join" structured behavior is owned here; the
+/// framework has no alternatives concept.
+pub struct AbstractScfIfFrame<V, E, K> {
+    stage: CompileStage,
+    env: EnvIndex,
+    remaining: VecDeque<Block>,
+    acc: Option<Product<V>>,
+    _marker: PhantomData<fn() -> (E, K)>,
 }
 
-impl<I, L, F, C, E, T, V, X> Frame<I, F, C, E> for IfFrame<L, T, V, X>
+impl<V, E, K> AbstractScfIfFrame<V, E, K>
 where
-    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V, X> + ScfIfDispatch<L, F, C, E, V>,
-    L: Dialect,
-    F: TryFrom<ScfFrame<L, T, V, X>>,
-    C: ProjectOrSelf<ScfCompletion<V>>,
-    E: From<InterpreterError> + From<<F as TryFrom<ScfFrame<L, T, V, X>>>::Error>,
-    T: CompileTimeValue,
-    V: BranchCondition,
-    X: BlockTransfer<Value = V>,
+    V: Clone + PartialEq,
+    E: From<InterpreterError>,
+    K: Clone + Eq + std::hash::Hash,
 {
-    fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        match self.phase {
-            IfPhase::Entry => {
-                let block = match interp.read(self.env, self.condition)?.is_truthy() {
-                    Some(true) => self.then_body,
-                    Some(false) => self.else_body,
-                    None => {
-                        return interp.dispatch_indeterminate_if(
-                            self.location,
-                            self.env,
-                            self.then_body,
-                            self.else_body,
-                            self.results,
-                        );
-                    }
-                };
-                let child =
-                    interp.dispatch_scf_block(self.location, block, self.env, Product::new())?;
+    pub fn new(
+        stage: CompileStage,
+        env: EnvIndex,
+        then_body: Block,
+        else_body: Block,
+        decided: Option<bool>,
+    ) -> Self {
+        let remaining = match decided {
+            Some(true) => vec![then_body],
+            Some(false) => vec![else_body],
+            None => vec![then_body, else_body],
+        };
+        Self {
+            stage,
+            env,
+            remaining: remaining.into(),
+            acc: None,
+            _marker: PhantomData,
+        }
+    }
+
+    fn join_acc<I>(&mut self, interp: &mut I, values: Product<V>) -> Result<(), E>
+    where
+        I: AbstractFrameDriver<Value = V, Error = E>,
+    {
+        let merged = match self.acc.take() {
+            None => values,
+            Some(current) => interp.analysis_merge(&current, &values, 0)?,
+        };
+        self.acc = Some(merged);
+        Ok(())
+    }
+
+    pub fn step_into<I, F>(
+        mut self,
+        _interp: &mut I,
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
+    where
+        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+        F: AbstractFrameBuild<V, E, K> + BuildAbstractScfIf<V, E, K>,
+    {
+        match self.remaining.pop_front() {
+            None => Ok(FrameEffect::Complete(AbstractCompletion::Finished(
+                self.acc,
+            ))),
+            Some(block) => {
+                let body = AbstractBlockFrame::new(self.stage, self.env, block, Product::new());
                 Ok(FrameEffect::Push {
-                    parent: self.active().into_scf_frame().try_into()?,
-                    child,
+                    parent: F::scf_if(self),
+                    child: F::from_block(body),
                 })
             }
-            IfPhase::Active => Err(E::from(InterpreterError::UnexpectedCompletion {
-                location: self.location,
-                completion: "active scf.if frame stepped",
-            })),
         }
     }
 
-    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        Err(E::from(InterpreterError::UnexpectedCompletion {
-            location: self.location,
-            completion: "scf.if body completed without scf.yield",
-        }))
+    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+        Err(E::from(InterpreterError::Custom(
+            "scf.if frame resumed without a body completion",
+        )))
     }
 
-    fn resume(self, completion: C, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        match completion.project_or_self() {
-            Ok(ScfCompletion::Yield(value)) => {
-                write_results(interp, self.env, self.results.as_slice(), value)?;
-                Ok(FrameEffect::Done)
+    pub fn resume_into<I, F>(
+        mut self,
+        completion: AbstractCompletion<V>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
+    where
+        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+        F: AbstractFrameBuild<V, E, K> + BuildAbstractScfIf<V, E, K>,
+    {
+        match completion {
+            AbstractCompletion::Finished(Some(values)) => {
+                self.join_acc(interp, values)?;
+                Ok(FrameEffect::Continue(F::scf_if(self)))
             }
-            Err(completion) => Ok(FrameEffect::Complete(completion)),
+            // This arm returned (no finish value): skip it, try the next.
+            AbstractCompletion::Finished(None) => Ok(FrameEffect::Continue(F::scf_if(self))),
+            AbstractCompletion::FunctionDone => Err(E::from(InterpreterError::Custom(
+                "scf.if frame resumed with a function completion",
+            ))),
         }
     }
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ForFrame<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
-    pub location: Location,
-    pub env: EnvIndex,
-    start: SSAValue,
+// ===========================================================================
+// Concrete loop frame: precise counted-loop traversal.
+// ===========================================================================
+
+/// Concrete `scf.for` traversal: re-push the body block while the induction
+/// variable satisfies the loop condition, advancing it by `step` each turn and
+/// carrying the yielded values forward. Loop policy lives here, not in the
+/// framework.
+pub struct ScfForFrame<V, E> {
+    stage: CompileStage,
+    env: EnvIndex,
+    body: Block,
+    induction: V,
     end: SSAValue,
     step: SSAValue,
-    init_args: Vec<SSAValue>,
-    body: Block,
-    results: Vec<ResultValue>,
-    phase: ForPhase<V>,
-    _marker: ForFrameMarker<L, T, X>,
+    carried: Product<V>,
+    _marker: PhantomData<fn() -> E>,
 }
 
-/// Public suspension point for an `scf.for` loop at an indeterminate condition.
-///
-/// A [`ForFrame`] normally checks `iv.loop_condition(&end)` to decide whether
-/// to exit or push the loop body. If that condition returns `None`, the frame
-/// cannot make a concrete choice. Instead, it passes a `ForContinuation` to
-/// [`ScfForDispatch::dispatch_indeterminate_for`].
-///
-/// The continuation contains both the static frame context (`location`, `env`,
-/// `body`, `results`, and original SSA slots) and the already-read runtime loop
-/// state (`iv`, `end`, `step`, and `carried`). This lets custom interpreters
-/// implement policies such as "write top and stop", "push the body once", or a
-/// loop-specific fixpoint strategy while still reusing the standard
-/// [`ForFrame`] resume logic.
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct ForContinuation<L: Dialect, T: CompileTimeValue, V, X = ConcreteBlockTransfer<V>> {
-    /// Program location of the `scf.for` operation.
-    pub location: Location,
-    /// Environment activation used by the loop body and loop results.
-    pub env: EnvIndex,
-    /// Original SSA slot for the loop start value.
-    pub start: SSAValue,
-    /// Original SSA slot for the loop end value.
-    pub end_value: SSAValue,
-    /// Original SSA slot for the loop step value.
-    pub step_value: SSAValue,
-    /// Original SSA slots for loop-carried initial values.
-    pub init_args: Vec<SSAValue>,
-    /// Single-block loop body.
-    pub body: Block,
-    /// Result slots of the `scf.for` operation.
-    pub results: Vec<ResultValue>,
-    /// Current induction variable value.
-    pub iv: V,
-    /// Already-read loop end value.
-    pub end: V,
-    /// Already-read loop step value.
-    pub step: V,
-    /// Current loop-carried values.
-    pub carried: Product<V>,
-    _marker: ForFrameMarker<L, T, X>,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-enum ForPhase<V> {
-    Entry,
-    Check {
-        iv: V,
-        end: V,
-        step: V,
+impl<V, E> ScfForFrame<V, E>
+where
+    V: Clone + ForLoopValue,
+    E: From<InterpreterError>,
+{
+    #[allow(clippy::too_many_arguments)]
+    pub fn new(
+        stage: CompileStage,
+        env: EnvIndex,
+        body: Block,
+        induction: V,
+        end: SSAValue,
+        step: SSAValue,
         carried: Product<V>,
-    },
-}
-
-impl<L: Dialect, T: CompileTimeValue, V, X> ForContinuation<L, T, V, X> {
-    fn new(frame: ForFrameParts<T>, iv: V, end: V, step: V, carried: Product<V>) -> Self {
+    ) -> Self {
         Self {
-            location: frame.location,
-            env: frame.env,
-            start: frame.start,
-            end_value: frame.end,
-            step_value: frame.step,
-            init_args: frame.init_args,
-            body: frame.body,
-            results: frame.results,
-            iv,
+            stage,
+            env,
+            body,
+            induction,
             end,
             step,
             carried,
@@ -530,301 +474,238 @@ impl<L: Dialect, T: CompileTimeValue, V, X> ForContinuation<L, T, V, X> {
         }
     }
 
-    /// Build the block arguments used when entering the loop body.
-    ///
-    /// SCF loop bodies receive the current induction variable followed by the
-    /// current loop-carried values. This helper keeps that calling convention
-    /// centralized so custom dispatch implementations do not duplicate it.
-    pub fn body_args(&self) -> Product<V>
+    pub fn step_into<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
     where
-        V: Clone,
+        I: FrameDriver<Value = V, Error = E>,
+        F: FrameBuild<V, E> + BuildScfFor<V, E>,
     {
-        loop_body_args(self.iv.clone(), self.carried.clone(), self.init_args.len())
+        let end = interp.env_read(self.env, self.end)?;
+        match self.induction.loop_condition(&end) {
+            Some(true) => {
+                let args: Product<V> = std::iter::once(self.induction.clone())
+                    .chain(self.carried.iter().cloned())
+                    .collect();
+                let body = BodyFrame::block(self.stage, self.env, self.body, args);
+                Ok(FrameEffect::Push {
+                    parent: F::scf_for(self),
+                    child: F::from_body(body),
+                })
+            }
+            Some(false) => Ok(FrameEffect::Complete(Completion::Finished(self.carried))),
+            None => Err(E::from(InterpreterError::IndeterminateBranch)),
+        }
     }
 
-    /// Rebuild the standard `ForFrame` in its check/resume state.
-    ///
-    /// Use this when an interpreter decides to push the loop body and wants the
-    /// normal `ForFrame::resume` logic to handle `scf.yield`, advance the
-    /// induction variable, and return to the condition check.
-    pub fn into_frame(self) -> ForFrame<L, T, V, X> {
-        ForFrame {
-            location: self.location,
-            env: self.env,
-            start: self.start,
-            end: self.end_value,
-            step: self.step_value,
-            init_args: self.init_args,
-            body: self.body,
-            results: self.results,
-            phase: ForPhase::Check {
-                iv: self.iv,
-                end: self.end,
-                step: self.step,
-                carried: self.carried,
-            },
-            _marker: PhantomData,
+    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, Completion<V>>, E> {
+        Err(E::from(InterpreterError::Custom(
+            "scf.for frame resumed without a body completion",
+        )))
+    }
+
+    pub fn resume_into<I, F>(
+        mut self,
+        completion: Completion<V>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<F, Completion<V>>, E>
+    where
+        I: FrameDriver<Value = V, Error = E>,
+        F: FrameBuild<V, E> + BuildScfFor<V, E>,
+    {
+        match completion {
+            // The body yielded: advance the induction variable and re-check.
+            Completion::Finished(yielded) => {
+                let step = interp.env_read(self.env, self.step)?;
+                let next = self
+                    .induction
+                    .loop_step(&step)
+                    .ok_or_else(|| E::from(InterpreterError::LoopStepOverflow))?;
+                self.induction = next;
+                self.carried = yielded;
+                Ok(FrameEffect::Continue(F::scf_for(self)))
+            }
+            // A `ret` inside the body returns from the enclosing function.
+            Completion::Returned(values) => Ok(FrameEffect::Complete(Completion::Returned(values))),
         }
     }
 }
 
-struct ForFrameParts<T: CompileTimeValue> {
-    location: Location,
+// ===========================================================================
+// Abstract loop frame: sound over-approximation.
+// ===========================================================================
+
+/// Abstract `scf.for` traversal: a loop-carried fixpoint. The body is analyzed
+/// with the current entry (`[induction] ++ carried`); each yield advances the
+/// induction variable and joins the new entry state, widening after the
+/// analysis threshold, until the entry is stable. Finish values join across the
+/// possible exits (including the zero-iteration "skip" when the loop condition
+/// is undecided). Loop policy lives here, not in the framework.
+pub struct AbstractScfForFrame<V, E, K> {
+    stage: CompileStage,
     env: EnvIndex,
-    start: SSAValue,
+    body: Block,
     end: SSAValue,
     step: SSAValue,
-    init_args: Vec<SSAValue>,
-    body: Block,
-    results: Vec<ResultValue>,
-    _marker: PhantomData<T>,
+    /// Current entry state bound to the body: `[induction] ++ carried`.
+    entry: Product<V>,
+    /// The zero-iteration result (original carried values).
+    inits: Product<V>,
+    /// Joined finish values across the explored exits.
+    finish: Option<Product<V>>,
+    iterations: usize,
+    entered: bool,
+    _marker: PhantomData<fn() -> (E, K)>,
 }
 
-impl<L: Dialect, T: CompileTimeValue, V, X> ForFrame<L, T, V, X> {
-    fn new(location: Location, env: EnvIndex, op: &For<T>) -> Self {
+impl<V, E, K> AbstractScfForFrame<V, E, K>
+where
+    V: Clone + PartialEq + ForLoopValue,
+    E: From<InterpreterError>,
+    K: Clone + Eq + std::hash::Hash,
+{
+    pub fn new(
+        stage: CompileStage,
+        env: EnvIndex,
+        body: Block,
+        induction: V,
+        end: SSAValue,
+        step: SSAValue,
+        carried: Product<V>,
+    ) -> Self {
+        let entry: Product<V> = std::iter::once(induction)
+            .chain(carried.iter().cloned())
+            .collect();
         Self {
-            location,
+            stage,
             env,
-            start: op.start,
-            end: op.end,
-            step: op.step,
-            init_args: op.init_args.clone(),
-            body: op.body,
-            results: op.results.clone(),
-            phase: ForPhase::Entry,
-            _marker: PhantomData,
-        }
-    }
-
-    fn into_scf_frame(self) -> ScfFrame<L, T, V, X> {
-        ScfFrame::For(self)
-    }
-}
-
-impl<L: Dialect, T: CompileTimeValue, V, X> HasLocation for ForFrame<L, T, V, X> {
-    fn location(&self) -> Location {
-        self.location
-    }
-}
-
-impl<I, L, F, C, E, T, V, X> Frame<I, F, C, E> for ForFrame<L, T, V, X>
-where
-    I: Env<V, Error = E> + ScfBlockDispatch<L, F, E, V, X> + ScfForDispatch<L, T, F, C, E, V, X>,
-    L: Dialect,
-    F: TryFrom<ScfFrame<L, T, V, X>>,
-    C: ProjectOrSelf<ScfCompletion<V>>,
-    E: From<InterpreterError> + From<<F as TryFrom<ScfFrame<L, T, V, X>>>::Error>,
-    T: CompileTimeValue,
-    V: Clone + ForLoopValue,
-    X: BlockTransfer<Value = V>,
-{
-    fn step(self, interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        let location = self.location;
-        let env = self.env;
-        let start = self.start;
-        let end_value = self.end;
-        let step_value = self.step;
-        let init_args = self.init_args;
-        let body = self.body;
-        let results = self.results;
-        let phase = self.phase;
-        let frame = ForFrameParts {
-            location,
-            env,
-            start,
-            end: end_value,
-            step: step_value,
-            init_args,
             body,
-            results,
+            end,
+            step,
+            entry,
+            inits: carried,
+            finish: None,
+            iterations: 0,
+            entered: false,
             _marker: PhantomData,
-        };
-
-        match phase {
-            ForPhase::Entry => {
-                let iv = interp.read(frame.env, frame.start)?;
-                let end = interp.read(frame.env, frame.end)?;
-                let step = interp.read(frame.env, frame.step)?;
-                let carried = interp.read_many(frame.env, frame.init_args.as_slice())?;
-                ForContinuation::<L, T, V, X>::new(frame, iv, end, step, carried)
-                    .into_frame()
-                    .into_scf_frame()
-                    .try_into()
-                    .map(FrameEffect::Continue)
-                    .map_err(E::from)
-            }
-            ForPhase::Check {
-                iv,
-                end,
-                step,
-                carried,
-            } => match iv.loop_condition(&end) {
-                Some(false) => {
-                    write_results(interp, env, frame.results.as_slice(), carried)?;
-                    Ok(FrameEffect::Done)
-                }
-                Some(true) => {
-                    let continuation =
-                        ForContinuation::<L, T, V, X>::new(frame, iv, end, step, carried);
-                    let args = continuation.body_args();
-                    let child = interp.dispatch_scf_block(
-                        continuation.location,
-                        continuation.body,
-                        continuation.env,
-                        args,
-                    )?;
-                    Ok(FrameEffect::Push {
-                        parent: continuation.into_frame().into_scf_frame().try_into()?,
-                        child,
-                    })
-                }
-                None => interp.dispatch_indeterminate_for(ForContinuation::<L, T, V, X>::new(
-                    frame, iv, end, step, carried,
-                )),
-            },
         }
     }
 
-    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        Err(E::from(InterpreterError::UnexpectedCompletion {
-            location: self.location,
-            completion: "scf.for body completed without scf.yield",
-        }))
+    fn induction(&self) -> Result<V, E> {
+        self.entry.get(0).cloned().ok_or_else(|| {
+            E::from(InterpreterError::Custom(
+                "scf.for body is missing its induction parameter",
+            ))
+        })
     }
 
-    fn resume(self, completion: C, _interp: &mut I) -> Result<FrameEffect<F, C>, E> {
-        let location = self.location;
-        let env = self.env;
-        let start = self.start;
-        let end_value = self.end;
-        let step_value = self.step;
-        let init_args = self.init_args;
-        let body = self.body;
-        let results = self.results;
-
-        let ForPhase::Check { iv, end, step, .. } = self.phase else {
-            return Ok(FrameEffect::Complete(completion));
+    fn join_finish<I>(&mut self, interp: &mut I, values: Product<V>) -> Result<(), E>
+    where
+        I: AbstractFrameDriver<Value = V, Error = E>,
+    {
+        let merged = match self.finish.take() {
+            None => values,
+            Some(current) => interp.analysis_merge(&current, &values, 0)?,
         };
-        match completion.project_or_self() {
-            Ok(ScfCompletion::Yield(carried)) => {
-                let next_iv = match iv.loop_step(&step) {
-                    Some(next_iv) => next_iv,
-                    None => return Err(E::from(InterpreterError::LoopStepOverflow)),
-                };
-                Self {
-                    location,
-                    env,
-                    start,
-                    end: end_value,
-                    step: step_value,
-                    init_args,
-                    body,
-                    results,
-                    phase: ForPhase::Check {
-                        iv: next_iv,
-                        end,
-                        step,
-                        carried,
-                    },
-                    _marker: PhantomData,
-                }
-                .into_scf_frame()
-                .try_into()
-                .map(FrameEffect::Continue)
-                .map_err(E::from)
-            }
-            Err(completion) => Ok(FrameEffect::Complete(completion)),
-        }
+        self.finish = Some(merged);
+        Ok(())
     }
-}
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for If<T>
-where
-    L: Dialect,
-    F: TryFrom<ScfFrame<L, T, X::Value, X>>,
-    E: From<<F as TryFrom<ScfFrame<L, T, X::Value, X>>>::Error>,
-    T: CompileTimeValue,
-    X: BlockTransfer,
-{
-    fn interpret(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        _interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        IfFrame::<L, T, X::Value, X>::new(location, env, self)
-            .into_scf_frame()
-            .try_into()
-            .map(StatementEffect::Push)
-            .map_err(E::from)
-    }
-}
-
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for For<T>
-where
-    L: Dialect,
-    F: TryFrom<ScfFrame<L, T, X::Value, X>>,
-    E: From<<F as TryFrom<ScfFrame<L, T, X::Value, X>>>::Error>,
-    T: CompileTimeValue,
-    X: BlockTransfer,
-{
-    fn interpret(
-        &self,
-        location: Location,
-        env: EnvIndex,
-        _interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        ForFrame::<L, T, X::Value, X>::new(location, env, self)
-            .into_scf_frame()
-            .try_into()
-            .map(StatementEffect::Push)
-            .map_err(E::from)
-    }
-}
-
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Yield<T>
-where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    C: TryFrom<ScfCompletion<X::Value>>,
-    E: From<<C as TryFrom<ScfCompletion<X::Value>>>::Error>,
-    T: CompileTimeValue,
-    X: BlockTransfer,
-{
-    fn interpret(
-        &self,
-        _location: Location,
-        env: EnvIndex,
+    pub fn step_into<I, F>(
+        mut self,
         interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
-        let values = interp.read_many(env, self.values.as_slice())?;
-        Ok(StatementEffect::Complete(C::try_from(
-            ScfCompletion::Yield(values),
-        )?))
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
+    where
+        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+        F: AbstractFrameBuild<V, E, K> + BuildAbstractScfFor<V, E, K>,
+    {
+        if !self.entered {
+            self.entered = true;
+            let end = interp.env_read(self.env, self.end)?;
+            match self.induction()?.loop_condition(&end) {
+                // Loop never runs: result is the initial carried values.
+                Some(false) => {
+                    return Ok(FrameEffect::Complete(AbstractCompletion::Finished(Some(
+                        self.inits,
+                    ))));
+                }
+                // Undecided: the loop may run zero times — join that exit.
+                None => self.finish = Some(self.inits.clone()),
+                Some(true) => {}
+            }
+            self.iterations = 1;
+        }
+        let body = AbstractBlockFrame::new(self.stage, self.env, self.body, self.entry.clone());
+        Ok(FrameEffect::Push {
+            parent: F::scf_for(self),
+            child: F::from_block(body),
+        })
     }
-}
 
-fn loop_body_args<V: Clone>(iv: V, carried: Product<V>, init_arg_count: usize) -> Product<V> {
-    let mut args = Vec::with_capacity(1 + init_arg_count);
-    args.push(iv);
-    args.extend(carried.into_iter().take(init_arg_count));
-    Product::from_vec(args)
-}
+    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+        Err(E::from(InterpreterError::Custom(
+            "scf.for frame resumed without a body completion",
+        )))
+    }
 
-fn write_results<I, V>(
-    interp: &mut I,
-    env: EnvIndex,
-    results: &[ResultValue],
-    value: Product<V>,
-) -> Result<(), I::Error>
-where
-    I: Env<V>,
-    I::Error: From<InterpreterError>,
-{
-    let results = results
-        .iter()
-        .copied()
-        .map(SSAValue::from)
-        .collect::<Vec<_>>();
-    interp.write_product(env, results.as_slice(), value)
+    pub fn resume_into<I, F>(
+        mut self,
+        completion: AbstractCompletion<V>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
+    where
+        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+        F: AbstractFrameBuild<V, E, K> + BuildAbstractScfFor<V, E, K>,
+    {
+        let yielded = match completion {
+            AbstractCompletion::Finished(Some(values)) => values,
+            // The body returned: the loop finishes with what it has joined.
+            AbstractCompletion::Finished(None) => {
+                return Ok(FrameEffect::Complete(AbstractCompletion::Finished(
+                    self.finish,
+                )));
+            }
+            AbstractCompletion::FunctionDone => {
+                return Err(E::from(InterpreterError::Custom(
+                    "scf.for frame resumed with a function completion",
+                )));
+            }
+        };
+
+        let step = interp.env_read(self.env, self.step)?;
+        let next = self
+            .induction()?
+            .loop_step(&step)
+            .ok_or_else(|| E::from(InterpreterError::LoopStepOverflow))?;
+        let end = interp.env_read(self.env, self.end)?;
+        let next_args: Product<V> = std::iter::once(next.clone())
+            .chain(yielded.iter().cloned())
+            .collect();
+
+        let (contribute, continue_loop) = match next.loop_condition(&end) {
+            Some(false) => (true, false),
+            Some(true) => (false, true),
+            None => (true, true),
+        };
+        if contribute {
+            self.join_finish(interp, yielded)?;
+        }
+        if !continue_loop {
+            return Ok(FrameEffect::Complete(AbstractCompletion::Finished(
+                self.finish,
+            )));
+        }
+
+        let joined = interp.analysis_merge(&self.entry, &next_args, self.iterations)?;
+        if joined == self.entry {
+            // Entry state stable: re-running the body adds nothing.
+            return Ok(FrameEffect::Complete(AbstractCompletion::Finished(
+                self.finish,
+            )));
+        }
+        self.entry = joined;
+        self.iterations += 1;
+        if self.iterations > interp.max_iterations() {
+            return Err(E::from(InterpreterError::FixpointDiverged));
+        }
+        Ok(FrameEffect::Continue(F::scf_for(self)))
+    }
 }

@@ -1,80 +1,72 @@
 use std::ops::{BitAnd, BitOr, BitXor, Not};
 
-use kirin::prelude::{CompileTimeValue, Dialect, SSAValue};
-use kirin_interpreter::{
-    BlockTransfer, Env, Interpretable, InterpreterError, Location, StatementEffect,
+use kirin::prelude::CompileTimeValue;
+use kirin_interpreter::dialect::{
+    ForwardEffect, ForwardEval, ForwardEvalInterp, Interpretable, InterpreterError,
 };
 use thiserror::Error;
 
 use crate::{Bitwise, CheckedShl, CheckedShr};
 
-impl<L, I, F, C, E, T, X> Interpretable<L, I, F, C, E, X> for Bitwise<T>
+impl<I, T> Interpretable<I, ForwardEval> for Bitwise<T>
 where
-    L: Dialect,
-    I: Env<X::Value, Error = E>,
-    X: BlockTransfer,
-    X::Value: Clone
-        + BitAnd<Output = X::Value>
-        + BitOr<Output = X::Value>
-        + BitXor<Output = X::Value>
-        + Not<Output = X::Value>
+    I: ForwardEvalInterp,
+    I::Value: BitAnd<Output = I::Value>
+        + BitOr<Output = I::Value>
+        + BitXor<Output = I::Value>
+        + Not<Output = I::Value>
         + CheckedShl
         + CheckedShr,
-    E: From<ShiftOverflow>,
+    I::Error: From<ShiftOverflow>,
     T: CompileTimeValue,
 {
-    fn interpret(
-        &self,
-        _location: Location,
-        env: kirin_interpreter::EnvIndex,
-        interp: &mut I,
-    ) -> Result<StatementEffect<F, C, X>, E> {
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
         match self {
             Bitwise::And {
                 lhs, rhs, result, ..
             } => {
-                let value = interp.read(env, *lhs)? & interp.read(env, *rhs)?;
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = interp.read(*lhs)? & interp.read(*rhs)?;
+                interp.write(*result, value)?;
             }
             Bitwise::Or {
                 lhs, rhs, result, ..
             } => {
-                let value = interp.read(env, *lhs)? | interp.read(env, *rhs)?;
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = interp.read(*lhs)? | interp.read(*rhs)?;
+                interp.write(*result, value)?;
             }
             Bitwise::Xor {
                 lhs, rhs, result, ..
             } => {
-                let value = interp.read(env, *lhs)? ^ interp.read(env, *rhs)?;
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = interp.read(*lhs)? ^ interp.read(*rhs)?;
+                interp.write(*result, value)?;
             }
             Bitwise::Not {
                 operand, result, ..
             } => {
-                let value = !interp.read(env, *operand)?;
-                interp.write(env, SSAValue::from(*result), value)?;
+                let value = !interp.read(*operand)?;
+                interp.write(*result, value)?;
             }
             Bitwise::Shl {
                 lhs, rhs, result, ..
             } => {
                 let value = interp
-                    .read(env, *lhs)?
-                    .checked_shl(interp.read(env, *rhs)?)
-                    .ok_or_else(|| E::from(ShiftOverflow))?;
-                interp.write(env, SSAValue::from(*result), value)?;
+                    .read(*lhs)?
+                    .checked_shl(interp.read(*rhs)?)
+                    .ok_or_else(|| I::Error::from(ShiftOverflow))?;
+                interp.write(*result, value)?;
             }
             Bitwise::Shr {
                 lhs, rhs, result, ..
             } => {
                 let value = interp
-                    .read(env, *lhs)?
-                    .checked_shr(interp.read(env, *rhs)?)
-                    .ok_or_else(|| E::from(ShiftOverflow))?;
-                interp.write(env, SSAValue::from(*result), value)?;
+                    .read(*lhs)?
+                    .checked_shr(interp.read(*rhs)?)
+                    .ok_or_else(|| I::Error::from(ShiftOverflow))?;
+                interp.write(*result, value)?;
             }
             Bitwise::__Phantom(..) => unreachable!(),
         }
-        Ok(StatementEffect::Done)
+        Ok(ForwardEffect::Next)
     }
 }
 

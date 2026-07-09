@@ -68,3 +68,16 @@ where
         Self::Top
     }
 }
+
+/// `ConstPropValue` widens by joining: the flat constant lattice has finite
+/// height, so plain joins already terminate.
+impl<C, S, F> kirin_ir::Widen for ConstPropValue<C, S, F>
+where
+    C: Clone + PartialEq,
+    S: Clone + PartialEq,
+    F: Clone + PartialEq,
+{
+    fn widen(&self, other: &Self) -> Self {
+        self.join(other)
+    }
+}

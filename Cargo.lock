@@ -795,6 +795,7 @@ dependencies = [
  "kirin-cmp",
  "kirin-interpreter",
  "kirin-ir",
+ "kirin-scf",
  "kirin-test-utils",
 ]
 
@@ -943,7 +944,6 @@ dependencies = [
  "kirin",
  "kirin-arith",
  "kirin-constant",
- "kirin-constprop",
  "kirin-function",
  "kirin-interpreter",
  "kirin-test-types",

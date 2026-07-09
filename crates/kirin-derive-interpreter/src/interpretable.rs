@@ -5,69 +5,41 @@ use kirin_derive_toolkit::prelude::darling;
 use proc_macro2::TokenStream;
 use quote::quote;
 
-const DEFAULT_INTERP_CRATE: &str = "::kirin_interpreter";
-const DEFAULT_IR_CRATE: &str = "::kirin::ir";
+pub const DEFAULT_INTERP_CRATE: &str = "::kirin_interpreter";
 
 pub fn do_derive_interpretable(input: &syn::DeriveInput) -> darling::Result<TokenStream> {
     let ir = Input::<StandardLayout>::from_derive_input(input)?;
     let interp_crate = parse_interpret_crate_path(input)?;
-    let ir_crate: syn::Path = ir
-        .attrs
-        .crate_path
-        .clone()
-        .unwrap_or_else(|| from_str(DEFAULT_IR_CRATE));
 
     ir.compose()
-        .add(move |ctx: &DeriveContext<'_, StandardLayout>| {
-            emit_interpretable(ctx, &interp_crate, &ir_crate)
-        })
+        .add(move |ctx: &DeriveContext<'_, StandardLayout>| emit_interpretable(ctx, &interp_crate))
         .build()
 }
 
 fn emit_interpretable(
     ctx: &DeriveContext<'_, StandardLayout>,
     interp_crate: &syn::Path,
-    ir_crate: &syn::Path,
 ) -> darling::Result<Vec<TokenStream>> {
     validate_global_wrapper(ctx)?;
 
     let type_name = &ctx.meta.name;
     let mut impl_generics = ctx.meta.generics.clone();
-    impl_generics
-        .params
-        .insert(0, syn::GenericParam::Type(syn::parse_quote!(__InterpL)));
+    // The dialect trait is specialized on the engine type `__InterpI` and the
+    // forward-value semantics marker; the delegating wrapper impl is generic over
+    // the engine.
     impl_generics
         .params
         .push(syn::GenericParam::Type(syn::parse_quote!(__InterpI)));
-    impl_generics
-        .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__InterpF)));
-    impl_generics
-        .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__InterpC)));
-    impl_generics
-        .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__InterpE)));
-    impl_generics
-        .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__InterpT)));
 
     let (impl_generics, _, _) = impl_generics.split_for_impl();
     let (_, ty_generics, original_where) = ctx.meta.generics.split_for_impl();
 
     let mut predicates: Vec<syn::WherePredicate> =
-        vec![syn::parse_quote! { __InterpL: #ir_crate::Dialect }];
+        vec![syn::parse_quote! { __InterpI: #interp_crate::Interp }];
     for stmt_ctx in ctx.statements.values() {
         if let Some(wrapper_ty) = stmt_ctx.wrapper_type {
             predicates.push(syn::parse_quote! {
-                #wrapper_ty: #interp_crate::Interpretable<
-                    __InterpL,
-                    __InterpI,
-                    __InterpF,
-                    __InterpC,
-                    __InterpE,
-                    __InterpT
-                >
+                #wrapper_ty: #interp_crate::Interpretable<__InterpI, #interp_crate::ForwardEval>
             });
         }
     }
@@ -100,14 +72,9 @@ fn emit_interpretable(
             quote! { Self::#variant_name #pattern }
         };
         arms.push(quote! {
-            #arm_pattern => <#wrapper_ty as #interp_crate::Interpretable<
-                __InterpL,
-                __InterpI,
-                __InterpF,
-                __InterpC,
-                __InterpE,
-                __InterpT
-            >>::interpret(#binding, location, env, interp)
+            #arm_pattern => <#wrapper_ty as #interp_crate::Interpretable<__InterpI, #interp_crate::ForwardEval>>::interpret(
+                #binding, interp,
+            )
         });
     }
 
@@ -128,20 +95,14 @@ fn emit_interpretable(
 
     Ok(vec![quote! {
         #[automatically_derived]
-        impl #impl_generics #interp_crate::Interpretable<
-            __InterpL,
-            __InterpI,
-            __InterpF,
-            __InterpC,
-            __InterpE,
-            __InterpT
-        > for #type_name #ty_generics #where_clause {
+        impl #impl_generics #interp_crate::Interpretable<__InterpI, #interp_crate::ForwardEval> for #type_name #ty_generics #where_clause {
             fn interpret(
                 &self,
-                location: #interp_crate::Location,
-                env: #interp_crate::EnvIndex,
                 interp: &mut __InterpI,
-            ) -> Result<#interp_crate::StatementEffect<__InterpF, __InterpC, __InterpT>, __InterpE> {
+            ) -> Result<
+                <__InterpI as #interp_crate::Interp>::Effect,
+                <__InterpI as #interp_crate::Interp>::Error,
+            > {
                 #body
             }
         }
@@ -172,7 +133,7 @@ fn validate_global_wrapper<L: kirin_derive_toolkit::ir::Layout>(
     Ok(())
 }
 
-fn parse_interpret_crate_path(input: &syn::DeriveInput) -> darling::Result<syn::Path> {
+pub fn parse_interpret_crate_path(input: &syn::DeriveInput) -> darling::Result<syn::Path> {
     let mut crate_path = None;
     for attr in &input.attrs {
         if !attr.path().is_ident("interpret") {
@@ -216,54 +177,16 @@ mod tests {
     }
 
     #[test]
-    fn interpretable_custom_crate_paths() {
+    fn interpretable_rejects_non_wrapper_variants() {
         let input: syn::DeriveInput = syn::parse_quote! {
-            #[wraps]
-            #[kirin(type = T, crate = kirin_ir)]
-            #[interpret(crate = kirin_interpreter)]
-            enum Ops<T> {
-                A(A<T>),
-            }
-        };
-        insta::assert_snapshot!(generate_interpretable_code(input));
-    }
-
-    #[test]
-    fn interpretable_per_variant_wraps() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type = ArithType)]
-            enum HighLevel {
+            #[kirin(type = T)]
+            enum Mixed<T> {
                 #[wraps]
-                Lexical(Lexical<ArithType>),
-                #[wraps]
-                Arith(Arith<ArithType>),
-            }
-        };
-        insta::assert_snapshot!(generate_interpretable_code(input));
-    }
-
-    #[test]
-    fn interpretable_rejects_partial_per_variant_wrappers() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            #[kirin(type = SimpleType)]
-            enum MixedOps {
-                #[wraps]
-                Add(AddOp),
-                Sub(SubOp),
+                Function(Function<T>),
+                Inline { value: SSAValue },
             }
         };
         let err = do_derive_interpretable(&input).unwrap_err().to_string();
-        assert!(err.contains("Sub"));
-    }
-
-    #[test]
-    fn interpretable_rejects_struct_wrappers() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            #[wraps]
-            #[kirin(type = SimpleType)]
-            struct Wrapped(Inner);
-        };
-        let err = do_derive_interpretable(&input).unwrap_err().to_string();
-        assert!(err.contains("enums"));
+        assert!(err.contains("not wrappers"));
     }
 }
