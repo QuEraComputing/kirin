@@ -1,7 +1,7 @@
 use kirin_arith::{Arith, ArithType};
 use kirin_cf::ControlFlow;
 use kirin_function::Return;
-use kirin_ir::{Dialect, Region, Signature};
+use kirin_ir::{Cfg, Dialect, Signature};
 
 /// Test language with namespace prefixes on wraps variants.
 /// Arith ops become `arith.add`, ControlFlow becomes `cf.br`, Return becomes `func.ret`.
@@ -17,7 +17,7 @@ pub enum NamespacedLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     Function {
-        body: Region,
+        body: Cfg,
         sig: Signature<ArithType>,
     },
     #[wraps]

@@ -1,6 +1,6 @@
 # Native Graph IR Node — Text Format and Semantics Design
 
-This design introduces two new IR body kinds — `digraph` and `ungraph` — alongside Block and Region. A graph body uses standard statement syntax where SSAValues represent edges. The leading keyword (`^`, `digraph`, `ungraph`) selects the backing storage: Block (linked list), petgraph DiGraph, or petgraph UnGraph.
+This design introduces two new IR body kinds — `digraph` and `ungraph` — alongside Block and CFG (`Cfg`). A graph body uses standard statement syntax where SSAValues represent edges. The leading keyword (`^`, `digraph`, `ungraph`) selects the backing storage: Block (linked list), petgraph DiGraph, or petgraph UnGraph.
 
 - For **directed graphs**, the text format follows MLIR graph region semantics (relaxed dominance, SSA def-use = directed edges).
 - For **undirected graphs**, `edge`-prefixed statements introduce edge SSAValues, and statements that share edge references are connected.

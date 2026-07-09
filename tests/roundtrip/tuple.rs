@@ -11,7 +11,7 @@ use kirin_tuple::Tuple;
 enum TupleLanguage {
     #[chumsky(format = "fn {:name}{sig} {body}")]
     Function {
-        body: Region,
+        body: Cfg,
         sig: Signature<ArithType>,
     },
     #[wraps]

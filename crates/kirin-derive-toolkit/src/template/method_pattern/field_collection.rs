@@ -20,8 +20,8 @@ pub enum FieldIterKind {
     Blocks,
     /// Successor block references.
     Successors,
-    /// Nested region fields.
-    Regions,
+    /// Nested CFG fields.
+    Cfgs,
     /// Directed graph body fields.
     Digraphs,
     /// Undirected graph body fields.
@@ -99,10 +99,7 @@ impl FieldCollection {
                 .successors()
                 .map(FieldAccess::from_field_info)
                 .collect(),
-            FieldIterKind::Regions => statement
-                .regions()
-                .map(FieldAccess::from_field_info)
-                .collect(),
+            FieldIterKind::Cfgs => statement.cfgs().map(FieldAccess::from_field_info).collect(),
             FieldIterKind::Digraphs => statement
                 .digraphs()
                 .map(FieldAccess::from_field_info)

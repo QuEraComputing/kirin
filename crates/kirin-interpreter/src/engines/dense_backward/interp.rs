@@ -46,17 +46,17 @@
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, Region, SSAValue,
+    Block, Cfg, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, SSAValue,
     StageMeta, Statement,
 };
 
 use super::frames::{DenseBlockFrame, DenseFrameBuild};
 use crate::core::query;
-use crate::engines::sparse_backward::RegionScope;
+use crate::engines::sparse_backward::CfgScope;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic,
+    AbstractInterpreter, BackwardSummaryDeps, CfgTopology, ClassicLiveness, DenseBackwardSemantic,
     DensePointStore, EnvIndex, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, OwnerSemantics, ProgramPoint, RegionTopology, Scoped, StageQuery,
+    InterpreterError, OwnerSemantics, ProgramPoint, Scoped, StageQuery,
     StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
 
@@ -321,7 +321,7 @@ where
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
-    type SummaryKey = Scoped<RegionScope, Block>;
+    type SummaryKey = Scoped<CfgScope, Block>;
     type Summary = BlockLiveness<V>;
     type Frame = F;
     type Completion = DenseBackwardCompletion<V>;
@@ -337,11 +337,11 @@ pub enum DenseBackwardCompletion<V> {
 }
 
 /// Analysis-local state carried in the driver's `store` slot: the scope,
-/// the region topology, and an optional per-point recorder filled by the
+/// the CFG topology, and an optional per-point recorder filled by the
 /// block frames during [`reconstruct_points`](DenseBackwardInterpreter::reconstruct_points).
 pub struct DenseAnalysisState<V> {
-    scope: Option<RegionScope>,
-    topology: RegionTopology,
+    scope: Option<CfgScope>,
+    topology: CfgTopology,
     recorder: Option<DensePointStore<V>>,
 }
 
@@ -349,7 +349,7 @@ impl<V> Default for DenseAnalysisState<V> {
     fn default() -> Self {
         Self {
             scope: None,
-            topology: RegionTopology::default(),
+            topology: CfgTopology::default(),
             recorder: None,
         }
     }
@@ -362,7 +362,7 @@ pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardF
     DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
     DenseAnalysisState<V>,
-    BackwardSummaryDeps<Scoped<RegionScope, Block>>,
+    BackwardSummaryDeps<Scoped<CfgScope, Block>>,
 >;
 
 // ===========================================================================
@@ -548,7 +548,7 @@ struct DenseBackwardSemantics;
 impl<'ir, S, V, E, F, Sem>
     OwnerSemantics<
         DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        Scoped<RegionScope, Block>,
+        Scoped<CfgScope, Block>,
         BlockLiveness<V>,
         F,
         DenseBackwardCompletion<V>,
@@ -564,7 +564,7 @@ where
     fn bottom_summary(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        _owner: &Scoped<RegionScope, Block>,
+        _owner: &Scoped<CfgScope, Block>,
     ) -> Result<BlockLiveness<V>, E> {
         Ok(BlockLiveness::bottom())
     }
@@ -572,10 +572,10 @@ where
     fn entry_frame(
         &mut self,
         interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: &Scoped<RegionScope, Block>,
+        owner: &Scoped<CfgScope, Block>,
         _summary: &BlockLiveness<V>,
     ) -> Result<F, E> {
-        let (stage, _region) = owner.scope;
+        let (stage, _cfg) = owner.scope;
         // Each owner walk starts from an empty exit state; the terminator's
         // absorbed edges seed the real live-out.
         interp.replace_state(V::bottom());
@@ -585,9 +585,9 @@ where
     fn complete_owner(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: Scoped<RegionScope, Block>,
+        owner: Scoped<CfgScope, Block>,
         completion: DenseBackwardCompletion<V>,
-    ) -> Result<SummaryEffect<Scoped<RegionScope, Block>, BlockLiveness<V>>, E> {
+    ) -> Result<SummaryEffect<Scoped<CfgScope, Block>, BlockLiveness<V>>, E> {
         match completion {
             DenseBackwardCompletion::Block { live_in, live_out } => Ok(SummaryEffect::Update {
                 owner,
@@ -608,8 +608,8 @@ where
 ///
 /// ```ignore
 /// let mut analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
-/// analysis.analyze(stage, region)?;
-/// let boundary = analysis.block_summary(stage, region, block);
+/// analysis.analyze(stage, cfg)?;
+/// let boundary = analysis.block_summary(stage, cfg, block);
 /// ```
 pub struct DenseBackwardInterpreter<
     'ir,
@@ -649,18 +649,18 @@ where
         self.driver.inner().pipeline()
     }
 
-    /// The converged boundary states of `block` under the `(stage, region)`
+    /// The converged boundary states of `block` under the `(stage, cfg)`
     /// scope.
     pub fn block_summary(
         &self,
         stage: CompileStage,
-        region: Region,
+        cfg: Cfg,
         block: Block,
     ) -> Option<&BlockLiveness<V>> {
-        self.driver.summary(&Scoped::new((stage, region), block))
+        self.driver.summary(&Scoped::new((stage, cfg), block))
     }
 
-    /// The analyzed region's CFG blocks (post-`analyze`).
+    /// The analyzed CFG's own top-level blocks (post-`analyze`).
     pub fn cfg_blocks(&self) -> Vec<Block> {
         self.driver
             .store()
@@ -680,13 +680,13 @@ where
     F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, Completion = DenseBackwardCompletion<V>>
         + DenseFrameBuild<V, E>,
 {
-    /// Run the block-boundary fixpoint over `region` in `stage`: seed every
+    /// Run the block-boundary fixpoint over `cfg` in `stage`: seed every
     /// CFG block (a backward analysis must visit them all) and drain the
     /// worklist; dependencies are discovered from the terminators' edges.
-    pub fn analyze(&mut self, stage: CompileStage, region: Region) -> Result<(), E> {
-        let scope = (stage, region);
-        let topology = query::region_topology(self.driver.inner().pipeline(), stage, region)?;
-        let owners: Vec<Scoped<RegionScope, Block>> = topology
+    pub fn analyze(&mut self, stage: CompileStage, cfg: Cfg) -> Result<(), E> {
+        let scope = (stage, cfg);
+        let topology = query::cfg_topology(self.driver.inner().pipeline(), stage, cfg)?;
+        let owners: Vec<Scoped<CfgScope, Block>> = topology
             .cfg_blocks()
             .map(|block| Scoped::new(scope, block.block))
             .collect();
@@ -708,9 +708,9 @@ where
     pub fn reconstruct_points(
         &mut self,
         stage: CompileStage,
-        region: Region,
+        cfg: Cfg,
     ) -> Result<DensePointStore<V>, E> {
-        let scope = (stage, region);
+        let scope = (stage, cfg);
         self.driver.store_mut().recorder = Some(DensePointStore::new());
         for block in self.cfg_blocks() {
             // The CfgOwner walk re-absorbs the converged successor summaries,

@@ -283,32 +283,32 @@ impl<'a> Iterator for CompositeOpsSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for CompositeOps {
-    type Iter = CompositeOpsRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCfgs<'a> for CompositeOps {
+    type Iter = CompositeOpsCfgsIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         match self {
-            Self::Alpha(field_0) => CompositeOpsRegionsIter::Alpha(
-                <AlphaOp as ::kirin::ir::HasRegions>::regions(field_0),
-            ),
-            Self::Beta(field_0) => {
-                CompositeOpsRegionsIter::Beta(<BetaOp as ::kirin::ir::HasRegions>::regions(field_0))
+            Self::Alpha(field_0) => {
+                CompositeOpsCfgsIter::Alpha(<AlphaOp as ::kirin::ir::HasCfgs>::cfgs(field_0))
             }
-            Self::Gamma(field_0) => CompositeOpsRegionsIter::Gamma(
-                <GammaOp as ::kirin::ir::HasRegions>::regions(field_0),
-            ),
+            Self::Beta(field_0) => {
+                CompositeOpsCfgsIter::Beta(<BetaOp as ::kirin::ir::HasCfgs>::cfgs(field_0))
+            }
+            Self::Gamma(field_0) => {
+                CompositeOpsCfgsIter::Gamma(<GammaOp as ::kirin::ir::HasCfgs>::cfgs(field_0))
+            }
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum CompositeOpsRegionsIter<'a> {
-    Alpha(<AlphaOp as ::kirin::ir::HasRegions<'a>>::Iter),
-    Beta(<BetaOp as ::kirin::ir::HasRegions<'a>>::Iter),
-    Gamma(<GammaOp as ::kirin::ir::HasRegions<'a>>::Iter),
+pub enum CompositeOpsCfgsIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasCfgs<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasCfgs<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasCfgs<'a>>::Iter),
 }
 #[automatically_derived]
-impl<'a> Iterator for CompositeOpsRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for CompositeOpsCfgsIter<'a> {
+    type Item = &'a ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Alpha(inner) => inner.next(),
@@ -318,32 +318,32 @@ impl<'a> Iterator for CompositeOpsRegionsIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for CompositeOps {
-    type IterMut = CompositeOpsRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCfgsMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsCfgsMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         match self {
-            Self::Alpha(field_0) => CompositeOpsRegionsMutIter::Alpha(
-                <AlphaOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            Self::Alpha(field_0) => CompositeOpsCfgsMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasCfgsMut>::cfgs_mut(field_0),
             ),
-            Self::Beta(field_0) => CompositeOpsRegionsMutIter::Beta(
-                <BetaOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            Self::Beta(field_0) => CompositeOpsCfgsMutIter::Beta(
+                <BetaOp as ::kirin::ir::HasCfgsMut>::cfgs_mut(field_0),
             ),
-            Self::Gamma(field_0) => CompositeOpsRegionsMutIter::Gamma(
-                <GammaOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            Self::Gamma(field_0) => CompositeOpsCfgsMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasCfgsMut>::cfgs_mut(field_0),
             ),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum CompositeOpsRegionsMutIter<'a> {
-    Alpha(<AlphaOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
-    Beta(<BetaOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
-    Gamma(<GammaOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+pub enum CompositeOpsCfgsMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasCfgsMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasCfgsMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasCfgsMut<'a>>::IterMut),
 }
 #[automatically_derived]
-impl<'a> Iterator for CompositeOpsRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for CompositeOpsCfgsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Alpha(inner) => inner.next(),

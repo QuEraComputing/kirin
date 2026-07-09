@@ -1,20 +1,20 @@
 //! Engine-internal IR queries over stage enums.
 //!
 //! Engines need a handful of language-independent facts (block parameters,
-//! statement order, region entry, function specialization) from typed
+//! statement order, CFG entry, function specialization) from typed
 //! `StageInfo<L>` values. Each query is a [`StageAction`] dispatched through
 //! kirin-ir's `StageDispatch` machinery; [`StageQuery`] bundles them into one
 //! bound that any well-formed stage enum satisfies automatically.
 
 use kirin_ir::{
-    Block, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasRegions, HasStageInfo,
-    HasSuccessors, Pipeline, Region, SSAKind, SSAValue, SpecializedFunction, StageAction,
-    StageInfo, StageMeta, StagedFunction, Statement, SupportsStageDispatch, Symbol,
+    Block, Cfg, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCfgs, HasStageInfo,
+    HasSuccessors, Pipeline, SSAKind, SSAValue, SpecializedFunction, StageAction, StageInfo,
+    StageMeta, StagedFunction, Statement, SupportsStageDispatch, Symbol,
     UniqueLiveSpecializationError,
 };
 
 use crate::InterpreterError;
-use crate::facts::topology::{self, RegionTopology};
+use crate::facts::topology::{self, CfgTopology};
 
 /// Block parameters as SSA values.
 pub struct BlockParams(pub Block);
@@ -95,10 +95,10 @@ where
     }
 }
 
-/// Entry block of a region.
-pub struct RegionEntry(pub Region);
+/// Entry block of a CFG.
+pub struct CfgEntry(pub Cfg);
 
-impl<S, L> StageAction<S, L> for RegionEntry
+impl<S, L> StageAction<S, L> for CfgEntry
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
@@ -230,17 +230,17 @@ where
     }
 }
 
-/// The topology of a region: blocks (including nested structured bodies),
+/// The topology of a CFG: blocks (including nested structured bodies),
 /// statements per block, CFG successors, and block feeders.
-pub struct RegionTopologyQuery(pub Region);
+pub struct CfgTopologyQuery(pub Cfg);
 
-impl<S, L> StageAction<S, L> for RegionTopologyQuery
+impl<S, L> StageAction<S, L> for CfgTopologyQuery
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasRegions<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a>,
 {
-    type Output = RegionTopology;
+    type Output = CfgTopology;
     type Error = InterpreterError;
 
     fn run(
@@ -248,7 +248,7 @@ where
         _stage: CompileStage,
         info: &StageInfo<L>,
     ) -> Result<Self::Output, Self::Error> {
-        Ok(topology::region_topology(info, &self.0))
+        Ok(topology::cfg_topology(info, &self.0))
     }
 }
 
@@ -282,7 +282,7 @@ pub trait StageQuery:
     + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
     + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
     + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
-    + SupportsStageDispatch<RegionEntry, Option<Block>, InterpreterError>
+    + SupportsStageDispatch<CfgEntry, Option<Block>, InterpreterError>
     + SupportsStageDispatch<
         UniqueSpecialization,
         Result<SpecializedFunction, InterpreterError>,
@@ -291,7 +291,7 @@ pub trait StageQuery:
     + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
     + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
     + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-    + SupportsStageDispatch<RegionTopologyQuery, RegionTopology, InterpreterError>
+    + SupportsStageDispatch<CfgTopologyQuery, CfgTopology, InterpreterError>
 {
 }
 
@@ -300,7 +300,7 @@ impl<S> StageQuery for S where
         + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
         + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
         + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
-        + SupportsStageDispatch<RegionEntry, Option<Block>, InterpreterError>
+        + SupportsStageDispatch<CfgEntry, Option<Block>, InterpreterError>
         + SupportsStageDispatch<
             UniqueSpecialization,
             Result<SpecializedFunction, InterpreterError>,
@@ -309,7 +309,7 @@ impl<S> StageQuery for S where
         + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
         + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
         + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-        + SupportsStageDispatch<RegionTopologyQuery, RegionTopology, InterpreterError>
+        + SupportsStageDispatch<CfgTopologyQuery, CfgTopology, InterpreterError>
 {
 }
 
@@ -354,12 +354,12 @@ pub(crate) fn next_statement<S: StageQuery>(
     dispatch(pipeline, stage, NextStatement { block, after })
 }
 
-pub(crate) fn region_entry<S: StageQuery>(
+pub(crate) fn cfg_entry<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
-    region: Region,
+    cfg: Cfg,
 ) -> Result<Option<Block>, InterpreterError> {
-    dispatch(pipeline, stage, RegionEntry(region))
+    dispatch(pipeline, stage, CfgEntry(cfg))
 }
 
 pub(crate) fn unique_specialization<S: StageQuery>(
@@ -402,10 +402,10 @@ pub(crate) fn terminator_arguments<S: StageQuery>(
     dispatch(pipeline, stage, TerminatorArguments(block))
 }
 
-pub(crate) fn region_topology<S: StageQuery>(
+pub(crate) fn cfg_topology<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
-    region: Region,
-) -> Result<RegionTopology, InterpreterError> {
-    dispatch(pipeline, stage, RegionTopologyQuery(region))
+    cfg: Cfg,
+) -> Result<CfgTopology, InterpreterError> {
+    dispatch(pipeline, stage, CfgTopologyQuery(cfg))
 }

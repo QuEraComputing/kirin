@@ -42,14 +42,14 @@ pub trait HasSuccessorsMut<'a> {
     fn successors_mut(&'a mut self) -> Self::IterMut;
 }
 
-pub trait HasRegions<'a> {
-    type Iter: Iterator<Item = &'a crate::Region>;
-    fn regions(&'a self) -> Self::Iter;
+pub trait HasCfgs<'a> {
+    type Iter: Iterator<Item = &'a crate::Cfg>;
+    fn cfgs(&'a self) -> Self::Iter;
 }
 
-pub trait HasRegionsMut<'a> {
-    type IterMut: Iterator<Item = &'a mut crate::Region>;
-    fn regions_mut(&'a mut self) -> Self::IterMut;
+pub trait HasCfgsMut<'a> {
+    type IterMut: Iterator<Item = &'a mut crate::Cfg>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut;
 }
 
 pub trait HasDigraphs<'a> {
@@ -72,17 +72,17 @@ pub trait HasUngraphsMut<'a> {
     fn ungraphs_mut(&'a mut self) -> Self::IterMut;
 }
 
-/// Structural trait for dialect operations that have a single region body.
+/// Structural trait for dialect operations that have a single CFG body.
 ///
 /// This trait is intentionally not a supertrait of `Dialect` — it applies to
 /// individual operations (e.g., `FunctionBody`, `Lambda`) that contain a single
-/// `Region`, not to the dialect enum itself.  It enables shared helper functions
-/// for interpreter and analysis code that operate on region-bearing operations.
-pub trait HasRegionBody {
-    fn region(&self) -> &crate::Region;
+/// `Cfg`, not to the dialect enum itself.  It enables shared helper functions
+/// for interpreter and analysis code that operate on CFG-bearing operations.
+pub trait HasCfgBody {
+    fn cfg(&self) -> &crate::Cfg;
 
     fn entry_block<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<crate::Block> {
-        self.region().blocks(stage).next()
+        self.cfg().blocks(stage).next()
     }
 }
 
@@ -127,8 +127,8 @@ pub trait Dialect:
     + for<'a> HasBlocksMut<'a>
     + for<'a> HasSuccessors<'a>
     + for<'a> HasSuccessorsMut<'a>
-    + for<'a> HasRegions<'a>
-    + for<'a> HasRegionsMut<'a>
+    + for<'a> HasCfgs<'a>
+    + for<'a> HasCfgsMut<'a>
     + for<'a> HasDigraphs<'a>
     + for<'a> HasDigraphsMut<'a>
     + for<'a> HasUngraphs<'a>

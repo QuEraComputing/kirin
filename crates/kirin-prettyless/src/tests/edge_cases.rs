@@ -108,10 +108,10 @@ fn test_print_block_multiple_unnamed_args() {
     insta::assert_snapshot!(buf);
 }
 
-// --- Region with multiple blocks ---
+// --- Cfg with multiple blocks ---
 
 #[test]
-fn test_print_region_multiple_blocks() {
+fn test_print_cfg_multiple_blocks() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
@@ -126,8 +126,8 @@ fn test_print_region_multiple_blocks() {
     let ret3 = SimpleLanguage::op_return(&mut stage, c.result);
     let block3 = stage.block().stmt(c).terminator(ret3).new();
 
-    let region = stage
-        .region()
+    let cfg = stage
+        .cfg()
         .add_block(block1)
         .add_block(block2)
         .add_block(block3)
@@ -135,7 +135,7 @@ fn test_print_region_multiple_blocks() {
 
     let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
-    let arena_doc = doc.print_region(&region);
+    let arena_doc = doc.print_cfg(&cfg);
     let mut buf = String::new();
     arena_doc.render_fmt(120, &mut buf).unwrap();
     insta::assert_snapshot!(buf);
@@ -309,7 +309,7 @@ fn test_staged_function_unnamed() {
         let a = SimpleLanguage::op_constant(ctx, 0i64);
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
-        let body = ctx.region().add_block(block).new();
+        let body = ctx.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
         ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
     });
@@ -336,7 +336,7 @@ fn test_staged_function_no_params() {
     let a = SimpleLanguage::op_constant(&mut stage, 0i64);
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
     let block = stage.block().stmt(a).terminator(ret).new();
-    let body = stage.region().add_block(block).new();
+    let body = stage.cfg().add_block(block).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
     let _ = stage
         .specialize()
@@ -390,7 +390,7 @@ fn test_pipeline_render_builder_write_to() {
         let a = SimpleLanguage::op_constant(ctx, 5i64);
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
-        let body = ctx.region().add_block(block).new();
+        let body = ctx.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
         ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
     });
@@ -426,7 +426,7 @@ fn test_function_render_builder_write_to() {
         let a = SimpleLanguage::op_constant(ctx, 99i64);
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
-        let body = ctx.region().add_block(block).new();
+        let body = ctx.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
         ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
     });
@@ -457,7 +457,7 @@ fn test_render_very_narrow_width() {
     let a = SimpleLanguage::op_constant(&mut stage, 1i64);
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
     let block = stage.block().stmt(a).terminator(ret).new();
-    let body = stage.region().add_block(block).new();
+    let body = stage.cfg().add_block(block).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
     let _ = stage
         .specialize()

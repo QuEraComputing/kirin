@@ -1,7 +1,7 @@
 use crate::arena::Arena;
+use crate::node::cfg::CfgInfo;
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::function::CompileStage;
-use crate::node::region::RegionInfo;
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{Dialect, InternTable, node::*};
 
@@ -22,7 +22,7 @@ pub struct Arenas<L: Dialect> {
     pub(crate) stage_id: Option<CompileStage>,
     pub(crate) staged_functions: Arena<StagedFunction, StagedFunctionInfo<L>>,
     pub(crate) staged_name_policy: StagedNamePolicy,
-    pub(crate) regions: Arena<Region, RegionInfo<L>>,
+    pub(crate) cfgs: Arena<Cfg, CfgInfo<L>>,
     pub(crate) blocks: Arena<Block, BlockInfo<L>>,
     pub(crate) statements: Arena<Statement, StatementInfo<L>>,
     pub(crate) digraphs: Arena<DiGraph, DiGraphInfo<L>>,
@@ -40,7 +40,7 @@ where
             stage_id: None,
             staged_functions: Arena::default(),
             staged_name_policy: StagedNamePolicy::default(),
-            regions: Arena::default(),
+            cfgs: Arena::default(),
             blocks: Arena::default(),
             statements: Arena::default(),
             digraphs: Arena::default(),
@@ -61,7 +61,7 @@ where
             stage_id: self.stage_id,
             staged_functions: self.staged_functions.clone(),
             staged_name_policy: self.staged_name_policy,
-            regions: self.regions.clone(),
+            cfgs: self.cfgs.clone(),
             blocks: self.blocks.clone(),
             statements: self.statements.clone(),
             digraphs: self.digraphs.clone(),
@@ -127,9 +127,9 @@ impl<L: Dialect> Arenas<L> {
         self.staged_name_policy = policy;
     }
 
-    /// Get a reference to the regions arena.
-    pub fn region_arena(&self) -> &Arena<Region, RegionInfo<L>> {
-        &self.regions
+    /// Get a reference to the cfgs arena.
+    pub fn cfg_arena(&self) -> &Arena<Cfg, CfgInfo<L>> {
+        &self.cfgs
     }
 
     /// Get a reference to the blocks arena.

@@ -1,6 +1,6 @@
 use kirin_arith::ArithType;
 use kirin_function::{Bind, Call, Return};
-use kirin_ir::{Dialect, Region, Signature};
+use kirin_ir::{Cfg, Dialect, Signature};
 
 /// Test language: Function + Bind + Call + Return.
 /// Used for function call/bind roundtrip tests.
@@ -16,7 +16,7 @@ pub enum CallableLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     Function {
-        body: Region,
+        body: Cfg,
         sig: Signature<ArithType>,
     },
     #[wraps]

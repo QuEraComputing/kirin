@@ -108,7 +108,7 @@ where
 // Demand converges value-by-value on the sparse backward engine's worklist,
 // so structured bodies need no walk and loops need no frame fixpoint: this
 // rule re-runs whenever a result or a body block parameter it feeds rises
-// (the owning statement is the body's *feeder* in the region topology).
+// (the owning statement is the body's *feeder* in the cfg topology).
 
 /// Backward demand for `scf.if`: the condition is an unconditional control
 /// root (consistent with `cf.cond_br`); a body's yield slot is demanded iff

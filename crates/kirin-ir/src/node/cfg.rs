@@ -6,27 +6,27 @@ use super::linked_list::LinkedList;
 use super::stmt::Statement;
 
 identifier! {
-    /// A unique identifier for a region.
-    struct Region
+    /// A unique identifier for a CFG (a block-list control-flow body).
+    struct Cfg
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct RegionInfo<L: Dialect> {
-    pub(crate) id: Region,
+pub struct CfgInfo<L: Dialect> {
+    pub(crate) id: Cfg,
     pub(crate) parent: Option<Statement>,
     pub(crate) blocks: LinkedList<Block>,
     _marker: std::marker::PhantomData<L>,
 }
 
 #[bon::bon]
-impl<L: Dialect> RegionInfo<L> {
+impl<L: Dialect> CfgInfo<L> {
     #[builder(finish_fn = new)]
     pub fn new(
-        /// The unique identifier for this region.
-        id: Region,
-        /// The parent statement of this region, if any.
+        /// The unique identifier for this CFG.
+        id: Cfg,
+        /// The parent statement of this CFG, if any.
         parent: Option<Statement>,
-        /// The blocks contained in this region.
+        /// The blocks contained in this CFG.
         blocks: LinkedList<Block>,
     ) -> Self {
         Self {
@@ -38,19 +38,19 @@ impl<L: Dialect> RegionInfo<L> {
     }
 }
 
-impl<L: Dialect> GetInfo<L> for Region {
-    type Info = Item<RegionInfo<L>>;
+impl<L: Dialect> GetInfo<L> for Cfg {
+    type Info = Item<CfgInfo<L>>;
 
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
-        stage.regions.get(*self)
+        stage.cfgs.get(*self)
     }
 
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
-        stage.regions.get_mut(*self)
+        stage.cfgs.get_mut(*self)
     }
 }
 
-impl Region {
+impl Cfg {
     pub fn blocks<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> BlockIter<'a, L> {
         let info = self.expect_info(stage);
         BlockIter {

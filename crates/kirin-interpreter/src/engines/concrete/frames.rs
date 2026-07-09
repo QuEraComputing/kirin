@@ -2,7 +2,7 @@
 //! protocol.
 //!
 //! These are the default total frames for [`ConcreteInterpreter`](crate::ConcreteInterpreter):
-//! [`BodyFrame`] (walks a function-body CFG region or a single body block) and
+//! [`BodyFrame`] (walks a function-body CFG or a single body block) and
 //! [`CallFrame`] (call/return). They implement the shared [`Frame`] trait by
 //! consuming the dialect [`SparseForwardEffect`] and driving a single deterministic
 //! path. Structured-control dialects do not get a framework "scope": they push
@@ -13,7 +13,7 @@
 //! via [`FrameBuild`] plus its dialect frames. The forward abstract analogue
 //! lives in [`sparse_forward::frames`](crate::engines::sparse_forward::frames).
 
-use kirin_ir::{Block, CompileStage, Product, Region, SSAValue, Statement};
+use kirin_ir::{Block, Cfg, CompileStage, Product, SSAValue, Statement};
 
 use crate::{
     CallEffect, Callee, EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError,
@@ -44,7 +44,7 @@ pub trait FrameBuild<V, E>: Sized {
     fn from_call(frame: CallFrame<V>) -> Self;
 }
 
-/// Traversal of one body: a function-body CFG region (multi-block, with jumps)
+/// Traversal of one body: a function-body CFG (multi-block, with jumps)
 /// or a single body block (scf-style, terminated by a yield).
 pub struct BodyFrame<V, E> {
     stage: CompileStage,
@@ -68,21 +68,21 @@ where
     V: Clone,
     E: From<InterpreterError>,
 {
-    /// Walk a function body: start at the entry block of `region`, binding
+    /// Walk a function body: start at the entry block of `cfg`, binding
     /// `args` to its parameters. Owns the activation and is the return boundary.
     pub fn function<I>(
         interp: &mut I,
         stage: CompileStage,
         index: EnvIndex,
-        region: Region,
+        cfg: Cfg,
         args: Product<V>,
     ) -> Result<Self, E>
     where
         I: FrameDriver<Value = V, Error = E>,
     {
         let entry = interp
-            .region_entry(stage, region)?
-            .ok_or_else(|| E::from(InterpreterError::EmptyRegion))?;
+            .cfg_entry(stage, cfg)?
+            .ok_or_else(|| E::from(InterpreterError::EmptyCfg))?;
         Self::start(interp, stage, index, entry, args, true, true)
     }
 
@@ -289,8 +289,7 @@ where
                 let target = interp.resolve_call(resolve_stage, &callee)?;
                 let index = interp.alloc_env();
                 let body = interp.enter_function(target.stage, target.body, args, index)?;
-                let frame =
-                    BodyFrame::function(interp, target.stage, index, body.region, body.args)?;
+                let frame = BodyFrame::function(interp, target.stage, index, body.cfg, body.args)?;
                 Ok(FrameEffect::Push {
                     parent: F::from_call(CallFrame::Awaiting {
                         caller_env,

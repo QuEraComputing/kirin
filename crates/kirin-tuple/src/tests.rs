@@ -1,5 +1,5 @@
 use kirin::ir::{
-    HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
+    HasArguments, HasBlocks, HasCfgs, HasResults, HasSuccessors, IsConstant, IsPure,
     IsSpeculatable, IsTerminator, TestSSAValue,
 };
 use kirin_test_types::UnitType;
@@ -73,8 +73,8 @@ fn new_tuple_no_blocks() {
 }
 
 #[test]
-fn new_tuple_no_regions() {
-    assert_eq!(make_new_tuple().regions().count(), 0);
+fn new_tuple_no_cfgs() {
+    assert_eq!(make_new_tuple().cfgs().count(), 0);
 }
 
 // --- Unpack: not a terminator ---
@@ -127,8 +127,8 @@ fn unpack_no_blocks() {
 }
 
 #[test]
-fn unpack_no_regions() {
-    assert_eq!(make_unpack().regions().count(), 0);
+fn unpack_no_cfgs() {
+    assert_eq!(make_unpack().cfgs().count(), 0);
 }
 
 // --- Clone + PartialEq ---

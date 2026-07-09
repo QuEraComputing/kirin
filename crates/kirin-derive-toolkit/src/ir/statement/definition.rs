@@ -226,12 +226,12 @@ impl<L: Layout> Statement<L> {
             });
         }
 
-        if let Some(collection) = Collection::from_type(ty, "Region") {
+        if let Some(collection) = Collection::from_type(ty, "Cfg") {
             return Ok(FieldInfo {
                 index,
                 ident,
                 collection,
-                data: FieldData::Region,
+                data: FieldData::Cfg,
             });
         }
 

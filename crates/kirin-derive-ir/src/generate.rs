@@ -83,20 +83,20 @@ pub(crate) const HAS_SUCCESSORS_MUT: FieldIterConfig = FieldIterConfig {
     trait_method: "successors_mut",
     trait_type_iter: "IterMut",
 };
-pub(crate) const HAS_REGIONS: FieldIterConfig = FieldIterConfig {
-    kind: FieldIterKind::Regions,
+pub(crate) const HAS_CFGS: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Cfgs,
     mutable: false,
-    trait_name: "HasRegions",
-    matching_type: "Region",
-    trait_method: "regions",
+    trait_name: "HasCfgs",
+    matching_type: "Cfg",
+    trait_method: "cfgs",
     trait_type_iter: "Iter",
 };
-pub(crate) const HAS_REGIONS_MUT: FieldIterConfig = FieldIterConfig {
-    kind: FieldIterKind::Regions,
+pub(crate) const HAS_CFGS_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Cfgs,
     mutable: true,
-    trait_name: "HasRegionsMut",
-    matching_type: "Region",
-    trait_method: "regions_mut",
+    trait_name: "HasCfgsMut",
+    matching_type: "Cfg",
+    trait_method: "cfgs_mut",
     trait_type_iter: "IterMut",
 };
 pub(crate) const HAS_DIGRAPHS: FieldIterConfig = FieldIterConfig {
@@ -141,8 +141,8 @@ pub(crate) const FIELD_ITER_CONFIGS: [FieldIterConfig; 14] = [
     HAS_BLOCKS_MUT,
     HAS_SUCCESSORS,
     HAS_SUCCESSORS_MUT,
-    HAS_REGIONS,
-    HAS_REGIONS_MUT,
+    HAS_CFGS,
+    HAS_CFGS_MUT,
     HAS_DIGRAPHS,
     HAS_DIGRAPHS_MUT,
     HAS_UNGRAPHS,

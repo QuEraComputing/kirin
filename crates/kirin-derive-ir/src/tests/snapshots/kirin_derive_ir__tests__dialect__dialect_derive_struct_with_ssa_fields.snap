@@ -179,45 +179,45 @@ impl<'a> Iterator for BinaryOpSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for BinaryOp {
-    type Iter = BinaryOpRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCfgs<'a> for BinaryOp {
+    type Iter = BinaryOpCfgsIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         let Self { result, lhs, rhs } = self;
-        BinaryOpRegionsIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        BinaryOpCfgsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Cfg>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct BinaryOpRegionsIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+pub struct BinaryOpCfgsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for BinaryOpRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for BinaryOpCfgsIter<'a> {
+    type Item = &'a ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for BinaryOp {
-    type IterMut = BinaryOpRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCfgsMut<'a> for BinaryOp {
+    type IterMut = BinaryOpCfgsMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         let Self { result, lhs, rhs } = self;
-        BinaryOpRegionsMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        BinaryOpCfgsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Cfg>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct BinaryOpRegionsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+pub struct BinaryOpCfgsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for BinaryOpRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for BinaryOpCfgsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

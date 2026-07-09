@@ -20,11 +20,11 @@
 //!   the real dispatch location, and the per-rule demand buffer.
 //! - the **[`StandardFixpointInterpreter`]** driver owns the demand facts
 //!   (summaries keyed by [`Scoped`] SSA values — never bare values), the value
-//!   worklist, and the analysis state (scope + region topology).
+//!   worklist, and the analysis state (scope + CFG topology).
 //!
 //! # Owners are values; scheduling is demand propagation
 //!
-//! `SummaryKey = Scoped<(CompileStage, Region), SSAValue>`: the fact anchor is
+//! `SummaryKey = Scoped<(CompileStage, Cfg), SSAValue>`: the fact anchor is
 //! the owner. The driver's *default* self-dependent index
 //! ([`OwnerSummaryDeps`]) is exactly demand propagation — a value whose fact
 //! rises is rescheduled, and analyzing a value means dispatching the rules
@@ -33,7 +33,7 @@
 //! - a statement **result** → the defining statement's backward rule;
 //! - a **block argument** → each of the block's *feeders* (terminators
 //!   targeting the block, statements owning it as a structured body) from the
-//!   [`RegionTopology`];
+//!   [`CfgTopology`];
 //! - a graph **port** → unsupported (loud error).
 //!
 //! Rules read converged facts ([`DemandInterp::is_demanded`]) and raise new
@@ -49,23 +49,23 @@ use std::marker::PhantomData;
 use std::mem;
 
 use kirin_ir::{
-    Block, CompileStage, HasArguments, HasBottom, HasResults, HasTop, IsPure, Lattice, Pipeline,
-    Region, SSAKind, SSAValue, StageMeta, Statement,
+    Block, Cfg, CompileStage, HasArguments, HasBottom, HasResults, HasTop, IsPure, Lattice,
+    Pipeline, SSAKind, SSAValue, StageMeta, Statement,
 };
 
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp, InterpDispatch,
-    InterpLocation, InterpreterError, OwnerSemantics, OwnerSummaryDeps, RegionTopology, Scoped,
+    AbstractInterpreter, CfgTopology, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
+    InterpDispatch, InterpLocation, InterpreterError, OwnerSemantics, OwnerSummaryDeps, Scoped,
     SparseBackwardSemantic, SparseStore, StageQuery, StandardFixpointInterpreter, StrongDemand,
     Summary, SummaryEffect,
 };
 
-/// The scope a region-level backward analysis qualifies its facts with.
+/// The scope a CFG-level backward analysis qualifies its facts with.
 ///
 /// Arena ids are per-stage, so the stage is part of the scope; analyzing two
-/// regions in one engine keeps their facts distinct.
-pub type RegionScope = (CompileStage, Region);
+/// cfgs in one engine keeps their facts distinct.
+pub type CfgScope = (CompileStage, Cfg);
 
 // ===========================================================================
 // Effect + dialect-facing trait
@@ -275,18 +275,18 @@ where
     E: From<InterpreterError>,
     Sem: SparseBackwardSemantic,
 {
-    type SummaryKey = Scoped<RegionScope, SSAValue>;
+    type SummaryKey = Scoped<CfgScope, SSAValue>;
     type Summary = DemandSummary<V>;
     type Frame = DemandFrame<V>;
     type Completion = Vec<(SSAValue, V)>;
 }
 
 /// Analysis-local state carried in the driver's `store` slot: the scope facts
-/// are qualified with, and the region topology (feeders for block arguments).
+/// are qualified with, and the CFG topology (feeders for block arguments).
 #[derive(Default)]
 pub struct BackwardAnalysisState {
-    scope: Option<RegionScope>,
-    topology: RegionTopology,
+    scope: Option<CfgScope>,
+    topology: CfgTopology,
 }
 
 /// The sparse backward driver: a [`StandardFixpointInterpreter`] over
@@ -296,7 +296,7 @@ pub type SparseBackwardDriver<'ir, S, V, E, Sem = StrongDemand> = StandardFixpoi
     SparseBackwardTransfer<'ir, S, V, E, Sem>,
     SparseBackwardProfile<V, E>,
     BackwardAnalysisState,
-    OwnerSummaryDeps<Scoped<RegionScope, SSAValue>>,
+    OwnerSummaryDeps<Scoped<CfgScope, SSAValue>>,
 >;
 
 // ===========================================================================
@@ -444,7 +444,7 @@ struct SparseBackwardSemantics;
 impl<'ir, S, V, E, Sem>
     OwnerSemantics<
         SparseBackwardDriver<'ir, S, V, E, Sem>,
-        Scoped<RegionScope, SSAValue>,
+        Scoped<CfgScope, SSAValue>,
         DemandSummary<V>,
         DemandFrame<V>,
         Vec<(SSAValue, V)>,
@@ -459,7 +459,7 @@ where
     fn bottom_summary(
         &mut self,
         _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-        _owner: &Scoped<RegionScope, SSAValue>,
+        _owner: &Scoped<CfgScope, SSAValue>,
     ) -> Result<DemandSummary<V>, E> {
         Ok(DemandSummary(V::bottom()))
     }
@@ -467,10 +467,10 @@ where
     fn entry_frame(
         &mut self,
         interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-        owner: &Scoped<RegionScope, SSAValue>,
+        owner: &Scoped<CfgScope, SSAValue>,
         _summary: &DemandSummary<V>,
     ) -> Result<DemandFrame<V>, E> {
-        let (stage, _region) = owner.scope;
+        let (stage, _cfg) = owner.scope;
         let kind = query::value_kind(interp.inner().pipeline(), stage, owner.item)?;
         let work = match kind {
             SSAKind::Result(statement, _) => vec![statement],
@@ -487,9 +487,9 @@ where
     fn complete_owner(
         &mut self,
         _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-        owner: Scoped<RegionScope, SSAValue>,
+        owner: Scoped<CfgScope, SSAValue>,
         completion: Vec<(SSAValue, V)>,
-    ) -> Result<SummaryEffect<Scoped<RegionScope, SSAValue>, DemandSummary<V>>, E> {
+    ) -> Result<SummaryEffect<Scoped<CfgScope, SSAValue>, DemandSummary<V>>, E> {
         // Scope-qualify the bare values the rules demanded.
         Ok(SummaryEffect::Many(
             completion
@@ -508,8 +508,8 @@ where
 ///
 /// ```ignore
 /// let mut analysis = SparseBackwardInterpreter::<Stage, Live>::new(&pipeline);
-/// analysis.analyze(stage, region)?;
-/// let demanded = analysis.is_demanded(stage, region, value);
+/// analysis.analyze(stage, cfg)?;
+/// let demanded = analysis.is_demanded(stage, cfg, value);
 /// ```
 pub struct SparseBackwardInterpreter<'ir, S: StageMeta, V, E = InterpreterError, Sem = StrongDemand>
 where
@@ -542,25 +542,16 @@ where
         self.driver.inner().pipeline()
     }
 
-    /// The converged demand fact for `value` under the `(stage, region)` scope.
-    pub fn fact(
-        &self,
-        stage: CompileStage,
-        region: Region,
-        value: impl Into<SSAValue>,
-    ) -> Option<&V> {
+    /// The converged demand fact for `value` under the `(stage, cfg)` scope.
+    pub fn fact(&self, stage: CompileStage, cfg: Cfg, value: impl Into<SSAValue>) -> Option<&V> {
         self.driver
-            .summary(&Scoped::new((stage, region), value.into()))
+            .summary(&Scoped::new((stage, cfg), value.into()))
             .map(|summary| &summary.0)
     }
 
-    /// All converged `(value, fact)` pairs under the `(stage, region)` scope.
-    pub fn facts(
-        &self,
-        stage: CompileStage,
-        region: Region,
-    ) -> impl Iterator<Item = (SSAValue, &V)> {
-        let scope = (stage, region);
+    /// All converged `(value, fact)` pairs under the `(stage, cfg)` scope.
+    pub fn facts(&self, stage: CompileStage, cfg: Cfg) -> impl Iterator<Item = (SSAValue, &V)> {
+        let scope = (stage, cfg);
         self.driver
             .summaries()
             .iter()
@@ -568,11 +559,11 @@ where
             .map(|(owner, summary)| (owner.item, &summary.0))
     }
 
-    /// The converged facts under the `(stage, region)` scope as a
+    /// The converged facts under the `(stage, cfg)` scope as a
     /// [`SparseStore`] (the sparse per-SSA-value fact view; absent = bottom).
-    pub fn fact_store(&self, stage: CompileStage, region: Region) -> SparseStore<V> {
+    pub fn fact_store(&self, stage: CompileStage, cfg: Cfg) -> SparseStore<V> {
         let mut store = SparseStore::new();
-        for (value, fact) in self.facts(stage, region) {
+        for (value, fact) in self.facts(stage, cfg) {
             store.set(value, fact.clone());
         }
         store
@@ -586,16 +577,16 @@ where
     E: From<InterpreterError>,
     Sem: SparseBackwardSemantic,
 {
-    /// Run the demand fixpoint over `region` in `stage`.
+    /// Run the demand fixpoint over `cfg` in `stage`.
     ///
-    /// **Prepass**: enumerate the region topology (blocks including structured
+    /// **Prepass**: enumerate the CFG topology (blocks including structured
     /// bodies, statements, feeders), then run every statement's rule once with
     /// nothing demanded — impure statements and terminators contribute the
     /// demand roots. **Propagation**: drain the value worklist; each risen
     /// value dispatches the rules that translate its demand.
-    pub fn analyze(&mut self, stage: CompileStage, region: Region) -> Result<(), E> {
-        let scope = (stage, region);
-        let topology = query::region_topology(self.driver.inner().pipeline(), stage, region)?;
+    pub fn analyze(&mut self, stage: CompileStage, cfg: Cfg) -> Result<(), E> {
+        let scope = (stage, cfg);
+        let topology = query::cfg_topology(self.driver.inner().pipeline(), stage, cfg)?;
         let statements: Vec<Statement> = topology
             .blocks
             .iter()
@@ -628,16 +619,11 @@ where
     }
 
     /// `true` iff `value` carries a non-bottom demand fact under the scope.
-    pub fn is_demanded(
-        &self,
-        stage: CompileStage,
-        region: Region,
-        value: impl Into<SSAValue>,
-    ) -> bool
+    pub fn is_demanded(&self, stage: CompileStage, cfg: Cfg, value: impl Into<SSAValue>) -> bool
     where
         V: HasBottom,
     {
-        self.fact(stage, region, value)
+        self.fact(stage, cfg, value)
             .is_some_and(|fact| *fact != V::bottom())
     }
 }

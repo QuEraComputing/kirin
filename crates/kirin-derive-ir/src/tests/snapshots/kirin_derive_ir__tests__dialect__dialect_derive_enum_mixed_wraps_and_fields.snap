@@ -243,28 +243,28 @@ impl<'a> Iterator for MixedOpsSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for MixedOps {
-    type Iter = MixedOpsRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCfgs<'a> for MixedOps {
+    type Iter = MixedOpsCfgsIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         match self {
             Self::Add(field_0) => {
-                MixedOpsRegionsIter::Add(<AddOp as ::kirin::ir::HasRegions>::regions(field_0))
+                MixedOpsCfgsIter::Add(<AddOp as ::kirin::ir::HasCfgs>::cfgs(field_0))
             }
             Self::Literal { value } => {
-                MixedOpsRegionsIter::Literal(std::iter::empty::<&'a ::kirin::ir::Region>())
+                MixedOpsCfgsIter::Literal(std::iter::empty::<&'a ::kirin::ir::Cfg>())
             }
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum MixedOpsRegionsIter<'a> {
-    Add(<AddOp as ::kirin::ir::HasRegions<'a>>::Iter),
-    Literal(std::iter::Empty<&'a ::kirin::ir::Region>),
+pub enum MixedOpsCfgsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasCfgs<'a>>::Iter),
+    Literal(std::iter::Empty<&'a ::kirin::ir::Cfg>),
 }
 #[automatically_derived]
-impl<'a> Iterator for MixedOpsRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for MixedOpsCfgsIter<'a> {
+    type Item = &'a ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Add(inner) => inner.next(),
@@ -273,28 +273,28 @@ impl<'a> Iterator for MixedOpsRegionsIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for MixedOps {
-    type IterMut = MixedOpsRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCfgsMut<'a> for MixedOps {
+    type IterMut = MixedOpsCfgsMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         match self {
-            Self::Add(field_0) => MixedOpsRegionsMutIter::Add(
-                <AddOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
-            ),
+            Self::Add(field_0) => {
+                MixedOpsCfgsMutIter::Add(<AddOp as ::kirin::ir::HasCfgsMut>::cfgs_mut(field_0))
+            }
             Self::Literal { value } => {
-                MixedOpsRegionsMutIter::Literal(std::iter::empty::<&'a mut ::kirin::ir::Region>())
+                MixedOpsCfgsMutIter::Literal(std::iter::empty::<&'a mut ::kirin::ir::Cfg>())
             }
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum MixedOpsRegionsMutIter<'a> {
-    Add(<AddOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
-    Literal(std::iter::Empty<&'a mut ::kirin::ir::Region>),
+pub enum MixedOpsCfgsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasCfgsMut<'a>>::IterMut),
+    Literal(std::iter::Empty<&'a mut ::kirin::ir::Cfg>),
 }
 #[automatically_derived]
-impl<'a> Iterator for MixedOpsRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for MixedOpsCfgsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Add(inner) => inner.next(),

@@ -46,9 +46,9 @@
 <text text-anchor="start" x="211.62" y="-490.85" font-family="Helvetica Neue" font-size="12.00">(i64) → i64</text>
 </g>
 <g id="clust4" class="cluster">
-<title>cluster_region</title>
+<title>cluster_cfg</title>
 <polygon fill="#ecf0f8" stroke="#7baaf7" stroke-width="1.5" stroke-dasharray="5,2" points="32,-32 32,-474.25 404,-474.25 404,-32 32,-32"/>
-<text text-anchor="start" x="202.25" y="-461.75" font-family="Helvetica Neue" font-style="italic" font-size="10.00">Region</text>
+<text text-anchor="start" x="202.25" y="-461.75" font-family="Helvetica Neue" font-style="italic" font-size="10.00">CFG</text>
 </g>
 <g id="clust5" class="cluster">
 <title>cluster_entry</title>

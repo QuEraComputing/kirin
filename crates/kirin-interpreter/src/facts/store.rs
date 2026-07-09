@@ -170,7 +170,7 @@ impl<F> DenseBlockStore<F> {
 
 #[cfg(test)]
 mod tests {
-    use kirin_ir::{Block, CompileStage, Id, Region, Statement, TestSSAValue};
+    use kirin_ir::{Block, Cfg, CompileStage, Id, Statement, TestSSAValue};
 
     use super::*;
 
@@ -205,14 +205,14 @@ mod tests {
 
     #[test]
     fn scoped_anchors_keep_scopes_distinct() {
-        type Scope = (CompileStage, Region);
+        type Scope = (CompileStage, Cfg);
         let scope_a: Scope = (
             CompileStage::from(Id::from(ssa(100))),
-            Region::from(Id::from(ssa(200))),
+            Cfg::from(Id::from(ssa(200))),
         );
         let scope_b: Scope = (
             CompileStage::from(Id::from(ssa(101))),
-            Region::from(Id::from(ssa(200))),
+            Cfg::from(Id::from(ssa(200))),
         );
 
         let mut store: ScopedSparseStore<Scope, &'static str> = FactStore::new();

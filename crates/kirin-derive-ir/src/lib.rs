@@ -76,8 +76,8 @@ derive_field_iter_macro!(
     HasSuccessorsMut,
     HAS_SUCCESSORS_MUT
 );
-derive_field_iter_macro!(derive_has_regions, HasRegions, HAS_REGIONS);
-derive_field_iter_macro!(derive_has_regions_mut, HasRegionsMut, HAS_REGIONS_MUT);
+derive_field_iter_macro!(derive_has_cfgs, HasCfgs, HAS_CFGS);
+derive_field_iter_macro!(derive_has_cfgs_mut, HasCfgsMut, HAS_CFGS_MUT);
 derive_field_iter_macro!(derive_has_digraphs, HasDigraphs, HAS_DIGRAPHS);
 derive_field_iter_macro!(derive_has_digraphs_mut, HasDigraphsMut, HAS_DIGRAPHS_MUT);
 derive_field_iter_macro!(derive_has_ungraphs, HasUngraphs, HAS_UNGRAPHS);

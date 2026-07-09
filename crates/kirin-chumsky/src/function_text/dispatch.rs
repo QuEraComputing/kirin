@@ -3,7 +3,7 @@
 //! [`ParseDispatch`] replaces the HRTB-based `SupportsStageDispatchMut` path
 //! for pipeline text parsing. Each stage enum variant dispatches to a concrete
 //! dialect parser with concrete lifetimes, which avoids the E0275 trait-solver
-//! overflow that occurs when `Block`/`Region`-containing types use `#[wraps]`.
+//! overflow that occurs when `Block`/`Cfg`-containing types use `#[wraps]`.
 //!
 //! For single-dialect pipelines (`Pipeline<StageInfo<L>>`), a blanket impl is
 //! provided so no derive macro is needed.

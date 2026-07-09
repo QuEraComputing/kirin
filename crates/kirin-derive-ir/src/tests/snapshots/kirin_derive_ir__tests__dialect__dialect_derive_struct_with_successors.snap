@@ -179,45 +179,45 @@ impl<'a> Iterator for BranchSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for Branch {
-    type Iter = BranchRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCfgs<'a> for Branch {
+    type Iter = BranchCfgsIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         let Self { target, args } = self;
-        BranchRegionsIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        BranchCfgsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Cfg>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct BranchRegionsIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+pub struct BranchCfgsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for BranchRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for BranchCfgsIter<'a> {
+    type Item = &'a ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for Branch {
-    type IterMut = BranchRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCfgsMut<'a> for Branch {
+    type IterMut = BranchCfgsMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         let Self { target, args } = self;
-        BranchRegionsMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        BranchCfgsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Cfg>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct BranchRegionsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+pub struct BranchCfgsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for BranchRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for BranchCfgsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

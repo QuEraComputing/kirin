@@ -57,8 +57,8 @@ digraph kirin {
                 color="#1a73e8"
                 fontsize=12
 
-                subgraph cluster_region {
-                    label=<<I>Region</I>>
+                subgraph cluster_cfg {
+                    label=<<I>CFG</I>>
                     style="dashed,filled"
                     fillcolor="#ecf0f8"
                     color="#7baaf7"

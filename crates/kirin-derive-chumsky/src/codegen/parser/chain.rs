@@ -662,14 +662,14 @@ impl GenerateHasDialectParser {
                     }
                 }
             }
-            FieldCategory::Region => {
-                // region_body returns Vec<Spanned<Block>>
+            FieldCategory::Cfg => {
+                // cfg_body returns Vec<Spanned<Block>>
                 let blocks_expr = find_var(BodyProjection::Body)
                     .map(|v| quote! { #v })
                     .unwrap_or_else(|| quote! { ::std::vec::Vec::new() });
 
                 quote! {
-                    #crate_path::Region {
+                    #crate_path::Cfg {
                         blocks: #blocks_expr,
                     }
                 }

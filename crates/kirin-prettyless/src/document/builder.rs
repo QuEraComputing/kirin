@@ -14,7 +14,7 @@ use crate::{ArenaDoc, Config, PrettyPrint};
 /// - **Arena methods** (via `Deref<Target = Arena>`): `text()`, `nil()`,
 ///   `line_()`, etc. for building document fragments.
 /// - **IR printing methods**: `print_statement()`, `print_block()`,
-///   `print_region()`, etc. for rendering structured IR nodes.
+///   `print_cfg()`, etc. for rendering structured IR nodes.
 ///
 /// For most use cases, prefer [`PrettyPrintExt::render`] or
 /// [`PrettyPrintExt::sprint`] which construct and use a `Document` internally.

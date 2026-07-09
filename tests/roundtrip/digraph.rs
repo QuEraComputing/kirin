@@ -228,13 +228,13 @@ specialize @test fn @foo(f64) -> f64 (%x: f64) { %r = add %x, %x; ret %r; }
     );
 }
 
-// --- Use Case 6: Region body-only projection pipeline test ---
+// --- Use Case 6: Cfg body-only projection pipeline test ---
 
-/// A dialect using Region body-only projection.
+/// A dialect using Cfg body-only projection.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
-enum RegionProjectedLang {
+enum CfgProjectedLang {
     #[chumsky(format = "$add {0}, {1}")]
     Add(
         SSAValue,
@@ -247,14 +247,14 @@ enum RegionProjectedLang {
     /// Function body: `fn {:name}{sig} {{ {body:body} }}`
     #[chumsky(format = "fn {:name}{sig} {{ {body:body} }}")]
     FuncBody {
-        body: Region,
+        body: Cfg,
         sig: Signature<SimpleType>,
     },
 }
 
 #[test]
-fn test_region_projected_pipeline_roundtrip() {
-    let mut pipeline = make_test_pipeline::<RegionProjectedLang>();
+fn test_cfg_projected_pipeline_roundtrip() {
+    let mut pipeline = make_test_pipeline::<CfgProjectedLang>();
 
     let input = r#"
 stage @test fn @foo(f64) -> f64;
@@ -262,19 +262,19 @@ specialize @test fn @foo(f64) -> f64 { ^entry(%x: f64) { %r = add %x, %x; ret %r
 "#;
     pipeline
         .parse(input)
-        .expect("should parse region projection format");
+        .expect("should parse cfg projection format");
 
     let printed = pipeline.sprint();
-    let mut pipeline2 = make_test_pipeline::<RegionProjectedLang>();
+    let mut pipeline2 = make_test_pipeline::<CfgProjectedLang>();
     pipeline2
         .parse(printed.trim())
-        .expect("should reparse region projection format");
+        .expect("should reparse cfg projection format");
     let printed2 = pipeline2.sprint();
 
     assert_eq!(
         printed.trim(),
         printed2.trim(),
-        "region projection pipeline roundtrip should be stable"
+        "cfg projection pipeline roundtrip should be stable"
     );
 }
 

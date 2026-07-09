@@ -2,7 +2,7 @@ use crate::{
     Dialect, Symbol,
     arena::{GetInfo, Id, Item},
     identifier,
-    node::region::Region,
+    node::cfg::Cfg,
 };
 
 use super::{
@@ -51,7 +51,7 @@ impl std::fmt::Display for Successor {
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlockInfo<L: Dialect> {
-    pub parent: Option<Region>,
+    pub parent: Option<Cfg>,
     pub name: Option<Symbol>,
     pub node: LinkedListNode<Block>,
     pub arguments: Vec<BlockArgument>,
@@ -64,8 +64,8 @@ pub struct BlockInfo<L: Dialect> {
 impl<L: Dialect> BlockInfo<L> {
     #[builder(finish_fn = new)]
     pub(crate) fn new(
-        /// The parent region of this block.
-        parent: Option<Region>,
+        /// The parent cfg of this block.
+        parent: Option<Cfg>,
         /// The name of this block.
         name: Option<Symbol>,
         /// The linked list node for this block.

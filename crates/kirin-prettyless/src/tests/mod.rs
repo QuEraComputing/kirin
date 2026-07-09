@@ -21,7 +21,7 @@ impl PrettyPrint for SimpleLanguage {
             }
             SimpleLanguage::Constant(value, _res) => doc.text(format!("constant {}", value)),
             SimpleLanguage::Return(retval) => doc.text("return ") + retval.pretty_print(doc),
-            SimpleLanguage::Function(region, _) => doc.print_region(region),
+            SimpleLanguage::Function(cfg, _) => doc.print_cfg(cfg),
         }
     }
 }
@@ -71,7 +71,7 @@ fn create_test_function() -> (
         .terminator(ret)
         .new();
 
-    let body = stage.region().add_block(block_a).add_block(block_b).new();
+    let body = stage.cfg().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
     let f = stage
         .specialize()

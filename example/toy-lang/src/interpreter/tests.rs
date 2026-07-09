@@ -262,10 +262,10 @@ fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
             .stmt(call)
             .terminator(ret)
             .new();
-        let region = builder.region().add_block(block).new();
+        let cfg = builder.cfg().add_block(block).new();
         let body = Function::<ArithType>::new(
             builder,
-            region,
+            cfg,
             Signature::new(vec![ArithType::I64], ArithType::I64, ()),
         );
         builder
@@ -897,8 +897,7 @@ mod advanced {
 
 mod demand {
     use kirin::prelude::{
-        CompileStage, GetInfo, HasRegionBody, HasResults, ParsePipelineText, Pipeline, Region,
-        SSAValue,
+        Cfg, CompileStage, GetInfo, HasCfgBody, HasResults, ParsePipelineText, Pipeline, SSAValue,
     };
     use kirin_arith::{Arith, ArithValue};
     use kirin_function::Lexical;
@@ -913,8 +912,8 @@ mod demand {
         pipeline
     }
 
-    /// The source stage id, its info, and the body region of `name`.
-    pub(super) fn source_region(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, Region) {
+    /// The source stage id, its info, and the body cfg of `name`.
+    pub(super) fn source_cfg(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, Cfg) {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
@@ -924,20 +923,20 @@ mod demand {
             .expect("staged function");
         let sf_info = sf.get_info(info).expect("staged function info");
         let body = *sf_info.specializations()[0].body();
-        let region = match body.definition(info) {
-            HighLevel::Lexical(Lexical::Function(function)) => *function.region(),
+        let cfg = match body.definition(info) {
+            HighLevel::Lexical(Lexical::Function(function)) => *function.cfg(),
             other => panic!("expected a function body, got {other:?}"),
         };
-        (stage_id, region)
+        (stage_id, cfg)
     }
 
-    /// The parameters of the region's entry block.
-    pub(super) fn entry_params(pipeline: &Pipeline<Stage>, region: Region) -> Vec<SSAValue> {
+    /// The parameters of the CFG's entry block.
+    pub(super) fn entry_params(pipeline: &Pipeline<Stage>, cfg: Cfg) -> Vec<SSAValue> {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
         };
-        let block = region.blocks(info).next().expect("entry block");
+        let block = cfg.blocks(info).next().expect("entry block");
         block
             .expect_info(info)
             .arguments
@@ -948,18 +947,18 @@ mod demand {
     }
 
     /// Find something by matching statement definitions anywhere in the
-    /// region (including scf bodies, via the topology's nested-block
+    /// cfg (including scf bodies, via the topology's nested-block
     /// enumeration).
     pub(super) fn find_value<R>(
         pipeline: &Pipeline<Stage>,
-        region: Region,
+        cfg: Cfg,
         select: impl Fn(&HighLevel) -> Option<R>,
     ) -> R {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
         };
-        let topology = kirin_interpreter::region_topology(info, &region);
+        let topology = kirin_interpreter::cfg_topology(info, &cfg);
         for block in &topology.blocks {
             for &stmt in &block.stmts {
                 if let Some(value) = select(stmt.definition(info)) {
@@ -967,16 +966,12 @@ mod demand {
                 }
             }
         }
-        panic!("no matching statement in region");
+        panic!("no matching statement in cfg");
     }
 
     /// The result of the `constant <value> -> i64` statement.
-    pub(super) fn constant_result(
-        pipeline: &Pipeline<Stage>,
-        region: Region,
-        value: i64,
-    ) -> SSAValue {
-        find_value(pipeline, region, |definition| match definition {
+    pub(super) fn constant_result(pipeline: &Pipeline<Stage>, cfg: Cfg, value: i64) -> SSAValue {
+        find_value(pipeline, cfg, |definition| match definition {
             HighLevel::Constant(constant) if constant.value == ArithValue::I64(value) => {
                 Some(constant.result.into())
             }
@@ -1008,11 +1003,11 @@ specialize @source fn @if_body(i64) -> i64 {
     #[test]
     fn scf_if_body_demand_follows_result_demand() {
         let pipeline = parse(IF_BODY_DEMAND);
-        let (stage, region) = source_region(&pipeline, "if_body");
-        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+        let (stage, cfg) = source_cfg(&pipeline, "if_body");
+        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
 
-        let cond = entry_params(&pipeline, region)[0];
-        let if_result = find_value(&pipeline, region, |definition| match definition {
+        let cond = entry_params(&pipeline, cfg)[0];
+        let if_result = find_value(&pipeline, cfg, |definition| match definition {
             HighLevel::Structured(_) => definition.results().next().map(|r| SSAValue::from(*r)),
             _ => None,
         });
@@ -1020,15 +1015,15 @@ specialize @source fn @if_body(i64) -> i64 {
         assert!(result.is_demanded(if_result), "ret demands the if result");
         assert!(result.is_demanded(cond), "condition is a control root");
         assert!(
-            result.is_demanded(constant_result(&pipeline, region, 1)),
+            result.is_demanded(constant_result(&pipeline, cfg, 1)),
             "then-arm yield operand feeds the demanded result"
         );
         assert!(
-            result.is_demanded(constant_result(&pipeline, region, 2)),
+            result.is_demanded(constant_result(&pipeline, cfg, 2)),
             "else-arm yield operand feeds the demanded result"
         );
         assert!(
-            !result.is_demanded(constant_result(&pipeline, region, 9)),
+            !result.is_demanded(constant_result(&pipeline, cfg, 9)),
             "a dead constant inside a body stays dead"
         );
     }
@@ -1057,20 +1052,20 @@ specialize @source fn @if_dead(i64) -> i64 {
     #[test]
     fn scf_if_dead_result_keeps_only_condition() {
         let pipeline = parse(IF_DEAD_RESULT);
-        let (stage, region) = source_region(&pipeline, "if_dead");
-        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+        let (stage, cfg) = source_cfg(&pipeline, "if_dead");
+        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
 
-        let cond = entry_params(&pipeline, region)[0];
-        let if_result = find_value(&pipeline, region, |definition| match definition {
+        let cond = entry_params(&pipeline, cfg)[0];
+        let if_result = find_value(&pipeline, cfg, |definition| match definition {
             HighLevel::Structured(_) => definition.results().next().map(|r| SSAValue::from(*r)),
             _ => None,
         });
 
         assert!(result.is_demanded(cond), "condition is a control root");
-        assert!(result.is_demanded(constant_result(&pipeline, region, 0)));
+        assert!(result.is_demanded(constant_result(&pipeline, cfg, 0)));
         assert!(!result.is_demanded(if_result));
-        assert!(!result.is_demanded(constant_result(&pipeline, region, 1)));
-        assert!(!result.is_demanded(constant_result(&pipeline, region, 2)));
+        assert!(!result.is_demanded(constant_result(&pipeline, cfg, 1)));
+        assert!(!result.is_demanded(constant_result(&pipeline, cfg, 2)));
     }
 
     pub(super) const FOR_CARRIED_DEMAND: &str = r#"
@@ -1097,12 +1092,12 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
     #[test]
     fn scf_for_loop_carried_demand_converges() {
         let pipeline = parse(FOR_CARRIED_DEMAND);
-        let (stage, region) = source_region(&pipeline, "loop_sum");
-        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+        let (stage, cfg) = source_cfg(&pipeline, "loop_sum");
+        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
 
-        let params = entry_params(&pipeline, region);
+        let params = entry_params(&pipeline, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
-        let next = find_value(&pipeline, region, |definition| match definition {
+        let next = find_value(&pipeline, cfg, |definition| match definition {
             HighLevel::Arith(Arith::Add { result, .. }) => Some(SSAValue::from(*result)),
             _ => None,
         });
@@ -1112,7 +1107,7 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
             let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
                 panic!("source stage holds HighLevel");
             };
-            let body = find_value(&pipeline, region, |definition| match definition {
+            let body = find_value(&pipeline, cfg, |definition| match definition {
                 HighLevel::Structured(kirin_scf::StructuredControlFlow::For(op)) => Some(op.body()),
                 _ => None,
             });
@@ -1127,11 +1122,11 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
         };
 
         assert!(
-            result.is_demanded(constant_result(&pipeline, region, 0)),
+            result.is_demanded(constant_result(&pipeline, cfg, 0)),
             "init"
         );
         assert!(
-            result.is_demanded(constant_result(&pipeline, region, 1)),
+            result.is_demanded(constant_result(&pipeline, cfg, 1)),
             "one"
         );
         assert!(result.is_demanded(next), "yield slot");
@@ -1165,11 +1160,11 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 {
     #[test]
     fn scf_for_dead_result_keeps_only_bounds() {
         let pipeline = parse(FOR_DEAD_RESULT);
-        let (stage, region) = source_region(&pipeline, "loop_dead");
-        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+        let (stage, cfg) = source_cfg(&pipeline, "loop_dead");
+        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
 
-        let params = entry_params(&pipeline, region);
-        let next = find_value(&pipeline, region, |definition| match definition {
+        let params = entry_params(&pipeline, cfg);
+        let next = find_value(&pipeline, cfg, |definition| match definition {
             HighLevel::Arith(Arith::Add { result, .. }) => Some(SSAValue::from(*result)),
             _ => None,
         });
@@ -1177,13 +1172,13 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 {
         assert!(result.is_demanded(params[0]), "bounds are control roots");
         assert!(result.is_demanded(params[1]));
         assert!(result.is_demanded(params[2]));
-        assert!(result.is_demanded(constant_result(&pipeline, region, 7)));
+        assert!(result.is_demanded(constant_result(&pipeline, cfg, 7)));
         assert!(
-            !result.is_demanded(constant_result(&pipeline, region, 0)),
+            !result.is_demanded(constant_result(&pipeline, cfg, 0)),
             "init dead"
         );
         assert!(
-            !result.is_demanded(constant_result(&pipeline, region, 1)),
+            !result.is_demanded(constant_result(&pipeline, cfg, 1)),
             "body interior dead"
         );
         assert!(!result.is_demanded(next), "yield slot dead");
@@ -1215,24 +1210,24 @@ specialize @source fn @main(i64, i64) -> i64 {
     #[test]
     fn call_arguments_are_demand_roots() {
         let pipeline = parse(CALL_PURITY);
-        let (stage, region) = source_region(&pipeline, "main");
-        let result = analyze_demand(&pipeline, stage, region).expect("analysis succeeds");
+        let (stage, cfg) = source_cfg(&pipeline, "main");
+        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
 
-        let params = entry_params(&pipeline, region);
+        let params = entry_params(&pipeline, cfg);
         let (x, y) = (params[0], params[1]);
-        let unused = find_value(&pipeline, region, |definition| match definition {
+        let unused = find_value(&pipeline, cfg, |definition| match definition {
             HighLevel::Lexical(Lexical::Call(_)) => {
                 definition.results().next().map(|r| SSAValue::from(*r))
             }
             _ => None,
         });
-        let deadsum = find_value(&pipeline, region, |definition| match definition {
+        let deadsum = find_value(&pipeline, cfg, |definition| match definition {
             HighLevel::Arith(Arith::Add { result, .. }) => Some(SSAValue::from(*result)),
             _ => None,
         });
 
         assert!(result.is_demanded(x), "call args are roots (impure)");
-        assert!(result.is_demanded(constant_result(&pipeline, region, 0)));
+        assert!(result.is_demanded(constant_result(&pipeline, cfg, 0)));
         assert!(!result.is_demanded(unused), "the call result is unused");
         assert!(!result.is_demanded(y), "pure add with dead result");
         assert!(!result.is_demanded(deadsum));
@@ -1246,12 +1241,12 @@ specialize @source fn @main(i64, i64) -> i64 {
 // ===========================================================================
 
 mod dense {
-    use kirin::prelude::{CompileStage, Pipeline, Region, SSAValue, Statement};
+    use kirin::prelude::{Cfg, CompileStage, Pipeline, SSAValue, Statement};
     use kirin_arith::{Arith, ArithValue};
     use kirin_liveness::{DenseLivenessResult, LiveSet, analyze_demand};
 
     use super::demand::{FOR_CARRIED_DEMAND, IF_DEAD_RESULT};
-    use super::demand::{constant_result, entry_params, find_value, parse, source_region};
+    use super::demand::{constant_result, entry_params, find_value, parse, source_cfg};
     use crate::interpreter::ToyDenseLiveness;
     use crate::language::HighLevel;
     use crate::stage::Stage;
@@ -1261,26 +1256,25 @@ mod dense {
     fn analyze_dense_toy(
         pipeline: &Pipeline<Stage>,
         stage: CompileStage,
-        region: Region,
+        cfg: Cfg,
     ) -> DenseLivenessResult {
         let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-        engine.analyze(stage, region).expect("analysis succeeds");
-        DenseLivenessResult::from_engine(&mut engine, stage, region)
-            .expect("reconstruction succeeds")
+        engine.analyze(stage, cfg).expect("analysis succeeds");
+        DenseLivenessResult::from_engine(&mut engine, stage, cfg).expect("reconstruction succeeds")
     }
 
     /// The statement whose definition matches `select` (anywhere in the
-    /// region, including scf bodies).
+    /// cfg, including scf bodies).
     fn find_statement(
         pipeline: &Pipeline<Stage>,
-        region: Region,
+        cfg: Cfg,
         select: impl Fn(&HighLevel) -> bool,
     ) -> Statement {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
         };
-        let topology = kirin_interpreter::region_topology(info, &region);
+        let topology = kirin_interpreter::cfg_topology(info, &cfg);
         for block in &topology.blocks {
             for &stmt in &block.stmts {
                 if select(stmt.definition(info)) {
@@ -1288,7 +1282,7 @@ mod dense {
                 }
             }
         }
-        panic!("no matching statement in region");
+        panic!("no matching statement in cfg");
     }
 
     fn live_set(values: &[SSAValue]) -> LiveSet {
@@ -1301,13 +1295,13 @@ mod dense {
     #[test]
     fn dense_per_point_inside_scf_if_arm() {
         let pipeline = parse(IF_DEAD_RESULT);
-        let (stage, region) = source_region(&pipeline, "if_dead");
-        let dense = analyze_dense_toy(&pipeline, stage, region);
-        let demand = analyze_demand(&pipeline, stage, region).expect("demand succeeds");
+        let (stage, cfg) = source_cfg(&pipeline, "if_dead");
+        let dense = analyze_dense_toy(&pipeline, stage, cfg);
+        let demand = analyze_demand(&pipeline, stage, cfg).expect("demand succeeds");
 
-        let cond = entry_params(&pipeline, region)[0];
-        let a = constant_result(&pipeline, region, 1);
-        let a_const = find_statement(&pipeline, region, |definition| match definition {
+        let cond = entry_params(&pipeline, cfg)[0];
+        let a = constant_result(&pipeline, cfg, 1);
+        let a_const = find_statement(&pipeline, cfg, |definition| match definition {
             HighLevel::Constant(constant) => constant.value == ArithValue::I64(1),
             _ => None::<()>.is_some(),
         });
@@ -1320,7 +1314,7 @@ mod dense {
         // The if's own points: its dead result is live after it (classic
         // records what the walk saw: nothing uses it, so it is NOT live), and
         // before it only the condition survives the arm join.
-        let if_stmt = find_statement(&pipeline, region, |definition| {
+        let if_stmt = find_statement(&pipeline, cfg, |definition| {
             matches!(definition, HighLevel::Structured(_))
         });
         assert_eq!(dense.live_before(if_stmt), Some(&live_set(&[cond])));
@@ -1340,26 +1334,26 @@ mod dense {
     #[test]
     fn dense_loop_carried_fixpoint() {
         let pipeline = parse(FOR_CARRIED_DEMAND);
-        let (stage, region) = source_region(&pipeline, "loop_sum");
-        let dense = analyze_dense_toy(&pipeline, stage, region);
+        let (stage, cfg) = source_cfg(&pipeline, "loop_sum");
+        let dense = analyze_dense_toy(&pipeline, stage, cfg);
 
-        let params = entry_params(&pipeline, region);
+        let params = entry_params(&pipeline, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
-        let init = constant_result(&pipeline, region, 0);
-        let one = constant_result(&pipeline, region, 1);
-        let (next, acc) = find_value(&pipeline, region, |definition| match definition {
+        let init = constant_result(&pipeline, cfg, 0);
+        let one = constant_result(&pipeline, cfg, 1);
+        let (next, acc) = find_value(&pipeline, cfg, |definition| match definition {
             HighLevel::Arith(Arith::Add { lhs, result, .. }) => {
                 Some((SSAValue::from(*result), *lhs))
             }
             _ => None,
         });
-        let for_stmt = find_statement(&pipeline, region, |definition| {
+        let for_stmt = find_statement(&pipeline, cfg, |definition| {
             matches!(definition, HighLevel::Structured(_))
         });
-        let add_stmt = find_statement(&pipeline, region, |definition| {
+        let add_stmt = find_statement(&pipeline, cfg, |definition| {
             matches!(definition, HighLevel::Arith(Arith::Add { .. }))
         });
-        let sum = find_value(&pipeline, region, |definition| match definition {
+        let sum = find_value(&pipeline, cfg, |definition| match definition {
             HighLevel::Structured(_) => {
                 use kirin::prelude::HasResults;
                 definition.results().next().map(|r| SSAValue::from(*r))

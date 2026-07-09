@@ -14,7 +14,7 @@ fn test_sprint_with_globals() {
     let a = SimpleLanguage::op_constant(&mut stage, 42i64);
     let ret = SimpleLanguage::op_return(&mut stage, a.result);
     let block = stage.block().stmt(a).terminator(ret).new();
-    let body = stage.region().add_block(block).new();
+    let body = stage.cfg().add_block(block).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
     let _ = stage
         .specialize()

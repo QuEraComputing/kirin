@@ -1,16 +1,17 @@
 pub mod block;
+pub mod cfg;
 pub(crate) mod digraph;
 pub mod function;
 pub(crate) mod graph;
 pub mod linked_list;
 pub(crate) mod port;
-pub mod region;
 pub mod ssa;
 pub mod stmt;
 pub mod symbol;
 pub(crate) mod ungraph;
 
 pub use block::{Block, BlockInfo, Successor};
+pub use cfg::{Cfg, CfgInfo};
 pub use digraph::{DiGraph, DiGraphInfo};
 pub use function::{
     CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
@@ -19,7 +20,6 @@ pub use function::{
 pub use graph::{DiGraphExtra, GraphInfo, UnGraphExtra};
 pub use linked_list::{LinkedList, LinkedListNode};
 pub use port::{Port, PortParent};
-pub use region::{Region, RegionInfo};
 pub use ssa::{
     BlockArgument, BuilderKey, BuilderSSAInfo, BuilderSSAKind, DeletedSSAValue, ResolutionInfo,
     ResultValue, SSAInfo, SSAKind, SSAValue, TestSSAValue,

@@ -217,53 +217,53 @@ impl<'a> Iterator for ConditionalOpSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for ConditionalOp {
-    type Iter = ConditionalOpRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCfgs<'a> for ConditionalOp {
+    type Iter = ConditionalOpCfgsIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         let Self {
             cond,
             then_block,
             else_block,
         } = self;
-        ConditionalOpRegionsIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        ConditionalOpCfgsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Cfg>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ConditionalOpRegionsIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+pub struct ConditionalOpCfgsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ConditionalOpRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for ConditionalOpCfgsIter<'a> {
+    type Item = &'a ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for ConditionalOp {
-    type IterMut = ConditionalOpRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCfgsMut<'a> for ConditionalOp {
+    type IterMut = ConditionalOpCfgsMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         let Self {
             cond,
             then_block,
             else_block,
         } = self;
-        ConditionalOpRegionsMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        ConditionalOpCfgsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Cfg>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ConditionalOpRegionsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+pub struct ConditionalOpCfgsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ConditionalOpRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for ConditionalOpCfgsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

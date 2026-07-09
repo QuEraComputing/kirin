@@ -350,7 +350,7 @@ impl<'ir> ValidationVisitor<'ir> {
                     FieldCategory::Block => {
                         (&[BodyProjection::Args, BodyProjection::Body], "Block")
                     }
-                    FieldCategory::Region => (&[BodyProjection::Body], "Region"),
+                    FieldCategory::Cfg => (&[BodyProjection::Body], "Cfg"),
                     _ => continue,
                 };
                 let missing: Vec<&str> = required
@@ -492,7 +492,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                         category,
                         FieldCategory::DiGraph
                             | FieldCategory::UnGraph
-                            | FieldCategory::Region
+                            | FieldCategory::Cfg
                             | FieldCategory::Block
                     )
                 }
@@ -508,7 +508,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                 let valid_on = match proj {
                     BodyProjection::Ports | BodyProjection::Captures => "DiGraph or UnGraph",
                     BodyProjection::Args => "Block",
-                    BodyProjection::Body => "DiGraph, UnGraph, Region, or Block",
+                    BodyProjection::Body => "DiGraph, UnGraph, Cfg, or Block",
                 };
                 self.add_error(format!(
                     "'{}' projection is only valid on {} fields, but '{}' is a {} field",
@@ -763,12 +763,12 @@ mod tests {
         }
     }
 
-    fn make_region(index: usize, name: &str) -> FieldInfo<ChumskyLayout> {
+    fn make_cfg(index: usize, name: &str) -> FieldInfo<ChumskyLayout> {
         FieldInfo {
             index,
             ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
             collection: Collection::Single,
-            data: FieldData::Region,
+            data: FieldData::Cfg,
         }
     }
 
@@ -808,8 +808,8 @@ mod tests {
     }
 
     #[test]
-    fn body_projection_on_region_is_valid() {
-        let fields = vec![make_region(0, "body")];
+    fn body_projection_on_cfg_is_valid() {
+        let fields = vec![make_cfg(0, "body")];
         let stmt = make_stmt(fields.clone());
         let format = Format::parse("{body:body}", None).unwrap();
         assert!(validate_format(&stmt, &format, &fields).is_ok());
@@ -824,8 +824,8 @@ mod tests {
     }
 
     #[test]
-    fn ports_projection_on_region_is_invalid() {
-        let fields = vec![make_region(0, "body")];
+    fn ports_projection_on_cfg_is_invalid() {
+        let fields = vec![make_cfg(0, "body")];
         let stmt = make_stmt(fields.clone());
         let format = Format::parse("{body:ports}", None).unwrap();
         let err = validate_format(&stmt, &format, &fields).unwrap_err();
@@ -837,8 +837,8 @@ mod tests {
     }
 
     #[test]
-    fn args_projection_on_region_is_invalid() {
-        let fields = vec![make_region(0, "body")];
+    fn args_projection_on_cfg_is_invalid() {
+        let fields = vec![make_cfg(0, "body")];
         let stmt = make_stmt(fields.clone());
         let format = Format::parse("{body:args}", None).unwrap();
         let err = validate_format(&stmt, &format, &fields).unwrap_err();

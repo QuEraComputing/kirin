@@ -13,7 +13,7 @@ pub struct Return<T: CompileTimeValue> {
 mod tests {
     use super::*;
     use kirin::ir::{
-        HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
+        HasArguments, HasBlocks, HasCfgs, HasResults, HasSuccessors, IsConstant, IsPure,
         IsSpeculatable, IsTerminator, TestSSAValue,
     };
     use kirin_test_types::UnitType;
@@ -78,8 +78,8 @@ mod tests {
     }
 
     #[test]
-    fn no_regions() {
-        assert_eq!(make_return().regions().count(), 0);
+    fn no_cfgs() {
+        assert_eq!(make_return().cfgs().count(), 0);
     }
 
     #[test]

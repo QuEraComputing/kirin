@@ -217,53 +217,53 @@ impl<'a> Iterator for ZxEvalSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for ZxEval {
-    type Iter = ZxEvalRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCfgs<'a> for ZxEval {
+    type Iter = ZxEvalCfgsIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         let Self {
             boundary,
             captures,
             body,
         } = self;
-        ZxEvalRegionsIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        ZxEvalCfgsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Cfg>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxEvalRegionsIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+pub struct ZxEvalCfgsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxEvalRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for ZxEvalCfgsIter<'a> {
+    type Item = &'a ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for ZxEval {
-    type IterMut = ZxEvalRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCfgsMut<'a> for ZxEval {
+    type IterMut = ZxEvalCfgsMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         let Self {
             boundary,
             captures,
             body,
         } = self;
-        ZxEvalRegionsMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        ZxEvalCfgsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Cfg>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxEvalRegionsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+pub struct ZxEvalCfgsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxEvalRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for ZxEvalCfgsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

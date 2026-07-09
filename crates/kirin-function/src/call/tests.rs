@@ -1,6 +1,6 @@
 use super::*;
 use kirin::ir::{
-    HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
+    HasArguments, HasBlocks, HasCfgs, HasResults, HasSuccessors, IsConstant, IsPure,
     IsSpeculatable, IsTerminator, TestSSAValue,
 };
 use kirin_test_types::UnitType;
@@ -51,8 +51,8 @@ fn no_blocks() {
 }
 
 #[test]
-fn no_regions() {
-    assert_eq!(make_call(0).regions().count(), 0);
+fn no_cfgs() {
+    assert_eq!(make_call(0).cfgs().count(), 0);
 }
 
 #[test]
