@@ -1,0 +1,26 @@
+---
+source: crates/kirin-derive-ir/src/tests/standalone.rs
+expression: rustfmt(tokens.to_string())
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasCfgs<'a> for Lambda {
+    type Iter = LambdaCfgsIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
+        let Self { body } = self;
+        LambdaCfgsIter {
+            inner: std::iter::once(body),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct LambdaCfgsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::Cfg>,
+}
+#[automatically_derived]
+impl<'a> Iterator for LambdaCfgsIter<'a> {
+    type Item = &'a ::kirin::ir::Cfg;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}

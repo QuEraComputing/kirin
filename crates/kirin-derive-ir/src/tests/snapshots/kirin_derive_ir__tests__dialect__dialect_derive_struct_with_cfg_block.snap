@@ -225,55 +225,55 @@ impl<'a> Iterator for IfOpSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for IfOp {
-    type Iter = IfOpRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCfgs<'a> for IfOp {
+    type Iter = IfOpCfgsIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         let Self {
             condition,
             then_block,
             else_block,
             body,
         } = self;
-        IfOpRegionsIter {
+        IfOpCfgsIter {
             inner: std::iter::once(body),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct IfOpRegionsIter<'a> {
-    inner: std::iter::Once<&'a ::kirin::ir::Region>,
+pub struct IfOpCfgsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for IfOpRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for IfOpCfgsIter<'a> {
+    type Item = &'a ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for IfOp {
-    type IterMut = IfOpRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCfgsMut<'a> for IfOp {
+    type IterMut = IfOpCfgsMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         let Self {
             condition,
             then_block,
             else_block,
             body,
         } = self;
-        IfOpRegionsMutIter {
+        IfOpCfgsMutIter {
             inner: std::iter::once(body),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct IfOpRegionsMutIter<'a> {
-    inner: std::iter::Once<&'a mut ::kirin::ir::Region>,
+pub struct IfOpCfgsMutIter<'a> {
+    inner: std::iter::Once<&'a mut ::kirin::ir::Cfg>,
 }
 #[automatically_derived]
-impl<'a> Iterator for IfOpRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for IfOpCfgsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Cfg;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
