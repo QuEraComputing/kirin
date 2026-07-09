@@ -51,7 +51,7 @@ where:
 Interpretation of this judgment against Rust API:
 
 - `interpret` returns `Result<Effect<...>, ...>` directly.
-- `σ -> σ'` is implicit, induced by `ForwardEvalInterp` reads/writes through
+- `σ -> σ'` is implicit, induced by `SparseForwardInterp` reads/writes through
   the engine's `Env` implementation.
 - concrete and abstract engines then consume `φ` using different global drivers
   (frame stack vs fixpoint worklists).

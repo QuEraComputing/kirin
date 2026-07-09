@@ -1,11 +1,38 @@
-use kirin::prelude::CompileTimeValue;
-use kirin_interpreter::dialect::{ForwardEffect, ForwardEval, ForwardEvalInterp, Interpretable};
+use kirin::prelude::{CompileTimeValue, HasBottom};
+use kirin_interpreter::dialect::{
+    ClassicLiveness, ClassicLivenessInterp, DemandInterp, ForwardEval, Interpretable,
+    SparseForwardEffect, SparseForwardInterp, StrongDemand,
+};
 
 use crate::{Cmp, CompareValue};
 
+/// Classic (weak) per-point liveness: kill the result, gen all operands.
+impl<I, T> Interpretable<I, ClassicLiveness> for Cmp<T>
+where
+    I: ClassicLivenessInterp,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        interp.gen_uses_kill_defs(self)
+    }
+}
+
+/// Backward demand: purity-aware neededness. `Cmp` is `#[kirin(pure)]`, so
+/// operands are demanded only when a result is demanded.
+impl<I, T> Interpretable<I, StrongDemand> for Cmp<T>
+where
+    I: DemandInterp,
+    I::Value: HasBottom + PartialEq,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        interp.demand_uses_if_observable(self)
+    }
+}
+
 impl<I, T> Interpretable<I, ForwardEval> for Cmp<T>
 where
-    I: ForwardEvalInterp,
+    I: SparseForwardInterp,
     I::Value: CompareValue,
     <I::Value as CompareValue>::Bool: Into<I::Value>,
     T: CompileTimeValue,
@@ -50,6 +77,6 @@ where
             }
             Cmp::__Phantom(..) => unreachable!(),
         }
-        Ok(ForwardEffect::Next)
+        Ok(SparseForwardEffect::Next)
     }
 }

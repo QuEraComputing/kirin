@@ -18,6 +18,7 @@ kirin-constprop = { workspace = true }
 kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
 kirin-interpreter = { workspace = true, features = ["derive"] }
+kirin-liveness = { workspace = true }
 kirin-chumsky = { workspace = true }
 kirin-prettyless = { workspace = true }
 clap = { workspace = true }

@@ -2,11 +2,12 @@ use std::marker::PhantomData;
 
 use kirin_ir::{Block, CompileStage, Pipeline, Product, Region, SSAValue, StageMeta, Statement};
 
+use crate::core::query;
 use crate::{
-    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEffect, ForwardEval, Frame,
-    FrameBuild, FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, Linker, SameStageLinker, StageQuery, StandardFrame, Store, drive_frames,
-    query,
+    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEval, Frame, FrameBuild,
+    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpLocation,
+    InterpreterError, Linker, SameStageLinker, SparseForwardEffect, StageQuery, StandardFrame,
+    Store, drive_frames,
 };
 
 /// Concrete executor: runs IR over a concrete value domain with an explicit
@@ -80,8 +81,8 @@ where
 {
     type Value = V;
     type Error = E;
-    type Effect = ForwardEffect<V, F>;
-    type Kind = ForwardEval;
+    type Effect = SparseForwardEffect<V, F>;
+    type Semantics = ForwardEval;
 
     fn stage(&self) -> CompileStage {
         self.location.expect("interp location not set").stage
@@ -113,7 +114,7 @@ where
 
 impl<'ir, S, V, E, Lk, F> FrameDriver for ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
-    S: StageQuery + InterpDispatch<Self, ForwardEval>,
+    S: StageQuery + InterpDispatch<Self>,
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,
@@ -197,7 +198,7 @@ where
 
 impl<'ir, S, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
-    S: StageQuery + InterpDispatch<Self, ForwardEval>,
+    S: StageQuery + InterpDispatch<Self>,
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,

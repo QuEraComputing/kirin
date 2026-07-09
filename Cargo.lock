@@ -923,6 +923,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-liveness"
+version = "0.1.0"
+dependencies = [
+ "kirin",
+ "kirin-arith",
+ "kirin-interpreter",
+ "kirin-ir",
+ "kirin-test-languages",
+]
+
+[[package]]
 name = "kirin-prettyless"
 version = "0.1.0"
 dependencies = [
@@ -961,6 +972,7 @@ dependencies = [
  "kirin-constant",
  "kirin-derive-chumsky",
  "kirin-function",
+ "kirin-interpreter",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
@@ -1899,6 +1911,7 @@ dependencies = [
  "kirin-constprop",
  "kirin-function",
  "kirin-interpreter",
+ "kirin-liveness",
  "kirin-prettyless",
  "kirin-scf",
  "predicates",

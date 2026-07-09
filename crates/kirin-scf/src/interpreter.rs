@@ -3,7 +3,7 @@
 //! SCF traversal is **dialect-local**: the framework owns no "scope" concept.
 //! Each structured `scf` operation owns its traversal in an SCF frame, built
 //! per-engine through a small dispatch capability and pushed with
-//! [`ForwardEffect::Push`]:
+//! [`SparseForwardEffect::Push`]:
 //!
 //! - `scf.if` -> [`ScfIfFrame`] (concrete) / [`AbstractScfIfFrame`] (abstract),
 //!   via [`ScfIfDispatch`]. The frame chooses the arm (concrete) or explores
@@ -20,14 +20,18 @@
 use std::collections::VecDeque;
 use std::marker::PhantomData;
 
+use kirin::prelude::Lattice;
 use kirin::prelude::{Block, CompileStage, CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    BranchCondition, ForwardEffect, ForwardEval, ForwardEvalInterp, Interpretable, InterpreterError,
+    BranchCondition, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
+    ForwardEval, Interpretable, InterpreterError, SparseForwardEffect, SparseForwardInterp,
+    StrongDemand,
 };
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BodyFrame,
-    CallContext, Completion, ConcreteInterpreter, EnvIndex, ForwardAbstractInterpreter, FrameBuild,
-    FrameDriver, FrameEffect,
+    CallContext, Completion, ConcreteInterpreter, DenseBackwardCompletion,
+    DenseBackwardFrameDriver, DenseBlockFrame, DenseFrameBuild, EnvIndex, FrameBuild, FrameDriver,
+    FrameEffect, PointFacts, SparseForwardTransfer,
 };
 
 use crate::{For, ForLoopValue, If, Yield};
@@ -38,7 +42,7 @@ use crate::{For, ForLoopValue, If, Yield};
 
 impl<I, T> Interpretable<I, ForwardEval> for If<T>
 where
-    I: ForwardEvalInterp + ScfIfDispatch,
+    I: SparseForwardInterp + ScfIfDispatch,
     I::Value: BranchCondition,
     T: CompileTimeValue,
 {
@@ -51,7 +55,7 @@ where
         // it — pick an arm or explore both and join.
         let decided = interp.read(self.condition)?.is_truthy();
         let frame = interp.scf_if_frame(stage, index, self.then_body, self.else_body, decided)?;
-        Ok(ForwardEffect::Push { frame, results })
+        Ok(SparseForwardEffect::Push { frame, results })
     }
 }
 
@@ -61,7 +65,7 @@ where
 
 impl<I, T> Interpretable<I, ForwardEval> for For<T>
 where
-    I: ForwardEvalInterp + ScfForDispatch,
+    I: SparseForwardInterp + ScfForDispatch,
     I::Value: ForLoopValue + Clone + 'static,
     T: CompileTimeValue,
 {
@@ -81,19 +85,402 @@ where
             carried,
             self.results.len(),
         )?;
-        Ok(ForwardEffect::Push { frame, results })
+        Ok(SparseForwardEffect::Push { frame, results })
     }
 }
 
 impl<I, T> Interpretable<I, ForwardEval> for Yield<T>
 where
-    I: ForwardEvalInterp,
+    I: SparseForwardInterp,
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        Ok(ForwardEffect::Yield(
+        Ok(SparseForwardEffect::Yield(
             interp.read_many(self.values.as_slice())?,
         ))
+    }
+}
+
+// ===========================================================================
+// Backward demand (sparse) — rules only, no frames
+// ===========================================================================
+//
+// Demand converges value-by-value on the sparse backward engine's worklist,
+// so structured bodies need no walk and loops need no frame fixpoint: this
+// rule re-runs whenever a result or a body block parameter it feeds rises
+// (the owning statement is the body's *feeder* in the region topology).
+
+/// Backward demand for `scf.if`: the condition is an unconditional control
+/// root (consistent with `cf.cond_br`); a body's yield slot is demanded iff
+/// the matching result is demanded.
+impl<I, T> Interpretable<I, StrongDemand> for If<T>
+where
+    I: DemandInterp,
+    I::Value: HasBottom + PartialEq,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        interp.demand(self.condition)?;
+        let then_slots = interp.terminator_args(self.then_body)?;
+        let else_slots = interp.terminator_args(self.else_body)?;
+        for (index, result) in self.results.iter().enumerate() {
+            if interp.is_demanded(*result)? {
+                if let Some(slot) = then_slots.get(index) {
+                    interp.demand(*slot)?;
+                }
+                if let Some(slot) = else_slots.get(index) {
+                    interp.demand(*slot)?;
+                }
+            }
+        }
+        Ok(interp.effect())
+    }
+}
+
+/// Backward demand for `scf.for`: the loop bounds are unconditional control
+/// roots. Carried slot `i` (result `i` / carried body parameter `i` / yield
+/// slot `i` / `init_args[i]`) is demanded when the result is demanded (the
+/// zero-iteration case flows `init_args[i]` straight to the result) or when
+/// the carried parameter is demanded inside the body; either demands both the
+/// initial value and the yield slot that feeds the next iteration.
+impl<I, T> Interpretable<I, StrongDemand> for For<T>
+where
+    I: DemandInterp,
+    I::Value: HasBottom + PartialEq,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        interp.demand(self.start)?;
+        interp.demand(self.end)?;
+        interp.demand(self.step)?;
+        // Body parameters: [induction variable, carried...].
+        let params = interp.block_params(self.body)?;
+        let yields = interp.terminator_args(self.body)?;
+        for (index, init) in self.init_args.iter().enumerate() {
+            let result_demanded = match self.results.get(index) {
+                Some(result) => interp.is_demanded(*result)?,
+                None => false,
+            };
+            let carried_demanded = match params.get(index + 1) {
+                Some(param) => interp.is_demanded(*param)?,
+                None => false,
+            };
+            if result_demanded || carried_demanded {
+                interp.demand(*init)?;
+                if let Some(slot) = yields.get(index) {
+                    interp.demand(*slot)?;
+                }
+            }
+        }
+        Ok(interp.effect())
+    }
+}
+
+/// Backward demand for `scf.yield`: inert — its operands are demanded by the
+/// owning `scf.if`/`scf.for` rule, which knows the result/slot correspondence.
+impl<I, T> Interpretable<I, StrongDemand> for Yield<T>
+where
+    I: DemandInterp,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        Ok(interp.effect())
+    }
+}
+
+// ===========================================================================
+// Backward per-point liveness (dense) — dialect-owned dense frames
+// ===========================================================================
+//
+// Classic per-point liveness needs the sets *inside* structured bodies, so
+// scf owns dense backward frames (the backward analogue of the forward SCF
+// frames). There is only one dense backward engine, so no per-engine dispatch
+// trait is needed: the rules construct the frames directly through the
+// `BuildDenseScf*` composition traits on the engine's total frame type.
+
+/// Classic per-point liveness for `scf.if`: kill the results, gen the
+/// condition (a use), and push a frame that walks both arms from the saved
+/// after-state and joins their entry states.
+impl<I, T> Interpretable<I, ClassicLiveness> for If<T>
+where
+    I: ClassicLivenessInterp,
+    I::Frame: BuildDenseScfIf<I::Value, I::Error>,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let stage = interp.stage();
+        for result in &self.results {
+            interp.kill_def(*result)?;
+        }
+        interp.gen_live(self.condition)?;
+        Ok(DenseBackwardEffect::Push {
+            frame: I::Frame::scf_if(DenseScfIfFrame::new(stage, self.then_body, self.else_body)),
+        })
+    }
+}
+
+/// Classic per-point liveness for `scf.for`: kill the results, gen **all**
+/// operand uses (bounds and initial carried values — classic liveness gens
+/// uses unconditionally), and push the loop frame that iterates the body walk
+/// to its loop-carried fixpoint.
+impl<I, T> Interpretable<I, ClassicLiveness> for For<T>
+where
+    I: ClassicLivenessInterp,
+    I::Frame: BuildDenseScfFor<I::Value, I::Error>,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        let stage = interp.stage();
+        for result in &self.results {
+            interp.kill_def(*result)?;
+        }
+        interp.gen_live(self.start)?;
+        interp.gen_live(self.end)?;
+        interp.gen_live(self.step)?;
+        for init in &self.init_args {
+            interp.gen_live(*init)?;
+        }
+        Ok(DenseBackwardEffect::Push {
+            frame: I::Frame::scf_for(DenseScfForFrame::new(stage, self.body)),
+        })
+    }
+}
+
+/// Classic per-point liveness for `scf.yield`: its operands are plain uses
+/// inside the body walk.
+impl<I, T> Interpretable<I, ClassicLiveness> for Yield<T>
+where
+    I: ClassicLivenessInterp,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        for value in &self.values {
+            interp.gen_live(*value)?;
+        }
+        Ok(DenseBackwardEffect::Next)
+    }
+}
+
+/// Construction trait letting a total dense backward frame enum embed the
+/// scf.if dense frame.
+pub trait BuildDenseScfIf<V, E>: Sized {
+    fn scf_if(frame: DenseScfIfFrame<V, E>) -> Self;
+}
+
+/// Construction trait letting a total dense backward frame enum embed the
+/// scf.for dense frame.
+pub trait BuildDenseScfFor<V, E>: Sized {
+    fn scf_for(frame: DenseScfForFrame<V, E>) -> Self;
+}
+
+/// Walk both arms of an `scf.if` from the saved after-state and join their
+/// entry states: `before = gen(cond) ∪ T_then(after) ∪ T_else(after)` (the
+/// rule already applied the kills and the condition gen).
+pub struct DenseScfIfFrame<V, E> {
+    stage: CompileStage,
+    arms: VecDeque<Block>,
+    /// The state after the `scf.if` (captured on the first step).
+    after: Option<V>,
+    /// Join of the walked arms' entry states.
+    joined: Option<V>,
+    _marker: PhantomData<fn() -> E>,
+}
+
+impl<V, E> DenseScfIfFrame<V, E> {
+    pub fn new(stage: CompileStage, then_body: Block, else_body: Block) -> Self {
+        Self {
+            stage,
+            arms: VecDeque::from([then_body, else_body]),
+            after: None,
+            joined: None,
+            _marker: PhantomData,
+        }
+    }
+
+    pub fn step_into<I, F>(
+        mut self,
+        interp: &mut I,
+    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E>
+    where
+        I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+        F: DenseFrameBuild<V, E> + BuildDenseScfIf<V, E>,
+        V: Clone + Lattice,
+        E: From<InterpreterError>,
+    {
+        if self.after.is_none() {
+            self.after = Some(interp.state());
+        }
+        match self.arms.pop_front() {
+            Some(arm) => {
+                let after = self.after.clone().expect("after-state captured");
+                interp.replace_state(after);
+                let stage = self.stage;
+                Ok(FrameEffect::Push {
+                    parent: F::scf_if(self),
+                    child: F::from_block(DenseBlockFrame::structured_body(stage, arm)),
+                })
+            }
+            None => {
+                let joined = self
+                    .joined
+                    .take()
+                    .unwrap_or_else(|| self.after.clone().expect("after-state captured"));
+                interp.replace_state(joined);
+                Ok(FrameEffect::Complete(DenseBackwardCompletion::Structured))
+            }
+        }
+    }
+
+    pub fn resume_into<I, F>(
+        mut self,
+        completion: DenseBackwardCompletion<V>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E>
+    where
+        I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+        F: DenseFrameBuild<V, E> + BuildDenseScfIf<V, E>,
+        V: Clone + Lattice,
+        E: From<InterpreterError>,
+    {
+        match completion {
+            DenseBackwardCompletion::Structured => {
+                let arm_entry = interp.state();
+                self.joined = Some(match self.joined.take() {
+                    Some(joined) => joined.join(&arm_entry),
+                    None => arm_entry,
+                });
+                self.step_into(interp)
+            }
+            DenseBackwardCompletion::Block { .. } => Err(E::from(InterpreterError::Custom(
+                "an scf.if arm completed as a CFG block owner",
+            ))),
+        }
+    }
+
+    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E>
+    where
+        E: From<InterpreterError>,
+    {
+        Err(E::from(InterpreterError::Custom(
+            "scf.if dense frames resume only with completions",
+        )))
+    }
+}
+
+/// Iterate the `scf.for` body walk to its loop-carried fixpoint:
+/// `E* = seed ∪ carry(walk(E*))` where `seed` is the state after the loop
+/// (kills/gens already applied by the rule) and `carry` maps a live carried
+/// parameter to the yield slot feeding it. Finalizes by killing the body
+/// parameters — the initial-value gens were applied by the rule.
+pub struct DenseScfForFrame<V, E> {
+    stage: CompileStage,
+    body: Block,
+    /// Captured on the first step.
+    seed: Option<V>,
+    params: Vec<SSAValue>,
+    yields: Vec<SSAValue>,
+    /// The current body-exit state estimate.
+    entry: Option<V>,
+    _marker: PhantomData<fn() -> E>,
+}
+
+impl<V, E> DenseScfForFrame<V, E> {
+    pub fn new(stage: CompileStage, body: Block) -> Self {
+        Self {
+            stage,
+            body,
+            seed: None,
+            params: Vec::new(),
+            yields: Vec::new(),
+            entry: None,
+            _marker: PhantomData,
+        }
+    }
+
+    fn carry(&self, body_entry: &V) -> V
+    where
+        V: Clone + Lattice + PointFacts,
+    {
+        let mut next = self.seed.clone().expect("seed captured");
+        for (index, param) in self.params.iter().skip(1).enumerate() {
+            if body_entry.contains(*param)
+                && let Some(slot) = self.yields.get(index)
+            {
+                next.insert(*slot);
+            }
+        }
+        next
+    }
+
+    pub fn step_into<I, F>(
+        mut self,
+        interp: &mut I,
+    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E>
+    where
+        I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+        F: DenseFrameBuild<V, E> + BuildDenseScfFor<V, E>,
+        V: Clone + PartialEq + Lattice + PointFacts,
+        E: From<InterpreterError>,
+    {
+        if self.seed.is_none() {
+            self.seed = Some(interp.state());
+            self.params = interp.block_params(self.stage, self.body)?;
+            self.yields = interp.terminator_args(self.stage, self.body)?;
+            self.entry = self.seed.clone();
+        }
+        let entry = self.entry.clone().expect("entry estimate present");
+        interp.replace_state(entry);
+        let (stage, body) = (self.stage, self.body);
+        Ok(FrameEffect::Push {
+            parent: F::scf_for(self),
+            child: F::from_block(DenseBlockFrame::structured_body(stage, body)),
+        })
+    }
+
+    pub fn resume_into<I, F>(
+        mut self,
+        completion: DenseBackwardCompletion<V>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E>
+    where
+        I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+        F: DenseFrameBuild<V, E> + BuildDenseScfFor<V, E>,
+        V: Clone + PartialEq + Lattice + PointFacts,
+        E: From<InterpreterError>,
+    {
+        match completion {
+            DenseBackwardCompletion::Structured => {
+                let body_entry = interp.state();
+                let next = self.carry(&body_entry);
+                if Some(&next) != self.entry.as_ref() {
+                    // The loop-carried estimate rose: re-walk the body from it
+                    // (monotone joins over a finite set — terminates).
+                    self.entry = Some(next);
+                    self.step_into(interp)
+                } else {
+                    // Stable: the final body entry, minus the body-local
+                    // parameters, is the state before the loop.
+                    let mut before = body_entry;
+                    for param in &self.params {
+                        before.remove(*param);
+                    }
+                    interp.replace_state(before);
+                    Ok(FrameEffect::Complete(DenseBackwardCompletion::Structured))
+                }
+            }
+            DenseBackwardCompletion::Block { .. } => Err(E::from(InterpreterError::Custom(
+                "an scf.for body completed as a CFG block owner",
+            ))),
+        }
+    }
+
+    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E>
+    where
+        E: From<InterpreterError>,
+    {
+        Err(E::from(InterpreterError::Custom(
+            "scf.for dense frames resume only with completions",
+        )))
     }
 }
 
@@ -104,7 +491,7 @@ where
 // ===========================================================================
 
 /// Capability the `scf.for` rule uses to obtain this engine's loop frame.
-pub trait ScfForDispatch: ForwardEvalInterp {
+pub trait ScfForDispatch: SparseForwardInterp {
     #[allow(clippy::too_many_arguments)]
     fn scf_for_frame(
         &mut self,
@@ -154,7 +541,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> ScfForDispatch for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F> ScfForDispatch for SparseForwardTransfer<'ir, S, V, E, Lk, P, F>
 where
     S: kirin::prelude::StageMeta,
     V: Clone + PartialEq + ForLoopValue + HasBottom,
@@ -185,7 +572,7 @@ where
 // ===========================================================================
 
 /// Capability the `scf.if` rule uses to obtain this engine's if frame.
-pub trait ScfIfDispatch: ForwardEvalInterp {
+pub trait ScfIfDispatch: SparseForwardInterp {
     fn scf_if_frame(
         &mut self,
         stage: CompileStage,
@@ -228,7 +615,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F> ScfIfDispatch for ForwardAbstractInterpreter<'ir, S, V, E, Lk, P, F>
+impl<'ir, S, V, E, Lk, P, F> ScfIfDispatch for SparseForwardTransfer<'ir, S, V, E, Lk, P, F>
 where
     S: kirin::prelude::StageMeta,
     V: Clone + PartialEq + HasBottom,
@@ -423,6 +810,9 @@ where
             AbstractCompletion::Finished(None) => Ok(FrameEffect::Continue(F::scf_if(self))),
             AbstractCompletion::FunctionDone => Err(E::from(InterpreterError::Custom(
                 "scf.if frame resumed with a function completion",
+            ))),
+            AbstractCompletion::CfgBlock { .. } => Err(E::from(InterpreterError::Custom(
+                "scf.if frame resumed with a CFG-block completion",
             ))),
         }
     }
@@ -666,6 +1056,11 @@ where
             AbstractCompletion::FunctionDone => {
                 return Err(E::from(InterpreterError::Custom(
                     "scf.for frame resumed with a function completion",
+                )));
+            }
+            AbstractCompletion::CfgBlock { .. } => {
+                return Err(E::from(InterpreterError::Custom(
+                    "scf.for frame resumed with a CFG-block completion",
                 )));
             }
         };

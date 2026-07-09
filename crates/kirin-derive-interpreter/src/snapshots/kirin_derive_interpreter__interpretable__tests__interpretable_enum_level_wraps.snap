@@ -3,13 +3,13 @@ source: crates/kirin-derive-interpreter/src/interpretable.rs
 expression: generate_interpretable_code(input)
 ---
 #[automatically_derived]
-impl<T: CompileTimeValue, __InterpI>
-    ::kirin_interpreter::Interpretable<__InterpI, ::kirin_interpreter::ForwardEval> for Lexical<T>
+impl<T: CompileTimeValue, __InterpI, __Semantics>
+    ::kirin_interpreter::Interpretable<__InterpI, __Semantics> for Lexical<T>
 where
     __InterpI: ::kirin_interpreter::Interp,
-    Function<T>: ::kirin_interpreter::Interpretable<__InterpI, ::kirin_interpreter::ForwardEval>,
-    Call<T>: ::kirin_interpreter::Interpretable<__InterpI, ::kirin_interpreter::ForwardEval>,
-    Return<T>: ::kirin_interpreter::Interpretable<__InterpI, ::kirin_interpreter::ForwardEval>,
+    Function<T>: ::kirin_interpreter::Interpretable<__InterpI, __Semantics>,
+    Call<T>: ::kirin_interpreter::Interpretable<__InterpI, __Semantics>,
+    Return<T>: ::kirin_interpreter::Interpretable<__InterpI, __Semantics>,
 {
     fn interpret(
         &self,
@@ -21,15 +21,15 @@ where
         match self {
             Self::Function(field_0) => <Function<T> as ::kirin_interpreter::Interpretable<
                 __InterpI,
-                ::kirin_interpreter::ForwardEval,
+                __Semantics,
             >>::interpret(field_0, interp),
             Self::Call(field_0) => <Call<T> as ::kirin_interpreter::Interpretable<
                 __InterpI,
-                ::kirin_interpreter::ForwardEval,
+                __Semantics,
             >>::interpret(field_0, interp),
             Self::Return(field_0) => <Return<T> as ::kirin_interpreter::Interpretable<
                 __InterpI,
-                ::kirin_interpreter::ForwardEval,
+                __Semantics,
             >>::interpret(field_0, interp),
         }
     }

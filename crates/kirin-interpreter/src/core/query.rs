@@ -7,12 +7,14 @@
 //! bound that any well-formed stage enum satisfies automatically.
 
 use kirin_ir::{
-    Block, CompileStage, Dialect, GetInfo, HasStageInfo, Pipeline, Region, SSAValue,
-    SpecializedFunction, StageAction, StageInfo, StageMeta, StagedFunction, Statement,
-    SupportsStageDispatch, Symbol, UniqueLiveSpecializationError,
+    Block, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasRegions, HasStageInfo,
+    HasSuccessors, Pipeline, Region, SSAKind, SSAValue, SpecializedFunction, StageAction,
+    StageInfo, StageMeta, StagedFunction, Statement, SupportsStageDispatch, Symbol,
+    UniqueLiveSpecializationError,
 };
 
 use crate::InterpreterError;
+use crate::facts::topology::{self, RegionTopology};
 
 /// Block parameters as SSA values.
 pub struct BlockParams(pub Block);
@@ -172,6 +174,84 @@ where
     }
 }
 
+/// The kind (defining site) of an SSA value: statement result, block
+/// argument, or graph port.
+pub struct ValueKind(pub SSAValue);
+
+impl<S, L> StageAction<S, L> for ValueKind
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+{
+    type Output = SSAKind;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        self.0
+            .get_info(info)
+            .map(|value| *value.kind())
+            .ok_or(InterpreterError::MissingValue(self.0))
+    }
+}
+
+/// The operands of `block`'s terminator (a structured body's yield slots).
+/// Empty for a terminator-less block.
+pub struct TerminatorArguments(pub Block);
+
+impl<S, L> StageAction<S, L> for TerminatorArguments
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+    for<'a> L: HasArguments<'a>,
+{
+    type Output = Vec<SSAValue>;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        Ok(self
+            .0
+            .terminator(info)
+            .map(|terminator| {
+                terminator
+                    .definition(info)
+                    .arguments()
+                    .copied()
+                    .collect::<Vec<_>>()
+            })
+            .unwrap_or_default())
+    }
+}
+
+/// The topology of a region: blocks (including nested structured bodies),
+/// statements per block, CFG successors, and block feeders.
+pub struct RegionTopologyQuery(pub Region);
+
+impl<S, L> StageAction<S, L> for RegionTopologyQuery
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasRegions<'a>,
+{
+    type Output = RegionTopology;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        Ok(topology::region_topology(info, &self.0))
+    }
+}
+
 /// Resolve a stage-local symbol to its interned name.
 pub struct ResolveSymbolName(pub Symbol);
 
@@ -209,6 +289,9 @@ pub trait StageQuery:
         InterpreterError,
     > + SupportsStageDispatch<FunctionBody, Result<Statement, InterpreterError>, InterpreterError>
     + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
+    + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
+    + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
+    + SupportsStageDispatch<RegionTopologyQuery, RegionTopology, InterpreterError>
 {
 }
 
@@ -224,6 +307,9 @@ impl<S> StageQuery for S where
             InterpreterError,
         > + SupportsStageDispatch<FunctionBody, Result<Statement, InterpreterError>, InterpreterError>
         + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
+        + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
+        + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
+        + SupportsStageDispatch<RegionTopologyQuery, RegionTopology, InterpreterError>
 {
 }
 
@@ -298,4 +384,28 @@ pub(crate) fn resolve_symbol_name<S: StageQuery>(
     symbol: Symbol,
 ) -> Result<Option<String>, InterpreterError> {
     dispatch(pipeline, stage, ResolveSymbolName(symbol))
+}
+
+pub(crate) fn value_kind<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    value: SSAValue,
+) -> Result<SSAKind, InterpreterError> {
+    dispatch(pipeline, stage, ValueKind(value))
+}
+
+pub(crate) fn terminator_arguments<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    block: Block,
+) -> Result<Vec<SSAValue>, InterpreterError> {
+    dispatch(pipeline, stage, TerminatorArguments(block))
+}
+
+pub(crate) fn region_topology<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    region: Region,
+) -> Result<RegionTopology, InterpreterError> {
+    dispatch(pipeline, stage, RegionTopologyQuery(region))
 }

@@ -1,8 +1,10 @@
 //! Code generation for `#[derive(InterpDispatch)]` on stage enums.
 //!
-//! Generates a monomorphic `InterpDispatch<I, Kind>` implementation that
-//! delegates each stage variant to the blanket `InterpDispatch` impl on its
-//! `StageInfo<L>`, mirroring `#[derive(ParseDispatch)]` for parsing.
+//! Generates a monomorphic `InterpDispatch<I>` implementation that delegates
+//! each stage variant to the blanket `InterpDispatch` impl on its
+//! `StageInfo<L>`, mirroring `#[derive(ParseDispatch)]` for parsing. The
+//! semantic key dispatched is always `I::Semantics` — engines cannot pair a
+//! stage with a foreign key's rules.
 
 use kirin_derive_toolkit::stage::{self, StageVariantInfo};
 use proc_macro2::TokenStream;
@@ -53,9 +55,6 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     impl_generics
         .params
         .push(syn::GenericParam::Type(syn::parse_quote!(__InterpI)));
-    impl_generics
-        .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__Kind)));
     let (impl_generics, _, _) = impl_generics.split_for_impl();
     let (_, ty_generics, original_where) = input.generics.split_for_impl();
 
@@ -63,13 +62,13 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         vec![syn::parse_quote! { __InterpI: #interp_crate::Interp }];
     for v in &variants {
         let dialect_ty = &v.dialect_ty;
-        // Dispatch is keyed on the engine `__InterpI` and the semantics marker
-        // `__Kind`: the engine passes itself in. So each language need only be
-        // interpretable for that engine/semantics — no higher-ranked GAT
-        // projection. The forward engines instantiate `__Kind = ForwardEval` in
-        // their `FrameDriver` bound.
+        // Dispatch is keyed on the engine `__InterpI` alone; the semantic key
+        // is always `__InterpI`'s own (`Interp::Semantics`), so a stage can
+        // never be paired with a foreign key's rules. Each language need only
+        // be interpretable for that engine's key — no higher-ranked GAT
+        // projection.
         predicates.push(syn::parse_quote! {
-            #dialect_ty: #interp_crate::Interpretable<__InterpI, __Kind> + #interp_crate::FunctionEntry<__InterpI>
+            #dialect_ty: #interp_crate::Interpretable<__InterpI, <__InterpI as #interp_crate::Interp>::Semantics> + #interp_crate::FunctionEntry<__InterpI>
         });
     }
     let mut where_clause = original_where.cloned().unwrap_or_else(|| syn::WhereClause {
@@ -95,7 +94,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 
     Ok(quote! {
         #[automatically_derived]
-        impl #impl_generics #interp_crate::InterpDispatch<__InterpI, __Kind> for #enum_ident #ty_generics
+        impl #impl_generics #interp_crate::InterpDispatch<__InterpI> for #enum_ident #ty_generics
         #where_clause
         {
             fn dispatch_statement(

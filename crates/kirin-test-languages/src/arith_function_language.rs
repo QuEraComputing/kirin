@@ -27,3 +27,67 @@ pub enum ArithFunctionLanguage {
     #[wraps]
     Return(Return<ArithType>),
 }
+
+// Manual interpreter impls: the inline `Function` variant keeps this enum off
+// the `#[derive(Interpretable)]` wraps-delegation path, so the delegation is
+// written out by hand.
+#[cfg(feature = "interpreter")]
+mod interpreter {
+    use kirin_interpreter::dialect::{
+        ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, FunctionBody,
+        FunctionEntry, Interp, Interpretable, InterpreterError, StrongDemand,
+    };
+    use kirin_ir::{HasBottom, Product};
+
+    use super::ArithFunctionLanguage;
+
+    /// Backward demand: `Function` defines a body and is inert for demand;
+    /// the wrapped dialects delegate to their own backward rules.
+    impl<I> Interpretable<I, StrongDemand> for ArithFunctionLanguage
+    where
+        I: DemandInterp,
+        I::Value: HasBottom + PartialEq,
+    {
+        fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+            match self {
+                ArithFunctionLanguage::Function { .. } => Ok(interp.effect()),
+                ArithFunctionLanguage::Arith(op) => op.interpret(interp),
+                ArithFunctionLanguage::ControlFlow(op) => op.interpret(interp),
+                ArithFunctionLanguage::Return(op) => op.interpret(interp),
+            }
+        }
+    }
+
+    /// Classic per-point liveness: `Function` has no SSA operands (inert);
+    /// the wrapped dialects delegate to their own dense rules.
+    impl<I> Interpretable<I, ClassicLiveness> for ArithFunctionLanguage
+    where
+        I: ClassicLivenessInterp,
+    {
+        fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+            match self {
+                ArithFunctionLanguage::Function { .. } => Ok(DenseBackwardEffect::Next),
+                ArithFunctionLanguage::Arith(op) => op.interpret(interp),
+                ArithFunctionLanguage::ControlFlow(op) => op.interpret(interp),
+                ArithFunctionLanguage::Return(op) => op.interpret(interp),
+            }
+        }
+    }
+
+    impl<I: Interp> FunctionEntry<I> for ArithFunctionLanguage {
+        fn function_entry(
+            &self,
+            args: Product<I::Value>,
+            interp: &mut I,
+        ) -> Result<FunctionBody<I::Value>, I::Error> {
+            match self {
+                ArithFunctionLanguage::Function { body, .. } => {
+                    Ok(FunctionBody::new(*body).args(args))
+                }
+                _ => Err(I::Error::from(InterpreterError::NotCallable(
+                    interp.statement(),
+                ))),
+            }
+        }
+    }
+}

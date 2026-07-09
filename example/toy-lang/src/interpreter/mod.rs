@@ -12,15 +12,19 @@ mod frame;
 mod tests;
 
 pub use error::ToyError;
-pub use frame::{ToyAbstractFrame, ToyFrame};
+pub use frame::{ToyAbstractFrame, ToyDenseBackwardFrame, ToyFrame};
 
-use kirin::prelude::Pipeline;
+use kirin::prelude::{CompileStage, GetInfo, Pipeline, Region, UniqueLiveSpecializationError};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
+use kirin_function::{Lexical, Lifted};
+use kirin_interpreter::InterpreterError;
 use kirin_interpreter::engine::{
-    CallContext, ConcreteInterpreter, CrossStageLinker, ForwardAbstractInterpreter,
-    SameStageLinker, expect_single,
+    CallContext, ConcreteInterpreter, CrossStageLinker, SameStageLinker, SparseForwardInterpreter,
+    expect_single,
 };
+use kirin_liveness::{DemandResult, DenseLivenessResult, LiveSet};
 
+use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
 
 /// Summary key of the constant-propagation analysis policy.
@@ -33,7 +37,7 @@ pub type ToyInterpreter<'ir, Lk = CrossStageLinker> =
 
 /// Cross-language constant propagation, with a frame type embedding the SCF
 /// loop frame.
-pub type ToyConstProp<'ir, Lk = CrossStageLinker> = ForwardAbstractInterpreter<
+pub type ToyConstProp<'ir, Lk = CrossStageLinker> = SparseForwardInterpreter<
     'ir,
     Stage,
     ConstPropValue,
@@ -41,6 +45,18 @@ pub type ToyConstProp<'ir, Lk = CrossStageLinker> = ForwardAbstractInterpreter<
     Lk,
     ConstPropContext,
     ToyAbstractFrame<ConstPropValue, ToyError, CpKey>,
+>;
+
+/// Classic per-point liveness (dense backward) over toy programs, with a
+/// frame type embedding the SCF dense frames (arm join + loop fixpoint).
+/// Strong liveness needs no composition — the sparse demand engine has no
+/// frames (loop-carried demand converges on the value worklist), so
+/// [`kirin_liveness::analyze_demand`] applies directly.
+pub type ToyDenseLiveness<'ir> = kirin_liveness::DenseLiveness<
+    'ir,
+    Stage,
+    InterpreterError,
+    ToyDenseBackwardFrame<LiveSet, InterpreterError>,
 >;
 
 /// Execute `function_name` starting at `stage_name`, following calls across
@@ -95,4 +111,95 @@ pub fn analyze_constprop(
 ) -> Result<ConstPropValue, ToyError> {
     let mut analysis: ToyConstProp<'_> = ToyConstProp::new(pipeline).with_linker(CrossStageLinker);
     expect_single(analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?)
+}
+
+/// The body region of `function_name`'s specialization at `stage_name`.
+fn function_region(
+    pipeline: &Pipeline<Stage>,
+    stage_name: &str,
+    function_name: &str,
+) -> Result<(CompileStage, Region), InterpreterError> {
+    let stage_id = pipeline
+        .stage_by_name(stage_name)
+        .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
+    let staged = pipeline
+        .resolve_staged_function(function_name, stage_id)
+        .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
+    let stage = pipeline
+        .stage(stage_id)
+        .ok_or(InterpreterError::MissingStage(stage_id))?;
+
+    let region = match stage {
+        Stage::Source(info) => {
+            let staged_info = staged
+                .get_info(info)
+                .ok_or(InterpreterError::MissingSpecialization(staged))?;
+            let spec = match staged_info.unique_live_specialization() {
+                Ok(spec) => spec,
+                Err(UniqueLiveSpecializationError::NoSpecialization) => {
+                    return Err(InterpreterError::MissingSpecialization(staged));
+                }
+                Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
+                    return Err(InterpreterError::AmbiguousSpecialization {
+                        function: staged,
+                        count,
+                    });
+                }
+            };
+            let spec_info = spec
+                .get_info(info)
+                .ok_or(InterpreterError::Custom("specialized function has no body"))?;
+            match spec_info.body().definition(info) {
+                HighLevel::Lexical(Lexical::Function(function)) => {
+                    use kirin::prelude::HasRegionBody;
+                    *function.region()
+                }
+                _ => return Err(InterpreterError::Custom("expected a function body")),
+            }
+        }
+        Stage::Lowered(info) => {
+            let staged_info = staged
+                .get_info(info)
+                .ok_or(InterpreterError::MissingSpecialization(staged))?;
+            let spec = match staged_info.unique_live_specialization() {
+                Ok(spec) => spec,
+                Err(UniqueLiveSpecializationError::NoSpecialization) => {
+                    return Err(InterpreterError::MissingSpecialization(staged));
+                }
+                Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
+                    return Err(InterpreterError::AmbiguousSpecialization {
+                        function: staged,
+                        count,
+                    });
+                }
+            };
+            let spec_info = spec
+                .get_info(info)
+                .ok_or(InterpreterError::Custom("specialized function has no body"))?;
+            match spec_info.body().definition(info) {
+                LowLevel::Lifted(Lifted::Function(function)) => {
+                    use kirin::prelude::HasRegionBody;
+                    *function.region()
+                }
+                _ => return Err(InterpreterError::Custom("expected a function body")),
+            }
+        }
+    };
+    Ok((stage_id, region))
+}
+
+/// Run both liveness analyses over `function_name`'s body at `stage_name`:
+/// strong liveness (the sparse demanded set — DCE-grade) and classic per-point
+/// liveness (dense block-boundary sets — regalloc-grade).
+pub fn analyze_liveness(
+    pipeline: &Pipeline<Stage>,
+    stage_name: &str,
+    function_name: &str,
+) -> Result<(DemandResult, DenseLivenessResult), InterpreterError> {
+    let (stage, region) = function_region(pipeline, stage_name, function_name)?;
+    let demand = kirin_liveness::analyze_demand(pipeline, stage, region)?;
+    let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
+    engine.analyze(stage, region)?;
+    let dense = DenseLivenessResult::from_engine(&mut engine, stage, region)?;
+    Ok((demand, dense))
 }

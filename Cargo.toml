@@ -23,6 +23,7 @@ members = [
   "crates/kirin-interval",
   "crates/kirin-ir",
   "crates/kirin-lexer",
+  "crates/kirin-liveness",
   "crates/kirin-prettyless",
   "crates/kirin-scf",
   "crates/kirin-test-languages",
@@ -79,6 +80,7 @@ kirin-interval = { path = "crates/kirin-interval", version = "0.1.0" }
 # Internal crates
 kirin-ir = { path = "crates/kirin-ir", version = "0.1.0" }
 kirin-lexer = { path = "crates/kirin-lexer", version = "0.1.0" }
+kirin-liveness = { path = "crates/kirin-liveness", version = "0.1.0" }
 kirin-prettyless = { path = "crates/kirin-prettyless", version = "0.1.0" }
 kirin-scf = { path = "crates/kirin-scf", version = "0.1.0" }
 kirin-test-languages = { path = "crates/kirin-test-languages", version = "0.1.0" }

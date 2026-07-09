@@ -41,6 +41,10 @@ enum Command {
         /// Run constant propagation instead of concrete execution.
         #[arg(long)]
         constprop: bool,
+        /// Run liveness analysis (strong demand + classic per-point) instead
+        /// of concrete execution.
+        #[arg(long)]
+        liveness: bool,
         /// Restrict execution to the entry stage's language; reject calls
         /// that would dispatch into a different stage. Default is cross-
         /// language.
@@ -66,6 +70,7 @@ fn main() -> anyhow::Result<()> {
             function: func_name,
             args,
             constprop,
+            liveness,
             per_language,
         } => run_program(
             &file,
@@ -73,17 +78,20 @@ fn main() -> anyhow::Result<()> {
             &func_name,
             &args,
             constprop,
+            liveness,
             per_language,
         ),
     }
 }
 
+#[allow(clippy::too_many_arguments)]
 fn run_program(
     file: &std::path::Path,
     stage_name: &str,
     func_name: &str,
     cli_args: &[String],
     constprop: bool,
+    liveness: bool,
     per_language: bool,
 ) -> anyhow::Result<()> {
     let src = std::fs::read_to_string(file)?;
@@ -94,6 +102,24 @@ fn run_program(
         .iter()
         .map(|s| s.parse::<i64>())
         .collect::<Result<_, _>>()?;
+
+    if liveness && constprop {
+        anyhow::bail!("--liveness and --constprop are mutually exclusive");
+    }
+
+    if liveness {
+        let (demand, dense) = interpreter::analyze_liveness(&pipeline, stage_name, func_name)?;
+        println!("demanded: {:?}", demand.demanded());
+        let mut boundaries: Vec<_> = dense
+            .blocks()
+            .map(|(block, live_in, live_out)| format!("{block:?}: in={live_in:?} out={live_out:?}"))
+            .collect();
+        boundaries.sort();
+        for line in boundaries {
+            println!("{line}");
+        }
+        return Ok(());
+    }
 
     if constprop {
         let abstract_args = args

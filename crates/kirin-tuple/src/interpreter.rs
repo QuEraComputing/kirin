@@ -1,11 +1,45 @@
-use kirin::prelude::{CompileTimeValue, Product};
+use kirin::prelude::{CompileTimeValue, HasBottom, Product};
 use kirin_interpreter::InterpreterError;
 use kirin_interpreter::dialect::{
-    ForwardEffect, ForwardEval, ForwardEvalInterp, HasProductValue, Interpretable,
+    ClassicLiveness, ClassicLivenessInterp, DemandInterp, ForwardEval, HasProductValue,
+    Interpretable, SparseForwardEffect, SparseForwardInterp, StrongDemand,
 };
 use thiserror::Error;
 
 use crate::{Get, Len, NewTuple, Unpack};
+
+/// Backward rules for the tuple ops. Sparse: purity-aware neededness (all
+/// four are `#[kirin(pure)]` data ops, so operands are demanded only when a
+/// result is demanded). Dense: the classic kill-defs/gen-uses transfer.
+macro_rules! backward_ordinary {
+    ($ty:ident) => {
+        impl<I, T> Interpretable<I, StrongDemand> for $ty<T>
+        where
+            I: DemandInterp,
+            I::Value: HasBottom + PartialEq,
+            T: CompileTimeValue,
+        {
+            fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+                interp.demand_uses_if_observable(self)
+            }
+        }
+
+        impl<I, T> Interpretable<I, ClassicLiveness> for $ty<T>
+        where
+            I: ClassicLivenessInterp,
+            T: CompileTimeValue,
+        {
+            fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+                interp.gen_uses_kill_defs(self)
+            }
+        }
+    };
+}
+
+backward_ordinary!(NewTuple);
+backward_ordinary!(Unpack);
+backward_ordinary!(Get);
+backward_ordinary!(Len);
 
 pub trait TupleIndexValue: Sized {
     fn as_tuple_index(&self) -> Option<usize>;
@@ -14,7 +48,7 @@ pub trait TupleIndexValue: Sized {
 
 impl<I, T> Interpretable<I, ForwardEval> for NewTuple<T>
 where
-    I: ForwardEvalInterp,
+    I: SparseForwardInterp,
     I::Value: HasProductValue,
     T: CompileTimeValue,
 {
@@ -25,13 +59,13 @@ where
             .map(|arg| interp.read(*arg))
             .collect::<Result<Product<_>, _>>()?;
         interp.write(self.result, I::Value::from_product(values))?;
-        Ok(ForwardEffect::Next)
+        Ok(SparseForwardEffect::Next)
     }
 }
 
 impl<I, T> Interpretable<I, ForwardEval> for Unpack<T>
 where
-    I: ForwardEvalInterp,
+    I: SparseForwardInterp,
     I::Value: HasProductValue,
     I::Error: From<ExpectedTuple>,
     T: CompileTimeValue,
@@ -43,13 +77,13 @@ where
             .ok_or_else(|| I::Error::from(ExpectedTuple))?
             .clone();
         interp.write_results(self.results.as_slice(), product)?;
-        Ok(ForwardEffect::Next)
+        Ok(SparseForwardEffect::Next)
     }
 }
 
 impl<I, T> Interpretable<I, ForwardEval> for Get<T>
 where
-    I: ForwardEvalInterp,
+    I: SparseForwardInterp,
     I::Value: HasProductValue + TupleIndexValue,
     I::Error: From<ExpectedTuple> + From<InvalidTupleIndex> + From<TupleIndexOutOfBounds>,
     T: CompileTimeValue,
@@ -67,13 +101,13 @@ where
             .cloned()
             .ok_or_else(|| I::Error::from(TupleIndexOutOfBounds))?;
         interp.write(self.result, value)?;
-        Ok(ForwardEffect::Next)
+        Ok(SparseForwardEffect::Next)
     }
 }
 
 impl<I, T> Interpretable<I, ForwardEval> for Len<T>
 where
-    I: ForwardEvalInterp,
+    I: SparseForwardInterp,
     I::Value: HasProductValue + TupleIndexValue,
     I::Error: From<ExpectedTuple>,
     T: CompileTimeValue,
@@ -85,7 +119,7 @@ where
             .ok_or_else(|| I::Error::from(ExpectedTuple))?
             .len();
         interp.write(self.result, I::Value::from_tuple_index(len))?;
-        Ok(ForwardEffect::Next)
+        Ok(SparseForwardEffect::Next)
     }
 }
 

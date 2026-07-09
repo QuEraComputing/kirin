@@ -21,6 +21,8 @@ pub enum InterpreterError {
     MissingStageInfo(CompileStage),
     #[error("missing block info for block {0:?}")]
     MissingBlock(Block),
+    #[error("missing SSA value {0:?}")]
+    MissingValue(SSAValue),
     #[error("missing function {0:?}")]
     MissingFunction(Function),
     #[error("function {function:?} has no staged function for stage {stage:?}")]

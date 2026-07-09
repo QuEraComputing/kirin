@@ -1,45 +1,19 @@
 use kirin_ir::{CompileStage, Product, SSAValue, Statement};
 
-use crate::{EnvIndex, ForwardEffect, InterpreterError};
+use crate::{EnvIndex, InterpreterError, SemanticKey, SparseForwardEffect, SparseForwardSemantic};
 
-/// Compile-time semantics marker for forward **evaluation**.
-///
-/// Used as the second type parameter of [`Interpretable`](crate::Interpretable)
-/// to select the forward-evaluation rule for a dialect statement: read operands,
-/// compute a semantic/lattice value, write results. This one mode covers concrete
-/// execution, constant propagation, and interval analysis — they differ only in
-/// the value domain, not in the shape of the rule. It is a pure type-level tag,
-/// never instantiated at runtime.
-///
-/// It is deliberately *not* called `ForwardValue`: a future forward **type
-/// inference** mode also attaches facts to SSA values, but should expose a
-/// different rule API (`ForwardType` / `ForwardTypeInterp`), so the name reflects
-/// the *evaluation* semantics rather than "operates on values".
-///
-/// Future sibling modes (not yet implemented) would each get their own marker and
-/// engine trait:
-/// - `ForwardType` / `ForwardTypeInterp` — forward type inference;
-/// - `BackwardDataflow` / `BackwardDataflowInterp` — generic backward dataflow;
-/// - [`BackwardLiveness`] / `BackwardLivenessInterp` — backward liveness.
-pub struct ForwardEval;
-
-/// Compile-time semantics marker for a future backward liveness analysis.
-///
-/// Reserved so a dialect can carry both an [`Interpretable<I, ForwardEval>`]
-/// and an [`Interpretable<I, BackwardLiveness>`] impl without coherence
-/// conflicts. Like [`ForwardEval`], it is a pure type-level tag. (Its engine
-/// trait would be `BackwardLivenessInterp`; see [`ForwardEval`] for the full list
-/// of planned sibling modes.)
-///
-/// [`Interpretable<I, ForwardEval>`]: crate::Interpretable
-/// [`Interpretable<I, BackwardLiveness>`]: crate::Interpretable
-pub struct BackwardLiveness;
+// An engine names its semantics through [`Interp::Semantics`], a
+// [`SemanticKey`] from [`semantics`](crate::semantics): [`ForwardEval`](crate::ForwardEval) is
+// forward evaluation (concrete execution, constprop, interval),
+// [`StrongDemand`](crate::StrongDemand) is per-value backward demand, and
+// [`ClassicLiveness`](crate::ClassicLiveness) is per-point backward liveness.
+// The key's [`Shape`](SemanticKey::Shape) fixes the solver mechanics.
 
 /// The current statement location an engine is interpreting.
 ///
 /// Engines stash this before dispatching a dialect rule so the rule can read it
 /// back through [`Interp::stage`]/[`Interp::statement`]/[`Interp::index`] (and,
-/// for forward rules, the SSA helpers on [`ForwardEvalInterp`]).
+/// for forward rules, the SSA helpers on [`SparseForwardInterp`]).
 #[derive(Clone, Copy, Debug)]
 pub struct InterpLocation {
     pub stage: CompileStage,
@@ -50,7 +24,7 @@ pub struct InterpLocation {
 /// Shared engine contract for concrete execution and analyses.
 ///
 /// `Interp` names the value domain, error type, statement effect, and the
-/// semantics [`Kind`](Interp::Kind) of an engine, and exposes the current
+/// [`Semantics`](Interp::Semantics) key of an engine, and exposes the current
 /// statement location. SSA storage access lives on [`Env`], and traversal lives
 /// in frame types.
 pub trait Interp: Sized {
@@ -61,10 +35,11 @@ pub trait Interp: Sized {
     type Error: From<InterpreterError>;
     /// The per-statement effect/result produced by this analysis.
     type Effect;
-    /// The semantics this engine runs — e.g. [`ForwardEval`]. Dialect rules are
-    /// selected by matching their [`Interpretable`](crate::Interpretable) `Kind`
-    /// parameter against this.
-    type Kind;
+    /// The semantic key this engine runs — e.g. [`ForwardEval`](crate::ForwardEval). Dialect rules
+    /// are selected by matching their [`Interpretable`](crate::Interpretable)
+    /// `Semantics` parameter against this; the key's
+    /// [`Shape`](SemanticKey::Shape) fixes the solver mechanics.
+    type Semantics: SemanticKey;
 
     /// The stage the current statement belongs to.
     fn stage(&self) -> CompileStage;
@@ -96,18 +71,25 @@ pub trait Env: Interp {
     ) -> Result<(), Self::Error>;
 }
 
-/// Forward-evaluation engine flavor: env access plus [`ForwardEffect`].
+/// [`SparseForwardShape`](crate::SparseForwardShape)-engine flavor: env
+/// access plus [`SparseForwardEffect`]. This is the *shape-generic* engine
+/// surface: env/read/write are how any sparse-forward semantics executes
+/// statements, so the blanket impl below covers every engine whose
+/// [`Semantics`](Interp::Semantics) is a [`SparseForwardSemantic`] —
+/// [`ForwardEval`](crate::ForwardEval) today, downstream keys (e.g. a qubit-address analysis)
+/// tomorrow. Rules pick their key in the `Interpretable` tag.
 ///
-/// Forward-evaluation dialect rules (`impl Interpretable<I, ForwardEval>`) bound
-/// on this trait and use its SSA helpers — [`read`](Self::read), [`read_many`](Self::read_many),
-/// [`write`](Self::write), [`write_results`](Self::write_results) — which operate
-/// on the engine's *current* activation ([`Interp::index`]). The associated
-/// frame type is exposed only because [`ForwardEffect::Push`] carries a frame;
-/// ordinary dialects do not name it.
-pub trait ForwardEvalInterp:
-    Env + Interp<Kind = ForwardEval, Effect = ForwardEffect<<Self as Interp>::Value, Self::Frame>>
+/// Dialect rules (`impl Interpretable<I, ForwardEval>`, or another
+/// sparse-forward key) bound on this trait and use its SSA helpers —
+/// [`read`](Self::read), [`read_many`](Self::read_many),
+/// [`write`](Self::write), [`write_results`](Self::write_results) — which
+/// operate on the engine's *current* activation ([`Interp::index`]). The
+/// associated frame type is exposed only because [`SparseForwardEffect::Push`]
+/// carries a frame; ordinary dialects do not name it.
+pub trait SparseForwardInterp:
+    Env + Interp<Effect = SparseForwardEffect<<Self as Interp>::Value, Self::Frame>>
 {
-    /// The engine's total frame type, carried by [`ForwardEffect::Push`].
+    /// The engine's total frame type, carried by [`SparseForwardEffect::Push`].
     type Frame;
 
     /// Read one SSA value from the current activation.
@@ -145,9 +127,10 @@ pub trait ForwardEvalInterp:
     }
 }
 
-impl<V, F, I> ForwardEvalInterp for I
+impl<V, F, I> SparseForwardInterp for I
 where
-    I: Env + Interp<Value = V, Kind = ForwardEval, Effect = ForwardEffect<V, F>>,
+    I: Env + Interp<Value = V, Effect = SparseForwardEffect<V, F>>,
+    I::Semantics: SparseForwardSemantic,
 {
     type Frame = F;
 }

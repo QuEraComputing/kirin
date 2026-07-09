@@ -110,7 +110,7 @@ pub trait ForwardFrameDriver: Env {
     ) -> Result<FunctionTarget, Self::Error>;
     /// Dispatch one statement to its dialect [`Interpretable`](crate::Interpretable)
     /// rule, producing this engine's [`Effect`](Interp::Effect) (a
-    /// [`ForwardEffect`](crate::ForwardEffect) for the value engines).
+    /// [`SparseForwardEffect`](crate::SparseForwardEffect) for the value engines).
     fn run_statement(
         &mut self,
         stage: CompileStage,
@@ -191,7 +191,7 @@ pub trait ForwardFrameDriver: Env {
 /// abstract frames need from the engine, beyond the [`ForwardFrameDriver`] IR
 /// queries.
 ///
-/// Implemented by [`ForwardAbstractInterpreter`](crate::ForwardAbstractInterpreter).
+/// Implemented by [`SparseForwardInterpreter`](crate::SparseForwardInterpreter).
 /// The standard abstract frames are generic over `I: ForwardDataflowFrameDriver`,
 /// so a custom forward-dataflow frame can drive any engine providing these
 /// capabilities.
