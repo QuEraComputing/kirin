@@ -29,6 +29,7 @@ nav:
       - FAQ:
         - faq/index.md
         - Class methods in kernels: faq/class_methods.md
+        - Variable number of kernel arguments: faq/vararg_kernels.md
       # - Comparison: comparison.md
       - Contributing: contrib.md
   - Cookbook:
