@@ -40,8 +40,8 @@ use kirin_ir::{
 use crate::core::query;
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver,
-    AbstractInterpreter, CallEffect, Callee, Env, EnvIndex, EnvStackStore, FixpointProfile,
-    ForwardEval, ForwardFrameDriver, ForwardSummaryDeps, Frame, FunctionBody, FunctionTarget,
+    AbstractInterpreter, Body, CallEffect, CallableBody, Callee, Env, EnvIndex, EnvStackStore,
+    FixpointProfile, ForwardEval, ForwardFrameDriver, ForwardSummaryDeps, Frame, FunctionTarget,
     Interp, InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics,
     SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
     StandardFixpointInterpreter, Store, Summary, SummaryDependency, SummaryDependencyIndex,
@@ -652,7 +652,7 @@ where
         body: Statement,
         args: Product<V>,
         index: EnvIndex,
-    ) -> Result<FunctionBody<V>, E> {
+    ) -> Result<CallableBody<V>, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
@@ -686,6 +686,14 @@ where
 
     fn cfg_entry(&self, stage: CompileStage, cfg: Cfg) -> Result<Option<Block>, E> {
         query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
+    }
+
+    fn digraph_walk_plan(
+        &self,
+        stage: CompileStage,
+        graph: kirin_ir::DiGraph,
+    ) -> Result<crate::GraphWalkPlan, E> {
+        query::digraph_walk_plan(self.pipeline, stage, graph).map_err(E::from)
     }
 }
 
@@ -729,7 +737,7 @@ where
         body: Statement,
         args: Product<V>,
         index: EnvIndex,
-    ) -> Result<FunctionBody<V>, E> {
+    ) -> Result<CallableBody<V>, E> {
         self.inner_mut().enter_function(stage, body, args, index)
     }
 
@@ -752,6 +760,14 @@ where
 
     fn cfg_entry(&self, stage: CompileStage, cfg: Cfg) -> Result<Option<Block>, E> {
         self.inner().cfg_entry(stage, cfg)
+    }
+
+    fn digraph_walk_plan(
+        &self,
+        stage: CompileStage,
+        graph: kirin_ir::DiGraph,
+    ) -> Result<crate::GraphWalkPlan, E> {
+        self.inner().digraph_walk_plan(stage, graph)
     }
 }
 
@@ -1051,9 +1067,15 @@ where
             .map(|function| function.entry.clone())
             .expect("function summary present");
         let body_info = self.enter_function(stage, body, entry_args, env)?;
-        let entry_block = self
-            .cfg_entry(stage, body_info.cfg)?
-            .ok_or_else(|| E::from(InterpreterError::EmptyCfg))?;
+        let entry_block = match body_info.body {
+            Body::Cfg(cfg) => self
+                .cfg_entry(stage, cfg)?
+                .ok_or_else(|| E::from(InterpreterError::EmptyCfg))?,
+            Body::Block(block) => block,
+            other @ (Body::DiGraph(_) | Body::UnGraph(_)) => {
+                return Err(E::from(InterpreterError::NoDefaultWalker(other)));
+            }
+        };
         if let Some(function) = self
             .summary_mut(&Owner::Function(key.clone()))
             .and_then(|info| info.as_function_mut())

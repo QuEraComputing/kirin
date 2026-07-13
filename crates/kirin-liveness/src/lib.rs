@@ -26,7 +26,7 @@ pub use live::{Live, LiveSet};
 pub use result::{DemandResult, DenseLivenessResult};
 
 use kirin_interpreter::{
-    DenseBackwardInterpreter, DenseBackwardTransfer, InterpDispatch, InterpreterError,
+    Body, DenseBackwardInterpreter, DenseBackwardTransfer, InterpDispatch, InterpreterError,
     SparseBackwardDriver, SparseBackwardInterpreter, StageQuery, StandardDenseBackwardFrame,
 };
 use kirin_ir::{Cfg, CompileStage, Pipeline, StageMeta};
@@ -41,30 +41,31 @@ pub type Demand<'ir, S, E = InterpreterError> = SparseBackwardInterpreter<'ir, S
 pub type DenseLiveness<'ir, S, E = InterpreterError, F = StandardDenseBackwardFrame<LiveSet, E>> =
     DenseBackwardInterpreter<'ir, S, LiveSet, E, F>;
 
-/// Run strong liveness (sparse backward demand) over `cfg` in `stage`.
+/// Run strong liveness (sparse backward demand) over `body` in `stage`.
 pub fn analyze_demand<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
-    cfg: Cfg,
+    body: impl Into<Body>,
 ) -> Result<DemandResult, InterpreterError>
 where
     S: StageMeta
         + StageQuery
         + InterpDispatch<SparseBackwardDriver<'ir, S, Live, InterpreterError>>,
 {
+    let body = body.into();
     let mut engine = Demand::<S>::new(pipeline);
-    engine.analyze(stage, cfg)?;
-    Ok(DemandResult::from_engine(&engine, stage, cfg))
+    engine.analyze(stage, body)?;
+    Ok(DemandResult::from_engine(&engine, stage, body))
 }
 
-/// Run classic per-point liveness (dense backward) over `cfg` in `stage`,
+/// Run classic per-point liveness (dense backward) over `body` in `stage`,
 /// with the standard (structured-control-free) frames. Languages with scf
 /// compose [`DenseLiveness`] with their own frame type and build the result
 /// via [`DenseLivenessResult::from_engine`].
 pub fn analyze_dense<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
-    cfg: Cfg,
+    body: impl Into<Body>,
 ) -> Result<DenseLivenessResult, InterpreterError>
 where
     S: StageMeta
@@ -79,7 +80,8 @@ where
             >,
         >,
 {
+    let body = body.into();
     let mut engine = DenseLiveness::<S>::new(pipeline);
-    engine.analyze(stage, cfg)?;
-    DenseLivenessResult::from_engine(&mut engine, stage, cfg)
+    engine.analyze(stage, body)?;
+    DenseLivenessResult::from_engine(&mut engine, stage, body)
 }

@@ -117,8 +117,11 @@ kirin-cmp = { workspace = true }
 kirin-constant = { workspace = true }
 kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
+kirin-interpreter = { workspace = true }
 kirin-test-languages = { workspace = true, features = [
   "arith-function-language",
+  "graph-function-language",
+  "interpreter",
   "bitwise-function-language",
   "callable-language",
   "namespaced-language",

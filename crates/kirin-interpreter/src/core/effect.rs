@@ -1,7 +1,46 @@
 use kirin_ir::{
-    Block, Cfg, CompileStage, Function, Product, SSAValue, SpecializedFunction, StagedFunction,
-    Symbol,
+    Block, Cfg, CompileStage, DiGraph, Function, Product, SSAValue, SpecializedFunction,
+    StagedFunction, Symbol, UnGraph,
 };
+
+/// A traversal descriptor: which body was the engine handed?
+///
+/// Interpreter vocabulary, not an IR concept — dialect ops keep their precise
+/// field types (`Block`, `Cfg`, `DiGraph`, `UnGraph`); a `Body` appears only at
+/// the moment a body is handed to the interpreter (callable entry, topology
+/// queries, analysis scopes). Bodies carry no semantics of their own: the
+/// statement that owns a body defines what entering and exiting it means.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum Body {
+    Block(Block),
+    Cfg(Cfg),
+    DiGraph(DiGraph),
+    UnGraph(UnGraph),
+}
+
+impl From<Block> for Body {
+    fn from(block: Block) -> Self {
+        Self::Block(block)
+    }
+}
+
+impl From<Cfg> for Body {
+    fn from(cfg: Cfg) -> Self {
+        Self::Cfg(cfg)
+    }
+}
+
+impl From<DiGraph> for Body {
+    fn from(graph: DiGraph) -> Self {
+        Self::DiGraph(graph)
+    }
+}
+
+impl From<UnGraph> for Body {
+    fn from(graph: UnGraph) -> Self {
+        Self::UnGraph(graph)
+    }
+}
 
 /// The closed forward control algebra a statement produces.
 ///
@@ -86,27 +125,32 @@ pub enum Callee {
     Specialized(SpecializedFunction),
 }
 
-/// The body a callable statement enters when invoked: a CFG plus the
-/// entry arguments bound to its entry block.
+/// The body a callable statement enters when invoked, plus the entry
+/// arguments bound to its boundary (block parameters / graph ports).
 ///
 /// This is the function-call entry descriptor — the call mechanism, not a
 /// structured-control abstraction. A [`FunctionEntry`](crate::FunctionEntry)
-/// rule returns one; the engine builds the body frame that walks the CFG.
-pub struct FunctionBody<V> {
-    pub cfg: Cfg,
+/// rule returns one; the engine picks the walker that matches the body kind.
+/// Any body kind may be callable — the statement declaring itself callable
+/// defines the semantics; the framework supplies default walkers for `Cfg`,
+/// `Block` (linear functions), and `DiGraph`, and rejects `UnGraph` with
+/// [`InterpreterError::NoDefaultWalker`](crate::InterpreterError) unless a
+/// dialect supplies its own walk.
+pub struct CallableBody<V> {
+    pub body: Body,
     pub args: Product<V>,
 }
 
-impl<V> FunctionBody<V> {
-    /// A function body over `cfg`, with no entry arguments yet.
-    pub fn new(cfg: Cfg) -> Self {
+impl<V> CallableBody<V> {
+    /// A callable body, with no entry arguments yet.
+    pub fn new(body: impl Into<Body>) -> Self {
         Self {
-            cfg,
+            body: body.into(),
             args: Product::new(),
         }
     }
 
-    /// Entry arguments bound to the CFG entry block's parameters.
+    /// Entry arguments bound to the body's boundary parameters.
     pub fn args(mut self, args: impl IntoIterator<Item = V>) -> Self {
         self.args = args.into_iter().collect();
         self

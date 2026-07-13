@@ -13,8 +13,9 @@ use kirin_ir::{
     UniqueLiveSpecializationError,
 };
 
+use crate::Body;
 use crate::InterpreterError;
-use crate::facts::topology::{self, CfgTopology};
+use crate::facts::topology::{self, BodyTopology};
 
 /// Block parameters as SSA values.
 pub struct BlockParams(pub Block);
@@ -112,6 +113,52 @@ where
         info: &StageInfo<L>,
     ) -> Result<Self::Output, Self::Error> {
         Ok(self.0.blocks(info).next())
+    }
+}
+
+/// Everything the default digraph walker needs: the boundary ports, the
+/// node statements in topological order, and the graph's yields.
+#[derive(Clone, Debug)]
+pub struct GraphWalkPlan {
+    pub ports: Vec<kirin_ir::Port>,
+    pub schedule: Vec<Statement>,
+    pub yields: Vec<SSAValue>,
+}
+
+/// The walk plan of a digraph body (ports, toposorted nodes, yields).
+///
+/// Fails with [`InterpreterError::GraphHasCycle`] on cyclic digraphs: they
+/// are structurally legal IR but have no single-pass execution order.
+pub struct DiGraphWalkQuery(pub kirin_ir::DiGraph);
+
+impl<S, L> StageAction<S, L> for DiGraphWalkQuery
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+{
+    type Output = GraphWalkPlan;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        let graph_info = self
+            .0
+            .get_info(info)
+            .ok_or(InterpreterError::GraphHasCycle(self.0))?;
+        let order = petgraph::algo::toposort(graph_info.graph(), None)
+            .map_err(|_| InterpreterError::GraphHasCycle(self.0))?;
+        let schedule = order
+            .into_iter()
+            .map(|node| graph_info.graph()[node])
+            .collect();
+        Ok(GraphWalkPlan {
+            ports: graph_info.ports().to_vec(),
+            schedule,
+            yields: graph_info.yields().to_vec(),
+        })
     }
 }
 
@@ -230,17 +277,22 @@ where
     }
 }
 
-/// The topology of a CFG: blocks (including nested structured bodies),
-/// statements per block, CFG successors, and block feeders.
-pub struct CfgTopologyQuery(pub Cfg);
+/// The topology of a body: blocks and graph parts (including nested
+/// structured bodies), statements per part, CFG successors, block feeders,
+/// and graph-port boundaries.
+pub struct BodyTopologyQuery(pub Body);
 
-impl<S, L> StageAction<S, L> for CfgTopologyQuery
+impl<S, L> StageAction<S, L> for BodyTopologyQuery
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a>,
+    for<'a> L: HasSuccessors<'a>
+        + HasBlocks<'a>
+        + HasCfgs<'a>
+        + kirin_ir::HasDigraphs<'a>
+        + kirin_ir::HasUngraphs<'a>,
 {
-    type Output = CfgTopology;
+    type Output = BodyTopology;
     type Error = InterpreterError;
 
     fn run(
@@ -248,7 +300,7 @@ where
         _stage: CompileStage,
         info: &StageInfo<L>,
     ) -> Result<Self::Output, Self::Error> {
-        Ok(topology::cfg_topology(info, &self.0))
+        Ok(topology::body_topology(info, self.0))
     }
 }
 
@@ -291,7 +343,8 @@ pub trait StageQuery:
     + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
     + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
     + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-    + SupportsStageDispatch<CfgTopologyQuery, CfgTopology, InterpreterError>
+    + SupportsStageDispatch<BodyTopologyQuery, BodyTopology, InterpreterError>
+    + SupportsStageDispatch<DiGraphWalkQuery, GraphWalkPlan, InterpreterError>
 {
 }
 
@@ -309,7 +362,8 @@ impl<S> StageQuery for S where
         + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
         + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
         + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-        + SupportsStageDispatch<CfgTopologyQuery, CfgTopology, InterpreterError>
+        + SupportsStageDispatch<BodyTopologyQuery, BodyTopology, InterpreterError>
+        + SupportsStageDispatch<DiGraphWalkQuery, GraphWalkPlan, InterpreterError>
 {
 }
 
@@ -402,10 +456,18 @@ pub(crate) fn terminator_arguments<S: StageQuery>(
     dispatch(pipeline, stage, TerminatorArguments(block))
 }
 
-pub(crate) fn cfg_topology<S: StageQuery>(
+pub(crate) fn digraph_walk_plan<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
-    cfg: Cfg,
-) -> Result<CfgTopology, InterpreterError> {
-    dispatch(pipeline, stage, CfgTopologyQuery(cfg))
+    graph: kirin_ir::DiGraph,
+) -> Result<GraphWalkPlan, InterpreterError> {
+    dispatch(pipeline, stage, DiGraphWalkQuery(graph))
+}
+
+pub(crate) fn body_topology<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    body: Body,
+) -> Result<BodyTopology, InterpreterError> {
+    dispatch(pipeline, stage, BodyTopologyQuery(body))
 }

@@ -10,7 +10,7 @@ use std::hash::Hash;
 use kirin_ir::{Block, Cfg, CompileStage, Product, SSAValue, Statement};
 
 use crate::{
-    CallEffect, Callee, Env, EnvIndex, FunctionBody, FunctionTarget, Interp, InterpreterError,
+    CallEffect, CallableBody, Callee, Env, EnvIndex, FunctionTarget, Interp, InterpreterError,
 };
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
@@ -117,14 +117,14 @@ pub trait ForwardFrameDriver: Env {
         statement: Statement,
         index: EnvIndex,
     ) -> Result<Self::Effect, Self::Error>;
-    /// Build the [`FunctionBody`] a callable statement enters on invocation.
+    /// Build the [`CallableBody`] a callable statement enters on invocation.
     fn enter_function(
         &mut self,
         stage: CompileStage,
         body: Statement,
         args: Product<Self::Value>,
         index: EnvIndex,
-    ) -> Result<FunctionBody<Self::Value>, Self::Error>;
+    ) -> Result<CallableBody<Self::Value>, Self::Error>;
 
     fn block_params(&self, stage: CompileStage, block: Block)
     -> Result<Vec<SSAValue>, Self::Error>;
@@ -140,6 +140,14 @@ pub trait ForwardFrameDriver: Env {
         after: Statement,
     ) -> Result<Option<Statement>, Self::Error>;
     fn cfg_entry(&self, stage: CompileStage, cfg: Cfg) -> Result<Option<Block>, Self::Error>;
+
+    /// The default walk plan of a digraph body (ports, toposorted nodes,
+    /// yields). Errors on cyclic digraphs.
+    fn digraph_walk_plan(
+        &self,
+        stage: CompileStage,
+        graph: kirin_ir::DiGraph,
+    ) -> Result<crate::GraphWalkPlan, Self::Error>;
 
     /// Bind a block's parameters to incoming actuals in `env` (arity-checked).
     fn bind_block_args(

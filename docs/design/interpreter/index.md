@@ -224,7 +224,7 @@ operations are implemented.
 ```rust
 pub trait FunctionEntry<I: Interp>: Dialect {
     fn function_entry(&self, args: Product<I::Value>, interp: &mut I)
-        -> Result<FunctionBody<I::Value>, I::Error>;
+        -> Result<CallableBody<I::Value>, I::Error>;
 }
 ```
 
@@ -232,7 +232,7 @@ Like `Interpretable`, it receives the engine `interp` directly (function entry i
 forward-only, so there is no `Semantics` parameter).
 
 Statements that define function bodies (e.g. `kirin_function::Function`)
-return the `FunctionBody { cfg, args }` to enter on invocation (the
+return the `CallableBody { body, args }` to enter on invocation (the
 function-call entry descriptor — not a structured-control abstraction). On
 language enums it is derived; `#[callable]` marks the variants that forward, all
 others report `NotCallable`.

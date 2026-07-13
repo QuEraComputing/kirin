@@ -51,6 +51,7 @@ use kirin_ir::{
 };
 
 use super::frames::{DenseBlockFrame, DenseFrameBuild};
+use crate::Body;
 use crate::core::query;
 use crate::engines::sparse_backward::CfgScope;
 use crate::{
@@ -654,10 +655,11 @@ where
     pub fn block_summary(
         &self,
         stage: CompileStage,
-        cfg: Cfg,
+        body: impl Into<Body>,
         block: Block,
     ) -> Option<&BlockLiveness<V>> {
-        self.driver.summary(&Scoped::new((stage, cfg), block))
+        self.driver
+            .summary(&Scoped::new((stage, body.into()), block))
     }
 
     /// The analyzed CFG's own top-level blocks (post-`analyze`).
@@ -683,9 +685,10 @@ where
     /// Run the block-boundary fixpoint over `cfg` in `stage`: seed every
     /// CFG block (a backward analysis must visit them all) and drain the
     /// worklist; dependencies are discovered from the terminators' edges.
-    pub fn analyze(&mut self, stage: CompileStage, cfg: Cfg) -> Result<(), E> {
-        let scope = (stage, cfg);
-        let topology = query::cfg_topology(self.driver.inner().pipeline(), stage, cfg)?;
+    pub fn analyze(&mut self, stage: CompileStage, body: impl Into<Body>) -> Result<(), E> {
+        let body = body.into();
+        let scope = (stage, body);
+        let topology = query::body_topology(self.driver.inner().pipeline(), stage, body)?;
         let owners: Vec<Scoped<CfgScope, Block>> = topology
             .cfg_blocks()
             .map(|block| Scoped::new(scope, block.block))
@@ -708,9 +711,9 @@ where
     pub fn reconstruct_points(
         &mut self,
         stage: CompileStage,
-        cfg: Cfg,
+        body: impl Into<Body>,
     ) -> Result<DensePointStore<V>, E> {
-        let scope = (stage, cfg);
+        let scope = (stage, body.into());
         self.driver.store_mut().recorder = Some(DensePointStore::new());
         for block in self.cfg_blocks() {
             // The CfgOwner walk re-absorbs the converged successor summaries,

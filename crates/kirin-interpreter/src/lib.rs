@@ -66,9 +66,11 @@ mod semantics;
 
 // The shared chassis: engine trait + dialect dispatch, effect types,
 // activation storage, calling conventions, errors, and IR queries.
-pub use self::core::{AbstractInterpreter, Env, Interp, InterpLocation, SparseForwardInterp};
+pub use self::core::{
+    AbstractInterpreter, Env, GraphWalkPlan, Interp, InterpLocation, SparseForwardInterp,
+};
+pub use self::core::{Body, CallEffect, CallableBody, Callee, Edge, SparseForwardEffect};
 pub use self::core::{BranchCondition, HasProductValue, expect_single};
-pub use self::core::{CallEffect, Callee, Edge, FunctionBody, SparseForwardEffect};
 pub use self::core::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
 pub use self::core::{EnvIndex, EnvStackStore, Store};
 pub use self::core::{FunctionEntry, InterpDispatch, Interpretable};
@@ -84,7 +86,8 @@ pub use self::core::ForwardFrameDriver as FrameDriver;
 
 // Concrete execution engine + the concrete standard frames.
 pub use engines::concrete::{
-    BodyFrame, CallFrame, Completion, ConcreteInterpreter, FrameBuild, StandardFrame,
+    BlockMode, BodyFrame, CallFrame, Completion, ConcreteInterpreter, DiGraphFrame, FrameBuild,
+    StandardFrame,
 };
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
 pub use engines::sparse_forward::{
@@ -110,8 +113,9 @@ pub use engines::dense_backward::{
 // fact stores, and cfg topology enumeration. Anchor family is a property of
 // the solver shape; dispatch meaning lives in `semantics`.
 pub use facts::{
-    BlockTopology, CfgTopology, Change, DenseAnchor, DenseBlockStore, DensePointStore, FactStore,
-    LatticeAnchor, ProgramPoint, Scoped, ScopedSparseStore, SparseStore, cfg_topology,
+    BlockTopology, BodyTopology, CfgTopology, Change, DenseAnchor, DenseBlockStore,
+    DensePointStore, FactStore, GraphTopology, LatticeAnchor, PortBoundary, ProgramPoint, Scoped,
+    ScopedSparseStore, SparseStore, body_topology, cfg_topology,
 };
 
 // Semantic keys (*what* a rule means — the `Interpretable`/`Interp::Semantics`
@@ -144,10 +148,10 @@ pub use kirin_derive_interpreter::{FunctionEntry, InterpDispatch, Interpretable}
 /// (`impl SemanticKey for MyKey { type Shape = ...; }`).
 pub mod dialect {
     pub use crate::{
-        AnalysisShape, BranchCondition, CallEffect, Callee, ClassicLiveness, ClassicLivenessInterp,
-        DemandInterp, DenseBackwardEffect, DenseBackwardInterp, DenseBackwardShape,
-        DenseForwardShape, Edge, ForwardEval, FunctionBody, FunctionEntry, HasProductValue, Interp,
-        Interpretable, InterpreterError, PointFacts, SemanticKey, SparseBackwardEffect,
+        AnalysisShape, Body, BranchCondition, CallEffect, CallableBody, Callee, ClassicLiveness,
+        ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, DenseBackwardInterp,
+        DenseBackwardShape, DenseForwardShape, Edge, ForwardEval, FunctionEntry, HasProductValue,
+        Interp, Interpretable, InterpreterError, PointFacts, SemanticKey, SparseBackwardEffect,
         SparseBackwardInterp, SparseBackwardShape, SparseForwardEffect, SparseForwardInterp,
         SparseForwardShape, StrongDemand, SuccessorEdge,
     };
@@ -160,7 +164,7 @@ pub mod engine {
         AbstractFrameDriver, AbstractInterpreter, BodyFrame, CallContext, CallFrame, Callee,
         Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker,
         DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBackwardInterp,
-        DenseBackwardInterpreter, DenseBlockFrame, DenseFrameBuild, Env,
+        DenseBackwardInterpreter, DenseBlockFrame, DenseFrameBuild, DiGraphFrame, Env,
         ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameBuild, FrameDriver,
         FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
         SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter, SparseForwardInterp,

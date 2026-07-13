@@ -711,6 +711,7 @@ dependencies = [
  "kirin-cmp",
  "kirin-constant",
  "kirin-function",
+ "kirin-interpreter",
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
@@ -884,6 +885,7 @@ version = "0.1.0"
 dependencies = [
  "kirin-derive-interpreter",
  "kirin-ir",
+ "petgraph",
  "smallvec",
  "thiserror 2.0.18",
 ]

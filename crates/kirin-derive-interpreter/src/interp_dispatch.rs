@@ -116,7 +116,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
                 args: #ir_crate::Product<<__InterpI as #interp_crate::Interp>::Value>,
                 interp: &mut __InterpI,
             ) -> Result<
-                #interp_crate::FunctionBody<<__InterpI as #interp_crate::Interp>::Value>,
+                #interp_crate::CallableBody<<__InterpI as #interp_crate::Interp>::Value>,
                 <__InterpI as #interp_crate::Interp>::Error,
             > {
                 match self {

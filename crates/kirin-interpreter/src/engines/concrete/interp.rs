@@ -4,8 +4,8 @@ use kirin_ir::{Block, Cfg, CompileStage, Pipeline, Product, SSAValue, StageMeta,
 
 use crate::core::query;
 use crate::{
-    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEval, Frame, FrameBuild,
-    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpLocation,
+    Body, BodyFrame, CallableBody, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEval,
+    Frame, FrameBuild, FrameDriver, FunctionTarget, Interp, InterpDispatch, InterpLocation,
     InterpreterError, Linker, SameStageLinker, SparseForwardEffect, StageQuery, StandardFrame,
     Store, drive_frames,
 };
@@ -159,7 +159,7 @@ where
         body: Statement,
         args: Product<V>,
         index: EnvIndex,
-    ) -> Result<FunctionBody<V>, E> {
+    ) -> Result<CallableBody<V>, E> {
         let pipeline = self.pipeline;
         let info = pipeline
             .stage(stage)
@@ -193,6 +193,14 @@ where
 
     fn cfg_entry(&self, stage: CompileStage, cfg: Cfg) -> Result<Option<Block>, E> {
         query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
+    }
+
+    fn digraph_walk_plan(
+        &self,
+        stage: CompileStage,
+        graph: kirin_ir::DiGraph,
+    ) -> Result<crate::GraphWalkPlan, E> {
+        query::digraph_walk_plan(self.pipeline, stage, graph).map_err(E::from)
     }
 }
 
@@ -233,8 +241,34 @@ where
         let index = self.alloc_env();
         let args: Product<V> = args.into_iter().collect();
         let body = self.enter_function(target.stage, target.body, args, index)?;
-        let frame = BodyFrame::function(self, target.stage, index, body.cfg, body.args)?;
-        self.frames.push(F::from_body(frame));
+        let frame = match body.body {
+            Body::Cfg(cfg) => F::from_body(BodyFrame::function(
+                self,
+                target.stage,
+                index,
+                cfg,
+                body.args,
+            )?),
+            Body::Block(block) => F::from_body(BodyFrame::linear_function(
+                self,
+                target.stage,
+                index,
+                block,
+                body.args,
+            )?),
+            Body::DiGraph(graph) => {
+                F::from_digraph(crate::engines::concrete::DiGraphFrame::function(
+                    target.stage,
+                    index,
+                    graph,
+                    body.args,
+                ))
+            }
+            other @ Body::UnGraph(_) => {
+                return Err(E::from(InterpreterError::NoDefaultWalker(other)));
+            }
+        };
+        self.frames.push(frame);
         self.run()
     }
 

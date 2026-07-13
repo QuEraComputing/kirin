@@ -567,8 +567,8 @@ mod advanced {
     use kirin_interpreter::engine::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
         AbstractFrameDriver, BodyFrame, CallContext, CallFrame, Completion, ConcreteInterpreter,
-        CrossStageLinker, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
-        SparseForwardInterp, SparseForwardInterpreter, expect_single,
+        CrossStageLinker, DiGraphFrame, Frame, FrameBuild, FrameDriver, FrameEffect,
+        InterpreterError, SparseForwardInterp, SparseForwardInterpreter, expect_single,
     };
     use kirin_scf::{
         AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf,
@@ -600,6 +600,7 @@ mod advanced {
     enum TracingFrame<V, E> {
         Body(BodyFrame<V, E>),
         Call(CallFrame<V>),
+        DiGraph(DiGraphFrame<V, E>),
         ScfIf(ScfIfFrame<V, E>),
         ScfFor(ScfForFrame<V, E>),
     }
@@ -610,6 +611,9 @@ mod advanced {
         }
         fn from_call(frame: CallFrame<V>) -> Self {
             TracingFrame::Call(frame)
+        }
+        fn from_digraph(frame: DiGraphFrame<V, E>) -> Self {
+            TracingFrame::DiGraph(frame)
         }
     }
 
@@ -643,6 +647,7 @@ mod advanced {
                     TRACE.with(|t| t.borrow_mut().calls += 1);
                     frame.step_into::<I, Self>(interp)
                 }
+                TracingFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
                 TracingFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
                 TracingFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
             }
@@ -657,6 +662,7 @@ mod advanced {
                 TracingFrame::Call(frame) => {
                     frame.resume_done_into::<Self>().map_err(I::Error::from)
                 }
+                TracingFrame::DiGraph(frame) => Ok(frame.resume_done_into::<Self>()),
                 TracingFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
                 TracingFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
             }
@@ -670,6 +676,7 @@ mod advanced {
             match self {
                 TracingFrame::Body(frame) => frame.resume_into::<I, Self>(completion, interp),
                 TracingFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
+                TracingFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
                 TracingFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),
                 TracingFrame::ScfFor(frame) => frame.resume_into::<I, Self>(completion, interp),
             }

@@ -2,9 +2,9 @@
 //! per-point sets (classic liveness), plus their composition.
 
 use kirin_interpreter::{
-    DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardInterpreter, DenseBackwardTransfer,
-    DenseBlockStore, DenseFrameBuild, DensePointStore, Frame, InterpDispatch, InterpreterError,
-    ProgramPoint, SparseBackwardInterpreter, StageQuery,
+    Body, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardInterpreter,
+    DenseBackwardTransfer, DenseBlockStore, DenseFrameBuild, DensePointStore, Frame,
+    InterpDispatch, InterpreterError, ProgramPoint, SparseBackwardInterpreter, StageQuery,
 };
 use kirin_ir::{Block, Cfg, CompileStage, Lattice, SSAValue, StageMeta, Statement};
 
@@ -21,10 +21,10 @@ impl DemandResult {
     pub(crate) fn from_engine<S: StageMeta>(
         engine: &SparseBackwardInterpreter<'_, S, Live, InterpreterError>,
         stage: CompileStage,
-        cfg: Cfg,
+        body: impl Into<Body>,
     ) -> Self {
         // The engine's sparse fact view; the demand set is its live support.
-        let facts = engine.fact_store(stage, cfg);
+        let facts = engine.fact_store(stage, body);
         let demanded = facts
             .iter()
             .filter(|(_, fact)| fact.is_live())
@@ -64,7 +64,7 @@ impl DenseLivenessResult {
     pub fn from_engine<'ir, S, F>(
         engine: &mut DenseBackwardInterpreter<'ir, S, LiveSet, InterpreterError, F>,
         stage: CompileStage,
-        cfg: Cfg,
+        body: impl Into<Body>,
     ) -> Result<Self, InterpreterError>
     where
         S: StageMeta
@@ -75,14 +75,15 @@ impl DenseLivenessResult {
                 Completion = DenseBackwardCompletion<LiveSet>,
             > + DenseFrameBuild<LiveSet, InterpreterError>,
     {
+        let body = body.into();
         let mut blocks = DenseBlockStore::new();
         for block in engine.cfg_blocks() {
-            if let Some(summary) = engine.block_summary(stage, cfg, block) {
+            if let Some(summary) = engine.block_summary(stage, body, block) {
                 blocks.set_entry(block, summary.live_in.clone());
                 blocks.set_exit(block, summary.live_out.clone());
             }
         }
-        let points = engine.reconstruct_points(stage, cfg)?;
+        let points = engine.reconstruct_points(stage, body)?;
         Ok(Self { blocks, points })
     }
 

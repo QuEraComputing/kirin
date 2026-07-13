@@ -41,6 +41,12 @@ pub enum InterpreterError {
     MissingCallTarget(Symbol),
     #[error("cfg has no entry block")]
     EmptyCfg,
+    #[error("body {0:?} has no default walker in this engine")]
+    NoDefaultWalker(crate::Body),
+    #[error("digraph {0:?} has a cycle; the default walker only runs DAGs")]
+    GraphHasCycle(kirin_ir::DiGraph),
+    #[error("CFG control flow (jump/branch) inside a structured or linear body")]
+    CfgControlFlowInStructuredBody,
     #[error("block {0:?} fell through without a terminator effect")]
     BlockFellThrough(Block),
     #[error("function body fell through without returning")]

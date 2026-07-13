@@ -55,17 +55,20 @@ use kirin_ir::{
 
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, CfgTopology, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
+    AbstractInterpreter, Body, CfgTopology, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
     InterpDispatch, InterpLocation, InterpreterError, OwnerSemantics, OwnerSummaryDeps, Scoped,
     SparseBackwardSemantic, SparseStore, StageQuery, StandardFixpointInterpreter, StrongDemand,
     Summary, SummaryEffect,
 };
 
-/// The scope a CFG-level backward analysis qualifies its facts with.
+/// The scope a body-level backward analysis qualifies its facts with.
 ///
 /// Arena ids are per-stage, so the stage is part of the scope; analyzing two
-/// cfgs in one engine keeps their facts distinct.
-pub type CfgScope = (CompileStage, Cfg);
+/// bodies in one engine keeps their facts distinct.
+pub type BodyScope = (CompileStage, Body);
+
+/// Deprecated name for [`BodyScope`]; kept for one release.
+pub type CfgScope = BodyScope;
 
 // ===========================================================================
 // Effect + dialect-facing trait
@@ -476,9 +479,18 @@ where
             SSAKind::Result(statement, _) => vec![statement],
             SSAKind::BlockArgument(block, _) => interp.store().topology.feeders(block).to_vec(),
             SSAKind::Port(..) => {
-                return Err(E::from(InterpreterError::Custom(
-                    "graph ports are not supported by sparse backward demand",
-                )));
+                // A port is a boundary SSA value: the statement owning the
+                // graph translates demand across the boundary (its rule maps
+                // port/index to operands, captures, or results).
+                let boundary = interp.store().topology.port_boundary(owner.item);
+                match boundary {
+                    Some(boundary) => vec![boundary.owner],
+                    None => {
+                        return Err(E::from(InterpreterError::Custom(
+                            "graph port outside the analyzed body",
+                        )));
+                    }
+                }
             }
         };
         Ok(DemandFrame::new(stage, work))
@@ -542,16 +554,25 @@ where
         self.driver.inner().pipeline()
     }
 
-    /// The converged demand fact for `value` under the `(stage, cfg)` scope.
-    pub fn fact(&self, stage: CompileStage, cfg: Cfg, value: impl Into<SSAValue>) -> Option<&V> {
+    /// The converged demand fact for `value` under the `(stage, body)` scope.
+    pub fn fact(
+        &self,
+        stage: CompileStage,
+        body: impl Into<Body>,
+        value: impl Into<SSAValue>,
+    ) -> Option<&V> {
         self.driver
-            .summary(&Scoped::new((stage, cfg), value.into()))
+            .summary(&Scoped::new((stage, body.into()), value.into()))
             .map(|summary| &summary.0)
     }
 
-    /// All converged `(value, fact)` pairs under the `(stage, cfg)` scope.
-    pub fn facts(&self, stage: CompileStage, cfg: Cfg) -> impl Iterator<Item = (SSAValue, &V)> {
-        let scope = (stage, cfg);
+    /// All converged `(value, fact)` pairs under the `(stage, body)` scope.
+    pub fn facts(
+        &self,
+        stage: CompileStage,
+        body: impl Into<Body>,
+    ) -> impl Iterator<Item = (SSAValue, &V)> {
+        let scope = (stage, body.into());
         self.driver
             .summaries()
             .iter()
@@ -559,11 +580,11 @@ where
             .map(|(owner, summary)| (owner.item, &summary.0))
     }
 
-    /// The converged facts under the `(stage, cfg)` scope as a
+    /// The converged facts under the `(stage, body)` scope as a
     /// [`SparseStore`] (the sparse per-SSA-value fact view; absent = bottom).
-    pub fn fact_store(&self, stage: CompileStage, cfg: Cfg) -> SparseStore<V> {
+    pub fn fact_store(&self, stage: CompileStage, body: impl Into<Body>) -> SparseStore<V> {
         let mut store = SparseStore::new();
-        for (value, fact) in self.facts(stage, cfg) {
+        for (value, fact) in self.facts(stage, body) {
             store.set(value, fact.clone());
         }
         store
@@ -577,21 +598,19 @@ where
     E: From<InterpreterError>,
     Sem: SparseBackwardSemantic,
 {
-    /// Run the demand fixpoint over `cfg` in `stage`.
+    /// Run the demand fixpoint over `body` in `stage`.
     ///
-    /// **Prepass**: enumerate the CFG topology (blocks including structured
-    /// bodies, statements, feeders), then run every statement's rule once with
-    /// nothing demanded — impure statements and terminators contribute the
-    /// demand roots. **Propagation**: drain the value worklist; each risen
-    /// value dispatches the rules that translate its demand.
-    pub fn analyze(&mut self, stage: CompileStage, cfg: Cfg) -> Result<(), E> {
-        let scope = (stage, cfg);
-        let topology = query::cfg_topology(self.driver.inner().pipeline(), stage, cfg)?;
-        let statements: Vec<Statement> = topology
-            .blocks
-            .iter()
-            .flat_map(|block| block.stmts.iter().copied())
-            .collect();
+    /// **Prepass**: enumerate the body topology (blocks and graph parts,
+    /// including structured bodies, statements, feeders, port boundaries),
+    /// then run every statement's rule once with nothing demanded — impure
+    /// statements and terminators contribute the demand roots.
+    /// **Propagation**: drain the value worklist; each risen value dispatches
+    /// the rules that translate its demand.
+    pub fn analyze(&mut self, stage: CompileStage, body: impl Into<Body>) -> Result<(), E> {
+        let body = body.into();
+        let scope = (stage, body);
+        let topology = query::body_topology(self.driver.inner().pipeline(), stage, body)?;
+        let statements: Vec<Statement> = topology.statements().collect();
         *self.driver.store_mut() = BackwardAnalysisState {
             scope: Some(scope),
             topology,
@@ -619,11 +638,16 @@ where
     }
 
     /// `true` iff `value` carries a non-bottom demand fact under the scope.
-    pub fn is_demanded(&self, stage: CompileStage, cfg: Cfg, value: impl Into<SSAValue>) -> bool
+    pub fn is_demanded(
+        &self,
+        stage: CompileStage,
+        body: impl Into<Body>,
+        value: impl Into<SSAValue>,
+    ) -> bool
     where
         V: HasBottom,
     {
-        self.fact(stage, cfg, value)
+        self.fact(stage, body, value)
             .is_some_and(|fact| *fact != V::bottom())
     }
 }

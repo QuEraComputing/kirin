@@ -14,7 +14,7 @@ pub(crate) mod query;
 pub(crate) mod value;
 
 pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
-pub use effect::{CallEffect, Callee, Edge, FunctionBody, SparseForwardEffect};
+pub use effect::{Body, CallEffect, CallableBody, Callee, Edge, SparseForwardEffect};
 pub use env::{EnvIndex, EnvStackStore, Store};
 pub use error::InterpreterError;
 pub use frame::{
@@ -22,5 +22,5 @@ pub use frame::{
 };
 pub use interp::{AbstractInterpreter, Env, Interp, InterpLocation, SparseForwardInterp};
 pub use linker::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
-pub use query::StageQuery;
+pub use query::{GraphWalkPlan, StageQuery};
 pub use value::{BranchCondition, HasProductValue, expect_single};

@@ -11,8 +11,8 @@ use std::hash::Hash;
 
 use kirin_interpreter::engine::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-    AbstractFrameDriver, BodyFrame, CallFrame, Completion, Frame, FrameBuild, FrameDriver,
-    FrameEffect, InterpreterError, SparseForwardInterp,
+    AbstractFrameDriver, BodyFrame, CallFrame, Completion, DiGraphFrame, Frame, FrameBuild,
+    FrameDriver, FrameEffect, InterpreterError, SparseForwardInterp,
 };
 use kirin_scf::{
     AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf, BuildScfFor,
@@ -27,6 +27,7 @@ use kirin_scf::{
 pub enum ToyFrame<V, E> {
     Body(BodyFrame<V, E>),
     Call(CallFrame<V>),
+    DiGraph(DiGraphFrame<V, E>),
     ScfIf(ScfIfFrame<V, E>),
     ScfFor(ScfForFrame<V, E>),
 }
@@ -37,6 +38,9 @@ impl<V, E> FrameBuild<V, E> for ToyFrame<V, E> {
     }
     fn from_call(frame: CallFrame<V>) -> Self {
         ToyFrame::Call(frame)
+    }
+    fn from_digraph(frame: DiGraphFrame<V, E>) -> Self {
+        ToyFrame::DiGraph(frame)
     }
 }
 
@@ -64,6 +68,7 @@ where
         match self {
             ToyFrame::Body(frame) => frame.step_into::<I, Self>(interp),
             ToyFrame::Call(frame) => frame.step_into::<I, Self>(interp),
+            ToyFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
             ToyFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
             ToyFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
         }
@@ -73,6 +78,7 @@ where
         match self {
             ToyFrame::Body(frame) => Ok(frame.resume_done_into::<Self>()),
             ToyFrame::Call(frame) => frame.resume_done_into::<Self>().map_err(I::Error::from),
+            ToyFrame::DiGraph(frame) => Ok(frame.resume_done_into::<Self>()),
             ToyFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
             ToyFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
         }
@@ -86,6 +92,7 @@ where
         match self {
             ToyFrame::Body(frame) => frame.resume_into::<I, Self>(completion, interp),
             ToyFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
+            ToyFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
             ToyFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),
             ToyFrame::ScfFor(frame) => frame.resume_into::<I, Self>(completion, interp),
         }
