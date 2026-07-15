@@ -130,12 +130,14 @@ pub enum Callee {
 ///
 /// This is the function-call entry descriptor — the call mechanism, not a
 /// structured-control abstraction. A [`FunctionEntry`](crate::FunctionEntry)
-/// rule returns one; the engine picks the walker that matches the body kind.
-/// Any body kind may be callable — the statement declaring itself callable
-/// defines the semantics; the framework supplies default walkers for `Cfg`,
-/// `Block` (linear functions), and `DiGraph`, and rejects `UnGraph` with
-/// [`InterpreterError::NoDefaultWalker`](crate::InterpreterError) unless a
-/// dialect supplies its own walk.
+/// rule returns one; the call boundary picks the walker that matches the
+/// body kind. Any body kind may be callable — the statement declaring itself
+/// callable defines the semantics; the framework supplies default walkers
+/// for `Cfg`, `Block`, and `DiGraph`, while `UnGraph` traversal is a
+/// dialect/compiler-supplied policy (the concrete engine's
+/// `FrameBuild::from_ungraph_entry` hook), rejected with
+/// [`InterpreterError::NoDefaultWalker`](crate::InterpreterError) when no
+/// policy is provided.
 pub struct CallableBody<V> {
     pub body: Body,
     pub args: Product<V>,

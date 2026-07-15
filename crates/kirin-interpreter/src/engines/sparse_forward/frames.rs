@@ -75,7 +75,7 @@ pub struct AbstractBlockFrame<V, E, K> {
     cursor: Option<Statement>,
     mode: BlockMode,
     /// Entry arguments not yet bound — bound on the first step, so building the
-    /// frame needs no engine access (see [`BodyFrame`](crate::BodyFrame)).
+    /// frame needs no engine access (see [`BlockFrame`](crate::BlockFrame)).
     pending: Option<Product<V>>,
     resume_slots: Option<Product<SSAValue>>,
     _marker: PhantomData<fn() -> (E, K)>,

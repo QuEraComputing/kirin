@@ -566,9 +566,10 @@ mod advanced {
     use kirin_constprop::{ConstPropContext, ConstPropValue};
     use kirin_interpreter::engine::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-        AbstractFrameDriver, BodyFrame, CallContext, CallFrame, Completion, ConcreteInterpreter,
-        CrossStageLinker, DiGraphFrame, Frame, FrameBuild, FrameDriver, FrameEffect,
-        InterpreterError, SparseForwardInterp, SparseForwardInterpreter, expect_single,
+        AbstractFrameDriver, BlockFrame, CallContext, CallFrame, CfgFrame, Completion,
+        ConcreteInterpreter, CrossStageLinker, DiGraphFrame, Frame, FrameBuild, FrameDriver,
+        FrameEffect, InterpreterError, SparseForwardInterp, SparseForwardInterpreter,
+        expect_single,
     };
     use kirin_scf::{
         AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf,
@@ -581,8 +582,9 @@ mod advanced {
 
     // --- A custom total frame enum -----------------------------------------
     //
-    // It reuses the standard `BodyFrame`/`CallFrame` traversal (and the SCF loop
-    // frame) verbatim via `FrameBuild`/`BuildScfFor` + the delegating `*_into`
+    // It reuses the standard representation walkers (`BlockFrame`/`CfgFrame`/
+    // `DiGraphFrame`), the `CallFrame` call boundary, and the SCF frames
+    // verbatim via `FrameBuild`/`BuildScfFor` + the delegating `*_into`
     // methods, and adds *observation*: every call and every body step is counted
     // in a side log. The engine is not forked — only `ConcreteInterpreter`'s `F`
     // type parameter changes.
@@ -598,7 +600,8 @@ mod advanced {
     }
 
     enum TracingFrame<V, E> {
-        Body(BodyFrame<V, E>),
+        Block(BlockFrame<V, E>),
+        Cfg(CfgFrame<V, E>),
         Call(CallFrame<V>),
         DiGraph(DiGraphFrame<V, E>),
         ScfIf(ScfIfFrame<V, E>),
@@ -606,8 +609,11 @@ mod advanced {
     }
 
     impl<V, E> FrameBuild<V, E> for TracingFrame<V, E> {
-        fn from_body(frame: BodyFrame<V, E>) -> Self {
-            TracingFrame::Body(frame)
+        fn from_block(frame: BlockFrame<V, E>) -> Self {
+            TracingFrame::Block(frame)
+        }
+        fn from_cfg(frame: CfgFrame<V, E>) -> Self {
+            TracingFrame::Cfg(frame)
         }
         fn from_call(frame: CallFrame<V>) -> Self {
             TracingFrame::Call(frame)
@@ -639,7 +645,11 @@ mod advanced {
 
         fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
-                TracingFrame::Body(frame) => {
+                TracingFrame::Block(frame) => {
+                    TRACE.with(|t| t.borrow_mut().body_steps += 1);
+                    frame.step_into::<I, Self>(interp)
+                }
+                TracingFrame::Cfg(frame) => {
                     TRACE.with(|t| t.borrow_mut().body_steps += 1);
                     frame.step_into::<I, Self>(interp)
                 }
@@ -658,7 +668,8 @@ mod advanced {
             _interp: &mut I,
         ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
-                TracingFrame::Body(frame) => Ok(frame.resume_done_into::<Self>()),
+                TracingFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
+                TracingFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
                 TracingFrame::Call(frame) => {
                     frame.resume_done_into::<Self>().map_err(I::Error::from)
                 }
@@ -674,7 +685,8 @@ mod advanced {
             interp: &mut I,
         ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
-                TracingFrame::Body(frame) => frame.resume_into::<I, Self>(completion, interp),
+                TracingFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
+                TracingFrame::Cfg(frame) => frame.resume_into::<I, Self>(completion, interp),
                 TracingFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
                 TracingFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
                 TracingFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),
@@ -706,15 +718,16 @@ mod advanced {
         .unwrap();
 
         // (1)+(2): the custom frame ran the real program correctly by reusing
-        // the standard BodyFrame/CallFrame traversal (no engine fork).
+        // the standard walker/CallFrame traversal (no engine fork).
         assert_eq!(result, 120);
 
         // (3): traversal is observable through the custom frame. factorial(5)
-        // makes 4 recursive calls (5→4→3→2→1; the base case at 1 makes none),
-        // all routed through the custom Call arm; body statements run through
-        // its Body arm.
+        // is 5 activations: the root call plus 4 recursive calls (5→4→3→2→1;
+        // the base case at 1 makes none) — every call, root included, is one
+        // `CallFrame` routed through the custom Call arm; body statements run
+        // through its Block/Cfg arms.
         let trace = TRACE.with(|t| *t.borrow());
-        assert_eq!(trace.calls, 4);
+        assert_eq!(trace.calls, 5);
         assert!(trace.body_steps > 0);
     }
 

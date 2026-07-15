@@ -8,7 +8,9 @@ use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::{Call, Return};
-use kirin_ir::{Block, Cfg, DiGraph, Dialect, Placeholder as _, ResultValue, SSAValue, Signature};
+use kirin_ir::{
+    Block, Cfg, DiGraph, Dialect, Placeholder as _, ResultValue, SSAValue, Signature, UnGraph,
+};
 
 #[derive(Debug, Clone, PartialEq, Dialect)]
 #[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]
@@ -42,6 +44,18 @@ pub enum GraphFunctionLanguage {
     )]
     LinearFunction {
         body: Block,
+        sig: Signature<ArithType>,
+    },
+    /// UnGraph-bodied callable. The framework has no default walker for an
+    /// undirected graph body: calling one requires the compiler to supply a
+    /// traversal policy (`FrameBuild::from_ungraph_entry`), otherwise the
+    /// engine reports `NoDefaultWalker`.
+    #[cfg_attr(
+        any(feature = "parser", feature = "pretty"),
+        chumsky(format = "fn {:name}{sig} {body}")
+    )]
+    UnGraphFunction {
+        body: UnGraph,
         sig: Signature<ArithType>,
     },
     /// Inline graph evaluation: enters its owned digraph via a pushed frame.
@@ -99,7 +113,8 @@ mod interpreter {
             match self {
                 GraphFunctionLanguage::Function { .. }
                 | GraphFunctionLanguage::GraphFunction { .. }
-                | GraphFunctionLanguage::LinearFunction { .. } => Ok(SparseForwardEffect::Next),
+                | GraphFunctionLanguage::LinearFunction { .. }
+                | GraphFunctionLanguage::UnGraphFunction { .. } => Ok(SparseForwardEffect::Next),
                 GraphFunctionLanguage::GraphEval {
                     lhs,
                     rhs,
@@ -109,7 +124,10 @@ mod interpreter {
                     let args: Product<I::Value> = [interp.read(*lhs)?, interp.read(*rhs)?]
                         .into_iter()
                         .collect();
-                    let frame = DiGraphFrame::nested(interp.stage(), interp.index(), *graph, args);
+                    // A nested (uncallable) graph body: no function activation,
+                    // no callee resolution — the operation pushes the walker
+                    // directly into the current activation.
+                    let frame = DiGraphFrame::new(interp.stage(), interp.index(), *graph, args);
                     Ok(SparseForwardEffect::Push {
                         frame: I::Frame::from_digraph(frame),
                         results: [SSAValue::from(*result)].into_iter().collect(),
@@ -138,6 +156,9 @@ mod interpreter {
                     Ok(CallableBody::new(*body).args(args))
                 }
                 GraphFunctionLanguage::LinearFunction { body, .. } => {
+                    Ok(CallableBody::new(*body).args(args))
+                }
+                GraphFunctionLanguage::UnGraphFunction { body, .. } => {
                     Ok(CallableBody::new(*body).args(args))
                 }
                 _ => Err(I::Error::from(InterpreterError::NotCallable(

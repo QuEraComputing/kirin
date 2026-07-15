@@ -4,6 +4,7 @@ pub(crate) mod frames;
 pub(crate) mod interp;
 
 pub use frames::{
-    BlockMode, BodyFrame, CallFrame, Completion, DiGraphFrame, FrameBuild, StandardFrame,
+    BlockFrame, CallFrame, CfgFrame, Completion, DiGraphFrame, FrameBuild, StandardFrame,
+    UnGraphEntry,
 };
 pub use interp::ConcreteInterpreter;

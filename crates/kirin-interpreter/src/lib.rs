@@ -84,10 +84,13 @@ pub use self::core::{
 pub use self::core::ForwardDataflowFrameDriver as AbstractFrameDriver;
 pub use self::core::ForwardFrameDriver as FrameDriver;
 
-// Concrete execution engine + the concrete standard frames.
+// Concrete execution engine + the concrete standard frames: the
+// representation walkers (`BlockFrame`/`CfgFrame`/`DiGraphFrame` — `UnGraph`
+// traversal is a dialect/compiler policy supplied through
+// `FrameBuild::from_ungraph_entry`) and the `CallFrame` call boundary.
 pub use engines::concrete::{
-    BlockMode, BodyFrame, CallFrame, Completion, ConcreteInterpreter, DiGraphFrame, FrameBuild,
-    StandardFrame,
+    BlockFrame, CallFrame, CfgFrame, Completion, ConcreteInterpreter, DiGraphFrame, FrameBuild,
+    StandardFrame, UnGraphEntry,
 };
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
 pub use engines::sparse_forward::{
@@ -161,14 +164,14 @@ pub mod dialect {
 pub mod engine {
     pub use crate::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-        AbstractFrameDriver, AbstractInterpreter, BodyFrame, CallContext, CallFrame, Callee,
-        Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker,
+        AbstractFrameDriver, AbstractInterpreter, BlockFrame, CallContext, CallFrame, Callee,
+        CfgFrame, Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker,
         DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBackwardInterp,
         DenseBackwardInterpreter, DenseBlockFrame, DenseFrameBuild, DiGraphFrame, Env,
         ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameBuild, FrameDriver,
         FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
         SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter, SparseForwardInterp,
         SparseForwardInterpreter, StandardAbstractFrame, StandardDenseBackwardFrame, StandardFrame,
-        WideningStrategy, drive_frames, expect_single,
+        UnGraphEntry, WideningStrategy, drive_frames, expect_single,
     };
 }

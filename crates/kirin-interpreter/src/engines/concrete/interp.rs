@@ -4,8 +4,8 @@ use kirin_ir::{Block, Cfg, CompileStage, Pipeline, Product, SSAValue, StageMeta,
 
 use crate::core::query;
 use crate::{
-    Body, BodyFrame, CallableBody, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEval,
-    Frame, FrameBuild, FrameDriver, FunctionTarget, Interp, InterpDispatch, InterpLocation,
+    CallFrame, CallableBody, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEval, Frame,
+    FrameBuild, FrameDriver, FunctionTarget, Interp, InterpDispatch, InterpLocation,
     InterpreterError, Linker, SameStageLinker, SparseForwardEffect, StageQuery, StandardFrame,
     Store, drive_frames,
 };
@@ -231,44 +231,20 @@ where
     }
 
     /// Execute a function to completion and return its return product.
+    ///
+    /// The root call is an ordinary [`CallFrame`]: the same call boundary
+    /// that nested `Call` effects go through owns callee resolution, the
+    /// callee activation, body-kind selection, and completion validation —
+    /// there is exactly one implementation of that behavior.
     pub fn call(
         &mut self,
         stage: CompileStage,
         callee: Callee,
         args: impl IntoIterator<Item = V>,
     ) -> Result<Product<V>, E> {
-        let target = self.resolve_call(stage, &callee)?;
-        let index = self.alloc_env();
         let args: Product<V> = args.into_iter().collect();
-        let body = self.enter_function(target.stage, target.body, args, index)?;
-        let frame = match body.body {
-            Body::Cfg(cfg) => F::from_body(BodyFrame::function(
-                self,
-                target.stage,
-                index,
-                cfg,
-                body.args,
-            )?),
-            Body::Block(block) => F::from_body(BodyFrame::linear_function(
-                self,
-                target.stage,
-                index,
-                block,
-                body.args,
-            )?),
-            Body::DiGraph(graph) => {
-                F::from_digraph(crate::engines::concrete::DiGraphFrame::function(
-                    target.stage,
-                    index,
-                    graph,
-                    body.args,
-                ))
-            }
-            other @ Body::UnGraph(_) => {
-                return Err(E::from(InterpreterError::NoDefaultWalker(other)));
-            }
-        };
-        self.frames.push(frame);
+        self.frames
+            .push(F::from_call(CallFrame::root(stage, callee, args)));
         self.run()
     }
 
@@ -281,9 +257,9 @@ where
         self.frames = frames;
         match completion? {
             Completion::Returned(values) => Ok(values),
-            Completion::Finished(_) => Err(E::from(InterpreterError::Custom(
-                "body completion reached the frame-stack root",
-            ))),
+            Completion::Yielded(_) | Completion::Finished(_) => Err(E::from(
+                InterpreterError::Custom("body completion reached the frame-stack root"),
+            )),
         }
     }
 }

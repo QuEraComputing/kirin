@@ -199,7 +199,9 @@ SCF has two such operations:
   reads the condition value and hands the `Option<bool>` decision to the frame;
   the **frame** picks the arm (concrete; undecided is `IndeterminateBranch`) or
   explores both arms and **joins** their finish results (abstract). It walks each
-  arm by pushing the framework `BodyFrame`/`AbstractBlockFrame` building block.
+  arm by pushing the framework `BlockFrame`/`AbstractBlockFrame` building block,
+  consumes the arm's `Completion::Yielded` values, and relays a bubbled
+  `Completion::Returned` unchanged toward the nearest `CallFrame`.
 
 - **`scf.for`** → `ScfForFrame` / `AbstractScfForFrame`, built via
   `ScfForDispatch`. The frame pushes a body frame each iteration, advances the
@@ -209,10 +211,11 @@ SCF has two such operations:
   accumulating finish values across exits — so `scf.for` over a lattice
   converges, with no framework "scope hook".
 
-The framework `BodyFrame`/`AbstractBlockFrame` (single-block body walkers,
-completing on `Yield`) are reusable **building blocks**, not framework-owned
-structured semantics: the SCF frames build them to walk a chosen body, but the
-structured *decision* and result binding stay in the SCF frame. A language that
+The framework `BlockFrame`/`AbstractBlockFrame` (single-block body walkers,
+surfacing `Yield` to their parent) are reusable **building blocks**, not
+framework-owned structured semantics: the SCF frames build them to walk a
+chosen body, but the structured *decision* and result binding stay in the SCF
+frame. A language that
 uses SCF composes a total frame type embedding the standard frames plus
 `ScfIfFrame`/`ScfForFrame` (via `BuildScfIf`/`BuildScfFor` and the abstract
 equivalents); see `example/toy-lang`'s `ToyFrame`/`ToyAbstractFrame`. Future
@@ -294,13 +297,40 @@ belongs to.
 A generic **frame-stack driver**: it pops the top frame, calls `Frame::step`,
 and applies the returned `FrameEffect` (`Continue` / `Push` / `Done` /
 `Complete`) — it owns *no* traversal logic itself. Traversal lives in the
-frames. The default total frame type `StandardFrame<V, E>` wraps the standard
-`BodyFrame` (walks a function-body CFG, or a single body block that
-completes on `Yield` — `Jump` retargets it, `Return` completes it) and
-`CallFrame` (dispatch a callee, await its `Return`). The dialect-produced
-`SparseForwardEffect` is consumed by `BodyFrame`, which maps it to a `FrameEffect`
-(handling `Push` by pushing the carried frame). `StandardFrame` is
-structured-control-free; a custom `F`
+frames, organized along two independent axes:
+
+- **Body representation** (the closed `Body` vocabulary — an intentional IR
+  design decision): each framework-walkable representation has one
+  *representation walker* owning traversal mechanics only — `CfgFrame`
+  (multi-block, follows `Jump`, rejects an undecided `Branch`), `BlockFrame`
+  (one linear block; `Jump`/`Branch` are errors), and `DiGraphFrame`
+  (dependency-ordered DAG walk collecting the declared yields). `UnGraph` has
+  **no default walker**: an undirected graph has no inherent execution order,
+  so callable-UnGraph traversal is a dialect/compiler-supplied policy
+  (`FrameBuild::from_ungraph_entry`, defaulting to `NoDefaultWalker`).
+- **Entry context**: the same walker serves a *callable* body (entered
+  through `CallFrame`) and a *nested structured-operation* body (entered
+  through a dialect frame); analysis owners are the abstract engines' third
+  context. Walkers never know their role — they surface exits through the
+  completion protocol (`Completion::Returned` for a function `Return`,
+  `Completion::Yielded` for a structured `Yield`, `Completion::Finished` for
+  natural completion such as a digraph's output yields) and the parent frame
+  decides what each means.
+
+`CallFrame` is the **call boundary**: it resolves the callee, allocates the
+callee activation, selects the entry walker for the closed `Body` variant,
+validates the completion kind (`Returned`, or a graph's natural `Finished`;
+a structured `Yielded` is an error), frees the callee activation exactly
+once, and delivers the values — into the caller's result slots, or as the
+run's result for a root call (`ConcreteInterpreter::call` pushes a
+`CallFrame::root`, so root and nested calls share one boundary
+implementation). Representation walkers never free activations; a `Returned`
+bubbles through dialect frames to the nearest `CallFrame`.
+
+The default total frame type `StandardFrame<V, E>` bundles the three walkers
+plus `CallFrame`. The dialect-produced `SparseForwardEffect` is consumed by
+the walkers, which map it to a `FrameEffect` (handling `Push` by pushing the
+carried frame). `StandardFrame` is structured-control-free; a custom `F`
 ([Custom traversal and policies](#custom-traversal-and-policies)) adds dialect
 frames or replaces traversal without touching the engine.
 
@@ -426,13 +456,17 @@ it**. The concrete and
 abstract standard frames are two *implementations* of this one protocol — not
 parallel frameworks.
 
-### Concrete frames — `BodyFrame` / `CallFrame` / `StandardFrame`
+### Concrete frames — `BlockFrame` / `CfgFrame` / `DiGraphFrame` / `CallFrame` / `StandardFrame`
 
 `ConcreteInterpreter` is generic over the total frame type `F` (default
-`StandardFrame`). A custom enum reuses the standard `BodyFrame`/`CallFrame`
-single-path traversal through `FrameBuild` (`from_body`/`from_call`) and their
-`*_into` delegating methods, adds dialect frames / observation, and instantiates
-the engine with that `F`. (Examples: `example/toy-lang`'s `ToyFrame`, which adds
+`StandardFrame`). A custom enum reuses the standard single-path traversal —
+the representation walkers and the call boundary — through `FrameBuild`
+(`from_block`/`from_cfg`/`from_call`/`from_digraph`) and their `*_into`
+delegating methods, adds dialect frames / observation, and instantiates the
+engine with that `F`. Overriding `FrameBuild::from_ungraph_entry` (default:
+`NoDefaultWalker`) supplies a callable-UnGraph traversal policy without
+touching the generic logic (see the workspace `tests/body_kinds.rs` policy
+test). (Further examples: `example/toy-lang`'s `ToyFrame`, which adds
 `kirin_scf`'s `ScfIfFrame`/`ScfForFrame` via `BuildScfIf`/`BuildScfFor`; and a
 `TracingFrame` counting call/body visitation while running the real program — see
 `example/toy-lang`'s `interpreter::tests::advanced`.)

@@ -117,7 +117,7 @@ kirin-cmp = { workspace = true }
 kirin-constant = { workspace = true }
 kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
-kirin-interpreter = { workspace = true }
+kirin-interpreter = { workspace = true, features = ["derive"] }
 kirin-test-languages = { workspace = true, features = [
   "arith-function-language",
   "graph-function-language",

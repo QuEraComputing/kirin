@@ -45,12 +45,10 @@ pub enum InterpreterError {
     NoDefaultWalker(crate::Body),
     #[error("digraph {0:?} has a cycle; the default walker only runs DAGs")]
     GraphHasCycle(kirin_ir::DiGraph),
-    #[error("CFG control flow (jump/branch) inside a structured or linear body")]
+    #[error("CFG control flow (jump/branch) inside a single-block or graph body")]
     CfgControlFlowInStructuredBody,
     #[error("block {0:?} fell through without a terminator effect")]
     BlockFellThrough(Block),
-    #[error("function body fell through without returning")]
-    FunctionBodyFellThrough,
     #[error("yield outside of an enclosing scope at {0:?}")]
     UnexpectedYield(Statement),
     #[error("statement {0:?} is not callable")]

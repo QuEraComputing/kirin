@@ -10,10 +10,13 @@
 //!   both arms and joins their results (abstract).
 //! - `scf.for` -> [`ScfForFrame`] / [`AbstractScfForFrame`], via [`ScfForDispatch`].
 //!
-//! Both reuse the framework's generic [`BodyFrame`]/[`AbstractBlockFrame`] to
+//! Both reuse the framework's generic [`BlockFrame`]/[`AbstractBlockFrame`] to
 //! *walk* a chosen body block — those are reusable building blocks, not
 //! framework-owned structured semantics — but the structured *decision* and
-//! result binding are owned by the SCF frame. A language that uses `scf`
+//! result binding are owned by the SCF frame: the block walker surfaces a
+//! structured `Yield` as [`Completion::Yielded`], which the SCF frame consumes,
+//! while a function `Return` ([`Completion::Returned`]) is relayed unchanged so
+//! it bubbles to the nearest `CallFrame`. A language that uses `scf`
 //! composes a total frame type embedding these via [`BuildScfIf`]/[`BuildScfFor`]
 //! (and the abstract equivalents [`BuildAbstractScfIf`]/[`BuildAbstractScfFor`]).
 
@@ -28,7 +31,7 @@ use kirin_interpreter::dialect::{
     StrongDemand,
 };
 use kirin_interpreter::{
-    AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BodyFrame,
+    AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BlockFrame,
     CallContext, Completion, ConcreteInterpreter, DenseBackwardCompletion,
     DenseBackwardFrameDriver, DenseBlockFrame, DenseFrameBuild, EnvIndex, FrameBuild, FrameDriver,
     FrameEffect, PointFacts, SparseForwardTransfer,
@@ -642,10 +645,12 @@ where
 // Concrete if frame: pick the decided arm, relay its completion.
 // ===========================================================================
 
-/// Concrete `scf.if` traversal: push the framework [`BodyFrame`] for the decided
-/// arm and relay its completion to the pusher. The structured *decision* (which
-/// arm) is owned here; an undecided condition is impossible under concrete
-/// execution (`IndeterminateBranch`).
+/// Concrete `scf.if` traversal: push the framework [`BlockFrame`] for the
+/// decided arm, consume the arm's structured `Yield`, and hand the yielded
+/// values to the pusher. The structured *decision* (which arm) is owned here;
+/// an undecided condition is impossible under concrete execution
+/// (`IndeterminateBranch`). A function `Return` inside the arm is relayed
+/// unchanged so it bubbles to the nearest `CallFrame`.
 pub struct ScfIfFrame<V, E> {
     stage: CompileStage,
     env: EnvIndex,
@@ -687,10 +692,10 @@ where
             Some(false) => self.else_body,
             None => return Err(E::from(InterpreterError::IndeterminateBranch)),
         };
-        let body = BodyFrame::block(self.stage, self.env, arm, Product::new());
+        let body = BlockFrame::new(self.stage, self.env, arm, Product::new());
         Ok(FrameEffect::Push {
             parent: F::scf_if(self),
-            child: F::from_body(body),
+            child: F::from_block(body),
         })
     }
 
@@ -704,8 +709,16 @@ where
         self,
         completion: Completion<V>,
     ) -> Result<FrameEffect<F, Completion<V>>, E> {
-        // Relay the chosen arm's completion (yield-finish or function return).
-        Ok(FrameEffect::Complete(completion))
+        match completion {
+            // The arm's structured yield: its values are this operation's
+            // results, delivered to the pusher as a finished sub-computation.
+            Completion::Yielded(values) => Ok(FrameEffect::Complete(Completion::Finished(values))),
+            // A `ret` inside the arm: relay it toward the nearest `CallFrame`.
+            Completion::Returned(values) => Ok(FrameEffect::Complete(Completion::Returned(values))),
+            Completion::Finished(_) => Err(E::from(InterpreterError::Custom(
+                "scf.if arm completed without a structured yield",
+            ))),
+        }
     }
 }
 
@@ -875,10 +888,10 @@ where
                 let args: Product<V> = std::iter::once(self.induction.clone())
                     .chain(self.carried.iter().cloned())
                     .collect();
-                let body = BodyFrame::block(self.stage, self.env, self.body, args);
+                let body = BlockFrame::new(self.stage, self.env, self.body, args);
                 Ok(FrameEffect::Push {
                     parent: F::scf_for(self),
-                    child: F::from_body(body),
+                    child: F::from_block(body),
                 })
             }
             Some(false) => Ok(FrameEffect::Complete(Completion::Finished(self.carried))),
@@ -902,8 +915,9 @@ where
         F: FrameBuild<V, E> + BuildScfFor<V, E>,
     {
         match completion {
-            // The body yielded: advance the induction variable and re-check.
-            Completion::Finished(yielded) => {
+            // The body's structured yield: advance the induction variable,
+            // carry the yielded values forward, and re-check the condition.
+            Completion::Yielded(yielded) => {
                 let step = interp.env_read(self.env, self.step)?;
                 let next = self
                     .induction
@@ -913,8 +927,11 @@ where
                 self.carried = yielded;
                 Ok(FrameEffect::Continue(F::scf_for(self)))
             }
-            // A `ret` inside the body returns from the enclosing function.
+            // A `ret` inside the body: relay it toward the nearest `CallFrame`.
             Completion::Returned(values) => Ok(FrameEffect::Complete(Completion::Returned(values))),
+            Completion::Finished(_) => Err(E::from(InterpreterError::Custom(
+                "scf.for body completed without a structured yield",
+            ))),
         }
     }
 }
