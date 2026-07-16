@@ -1255,32 +1255,35 @@ specialize @source fn @main(i64, i64) -> i64 {
 }
 
 // ===========================================================================
-// Classic (dense, per-point) liveness through scf's dialect-owned dense
-// frames: arm-join for `scf.if`, the loop-carried fixpoint for `scf.for`, and
-// per-point reconstruction inside structured bodies.
+// Classic (dense, per-point) liveness through the toy language's total dense
+// frame: arm-join for `scf.if`, the loop-carried fixpoint for `scf.for`, and
+// per-point reconstruction inside structured bodies. Runs on the finalized IR
+// alone — no demand pre-pass.
 // ===========================================================================
 
 mod dense {
     use kirin::prelude::{Cfg, CompileStage, Pipeline, SSAValue, Statement};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_liveness::{DenseLivenessResult, LiveSet, analyze_demand};
+    use kirin_interpreter::InterpreterError;
+    use kirin_liveness::{DenseLivenessResult, LiveSet};
 
     use super::demand::{FOR_CARRIED_DEMAND, IF_DEAD_RESULT};
     use super::demand::{constant_result, entry_params, find_value, parse, source_cfg};
-    use crate::interpreter::ToyDenseLiveness;
+    use crate::interpreter::ToyDenseBackwardFrame;
     use crate::language::HighLevel;
     use crate::stage::Stage;
 
-    /// Run classic dense liveness with the toy total frame (scf frames
-    /// embedded).
+    /// Run classic dense liveness with the toy total frame.
     fn analyze_dense_toy(
         pipeline: &Pipeline<Stage>,
         stage: CompileStage,
         cfg: Cfg,
     ) -> DenseLivenessResult {
-        let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-        engine.analyze(stage, cfg).expect("analysis succeeds");
-        DenseLivenessResult::from_engine(&mut engine, stage, cfg).expect("reconstruction succeeds")
+        kirin_liveness::analyze_dense_with_frame::<
+            _,
+            ToyDenseBackwardFrame<LiveSet, InterpreterError>,
+        >(pipeline, stage, cfg)
+        .expect("analysis succeeds")
     }
 
     /// The statement whose definition matches `select` (anywhere in the
@@ -1309,15 +1312,15 @@ mod dense {
         values.iter().copied().collect()
     }
 
-    /// Per-point sets inside an `scf.if` arm follow classic semantics (the
-    /// yield's operand is live after its def even though the result is dead),
-    /// and intersecting with the demand set recovers the strong view.
+    /// Per-point sets inside an `scf.if` arm follow classic semantics: the
+    /// yield's operand is live after its def even though the result is dead.
+    /// (The strong view is the `dense ∩ demanded` composition, covered in
+    /// kirin-liveness — no demand pass runs here.)
     #[test]
     fn dense_per_point_inside_scf_if_arm() {
         let pipeline = parse(IF_DEAD_RESULT);
         let (stage, cfg) = source_cfg(&pipeline, "if_dead");
         let dense = analyze_dense_toy(&pipeline, stage, cfg);
-        let demand = analyze_demand(&pipeline, stage, cfg).expect("demand succeeds");
 
         let cond = entry_params(&pipeline, cfg)[0];
         let a = constant_result(&pipeline, cfg, 1);
@@ -1331,20 +1334,55 @@ mod dense {
         assert_eq!(dense.live_after(a_const), Some(&live_set(&[cond, a])));
         assert_eq!(dense.live_before(a_const), Some(&live_set(&[cond])));
 
-        // The if's own points: its dead result is live after it (classic
-        // records what the walk saw: nothing uses it, so it is NOT live), and
-        // before it only the condition survives the arm join.
+        // The if's dead result is not live after it because nothing uses it;
+        // before it, only the condition survives the arm join.
         let if_stmt = find_statement(&pipeline, cfg, |definition| {
             matches!(definition, HighLevel::Structured(_))
         });
         assert_eq!(dense.live_before(if_stmt), Some(&live_set(&[cond])));
+    }
 
-        // Strong per-point view: %a is classically live after its def but not
-        // demanded (the if result is dead), so the composition drops it.
-        let strong = dense
-            .strong_live_after(a_const, &demand)
-            .expect("point reconstructed");
-        assert_eq!(strong, live_set(&[cond]));
+    const IF_ARMS_DIFFERENT_USES: &str = r#"
+stage @source fn @if_arms(i64, i64, i64) -> i64;
+
+specialize @source fn @if_arms(i64, i64, i64) -> i64 {
+  ^entry(%cond: i64, %x: i64, %y: i64) {
+    %r = if %cond then ^then() {
+      yield %x;
+    } else ^else() {
+      yield %y;
+    } -> i64;
+    ret %r;
+  }
+}
+"#;
+
+    /// The scf.if liveness frame walks BOTH arms backward and joins their
+    /// live-entry states: the arms use different SSA values (%x vs %y), so
+    /// the state before the `if` must contain the condition and both.
+    #[test]
+    fn dense_scf_if_joins_both_arm_entries() {
+        let pipeline = parse(IF_ARMS_DIFFERENT_USES);
+        let (stage, cfg) = source_cfg(&pipeline, "if_arms");
+        let dense = analyze_dense_toy(&pipeline, stage, cfg);
+
+        let params = entry_params(&pipeline, cfg);
+        let (cond, x, y) = (params[0], params[1], params[2]);
+        let if_stmt = find_statement(&pipeline, cfg, |definition| {
+            matches!(definition, HighLevel::Structured(_))
+        });
+        let r = find_value(&pipeline, cfg, |definition| match definition {
+            HighLevel::Structured(_) => {
+                use kirin::prelude::HasResults;
+                definition.results().next().map(|v| SSAValue::from(*v))
+            }
+            _ => None,
+        });
+
+        // After the if only its result matters; before it, the then-arm
+        // contributed %x, the else-arm %y, and the rule genned %cond.
+        assert_eq!(dense.live_after(if_stmt), Some(&live_set(&[r])));
+        assert_eq!(dense.live_before(if_stmt), Some(&live_set(&[cond, x, y])));
     }
 
     /// The scf.for dense frame iterates the body walk to the loop-carried

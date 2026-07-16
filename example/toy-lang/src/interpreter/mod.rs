@@ -22,7 +22,7 @@ use kirin_interpreter::engine::{
     CallContext, ConcreteInterpreter, CrossStageLinker, SameStageLinker, SparseForwardInterpreter,
     expect_single,
 };
-use kirin_liveness::{DemandResult, DenseLivenessResult, LiveSet};
+use kirin_liveness::{DenseLivenessResult, LiveSet};
 
 use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
@@ -45,18 +45,6 @@ pub type ToyConstProp<'ir, Lk = CrossStageLinker> = SparseForwardInterpreter<
     Lk,
     ConstPropContext,
     ToyAbstractFrame<ConstPropValue, ToyError, CpKey>,
->;
-
-/// Classic per-point liveness (dense backward) over toy programs, with a
-/// frame type embedding the SCF dense frames (arm join + loop fixpoint).
-/// Strong liveness needs no composition — the sparse demand engine has no
-/// frames (loop-carried demand converges on the value worklist), so
-/// [`kirin_liveness::analyze_demand`] applies directly.
-pub type ToyDenseLiveness<'ir> = kirin_liveness::DenseLiveness<
-    'ir,
-    Stage,
-    InterpreterError,
-    ToyDenseBackwardFrame<LiveSet, InterpreterError>,
 >;
 
 /// Execute `function_name` starting at `stage_name`, following calls across
@@ -188,18 +176,18 @@ fn function_cfg(
     Ok((stage_id, cfg))
 }
 
-/// Run both liveness analyses over `function_name`'s body at `stage_name`:
-/// strong liveness (the sparse demanded set — DCE-grade) and classic per-point
-/// liveness (dense block-boundary sets — regalloc-grade).
-pub fn analyze_liveness(
+/// Run classic per-point liveness (dense backward — regalloc-grade
+/// block-boundary and per-statement sets) over `function_name`'s body at
+/// `stage_name`. Consumes the finalized IR directly; strong demand
+/// ([`kirin_liveness::analyze_demand`]) is an independent analysis and is
+/// not involved.
+pub fn analyze_classic_liveness(
     pipeline: &Pipeline<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<(DemandResult, DenseLivenessResult), InterpreterError> {
+) -> Result<DenseLivenessResult, InterpreterError> {
     let (stage, cfg) = function_cfg(pipeline, stage_name, function_name)?;
-    let demand = kirin_liveness::analyze_demand(pipeline, stage, cfg)?;
-    let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-    engine.analyze(stage, cfg)?;
-    let dense = DenseLivenessResult::from_engine(&mut engine, stage, cfg)?;
-    Ok((demand, dense))
+    kirin_liveness::analyze_dense_with_frame::<_, ToyDenseBackwardFrame<LiveSet, InterpreterError>>(
+        pipeline, stage, cfg,
+    )
 }

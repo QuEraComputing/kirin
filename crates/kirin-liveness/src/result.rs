@@ -6,7 +6,7 @@ use kirin_interpreter::{
     DenseBackwardTransfer, DenseBlockStore, DenseFrameBuild, DensePointStore, Frame,
     InterpDispatch, InterpreterError, ProgramPoint, SparseBackwardInterpreter, StageQuery,
 };
-use kirin_ir::{Block, Cfg, CompileStage, Lattice, SSAValue, StageMeta, Statement};
+use kirin_ir::{Block, CompileStage, Lattice, SSAValue, StageMeta, Statement};
 
 use crate::live::{Live, LiveSet};
 

@@ -563,7 +563,8 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
     kill/gen transfer (`gen_uses_kill_defs`, purity-irrelevant). Block owners
     converge boundary summaries; `live_before`/`live_after` are reconstructed
     per point on demand (never persisted by the fixpoint); scf owns dense
-    frames (arm-join, loop fixpoint).
+    frames (arm-join, loop fixpoint). Classic liveness consumes finalized IR
+    directly and does not require a sparse-demand pre-pass.
   Strong per-point sets are the composition `dense ∩ demanded`, not a third
   analysis. Because the `Semantics` parameter distinguishes impls, one dialect
   carries all three rules at once, as every shipped dialect demonstrates.

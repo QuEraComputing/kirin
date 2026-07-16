@@ -41,8 +41,8 @@ enum Command {
         /// Run constant propagation instead of concrete execution.
         #[arg(long)]
         constprop: bool,
-        /// Run liveness analysis (strong demand + classic per-point) instead
-        /// of concrete execution.
+        /// Run classic per-program-point liveness analysis (dense backward)
+        /// instead of concrete execution.
         #[arg(long)]
         liveness: bool,
         /// Restrict execution to the entry stage's language; reject calls
@@ -108,8 +108,7 @@ fn run_program(
     }
 
     if liveness {
-        let (demand, dense) = interpreter::analyze_liveness(&pipeline, stage_name, func_name)?;
-        println!("demanded: {:?}", demand.demanded());
+        let dense = interpreter::analyze_classic_liveness(&pipeline, stage_name, func_name)?;
         let mut boundaries: Vec<_> = dense
             .blocks()
             .map(|(block, live_in, live_out)| format!("{block:?}: in={live_in:?} out={live_out:?}"))
