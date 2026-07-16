@@ -26,7 +26,8 @@ pub use live::{Live, LiveSet};
 pub use result::{DemandResult, DenseLivenessResult};
 
 use kirin_interpreter::{
-    Body, DenseBackwardInterpreter, DenseBackwardTransfer, InterpDispatch, InterpreterError,
+    Body, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardInterpreter,
+    DenseBackwardTransfer, DenseFrameBuild, Frame, InterpDispatch, InterpreterError,
     SparseBackwardDriver, SparseBackwardInterpreter, StageQuery, StandardDenseBackwardFrame,
 };
 use kirin_ir::{CompileStage, Pipeline, StageMeta};
@@ -59,9 +60,9 @@ where
 }
 
 /// Run classic per-point liveness (dense backward) over `body` in `stage`,
-/// with the standard (structured-control-free) frames. Languages with scf
-/// compose [`DenseLiveness`] with their own frame type and build the result
-/// via [`DenseLivenessResult::from_engine`].
+/// with the standard (structured-control-free) frames. Languages with
+/// structured dialects select their total frame through
+/// [`analyze_dense_with_frame`] instead.
 pub fn analyze_dense<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
@@ -80,8 +81,32 @@ where
             >,
         >,
 {
+    analyze_dense_with_frame::<S, StandardDenseBackwardFrame<LiveSet, InterpreterError>>(
+        pipeline, stage, body,
+    )
+}
+
+/// Run classic per-point liveness (dense backward) over `body` in `stage`
+/// with a caller-selected total frame type `F` — the entry point for
+/// languages whose structured dialects require a language-specific total
+/// frame. The analysis consumes the finalized IR directly; it neither
+/// requires nor computes a demand ([`DemandResult`]) pre-pass.
+pub fn analyze_dense_with_frame<'ir, S, F>(
+    pipeline: &'ir Pipeline<S>,
+    stage: CompileStage,
+    body: impl Into<Body>,
+) -> Result<DenseLivenessResult, InterpreterError>
+where
+    S: StageMeta
+        + StageQuery
+        + InterpDispatch<DenseBackwardTransfer<'ir, S, LiveSet, InterpreterError, F>>,
+    F: Frame<
+            DenseBackwardDriver<'ir, S, LiveSet, InterpreterError, F>,
+            Completion = DenseBackwardCompletion<LiveSet>,
+        > + DenseFrameBuild<LiveSet, InterpreterError>,
+{
     let body = body.into();
-    let mut engine = DenseLiveness::<S>::new(pipeline);
+    let mut engine = DenseLiveness::<S, InterpreterError, F>::new(pipeline);
     engine.analyze(stage, body)?;
     DenseLivenessResult::from_engine(&mut engine, stage, body)
 }
