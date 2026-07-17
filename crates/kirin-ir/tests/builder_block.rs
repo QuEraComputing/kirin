@@ -6,12 +6,12 @@ mod common;
 use common::{BuilderDialect, TestType, new_stage};
 use kirin_ir::*;
 
-struct CfgBodyOp {
-    cfg: Cfg,
+struct CFGBodyOp {
+    cfg: CFG,
 }
 
-impl HasCfgBody for CfgBodyOp {
-    fn cfg(&self) -> &Cfg {
+impl HasCFGBody for CFGBodyOp {
+    fn cfg(&self) -> &CFG {
         &self.cfg
     }
 }
@@ -226,7 +226,7 @@ fn block_argument_placeholder_substitution_with_zero_args() {
     assert!(info.arguments.is_empty());
 }
 
-// --- CfgBuilder tests ---
+// --- CFGBuilder tests ---
 
 #[test]
 fn cfg_builder_creates_cfg_with_ordered_blocks() {
@@ -258,7 +258,7 @@ fn has_cfg_body_entry_block_returns_first_block() {
     let b0 = stage.block().new();
     let b1 = stage.block().new();
     let cfg = stage.cfg().add_block(b0).add_block(b1).new();
-    let op = CfgBodyOp { cfg };
+    let op = CFGBodyOp { cfg };
 
     let stage = stage.finalize().unwrap();
     assert_eq!(op.entry_block(&stage), Some(b0));

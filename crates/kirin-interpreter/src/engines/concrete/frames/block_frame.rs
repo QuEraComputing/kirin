@@ -19,7 +19,7 @@ use super::{CallFrame, Completion, FrameBuild};
 /// (dialect frame → `BlockFrame`): the parent frame defines the role and
 /// interprets the completion. CFG transitions (`Jump`/`Branch`) are rejected
 /// — a single block owns no CFG edges; multi-block traversal is
-/// [`CfgFrame`](super::CfgFrame)'s job.
+/// [`CFGFrame`](super::CFGFrame)'s job.
 pub struct BlockFrame<V, E> {
     cursor: BlockCursor<V>,
     _marker: std::marker::PhantomData<fn() -> E>,
@@ -59,7 +59,7 @@ where
         match interp.run_statement(self.cursor.stage, statement, self.cursor.index)? {
             SparseForwardEffect::Next => Ok(FrameEffect::Continue(F::from_block(self))),
             SparseForwardEffect::Jump(_) | SparseForwardEffect::Branch(_) => {
-                Err(E::from(InterpreterError::CfgControlFlowInStructuredBody))
+                Err(E::from(InterpreterError::CFGControlFlowInStructuredBody))
             }
             SparseForwardEffect::Push { frame, results } => {
                 self.cursor.expect_results(results);

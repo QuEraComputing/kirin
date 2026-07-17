@@ -2,7 +2,7 @@ use kirin_ir::{CompileStage, Product, UnGraph};
 
 use crate::{Body, EnvIndex, InterpreterError};
 
-use super::{BlockFrame, CallFrame, CfgFrame, DiGraphFrame};
+use super::{BlockFrame, CFGFrame, CallFrame, DiGraphFrame};
 
 /// Completion payloads produced by the standard concrete frames.
 ///
@@ -17,7 +17,7 @@ use super::{BlockFrame, CallFrame, CfgFrame, DiGraphFrame};
 /// - [`Yielded`](Completion::Yielded): a structured `Yield` terminated a
 ///   block body. The structured-operation frame that pushed the block (e.g.
 ///   `scf.if`/`scf.for`) consumes the carried values. A [`CallFrame`]
-///   rejects it: a callable Block or Cfg must exit with `Return`, never a
+///   rejects it: a callable Block or CFG must exit with `Return`, never a
 ///   structured yield.
 /// - [`Finished`](Completion::Finished): the body ran to its natural end
 ///   with these values — a digraph's declared output yields, or a dialect
@@ -61,7 +61,7 @@ pub struct UnGraphEntry<V> {
 /// [`from_ungraph_entry`](Self::from_ungraph_entry) hook supplies.
 pub trait FrameBuild<V, E>: Sized {
     fn from_block(frame: BlockFrame<V, E>) -> Self;
-    fn from_cfg(frame: CfgFrame<V, E>) -> Self;
+    fn from_cfg(frame: CFGFrame<V, E>) -> Self;
     fn from_call(frame: CallFrame<V>) -> Self;
     fn from_digraph(frame: DiGraphFrame<V, E>) -> Self;
 

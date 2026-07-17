@@ -4,10 +4,10 @@
 //! Two independent axes organize these frames:
 //!
 //! - **Body representation** — the closed [`Body`](crate::Body) vocabulary
-//!   (`Cfg` / `Block` / `DiGraph` / `UnGraph`), an intentional IR design
+//!   (`CFG` / `Block` / `DiGraph` / `UnGraph`), an intentional IR design
 //!   decision. Each representation the framework can walk has one
 //!   representation frame implementing *traversal mechanics only*:
-//!   [`CfgFrame`] (multi-block, follows jumps), [`BlockFrame`] (one linear
+//!   [`CFGFrame`] (multi-block, follows jumps), [`BlockFrame`] (one linear
 //!   block), and [`DiGraphFrame`] (dependency-ordered DAG walk). `UnGraph`
 //!   has **no** default walker — an undirected graph has no inherent
 //!   execution order, so traversal is a dialect/compiler-supplied policy
@@ -29,7 +29,7 @@
 //!
 //! ```text
 //! linear function  = CallFrame   → BlockFrame
-//! CFG function     = CallFrame   → CfgFrame
+//! CFG function     = CallFrame   → CFGFrame
 //! graph function   = CallFrame   → DiGraphFrame
 //! nested scf block = ScfIfFrame  → BlockFrame
 //! ```
@@ -57,7 +57,7 @@ mod standard_frame;
 
 pub use block_frame::BlockFrame;
 pub use call_frame::CallFrame;
-pub use cfg_frame::CfgFrame;
+pub use cfg_frame::CFGFrame;
 pub use digraph_frame::DiGraphFrame;
 pub use protocol::{Completion, FrameBuild, UnGraphEntry};
 pub use standard_frame::StandardFrame;

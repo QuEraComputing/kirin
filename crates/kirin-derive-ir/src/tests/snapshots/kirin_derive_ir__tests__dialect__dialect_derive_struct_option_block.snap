@@ -217,53 +217,53 @@ impl<'a> Iterator for ConditionalOpSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCfgs<'a> for ConditionalOp {
-    type Iter = ConditionalOpCfgsIter<'a>;
+impl<'a> ::kirin::ir::HasCFG<'a> for ConditionalOp {
+    type Iter = ConditionalOpCFGIter<'a>;
     fn cfgs(&'a self) -> Self::Iter {
         let Self {
             cond,
             then_block,
             else_block,
         } = self;
-        ConditionalOpCfgsIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::Cfg>(),
+        ConditionalOpCFGIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ConditionalOpCfgsIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::Cfg>,
+pub struct ConditionalOpCFGIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ConditionalOpCfgsIter<'a> {
-    type Item = &'a ::kirin::ir::Cfg;
+impl<'a> Iterator for ConditionalOpCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCfgsMut<'a> for ConditionalOp {
-    type IterMut = ConditionalOpCfgsMutIter<'a>;
+impl<'a> ::kirin::ir::HasCFGMut<'a> for ConditionalOp {
+    type IterMut = ConditionalOpCFGMutIter<'a>;
     fn cfgs_mut(&'a mut self) -> Self::IterMut {
         let Self {
             cond,
             then_block,
             else_block,
         } = self;
-        ConditionalOpCfgsMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::Cfg>(),
+        ConditionalOpCFGMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ConditionalOpCfgsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::Cfg>,
+pub struct ConditionalOpCFGMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ConditionalOpCfgsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Cfg;
+impl<'a> Iterator for ConditionalOpCFGMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

@@ -1,4 +1,4 @@
-use kirin_ir::{Cfg, CompileStage, Product};
+use kirin_ir::{CFG, CompileStage, Product};
 
 use crate::{
     EnvIndex, FrameDriver, FrameEffect, InterpreterError, SparseForwardEffect, SparseForwardInterp,
@@ -7,21 +7,21 @@ use crate::{
 use super::block_cursor::BlockCursor;
 use super::{CallFrame, Completion, FrameBuild};
 
-/// Representation walker for a [`Cfg`]: enter the entry block, run
+/// Representation walker for a [`CFG`]: enter the entry block, run
 /// statements, follow `Jump` edges between blocks (binding successor
 /// arguments and resetting the cursor), and surface the exit through the
 /// [`Completion`] protocol.
 ///
-/// Traversal mechanics only. A `CfgFrame` does not own an activation, is not
+/// Traversal mechanics only. A `CFGFrame` does not own an activation, is not
 /// a call boundary, and does not decide whether a `Return` belongs to a
 /// function call — it completes [`Returned`](Completion::Returned) and lets
 /// the completion bubble to the nearest [`CallFrame`]. An undecided concrete
 /// `Branch` is an error (single-path execution); exploring branch
 /// alternatives is the abstract engine's business.
-pub struct CfgFrame<V, E> {
+pub struct CFGFrame<V, E> {
     stage: CompileStage,
     index: EnvIndex,
-    cfg: Cfg,
+    cfg: CFG,
     /// Entry arguments awaiting the first step (the entry block is resolved
     /// lazily, so construction needs no engine access).
     pending: Option<Product<V>>,
@@ -30,7 +30,7 @@ pub struct CfgFrame<V, E> {
     _marker: std::marker::PhantomData<fn() -> E>,
 }
 
-impl<V, E> CfgFrame<V, E>
+impl<V, E> CFGFrame<V, E>
 where
     V: Clone,
     E: From<InterpreterError>,
@@ -38,7 +38,7 @@ where
     /// Walk `cfg` from its entry block, binding `args` to the entry block's
     /// parameters on the first step. Pure construction — needs no engine
     /// access.
-    pub fn new(stage: CompileStage, index: EnvIndex, cfg: Cfg, args: Product<V>) -> Self {
+    pub fn new(stage: CompileStage, index: EnvIndex, cfg: CFG, args: Product<V>) -> Self {
         Self {
             stage,
             index,
@@ -60,7 +60,7 @@ where
         if let Some(args) = self.pending.take() {
             let entry = interp
                 .cfg_entry(self.stage, self.cfg)?
-                .ok_or_else(|| E::from(InterpreterError::EmptyCfg))?;
+                .ok_or_else(|| E::from(InterpreterError::EmptyCFG))?;
             let mut cursor = BlockCursor::new(self.stage, self.index, entry, args);
             cursor.bind_entry(interp)?;
             self.cursor = Some(cursor);

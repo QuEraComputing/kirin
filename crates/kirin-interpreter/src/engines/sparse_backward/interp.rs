@@ -24,7 +24,7 @@
 //!
 //! # Owners are values; scheduling is demand propagation
 //!
-//! `SummaryKey = Scoped<(CompileStage, Cfg), SSAValue>`: the fact anchor is
+//! `SummaryKey = Scoped<(CompileStage, CFG), SSAValue>`: the fact anchor is
 //! the owner. The driver's *default* self-dependent index
 //! ([`OwnerSummaryDeps`]) is exactly demand propagation — a value whose fact
 //! rises is rescheduled, and analyzing a value means dispatching the rules
@@ -33,7 +33,7 @@
 //! - a statement **result** → the defining statement's backward rule;
 //! - a **block argument** → each of the block's *feeders* (terminators
 //!   targeting the block, statements owning it as a structured body) from the
-//!   [`CfgTopology`];
+//!   [`CFGTopology`];
 //! - a graph **port** → unsupported (loud error).
 //!
 //! Rules read converged facts ([`DemandInterp::is_demanded`]) and raise new
@@ -49,13 +49,13 @@ use std::marker::PhantomData;
 use std::mem;
 
 use kirin_ir::{
-    Block, Cfg, CompileStage, HasArguments, HasBottom, HasResults, HasTop, IsPure, Lattice,
-    Pipeline, SSAKind, SSAValue, StageMeta, Statement,
+    Block, CompileStage, HasArguments, HasBottom, HasResults, HasTop, IsPure, Lattice, Pipeline,
+    SSAKind, SSAValue, StageMeta, Statement,
 };
 
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, Body, CfgTopology, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
+    AbstractInterpreter, Body, CFGTopology, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
     InterpDispatch, InterpLocation, InterpreterError, OwnerSemantics, OwnerSummaryDeps, Scoped,
     SparseBackwardSemantic, SparseStore, StageQuery, StandardFixpointInterpreter, StrongDemand,
     Summary, SummaryEffect,
@@ -68,7 +68,7 @@ use crate::{
 pub type BodyScope = (CompileStage, Body);
 
 /// Deprecated name for [`BodyScope`]; kept for one release.
-pub type CfgScope = BodyScope;
+pub type CFGScope = BodyScope;
 
 // ===========================================================================
 // Effect + dialect-facing trait
@@ -278,7 +278,7 @@ where
     E: From<InterpreterError>,
     Sem: SparseBackwardSemantic,
 {
-    type SummaryKey = Scoped<CfgScope, SSAValue>;
+    type SummaryKey = Scoped<CFGScope, SSAValue>;
     type Summary = DemandSummary<V>;
     type Frame = DemandFrame<V>;
     type Completion = Vec<(SSAValue, V)>;
@@ -288,8 +288,8 @@ where
 /// are qualified with, and the CFG topology (feeders for block arguments).
 #[derive(Default)]
 pub struct BackwardAnalysisState {
-    scope: Option<CfgScope>,
-    topology: CfgTopology,
+    scope: Option<CFGScope>,
+    topology: CFGTopology,
 }
 
 /// The sparse backward driver: a [`StandardFixpointInterpreter`] over
@@ -299,7 +299,7 @@ pub type SparseBackwardDriver<'ir, S, V, E, Sem = StrongDemand> = StandardFixpoi
     SparseBackwardTransfer<'ir, S, V, E, Sem>,
     SparseBackwardProfile<V, E>,
     BackwardAnalysisState,
-    OwnerSummaryDeps<Scoped<CfgScope, SSAValue>>,
+    OwnerSummaryDeps<Scoped<CFGScope, SSAValue>>,
 >;
 
 // ===========================================================================
@@ -447,7 +447,7 @@ struct SparseBackwardSemantics;
 impl<'ir, S, V, E, Sem>
     OwnerSemantics<
         SparseBackwardDriver<'ir, S, V, E, Sem>,
-        Scoped<CfgScope, SSAValue>,
+        Scoped<CFGScope, SSAValue>,
         DemandSummary<V>,
         DemandFrame<V>,
         Vec<(SSAValue, V)>,
@@ -462,7 +462,7 @@ where
     fn bottom_summary(
         &mut self,
         _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-        _owner: &Scoped<CfgScope, SSAValue>,
+        _owner: &Scoped<CFGScope, SSAValue>,
     ) -> Result<DemandSummary<V>, E> {
         Ok(DemandSummary(V::bottom()))
     }
@@ -470,7 +470,7 @@ where
     fn entry_frame(
         &mut self,
         interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-        owner: &Scoped<CfgScope, SSAValue>,
+        owner: &Scoped<CFGScope, SSAValue>,
         _summary: &DemandSummary<V>,
     ) -> Result<DemandFrame<V>, E> {
         let (stage, _cfg) = owner.scope;
@@ -499,9 +499,9 @@ where
     fn complete_owner(
         &mut self,
         _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-        owner: Scoped<CfgScope, SSAValue>,
+        owner: Scoped<CFGScope, SSAValue>,
         completion: Vec<(SSAValue, V)>,
-    ) -> Result<SummaryEffect<Scoped<CfgScope, SSAValue>, DemandSummary<V>>, E> {
+    ) -> Result<SummaryEffect<Scoped<CFGScope, SSAValue>, DemandSummary<V>>, E> {
         // Scope-qualify the bare values the rules demanded.
         Ok(SummaryEffect::Many(
             completion

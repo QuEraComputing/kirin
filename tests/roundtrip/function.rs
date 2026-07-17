@@ -14,7 +14,7 @@ use kirin_test_utils::roundtrip;
 enum SplitSigLanguage {
     #[chumsky(format = "fn {:name}({sig:inputs}) -> {sig:return} {body}")]
     Function {
-        body: Cfg,
+        body: CFG,
         sig: Signature<SimpleType>,
     },
     #[wraps]
@@ -124,7 +124,7 @@ specialize @A fn @main(i32) -> i32 {
 
 // --- Tests from lambda_print.rs ---
 
-// Lambda (Cfg-containing) works with #[wraps] delegation.
+// Lambda (CFG-containing) works with #[wraps] delegation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]

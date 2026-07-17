@@ -9,13 +9,13 @@
 //! slot index). This is topology only — uses/defs/edge-argument *semantics*
 //! stay in dialect [`Interpretable`](crate::Interpretable) rules; the
 //! enumeration consumes the generic [`HasSuccessors`]/[`HasBlocks`]/
-//! [`HasCfgs`]/[`HasDigraphs`]/[`HasUngraphs`] contract every dialect
+//! [`HasCFG`]/[`HasDigraphs`]/[`HasUngraphs`] contract every dialect
 //! derives.
 
 use std::collections::{HashMap, HashSet};
 
 use kirin_ir::{
-    Block, Cfg, DiGraph, Dialect, GetInfo, HasBlocks, HasCfgs, HasDigraphs, HasSuccessors,
+    Block, CFG, DiGraph, Dialect, GetInfo, HasBlocks, HasCFG, HasDigraphs, HasSuccessors,
     HasUngraphs, Port, SSAValue, StageInfo, Statement, UnGraph,
 };
 
@@ -73,7 +73,7 @@ pub struct BodyTopology {
 }
 
 /// Deprecated name for [`BodyTopology`]; kept for one release.
-pub type CfgTopology = BodyTopology;
+pub type CFGTopology = BodyTopology;
 
 impl BodyTopology {
     /// The statements whose rules can translate demand on `block`'s parameters:
@@ -108,12 +108,12 @@ impl BodyTopology {
 pub fn body_topology<L>(stage: &StageInfo<L>, body: Body) -> BodyTopology
 where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
 {
     let mut topology = BodyTopology::default();
     let mut visited = HashSet::new();
     match body {
-        Body::Cfg(cfg) => {
+        Body::CFG(cfg) => {
             for block in cfg.blocks(stage) {
                 collect_block(stage, block, false, &mut topology, &mut visited);
             }
@@ -133,14 +133,14 @@ where
 
 /// Enumerate the topology of `cfg` in the finalized `stage`.
 ///
-/// Deprecated spelling of [`body_topology`] over a `Cfg`; kept for one
+/// Deprecated spelling of [`body_topology`] over a `CFG`; kept for one
 /// release.
-pub fn cfg_topology<L>(stage: &StageInfo<L>, cfg: &Cfg) -> BodyTopology
+pub fn cfg_topology<L>(stage: &StageInfo<L>, cfg: &CFG) -> BodyTopology
 where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
 {
-    body_topology(stage, Body::Cfg(*cfg))
+    body_topology(stage, Body::CFG(*cfg))
 }
 
 fn collect_block<L>(
@@ -151,7 +151,7 @@ fn collect_block<L>(
     visited: &mut HashSet<Block>,
 ) where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
 {
     if !visited.insert(block) {
         return;
@@ -192,7 +192,7 @@ fn collect_digraph<L>(
     visited: &mut HashSet<Block>,
 ) where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
 {
     let info = graph.expect_info(stage);
     let stmts: Vec<Statement> = info.graph().node_weights().copied().collect();
@@ -215,7 +215,7 @@ fn collect_ungraph<L>(
     visited: &mut HashSet<Block>,
 ) where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
 {
     let info = graph.expect_info(stage);
     let stmts: Vec<Statement> = info.graph().node_weights().copied().collect();
@@ -240,11 +240,11 @@ fn collect_owned_bodies<L>(
     visited: &mut HashSet<Block>,
 ) where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
 {
     let definition = stmt.definition(stage);
     let owned_blocks: Vec<Block> = definition.blocks().copied().collect();
-    let owned_cfgs: Vec<Cfg> = definition.cfgs().copied().collect();
+    let owned_cfgs: Vec<CFG> = definition.cfgs().copied().collect();
     let owned_digraphs: Vec<DiGraph> = definition.digraphs().copied().collect();
     let owned_ungraphs: Vec<UnGraph> = definition.ungraphs().copied().collect();
     for owned in owned_blocks {

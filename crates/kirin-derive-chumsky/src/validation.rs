@@ -350,7 +350,7 @@ impl<'ir> ValidationVisitor<'ir> {
                     FieldCategory::Block => {
                         (&[BodyProjection::Args, BodyProjection::Body], "Block")
                     }
-                    FieldCategory::Cfg => (&[BodyProjection::Body], "Cfg"),
+                    FieldCategory::CFG => (&[BodyProjection::Body], "CFG"),
                     _ => continue,
                 };
                 let missing: Vec<&str> = required
@@ -492,7 +492,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                         category,
                         FieldCategory::DiGraph
                             | FieldCategory::UnGraph
-                            | FieldCategory::Cfg
+                            | FieldCategory::CFG
                             | FieldCategory::Block
                     )
                 }
@@ -508,7 +508,7 @@ impl<'ir> FormatVisitor<'ir> for ValidationVisitor<'ir> {
                 let valid_on = match proj {
                     BodyProjection::Ports | BodyProjection::Captures => "DiGraph or UnGraph",
                     BodyProjection::Args => "Block",
-                    BodyProjection::Body => "DiGraph, UnGraph, Cfg, or Block",
+                    BodyProjection::Body => "DiGraph, UnGraph, CFG, or Block",
                 };
                 self.add_error(format!(
                     "'{}' projection is only valid on {} fields, but '{}' is a {} field",
@@ -768,7 +768,7 @@ mod tests {
             index,
             ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
             collection: Collection::Single,
-            data: FieldData::Cfg,
+            data: FieldData::CFG,
         }
     }
 

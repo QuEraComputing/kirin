@@ -307,9 +307,9 @@ pub struct FieldIterConfig {
     pub kind: FieldIterKind,
     /// Whether the iterator yields mutable references.
     pub mutable: bool,
-    /// Fully qualified trait name (e.g., `"HasCfgs"`).
+    /// Fully qualified trait name (e.g., `"HasCFG"`).
     pub trait_name: &'static str,
-    /// The IR type that fields must match (e.g., `"Cfg"`).
+    /// The IR type that fields must match (e.g., `"CFG"`).
     pub matching_type: &'static str,
     /// Method name on the trait (e.g., `"cfgs"`).
     pub trait_method: &'static str,

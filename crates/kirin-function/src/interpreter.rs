@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, HasBottom, HasCfgBody, Product, SSAValue};
+use kirin::prelude::{CompileTimeValue, HasBottom, HasCFGBody, Product, SSAValue};
 use kirin_interpreter::dialect::{
     CallEffect, CallableBody, Callee, ClassicLiveness, ClassicLivenessInterp, DemandInterp,
     DenseBackwardEffect, ForwardEval, FunctionEntry, Interp, Interpretable, InterpreterError,

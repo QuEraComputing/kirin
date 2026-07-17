@@ -4,7 +4,7 @@
 //! loop frame ([`ScfForFrame`]/[`AbstractScfForFrame`]). A language that uses
 //! such a dialect composes its own total frame enum embedding the standard
 //! framework frames — the representation walkers
-//! ([`BlockFrame`]/[`CfgFrame`]/[`DiGraphFrame`]) and the [`CallFrame`] call
+//! ([`BlockFrame`]/[`CFGFrame`]/[`DiGraphFrame`]) and the [`CallFrame`] call
 //! boundary, via [`FrameBuild`]/[`AbstractFrameBuild`] — plus the dialect
 //! frames (via [`BuildScfFor`]/[`BuildAbstractScfFor`]). The engine is
 //! not forked — only the engine's `F` type parameter changes.
@@ -13,7 +13,7 @@ use std::hash::Hash;
 
 use kirin_interpreter::engine::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-    AbstractFrameDriver, BlockFrame, CallFrame, CfgFrame, Completion, DiGraphFrame, Frame,
+    AbstractFrameDriver, BlockFrame, CFGFrame, CallFrame, Completion, DiGraphFrame, Frame,
     FrameBuild, FrameDriver, FrameEffect, InterpreterError, SparseForwardInterp,
 };
 use kirin_scf::{
@@ -29,7 +29,7 @@ use kirin_scf::{
 /// boundary plus the SCF if/for frames.
 pub enum ToyFrame<V, E> {
     Block(BlockFrame<V, E>),
-    Cfg(CfgFrame<V, E>),
+    CFG(CFGFrame<V, E>),
     Call(CallFrame<V>),
     DiGraph(DiGraphFrame<V, E>),
     ScfIf(ScfIfFrame<V, E>),
@@ -40,8 +40,8 @@ impl<V, E> FrameBuild<V, E> for ToyFrame<V, E> {
     fn from_block(frame: BlockFrame<V, E>) -> Self {
         ToyFrame::Block(frame)
     }
-    fn from_cfg(frame: CfgFrame<V, E>) -> Self {
-        ToyFrame::Cfg(frame)
+    fn from_cfg(frame: CFGFrame<V, E>) -> Self {
+        ToyFrame::CFG(frame)
     }
     fn from_call(frame: CallFrame<V>) -> Self {
         ToyFrame::Call(frame)
@@ -74,7 +74,7 @@ where
     fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
             ToyFrame::Block(frame) => frame.step_into::<I, Self>(interp),
-            ToyFrame::Cfg(frame) => frame.step_into::<I, Self>(interp),
+            ToyFrame::CFG(frame) => frame.step_into::<I, Self>(interp),
             ToyFrame::Call(frame) => frame.step_into::<I, Self>(interp),
             ToyFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
             ToyFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
@@ -85,7 +85,7 @@ where
     fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
             ToyFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-            ToyFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
+            ToyFrame::CFG(frame) => Ok(frame.resume_done_into::<Self>()),
             ToyFrame::Call(frame) => frame.resume_done_into::<Self>().map_err(I::Error::from),
             ToyFrame::DiGraph(frame) => Ok(frame.resume_done_into::<Self>()),
             ToyFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
@@ -100,7 +100,7 @@ where
     ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
             ToyFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
-            ToyFrame::Cfg(frame) => frame.resume_into::<I, Self>(completion, interp),
+            ToyFrame::CFG(frame) => frame.resume_into::<I, Self>(completion, interp),
             ToyFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
             ToyFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
             ToyFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),

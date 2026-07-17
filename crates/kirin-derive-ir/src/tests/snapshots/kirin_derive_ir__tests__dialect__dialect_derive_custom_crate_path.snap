@@ -171,43 +171,43 @@ impl<'a> Iterator for NopSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> kirin_ir::HasCfgs<'a> for Nop {
-    type Iter = NopCfgsIter<'a>;
+impl<'a> kirin_ir::HasCFG<'a> for Nop {
+    type Iter = NopCFGIter<'a>;
     fn cfgs(&'a self) -> Self::Iter {
-        NopCfgsIter {
-            inner: std::iter::empty::<&'a kirin_ir::Cfg>(),
+        NopCFGIter {
+            inner: std::iter::empty::<&'a kirin_ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct NopCfgsIter<'a> {
-    inner: std::iter::Empty<&'a kirin_ir::Cfg>,
+pub struct NopCFGIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for NopCfgsIter<'a> {
-    type Item = &'a kirin_ir::Cfg;
+impl<'a> Iterator for NopCFGIter<'a> {
+    type Item = &'a kirin_ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> kirin_ir::HasCfgsMut<'a> for Nop {
-    type IterMut = NopCfgsMutIter<'a>;
+impl<'a> kirin_ir::HasCFGMut<'a> for Nop {
+    type IterMut = NopCFGMutIter<'a>;
     fn cfgs_mut(&'a mut self) -> Self::IterMut {
-        NopCfgsMutIter {
-            inner: std::iter::empty::<&'a mut kirin_ir::Cfg>(),
+        NopCFGMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct NopCfgsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut kirin_ir::Cfg>,
+pub struct NopCFGMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for NopCfgsMutIter<'a> {
-    type Item = &'a mut kirin_ir::Cfg;
+impl<'a> Iterator for NopCFGMutIter<'a> {
+    type Item = &'a mut kirin_ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

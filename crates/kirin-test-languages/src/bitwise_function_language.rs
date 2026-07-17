@@ -2,7 +2,7 @@ use kirin_arith::ArithType;
 use kirin_bitwise::Bitwise;
 use kirin_cf::ControlFlow;
 use kirin_function::Return;
-use kirin_ir::{Cfg, Dialect, Signature};
+use kirin_ir::{CFG, Dialect, Signature};
 
 /// Test language: Function + Bitwise + ControlFlow + Return.
 /// Used for bitwise pipeline roundtrip tests.
@@ -18,7 +18,7 @@ pub enum BitwiseFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     Function {
-        body: Cfg,
+        body: CFG,
         sig: Signature<ArithType>,
     },
     #[wraps]

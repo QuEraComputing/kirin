@@ -301,7 +301,7 @@ frames, organized along two independent axes:
 
 - **Body representation** (the closed `Body` vocabulary — an intentional IR
   design decision): each framework-walkable representation has one
-  *representation walker* owning traversal mechanics only — `CfgFrame`
+  *representation walker* owning traversal mechanics only — `CFGFrame`
   (multi-block, follows `Jump`, rejects an undecided `Branch`), `BlockFrame`
   (one linear block; `Jump`/`Branch` are errors), and `DiGraphFrame`
   (dependency-ordered DAG walk collecting the declared yields). `UnGraph` has
@@ -456,7 +456,7 @@ it**. The concrete and
 abstract standard frames are two *implementations* of this one protocol — not
 parallel frameworks.
 
-### Concrete frames — `BlockFrame` / `CfgFrame` / `DiGraphFrame` / `CallFrame` / `StandardFrame`
+### Concrete frames — `BlockFrame` / `CFGFrame` / `DiGraphFrame` / `CallFrame` / `StandardFrame`
 
 `ConcreteInterpreter` is generic over the total frame type `F` (default
 `StandardFrame`). A custom enum reuses the standard single-path traversal —
@@ -475,7 +475,7 @@ test). (Further examples: `example/toy-lang`'s `ToyFrame`, which adds
 
 `SparseForwardInterpreter` is symmetrically generic over a total abstract frame type
 `F` (default `StandardAbstractFrame`). The standard abstract frames
-(`AbstractFunctionFrame`, `AbstractCfgFrame`, `AbstractBlockFrame`,
+(`AbstractFunctionFrame`, `AbstractCFGFrame`, `AbstractBlockFrame`,
 `AbstractCallFrame`) implement the *same*
 `Frame` protocol, but their traversal is the abstract one: a CFG block worklist
 that joins/widens at merge points, `Branch` exploration, single-block

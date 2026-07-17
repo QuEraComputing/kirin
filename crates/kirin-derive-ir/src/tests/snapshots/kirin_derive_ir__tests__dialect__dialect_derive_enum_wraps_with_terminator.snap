@@ -243,28 +243,28 @@ impl<'a> Iterator for CfOpsSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCfgs<'a> for CfOps {
-    type Iter = CfOpsCfgsIter<'a>;
+impl<'a> ::kirin::ir::HasCFG<'a> for CfOps {
+    type Iter = CfOpsCFGIter<'a>;
     fn cfgs(&'a self) -> Self::Iter {
         match self {
             Self::Branch(field_0) => {
-                CfOpsCfgsIter::Branch(<BranchOp as ::kirin::ir::HasCfgs>::cfgs(field_0))
+                CfOpsCFGIter::Branch(<BranchOp as ::kirin::ir::HasCFG>::cfgs(field_0))
             }
             Self::Return(field_0) => {
-                CfOpsCfgsIter::Return(<ReturnOp as ::kirin::ir::HasCfgs>::cfgs(field_0))
+                CfOpsCFGIter::Return(<ReturnOp as ::kirin::ir::HasCFG>::cfgs(field_0))
             }
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum CfOpsCfgsIter<'a> {
-    Branch(<BranchOp as ::kirin::ir::HasCfgs<'a>>::Iter),
-    Return(<ReturnOp as ::kirin::ir::HasCfgs<'a>>::Iter),
+pub enum CfOpsCFGIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasCFG<'a>>::Iter),
+    Return(<ReturnOp as ::kirin::ir::HasCFG<'a>>::Iter),
 }
 #[automatically_derived]
-impl<'a> Iterator for CfOpsCfgsIter<'a> {
-    type Item = &'a ::kirin::ir::Cfg;
+impl<'a> Iterator for CfOpsCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Branch(inner) => inner.next(),
@@ -273,28 +273,28 @@ impl<'a> Iterator for CfOpsCfgsIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCfgsMut<'a> for CfOps {
-    type IterMut = CfOpsCfgsMutIter<'a>;
+impl<'a> ::kirin::ir::HasCFGMut<'a> for CfOps {
+    type IterMut = CfOpsCFGMutIter<'a>;
     fn cfgs_mut(&'a mut self) -> Self::IterMut {
         match self {
             Self::Branch(field_0) => {
-                CfOpsCfgsMutIter::Branch(<BranchOp as ::kirin::ir::HasCfgsMut>::cfgs_mut(field_0))
+                CfOpsCFGMutIter::Branch(<BranchOp as ::kirin::ir::HasCFGMut>::cfgs_mut(field_0))
             }
             Self::Return(field_0) => {
-                CfOpsCfgsMutIter::Return(<ReturnOp as ::kirin::ir::HasCfgsMut>::cfgs_mut(field_0))
+                CfOpsCFGMutIter::Return(<ReturnOp as ::kirin::ir::HasCFGMut>::cfgs_mut(field_0))
             }
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum CfOpsCfgsMutIter<'a> {
-    Branch(<BranchOp as ::kirin::ir::HasCfgsMut<'a>>::IterMut),
-    Return(<ReturnOp as ::kirin::ir::HasCfgsMut<'a>>::IterMut),
+pub enum CfOpsCFGMutIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasCFGMut<'a>>::IterMut),
+    Return(<ReturnOp as ::kirin::ir::HasCFGMut<'a>>::IterMut),
 }
 #[automatically_derived]
-impl<'a> Iterator for CfOpsCfgsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Cfg;
+impl<'a> Iterator for CfOpsCFGMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Branch(inner) => inner.next(),

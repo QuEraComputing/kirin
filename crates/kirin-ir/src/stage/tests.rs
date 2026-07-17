@@ -2,8 +2,8 @@ use std::convert::Infallible;
 
 use super::*;
 use crate::{
-    Block, Cfg, CompileStage, DiGraph, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut,
-    HasBlocks, HasBlocksMut, HasCfgs, HasCfgsMut, HasDigraphs, HasDigraphsMut, HasResults,
+    Block, CFG, CompileStage, DiGraph, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut,
+    HasBlocks, HasBlocksMut, HasCFG, HasCFGMut, HasDigraphs, HasDigraphsMut, HasResults,
     HasResultsMut, HasStageInfo, HasSuccessors, HasSuccessorsMut, HasUngraphs, HasUngraphsMut, Id,
     IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, Pipeline, ResultValue, SSAValue,
     StageInfo, StageMeta, StagedNamePolicy, Successor, UnGraph,
@@ -89,16 +89,16 @@ macro_rules! impl_empty_dialect_traits {
             }
         }
 
-        impl<'a> HasCfgs<'a> for $dialect {
-            type Iter = std::iter::Empty<&'a Cfg>;
+        impl<'a> HasCFG<'a> for $dialect {
+            type Iter = std::iter::Empty<&'a CFG>;
 
             fn cfgs(&'a self) -> Self::Iter {
                 std::iter::empty()
             }
         }
 
-        impl<'a> HasCfgsMut<'a> for $dialect {
-            type IterMut = std::iter::Empty<&'a mut Cfg>;
+        impl<'a> HasCFGMut<'a> for $dialect {
+            type IterMut = std::iter::Empty<&'a mut CFG>;
 
             fn cfgs_mut(&'a mut self) -> Self::IterMut {
                 std::iter::empty()

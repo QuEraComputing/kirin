@@ -8,7 +8,7 @@
 //! | `ResultValue` / `ResultValue<T>` | [`Result`](FieldCategory::Result) | SSA output value |
 //! | `Block` | [`Block`](FieldCategory::Block) | Basic block reference |
 //! | `Successor` | [`Successor`](FieldCategory::Successor) | Control-flow successor |
-//! | `Cfg` / `Cfg<T>` | [`Cfg`](FieldCategory::Cfg) | Nested CFG |
+//! | `CFG` / `CFG<T>` | [`CFG`](FieldCategory::CFG) | Nested CFG |
 //! | `Symbol` | [`Symbol`](FieldCategory::Symbol) | Symbol reference |
 //! | anything else | [`Value`](FieldCategory::Value) | Plain Rust value |
 //!

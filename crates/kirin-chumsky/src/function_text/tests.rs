@@ -2,7 +2,7 @@ use std::collections::BTreeSet;
 
 use chumsky::prelude::*;
 use kirin_ir::{
-    Cfg, Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Pipeline,
+    CFG, Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Pipeline,
     Placeholder, Signature, StageInfo, TypeLattice,
 };
 use kirin_prettyless::PrintExt;
@@ -89,7 +89,7 @@ trivial_type_lattice!(I32Type, "i32", just(Token::Identifier("i32")));
 #[kirin(builders, type = UnitType, crate = kirin_ir)]
 #[chumsky(crate = crate, format = "fn {:name}{sig} {body}")]
 struct FunctionBody {
-    body: Cfg,
+    body: CFG,
     sig: Signature<UnitType>,
 }
 
@@ -97,7 +97,7 @@ struct FunctionBody {
 #[kirin(builders, type = I32Type, crate = kirin_ir)]
 #[chumsky(crate = crate, format = "fn {:name}{sig} {body}")]
 struct LowerBody {
-    body: Cfg,
+    body: CFG,
     sig: Signature<I32Type>,
 }
 

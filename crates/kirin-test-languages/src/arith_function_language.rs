@@ -1,7 +1,7 @@
 use kirin_arith::{Arith, ArithType};
 use kirin_cf::ControlFlow;
 use kirin_function::Return;
-use kirin_ir::{Cfg, Dialect, Signature};
+use kirin_ir::{CFG, Dialect, Signature};
 
 /// Test language: Function + Arith + ControlFlow + Return.
 /// Used for arith pipeline roundtrips and as bare (no-namespace) language.
@@ -17,7 +17,7 @@ pub enum ArithFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     Function {
-        body: Cfg,
+        body: CFG,
         sig: Signature<ArithType>,
     },
     #[wraps]

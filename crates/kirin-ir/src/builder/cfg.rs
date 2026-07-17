@@ -1,12 +1,12 @@
-use crate::{Block, BuilderStageInfo, Cfg, Dialect, Statement, node::CfgInfo};
+use crate::{Block, BuilderStageInfo, CFG, Dialect, Statement, node::CFGInfo};
 
-pub struct CfgBuilder<'a, L: Dialect> {
+pub struct CFGBuilder<'a, L: Dialect> {
     pub(super) stage: &'a mut BuilderStageInfo<L>,
     pub(super) parent: Option<Statement>,
     pub(super) blocks: Vec<Block>,
 }
 
-impl<'a, L: Dialect> CfgBuilder<'a, L> {
+impl<'a, L: Dialect> CFGBuilder<'a, L> {
     pub fn from_stage(stage: &'a mut BuilderStageInfo<L>) -> Self {
         Self {
             stage,
@@ -29,9 +29,9 @@ impl<'a, L: Dialect> CfgBuilder<'a, L> {
     }
 
     #[allow(clippy::wrong_self_convention, clippy::new_ret_no_self)]
-    pub fn new(self) -> Cfg {
+    pub fn new(self) -> CFG {
         let id = self.stage.cfgs.next_id();
-        let info = CfgInfo::builder()
+        let info = CFGInfo::builder()
             .id(id)
             .blocks(self.stage.link_blocks(&self.blocks))
             .maybe_parent(self.parent)

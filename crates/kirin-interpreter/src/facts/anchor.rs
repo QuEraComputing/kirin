@@ -72,8 +72,8 @@ impl LatticeAnchor for DenseAnchor {}
 ///
 /// Framework-level summary keys are never bare anchors: the same [`SSAValue`]
 /// or [`Block`] under two scopes (two stages, two analyzed cfgs, two call
-/// contexts) is two distinct facts, so keys carry their scope. Cfg-level
-/// analyses use `(CompileStage, Cfg)` as the scope; interprocedural
+/// contexts) is two distinct facts, so keys carry their scope. CFG-level
+/// analyses use `(CompileStage, CFG)` as the scope; interprocedural
 /// analyses generalize `K` to a call-context key (the backward analogue of the
 /// forward engine's context-qualified value keys).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

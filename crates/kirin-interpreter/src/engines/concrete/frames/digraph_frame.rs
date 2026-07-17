@@ -112,7 +112,7 @@ where
                 })
             }
             SparseForwardEffect::Jump(_) | SparseForwardEffect::Branch(_) => {
-                Err(E::from(InterpreterError::CfgControlFlowInStructuredBody))
+                Err(E::from(InterpreterError::CFGControlFlowInStructuredBody))
             }
             SparseForwardEffect::Yield(_) => Err(E::from(InterpreterError::Custom(
                 "yield inside a digraph body (a digraph's outputs are its declared yields)",

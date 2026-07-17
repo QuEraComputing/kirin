@@ -81,7 +81,7 @@ specialize @lowered fn @cross(i64) -> i64 {
 // block-entry never changes — under CFG-successor-edge scheduling alone it runs
 // once (reading the early `%doubled`) and is never rerun when `%doubled` rises.
 // Sound analysis must still return `Top`. This is the M3b acceptance stress test
-// for value/def-use deps; it exposes the gap the retained `AbstractCfgFrame`
+// for value/def-use deps; it exposes the gap the retained `AbstractCFGFrame`
 // worklist has, which M3b's Block owners + value-reader deps close.
 const LOOP_CARRIED_CROSS_BLOCK_RISE: &str = r#"
 stage @lowered fn @rise(i64) -> i64;
@@ -566,7 +566,7 @@ mod advanced {
     use kirin_constprop::{ConstPropContext, ConstPropValue};
     use kirin_interpreter::engine::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-        AbstractFrameDriver, BlockFrame, CallContext, CallFrame, CfgFrame, Completion,
+        AbstractFrameDriver, BlockFrame, CFGFrame, CallContext, CallFrame, Completion,
         ConcreteInterpreter, CrossStageLinker, DiGraphFrame, Frame, FrameBuild, FrameDriver,
         FrameEffect, InterpreterError, SparseForwardInterp, SparseForwardInterpreter,
         expect_single,
@@ -582,7 +582,7 @@ mod advanced {
 
     // --- A custom total frame enum -----------------------------------------
     //
-    // It reuses the standard representation walkers (`BlockFrame`/`CfgFrame`/
+    // It reuses the standard representation walkers (`BlockFrame`/`CFGFrame`/
     // `DiGraphFrame`), the `CallFrame` call boundary, and the SCF frames
     // verbatim via `FrameBuild`/`BuildScfFor` + the delegating `*_into`
     // methods, and adds *observation*: every call and every body step is counted
@@ -601,7 +601,7 @@ mod advanced {
 
     enum TracingFrame<V, E> {
         Block(BlockFrame<V, E>),
-        Cfg(CfgFrame<V, E>),
+        CFG(CFGFrame<V, E>),
         Call(CallFrame<V>),
         DiGraph(DiGraphFrame<V, E>),
         ScfIf(ScfIfFrame<V, E>),
@@ -612,8 +612,8 @@ mod advanced {
         fn from_block(frame: BlockFrame<V, E>) -> Self {
             TracingFrame::Block(frame)
         }
-        fn from_cfg(frame: CfgFrame<V, E>) -> Self {
-            TracingFrame::Cfg(frame)
+        fn from_cfg(frame: CFGFrame<V, E>) -> Self {
+            TracingFrame::CFG(frame)
         }
         fn from_call(frame: CallFrame<V>) -> Self {
             TracingFrame::Call(frame)
@@ -649,7 +649,7 @@ mod advanced {
                     TRACE.with(|t| t.borrow_mut().body_steps += 1);
                     frame.step_into::<I, Self>(interp)
                 }
-                TracingFrame::Cfg(frame) => {
+                TracingFrame::CFG(frame) => {
                     TRACE.with(|t| t.borrow_mut().body_steps += 1);
                     frame.step_into::<I, Self>(interp)
                 }
@@ -669,7 +669,7 @@ mod advanced {
         ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
                 TracingFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
+                TracingFrame::CFG(frame) => Ok(frame.resume_done_into::<Self>()),
                 TracingFrame::Call(frame) => {
                     frame.resume_done_into::<Self>().map_err(I::Error::from)
                 }
@@ -686,7 +686,7 @@ mod advanced {
         ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
             match self {
                 TracingFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
-                TracingFrame::Cfg(frame) => frame.resume_into::<I, Self>(completion, interp),
+                TracingFrame::CFG(frame) => frame.resume_into::<I, Self>(completion, interp),
                 TracingFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
                 TracingFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
                 TracingFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),
@@ -725,7 +725,7 @@ mod advanced {
         // is 5 activations: the root call plus 4 recursive calls (5→4→3→2→1;
         // the base case at 1 makes none) — every call, root included, is one
         // `CallFrame` routed through the custom Call arm; body statements run
-        // through its Block/Cfg arms.
+        // through its Block/CFG arms.
         let trace = TRACE.with(|t| *t.borrow());
         assert_eq!(trace.calls, 5);
         assert!(trace.body_steps > 0);
@@ -917,7 +917,7 @@ mod advanced {
 
 mod demand {
     use kirin::prelude::{
-        Cfg, CompileStage, GetInfo, HasCfgBody, HasResults, ParsePipelineText, Pipeline, SSAValue,
+        CFG, CompileStage, GetInfo, HasCFGBody, HasResults, ParsePipelineText, Pipeline, SSAValue,
     };
     use kirin_arith::{Arith, ArithValue};
     use kirin_function::Lexical;
@@ -933,7 +933,7 @@ mod demand {
     }
 
     /// The source stage id, its info, and the body cfg of `name`.
-    pub(super) fn source_cfg(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, Cfg) {
+    pub(super) fn source_cfg(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, CFG) {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
@@ -951,7 +951,7 @@ mod demand {
     }
 
     /// The parameters of the CFG's entry block.
-    pub(super) fn entry_params(pipeline: &Pipeline<Stage>, cfg: Cfg) -> Vec<SSAValue> {
+    pub(super) fn entry_params(pipeline: &Pipeline<Stage>, cfg: CFG) -> Vec<SSAValue> {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
@@ -971,7 +971,7 @@ mod demand {
     /// enumeration).
     pub(super) fn find_value<R>(
         pipeline: &Pipeline<Stage>,
-        cfg: Cfg,
+        cfg: CFG,
         select: impl Fn(&HighLevel) -> Option<R>,
     ) -> R {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
@@ -990,7 +990,7 @@ mod demand {
     }
 
     /// The result of the `constant <value> -> i64` statement.
-    pub(super) fn constant_result(pipeline: &Pipeline<Stage>, cfg: Cfg, value: i64) -> SSAValue {
+    pub(super) fn constant_result(pipeline: &Pipeline<Stage>, cfg: CFG, value: i64) -> SSAValue {
         find_value(pipeline, cfg, |definition| match definition {
             HighLevel::Constant(constant) if constant.value == ArithValue::I64(value) => {
                 Some(constant.result.into())
@@ -1261,7 +1261,7 @@ specialize @source fn @main(i64, i64) -> i64 {
 // ===========================================================================
 
 mod dense {
-    use kirin::prelude::{Cfg, CompileStage, Pipeline, SSAValue, Statement};
+    use kirin::prelude::{CFG, CompileStage, Pipeline, SSAValue, Statement};
     use kirin_arith::{Arith, ArithValue};
     use kirin_liveness::{DenseLivenessResult, LiveSet, analyze_demand};
 
@@ -1276,7 +1276,7 @@ mod dense {
     fn analyze_dense_toy(
         pipeline: &Pipeline<Stage>,
         stage: CompileStage,
-        cfg: Cfg,
+        cfg: CFG,
     ) -> DenseLivenessResult {
         let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
         engine.analyze(stage, cfg).expect("analysis succeeds");
@@ -1287,7 +1287,7 @@ mod dense {
     /// cfg, including scf bodies).
     fn find_statement(
         pipeline: &Pipeline<Stage>,
-        cfg: Cfg,
+        cfg: CFG,
         select: impl Fn(&HighLevel) -> bool,
     ) -> Statement {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");

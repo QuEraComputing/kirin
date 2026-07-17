@@ -29,7 +29,7 @@ use kirin_interpreter::{
     Body, DenseBackwardInterpreter, DenseBackwardTransfer, InterpDispatch, InterpreterError,
     SparseBackwardDriver, SparseBackwardInterpreter, StageQuery, StandardDenseBackwardFrame,
 };
-use kirin_ir::{Cfg, CompileStage, Pipeline, StageMeta};
+use kirin_ir::{CompileStage, Pipeline, StageMeta};
 
 /// The sparse backward demand engine instantiated at the [`Live`] lattice:
 /// strong liveness.

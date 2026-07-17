@@ -83,19 +83,19 @@ pub(crate) const HAS_SUCCESSORS_MUT: FieldIterConfig = FieldIterConfig {
     trait_method: "successors_mut",
     trait_type_iter: "IterMut",
 };
-pub(crate) const HAS_CFGS: FieldIterConfig = FieldIterConfig {
-    kind: FieldIterKind::Cfgs,
+pub(crate) const HAS_CFG: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::CFG,
     mutable: false,
-    trait_name: "HasCfgs",
-    matching_type: "Cfg",
+    trait_name: "HasCFG",
+    matching_type: "CFG",
     trait_method: "cfgs",
     trait_type_iter: "Iter",
 };
-pub(crate) const HAS_CFGS_MUT: FieldIterConfig = FieldIterConfig {
-    kind: FieldIterKind::Cfgs,
+pub(crate) const HAS_CFG_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::CFG,
     mutable: true,
-    trait_name: "HasCfgsMut",
-    matching_type: "Cfg",
+    trait_name: "HasCFGMut",
+    matching_type: "CFG",
     trait_method: "cfgs_mut",
     trait_type_iter: "IterMut",
 };
@@ -141,8 +141,8 @@ pub(crate) const FIELD_ITER_CONFIGS: [FieldIterConfig; 14] = [
     HAS_BLOCKS_MUT,
     HAS_SUCCESSORS,
     HAS_SUCCESSORS_MUT,
-    HAS_CFGS,
-    HAS_CFGS_MUT,
+    HAS_CFG,
+    HAS_CFG_MUT,
     HAS_DIGRAPHS,
     HAS_DIGRAPHS_MUT,
     HAS_UNGRAPHS,

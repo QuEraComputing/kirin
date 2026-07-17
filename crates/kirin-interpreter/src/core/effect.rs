@@ -1,19 +1,19 @@
 use kirin_ir::{
-    Block, Cfg, CompileStage, DiGraph, Function, Product, SSAValue, SpecializedFunction,
+    Block, CFG, CompileStage, DiGraph, Function, Product, SSAValue, SpecializedFunction,
     StagedFunction, Symbol, UnGraph,
 };
 
 /// A traversal descriptor: which body was the engine handed?
 ///
 /// Interpreter vocabulary, not an IR concept — dialect ops keep their precise
-/// field types (`Block`, `Cfg`, `DiGraph`, `UnGraph`); a `Body` appears only at
+/// field types (`Block`, `CFG`, `DiGraph`, `UnGraph`); a `Body` appears only at
 /// the moment a body is handed to the interpreter (callable entry, topology
 /// queries, analysis scopes). Bodies carry no semantics of their own: the
 /// statement that owns a body defines what entering and exiting it means.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Body {
     Block(Block),
-    Cfg(Cfg),
+    CFG(CFG),
     DiGraph(DiGraph),
     UnGraph(UnGraph),
 }
@@ -24,9 +24,9 @@ impl From<Block> for Body {
     }
 }
 
-impl From<Cfg> for Body {
-    fn from(cfg: Cfg) -> Self {
-        Self::Cfg(cfg)
+impl From<CFG> for Body {
+    fn from(cfg: CFG) -> Self {
+        Self::CFG(cfg)
     }
 }
 
@@ -133,7 +133,7 @@ pub enum Callee {
 /// rule returns one; the call boundary picks the walker that matches the
 /// body kind. Any body kind may be callable — the statement declaring itself
 /// callable defines the semantics; the framework supplies default walkers
-/// for `Cfg`, `Block`, and `DiGraph`, while `UnGraph` traversal is a
+/// for `CFG`, `Block`, and `DiGraph`, while `UnGraph` traversal is a
 /// dialect/compiler-supplied policy (the concrete engine's
 /// `FrameBuild::from_ungraph_entry` hook), rejected with
 /// [`InterpreterError::NoDefaultWalker`](crate::InterpreterError) when no

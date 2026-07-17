@@ -39,7 +39,7 @@ pub enum AbstractCompletion<V> {
     /// A single CFG **block owner** finished its one-pass walk (M3b): the outgoing
     /// CFG edges it took (empty for a `return`). Any return value was contributed
     /// to the engine's return accumulator during the walk.
-    CfgBlock { edges: Vec<Edge<V>> },
+    CFGBlock { edges: Vec<Edge<V>> },
 }
 
 /// Construction trait letting any total abstract frame enum embed the standard
@@ -64,8 +64,8 @@ pub enum BlockMode {
     /// error. Used by dialect frames that walk a chosen body.
     StructuredBody,
     /// A CFG **block owner** (M3b): completes on `Jump`/`Branch`
-    /// ([`AbstractCompletion::CfgBlock`]) or `Return`; `Yield` is an error.
-    CfgBlock,
+    /// ([`AbstractCompletion::CFGBlock`]) or `Return`; `Yield` is an error.
+    CFGBlock,
 }
 
 pub struct AbstractBlockFrame<V, E, K> {
@@ -100,7 +100,7 @@ where
         block: Block,
         args: Product<V>,
     ) -> Self {
-        Self::with_mode(stage, index, block, args, BlockMode::CfgBlock)
+        Self::with_mode(stage, index, block, args, BlockMode::CFGBlock)
     }
 
     fn with_mode(
@@ -152,8 +152,8 @@ where
                     BlockMode::StructuredBody => {
                         Ok(FrameEffect::Complete(AbstractCompletion::Finished(None)))
                     }
-                    BlockMode::CfgBlock => {
-                        Ok(FrameEffect::Complete(AbstractCompletion::CfgBlock {
+                    BlockMode::CFGBlock => {
+                        Ok(FrameEffect::Complete(AbstractCompletion::CFGBlock {
                             edges: Vec::new(),
                         }))
                     }
@@ -163,12 +163,12 @@ where
                 BlockMode::StructuredBody => Ok(FrameEffect::Complete(
                     AbstractCompletion::Finished(Some(values)),
                 )),
-                BlockMode::CfgBlock => Err(E::from(InterpreterError::Custom(
+                BlockMode::CFGBlock => Err(E::from(InterpreterError::Custom(
                     "yield inside a CFG block owner",
                 ))),
             },
             SparseForwardEffect::Jump(edge) => match self.mode {
-                BlockMode::CfgBlock => Ok(FrameEffect::Complete(AbstractCompletion::CfgBlock {
+                BlockMode::CFGBlock => Ok(FrameEffect::Complete(AbstractCompletion::CFGBlock {
                     edges: vec![edge],
                 })),
                 BlockMode::StructuredBody => Err(E::from(InterpreterError::Custom(
@@ -176,7 +176,7 @@ where
                 ))),
             },
             SparseForwardEffect::Branch(edges) => match self.mode {
-                BlockMode::CfgBlock => Ok(FrameEffect::Complete(AbstractCompletion::CfgBlock {
+                BlockMode::CFGBlock => Ok(FrameEffect::Complete(AbstractCompletion::CFGBlock {
                     edges,
                 })),
                 BlockMode::StructuredBody => Err(E::from(InterpreterError::Custom(
@@ -234,14 +234,14 @@ where
                 BlockMode::StructuredBody => {
                     Ok(FrameEffect::Complete(AbstractCompletion::Finished(None)))
                 }
-                BlockMode::CfgBlock => Ok(FrameEffect::Complete(AbstractCompletion::CfgBlock {
+                BlockMode::CFGBlock => Ok(FrameEffect::Complete(AbstractCompletion::CFGBlock {
                     edges: Vec::new(),
                 })),
             },
             AbstractCompletion::FunctionDone => Err(E::from(InterpreterError::Custom(
                 "block frame resumed with a function completion",
             ))),
-            AbstractCompletion::CfgBlock { .. } => Err(E::from(InterpreterError::Custom(
+            AbstractCompletion::CFGBlock { .. } => Err(E::from(InterpreterError::Custom(
                 "block frame resumed with a CFG-block completion",
             ))),
         }

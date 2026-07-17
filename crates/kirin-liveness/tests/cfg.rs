@@ -50,7 +50,7 @@ fn parse(program: &str) -> Pipeline<StageInfo<ArithFunctionLanguage>> {
 /// The finalized stage id and the body cfg of `@main`.
 fn main_cfg(
     pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
-) -> (kirin::prelude::CompileStage, kirin_ir::Cfg) {
+) -> (kirin::prelude::CompileStage, kirin_ir::CFG) {
     let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
     let stage = pipeline.stage(stage_id).expect("stage info");
 
@@ -71,7 +71,7 @@ fn main_cfg(
 /// The parameters of the `index`-th block of `cfg`, as SSA values.
 fn block_params(
     pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
-    cfg: kirin_ir::Cfg,
+    cfg: kirin_ir::CFG,
     index: usize,
 ) -> Vec<SSAValue> {
     let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
@@ -90,7 +90,7 @@ fn block_params(
 /// selects (e.g. the result and operands of the one `add`).
 fn find_arith<R>(
     pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
-    cfg: kirin_ir::Cfg,
+    cfg: kirin_ir::CFG,
     select: impl Fn(&Arith<kirin_arith::ArithType>) -> Option<R>,
 ) -> R {
     let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
@@ -264,7 +264,7 @@ use kirin_liveness::{LiveSet, analyze_dense};
 /// The `index`-th block of `cfg`.
 fn nth_block(
     pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
-    cfg: kirin_ir::Cfg,
+    cfg: kirin_ir::CFG,
     index: usize,
 ) -> kirin_ir::Block {
     let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
@@ -275,7 +275,7 @@ fn nth_block(
 /// The statement whose definition matches `select`.
 fn find_stmt(
     pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
-    cfg: kirin_ir::Cfg,
+    cfg: kirin_ir::CFG,
     select: impl Fn(&ArithFunctionLanguage) -> bool,
 ) -> kirin_ir::Statement {
     let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");

@@ -3,7 +3,7 @@ use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
 use crate::{EnvIndex, FrameDriver, InterpreterError};
 
 /// Block-cursor mechanics shared by the block-shaped walkers
-/// ([`BlockFrame`](super::BlockFrame) and [`CfgFrame`](super::CfgFrame)):
+/// ([`BlockFrame`](super::BlockFrame) and [`CFGFrame`](super::CFGFrame)):
 /// the current block, the statement cursor, lazily bound entry arguments,
 /// and the result slots awaiting a pushed child's completion values.
 ///

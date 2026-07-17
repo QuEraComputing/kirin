@@ -1,5 +1,5 @@
 //! Mixed graph/SSA test language: regular SSA IR (arith + cf + function
-//! calls over `Cfg` bodies) combined with `DiGraph` computational-graph
+//! calls over `CFG` bodies) combined with `DiGraph` computational-graph
 //! bodies — the acceptance shape from issue #667. Adds a linear (`Block`-
 //! bodied) callable and an inline graph-owning statement so both interpreter
 //! entry paths (call and `Push`) are exercised.
@@ -9,7 +9,7 @@ use kirin_cf::ControlFlow;
 use kirin_constant::Constant;
 use kirin_function::{Call, Return};
 use kirin_ir::{
-    Block, Cfg, DiGraph, Dialect, Placeholder as _, ResultValue, SSAValue, Signature, UnGraph,
+    Block, CFG, DiGraph, Dialect, Placeholder as _, ResultValue, SSAValue, Signature, UnGraph,
 };
 
 #[derive(Debug, Clone, PartialEq, Dialect)]
@@ -19,13 +19,13 @@ use kirin_ir::{
 #[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
 #[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]
 pub enum GraphFunctionLanguage {
-    /// Standard Cfg-bodied function.
+    /// Standard CFG-bodied function.
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     Function {
-        body: Cfg,
+        body: CFG,
         sig: Signature<ArithType>,
     },
     /// DiGraph-bodied callable (a computational graph as a function body).

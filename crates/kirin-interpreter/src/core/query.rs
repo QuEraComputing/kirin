@@ -7,7 +7,7 @@
 //! bound that any well-formed stage enum satisfies automatically.
 
 use kirin_ir::{
-    Block, Cfg, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCfgs, HasStageInfo,
+    Block, CFG, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCFG, HasStageInfo,
     HasSuccessors, Pipeline, SSAKind, SSAValue, SpecializedFunction, StageAction, StageInfo,
     StageMeta, StagedFunction, Statement, SupportsStageDispatch, Symbol,
     UniqueLiveSpecializationError,
@@ -97,9 +97,9 @@ where
 }
 
 /// Entry block of a CFG.
-pub struct CfgEntry(pub Cfg);
+pub struct CFGEntry(pub CFG);
 
-impl<S, L> StageAction<S, L> for CfgEntry
+impl<S, L> StageAction<S, L> for CFGEntry
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
@@ -288,7 +288,7 @@ where
     L: Dialect,
     for<'a> L: HasSuccessors<'a>
         + HasBlocks<'a>
-        + HasCfgs<'a>
+        + HasCFG<'a>
         + kirin_ir::HasDigraphs<'a>
         + kirin_ir::HasUngraphs<'a>,
 {
@@ -334,7 +334,7 @@ pub trait StageQuery:
     + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
     + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
     + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
-    + SupportsStageDispatch<CfgEntry, Option<Block>, InterpreterError>
+    + SupportsStageDispatch<CFGEntry, Option<Block>, InterpreterError>
     + SupportsStageDispatch<
         UniqueSpecialization,
         Result<SpecializedFunction, InterpreterError>,
@@ -353,7 +353,7 @@ impl<S> StageQuery for S where
         + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
         + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
         + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
-        + SupportsStageDispatch<CfgEntry, Option<Block>, InterpreterError>
+        + SupportsStageDispatch<CFGEntry, Option<Block>, InterpreterError>
         + SupportsStageDispatch<
             UniqueSpecialization,
             Result<SpecializedFunction, InterpreterError>,
@@ -411,9 +411,9 @@ pub(crate) fn next_statement<S: StageQuery>(
 pub(crate) fn cfg_entry<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
-    cfg: Cfg,
+    cfg: CFG,
 ) -> Result<Option<Block>, InterpreterError> {
-    dispatch(pipeline, stage, CfgEntry(cfg))
+    dispatch(pipeline, stage, CFGEntry(cfg))
 }
 
 pub(crate) fn unique_specialization<S: StageQuery>(

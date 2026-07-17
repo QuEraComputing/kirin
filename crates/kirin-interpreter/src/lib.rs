@@ -85,11 +85,11 @@ pub use self::core::ForwardDataflowFrameDriver as AbstractFrameDriver;
 pub use self::core::ForwardFrameDriver as FrameDriver;
 
 // Concrete execution engine + the concrete standard frames: the
-// representation walkers (`BlockFrame`/`CfgFrame`/`DiGraphFrame` — `UnGraph`
+// representation walkers (`BlockFrame`/`CFGFrame`/`DiGraphFrame` — `UnGraph`
 // traversal is a dialect/compiler policy supplied through
 // `FrameBuild::from_ungraph_entry`) and the `CallFrame` call boundary.
 pub use engines::concrete::{
-    BlockFrame, CallFrame, CfgFrame, Completion, ConcreteInterpreter, DiGraphFrame, FrameBuild,
+    BlockFrame, CFGFrame, CallFrame, Completion, ConcreteInterpreter, DiGraphFrame, FrameBuild,
     StandardFrame, UnGraphEntry,
 };
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
@@ -100,7 +100,7 @@ pub use engines::sparse_forward::{
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{
-    BackwardAnalysisState, CfgScope, DemandFrame, DemandInterp, DemandSummary,
+    BackwardAnalysisState, CFGScope, DemandFrame, DemandInterp, DemandSummary,
     SparseBackwardDriver, SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter,
     SparseBackwardProfile, SparseBackwardTransfer,
 };
@@ -116,7 +116,7 @@ pub use engines::dense_backward::{
 // fact stores, and cfg topology enumeration. Anchor family is a property of
 // the solver shape; dispatch meaning lives in `semantics`.
 pub use facts::{
-    BlockTopology, BodyTopology, CfgTopology, Change, DenseAnchor, DenseBlockStore,
+    BlockTopology, BodyTopology, CFGTopology, Change, DenseAnchor, DenseBlockStore,
     DensePointStore, FactStore, GraphTopology, LatticeAnchor, PortBoundary, ProgramPoint, Scoped,
     ScopedSparseStore, SparseStore, body_topology, cfg_topology,
 };
@@ -164,8 +164,8 @@ pub mod dialect {
 pub mod engine {
     pub use crate::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-        AbstractFrameDriver, AbstractInterpreter, BlockFrame, CallContext, CallFrame, Callee,
-        CfgFrame, Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker,
+        AbstractFrameDriver, AbstractInterpreter, BlockFrame, CFGFrame, CallContext, CallFrame,
+        Callee, Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker,
         DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBackwardInterp,
         DenseBackwardInterpreter, DenseBlockFrame, DenseFrameBuild, DiGraphFrame, Env,
         ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameBuild, FrameDriver,

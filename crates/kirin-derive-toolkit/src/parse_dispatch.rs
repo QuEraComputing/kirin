@@ -2,7 +2,7 @@
 //!
 //! Generates a monomorphic [`ParseDispatch`] implementation that dispatches to
 //! concrete dialect parsers with concrete lifetimes, avoiding the HRTB bounds
-//! that cause E0275 with `Block`/`Cfg`-containing types.
+//! that cause E0275 with `Block`/`CFG`-containing types.
 //!
 //! Reuses the same `#[stage(...)]` attribute parsing as `StageMeta`.
 

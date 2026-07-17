@@ -13,8 +13,8 @@ pub enum FieldCategory {
     Block,
     /// Control-flow successor (`Successor`).
     Successor,
-    /// Nested CFG (`Cfg` / `Cfg<T>`).
-    Cfg,
+    /// Nested CFG (`CFG` / `CFG<T>`).
+    CFG,
     /// Directed graph body (`DiGraph`).
     DiGraph,
     /// Undirected graph body (`UnGraph`).
@@ -54,7 +54,7 @@ pub enum FieldData<L: Layout> {
     },
     Block,
     Successor,
-    Cfg,
+    CFG,
     DiGraph,
     UnGraph,
     Signature,
@@ -82,7 +82,7 @@ impl<L: Layout> Clone for FieldData<L> {
             },
             FieldData::Block => FieldData::Block,
             FieldData::Successor => FieldData::Successor,
-            FieldData::Cfg => FieldData::Cfg,
+            FieldData::CFG => FieldData::CFG,
             FieldData::DiGraph => FieldData::DiGraph,
             FieldData::UnGraph => FieldData::UnGraph,
             FieldData::Signature => FieldData::Signature,
@@ -128,7 +128,7 @@ mod tests {
 
     #[test]
     fn field_category_is_ssa_like_cfg() {
-        assert!(!FieldCategory::Cfg.is_ssa_like());
+        assert!(!FieldCategory::CFG.is_ssa_like());
     }
 
     #[test]

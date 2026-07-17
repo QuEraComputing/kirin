@@ -2,7 +2,7 @@ use kirin_ir::{CompileStage, Product, SSAValue};
 
 use crate::{Body, CallEffect, Callee, EnvIndex, FrameDriver, FrameEffect, InterpreterError};
 
-use super::{BlockFrame, CfgFrame, Completion, DiGraphFrame, FrameBuild, UnGraphEntry};
+use super::{BlockFrame, CFGFrame, Completion, DiGraphFrame, FrameBuild, UnGraphEntry};
 
 /// The function-call boundary frame: interpreter runtime bookkeeping, not a
 /// function dialect operation and not the callable itself.
@@ -15,7 +15,7 @@ use super::{BlockFrame, CfgFrame, Completion, DiGraphFrame, FrameBuild, UnGraphE
 /// 3. ask [`FunctionEntry`](crate::FunctionEntry) for the callable body
 ///    descriptor ([`CallableBody`](crate::CallableBody));
 /// 4. select the entry frame for the closed [`Body`] variant —
-///    `Cfg` → [`CfgFrame`], `Block` → [`BlockFrame`],
+///    `CFG` → [`CFGFrame`], `Block` → [`BlockFrame`],
 ///    `DiGraph` → [`DiGraphFrame`], `UnGraph` → the dialect/compiler policy
 ///    ([`FrameBuild::from_ungraph_entry`]);
 /// 5. suspend while the callee frame runs;
@@ -113,8 +113,8 @@ where
                 // vocabulary, so this match is intentionally exhaustive;
                 // only the `UnGraph` arm delegates to a language policy.
                 let child = match entry.body {
-                    Body::Cfg(cfg) => {
-                        F::from_cfg(CfgFrame::new(target.stage, index, cfg, entry.args))
+                    Body::CFG(cfg) => {
+                        F::from_cfg(CFGFrame::new(target.stage, index, cfg, entry.args))
                     }
                     Body::Block(block) => {
                         F::from_block(BlockFrame::new(target.stage, index, block, entry.args))

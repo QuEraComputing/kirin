@@ -124,15 +124,15 @@ impl<'a> HasSuccessorsMut<'a> for BuilderDialect {
     }
 }
 
-impl<'a> HasCfgs<'a> for BuilderDialect {
-    type Iter = std::iter::Empty<&'a Cfg>;
+impl<'a> HasCFG<'a> for BuilderDialect {
+    type Iter = std::iter::Empty<&'a CFG>;
     fn cfgs(&'a self) -> Self::Iter {
         std::iter::empty()
     }
 }
 
-impl<'a> HasCfgsMut<'a> for BuilderDialect {
-    type IterMut = std::iter::Empty<&'a mut Cfg>;
+impl<'a> HasCFGMut<'a> for BuilderDialect {
+    type IterMut = std::iter::Empty<&'a mut CFG>;
     fn cfgs_mut(&'a mut self) -> Self::IterMut {
         std::iter::empty()
     }

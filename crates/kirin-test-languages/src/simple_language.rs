@@ -1,5 +1,5 @@
 use crate::{SimpleType, Value};
-use kirin_ir::{Cfg, Dialect, ResultValue, SSAValue};
+use kirin_ir::{CFG, Dialect, ResultValue, SSAValue};
 
 #[derive(Clone, Debug, PartialEq, Dialect)]
 #[cfg_attr(feature = "parser", derive(kirin_chumsky::HasParser))]
@@ -35,5 +35,5 @@ pub enum SimpleLanguage {
         any(feature = "parser", feature = "pretty"),
         chumsky(format = "$function {0}")
     )]
-    Function(Cfg, #[kirin(type = SimpleType::F64)] ResultValue),
+    Function(CFG, #[kirin(type = SimpleType::F64)] ResultValue),
 }

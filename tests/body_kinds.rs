@@ -2,16 +2,16 @@
 //!
 //! Two independent axes organize concrete traversal:
 //!
-//! - **Body representation** — the closed `Body` vocabulary: `Cfg`, `Block`,
+//! - **Body representation** — the closed `Body` vocabulary: `CFG`, `Block`,
 //!   `DiGraph`, `UnGraph`. Each framework-walkable representation has one
-//!   walker (`CfgFrame`/`BlockFrame`/`DiGraphFrame`); `UnGraph` traversal is
+//!   walker (`CFGFrame`/`BlockFrame`/`DiGraphFrame`); `UnGraph` traversal is
 //!   a compiler-supplied policy (`FrameBuild::from_ungraph_entry`).
 //! - **Entry context** — callable (entered through `CallFrame`, which owns
 //!   the callee activation) vs. nested (entered through a dialect frame
 //!   pushed with `SparseForwardEffect::Push`, borrowing the current
 //!   activation).
 //!
-//! The tests cover the composition matrix: callable Cfg/Block/DiGraph bodies
+//! The tests cover the composition matrix: callable CFG/Block/DiGraph bodies
 //! (`CallFrame` → walker), nested DiGraph and scf Blocks (dialect frame →
 //! walker), returns bubbling through dialect frames to the nearest
 //! `CallFrame`, and the callable-UnGraph policy hook (with and without a
@@ -27,7 +27,7 @@ use kirin_cmp::Cmp;
 use kirin_constant::Constant;
 use kirin_function::Lexical;
 use kirin_interpreter::{
-    BlockFrame, Body, CallFrame, CfgFrame, Completion, ConcreteInterpreter, DiGraphFrame, Env,
+    BlockFrame, Body, CFGFrame, CallFrame, Completion, ConcreteInterpreter, DiGraphFrame, Env,
     EnvIndex, Frame, FrameBuild, FrameDriver, FrameEffect, FunctionEntry, Interpretable,
     InterpreterError, SameStageLinker, SparseForwardEffect, StandardFrame, UnGraphEntry,
     expect_single,
@@ -79,7 +79,7 @@ fn run(pipeline: &Pipeline<L>, function: &str, args: &[i64]) -> Result<i64, Test
 // 1. Callable DiGraph: caller → CallFrame → DiGraphFrame.
 // ===========================================================================
 
-/// A Cfg-bodied `main` calls a DiGraph-bodied callable. The `call.named`
+/// A CFG-bodied `main` calls a DiGraph-bodied callable. The `call.named`
 /// statement produces a `Call` effect; the resulting `CallFrame` resolves
 /// the callee, allocates its activation, and — because the callable body is
 /// `Body::DiGraph` — enters a `DiGraphFrame`. The graph walks its arith
@@ -115,7 +115,7 @@ specialize @test fn @main() -> i64 {
 // 2. Nested/pushed DiGraph: dialect operation → DiGraphFrame.
 // ===========================================================================
 
-/// A statement inside a Cfg block owns a DiGraph body and enters it with
+/// A statement inside a CFG block owns a DiGraph body and enters it with
 /// `SparseForwardEffect::Push` — the same way `scf.if` enters its Block
 /// arms. Unlike test 1 there is **no** `CallFrame` in the chain: no callee
 /// resolution happens, no function activation is allocated or freed — the
@@ -227,7 +227,7 @@ specialize @test fn @main() -> i64 {
 // nested Blocks through dialect frames (ScfIfFrame/ScfForFrame → BlockFrame).
 // ===========================================================================
 
-/// Inline language wrapping functions (Cfg bodies), scf, and arithmetic.
+/// Inline language wrapping functions (CFG bodies), scf, and arithmetic.
 /// Specific to this integration suite; shared test dialects live in
 /// `kirin-test-languages`.
 #[derive(
@@ -253,7 +253,7 @@ enum ScfLanguage {
 /// engine fork).
 enum ScfTestFrame<V, E> {
     Block(BlockFrame<V, E>),
-    Cfg(CfgFrame<V, E>),
+    CFG(CFGFrame<V, E>),
     Call(CallFrame<V>),
     DiGraph(DiGraphFrame<V, E>),
     ScfIf(ScfIfFrame<V, E>),
@@ -264,8 +264,8 @@ impl<V, E> FrameBuild<V, E> for ScfTestFrame<V, E> {
     fn from_block(frame: BlockFrame<V, E>) -> Self {
         ScfTestFrame::Block(frame)
     }
-    fn from_cfg(frame: CfgFrame<V, E>) -> Self {
-        ScfTestFrame::Cfg(frame)
+    fn from_cfg(frame: CFGFrame<V, E>) -> Self {
+        ScfTestFrame::CFG(frame)
     }
     fn from_call(frame: CallFrame<V>) -> Self {
         ScfTestFrame::Call(frame)
@@ -299,7 +299,7 @@ where
     fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
             ScfTestFrame::Block(frame) => frame.step_into::<I, Self>(interp),
-            ScfTestFrame::Cfg(frame) => frame.step_into::<I, Self>(interp),
+            ScfTestFrame::CFG(frame) => frame.step_into::<I, Self>(interp),
             ScfTestFrame::Call(frame) => frame.step_into::<I, Self>(interp),
             ScfTestFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
             ScfTestFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
@@ -310,7 +310,7 @@ where
     fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
             ScfTestFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-            ScfTestFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
+            ScfTestFrame::CFG(frame) => Ok(frame.resume_done_into::<Self>()),
             ScfTestFrame::Call(frame) => frame.resume_done_into::<Self>().map_err(I::Error::from),
             ScfTestFrame::DiGraph(frame) => Ok(frame.resume_done_into::<Self>()),
             ScfTestFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
@@ -325,7 +325,7 @@ where
     ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
             ScfTestFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
-            ScfTestFrame::Cfg(frame) => frame.resume_into::<I, Self>(completion, interp),
+            ScfTestFrame::CFG(frame) => frame.resume_into::<I, Self>(completion, interp),
             ScfTestFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
             ScfTestFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
             ScfTestFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),
@@ -415,7 +415,7 @@ specialize @test fn @sum_below(i64) -> i64 {
 
 /// A function `Return` inside an `scf.if` arm: the arm's `BlockFrame`
 /// completes `Returned`, the `ScfIfFrame` relays it (it is not a call
-/// boundary), the function's `CfgFrame` relays it too, and the nearest
+/// boundary), the function's `CFGFrame` relays it too, and the nearest
 /// `CallFrame` consumes it — freeing the callee activation exactly once and
 /// writing the caller's result slots. Execution must not continue after the
 /// return: the statements below the `if` never run on the early-return path.
@@ -483,7 +483,7 @@ specialize @test fn @twice(i64) -> i64 {
 /// default composition — the generic traversal logic is untouched.
 enum UnPolicyFrame {
     Block(BlockFrame<i64, TestError>),
-    Cfg(CfgFrame<i64, TestError>),
+    CFG(CFGFrame<i64, TestError>),
     Call(CallFrame<i64>),
     DiGraph(DiGraphFrame<i64, TestError>),
     Chain(UnGraphChainFrame),
@@ -493,8 +493,8 @@ impl FrameBuild<i64, TestError> for UnPolicyFrame {
     fn from_block(frame: BlockFrame<i64, TestError>) -> Self {
         UnPolicyFrame::Block(frame)
     }
-    fn from_cfg(frame: CfgFrame<i64, TestError>) -> Self {
-        UnPolicyFrame::Cfg(frame)
+    fn from_cfg(frame: CFGFrame<i64, TestError>) -> Self {
+        UnPolicyFrame::CFG(frame)
     }
     fn from_call(frame: CallFrame<i64>) -> Self {
         UnPolicyFrame::Call(frame)
@@ -604,7 +604,7 @@ impl<'ir> Frame<UnEngine<'ir>> for UnPolicyFrame {
     ) -> Result<FrameEffect<Self, Self::Completion>, TestError> {
         match self {
             UnPolicyFrame::Block(frame) => frame.step_into::<UnEngine<'ir>, Self>(interp),
-            UnPolicyFrame::Cfg(frame) => frame.step_into::<UnEngine<'ir>, Self>(interp),
+            UnPolicyFrame::CFG(frame) => frame.step_into::<UnEngine<'ir>, Self>(interp),
             UnPolicyFrame::Call(frame) => frame.step_into::<UnEngine<'ir>, Self>(interp),
             UnPolicyFrame::DiGraph(frame) => frame.step_into::<UnEngine<'ir>, Self>(interp),
             UnPolicyFrame::Chain(frame) => frame.step(interp),
@@ -617,7 +617,7 @@ impl<'ir> Frame<UnEngine<'ir>> for UnPolicyFrame {
     ) -> Result<FrameEffect<Self, Self::Completion>, TestError> {
         match self {
             UnPolicyFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-            UnPolicyFrame::Cfg(frame) => Ok(frame.resume_done_into::<Self>()),
+            UnPolicyFrame::CFG(frame) => Ok(frame.resume_done_into::<Self>()),
             UnPolicyFrame::Call(frame) => frame.resume_done_into::<Self>().map_err(TestError::from),
             UnPolicyFrame::DiGraph(frame) => Ok(frame.resume_done_into::<Self>()),
             UnPolicyFrame::Chain(_) => Err(TestError::Core(InterpreterError::Custom(
@@ -635,7 +635,7 @@ impl<'ir> Frame<UnEngine<'ir>> for UnPolicyFrame {
             UnPolicyFrame::Block(frame) => {
                 frame.resume_into::<UnEngine<'ir>, Self>(completion, interp)
             }
-            UnPolicyFrame::Cfg(frame) => {
+            UnPolicyFrame::CFG(frame) => {
                 frame.resume_into::<UnEngine<'ir>, Self>(completion, interp)
             }
             UnPolicyFrame::Call(frame) => {

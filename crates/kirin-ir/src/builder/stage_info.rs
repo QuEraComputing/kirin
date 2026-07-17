@@ -105,7 +105,7 @@ impl std::error::Error for FinalizeError {}
 ///     .new();
 /// ```
 ///
-/// Cfgs (containers of blocks):
+/// CFG (containers of blocks):
 /// ```ignore
 /// let entry = stage.block().new();
 /// let exit = stage.block().new();

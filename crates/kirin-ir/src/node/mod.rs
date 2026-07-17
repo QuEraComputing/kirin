@@ -11,7 +11,7 @@ pub mod symbol;
 pub(crate) mod ungraph;
 
 pub use block::{Block, BlockInfo, Successor};
-pub use cfg::{Cfg, CfgInfo};
+pub use cfg::{CFG, CFGInfo};
 pub use digraph::{DiGraph, DiGraphInfo};
 pub use function::{
     CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,

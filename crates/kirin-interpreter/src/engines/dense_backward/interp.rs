@@ -46,16 +46,16 @@
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, Cfg, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, SSAValue,
+    Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, SSAValue,
     StageMeta, Statement,
 };
 
 use super::frames::{DenseBlockFrame, DenseFrameBuild};
 use crate::Body;
 use crate::core::query;
-use crate::engines::sparse_backward::CfgScope;
+use crate::engines::sparse_backward::CFGScope;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, CfgTopology, ClassicLiveness, DenseBackwardSemantic,
+    AbstractInterpreter, BackwardSummaryDeps, CFGTopology, ClassicLiveness, DenseBackwardSemantic,
     DensePointStore, EnvIndex, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
     InterpreterError, OwnerSemantics, ProgramPoint, Scoped, StageQuery,
     StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
@@ -322,7 +322,7 @@ where
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
-    type SummaryKey = Scoped<CfgScope, Block>;
+    type SummaryKey = Scoped<CFGScope, Block>;
     type Summary = BlockLiveness<V>;
     type Frame = F;
     type Completion = DenseBackwardCompletion<V>;
@@ -341,8 +341,8 @@ pub enum DenseBackwardCompletion<V> {
 /// the CFG topology, and an optional per-point recorder filled by the
 /// block frames during [`reconstruct_points`](DenseBackwardInterpreter::reconstruct_points).
 pub struct DenseAnalysisState<V> {
-    scope: Option<CfgScope>,
-    topology: CfgTopology,
+    scope: Option<CFGScope>,
+    topology: CFGTopology,
     recorder: Option<DensePointStore<V>>,
 }
 
@@ -350,7 +350,7 @@ impl<V> Default for DenseAnalysisState<V> {
     fn default() -> Self {
         Self {
             scope: None,
-            topology: CfgTopology::default(),
+            topology: CFGTopology::default(),
             recorder: None,
         }
     }
@@ -363,7 +363,7 @@ pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardF
     DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
     DenseAnalysisState<V>,
-    BackwardSummaryDeps<Scoped<CfgScope, Block>>,
+    BackwardSummaryDeps<Scoped<CFGScope, Block>>,
 >;
 
 // ===========================================================================
@@ -549,7 +549,7 @@ struct DenseBackwardSemantics;
 impl<'ir, S, V, E, F, Sem>
     OwnerSemantics<
         DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        Scoped<CfgScope, Block>,
+        Scoped<CFGScope, Block>,
         BlockLiveness<V>,
         F,
         DenseBackwardCompletion<V>,
@@ -565,7 +565,7 @@ where
     fn bottom_summary(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        _owner: &Scoped<CfgScope, Block>,
+        _owner: &Scoped<CFGScope, Block>,
     ) -> Result<BlockLiveness<V>, E> {
         Ok(BlockLiveness::bottom())
     }
@@ -573,7 +573,7 @@ where
     fn entry_frame(
         &mut self,
         interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: &Scoped<CfgScope, Block>,
+        owner: &Scoped<CFGScope, Block>,
         _summary: &BlockLiveness<V>,
     ) -> Result<F, E> {
         let (stage, _cfg) = owner.scope;
@@ -586,9 +586,9 @@ where
     fn complete_owner(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: Scoped<CfgScope, Block>,
+        owner: Scoped<CFGScope, Block>,
         completion: DenseBackwardCompletion<V>,
-    ) -> Result<SummaryEffect<Scoped<CfgScope, Block>, BlockLiveness<V>>, E> {
+    ) -> Result<SummaryEffect<Scoped<CFGScope, Block>, BlockLiveness<V>>, E> {
         match completion {
             DenseBackwardCompletion::Block { live_in, live_out } => Ok(SummaryEffect::Update {
                 owner,
@@ -689,7 +689,7 @@ where
         let body = body.into();
         let scope = (stage, body);
         let topology = query::body_topology(self.driver.inner().pipeline(), stage, body)?;
-        let owners: Vec<Scoped<CfgScope, Block>> = topology
+        let owners: Vec<Scoped<CFGScope, Block>> = topology
             .cfg_blocks()
             .map(|block| Scoped::new(scope, block.block))
             .collect();
@@ -716,7 +716,7 @@ where
         let scope = (stage, body.into());
         self.driver.store_mut().recorder = Some(DensePointStore::new());
         for block in self.cfg_blocks() {
-            // The CfgOwner walk re-absorbs the converged successor summaries,
+            // The CFGOwner walk re-absorbs the converged successor summaries,
             // so it replays exactly the fixpoint's final states.
             let _ = scope;
             self.driver.replace_state(V::bottom());

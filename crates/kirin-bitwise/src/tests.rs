@@ -1,6 +1,6 @@
 use kirin::ir::{
-    HasArguments, HasBlocks, HasCfgs, HasResults, HasSuccessors, IsConstant, IsPure,
-    IsSpeculatable, IsTerminator, TestSSAValue,
+    HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant, IsPure, IsSpeculatable,
+    IsTerminator, TestSSAValue,
 };
 use kirin_test_types::UnitType;
 
@@ -132,7 +132,7 @@ fn all_have_one_result() {
     }
 }
 
-// --- HasSuccessors / HasBlocks / HasCfgs: all empty ---
+// --- HasSuccessors / HasBlocks / HasCFG: all empty ---
 
 #[test]
 fn no_successors() {

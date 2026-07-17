@@ -9,6 +9,6 @@ pub(crate) mod topology;
 pub use anchor::{Change, DenseAnchor, LatticeAnchor, ProgramPoint, Scoped};
 pub use store::{DenseBlockStore, DensePointStore, FactStore, ScopedSparseStore, SparseStore};
 pub use topology::{
-    BlockTopology, BodyTopology, CfgTopology, GraphTopology, PortBoundary, body_topology,
+    BlockTopology, BodyTopology, CFGTopology, GraphTopology, PortBoundary, body_topology,
     cfg_topology,
 };

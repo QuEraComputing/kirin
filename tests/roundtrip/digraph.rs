@@ -228,13 +228,13 @@ specialize @test fn @foo(f64) -> f64 (%x: f64) { %r = add %x, %x; ret %r; }
     );
 }
 
-// --- Use Case 6: Cfg body-only projection pipeline test ---
+// --- Use Case 6: CFG body-only projection pipeline test ---
 
-/// A dialect using Cfg body-only projection.
+/// A dialect using CFG body-only projection.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
-enum CfgProjectedLang {
+enum CFGProjectedLang {
     #[chumsky(format = "$add {0}, {1}")]
     Add(
         SSAValue,
@@ -247,14 +247,14 @@ enum CfgProjectedLang {
     /// Function body: `fn {:name}{sig} {{ {body:body} }}`
     #[chumsky(format = "fn {:name}{sig} {{ {body:body} }}")]
     FuncBody {
-        body: Cfg,
+        body: CFG,
         sig: Signature<SimpleType>,
     },
 }
 
 #[test]
 fn test_cfg_projected_pipeline_roundtrip() {
-    let mut pipeline = make_test_pipeline::<CfgProjectedLang>();
+    let mut pipeline = make_test_pipeline::<CFGProjectedLang>();
 
     let input = r#"
 stage @test fn @foo(f64) -> f64;
@@ -265,7 +265,7 @@ specialize @test fn @foo(f64) -> f64 { ^entry(%x: f64) { %r = add %x, %x; ret %r
         .expect("should parse cfg projection format");
 
     let printed = pipeline.sprint();
-    let mut pipeline2 = make_test_pipeline::<CfgProjectedLang>();
+    let mut pipeline2 = make_test_pipeline::<CFGProjectedLang>();
     pipeline2
         .parse(printed.trim())
         .expect("should reparse cfg projection format");

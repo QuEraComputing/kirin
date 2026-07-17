@@ -1,5 +1,5 @@
 use kirin::ir::{
-    Block, HasArguments, HasBlocks, HasCfgs, HasResults, HasSuccessors, IsConstant, IsPure,
+    Block, HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant, IsPure,
     IsSpeculatable, IsTerminator, Successor, TestSSAValue,
 };
 use kirin_test_types::UnitType;
@@ -133,7 +133,7 @@ fn cond_branch_has_two_successors() {
     assert_eq!(succs.len(), 2);
 }
 
-// --- HasBlocks / HasCfgs: empty ---
+// --- HasBlocks / HasCFG: empty ---
 
 #[test]
 fn no_blocks() {

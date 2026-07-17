@@ -78,7 +78,7 @@ pub struct Block<'src, TypeOutput, StmtOutput> {
 /// The `TypeOutput` parameter is the parsed type representation.
 /// The `StmtOutput` parameter is the parsed statement representation.
 #[derive(Debug, Clone, PartialEq)]
-pub struct Cfg<'src, TypeOutput, StmtOutput> {
+pub struct CFG<'src, TypeOutput, StmtOutput> {
     /// The blocks in the CFG.
     pub blocks: Vec<Spanned<Block<'src, TypeOutput, StmtOutput>>>,
 }
@@ -102,7 +102,7 @@ where
 }
 
 /// Emit a single block AST node into the IR, reusing an existing block ID if
-/// the name was already registered (e.g. by a two-pass Cfg emit).
+/// the name was already registered (e.g. by a two-pass CFG emit).
 ///
 /// Uses a two-phase approach: first creates the block with its arguments (to
 /// get real `BlockArgument` SSAs), then emits statements and attaches them.
@@ -182,7 +182,7 @@ where
     ctx.stage
         .attach_statements_to_block(block, &stmts, terminator);
 
-    // Register the block only if not already registered (two-pass Cfg
+    // Register the block only if not already registered (two-pass CFG
     // creates stubs first, so the name may already be present).
     if let Some(label) = block_ast.label
         && ctx.lookup_block(label.value).is_none()
@@ -230,7 +230,7 @@ where
     }
 }
 
-impl<'src, TypeOutput, StmtOutput> Cfg<'src, TypeOutput, StmtOutput> {
+impl<'src, TypeOutput, StmtOutput> CFG<'src, TypeOutput, StmtOutput> {
     pub fn emit_with<IR>(
         &self,
         ctx: &mut EmitContext<'_, IR>,
@@ -238,7 +238,7 @@ impl<'src, TypeOutput, StmtOutput> Cfg<'src, TypeOutput, StmtOutput> {
             &StmtOutput,
             &mut EmitContext<'ctx, IR>,
         ) -> Result<kirin_ir::Statement, EmitError>,
-    ) -> Result<kirin_ir::Cfg, EmitError>
+    ) -> Result<kirin_ir::CFG, EmitError>
     where
         IR: Dialect,
         TypeOutput: EmitIR<IR, Output = IR::Type>,
@@ -289,7 +289,7 @@ impl<'src, TypeOutput, StmtOutput> Cfg<'src, TypeOutput, StmtOutput> {
     }
 }
 
-/// Implementation of EmitIR for Cfg AST nodes.
+/// Implementation of EmitIR for CFG AST nodes.
 ///
 /// This builds an IR CFG containing all the parsed blocks.
 /// Uses two-pass emit to support forward block references (e.g. `br ^exit`
@@ -297,13 +297,13 @@ impl<'src, TypeOutput, StmtOutput> Cfg<'src, TypeOutput, StmtOutput> {
 ///
 /// The `TypeOutput: EmitIR<IR, Output = IR::Type>` bound allows proper type
 /// conversion for block arguments within the CFG via the EmitIR trait.
-impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for Cfg<'src, TypeOutput, StmtOutput>
+impl<'src, TypeOutput, StmtOutput, IR> EmitIR<IR> for CFG<'src, TypeOutput, StmtOutput>
 where
     IR: Dialect,
     TypeOutput: EmitIR<IR, Output = IR::Type>,
     StmtOutput: EmitIR<IR, Output = kirin_ir::Statement>,
 {
-    type Output = kirin_ir::Cfg;
+    type Output = kirin_ir::CFG;
 
     fn emit(&self, ctx: &mut EmitContext<'_, IR>) -> Result<Self::Output, EmitError> {
         self.emit_with(ctx, &|stmt, ctx| stmt.emit(ctx))

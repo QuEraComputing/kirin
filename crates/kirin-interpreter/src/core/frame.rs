@@ -7,7 +7,7 @@
 
 use std::hash::Hash;
 
-use kirin_ir::{Block, Cfg, CompileStage, Product, SSAValue, Statement};
+use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
 use crate::{
     CallEffect, CallableBody, Callee, Env, EnvIndex, FunctionTarget, Interp, InterpreterError,
@@ -139,7 +139,7 @@ pub trait ForwardFrameDriver: Env {
         block: Block,
         after: Statement,
     ) -> Result<Option<Statement>, Self::Error>;
-    fn cfg_entry(&self, stage: CompileStage, cfg: Cfg) -> Result<Option<Block>, Self::Error>;
+    fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, Self::Error>;
 
     /// The default walk plan of a digraph body (ports, toposorted nodes,
     /// yields). Errors on cyclic digraphs.
