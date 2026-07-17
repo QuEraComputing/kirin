@@ -171,7 +171,7 @@ Locked constraints (user, 2026-07-01):
     Block { function: <CallContext<V>>::Key, block: Block }
   ```
   `Owner`/`SummaryKey` is **not** a `LatticeAnchor`. CFG block-entry convergence must become
-  owner-summary convergence; `AbstractCfgFrame`'s `pending`/`queued`/`block_in` may be
+  owner-summary convergence; `AbstractCFGFrame`'s `pending`/`queued`/`block_in` may be
   *temporarily* retained during a short mechanical transition, but M3 is not complete until it
   is gone.
 - **Preserve the public API** verbatim: `SparseForwardInterpreter`, `CallContext`,
@@ -192,7 +192,7 @@ Locked constraints (user, 2026-07-01):
   until branch/jump/return/push/call, and emit `SummaryEffect` updates —
   successor `Block` owners for `Jump`/`Branch`, the current `Function` owner return for `Return`,
   the callee `Function` owner for `Call`. No local `pending`/`queued`/`block_in` remains in
-  `AbstractCfgFrame`.
+  `AbstractCFGFrame`.
 - **SCF loops** may stay traversal frames for this pass **only if** their convergence goes
   through the driver's shared `WideningStrategy`/`FixpointPhase` path. No second public solver.
   Any residual loop guard is documented as frame-local traversal.
@@ -223,9 +223,9 @@ Locked constraints (user, 2026-07-01):
   `BlockSummary`, `SparseForwardProfile`, and `SparseForwardCore`; move the interprocedural
   `while`-loop + `FnInfo`/`summaries`/`worklist`/`queued` + `summarize_call` summary bookkeeping +
   `return_summary` onto `StandardFixpointInterpreter` with `ForwardSummaryDeps<Owner>` (Function
-  owners + `callee → caller` deps + self-deps). **`AbstractCfgFrame` retained** (constraint-1
+  owners + `callee → caller` deps + self-deps). **`AbstractCFGFrame` retained** (constraint-1
   transition). Public API unchanged.
-- **M3b — CFG → Block owners.** Replace `AbstractCfgFrame`'s block worklist with `Block` owners
+- **M3b — CFG → Block owners.** Replace `AbstractCFGFrame`'s block worklist with `Block` owners
   and `BlockSummary`; block walk emits `SummaryEffect` per §3.2; function env shared across its
   block owners; **value/def-use deps so a block owner reschedules when a directly-read external
   fact rises** (§3.2.1). Delete `pending`/`queued`/`block_in`. Regression: successor block directly
@@ -282,7 +282,7 @@ to the `Function` return). Exactly one pass per analysis — no intra-owner bloc
   per-stage dialect bounds (`HasArguments`/`HasResults`/`HasSuccessors`) `extract_region` needs.
 
 **Staging (constraint 1).** Build `Block` owners + value deps, switch the engine to them, verify
-green (incl. the loop-carried cross-block-rise stress test), **then** delete `AbstractCfgFrame`'s
+green (incl. the loop-carried cross-block-rise stress test), **then** delete `AbstractCFGFrame`'s
 `pending`/`queued`/`block_in`.
 
 ### 3.2.5 M3b implementation refinements (worked out 2026-07-01; switch not yet landed)
@@ -309,11 +309,11 @@ Returns go via the existing `ret_acc` (`contribute_return`), flushed to `Functio
 block owner's `complete_owner`.
 
 Frames-layer changes (implemented + reverted cleanly this session; re-apply first next time):
-`AbstractCompletion::CfgBlock { edges: Vec<Edge<V>> }`; `AbstractBlockFrame` gains a
-`BlockMode { StructuredBody, CfgBlock }` + `new_cfg_block`; in `CfgBlock` mode `Jump`/`Branch`
-complete with `CfgBlock{edges}`, `Return` contributes + completes `CfgBlock{edges:[]}`, `Yield`
-errors; resume with `Finished(None)` (nested return) completes `CfgBlock{edges:[]}`. Add `CfgBlock`
-arms to the other frames' resume matches. During the switch `AbstractCfgFrame`/`AbstractFunctionFrame`
+`AbstractCompletion::CFGBlock { edges: Vec<Edge<V>> }`; `AbstractBlockFrame` gains a
+`BlockMode { StructuredBody, CFGBlock }` + `new_cfg_block`; in `CFGBlock` mode `Jump`/`Branch`
+complete with `CFGBlock{edges}`, `Return` contributes + completes `CFGBlock{edges:[]}`, `Yield`
+errors; resume with `Finished(None)` (nested return) completes `CFGBlock{edges:[]}`. Add `CFGBlock`
+arms to the other frames' resume matches. During the switch `AbstractCFGFrame`/`AbstractFunctionFrame`
 become unused (dead-code warnings) until deleted in the final step — build/tests stay green; clippy
 `-D warnings` goes green only after deletion.
 
@@ -418,7 +418,7 @@ Also `cargo clippy -p kirin-interpreter -p kirin-liveness --all-targets -- -D wa
   sparse-backward clients simply don't exercise widening.
 - The wrapper picks up the blanket `SparseForwardInterp` impl only if it impls `Env` and
   delegates `Effect = I::Effect`; verify this composes for the M3 forward wrapper before
-  reworking `AbstractCfgFrame`.
+  reworking `AbstractCFGFrame`.
 ```
 
 ## 9. Status (2026-07-02): superseded in part by the two-liveness unification

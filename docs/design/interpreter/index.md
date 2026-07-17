@@ -441,7 +441,7 @@ the engine with that `F`. (Examples: `example/toy-lang`'s `ToyFrame`, which adds
 
 `SparseForwardInterpreter` is symmetrically generic over a total abstract frame type
 `F` (default `StandardAbstractFrame`). The standard abstract frames
-(`AbstractFunctionFrame`, `AbstractCfgFrame`, `AbstractBlockFrame`,
+(`AbstractFunctionFrame`, `AbstractCFGFrame`, `AbstractBlockFrame`,
 `AbstractCallFrame`) implement the *same*
 `Frame` protocol, but their traversal is the abstract one: a CFG block worklist
 that joins/widens at merge points, `Branch` exploration, single-block

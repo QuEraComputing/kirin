@@ -7,23 +7,23 @@ use super::stmt::Statement;
 
 identifier! {
     /// A unique identifier for a CFG (a block-list control-flow body).
-    struct Cfg
+    struct CFG
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct CfgInfo<L: Dialect> {
-    pub(crate) id: Cfg,
+pub struct CFGInfo<L: Dialect> {
+    pub(crate) id: CFG,
     pub(crate) parent: Option<Statement>,
     pub(crate) blocks: LinkedList<Block>,
     _marker: std::marker::PhantomData<L>,
 }
 
 #[bon::bon]
-impl<L: Dialect> CfgInfo<L> {
+impl<L: Dialect> CFGInfo<L> {
     #[builder(finish_fn = new)]
     pub fn new(
         /// The unique identifier for this CFG.
-        id: Cfg,
+        id: CFG,
         /// The parent statement of this CFG, if any.
         parent: Option<Statement>,
         /// The blocks contained in this CFG.
@@ -38,8 +38,8 @@ impl<L: Dialect> CfgInfo<L> {
     }
 }
 
-impl<L: Dialect> GetInfo<L> for Cfg {
-    type Info = Item<CfgInfo<L>>;
+impl<L: Dialect> GetInfo<L> for CFG {
+    type Info = Item<CFGInfo<L>>;
 
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.cfgs.get(*self)
@@ -50,7 +50,7 @@ impl<L: Dialect> GetInfo<L> for Cfg {
     }
 }
 
-impl Cfg {
+impl CFG {
     pub fn blocks<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> BlockIter<'a, L> {
         let info = self.expect_info(stage);
         BlockIter {

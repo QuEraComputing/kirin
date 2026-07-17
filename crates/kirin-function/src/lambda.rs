@@ -36,14 +36,14 @@ use kirin::prelude::*;
 pub struct Lambda<T: CompileTimeValue> {
     name: Symbol,
     captures: Vec<SSAValue>,
-    pub(crate) body: Cfg,
+    pub(crate) body: CFG,
     res: ResultValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
 
-impl<T: CompileTimeValue> HasCfgBody for Lambda<T> {
-    fn cfg(&self) -> &Cfg {
+impl<T: CompileTimeValue> HasCFGBody for Lambda<T> {
+    fn cfg(&self) -> &CFG {
         &self.body
     }
 }

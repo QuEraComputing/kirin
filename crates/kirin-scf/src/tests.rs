@@ -1,6 +1,6 @@
 use kirin::ir::{
-    HasArguments, HasBlocks, HasCfgs, HasResults, HasSuccessors, IsConstant, IsPure,
-    IsSpeculatable, IsTerminator, TestSSAValue,
+    HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant, IsPure, IsSpeculatable,
+    IsTerminator, TestSSAValue,
 };
 use kirin_test_types::UnitType;
 

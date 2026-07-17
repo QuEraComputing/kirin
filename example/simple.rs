@@ -10,20 +10,20 @@ use kirin_function::{Bind, Call, Return};
 /// Higher-level language: structured control flow (`if`) and lexical
 /// lambdas that capture variables from the enclosing scope.
 ///
-/// Block/Cfg-containing dialect types (SCF, Lambda) are inlined here
+/// Block/CFG-containing dialect types (SCF, Lambda) are inlined here
 /// to demonstrate the format-string parser path for inline variants.
 /// These types can also be composed via `#[wraps]` — see `toy-lang`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = ArithType)]
 enum HighLevel {
     #[chumsky(format = "{body}")]
-    Function { body: Cfg },
+    Function { body: CFG },
 
     #[chumsky(format = "$lambda {name} captures({captures}) {body} -> {res:type}")]
     Lambda {
         name: Symbol,
         captures: Vec<SSAValue>,
-        body: Cfg,
+        body: CFG,
         #[kirin(type = ArithType::placeholder())]
         res: ResultValue,
     },
@@ -49,7 +49,7 @@ enum HighLevel {
 #[kirin(builders, type = ArithType)]
 enum LowLevel {
     #[chumsky(format = "{body}")]
-    Function { body: Cfg },
+    Function { body: CFG },
 
     #[wraps]
     Arith(Arith<ArithType>),

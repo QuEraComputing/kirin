@@ -1,5 +1,5 @@
 use kirin::ir::{
-    HasArguments, HasBlocks, HasCfgs, HasResults, HasSuccessors, IsConstant, IsPure, IsTerminator,
+    HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant, IsPure, IsTerminator,
     TestSSAValue, Typeof,
 };
 use kirin::pretty::{ArenaDoc, DocAllocator, Document, PrettyPrint};
@@ -92,7 +92,7 @@ fn one_result() {
     assert_eq!(c.results().count(), 1);
 }
 
-// --- HasSuccessors / HasBlocks / HasCfgs: all empty ---
+// --- HasSuccessors / HasBlocks / HasCFG: all empty ---
 
 #[test]
 fn no_successors() {

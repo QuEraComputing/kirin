@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use kirin_ir::{
-    Block, Cfg, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Port, SSAInfo, SSAValue, Signature,
+    Block, CFG, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Port, SSAInfo, SSAValue, Signature,
     SpecializedFunction, StagedFunction, Statement, Symbol, UnGraph,
 };
 use petgraph::visit::IntoNodeReferences;
@@ -154,7 +154,7 @@ where
     }
 
     /// Pretty print a CFG with its blocks.
-    pub fn print_cfg(&'a self, cfg: &Cfg) -> ArenaDoc<'a> {
+    pub fn print_cfg(&'a self, cfg: &CFG) -> ArenaDoc<'a> {
         let mut inner = self.nil();
         for block in cfg.blocks(self.stage) {
             inner += self.print_block(&block);
@@ -458,8 +458,8 @@ where
         inner
     }
 
-    /// Print a Cfg body only: blocks without outer braces.
-    pub fn print_cfg_body_only(&'a self, cfg: &Cfg) -> ArenaDoc<'a> {
+    /// Print a CFG body only: blocks without outer braces.
+    pub fn print_cfg_body_only(&'a self, cfg: &CFG) -> ArenaDoc<'a> {
         let mut inner = self.nil();
         for block in cfg.blocks(self.stage) {
             inner += self.print_block(&block);

@@ -811,7 +811,7 @@ where
             AbstractCompletion::FunctionDone => Err(E::from(InterpreterError::Custom(
                 "scf.if frame resumed with a function completion",
             ))),
-            AbstractCompletion::CfgBlock { .. } => Err(E::from(InterpreterError::Custom(
+            AbstractCompletion::CFGBlock { .. } => Err(E::from(InterpreterError::Custom(
                 "scf.if frame resumed with a CFG-block completion",
             ))),
         }
@@ -1058,7 +1058,7 @@ where
                     "scf.for frame resumed with a function completion",
                 )));
             }
-            AbstractCompletion::CfgBlock { .. } => {
+            AbstractCompletion::CFGBlock { .. } => {
                 return Err(E::from(InterpreterError::Custom(
                     "scf.for frame resumed with a CFG-block completion",
                 )));

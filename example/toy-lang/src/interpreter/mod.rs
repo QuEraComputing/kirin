@@ -14,7 +14,7 @@ mod tests;
 pub use error::ToyError;
 pub use frame::{ToyAbstractFrame, ToyDenseBackwardFrame, ToyFrame};
 
-use kirin::prelude::{Cfg, CompileStage, GetInfo, Pipeline, UniqueLiveSpecializationError};
+use kirin::prelude::{CFG, CompileStage, GetInfo, Pipeline, UniqueLiveSpecializationError};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::{Lexical, Lifted};
 use kirin_interpreter::InterpreterError;
@@ -118,7 +118,7 @@ fn function_cfg(
     pipeline: &Pipeline<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<(CompileStage, Cfg), InterpreterError> {
+) -> Result<(CompileStage, CFG), InterpreterError> {
     let stage_id = pipeline
         .stage_by_name(stage_name)
         .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
@@ -151,7 +151,7 @@ fn function_cfg(
                 .ok_or(InterpreterError::Custom("specialized function has no body"))?;
             match spec_info.body().definition(info) {
                 HighLevel::Lexical(Lexical::Function(function)) => {
-                    use kirin::prelude::HasCfgBody;
+                    use kirin::prelude::HasCFGBody;
                     *function.cfg()
                 }
                 _ => return Err(InterpreterError::Custom("expected a function body")),
@@ -178,7 +178,7 @@ fn function_cfg(
                 .ok_or(InterpreterError::Custom("specialized function has no body"))?;
             match spec_info.body().definition(info) {
                 LowLevel::Lifted(Lifted::Function(function)) => {
-                    use kirin::prelude::HasCfgBody;
+                    use kirin::prelude::HasCFGBody;
                     *function.cfg()
                 }
                 _ => return Err(InterpreterError::Custom("expected a function body")),

@@ -40,7 +40,7 @@
 //! | Result         | --          | --      | yes     |          |             |         |         |           |           |
 //! | Block          | yes         |         |         |          |             | yes     | yes     |           |           |
 //! | Successor      | yes         |         |         |          |             |         |         |           |           |
-//! | Cfg         | yes         |         |         |          |             |         | yes     |           |           |
+//! | CFG         | yes         |         |         |          |             |         | yes     |           |           |
 //! | Symbol         | yes         |         |         |          |             |         |         |           |           |
 //! | Value          | yes         |         |         |          |             |         |         |           |           |
 //! | DiGraph        | yes         |         |         | yes      | yes         |         | yes     |           |           |

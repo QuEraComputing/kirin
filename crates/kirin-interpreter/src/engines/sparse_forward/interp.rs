@@ -33,7 +33,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, Cfg, CompileStage, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
+    Block, CFG, CompileStage, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
     StageMeta, Statement, Widen,
 };
 
@@ -684,7 +684,7 @@ where
         query::next_statement(self.pipeline, stage, block, after).map_err(E::from)
     }
 
-    fn cfg_entry(&self, stage: CompileStage, cfg: Cfg) -> Result<Option<Block>, E> {
+    fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
         query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
     }
 }
@@ -750,7 +750,7 @@ where
         self.inner().next_statement(stage, block, after)
     }
 
-    fn cfg_entry(&self, stage: CompileStage, cfg: Cfg) -> Result<Option<Block>, E> {
+    fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
         self.inner().cfg_entry(stage, cfg)
     }
 }
@@ -1053,7 +1053,7 @@ where
         let body_info = self.enter_function(stage, body, entry_args, env)?;
         let entry_block = self
             .cfg_entry(stage, body_info.cfg)?
-            .ok_or_else(|| E::from(InterpreterError::EmptyCfg))?;
+            .ok_or_else(|| E::from(InterpreterError::EmptyCFG))?;
         if let Some(function) = self
             .summary_mut(&Owner::Function(key.clone()))
             .and_then(|info| info.as_function_mut())
@@ -1180,7 +1180,7 @@ where
             }
         };
         let edges = match completion {
-            AbstractCompletion::CfgBlock { edges } => edges,
+            AbstractCompletion::CFGBlock { edges } => edges,
             _ => {
                 return Err(E::from(InterpreterError::Custom(
                     "block owner completed with a non-CFG-block completion",

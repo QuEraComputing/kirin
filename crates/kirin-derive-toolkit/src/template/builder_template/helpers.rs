@@ -101,7 +101,7 @@ fn build_fn_inputs(info: &StatementInfo, ir_type: &syn::Path) -> Vec<proc_macro2
             FieldCategory::Argument
             | FieldCategory::Block
             | FieldCategory::Successor
-            | FieldCategory::Cfg
+            | FieldCategory::CFG
             | FieldCategory::DiGraph
             | FieldCategory::UnGraph
             | FieldCategory::Symbol => {
@@ -147,7 +147,7 @@ fn build_fn_let_inputs(info: &StatementInfo, ir_type: &syn::Path) -> Vec<proc_ma
             FieldCategory::Argument
             | FieldCategory::Block
             | FieldCategory::Successor
-            | FieldCategory::Cfg
+            | FieldCategory::CFG
             | FieldCategory::DiGraph
             | FieldCategory::UnGraph
             | FieldCategory::Symbol => {
@@ -166,7 +166,7 @@ fn field_type_for_category(collection: &Collection, category: FieldCategory) -> 
         FieldCategory::Result => "ResultValue",
         FieldCategory::Block => "Block",
         FieldCategory::Successor => "Successor",
-        FieldCategory::Cfg => "Cfg",
+        FieldCategory::CFG => "CFG",
         FieldCategory::DiGraph => "DiGraph",
         FieldCategory::UnGraph => "UnGraph",
         FieldCategory::Symbol => "Symbol",

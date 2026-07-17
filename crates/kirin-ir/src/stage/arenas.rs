@@ -1,5 +1,5 @@
 use crate::arena::Arena;
-use crate::node::cfg::CfgInfo;
+use crate::node::cfg::CFGInfo;
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::function::CompileStage;
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
@@ -22,7 +22,7 @@ pub struct Arenas<L: Dialect> {
     pub(crate) stage_id: Option<CompileStage>,
     pub(crate) staged_functions: Arena<StagedFunction, StagedFunctionInfo<L>>,
     pub(crate) staged_name_policy: StagedNamePolicy,
-    pub(crate) cfgs: Arena<Cfg, CfgInfo<L>>,
+    pub(crate) cfgs: Arena<CFG, CFGInfo<L>>,
     pub(crate) blocks: Arena<Block, BlockInfo<L>>,
     pub(crate) statements: Arena<Statement, StatementInfo<L>>,
     pub(crate) digraphs: Arena<DiGraph, DiGraphInfo<L>>,
@@ -128,7 +128,7 @@ impl<L: Dialect> Arenas<L> {
     }
 
     /// Get a reference to the cfgs arena.
-    pub fn cfg_arena(&self) -> &Arena<Cfg, CfgInfo<L>> {
+    pub fn cfg_arena(&self) -> &Arena<CFG, CFGInfo<L>> {
         &self.cfgs
     }
 

@@ -7,14 +7,14 @@
 //! bound that any well-formed stage enum satisfies automatically.
 
 use kirin_ir::{
-    Block, Cfg, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCfgs, HasStageInfo,
+    Block, CFG, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCFG, HasStageInfo,
     HasSuccessors, Pipeline, SSAKind, SSAValue, SpecializedFunction, StageAction, StageInfo,
     StageMeta, StagedFunction, Statement, SupportsStageDispatch, Symbol,
     UniqueLiveSpecializationError,
 };
 
 use crate::InterpreterError;
-use crate::facts::topology::{self, CfgTopology};
+use crate::facts::topology::{self, CFGTopology};
 
 /// Block parameters as SSA values.
 pub struct BlockParams(pub Block);
@@ -96,9 +96,9 @@ where
 }
 
 /// Entry block of a CFG.
-pub struct CfgEntry(pub Cfg);
+pub struct CFGEntry(pub CFG);
 
-impl<S, L> StageAction<S, L> for CfgEntry
+impl<S, L> StageAction<S, L> for CFGEntry
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
@@ -232,15 +232,15 @@ where
 
 /// The topology of a CFG: blocks (including nested structured bodies),
 /// statements per block, CFG successors, and block feeders.
-pub struct CfgTopologyQuery(pub Cfg);
+pub struct CFGTopologyQuery(pub CFG);
 
-impl<S, L> StageAction<S, L> for CfgTopologyQuery
+impl<S, L> StageAction<S, L> for CFGTopologyQuery
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a>,
 {
-    type Output = CfgTopology;
+    type Output = CFGTopology;
     type Error = InterpreterError;
 
     fn run(
@@ -282,7 +282,7 @@ pub trait StageQuery:
     + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
     + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
     + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
-    + SupportsStageDispatch<CfgEntry, Option<Block>, InterpreterError>
+    + SupportsStageDispatch<CFGEntry, Option<Block>, InterpreterError>
     + SupportsStageDispatch<
         UniqueSpecialization,
         Result<SpecializedFunction, InterpreterError>,
@@ -291,7 +291,7 @@ pub trait StageQuery:
     + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
     + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
     + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-    + SupportsStageDispatch<CfgTopologyQuery, CfgTopology, InterpreterError>
+    + SupportsStageDispatch<CFGTopologyQuery, CFGTopology, InterpreterError>
 {
 }
 
@@ -300,7 +300,7 @@ impl<S> StageQuery for S where
         + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
         + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
         + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
-        + SupportsStageDispatch<CfgEntry, Option<Block>, InterpreterError>
+        + SupportsStageDispatch<CFGEntry, Option<Block>, InterpreterError>
         + SupportsStageDispatch<
             UniqueSpecialization,
             Result<SpecializedFunction, InterpreterError>,
@@ -309,7 +309,7 @@ impl<S> StageQuery for S where
         + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
         + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
         + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-        + SupportsStageDispatch<CfgTopologyQuery, CfgTopology, InterpreterError>
+        + SupportsStageDispatch<CFGTopologyQuery, CFGTopology, InterpreterError>
 {
 }
 
@@ -357,9 +357,9 @@ pub(crate) fn next_statement<S: StageQuery>(
 pub(crate) fn cfg_entry<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
-    cfg: Cfg,
+    cfg: CFG,
 ) -> Result<Option<Block>, InterpreterError> {
-    dispatch(pipeline, stage, CfgEntry(cfg))
+    dispatch(pipeline, stage, CFGEntry(cfg))
 }
 
 pub(crate) fn unique_specialization<S: StageQuery>(
@@ -405,7 +405,7 @@ pub(crate) fn terminator_arguments<S: StageQuery>(
 pub(crate) fn cfg_topology<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
-    cfg: Cfg,
-) -> Result<CfgTopology, InterpreterError> {
-    dispatch(pipeline, stage, CfgTopologyQuery(cfg))
+    cfg: CFG,
+) -> Result<CFGTopology, InterpreterError> {
+    dispatch(pipeline, stage, CFGTopologyQuery(cfg))
 }

@@ -13,9 +13,9 @@
 //! | `for %iv in %lo..%hi step %s iter_args(..) do {..} [-> types]` | Counted loop with multi-accumulator support |
 //! | `yield [%v1, %v2, ..]` | Terminates an SCF body block, yielding 0-to-N values to the parent |
 //!
-//! # Block vs Cfg
+//! # Block vs CFG
 //!
-//! All body fields use `Block` (not `Cfg`) because MLIR's `scf.if` and
+//! All body fields use `Block` (not `CFG`) because MLIR's `scf.if` and
 //! `scf.for` have the `SingleBlock` + `SingleBlockImplicitTerminator<YieldOp>`
 //! traits. A `yield` terminates each body block.
 //!

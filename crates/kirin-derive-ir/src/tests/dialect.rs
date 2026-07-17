@@ -34,7 +34,7 @@ fn test_dialect_derive_struct_with_cfg_block() {
             condition: Value,
             then_block: Block,
             else_block: Block,
-            body: Cfg,
+            body: CFG,
         }
     };
     insta::assert_snapshot!(generate_dialect_code(input));

@@ -55,7 +55,7 @@ impl GenerateEmitIR {
                     FieldCategory::Block => quote! {
                         let #emitted_var = #var.value.emit_with(ctx, emit_language_output)?;
                     },
-                    FieldCategory::Cfg => quote! {
+                    FieldCategory::CFG => quote! {
                         let #emitted_var = #var.emit_with(ctx, emit_language_output)?;
                     },
                     FieldCategory::DiGraph => quote! {

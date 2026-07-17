@@ -63,7 +63,7 @@ impl Statement {
     pub fn cfgs<'a, L: Dialect>(
         &self,
         stage: &'a crate::StageInfo<L>,
-    ) -> <L as crate::HasCfgs<'a>>::Iter {
+    ) -> <L as crate::HasCFG<'a>>::Iter {
         self.expect_info(stage).definition.cfgs()
     }
 

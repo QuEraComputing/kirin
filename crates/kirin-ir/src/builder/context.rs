@@ -1,5 +1,5 @@
 use super::block::BlockBuilder;
-use super::cfg::CfgBuilder;
+use super::cfg::CFGBuilder;
 use super::digraph::DiGraphBuilder;
 use super::ungraph::UnGraphBuilder;
 
@@ -10,8 +10,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
         BlockBuilder::from_stage(self)
     }
 
-    pub fn cfg(&mut self) -> CfgBuilder<'_, L> {
-        CfgBuilder::from_stage(self)
+    pub fn cfg(&mut self) -> CFGBuilder<'_, L> {
+        CFGBuilder::from_stage(self)
     }
 
     pub fn digraph(&mut self) -> DiGraphBuilder<'_, L> {

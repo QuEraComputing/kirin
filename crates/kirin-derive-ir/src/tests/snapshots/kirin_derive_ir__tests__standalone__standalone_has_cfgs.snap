@@ -3,23 +3,23 @@ source: crates/kirin-derive-ir/src/tests/standalone.rs
 expression: rustfmt(tokens.to_string())
 ---
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCfgs<'a> for Lambda {
-    type Iter = LambdaCfgsIter<'a>;
+impl<'a> ::kirin::ir::HasCFG<'a> for Lambda {
+    type Iter = LambdaCFGIter<'a>;
     fn cfgs(&'a self) -> Self::Iter {
         let Self { body } = self;
-        LambdaCfgsIter {
+        LambdaCFGIter {
             inner: std::iter::once(body),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct LambdaCfgsIter<'a> {
-    inner: std::iter::Once<&'a ::kirin::ir::Cfg>,
+pub struct LambdaCFGIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for LambdaCfgsIter<'a> {
-    type Item = &'a ::kirin::ir::Cfg;
+impl<'a> Iterator for LambdaCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

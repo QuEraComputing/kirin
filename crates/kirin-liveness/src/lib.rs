@@ -29,7 +29,7 @@ use kirin_interpreter::{
     DenseBackwardInterpreter, DenseBackwardTransfer, InterpDispatch, InterpreterError,
     SparseBackwardDriver, SparseBackwardInterpreter, StageQuery, StandardDenseBackwardFrame,
 };
-use kirin_ir::{Cfg, CompileStage, Pipeline, StageMeta};
+use kirin_ir::{CFG, CompileStage, Pipeline, StageMeta};
 
 /// The sparse backward demand engine instantiated at the [`Live`] lattice:
 /// strong liveness.
@@ -45,7 +45,7 @@ pub type DenseLiveness<'ir, S, E = InterpreterError, F = StandardDenseBackwardFr
 pub fn analyze_demand<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
-    cfg: Cfg,
+    cfg: CFG,
 ) -> Result<DemandResult, InterpreterError>
 where
     S: StageMeta
@@ -64,7 +64,7 @@ where
 pub fn analyze_dense<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
-    cfg: Cfg,
+    cfg: CFG,
 ) -> Result<DenseLivenessResult, InterpreterError>
 where
     S: StageMeta

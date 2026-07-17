@@ -176,10 +176,10 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The type parameter `S` is the statement AST type produced by the language parser.
-/// The parser produces `Cfg<'t, <T as HasParser>::Output, S>`.
+/// The parser produces `CFG<'t, <T as HasParser>::Output, S>`.
 pub fn cfg<'t, I, T, S>(
     language: RecursiveParser<'t, I, S>,
-) -> impl Parser<'t, I, Cfg<'t, <T as HasParser<'t>>::Output, S>, ParserError<'t>>
+) -> impl Parser<'t, I, CFG<'t, <T as HasParser<'t>>::Output, S>, ParserError<'t>>
 where
     I: TokenInput<'t>,
     T: HasParser<'t>,
@@ -190,7 +190,7 @@ where
         .repeated()
         .collect::<Vec<_>>()
         .delimited_by(just(Token::LBrace), just(Token::RBrace))
-        .map(|blocks| Cfg { blocks })
+        .map(|blocks| CFG { blocks })
         .labelled("cfg")
 }
 
@@ -221,7 +221,7 @@ where
 ///
 /// Matches a sequence of blocks, each optionally terminated by a semicolon.
 /// This is the inner content of a CFG, used for `:body` projections on
-/// Cfg fields where the caller provides surrounding syntax via the format string.
+/// CFG fields where the caller provides surrounding syntax via the format string.
 pub fn cfg_body<'t, I, T, S>(
     language: RecursiveParser<'t, I, S>,
 ) -> impl Parser<'t, I, Vec<Spanned<Block<'t, <T as HasParser<'t>>::Output, S>>>, ParserError<'t>>

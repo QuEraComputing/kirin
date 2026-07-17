@@ -42,13 +42,13 @@ pub trait HasSuccessorsMut<'a> {
     fn successors_mut(&'a mut self) -> Self::IterMut;
 }
 
-pub trait HasCfgs<'a> {
-    type Iter: Iterator<Item = &'a crate::Cfg>;
+pub trait HasCFG<'a> {
+    type Iter: Iterator<Item = &'a crate::CFG>;
     fn cfgs(&'a self) -> Self::Iter;
 }
 
-pub trait HasCfgsMut<'a> {
-    type IterMut: Iterator<Item = &'a mut crate::Cfg>;
+pub trait HasCFGMut<'a> {
+    type IterMut: Iterator<Item = &'a mut crate::CFG>;
     fn cfgs_mut(&'a mut self) -> Self::IterMut;
 }
 
@@ -76,10 +76,10 @@ pub trait HasUngraphsMut<'a> {
 ///
 /// This trait is intentionally not a supertrait of `Dialect` — it applies to
 /// individual operations (e.g., `FunctionBody`, `Lambda`) that contain a single
-/// `Cfg`, not to the dialect enum itself.  It enables shared helper functions
+/// `CFG`, not to the dialect enum itself.  It enables shared helper functions
 /// for interpreter and analysis code that operate on CFG-bearing operations.
-pub trait HasCfgBody {
-    fn cfg(&self) -> &crate::Cfg;
+pub trait HasCFGBody {
+    fn cfg(&self) -> &crate::CFG;
 
     fn entry_block<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<crate::Block> {
         self.cfg().blocks(stage).next()
@@ -127,8 +127,8 @@ pub trait Dialect:
     + for<'a> HasBlocksMut<'a>
     + for<'a> HasSuccessors<'a>
     + for<'a> HasSuccessorsMut<'a>
-    + for<'a> HasCfgs<'a>
-    + for<'a> HasCfgsMut<'a>
+    + for<'a> HasCFG<'a>
+    + for<'a> HasCFGMut<'a>
     + for<'a> HasDigraphs<'a>
     + for<'a> HasDigraphsMut<'a>
     + for<'a> HasUngraphs<'a>

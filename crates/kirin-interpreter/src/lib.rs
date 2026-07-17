@@ -94,7 +94,7 @@ pub use engines::sparse_forward::{
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{
-    BackwardAnalysisState, CfgScope, DemandFrame, DemandInterp, DemandSummary,
+    BackwardAnalysisState, CFGScope, DemandFrame, DemandInterp, DemandSummary,
     SparseBackwardDriver, SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter,
     SparseBackwardProfile, SparseBackwardTransfer,
 };
@@ -110,7 +110,7 @@ pub use engines::dense_backward::{
 // fact stores, and cfg topology enumeration. Anchor family is a property of
 // the solver shape; dispatch meaning lives in `semantics`.
 pub use facts::{
-    BlockTopology, CfgTopology, Change, DenseAnchor, DenseBlockStore, DensePointStore, FactStore,
+    BlockTopology, CFGTopology, Change, DenseAnchor, DenseBlockStore, DensePointStore, FactStore,
     LatticeAnchor, ProgramPoint, Scoped, ScopedSparseStore, SparseStore, cfg_topology,
 };
 

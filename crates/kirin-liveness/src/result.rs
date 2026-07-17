@@ -6,7 +6,7 @@ use kirin_interpreter::{
     DenseBlockStore, DenseFrameBuild, DensePointStore, Frame, InterpDispatch, InterpreterError,
     ProgramPoint, SparseBackwardInterpreter, StageQuery,
 };
-use kirin_ir::{Block, Cfg, CompileStage, Lattice, SSAValue, StageMeta, Statement};
+use kirin_ir::{Block, CFG, CompileStage, Lattice, SSAValue, StageMeta, Statement};
 
 use crate::live::{Live, LiveSet};
 
@@ -21,7 +21,7 @@ impl DemandResult {
     pub(crate) fn from_engine<S: StageMeta>(
         engine: &SparseBackwardInterpreter<'_, S, Live, InterpreterError>,
         stage: CompileStage,
-        cfg: Cfg,
+        cfg: CFG,
     ) -> Self {
         // The engine's sparse fact view; the demand set is its live support.
         let facts = engine.fact_store(stage, cfg);
@@ -64,7 +64,7 @@ impl DenseLivenessResult {
     pub fn from_engine<'ir, S, F>(
         engine: &mut DenseBackwardInterpreter<'ir, S, LiveSet, InterpreterError, F>,
         stage: CompileStage,
-        cfg: Cfg,
+        cfg: CFG,
     ) -> Result<Self, InterpreterError>
     where
         S: StageMeta

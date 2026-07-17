@@ -283,32 +283,32 @@ impl<'a> Iterator for CompositeOpsSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCfgs<'a> for CompositeOps {
-    type Iter = CompositeOpsCfgsIter<'a>;
+impl<'a> ::kirin::ir::HasCFG<'a> for CompositeOps {
+    type Iter = CompositeOpsCFGIter<'a>;
     fn cfgs(&'a self) -> Self::Iter {
         match self {
             Self::Alpha(field_0) => {
-                CompositeOpsCfgsIter::Alpha(<AlphaOp as ::kirin::ir::HasCfgs>::cfgs(field_0))
+                CompositeOpsCFGIter::Alpha(<AlphaOp as ::kirin::ir::HasCFG>::cfgs(field_0))
             }
             Self::Beta(field_0) => {
-                CompositeOpsCfgsIter::Beta(<BetaOp as ::kirin::ir::HasCfgs>::cfgs(field_0))
+                CompositeOpsCFGIter::Beta(<BetaOp as ::kirin::ir::HasCFG>::cfgs(field_0))
             }
             Self::Gamma(field_0) => {
-                CompositeOpsCfgsIter::Gamma(<GammaOp as ::kirin::ir::HasCfgs>::cfgs(field_0))
+                CompositeOpsCFGIter::Gamma(<GammaOp as ::kirin::ir::HasCFG>::cfgs(field_0))
             }
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum CompositeOpsCfgsIter<'a> {
-    Alpha(<AlphaOp as ::kirin::ir::HasCfgs<'a>>::Iter),
-    Beta(<BetaOp as ::kirin::ir::HasCfgs<'a>>::Iter),
-    Gamma(<GammaOp as ::kirin::ir::HasCfgs<'a>>::Iter),
+pub enum CompositeOpsCFGIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasCFG<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasCFG<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasCFG<'a>>::Iter),
 }
 #[automatically_derived]
-impl<'a> Iterator for CompositeOpsCfgsIter<'a> {
-    type Item = &'a ::kirin::ir::Cfg;
+impl<'a> Iterator for CompositeOpsCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Alpha(inner) => inner.next(),
@@ -318,32 +318,32 @@ impl<'a> Iterator for CompositeOpsCfgsIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCfgsMut<'a> for CompositeOps {
-    type IterMut = CompositeOpsCfgsMutIter<'a>;
+impl<'a> ::kirin::ir::HasCFGMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsCFGMutIter<'a>;
     fn cfgs_mut(&'a mut self) -> Self::IterMut {
         match self {
-            Self::Alpha(field_0) => CompositeOpsCfgsMutIter::Alpha(
-                <AlphaOp as ::kirin::ir::HasCfgsMut>::cfgs_mut(field_0),
+            Self::Alpha(field_0) => CompositeOpsCFGMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasCFGMut>::cfgs_mut(field_0),
             ),
-            Self::Beta(field_0) => CompositeOpsCfgsMutIter::Beta(
-                <BetaOp as ::kirin::ir::HasCfgsMut>::cfgs_mut(field_0),
-            ),
-            Self::Gamma(field_0) => CompositeOpsCfgsMutIter::Gamma(
-                <GammaOp as ::kirin::ir::HasCfgsMut>::cfgs_mut(field_0),
+            Self::Beta(field_0) => {
+                CompositeOpsCFGMutIter::Beta(<BetaOp as ::kirin::ir::HasCFGMut>::cfgs_mut(field_0))
+            }
+            Self::Gamma(field_0) => CompositeOpsCFGMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasCFGMut>::cfgs_mut(field_0),
             ),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum CompositeOpsCfgsMutIter<'a> {
-    Alpha(<AlphaOp as ::kirin::ir::HasCfgsMut<'a>>::IterMut),
-    Beta(<BetaOp as ::kirin::ir::HasCfgsMut<'a>>::IterMut),
-    Gamma(<GammaOp as ::kirin::ir::HasCfgsMut<'a>>::IterMut),
+pub enum CompositeOpsCFGMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasCFGMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasCFGMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasCFGMut<'a>>::IterMut),
 }
 #[automatically_derived]
-impl<'a> Iterator for CompositeOpsCfgsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Cfg;
+impl<'a> Iterator for CompositeOpsCFGMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Alpha(inner) => inner.next(),

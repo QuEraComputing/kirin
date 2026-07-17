@@ -7,12 +7,12 @@
 //! (terminators targeting it, statements owning it). This is topology only —
 //! uses/defs/edge-argument *semantics* stay in dialect
 //! [`Interpretable`](crate::Interpretable) rules; the enumeration consumes the
-//! generic [`HasSuccessors`]/[`HasBlocks`]/[`HasCfgs`] contract every
+//! generic [`HasSuccessors`]/[`HasBlocks`]/[`HasCFG`] contract every
 //! dialect derives.
 
 use std::collections::{HashMap, HashSet};
 
-use kirin_ir::{Block, Cfg, Dialect, HasBlocks, HasCfgs, HasSuccessors, StageInfo, Statement};
+use kirin_ir::{Block, CFG, Dialect, HasBlocks, HasCFG, HasSuccessors, StageInfo, Statement};
 
 /// The shape of one block: its statements and CFG successors.
 #[derive(Clone, Debug)]
@@ -30,12 +30,12 @@ pub struct BlockTopology {
 /// The shape of a CFG: all blocks (the CFG's own top-level blocks and
 /// structured bodies, recursively) plus the block-feeder index.
 #[derive(Clone, Debug, Default)]
-pub struct CfgTopology {
+pub struct CFGTopology {
     pub blocks: Vec<BlockTopology>,
     feeders: HashMap<Block, Vec<Statement>>,
 }
 
-impl CfgTopology {
+impl CFGTopology {
     /// The statements whose rules can translate demand on `block`'s parameters:
     /// terminators with an edge into `block`, plus statements owning `block`
     /// as a structured body.
@@ -50,12 +50,12 @@ impl CfgTopology {
 }
 
 /// Enumerate the topology of `cfg` in the finalized `stage`.
-pub fn cfg_topology<L>(stage: &StageInfo<L>, cfg: &Cfg) -> CfgTopology
+pub fn cfg_topology<L>(stage: &StageInfo<L>, cfg: &CFG) -> CFGTopology
 where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a>,
 {
-    let mut topology = CfgTopology::default();
+    let mut topology = CFGTopology::default();
     let mut visited = HashSet::new();
     for block in cfg.blocks(stage) {
         collect_block(stage, block, false, &mut topology, &mut visited);
@@ -67,11 +67,11 @@ fn collect_block<L>(
     stage: &StageInfo<L>,
     block: Block,
     nested: bool,
-    topology: &mut CfgTopology,
+    topology: &mut CFGTopology,
     visited: &mut HashSet<Block>,
 ) where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCfgs<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a>,
 {
     if !visited.insert(block) {
         return;
@@ -103,7 +103,7 @@ fn collect_block<L>(
     for &stmt in &stmts {
         let definition = stmt.definition(stage);
         let owned_blocks: Vec<Block> = definition.blocks().copied().collect();
-        let owned_cfgs: Vec<Cfg> = definition.cfgs().copied().collect();
+        let owned_cfgs: Vec<CFG> = definition.cfgs().copied().collect();
         for owned in owned_blocks {
             topology.feeders.entry(owned).or_default().push(stmt);
             collect_block(stage, owned, true, topology, visited);

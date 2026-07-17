@@ -1,5 +1,5 @@
 use kirin_ir::{
-    Block, Cfg, CompileStage, Function, Product, SSAValue, SpecializedFunction, StagedFunction,
+    Block, CFG, CompileStage, Function, Product, SSAValue, SpecializedFunction, StagedFunction,
     Symbol,
 };
 
@@ -93,13 +93,13 @@ pub enum Callee {
 /// structured-control abstraction. A [`FunctionEntry`](crate::FunctionEntry)
 /// rule returns one; the engine builds the body frame that walks the CFG.
 pub struct FunctionBody<V> {
-    pub cfg: Cfg,
+    pub cfg: CFG,
     pub args: Product<V>,
 }
 
 impl<V> FunctionBody<V> {
     /// A function body over `cfg`, with no entry arguments yet.
-    pub fn new(cfg: Cfg) -> Self {
+    pub fn new(cfg: CFG) -> Self {
         Self {
             cfg,
             args: Product::new(),

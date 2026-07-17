@@ -217,53 +217,53 @@ impl<'a> Iterator for ZxEvalSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCfgs<'a> for ZxEval {
-    type Iter = ZxEvalCfgsIter<'a>;
+impl<'a> ::kirin::ir::HasCFG<'a> for ZxEval {
+    type Iter = ZxEvalCFGIter<'a>;
     fn cfgs(&'a self) -> Self::Iter {
         let Self {
             boundary,
             captures,
             body,
         } = self;
-        ZxEvalCfgsIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::Cfg>(),
+        ZxEvalCFGIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxEvalCfgsIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::Cfg>,
+pub struct ZxEvalCFGIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxEvalCfgsIter<'a> {
-    type Item = &'a ::kirin::ir::Cfg;
+impl<'a> Iterator for ZxEvalCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCfgsMut<'a> for ZxEval {
-    type IterMut = ZxEvalCfgsMutIter<'a>;
+impl<'a> ::kirin::ir::HasCFGMut<'a> for ZxEval {
+    type IterMut = ZxEvalCFGMutIter<'a>;
     fn cfgs_mut(&'a mut self) -> Self::IterMut {
         let Self {
             boundary,
             captures,
             body,
         } = self;
-        ZxEvalCfgsMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::Cfg>(),
+        ZxEvalCFGMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxEvalCfgsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::Cfg>,
+pub struct ZxEvalCFGMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxEvalCfgsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Cfg;
+impl<'a> Iterator for ZxEvalCFGMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

@@ -13,7 +13,7 @@
 //! via [`FrameBuild`] plus its dialect frames. The forward abstract analogue
 //! lives in [`sparse_forward::frames`](crate::engines::sparse_forward::frames).
 
-use kirin_ir::{Block, Cfg, CompileStage, Product, SSAValue, Statement};
+use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
 use crate::{
     CallEffect, Callee, EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError,
@@ -74,7 +74,7 @@ where
         interp: &mut I,
         stage: CompileStage,
         index: EnvIndex,
-        cfg: Cfg,
+        cfg: CFG,
         args: Product<V>,
     ) -> Result<Self, E>
     where
@@ -82,7 +82,7 @@ where
     {
         let entry = interp
             .cfg_entry(stage, cfg)?
-            .ok_or_else(|| E::from(InterpreterError::EmptyCfg))?;
+            .ok_or_else(|| E::from(InterpreterError::EmptyCFG))?;
         Self::start(interp, stage, index, entry, args, true, true)
     }
 

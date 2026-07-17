@@ -108,7 +108,7 @@ fn test_print_block_multiple_unnamed_args() {
     insta::assert_snapshot!(buf);
 }
 
-// --- Cfg with multiple blocks ---
+// --- CFG with multiple blocks ---
 
 #[test]
 fn test_print_cfg_multiple_blocks() {

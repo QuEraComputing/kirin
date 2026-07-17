@@ -7,7 +7,7 @@ use crate::{ChumskyLayout, PrettyPrintLayout};
 /// Parses derive input for chumsky macros.
 ///
 /// For value-only definitions, `#[kirin(type = ...)]` is optional.
-/// For dialect-like definitions using SSA/Result/Block/Cfg fields,
+/// For dialect-like definitions using SSA/Result/Block/CFG fields,
 /// `#[kirin(type = ...)]` remains required.
 pub fn parse_derive_input(
     ast: &syn::DeriveInput,
@@ -26,7 +26,7 @@ pub fn parse_derive_input(
 
     if input_requires_ir_type(&input) {
         return Err(darling::Error::custom(
-            "`#[kirin(type = ...)]` is required when using SSAValue, ResultValue, Block, or Cfg fields",
+            "`#[kirin(type = ...)]` is required when using SSAValue, ResultValue, Block, or CFG fields",
         )
         .with_span(&ast.ident));
     }
@@ -59,7 +59,7 @@ fn statement_requires_ir_type<L: kirin_derive_toolkit::ir::Layout>(
             FieldCategory::Argument
                 | FieldCategory::Result
                 | FieldCategory::Block
-                | FieldCategory::Cfg
+                | FieldCategory::CFG
         )
     })
 }
@@ -83,7 +83,7 @@ pub fn parse_pretty_derive_input(
 
     if input_requires_ir_type(&input) {
         return Err(darling::Error::custom(
-            "`#[kirin(type = ...)]` is required when using SSAValue, ResultValue, Block, or Cfg fields",
+            "`#[kirin(type = ...)]` is required when using SSAValue, ResultValue, Block, or CFG fields",
         )
         .with_span(&ast.ident));
     }
