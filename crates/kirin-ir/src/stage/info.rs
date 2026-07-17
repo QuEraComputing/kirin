@@ -8,7 +8,7 @@ use super::arenas::Arenas;
 
 /// Finalized IR for a single compilation stage.
 ///
-/// `StageInfo` holds the node arenas (blocks, statements, regions, graphs,
+/// `StageInfo` holds the node arenas (blocks, statements, cfgs, graphs,
 /// functions) and a clean SSA arena where every value has a resolved type and
 /// kind. It is the read-only output of [`BuilderStageInfo::finalize`].
 ///
@@ -55,8 +55,8 @@ use super::arenas::Arenas;
 ///     let arg = b.block_argument().index(0);
 ///     let ret = b.statement().definition(MyDialect::Return(arg)).new();
 ///     let block = b.block().argument(MyType::I64).terminator(ret).new();
-///     let region = b.region().add_block(block).new();
-///     let body = b.statement().definition(MyDialect::FuncBody(region)).new();
+///     let cfg = b.cfg().add_block(block).new();
+///     let body = b.statement().definition(MyDialect::FuncBody(cfg)).new();
 ///
 ///     b.specialize().staged_func(sf).body(body).new().unwrap();
 /// });

@@ -184,7 +184,7 @@ pub enum FieldCategory {
     Result,
     Block,
     Successor,
-    Region,
+    CFG,
     DiGraph,    // new
     UnGraph,    // new
     Symbol,
@@ -204,7 +204,7 @@ pub enum FieldData<L: Layout> {
 
 Field classification in `parse_field` adds type-name checks for `"DiGraph"` and `"UnGraph"`, supporting `Single`, `Vec<T>`, and `Option<T>` collection wrapping.
 
-`#[derive(Dialect)]` auto-generates `HasDigraphs`/`HasUngraphs` impls for all dialects. Dialects with no `DiGraph`/`UnGraph` fields get empty-iterator impls (same pattern as `HasBlocks`/`HasRegions`).
+`#[derive(Dialect)]` auto-generates `HasDigraphs`/`HasUngraphs` impls for all dialects. Dialects with no `DiGraph`/`UnGraph` fields get empty-iterator impls (same pattern as `HasBlocks`/`HasCFG`).
 
 ### #[kirin(edge)] Attribute
 

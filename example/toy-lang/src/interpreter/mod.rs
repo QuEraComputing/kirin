@@ -14,7 +14,7 @@ mod tests;
 pub use error::ToyError;
 pub use frame::{ToyAbstractFrame, ToyDenseBackwardFrame, ToyFrame};
 
-use kirin::prelude::{CompileStage, GetInfo, Pipeline, Region, UniqueLiveSpecializationError};
+use kirin::prelude::{CFG, CompileStage, GetInfo, Pipeline, UniqueLiveSpecializationError};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::{Lexical, Lifted};
 use kirin_interpreter::InterpreterError;
@@ -113,12 +113,12 @@ pub fn analyze_constprop(
     expect_single(analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?)
 }
 
-/// The body region of `function_name`'s specialization at `stage_name`.
-fn function_region(
+/// The body cfg of `function_name`'s specialization at `stage_name`.
+fn function_cfg(
     pipeline: &Pipeline<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<(CompileStage, Region), InterpreterError> {
+) -> Result<(CompileStage, CFG), InterpreterError> {
     let stage_id = pipeline
         .stage_by_name(stage_name)
         .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
@@ -129,7 +129,7 @@ fn function_region(
         .stage(stage_id)
         .ok_or(InterpreterError::MissingStage(stage_id))?;
 
-    let region = match stage {
+    let cfg = match stage {
         Stage::Source(info) => {
             let staged_info = staged
                 .get_info(info)
@@ -151,8 +151,8 @@ fn function_region(
                 .ok_or(InterpreterError::Custom("specialized function has no body"))?;
             match spec_info.body().definition(info) {
                 HighLevel::Lexical(Lexical::Function(function)) => {
-                    use kirin::prelude::HasRegionBody;
-                    *function.region()
+                    use kirin::prelude::HasCFGBody;
+                    *function.cfg()
                 }
                 _ => return Err(InterpreterError::Custom("expected a function body")),
             }
@@ -178,14 +178,14 @@ fn function_region(
                 .ok_or(InterpreterError::Custom("specialized function has no body"))?;
             match spec_info.body().definition(info) {
                 LowLevel::Lifted(Lifted::Function(function)) => {
-                    use kirin::prelude::HasRegionBody;
-                    *function.region()
+                    use kirin::prelude::HasCFGBody;
+                    *function.cfg()
                 }
                 _ => return Err(InterpreterError::Custom("expected a function body")),
             }
         }
     };
-    Ok((stage_id, region))
+    Ok((stage_id, cfg))
 }
 
 /// Run both liveness analyses over `function_name`'s body at `stage_name`:
@@ -196,10 +196,10 @@ pub fn analyze_liveness(
     stage_name: &str,
     function_name: &str,
 ) -> Result<(DemandResult, DenseLivenessResult), InterpreterError> {
-    let (stage, region) = function_region(pipeline, stage_name, function_name)?;
-    let demand = kirin_liveness::analyze_demand(pipeline, stage, region)?;
+    let (stage, cfg) = function_cfg(pipeline, stage_name, function_name)?;
+    let demand = kirin_liveness::analyze_demand(pipeline, stage, cfg)?;
     let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-    engine.analyze(stage, region)?;
-    let dense = DenseLivenessResult::from_engine(&mut engine, stage, region)?;
+    engine.analyze(stage, cfg)?;
+    let dense = DenseLivenessResult::from_engine(&mut engine, stage, cfg)?;
     Ok((demand, dense))
 }

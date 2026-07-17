@@ -1,6 +1,6 @@
 use super::block::BlockBuilder;
+use super::cfg::CFGBuilder;
 use super::digraph::DiGraphBuilder;
-use super::region::RegionBuilder;
 use super::ungraph::UnGraphBuilder;
 
 use crate::{BuilderStageInfo, Dialect};
@@ -10,8 +10,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
         BlockBuilder::from_stage(self)
     }
 
-    pub fn region(&mut self) -> RegionBuilder<'_, L> {
-        RegionBuilder::from_stage(self)
+    pub fn cfg(&mut self) -> CFGBuilder<'_, L> {
+        CFGBuilder::from_stage(self)
     }
 
     pub fn digraph(&mut self) -> DiGraphBuilder<'_, L> {

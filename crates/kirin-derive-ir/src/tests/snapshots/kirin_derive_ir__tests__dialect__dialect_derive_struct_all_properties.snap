@@ -179,45 +179,45 @@ impl<'a> Iterator for ConstantSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for Constant {
-    type Iter = ConstantRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCFG<'a> for Constant {
+    type Iter = ConstantCFGIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         let Self { result } = self;
-        ConstantRegionsIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        ConstantCFGIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ConstantRegionsIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+pub struct ConstantCFGIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ConstantRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for ConstantCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for Constant {
-    type IterMut = ConstantRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCFGMut<'a> for Constant {
+    type IterMut = ConstantCFGMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         let Self { result } = self;
-        ConstantRegionsMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        ConstantCFGMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ConstantRegionsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+pub struct ConstantCFGMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ConstantRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for ConstantCFGMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

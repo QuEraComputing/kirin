@@ -44,7 +44,7 @@ variant_parsers.into_iter()
     .reduce(|acc, parser| quote! { #acc.or(#parser) })
 ```
 
-This is the standard alternation combinator for CFGs. The ordering is left-to-right (first variant has priority), which means the parser is **ordered** — if two variants could parse the same prefix, the first one wins. This is consistent with PEG semantics rather than CFG semantics.
+This is the standard alternation combinator for CFG. The ordering is left-to-right (first variant has priority), which means the parser is **ordered** — if two variants could parse the same prefix, the first one wins. This is consistent with PEG semantics rather than CFG semantics.
 
 For `#[wraps]` variants, the parser delegates to the inner type's `HasDialectParser::namespaced_parser`, threading the namespace filter. This provides compositional namespace scoping: each wrapper adds its format string as a namespace prefix, and the inner parser filters by that prefix.
 

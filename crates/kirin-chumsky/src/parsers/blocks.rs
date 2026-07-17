@@ -162,7 +162,7 @@ where
     })
 }
 
-/// Parses a region containing multiple blocks.
+/// Parses a CFG containing multiple blocks.
 ///
 /// Matches:
 /// ```text
@@ -176,10 +176,10 @@ where
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The type parameter `S` is the statement AST type produced by the language parser.
-/// The parser produces `Region<'t, <T as HasParser>::Output, S>`.
-pub fn region<'t, I, T, S>(
+/// The parser produces `CFG<'t, <T as HasParser>::Output, S>`.
+pub fn cfg<'t, I, T, S>(
     language: RecursiveParser<'t, I, S>,
-) -> impl Parser<'t, I, Region<'t, <T as HasParser<'t>>::Output, S>, ParserError<'t>>
+) -> impl Parser<'t, I, CFG<'t, <T as HasParser<'t>>::Output, S>, ParserError<'t>>
 where
     I: TokenInput<'t>,
     T: HasParser<'t>,
@@ -190,8 +190,8 @@ where
         .repeated()
         .collect::<Vec<_>>()
         .delimited_by(just(Token::LBrace), just(Token::RBrace))
-        .map(|blocks| Region { blocks })
-        .labelled("region")
+        .map(|blocks| CFG { blocks })
+        .labelled("cfg")
 }
 
 /// Parses block body statements (without header, without braces).
@@ -217,12 +217,12 @@ where
         .labelled("block body statements")
 }
 
-/// Parses region body (blocks without outer braces).
+/// Parses CFG body (blocks without outer braces).
 ///
 /// Matches a sequence of blocks, each optionally terminated by a semicolon.
-/// This is the inner content of a region, used for `:body` projections on
-/// Region fields where the caller provides surrounding syntax via the format string.
-pub fn region_body<'t, I, T, S>(
+/// This is the inner content of a CFG, used for `:body` projections on
+/// CFG fields where the caller provides surrounding syntax via the format string.
+pub fn cfg_body<'t, I, T, S>(
     language: RecursiveParser<'t, I, S>,
 ) -> impl Parser<'t, I, Vec<Spanned<Block<'t, <T as HasParser<'t>>::Output, S>>>, ParserError<'t>>
 where
@@ -234,5 +234,5 @@ where
         .then_ignore(just(Token::Semicolon).or_not())
         .repeated()
         .collect::<Vec<_>>()
-        .labelled("region body")
+        .labelled("cfg body")
 }

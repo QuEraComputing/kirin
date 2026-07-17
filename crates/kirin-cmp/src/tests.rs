@@ -1,6 +1,6 @@
 use kirin::ir::{
-    HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
-    IsSpeculatable, IsTerminator, TestSSAValue,
+    HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant, IsPure, IsSpeculatable,
+    IsTerminator, TestSSAValue,
 };
 use kirin_test_types::UnitType;
 
@@ -141,13 +141,13 @@ fn no_blocks() {
     }
 }
 
-// --- HasRegions: no regions ---
+// --- HasCFG: no cfgs ---
 
 #[test]
-fn no_regions() {
+fn no_cfgs() {
     for op in all_variants() {
-        let regions: Vec<_> = op.regions().collect();
-        assert_eq!(regions.len(), 0, "expected 0 regions for {op:?}");
+        let cfgs: Vec<_> = op.cfgs().collect();
+        assert_eq!(cfgs.len(), 0, "expected 0 cfgs for {op:?}");
     }
 }
 

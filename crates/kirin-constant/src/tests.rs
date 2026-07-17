@@ -1,6 +1,6 @@
 use kirin::ir::{
-    HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
-    IsTerminator, TestSSAValue, Typeof,
+    HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant, IsPure, IsTerminator,
+    TestSSAValue, Typeof,
 };
 use kirin::pretty::{ArenaDoc, DocAllocator, Document, PrettyPrint};
 
@@ -92,7 +92,7 @@ fn one_result() {
     assert_eq!(c.results().count(), 1);
 }
 
-// --- HasSuccessors / HasBlocks / HasRegions: all empty ---
+// --- HasSuccessors / HasBlocks / HasCFG: all empty ---
 
 #[test]
 fn no_successors() {
@@ -105,8 +105,8 @@ fn no_blocks() {
 }
 
 #[test]
-fn no_regions() {
-    assert_eq!(make_constant(0).regions().count(), 0);
+fn no_cfgs() {
+    assert_eq!(make_constant(0).cfgs().count(), 0);
 }
 
 // --- Clone + PartialEq ---

@@ -60,11 +60,11 @@ impl Statement {
         self.expect_info(stage).definition.arguments()
     }
 
-    pub fn regions<'a, L: Dialect>(
+    pub fn cfgs<'a, L: Dialect>(
         &self,
         stage: &'a crate::StageInfo<L>,
-    ) -> <L as crate::HasRegions<'a>>::Iter {
-        self.expect_info(stage).definition.regions()
+    ) -> <L as crate::HasCFG<'a>>::Iter {
+        self.expect_info(stage).definition.cfgs()
     }
 
     pub fn blocks<'a, L: Dialect>(

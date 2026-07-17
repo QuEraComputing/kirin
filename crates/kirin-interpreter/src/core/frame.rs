@@ -7,7 +7,7 @@
 
 use std::hash::Hash;
 
-use kirin_ir::{Block, CompileStage, Product, Region, SSAValue, Statement};
+use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
 use crate::{
     CallEffect, Callee, Env, EnvIndex, FunctionBody, FunctionTarget, Interp, InterpreterError,
@@ -139,11 +139,7 @@ pub trait ForwardFrameDriver: Env {
         block: Block,
         after: Statement,
     ) -> Result<Option<Statement>, Self::Error>;
-    fn region_entry(
-        &self,
-        stage: CompileStage,
-        region: Region,
-    ) -> Result<Option<Block>, Self::Error>;
+    fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, Self::Error>;
 
     /// Bind a block's parameters to incoming actuals in `env` (arity-checked).
     fn bind_block_args(

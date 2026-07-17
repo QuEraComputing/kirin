@@ -64,7 +64,7 @@ impl std::error::Error for FinalizeError {}
 /// Builder for constructing IR within a single compilation stage.
 ///
 /// `BuilderStageInfo` holds the same node arenas as [`StageInfo`] (blocks,
-/// statements, regions, graphs, etc.) but uses [`BuilderSSAInfo`] for the SSA
+/// statements, cfgs, graphs, etc.) but uses [`BuilderSSAInfo`] for the SSA
 /// arena — allowing `Option<L::Type>` and [`BuilderSSAKind`] placeholders during
 /// construction.
 ///
@@ -105,11 +105,11 @@ impl std::error::Error for FinalizeError {}
 ///     .new();
 /// ```
 ///
-/// Regions (containers of blocks):
+/// CFG (containers of blocks):
 /// ```ignore
 /// let entry = stage.block().new();
 /// let exit = stage.block().new();
-/// let region = stage.region().add_block(entry).add_block(exit).new();
+/// let cfg = stage.cfg().add_block(entry).add_block(exit).new();
 /// ```
 ///
 /// # Finalization

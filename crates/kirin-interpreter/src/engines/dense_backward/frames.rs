@@ -25,7 +25,7 @@ pub enum DenseBlockMode {
     /// A CFG block owner: the terminator's [`Edges`](DenseBackwardEffect::Edges)
     /// are absorbed (seeding the state and recording `live_out`); completes
     /// with [`DenseBackwardCompletion::Block`].
-    CfgOwner,
+    CFGOwner,
     /// A structured body walked by a dialect frame against the current point
     /// state: CFG edges are an error, and completion is
     /// [`DenseBackwardCompletion::Structured`].
@@ -42,7 +42,7 @@ pub struct DenseBlockFrame<V, E> {
     /// Number of statements not yet walked (walks from the end).
     remaining: usize,
     mode: DenseBlockMode,
-    /// The absorbed edge mapping (`CfgOwner` only).
+    /// The absorbed edge mapping (`CFGOwner` only).
     live_out: Option<V>,
     /// A pushed structured statement whose before-point is recorded once its
     /// frame completes.
@@ -70,7 +70,7 @@ where
 
     /// A CFG block-owner walk.
     pub fn cfg_owner(stage: CompileStage, block: Block) -> Self {
-        Self::with_mode(stage, block, DenseBlockMode::CfgOwner)
+        Self::with_mode(stage, block, DenseBlockMode::CFGOwner)
     }
 
     /// A structured-body walk (pushed by a dialect frame).
@@ -98,7 +98,7 @@ where
 
         if self.remaining == 0 {
             return Ok(FrameEffect::Complete(match self.mode {
-                DenseBlockMode::CfgOwner => DenseBackwardCompletion::Block {
+                DenseBlockMode::CFGOwner => DenseBackwardCompletion::Block {
                     live_in: interp.state(),
                     live_out: self.live_out.take().unwrap_or_else(|| interp.state()),
                 },
@@ -124,7 +124,7 @@ where
                     )));
                 }
                 match self.mode {
-                    DenseBlockMode::CfgOwner => {
+                    DenseBlockMode::CFGOwner => {
                         let out = interp.absorb_edges(self.stage, &edges)?;
                         self.live_out = Some(out);
                         interp.record_before(statement);

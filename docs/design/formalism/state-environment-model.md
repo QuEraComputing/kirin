@@ -106,7 +106,7 @@ This is performed by engine/frame protocol, not by dialect statements.
 
 Structured control (`scf.if`, `scf.for`) is represented by `Scope<V, E>`:
 
-- `body: ScopeBody` (`Block`, `Region`, or `Immediate`)
+- `body: ScopeBody` (`Block`, `CFG`, or `Immediate`)
 - `args: Product<V>` (entry arguments)
 - `results: Product<SSAValue>` (landing slots)
 - `hook: Option<Box<dyn ScopeHook<V, E>>>`

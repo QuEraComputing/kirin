@@ -39,6 +39,18 @@ pub fn to_camel_case(s: impl AsRef<str>) -> String {
     result
 }
 
+/// Derives the iterator-type infix for a field-iterator trait (e.g. `HasCFG` → `CFG`,
+/// `HasArgumentsMut` → `ArgumentsMut`) by stripping the conventional `Has` prefix from the
+/// trait name. This preserves acronym casing (`CFG`) that camel-casing the snake_case method
+/// name (`cfgs`) would lose. Falls back to camel-casing `method` when the trait name lacks the
+/// `Has` prefix.
+pub fn iter_infix(trait_name: impl AsRef<str>, method: impl AsRef<str>) -> String {
+    match trait_name.as_ref().strip_prefix("Has") {
+        Some(rest) if !rest.is_empty() => rest.to_string(),
+        _ => to_camel_case(method),
+    }
+}
+
 /// Converts a string to snake_case.
 pub fn to_snake_case(s: impl AsRef<str>) -> String {
     let s = s.as_ref();

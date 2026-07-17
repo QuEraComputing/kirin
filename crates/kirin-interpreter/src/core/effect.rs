@@ -1,5 +1,5 @@
 use kirin_ir::{
-    Block, CompileStage, Function, Product, Region, SSAValue, SpecializedFunction, StagedFunction,
+    Block, CFG, CompileStage, Function, Product, SSAValue, SpecializedFunction, StagedFunction,
     Symbol,
 };
 
@@ -24,7 +24,7 @@ use kirin_ir::{
 pub enum SparseForwardEffect<V, F> {
     /// Statement done; continue with the next statement.
     Next,
-    /// Unconditional transfer to a block in the current region.
+    /// Unconditional transfer to a block in the current CFG.
     Jump(Edge<V>),
     /// Conditional transfer whose condition is undecided in the value domain.
     Branch(Vec<Edge<V>>),
@@ -86,27 +86,27 @@ pub enum Callee {
     Specialized(SpecializedFunction),
 }
 
-/// The body a callable statement enters when invoked: a CFG region plus the
+/// The body a callable statement enters when invoked: a CFG plus the
 /// entry arguments bound to its entry block.
 ///
 /// This is the function-call entry descriptor — the call mechanism, not a
 /// structured-control abstraction. A [`FunctionEntry`](crate::FunctionEntry)
-/// rule returns one; the engine builds the body frame that walks the region.
+/// rule returns one; the engine builds the body frame that walks the CFG.
 pub struct FunctionBody<V> {
-    pub region: Region,
+    pub cfg: CFG,
     pub args: Product<V>,
 }
 
 impl<V> FunctionBody<V> {
-    /// A function body over `region`, with no entry arguments yet.
-    pub fn new(region: Region) -> Self {
+    /// A function body over `cfg`, with no entry arguments yet.
+    pub fn new(cfg: CFG) -> Self {
         Self {
-            region,
+            cfg,
             args: Product::new(),
         }
     }
 
-    /// Entry arguments bound to the region entry block's parameters.
+    /// Entry arguments bound to the CFG entry block's parameters.
     pub fn args(mut self, args: impl IntoIterator<Item = V>) -> Self {
         self.args = args.into_iter().collect();
         self

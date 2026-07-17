@@ -303,15 +303,15 @@ impl Template<StandardLayout> for MarkerTemplate {
 
 /// Configuration for a field iterator trait.
 pub struct FieldIterConfig {
-    /// Which field category to iterate over (e.g., regions, blocks, successors).
+    /// Which field category to iterate over (e.g., cfgs, blocks, successors).
     pub kind: FieldIterKind,
     /// Whether the iterator yields mutable references.
     pub mutable: bool,
-    /// Fully qualified trait name (e.g., `"HasRegions"`).
+    /// Fully qualified trait name (e.g., `"HasCFG"`).
     pub trait_name: &'static str,
-    /// The IR type that fields must match (e.g., `"Region"`).
+    /// The IR type that fields must match (e.g., `"CFG"`).
     pub matching_type: &'static str,
-    /// Method name on the trait (e.g., `"regions"`).
+    /// Method name on the trait (e.g., `"cfgs"`).
     pub trait_method: &'static str,
     /// Associated type name for the iterator (e.g., `"Iter"`).
     pub trait_type_iter: &'static str,

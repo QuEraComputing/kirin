@@ -12,7 +12,7 @@
 //!   → stage.statement()          create statements
 //!   → stage.block_argument()     create placeholder SSAs
 //!   → stage.block()              build blocks (resolves placeholders)
-//!   → stage.region()             group blocks into regions
+//!   → stage.cfg()             group blocks into cfgs
 //!   → stage.staged_function()    register callable functions
 //!   → stage.specialize()         add specializations
 //!   → stage.finalize()           validate → StageInfo (clean SSAInfo)
@@ -21,12 +21,12 @@
 //! See [`BuilderStageInfo`] for detailed usage examples.
 
 mod block;
+mod cfg;
 mod context;
 pub mod digraph;
 pub mod error;
 mod graph_common;
 mod redefine;
-mod region;
 mod stage_info;
 mod staged;
 pub mod ungraph;

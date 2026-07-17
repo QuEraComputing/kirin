@@ -371,20 +371,20 @@ fn test_print_block_with_named_args() {
 }
 
 // ============================================================================
-// print_region tests
+// print_cfg tests
 // ============================================================================
 
 #[test]
-fn test_print_region_empty() {
+fn test_print_cfg_empty() {
     let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
     let test_sym = gs.intern("test".to_string());
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
     let _ = stage.staged_function().name(test_sym).new().unwrap();
 
-    let region = stage.region().new();
+    let cfg = stage.cfg().new();
     let stage = stage.finalize().unwrap();
     let doc = Document::new(Default::default(), &stage);
-    let arena_doc = doc.print_region(&region);
+    let arena_doc = doc.print_cfg(&cfg);
     let mut buf = String::new();
     arena_doc.render_fmt(80, &mut buf).unwrap();
     insta::assert_snapshot!(buf);
@@ -427,7 +427,7 @@ fn test_render_builder_config() {
         .stmt(c)
         .terminator(ret)
         .new();
-    let body = stage.region().add_block(block).new();
+    let body = stage.cfg().add_block(block).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
     let f = stage
         .specialize()

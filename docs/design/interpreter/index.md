@@ -232,7 +232,7 @@ Like `Interpretable`, it receives the engine `interp` directly (function entry i
 forward-only, so there is no `Semantics` parameter).
 
 Statements that define function bodies (e.g. `kirin_function::Function`)
-return the `FunctionBody { region, args }` to enter on invocation (the
+return the `FunctionBody { cfg, args }` to enter on invocation (the
 function-call entry descriptor — not a structured-control abstraction). On
 language enums it is derived; `#[callable]` marks the variants that forward, all
 others report `NotCallable`.
@@ -295,7 +295,7 @@ A generic **frame-stack driver**: it pops the top frame, calls `Frame::step`,
 and applies the returned `FrameEffect` (`Continue` / `Push` / `Done` /
 `Complete`) — it owns *no* traversal logic itself. Traversal lives in the
 frames. The default total frame type `StandardFrame<V, E>` wraps the standard
-`BodyFrame` (walks a function-body region CFG, or a single body block that
+`BodyFrame` (walks a function-body CFG, or a single body block that
 completes on `Yield` — `Jump` retargets it, `Return` completes it) and
 `CallFrame` (dispatch a callee, await its `Return`). The dialect-produced
 `SparseForwardEffect` is consumed by `BodyFrame`, which maps it to a `FrameEffect`
@@ -332,7 +332,7 @@ keying and merge; the interprocedural protocol (summary tables, caller
 recording) stays atomic in the engine. Three nested fixpoints, expressed as
 frames:
 
-- **CFG**: each function body region is a block worklist; block parameters
+- **CFG**: each function-body CFG is a block worklist; block parameters
   join across incoming edges and widen after `widen_after` visits — `cf`
   back-edge loops converge.
 - **Pushed loop frames**: a dialect loop frame (e.g. `scf.for`'s
@@ -365,7 +365,7 @@ Two mechanisms keep engines generic over stage enums:
   matching `Interpretable`/`FunctionEntry` rule.
 - `StageQuery` — a bound bundle over kirin-ir's `StageDispatch`/`StageAction`
   machinery for language-independent IR facts (block parameters, statement
-  order, region entry, specialization lookup, symbol resolution). Satisfied
+  order, CFG entry, specialization lookup, symbol resolution). Satisfied
   automatically by any stage enum; used by engines and linkers internally.
 
 ## Custom traversal and policies
@@ -441,7 +441,7 @@ the engine with that `F`. (Examples: `example/toy-lang`'s `ToyFrame`, which adds
 
 `SparseForwardInterpreter` is symmetrically generic over a total abstract frame type
 `F` (default `StandardAbstractFrame`). The standard abstract frames
-(`AbstractFunctionFrame`, `AbstractCfgFrame`, `AbstractBlockFrame`,
+(`AbstractFunctionFrame`, `AbstractCFGFrame`, `AbstractBlockFrame`,
 `AbstractCallFrame`) implement the *same*
 `Frame` protocol, but their traversal is the abstract one: a CFG block worklist
 that joins/widens at merge points, `Branch` exploration, single-block

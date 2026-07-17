@@ -5,7 +5,7 @@ use crate::{BuilderStageInfo, Dialect};
 
 pub struct BlockBuilder<'a, L: Dialect> {
     stage: &'a mut BuilderStageInfo<L>,
-    parent: Option<Region>,
+    parent: Option<CFG>,
     name: Option<String>,
     arguments: Vec<(L::Type, Option<String>)>,
     statements: Vec<Statement>,
@@ -24,8 +24,8 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         }
     }
 
-    /// Attach the block to a parent region without pushing it to the region's block list.
-    pub fn parent(mut self, parent: Region) -> Self {
+    /// Attach the block to a parent cfg without pushing it to the CFG's block list.
+    pub fn parent(mut self, parent: CFG) -> Self {
         self.parent = Some(parent);
         self
     }

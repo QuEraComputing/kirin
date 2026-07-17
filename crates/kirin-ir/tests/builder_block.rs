@@ -1,4 +1,4 @@
-//! Integration tests for block builder, region builder, statement iteration,
+//! Integration tests for block builder, cfg builder, statement iteration,
 //! detach, SSA creation, and linked list helpers.
 
 mod common;
@@ -6,13 +6,13 @@ mod common;
 use common::{BuilderDialect, TestType, new_stage};
 use kirin_ir::*;
 
-struct RegionBodyOp {
-    region: Region,
+struct CFGBodyOp {
+    cfg: CFG,
 }
 
-impl HasRegionBody for RegionBodyOp {
-    fn region(&self) -> &Region {
-        &self.region
+impl HasCFGBody for CFGBodyOp {
+    fn cfg(&self) -> &CFG {
+        &self.cfg
     }
 }
 
@@ -226,25 +226,20 @@ fn block_argument_placeholder_substitution_with_zero_args() {
     assert!(info.arguments.is_empty());
 }
 
-// --- RegionBuilder tests ---
+// --- CFGBuilder tests ---
 
 #[test]
-fn region_builder_creates_region_with_ordered_blocks() {
+fn cfg_builder_creates_cfg_with_ordered_blocks() {
     let mut stage = new_stage();
     let b0 = stage.block().new();
     let b1 = stage.block().new();
     let b2 = stage.block().new();
 
-    let region = stage
-        .region()
-        .add_block(b0)
-        .add_block(b1)
-        .add_block(b2)
-        .new();
+    let cfg = stage.cfg().add_block(b0).add_block(b1).add_block(b2).new();
 
     let stage = stage.finalize().unwrap();
-    assert_eq!(region.blocks(&stage).len(), 3);
-    let blocks: Vec<_> = region.blocks(&stage).collect();
+    assert_eq!(cfg.blocks(&stage).len(), 3);
+    let blocks: Vec<_> = cfg.blocks(&stage).collect();
     assert_eq!(blocks, vec![b0, b1, b2]);
 
     let b0_info = b0.expect_info(&stage);
@@ -258,52 +253,47 @@ fn region_builder_creates_region_with_ordered_blocks() {
 }
 
 #[test]
-fn has_region_body_entry_block_returns_first_block() {
+fn has_cfg_body_entry_block_returns_first_block() {
     let mut stage = new_stage();
     let b0 = stage.block().new();
     let b1 = stage.block().new();
-    let region = stage.region().add_block(b0).add_block(b1).new();
-    let op = RegionBodyOp { region };
+    let cfg = stage.cfg().add_block(b0).add_block(b1).new();
+    let op = CFGBodyOp { cfg };
 
     let stage = stage.finalize().unwrap();
     assert_eq!(op.entry_block(&stage), Some(b0));
 }
 
 #[test]
-#[should_panic(expected = "already added to the region")]
-fn region_builder_panics_on_duplicate_block() {
+#[should_panic(expected = "already added to the cfg")]
+fn cfg_builder_panics_on_duplicate_block() {
     let mut stage = new_stage();
     let b0 = stage.block().new();
-    let _ = stage.region().add_block(b0).add_block(b0).new();
+    let _ = stage.cfg().add_block(b0).add_block(b0).new();
 }
 
 #[test]
-fn region_block_iter_single_block() {
+fn cfg_block_iter_single_block() {
     let mut stage = new_stage();
     let b0 = stage.block().new();
-    let region = stage.region().add_block(b0).new();
+    let cfg = stage.cfg().add_block(b0).new();
 
     let stage = stage.finalize().unwrap();
-    let blocks: Vec<_> = region.blocks(&stage).collect();
+    let blocks: Vec<_> = cfg.blocks(&stage).collect();
     assert_eq!(blocks, vec![b0]);
-    assert_eq!(region.blocks(&stage).len(), 1);
+    assert_eq!(cfg.blocks(&stage).len(), 1);
 }
 
 #[test]
-fn region_block_iter_double_ended() {
+fn cfg_block_iter_double_ended() {
     let mut stage = new_stage();
     let b0 = stage.block().new();
     let b1 = stage.block().new();
     let b2 = stage.block().new();
-    let region = stage
-        .region()
-        .add_block(b0)
-        .add_block(b1)
-        .add_block(b2)
-        .new();
+    let cfg = stage.cfg().add_block(b0).add_block(b1).add_block(b2).new();
 
     let stage = stage.finalize().unwrap();
-    let mut iter = region.blocks(&stage);
+    let mut iter = cfg.blocks(&stage);
     assert_eq!(iter.next_back(), Some(b2));
     assert_eq!(iter.next(), Some(b0));
     assert_eq!(iter.next_back(), Some(b1));
@@ -312,14 +302,14 @@ fn region_block_iter_double_ended() {
 }
 
 #[test]
-fn region_block_iter_exact_size() {
+fn cfg_block_iter_exact_size() {
     let mut stage = new_stage();
     let b0 = stage.block().new();
     let b1 = stage.block().new();
-    let region = stage.region().add_block(b0).add_block(b1).new();
+    let cfg = stage.cfg().add_block(b0).add_block(b1).new();
 
     let stage = stage.finalize().unwrap();
-    let mut iter = region.blocks(&stage);
+    let mut iter = cfg.blocks(&stage);
     assert_eq!(iter.len(), 2);
     iter.next();
     assert_eq!(iter.len(), 1);
@@ -328,14 +318,14 @@ fn region_block_iter_exact_size() {
 }
 
 #[test]
-fn empty_region() {
+fn empty_cfg() {
     let mut stage = new_stage();
-    let region = stage.region().new();
+    let cfg = stage.cfg().new();
 
     let stage = stage.finalize().unwrap();
-    let blocks: Vec<_> = region.blocks(&stage).collect();
+    let blocks: Vec<_> = cfg.blocks(&stage).collect();
     assert!(blocks.is_empty());
-    assert_eq!(region.blocks(&stage).len(), 0);
+    assert_eq!(cfg.blocks(&stage).len(), 0);
 }
 
 // --- Detach tests ---

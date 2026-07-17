@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{Block, CompileStage, Pipeline, Product, Region, SSAValue, StageMeta, Statement};
+use kirin_ir::{Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta, Statement};
 
 use crate::core::query;
 use crate::{
@@ -191,8 +191,8 @@ where
         query::next_statement(self.pipeline, stage, block, after).map_err(E::from)
     }
 
-    fn region_entry(&self, stage: CompileStage, region: Region) -> Result<Option<Block>, E> {
-        query::region_entry(self.pipeline, stage, region).map_err(E::from)
+    fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
+        query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
     }
 }
 
@@ -233,7 +233,7 @@ where
         let index = self.alloc_env();
         let args: Product<V> = args.into_iter().collect();
         let body = self.enter_function(target.stage, target.body, args, index)?;
-        let frame = BodyFrame::function(self, target.stage, index, body.region, body.args)?;
+        let frame = BodyFrame::function(self, target.stage, index, body.cfg, body.args)?;
         self.frames.push(F::from_body(frame));
         self.run()
     }

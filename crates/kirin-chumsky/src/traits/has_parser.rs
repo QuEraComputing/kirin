@@ -33,7 +33,7 @@ pub trait HasParser<'t> {
 ///
 /// This trait provides recursive parsing capabilities for dialects.
 /// The AST type is parameterized by `TypeOutput` (for type annotations) and
-/// `LanguageOutput` (for nested statements in blocks/regions).
+/// `LanguageOutput` (for nested statements in blocks/cfgs).
 ///
 /// Using explicit type parameters instead of GAT projections avoids infinite
 /// compilation times when the Language type is self-referential.
@@ -43,7 +43,7 @@ pub trait HasDialectParser<'t>: Sized {
     /// The AST type produced by parsing this dialect.
     ///
     /// - `TypeOutput`: The parsed representation of type annotations
-    /// - `LanguageOutput`: The AST type for statements in blocks/regions
+    /// - `LanguageOutput`: The AST type for statements in blocks/cfgs
     type Output<TypeOutput, LanguageOutput>: Clone + PartialEq
     where
         TypeOutput: Clone + PartialEq + 't,

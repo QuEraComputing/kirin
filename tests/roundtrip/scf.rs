@@ -11,7 +11,7 @@ use kirin_test_utils::roundtrip;
 enum ScfLanguage {
     #[chumsky(format = "fn {:name}{sig} {body}")]
     Function {
-        body: Region,
+        body: CFG,
         sig: Signature<ArithType>,
     },
     #[wraps]

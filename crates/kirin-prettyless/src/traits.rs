@@ -16,10 +16,10 @@ use prettyless::DocAllocator;
 /// should produce output that roundtrips through the parser.
 ///
 /// The bounds on `L` (`PrettyPrint` and `Type: Display`) are required because:
-/// - `L: PrettyPrint` is needed to print nested Block/Region structures
+/// - `L: PrettyPrint` is needed to print nested Block/CFG structures
 /// - `Type: Display` is needed to print type annotations (`:type` format)
 ///
-/// For IR nodes that require context (like `Statement`, `Block`, `Region`), use
+/// For IR nodes that require context (like `Statement`, `Block`, `CFG`), use
 /// the convenience methods provided on `Document` instead.
 ///
 /// # Example

@@ -152,7 +152,7 @@ fn test_roundtrip_return() {
     assert_eq!(output.trim(), input);
 }
 
-/// Test roundtrip for a full function with region containing multiple blocks and statements.
+/// Test roundtrip for a full function with CFG containing multiple blocks and statements.
 #[test]
 fn test_roundtrip_function() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
@@ -199,7 +199,7 @@ fn test_roundtrip_function() {
     assert_eq!(output.trim_end(), input);
 }
 
-/// Test roundtrip for a function with multiple blocks in the region.
+/// Test roundtrip for a function with multiple blocks in the CFG.
 #[test]
 fn test_roundtrip_function_multiple_blocks() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();

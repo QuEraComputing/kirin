@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 
 use kirin_ir::{
-    Block, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Port, Region, SSAInfo, SSAValue, Signature,
+    Block, CFG, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Port, SSAInfo, SSAValue, Signature,
     SpecializedFunction, StagedFunction, Statement, Symbol, UnGraph,
 };
 use petgraph::visit::IntoNodeReferences;
@@ -153,10 +153,10 @@ where
         header + self.text(" {") + self.block_indent(inner) + self.line_() + self.text("}")
     }
 
-    /// Pretty print a region with its blocks.
-    pub fn print_region(&'a self, region: &Region) -> ArenaDoc<'a> {
+    /// Pretty print a CFG with its blocks.
+    pub fn print_cfg(&'a self, cfg: &CFG) -> ArenaDoc<'a> {
         let mut inner = self.nil();
-        for block in region.blocks(self.stage) {
+        for block in cfg.blocks(self.stage) {
             inner += self.print_block(&block);
             inner += self.line_();
         }
@@ -458,10 +458,10 @@ where
         inner
     }
 
-    /// Print a Region body only: blocks without outer braces.
-    pub fn print_region_body_only(&'a self, region: &Region) -> ArenaDoc<'a> {
+    /// Print a CFG body only: blocks without outer braces.
+    pub fn print_cfg_body_only(&'a self, cfg: &CFG) -> ArenaDoc<'a> {
         let mut inner = self.nil();
-        for block in region.blocks(self.stage) {
+        for block in cfg.blocks(self.stage) {
             inner += self.print_block(&block);
             inner += self.line_();
         }

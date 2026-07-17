@@ -25,17 +25,16 @@ pub use comptime::{CompileTimeValue, Placeholder, Typeof};
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
-    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasDigraphs, HasDigraphsMut,
-    HasRegionBody, HasRegions, HasRegionsMut, HasResults, HasResultsMut, HasSuccessors,
-    HasSuccessorsMut, HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable,
-    IsTerminator,
+    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGBody, HasCFGMut,
+    HasDigraphs, HasDigraphsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
+    HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator,
 };
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice, Widen};
 pub use node::{
-    Block, BlockArgument, BlockInfo, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CompileStage,
+    Block, BlockArgument, BlockInfo, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CFG, CompileStage,
     DeletedSSAValue, DiGraph, DiGraphExtra, DiGraphInfo, Function, FunctionInfo, GlobalSymbol,
-    GraphInfo, LinkedList, LinkedListNode, Port, PortParent, Region, ResolutionInfo, ResultValue,
-    SSAInfo, SSAKind, SSAValue, SpecializedFunction, SpecializedFunctionInfo, StagedFunction,
+    GraphInfo, LinkedList, LinkedListNode, Port, PortParent, ResolutionInfo, ResultValue, SSAInfo,
+    SSAKind, SSAValue, SpecializedFunction, SpecializedFunctionInfo, StagedFunction,
     StagedFunctionInfo, StagedNamePolicy, Statement, StatementInfo, StatementParent, Successor,
     Symbol, TestSSAValue, UnGraph, UnGraphExtra, UnGraphInfo, UniqueLiveSpecializationError,
 };
@@ -54,9 +53,9 @@ pub use stage::{
 /// Re-exports of the most commonly used types for dialect authors.
 pub mod prelude {
     pub use crate::{
-        Block, BuilderStageInfo, CompileStage, Dialect, Function, GetInfo, HasRegionBody,
-        HasSignature, HasStageInfo, Pipeline, Region, ResultValue, SSAValue, Signature,
-        SignatureSemantics, StageInfo, StageMeta, Statement,
+        Block, BuilderStageInfo, CFG, CompileStage, Dialect, Function, GetInfo, HasCFGBody,
+        HasSignature, HasStageInfo, Pipeline, ResultValue, SSAValue, Signature, SignatureSemantics,
+        StageInfo, StageMeta, Statement,
     };
     pub use crate::{
         CompileTimeValue, HasProduct, Placeholder, Product, Project, ProjectError, TryProject,
@@ -66,7 +65,6 @@ pub mod prelude {
 
 #[cfg(feature = "derive")]
 pub use kirin_derive_ir::{
-    Dialect, HasArguments, HasDigraphs, HasRegions, HasResults, HasSuccessors, HasUngraphs,
-    IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, LiftProject, ParseDispatch,
-    StageMeta,
+    Dialect, HasArguments, HasCFG, HasDigraphs, HasResults, HasSuccessors, HasUngraphs, IsConstant,
+    IsEdge, IsPure, IsSpeculatable, IsTerminator, LiftProject, ParseDispatch, StageMeta,
 };

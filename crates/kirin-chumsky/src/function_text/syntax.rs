@@ -70,7 +70,7 @@ where
 }
 
 /// Body span scanner. Matches an optional keyword prefix (e.g. `digraph`,
-/// `ungraph`) followed by a brace-balanced `{ ... }` region. Returns the
+/// `ungraph`) followed by a brace-balanced `{ ... }` CFG. Returns the
 /// span covering everything from the first non-brace token (or the opening
 /// brace) through the matching closing brace. Does not parse body contents.
 fn body_span<'src, I>() -> impl Parser<'src, I, SimpleSpan, ParserError<'src>>

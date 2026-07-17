@@ -27,14 +27,14 @@ fn test_dialect_derive_struct_with_ssa_fields() {
 }
 
 #[test]
-fn test_dialect_derive_struct_with_region_block() {
+fn test_dialect_derive_struct_with_cfg_block() {
     let input: syn::DeriveInput = syn::parse_quote! {
         #[kirin(type = SimpleType)]
         struct IfOp {
             condition: Value,
             then_block: Block,
             else_block: Block,
-            body: Region,
+            body: CFG,
         }
     };
     insta::assert_snapshot!(generate_dialect_code(input));

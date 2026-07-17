@@ -26,7 +26,7 @@ impl FieldCategoryExt for FieldCategory {
             FieldCategory::Result => "result_value",
             FieldCategory::Block => "block",
             FieldCategory::Successor => "successor",
-            FieldCategory::Region => "region",
+            FieldCategory::CFG => "cfg",
             FieldCategory::Symbol => "symbol",
             FieldCategory::Value => "value",
             FieldCategory::DiGraph => "digraph",
@@ -66,8 +66,8 @@ pub fn ast_type<L: Layout>(
         FieldCategory::Successor => {
             quote! { #crate_path::BlockLabel<'t> }
         }
-        FieldCategory::Region => {
-            quote! { #crate_path::Region<'t, #type_output, LanguageOutput> }
+        FieldCategory::CFG => {
+            quote! { #crate_path::CFG<'t, #type_output, LanguageOutput> }
         }
         FieldCategory::Symbol => {
             quote! { #crate_path::SymbolName<'t> }
@@ -141,14 +141,14 @@ pub fn parser_expr<L: Layout>(
         FieldCategory::Successor => {
             quote! { #crate_path::block_label() }
         }
-        FieldCategory::Region => match opt {
+        FieldCategory::CFG => match opt {
             FormatOption::Default => {
-                quote! { #crate_path::region::<_, #ir_type, _>(language.clone()) }
+                quote! { #crate_path::cfg::<_, #ir_type, _>(language.clone()) }
             }
             FormatOption::Body(BodyProjection::Body) => {
-                quote! { #crate_path::region_body::<_, #ir_type, _>(language.clone()) }
+                quote! { #crate_path::cfg_body::<_, #ir_type, _>(language.clone()) }
             }
-            _ => unreachable!("validation prevents other projections on Region fields"),
+            _ => unreachable!("validation prevents other projections on CFG fields"),
         },
         FieldCategory::Symbol => {
             quote! { #crate_path::symbol() }
@@ -269,18 +269,16 @@ pub fn print_expr<L: Layout>(
         FieldCategory::Successor => quote! {
             #prettyless_path::PrettyPrint::pretty_print(#field_ref, doc)
         },
-        FieldCategory::Region => match opt {
-            FormatOption::Default => quote! { doc.print_region(#field_ref) },
+        FieldCategory::CFG => match opt {
+            FormatOption::Default => quote! { doc.print_cfg(#field_ref) },
             FormatOption::Body(BodyProjection::Body) => quote! {
-                doc.print_region_body_only(#field_ref)
+                doc.print_cfg_body_only(#field_ref)
             },
             FormatOption::Body(_) => {
-                unreachable!(
-                    "Ports/Captures/Yields/Args projections are not valid on Region fields"
-                )
+                unreachable!("Ports/Captures/Yields/Args projections are not valid on CFG fields")
             }
             FormatOption::Name | FormatOption::Type | FormatOption::Signature(_) => {
-                unreachable!("Name/Type/Signature projections are not valid on Region fields")
+                unreachable!("Name/Type/Signature projections are not valid on CFG fields")
             }
         },
         FieldCategory::Symbol => quote! {

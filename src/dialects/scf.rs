@@ -12,7 +12,7 @@ use crate::ir::{Block, HasArguments, ResultValue, SSAValue};
     IsPure,
     IsTerminator,
     IsConstant,
-    HasRegions,
+    HasCFG,
     HasSuccessors,
 )]
 pub enum SCFInstruction {

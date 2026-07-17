@@ -42,7 +42,7 @@ type ForwardRefCreator<L> = fn(&mut BuilderStageInfo<L>, &str) -> kirin_ir::SSAV
 /// Context for emitting IR from parsed AST, tracking name mappings.
 ///
 /// The `stage` field is a `&mut BuilderStageInfo<L>` since emit is a build-time
-/// operation that needs access to builder methods (block, region, ssa, etc.).
+/// operation that needs access to builder methods (block, cfg, ssa, etc.).
 pub struct EmitContext<'a, L: Dialect> {
     pub stage: &'a mut BuilderStageInfo<L>,
     /// Scope stack for SSA name bindings. Inner scopes shadow outer ones.

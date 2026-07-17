@@ -1,6 +1,6 @@
 use crate::context::DeriveContext;
 use crate::ir::{self, StandardLayout};
-use crate::misc::{from_str, to_camel_case};
+use crate::misc::{from_str, iter_infix};
 use crate::tokens::{EnumDef, EnumVariant, Method, StructDef, StructField, TraitImpl};
 use proc_macro2::TokenStream;
 use quote::{ToTokens, format_ident, quote};
@@ -23,7 +23,8 @@ pub struct FieldIterTemplateSet {
 impl FieldIterTemplateSet {
     pub fn new(config: FieldIterConfig, default_crate_path: &str, trait_lifetime: &str) -> Self {
         let trait_method: syn::Ident = from_str(config.trait_method);
-        let iter_name_suffix = format_ident!("{}Iter", to_camel_case(trait_method.to_string()));
+        let iter_name_suffix =
+            format_ident!("{}Iter", iter_infix(config.trait_name, config.trait_method));
 
         Self {
             collection: FieldCollection {

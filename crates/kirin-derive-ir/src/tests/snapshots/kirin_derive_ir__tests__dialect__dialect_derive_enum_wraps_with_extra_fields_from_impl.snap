@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-ir/src/tests/dialect.rs
-assertion_line: 268
 expression: code
 ---
 #[automatically_derived]
@@ -244,28 +243,28 @@ impl<'a> Iterator for MixedWrapsSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for MixedWraps {
-    type Iter = MixedWrapsRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCFG<'a> for MixedWraps {
+    type Iter = MixedWrapsCFGIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         match self {
-            Self::Simple(field_0) => MixedWrapsRegionsIter::Simple(
-                <SimpleOp as ::kirin::ir::HasRegions>::regions(field_0),
-            ),
+            Self::Simple(field_0) => {
+                MixedWrapsCFGIter::Simple(<SimpleOp as ::kirin::ir::HasCFG>::cfgs(field_0))
+            }
             Self::Wrapped { inner, tag } => {
-                MixedWrapsRegionsIter::Wrapped(<InnerOp as ::kirin::ir::HasRegions>::regions(inner))
+                MixedWrapsCFGIter::Wrapped(<InnerOp as ::kirin::ir::HasCFG>::cfgs(inner))
             }
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum MixedWrapsRegionsIter<'a> {
-    Simple(<SimpleOp as ::kirin::ir::HasRegions<'a>>::Iter),
-    Wrapped(<InnerOp as ::kirin::ir::HasRegions<'a>>::Iter),
+pub enum MixedWrapsCFGIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasCFG<'a>>::Iter),
+    Wrapped(<InnerOp as ::kirin::ir::HasCFG<'a>>::Iter),
 }
 #[automatically_derived]
-impl<'a> Iterator for MixedWrapsRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for MixedWrapsCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Simple(inner) => inner.next(),
@@ -274,28 +273,28 @@ impl<'a> Iterator for MixedWrapsRegionsIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for MixedWraps {
-    type IterMut = MixedWrapsRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCFGMut<'a> for MixedWraps {
+    type IterMut = MixedWrapsCFGMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         match self {
-            Self::Simple(field_0) => MixedWrapsRegionsMutIter::Simple(
-                <SimpleOp as ::kirin::ir::HasRegionsMut>::regions_mut(field_0),
+            Self::Simple(field_0) => MixedWrapsCFGMutIter::Simple(
+                <SimpleOp as ::kirin::ir::HasCFGMut>::cfgs_mut(field_0),
             ),
-            Self::Wrapped { inner, tag } => MixedWrapsRegionsMutIter::Wrapped(
-                <InnerOp as ::kirin::ir::HasRegionsMut>::regions_mut(inner),
-            ),
+            Self::Wrapped { inner, tag } => {
+                MixedWrapsCFGMutIter::Wrapped(<InnerOp as ::kirin::ir::HasCFGMut>::cfgs_mut(inner))
+            }
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub enum MixedWrapsRegionsMutIter<'a> {
-    Simple(<SimpleOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
-    Wrapped(<InnerOp as ::kirin::ir::HasRegionsMut<'a>>::IterMut),
+pub enum MixedWrapsCFGMutIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasCFGMut<'a>>::IterMut),
+    Wrapped(<InnerOp as ::kirin::ir::HasCFGMut<'a>>::IterMut),
 }
 #[automatically_derived]
-impl<'a> Iterator for MixedWrapsRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for MixedWrapsCFGMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         match self {
             Self::Simple(inner) => inner.next(),

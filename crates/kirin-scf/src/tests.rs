@@ -1,6 +1,6 @@
 use kirin::ir::{
-    HasArguments, HasBlocks, HasRegions, HasResults, HasSuccessors, IsConstant, IsPure,
-    IsSpeculatable, IsTerminator, TestSSAValue,
+    HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant, IsPure, IsSpeculatable,
+    IsTerminator, TestSSAValue,
 };
 use kirin_test_types::UnitType;
 
@@ -90,8 +90,8 @@ fn yield_no_blocks() {
 }
 
 #[test]
-fn yield_no_regions() {
-    assert_eq!(make_yield().regions().count(), 0);
+fn yield_no_cfgs() {
+    assert_eq!(make_yield().cfgs().count(), 0);
 }
 
 // --- Clone + PartialEq for Yield ---

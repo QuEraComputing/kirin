@@ -171,43 +171,43 @@ impl<'a> Iterator for NopSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> kirin_ir::HasRegions<'a> for Nop {
-    type Iter = NopRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
-        NopRegionsIter {
-            inner: std::iter::empty::<&'a kirin_ir::Region>(),
+impl<'a> kirin_ir::HasCFG<'a> for Nop {
+    type Iter = NopCFGIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
+        NopCFGIter {
+            inner: std::iter::empty::<&'a kirin_ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct NopRegionsIter<'a> {
-    inner: std::iter::Empty<&'a kirin_ir::Region>,
+pub struct NopCFGIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for NopRegionsIter<'a> {
-    type Item = &'a kirin_ir::Region;
+impl<'a> Iterator for NopCFGIter<'a> {
+    type Item = &'a kirin_ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> kirin_ir::HasRegionsMut<'a> for Nop {
-    type IterMut = NopRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
-        NopRegionsMutIter {
-            inner: std::iter::empty::<&'a mut kirin_ir::Region>(),
+impl<'a> kirin_ir::HasCFGMut<'a> for Nop {
+    type IterMut = NopCFGMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
+        NopCFGMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct NopRegionsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut kirin_ir::Region>,
+pub struct NopCFGMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for NopRegionsMutIter<'a> {
-    type Item = &'a mut kirin_ir::Region;
+impl<'a> Iterator for NopCFGMutIter<'a> {
+    type Item = &'a mut kirin_ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

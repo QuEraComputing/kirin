@@ -37,11 +37,11 @@ impl<L: Layout> Statement<L> {
             .filter(|f| f.category() == FieldCategory::Successor)
     }
 
-    /// Iterates fields classified as [`FieldCategory::Region`].
-    pub fn regions(&self) -> impl Iterator<Item = &FieldInfo<L>> {
+    /// Iterates fields classified as [`FieldCategory::CFG`].
+    pub fn cfgs(&self) -> impl Iterator<Item = &FieldInfo<L>> {
         self.fields
             .iter()
-            .filter(|f| f.category() == FieldCategory::Region)
+            .filter(|f| f.category() == FieldCategory::CFG)
     }
 
     /// Iterates fields classified as [`FieldCategory::DiGraph`].

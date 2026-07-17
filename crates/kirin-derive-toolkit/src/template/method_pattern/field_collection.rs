@@ -20,8 +20,8 @@ pub enum FieldIterKind {
     Blocks,
     /// Successor block references.
     Successors,
-    /// Nested region fields.
-    Regions,
+    /// Nested CFG fields.
+    CFG,
     /// Directed graph body fields.
     Digraphs,
     /// Undirected graph body fields.
@@ -99,10 +99,7 @@ impl FieldCollection {
                 .successors()
                 .map(FieldAccess::from_field_info)
                 .collect(),
-            FieldIterKind::Regions => statement
-                .regions()
-                .map(FieldAccess::from_field_info)
-                .collect(),
+            FieldIterKind::CFG => statement.cfgs().map(FieldAccess::from_field_info).collect(),
             FieldIterKind::Digraphs => statement
                 .digraphs()
                 .map(FieldAccess::from_field_info)
@@ -229,7 +226,10 @@ impl MethodPattern<StandardLayout> for FieldCollection {
         let iter_name = format_ident!(
             "{}{}Iter",
             ctx.meta.name,
-            crate::misc::to_camel_case(self.trait_method.to_string()),
+            crate::misc::iter_infix(
+                crate::misc::strip_path(&self.trait_path).to_string(),
+                self.trait_method.to_string(),
+            ),
         );
         let pattern = &stmt_ctx.pattern;
         if stmt_ctx.pattern.is_empty() {
@@ -257,7 +257,10 @@ impl MethodPattern<StandardLayout> for FieldCollection {
         let iter_name = format_ident!(
             "{}{}Iter",
             ctx.meta.name,
-            crate::misc::to_camel_case(self.trait_method.to_string()),
+            crate::misc::iter_infix(
+                crate::misc::strip_path(&self.trait_path).to_string(),
+                self.trait_method.to_string(),
+            ),
         );
         let variant_name = &stmt_ctx.stmt.name;
         Ok(quote! { #iter_name::#variant_name(#iter_expr) })

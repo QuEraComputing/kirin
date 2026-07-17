@@ -1,5 +1,5 @@
 //! Snapshot tests for standalone single-trait derive macros
-//! (HasArguments, HasResults, HasRegions, HasDigraphs, HasUngraphs, IsTerminator, IsEdge).
+//! (HasArguments, HasResults, HasCFG, HasDigraphs, HasUngraphs, IsTerminator, IsEdge).
 
 use crate::generate::*;
 use kirin_test_utils::rustfmt;
@@ -46,14 +46,14 @@ fn test_standalone_has_results() {
 }
 
 #[test]
-fn test_standalone_has_regions() {
+fn test_standalone_has_cfgs() {
     let input: syn::DeriveInput = syn::parse_quote! {
         #[kirin(type = SimpleType)]
         struct Lambda {
-            body: Region,
+            body: CFG,
         }
     };
-    let tokens = generate_field_iter(&input, HAS_REGIONS).expect("Failed to generate HasRegions");
+    let tokens = generate_field_iter(&input, HAS_CFG).expect("Failed to generate HasCFG");
     insta::assert_snapshot!(rustfmt(tokens.to_string()));
 }
 

@@ -1,20 +1,18 @@
-//! Dialect-neutral region topology enumeration.
+//! Dialect-neutral CFG topology enumeration.
 //!
-//! Backward analyses need the *shape* of a region: which blocks exist
+//! Backward analyses need the *shape* of a CFG: which blocks exist
 //! (including blocks nested inside structured statements), each block's
 //! statements, the CFG successor relation, and each block's *feeders* — the
 //! statements whose rules can translate demand on that block's parameters
 //! (terminators targeting it, statements owning it). This is topology only —
 //! uses/defs/edge-argument *semantics* stay in dialect
 //! [`Interpretable`](crate::Interpretable) rules; the enumeration consumes the
-//! generic [`HasSuccessors`]/[`HasBlocks`]/[`HasRegions`] contract every
+//! generic [`HasSuccessors`]/[`HasBlocks`]/[`HasCFG`] contract every
 //! dialect derives.
 
 use std::collections::{HashMap, HashSet};
 
-use kirin_ir::{
-    Block, Dialect, HasBlocks, HasRegions, HasSuccessors, Region, StageInfo, Statement,
-};
+use kirin_ir::{Block, CFG, Dialect, HasBlocks, HasCFG, HasSuccessors, StageInfo, Statement};
 
 /// The shape of one block: its statements and CFG successors.
 #[derive(Clone, Debug)]
@@ -25,19 +23,19 @@ pub struct BlockTopology {
     /// CFG successor blocks (targets of the block's terminator).
     pub successors: Vec<Block>,
     /// `true` for blocks nested inside a statement (structured bodies),
-    /// `false` for the analyzed region's own CFG blocks.
+    /// `false` for the analyzed CFG's own top-level blocks.
     pub nested: bool,
 }
 
-/// The shape of a region: all blocks (region CFG blocks first-level and
+/// The shape of a CFG: all blocks (the CFG's own top-level blocks and
 /// structured bodies, recursively) plus the block-feeder index.
 #[derive(Clone, Debug, Default)]
-pub struct RegionTopology {
+pub struct CFGTopology {
     pub blocks: Vec<BlockTopology>,
     feeders: HashMap<Block, Vec<Statement>>,
 }
 
-impl RegionTopology {
+impl CFGTopology {
     /// The statements whose rules can translate demand on `block`'s parameters:
     /// terminators with an edge into `block`, plus statements owning `block`
     /// as a structured body.
@@ -45,21 +43,21 @@ impl RegionTopology {
         self.feeders.get(&block).map(Vec::as_slice).unwrap_or(&[])
     }
 
-    /// The analyzed region's own CFG blocks (excluding nested bodies).
+    /// The analyzed CFG's own top-level blocks (excluding nested bodies).
     pub fn cfg_blocks(&self) -> impl Iterator<Item = &BlockTopology> {
         self.blocks.iter().filter(|block| !block.nested)
     }
 }
 
-/// Enumerate the topology of `region` in the finalized `stage`.
-pub fn region_topology<L>(stage: &StageInfo<L>, region: &Region) -> RegionTopology
+/// Enumerate the topology of `cfg` in the finalized `stage`.
+pub fn cfg_topology<L>(stage: &StageInfo<L>, cfg: &CFG) -> CFGTopology
 where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasRegions<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a>,
 {
-    let mut topology = RegionTopology::default();
+    let mut topology = CFGTopology::default();
     let mut visited = HashSet::new();
-    for block in region.blocks(stage) {
+    for block in cfg.blocks(stage) {
         collect_block(stage, block, false, &mut topology, &mut visited);
     }
     topology
@@ -69,11 +67,11 @@ fn collect_block<L>(
     stage: &StageInfo<L>,
     block: Block,
     nested: bool,
-    topology: &mut RegionTopology,
+    topology: &mut CFGTopology,
     visited: &mut HashSet<Block>,
 ) where
     L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasRegions<'a>,
+    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a>,
 {
     if !visited.insert(block) {
         return;
@@ -105,13 +103,13 @@ fn collect_block<L>(
     for &stmt in &stmts {
         let definition = stmt.definition(stage);
         let owned_blocks: Vec<Block> = definition.blocks().copied().collect();
-        let owned_regions: Vec<Region> = definition.regions().copied().collect();
+        let owned_cfgs: Vec<CFG> = definition.cfgs().copied().collect();
         for owned in owned_blocks {
             topology.feeders.entry(owned).or_default().push(stmt);
             collect_block(stage, owned, true, topology, visited);
         }
-        for owned_region in owned_regions {
-            for owned in owned_region.blocks(stage) {
+        for owned_cfg in owned_cfgs {
+            for owned in owned_cfg.blocks(stage) {
                 topology.feeders.entry(owned).or_default().push(stmt);
                 collect_block(stage, owned, true, topology, visited);
             }

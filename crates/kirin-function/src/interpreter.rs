@@ -1,4 +1,4 @@
-use kirin::prelude::{CompileTimeValue, HasBottom, HasRegionBody, Product, SSAValue};
+use kirin::prelude::{CompileTimeValue, HasBottom, HasCFGBody, Product, SSAValue};
 use kirin_interpreter::dialect::{
     CallEffect, Callee, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
     ForwardEval, FunctionBody, FunctionEntry, Interp, Interpretable, InterpreterError,
@@ -99,7 +99,7 @@ where
         args: Product<I::Value>,
         _interp: &mut I,
     ) -> Result<FunctionBody<I::Value>, I::Error> {
-        Ok(FunctionBody::new(*self.region()).args(args))
+        Ok(FunctionBody::new(*self.cfg()).args(args))
     }
 }
 
@@ -113,7 +113,7 @@ where
         args: Product<I::Value>,
         _interp: &mut I,
     ) -> Result<FunctionBody<I::Value>, I::Error> {
-        Ok(FunctionBody::new(*self.region()).args(args))
+        Ok(FunctionBody::new(*self.cfg()).args(args))
     }
 }
 

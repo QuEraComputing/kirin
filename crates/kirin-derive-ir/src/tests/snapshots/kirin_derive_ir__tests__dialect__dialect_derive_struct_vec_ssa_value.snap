@@ -177,45 +177,45 @@ impl<'a> Iterator for CallOpSuccessorsMutIter<'a> {
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegions<'a> for CallOp {
-    type Iter = CallOpRegionsIter<'a>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> ::kirin::ir::HasCFG<'a> for CallOp {
+    type Iter = CallOpCFGIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
         let Self { args, result } = self;
-        CallOpRegionsIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::Region>(),
+        CallOpCFGIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct CallOpRegionsIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::Region>,
+pub struct CallOpCFGIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for CallOpRegionsIter<'a> {
-    type Item = &'a ::kirin::ir::Region;
+impl<'a> Iterator for CallOpCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasRegionsMut<'a> for CallOp {
-    type IterMut = CallOpRegionsMutIter<'a>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> ::kirin::ir::HasCFGMut<'a> for CallOp {
+    type IterMut = CallOpCFGMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         let Self { args, result } = self;
-        CallOpRegionsMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::Region>(),
+        CallOpCFGMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::CFG>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct CallOpRegionsMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::Region>,
+pub struct CallOpCFGMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for CallOpRegionsMutIter<'a> {
-    type Item = &'a mut ::kirin::ir::Region;
+impl<'a> Iterator for CallOpCFGMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }

@@ -124,16 +124,16 @@ impl<'a> HasSuccessorsMut<'a> for BuilderDialect {
     }
 }
 
-impl<'a> HasRegions<'a> for BuilderDialect {
-    type Iter = std::iter::Empty<&'a Region>;
-    fn regions(&'a self) -> Self::Iter {
+impl<'a> HasCFG<'a> for BuilderDialect {
+    type Iter = std::iter::Empty<&'a CFG>;
+    fn cfgs(&'a self) -> Self::Iter {
         std::iter::empty()
     }
 }
 
-impl<'a> HasRegionsMut<'a> for BuilderDialect {
-    type IterMut = std::iter::Empty<&'a mut Region>;
-    fn regions_mut(&'a mut self) -> Self::IterMut {
+impl<'a> HasCFGMut<'a> for BuilderDialect {
+    type IterMut = std::iter::Empty<&'a mut CFG>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
         std::iter::empty()
     }
 }

@@ -44,7 +44,7 @@ fn test_block() {
         .terminator(ret)
         .new();
 
-    let body = stage.region().add_block(block_a).add_block(block_b).new();
+    let body = stage.cfg().add_block(block_a).add_block(block_b).new();
     let fdef = SimpleLanguage::op_function(&mut stage, body);
     let f = stage
         .specialize()

@@ -21,7 +21,7 @@ fn test_pipeline_function_print() {
         let a = SimpleLanguage::op_constant(ctx0, 42i64);
         let ret = SimpleLanguage::op_return(ctx0, a.result);
         let block = ctx0.block().stmt(a).terminator(ret).new();
-        let body = ctx0.region().add_block(block).new();
+        let body = ctx0.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx0, body);
         ctx0.specialize().staged_func(sf0).body(fdef).new().unwrap();
     });
@@ -46,7 +46,7 @@ fn test_pipeline_function_print() {
         let c = SimpleLanguage::op_add(ctx1, a.result, b.result);
         let ret = SimpleLanguage::op_return(ctx1, c.result);
         let block = ctx1.block().stmt(a).stmt(b).stmt(c).terminator(ret).new();
-        let body = ctx1.region().add_block(block).new();
+        let body = ctx1.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx1, body);
         ctx1.specialize().staged_func(sf1).body(fdef).new().unwrap();
     });
@@ -78,7 +78,7 @@ fn test_pipeline_unnamed_stage() {
         let a = SimpleLanguage::op_constant(ctx, 7i64);
         let ret = SimpleLanguage::op_return(ctx, a.result);
         let block = ctx.block().stmt(a).terminator(ret).new();
-        let body = ctx.region().add_block(block).new();
+        let body = ctx.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
         ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
     });

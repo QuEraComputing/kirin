@@ -39,8 +39,8 @@ pub enum InterpreterError {
     },
     #[error("missing call target {0:?}")]
     MissingCallTarget(Symbol),
-    #[error("region has no entry block")]
-    EmptyRegion,
+    #[error("cfg has no entry block")]
+    EmptyCFG,
     #[error("block {0:?} fell through without a terminator effect")]
     BlockFellThrough(Block),
     #[error("function body fell through without returning")]

@@ -11,7 +11,7 @@ use kirin_test_utils::roundtrip;
 enum ConstantLanguage {
     #[chumsky(format = "fn {:name}{sig} {body}")]
     Function {
-        body: Region,
+        body: CFG,
         sig: Signature<ArithType>,
     },
     #[kirin(constant, pure)]

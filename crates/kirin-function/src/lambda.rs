@@ -11,12 +11,12 @@ use kirin::prelude::*;
 /// a `sig: Signature<T>` field. The reasons are:
 ///
 /// - **Parameters are implicit in block arguments.** A lambda's parameter types
-///   are defined by the block arguments of its `body` region's entry block.
+///   are defined by the block arguments of its `body` CFG's entry block.
 ///   Duplicating them in a `Signature` would create a consistency hazard.
 ///
 /// - **Return type is already present.** The `res: ResultValue` field carries
 ///   the lambda's return type, which is the only part of the signature that
-///   cannot be recovered from the body region alone.
+///   cannot be recovered from the body cfg alone.
 ///
 /// - **Captures are not part of the function type.** In PL theory, a closure's
 ///   *function type* describes its parameter and return types, not its captured
@@ -36,14 +36,14 @@ use kirin::prelude::*;
 pub struct Lambda<T: CompileTimeValue> {
     name: Symbol,
     captures: Vec<SSAValue>,
-    pub(crate) body: Region,
+    pub(crate) body: CFG,
     res: ResultValue,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
 }
 
-impl<T: CompileTimeValue> HasRegionBody for Lambda<T> {
-    fn region(&self) -> &Region {
+impl<T: CompileTimeValue> HasCFGBody for Lambda<T> {
+    fn cfg(&self) -> &CFG {
         &self.body
     }
 }

@@ -2,8 +2,8 @@ use std::collections::BTreeSet;
 
 use chumsky::prelude::*;
 use kirin_ir::{
-    Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Pipeline,
-    Placeholder, Region, Signature, StageInfo, TypeLattice,
+    CFG, Function, FunctionInfo, GlobalSymbol, HasBottom, HasTop, InternTable, Lattice, Pipeline,
+    Placeholder, Signature, StageInfo, TypeLattice,
 };
 use kirin_prettyless::PrintExt;
 
@@ -89,7 +89,7 @@ trivial_type_lattice!(I32Type, "i32", just(Token::Identifier("i32")));
 #[kirin(builders, type = UnitType, crate = kirin_ir)]
 #[chumsky(crate = crate, format = "fn {:name}{sig} {body}")]
 struct FunctionBody {
-    body: Region,
+    body: CFG,
     sig: Signature<UnitType>,
 }
 
@@ -97,7 +97,7 @@ struct FunctionBody {
 #[kirin(builders, type = I32Type, crate = kirin_ir)]
 #[chumsky(crate = crate, format = "fn {:name}{sig} {body}")]
 struct LowerBody {
-    body: Region,
+    body: CFG,
     sig: Signature<I32Type>,
 }
 
@@ -286,8 +286,8 @@ fn test_pipeline_roundtrip_print_parse_print() {
 
     pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
         let block = b.block().new();
-        let region = b.region().add_block(block).new();
-        let body = FunctionBody::new(b, region, Signature::new(vec![], UnitType, ()));
+        let cfg = b.cfg().add_block(block).new();
+        let body = FunctionBody::new(b, cfg, Signature::new(vec![], UnitType, ()));
         b.specialize()
             .staged_func(staged_function)
             .signature(unit_sig())

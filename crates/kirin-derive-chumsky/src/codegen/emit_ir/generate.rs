@@ -117,7 +117,7 @@ impl GenerateEmitIR {
             matches!(
                 field.category(),
                 FieldCategory::Block
-                    | FieldCategory::Region
+                    | FieldCategory::CFG
                     | FieldCategory::DiGraph
                     | FieldCategory::UnGraph
             )
@@ -132,7 +132,7 @@ impl GenerateEmitIR {
             matches!(
                 field.category(),
                 FieldCategory::Block
-                    | FieldCategory::Region
+                    | FieldCategory::CFG
                     | FieldCategory::DiGraph
                     | FieldCategory::UnGraph
             )

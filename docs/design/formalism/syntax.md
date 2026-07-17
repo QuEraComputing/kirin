@@ -7,8 +7,8 @@ just enough formal shorthand to compose with Parts II-IV.
 
 ## Reading Recipe
 
-- **Formal read:** Treat this as the grammar-level domain of `s` (statement), owners (`Region`/`Block`), and SSA carriers consumed by the judgment.
-- **API read:** Verify mappings in `crates/kirin-ir/src/{pipeline.rs,stage/info.rs,language.rs,node/{function/*,region.rs,block.rs,stmt.rs,ssa.rs},product.rs}` and stage/language composition in `example/toy-lang/src/{language.rs,stage.rs}`.
+- **Formal read:** Treat this as the grammar-level domain of `s` (statement), owners (`CFG`/`Block`), and SSA carriers consumed by the judgment.
+- **API read:** Verify mappings in `crates/kirin-ir/src/{pipeline.rs,stage/info.rs,language.rs,node/{function/*,cfg.rs,block.rs,stmt.rs,ssa.rs},product.rs}` and stage/language composition in `example/toy-lang/src/{language.rs,stage.rs}`.
 
 The formal names below map directly to concrete Rust IR/runtime types.
 
@@ -20,7 +20,7 @@ The formal names below map directly to concrete Rust IR/runtime types.
 | `Function` | `FunctionInfo` / `Function` | [`crates/kirin-ir/src/node/function/generic.rs`](../../../crates/kirin-ir/src/node/function/generic.rs) |
 | `StagedFunction` | `StagedFunctionInfo` / `StagedFunction` | [`crates/kirin-ir/src/node/function/staged.rs`](../../../crates/kirin-ir/src/node/function/staged.rs) |
 | `SpecializedFunction` | `SpecializedFunctionInfo` / `SpecializedFunction` | [`crates/kirin-ir/src/node/function/specialized.rs`](../../../crates/kirin-ir/src/node/function/specialized.rs) |
-| `Region` | `RegionInfo` / `Region` | [`crates/kirin-ir/src/node/region.rs`](../../../crates/kirin-ir/src/node/region.rs) |
+| `CFG` | `CFGInfo` / `CFG` | [`crates/kirin-ir/src/node/cfg.rs`](../../../crates/kirin-ir/src/node/cfg.rs) |
 | `Block` | `BlockInfo` / `Block` / `Successor` | [`crates/kirin-ir/src/node/block.rs`](../../../crates/kirin-ir/src/node/block.rs) |
 | `Statement` | `StatementInfo` / `Statement` | [`crates/kirin-ir/src/node/stmt.rs`](../../../crates/kirin-ir/src/node/stmt.rs) |
 | `SSAValue` | `SSAValue`, `ResultValue`, `BlockArgument` | [`crates/kirin-ir/src/node/ssa.rs`](../../../crates/kirin-ir/src/node/ssa.rs) |
@@ -34,7 +34,7 @@ Kirin syntax for interpreter purposes is SSA IR over staged pipelines:
 - `StageInfo<L>` is per-stage storage for one language `L`.
 - `L: Dialect` is the stage language (often an enum wrapping multiple dialects).
 - `Function -> StagedFunction -> SpecializedFunction` is the callable hierarchy.
-- `Region -> Block -> Statement` is executable structure.
+- `CFG -> Block -> Statement` is executable structure.
 - `SSAValue` connects operands/results/block arguments across statements.
 
 The interpreter executes this graph-like SSA structure, not an expression tree.
@@ -50,8 +50,8 @@ Function       ::= FunctionInfo + staged variants
 StagedFunction ::= stage-specific callable variant
 Specialized    ::= concrete specialization with body Statement
 
-Statement      ::= dialect definition + operands + results + nested blocks/regions/successors
-Region         ::= Block*
+Statement      ::= dialect definition + operands + results + nested blocks/cfgs/successors
+CFG            ::= Block*
 Block          ::= BlockArgument* ; Statement* ; optional terminator cache
 SSAValue       ::= ResultValue | BlockArgument | Port
 ```

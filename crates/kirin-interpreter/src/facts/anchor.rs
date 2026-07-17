@@ -71,9 +71,9 @@ impl LatticeAnchor for DenseAnchor {}
 /// An anchor or owner qualified by the scope/context it belongs to.
 ///
 /// Framework-level summary keys are never bare anchors: the same [`SSAValue`]
-/// or [`Block`] under two scopes (two stages, two analyzed regions, two call
-/// contexts) is two distinct facts, so keys carry their scope. Region-level
-/// analyses use `(CompileStage, Region)` as the scope; interprocedural
+/// or [`Block`] under two scopes (two stages, two analyzed cfgs, two call
+/// contexts) is two distinct facts, so keys carry their scope. CFG-level
+/// analyses use `(CompileStage, CFG)` as the scope; interprocedural
 /// analyses generalize `K` to a call-context key (the backward analogue of the
 /// forward engine's context-qualified value keys).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]

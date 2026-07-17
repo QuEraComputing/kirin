@@ -2,11 +2,11 @@ use std::convert::Infallible;
 
 use super::*;
 use crate::{
-    Block, CompileStage, DiGraph, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut, HasBlocks,
-    HasBlocksMut, HasDigraphs, HasDigraphsMut, HasRegions, HasRegionsMut, HasResults,
+    Block, CFG, CompileStage, DiGraph, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut,
+    HasBlocks, HasBlocksMut, HasCFG, HasCFGMut, HasDigraphs, HasDigraphsMut, HasResults,
     HasResultsMut, HasStageInfo, HasSuccessors, HasSuccessorsMut, HasUngraphs, HasUngraphsMut, Id,
-    IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, Pipeline, Region, ResultValue,
-    SSAValue, StageInfo, StageMeta, StagedNamePolicy, Successor, UnGraph,
+    IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, Pipeline, ResultValue, SSAValue,
+    StageInfo, StageMeta, StagedNamePolicy, Successor, UnGraph,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -89,18 +89,18 @@ macro_rules! impl_empty_dialect_traits {
             }
         }
 
-        impl<'a> HasRegions<'a> for $dialect {
-            type Iter = std::iter::Empty<&'a Region>;
+        impl<'a> HasCFG<'a> for $dialect {
+            type Iter = std::iter::Empty<&'a CFG>;
 
-            fn regions(&'a self) -> Self::Iter {
+            fn cfgs(&'a self) -> Self::Iter {
                 std::iter::empty()
             }
         }
 
-        impl<'a> HasRegionsMut<'a> for $dialect {
-            type IterMut = std::iter::Empty<&'a mut Region>;
+        impl<'a> HasCFGMut<'a> for $dialect {
+            type IterMut = std::iter::Empty<&'a mut CFG>;
 
-            fn regions_mut(&'a mut self) -> Self::IterMut {
+            fn cfgs_mut(&'a mut self) -> Self::IterMut {
                 std::iter::empty()
             }
         }
