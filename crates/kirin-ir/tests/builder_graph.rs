@@ -35,6 +35,39 @@ fn digraph_builder_two_node_dag() {
 }
 
 #[test]
+fn finalize_indexes_digraph_yields_as_uses() {
+    let mut stage = new_stage();
+
+    // s0 produces %r; the graph yields %r. No statement reads %r, so its only
+    // use is the boundary yield — invisible to an operand-only scan.
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let result_ssa = stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Result(s0, 0))
+        .new();
+
+    let dg = stage
+        .digraph()
+        .node(s0)
+        .yield_value(result_ssa)
+        .name("yielder")
+        .new();
+
+    let stage = stage.finalize().unwrap();
+
+    let uses = result_ssa.get_info(&stage).unwrap().uses();
+    assert_eq!(uses.len(), 1, "%r is used only by the graph yield");
+    assert_eq!(
+        uses[0],
+        Use::DiGraphYield {
+            graph: dg,
+            index: 0
+        }
+    );
+}
+
+#[test]
 fn digraph_builder_port_and_capture_creation() {
     let mut stage = new_stage();
 

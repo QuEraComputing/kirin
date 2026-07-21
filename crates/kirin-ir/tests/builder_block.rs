@@ -120,21 +120,24 @@ fn finalize_populates_def_use_index() {
 
     let uses0 = real_arg0.get_info(&stage).unwrap().uses();
     assert_eq!(uses0.len(), 2, "arg0 is read by two statements");
-    assert!(
-        uses0
-            .iter()
-            .any(|u| u.stmt() == add_stmt && u.operand_index() == 0)
-    );
-    assert!(
-        uses0
-            .iter()
-            .any(|u| u.stmt() == use_stmt && u.operand_index() == 0)
-    );
+    assert!(uses0.contains(&Use::StatementOperand {
+        stmt: add_stmt,
+        index: 0
+    }));
+    assert!(uses0.contains(&Use::StatementOperand {
+        stmt: use_stmt,
+        index: 0
+    }));
 
     let uses1 = real_arg1.get_info(&stage).unwrap().uses();
     assert_eq!(uses1.len(), 1, "arg1 is read only by the add");
-    assert_eq!(uses1[0].stmt(), add_stmt);
-    assert_eq!(uses1[0].operand_index(), 1);
+    assert_eq!(
+        uses1[0],
+        Use::StatementOperand {
+            stmt: add_stmt,
+            index: 1
+        }
+    );
 }
 
 #[test]
