@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::arena::Arena;
-use crate::node::ssa::SSAInfo;
+use crate::arena::{Arena, Id};
+use crate::node::ssa::{SSAInfo, Use};
 use crate::{BuilderStageInfo, Dialect, node::*};
 
 use super::arenas::Arenas;
@@ -115,6 +115,48 @@ impl<L: Dialect> StageInfo<L> {
     /// deleted (tombstoned) items are `None`.
     pub fn ssa_arena(&self) -> &Arena<SSAValue, Option<SSAInfo<L>>> {
         &self.ssas
+    }
+
+    /// Rebuild the def-use index ([`SSAInfo::uses`](crate::SSAInfo)) from the
+    /// authoritative operand storage.
+    ///
+    /// Clears every live value's use list, then scans each live statement's
+    /// operands (in [`HasArguments`](crate::HasArguments) order) and records
+    /// one [`Use`](crate::Use) per operand slot on the value it reads. The
+    /// statement operand slots are the ground truth; this list is a derived
+    /// reverse index over them.
+    ///
+    /// Idempotent — safe to re-run. Called at
+    /// [`finalize`](crate::BuilderStageInfo::finalize) so finalized IR ships a
+    /// populated index; a mutation layer must call it (or maintain the index
+    /// incrementally) after changing operands.
+    ///
+    /// Only statement operands are indexed. SSA slots stored on graph bodies
+    /// (`DiGraph` yields, edge/capture ports) are not yet represented by
+    /// [`Use`](crate::Use) and are excluded.
+    pub fn rebuild_use_index(&mut self) {
+        let StageInfo { nodes, ssas } = self;
+
+        for item in ssas.iter_mut() {
+            if let Some(info) = (**item).as_mut() {
+                info.uses_mut().clear();
+            }
+        }
+
+        for (index, item) in nodes.statements.items.iter().enumerate() {
+            if item.deleted() {
+                continue;
+            }
+            let stmt = Statement(Id(index));
+            let operands: Vec<SSAValue> = item.data.definition.arguments().copied().collect();
+            for (operand_index, operand) in operands.into_iter().enumerate() {
+                if let Some(slot) = ssas.get_mut(operand)
+                    && let Some(info) = (**slot).as_mut()
+                {
+                    info.uses_mut().push(Use::new(stmt, operand_index));
+                }
+            }
+        }
     }
 
     /// Temporarily convert to a [`BuilderStageInfo`] for construction, then

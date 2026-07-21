@@ -238,10 +238,38 @@ impl<L: Dialect> From<SSAInfo<L>> for BuilderSSAInfo<L> {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
+/// One def-use edge: an operand slot of `stmt` that reads an SSA value.
+///
+/// Stored in [`SSAInfo::uses`] as the reverse index of the authoritative
+/// operand storage inside each statement's dialect definition. Populated by
+/// [`StageInfo::rebuild_use_index`](crate::StageInfo::rebuild_use_index) at
+/// finalization; a mutation layer (the rewriter) must keep it in sync with
+/// every operand change.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Use {
     stmt: Statement,
     operand_index: usize,
+}
+
+impl Use {
+    /// A use at operand slot `operand_index` (in `HasArguments` order) of `stmt`.
+    pub fn new(stmt: Statement, operand_index: usize) -> Self {
+        Self {
+            stmt,
+            operand_index,
+        }
+    }
+
+    /// The statement whose operand slot reads the value.
+    pub fn stmt(&self) -> Statement {
+        self.stmt
+    }
+
+    /// The operand index within the statement, in `HasArguments` order.
+    pub fn operand_index(&self) -> usize {
+        self.operand_index
+    }
 }
 
 /// A lookup key for builder placeholders — resolved at build time to the real SSA value.
