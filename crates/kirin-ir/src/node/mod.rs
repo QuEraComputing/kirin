@@ -22,7 +22,7 @@ pub use linked_list::{LinkedList, LinkedListNode};
 pub use port::{Port, PortParent};
 pub use ssa::{
     BlockArgument, BuilderKey, BuilderSSAInfo, BuilderSSAKind, DeletedSSAValue, ResolutionInfo,
-    ResultValue, SSAInfo, SSAKind, SSAValue, TestSSAValue,
+    ResultValue, SSAInfo, SSAKind, SSAValue, TestSSAValue, Use,
 };
 pub use stmt::{Statement, StatementInfo, StatementParent};
 pub use symbol::{GlobalSymbol, Symbol};

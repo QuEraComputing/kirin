@@ -1,7 +1,7 @@
 use std::ops::{Deref, DerefMut};
 
-use crate::arena::Arena;
-use crate::node::ssa::SSAInfo;
+use crate::arena::{Arena, Id};
+use crate::node::ssa::{SSAInfo, Use};
 use crate::{BuilderStageInfo, Dialect, node::*};
 
 use super::arenas::Arenas;
@@ -115,6 +115,68 @@ impl<L: Dialect> StageInfo<L> {
     /// deleted (tombstoned) items are `None`.
     pub fn ssa_arena(&self) -> &Arena<SSAValue, Option<SSAInfo<L>>> {
         &self.ssas
+    }
+
+    /// Rebuild the def-use index ([`SSAInfo::uses`](crate::SSAInfo)) from the
+    /// authoritative storage.
+    ///
+    /// Clears every live value's use list, then records one [`Use`](crate::Use)
+    /// per position that reads a value:
+    ///
+    /// - each live statement's operands (in [`HasArguments`](crate::HasArguments)
+    ///   order) → [`Use::StatementOperand`](crate::Use), and
+    /// - each live `DiGraph` body's yields (in yield order) →
+    ///   [`Use::DiGraphYield`](crate::Use). A yield is a boundary export with no
+    ///   backing statement, so it would otherwise be invisible to the operand
+    ///   scan.
+    ///
+    /// The operand and yield slots are the ground truth; this list is a derived
+    /// reverse index over them. `UnGraph` contributes nothing: its edges are
+    /// statements whose operands are already covered above; graph ports and
+    /// block arguments are definitions, not uses.
+    ///
+    /// Idempotent — safe to re-run. Called at
+    /// [`finalize`](crate::BuilderStageInfo::finalize) so finalized IR ships a
+    /// populated index; a mutation layer must call it (or maintain the index
+    /// incrementally) after changing operands or yields.
+    pub fn rebuild_use_index(&mut self) {
+        let StageInfo { nodes, ssas } = self;
+
+        for item in ssas.iter_mut() {
+            if let Some(info) = (**item).as_mut() {
+                info.uses_mut().clear();
+            }
+        }
+
+        for (raw, item) in nodes.statements.items.iter().enumerate() {
+            if item.deleted() {
+                continue;
+            }
+            let stmt = Statement(Id(raw));
+            let operands: Vec<SSAValue> = item.data.definition.arguments().copied().collect();
+            for (index, operand) in operands.into_iter().enumerate() {
+                if let Some(slot) = ssas.get_mut(operand)
+                    && let Some(info) = (**slot).as_mut()
+                {
+                    info.uses_mut().push(Use::StatementOperand { stmt, index });
+                }
+            }
+        }
+
+        for (raw, item) in nodes.digraphs.items.iter().enumerate() {
+            if item.deleted() {
+                continue;
+            }
+            let graph = DiGraph::from(Id(raw));
+            let yields: Vec<SSAValue> = item.data.yields().to_vec();
+            for (index, yielded) in yields.into_iter().enumerate() {
+                if let Some(slot) = ssas.get_mut(yielded)
+                    && let Some(info) = (**slot).as_mut()
+                {
+                    info.uses_mut().push(Use::DiGraphYield { graph, index });
+                }
+            }
+        }
     }
 
     /// Temporarily convert to a [`BuilderStageInfo`] for construction, then

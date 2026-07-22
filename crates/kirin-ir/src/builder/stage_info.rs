@@ -236,10 +236,12 @@ impl<L: Dialect> BuilderStageInfo<L> {
             },
             |_info| None,
         );
-        Ok(StageInfo {
+        let mut stage = StageInfo {
             nodes: self.nodes,
             ssas,
-        })
+        };
+        stage.rebuild_use_index();
+        Ok(stage)
     }
 
     /// Convert to [`StageInfo`] without validation.
@@ -279,10 +281,12 @@ impl<L: Dialect> BuilderStageInfo<L> {
             // Deleted items become None tombstones — safe, no zeroed memory.
             |_info| None,
         );
-        StageInfo {
+        let mut stage = StageInfo {
             nodes: self.nodes,
             ssas,
-        }
+        };
+        stage.rebuild_use_index();
+        stage
     }
 }
 

@@ -89,6 +89,58 @@ fn block_builder_substitutes_builder_block_arguments() {
 }
 
 #[test]
+fn finalize_populates_def_use_index() {
+    let mut stage = new_stage();
+
+    let arg0 = stage.block_argument().index(0);
+    let arg1 = stage.block_argument().index(1);
+
+    // arg0 is read twice (add operand 0, use operand 0); arg1 once (add operand 1).
+    let add_stmt = stage
+        .statement()
+        .definition(BuilderDialect::Add(arg0, arg1))
+        .new();
+    let use_stmt = stage
+        .statement()
+        .definition(BuilderDialect::Use(arg0))
+        .new();
+
+    let block = stage
+        .block()
+        .argument(TestType::I32)
+        .argument(TestType::I64)
+        .stmt(add_stmt)
+        .stmt(use_stmt)
+        .new();
+
+    let stage = stage.finalize().unwrap();
+    let block_info = block.expect_info(&stage);
+    let real_arg0: SSAValue = block_info.arguments[0].into();
+    let real_arg1: SSAValue = block_info.arguments[1].into();
+
+    let uses0 = real_arg0.get_info(&stage).unwrap().uses();
+    assert_eq!(uses0.len(), 2, "arg0 is read by two statements");
+    assert!(uses0.contains(&Use::StatementOperand {
+        stmt: add_stmt,
+        index: 0
+    }));
+    assert!(uses0.contains(&Use::StatementOperand {
+        stmt: use_stmt,
+        index: 0
+    }));
+
+    let uses1 = real_arg1.get_info(&stage).unwrap().uses();
+    assert_eq!(uses1.len(), 1, "arg1 is read only by the add");
+    assert_eq!(
+        uses1[0],
+        Use::StatementOperand {
+            stmt: add_stmt,
+            index: 1
+        }
+    );
+}
+
+#[test]
 #[should_panic(expected = "is not a terminator")]
 fn block_builder_terminator_rejects_non_terminator() {
     let mut stage = new_stage();

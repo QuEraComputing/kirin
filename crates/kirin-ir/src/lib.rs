@@ -37,7 +37,7 @@ pub use node::{
     GraphInfo, LinkedList, LinkedListNode, Port, PortParent, ResolutionInfo, ResultValue, SSAInfo,
     SSAKind, SSAValue, SpecializedFunction, SpecializedFunctionInfo, StagedFunction,
     StagedFunctionInfo, StagedNamePolicy, Statement, StatementInfo, StatementParent, Successor,
-    Symbol, TestSSAValue, UnGraph, UnGraphExtra, UnGraphInfo, UniqueLiveSpecializationError,
+    Symbol, TestSSAValue, UnGraph, UnGraphExtra, UnGraphInfo, UniqueLiveSpecializationError, Use,
 };
 pub use pipeline::Pipeline;
 pub use product::{HasProduct, Product};
