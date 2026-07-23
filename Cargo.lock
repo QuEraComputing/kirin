@@ -950,6 +950,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-rewrite"
+version = "0.1.0"
+dependencies = [
+ "kirin-ir",
+ "kirin-wildcard",
+]
+
+[[package]]
 name = "kirin-scf"
 version = "0.1.0"
 dependencies = [
@@ -1011,6 +1019,13 @@ dependencies = [
  "kirin-test-types",
  "smallvec",
  "thiserror 2.0.18",
+]
+
+[[package]]
+name = "kirin-wildcard"
+version = "0.1.0"
+dependencies = [
+ "kirin-ir",
 ]
 
 [[package]]

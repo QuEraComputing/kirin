@@ -9,6 +9,7 @@ mod node;
 mod pipeline;
 mod product;
 mod project;
+mod rewrite;
 mod signature;
 mod stage;
 
@@ -42,6 +43,7 @@ pub use node::{
 pub use pipeline::Pipeline;
 pub use product::{HasProduct, Product};
 pub use project::{Project, ProjectError, TryProject, TryProjectTo};
+pub use rewrite::{MutationEvent, RewriteError, Rewriter};
 pub use signature::{
     ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
