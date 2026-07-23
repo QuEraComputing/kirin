@@ -1,0 +1,8 @@
+[package]
+name = "kirin-rewrite"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+kirin-ir = { workspace = true }
+kirin-wildcard = { workspace = true }
