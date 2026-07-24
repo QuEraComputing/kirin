@@ -298,6 +298,12 @@ Concrete analyses may integrate through registered keys or traits. Do not make
 | **mutation event** | A structured summary of an edit, such as `ErasedStatement`, `ReplacedUses`, or `ChangedCfg`. |
 | **tombstone** | A deleted arena slot retained until a later compaction pass. |
 | **IdMap** | The old-id to new-id map returned by arena compaction/GC. |
+| **Use** | An element of the def-use index (`SSAInfo::uses`): `StatementOperand { stmt, index }` or `DiGraphYield { graph, index }`. |
+| **`WildcardOp`** | The pattern-arena producer ops realizing holes under Option A: `Any` (prints `%_`) and `Capture` (prints `%x`). |
+| **`RewriteDialect`** | The generated per-dialect rewrite-facing view (Gap 2): `kind()` for root-op indexing, `match_view()` for typed structural comparison, `instantiate()` to build an op from a template. |
+| **`Kind`** | A fieldless mirror of an operation's variant; equality is id-independent, so it keys the root-op index (`HashMap<Kind, _>`). |
+| **`NativeRule`** | An executable Rust rule (metadata + checked mutation through `Rewriter`) for transformations not expressible as declarative data; a permanent escape hatch, not scaffolding. |
+| **`RuleSet`** | An explicitly assembled, deterministically ordered collection of declarative and native rules available to one driver run. |
 
 ---
 
@@ -805,6 +811,7 @@ The `Rewriter` should record events such as:
 pub enum MutationEvent {
     InsertedStatement { stmt: Statement },
     ErasedStatement { stmt: Statement },
+    ReplacedStatement { stmt: Statement },
     ReplacedUses { old: SSAValue, new: SSAValue },
     ChangedOperands { stmt: Statement },
     ChangedAttributes { stmt: Statement },
@@ -1099,8 +1106,9 @@ to inventory all semantic SSA reference positions and separately list the
 derived metadata that each mutation must synchronize. The reverse
 `SSAValue -> uses` index (`SSAInfo::uses`) records statement operands and
 `DiGraph` yields. `StageInfo::finalize` populates it through
-`rebuild_use_index`, and the current `Rewriter::set_operand` /
-`replace_all_uses` slice maintains it incrementally.
+`rebuild_use_index`, and every current `Rewriter` edit (`set_operand`,
+`replace_all_uses`, `erase_statement`, `insert_before`/`insert_after`,
+`replace_statement`) maintains it incrementally.
 
 The index is derived metadata over authoritative statement/yield slots, not a
 substitute for them. A verifier must be able to recompute the index because raw
@@ -1631,7 +1639,9 @@ this first-draft module layout.
 
 Owns:
 
-- left-hand-side pattern IR;
+- left-hand-side [pattern IR](#wildcard-and-pattern-dialect) (`WildcardOp`
+  producers over ordinary dialect ops — the Option A model, see
+  [Gap 1](#gap-1--pattern-representation--resolved-option-a));
 - an ordered replacement action template;
 - root-op metadata.
 
@@ -1679,6 +1689,13 @@ pub struct Match {
     pub bindings: Bindings,
 }
 ```
+
+The matcher inspects each candidate through its `RewriteDialect` view — `kind()`
+for root-op indexing, `match_view()` for typed operand/result/attribute
+comparison — and builds replacements through `instantiate()`. That contract is
+the resolution of
+[Gap 2](#gap-2--rewrite-facing-matching-contract--resolved-dedicated-derive)
+(illustrative types in companion §1).
 
 ### `Bindings`
 
