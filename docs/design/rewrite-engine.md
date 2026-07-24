@@ -1126,49 +1126,56 @@ The verifier must recompute uses from the authoritative slots and check that:
 
 ---
 
-## Levels of IR Validity
+## IR Validity Invariants
 
-"Valid IR" is not one property; it is a ladder from cheap local invariants to
-global and semantic ones. This distinction drives the whole `Rewriter` contract:
-the engine assumes the IR is valid on entry and only has to prove *this edit
-preserves each level*. For the lower rungs that is local bookkeeping; for the
-upper rungs it is a global query, which is exactly why some edits are deferred.
+"Valid IR" is not one property; it is a set of invariants ordered from cheap
+local bookkeeping to global structure and semantics. This drives the whole
+`Rewriter` contract: the engine assumes every invariant holds on entry and only
+has to prove *this edit preserves each one*. For the lower invariants that is
+local bookkeeping; for the upper ones it is a global query, which is exactly why
+some edits are deferred. Each invariant has a tag (I1–I7) used throughout the
+`Rewriter` API section. (These are distinct from Diagram A's crate *layers* and
+the Pattern-Scope *levels* below — different ladders that happen to share
+numbering.)
 
-| Level | Invariant | Scope | Maintained on each edit? |
+| Invariant | Property | Scope | Maintained on each edit? |
 |---|---|---|---|
-| **L1** Referential | every referenced id resolves to a live (non-tombstoned) slot | local | ✅ liveness checks + tombstones |
-| **L2** Def-use index | `SSAInfo::uses` matches the authoritative operand/yield slots | local | ✅ incrementally |
-| **L3** Structural | block lists (head/tail/len + terminator cache) and graph topology consistent | local | ✅ for block bodies |
-| **L4** Well-typed | each operand's type fits the consuming slot; results have resolved types | local | ⬜ cheap check, not yet wired |
-| **L5** Dominance & visibility | every use is dominated by its def and in scope | **global** | ⬜ needs a dominator-tree / scope query |
-| **L6** Terminator & CFG | every CFG block ends in exactly one terminator; successors consistent | **global** | rejected, never corrupted |
-| **L7** Semantic | the rewrite preserves program meaning | — | rule author (proofs deferred) |
+| **I1** Referential | every referenced id resolves to a live (non-tombstoned) slot | local | ✅ liveness checks + tombstones |
+| **I2** Def-use index | `SSAInfo::uses` matches the authoritative operand/yield slots | local | ✅ incrementally |
+| **I3b** Block structure | block lists (head/tail/len + terminator cache) consistent | local | ✅ for block bodies |
+| **I3g** Graph topology | `DiGraph`/`UnGraph` petgraph edge weights mirror the operands | local | ⬜ not synced on graph-body operand edits |
+| **I4** Well-typed | each operand's type fits the consuming slot; results have resolved types | local | ⬜ cheap check, not yet wired |
+| **I5** Dominance & visibility | every use is dominated by its def and in scope | **global** | ⬜ needs a dominator-tree / scope query |
+| **I6** Terminator & CFG | every CFG block ends in exactly one terminator; successors consistent | **global** | rejected, never corrupted |
+| **I7** Semantic | the rewrite preserves program meaning | — | rule author (proofs deferred) |
 
-**Local (L1–L4) is bookkeeping.** An edit touches a bounded neighbourhood, so
-"maintain" means patch the few slots it changed (L1–L3) or compare two types
-(L4). The invariant held before and the edit only perturbs its neighbourhood.
+**Local (I1–I4) is bookkeeping.** An edit touches a bounded neighbourhood, so
+"maintain" means patch the few slots it changed (I1–I3b) or compare two types
+(I4). The invariant held before and the edit only perturbs its neighbourhood.
+I3g is the odd one among the locals: cheap to maintain in principle, but not yet
+synced when an operand edit lands on a graph body.
 
-**Global (L5–L6) is a query, not bookkeeping.** Whether an edit preserves these
+**Global (I5–I6) is a query, not bookkeeping.** Whether an edit preserves these
 depends on pre-existing structure unrelated to the edit site. Substituting a
 value introduces a use where that value was *not* used before, so prior validity
 says nothing about whether its definition dominates or is visible at the new
 site — the engine must consult a dominator tree / scope model. Changing a
 terminator rewrites CFG edges and thus dominance for the whole function. This is
-why L5/L6 are deferred: not re-verification, but a global query/repair the
+why I5/I6 are deferred: not re-verification, but a global query/repair the
 inductive step needs.
 
-**Semantic (L7) is out of scope for structural rewriting** — it is the rule
+**Semantic (I7) is out of scope for structural rewriting** — it is the rule
 author's responsibility, with proof backends deferred (see Diagram A's
 ownership split).
 
 ### Reject-before-mutate vs verify-after
 
-Kirin-python has no per-edit gate at any level: it mutates a shared object graph
-directly (`stmt.delete()`, `value.replace_by(new)`), so an edit may leave the IR
-transiently invalid — a block with no terminator, a use not dominated by its
-def — and structural correctness is re-established by a separate verification
+Kirin-python has no per-edit gate for any invariant: it mutates a shared object
+graph directly (`stmt.delete()`, `value.replace_by(new)`), so an edit may leave
+the IR transiently invalid — a block with no terminator, a use not dominated by
+its def — and structural correctness is re-established by a separate verification
 pass and pass-author convention, not enforced per edit. Kirin-rust inverts this:
-the `Rewriter` maintains L1–L3 continuously and *rejects* any edit it cannot
+the `Rewriter` maintains I1–I3b continuously and *rejects* any edit it cannot
 prove keeps them, so invalid IR is never published in the first place. A
 verifier still exists as a backstop for implementation bugs and raw mutation
 paths that bypass the `Rewriter`, not as the primary guarantee.
@@ -1265,45 +1272,94 @@ terminator and `DiGraph`/`UnGraph`-body surgery, result-defining insertion
 type/visibility/dominance preflight plus the stage-revision bump described under
 [Replacement Legality and Atomicity](#replacement-legality-and-atomicity).
 
-#### Which edits can break which invariant
+#### Which invariants each method preserves or violates
 
-Not every method can violate every [validity level](#levels-of-ir-validity),
-which is why one edit is already complete and the others are not:
+Every method is checked against the [IR validity invariants](#ir-validity-invariants).
+✅ = preserved (still holds after, given it held before); ❌ = **not checked**, a
+caller can leave it violated; ⚠️ = conditional (see notes); ➖ = cannot affect it.
 
-- **`erase_statement` only *removes* a use.** Fewer uses is still dominated and
-  still well-typed, so erase cannot break L4 or L5 — it is a complete
-  validity-preserving edit today. (It still enforces L1/L3 and refuses to strand
-  a statement whose results are used, `StatementResultsInUse`.)
-- **`set_operand`, `replace_all_uses`, `insert_*`, and `replace_statement`
-  *introduce* a use** of a value at a site where it was not used before. That is
-  precisely the edit that can violate **L4** (the new value's type may not fit
-  the slot) and **L5** (its definition may not dominate / be visible at the new
-  site). They currently check L1 (liveness) and slot existence but **not**
-  L4/L5, so a caller can still hand them a non-dominating or ill-typed value and
+| Method | I1 | I2 | I3b | I3g | I4 | I5 | I6 | I7 |
+|---|---|---|---|---|---|---|---|---|
+| `set_operand` | ✅ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ✅ | ❌ |
+| `replace_all_uses` | ✅ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ✅ | ❌ |
+| `erase_statement` | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ✅ | ⚠️ |
+| `insert_before` / `insert_after` | ✅ | ✅ | ✅ | ✅ | ❌ | ❌ | ✅ | ❌ |
+| `replace_statement` | ✅ | ✅ | ✅ | ⚠️ | ❌ | ❌ | ✅ | ❌ |
+
+- **The value-introducing edits** (`set_operand`, `replace_all_uses`,
+  `insert_*`, `replace_statement`) install a value at a site where it was not
+  used before, so they can violate **I4** (type may not fit the slot) and **I5**
+  (definition may not dominate / be visible). They check only I1 liveness + slot
+  existence, so a caller can hand them an ill-typed or non-dominating value and
   produce invalid SSA.
+- **I3g ⚠️** on `set_operand` / `replace_all_uses` / `replace_statement`: these
+  do not check body kind, so on a `DiGraph`/`UnGraph`-owned statement they
+  rewrite the operand (and `replace_all_uses` also the yields, which *are*
+  maintained) but do **not** update the petgraph edge weights that mirror
+  operands — graph topology desyncs. Safe on block bodies. `insert_*` avoids
+  this by refusing non-block bodies (`NotInBlockBody`).
+- **`erase_statement` is the only edit that preserves I1–I6.** Removing a use
+  can't make anything ill-typed or non-dominated, and it refuses graph bodies,
+  terminators, and statements whose results are still used. Its only exposure is
+  **I7 ⚠️**: it checks results are *unused*, not that the statement is *pure*, so
+  erasing an impure/observable statement changes meaning — the author's call.
+- **I7 is never the Rewriter's job** (proofs deferred).
 
-This is why first-draft rules are *trusted compiler rules* and the verifier
-remains the backstop: until the L4 check and the L5 dominator/scope query are
-wired in, the value-introducing edits assume the caller supplies a dominating,
-type-compatible value.
+##### Before/after a single edit
+
+*Precondition:* the stage holds every invariant on entry. *Guaranteed after:*
+**I1, I2, I3b, I6** still hold — and because every precondition is checked before
+any write, a *rejected* edit leaves the stage byte-for-byte unchanged (no
+transient invalid state). *Caller's responsibility:* **I4, I5, I7** (and **I3g**
+if a graph body was touched) may be left violated; the method will not detect it.
+
+##### After a whole rewrite pass
+
+A pass (`Fixpoint(Walk(Chain(rules)))` in Kirin-python terms) applies many edits.
+An invariant survives the pass **iff every individual edit preserves it**:
+
+- **Hold continuously — during *and* after the pass:** **I1, I2, I3b, I6.** They
+  are per-edit invariants, so induction over the edit sequence carries them to
+  the end.
+- **Not restored by the pass** — true only if every applied rule was correct; the
+  **verifier** is the pass-boundary backstop that recomputes and checks them:
+  **I4, I5, I7**, plus **I3g** when any operand edit touched a graph body.
+- **Pass-boundary housekeeping:** erasures tombstone (ids stay stable, worklists
+  skip dead ids); compaction runs only at boundaries and returns an `IdMap` every
+  stored id must be remapped through — so **ids are stable within a pass, may be
+  remapped between passes**. Analysis freshness is meant to follow a
+  stage-revision bump per edit (design), but that bump and the `AnalysisManager`
+  are not implemented yet (M1/M3), so caches are **not** auto-invalidated across a
+  pass today.
+
+This is why first-draft rules are *trusted compiler rules*: the machinery
+guarantees **I1, I2, I3b, I6** end-to-end, while **I4, I5, I3g, I7** rest on rule
+correctness until the type check, the I5 dominator/scope query, graph-topology
+sync, and the verifier land.
 
 #### `RewriteError`
 
-`RewriteError` is a typed rejection, never a partial mutation. Its variants:
+`RewriteError` is a typed rejection, never a partial mutation. The **Category**
+column marks whether a rejection is permanent or will lift as the engine grows:
+**liveness** = a referential/bounds check, always enforced; **deferred** = a
+capability not yet implemented that will become legal in a later slice (a tool
+may treat these as "retry once supported"); **guard** = a permanent invariant
+protection (never retry). The variant *names* encode the condition, not this
+axis — hence the column.
 
-| Variant | Meaning | Raised by |
-|---|---|---|
-| `UnknownStatement(stmt)` | id does not resolve to a live (non-tombstoned) statement | all statement methods |
-| `UnknownValue(value)` | SSA id does not resolve to a live value | `set_operand`, `replace_all_uses`, `insert_*`, `replace_statement` |
-| `OperandIndexOutOfRange { stmt, index }` | operand index past the statement's operand list | `set_operand` |
-| `NotInBlockBody(stmt)` | statement is owned by a `DiGraph`/`UnGraph` (or nothing), not a block — graph surgery deferred | `erase_statement`, `insert_*` |
-| `CannotEraseTerminator(stmt)` | erasing a block terminator would need control-flow repair, deferred | `erase_statement` |
-| `StatementResultsInUse(stmt)` | a result of the statement is still used elsewhere; replace those uses first | `erase_statement` |
-| `AnchorIsTerminator(stmt)` | insertion relative to a terminator is deferred | `insert_*` |
-| `CannotInsertTerminator` | the inserted definition is a terminator (not spliced mid-block) | `insert_*` |
-| `CannotInsertWithResults` | the inserted definition declares results (fresh result allocation deferred) | `insert_*` |
-| `ResultArityMismatch { stmt, expected, found }` | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
-| `TerminatorKindMismatch(stmt)` | replacement changes terminator-ness, desyncing the block's terminator cache | `replace_statement` |
+| Variant | Category | Meaning | Raised by |
+|---|---|---|---|
+| `UnknownStatement(stmt)` | liveness | id does not resolve to a live (non-tombstoned) statement | all statement methods |
+| `UnknownValue(value)` | liveness | SSA id does not resolve to a live value | `set_operand`, `replace_all_uses`, `insert_*`, `replace_statement` |
+| `OperandIndexOutOfRange { stmt, index }` | liveness | operand index past the statement's operand list | `set_operand` |
+| `NotInBlockBody(stmt)` | deferred | statement is owned by a `DiGraph`/`UnGraph` (or nothing), not a block — graph surgery deferred | `erase_statement`, `insert_*` |
+| `CannotEraseTerminator(stmt)` | deferred | erasing a block terminator would need control-flow repair, deferred | `erase_statement` |
+| `StatementResultsInUse(stmt)` | guard | a result of the statement is still used elsewhere; replace those uses first | `erase_statement` |
+| `AnchorIsTerminator(stmt)` | deferred | insertion relative to a terminator is deferred | `insert_*` |
+| `CannotInsertTerminator` | guard | the inserted definition is a terminator (not spliced mid-block) | `insert_*` |
+| `CannotInsertWithResults` | deferred | the inserted definition declares results (fresh result allocation deferred) | `insert_*` |
+| `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
+| `TerminatorKindMismatch(stmt)` | guard | replacement changes terminator-ness, desyncing the block's terminator cache | `replace_statement` |
 
 The `MutationEvent` vocabulary emitted by these methods is
 `ChangedOperands`, `ReplacedUses`, `InsertedStatement`, `ErasedStatement`, and
