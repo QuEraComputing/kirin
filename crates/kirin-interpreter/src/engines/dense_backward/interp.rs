@@ -53,9 +53,9 @@ use kirin_ir::{
 use super::frames::{DenseBlockFrame, DenseFrameBuild};
 use crate::Body;
 use crate::core::query;
-use crate::engines::sparse_backward::CFGScope;
+use crate::engines::sparse_backward::BodyScope;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, CFGTopology, ClassicLiveness, DenseBackwardSemantic,
+    AbstractInterpreter, BackwardSummaryDeps, BodyTopology, ClassicLiveness, DenseBackwardSemantic,
     DensePointStore, EnvIndex, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
     InterpreterError, OwnerSemantics, ProgramPoint, Scoped, StageQuery,
     StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
@@ -322,7 +322,7 @@ where
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
-    type SummaryKey = Scoped<CFGScope, Block>;
+    type SummaryKey = Scoped<BodyScope, Block>;
     type Summary = BlockLiveness<V>;
     type Frame = F;
     type Completion = DenseBackwardCompletion<V>;
@@ -338,11 +338,11 @@ pub enum DenseBackwardCompletion<V> {
 }
 
 /// Analysis-local state carried in the driver's `store` slot: the scope,
-/// the CFG topology, and an optional per-point recorder filled by the
+/// the body topology, and an optional per-point recorder filled by the
 /// block frames during [`reconstruct_points`](DenseBackwardInterpreter::reconstruct_points).
 pub struct DenseAnalysisState<V> {
-    scope: Option<CFGScope>,
-    topology: CFGTopology,
+    scope: Option<BodyScope>,
+    topology: BodyTopology,
     recorder: Option<DensePointStore<V>>,
 }
 
@@ -350,7 +350,7 @@ impl<V> Default for DenseAnalysisState<V> {
     fn default() -> Self {
         Self {
             scope: None,
-            topology: CFGTopology::default(),
+            topology: BodyTopology::default(),
             recorder: None,
         }
     }
@@ -363,7 +363,7 @@ pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardF
     DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
     DenseAnalysisState<V>,
-    BackwardSummaryDeps<Scoped<CFGScope, Block>>,
+    BackwardSummaryDeps<Scoped<BodyScope, Block>>,
 >;
 
 // ===========================================================================
@@ -549,7 +549,7 @@ struct DenseBackwardSemantics;
 impl<'ir, S, V, E, F, Sem>
     OwnerSemantics<
         DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        Scoped<CFGScope, Block>,
+        Scoped<BodyScope, Block>,
         BlockLiveness<V>,
         F,
         DenseBackwardCompletion<V>,
@@ -565,7 +565,7 @@ where
     fn bottom_summary(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        _owner: &Scoped<CFGScope, Block>,
+        _owner: &Scoped<BodyScope, Block>,
     ) -> Result<BlockLiveness<V>, E> {
         Ok(BlockLiveness::bottom())
     }
@@ -573,7 +573,7 @@ where
     fn entry_frame(
         &mut self,
         interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: &Scoped<CFGScope, Block>,
+        owner: &Scoped<BodyScope, Block>,
         _summary: &BlockLiveness<V>,
     ) -> Result<F, E> {
         let (stage, _cfg) = owner.scope;
@@ -586,9 +586,9 @@ where
     fn complete_owner(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: Scoped<CFGScope, Block>,
+        owner: Scoped<BodyScope, Block>,
         completion: DenseBackwardCompletion<V>,
-    ) -> Result<SummaryEffect<Scoped<CFGScope, Block>, BlockLiveness<V>>, E> {
+    ) -> Result<SummaryEffect<Scoped<BodyScope, Block>, BlockLiveness<V>>, E> {
         match completion {
             DenseBackwardCompletion::Block { live_in, live_out } => Ok(SummaryEffect::Update {
                 owner,
@@ -689,7 +689,7 @@ where
         let body = body.into();
         let scope = (stage, body);
         let topology = query::body_topology(self.driver.inner().pipeline(), stage, body)?;
-        let owners: Vec<Scoped<CFGScope, Block>> = topology
+        let owners: Vec<Scoped<BodyScope, Block>> = topology
             .cfg_blocks()
             .map(|block| Scoped::new(scope, block.block))
             .collect();

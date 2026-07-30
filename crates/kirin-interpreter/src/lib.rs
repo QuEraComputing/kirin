@@ -75,6 +75,9 @@ pub use self::core::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
 pub use self::core::{EnvIndex, EnvStackStore, Store};
 pub use self::core::{FunctionEntry, InterpDispatch, Interpretable};
 pub use self::core::{InterpreterError, StageQuery};
+// The body-shape IR query: what blocks/graphs a body contains, which
+// statements feed a block's parameters, and where a graph port sits.
+pub use self::core::{BlockTopology, BodyTopology, GraphTopology, body_topology};
 // The shared, direction-neutral frame protocol (`Frame`/`FrameEngine`/
 // `FrameEffect`/`drive_frames`) plus the forward frame-driver capability surfaces.
 pub use self::core::{
@@ -100,7 +103,7 @@ pub use engines::sparse_forward::{
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{
-    BackwardAnalysisState, CFGScope, DemandFrame, DemandInterp, DemandSummary,
+    BackwardAnalysisState, BodyScope, DemandFrame, DemandInterp, DemandSummary,
     SparseBackwardDriver, SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter,
     SparseBackwardProfile, SparseBackwardTransfer,
 };
@@ -112,13 +115,12 @@ pub use engines::dense_backward::{
     DenseBlockMode, DenseFrameBuild, PointFacts, StandardDenseBackwardFrame, SuccessorEdge,
 };
 
-// Lattice anchors (*where* facts attach), scope qualification, the polymorphic
-// fact stores, and cfg topology enumeration. Anchor family is a property of
-// the solver shape; dispatch meaning lives in `semantics`.
+// Lattice anchors (*where* facts attach), scope qualification, and the
+// polymorphic fact stores. Anchor family is a property of the solver shape;
+// dispatch meaning lives in `semantics`.
 pub use facts::{
-    BlockTopology, BodyTopology, CFGTopology, Change, DenseAnchor, DenseBlockStore,
-    DensePointStore, FactStore, GraphTopology, LatticeAnchor, PortBoundary, ProgramPoint, Scoped,
-    ScopedSparseStore, SparseStore, body_topology, cfg_topology,
+    Change, DenseAnchor, DenseBlockStore, DensePointStore, FactStore, LatticeAnchor, PortBoundary,
+    ProgramPoint, Scoped, ScopedSparseStore, SparseStore,
 };
 
 // Semantic keys (*what* a rule means — the `Interpretable`/`Interp::Semantics`

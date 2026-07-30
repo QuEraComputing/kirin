@@ -10,7 +10,7 @@ use std::hash::Hash;
 use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
 use crate::{
-    CallEffect, CallableBody, Callee, Env, EnvIndex, FunctionTarget, Interp, InterpreterError,
+    Body, CallEffect, CallableBody, Callee, Env, EnvIndex, FunctionTarget, Interp, InterpreterError,
 };
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
@@ -143,11 +143,21 @@ pub trait ForwardFrameDriver: Env {
 
     /// The default walk plan of a digraph body (ports, toposorted nodes,
     /// yields). Errors on cyclic digraphs.
+    ///
+    /// Digraph bodies are opt-in: an engine that never walks one inherits this
+    /// rejection rather than inventing a schedule, the same way
+    /// [`FrameBuild::from_ungraph_entry`](crate::FrameBuild::from_ungraph_entry)
+    /// rejects a callable `UnGraph` without a compiler-supplied policy.
     fn digraph_walk_plan(
         &self,
         stage: CompileStage,
         graph: kirin_ir::DiGraph,
-    ) -> Result<crate::GraphWalkPlan, Self::Error>;
+    ) -> Result<crate::GraphWalkPlan, Self::Error> {
+        let _ = stage;
+        Err(Self::Error::from(InterpreterError::NoDefaultWalker(
+            Body::DiGraph(graph),
+        )))
+    }
 
     /// Bind a block's parameters to incoming actuals in `env` (arity-checked).
     fn bind_block_args(

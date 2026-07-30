@@ -1,5 +1,6 @@
-//! Lattice anchors: *where* dataflow facts attach — plus scope qualification
-//! and change detection.
+//! Locations in the IR that dataflow reasoning refers to: lattice anchors
+//! (*where* facts attach), boundary locations, scope qualification, and change
+//! detection.
 //!
 //! Following MLIR's terminology, a lattice fact is attached to a *lattice
 //! anchor*: sparse analyses anchor facts to [`SSAValue`]s; dense analyses
@@ -65,17 +66,38 @@ pub enum DenseAnchor {
 impl LatticeAnchor for DenseAnchor {}
 
 // ===========================================================================
+// Boundary locations
+// ===========================================================================
+
+/// Where a graph port sits on its owning statement's boundary.
+///
+/// This is a **location**, not a value mapping: the owning statement's
+/// dialect rule translates port/index into its operands, captures, or
+/// results — for values (forward) and demand (backward) alike. Unlike a
+/// [`LatticeAnchor`] no fact attaches here; it is what
+/// [`BodyTopology::port_boundary`](crate::BodyTopology::port_boundary) hands
+/// a rule so it can reach the statement owning a port.
+#[derive(Clone, Copy, Debug)]
+pub struct PortBoundary {
+    /// The statement that owns the graph.
+    pub owner: Statement,
+    /// Which boundary slot this port occupies.
+    pub index: usize,
+}
+
+// ===========================================================================
 // Scope qualification
 // ===========================================================================
 
 /// An anchor or owner qualified by the scope/context it belongs to.
 ///
 /// Framework-level summary keys are never bare anchors: the same [`SSAValue`]
-/// or [`Block`] under two scopes (two stages, two analyzed cfgs, two call
-/// contexts) is two distinct facts, so keys carry their scope. CFG-level
-/// analyses use `(CompileStage, CFG)` as the scope; interprocedural
-/// analyses generalize `K` to a call-context key (the backward analogue of the
-/// forward engine's context-qualified value keys).
+/// or [`Block`] under two scopes (two stages, two analyzed bodies, two call
+/// contexts) is two distinct facts, so keys carry their scope. Body-level
+/// analyses use [`BodyScope`](crate::BodyScope) — `(CompileStage, Body)` — as
+/// the scope; interprocedural analyses generalize `K` to a call-context key
+/// (the backward analogue of the forward engine's context-qualified value
+/// keys).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Scoped<K, T> {
     pub scope: K,

@@ -5,7 +5,7 @@
 pub(crate) mod interp;
 
 pub use interp::{
-    BackwardAnalysisState, CFGScope, DemandFrame, DemandInterp, DemandSummary,
+    BackwardAnalysisState, BodyScope, DemandFrame, DemandInterp, DemandSummary,
     SparseBackwardDriver, SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter,
     SparseBackwardProfile, SparseBackwardTransfer,
 };

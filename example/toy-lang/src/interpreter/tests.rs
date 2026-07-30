@@ -978,7 +978,7 @@ mod demand {
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
         };
-        let topology = kirin_interpreter::cfg_topology(info, &cfg);
+        let topology = kirin_interpreter::body_topology(info, kirin_interpreter::Body::CFG(cfg));
         for block in &topology.blocks {
             for &stmt in &block.stmts {
                 if let Some(value) = select(stmt.definition(info)) {
@@ -1297,7 +1297,7 @@ mod dense {
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
         };
-        let topology = kirin_interpreter::cfg_topology(info, &cfg);
+        let topology = kirin_interpreter::body_topology(info, kirin_interpreter::Body::CFG(cfg));
         for block in &topology.blocks {
             for &stmt in &block.stmts {
                 if select(stmt.definition(info)) {

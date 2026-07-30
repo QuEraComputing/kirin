@@ -15,7 +15,7 @@ use kirin_ir::{
 
 use crate::Body;
 use crate::InterpreterError;
-use crate::facts::topology::{self, BodyTopology};
+use crate::core::topology::{self, BodyTopology};
 
 /// Block parameters as SSA values.
 pub struct BlockParams(pub Block);

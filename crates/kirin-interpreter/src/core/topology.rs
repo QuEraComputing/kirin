@@ -1,4 +1,5 @@
-//! Dialect-neutral body topology enumeration.
+//! Dialect-neutral body topology enumeration: the implementation behind the
+//! [`BodyTopologyQuery`](super::query::BodyTopologyQuery) IR query.
 //!
 //! Backward analyses need the *shape* of a body: which blocks and graph
 //! nodes exist (including bodies nested inside structured statements), each
@@ -19,7 +20,7 @@ use kirin_ir::{
     HasUngraphs, Port, SSAValue, StageInfo, Statement, UnGraph,
 };
 
-use crate::Body;
+use crate::{Body, PortBoundary};
 
 /// The shape of one block: its statements and CFG successors.
 #[derive(Clone, Debug)]
@@ -48,19 +49,6 @@ pub struct GraphTopology {
     pub nested: bool,
 }
 
-/// Where a graph port sits on its owning statement's boundary.
-///
-/// This is a **location**, not a value mapping: the owning statement's
-/// dialect rule translates port/index into its operands, captures, or
-/// results — for values (forward) and demand (backward) alike.
-#[derive(Clone, Copy, Debug)]
-pub struct PortBoundary {
-    /// The statement that owns the graph.
-    pub owner: Statement,
-    /// Which boundary slot this port occupies.
-    pub index: usize,
-}
-
 /// The shape of a body: all blocks and graph parts (the analyzed body's own
 /// plus structured bodies, recursively), the block-feeder index, and the
 /// graph-port boundary index.
@@ -71,9 +59,6 @@ pub struct BodyTopology {
     feeders: HashMap<Block, Vec<Statement>>,
     port_boundary: HashMap<SSAValue, PortBoundary>,
 }
-
-/// Deprecated name for [`BodyTopology`]; kept for one release.
-pub type CFGTopology = BodyTopology;
 
 impl BodyTopology {
     /// The statements whose rules can translate demand on `block`'s parameters:
@@ -129,18 +114,6 @@ where
         }
     }
     topology
-}
-
-/// Enumerate the topology of `cfg` in the finalized `stage`.
-///
-/// Deprecated spelling of [`body_topology`] over a `CFG`; kept for one
-/// release.
-pub fn cfg_topology<L>(stage: &StageInfo<L>, cfg: &CFG) -> BodyTopology
-where
-    L: Dialect,
-    for<'a> L: HasSuccessors<'a> + HasBlocks<'a> + HasCFG<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
-{
-    body_topology(stage, Body::CFG(*cfg))
 }
 
 fn collect_block<L>(
