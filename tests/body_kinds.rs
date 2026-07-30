@@ -17,12 +17,16 @@
 //! `CallFrame`, and the callable-UnGraph policy hook (with and without a
 //! policy).
 //!
-//! A final section runs the *forward dataflow* engine
+//! The later sections run the *forward dataflow* engine
 //! (`SparseForwardInterpreter`, instantiated at the constant-propagation
 //! lattice) over the same body vocabulary: `CFG`, `Block` and `DiGraph`
 //! callable bodies analyze — the last as an `Owner::Graph` walked by
 //! `AbstractDiGraphFrame` — while `UnGraph` bodies and *nested* graph bodies
-//! are asserted to be refused.
+//! are asserted to be refused. Those sections also pin the graph owner's
+//! interprocedural behaviour: calls *inside* a graph body are summarized rather
+//! than descended into (so self-recursion converges), entry arguments join and
+//! re-run the owner when several call sites share one key, and a directed cycle
+//! is rejected identically by both engines.
 
 use std::collections::VecDeque;
 use std::hash::Hash;
@@ -38,10 +42,10 @@ use kirin_function::Lexical;
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
     AbstractFrameBuild, AbstractFrameDriver, BlockFrame, Body, CFGFrame, CallContext, CallFrame,
-    Completion, ConcreteInterpreter, DiGraphFrame, Env, EnvIndex, Frame, FrameBuild, FrameDriver,
-    FrameEffect, FunctionEntry, Interpretable, InterpreterError, SameStageLinker,
-    SparseForwardEffect, SparseForwardInterp, SparseForwardInterpreter, StandardFrame,
-    UnGraphEntry, expect_single,
+    Completion, ConcreteInterpreter, ContextInsensitive, DiGraphFrame, Env, EnvIndex, Frame,
+    FrameBuild, FrameDriver, FrameEffect, FunctionEntry, Interpretable, InterpreterError,
+    SameStageLinker, SparseForwardEffect, SparseForwardInterp, SparseForwardInterpreter,
+    StandardFrame, UnGraphEntry, expect_single,
 };
 use kirin_scf::{BuildScfFor, BuildScfIf, ScfForFrame, ScfIfFrame, StructuredControlFlow};
 use kirin_test_languages::GraphFunctionLanguage;
@@ -89,8 +93,18 @@ fn parse(program: &str) -> Pipeline<L> {
 }
 
 fn run(pipeline: &Pipeline<L>, function: &str, args: &[i64]) -> Result<i64, TestError> {
+    expect_single(run_product(pipeline, function, args)?)
+}
+
+/// `run`, keeping the whole returned product — for callables that return more
+/// than one value.
+fn run_product(
+    pipeline: &Pipeline<L>,
+    function: &str,
+    args: &[i64],
+) -> Result<Product<i64>, TestError> {
     let mut interp: Engine<'_> = ConcreteInterpreter::new(pipeline).with_linker(SameStageLinker);
-    expect_single(interp.call_by_name("test", function, args.iter().copied())?)
+    interp.call_by_name("test", function, args.iter().copied())
 }
 
 // ===========================================================================
@@ -866,6 +880,33 @@ fn analyze(
     expect_single(analysis.analyze_by_name("test", function, args.iter().cloned())?)
 }
 
+/// Summary key of the *context-insensitive* policy: one key per function, so
+/// every call site shares one owner and their arguments join.
+type CiKey = <ContextInsensitive as CallContext<ConstPropValue>>::Key;
+
+type InsensitiveEngine<'ir> = SparseForwardInterpreter<
+    'ir,
+    L,
+    ConstPropValue,
+    TestError,
+    SameStageLinker,
+    ContextInsensitive,
+    GraphAbstractFrame<ConstPropValue, TestError, CiKey>,
+>;
+
+/// The same analysis under [`ContextInsensitive`] keying: distinct call sites
+/// collapse onto one owner, so entry arguments must join and the owner must be
+/// re-analyzed when they rise.
+fn analyze_insensitive(
+    pipeline: &Pipeline<L>,
+    function: &str,
+    args: &[ConstPropValue],
+) -> Result<ConstPropValue, TestError> {
+    let mut analysis: InsensitiveEngine<'_> =
+        SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
+    expect_single(analysis.analyze_by_name("test", function, args.iter().cloned())?)
+}
+
 /// A CFG body whose branch condition is an *unknown* argument, so neither
 /// successor can be decided: the abstract block frame explores both and joins
 /// their returns. Identical arms fold to a constant; differing arms join to
@@ -1058,5 +1099,313 @@ fn abstract_nested_digraph_reports_no_walker() {
             TestError::Core(InterpreterError::Custom("no abstract digraph walker"))
         ),
         "expected the pushed-frame walker gap, got {error:?}"
+    );
+}
+
+// ===========================================================================
+// 10. Calls *inside* a graph body.
+// ===========================================================================
+
+/// A digraph node that is itself a call. The dependency edge `%a → %b` runs
+/// through two call results, so the graph walker must sequence the calls, and
+/// each call must be routed through the engine's call protocol rather than
+/// evaluated inline.
+const DIGRAPH_CALLS_PROGRAM: &str = r#"
+stage @test fn @inc(i64) -> i64;
+stage @test fn @gcall(i64) -> i64;
+stage @test fn @main() -> i64;
+
+specialize @test fn @inc(i64) -> i64 {
+  ^entry(%v: i64) {
+    %one = constant 1 -> i64;
+    %s = add %v, %one -> i64;
+    ret %s;
+  }
+}
+
+specialize @test fn @gcall(i64) -> i64 digraph ^g0(%x: i64) {
+  %b = call.named @inc(%a) -> i64;
+  %a = call.named @inc(%x) -> i64;
+  yield %b;
+}
+
+specialize @test fn @main() -> i64 {
+  ^entry() {
+    %c = constant 5 -> i64;
+    %r = call.named @gcall(%c) -> i64;
+    ret %r;
+  }
+}
+"#;
+
+/// Concretely: the `DiGraphFrame` pushes a `CallFrame` per call node, in
+/// dependency order (`%a` before `%b` despite the textual order).
+#[test]
+fn digraph_node_calls_run_in_dependency_order() {
+    let pipeline = parse(DIGRAPH_CALLS_PROGRAM);
+    assert_eq!(run(&pipeline, "gcall", &[5]).unwrap(), 7);
+    assert_eq!(run(&pipeline, "main", &[]).unwrap(), 7);
+}
+
+/// Abstractly the same graph must route each call through
+/// `summarize_call` — an `AbstractCallFrame`, *not* the concrete `CallFrame`,
+/// which would descend into the callee and bypass the interprocedural
+/// protocol. This is the one arm where `AbstractDiGraphFrame` differs
+/// substantively from the concrete walker.
+#[test]
+fn abstract_digraph_node_calls_are_summarized() {
+    let pipeline = parse(DIGRAPH_CALLS_PROGRAM);
+    assert_eq!(
+        analyze(&pipeline, "gcall", &[ConstPropValue::Const(5)]).unwrap(),
+        ConstPropValue::Const(7)
+    );
+    assert_eq!(
+        analyze(&pipeline, "main", &[]).unwrap(),
+        ConstPropValue::Const(7)
+    );
+    // An unknown port flows through both summarized calls to Top.
+    assert_eq!(
+        analyze(&pipeline, "gcall", &[ConstPropValue::Top]).unwrap(),
+        ConstPropValue::Top
+    );
+}
+
+/// A graph body that calls *itself*. A digraph cannot branch, so this
+/// recursion has no base case and does not terminate concretely — which is
+/// exactly why it is analysis-only. It terminates here because the call is
+/// summarized: the self-key's return summary starts at `bottom` and the owner
+/// re-runs only while it rises. Descending into the callee instead would
+/// recurse forever.
+const DIGRAPH_RECURSION_PROGRAM: &str = r#"
+stage @test fn @grec(i64) -> i64;
+
+specialize @test fn @grec(i64) -> i64 digraph ^g0(%x: i64) {
+  %r = call.named @grec(%x) -> i64;
+  yield %r;
+}
+"#;
+
+#[test]
+fn abstract_digraph_self_recursion_converges() {
+    let pipeline = parse(DIGRAPH_RECURSION_PROGRAM);
+    // Never returns, so the sound fixpoint is `bottom` — and, crucially, the
+    // analysis reaches it instead of diverging.
+    assert_eq!(
+        analyze(&pipeline, "grec", &[ConstPropValue::Const(1)]).unwrap(),
+        ConstPropValue::Bottom
+    );
+}
+
+// ===========================================================================
+// 11. Graph-owner re-analysis: two call sites, one owner.
+// ===========================================================================
+
+/// One graph-bodied callee reached from two call sites with different
+/// constants.
+const DIGRAPH_TWO_CALLERS_PROGRAM: &str = r#"
+stage @test fn @gdouble(i64) -> i64;
+stage @test fn @twocalls() -> i64;
+
+specialize @test fn @gdouble(i64) -> i64 digraph ^g0(%x: i64) {
+  %s = add %x, %x -> i64;
+  yield %s;
+}
+
+specialize @test fn @twocalls() -> i64 {
+  ^entry() {
+    %a = constant 1 -> i64;
+    %b = constant 2 -> i64;
+    %p = call.named @gdouble(%a) -> i64;
+    %q = call.named @gdouble(%b) -> i64;
+    %s = add %p, %q -> i64;
+    ret %s;
+  }
+}
+"#;
+
+/// The convergence behaviour of a graph owner, pinned from both sides by
+/// running the same program under both keying policies.
+///
+/// Under [`ContextInsensitive`] the two call sites share one owner, so its
+/// entry product must **join** (`Const(1) ⊔ Const(2)` = `Top`) and the graph
+/// must be **re-analyzed** with the wider entry — an owner seeded once and
+/// never re-run would leave the second call site reading a stale `Const(4)`.
+/// Under `ConstPropContext` the sites key separately and each stays exact.
+/// Together these show a graph owner participates in entry widening exactly
+/// like a block owner, which is where all of its convergence pressure comes
+/// from (one dependency-ordered pass is exact, so nothing widens *inside* the
+/// graph).
+#[test]
+fn abstract_digraph_owner_joins_two_call_sites() {
+    let pipeline = parse(DIGRAPH_TWO_CALLERS_PROGRAM);
+    // Shared owner: entry joins to Top, the graph re-runs, both results are Top.
+    assert_eq!(
+        analyze_insensitive(&pipeline, "twocalls", &[]).unwrap(),
+        ConstPropValue::Top
+    );
+    // Distinct keys: 1+1 = 2 and 2+2 = 4, so 2 + 4 = 6.
+    assert_eq!(
+        analyze(&pipeline, "twocalls", &[]).unwrap(),
+        ConstPropValue::Const(6)
+    );
+}
+
+// ===========================================================================
+// 12. Cyclic DiGraph: rejected when the walk plan is built.
+// ===========================================================================
+
+/// A digraph whose nodes depend on each other. The IR represents this happily —
+/// it parses — because a `DiGraph` is not required to be acyclic.
+const DIGRAPH_CYCLE_PROGRAM: &str = r#"
+stage @test fn @gcycle(i64) -> i64;
+
+specialize @test fn @gcycle(i64) -> i64 digraph ^g0(%x: i64) {
+  %a = add %b, %x -> i64;
+  %b = add %a, %x -> i64;
+  yield %a;
+}
+"#;
+
+/// Both engines reject a directed cycle, with the *same* error and from the
+/// *same* place: `digraph_walk_plan` topologically sorts the nodes, and a
+/// cyclic graph has no topological order. So the rejection is a property of the
+/// walk plan (shared by the concrete and abstract walkers), not of the IR and
+/// not of either engine.
+///
+/// Supporting cyclic graph bodies is therefore not an extension of the current
+/// walkers: it needs a schedule that is not a toposort plus a fixpoint *inside*
+/// the graph, which in turn needs a finer unit of re-analysis than
+/// `Owner::Graph`'s single exact pass.
+#[test]
+fn cyclic_digraph_is_rejected_by_both_engines() {
+    let pipeline = parse(DIGRAPH_CYCLE_PROGRAM);
+
+    let concrete = run(&pipeline, "gcycle", &[1]).unwrap_err();
+    assert!(
+        matches!(
+            concrete,
+            TestError::Core(InterpreterError::GraphHasCycle(_))
+        ),
+        "expected GraphHasCycle concretely, got {concrete:?}"
+    );
+
+    let abstract_ = analyze(&pipeline, "gcycle", &[ConstPropValue::Const(1)]).unwrap_err();
+    assert!(
+        matches!(
+            abstract_,
+            TestError::Core(InterpreterError::GraphHasCycle(_))
+        ),
+        "expected GraphHasCycle abstractly, got {abstract_:?}"
+    );
+}
+
+// ===========================================================================
+// 13. Multi-yield graphs and boundary arity.
+// ===========================================================================
+
+/// A graph yielding **two** values into a two-result call site.
+///
+/// Note the declared signature is `-> i64`, one type, while the function
+/// actually returns two values: `Signature` carries a single `ret` type, so it
+/// does not constrain return *arity*. The product arity that matters at runtime
+/// is the graph's `yield` list versus the call statement's result slots. (This
+/// is the same shape as `example/toy-qc/programs/ghz.kirin`, which declares
+/// `-> Qubit` and yields three.)
+const DIGRAPH_MULTIYIELD_PROGRAM: &str = r#"
+stage @test fn @gpair(i64) -> i64;
+stage @test fn @main() -> i64;
+
+specialize @test fn @gpair(i64) -> i64 digraph ^g0(%x: i64) {
+  %a = add %x, %x -> i64;
+  %b = mul %x, %x -> i64;
+  yield %a, %b;
+}
+
+specialize @test fn @main() -> i64 {
+  ^entry() {
+    %c = constant 3 -> i64;
+    %p, %q = call.named @gpair(%c) -> i64, i64;
+    %s = add %p, %q -> i64;
+    ret %s;
+  }
+}
+"#;
+
+/// Yield order is result-slot order: `%p` gets the first yield, `%q` the
+/// second. Asserting the product directly (rather than only their sum) pins
+/// that mapping.
+#[test]
+fn digraph_yields_multiple_values() {
+    let pipeline = parse(DIGRAPH_MULTIYIELD_PROGRAM);
+    let values: Vec<i64> = run_product(&pipeline, "gpair", &[3])
+        .unwrap()
+        .iter()
+        .copied()
+        .collect();
+    // 3 + 3 = 6 and 3 * 3 = 9, in yield order.
+    assert_eq!(values, vec![6, 9]);
+    // Both land in the caller's two result slots: 6 + 9.
+    assert_eq!(run(&pipeline, "main", &[]).unwrap(), 15);
+}
+
+/// The abstract walker collects the same product, so a multi-result callee's
+/// return summary carries both slots.
+#[test]
+fn abstract_digraph_yields_multiple_values() {
+    let pipeline = parse(DIGRAPH_MULTIYIELD_PROGRAM);
+    assert_eq!(
+        analyze(&pipeline, "main", &[]).unwrap(),
+        ConstPropValue::Const(15)
+    );
+}
+
+/// A graph whose boundary ports outnumber the call's arguments. Nothing earlier
+/// in the pipeline cross-checks the declared signature against the port list, so
+/// the graph walkers arity-check when binding the ports — the same check, and
+/// the same error, in both engines.
+const DIGRAPH_PORT_ARITY_PROGRAM: &str = r#"
+stage @test fn @g2(i64) -> i64;
+stage @test fn @main() -> i64;
+
+specialize @test fn @g2(i64) -> i64 digraph ^g0(%x: i64, %y: i64) {
+  %s = add %x, %y -> i64;
+  yield %s;
+}
+
+specialize @test fn @main() -> i64 {
+  ^entry() {
+    %c = constant 3 -> i64;
+    %r = call.named @g2(%c) -> i64;
+    ret %r;
+  }
+}
+"#;
+
+#[test]
+fn digraph_port_arity_mismatch_is_reported() {
+    let pipeline = parse(DIGRAPH_PORT_ARITY_PROGRAM);
+
+    let concrete = run(&pipeline, "main", &[]).unwrap_err();
+    assert!(
+        matches!(
+            concrete,
+            TestError::Core(InterpreterError::ProductArityMismatch {
+                expected: 2,
+                actual: 1
+            })
+        ),
+        "expected a port arity mismatch concretely, got {concrete:?}"
+    );
+
+    let abstract_ = analyze(&pipeline, "main", &[]).unwrap_err();
+    assert!(
+        matches!(
+            abstract_,
+            TestError::Core(InterpreterError::ProductArityMismatch {
+                expected: 2,
+                actual: 1
+            })
+        ),
+        "expected a port arity mismatch abstractly, got {abstract_:?}"
     );
 }
