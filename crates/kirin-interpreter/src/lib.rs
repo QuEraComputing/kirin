@@ -40,7 +40,7 @@
 //!   per semantic key (and [`FunctionEntry`] for callable statements). A rule
 //!   receives the engine `interp` directly. Shape-generic mechanics live on
 //!   the engine traits (read/write on [`SparseForwardInterp`];
-//!   fact/raise-fact on [`SparseBackwardInterp`]; insert/remove point facts on
+//!   fact/raise-fact on [`SparseBackwardInterp`]; opaque point-state access on
 //!   [`DenseBackwardInterp`]); semantics-specific vocabulary lives in helper
 //!   traits — demand rules bind [`DemandInterp`]
 //!   (`demand`/`is_demanded`/`demand_uses_if_observable`), classic-liveness rules bind
@@ -111,8 +111,9 @@ pub use engines::sparse_backward::{
 pub use engines::dense_backward::{
     BlockLiveness, ClassicLivenessInterp, DenseAnalysisState, DenseBackwardCompletion,
     DenseBackwardDriver, DenseBackwardEffect, DenseBackwardFrameDriver, DenseBackwardInterp,
-    DenseBackwardInterpreter, DenseBackwardProfile, DenseBackwardTransfer, DenseBlockFrame,
-    DenseBlockMode, DenseFrameBuild, PointFacts, StandardDenseBackwardFrame, SuccessorEdge,
+    DenseBackwardInterpreter, DenseBackwardProfile, DenseBackwardState, DenseBackwardTransfer,
+    DenseBlockFrame, DenseBlockMode, DenseFrameBuild, PointFacts, StandardDenseBackwardFrame,
+    SuccessorEdge,
 };
 
 // Lattice anchors (*where* facts attach), scope qualification, and the
@@ -169,11 +170,12 @@ pub mod engine {
         AbstractFrameDriver, AbstractInterpreter, BlockFrame, CFGFrame, CallContext, CallFrame,
         Callee, Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker,
         DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBackwardInterp,
-        DenseBackwardInterpreter, DenseBlockFrame, DenseFrameBuild, DiGraphFrame, Env,
-        ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameBuild, FrameDriver,
-        FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
-        SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter, SparseForwardInterp,
-        SparseForwardInterpreter, StandardAbstractFrame, StandardDenseBackwardFrame, StandardFrame,
-        UnGraphEntry, WideningStrategy, drive_frames, expect_single,
+        DenseBackwardInterpreter, DenseBackwardState, DenseBlockFrame, DenseFrameBuild,
+        DiGraphFrame, Env, ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameBuild,
+        FrameDriver, FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch,
+        InterpreterError, Linker, SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter,
+        SparseForwardInterp, SparseForwardInterpreter, StandardAbstractFrame,
+        StandardDenseBackwardFrame, StandardFrame, UnGraphEntry, WideningStrategy, drive_frames,
+        expect_single,
     };
 }

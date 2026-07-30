@@ -710,6 +710,7 @@ dependencies = [
  "kirin-chumsky",
  "kirin-cmp",
  "kirin-constant",
+ "kirin-constprop",
  "kirin-function",
  "kirin-interpreter",
  "kirin-ir",

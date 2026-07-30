@@ -100,8 +100,16 @@ pub trait SparseBackwardInterp:
     /// The converged fact for `value` (bottom if absent).
     fn fact(&self, value: impl Into<SSAValue>) -> Result<Self::Value, Self::Error>;
 
-    /// Raise `value`'s fact to ⊤ (buffered; returned by [`effect`](Self::effect)).
-    fn raise_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
+    /// Merge `fact` into `value`'s fact (buffered; returned by
+    /// [`effect`](Self::effect)).
+    ///
+    /// The engine moves the fact and never inspects it — which element of the
+    /// lattice a rule raises is the semantics' business, not the shape's.
+    fn raise_fact(
+        &mut self,
+        value: impl Into<SSAValue>,
+        fact: Self::Value,
+    ) -> Result<(), Self::Error>;
 
     /// Drain the raised-fact buffer into this rule's effect.
     fn effect(&mut self) -> Self::Effect;
@@ -122,10 +130,17 @@ pub trait SparseBackwardInterp:
 /// Pinned to `Semantics = StrongDemand` via the supertrait (rustc elaborates
 /// supertraits, so rules bounding `I: DemandInterp` need no extra clauses),
 /// and blanket-implemented for every strong-demand sparse-backward engine.
-pub trait DemandInterp: SparseBackwardInterp + Interp<Semantics = StrongDemand> {
+/// [`HasTop`] rides in the same supertrait as an associated-type bound rather
+/// than in a `where` clause, for the same reason: elaboration means rules
+/// bounding `I: DemandInterp` inherit it and never spell it. (A
+/// `where Self::Value: HasTop` on the trait would *not* be elaborated — every
+/// rule would have to repeat it.)
+pub trait DemandInterp:
+    SparseBackwardInterp + Interp<Semantics = StrongDemand, Value: HasTop>
+{
     /// Raise `value`'s demand (a demanded value carries the ⊤ fact).
     fn demand(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error> {
-        self.raise_fact(value)
+        self.raise_fact(value, Self::Value::top())
     }
 
     /// `true` iff `value` carries a non-bottom demand fact.
@@ -161,7 +176,12 @@ pub trait DemandInterp: SparseBackwardInterp + Interp<Semantics = StrongDemand> 
     }
 }
 
-impl<I> DemandInterp for I where I: SparseBackwardInterp + Interp<Semantics = StrongDemand> {}
+impl<I> DemandInterp for I
+where
+    I: SparseBackwardInterp + Interp<Semantics = StrongDemand>,
+    I::Value: HasTop,
+{
+}
 
 // ===========================================================================
 // SparseBackwardTransfer — the summary-free Interp delegate
@@ -324,7 +344,7 @@ impl<V> DemandFrame<V> {
 impl<'ir, S, V, E, Sem> Frame<SparseBackwardDriver<'ir, S, V, E, Sem>> for DemandFrame<V>
 where
     S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + HasTop,
+    V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
     Sem: SparseBackwardSemantic,
 {
@@ -401,7 +421,7 @@ where
 impl<'ir, S, V, E, Sem> SparseBackwardInterp for SparseBackwardDriver<'ir, S, V, E, Sem>
 where
     S: StageMeta + StageQuery,
-    V: Clone + PartialEq + Lattice + HasBottom + HasTop,
+    V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
     Sem: SparseBackwardSemantic,
 {
@@ -416,9 +436,9 @@ where
             .unwrap_or_else(V::bottom))
     }
 
-    fn raise_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
+    fn raise_fact(&mut self, value: impl Into<SSAValue>, fact: V) -> Result<(), E> {
         let value = value.into();
-        self.inner_mut().demands.push((value, V::top()));
+        self.inner_mut().demands.push((value, fact));
         Ok(())
     }
 
@@ -452,7 +472,7 @@ impl<'ir, S, V, E, Sem>
     > for SparseBackwardSemantics
 where
     S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + HasTop,
+    V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
     Sem: SparseBackwardSemantic,
 {
@@ -591,7 +611,7 @@ where
 impl<'ir, S, V, E, Sem> SparseBackwardInterpreter<'ir, S, V, E, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + HasTop,
+    V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
     Sem: SparseBackwardSemantic,
 {

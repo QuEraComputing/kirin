@@ -33,8 +33,8 @@ use kirin_interpreter::dialect::{
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BlockFrame,
     CallContext, Completion, ConcreteInterpreter, DenseBackwardCompletion,
-    DenseBackwardFrameDriver, DenseBlockFrame, DenseFrameBuild, EnvIndex, FrameBuild, FrameDriver,
-    FrameEffect, PointFacts, SparseForwardTransfer,
+    DenseBackwardFrameDriver, DenseBackwardState, DenseBlockFrame, DenseFrameBuild, EnvIndex,
+    FrameBuild, FrameDriver, FrameEffect, SparseForwardTransfer,
 };
 
 use crate::{For, ForLoopValue, If, Yield};
@@ -400,19 +400,18 @@ impl<V, E> DenseScfForFrame<V, E> {
         }
     }
 
+    /// The loop-carried estimate: the state after the loop, plus the body's
+    /// carried parameters renamed across the back-edge to the slots that yield
+    /// them. Unlike a CFG edge this does *not* pass anything through — the
+    /// body's own vocabulary does not escape backwards through the back-edge.
+    ///
+    /// `params[0]` is the induction variable, which no yield slot feeds.
     fn carry(&self, body_entry: &V) -> V
     where
-        V: Clone + Lattice + PointFacts,
+        V: Clone + Lattice + DenseBackwardState,
     {
-        let mut next = self.seed.clone().expect("seed captured");
-        for (index, param) in self.params.iter().skip(1).enumerate() {
-            if body_entry.contains(*param)
-                && let Some(slot) = self.yields.get(index)
-            {
-                next.insert(*slot);
-            }
-        }
-        next
+        let seed = self.seed.clone().expect("seed captured");
+        seed.join(&body_entry.rename(&self.params[1..], &self.yields))
     }
 
     pub fn step_into<I, F>(
@@ -422,7 +421,7 @@ impl<V, E> DenseScfForFrame<V, E> {
     where
         I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
         F: DenseFrameBuild<V, E> + BuildDenseScfFor<V, E>,
-        V: Clone + PartialEq + Lattice + PointFacts,
+        V: Clone + PartialEq + Lattice + DenseBackwardState,
         E: From<InterpreterError>,
     {
         if self.seed.is_none() {
@@ -448,7 +447,7 @@ impl<V, E> DenseScfForFrame<V, E> {
     where
         I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
         F: DenseFrameBuild<V, E> + BuildDenseScfFor<V, E>,
-        V: Clone + PartialEq + Lattice + PointFacts,
+        V: Clone + PartialEq + Lattice + DenseBackwardState,
         E: From<InterpreterError>,
     {
         match completion {
@@ -463,10 +462,7 @@ impl<V, E> DenseScfForFrame<V, E> {
                 } else {
                     // Stable: the final body entry, minus the body-local
                     // parameters, is the state before the loop.
-                    let mut before = body_entry;
-                    for param in &self.params {
-                        before.remove(*param);
-                    }
+                    let before = body_entry.forget(&self.params);
                     interp.replace_state(before);
                     Ok(FrameEffect::Complete(DenseBackwardCompletion::Structured))
                 }

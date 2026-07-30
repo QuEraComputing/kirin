@@ -89,14 +89,22 @@ conflict):
   the shape-generic `SparseBackwardInterp` (`fact`/`raise_fact`/`effect` plus
   the block-topology queries) serves any sparse-backward key, and
   `DemandInterp` (pinned to `StrongDemand` via its supertrait) adds the demand
-  vocabulary. Rules bind `DemandInterp`: read converged facts (`is_demanded`),
+  vocabulary. `raise_fact` takes the lattice element to merge, so the shape
+  moves facts without inspecting them; ⊤ is `demand`'s business, and `HasTop`
+  rides on `DemandInterp`'s supertrait so rules never spell it. Rules bind `DemandInterp`: read converged facts (`is_demanded`),
   raise demands (`demand`), and end with `interp.effect()`
   (= `SparseBackwardEffect`); ordinary dialects are the one-liner
   `interp.demand_uses_if_observable(self)` (purity-aware neededness via `IsPure`).
 - `ClassicLiveness` (on `DenseBackwardShape`) — likewise split: the
-  shape-generic `DenseBackwardInterp` (`insert_fact`/`remove_fact` point-state
-  mechanics) serves any dense-backward key, and `ClassicLivenessInterp` adds
-  liveness's spellings. Rules bind `ClassicLivenessInterp`: `gen_live`/
+  shape-generic `DenseBackwardInterp` (`point_state`/`point_state_mut`, which
+  hand the state over opaquely) serves any dense-backward key, and
+  `ClassicLivenessInterp` adds liveness's spellings — `PointFacts` ("a state is
+  a set of live values") is that key's contract, required by no engine and no
+  frame. What the shape *does* need of a state is `Lattice` for merges and
+  `DenseBackwardState` (`rename`/`forget`) for crossing edges and leaving
+  scopes; the parameter-to-argument substitution the CFG edge transfer and
+  `scf.for`'s back-edge both perform lives in those two methods, implemented
+  for `LiveSet` in `kirin-liveness`. Rules bind `ClassicLivenessInterp`: `gen_live`/
   `kill_def`; ordinary dialects (and calls — purity is irrelevant to dense
   sets) are `interp.gen_uses_kill_defs(self)`; CFG terminators name their edges
   (`Edges`, in `DenseBackwardEffect`), structured dialects push dense frames

@@ -115,6 +115,7 @@ kirin-bitwise = { workspace = true }
 kirin-cf = { workspace = true }
 kirin-cmp = { workspace = true }
 kirin-constant = { workspace = true }
+kirin-constprop = { workspace = true }
 kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
 kirin-interpreter = { workspace = true, features = ["derive"] }

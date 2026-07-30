@@ -188,7 +188,7 @@ where
 // Dense backward (classic per-point liveness)
 // ===========================================================================
 
-use kirin_interpreter::PointFacts;
+use kirin_interpreter::DenseBackwardState;
 use kirin_interpreter::engine::{
     DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBlockFrame, DenseFrameBuild,
 };
@@ -225,7 +225,7 @@ impl<V, E> BuildDenseScfFor<V, E> for ToyDenseBackwardFrame<V, E> {
 impl<I, V, E> Frame<I> for ToyDenseBackwardFrame<V, E>
 where
     I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = ToyDenseBackwardFrame<V, E>>,
-    V: Clone + PartialEq + Lattice + PointFacts,
+    V: Clone + PartialEq + Lattice + DenseBackwardState,
     E: From<InterpreterError>,
 {
     type Completion = DenseBackwardCompletion<V>;
