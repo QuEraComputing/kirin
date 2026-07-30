@@ -97,9 +97,9 @@ pub use engines::concrete::{
 };
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
 pub use engines::sparse_forward::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, CallContext,
-    ContextInsensitive, Owner, SparseForwardInterpreter, SparseForwardTransfer,
-    StandardAbstractFrame, WideningStrategy,
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
+    AbstractFrameBuild, CallContext, ContextInsensitive, Owner, SparseForwardInterpreter,
+    SparseForwardTransfer, StandardAbstractFrame, WideningStrategy,
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{
@@ -166,10 +166,10 @@ pub mod dialect {
 /// Everything a compiler author needs to run engines or customize traversal.
 pub mod engine {
     pub use crate::{
-        AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-        AbstractFrameDriver, AbstractInterpreter, BlockFrame, CFGFrame, CallContext, CallFrame,
-        Callee, Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker,
-        DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBackwardInterp,
+        AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
+        AbstractFrameBuild, AbstractFrameDriver, AbstractInterpreter, BlockFrame, CFGFrame,
+        CallContext, CallFrame, Callee, Completion, ConcreteInterpreter, ContextInsensitive,
+        CrossStageLinker, DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBackwardInterp,
         DenseBackwardInterpreter, DenseBackwardState, DenseBlockFrame, DenseFrameBuild,
         DiGraphFrame, Env, ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameBuild,
         FrameDriver, FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch,

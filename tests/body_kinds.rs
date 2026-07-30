@@ -19,9 +19,10 @@
 //!
 //! A final section runs the *forward dataflow* engine
 //! (`SparseForwardInterpreter`, instantiated at the constant-propagation
-//! lattice) over the same body vocabulary: `CFG`/`Block` bodies analyze, and
-//! `DiGraph`/`UnGraph` bodies are asserted to report `NoDefaultWalker`
-//! because no abstract graph walker exists yet.
+//! lattice) over the same body vocabulary: `CFG`, `Block` and `DiGraph`
+//! callable bodies analyze — the last as an `Owner::Graph` walked by
+//! `AbstractDiGraphFrame` — while `UnGraph` bodies and *nested* graph bodies
+//! are asserted to be refused.
 
 use std::collections::VecDeque;
 use std::hash::Hash;
@@ -35,11 +36,12 @@ use kirin_constant::Constant;
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::Lexical;
 use kirin_interpreter::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-    AbstractFrameDriver, BlockFrame, Body, CFGFrame, CallContext, CallFrame, Completion,
-    ConcreteInterpreter, DiGraphFrame, Env, EnvIndex, Frame, FrameBuild, FrameDriver, FrameEffect,
-    FunctionEntry, Interpretable, InterpreterError, SameStageLinker, SparseForwardEffect,
-    SparseForwardInterp, SparseForwardInterpreter, StandardFrame, UnGraphEntry, expect_single,
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
+    AbstractFrameBuild, AbstractFrameDriver, BlockFrame, Body, CFGFrame, CallContext, CallFrame,
+    Completion, ConcreteInterpreter, DiGraphFrame, Env, EnvIndex, Frame, FrameBuild, FrameDriver,
+    FrameEffect, FunctionEntry, Interpretable, InterpreterError, SameStageLinker,
+    SparseForwardEffect, SparseForwardInterp, SparseForwardInterpreter, StandardFrame,
+    UnGraphEntry, expect_single,
 };
 use kirin_scf::{BuildScfFor, BuildScfIf, ScfForFrame, ScfIfFrame, StructuredControlFlow};
 use kirin_test_languages::GraphFunctionLanguage;
@@ -209,10 +211,7 @@ fn linear_block_callable() {
 ///        │                     ├─▶ %d = mul %c, %e ──▶ yield
 ///        └─▶ %e = add %x, %one ┘
 /// ```
-#[test]
-fn digraph_runs_in_topological_order() {
-    let pipeline = parse(
-        r#"
+const DIGRAPH_TOPO_PROGRAM: &str = r#"
 stage @test fn @g(i64) -> i64;
 stage @test fn @main() -> i64;
 
@@ -231,8 +230,11 @@ specialize @test fn @main() -> i64 {
     ret %r;
   }
 }
-"#,
-    );
+"#;
+
+#[test]
+fn digraph_runs_in_topological_order() {
+    let pipeline = parse(DIGRAPH_TOPO_PROGRAM);
     // (3 + 3) * (3 + 1) = 24 — requires running both `add`s (and the
     // constant) before the `mul` despite the textual order.
     assert_eq!(run(&pipeline, "main", &[]).unwrap(), 24);
@@ -728,33 +730,41 @@ fn ungraph_without_policy_reports_no_default_walker() {
 // dataflow engine does with the same closed `Body` vocabulary, at the
 // constant-propagation lattice:
 //
-// - `CFG` and `Block` bodies analyze: `SparseForwardInterpreter` seeds the
-//   entry block (`Body::CFG` → its entry, `Body::Block` → itself) and the
-//   standard abstract frames walk it, joining branch arms and summarizing
-//   calls interprocedurally.
-// - `DiGraph` and `UnGraph` bodies are **refused**. There is no abstract
-//   graph walker: the engine rejects a graph callable body outright, and the
-//   abstract frame type has no variant able to walk a pushed graph. Both
-//   refusals are asserted rather than left implicit, so adding an abstract
-//   digraph walker fails these tests and forces them to be updated.
+// - `CFG`, `Block` and `DiGraph` bodies analyze. The engine translates the
+//   callable body into the executable owner the worklist holds — `Body::CFG` →
+//   its entry block, `Body::Block` → itself, `Body::DiGraph` → an
+//   `Owner::Graph` walked by `AbstractDiGraphFrame` as one dependency-ordered
+//   pass (exact for a DAG, so no intra-graph widening).
+// - `UnGraph` bodies are **refused**: an undirected graph has no derivable
+//   traversal order, and unlike the concrete engine there is no seam through
+//   which a compiler could supply one.
+// - A *nested* graph body (`graph_eval`) is also still refused, for an
+//   unrelated reason: that dialect rule builds the **concrete** `DiGraphFrame`
+//   directly instead of selecting one per engine the way scf does, so no
+//   abstract walker can be substituted. Both refusals are asserted rather than
+//   left implicit.
 
 /// Summary key of the constant-propagation context policy.
 type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
 
 /// Total abstract frame for the graph language: the standard abstract
-/// traversal, plus a variant recording the absence of a graph walker.
+/// traversal (blocks, calls, graph bodies), plus a variant recording the
+/// absence of a walker.
 ///
 /// The language's `Interpretable` rule bounds `I::Frame: FrameBuild<..>`
-/// because its `graph_eval` variant pushes a `DiGraphFrame`, so an abstract
-/// frame type for this language must satisfy that bound even though the
-/// abstract engine itself only ever calls `AbstractFrameBuild`. The concrete
-/// walkers cannot be embedded here — their completion type is
+/// because its `graph_eval` variant pushes a **concrete** `DiGraphFrame`, so an
+/// abstract frame type for this language must satisfy that bound even though
+/// the abstract engine itself only ever calls `AbstractFrameBuild`. The
+/// concrete walkers cannot be embedded here — their completion type is
 /// `Completion<V>`, not `AbstractCompletion<V>` — so the `FrameBuild` hooks
 /// build `NoWalker`, which reports the gap if it is ever stepped instead of
-/// silently running concrete traversal over lattice values.
+/// silently running concrete traversal over lattice values. Giving `graph_eval`
+/// a per-engine dispatch trait (as `kirin-scf` does for `scf.if`/`scf.for`)
+/// would remove the need for both the bound and this variant.
 enum GraphAbstractFrame<V, E, K> {
     Block(AbstractBlockFrame<V, E, K>),
     Call(AbstractCallFrame<V, E, K>),
+    DiGraph(AbstractDiGraphFrame<V, E, K>),
     /// No abstract walker exists for this body kind; carries the reason.
     NoWalker(&'static str),
 }
@@ -765,6 +775,9 @@ impl<V, E, K> AbstractFrameBuild<V, E, K> for GraphAbstractFrame<V, E, K> {
     }
     fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
         GraphAbstractFrame::Call(frame)
+    }
+    fn from_digraph(frame: AbstractDiGraphFrame<V, E, K>) -> Result<Self, E> {
+        Ok(GraphAbstractFrame::DiGraph(frame))
     }
 }
 
@@ -797,6 +810,7 @@ where
         match self {
             GraphAbstractFrame::Block(frame) => frame.step_into::<I, Self>(interp),
             GraphAbstractFrame::Call(frame) => frame.step_into::<I, Self>(interp),
+            GraphAbstractFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
             GraphAbstractFrame::NoWalker(reason) => {
                 Err(I::Error::from(InterpreterError::Custom(reason)))
             }
@@ -807,6 +821,7 @@ where
         match self {
             GraphAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
             GraphAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
+            GraphAbstractFrame::DiGraph(frame) => frame.resume_done_into::<Self>(),
             GraphAbstractFrame::NoWalker(reason) => {
                 Err(I::Error::from(InterpreterError::Custom(reason)))
             }
@@ -821,6 +836,7 @@ where
         match self {
             GraphAbstractFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
             GraphAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
+            GraphAbstractFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
             GraphAbstractFrame::NoWalker(reason) => {
                 Err(I::Error::from(InterpreterError::Custom(reason)))
             }
@@ -959,33 +975,55 @@ fn abstract_block_body_callable() {
     );
 }
 
-/// A callable `DiGraph` body has no abstract walker, so the engine refuses it
-/// when seeding the function's entry rather than inventing a schedule — both
-/// as an analysis root and as a summarized callee.
+/// `Body::DiGraph` under forward dataflow: the callable graph body becomes an
+/// `Owner::Graph` walked by `AbstractDiGraphFrame` — one dependency-ordered
+/// pass binding the boundary ports, with the graph's declared yields becoming
+/// the function's return summary. Reached both as an analysis root and as a
+/// summarized callee.
 #[test]
-fn abstract_digraph_callable_reports_no_default_walker() {
+fn abstract_digraph_callable_analyzes() {
     let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
-    let root = analyze(
-        &pipeline,
-        "gadd",
-        &[ConstPropValue::Const(2), ConstPropValue::Const(3)],
-    )
-    .unwrap_err();
-    assert!(
-        matches!(
-            root,
-            TestError::Core(InterpreterError::NoDefaultWalker(Body::DiGraph(_)))
-        ),
-        "expected NoDefaultWalker(DiGraph) as an analysis root, got {root:?}"
+    assert_eq!(
+        analyze(
+            &pipeline,
+            "gadd",
+            &[ConstPropValue::Const(2), ConstPropValue::Const(3)]
+        )
+        .unwrap(),
+        ConstPropValue::Const(5)
     );
+    // Same body, reached through a call from a CFG-bodied caller: the graph
+    // owner's yields flow back as the callee's return summary.
+    assert_eq!(
+        analyze(&pipeline, "main", &[]).unwrap(),
+        ConstPropValue::Const(5)
+    );
+    // An unknown port value propagates through the graph to Top.
+    assert_eq!(
+        analyze(
+            &pipeline,
+            "gadd",
+            &[ConstPropValue::Top, ConstPropValue::Const(3)]
+        )
+        .unwrap(),
+        ConstPropValue::Top
+    );
+}
 
-    let callee = analyze(&pipeline, "main", &[]).unwrap_err();
-    assert!(
-        matches!(
-            callee,
-            TestError::Core(InterpreterError::NoDefaultWalker(Body::DiGraph(_)))
-        ),
-        "expected NoDefaultWalker(DiGraph) through a call, got {callee:?}"
+/// The abstract walker uses the same dependency schedule as the concrete one:
+/// this graph's nodes are declared consumer-before-producer, so a textual walk
+/// would read unbound operands.
+#[test]
+fn abstract_digraph_follows_dependency_order() {
+    let pipeline = parse(DIGRAPH_TOPO_PROGRAM);
+    // (3 + 3) * (3 + 1) = 24, matching `digraph_runs_in_topological_order`.
+    assert_eq!(
+        analyze(&pipeline, "g", &[ConstPropValue::Const(3)]).unwrap(),
+        ConstPropValue::Const(24)
+    );
+    assert_eq!(
+        analyze(&pipeline, "main", &[]).unwrap(),
+        ConstPropValue::Const(24)
     );
 }
 

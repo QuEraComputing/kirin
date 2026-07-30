@@ -483,15 +483,40 @@ test). (Further examples: `example/toy-lang`'s `ToyFrame`, which adds
 
 `SparseForwardInterpreter` is symmetrically generic over a total abstract frame type
 `F` (default `StandardAbstractFrame`). The standard abstract frames
-(`AbstractFunctionFrame`, `AbstractCFGFrame`, `AbstractBlockFrame`,
-`AbstractCallFrame`) implement the *same*
+(`AbstractBlockFrame`, `AbstractCallFrame`, `AbstractDiGraphFrame`) implement the
+*same*
 `Frame` protocol, but their traversal is the abstract one: a CFG block worklist
 that joins/widens at merge points, `Branch` exploration, single-block
-body walks that complete on `Yield`, and per-key call summarization. A custom
+body walks that complete on `Yield`, dependency-ordered graph passes, and
+per-key call summarization. A custom
 enum reuses them through `AbstractFrameBuild` and the `*_into` methods — exactly
 mirroring the concrete pattern (see `ToyAbstractFrame`, which adds
 `AbstractScfIfFrame`/`AbstractScfForFrame`, and `TracingAbstractFrame` in the
 same test module).
+
+**Executable owners and the body vocabulary.** The forward fixpoint's work items
+are `Owner`s, and only *executable* owners run frames: `Owner::Block` (one CFG
+block) and `Owner::Graph` (one whole graph body). `Owner::Function` is
+storage-only — it accumulates a context's joined entry arguments and joined
+return, and is never scheduled. `seed_entry_block` is the single place a callable
+body becomes executable work, translating the closed `Body` vocabulary into an
+owner: `CFG` → its entry block, `Block` → itself, `DiGraph` → an `Owner::Graph`.
+A graph owner is one unit because a single dependency-ordered pass is *exact* for
+a DAG — no intra-graph widening is needed, and convergence pressure comes only
+from entry widening when a new call site raises the owner's entry product. On
+completion a graph owner has no successor edges; its declared yields become the
+function's return contribution. `UnGraph` bodies are rejected with
+`NoDefaultWalker`: an undirected graph has no derivable traversal order, and
+unlike the concrete engine's `FrameBuild::from_ungraph_entry` there is currently
+no seam through which a compiler could supply one. Analogously,
+`AbstractFrameBuild::from_digraph` defaults to rejecting, so a total abstract
+frame enum that carries no `AbstractDiGraphFrame` inherits the refusal rather
+than pretending to analyze a graph body.
+
+`AbstractDiGraphFrame` differs from the concrete `DiGraphFrame` in exactly one
+substantive way: a `Call` effect pushes an `AbstractCallFrame`, routing the call
+through `summarize_call` instead of descending into the callee. Descending would
+neither widen nor terminate on recursion.
 
 Abstract frames need a few capabilities beyond `ForwardFrameDriver`, on
 `ForwardDataflowFrameDriver: ForwardFrameDriver` (alias: `AbstractFrameDriver`) —

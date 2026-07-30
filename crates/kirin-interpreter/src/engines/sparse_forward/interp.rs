@@ -17,9 +17,10 @@
 //! # Owner kinds
 //!
 //! [`Owner::Function`] is a **summary/storage** owner — it is *never scheduled*; it
-//! records a function context's entry/return/entry-block. [`Owner::Block`] is the
-//! **executable** owner: exactly the block owners run frames (one single-pass CFG
-//! walk each). CFG convergence is owner-summary convergence: a block emits its
+//! records a function context's entry/return/entry-block. [`Owner::Block`] and
+//! [`Owner::Graph`] are the **executable** owners: exactly those run frames (one
+//! single-pass walk each — a CFG block, or a whole graph body in dependency
+//! order). CFG convergence is owner-summary convergence: a block emits its
 //! successor block-entries, its function return, its outputs, and its external
 //! read dependencies through the single [`apply_update`](ForwardDriver::apply_update)
 //! path, which merges via the analysis policy and reschedules owners / value
@@ -33,19 +34,19 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CFG, CompileStage, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
+    Block, CFG, CompileStage, DiGraph, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
     StageMeta, Statement, Widen,
 };
 
 use crate::core::query;
 use crate::{
-    AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver,
-    AbstractInterpreter, Body, CallEffect, CallableBody, Callee, Env, EnvIndex, EnvStackStore,
-    FixpointProfile, ForwardEval, ForwardFrameDriver, ForwardSummaryDeps, Frame, FunctionTarget,
-    Interp, InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics,
-    SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
-    StandardFixpointInterpreter, Store, Summary, SummaryDependency, SummaryDependencyIndex,
-    SummaryEffect,
+    AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractFrameBuild,
+    AbstractFrameDriver, AbstractInterpreter, Body, CallEffect, CallableBody, Callee, Env,
+    EnvIndex, EnvStackStore, FixpointProfile, ForwardEval, ForwardFrameDriver, ForwardSummaryDeps,
+    Frame, FunctionTarget, Interp, InterpDispatch, InterpLocation, InterpreterError, Linker,
+    OwnerSemantics, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
+    StandardAbstractFrame, StandardFixpointInterpreter, Store, Summary, SummaryDependency,
+    SummaryDependencyIndex, SummaryEffect,
 };
 
 // ===========================================================================
@@ -123,7 +124,8 @@ where
 /// Owner of a summary in the forward fixpoint.
 ///
 /// [`Owner::Function`] is a **summary/storage** owner (never scheduled);
-/// [`Owner::Block`] is the **executable** owner (frame-executed). `Owner` is a
+/// [`Owner::Block`] and [`Owner::Graph`] are the **executable** owners
+/// (frame-executed) — one per unit of re-analysis. `Owner` is a
 /// dataflow-equation identity — deliberately **not** a
 /// [`LatticeAnchor`](crate::LatticeAnchor).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -132,6 +134,22 @@ pub enum Owner<K> {
     Function(K),
     /// A CFG block executable owner within function context `K`.
     Block { function: K, block: Block },
+    /// A graph-body executable owner within function context `K`: the whole
+    /// graph is one unit, re-analyzed as a single dependency-ordered pass
+    /// whenever its entry product rises. One pass is exact for a DAG, so there
+    /// is no intra-graph fixpoint to split into finer owners.
+    Graph { function: K, graph: DiGraph },
+}
+
+impl<K> Owner<K> {
+    /// The function context this owner belongs to.
+    pub fn function(&self) -> &K {
+        match self {
+            Owner::Function(function)
+            | Owner::Block { function, .. }
+            | Owner::Graph { function, .. } => function,
+        }
+    }
 }
 
 /// Per-function summary/storage record: call-site metadata, the joined entry
@@ -300,18 +318,15 @@ enum ForwardUpdate<K, V> {
     /// Merge a return contribution into a function context's return (join); on
     /// rise, reschedule its callers.
     FunctionReturn { key: K, values: Product<V> },
-    /// Merge edge args into a block owner's entry (widen by visits); on rise,
-    /// (re)schedule that block owner.
-    BlockEntry {
-        function: K,
-        block: Block,
-        args: Product<V>,
-    },
-    /// Merge a block's freshly computed outputs (join); on any value's rise,
+    /// Merge incoming args into an **executable** owner's entry (widen by
+    /// visits); on rise, (re)schedule that owner. The incoming args are a CFG
+    /// edge's arguments for a block owner, or the boundary-port values for a
+    /// graph owner.
+    OwnerEntry { owner: Owner<K>, args: Product<V> },
+    /// Merge an owner's freshly computed outputs (join); on any value's rise,
     /// reschedule that value's readers.
-    BlockOutputs {
-        function: K,
-        block: Block,
+    OwnerOutputs {
+        owner: Owner<K>,
         outputs: HashMap<SSAValue, V>,
     },
 }
@@ -796,11 +811,7 @@ where
     }
 
     fn current_function_key(&self) -> Option<<P as CallContext<V>>::Key> {
-        match self.current_owner() {
-            Some(Owner::Function(key)) => Some(key.clone()),
-            Some(Owner::Block { function, .. }) => Some(function.clone()),
-            None => None,
-        }
+        self.current_owner().map(|owner| owner.function().clone())
     }
 
     /// Summarize a call atomically: resolve, merge the callee entry (which seeds
@@ -958,12 +969,7 @@ where
                 Ok(())
             }
 
-            ForwardUpdate::BlockEntry {
-                function,
-                block,
-                args,
-            } => {
-                let owner = Owner::Block { function, block };
+            ForwardUpdate::OwnerEntry { owner, args } => {
                 let changed = if self.summary(&owner).is_none() {
                     self.summaries_mut().insert(
                         owner.clone(),
@@ -1003,15 +1009,8 @@ where
                 Ok(())
             }
 
-            ForwardUpdate::BlockOutputs {
-                function,
-                block,
-                outputs,
-            } => {
-                let owner = Owner::Block {
-                    function: function.clone(),
-                    block,
-                };
+            ForwardUpdate::OwnerOutputs { owner, outputs } => {
+                let function = owner.function().clone();
                 let mut risen = Vec::new();
                 for (value, incoming) in outputs {
                     let old = self
@@ -1045,8 +1044,14 @@ where
         }
     }
 
-    /// Resolve the entry block of `key`'s function (allocating its shared env on
-    /// first use) and seed the entry block owner with the entry-block arguments.
+    /// Resolve the executable entry owner of `key`'s function (allocating its
+    /// shared env on first use) and seed it with the entry arguments.
+    ///
+    /// This is the one place a *function* becomes runnable *work*: it translates
+    /// the callable [`Body`] into the executable [`Owner`] the worklist can
+    /// hold — a `CFG`'s entry block or a `Block` body become an
+    /// [`Owner::Block`], a `DiGraph` body becomes an [`Owner::Graph`]. An
+    /// `UnGraph` has no derivable traversal order at all, so it is rejected.
     fn seed_entry_block(
         &mut self,
         key: &<P as CallContext<V>>::Key,
@@ -1067,36 +1072,53 @@ where
             .map(|function| function.entry.clone())
             .expect("function summary present");
         let body_info = self.enter_function(stage, body, entry_args, env)?;
-        let entry_block = match body_info.body {
-            Body::CFG(cfg) => self
-                .cfg_entry(stage, cfg)?
-                .ok_or_else(|| E::from(InterpreterError::EmptyCFG))?,
-            Body::Block(block) => block,
-            other @ (Body::DiGraph(_) | Body::UnGraph(_)) => {
-                return Err(E::from(InterpreterError::NoDefaultWalker(other)));
+        let owner = match body_info.body {
+            Body::CFG(cfg) => Owner::Block {
+                function: key.clone(),
+                block: self
+                    .cfg_entry(stage, cfg)?
+                    .ok_or_else(|| E::from(InterpreterError::EmptyCFG))?,
+            },
+            Body::Block(block) => Owner::Block {
+                function: key.clone(),
+                block,
+            },
+            // A graph body has no blocks: it is its own unit of re-analysis.
+            Body::DiGraph(graph) => Owner::Graph {
+                function: key.clone(),
+                graph,
+            },
+            // An undirected graph has no producer/consumer direction, so no
+            // traversal order can be derived from its structure.
+            graph @ Body::UnGraph(_) => {
+                return Err(E::from(InterpreterError::NoDefaultWalker(graph)));
             }
         };
         if let Some(function) = self
             .summary_mut(&Owner::Function(key.clone()))
             .and_then(|info| info.as_function_mut())
         {
-            function.entry_block = Some(entry_block);
+            function.entry_block = match &owner {
+                Owner::Block { block, .. } => Some(*block),
+                _ => None,
+            };
         }
-        self.apply_update(ForwardUpdate::BlockEntry {
-            function: key.clone(),
-            block: entry_block,
+        self.apply_update(ForwardUpdate::OwnerEntry {
+            owner,
             args: body_info.args,
         })
     }
 }
 
 // ===========================================================================
-// Owner semantics: only block owners are executable.
+// Owner semantics: block and graph owners are executable.
 // ===========================================================================
 
-/// The forward owner semantics. Only [`Owner::Block`] owners are analyzed: bind
-/// the block-entry, walk the block once, then route its outputs / successor edges /
-/// return / read-deps through [`apply_update`](ForwardDriver::apply_update).
+/// The forward owner semantics. [`Owner::Block`] and [`Owner::Graph`] owners are
+/// analyzed: bind the entry product, walk the unit once, then route its outputs /
+/// successor edges / return / read-deps through
+/// [`apply_update`](ForwardDriver::apply_update). A graph owner has no successor
+/// edges — its declared yields are the function's return instead.
 struct SparseForwardSemantics<V> {
     _marker: PhantomData<fn() -> V>,
 }
@@ -1136,7 +1158,11 @@ where
         // safe default for the dependency-index bookkeeping path.
         Ok(match owner {
             Owner::Function(_) => ForwardSummary::Function(FunctionSummary::bottom()),
-            Owner::Block { .. } => ForwardSummary::Block(BlockSummary::bottom()),
+            // Both executable owners carry the same shape of summary: a joined
+            // entry product plus the output facts they define.
+            Owner::Block { .. } | Owner::Graph { .. } => {
+                ForwardSummary::Block(BlockSummary::bottom())
+            }
         })
     }
 
@@ -1146,8 +1172,8 @@ where
         owner: &Owner<<P as CallContext<V>>::Key>,
         summary: &ForwardSummary<V>,
     ) -> Result<F, E> {
-        let (function, block) = match owner {
-            Owner::Block { function, block } => (function.clone(), *block),
+        let function = match owner {
+            Owner::Block { function, .. } | Owner::Graph { function, .. } => function.clone(),
             Owner::Function(_) => {
                 return Err(E::from(InterpreterError::Custom(
                     "function owners are storage-only and never executed",
@@ -1179,12 +1205,22 @@ where
             ))
         })?;
         interp.inner_mut().begin_block_log();
-        Ok(F::from_block(AbstractBlockFrame::new_cfg_block(
-            stage,
-            env,
-            block,
-            block_entry,
-        )))
+        match owner {
+            Owner::Block { block, .. } => Ok(F::from_block(AbstractBlockFrame::new_cfg_block(
+                stage,
+                env,
+                *block,
+                block_entry,
+            ))),
+            // One dependency-ordered pass over the whole graph. Exact for a DAG,
+            // so the pass never needs to iterate internally.
+            Owner::Graph { graph, .. } => {
+                F::from_digraph(AbstractDiGraphFrame::new(stage, env, *graph, block_entry))
+            }
+            Owner::Function(_) => Err(E::from(InterpreterError::Custom(
+                "function owners are storage-only and never executed",
+            ))),
+        }
     }
 
     fn complete_owner(
@@ -1193,22 +1229,29 @@ where
         owner: Owner<<P as CallContext<V>>::Key>,
         completion: AbstractCompletion<V>,
     ) -> Result<SummaryEffect<Owner<<P as CallContext<V>>::Key>, ForwardSummary<V>>, E> {
-        let (function, block) = match &owner {
-            Owner::Block { function, block } => (function.clone(), *block),
+        let function = match &owner {
+            Owner::Block { function, .. } | Owner::Graph { function, .. } => function.clone(),
             Owner::Function(_) => {
                 return Err(E::from(InterpreterError::Custom(
                     "function owners are storage-only and never executed",
                 )));
             }
         };
-        let edges = match completion {
-            AbstractCompletion::CFGBlock { edges } => edges,
+        // A block owner completes with its outgoing CFG edges. A graph owner has
+        // no successors at all — it completes with the graph's declared yields,
+        // which for a callable graph body *are* the function's return values.
+        let (edges, graph_yields) = match (&owner, completion) {
+            (Owner::Block { .. }, AbstractCompletion::CFGBlock { edges }) => (edges, None),
+            (Owner::Graph { .. }, AbstractCompletion::Finished(values)) => (Vec::new(), values),
             _ => {
                 return Err(E::from(InterpreterError::Custom(
-                    "block owner completed with a non-CFG-block completion",
+                    "executable owner completed with a mismatched completion",
                 )));
             }
         };
+        if let Some(values) = graph_yields {
+            interp.contribute_return(values)?;
+        }
 
         let (reads, writes) = interp.inner_mut().take_logs();
         let env = interp.store().env(&function).ok_or_else(|| {
@@ -1239,17 +1282,19 @@ where
             let fact = interp.inner().env_read(env, value)?;
             outputs.insert(value, fact);
         }
-        interp.apply_update(ForwardUpdate::BlockOutputs {
-            function: function.clone(),
-            block,
+        interp.apply_update(ForwardUpdate::OwnerOutputs {
+            owner: owner.clone(),
             outputs,
         })?;
 
-        // Propagate CFG successor edges as block-entry updates.
+        // Propagate CFG successor edges as block-owner entry updates. Empty for a
+        // returning block and for a graph owner.
         for edge in edges {
-            interp.apply_update(ForwardUpdate::BlockEntry {
-                function: function.clone(),
-                block: edge.target,
+            interp.apply_update(ForwardUpdate::OwnerEntry {
+                owner: Owner::Block {
+                    function: function.clone(),
+                    block: edge.target,
+                },
                 args: edge.args,
             })?;
         }
