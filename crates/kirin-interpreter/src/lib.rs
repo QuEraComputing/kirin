@@ -77,7 +77,7 @@ pub use self::core::{FunctionEntry, InterpDispatch, Interpretable};
 pub use self::core::{InterpreterError, StageQuery};
 // The body-shape IR query: what blocks/graphs a body contains, which
 // statements feed a block's parameters, and where a graph port sits.
-pub use self::core::{BlockTopology, BodyTopology, GraphTopology, body_topology};
+pub use self::core::{BlockTopology, BodyTopology, body_topology};
 // The shared, direction-neutral frame protocol (`Frame`/`FrameEngine`/
 // `FrameEffect`/`drive_frames`) plus the forward frame-driver capability surfaces.
 pub use self::core::{
@@ -145,7 +145,9 @@ pub use fixpoint::{
 };
 
 #[cfg(feature = "derive")]
-pub use kirin_derive_interpreter::{FunctionEntry, InterpDispatch, Interpretable};
+pub use kirin_derive_interpreter::{
+    AbstractFrameBuild, DenseFrameBuild, FrameBuild, FunctionEntry, InterpDispatch, Interpretable,
+};
 
 /// Everything a dialect author needs to implement statement semantics —
 /// forward evaluation (`Interpretable<I, ForwardEval>`), backward demand

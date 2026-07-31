@@ -27,6 +27,12 @@ use kirin_scf::{
 
 /// Concrete total frame: the standard representation walkers and call
 /// boundary plus the SCF if/for frames.
+///
+/// The framework injections are derived — one constructor per walker, matched by
+/// field type. The two scf variants are injected through `kirin-scf`'s own
+/// `BuildScfIf`/`BuildScfFor`, which the dialect declares and a language
+/// implements by hand.
+#[derive(FrameBuild)]
 pub enum ToyFrame<V, E> {
     Block(BlockFrame<V, E>),
     CFG(CFGFrame<V, E>),
@@ -34,21 +40,6 @@ pub enum ToyFrame<V, E> {
     DiGraph(DiGraphFrame<V, E>),
     ScfIf(ScfIfFrame<V, E>),
     ScfFor(ScfForFrame<V, E>),
-}
-
-impl<V, E> FrameBuild<V, E> for ToyFrame<V, E> {
-    fn from_block(frame: BlockFrame<V, E>) -> Self {
-        ToyFrame::Block(frame)
-    }
-    fn from_cfg(frame: CFGFrame<V, E>) -> Self {
-        ToyFrame::CFG(frame)
-    }
-    fn from_call(frame: CallFrame<V>) -> Self {
-        ToyFrame::Call(frame)
-    }
-    fn from_digraph(frame: DiGraphFrame<V, E>) -> Self {
-        ToyFrame::DiGraph(frame)
-    }
 }
 
 impl<V, E> BuildScfIf<V, E> for ToyFrame<V, E> {
@@ -115,20 +106,15 @@ where
 // ===========================================================================
 
 /// Abstract total frame: standard abstract traversal plus the SCF if/for frames.
+///
+/// No `AbstractDiGraphFrame` variant, so the derive omits `from_digraph` and the
+/// trait's refusing default applies — toy-lang has no graph bodies.
+#[derive(AbstractFrameBuild)]
 pub enum ToyAbstractFrame<V, E, K> {
     Block(AbstractBlockFrame<V, E, K>),
     Call(AbstractCallFrame<V, E, K>),
     ScfIf(AbstractScfIfFrame<V, E, K>),
     ScfFor(AbstractScfForFrame<V, E, K>),
-}
-
-impl<V, E, K> AbstractFrameBuild<V, E, K> for ToyAbstractFrame<V, E, K> {
-    fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
-        ToyAbstractFrame::Block(frame)
-    }
-    fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
-        ToyAbstractFrame::Call(frame)
-    }
 }
 
 impl<V, E, K> BuildAbstractScfIf<V, E, K> for ToyAbstractFrame<V, E, K> {
@@ -199,16 +185,11 @@ use kirin::prelude::Lattice;
 
 /// Dense backward total frame: the standard block walk plus the SCF dense
 /// frames (arm-join for `scf.if`, the loop-carried fixpoint for `scf.for`).
+#[derive(DenseFrameBuild)]
 pub enum ToyDenseBackwardFrame<V, E> {
     Block(DenseBlockFrame<V, E>),
     ScfIf(DenseScfIfFrame<V, E>),
     ScfFor(DenseScfForFrame<V, E>),
-}
-
-impl<V, E> DenseFrameBuild<V, E> for ToyDenseBackwardFrame<V, E> {
-    fn from_block(frame: DenseBlockFrame<V, E>) -> Self {
-        ToyDenseBackwardFrame::Block(frame)
-    }
 }
 
 impl<V, E> BuildDenseScfIf<V, E> for ToyDenseBackwardFrame<V, E> {

@@ -25,5 +25,5 @@ pub use frame::{
 pub use interp::{AbstractInterpreter, Env, Interp, InterpLocation, SparseForwardInterp};
 pub use linker::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
 pub use query::{GraphWalkPlan, StageQuery};
-pub use topology::{BlockTopology, BodyTopology, GraphTopology, body_topology};
+pub use topology::{BlockTopology, BodyTopology, body_topology};
 pub use value::{BranchCondition, HasProductValue, expect_single};

@@ -1,0 +1,11 @@
+---
+source: crates/kirin-derive-interpreter/src/frame_build.rs
+assertion_line: 291
+expression: "emit(input, &DENSE_BACKWARD)"
+---
+#[automatically_derived]
+impl<V, E> ::kirin_interpreter::DenseFrameBuild<V, E> for ToyDenseBackwardFrame<V, E> {
+    fn from_block(frame: DenseBlockFrame<V, E>) -> Self {
+        Self::Block(frame)
+    }
+}

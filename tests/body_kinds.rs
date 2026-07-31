@@ -283,6 +283,7 @@ enum ScfLanguage {
 /// Total frame enum for the scf tests: the standard representation walkers
 /// and call boundary plus the dialect-owned SCF frames (composition, not an
 /// engine fork).
+#[derive(FrameBuild)]
 enum ScfTestFrame<V, E> {
     Block(BlockFrame<V, E>),
     CFG(CFGFrame<V, E>),
@@ -290,21 +291,6 @@ enum ScfTestFrame<V, E> {
     DiGraph(DiGraphFrame<V, E>),
     ScfIf(ScfIfFrame<V, E>),
     ScfFor(ScfForFrame<V, E>),
-}
-
-impl<V, E> FrameBuild<V, E> for ScfTestFrame<V, E> {
-    fn from_block(frame: BlockFrame<V, E>) -> Self {
-        ScfTestFrame::Block(frame)
-    }
-    fn from_cfg(frame: CFGFrame<V, E>) -> Self {
-        ScfTestFrame::CFG(frame)
-    }
-    fn from_call(frame: CallFrame<V>) -> Self {
-        ScfTestFrame::Call(frame)
-    }
-    fn from_digraph(frame: DiGraphFrame<V, E>) -> Self {
-        ScfTestFrame::DiGraph(frame)
-    }
 }
 
 impl<V, E> BuildScfIf<V, E> for ScfTestFrame<V, E> {
@@ -790,24 +776,13 @@ type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
 /// silently running concrete traversal over lattice values. Giving `graph_eval`
 /// a per-engine dispatch trait (as `kirin-scf` does for `scf.if`/`scf.for`)
 /// would remove the need for both the bound and this variant.
+#[derive(AbstractFrameBuild)]
 enum GraphAbstractFrame<V, E, K> {
     Block(AbstractBlockFrame<V, E, K>),
     Call(AbstractCallFrame<V, E, K>),
     DiGraph(AbstractDiGraphFrame<V, E, K>),
     /// No abstract walker exists for this body kind; carries the reason.
     NoWalker(&'static str),
-}
-
-impl<V, E, K> AbstractFrameBuild<V, E, K> for GraphAbstractFrame<V, E, K> {
-    fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
-        GraphAbstractFrame::Block(frame)
-    }
-    fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
-        GraphAbstractFrame::Call(frame)
-    }
-    fn from_digraph(frame: AbstractDiGraphFrame<V, E, K>) -> Result<Self, E> {
-        Ok(GraphAbstractFrame::DiGraph(frame))
-    }
 }
 
 impl<V, E, K> FrameBuild<V, E> for GraphAbstractFrame<V, E, K> {

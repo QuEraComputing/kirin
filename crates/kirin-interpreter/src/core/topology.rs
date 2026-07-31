@@ -3,15 +3,22 @@
 //!
 //! Backward analyses need the *shape* of a body: which blocks and graph
 //! nodes exist (including bodies nested inside structured statements), each
-//! block's statements, the CFG successor relation, each block's *feeders* —
-//! the statements whose rules can translate demand on that block's
-//! parameters (terminators targeting it, statements owning it) — and each
-//! graph port's *boundary* (the statement owning the graph, and the port's
-//! slot index). This is topology only — uses/defs/edge-argument *semantics*
-//! stay in dialect [`Interpretable`](crate::Interpretable) rules; the
-//! enumeration consumes the generic [`HasSuccessors`]/[`HasBlocks`]/
-//! [`HasCFG`]/[`HasDigraphs`]/[`HasUngraphs`] contract every dialect
-//! derives.
+//! block's statements, each block's *feeders* — the statements whose rules can
+//! translate demand on that block's parameters (terminators targeting it,
+//! statements owning it) — and each graph port's *boundary* (the statement
+//! owning the graph, and the port's slot index). This is topology only —
+//! uses/defs/edge-argument *semantics* stay in dialect
+//! [`Interpretable`](crate::Interpretable) rules; the enumeration consumes the
+//! generic [`HasSuccessors`]/[`HasBlocks`]/[`HasCFG`]/[`HasDigraphs`]/
+//! [`HasUngraphs`] contract every dialect derives.
+//!
+//! Note what is deliberately *not* here: the forward CFG successor relation.
+//! That is a local IR query — `stmt.definition(stage).successors()` on a
+//! block's terminator answers it — so materializing a copy would duplicate IR
+//! state that can go stale. `feeders` is the *reverse* relation and is not
+//! obtainable from a block alone (finding who targets it requires sweeping the
+//! whole body), which is why this prepass materializes that one and not the
+//! forward one.
 
 use std::collections::{HashMap, HashSet};
 
@@ -22,40 +29,33 @@ use kirin_ir::{
 
 use crate::{Body, PortBoundary};
 
-/// The shape of one block: its statements and CFG successors.
+/// The shape of one block: which block it is and the statements it contains.
 #[derive(Clone, Debug)]
 pub struct BlockTopology {
     pub block: Block,
     /// Statements in program order; the terminator, if any, is last.
     pub stmts: Vec<Statement>,
-    /// CFG successor blocks (targets of the block's terminator).
-    pub successors: Vec<Block>,
     /// `true` for blocks nested inside a statement (structured bodies),
     /// `false` for the analyzed body's own top-level blocks.
-    pub nested: bool,
-}
-
-/// The shape of one graph body: its node statements, in declaration order.
-///
-/// Order is enumeration order, not a schedule — execution scheduling is the
-/// walker's job, and backward prepasses only need *all* statements.
-#[derive(Clone, Debug)]
-pub struct GraphTopology {
-    /// `Body::DiGraph(..)` or `Body::UnGraph(..)`.
-    pub graph: Body,
-    pub stmts: Vec<Statement>,
-    /// `true` for graphs nested inside a statement, `false` for the analyzed
-    /// body itself.
     pub nested: bool,
 }
 
 /// The shape of a body: all blocks and graph parts (the analyzed body's own
 /// plus structured bodies, recursively), the block-feeder index, and the
 /// graph-port boundary index.
+///
+/// Graph parts contribute only their node statements, flattened: nothing
+/// consumes per-graph grouping, the graph handle, or a nested flag, so none is
+/// recorded. Order is enumeration order, not a schedule — scheduling is the
+/// walker's job, and backward prepasses only need *all* statements.
 #[derive(Clone, Debug, Default)]
 pub struct BodyTopology {
     pub blocks: Vec<BlockTopology>,
-    pub graphs: Vec<GraphTopology>,
+    /// Position of each block within `blocks`, so a lookup by [`Block`] is O(1)
+    /// rather than a scan. Built during collection; holds no statements of its
+    /// own.
+    block_index: HashMap<Block, usize>,
+    graph_stmts: Vec<Statement>,
     feeders: HashMap<Block, Vec<Statement>>,
     port_boundary: HashMap<SSAValue, PortBoundary>,
 }
@@ -73,6 +73,18 @@ impl BodyTopology {
         self.blocks.iter().filter(|block| !block.nested)
     }
 
+    /// The statements of `block` in program order (terminator last), if this
+    /// topology enumerated it.
+    ///
+    /// O(1) via `block_index`. Worth indexing: the dense backward engine asks
+    /// this once per block-owner analysis, and owners are re-analyzed until the
+    /// fixpoint converges — a scan here is O(blocks) per iteration.
+    pub fn block_statements(&self, block: Block) -> Option<&[Statement]> {
+        self.block_index
+            .get(&block)
+            .map(|&position| self.blocks[position].stmts.as_slice())
+    }
+
     /// Where `port` sits on its owning statement's boundary, if the port
     /// belongs to a graph enumerated by this topology.
     pub fn port_boundary(&self, port: impl Into<SSAValue>) -> Option<&PortBoundary> {
@@ -85,7 +97,7 @@ impl BodyTopology {
         self.blocks
             .iter()
             .flat_map(|block| block.stmts.iter().copied())
-            .chain(self.graphs.iter().flat_map(|g| g.stmts.iter().copied()))
+            .chain(self.graph_stmts.iter().copied())
     }
 }
 
@@ -107,10 +119,10 @@ where
             collect_block(stage, block, false, &mut topology, &mut visited);
         }
         Body::DiGraph(graph) => {
-            collect_digraph(stage, graph, false, &mut topology, &mut visited);
+            collect_digraph(stage, graph, &mut topology, &mut visited);
         }
         Body::UnGraph(graph) => {
-            collect_ungraph(stage, graph, false, &mut topology, &mut visited);
+            collect_ungraph(stage, graph, &mut topology, &mut visited);
         }
     }
     topology
@@ -135,20 +147,22 @@ fn collect_block<L>(
         stmts.push(terminator);
     }
 
-    // CFG successor edges: the target's feeders include the terminator.
-    let mut successors = Vec::new();
+    // Record the *reverse* edge only: a statement with an edge into `target`
+    // is one of `target`'s feeders. The forward direction is left to the IR.
     for &stmt in &stmts {
         for successor in stmt.definition(stage).successors() {
-            let target = successor.target();
-            successors.push(target);
-            topology.feeders.entry(target).or_default().push(stmt);
+            topology
+                .feeders
+                .entry(successor.target())
+                .or_default()
+                .push(stmt);
         }
     }
 
+    topology.block_index.insert(block, topology.blocks.len());
     topology.blocks.push(BlockTopology {
         block,
         stmts: stmts.clone(),
-        successors,
         nested,
     });
 
@@ -160,7 +174,6 @@ fn collect_block<L>(
 fn collect_digraph<L>(
     stage: &StageInfo<L>,
     graph: DiGraph,
-    nested: bool,
     topology: &mut BodyTopology,
     visited: &mut HashSet<Block>,
 ) where
@@ -170,11 +183,7 @@ fn collect_digraph<L>(
     let info = graph.expect_info(stage);
     let stmts: Vec<Statement> = info.graph().node_weights().copied().collect();
     record_ports(info.parent(), info.ports(), topology);
-    topology.graphs.push(GraphTopology {
-        graph: Body::DiGraph(graph),
-        stmts: stmts.clone(),
-        nested,
-    });
+    topology.graph_stmts.extend(stmts.iter().copied());
     for stmt in stmts {
         collect_owned_bodies(stage, stmt, topology, visited);
     }
@@ -183,7 +192,6 @@ fn collect_digraph<L>(
 fn collect_ungraph<L>(
     stage: &StageInfo<L>,
     graph: UnGraph,
-    nested: bool,
     topology: &mut BodyTopology,
     visited: &mut HashSet<Block>,
 ) where
@@ -193,11 +201,7 @@ fn collect_ungraph<L>(
     let info = graph.expect_info(stage);
     let stmts: Vec<Statement> = info.graph().node_weights().copied().collect();
     record_ports(info.parent(), info.ports(), topology);
-    topology.graphs.push(GraphTopology {
-        graph: Body::UnGraph(graph),
-        stmts: stmts.clone(),
-        nested,
-    });
+    topology.graph_stmts.extend(stmts.iter().copied());
     for stmt in stmts {
         collect_owned_bodies(stage, stmt, topology, visited);
     }
@@ -231,10 +235,10 @@ fn collect_owned_bodies<L>(
         }
     }
     for owned in owned_digraphs {
-        collect_digraph(stage, owned, true, topology, visited);
+        collect_digraph(stage, owned, topology, visited);
     }
     for owned in owned_ungraphs {
-        collect_ungraph(stage, owned, true, topology, visited);
+        collect_ungraph(stage, owned, topology, visited);
     }
 }
 

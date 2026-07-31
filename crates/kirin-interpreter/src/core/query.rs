@@ -278,8 +278,9 @@ where
 }
 
 /// The topology of a body: blocks and graph parts (including nested
-/// structured bodies), statements per part, CFG successors, block feeders,
-/// and graph-port boundaries.
+/// structured bodies), statements per part, block feeders, and graph-port
+/// boundaries. Forward CFG successors are deliberately absent — those are a
+/// local IR query on a block's terminator.
 pub struct BodyTopologyQuery(pub Body);
 
 impl<S, L> StageAction<S, L> for BodyTopologyQuery

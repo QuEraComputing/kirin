@@ -493,10 +493,8 @@ where
     fn block_statements(&self, block: Block) -> Result<Vec<Statement>, E> {
         self.store()
             .topology
-            .blocks
-            .iter()
-            .find(|candidate| candidate.block == block)
-            .map(|candidate| candidate.stmts.clone())
+            .block_statements(block)
+            .map(<[Statement]>::to_vec)
             .ok_or_else(|| E::from(InterpreterError::MissingBlock(block)))
     }
 
