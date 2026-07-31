@@ -708,7 +708,7 @@ where
     V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
-    F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, Completion = DenseBackwardCompletion<V>>
+    F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, F, Completion = DenseBackwardCompletion<V>>
         + DenseFrameBuild<V, E>,
 {
     /// Run the block-boundary fixpoint over `cfg` in `stage`: seed every

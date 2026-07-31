@@ -1,6 +1,8 @@
 use kirin_ir::{CompileStage, Product, SSAValue};
 
-use crate::{Body, CallEffect, Callee, EnvIndex, FrameDriver, FrameEffect, InterpreterError};
+use crate::{
+    Body, CallEffect, Callee, EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError,
+};
 
 use super::{BlockFrame, CFGFrame, Completion, DiGraphFrame, FrameBuild, UnGraphEntry};
 
@@ -92,13 +94,18 @@ where
             },
         }
     }
+}
 
-    pub fn step_into<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, I::Error>
-    where
-        I: FrameDriver<Value = V>,
-        I::Error: From<InterpreterError>,
-        F: FrameBuild<V, I::Error>,
-    {
+impl<I, F, V, E> Frame<I, F> for CallFrame<V>
+where
+    I: FrameDriver<Value = V, Error = E>,
+    F: FrameBuild<V, E>,
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    type Completion = Completion<V>;
+
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
         match self.state {
             CallState::Pending {
                 resolve_stage,
@@ -139,32 +146,27 @@ where
                     child,
                 })
             }
-            CallState::Awaiting { .. } => Err(I::Error::from(InterpreterError::Custom(
+            CallState::Awaiting { .. } => Err(E::from(InterpreterError::Custom(
                 "call frame stepped while awaiting a return",
             ))),
         }
     }
 
-    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, Completion<V>>, InterpreterError> {
-        Err(InterpreterError::Custom(
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+        Err(E::from(InterpreterError::Custom(
             "call frame resumed without a return",
-        ))
+        )))
     }
 
     /// The callee completed: validate the completion kind, free the callee
     /// activation exactly once, and deliver the returned values.
-    pub fn resume_into<I, F>(
+    fn resume_into(
         self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, I::Error>
-    where
-        I: FrameDriver<Value = V>,
-        I::Error: From<InterpreterError>,
-        F: FrameBuild<V, I::Error>,
-    {
+    ) -> Result<FrameEffect<F, Completion<V>>, E> {
         let CallState::Awaiting { callee_env, dest } = self.state else {
-            return Err(I::Error::from(InterpreterError::Custom(
+            return Err(E::from(InterpreterError::Custom(
                 "call frame resumed before dispatch",
             )));
         };
@@ -173,7 +175,7 @@ where
             // (a callable DiGraph's outputs are the call's returned values).
             Completion::Returned(values) | Completion::Finished(values) => values,
             Completion::Yielded(_) => {
-                return Err(I::Error::from(InterpreterError::Custom(
+                return Err(E::from(InterpreterError::Custom(
                     "structured yield reached a function-call boundary (a callable body must exit with return)",
                 )));
             }

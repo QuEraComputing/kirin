@@ -319,49 +319,49 @@ impl<V, E> BuildScfFor<V, E> for ScfTestFrame<V, E> {
     }
 }
 
-impl<I, V, E> Frame<I> for ScfTestFrame<V, E>
+impl<I, F, V, E> Frame<I, F> for ScfTestFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E>
-        + kirin_interpreter::SparseForwardInterp<Frame = ScfTestFrame<V, E>>,
+    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    F: FrameBuild<V, E> + BuildScfIf<V, E> + BuildScfFor<V, E>,
     V: Clone + kirin_scf::ForLoopValue,
     E: From<InterpreterError>,
 {
     type Completion = Completion<V>;
 
-    fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
         match self {
-            ScfTestFrame::Block(frame) => frame.step_into::<I, Self>(interp),
-            ScfTestFrame::CFG(frame) => frame.step_into::<I, Self>(interp),
-            ScfTestFrame::Call(frame) => frame.step_into::<I, Self>(interp),
-            ScfTestFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
-            ScfTestFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
-            ScfTestFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
+            ScfTestFrame::Block(frame) => frame.step_into(interp),
+            ScfTestFrame::CFG(frame) => frame.step_into(interp),
+            ScfTestFrame::Call(frame) => frame.step_into(interp),
+            ScfTestFrame::DiGraph(frame) => frame.step_into(interp),
+            ScfTestFrame::ScfIf(frame) => frame.step_into(interp),
+            ScfTestFrame::ScfFor(frame) => frame.step_into(interp),
         }
     }
 
-    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
         match self {
-            ScfTestFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-            ScfTestFrame::CFG(frame) => Ok(frame.resume_done_into::<Self>()),
-            ScfTestFrame::Call(frame) => frame.resume_done_into::<Self>().map_err(I::Error::from),
-            ScfTestFrame::DiGraph(frame) => Ok(frame.resume_done_into::<Self>()),
-            ScfTestFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
-            ScfTestFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
+            ScfTestFrame::Block(frame) => frame.resume_done_into(interp),
+            ScfTestFrame::CFG(frame) => frame.resume_done_into(interp),
+            ScfTestFrame::Call(frame) => frame.resume_done_into(interp),
+            ScfTestFrame::DiGraph(frame) => frame.resume_done_into(interp),
+            ScfTestFrame::ScfIf(frame) => frame.resume_done_into(interp),
+            ScfTestFrame::ScfFor(frame) => frame.resume_done_into(interp),
         }
     }
 
-    fn resume(
+    fn resume_into(
         self,
-        completion: Self::Completion,
+        completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    ) -> Result<FrameEffect<F, Completion<V>>, E> {
         match self {
-            ScfTestFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
-            ScfTestFrame::CFG(frame) => frame.resume_into::<I, Self>(completion, interp),
-            ScfTestFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
-            ScfTestFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
-            ScfTestFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),
-            ScfTestFrame::ScfFor(frame) => frame.resume_into::<I, Self>(completion, interp),
+            ScfTestFrame::Block(frame) => frame.resume_into(completion, interp),
+            ScfTestFrame::CFG(frame) => frame.resume_into(completion, interp),
+            ScfTestFrame::Call(frame) => frame.resume_into(completion, interp),
+            ScfTestFrame::DiGraph(frame) => frame.resume_into(completion, interp),
+            ScfTestFrame::ScfIf(frame) => frame.resume_into(completion, interp),
+            ScfTestFrame::ScfFor(frame) => frame.resume_into(completion, interp),
         }
     }
 }
@@ -565,10 +565,14 @@ impl UnGraphChainFrame {
             outputs: Vec::new(),
         }
     }
+}
 
-    fn step(
+impl<'ir> Frame<UnEngine<'ir>, UnPolicyFrame> for UnGraphChainFrame {
+    type Completion = Completion<i64>;
+
+    fn step_into(
         mut self,
-        interp: &mut UnEngine<'_>,
+        interp: &mut UnEngine<'ir>,
     ) -> Result<FrameEffect<UnPolicyFrame, Completion<i64>>, TestError> {
         // First step: bind the boundary ports and fix the policy's schedule
         // and output convention from the graph's structure.
@@ -623,62 +627,73 @@ impl UnGraphChainFrame {
             }
         }
     }
+
+    fn resume_done_into(
+        self,
+        _interp: &mut UnEngine<'ir>,
+    ) -> Result<FrameEffect<UnPolicyFrame, Completion<i64>>, TestError> {
+        Err(TestError::Core(InterpreterError::Custom(
+            "the chain policy pushes no children",
+        )))
+    }
+
+    fn resume_into(
+        self,
+        _completion: Completion<i64>,
+        _interp: &mut UnEngine<'ir>,
+    ) -> Result<FrameEffect<UnPolicyFrame, Completion<i64>>, TestError> {
+        Err(TestError::Core(InterpreterError::Custom(
+            "the chain policy pushes no children",
+        )))
+    }
 }
 
 type UnEngine<'ir> = ConcreteInterpreter<'ir, L, i64, TestError, SameStageLinker, UnPolicyFrame>;
 
-impl<'ir> Frame<UnEngine<'ir>> for UnPolicyFrame {
+// Pinned to `F = Self` rather than generic: the `Chain` variant holds the
+// compiler-supplied `UnGraphChainFrame`, which has no `*FrameBuild` hook (it is
+// constructed through `FrameBuild::from_ungraph_entry`), so there is no way to
+// re-wrap it into an arbitrary outer `F`.
+impl<'ir> Frame<UnEngine<'ir>, Self> for UnPolicyFrame {
     type Completion = Completion<i64>;
 
-    fn step(
+    fn step_into(
         self,
         interp: &mut UnEngine<'ir>,
-    ) -> Result<FrameEffect<Self, Self::Completion>, TestError> {
+    ) -> Result<FrameEffect<Self, Completion<i64>>, TestError> {
         match self {
-            UnPolicyFrame::Block(frame) => frame.step_into::<UnEngine<'ir>, Self>(interp),
-            UnPolicyFrame::CFG(frame) => frame.step_into::<UnEngine<'ir>, Self>(interp),
-            UnPolicyFrame::Call(frame) => frame.step_into::<UnEngine<'ir>, Self>(interp),
-            UnPolicyFrame::DiGraph(frame) => frame.step_into::<UnEngine<'ir>, Self>(interp),
-            UnPolicyFrame::Chain(frame) => frame.step(interp),
+            UnPolicyFrame::Block(frame) => frame.step_into(interp),
+            UnPolicyFrame::CFG(frame) => frame.step_into(interp),
+            UnPolicyFrame::Call(frame) => frame.step_into(interp),
+            UnPolicyFrame::DiGraph(frame) => frame.step_into(interp),
+            UnPolicyFrame::Chain(frame) => frame.step_into(interp),
         }
     }
 
-    fn resume_done(
+    fn resume_done_into(
         self,
-        _interp: &mut UnEngine<'ir>,
-    ) -> Result<FrameEffect<Self, Self::Completion>, TestError> {
+        interp: &mut UnEngine<'ir>,
+    ) -> Result<FrameEffect<Self, Completion<i64>>, TestError> {
         match self {
-            UnPolicyFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-            UnPolicyFrame::CFG(frame) => Ok(frame.resume_done_into::<Self>()),
-            UnPolicyFrame::Call(frame) => frame.resume_done_into::<Self>().map_err(TestError::from),
-            UnPolicyFrame::DiGraph(frame) => Ok(frame.resume_done_into::<Self>()),
-            UnPolicyFrame::Chain(_) => Err(TestError::Core(InterpreterError::Custom(
-                "the chain policy pushes no children",
-            ))),
+            UnPolicyFrame::Block(frame) => frame.resume_done_into(interp),
+            UnPolicyFrame::CFG(frame) => frame.resume_done_into(interp),
+            UnPolicyFrame::Call(frame) => frame.resume_done_into(interp),
+            UnPolicyFrame::DiGraph(frame) => frame.resume_done_into(interp),
+            UnPolicyFrame::Chain(frame) => frame.resume_done_into(interp),
         }
     }
 
-    fn resume(
+    fn resume_into(
         self,
-        completion: Self::Completion,
+        completion: Completion<i64>,
         interp: &mut UnEngine<'ir>,
-    ) -> Result<FrameEffect<Self, Self::Completion>, TestError> {
+    ) -> Result<FrameEffect<Self, Completion<i64>>, TestError> {
         match self {
-            UnPolicyFrame::Block(frame) => {
-                frame.resume_into::<UnEngine<'ir>, Self>(completion, interp)
-            }
-            UnPolicyFrame::CFG(frame) => {
-                frame.resume_into::<UnEngine<'ir>, Self>(completion, interp)
-            }
-            UnPolicyFrame::Call(frame) => {
-                frame.resume_into::<UnEngine<'ir>, Self>(completion, interp)
-            }
-            UnPolicyFrame::DiGraph(frame) => {
-                frame.resume_into::<UnEngine<'ir>, Self>(completion, interp)
-            }
-            UnPolicyFrame::Chain(_) => Err(TestError::Core(InterpreterError::Custom(
-                "the chain policy pushes no children",
-            ))),
+            UnPolicyFrame::Block(frame) => frame.resume_into(completion, interp),
+            UnPolicyFrame::CFG(frame) => frame.resume_into(completion, interp),
+            UnPolicyFrame::Call(frame) => frame.resume_into(completion, interp),
+            UnPolicyFrame::DiGraph(frame) => frame.resume_into(completion, interp),
+            UnPolicyFrame::Chain(frame) => frame.resume_into(completion, interp),
         }
     }
 }
@@ -810,50 +825,44 @@ impl<V, E, K> FrameBuild<V, E> for GraphAbstractFrame<V, E, K> {
     }
 }
 
-impl<I, V, E, K> Frame<I> for GraphAbstractFrame<V, E, K>
+impl<I, F, V, E, K> Frame<I, F> for GraphAbstractFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-        + SparseForwardInterp<Frame = GraphAbstractFrame<V, E, K>>,
+    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + SparseForwardInterp<Frame = F>,
+    F: AbstractFrameBuild<V, E, K>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
-    fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match self {
-            GraphAbstractFrame::Block(frame) => frame.step_into::<I, Self>(interp),
-            GraphAbstractFrame::Call(frame) => frame.step_into::<I, Self>(interp),
-            GraphAbstractFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
-            GraphAbstractFrame::NoWalker(reason) => {
-                Err(I::Error::from(InterpreterError::Custom(reason)))
-            }
+            GraphAbstractFrame::Block(frame) => frame.step_into(interp),
+            GraphAbstractFrame::Call(frame) => frame.step_into(interp),
+            GraphAbstractFrame::DiGraph(frame) => frame.step_into(interp),
+            GraphAbstractFrame::NoWalker(reason) => Err(E::from(InterpreterError::Custom(reason))),
         }
     }
 
-    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match self {
-            GraphAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-            GraphAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
-            GraphAbstractFrame::DiGraph(frame) => frame.resume_done_into::<Self>(),
-            GraphAbstractFrame::NoWalker(reason) => {
-                Err(I::Error::from(InterpreterError::Custom(reason)))
-            }
+            GraphAbstractFrame::Block(frame) => frame.resume_done_into(interp),
+            GraphAbstractFrame::Call(frame) => frame.resume_done_into(interp),
+            GraphAbstractFrame::DiGraph(frame) => frame.resume_done_into(interp),
+            GraphAbstractFrame::NoWalker(reason) => Err(E::from(InterpreterError::Custom(reason))),
         }
     }
 
-    fn resume(
+    fn resume_into(
         self,
-        completion: Self::Completion,
+        completion: AbstractCompletion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match self {
-            GraphAbstractFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
-            GraphAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
-            GraphAbstractFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
-            GraphAbstractFrame::NoWalker(reason) => {
-                Err(I::Error::from(InterpreterError::Custom(reason)))
-            }
+            GraphAbstractFrame::Block(frame) => frame.resume_into(completion, interp),
+            GraphAbstractFrame::Call(frame) => frame.resume_into(completion, interp),
+            GraphAbstractFrame::DiGraph(frame) => frame.resume_into(completion, interp),
+            GraphAbstractFrame::NoWalker(reason) => Err(E::from(InterpreterError::Custom(reason))),
         }
     }
 }

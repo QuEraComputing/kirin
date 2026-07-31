@@ -1,7 +1,8 @@
 use kirin_ir::{CFG, CompileStage, Product};
 
 use crate::{
-    EnvIndex, FrameDriver, FrameEffect, InterpreterError, SparseForwardEffect, SparseForwardInterp,
+    EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError, SparseForwardEffect,
+    SparseForwardInterp,
 };
 
 use super::block_cursor::BlockCursor;
@@ -48,14 +49,20 @@ where
             _marker: std::marker::PhantomData,
         }
     }
+}
+
+impl<I, F, V, E> Frame<I, F> for CFGFrame<V, E>
+where
+    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    F: FrameBuild<V, E>,
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    type Completion = Completion<V>;
 
     /// Execute the next statement and translate its [`SparseForwardEffect`]
     /// into a [`FrameEffect`] over the total frame type `F`.
-    pub fn step_into<I, F>(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
-    where
-        I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
-        F: FrameBuild<V, E>,
-    {
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
         // First step: find the entry block and bind the entry arguments.
         if let Some(args) = self.pending.take() {
             let entry = interp
@@ -107,25 +114,18 @@ where
     /// A child finished without a payload (its results are already in the
     /// shared activation, e.g. a returned call): resume at the advanced
     /// cursor.
-    pub fn resume_done_into<F>(self) -> FrameEffect<F, Completion<V>>
-    where
-        F: FrameBuild<V, E>,
-    {
-        FrameEffect::Continue(F::from_cfg(self))
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+        Ok(FrameEffect::Continue(F::from_cfg(self)))
     }
 
     /// A child bubbled a completion: a pushed frame's values land in the
     /// push's result slots; a `Returned` keeps bubbling toward the nearest
     /// [`CallFrame`] (this frame owns no activation to free).
-    pub fn resume_into<I, F>(
+    fn resume_into(
         mut self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, E>
-    where
-        I: FrameDriver<Value = V, Error = E>,
-        F: FrameBuild<V, E>,
-    {
+    ) -> Result<FrameEffect<F, Completion<V>>, E> {
         match completion {
             Completion::Finished(values) | Completion::Yielded(values) => {
                 let cursor = self.cursor.as_mut().ok_or_else(|| {

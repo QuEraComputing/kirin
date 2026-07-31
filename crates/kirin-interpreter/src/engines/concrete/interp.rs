@@ -210,7 +210,7 @@ where
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,
-    F: Frame<Self, Completion = Completion<V>> + FrameBuild<V, E>,
+    F: Frame<Self, F, Completion = Completion<V>> + FrameBuild<V, E>,
 {
     /// Resolve `stage`/`function` by name and execute it to completion.
     pub fn call_by_name(

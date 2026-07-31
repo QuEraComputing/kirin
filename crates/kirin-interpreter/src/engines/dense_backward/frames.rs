@@ -77,15 +77,21 @@ where
     pub fn structured_body(stage: CompileStage, block: Block) -> Self {
         Self::with_mode(stage, block, DenseBlockMode::StructuredBody)
     }
+}
 
-    pub fn step_into<I, F>(
+impl<I, F, V, E> Frame<I, F> for DenseBlockFrame<V, E>
+where
+    I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+    F: DenseFrameBuild<V, E>,
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    type Completion = DenseBackwardCompletion<V>;
+
+    fn step_into(
         mut self,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E>
-    where
-        I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
-        F: DenseFrameBuild<V, E>,
-    {
+    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
         let statements = match self.statements.as_ref() {
             Some(statements) => statements,
             None => {
@@ -147,21 +153,20 @@ where
         }
     }
 
-    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
+    fn resume_done_into(
+        self,
+        _interp: &mut I,
+    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
         Err(E::from(InterpreterError::Custom(
             "dense block frames resume only with completions",
         )))
     }
 
-    pub fn resume_into<I, F>(
+    fn resume_into(
         mut self,
         completion: DenseBackwardCompletion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E>
-    where
-        I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
-        F: DenseFrameBuild<V, E>,
-    {
+    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
         match completion {
             DenseBackwardCompletion::Structured => {
                 if let Some(statement) = self.pending_point.take() {
@@ -197,33 +202,39 @@ impl<V, E> DenseFrameBuild<V, E> for StandardDenseBackwardFrame<V, E> {
     }
 }
 
-impl<I, V, E> Frame<I> for StandardDenseBackwardFrame<V, E>
+/// A *universe* impl, generic over the outer total frame type `F` — see
+/// [`Frame`] for what that buys.
+impl<I, F, V, E> Frame<I, F> for StandardDenseBackwardFrame<V, E>
 where
-    I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = StandardDenseBackwardFrame<V, E>>,
+    I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+    F: DenseFrameBuild<V, E>,
     V: Clone,
     E: From<InterpreterError>,
 {
     type Completion = DenseBackwardCompletion<V>;
 
-    fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, E> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
         match self {
-            Self::Block(frame) => frame.step_into::<I, Self>(interp),
+            Self::Block(frame) => frame.step_into(interp),
         }
     }
 
-    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, E> {
-        match self {
-            Self::Block(frame) => frame.resume_done_into::<Self>(),
-        }
-    }
-
-    fn resume(
+    fn resume_done_into(
         self,
-        completion: Self::Completion,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Self::Completion>, E> {
+    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
         match self {
-            Self::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
+            Self::Block(frame) => frame.resume_done_into(interp),
+        }
+    }
+
+    fn resume_into(
+        self,
+        completion: DenseBackwardCompletion<V>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
+        match self {
+            Self::Block(frame) => frame.resume_into(completion, interp),
         }
     }
 }

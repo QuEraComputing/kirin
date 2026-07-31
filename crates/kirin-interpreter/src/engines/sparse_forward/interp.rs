@@ -1475,7 +1475,7 @@ where
     Lk: Linker<S>,
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
-    F: Frame<ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>, Completion = AbstractCompletion<V>>
+    F: Frame<ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>, F, Completion = AbstractCompletion<V>>
         + AbstractFrameBuild<V, E, <P as CallContext<V>>::Key>,
 {
     /// Resolve `stage`/`function` by name and analyze. Returns the function's

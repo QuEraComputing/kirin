@@ -341,7 +341,13 @@ impl<V> DemandFrame<V> {
     }
 }
 
-impl<'ir, S, V, E, Sem> Frame<SparseBackwardDriver<'ir, S, V, E, Sem>> for DemandFrame<V>
+// A leaf *universe*, deliberately pinned to `F = Self` rather than generic like
+// the other frames. `step_into` returns `FrameEffect::Continue(self)`, so being
+// generic over `F` would need a conversion `DemandFrame -> F` — i.e. a public
+// `DemandFrameBuild` hook that nothing currently calls. Add it if the sparse
+// backward engine ever needs a wrapping frame (an instrumenting layer, say);
+// until then the pinned signature states the fact that it cannot be embedded.
+impl<'ir, S, V, E, Sem> Frame<SparseBackwardDriver<'ir, S, V, E, Sem>, Self> for DemandFrame<V>
 where
     S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom,
@@ -350,7 +356,7 @@ where
 {
     type Completion = Vec<(SSAValue, V)>;
 
-    fn step(
+    fn step_into(
         mut self,
         interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
     ) -> Result<FrameEffect<Self, Self::Completion>, E> {
@@ -365,7 +371,7 @@ where
         }
     }
 
-    fn resume_done(
+    fn resume_done_into(
         self,
         _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
     ) -> Result<FrameEffect<Self, Self::Completion>, E> {
@@ -374,7 +380,7 @@ where
         )))
     }
 
-    fn resume(
+    fn resume_into(
         self,
         _completion: Self::Completion,
         _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,

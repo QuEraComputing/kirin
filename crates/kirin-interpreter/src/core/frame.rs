@@ -20,10 +20,11 @@ pub enum FrameEffect<F, C> {
     /// Push `parent` then `child`; `child` runs next, `parent` resumes after.
     Push { parent: F, child: F },
     /// This frame finished with no payload; its parent's
-    /// [`Frame::resume_done`] is called.
+    /// [`Frame::resume_done_into`] is called.
     Done,
-    /// This frame produced a completion `C`; its parent's [`Frame::resume`] is
-    /// called (or, at the root, the run finishes with `C`).
+    /// This frame produced a completion `C`; its parent's
+    /// [`Frame::resume_into`] is called (or, at the root, the run finishes with
+    /// `C`).
     Complete(C),
 }
 
@@ -37,21 +38,43 @@ impl<T: Interp> FrameEngine for T {
     type Error = <T as Interp>::Error;
 }
 
-/// A continuation frame anchored in an IR traversal.
+/// A continuation frame anchored in an IR traversal, expressed over the total
+/// frame type `F` it composes into.
 ///
-/// Implemented by the total frame enum `F`. Each method consumes `self` and
-/// returns the next structural move as a [`FrameEffect`].
-pub trait Frame<I: FrameEngine>: Sized {
+/// Every method consumes `self` and returns the next structural move as a
+/// [`FrameEffect`] **over `F`** — never over `Self`. That single choice is what
+/// lets one trait serve both roles a frame stack needs:
+///
+/// - a **member** — an individual walker ([`BlockFrame`](crate::BlockFrame),
+///   [`CallFrame`](crate::CallFrame), a dialect's own frame). It is one variant
+///   of `F` and names its successors in `F`, re-wrapping itself through the
+///   relevant `*FrameBuild` hook. Members are generic over `F`, so the same
+///   walker composes into any language's frame type.
+/// - a **universe** — a language's total frame enum. It implements
+///   `Frame<I, Self>` when it is the stack's element type, and stays generic
+///   over `F` so that it can *also* be embedded in a larger enum (an
+///   instrumenting wrapper, or another language's frame type) without
+///   re-enumerating its variants.
+///
+/// [`drive_frames`] bounds on `F: Frame<I, F>`: the stack's element type must be
+/// a universe — a type able to represent every frame that can appear on it.
+pub trait Frame<I: FrameEngine, F>: Sized {
     /// The completion payload this frame family bubbles to parents/root.
     type Completion;
 
-    fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
-    fn resume_done(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
-    fn resume(
+    /// Do this frame's next unit of work.
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+
+    /// A pushed child finished with no payload.
+    fn resume_done_into(self, interp: &mut I)
+    -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+
+    /// A pushed child finished with a completion payload.
+    fn resume_into(
         self,
         completion: Self::Completion,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
+    ) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
 }
 
 /// Shared frame-stepping loop.
@@ -59,13 +82,13 @@ pub fn drive_frames<I, F>(engine: &mut I, frames: &mut Vec<F>) -> Result<F::Comp
 where
     I: FrameEngine,
     I::Error: From<InterpreterError>,
-    F: Frame<I>,
+    F: Frame<I, F>,
 {
     loop {
         let frame = frames
             .pop()
             .ok_or_else(|| I::Error::from(InterpreterError::EmptyFrameStack))?;
-        let mut effect = frame.step(engine)?;
+        let mut effect = frame.step_into(engine)?;
         loop {
             match effect {
                 FrameEffect::Continue(frame) => {
@@ -81,11 +104,11 @@ where
                     let parent = frames
                         .pop()
                         .ok_or_else(|| I::Error::from(InterpreterError::EmptyFrameStack))?;
-                    effect = parent.resume_done(engine)?;
+                    effect = parent.resume_done_into(engine)?;
                 }
                 FrameEffect::Complete(completion) => match frames.pop() {
                     Some(parent) => {
-                        effect = parent.resume(completion, engine)?;
+                        effect = parent.resume_into(completion, engine)?;
                     }
                     None => return Ok(completion),
                 },

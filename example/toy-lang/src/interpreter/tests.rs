@@ -577,7 +577,9 @@ mod advanced {
     };
 
     use super::build_pipeline;
-    use crate::interpreter::ToyError;
+    use kirin::prelude::Lattice;
+
+    use crate::interpreter::{ToyAbstractFrame, ToyError, ToyFrame};
     use crate::stage::Stage;
 
     // --- A custom total frame enum -----------------------------------------
@@ -599,99 +601,70 @@ mod advanced {
         body_steps: usize,
     }
 
-    enum TracingFrame<V, E> {
-        Block(BlockFrame<V, E>),
-        CFG(CFGFrame<V, E>),
-        Call(CallFrame<V>),
-        DiGraph(DiGraphFrame<V, E>),
-        ScfIf(ScfIfFrame<V, E>),
-        ScfFor(ScfForFrame<V, E>),
-    }
+    /// A *wrapper* universe: it does not re-enumerate the language's frames, it
+    /// embeds `ToyFrame` whole and observes it. Only possible because `Frame`'s
+    /// effects are over the outer total type `F`, not over `Self` — so
+    /// `ToyFrame: Frame<I, TracingFrame>` holds as soon as `TracingFrame`
+    /// implements the build traits.
+    struct TracingFrame<V, E>(ToyFrame<V, E>);
 
     impl<V, E> FrameBuild<V, E> for TracingFrame<V, E> {
         fn from_block(frame: BlockFrame<V, E>) -> Self {
-            TracingFrame::Block(frame)
+            Self(ToyFrame::Block(frame))
         }
         fn from_cfg(frame: CFGFrame<V, E>) -> Self {
-            TracingFrame::CFG(frame)
+            Self(ToyFrame::CFG(frame))
         }
         fn from_call(frame: CallFrame<V>) -> Self {
-            TracingFrame::Call(frame)
+            Self(ToyFrame::Call(frame))
         }
         fn from_digraph(frame: DiGraphFrame<V, E>) -> Self {
-            TracingFrame::DiGraph(frame)
+            Self(ToyFrame::DiGraph(frame))
         }
     }
 
     impl<V, E> BuildScfIf<V, E> for TracingFrame<V, E> {
         fn scf_if(frame: ScfIfFrame<V, E>) -> Self {
-            TracingFrame::ScfIf(frame)
+            Self(ToyFrame::ScfIf(frame))
         }
     }
 
     impl<V, E> BuildScfFor<V, E> for TracingFrame<V, E> {
         fn scf_for(frame: ScfForFrame<V, E>) -> Self {
-            TracingFrame::ScfFor(frame)
+            Self(ToyFrame::ScfFor(frame))
         }
     }
 
-    impl<I, V, E> Frame<I> for TracingFrame<V, E>
+    impl<I, F, V, E> Frame<I, F> for TracingFrame<V, E>
     where
-        I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = TracingFrame<V, E>>,
+        I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+        F: FrameBuild<V, E> + BuildScfIf<V, E> + BuildScfFor<V, E>,
         V: Clone + ForLoopValue,
         E: From<InterpreterError>,
     {
         type Completion = Completion<V>;
 
-        fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingFrame::Block(frame) => {
-                    TRACE.with(|t| t.borrow_mut().body_steps += 1);
-                    frame.step_into::<I, Self>(interp)
+        fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+            match &self.0 {
+                ToyFrame::Block(_) | ToyFrame::CFG(_) => {
+                    TRACE.with(|t| t.borrow_mut().body_steps += 1)
                 }
-                TracingFrame::CFG(frame) => {
-                    TRACE.with(|t| t.borrow_mut().body_steps += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingFrame::Call(frame) => {
-                    TRACE.with(|t| t.borrow_mut().calls += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
-                TracingFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
-                TracingFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
+                ToyFrame::Call(_) => TRACE.with(|t| t.borrow_mut().calls += 1),
+                _ => {}
             }
+            self.0.step_into(interp)
         }
 
-        fn resume_done(
-            self,
-            _interp: &mut I,
-        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingFrame::CFG(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingFrame::Call(frame) => {
-                    frame.resume_done_into::<Self>().map_err(I::Error::from)
-                }
-                TracingFrame::DiGraph(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
-                TracingFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
-            }
+        fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+            self.0.resume_done_into(interp)
         }
 
-        fn resume(
+        fn resume_into(
             self,
-            completion: Self::Completion,
+            completion: Completion<V>,
             interp: &mut I,
-        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
-                TracingFrame::CFG(frame) => frame.resume_into::<I, Self>(completion, interp),
-                TracingFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
-                TracingFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
-                TracingFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),
-                TracingFrame::ScfFor(frame) => frame.resume_into::<I, Self>(completion, interp),
-            }
+        ) -> Result<FrameEffect<F, Completion<V>>, E> {
+            self.0.resume_into(completion, interp)
         }
     }
 
@@ -777,91 +750,65 @@ mod advanced {
         calls: usize,
     }
 
-    enum TracingAbstractFrame<V, E, K> {
-        Block(AbstractBlockFrame<V, E, K>),
-        Call(AbstractCallFrame<V, E, K>),
-        ScfIf(AbstractScfIfFrame<V, E, K>),
-        ScfFor(AbstractScfForFrame<V, E, K>),
-    }
+    /// The abstract analogue of [`TracingFrame`]: a wrapper universe embedding
+    /// `ToyAbstractFrame` whole rather than re-listing its variants.
+    struct TracingAbstractFrame<V, E, K>(ToyAbstractFrame<V, E, K>);
 
     impl<V, E, K> AbstractFrameBuild<V, E, K> for TracingAbstractFrame<V, E, K> {
         fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::Block(frame)
+            Self(ToyAbstractFrame::Block(frame))
         }
         fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::Call(frame)
+            Self(ToyAbstractFrame::Call(frame))
         }
     }
 
     impl<V, E, K> BuildAbstractScfIf<V, E, K> for TracingAbstractFrame<V, E, K> {
         fn scf_if(frame: AbstractScfIfFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::ScfIf(frame)
+            Self(ToyAbstractFrame::ScfIf(frame))
         }
     }
 
     impl<V, E, K> BuildAbstractScfFor<V, E, K> for TracingAbstractFrame<V, E, K> {
         fn scf_for(frame: AbstractScfForFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::ScfFor(frame)
+            Self(ToyAbstractFrame::ScfFor(frame))
         }
     }
 
-    impl<I, V, E, K> Frame<I> for TracingAbstractFrame<V, E, K>
+    impl<I, F, V, E, K> Frame<I, F> for TracingAbstractFrame<V, E, K>
     where
         I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-            + SparseForwardInterp<Frame = TracingAbstractFrame<V, E, K>>,
-        V: Clone + PartialEq + ForLoopValue,
+            + SparseForwardInterp<Frame = F>,
+        F: AbstractFrameBuild<V, E, K> + BuildAbstractScfIf<V, E, K> + BuildAbstractScfFor<V, E, K>,
+        V: Clone + PartialEq + ForLoopValue + Lattice,
         E: From<InterpreterError>,
         K: Clone + Eq + Hash,
     {
         type Completion = AbstractCompletion<V>;
 
-        fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingAbstractFrame::Block(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().block_steps += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingAbstractFrame::Call(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().calls += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingAbstractFrame::ScfIf(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().if_steps += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingAbstractFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
+        fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+            match &self.0 {
+                ToyAbstractFrame::Block(_) => ATRACE.with(|t| t.borrow_mut().block_steps += 1),
+                ToyAbstractFrame::Call(_) => ATRACE.with(|t| t.borrow_mut().calls += 1),
+                ToyAbstractFrame::ScfIf(_) => ATRACE.with(|t| t.borrow_mut().if_steps += 1),
+                ToyAbstractFrame::ScfFor(_) => {}
             }
+            self.0.step_into(interp)
         }
 
-        fn resume_done(
+        fn resume_done_into(
             self,
-            _interp: &mut I,
-        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
-                TracingAbstractFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
-                TracingAbstractFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
-            }
-        }
-
-        fn resume(
-            self,
-            completion: Self::Completion,
             interp: &mut I,
-        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingAbstractFrame::Block(frame) => {
-                    frame.resume_into::<I, Self>(completion, interp)
-                }
-                TracingAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
-                TracingAbstractFrame::ScfIf(frame) => {
-                    frame.resume_into::<I, Self>(completion, interp)
-                }
-                TracingAbstractFrame::ScfFor(frame) => {
-                    frame.resume_into::<I, Self>(completion, interp)
-                }
-            }
+        ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+            self.0.resume_done_into(interp)
+        }
+
+        fn resume_into(
+            self,
+            completion: AbstractCompletion<V>,
+            interp: &mut I,
+        ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+            self.0.resume_into(completion, interp)
         }
     }
 

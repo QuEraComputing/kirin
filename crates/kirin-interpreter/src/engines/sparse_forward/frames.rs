@@ -138,16 +138,19 @@ where
             _marker: PhantomData,
         }
     }
+}
 
-    pub fn step_into<I, F>(
-        mut self,
-        interp: &mut I,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-            + SparseForwardInterp<Frame = F>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
+impl<I, F, V, E, K> Frame<I, F> for AbstractBlockFrame<V, E, K>
+where
+    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + SparseForwardInterp<Frame = F>,
+    F: AbstractFrameBuild<V, E, K>,
+    V: Clone + PartialEq,
+    E: From<InterpreterError>,
+    K: Clone + Eq + Hash,
+{
+    type Completion = AbstractCompletion<V>;
+
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         // Bind entry arguments lazily on the first step.
         if let Some(args) = self.pending.take() {
             interp.bind_block_args(self.stage, self.index, self.block, &args)?;
@@ -218,22 +221,15 @@ where
     }
 
     /// A pushed call frame finished: continue walking the body.
-    pub fn resume_done_into<F>(self) -> FrameEffect<F, AbstractCompletion<V>>
-    where
-        F: AbstractFrameBuild<V, E, K>,
-    {
-        FrameEffect::Continue(F::from_block(self))
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+        Ok(FrameEffect::Continue(F::from_block(self)))
     }
 
-    pub fn resume_into<I, F>(
+    fn resume_into(
         mut self,
         completion: AbstractCompletion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match completion {
             AbstractCompletion::Finished(Some(values)) => {
                 let slots = self.resume_slots.take().ok_or_else(|| {
@@ -241,7 +237,7 @@ where
                         "block resume without result slots",
                     ))
                 })?;
-                interp.write_results(self.index, &slots, values)?;
+                crate::FrameDriver::write_results(interp, self.index, &slots, values)?;
                 Ok(FrameEffect::Continue(F::from_block(self)))
             }
             // A nested push returned without finishing: this pass left via return.
@@ -331,15 +327,37 @@ where
         }
     }
 
-    pub fn step_into<I, F>(
-        mut self,
-        interp: &mut I,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
+    /// Schedule exhausted: read the declared yields out of the activation and
+    /// complete. The parent decides what the values mean — a graph **owner**
+    /// turns them into the function's return, a pushing statement binds them
+    /// into its result slots.
+    fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
     where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-            + SparseForwardInterp<Frame = F>,
+        I: AbstractFrameDriver<Value = V, Error = E>,
         F: AbstractFrameBuild<V, E, K>,
     {
+        let values: Product<V> = self
+            .yields
+            .iter()
+            .map(|&value| interp.env_read(self.index, value))
+            .collect::<Result<_, _>>()?;
+        Ok(FrameEffect::Complete(AbstractCompletion::Finished(Some(
+            values,
+        ))))
+    }
+}
+
+impl<I, F, V, E, K> Frame<I, F> for AbstractDiGraphFrame<V, E, K>
+where
+    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + SparseForwardInterp<Frame = F>,
+    F: AbstractFrameBuild<V, E, K>,
+    V: Clone + PartialEq,
+    E: From<InterpreterError>,
+    K: Clone + Eq + Hash,
+{
+    type Completion = AbstractCompletion<V>;
+
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         // First step: fetch the walk plan and bind the boundary ports.
         if let Some(args) = self.pending.take() {
             let plan = interp.digraph_walk_plan(self.stage, self.graph)?;
@@ -391,43 +409,17 @@ where
         }
     }
 
-    /// Schedule exhausted: read the declared yields out of the activation and
-    /// complete. The parent decides what the values mean — a graph **owner**
-    /// turns them into the function's return, a pushing statement binds them
-    /// into its result slots.
-    fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
-        let values: Product<V> = self
-            .yields
-            .iter()
-            .map(|&value| interp.env_read(self.index, value))
-            .collect::<Result<_, _>>()?;
-        Ok(FrameEffect::Complete(AbstractCompletion::Finished(Some(
-            values,
-        ))))
-    }
-
     /// A pushed child finished without a payload (e.g. a summarized call whose
     /// results are already written): resume the schedule.
-    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        F: AbstractFrameBuild<V, E, K>,
-    {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         Ok(FrameEffect::Continue(F::from_digraph(self)?))
     }
 
-    pub fn resume_into<I, F>(
+    fn resume_into(
         mut self,
         completion: AbstractCompletion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match completion {
             AbstractCompletion::Finished(Some(values)) => {
                 let slots = self.resume_slots.take().ok_or_else(|| {
@@ -435,7 +427,7 @@ where
                         "digraph resume without result slots",
                     ))
                 })?;
-                interp.write_results(self.index, &slots, values)?;
+                crate::FrameDriver::write_results(interp, self.index, &slots, values)?;
                 Ok(FrameEffect::Continue(F::from_digraph(self)?))
             }
             // A nested push left via `return`. A digraph has no function-return
@@ -481,25 +473,33 @@ where
             _marker: PhantomData,
         }
     }
+}
 
-    pub fn step_into<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
+impl<I, F, V, E, K> Frame<I, F> for AbstractCallFrame<V, E, K>
+where
+    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+    F: AbstractFrameBuild<V, E, K>,
+    V: Clone + PartialEq,
+    E: From<InterpreterError>,
+    K: Clone + Eq + Hash,
+{
+    type Completion = AbstractCompletion<V>;
+
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         interp.summarize_call(self.stage, self.call, self.index)?;
         Ok(FrameEffect::Done)
     }
 
-    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         Err(E::from(InterpreterError::Custom(
             "call frame resumed without a return",
         )))
     }
 
-    pub fn resume_into<F>(
+    fn resume_into(
         self,
         _completion: AbstractCompletion<V>,
+        _interp: &mut I,
     ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         Err(E::from(InterpreterError::Custom(
             "call frame resumed with a completion",
@@ -532,43 +532,43 @@ impl<V, E, K> AbstractFrameBuild<V, E, K> for StandardAbstractFrame<V, E, K> {
     }
 }
 
-impl<I, V, E, K> Frame<I> for StandardAbstractFrame<V, E, K>
+/// A *universe* impl, generic over the outer total frame type `F` — see
+/// [`Frame`] for what that buys.
+impl<I, F, V, E, K> Frame<I, F> for StandardAbstractFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-        + SparseForwardInterp<Frame = StandardAbstractFrame<V, E, K>>,
+    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + SparseForwardInterp<Frame = F>,
+    F: AbstractFrameBuild<V, E, K>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
-    fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match self {
-            StandardAbstractFrame::Block(frame) => frame.step_into::<I, Self>(interp),
-            StandardAbstractFrame::Call(frame) => frame.step_into::<I, Self>(interp),
-            StandardAbstractFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
+            StandardAbstractFrame::Block(frame) => frame.step_into(interp),
+            StandardAbstractFrame::Call(frame) => frame.step_into(interp),
+            StandardAbstractFrame::DiGraph(frame) => frame.step_into(interp),
         }
     }
 
-    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match self {
-            StandardAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-            StandardAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
-            StandardAbstractFrame::DiGraph(frame) => frame.resume_done_into::<Self>(),
+            StandardAbstractFrame::Block(frame) => frame.resume_done_into(interp),
+            StandardAbstractFrame::Call(frame) => frame.resume_done_into(interp),
+            StandardAbstractFrame::DiGraph(frame) => frame.resume_done_into(interp),
         }
     }
 
-    fn resume(
+    fn resume_into(
         self,
-        completion: Self::Completion,
+        completion: AbstractCompletion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match self {
-            StandardAbstractFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
-            StandardAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
-            StandardAbstractFrame::DiGraph(frame) => {
-                frame.resume_into::<I, Self>(completion, interp)
-            }
+            StandardAbstractFrame::Block(frame) => frame.resume_into(completion, interp),
+            StandardAbstractFrame::Call(frame) => frame.resume_into(completion, interp),
+            StandardAbstractFrame::DiGraph(frame) => frame.resume_into(completion, interp),
         }
     }
 }

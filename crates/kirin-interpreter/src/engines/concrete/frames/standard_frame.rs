@@ -28,42 +28,47 @@ impl<V, E> FrameBuild<V, E> for StandardFrame<V, E> {
     }
 }
 
-impl<I, V, E> Frame<I> for StandardFrame<V, E>
+/// A *universe* impl: generic over the outer total frame type `F` so that
+/// `StandardFrame` can be the stack's element type (`F = Self`, the usual case)
+/// **or** be embedded in a larger enum — an instrumenting wrapper, say — without
+/// re-enumerating its variants.
+impl<I, F, V, E> Frame<I, F> for StandardFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = StandardFrame<V, E>>,
+    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    F: FrameBuild<V, E>,
     V: Clone,
     E: From<InterpreterError>,
 {
     type Completion = Completion<V>;
 
-    fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
         match self {
-            StandardFrame::Block(frame) => frame.step_into::<I, Self>(interp),
-            StandardFrame::CFG(frame) => frame.step_into::<I, Self>(interp),
-            StandardFrame::Call(frame) => frame.step_into::<I, Self>(interp),
-            StandardFrame::DiGraph(frame) => frame.step_into::<I, Self>(interp),
+            StandardFrame::Block(frame) => frame.step_into(interp),
+            StandardFrame::CFG(frame) => frame.step_into(interp),
+            StandardFrame::Call(frame) => frame.step_into(interp),
+            StandardFrame::DiGraph(frame) => frame.step_into(interp),
         }
     }
 
-    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
         match self {
-            StandardFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-            StandardFrame::CFG(frame) => Ok(frame.resume_done_into::<Self>()),
-            StandardFrame::Call(frame) => frame.resume_done_into::<Self>().map_err(I::Error::from),
-            StandardFrame::DiGraph(frame) => Ok(frame.resume_done_into::<Self>()),
+            StandardFrame::Block(frame) => frame.resume_done_into(interp),
+            StandardFrame::CFG(frame) => frame.resume_done_into(interp),
+            StandardFrame::Call(frame) => frame.resume_done_into(interp),
+            StandardFrame::DiGraph(frame) => frame.resume_done_into(interp),
         }
     }
 
-    fn resume(
+    fn resume_into(
         self,
-        completion: Self::Completion,
+        completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    ) -> Result<FrameEffect<F, Completion<V>>, E> {
         match self {
-            StandardFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
-            StandardFrame::CFG(frame) => frame.resume_into::<I, Self>(completion, interp),
-            StandardFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
-            StandardFrame::DiGraph(frame) => frame.resume_into::<I, Self>(completion, interp),
+            StandardFrame::Block(frame) => frame.resume_into(completion, interp),
+            StandardFrame::CFG(frame) => frame.resume_into(completion, interp),
+            StandardFrame::Call(frame) => frame.resume_into(completion, interp),
+            StandardFrame::DiGraph(frame) => frame.resume_into(completion, interp),
         }
     }
 }

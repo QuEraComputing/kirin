@@ -437,30 +437,51 @@ pub enum FrameEffect<F, C> { Continue(F), Push { parent: F, child: F }, Done, Co
 pub trait FrameEngine { type Error; }          // direction-neutral anchor (no value domain)
 impl<T: Interp> FrameEngine for T { type Error = <T as Interp>::Error; }
 
-pub trait Frame<I: FrameEngine>: Sized {       // implemented by the *total* frame enum
+// ONE interface, implemented by every frame — individual walkers and total enums alike.
+// The effects are over `F`, the total frame type composed into, never over `Self`.
+pub trait Frame<I: FrameEngine, F>: Sized {
     type Completion;
-    fn step(self, &mut I)        -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
-    fn resume_done(self, &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
-    fn resume(self, Self::Completion, &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error>;
+    fn step_into(self, &mut I)        -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+    fn resume_done_into(self, &mut I) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+    fn resume_into(self, Self::Completion, &mut I) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
 }
 
-// The one shared, direction-neutral driver loop, used by every engine:
-pub fn drive_frames<I: FrameEngine, F: Frame<I>>(engine: &mut I, frames: &mut Vec<F>)
+// The one shared, direction-neutral driver loop, used by every engine. The
+// stack's element type must be a *universe* — `F: Frame<I, F>`.
+pub fn drive_frames<I: FrameEngine, F: Frame<I, F>>(engine: &mut I, frames: &mut Vec<F>)
     -> Result<F::Completion, I::Error>;
 
 // Forward-specific capability surface (alias: FrameDriver):
 pub trait ForwardFrameDriver: Env { /* env alloc/free, IR queries, dispatch, resolution */ }
 ```
 
+**Members and universes.** The `F` parameter is what lets one trait serve both
+roles a frame stack needs:
+
+- a **member** — an individual walker (`BlockFrame`, `CallFrame`, a dialect's own
+  frame). It is one variant of `F` and names its successors in `F`, re-wrapping
+  itself through the relevant `*FrameBuild` hook. Members are generic over `F`,
+  so the same walker composes into any language's frame type.
+- a **universe** — a total frame enum. It implements `Frame<I, Self>` when it is
+  the stack's element type, and stays generic over `F` so it can *also* be
+  embedded in a larger enum without re-enumerating its variants. `TracingFrame`
+  in `toy-lang`'s tests is exactly this: a newtype wrapping `ToyFrame` whole,
+  counting steps and delegating. (A leaf universe with no members, like the
+  sparse backward `DemandFrame`, honestly pins `F = Self`.)
+
+The stack must be homogeneous in *type* while heterogeneous in *kind*, which is
+why `F` is a closed sum type rather than `Box<dyn Frame>`: a run holds a
+`CallFrame`, a `CFGFrame`, a `BlockFrame` and a dialect frame simultaneously.
+
 `Frame` is anchored only on `FrameEngine` (a total `Error`), **not** on the
 forward value engine `Interp` — so the frame protocol is decoupled from forward
 value interpretation and reusable by other analyses. Every `Interp` is a
 `FrameEngine` by blanket impl. The engine owns a `Vec<F>` and calls
-`drive_frames`, which pops the top frame, `step`s it, and applies the returned
-`FrameEffect`. `ForwardFrameDriver: Env` is the richer **forward** capability
-surface the *forward* frames call (it requires `Env` because the default
-`bind_block_args`/`write_results` use `env_write`); **both forward engines implement
-it**. The concrete and
+`drive_frames`, which pops the top frame, `step_into`s it, and applies the
+returned `FrameEffect`. `ForwardFrameDriver: Env` is the richer **forward**
+capability surface the *forward* frames call (it requires `Env` because the
+default `bind_block_args`/`write_results` use `env_write`); **both forward
+engines implement it**. The concrete and
 abstract standard frames are two *implementations* of this one protocol — not
 parallel frameworks.
 

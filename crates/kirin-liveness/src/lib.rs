@@ -102,6 +102,7 @@ where
         + InterpDispatch<DenseBackwardTransfer<'ir, S, LiveSet, InterpreterError, F>>,
     F: Frame<
             DenseBackwardDriver<'ir, S, LiveSet, InterpreterError, F>,
+            F,
             Completion = DenseBackwardCompletion<LiveSet>,
         > + DenseFrameBuild<LiveSet, InterpreterError>,
 {

@@ -1,7 +1,8 @@
 use kirin_ir::{CompileStage, Product, SSAValue, Statement};
 
 use crate::{
-    EnvIndex, FrameDriver, FrameEffect, InterpreterError, SparseForwardEffect, SparseForwardInterp,
+    EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError, SparseForwardEffect,
+    SparseForwardInterp,
 };
 
 use super::{CallFrame, Completion, FrameBuild};
@@ -66,14 +67,36 @@ where
         }
     }
 
+    /// Schedule exhausted: read the declared yields from the activation and
+    /// complete `Finished` — the graph's natural completion. The parent
+    /// decides what the values mean (call returns or push results).
+    fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
+    where
+        I: FrameDriver<Value = V, Error = E>,
+        F: FrameBuild<V, E>,
+    {
+        let values: Product<V> = self
+            .yields
+            .iter()
+            .map(|&value| interp.env_read(self.index, value))
+            .collect::<Result<_, _>>()?;
+        Ok(FrameEffect::Complete(Completion::Finished(values)))
+    }
+}
+
+impl<I, F, V, E> Frame<I, F> for DiGraphFrame<V, E>
+where
+    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    F: FrameBuild<V, E>,
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    type Completion = Completion<V>;
+
     /// Execute the next scheduled node and translate its
     /// [`SparseForwardEffect`] into a [`FrameEffect`] over the total frame
     /// type `F`.
-    pub fn step_into<I, F>(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
-    where
-        I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
-        F: FrameBuild<V, E>,
-    {
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
         // First step: fetch the walk plan and bind the boundary ports.
         if let Some(args) = self.pending.take() {
             let plan = interp.digraph_walk_plan(self.stage, self.graph)?;
@@ -123,43 +146,20 @@ where
         }
     }
 
-    /// Schedule exhausted: read the declared yields from the activation and
-    /// complete `Finished` — the graph's natural completion. The parent
-    /// decides what the values mean (call returns or push results).
-    fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
-    where
-        I: FrameDriver<Value = V, Error = E>,
-        F: FrameBuild<V, E>,
-    {
-        let values: Product<V> = self
-            .yields
-            .iter()
-            .map(|&value| interp.env_read(self.index, value))
-            .collect::<Result<_, _>>()?;
-        Ok(FrameEffect::Complete(Completion::Finished(values)))
-    }
-
     /// A child finished without a payload (e.g. a returned call whose results
     /// are already written): resume the schedule.
-    pub fn resume_done_into<F>(self) -> FrameEffect<F, Completion<V>>
-    where
-        F: FrameBuild<V, E>,
-    {
-        FrameEffect::Continue(F::from_digraph(self))
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+        Ok(FrameEffect::Continue(F::from_digraph(self)))
     }
 
     /// A child bubbled a completion: a pushed frame's values land in the
     /// push's result slots. A `Returned` cannot bubble out of a graph node —
     /// a digraph has no function-return convention.
-    pub fn resume_into<I, F>(
+    fn resume_into(
         mut self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, E>
-    where
-        I: FrameDriver<Value = V, Error = E>,
-        F: FrameBuild<V, E>,
-    {
+    ) -> Result<FrameEffect<F, Completion<V>>, E> {
         match completion {
             Completion::Finished(values) | Completion::Yielded(values) => {
                 let slots = self.resume_slots.take().ok_or_else(|| {
@@ -167,7 +167,7 @@ where
                         "digraph resume without result slots",
                     ))
                 })?;
-                interp.write_results(self.index, &slots, values)?;
+                crate::FrameDriver::write_results(interp, self.index, &slots, values)?;
                 Ok(FrameEffect::Continue(F::from_digraph(self)))
             }
             Completion::Returned(_) => Err(E::from(InterpreterError::Custom(
