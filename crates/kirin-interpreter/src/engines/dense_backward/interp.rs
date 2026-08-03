@@ -26,7 +26,7 @@
 //!   summaries ([`BlockLiveness`], keyed by [`Scoped`] blocks), the block
 //!   worklist, and [`BackwardSummaryDeps`] (successor changed → reanalyse
 //!   predecessor, registered self-discoveringly by
-//!   [`absorb_edges`](DenseBackwardFrameDriver::absorb_edges)).
+//!   [`absorb_edges`](DenseBackwardFrameEngine::absorb_edges)).
 //!
 //! # Owners are blocks; one owner analysis is one backward walk
 //!
@@ -405,9 +405,9 @@ pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardF
 // Driver capabilities (frames run on the driver)
 // ===========================================================================
 
-/// The dense-backward frame-driver capability surface: what the dense frames
+/// The dense-backward engine-capability surface: what the dense frames
 /// need from the engine. Implemented on the driver (it needs the summaries).
-pub trait DenseBackwardFrameDriver: Interp<Effect = DenseBackwardEffect<Self::Frame>> {
+pub trait DenseBackwardFrameEngine: Interp<Effect = DenseBackwardEffect<Self::Frame>> {
     /// The engine's total backward frame type.
     type Frame;
 
@@ -461,7 +461,7 @@ pub trait DenseBackwardFrameDriver: Interp<Effect = DenseBackwardEffect<Self::Fr
     ) -> Result<Self::Value, Self::Error>;
 }
 
-impl<'ir, S, V, E, F, Sem> DenseBackwardFrameDriver for DenseBackwardDriver<'ir, S, V, E, F, Sem>
+impl<'ir, S, V, E, F, Sem> DenseBackwardFrameEngine for DenseBackwardDriver<'ir, S, V, E, F, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,

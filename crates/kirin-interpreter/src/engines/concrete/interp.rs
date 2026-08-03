@@ -4,10 +4,10 @@ use kirin_ir::{Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta,
 
 use crate::core::query;
 use crate::{
-    CallFrame, CallableBody, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEval, Frame,
-    FrameBuild, FrameDriver, FunctionTarget, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, Linker, SameStageLinker, SparseForwardEffect, StageQuery, StandardFrame,
-    Store, drive_frames,
+    BlockQueries, CFGQueries, CallFrame, CallServices, CallableBody, Callee, Completion,
+    DiGraphQueries, Env, EnvIndex, EnvStackStore, ForwardEval, Frame, FrameBuild, FunctionTarget,
+    Interp, InterpDispatch, InterpLocation, InterpreterError, Linker, SameStageLinker,
+    SparseForwardEffect, StageQuery, StandardFrame, StatementDispatch, Store, drive_frames,
 };
 
 /// Concrete executor: runs IR over a concrete value domain with an explicit
@@ -112,7 +112,11 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, F> FrameDriver for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+// The concrete engine provides the whole forward capability surface; it is split
+// into one impl block per capability so the components stay individually
+// nameable, and the blanket impl gives it `ForwardFrameEngine`/`ForwardFrameEngine`.
+
+impl<'ir, S, V, E, Lk, F> CallServices for ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
     S: StageQuery + InterpDispatch<Self>,
     V: Clone,
@@ -131,26 +135,6 @@ where
         self.linker
             .resolve(self.pipeline, stage, callee)
             .map_err(E::from)
-    }
-
-    fn run_statement(
-        &mut self,
-        stage: CompileStage,
-        statement: Statement,
-        index: EnvIndex,
-    ) -> Result<Self::Effect, E> {
-        let pipeline = self.pipeline;
-        let info = pipeline
-            .stage(stage)
-            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let previous = self.location.replace(InterpLocation {
-            stage,
-            statement,
-            index,
-        });
-        let result = info.dispatch_statement(statement, self);
-        self.location = previous;
-        result
     }
 
     fn enter_function(
@@ -173,7 +157,43 @@ where
         self.location = previous;
         result
     }
+}
 
+impl<'ir, S, V, E, Lk, F> StatementDispatch for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
+    fn run_statement(
+        &mut self,
+        stage: CompileStage,
+        statement: Statement,
+        index: EnvIndex,
+    ) -> Result<Self::Effect, E> {
+        let pipeline = self.pipeline;
+        let info = pipeline
+            .stage(stage)
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
+        let previous = self.location.replace(InterpLocation {
+            stage,
+            statement,
+            index,
+        });
+        let result = info.dispatch_statement(statement, self);
+        self.location = previous;
+        result
+    }
+}
+
+impl<'ir, S, V, E, Lk, F> BlockQueries for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
         query::block_params(self.pipeline, stage, block).map_err(E::from)
     }
@@ -190,11 +210,27 @@ where
     ) -> Result<Option<Statement>, E> {
         query::next_statement(self.pipeline, stage, block, after).map_err(E::from)
     }
+}
 
+impl<'ir, S, V, E, Lk, F> CFGQueries for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
     fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
         query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
     }
+}
 
+impl<'ir, S, V, E, Lk, F> DiGraphQueries for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
     fn digraph_walk_plan(
         &self,
         stage: CompileStage,

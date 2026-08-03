@@ -565,10 +565,10 @@ mod advanced {
 
     use kirin_constprop::{ConstPropContext, ConstPropValue};
     use kirin_interpreter::engine::{
-        AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-        AbstractFrameDriver, BlockFrame, CFGFrame, CallContext, CallFrame, Completion,
-        ConcreteInterpreter, CrossStageLinker, DefaultBodyFrames, DiGraphFrame, Frame, FrameBuild,
-        FrameDriver, FrameEffect, InterpreterError, SparseForwardInterp, SparseForwardInterpreter,
+        AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, BlockFrame,
+        CFGFrame, CallContext, CallFrame, Completion, ConcreteInterpreter, CrossStageLinker,
+        DefaultBodyFrames, DiGraphFrame, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
+        FrameBuild, FrameEffect, InterpreterError, SparseForwardInterp, SparseForwardInterpreter,
         expect_single,
     };
     use kirin_scf::{
@@ -639,7 +639,7 @@ mod advanced {
 
     impl<I, F, V, E> Frame<I, F> for TracingFrame<V, E>
     where
-        I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+        I: ForwardFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
         F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames> + BuildScfIf<V, E> + BuildScfFor<V, E>,
         V: Clone + ForLoopValue,
         E: From<InterpreterError>,
@@ -779,7 +779,7 @@ mod advanced {
 
     impl<I, F, V, E, K> Frame<I, F> for TracingAbstractFrame<V, E, K>
     where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
+        I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
             + SparseForwardInterp<Frame = F>,
         F: AbstractFrameBuild<V, E, K> + BuildAbstractScfIf<V, E, K> + BuildAbstractScfFor<V, E, K>,
         V: Clone + PartialEq + ForLoopValue + Lattice,

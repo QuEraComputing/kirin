@@ -78,14 +78,18 @@ pub use self::core::{InterpreterError, StageQuery};
 // The body-shape IR query: what blocks/graphs a body contains, which
 // statements feed a block's parameters, and where a graph port sits.
 pub use self::core::{BlockTopology, BodyTopology, body_topology};
-// The shared, direction-neutral frame protocol (`Frame`/`FrameEngine`/
-// `FrameEffect`/`drive_frames`) plus the forward frame-driver capability surfaces.
+// The shared, direction-neutral frame protocol: `Frame`/`FrameEffect`/
+// `drive_frames` (the frame-stack driver loop) anchored on `FrameEngine`, the
+// minimal engine contract. On top of it, the forward engine capabilities a frame
+// can require: one narrowly scoped component trait per kind of traversal
+// (`StatementDispatch`, `BlockQueries`, `CFGQueries`, `DiGraphQueries`,
+// `CallServices`), so a member frame bounds only what it consumes, plus two
+// whole-universe umbrellas — `ForwardFrameEngine` (full standard concrete
+// surface) and `ForwardDataflowFrameEngine` (standard forward-abstract surface).
 pub use self::core::{
-    ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameEffect, FrameEngine, drive_frames,
+    BlockQueries, CFGQueries, CallServices, DiGraphQueries, ForwardDataflowFrameEngine,
+    ForwardFrameEngine, Frame, FrameEffect, FrameEngine, StatementDispatch, drive_frames,
 };
-// Backward-compatible aliases for the forward frame-driver capability surfaces.
-pub use self::core::ForwardDataflowFrameDriver as AbstractFrameDriver;
-pub use self::core::ForwardFrameDriver as FrameDriver;
 
 // Concrete execution engine + the concrete standard frames: the
 // representation walkers (`BlockFrame`/`CFGFrame`/`DiGraphFrame` — `UnGraph`
@@ -110,7 +114,7 @@ pub use engines::sparse_backward::{
 // Dense backward engine (`Sem = ClassicLiveness`) + the dense standard frames.
 pub use engines::dense_backward::{
     BlockLiveness, ClassicLivenessInterp, DenseAnalysisState, DenseBackwardCompletion,
-    DenseBackwardDriver, DenseBackwardEffect, DenseBackwardFrameDriver, DenseBackwardInterp,
+    DenseBackwardDriver, DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp,
     DenseBackwardInterpreter, DenseBackwardProfile, DenseBackwardState, DenseBackwardTransfer,
     DenseBlockFrame, DenseBlockMode, DenseFrameBuild, PointFacts, StandardDenseBackwardFrame,
     SuccessorEdge,
@@ -169,16 +173,16 @@ pub mod dialect {
 pub mod engine {
     pub use crate::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-        AbstractFrameBuild, AbstractFrameDriver, AbstractInterpreter, BlockFrame, BodyFrameEntry,
-        CFGFrame, CallBodyFramePolicy, CallContext, CallFrame, Callee, Completion,
-        ConcreteInterpreter, ContextInsensitive, CrossStageLinker, DefaultBodyFrames,
-        DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBackwardInterp,
+        AbstractFrameBuild, AbstractInterpreter, BlockFrame, BlockQueries, BodyFrameEntry,
+        CFGFrame, CFGQueries, CallBodyFramePolicy, CallContext, CallFrame, CallServices, Callee,
+        Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker, DefaultBodyFrames,
+        DenseBackwardCompletion, DenseBackwardFrameEngine, DenseBackwardInterp,
         DenseBackwardInterpreter, DenseBackwardState, DenseBlockFrame, DenseFrameBuild,
-        DiGraphFrame, Env, ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameBuild,
-        FrameDriver, FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch,
+        DiGraphFrame, DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
+        FrameBuild, FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch,
         InterpreterError, Linker, SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter,
         SparseForwardInterp, SparseForwardInterpreter, StandardAbstractFrame,
-        StandardDenseBackwardFrame, StandardFrame, UnGraphEntry, WideningStrategy, drive_frames,
-        expect_single,
+        StandardDenseBackwardFrame, StandardFrame, StatementDispatch, UnGraphEntry,
+        WideningStrategy, drive_frames, expect_single,
     };
 }

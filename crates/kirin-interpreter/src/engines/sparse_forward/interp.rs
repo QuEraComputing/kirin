@@ -8,7 +8,9 @@
 //!
 //! - **[`SparseForwardTransfer`]** is the [`Interp`] delegate: pipeline, linker, SSA
 //!   env, analysis policy, per-function return accumulator, and read/write logging;
-//!   it provides the dialect-dispatch / IR-query surface ([`ForwardFrameDriver`]).
+//!   it provides the dialect-dispatch / IR-query surface ([`StatementDispatch`],
+//!   [`BlockQueries`], [`CFGQueries`], [`DiGraphQueries`], and — for
+//!   concrete-shaped callers — [`CallServices`]).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the summaries, the
 //!   dependency graph ([`ForwardSummaryDeps`]), the owner worklist, and the
 //!   owner-local [`ForwardStore`] (shared envs + context-qualified value-reader
@@ -41,11 +43,12 @@ use kirin_ir::{
 use crate::core::query;
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractFrameBuild,
-    AbstractFrameDriver, AbstractInterpreter, Body, CallEffect, CallableBody, Callee, Env,
-    EnvIndex, EnvStackStore, FixpointProfile, ForwardEval, ForwardFrameDriver, ForwardSummaryDeps,
-    Frame, FunctionTarget, Interp, InterpDispatch, InterpLocation, InterpreterError, Linker,
-    OwnerSemantics, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
-    StandardAbstractFrame, StandardFixpointInterpreter, Store, Summary, SummaryDependency,
+    AbstractInterpreter, BlockQueries, Body, CFGQueries, CallEffect, CallServices, CallableBody,
+    Callee, DiGraphQueries, Env, EnvIndex, EnvStackStore, FixpointProfile,
+    ForwardDataflowFrameEngine, ForwardEval, ForwardSummaryDeps, Frame, FunctionTarget, Interp,
+    InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics, SameStageLinker,
+    SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
+    StandardFixpointInterpreter, StatementDispatch, Store, Summary, SummaryDependency,
     SummaryDependencyIndex, SummaryEffect,
 };
 
@@ -500,7 +503,7 @@ where
 }
 
 // Policy-driven merge + return accumulation, kept on the transfer (the analysis `P`
-// lives here). The driver's `AbstractFrameDriver` impl delegates to these.
+// lives here). The driver's `ForwardDataflowFrameEngine` impl delegates to these.
 impl<'ir, S: StageMeta, V, E, Lk, P, F, Sem> SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
     V: Clone + PartialEq + Widen,
@@ -616,8 +619,12 @@ where
 {
 }
 
-// The IR-query / dispatch capability surface. Dialect rules dispatch on the transfer.
-impl<'ir, S, V, E, Lk, P, F, Sem> ForwardFrameDriver
+// The IR-query / dispatch capability surface. Dialect rules dispatch on the
+// transfer. The transfer implements the *concrete* call lifecycle too, even
+// though the abstract frames never use it: `SparseForwardTransfer` is also the
+// engine a concrete-shaped caller can drive, and keeping it whole preserves the
+// existing delegation to `ForwardDriver` unchanged.
+impl<'ir, S, V, E, Lk, P, F, Sem> CallServices
     for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageQuery + InterpDispatch<Self>,
@@ -641,26 +648,6 @@ where
             .map_err(E::from)
     }
 
-    fn run_statement(
-        &mut self,
-        stage: CompileStage,
-        statement: Statement,
-        index: EnvIndex,
-    ) -> Result<Self::Effect, E> {
-        let pipeline = self.pipeline;
-        let info = pipeline
-            .stage(stage)
-            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let previous = self.location.replace(InterpLocation {
-            stage,
-            statement,
-            index,
-        });
-        let result = info.dispatch_statement(statement, self);
-        self.location = previous;
-        result
-    }
-
     fn enter_function(
         &mut self,
         stage: CompileStage,
@@ -681,7 +668,49 @@ where
         self.location = previous;
         result
     }
+}
 
+impl<'ir, S, V, E, Lk, P, F, Sem> StatementDispatch
+    for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
+    fn run_statement(
+        &mut self,
+        stage: CompileStage,
+        statement: Statement,
+        index: EnvIndex,
+    ) -> Result<Self::Effect, E> {
+        let pipeline = self.pipeline;
+        let info = pipeline
+            .stage(stage)
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
+        let previous = self.location.replace(InterpLocation {
+            stage,
+            statement,
+            index,
+        });
+        let result = info.dispatch_statement(statement, self);
+        self.location = previous;
+        result
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F, Sem> BlockQueries
+    for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
         query::block_params(self.pipeline, stage, block).map_err(E::from)
     }
@@ -698,11 +727,32 @@ where
     ) -> Result<Option<Statement>, E> {
         query::next_statement(self.pipeline, stage, block, after).map_err(E::from)
     }
+}
 
+impl<'ir, S, V, E, Lk, P, F, Sem> CFGQueries for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
         query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
     }
+}
 
+impl<'ir, S, V, E, Lk, P, F, Sem> DiGraphQueries
+    for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn digraph_walk_plan(
         &self,
         stage: CompileStage,
@@ -716,7 +766,8 @@ where
 // Driver capability impls (frames run on the driver, which delegates to the transfer)
 // ===========================================================================
 
-impl<'ir, S, V, E, Lk, P, F, Sem> ForwardFrameDriver for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+// Delegation is unchanged; only the trait each group of methods belongs to.
+impl<'ir, S, V, E, Lk, P, F, Sem> CallServices for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + HasBottom,
@@ -737,15 +788,6 @@ where
         self.inner().resolve_call(stage, callee)
     }
 
-    fn run_statement(
-        &mut self,
-        stage: CompileStage,
-        statement: Statement,
-        index: EnvIndex,
-    ) -> Result<Self::Effect, E> {
-        self.inner_mut().run_statement(stage, statement, index)
-    }
-
     fn enter_function(
         &mut self,
         stage: CompileStage,
@@ -755,7 +797,36 @@ where
     ) -> Result<CallableBody<V>, E> {
         self.inner_mut().enter_function(stage, body, args, index)
     }
+}
 
+impl<'ir, S, V, E, Lk, P, F, Sem> StatementDispatch for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
+    fn run_statement(
+        &mut self,
+        stage: CompileStage,
+        statement: Statement,
+        index: EnvIndex,
+    ) -> Result<Self::Effect, E> {
+        self.inner_mut().run_statement(stage, statement, index)
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F, Sem> BlockQueries for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
         self.inner().block_params(stage, block)
     }
@@ -772,11 +843,31 @@ where
     ) -> Result<Option<Statement>, E> {
         self.inner().next_statement(stage, block, after)
     }
+}
 
+impl<'ir, S, V, E, Lk, P, F, Sem> CFGQueries for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
         self.inner().cfg_entry(stage, cfg)
     }
+}
 
+impl<'ir, S, V, E, Lk, P, F, Sem> DiGraphQueries for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn digraph_walk_plan(
         &self,
         stage: CompileStage,
@@ -786,7 +877,8 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F, Sem> AbstractFrameDriver for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+impl<'ir, S, V, E, Lk, P, F, Sem> ForwardDataflowFrameEngine
+    for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + PartialEq + Widen + HasBottom,
@@ -853,7 +945,7 @@ where
             .and_then(|info| info.as_function())
             .and_then(|function| function.ret.clone());
         match ret {
-            Some(values) => self.write_results(index, &results, values),
+            Some(values) => self.bind_values(index, results.as_slice(), values),
             None => {
                 for slot in results.iter().copied() {
                     self.env_write(index, slot, V::bottom())?;

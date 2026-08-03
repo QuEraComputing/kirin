@@ -15,7 +15,7 @@
 //! policy lives in that dialect frame (it may reuse [`AbstractBlockFrame`] to
 //! walk a chosen body). The interprocedural
 //! *policy* (summary keying, join/widen, caller recording — including same-key
-//! recursion) stays atomic in the engine behind [`AbstractFrameDriver`]; frames
+//! recursion) stays atomic in the engine behind [`ForwardDataflowFrameEngine`]; frames
 //! only choose what to step next.
 
 use std::collections::VecDeque;
@@ -24,9 +24,10 @@ use std::marker::PhantomData;
 
 use kirin_ir::{Block, CompileStage, DiGraph, Product, SSAValue, Statement};
 
+use crate::core::frame::BlockBinding;
 use crate::{
-    AbstractFrameDriver, Body, CallEffect, Edge, EnvIndex, Frame, FrameEffect, InterpreterError,
-    SparseForwardEffect, SparseForwardInterp,
+    Body, CallEffect, Edge, Env, EnvIndex, ForwardDataflowFrameEngine, Frame, FrameEffect,
+    InterpreterError, SparseForwardEffect, SparseForwardInterp,
 };
 
 /// Completion payloads produced by the standard abstract frames.
@@ -142,7 +143,8 @@ where
 
 impl<I, F, V, E, K> Frame<I, F> for AbstractBlockFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + SparseForwardInterp<Frame = F>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
+        + SparseForwardInterp<Frame = F>,
     F: AbstractFrameBuild<V, E, K>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
@@ -237,7 +239,7 @@ where
                         "block resume without result slots",
                     ))
                 })?;
-                crate::FrameDriver::write_results(interp, self.index, &slots, values)?;
+                interp.bind_values(self.index, slots.as_slice(), values)?;
                 Ok(FrameEffect::Continue(F::from_block(self)))
             }
             // A nested push returned without finishing: this pass left via return.
@@ -331,9 +333,10 @@ where
     /// complete. The parent decides what the values mean — a graph **owner**
     /// turns them into the function's return, a pushing statement binds them
     /// into its result slots.
+    /// Reading the yields needs [`Env`] alone, not the whole dataflow surface.
     fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
     where
-        I: AbstractFrameDriver<Value = V, Error = E>,
+        I: Env<Value = V, Error = E>,
         F: AbstractFrameBuild<V, E, K>,
     {
         let values: Product<V> = self
@@ -349,7 +352,8 @@ where
 
 impl<I, F, V, E, K> Frame<I, F> for AbstractDiGraphFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + SparseForwardInterp<Frame = F>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
+        + SparseForwardInterp<Frame = F>,
     F: AbstractFrameBuild<V, E, K>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
@@ -427,7 +431,7 @@ where
                         "digraph resume without result slots",
                     ))
                 })?;
-                crate::FrameDriver::write_results(interp, self.index, &slots, values)?;
+                interp.bind_values(self.index, slots.as_slice(), values)?;
                 Ok(FrameEffect::Continue(F::from_digraph(self)?))
             }
             // A nested push left via `return`. A digraph has no function-return
@@ -477,7 +481,7 @@ where
 
 impl<I, F, V, E, K> Frame<I, F> for AbstractCallFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>,
     F: AbstractFrameBuild<V, E, K>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
@@ -536,7 +540,8 @@ impl<V, E, K> AbstractFrameBuild<V, E, K> for StandardAbstractFrame<V, E, K> {
 /// [`Frame`] for what that buys.
 impl<I, F, V, E, K> Frame<I, F> for StandardAbstractFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + SparseForwardInterp<Frame = F>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
+        + SparseForwardInterp<Frame = F>,
     F: AbstractFrameBuild<V, E, K>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,

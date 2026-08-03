@@ -20,7 +20,8 @@ pub use effect::{Body, CallEffect, CallableBody, Callee, Edge, SparseForwardEffe
 pub use env::{EnvIndex, EnvStackStore, Store};
 pub use error::InterpreterError;
 pub use frame::{
-    ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameEffect, FrameEngine, drive_frames,
+    BlockQueries, CFGQueries, CallServices, DiGraphQueries, ForwardDataflowFrameEngine,
+    ForwardFrameEngine, Frame, FrameEffect, FrameEngine, StatementDispatch, drive_frames,
 };
 pub use interp::{AbstractInterpreter, Env, Interp, InterpLocation, SparseForwardInterp};
 pub use linker::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};

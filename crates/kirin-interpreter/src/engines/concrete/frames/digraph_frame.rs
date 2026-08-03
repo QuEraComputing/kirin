@@ -1,8 +1,8 @@
 use kirin_ir::{CompileStage, Product, SSAValue, Statement};
 
 use crate::{
-    EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError, SparseForwardEffect,
-    SparseForwardInterp,
+    DiGraphQueries, Env, EnvIndex, Frame, FrameEffect, InterpreterError, SparseForwardEffect,
+    SparseForwardInterp, StatementDispatch,
 };
 
 use super::{CallFrame, Completion, FrameBuild};
@@ -70,9 +70,12 @@ where
     /// Schedule exhausted: read the declared yields from the activation and
     /// complete `Finished` — the graph's natural completion. The parent
     /// decides what the values mean (call returns or push results).
+    ///
+    /// Reading the yields is all this step needs, so it asks for [`Env`] alone —
+    /// not [`DiGraphQueries`], whose schedule was already consumed.
     fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
     where
-        I: FrameDriver<Value = V, Error = E>,
+        I: Env<Value = V, Error = E>,
         F: FrameBuild<V, E>,
     {
         let values: Product<V> = self
@@ -86,7 +89,7 @@ where
 
 impl<I, F, V, E> Frame<I, F> for DiGraphFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    I: DiGraphQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = F>,
     F: FrameBuild<V, E>,
     V: Clone,
     E: From<InterpreterError>,
@@ -167,7 +170,7 @@ where
                         "digraph resume without result slots",
                     ))
                 })?;
-                crate::FrameDriver::write_results(interp, self.index, &slots, values)?;
+                interp.bind_values(self.index, slots.as_slice(), values)?;
                 Ok(FrameEffect::Continue(F::from_digraph(self)))
             }
             Completion::Returned(_) => Err(E::from(InterpreterError::Custom(

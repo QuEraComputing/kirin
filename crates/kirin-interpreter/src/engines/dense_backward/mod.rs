@@ -8,7 +8,7 @@ pub(crate) mod interp;
 pub use frames::{DenseBlockFrame, DenseBlockMode, DenseFrameBuild, StandardDenseBackwardFrame};
 pub use interp::{
     BlockLiveness, ClassicLivenessInterp, DenseAnalysisState, DenseBackwardCompletion,
-    DenseBackwardDriver, DenseBackwardEffect, DenseBackwardFrameDriver, DenseBackwardInterp,
+    DenseBackwardDriver, DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp,
     DenseBackwardInterpreter, DenseBackwardProfile, DenseBackwardState, DenseBackwardTransfer,
     PointFacts, SuccessorEdge,
 };

@@ -1,6 +1,7 @@
 use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
 
-use crate::{EnvIndex, FrameDriver, InterpreterError};
+use crate::core::frame::BlockBinding;
+use crate::{BlockQueries, Env, EnvIndex, InterpreterError};
 
 /// Block-cursor mechanics shared by the block-shaped walkers
 /// ([`BlockFrame`](super::BlockFrame) and [`CFGFrame`](super::CFGFrame)):
@@ -15,7 +16,7 @@ pub(super) struct BlockCursor<V> {
     cursor: Option<Statement>,
     /// Entry arguments not yet bound. A frame built by a dialect frame is
     /// constructed without engine access — it binds on its first `step`, so
-    /// construction needs no [`FrameDriver`].
+    /// construction needs no engine access.
     pending: Option<Product<V>>,
     /// Result slots awaiting a pushed child frame's completion values.
     resume_slots: Option<Product<SSAValue>>,
@@ -43,7 +44,7 @@ impl<V: Clone> BlockCursor<V> {
     /// on this call (the frame should `Continue` and step again).
     pub(super) fn bind_entry<I>(&mut self, interp: &mut I) -> Result<bool, I::Error>
     where
-        I: FrameDriver<Value = V>,
+        I: Env<Value = V> + BlockQueries,
     {
         match self.pending.take() {
             Some(args) => {
@@ -58,7 +59,7 @@ impl<V: Clone> BlockCursor<V> {
     /// Take the current statement, advancing the cursor past it.
     pub(super) fn advance<I>(&mut self, interp: &I) -> Result<Option<Statement>, I::Error>
     where
-        I: FrameDriver<Value = V>,
+        I: BlockQueries<Value = V>,
     {
         let Some(statement) = self.cursor else {
             return Ok(None);
@@ -76,7 +77,7 @@ impl<V: Clone> BlockCursor<V> {
         args: &Product<V>,
     ) -> Result<(), I::Error>
     where
-        I: FrameDriver<Value = V>,
+        I: Env<Value = V> + BlockQueries,
     {
         interp.bind_block_args(self.stage, self.index, target, args)?;
         self.cursor = interp.first_statement(self.stage, target)?;
@@ -96,12 +97,12 @@ impl<V: Clone> BlockCursor<V> {
         values: Product<V>,
     ) -> Result<(), I::Error>
     where
-        I: FrameDriver<Value = V>,
+        I: Env<Value = V>,
         I::Error: From<InterpreterError>,
     {
         let slots = self.resume_slots.take().ok_or_else(|| {
             I::Error::from(InterpreterError::Custom("body resume without result slots"))
         })?;
-        interp.write_results(self.index, &slots, values)
+        interp.bind_values(self.index, slots.as_slice(), values)
     }
 }

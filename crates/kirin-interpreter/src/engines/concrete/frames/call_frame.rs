@@ -1,7 +1,7 @@
 use kirin_ir::{CompileStage, Product, SSAValue};
 
 use crate::{
-    Body, CallEffect, Callee, EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError,
+    Body, CallEffect, CallServices, Callee, EnvIndex, Frame, FrameEffect, InterpreterError,
 };
 
 use super::{BodyFrameEntry, CallBodyFramePolicy, Completion, DefaultBodyFrames, FrameBuild};
@@ -105,7 +105,7 @@ where
 
 impl<I, F, V, E, P> Frame<I, F> for CallFrame<V, P>
 where
-    I: FrameDriver<Value = V, Error = E>,
+    I: CallServices<Value = V, Error = E>,
     F: FrameBuild<V, E, BodyFrames = P>,
     P: CallBodyFramePolicy<V, E, F>,
     V: Clone,
@@ -205,7 +205,7 @@ where
         interp.free_env(callee_env)?;
         match dest {
             CallDest::Caller { env, results } => {
-                interp.write_results(env, &results, values)?;
+                interp.bind_values(env, results.as_slice(), values)?;
                 Ok(FrameEffect::Done)
             }
             CallDest::Root => Ok(FrameEffect::Complete(Completion::Returned(values))),

@@ -1,8 +1,8 @@
 use kirin_ir::{CFG, CompileStage, Product};
 
 use crate::{
-    EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError, SparseForwardEffect,
-    SparseForwardInterp,
+    CFGQueries, EnvIndex, Frame, FrameEffect, InterpreterError, SparseForwardEffect,
+    SparseForwardInterp, StatementDispatch,
 };
 
 use super::block_cursor::BlockCursor;
@@ -53,7 +53,7 @@ where
 
 impl<I, F, V, E> Frame<I, F> for CFGFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    I: CFGQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = F>,
     F: FrameBuild<V, E>,
     V: Clone,
     E: From<InterpreterError>,

@@ -1,4 +1,4 @@
-use crate::{Frame, FrameDriver, FrameEffect, InterpreterError, SparseForwardInterp};
+use crate::{ForwardFrameEngine, Frame, FrameEffect, InterpreterError, SparseForwardInterp};
 
 use super::{
     BlockFrame, CFGFrame, CallFrame, Completion, DefaultBodyFrames, DiGraphFrame, FrameBuild,
@@ -38,7 +38,7 @@ impl<V, E> FrameBuild<V, E> for StandardFrame<V, E> {
 /// re-enumerating its variants.
 impl<I, F, V, E> Frame<I, F> for StandardFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    I: ForwardFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
     // The `Call` variant is spelled `CallFrame<V>`, i.e. the default policy, so
     // an outer universe embedding `StandardFrame` must use that policy too.
     F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames>,

@@ -42,12 +42,12 @@ use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::Lexical;
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-    AbstractFrameBuild, AbstractFrameDriver, BlockFrame, Body, BodyFrameEntry, CFGFrame,
-    CallBodyFramePolicy, CallContext, CallFrame, Completion, ConcreteInterpreter,
-    ContextInsensitive, DefaultBodyFrames, DiGraphFrame, Env, EnvIndex, Frame, FrameBuild,
-    FrameDriver, FrameEffect, FunctionEntry, Interpretable, InterpreterError, SameStageLinker,
+    AbstractFrameBuild, BlockFrame, Body, BodyFrameEntry, CFGFrame, CallBodyFramePolicy,
+    CallContext, CallFrame, Completion, ConcreteInterpreter, ContextInsensitive, DefaultBodyFrames,
+    DiGraphFrame, Env, EnvIndex, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame, FrameBuild,
+    FrameEffect, FunctionEntry, Interpretable, InterpreterError, SameStageLinker,
     SparseForwardEffect, SparseForwardInterp, SparseForwardInterpreter, StandardFrame,
-    UnGraphEntry, expect_single,
+    StatementDispatch, UnGraphEntry, expect_single,
 };
 use kirin_scf::{BuildScfFor, BuildScfIf, ScfForFrame, ScfIfFrame, StructuredControlFlow};
 use kirin_test_languages::GraphFunctionLanguage;
@@ -309,7 +309,7 @@ impl<V, E> BuildScfFor<V, E> for ScfTestFrame<V, E> {
 
 impl<I, F, V, E> Frame<I, F> for ScfTestFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    I: ForwardFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
     F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames> + BuildScfIf<V, E> + BuildScfFor<V, E>,
     V: Clone + kirin_scf::ForLoopValue,
     E: From<InterpreterError>,
@@ -808,7 +808,8 @@ impl<V, E, K> FrameBuild<V, E> for GraphAbstractFrame<V, E, K> {
 
 impl<I, F, V, E, K> Frame<I, F> for GraphAbstractFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + SparseForwardInterp<Frame = F>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
+        + SparseForwardInterp<Frame = F>,
     F: AbstractFrameBuild<V, E, K>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
@@ -1497,7 +1498,8 @@ impl BuildScfFor<i64, TestError> for PolicyFrame {
 
 impl<I> Frame<I, PolicyFrame> for PolicyFrame
 where
-    I: FrameDriver<Value = i64, Error = TestError> + SparseForwardInterp<Frame = PolicyFrame>,
+    I: ForwardFrameEngine<Value = i64, Error = TestError>
+        + SparseForwardInterp<Frame = PolicyFrame>,
 {
     type Completion = Completion<i64>;
 
@@ -1678,7 +1680,7 @@ impl<V, E> MyCfgWalker<V, E> {
 
 impl<I, V, E> Frame<I, DerivedFrame<V, E>> for MyCfgWalker<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = DerivedFrame<V, E>>,
+    I: ForwardFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = DerivedFrame<V, E>>,
     V: Clone,
     E: From<InterpreterError>,
 {
@@ -1758,7 +1760,7 @@ enum DerivedFrame<V, E> {
 
 impl<I, V, E> Frame<I, Self> for DerivedFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = DerivedFrame<V, E>>,
+    I: ForwardFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = DerivedFrame<V, E>>,
     V: Clone,
     E: From<InterpreterError>,
 {

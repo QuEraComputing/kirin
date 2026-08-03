@@ -352,7 +352,7 @@ and one *specialization* of the shared framework in the forward direction (it se
 lattice-valued abstract engines. `SparseForwardInterpreter` is the forward
 engine; `SparseBackwardInterpreter` (per-SSA demand / strong liveness) and
 `DenseBackwardInterpreter` (classic per-point liveness) are the backward
-specializations — each with its own fact store, effect, and frame-driver
+specializations — each with its own fact store, effect, and engine-capability
 capability, reusing the same framework (fixpoint driver + `*Transfer` inner
 `Interp`) and also implementing `AbstractInterpreter`.
 
@@ -416,20 +416,105 @@ type `F` is the engine's generic; it is named in `Interpretable<I, ForwardEval>`
 *only* by a structured dialect building `SparseForwardEffect::Push` (through
 `SparseForwardInterp::Frame`) — ordinary dialects never mention it.
 
-### Shared protocol vs. forward frame drivers
+### Shared protocol vs. forward engine capabilities
 
 `Frame`, `FrameEngine`, `FrameEffect`, and `drive_frames` are **shared and
 direction-neutral** — they say nothing about a value domain or direction, and
 the backward engines reuse them as-is. On top of that neutral protocol sit the
-per-direction frame-driver capability surfaces: `ForwardFrameDriver` /
-`ForwardDataflowFrameDriver` for the forward engines (they require `Env`, run
-`SparseForwardEffect`, bind block args, write forward results, and summarize
-forward calls; `FrameDriver` and `AbstractFrameDriver` are retained as
-compatibility aliases), and `DenseBackwardFrameDriver` for the dense backward
-engine (statement dispatch, point-state access, edge absorption against the
-converged summaries, per-point recording). The sparse backward engine needs no
-frame-driver surface at all — its `DemandFrame` dispatches rules directly on
-the driver.
+per-direction engine-capability surfaces: the forward **component traits**
+below, composed by the `ForwardFrameEngine` / `ForwardDataflowFrameEngine`
+umbrellas, and `DenseBackwardFrameEngine` for the dense backward engine
+(statement dispatch, point-state access, edge absorption against the converged
+summaries, per-point recording). The sparse backward engine needs no capability
+surface at all — its `DemandFrame` dispatches rules directly on the transfer.
+
+**"Engine" means three different things**, so the names are kept distinct:
+
+| name | what it is |
+|---|---|
+| `drive_frames` | the **frame-stack driver** — the loop. The only thing called a driver at this layer; `ForwardDriver`/`DenseBackwardDriver` are fixpoint-driver *structs*, not capability traits. |
+| `FrameEngine` | the **minimal engine contract** the generic frame stack needs: a total `Error` type, nothing more. |
+| `ForwardFrameEngine` | the **full engine capability set** for the standard concrete frame universe. |
+| `ForwardDataflowFrameEngine` | the capability set for the standard forward-abstract frame universe. |
+| component traits | narrowly scoped **services used by individual frames**. |
+
+#### The forward capability model
+
+Forward capabilities are split by **what one frame needs**, not by what one
+engine happens to provide. A frame's bound is then a precise statement of which
+engine operations it can reach, and an engine that implements only part of the
+surface still runs the frames it can support.
+
+| trait | capability | required by |
+|---|---|---|
+| `StatementDispatch: Interp` | `run_statement` — dispatch to the dialect rule | every executing frame |
+| `BlockQueries: Interp` | `block_params`/`first_statement`/`next_statement` | `BlockCursor`, `BlockFrame`, `AbstractBlockFrame`, dialect block walkers |
+| `CFGQueries: BlockQueries` | `cfg_entry` | `CFGFrame` |
+| `DiGraphQueries: Interp` | `digraph_walk_plan` (default: `NoDefaultWalker`) | `DiGraphFrame`, `AbstractDiGraphFrame` |
+| `CallServices: Env` | `alloc_env`/`free_env`/`resolve_call`/`enter_function` | `CallFrame` |
+
+**The `*Queries` traits are read-only, and only require `Interp`** — so nothing
+on them can touch SSA storage, and their names cannot hide a store mutation. The
+one operation that needs both a query and a write, binding a block's parameters
+to incoming actuals, lives on the crate-private `BlockBinding` extension
+(bounded `Env + BlockQueries`) instead. A frame that binds a block entry
+therefore spells that requirement out: `BlockCursor::bind_entry` and
+`::enter_block` take `Env + BlockQueries`, while `::advance` takes `BlockQueries`
+alone and `::write_child_results` takes `Env` alone.
+
+`CallServices` names *services*, not a convention: **`CallFrame` still owns the
+calling convention** — the operation order, which completions are legal, and
+freeing the activation exactly once — and this trait only supplies the
+primitives. It is deliberately **not** split further: the standard `CallFrame`
+consumes all four together, and their pairing is a safety property (an
+`alloc_env` without its `free_env` leaks; a second `free_env` double-frees), so
+no engine should be able to offer half a call convention.
+
+`StatementDispatch` and `InterpDispatch` face opposite directions and are easy
+to confuse. `InterpDispatch<I>` is implemented by a **stage/language** to route a
+statement to the right dialect rule. `StatementDispatch` is implemented by the
+**engine** and is what a *frame* calls: it stashes the current location
+(`stage`/`statement`/`index`) so the rule can read it back through `Interp`, then
+delegates to `InterpDispatch`.
+
+Two umbrellas compose them, one per engine family. Use an umbrella at the
+*universe* level — a total frame enum's engine must support the union of all its
+variants — and the components at the *member* level:
+
+```rust
+// Full concrete surface. Adds no methods; blanket-implemented.
+pub trait ForwardFrameEngine:
+    StatementDispatch + CFGQueries + DiGraphQueries + CallServices {}
+impl<T> ForwardFrameEngine for T
+where T: StatementDispatch + CFGQueries + DiGraphQueries + CallServices {}
+
+// Abstract dataflow: the traversal it *shares*, plus merge/summarization.
+// Notably NOT CallServices, and NOT CFGQueries.
+pub trait ForwardDataflowFrameEngine:
+    Env + StatementDispatch + BlockQueries + DiGraphQueries
+{
+    type SummaryKey: Clone + Eq + Hash;
+    fn analysis_merge(..); fn contribute_return(..); fn current_function_key(..);
+    fn summarize_call(..); fn max_iterations(..);
+}
+```
+
+An abstract engine therefore **no longer inherits the concrete call lifecycle**.
+That follows the semantics: forward abstract interpretation *summarizes* a call
+(`summarize_call` → `AbstractCallFrame`) rather than descending into it, and
+reaches a callable body's entry block through `Owner` seeding in the fixpoint
+driver rather than `cfg_entry`. Requiring it to expose `alloc_env`, `free_env`,
+`enter_function`, `resolve_call`, and `cfg_entry` was demanding a call
+convention it never performs. `tests/frame_engine_capabilities.rs` pins this
+down with deliberately incomplete mock engines whose ability to compile *is* the
+regression test.
+
+Binding values into an **explicitly selected** activation is
+`Env::bind_values(index, slots, values)`, not a method on any umbrella, so it is
+no longer confusable with `SparseForwardInterp::write_results` (the
+dialect-facing helper, which binds into the engine's *current* activation,
+`interp.index()`). The two differ by *which activation*, not by what they do —
+so neither name mentions the `Product` container it happens to accept.
 
 ```rust
 pub enum FrameEffect<F, C> { Continue(F), Push { parent: F, child: F }, Done, Complete(C) }
@@ -451,8 +536,14 @@ pub trait Frame<I: FrameEngine, F>: Sized {
 pub fn drive_frames<I: FrameEngine, F: Frame<I, F>>(engine: &mut I, frames: &mut Vec<F>)
     -> Result<F::Completion, I::Error>;
 
-// Forward-specific capability surface (alias: FrameDriver):
-pub trait ForwardFrameDriver: Env { /* env alloc/free, IR queries, dispatch, resolution */ }
+// Forward-specific capability surface: one component trait per kind of
+// traversal, plus two umbrellas — see "The forward capability model" above.
+pub trait StatementDispatch: Interp  { /* run_statement */ }
+pub trait BlockQueries: Interp       { /* read-only block queries */ }
+pub trait CFGQueries: BlockQueries   { /* cfg_entry */ }
+pub trait DiGraphQueries: Interp     { /* digraph_walk_plan */ }
+pub trait CallServices: Env          { /* alloc/free env, resolve_call, enter_function */ }
+pub(crate) trait BlockBinding: Env + BlockQueries { /* bind_block_args */ }
 ```
 
 **Members and universes.** The `F` parameter is what lets one trait serve both
@@ -478,12 +569,27 @@ forward value engine `Interp` — so the frame protocol is decoupled from forwar
 value interpretation and reusable by other analyses. Every `Interp` is a
 `FrameEngine` by blanket impl. The engine owns a `Vec<F>` and calls
 `drive_frames`, which pops the top frame, `step_into`s it, and applies the
-returned `FrameEffect`. `ForwardFrameDriver: Env` is the richer **forward**
-capability surface the *forward* frames call (it requires `Env` because the
-default `bind_block_args`/`write_results` use `env_write`); **both forward
-engines implement it**. The concrete and
-abstract standard frames are two *implementations* of this one protocol — not
-parallel frameworks.
+returned `FrameEffect`. The forward component traits above are the richer
+capability surfaces the *forward* frames call; each forward frame bounds only the
+components it uses, and the concrete engine implements all of them (so it also
+gets `ForwardFrameEngine` by blanket impl). The concrete and abstract standard
+frames are two *implementations* of this one protocol — not parallel frameworks.
+
+Narrowest first, the shipped member frames now require:
+
+| frame | bound |
+|---|---|
+| `ScfIfFrame` | `FrameEngine<Error = E>` — decides its arm before being built, so it touches no engine capability at all |
+| `ScfForFrame` | `Env<Value = V, Error = E>` — reads the loop bound/step, pushes a `BlockFrame` |
+| `CallFrame` | `CallServices` |
+| `BlockCursor` | per operation: `BlockQueries` (query) / `Env + BlockQueries` (bind entry) / `Env` (bind child results) |
+| `DiGraphFrame::finish`, `AbstractDiGraphFrame::finish` | `Env` — the schedule is already consumed; only the yields are read |
+| `BlockFrame` | `BlockQueries + StatementDispatch + SparseForwardInterp` |
+| `CFGFrame` | `CFGQueries + StatementDispatch + SparseForwardInterp` |
+| `DiGraphFrame` | `DiGraphQueries + StatementDispatch + SparseForwardInterp` |
+| `AbstractBlockFrame`, `AbstractCallFrame`, `AbstractDiGraphFrame` | `ForwardDataflowFrameEngine` (+ `SparseForwardInterp` for the walkers) |
+| `StandardFrame`, `ToyFrame`, other total concrete enums | `ForwardFrameEngine + SparseForwardInterp` — correct at the universe level |
+| `StandardAbstractFrame`, other total abstract enums | `ForwardDataflowFrameEngine + SparseForwardInterp` |
 
 ### Concrete frames — `BlockFrame` / `CFGFrame` / `DiGraphFrame` / `CallFrame` / `StandardFrame`
 
@@ -546,7 +652,7 @@ through their own dialect frames (chosen per engine by `ScfIfDispatch` /
 bodies — they borrow the caller's activation and exit by `Yield` — so the
 callable-body policy plays no part.
 
-### Abstract frames — `StandardAbstractFrame` / `AbstractFrameBuild` / `ForwardDataflowFrameDriver`
+### Abstract frames — `StandardAbstractFrame` / `AbstractFrameBuild` / `ForwardDataflowFrameEngine`
 
 `SparseForwardInterpreter` is symmetrically generic over a total abstract frame type
 `F` (default `StandardAbstractFrame`). The standard abstract frames
@@ -585,10 +691,15 @@ substantive way: a `Call` effect pushes an `AbstractCallFrame`, routing the call
 through `summarize_call` instead of descending into the callee. Descending would
 neither widen nor terminate on recursion.
 
-Abstract frames need a few capabilities beyond `ForwardFrameDriver`, on
-`ForwardDataflowFrameDriver: ForwardFrameDriver` (alias: `AbstractFrameDriver`) —
-`analysis_merge`, `contribute_return`, and
-`summarize_call`. The interprocedural protocol stays **atomic in the engine**:
+Abstract frames need a few capabilities beyond the traversal they share with
+concrete execution, on `ForwardDataflowFrameEngine: Env + StatementDispatch +
+BlockQueries + DiGraphQueries` —
+`analysis_merge`, `contribute_return`, and `summarize_call`. It does **not**
+extend `CallServices`: `AbstractCallFrame`'s single engine requirement is
+`summarize_call`, so summarizing a call needs no call convention at all. Nor
+`CFGQueries`, since the entry block of a callable body arrives via `Owner`
+seeding rather than `cfg_entry`. The interprocedural protocol stays **atomic in
+the engine**:
 `summarize_call` performs resolve → key → join-into-callee-entry → record-caller
 (*including same-key recursion*) → read-return-summary in one step, so a custom
 frame chooses *what to traverse* but cannot reorder the summary protocol and

@@ -12,10 +12,9 @@
 use std::hash::Hash;
 
 use kirin_interpreter::engine::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-    AbstractFrameDriver, BlockFrame, CFGFrame, CallFrame, Completion, DefaultBodyFrames,
-    DiGraphFrame, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
-    SparseForwardInterp,
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, BlockFrame,
+    CFGFrame, CallFrame, Completion, DefaultBodyFrames, DiGraphFrame, ForwardDataflowFrameEngine,
+    ForwardFrameEngine, Frame, FrameBuild, FrameEffect, InterpreterError, SparseForwardInterp,
 };
 use kirin_scf::{
     AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf, BuildScfFor,
@@ -57,7 +56,7 @@ impl<V, E> BuildScfFor<V, E> for ToyFrame<V, E> {
 
 impl<I, F, V, E> Frame<I, F> for ToyFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    I: ForwardFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
     F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames> + BuildScfIf<V, E> + BuildScfFor<V, E>,
     V: Clone + ForLoopValue,
     E: From<InterpreterError>,
@@ -132,7 +131,8 @@ impl<V, E, K> BuildAbstractScfFor<V, E, K> for ToyAbstractFrame<V, E, K> {
 
 impl<I, F, V, E, K> Frame<I, F> for ToyAbstractFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K> + SparseForwardInterp<Frame = F>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
+        + SparseForwardInterp<Frame = F>,
     F: AbstractFrameBuild<V, E, K> + BuildAbstractScfIf<V, E, K> + BuildAbstractScfFor<V, E, K>,
     V: Clone + PartialEq + ForLoopValue + Lattice,
     E: From<InterpreterError>,
@@ -178,7 +178,7 @@ where
 
 use kirin_interpreter::DenseBackwardState;
 use kirin_interpreter::engine::{
-    DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBlockFrame, DenseFrameBuild,
+    DenseBackwardCompletion, DenseBackwardFrameEngine, DenseBlockFrame, DenseFrameBuild,
 };
 use kirin_scf::{BuildDenseScfFor, BuildDenseScfIf, DenseScfForFrame, DenseScfIfFrame};
 
@@ -207,7 +207,7 @@ impl<V, E> BuildDenseScfFor<V, E> for ToyDenseBackwardFrame<V, E> {
 
 impl<I, F, V, E> Frame<I, F> for ToyDenseBackwardFrame<V, E>
 where
-    I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+    I: DenseBackwardFrameEngine<Value = V, Error = E, Frame = F>,
     F: DenseFrameBuild<V, E> + BuildDenseScfIf<V, E> + BuildDenseScfFor<V, E>,
     V: Clone + PartialEq + Lattice + DenseBackwardState,
     E: From<InterpreterError>,

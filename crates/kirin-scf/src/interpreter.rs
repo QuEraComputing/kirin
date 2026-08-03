@@ -32,10 +32,10 @@ use kirin_interpreter::dialect::{
     StrongDemand,
 };
 use kirin_interpreter::{
-    AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver, BlockFrame,
-    CallContext, Completion, ConcreteInterpreter, DenseBackwardCompletion,
-    DenseBackwardFrameDriver, DenseBackwardState, DenseBlockFrame, DenseFrameBuild, EnvIndex,
-    Frame, FrameBuild, FrameDriver, FrameEffect, SparseForwardTransfer,
+    AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, BlockFrame, CallContext,
+    Completion, ConcreteInterpreter, DenseBackwardCompletion, DenseBackwardFrameEngine,
+    DenseBackwardState, DenseBlockFrame, DenseFrameBuild, Env, EnvIndex,
+    ForwardDataflowFrameEngine, Frame, FrameBuild, FrameEffect, FrameEngine, SparseForwardTransfer,
 };
 
 use crate::{For, ForLoopValue, If, Yield};
@@ -304,7 +304,7 @@ impl<V, E> DenseScfIfFrame<V, E> {
 
 impl<I, F, V, E> Frame<I, F> for DenseScfIfFrame<V, E>
 where
-    I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+    I: DenseBackwardFrameEngine<Value = V, Error = E, Frame = F>,
     F: DenseFrameBuild<V, E> + BuildDenseScfIf<V, E>,
     V: Clone + Lattice,
     E: From<InterpreterError>,
@@ -416,7 +416,7 @@ impl<V, E> DenseScfForFrame<V, E> {
 
 impl<I, F, V, E> Frame<I, F> for DenseScfForFrame<V, E>
 where
-    I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+    I: DenseBackwardFrameEngine<Value = V, Error = E, Frame = F>,
     F: DenseFrameBuild<V, E> + BuildDenseScfFor<V, E>,
     V: Clone + PartialEq + Lattice + DenseBackwardState,
     E: From<InterpreterError>,
@@ -676,9 +676,14 @@ where
     }
 }
 
+/// `scf.if` decides its arm *before* the frame is built (the rule reads the
+/// condition), so stepping it touches no engine capability at all — only the
+/// error type. This is the narrowest bound in the codebase, and it is the point
+/// of splitting the driver: a dialect frame that makes a decision and delegates
+/// the walking should not have to name an engine that can allocate activations.
 impl<I, F, V, E> Frame<I, F> for ScfIfFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E>,
+    I: FrameEngine<Error = E>,
     F: FrameBuild<V, E> + BuildScfIf<V, E>,
     V: Clone,
     E: From<InterpreterError>,
@@ -767,7 +772,7 @@ where
 
     fn join_acc<I>(&mut self, interp: &mut I, values: Product<V>) -> Result<(), E>
     where
-        I: AbstractFrameDriver<Value = V, Error = E>,
+        I: ForwardDataflowFrameEngine<Value = V, Error = E>,
     {
         let merged = match self.acc.take() {
             None => values,
@@ -780,7 +785,7 @@ where
 
 impl<I, F, V, E, K> Frame<I, F> for AbstractScfIfFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>,
     F: AbstractFrameBuild<V, E, K> + BuildAbstractScfIf<V, E, K>,
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
@@ -878,9 +883,11 @@ where
     }
 }
 
+/// `scf.for` reads the loop bound/step out of the activation it was given and
+/// otherwise only pushes a [`BlockFrame`] — so [`Env`] is its whole requirement.
 impl<I, F, V, E> Frame<I, F> for ScfForFrame<V, E>
 where
-    I: FrameDriver<Value = V, Error = E>,
+    I: Env<Value = V, Error = E>,
     F: FrameBuild<V, E> + BuildScfFor<V, E>,
     V: Clone + ForLoopValue,
     E: From<InterpreterError>,
@@ -1008,7 +1015,7 @@ where
 
     fn join_finish<I>(&mut self, interp: &mut I, values: Product<V>) -> Result<(), E>
     where
-        I: AbstractFrameDriver<Value = V, Error = E>,
+        I: ForwardDataflowFrameEngine<Value = V, Error = E>,
     {
         let merged = match self.finish.take() {
             None => values,
@@ -1021,7 +1028,7 @@ where
 
 impl<I, F, V, E, K> Frame<I, F> for AbstractScfForFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>,
     F: AbstractFrameBuild<V, E, K> + BuildAbstractScfFor<V, E, K>,
     V: Clone + PartialEq + ForLoopValue + Lattice,
     E: From<InterpreterError>,

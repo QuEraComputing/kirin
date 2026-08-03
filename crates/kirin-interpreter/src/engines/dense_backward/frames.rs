@@ -15,7 +15,7 @@ use std::marker::PhantomData;
 use kirin_ir::{Block, CompileStage, Statement};
 
 use crate::{
-    DenseBackwardCompletion, DenseBackwardEffect, DenseBackwardFrameDriver, Frame, FrameEffect,
+    DenseBackwardCompletion, DenseBackwardEffect, DenseBackwardFrameEngine, Frame, FrameEffect,
     InterpreterError,
 };
 
@@ -81,7 +81,7 @@ where
 
 impl<I, F, V, E> Frame<I, F> for DenseBlockFrame<V, E>
 where
-    I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+    I: DenseBackwardFrameEngine<Value = V, Error = E, Frame = F>,
     F: DenseFrameBuild<V, E>,
     V: Clone,
     E: From<InterpreterError>,
@@ -206,7 +206,7 @@ impl<V, E> DenseFrameBuild<V, E> for StandardDenseBackwardFrame<V, E> {
 /// [`Frame`] for what that buys.
 impl<I, F, V, E> Frame<I, F> for StandardDenseBackwardFrame<V, E>
 where
-    I: DenseBackwardFrameDriver<Value = V, Error = E, Frame = F>,
+    I: DenseBackwardFrameEngine<Value = V, Error = E, Frame = F>,
     F: DenseFrameBuild<V, E>,
     V: Clone,
     E: From<InterpreterError>,
