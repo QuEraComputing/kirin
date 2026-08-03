@@ -42,13 +42,18 @@ pub struct BlockHeader<'src, TypeOutput> {
 
 /// A basic block containing a label, arguments, and statements.
 ///
-/// Represents syntax like:
+/// Represents the untagged block syntax:
 /// ```ignore
 /// ^bb0(%arg: i32) {
 ///     %x = add %arg, %arg;
 ///     return %x;
 /// }
 /// ```
+///
+/// This AST node covers both roles the untagged form plays: a CFG's member
+/// block (where the enclosing `cfg { .. }` supplies the discriminator) and a
+/// standalone `Block` body, which the parser and printer tag with the `block`
+/// keyword around this same shape.
 ///
 /// Fields are flat to support both full parsing (with block header) and
 /// projection-based parsing (where pieces come from different format positions).
@@ -69,11 +74,14 @@ pub struct Block<'src, TypeOutput, StmtOutput> {
 ///
 /// Represents syntax like:
 /// ```ignore
-/// {
+/// cfg {
 ///     ^entry(%arg: i32) { ... };
 ///     ^bb1() { ... };
 /// }
 /// ```
+///
+/// The `cfg` discriminator belongs to the whole container; the member blocks
+/// stay untagged.
 ///
 /// The `TypeOutput` parameter is the parsed type representation.
 /// The `StmtOutput` parameter is the parsed statement representation.

@@ -11,7 +11,7 @@ use kirin_test_languages::ArithFunctionLanguage;
 const PROGRAM: &str = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %cond: i64) {
     %dead = add %x, %x -> i64;
     cond_br %cond then=^then(%x) else=^else(%x);
@@ -29,7 +29,7 @@ specialize @test fn @main(i64, i64) -> i64 {
 const DEAD_EDGE_ARG_PROGRAM: &str = r#"
 stage @test fn @main(i64, i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64, i64) -> i64 {
+specialize @test fn @main(i64, i64, i64) -> i64 cfg {
   ^entry(%live: i64, %dead: i64, %cond: i64) {
     cond_br %cond then=^then(%live) else=^else(%dead);
   }
@@ -181,7 +181,7 @@ fn unused_successor_block_argument_does_not_keep_edge_arg_live() {
 const RET_PARAM_PROGRAM: &str = r#"
 stage @test fn @main(i64) -> i64;
 
-specialize @test fn @main(i64) -> i64 {
+specialize @test fn @main(i64) -> i64 cfg {
   ^entry(%x: i64) {
     ret %x;
   }
@@ -191,7 +191,7 @@ specialize @test fn @main(i64) -> i64 {
 const DEMANDED_RESULT_PROGRAM: &str = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%a: i64, %b: i64) {
     %s = add %a, %b -> i64;
     ret %s;
@@ -202,7 +202,7 @@ specialize @test fn @main(i64, i64) -> i64 {
 const DEAD_RESULT_PROGRAM: &str = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%a: i64, %b: i64) {
     %s = add %a, %b -> i64;
     ret %a;

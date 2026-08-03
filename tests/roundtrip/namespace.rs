@@ -11,7 +11,7 @@ fn test_namespace_pipeline_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%a: i64, %b: i64) {
     %sum = arith.add %a, %b -> i64;
     %diff = arith.sub %sum, %b -> i64;
@@ -79,7 +79,7 @@ fn test_bare_pipeline_roundtrip() {
     let input = r#"
 stage @test fn @compose(i64, i64) -> i64;
 
-specialize @test fn @compose(i64, i64) -> i64 {
+specialize @test fn @compose(i64, i64) -> i64 cfg {
   ^entry(%a: i64, %b: i64) {
     %sum = add %a, %b -> i64;
     %diff = sub %sum, %b -> i64;
