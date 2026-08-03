@@ -28,6 +28,7 @@
 //! re-run the owner when several call sites share one key, and a directed cycle
 //! is rejected identically by both engines.
 
+use std::cell::RefCell;
 use std::collections::VecDeque;
 use std::hash::Hash;
 
@@ -41,11 +42,12 @@ use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::Lexical;
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-    AbstractFrameBuild, AbstractFrameDriver, BlockFrame, Body, CFGFrame, CallContext, CallFrame,
-    Completion, ConcreteInterpreter, ContextInsensitive, DiGraphFrame, Env, EnvIndex, Frame,
-    FrameBuild, FrameDriver, FrameEffect, FunctionEntry, Interpretable, InterpreterError,
-    SameStageLinker, SparseForwardEffect, SparseForwardInterp, SparseForwardInterpreter,
-    StandardFrame, UnGraphEntry, expect_single,
+    AbstractFrameBuild, AbstractFrameDriver, BlockFrame, Body, BodyFrameEntry, CFGFrame,
+    CallBodyFramePolicy, CallContext, CallFrame, Completion, ConcreteInterpreter,
+    ContextInsensitive, DefaultBodyFrames, DiGraphFrame, Env, EnvIndex, Frame, FrameBuild,
+    FrameDriver, FrameEffect, FunctionEntry, Interpretable, InterpreterError, SameStageLinker,
+    SparseForwardEffect, SparseForwardInterp, SparseForwardInterpreter, StandardFrame,
+    UnGraphEntry, expect_single,
 };
 use kirin_scf::{BuildScfFor, BuildScfIf, ScfForFrame, ScfIfFrame, StructuredControlFlow};
 use kirin_test_languages::GraphFunctionLanguage;
@@ -308,7 +310,7 @@ impl<V, E> BuildScfFor<V, E> for ScfTestFrame<V, E> {
 impl<I, F, V, E> Frame<I, F> for ScfTestFrame<V, E>
 where
     I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
-    F: FrameBuild<V, E> + BuildScfIf<V, E> + BuildScfFor<V, E>,
+    F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames> + BuildScfIf<V, E> + BuildScfFor<V, E>,
     V: Clone + kirin_scf::ForLoopValue,
     E: From<InterpreterError>,
 {
@@ -374,10 +376,7 @@ fn run_scf(pipeline: &Pipeline<ScfL>, function: &str, args: &[i64]) -> Result<i6
 /// `scf.if` picks the decided arm and pushes the framework `BlockFrame` for
 /// it; the arm's `yield` surfaces as `Completion::Yielded`, which the
 /// `ScfIfFrame` consumes and hands to the pusher as the operation's results.
-#[test]
-fn scf_if_arm_yields_to_dialect_frame() {
-    let pipeline = parse_scf(
-        r#"
+const SCF_ABS_PROGRAM: &str = r#"
 stage @test fn @abs(i64) -> i64;
 
 specialize @test fn @abs(i64) -> i64 {
@@ -393,8 +392,11 @@ specialize @test fn @abs(i64) -> i64 {
     ret %result;
   }
 }
-"#,
-    );
+"#;
+
+#[test]
+fn scf_if_arm_yields_to_dialect_frame() {
+    let pipeline = parse_scf(SCF_ABS_PROGRAM);
     assert_eq!(run_scf(&pipeline, "abs", &[-7]).unwrap(), 7);
     assert_eq!(run_scf(&pipeline, "abs", &[4]).unwrap(), 4);
 }
@@ -508,6 +510,8 @@ enum UnPolicyFrame {
 }
 
 impl FrameBuild<i64, TestError> for UnPolicyFrame {
+    type BodyFrames = DefaultBodyFrames;
+
     fn from_block(frame: BlockFrame<i64, TestError>) -> Self {
         UnPolicyFrame::Block(frame)
     }
@@ -786,6 +790,8 @@ enum GraphAbstractFrame<V, E, K> {
 }
 
 impl<V, E, K> FrameBuild<V, E> for GraphAbstractFrame<V, E, K> {
+    type BodyFrames = DefaultBodyFrames;
+
     fn from_block(_: BlockFrame<V, E>) -> Self {
         GraphAbstractFrame::NoWalker("no abstract walker for a concrete Block frame")
     }
@@ -1392,4 +1398,471 @@ fn digraph_port_arity_mismatch_is_reported() {
         ),
         "expected a port arity mismatch abstractly, got {abstract_:?}"
     );
+}
+
+// ===========================================================================
+// 14. A custom callable-body walker policy.
+// ===========================================================================
+
+// `CallFrame` owns the call convention — resolve, allocate, enter, suspend,
+// validate the completion, free the activation exactly once, bind results — and
+// delegates only *which walker enters the callee body* to a
+// `CallBodyFramePolicy`. These tests show a language replacing that choice for
+// two body kinds without reimplementing any of the lifecycle, and confirm the
+// choice does not leak into `scf.if`, which picks its own dialect frame.
+
+thread_local! {
+    /// Which body kinds the custom policy was asked for, in order.
+    static POLICY_LOG: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
+}
+
+/// A custom policy: instrument `CFG` and `DiGraph` entry, delegate `Block` and
+/// `UnGraph` to the framework default. Each arm still builds the *standard*
+/// walker — the point is that the language chose it, not that it walks
+/// differently.
+struct LoggingBodyFrames;
+
+impl CallBodyFramePolicy<i64, TestError, PolicyFrame> for LoggingBodyFrames {
+    fn from_cfg(entry: BodyFrameEntry<CFG, i64>) -> Result<PolicyFrame, TestError> {
+        POLICY_LOG.with(|log| log.borrow_mut().push("cfg"));
+        Ok(PolicyFrame::CFG(CFGFrame::new(
+            entry.stage,
+            entry.index,
+            entry.body,
+            entry.args,
+        )))
+    }
+
+    fn from_block(entry: BodyFrameEntry<Block, i64>) -> Result<PolicyFrame, TestError> {
+        POLICY_LOG.with(|log| log.borrow_mut().push("block"));
+        <DefaultBodyFrames as CallBodyFramePolicy<i64, TestError, PolicyFrame>>::from_block(entry)
+    }
+
+    fn from_digraph(entry: BodyFrameEntry<DiGraph, i64>) -> Result<PolicyFrame, TestError> {
+        POLICY_LOG.with(|log| log.borrow_mut().push("digraph"));
+        Ok(PolicyFrame::DiGraph(DiGraphFrame::new(
+            entry.stage,
+            entry.index,
+            entry.body,
+            entry.args,
+        )))
+    }
+
+    fn from_ungraph(entry: BodyFrameEntry<UnGraph, i64>) -> Result<PolicyFrame, TestError> {
+        POLICY_LOG.with(|log| log.borrow_mut().push("ungraph"));
+        <DefaultBodyFrames as CallBodyFramePolicy<i64, TestError, PolicyFrame>>::from_ungraph(entry)
+    }
+}
+
+/// A total frame type that selects `LoggingBodyFrames`. Note the `Call` variant
+/// carries the policy, and `FrameBuild::BodyFrames` names it — the derive would
+/// emit exactly this via `#[interpret(body_frames = LoggingBodyFrames)]`.
+enum PolicyFrame {
+    Block(BlockFrame<i64, TestError>),
+    CFG(CFGFrame<i64, TestError>),
+    Call(CallFrame<i64, LoggingBodyFrames>),
+    DiGraph(DiGraphFrame<i64, TestError>),
+    ScfIf(ScfIfFrame<i64, TestError>),
+    ScfFor(ScfForFrame<i64, TestError>),
+}
+
+impl FrameBuild<i64, TestError> for PolicyFrame {
+    type BodyFrames = LoggingBodyFrames;
+
+    fn from_block(frame: BlockFrame<i64, TestError>) -> Self {
+        PolicyFrame::Block(frame)
+    }
+    fn from_cfg(frame: CFGFrame<i64, TestError>) -> Self {
+        PolicyFrame::CFG(frame)
+    }
+    fn from_call(frame: CallFrame<i64, LoggingBodyFrames>) -> Self {
+        PolicyFrame::Call(frame)
+    }
+    fn from_digraph(frame: DiGraphFrame<i64, TestError>) -> Self {
+        PolicyFrame::DiGraph(frame)
+    }
+}
+
+impl BuildScfIf<i64, TestError> for PolicyFrame {
+    fn scf_if(frame: ScfIfFrame<i64, TestError>) -> Self {
+        PolicyFrame::ScfIf(frame)
+    }
+}
+
+impl BuildScfFor<i64, TestError> for PolicyFrame {
+    fn scf_for(frame: ScfForFrame<i64, TestError>) -> Self {
+        PolicyFrame::ScfFor(frame)
+    }
+}
+
+impl<I> Frame<I, PolicyFrame> for PolicyFrame
+where
+    I: FrameDriver<Value = i64, Error = TestError> + SparseForwardInterp<Frame = PolicyFrame>,
+{
+    type Completion = Completion<i64>;
+
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<i64>>, TestError> {
+        match self {
+            PolicyFrame::Block(frame) => frame.step_into(interp),
+            PolicyFrame::CFG(frame) => frame.step_into(interp),
+            PolicyFrame::Call(frame) => frame.step_into(interp),
+            PolicyFrame::DiGraph(frame) => frame.step_into(interp),
+            PolicyFrame::ScfIf(frame) => frame.step_into(interp),
+            PolicyFrame::ScfFor(frame) => frame.step_into(interp),
+        }
+    }
+
+    fn resume_done_into(
+        self,
+        interp: &mut I,
+    ) -> Result<FrameEffect<Self, Completion<i64>>, TestError> {
+        match self {
+            PolicyFrame::Block(frame) => frame.resume_done_into(interp),
+            PolicyFrame::CFG(frame) => frame.resume_done_into(interp),
+            PolicyFrame::Call(frame) => frame.resume_done_into(interp),
+            PolicyFrame::DiGraph(frame) => frame.resume_done_into(interp),
+            PolicyFrame::ScfIf(frame) => frame.resume_done_into(interp),
+            PolicyFrame::ScfFor(frame) => frame.resume_done_into(interp),
+        }
+    }
+
+    fn resume_into(
+        self,
+        completion: Completion<i64>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<Self, Completion<i64>>, TestError> {
+        match self {
+            PolicyFrame::Block(frame) => frame.resume_into(completion, interp),
+            PolicyFrame::CFG(frame) => frame.resume_into(completion, interp),
+            PolicyFrame::Call(frame) => frame.resume_into(completion, interp),
+            PolicyFrame::DiGraph(frame) => frame.resume_into(completion, interp),
+            PolicyFrame::ScfIf(frame) => frame.resume_into(completion, interp),
+            PolicyFrame::ScfFor(frame) => frame.resume_into(completion, interp),
+        }
+    }
+}
+
+type PolicyEngine<'ir> = ConcreteInterpreter<'ir, L, i64, TestError, SameStageLinker, PolicyFrame>;
+
+fn run_with_policy(pipeline: &Pipeline<L>, function: &str, args: &[i64]) -> Result<i64, TestError> {
+    POLICY_LOG.with(|log| log.borrow_mut().clear());
+    let mut interp: PolicyEngine<'_> =
+        ConcreteInterpreter::new(pipeline).with_linker(SameStageLinker);
+    expect_single(interp.call_by_name("test", function, args.iter().copied())?)
+}
+
+fn policy_log() -> Vec<&'static str> {
+    POLICY_LOG.with(|log| log.borrow().clone())
+}
+
+/// A root call and a nested call, both routed through the custom policy. The
+/// returned values are unchanged — only the *selection* of the walker moved.
+#[test]
+fn custom_body_policy_enters_callable_bodies() {
+    let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
+
+    // Root call into a CFG body, which then calls a DiGraph body.
+    assert_eq!(run_with_policy(&pipeline, "main", &[]).unwrap(), 5);
+    assert_eq!(policy_log(), vec!["cfg", "digraph"]);
+
+    // Root call straight into the DiGraph body.
+    assert_eq!(run_with_policy(&pipeline, "gadd", &[2, 3]).unwrap(), 5);
+    assert_eq!(policy_log(), vec!["digraph"]);
+}
+
+/// The `Block` arm delegates to `DefaultBodyFrames`, so a policy can override
+/// only the body kinds it cares about.
+#[test]
+fn custom_body_policy_can_delegate_to_the_default() {
+    let pipeline = parse(BLOCK_CALLABLE_PROGRAM);
+    assert_eq!(run_with_policy(&pipeline, "main", &[]).unwrap(), 42);
+    assert_eq!(policy_log(), vec!["cfg", "block"]);
+}
+
+/// Isolation: `scf.if` builds its *own* dialect frame via `ScfIfDispatch` and
+/// walks the chosen arm with a framework `BlockFrame`. It is a nested body, not
+/// a callable one, so the call-body policy must never be consulted for it.
+#[test]
+fn scf_if_does_not_use_the_call_body_policy() {
+    let pipeline = parse_scf(SCF_ABS_PROGRAM);
+    let mut interp: ConcreteInterpreter<
+        '_,
+        ScfL,
+        i64,
+        TestError,
+        SameStageLinker,
+        ScfTestFrame<i64, TestError>,
+    > = ConcreteInterpreter::new(&pipeline).with_linker(SameStageLinker);
+    POLICY_LOG.with(|log| log.borrow_mut().clear());
+    let result =
+        expect_single::<i64, TestError>(interp.call_by_name("test", "abs", [-7]).unwrap()).unwrap();
+    assert_eq!(result, 7);
+    // `ScfTestFrame` uses the default policy, and in any case the scf arm never
+    // reaches a call boundary — the log stays empty.
+    assert!(policy_log().is_empty(), "got {:?}", policy_log());
+}
+
+// ===========================================================================
+// 15. A *genuine* replacement walker, selected through the derive.
+// ===========================================================================
+
+// Section 14 proves the policy is consulted, but each arm still built a
+// standard walker and the total frame type implemented `FrameBuild` by hand. This
+// section closes both gaps:
+//
+// - `MyCfgWalker` is a **distinct frame type** with its own `Frame` impl and its
+//   own enum variant. A callable `CFG` body enters through it, never through
+//   `DerivedFrame::CFG`.
+// - the policy is selected by `#[interpret(body_frames = MyBodyFrames)]`, so the
+//   derive is **compiled and executed** here rather than only snapshotted.
+//
+// What this does *not* claim: `MyCfgWalker` delegates the actual block-to-block
+// traversal to a `CFGFrame` it owns, rather than reimplementing CFG walking. It
+// hands off after the entry step, which is why the assertions count *entries*.
+// The substitutable thing Roger asked for is the frame type the language chooses
+// at the callable-body boundary, and that is what is replaced.
+
+#[derive(Clone, Copy, Default, Debug, PartialEq)]
+struct CustomTrace {
+    /// `MyBodyFrames::from_cfg` calls — one per callable CFG activation.
+    policy_selections: usize,
+    /// Steps taken *by* `MyCfgWalker`.
+    my_steps: usize,
+    /// Steps taken by the standard `DerivedFrame::CFG` variant. Must stay `0`:
+    /// if the custom walker ever handed the walk back to the framework variant,
+    /// this counts it.
+    standard_cfg_steps: usize,
+}
+
+thread_local! {
+    static CUSTOM: RefCell<CustomTrace> = const { RefCell::new(CustomTrace {
+        policy_selections: 0,
+        my_steps: 0,
+        standard_cfg_steps: 0,
+    }) };
+}
+
+/// A language's own callable-CFG walker: distinct type, distinct variant.
+struct MyCfgWalker<V, E> {
+    inner: CFGFrame<V, E>,
+}
+
+impl<V, E> MyCfgWalker<V, E> {
+    /// The inner `CFGFrame` re-wraps *itself* through `FrameBuild::from_cfg`,
+    /// which lands in `DerivedFrame::CFG`. Lift those back so this walker stays
+    /// resident for the whole traversal rather than only its entry step.
+    ///
+    /// Only the frame that represents *self* is lifted: `Push.child` is a
+    /// different frame (a call boundary or a pushed dialect frame) and must be
+    /// left alone.
+    fn stay_resident(
+        effect: FrameEffect<DerivedFrame<V, E>, Completion<V>>,
+    ) -> FrameEffect<DerivedFrame<V, E>, Completion<V>> {
+        fn lift<V, E>(frame: DerivedFrame<V, E>) -> DerivedFrame<V, E> {
+            match frame {
+                DerivedFrame::CFG(inner) => DerivedFrame::MyCfg(MyCfgWalker { inner }),
+                other => other,
+            }
+        }
+        match effect {
+            FrameEffect::Continue(frame) => FrameEffect::Continue(lift(frame)),
+            FrameEffect::Push { parent, child } => FrameEffect::Push {
+                parent: lift(parent),
+                child,
+            },
+            // `Done`/`Complete` carry no frame.
+            other => other,
+        }
+    }
+}
+
+impl<I, V, E> Frame<I, DerivedFrame<V, E>> for MyCfgWalker<V, E>
+where
+    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = DerivedFrame<V, E>>,
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    type Completion = Completion<V>;
+
+    fn step_into(
+        self,
+        interp: &mut I,
+    ) -> Result<FrameEffect<DerivedFrame<V, E>, Completion<V>>, E> {
+        CUSTOM.with(|t| t.borrow_mut().my_steps += 1);
+        self.inner.step_into(interp).map(Self::stay_resident)
+    }
+
+    fn resume_done_into(
+        self,
+        interp: &mut I,
+    ) -> Result<FrameEffect<DerivedFrame<V, E>, Completion<V>>, E> {
+        CUSTOM.with(|t| t.borrow_mut().my_steps += 1);
+        self.inner.resume_done_into(interp).map(Self::stay_resident)
+    }
+
+    fn resume_into(
+        self,
+        completion: Completion<V>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<DerivedFrame<V, E>, Completion<V>>, E> {
+        CUSTOM.with(|t| t.borrow_mut().my_steps += 1);
+        self.inner
+            .resume_into(completion, interp)
+            .map(Self::stay_resident)
+    }
+}
+
+/// Replaces the `CFG` walker outright; delegates the other three body kinds to
+/// the framework default.
+struct MyBodyFrames;
+
+impl<V, E> CallBodyFramePolicy<V, E, DerivedFrame<V, E>> for MyBodyFrames
+where
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    fn from_cfg(entry: BodyFrameEntry<CFG, V>) -> Result<DerivedFrame<V, E>, E> {
+        // Not `F::from_cfg` — the language's own walker, in its own variant.
+        CUSTOM.with(|t| t.borrow_mut().policy_selections += 1);
+        Ok(DerivedFrame::MyCfg(MyCfgWalker {
+            inner: CFGFrame::new(entry.stage, entry.index, entry.body, entry.args),
+        }))
+    }
+
+    fn from_block(entry: BodyFrameEntry<Block, V>) -> Result<DerivedFrame<V, E>, E> {
+        <DefaultBodyFrames as CallBodyFramePolicy<V, E, DerivedFrame<V, E>>>::from_block(entry)
+    }
+
+    fn from_digraph(entry: BodyFrameEntry<DiGraph, V>) -> Result<DerivedFrame<V, E>, E> {
+        <DefaultBodyFrames as CallBodyFramePolicy<V, E, DerivedFrame<V, E>>>::from_digraph(entry)
+    }
+
+    fn from_ungraph(entry: BodyFrameEntry<UnGraph, V>) -> Result<DerivedFrame<V, E>, E> {
+        <DefaultBodyFrames as CallBodyFramePolicy<V, E, DerivedFrame<V, E>>>::from_ungraph(entry)
+    }
+}
+
+/// The policy is chosen by the attribute; the derive emits
+/// `type BodyFrames = MyBodyFrames` and the four injection constructors.
+#[derive(FrameBuild)]
+#[interpret(body_frames = MyBodyFrames)]
+enum DerivedFrame<V, E> {
+    Block(BlockFrame<V, E>),
+    /// Required by `FrameBuild`, and reached only when `MyCfgWalker` hands off
+    /// mid-walk — never as the entry frame for a callable body.
+    CFG(CFGFrame<V, E>),
+    Call(CallFrame<V, MyBodyFrames>),
+    DiGraph(DiGraphFrame<V, E>),
+    MyCfg(MyCfgWalker<V, E>),
+}
+
+impl<I, V, E> Frame<I, Self> for DerivedFrame<V, E>
+where
+    I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = DerivedFrame<V, E>>,
+    V: Clone,
+    E: From<InterpreterError>,
+{
+    type Completion = Completion<V>;
+
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>>, E> {
+        match self {
+            DerivedFrame::Block(frame) => frame.step_into(interp),
+            DerivedFrame::CFG(frame) => {
+                CUSTOM.with(|t| t.borrow_mut().standard_cfg_steps += 1);
+                frame.step_into(interp)
+            }
+            DerivedFrame::Call(frame) => frame.step_into(interp),
+            DerivedFrame::DiGraph(frame) => frame.step_into(interp),
+            DerivedFrame::MyCfg(frame) => frame.step_into(interp),
+        }
+    }
+
+    fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>>, E> {
+        match self {
+            DerivedFrame::Block(frame) => frame.resume_done_into(interp),
+            DerivedFrame::CFG(frame) => frame.resume_done_into(interp),
+            DerivedFrame::Call(frame) => frame.resume_done_into(interp),
+            DerivedFrame::DiGraph(frame) => frame.resume_done_into(interp),
+            DerivedFrame::MyCfg(frame) => frame.resume_done_into(interp),
+        }
+    }
+
+    fn resume_into(
+        self,
+        completion: Completion<V>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<Self, Completion<V>>, E> {
+        match self {
+            DerivedFrame::Block(frame) => frame.resume_into(completion, interp),
+            DerivedFrame::CFG(frame) => frame.resume_into(completion, interp),
+            DerivedFrame::Call(frame) => frame.resume_into(completion, interp),
+            DerivedFrame::DiGraph(frame) => frame.resume_into(completion, interp),
+            DerivedFrame::MyCfg(frame) => frame.resume_into(completion, interp),
+        }
+    }
+}
+
+fn run_derived(pipeline: &Pipeline<L>, function: &str, args: &[i64]) -> Result<i64, TestError> {
+    CUSTOM.with(|t| *t.borrow_mut() = CustomTrace::default());
+    let mut interp: ConcreteInterpreter<
+        '_,
+        L,
+        i64,
+        TestError,
+        SameStageLinker,
+        DerivedFrame<i64, TestError>,
+    > = ConcreteInterpreter::new(pipeline).with_linker(SameStageLinker);
+    expect_single(interp.call_by_name("test", function, args.iter().copied())?)
+}
+
+/// The custom walker is selected by `#[interpret(body_frames = ..)]` and stays
+/// resident for the **whole** CFG traversal, because it re-wraps every frame the
+/// inner walker hands back (see [`MyCfgWalker::stay_resident`]).
+///
+/// Two assertions carry the claim: `standard_cfg_steps == 0` proves the
+/// framework's `CFGFrame` variant is never stepped, and `my_steps` well above
+/// `policy_selections` proves the walker kept going rather than handing off after
+/// entry. Deleting the re-wrap flips this to
+/// `my_steps: 1, standard_cfg_steps: 4` — i.e. entry-only — so the assertions
+/// have teeth. (Observed here: `my_steps: 6, standard_cfg_steps: 0`.)
+#[test]
+fn derived_policy_substitutes_a_custom_cfg_walker() {
+    let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
+
+    // `main` is CFG-bodied → the custom walker. It calls `gadd`, a DiGraph body,
+    // which the policy delegates to the framework's `DiGraphFrame`.
+    assert_eq!(run_derived(&pipeline, "main", &[]).unwrap(), 5);
+    let trace = CUSTOM.with(|t| *t.borrow());
+    assert_eq!(trace.policy_selections, 1, "{trace:?}");
+    assert_eq!(
+        trace.standard_cfg_steps, 0,
+        "custom walker leaked: {trace:?}"
+    );
+    assert!(
+        trace.my_steps > trace.policy_selections,
+        "walker handed off after entry: {trace:?}"
+    );
+
+    // A root call straight into the DiGraph body: delegated, so no custom CFG
+    // walker is ever built.
+    assert_eq!(run_derived(&pipeline, "gadd", &[2, 3]).unwrap(), 5);
+    assert_eq!(CUSTOM.with(|t| *t.borrow()), CustomTrace::default());
+}
+
+/// Two nested CFG-bodied callables: the policy is consulted once per activation,
+/// and neither activation ever falls back to the standard variant.
+#[test]
+fn derived_policy_walker_stays_resident_across_activations() {
+    let pipeline = parse(CFG_BRANCH_PROGRAM);
+    // `caller` (CFG) calls `same` (CFG) → two callable CFG activations.
+    assert_eq!(run_derived(&pipeline, "caller", &[0]).unwrap(), 8);
+    let trace = CUSTOM.with(|t| *t.borrow());
+    assert_eq!(trace.policy_selections, 2, "{trace:?}");
+    assert_eq!(
+        trace.standard_cfg_steps, 0,
+        "custom walker leaked: {trace:?}"
+    );
+    // Both bodies are multi-statement, so residency means many more steps than
+    // the two entries.
+    assert!(trace.my_steps > 4, "{trace:?}");
 }

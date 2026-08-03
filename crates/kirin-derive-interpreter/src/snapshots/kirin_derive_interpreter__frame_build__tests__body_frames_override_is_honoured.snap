@@ -1,18 +1,17 @@
 ---
 source: crates/kirin-derive-interpreter/src/frame_build.rs
-assertion_line: 384
 expression: "emit(input, &CONCRETE)"
 ---
 #[automatically_derived]
-impl<V, E> crate::FrameBuild<V, E> for StandardFrame<V, E> {
-    type BodyFrames = crate::DefaultBodyFrames;
+impl<V, E> ::kirin_interpreter::FrameBuild<V, E> for MyFrame<V, E> {
+    type BodyFrames = MyBodyFrames;
     fn from_block(frame: BlockFrame<V, E>) -> Self {
         Self::Block(frame)
     }
     fn from_cfg(frame: CFGFrame<V, E>) -> Self {
         Self::CFG(frame)
     }
-    fn from_call(frame: CallFrame<V>) -> Self {
+    fn from_call(frame: CallFrame<V, MyBodyFrames>) -> Self {
         Self::Call(frame)
     }
     fn from_digraph(frame: DiGraphFrame<V, E>) -> Self {

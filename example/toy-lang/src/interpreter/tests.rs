@@ -567,8 +567,8 @@ mod advanced {
     use kirin_interpreter::engine::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
         AbstractFrameDriver, BlockFrame, CFGFrame, CallContext, CallFrame, Completion,
-        ConcreteInterpreter, CrossStageLinker, DiGraphFrame, Frame, FrameBuild, FrameDriver,
-        FrameEffect, InterpreterError, SparseForwardInterp, SparseForwardInterpreter,
+        ConcreteInterpreter, CrossStageLinker, DefaultBodyFrames, DiGraphFrame, Frame, FrameBuild,
+        FrameDriver, FrameEffect, InterpreterError, SparseForwardInterp, SparseForwardInterpreter,
         expect_single,
     };
     use kirin_scf::{
@@ -609,6 +609,8 @@ mod advanced {
     struct TracingFrame<V, E>(ToyFrame<V, E>);
 
     impl<V, E> FrameBuild<V, E> for TracingFrame<V, E> {
+        type BodyFrames = DefaultBodyFrames;
+
         fn from_block(frame: BlockFrame<V, E>) -> Self {
             Self(ToyFrame::Block(frame))
         }
@@ -638,7 +640,7 @@ mod advanced {
     impl<I, F, V, E> Frame<I, F> for TracingFrame<V, E>
     where
         I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
-        F: FrameBuild<V, E> + BuildScfIf<V, E> + BuildScfFor<V, E>,
+        F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames> + BuildScfIf<V, E> + BuildScfFor<V, E>,
         V: Clone + ForLoopValue,
         E: From<InterpreterError>,
     {

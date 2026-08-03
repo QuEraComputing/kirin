@@ -500,6 +500,52 @@ test). (Further examples: `example/toy-lang`'s `ToyFrame`, which adds
 `TracingFrame` counting call/body visitation while running the real program — see
 `example/toy-lang`'s `interpreter::tests::advanced`.)
 
+### Callable-body walkers — `CallBodyFramePolicy` / `DefaultBodyFrames`
+
+`CallFrame` bundles two separable concerns, and only the second is
+configurable:
+
+| Concern | Where | Configurable? |
+|---|---|---|
+| **call convention** — resolve the callee, allocate its activation, ask `FunctionEntry` for the body, suspend, validate the completion kind, free the activation *exactly once*, bind results | `CallFrame` itself | **no** — this is where double-frees would live |
+| **walker choice** — which frame traverses the callee body | `CallBodyFramePolicy<V, E, F>` | **yes** |
+
+`Body` stays a closed vocabulary, so `CallFrame::step_into` still matches it
+exhaustively; only the frame each arm builds is chosen by the policy. The
+default reproduces today's behaviour exactly:
+
+| body | `DefaultBodyFrames` | a custom `MyBodyFrames` might use |
+|---|---|---|
+| `CFG` | `CFGFrame` | `MyCustomCFGFrame` |
+| `Block` | `BlockFrame` | `BlockFrame` (delegate to the default) |
+| `DiGraph` | `DiGraphFrame` | `MyScheduledGraphFrame` |
+| `UnGraph` | `FrameBuild::from_ungraph_entry` → `NoDefaultWalker` unless overridden | `MyCircuitWalker` |
+
+The policy is selected by the **compiler/language author** through the concrete
+total frame type's `FrameBuild::BodyFrames`; `#[derive(FrameBuild)]` emits
+`DefaultBodyFrames` unless given
+`#[interpret(body_frames = MyBodyFrames)]`. `CallFrame<V>` continues to mean
+`CallFrame<V, DefaultBodyFrames>`. A dialect crate may *offer* reusable walkers
+or policies, but a callable dialect should not permanently fix one traversal for
+every engine.
+
+**Concrete execution only, and deliberately so.** Concrete execution descends
+into a callee — `CallFrame` → body walker → completion → `CallFrame`. Forward
+abstract interpretation does not: `AbstractCallFrame` *summarizes* the call while
+the fixpoint engine separately maps a callable body to an `Owner::Block` or
+`Owner::Graph` in `seed_entry_block`. Customizing that would be an abstract
+body-entry/owner policy, not this one. The backward engines differ further —
+sparse backward uses SSA values as owners and never walks callable bodies through
+a call frame; dense backward uses block owners and reverse walks. If those ever
+need configurable representation traversal, add engine-family-specific policies;
+do not make IR owners supply walkers.
+
+**Not consulted for nested bodies.** `scf.if`/`scf.for` enter their Blocks
+through their own dialect frames (chosen per engine by `ScfIfDispatch` /
+`ScfForDispatch`), which then reuse a framework `BlockFrame`. Those are *nested*
+bodies — they borrow the caller's activation and exit by `Yield` — so the
+callable-body policy plays no part.
+
 ### Abstract frames — `StandardAbstractFrame` / `AbstractFrameBuild` / `ForwardDataflowFrameDriver`
 
 `SparseForwardInterpreter` is symmetrically generic over a total abstract frame type

@@ -1,6 +1,8 @@
 use crate::{Frame, FrameDriver, FrameEffect, InterpreterError, SparseForwardInterp};
 
-use super::{BlockFrame, CFGFrame, CallFrame, Completion, DiGraphFrame, FrameBuild};
+use super::{
+    BlockFrame, CFGFrame, CallFrame, Completion, DefaultBodyFrames, DiGraphFrame, FrameBuild,
+};
 
 /// The standard total concrete frame enum: the representation walkers plus
 /// the call boundary, no structured-control dialect frames and no
@@ -14,6 +16,8 @@ pub enum StandardFrame<V, E> {
 }
 
 impl<V, E> FrameBuild<V, E> for StandardFrame<V, E> {
+    type BodyFrames = DefaultBodyFrames;
+
     fn from_block(frame: BlockFrame<V, E>) -> Self {
         StandardFrame::Block(frame)
     }
@@ -35,7 +39,9 @@ impl<V, E> FrameBuild<V, E> for StandardFrame<V, E> {
 impl<I, F, V, E> Frame<I, F> for StandardFrame<V, E>
 where
     I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
-    F: FrameBuild<V, E>,
+    // The `Call` variant is spelled `CallFrame<V>`, i.e. the default policy, so
+    // an outer universe embedding `StandardFrame` must use that policy too.
+    F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames>,
     V: Clone,
     E: From<InterpreterError>,
 {

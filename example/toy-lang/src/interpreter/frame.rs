@@ -13,8 +13,9 @@ use std::hash::Hash;
 
 use kirin_interpreter::engine::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-    AbstractFrameDriver, BlockFrame, CFGFrame, CallFrame, Completion, DiGraphFrame, Frame,
-    FrameBuild, FrameDriver, FrameEffect, InterpreterError, SparseForwardInterp,
+    AbstractFrameDriver, BlockFrame, CFGFrame, CallFrame, Completion, DefaultBodyFrames,
+    DiGraphFrame, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
+    SparseForwardInterp,
 };
 use kirin_scf::{
     AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf, BuildScfFor,
@@ -57,7 +58,7 @@ impl<V, E> BuildScfFor<V, E> for ToyFrame<V, E> {
 impl<I, F, V, E> Frame<I, F> for ToyFrame<V, E>
 where
     I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
-    F: FrameBuild<V, E> + BuildScfIf<V, E> + BuildScfFor<V, E>,
+    F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames> + BuildScfIf<V, E> + BuildScfFor<V, E>,
     V: Clone + ForLoopValue,
     E: From<InterpreterError>,
 {

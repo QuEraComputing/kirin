@@ -59,5 +59,7 @@ pub use block_frame::BlockFrame;
 pub use call_frame::CallFrame;
 pub use cfg_frame::CFGFrame;
 pub use digraph_frame::DiGraphFrame;
-pub use protocol::{Completion, FrameBuild, UnGraphEntry};
+pub use protocol::{
+    BodyFrameEntry, CallBodyFramePolicy, Completion, DefaultBodyFrames, FrameBuild, UnGraphEntry,
+};
 pub use standard_frame::StandardFrame;

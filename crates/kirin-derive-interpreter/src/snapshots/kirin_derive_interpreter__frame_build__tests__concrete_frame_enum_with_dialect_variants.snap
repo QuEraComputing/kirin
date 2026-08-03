@@ -1,10 +1,11 @@
 ---
 source: crates/kirin-derive-interpreter/src/frame_build.rs
-assertion_line: 256
+assertion_line: 335
 expression: "emit(input, &CONCRETE)"
 ---
 #[automatically_derived]
 impl<V, E> ::kirin_interpreter::FrameBuild<V, E> for ToyFrame<V, E> {
+    type BodyFrames = ::kirin_interpreter::DefaultBodyFrames;
     fn from_block(frame: BlockFrame<V, E>) -> Self {
         Self::Block(frame)
     }

@@ -53,6 +53,12 @@ pub struct Family {
     /// the deriving enum declares.
     arity: usize,
     ctors: &'static [Ctor],
+    /// `true` for the concrete family, whose `FrameBuild` carries a
+    /// `BodyFrames` associated type selecting the callable-body walkers. The
+    /// abstract and dense families have no such policy — forward abstract
+    /// interpretation summarizes calls rather than descending into them, and the
+    /// backward engines do not walk callable bodies through a call frame.
+    body_frames: bool,
 }
 
 pub const CONCRETE: Family = Family {
@@ -84,6 +90,7 @@ pub const CONCRETE: Family = Family {
             fallible: false,
         },
     ],
+    body_frames: true,
 };
 
 pub const SPARSE_FORWARD: Family = Family {
@@ -111,6 +118,7 @@ pub const SPARSE_FORWARD: Family = Family {
             fallible: true,
         },
     ],
+    body_frames: false,
 };
 
 pub const DENSE_BACKWARD: Family = Family {
@@ -122,12 +130,21 @@ pub const DENSE_BACKWARD: Family = Family {
         required: true,
         fallible: false,
     }],
+    body_frames: false,
 };
 
-/// Reads the `#[interpret(crate = ...)]` override, reusing the namespace the
+/// The `#[interpret(..)]` options these derives read, reusing the namespace the
 /// other interpreter derives already use.
-fn parse_interp_crate_path(input: &DeriveInput) -> syn::Result<syn::Path> {
+struct Options {
+    crate_path: syn::Path,
+    /// `#[interpret(body_frames = MyBodyFrames)]` — the callable-body walker
+    /// policy for the concrete family. `None` means [`DefaultBodyFrames`].
+    body_frames: Option<syn::Path>,
+}
+
+fn parse_options(input: &DeriveInput) -> syn::Result<Options> {
     let mut crate_path = None;
+    let mut body_frames = None;
     for attr in &input.attrs {
         if !attr.path().is_ident("interpret") {
             continue;
@@ -136,15 +153,21 @@ fn parse_interp_crate_path(input: &DeriveInput) -> syn::Result<syn::Path> {
             if meta.path.is_ident("crate") {
                 crate_path = Some(meta.value()?.parse()?);
                 Ok(())
+            } else if meta.path.is_ident("body_frames") {
+                body_frames = Some(meta.value()?.parse()?);
+                Ok(())
             } else {
                 Err(meta.error("unsupported attribute for #[interpret(...)]"))
             }
         })?;
     }
-    match crate_path {
-        Some(path) => Ok(path),
-        None => syn::parse_str(DEFAULT_INTERP_CRATE),
-    }
+    Ok(Options {
+        crate_path: match crate_path {
+            Some(path) => path,
+            None => syn::parse_str(DEFAULT_INTERP_CRATE)?,
+        },
+        body_frames,
+    })
 }
 
 /// The final path segment of a type, used to recognize a framework frame.
@@ -157,7 +180,18 @@ fn type_head(ty: &syn::Type) -> Option<String> {
 
 pub fn generate(input: &DeriveInput, family: &Family) -> syn::Result<TokenStream> {
     let trait_ident: syn::Ident = syn::parse_str(family.trait_name)?;
-    let interp_crate = parse_interp_crate_path(input)?;
+    let options = parse_options(input)?;
+    let interp_crate = &options.crate_path;
+
+    if !family.body_frames && options.body_frames.is_some() {
+        return Err(syn::Error::new_spanned(
+            input,
+            format!(
+                "`body_frames` applies only to the concrete `FrameBuild` family; `{}` has no callable-body policy",
+                family.trait_name
+            ),
+        ));
+    }
 
     let syn::Data::Enum(data) = &input.data else {
         return Err(syn::Error::new_spanned(
@@ -250,11 +284,22 @@ pub fn generate(input: &DeriveInput, family: &Family) -> syn::Result<TokenStream
     let enum_ident = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
+    let assoc_body_frames = if family.body_frames {
+        let policy = match &options.body_frames {
+            Some(path) => quote! { #path },
+            None => quote! { #interp_crate::DefaultBodyFrames },
+        };
+        quote! { type BodyFrames = #policy; }
+    } else {
+        quote! {}
+    };
+
     Ok(quote! {
         #[automatically_derived]
         impl #impl_generics #interp_crate::#trait_ident<#(#type_params),*>
             for #enum_ident #ty_generics #where_clause
         {
+            #assoc_body_frames
             #(#methods)*
         }
     })
@@ -337,6 +382,35 @@ mod tests {
             }
         };
         insta::assert_snapshot!(emit(input, &CONCRETE));
+    }
+
+    #[test]
+    fn body_frames_override_is_honoured() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[interpret(body_frames = MyBodyFrames)]
+            enum MyFrame<V, E> {
+                Block(BlockFrame<V, E>),
+                CFG(CFGFrame<V, E>),
+                Call(CallFrame<V, MyBodyFrames>),
+                DiGraph(DiGraphFrame<V, E>),
+            }
+        };
+        insta::assert_snapshot!(emit(input, &CONCRETE));
+    }
+
+    #[test]
+    fn rejects_body_frames_on_a_family_without_a_call_policy() {
+        // Only the concrete family descends into a callee, so only it has a
+        // callable-body policy to configure.
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[interpret(body_frames = MyBodyFrames)]
+            enum MyAbstractFrame<V, E, K> {
+                Block(AbstractBlockFrame<V, E, K>),
+                Call(AbstractCallFrame<V, E, K>),
+            }
+        };
+        let err = generate(&input, &SPARSE_FORWARD).unwrap_err().to_string();
+        assert!(err.contains("applies only to the concrete"), "{err}");
     }
 
     #[test]

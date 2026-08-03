@@ -4,7 +4,7 @@ use crate::{
     Body, CallEffect, Callee, EnvIndex, Frame, FrameDriver, FrameEffect, InterpreterError,
 };
 
-use super::{BlockFrame, CFGFrame, Completion, DiGraphFrame, FrameBuild, UnGraphEntry};
+use super::{BodyFrameEntry, CallBodyFramePolicy, Completion, DefaultBodyFrames, FrameBuild};
 
 /// The function-call boundary frame: interpreter runtime bookkeeping, not a
 /// function dialect operation and not the callable itself.
@@ -16,10 +16,12 @@ use super::{BlockFrame, CFGFrame, Completion, DiGraphFrame, FrameBuild, UnGraphE
 /// 2. allocate the callee activation;
 /// 3. ask [`FunctionEntry`](crate::FunctionEntry) for the callable body
 ///    descriptor ([`CallableBody`](crate::CallableBody));
-/// 4. select the entry frame for the closed [`Body`] variant —
-///    `CFG` → [`CFGFrame`], `Block` → [`BlockFrame`],
-///    `DiGraph` → [`DiGraphFrame`], `UnGraph` → the dialect/compiler policy
-///    ([`FrameBuild::from_ungraph_entry`]);
+/// 4. select the entry frame for the closed [`Body`] variant — **delegated to
+///    the `P` policy** ([`CallBodyFramePolicy`]), which defaults to
+///    [`DefaultBodyFrames`]: `CFG` → `CFGFrame`, `Block` → `BlockFrame`,
+///    `DiGraph` → `DiGraphFrame`, `UnGraph` → the dialect/compiler hook
+///    ([`FrameBuild::from_ungraph_entry`]). Everything else in this list is
+///    fixed: a custom policy chooses walkers, never the lifecycle;
 /// 5. suspend while the callee frame runs;
 /// 6. validate the callee's completion kind ([`Returned`](Completion::Returned)
 ///    or a graph's natural [`Finished`](Completion::Finished) are returns; a
@@ -30,8 +32,11 @@ use super::{BlockFrame, CFGFrame, Completion, DiGraphFrame, FrameBuild, UnGraphE
 ///    ([`ConcreteInterpreter::call`](crate::ConcreteInterpreter::call) pushes
 ///    a [`CallFrame::root`], so root and nested calls share this one
 ///    boundary implementation).
-pub struct CallFrame<V> {
+pub struct CallFrame<V, P = DefaultBodyFrames> {
     state: CallState<V>,
+    /// Which walkers enter the callee body. Selected by the total frame type
+    /// via [`FrameBuild::BodyFrames`]; the lifecycle above is unaffected.
+    _policy: std::marker::PhantomData<fn() -> P>,
 }
 
 enum CallState<V> {
@@ -62,7 +67,7 @@ enum CallDest {
     Root,
 }
 
-impl<V> CallFrame<V>
+impl<V, P> CallFrame<V, P>
 where
     V: Clone,
 {
@@ -79,6 +84,7 @@ where
                     results: call.results,
                 },
             },
+            _policy: std::marker::PhantomData,
         }
     }
 
@@ -92,14 +98,16 @@ where
                 args,
                 dest: CallDest::Root,
             },
+            _policy: std::marker::PhantomData,
         }
     }
 }
 
-impl<I, F, V, E> Frame<I, F> for CallFrame<V>
+impl<I, F, V, E, P> Frame<I, F> for CallFrame<V, P>
 where
     I: FrameDriver<Value = V, Error = E>,
-    F: FrameBuild<V, E>,
+    F: FrameBuild<V, E, BodyFrames = P>,
+    P: CallBodyFramePolicy<V, E, F>,
     V: Clone,
     E: From<InterpreterError>,
 {
@@ -119,20 +127,33 @@ where
                 // The closed `Body` enum is the framework's supported body
                 // vocabulary, so this match is intentionally exhaustive;
                 // only the `UnGraph` arm delegates to a language policy.
+                // `Body` is a closed vocabulary, so this match stays
+                // exhaustive; only *which frame* each arm builds is
+                // configurable, via the `P` policy. Activation ownership and
+                // completion handling deliberately stay out of the policy.
                 let child = match entry.body {
-                    Body::CFG(cfg) => {
-                        F::from_cfg(CFGFrame::new(target.stage, index, cfg, entry.args))
-                    }
-                    Body::Block(block) => {
-                        F::from_block(BlockFrame::new(target.stage, index, block, entry.args))
-                    }
-                    Body::DiGraph(graph) => {
-                        F::from_digraph(DiGraphFrame::new(target.stage, index, graph, entry.args))
-                    }
-                    Body::UnGraph(graph) => F::from_ungraph_entry(UnGraphEntry {
+                    Body::CFG(cfg) => P::from_cfg(BodyFrameEntry {
                         stage: target.stage,
                         index,
-                        graph,
+                        body: cfg,
+                        args: entry.args,
+                    })?,
+                    Body::Block(block) => P::from_block(BodyFrameEntry {
+                        stage: target.stage,
+                        index,
+                        body: block,
+                        args: entry.args,
+                    })?,
+                    Body::DiGraph(graph) => P::from_digraph(BodyFrameEntry {
+                        stage: target.stage,
+                        index,
+                        body: graph,
+                        args: entry.args,
+                    })?,
+                    Body::UnGraph(graph) => P::from_ungraph(BodyFrameEntry {
+                        stage: target.stage,
+                        index,
+                        body: graph,
                         args: entry.args,
                     })?,
                 };
@@ -142,6 +163,7 @@ where
                             callee_env: index,
                             dest,
                         },
+                        _policy: std::marker::PhantomData,
                     }),
                     child,
                 })

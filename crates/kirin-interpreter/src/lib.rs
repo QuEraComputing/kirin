@@ -92,8 +92,8 @@ pub use self::core::ForwardFrameDriver as FrameDriver;
 // traversal is a dialect/compiler policy supplied through
 // `FrameBuild::from_ungraph_entry`) and the `CallFrame` call boundary.
 pub use engines::concrete::{
-    BlockFrame, CFGFrame, CallFrame, Completion, ConcreteInterpreter, DiGraphFrame, FrameBuild,
-    StandardFrame, UnGraphEntry,
+    BlockFrame, BodyFrameEntry, CFGFrame, CallBodyFramePolicy, CallFrame, Completion,
+    ConcreteInterpreter, DefaultBodyFrames, DiGraphFrame, FrameBuild, StandardFrame, UnGraphEntry,
 };
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
 pub use engines::sparse_forward::{
@@ -169,9 +169,10 @@ pub mod dialect {
 pub mod engine {
     pub use crate::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-        AbstractFrameBuild, AbstractFrameDriver, AbstractInterpreter, BlockFrame, CFGFrame,
-        CallContext, CallFrame, Callee, Completion, ConcreteInterpreter, ContextInsensitive,
-        CrossStageLinker, DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBackwardInterp,
+        AbstractFrameBuild, AbstractFrameDriver, AbstractInterpreter, BlockFrame, BodyFrameEntry,
+        CFGFrame, CallBodyFramePolicy, CallContext, CallFrame, Callee, Completion,
+        ConcreteInterpreter, ContextInsensitive, CrossStageLinker, DefaultBodyFrames,
+        DenseBackwardCompletion, DenseBackwardFrameDriver, DenseBackwardInterp,
         DenseBackwardInterpreter, DenseBackwardState, DenseBlockFrame, DenseFrameBuild,
         DiGraphFrame, Env, ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameBuild,
         FrameDriver, FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch,
