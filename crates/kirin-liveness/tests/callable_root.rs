@@ -14,12 +14,12 @@ const BLOCK_PROGRAM: &str = r#"
 stage @test fn @linear(i64) -> i64;
 stage @test fn @main(i64) -> i64;
 
-specialize @test fn @linear(i64) -> i64 ^body(%x: i64) {
+specialize @test fn @linear(i64) -> i64 block ^body(%x: i64) {
   %y = neg %x -> i64;
   ret %y;
 }
 
-specialize @test fn @main(i64) -> i64 {
+specialize @test fn @main(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %y = call.named @linear(%x) -> i64;
     ret %y;
@@ -31,7 +31,7 @@ const CROSS_STAGE_PROGRAM: &str = r#"
 stage @source fn @linear(i64) -> i64;
 stage @lowered fn @linear(i64) -> i64;
 
-specialize @lowered fn @linear(i64) -> i64 ^body(%x: i64) {
+specialize @lowered fn @linear(i64) -> i64 block ^body(%x: i64) {
   ret %x;
 }
 "#;
@@ -53,11 +53,11 @@ specialize @test fn @undirected(i64) -> i64 ungraph ^graph(%x: i64) {
 const AMBIGUOUS_PROGRAM: &str = r#"
 stage @test fn @ambiguous(i64, i64) -> i64;
 
-specialize @test fn @ambiguous(i64) -> i64 ^first(%x: i64) {
+specialize @test fn @ambiguous(i64) -> i64 block ^first(%x: i64) {
   ret %x;
 }
 
-specialize @test fn @ambiguous(i64, i64) -> i64 ^second(%x: i64, %y: i64) {
+specialize @test fn @ambiguous(i64, i64) -> i64 block ^second(%x: i64, %y: i64) {
   ret %x;
 }
 "#;

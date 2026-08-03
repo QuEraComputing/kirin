@@ -105,13 +105,13 @@ fn test_lowered_function_roundtrip_print_parse_print() {
 stage @A fn @main(i32) -> i32;
 stage @A fn @closure(i32, i32) -> i32;
 
-specialize @A fn @closure(i32, i32) -> i32 {
+specialize @A fn @closure(i32, i32) -> i32 cfg {
   ^bb0(%capt0: i32, %arg0: i32) {
     ret %arg0;
   }
 }
 
-specialize @A fn @main(i32) -> i32 {
+specialize @A fn @main(i32) -> i32 cfg {
   ^bb0(%x: i32) {
     %f = bind @closure captures(%x) -> i32;
     %r_call = call.named @closure(%x, %x) -> i32;
@@ -139,7 +139,7 @@ enum LambdaLanguage {
 
 #[test]
 fn test_lambda_parse_roundtrip() {
-    let input = "%f = lambda @closure captures(%x, %y) { } -> i32";
+    let input = "%f = lambda @closure captures(%x, %y) cfg { } -> i32";
     let operands = &[("x", SimpleType::I32), ("y", SimpleType::I32)];
     roundtrip::assert_statement_roundtrip::<LambdaLanguage>(input, operands);
 
@@ -152,7 +152,7 @@ fn test_lambda_parse_roundtrip() {
 #[test]
 fn test_lambda_parse_roundtrip_single_capture() {
     roundtrip::assert_statement_roundtrip::<LambdaLanguage>(
-        "%f = lambda @closure captures(%x) { } -> i32",
+        "%f = lambda @closure captures(%x) cfg { } -> i32",
         &[("x", SimpleType::I32)],
     );
 }
@@ -169,7 +169,7 @@ fn test_specialize_without_stage_auto_creates() {
         .new();
 
     // No `stage` declaration -- specialize auto-creates the staged function
-    let input = "specialize @A fn @foo(i32) -> i32 { ^bb0(%x: i32) { ret %x; } }";
+    let input = "specialize @A fn @foo(i32) -> i32 cfg { ^bb0(%x: i32) { ret %x; } }";
     let functions = pipeline
         .parse(input)
         .expect("should parse without stage declaration");
@@ -188,7 +188,7 @@ fn test_specialize_without_stage_roundtrip() {
 
     let input = r#"
 stage @A fn @foo(i32) -> i32;
-specialize @A fn @foo(i32) -> i32 { ^bb0(%x: i32) { ret %x; } }
+specialize @A fn @foo(i32) -> i32 cfg { ^bb0(%x: i32) { ret %x; } }
 "#;
     pipeline.parse(input).expect("should parse");
 
@@ -217,7 +217,7 @@ fn test_split_sig_pipeline_multiple_params() {
     let input = r#"
 stage @A fn @main(i32, i64) -> i32;
 
-specialize @A fn @main(i32, i64) -> i32 {
+specialize @A fn @main(i32, i64) -> i32 cfg {
   ^bb0(%x: i32, %y: i64) {
     ret %x;
   }
@@ -231,7 +231,7 @@ fn test_split_sig_pipeline_single_param() {
     let input = r#"
 stage @A fn @main(i32) -> i32;
 
-specialize @A fn @main(i32) -> i32 {
+specialize @A fn @main(i32) -> i32 cfg {
   ^bb0(%x: i32) {
     ret %x;
   }
@@ -246,7 +246,7 @@ fn test_split_sig_pipeline_many_params() {
     let input = r#"
 stage @A fn @compute(i32, i64, f32) -> f64;
 
-specialize @A fn @compute(i32, i64, f32) -> f64 {
+specialize @A fn @compute(i32, i64, f32) -> f64 cfg {
   ^bb0(%x: i32, %y: i64, %z: f32) {
     ret %x;
   }
