@@ -29,7 +29,25 @@ class AbstractFrame(Frame[ResultType]):
     """
 
     worklist: WorkList[Successor[ResultType]] = field(default_factory=WorkList)
-    visited: dict[ir.Block, set[Successor[ResultType]]] = field(default_factory=dict)
+    visited: dict[ir.Block, set[tuple[Successor[ResultType], int]]] = field(
+        default_factory=dict
+    )
+    _changes: set[ir.SSAValue] = field(
+        default_factory=set, init=False, compare=False, repr=False
+    )
+
+    def set(self, key: ir.SSAValue, value: ResultType) -> None:
+        previous = self.entries.get(key)
+        self.entries[key] = value
+        if previous is None or not (
+            previous.is_subseteq(value) and value.is_subseteq(previous)
+        ):
+            self._changes.add(key)
+
+    def take_changes(self) -> set[ir.SSAValue]:
+        changes = self._changes
+        self._changes = set()
+        return changes
 
 
 AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)

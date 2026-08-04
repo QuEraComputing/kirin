@@ -17,9 +17,9 @@ class ForwardFrame(interp.AbstractFrame[LatticeType]):
     ) -> None:
         for ssa_value, result in zip(keys, values):
             if ssa_value in self.entries:
-                self.entries[ssa_value] = self.entries[ssa_value].join(result)
+                self.set(ssa_value, self.entries[ssa_value].join(result))
             else:
-                self.entries[ssa_value] = result
+                self.set(ssa_value, result)
 
 
 FrameType = TypeVar("FrameType", bound=ForwardFrame)
