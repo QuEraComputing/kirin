@@ -208,6 +208,17 @@ def loop_with_unreachable_dominated_use(condition: bool) -> int:
     return counter
 
 
+@basic_no_opt
+def loop_carried_pair(condition: bool) -> int:
+    left = 0
+    right = 0
+    for _ in range(2):
+        if condition:
+            left += 1
+            right += 1
+    return left + right
+
+
 def nested_loop_carried_conditional_counter():
     method = loop_carried_conditional_counter.similar(basic_no_opt.add(nested_dialect))
     add = next(stmt for stmt in method.code.walk() if stmt.name == "add")
@@ -219,6 +230,21 @@ def nested_loop_carried_conditional_counter():
     add.result.replace_by(nested_region.results[0])
     add.delete()
     return method, nested_add
+
+
+def nested_loop_carried_pair():
+    method = loop_carried_pair.similar(basic_no_opt.add(nested_dialect))
+    body_adds = next(
+        adds
+        for block in method.callable_region.blocks
+        if len(adds := tuple(stmt for stmt in block.stmts if stmt.name == "add")) == 2
+    )
+    nested_add = py.binop.Add(body_adds[0].lhs, body_adds[1].lhs)
+    nested_region = NestedRegion(
+        ir.Region(ir.Block([nested_add, NestedYield(nested_add.result)]))
+    )
+    nested_region.insert_before(body_adds[0])
+    return method, (body_adds[0].lhs, body_adds[1].lhs)
 
 
 def test_constprop():
@@ -272,11 +298,15 @@ def test_constprop_revisits_use_inside_nested_region():
 
 
 def test_dependency_generation_deduplicates_pending_visits():
-    method, _ = nested_loop_carried_conditional_counter()
+    method, dependencies = nested_loop_carried_pair()
     NestedConstProp.visits = 0
 
-    const.Propagate(method.dialects).run(method)
+    frame, _ = const.Propagate(method.dialects).run(method)
 
+    assert tuple(frame.entries[value] for value in dependencies) == (
+        const.Unknown(),
+        const.Unknown(),
+    )
     assert NestedConstProp.visits == 2
 
 

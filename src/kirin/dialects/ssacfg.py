@@ -48,7 +48,7 @@ class Abstract(interp.MethodTable):
         node: ir.Region,
     ):
         result = None
-        dependents = self.get_dependents(node)
+        dependents = self._get_dependents(node)
         reached: set[ir.Block] = set()
         generations: dict[ir.Block, int] = {}
         frame.worklist.append(
@@ -89,10 +89,10 @@ class Abstract(interp.MethodTable):
         return result
 
     @staticmethod
-    def get_dependents(node: ir.Region) -> dict[ir.SSAValue, set[ir.Block]]:
+    def _get_dependents(node: ir.Region) -> dict[ir.SSAValue, set[ir.Block]]:
         dependents: dict[ir.SSAValue, set[ir.Block]] = {}
         for stmt in node.walk():
-            block = Abstract.get_enclosing_block(node, stmt)
+            block = Abstract._get_enclosing_block(node, stmt)
             if block is None:
                 continue
             for value in stmt.args:
@@ -100,7 +100,7 @@ class Abstract(interp.MethodTable):
         return dependents
 
     @staticmethod
-    def get_enclosing_block(region: ir.Region, stmt: ir.Statement) -> ir.Block | None:
+    def _get_enclosing_block(region: ir.Region, stmt: ir.Statement) -> ir.Block | None:
         node: ir.IRNode | None = stmt
         while node is not None:
             parent = node.parent_node
@@ -115,7 +115,7 @@ class Abstract(interp.MethodTable):
         frame: FrameType,
         succ: interp.Successor,
     ) -> tuple[interp.SpecialValue[LatticeType], set[ir.SSAValue]]:
-        frame.take_changes()
+        frame._take_changes()
         frame.current_block = succ.block
         frame.set_values(succ.block.args, succ.block_args)
         for stmt in succ.block.stmts:
@@ -126,5 +126,5 @@ class Abstract(interp.MethodTable):
             elif stmt_results is None:
                 continue  # empty result
             else:  # terminate
-                return stmt_results, frame.take_changes()
-        return None, frame.take_changes()
+                return stmt_results, frame._take_changes()
+        return None, frame._take_changes()

@@ -44,7 +44,7 @@ class AbstractFrame(Frame[ResultType]):
         ):
             self._changes.add(key)
 
-    def take_changes(self) -> set[ir.SSAValue]:
+    def _take_changes(self) -> set[ir.SSAValue]:
         changes = self._changes
         self._changes = set()
         return changes
