@@ -36,6 +36,35 @@ class Concrete(interp.MethodTable):
 
 @dialect.register(key="abstract")
 class Abstract(interp.MethodTable):
+    """Evaluate an SSACFG region with a dependency-aware worklist.
+
+    The worklist contains path-sensitive :class:`Successor` values: a destination
+    block paired with the abstract values passed to its block arguments. Each
+    popped successor is checked against this visitation key::
+
+        (successor, generations[successor.block])
+
+    The generation is a per-block invalidation counter. Suppose ``^2`` has
+    already been evaluated through ``Successor(^2, True)``. If an SSA value read
+    by ``^2`` changes, the solver increments ``generations[^2]`` and requeues the
+    same successor. Although its explicit block arguments have not changed, the
+    new generation gives it a distinct visitation key::
+
+        (Successor(^2, True), 0)  # original evaluation
+        (Successor(^2, True), 1)  # reevaluation after invalidation
+
+    Dependencies come from a static SSA use-def map, with nested uses attributed
+    to their enclosing SSACFG block. A dependency change only requeues blocks
+    already reached through normal control flow.
+
+    The generation is read when work is popped; it is not stored in the queued
+    successor. If several invalidations are pending for one block, every queued
+    copy therefore observes the latest generation. The first copy is evaluated
+    and the remaining copies match its visitation key and are skipped.
+
+    Unreached blocks are never scheduled by dependency changes, and the existing
+    per-block visitation limit remains the convergence guard.
+    """
 
     FrameType = TypeVar("FrameType", bound=interp.AbstractFrame)
     LatticeType = TypeVar("LatticeType", bound=lattice.BoundedLattice)
