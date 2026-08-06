@@ -1,8 +1,9 @@
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
-from kirin.prelude import basic_no_opt
+from kirin.prelude import basic_no_opt, structural_no_opt
+from kirin.rewrite import Walk, Inline
 from kirin.analysis import const
-from kirin.dialects import py, ilist
+from kirin.dialects import py, scf, ilist
 from kirin.passes.fold import Fold
 
 nested_dialect = ir.Dialect("nested")
@@ -219,17 +220,20 @@ def loop_carried_pair(condition: bool) -> int:
     return left + right
 
 
-def nested_loop_carried_conditional_counter():
-    method = loop_carried_conditional_counter.similar(basic_no_opt.add(nested_dialect))
-    add = next(stmt for stmt in method.code.walk() if stmt.name == "add")
-    nested_add = py.binop.Add(add.lhs, add.rhs)
-    nested_region = NestedRegion(
-        ir.Region(ir.Block([nested_add, NestedYield(nested_add.result)]))
-    )
-    nested_region.insert_before(add)
-    add.result.replace_by(nested_region.results[0])
-    add.delete()
-    return method, nested_add
+@structural_no_opt
+def increment_in_nested_region(counter: int) -> int:
+    if True:
+        counter += 1
+    return counter
+
+
+@basic_no_opt
+def loop_carried_nested_region_counter(condition: bool) -> int:
+    counter = 0
+    for _ in range(2):
+        if condition:
+            counter = increment_in_nested_region(counter)
+    return counter
 
 
 def nested_loop_carried_pair():
@@ -245,6 +249,18 @@ def nested_loop_carried_pair():
     )
     nested_region.insert_before(body_adds[0])
     return method, (body_adds[0].lhs, body_adds[1].lhs)
+
+
+def frontend_nested_loop_carried_counter():
+    method = loop_carried_nested_region_counter.similar(structural_no_opt)
+    Walk(Inline(lambda _: True)).rewrite(method.code)
+    nested_add = next(
+        stmt
+        for stmt in method.code.walk()
+        if isinstance(stmt, py.binop.Add)
+        and stmt.parent_region is not method.callable_region
+    )
+    return method, nested_add
 
 
 def test_constprop():
@@ -289,8 +305,17 @@ def test_fold_preserves_loop_carried_conditional_counter():
     assert method(True) == 2
 
 
-def test_constprop_revisits_use_inside_nested_region():
-    method, nested_add = nested_loop_carried_conditional_counter()
+def test_constprop_revisits_outer_block_for_use_inside_nested_region():
+    method, nested_add = frontend_nested_loop_carried_counter()
+    nested_block = nested_add.parent_block
+    assert nested_block is not None
+    nested_region = nested_block.parent_node
+    assert nested_region is not None
+    region_stmt = nested_region.parent_node
+    assert isinstance(region_stmt, scf.IfElse)
+    outer_block = region_stmt.parent_block
+    assert outer_block is not None
+    assert nested_block is not outer_block
 
     frame, _ = const.Propagate(method.dialects).run(method)
 
