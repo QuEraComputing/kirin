@@ -1,8 +1,54 @@
-from kirin import ir, types, lowering
+from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
-from kirin.prelude import basic_no_opt
+from kirin.prelude import basic_no_opt, structural_no_opt
+from kirin.rewrite import Walk, Inline
 from kirin.analysis import const
-from kirin.dialects import ilist
+from kirin.dialects import py, scf, ilist
+from kirin.passes.fold import Fold
+
+nested_dialect = ir.Dialect("nested")
+
+
+@statement(dialect=nested_dialect, init=False)
+class NestedYield(ir.Statement):
+    name = "yield"
+    traits = frozenset({ir.IsTerminator()})
+    values: tuple[ir.SSAValue, ...] = info.argument(types.Any)
+
+    def __init__(self, *values: ir.SSAValue):
+        super().__init__(args=values, args_slice={"values": slice(None)})
+
+
+@statement(dialect=nested_dialect, init=False)
+class NestedRegion(ir.Statement):
+    name = "region"
+    traits = frozenset({ir.Pure(), ir.SSACFG(), lowering.FromPythonCall()})
+    body: ir.Region = info.region(multi=False)
+
+    def __init__(self, body: ir.Region):
+        terminator = body.blocks[0].last_stmt
+        assert isinstance(terminator, NestedYield)
+        super().__init__(
+            regions=(body,),
+            result_types=tuple(value.type for value in terminator.values),
+        )
+
+
+@nested_dialect.register(key="constprop")
+class NestedConstProp(interp.MethodTable):
+    visits = 0
+
+    @interp.impl(NestedYield)
+    def yield_stmt(self, interp_, frame, stmt: NestedYield):
+        return interp.YieldValue(frame.get_values(stmt.values))
+
+    @interp.impl(NestedRegion)
+    def region(self, interp_, frame, stmt: NestedRegion):
+        type(self).visits += 1
+        with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
+            results = interp_.frame_call_region(body_frame, stmt, stmt.body)
+        frame.entries.update(body_frame.entries)
+        return results
 
 
 class TestLattice:
@@ -143,6 +189,80 @@ def recurse():
     return ntuple(3)
 
 
+@basic_no_opt
+def loop_carried_conditional_counter(condition: bool) -> int:
+    counter = 0
+    for _ in range(2):
+        if condition:
+            counter += 1
+    return counter
+
+
+@basic_no_opt
+def loop_with_unreachable_dominated_use(condition: bool) -> int:
+    counter = 0
+    for _ in range(2):
+        if condition:
+            counter += 1
+        if False:
+            counter + 10
+    return counter
+
+
+@basic_no_opt
+def loop_carried_pair(condition: bool) -> int:
+    left = 0
+    right = 0
+    for _ in range(2):
+        if condition:
+            left += 1
+            right += 1
+    return left + right
+
+
+@structural_no_opt
+def increment_in_nested_region(counter: int) -> int:
+    if True:
+        counter += 1
+    return counter
+
+
+@basic_no_opt
+def loop_carried_nested_region_counter(condition: bool) -> int:
+    counter = 0
+    for _ in range(2):
+        if condition:
+            counter = increment_in_nested_region(counter)
+    return counter
+
+
+def nested_loop_carried_pair():
+    method = loop_carried_pair.similar(basic_no_opt.add(nested_dialect))
+    body_adds = next(
+        adds
+        for block in method.callable_region.blocks
+        if len(adds := tuple(stmt for stmt in block.stmts if stmt.name == "add")) == 2
+    )
+    nested_add = py.binop.Add(body_adds[0].lhs, body_adds[1].lhs)
+    nested_region = NestedRegion(
+        ir.Region(ir.Block([nested_add, NestedYield(nested_add.result)]))
+    )
+    nested_region.insert_before(body_adds[0])
+    return method, (body_adds[0].lhs, body_adds[1].lhs)
+
+
+def frontend_nested_loop_carried_counter():
+    method = loop_carried_nested_region_counter.similar(structural_no_opt)
+    Walk(Inline(lambda _: True)).rewrite(method.code)
+    nested_add = next(
+        stmt
+        for stmt in method.code.walk()
+        if isinstance(stmt, py.binop.Add)
+        and stmt.parent_region is not method.callable_region
+    )
+    return method, nested_add
+
+
 def test_constprop():
     infer = const.Propagate(basic_no_opt)
     frame, ret = infer.run(main)
@@ -166,6 +286,62 @@ def test_constprop():
     assert ret == const.Unknown()
     _, ret = infer.run(recurse)
     assert ret == const.Value((0, 0, 0))
+
+
+def test_constprop_revisits_dominated_loop_carried_use():
+    method = loop_carried_conditional_counter.similar()
+
+    frame, _ = const.Propagate(method.dialects).run(method)
+    add = next(stmt for stmt in method.code.walk() if stmt.name == "add")
+
+    assert frame.entries[add.result] == const.Unknown()
+
+
+def test_fold_preserves_loop_carried_conditional_counter():
+    method = loop_carried_conditional_counter.similar()
+
+    Fold(method.dialects)(method)
+
+    assert method(True) == 2
+
+
+def test_constprop_revisits_outer_block_for_use_inside_nested_region():
+    method, nested_add = frontend_nested_loop_carried_counter()
+    nested_block = nested_add.parent_block
+    assert nested_block is not None
+    nested_region = nested_block.parent_node
+    assert nested_region is not None
+    region_stmt = nested_region.parent_node
+    assert isinstance(region_stmt, scf.IfElse)
+    outer_block = region_stmt.parent_block
+    assert outer_block is not None
+    assert nested_block is not outer_block
+
+    frame, _ = const.Propagate(method.dialects).run(method)
+
+    assert frame.entries[nested_add.result] == const.Unknown()
+
+
+def test_dependency_generation_deduplicates_pending_visits():
+    method, dependencies = nested_loop_carried_pair()
+    NestedConstProp.visits = 0
+
+    frame, _ = const.Propagate(method.dialects).run(method)
+
+    assert tuple(frame.entries[value] for value in dependencies) == (
+        const.Unknown(),
+        const.Unknown(),
+    )
+    assert NestedConstProp.visits == 2
+
+
+def test_dependency_change_does_not_reach_dead_block():
+    method = loop_with_unreachable_dominated_use.similar()
+    dead_add = tuple(stmt for stmt in method.code.walk() if stmt.name == "add")[-1]
+
+    frame, _ = const.Propagate(method.dialects).run(method)
+
+    assert dead_add.result not in frame.entries
 
 
 @basic_no_opt
