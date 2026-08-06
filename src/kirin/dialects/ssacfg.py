@@ -77,7 +77,7 @@ class Abstract(interp.MethodTable):
         node: ir.Region,
     ):
         result = None
-        dependents = self._get_dependents(node)
+        dependents: dict[ir.SSAValue, set[ir.Block]] = {}
         reached: set[ir.Block] = set()
         generations: dict[ir.Block, int] = {}
         frame.worklist.append(
@@ -98,7 +98,16 @@ class Abstract(interp.MethodTable):
                 continue
 
             for value in changes:
-                for block in dependents.get(value, ()):
+                blocks = dependents.get(value)
+                if blocks is None:
+                    blocks = set()
+                    dependents[value] = blocks
+                    for use in value.uses:
+                        block = self._get_enclosing_block(node, use.stmt)
+                        if block is not None:
+                            blocks.add(block)
+
+                for block in blocks:
                     if block is succ.block or block not in reached:
                         continue
                     generations[block] = generations.get(block, 0) + 1
@@ -116,17 +125,6 @@ class Abstract(interp.MethodTable):
         if isinstance(result, interp.YieldValue):
             return result.values
         return result
-
-    @staticmethod
-    def _get_dependents(node: ir.Region) -> dict[ir.SSAValue, set[ir.Block]]:
-        dependents: dict[ir.SSAValue, set[ir.Block]] = {}
-        for stmt in node.walk():
-            block = Abstract._get_enclosing_block(node, stmt)
-            if block is None:
-                continue
-            for value in stmt.args:
-                dependents.setdefault(value, set()).add(block)
-        return dependents
 
     @staticmethod
     def _get_enclosing_block(region: ir.Region, stmt: ir.Statement) -> ir.Block | None:
