@@ -36,6 +36,35 @@ class Concrete(interp.MethodTable):
 
 @dialect.register(key="abstract")
 class Abstract(interp.MethodTable):
+    """Evaluate an SSACFG region with a dependency-aware worklist.
+
+    The worklist contains path-sensitive :class:`Successor` values: a destination
+    block paired with the abstract values passed to its block arguments. Each
+    popped successor is checked against this visitation key::
+
+        (successor, generations[successor.block])
+
+    The generation is a per-block invalidation counter. Suppose ``^2`` has
+    already been evaluated through ``Successor(^2, True)``. If an SSA value read
+    by ``^2`` changes, the solver increments ``generations[^2]`` and requeues the
+    same successor. Although its explicit block arguments have not changed, the
+    new generation gives it a distinct visitation key::
+
+        (Successor(^2, True), 0)  # original evaluation
+        (Successor(^2, True), 1)  # reevaluation after invalidation
+
+    Dependencies come from a static SSA use-def map, with nested uses attributed
+    to their enclosing SSACFG block. A dependency change only requeues blocks
+    already reached through normal control flow.
+
+    The generation is read when work is popped; it is not stored in the queued
+    successor. If several invalidations are pending for one block, every queued
+    copy therefore observes the latest generation. The first copy is evaluated
+    and the remaining copies match its visitation key and are skipped.
+
+    Unreached blocks are never scheduled by dependency changes, and the existing
+    per-block visitation limit remains the convergence guard.
+    """
 
     FrameType = TypeVar("FrameType", bound=interp.AbstractFrame)
     LatticeType = TypeVar("LatticeType", bound=lattice.BoundedLattice)
@@ -48,19 +77,43 @@ class Abstract(interp.MethodTable):
         node: ir.Region,
     ):
         result = None
+        dependents: dict[ir.SSAValue, set[ir.Block]] = {}
+        reached: set[ir.Block] = set()
+        generations: dict[ir.Block, int] = {}
         frame.worklist.append(
             interp.Successor(node.blocks[0], *frame.get_values(node.blocks[0].args))
         )
         while (succ := frame.worklist.pop()) is not None:
             visited = frame.visited.setdefault(succ.block, set())
-            if succ in visited:
+            generation = generations.get(succ.block, 0)
+            visit = (succ, generation)
+            if visit in visited:
                 continue
 
-            block_result = self.run_succ(interp_, frame, succ)
+            reached.add(succ.block)
+            block_result, changes = self.run_succ(interp_, frame, succ)
             if len(frame.visited[succ.block]) < 128:
-                frame.visited[succ.block].add(succ)
+                frame.visited[succ.block].add(visit)
             else:
                 continue
+
+            for value in changes:
+                blocks = dependents.get(value)
+                if blocks is None:
+                    blocks = set()
+                    dependents[value] = blocks
+                    for use in value.uses:
+                        block = self._get_enclosing_block(node, use.stmt)
+                        if block is not None:
+                            blocks.add(block)
+
+                for block in blocks:
+                    if block is succ.block or block not in reached:
+                        continue
+                    generations[block] = generations.get(block, 0) + 1
+                    frame.worklist.append(
+                        interp.Successor(block, *frame.get_values(block.args))
+                    )
 
             if isinstance(block_result, interp.Successor):
                 raise interp.InterpreterError(
@@ -73,12 +126,23 @@ class Abstract(interp.MethodTable):
             return result.values
         return result
 
+    @staticmethod
+    def _get_enclosing_block(region: ir.Region, stmt: ir.Statement) -> ir.Block | None:
+        node: ir.IRNode | None = stmt
+        while node is not None:
+            parent = node.parent_node
+            if isinstance(parent, ir.Block) and parent.parent_node is region:
+                return parent
+            node = parent
+        return None
+
     def run_succ(
         self,
         interp_: interp.AbstractInterpreter[FrameType, LatticeType],
         frame: FrameType,
         succ: interp.Successor,
-    ) -> interp.SpecialValue[LatticeType]:
+    ) -> tuple[interp.SpecialValue[LatticeType], set[ir.SSAValue]]:
+        frame._take_changes()
         frame.current_block = succ.block
         frame.set_values(succ.block.args, succ.block_args)
         for stmt in succ.block.stmts:
@@ -89,5 +153,5 @@ class Abstract(interp.MethodTable):
             elif stmt_results is None:
                 continue  # empty result
             else:  # terminate
-                return stmt_results
-        return None
+                return stmt_results, frame._take_changes()
+        return None, frame._take_changes()
