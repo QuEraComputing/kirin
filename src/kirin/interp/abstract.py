@@ -22,14 +22,41 @@ AbsIntResultType: TypeAlias = (
 
 @dataclass
 class AbstractFrame(Frame[ResultType]):
-    """Interpreter frame for abstract interpreter.
+    """Store abstract SSA values and worklist state for an analysis call.
 
-    This frame is used to store the state of the abstract interpreter.
-    It contains the worklist of successors to be processed.
+    In addition to the SSA-value entries inherited from :class:`Frame`, an
+    abstract frame owns the pending control-flow successors and the visitation
+    identities already evaluated for each block. A visitation identity combines
+    a path-sensitive successor with the dependency generation maintained by the
+    SSACFG solver. This lets an unchanged control-flow edge run again after an
+    SSA value used by its destination changes.
+
+    Assignments record values whose lattice meaning changed in ``_changes``.
+    The SSACFG solver drains that set after evaluating a block and requeues any
+    reached blocks that depend on those values. Multiple pending invalidations
+    at the same latest generation therefore share one visitation identity.
     """
 
     worklist: WorkList[Successor[ResultType]] = field(default_factory=WorkList)
-    visited: dict[ir.Block, set[Successor[ResultType]]] = field(default_factory=dict)
+    visited: dict[ir.Block, set[tuple[Successor[ResultType], int]]] = field(
+        default_factory=dict
+    )
+    _changes: set[ir.SSAValue] = field(
+        default_factory=set, init=False, compare=False, repr=False
+    )
+
+    def set(self, key: ir.SSAValue, value: ResultType) -> None:
+        previous = self.entries.get(key)
+        self.entries[key] = value
+        if previous is None or not (
+            previous.is_subseteq(value) and value.is_subseteq(previous)
+        ):
+            self._changes.add(key)
+
+    def _take_changes(self) -> set[ir.SSAValue]:
+        changes = self._changes
+        self._changes = set()
+        return changes
 
 
 AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
