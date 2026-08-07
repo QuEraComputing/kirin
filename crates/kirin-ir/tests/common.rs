@@ -41,6 +41,7 @@ impl Placeholder for TestType {
 /// - `Use(a)`: one SSAValue operand (ungraph node)
 /// - `Gate(a, b)`: two SSAValue operands (ungraph node)
 /// - `Wire(r)`: edge that produces a ResultValue (ungraph edge)
+/// - `Split(a, b)`: no operands, two ResultValues (multi-result rewrites)
 /// - `Isolated`: no operands, no results (ungraph isolated node)
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -51,6 +52,7 @@ pub enum BuilderDialect {
     Use(SSAValue),
     Gate(SSAValue, SSAValue),
     Wire(ResultValue),
+    Split(ResultValue, ResultValue),
     Isolated,
 }
 
@@ -81,6 +83,7 @@ impl<'a> HasResults<'a> for BuilderDialect {
     fn results(&'a self) -> Self::Iter {
         match self {
             BuilderDialect::Wire(r) => vec![r].into_iter(),
+            BuilderDialect::Split(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }
     }
@@ -91,6 +94,7 @@ impl<'a> HasResultsMut<'a> for BuilderDialect {
     fn results_mut(&'a mut self) -> Self::IterMut {
         match self {
             BuilderDialect::Wire(r) => vec![r].into_iter(),
+            BuilderDialect::Split(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }
     }
@@ -218,6 +222,29 @@ pub fn make_wire(stage: &mut BuilderStageInfo<BuilderDialect>) -> (Statement, SS
         .kind(BuilderSSAKind::Result(stmt, 0))
         .new();
     (stmt, wire_ssa)
+}
+
+/// Create a `Split` statement with two freshly allocated result values.
+///
+/// Both results start as `Unresolved(Result(idx))` placeholders; the statement
+/// builder binds them to the statement once its id exists.
+#[allow(dead_code)]
+pub fn make_split(stage: &mut BuilderStageInfo<BuilderDialect>) -> (Statement, SSAValue, SSAValue) {
+    let a = stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Unresolved(ResolutionInfo::Result(0)))
+        .new();
+    let b = stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Unresolved(ResolutionInfo::Result(1)))
+        .new();
+    let stmt = stage
+        .statement()
+        .definition(BuilderDialect::Split(a.into(), b.into()))
+        .new();
+    (stmt, a, b)
 }
 
 /// Create a new BuilderStageInfo with the unified BuilderDialect.

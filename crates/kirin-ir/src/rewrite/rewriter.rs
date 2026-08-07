@@ -1,11 +1,28 @@
-//! Safe mutation layer over finalized IR.
+//! Restricted in-place mutation layer over finalized IR.
 //!
 //! First slice of the rewrite engine described in
 //! `docs/design/rewrite-engine.md`: a [`Rewriter`] that owns mutation of a
-//! [`StageInfo`], records every edit as a [`MutationEvent`], and rejects
-//! illegal edits with a [`RewriteError`] instead of corrupting the arenas.
+//! [`StageInfo`] and records every edit as a [`MutationEvent`].
 //!
-//! Scope is operand/yield rewriting plus block-body statement surgery:
+//! # What this layer does and does not guarantee
+//!
+//! Each method checks its own *executable* preconditions before writing, so a
+//! rejected edit returns a [`RewriteError`] with the stage untouched. That is a
+//! per-action property only — it is **not** a claim that the stage as a whole
+//! stays valid. An accepted edit may leave the stage ill-typed, non-dominating,
+//! or (see below) with desynchronized graph topology, because valid rewrites
+//! often need several individually incomplete edits.
+//!
+//! Whole-stage usability is meant to be re-established at a *pass boundary*
+//! that rebuilds derived metadata before returning success and marks the stage
+//! unusable on failure. **That boundary does not exist yet** (see M1 in the
+//! design doc): there is no `Ready` / `Rewriting` / `Unusable` lifecycle or
+//! rebuild step. Callers
+//! of this module today get referential integrity, an accurate def-use index,
+//! and traversable block lists — nothing above that.
+//!
+//! Scope is operand/yield rewriting (including bulk result redirection through
+//! [`Rewriter::replace_results`]) plus block-body statement surgery:
 //! [`Rewriter::erase_statement`], [`Rewriter::insert_before`],
 //! [`Rewriter::insert_after`], and [`Rewriter::replace_statement`]. The rewriter
 //! **maintains** the def-use index ([`SSAInfo::uses`](crate::SSAInfo))
@@ -13,15 +30,25 @@
 //! to later slices: terminator/graph-body surgery, result-defining insertion,
 //! and full cross-block dominance/visibility preflight.
 //!
+//! # Known gap: graph-body operand edits
+//!
+//! [`Rewriter::erase_statement`] and the `insert_*` methods reject
+//! `DiGraph`/`UnGraph`-owned statements with [`RewriteError::NotInBlockBody`].
+//! [`Rewriter::replace_operand`], [`Rewriter::replace_all_uses`],
+//! [`Rewriter::replace_results`], and [`Rewriter::replace_statement`] do **not**
+//! check body kind: on a graph-owned statement they rewrite the operand and
+//! leave the petgraph edge weights that mirror it stale. Until graph surgery
+//! lands, prefer not to point them at graph bodies.
+//!
 //! Because edits are index-driven (they consult and update `SSAInfo::uses`
 //! rather than scanning), correctness depends on the index being accurate at
 //! entry — every mutation path must keep it in lockstep. Direct arena writes
-//! that bypass the `Rewriter` desync it.
+//! that bypass the `Rewriter` desync it, and `StageInfo::statement_arena_mut`
+//! is still public, so that bypass is currently reachable.
 //!
 //! Statement surgery uses arena tombstones: an erased statement is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
-//! removed. Every precondition is checked *before* any mutation, so a rejected
-//! edit leaves the stage untouched.
+//! removed.
 
 use std::fmt;
 
@@ -79,8 +106,10 @@ pub enum RewriteError {
     /// The inserted definition declares results; allocating fresh result SSA
     /// values (with types) is deferred to a later slice.
     CannotInsertWithResults,
-    /// A `replace_statement` changed the number of results, which would orphan or
-    /// invent result SSA values. The replacement must have the same result arity.
+    /// A result list did not line up one-for-one with the statement's results:
+    /// a `replace_statement` definition changed the result count (which would
+    /// orphan or invent result SSA values), or a `replace_results` call did not
+    /// supply exactly one replacement per result.
     ResultArityMismatch {
         stmt: Statement,
         expected: usize,
@@ -194,7 +223,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Maintains the def-use index: the `{stmt, index}` use moves from the
     /// previous operand's [`SSAInfo::uses`](crate::SSAInfo) to `value`'s.
     /// Writing the value already in the slot is a no-op and records no event.
-    pub fn set_operand(
+    pub fn replace_operand(
         &mut self,
         stmt: Statement,
         index: usize,
@@ -258,58 +287,150 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if old == new {
             return Ok(0);
         }
+        Ok(self.redirect_uses(&[(old, new)]))
+    }
 
-        // Snapshot `old`'s use sites so we can mutate the arenas while walking
-        // them (the borrow of `old`'s info ends here).
-        let sites: Vec<Use> = old
-            .get_info(self.stage)
-            .map(|info| info.uses().to_vec())
-            .unwrap_or_default();
+    /// Redirect **every** result of `stmt` at once, one replacement per result
+    /// in result order, exact arity required.
+    ///
+    /// This is the primitive multi-result rewrites need: CSE finds a duplicate
+    /// statement, points all of its results at the original's results, then
+    /// erases the duplicate. Hand-writing that as a loop of
+    /// [`Rewriter::replace_all_uses`] calls over index-matched pairs is the
+    /// error-prone path, so it must not be the convenient one.
+    ///
+    /// Arity is unchanged — this rewrites *uses* only, never the statement's own
+    /// result list. Substitution is simultaneous, not sequential: every slot is
+    /// rewritten against the use lists as they stand on entry, so naming one of
+    /// `stmt`'s own results as a replacement redirects the two independently
+    /// instead of chaining. A pair whose replacement is the result itself is a
+    /// no-op.
+    ///
+    /// Rejects — leaving the stage untouched — if `stmt` is unknown, any
+    /// replacement is not live, or `replacements` does not have exactly one
+    /// entry per result. Records the same events as `replace_all_uses`: one
+    /// [`MutationEvent::ChangedOperands`] per affected statement, then one
+    /// [`MutationEvent::ReplacedUses`] per result that had uses to rewrite.
+    pub fn replace_results(
+        &mut self,
+        stmt: Statement,
+        replacements: &[SSAValue],
+    ) -> Result<(), RewriteError> {
+        let results: Vec<SSAValue> = {
+            let item = stmt
+                .get_info(self.stage)
+                .filter(|item| !item.deleted())
+                .ok_or(RewriteError::UnknownStatement(stmt))?;
+            item.definition
+                .results()
+                .map(|r| SSAValue::from(*r))
+                .collect()
+        };
+        if replacements.len() != results.len() {
+            return Err(RewriteError::ResultArityMismatch {
+                stmt,
+                expected: results.len(),
+                found: replacements.len(),
+            });
+        }
+        for &new in replacements {
+            if new.get_info(self.stage).is_none() {
+                return Err(RewriteError::UnknownValue(new));
+            }
+        }
 
-        let mut moved: Vec<Use> = Vec::new();
+        let pairs: Vec<(SSAValue, SSAValue)> = results
+            .into_iter()
+            .zip(replacements.iter().copied())
+            .filter(|(old, new)| old != new)
+            .collect();
+        self.redirect_uses(&pairs);
+        Ok(())
+    }
+
+    /// Simultaneously substitute each `old` with its paired `new` across every
+    /// use slot, returning the number of slots rewritten.
+    ///
+    /// Every id must already be checked live and every pair must be
+    /// non-trivial. Distinct values have disjoint use lists, so each slot is
+    /// rewritten exactly once — and because the use lists are snapshotted
+    /// before any write and cleared before any transfer, a value that is both
+    /// replaced and a replacement ends up with exactly the sites redirected
+    /// *to* it. A sequential loop would instead let a later pair carry away the
+    /// sites an earlier one just moved.
+    fn redirect_uses(&mut self, pairs: &[(SSAValue, SSAValue)]) -> usize {
+        // Snapshot the use sites so we can mutate the arenas while walking them
+        // (the borrows of the `old` infos end here).
+        let sites: Vec<Vec<Use>> = pairs
+            .iter()
+            .map(|(old, _)| {
+                old.get_info(self.stage)
+                    .map(|info| info.uses().to_vec())
+                    .unwrap_or_default()
+            })
+            .collect();
+
+        // Rewrite the slots, keeping the sites that actually applied — a stale
+        // site names a statement or graph that has since been tombstoned.
         let mut changed_stmts: Vec<Statement> = Vec::new();
-        for site in sites {
-            let applied = match site {
-                Use::StatementOperand { stmt, index } => {
-                    let ok = stmt
+        let mut moved: Vec<Vec<Use>> = Vec::with_capacity(pairs.len());
+        for (&(_, new), sites) in pairs.iter().zip(&sites) {
+            let mut applied: Vec<Use> = Vec::with_capacity(sites.len());
+            for &site in sites {
+                let ok = match site {
+                    Use::StatementOperand { stmt, index } => {
+                        let ok = stmt
+                            .get_info_mut(self.stage)
+                            .filter(|item| !item.deleted())
+                            .and_then(|item| item.definition.arguments_mut().nth(index))
+                            .map(|slot| *slot = new)
+                            .is_some();
+                        if ok && !changed_stmts.contains(&stmt) {
+                            changed_stmts.push(stmt);
+                        }
+                        ok
+                    }
+                    Use::DiGraphYield { graph, index } => graph
                         .get_info_mut(self.stage)
                         .filter(|item| !item.deleted())
-                        .and_then(|item| item.definition.arguments_mut().nth(index))
+                        .and_then(|item| item.yields_mut().get_mut(index))
                         .map(|slot| *slot = new)
-                        .is_some();
-                    if ok && !changed_stmts.contains(&stmt) {
-                        changed_stmts.push(stmt);
-                    }
-                    ok
+                        .is_some(),
+                };
+                if ok {
+                    applied.push(site);
                 }
-                Use::DiGraphYield { graph, index } => graph
-                    .get_info_mut(self.stage)
-                    .filter(|item| !item.deleted())
-                    .and_then(|item| item.yields_mut().get_mut(index))
-                    .map(|slot| *slot = new)
-                    .is_some(),
-            };
-            if applied {
-                moved.push(site);
+            }
+            moved.push(applied);
+        }
+
+        // Transfer the use records in two phases: drop every moved list before
+        // installing any of them, so a value appearing on both sides of the
+        // substitution keeps only the sites redirected to it.
+        for (&(old, _), moved) in pairs.iter().zip(&moved) {
+            if !moved.is_empty()
+                && let Some(info) = old.get_info_mut(self.stage)
+            {
+                info.uses_mut().clear();
+            }
+        }
+        for (&(_, new), moved) in pairs.iter().zip(&moved) {
+            if !moved.is_empty()
+                && let Some(info) = new.get_info_mut(self.stage)
+            {
+                info.uses_mut().extend(moved.iter().copied());
             }
         }
 
-        let replaced = moved.len();
-        if replaced > 0 {
-            // Transfer the use records: `old` is no longer read anywhere; the
-            // rewritten slots now read `new`.
-            if let Some(info) = old.get_info_mut(self.stage) {
-                info.uses_mut().clear();
-            }
-            if let Some(info) = new.get_info_mut(self.stage) {
-                info.uses_mut().extend(moved);
-            }
-            for stmt in changed_stmts {
-                self.events.push(MutationEvent::ChangedOperands { stmt });
-            }
-            self.events.push(MutationEvent::ReplacedUses { old, new });
+        for stmt in changed_stmts {
+            self.events.push(MutationEvent::ChangedOperands { stmt });
         }
-        Ok(replaced)
+        for (&(old, new), moved) in pairs.iter().zip(&moved) {
+            if !moved.is_empty() {
+                self.events.push(MutationEvent::ReplacedUses { old, new });
+            }
+        }
+        moved.iter().map(Vec::len).sum()
     }
 
     /// Erase `stmt`: tombstone it, unlink it from its block's statement list,
