@@ -5,7 +5,7 @@ mod common;
 
 use std::collections::HashSet;
 
-use common::{BuilderDialect, TestType, make_wire, new_stage};
+use common::{BuilderDialect, TestType, make_split, make_wire, new_stage};
 use kirin_ir::*;
 
 /// The def-use set of `value` (order-agnostic; `SSAInfo::uses` is a bag).
@@ -90,7 +90,7 @@ fn replace_all_uses_rewrites_operands_and_records_events() {
 }
 
 #[test]
-fn set_operand_updates_single_slot_and_rejects_illegal_edits() {
+fn replace_operand_updates_single_slot_and_rejects_illegal_edits() {
     let mut stage = new_stage();
 
     let x = stage.block_argument().index(0);
@@ -117,12 +117,12 @@ fn set_operand_updates_single_slot_and_rejects_illegal_edits() {
     let mut rewriter = Rewriter::new(&mut stage);
 
     // Rewrite only the second operand; the first must stay untouched.
-    let old = rewriter.set_operand(add, 1, real_y).unwrap();
+    let old = rewriter.replace_operand(add, 1, real_y).unwrap();
     assert_eq!(old, real_x);
 
     // Out-of-range operand index is rejected.
     assert_eq!(
-        rewriter.set_operand(add, 2, real_y),
+        rewriter.replace_operand(add, 2, real_y),
         Err(RewriteError::OperandIndexOutOfRange {
             stmt: add,
             index: 2
@@ -132,12 +132,12 @@ fn set_operand_updates_single_slot_and_rejects_illegal_edits() {
     // A value id that does not resolve to a live SSA value is rejected.
     let bogus = SSAValue::from(TestSSAValue(9999));
     assert_eq!(
-        rewriter.set_operand(add, 0, bogus),
+        rewriter.replace_operand(add, 0, bogus),
         Err(RewriteError::UnknownValue(bogus))
     );
 
     // Writing the value already in the slot is a no-op and records no event.
-    assert_eq!(rewriter.set_operand(add, 1, real_y).unwrap(), real_y);
+    assert_eq!(rewriter.replace_operand(add, 1, real_y).unwrap(), real_y);
 
     assert_eq!(
         rewriter.drain_events(),
@@ -155,7 +155,7 @@ fn set_operand_updates_single_slot_and_rejects_illegal_edits() {
 }
 
 #[test]
-fn set_operand_maintains_def_use_index() {
+fn replace_operand_maintains_def_use_index() {
     let mut stage = new_stage();
 
     let x = stage.block_argument().index(0);
@@ -191,13 +191,13 @@ fn set_operand_maintains_def_use_index() {
 
     {
         let mut rewriter = Rewriter::new(&mut stage);
-        rewriter.set_operand(add, 1, real_y).unwrap();
+        rewriter.replace_operand(add, 1, real_y).unwrap();
     }
 
     // After: the {add, 1} use moved from x to y; {add, 0} still reads x.
     assert_eq!(uses_set(&stage, real_x), HashSet::from([so(add, 0)]));
     assert_eq!(uses_set(&stage, real_y), HashSet::from([so(add, 1)]));
-    // use-def is untouched — set_operand changes who reads a value, not its def.
+    // use-def is untouched — replace_operand changes who reads a value, not its def.
     assert_eq!(*real_x.get_info(&stage).unwrap().kind(), x_kind);
     assert_eq!(*real_y.get_info(&stage).unwrap().kind(), y_kind);
 
@@ -549,4 +549,204 @@ fn replace_statement_preserves_result_identity() {
         other => panic!("expected Wire, got {other:?}"),
     }
     assert_eq!(uses_set(&stage, wire_ssa), HashSet::from([so(consumer, 0)]));
+}
+
+/// The CSE shape `replace_results` exists for: redirect a duplicate's whole
+/// result list at the original's, then erase the duplicate.
+#[test]
+fn replace_results_redirects_every_result_and_unblocks_erase() {
+    let mut stage = new_stage();
+
+    let (orig, orig_a, orig_b) = make_split(&mut stage);
+    let (dup, dup_a, dup_b) = make_split(&mut stage);
+    // One consumer reads both duplicate results; another reads just the second.
+    let both = stage
+        .statement()
+        .definition(BuilderDialect::Add(dup_a, dup_b))
+        .new();
+    let second = stage
+        .statement()
+        .definition(BuilderDialect::Use(dup_b))
+        .new();
+    let _block = stage
+        .block()
+        .stmt(orig)
+        .stmt(dup)
+        .stmt(both)
+        .stmt(second)
+        .new();
+
+    let mut stage = stage.finalize().unwrap();
+    assert_eq!(uses_set(&stage, dup_a), HashSet::from([so(both, 0)]));
+    assert_eq!(
+        uses_set(&stage, dup_b),
+        HashSet::from([so(both, 1), so(second, 0)])
+    );
+
+    let events = {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.replace_results(dup, &[orig_a, orig_b]).unwrap();
+        rw.drain_events()
+    };
+
+    // Both results moved to the originals; the duplicate is now unread.
+    assert!(uses_set(&stage, dup_a).is_empty());
+    assert!(uses_set(&stage, dup_b).is_empty());
+    assert_eq!(uses_set(&stage, orig_a), HashSet::from([so(both, 0)]));
+    assert_eq!(
+        uses_set(&stage, orig_b),
+        HashSet::from([so(both, 1), so(second, 0)])
+    );
+    match both.definition(&stage) {
+        BuilderDialect::Add(a, b) => {
+            assert_eq!(*a, orig_a);
+            assert_eq!(*b, orig_b);
+        }
+        other => panic!("expected Add, got {other:?}"),
+    }
+
+    // `both` reads two redirected results but is named once.
+    assert_eq!(
+        events,
+        vec![
+            MutationEvent::ChangedOperands { stmt: both },
+            MutationEvent::ChangedOperands { stmt: second },
+            MutationEvent::ReplacedUses {
+                old: dup_a,
+                new: orig_a,
+            },
+            MutationEvent::ReplacedUses {
+                old: dup_b,
+                new: orig_b,
+            },
+        ],
+        "one ChangedOperands per affected statement, then one ReplacedUses per result"
+    );
+
+    // The point of the redirection: erasing the duplicate is now legal.
+    {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.erase_statement(dup).unwrap();
+    }
+    assert!(dup.get_info(&stage).unwrap().deleted());
+
+    let (ma, mb) = (uses_set(&stage, orig_a), uses_set(&stage, orig_b));
+    stage.rebuild_use_index();
+    assert_eq!(uses_set(&stage, orig_a), ma);
+    assert_eq!(uses_set(&stage, orig_b), mb);
+}
+
+/// Substitution is simultaneous, so naming one of the statement's own results
+/// as a replacement redirects the two independently. A sequential loop of
+/// `replace_all_uses` would instead let the second pair carry away the sites
+/// the first one just moved.
+#[test]
+fn replace_results_substitutes_simultaneously() {
+    let mut stage = new_stage();
+
+    let (split, a, b) = make_split(&mut stage);
+    let (other, x, _y) = make_split(&mut stage);
+    let reads_a = stage.statement().definition(BuilderDialect::Use(a)).new();
+    let reads_b = stage.statement().definition(BuilderDialect::Use(b)).new();
+    let _block = stage
+        .block()
+        .stmt(split)
+        .stmt(other)
+        .stmt(reads_a)
+        .stmt(reads_b)
+        .new();
+
+    let mut stage = stage.finalize().unwrap();
+
+    // a -> b and b -> x at once.
+    {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.replace_results(split, &[b, x]).unwrap();
+    }
+
+    // The site that read `a` reads `b`; the site that read `b` reads `x`.
+    match reads_a.definition(&stage) {
+        BuilderDialect::Use(v) => assert_eq!(*v, b),
+        other => panic!("expected Use, got {other:?}"),
+    }
+    match reads_b.definition(&stage) {
+        BuilderDialect::Use(v) => assert_eq!(*v, x),
+        other => panic!("expected Use, got {other:?}"),
+    }
+    // `b` holds exactly the site redirected to it, not that site plus its own.
+    assert!(uses_set(&stage, a).is_empty());
+    assert_eq!(uses_set(&stage, b), HashSet::from([so(reads_a, 0)]));
+    assert_eq!(uses_set(&stage, x), HashSet::from([so(reads_b, 0)]));
+
+    let (ma, mb, mx) = (
+        uses_set(&stage, a),
+        uses_set(&stage, b),
+        uses_set(&stage, x),
+    );
+    stage.rebuild_use_index();
+    assert_eq!(uses_set(&stage, a), ma);
+    assert_eq!(uses_set(&stage, b), mb);
+    assert_eq!(uses_set(&stage, x), mx);
+}
+
+#[test]
+fn replace_results_rejects_bad_arity_and_dead_ids() {
+    let mut stage = new_stage();
+
+    let (split, a, b) = make_split(&mut stage);
+    let nop = stage.statement().definition(BuilderDialect::Nop).new();
+    let consumer = stage.statement().definition(BuilderDialect::Use(a)).new();
+    let _block = stage.block().stmt(split).stmt(nop).stmt(consumer).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let before = (uses_set(&stage, a), uses_set(&stage, b));
+
+    let events = {
+        let mut rw = Rewriter::new(&mut stage);
+
+        // Too few, too many, and none-for-two are all arity mismatches.
+        for (replacements, found) in [(&[b][..], 1), (&[b, a, b][..], 3), (&[][..], 0)] {
+            assert_eq!(
+                rw.replace_results(split, replacements),
+                Err(RewriteError::ResultArityMismatch {
+                    stmt: split,
+                    expected: 2,
+                    found,
+                })
+            );
+        }
+
+        // A result-less statement takes an empty list and rejects anything else.
+        assert_eq!(rw.replace_results(nop, &[]), Ok(()));
+        assert_eq!(
+            rw.replace_results(nop, &[a]),
+            Err(RewriteError::ResultArityMismatch {
+                stmt: nop,
+                expected: 0,
+                found: 1,
+            })
+        );
+
+        // A dead replacement is rejected before any pair is applied.
+        let dead = SSAValue::from(TestSSAValue(999));
+        assert_eq!(
+            rw.replace_results(split, &[a, dead]),
+            Err(RewriteError::UnknownValue(dead))
+        );
+
+        // A tombstoned statement is unknown, not a zero-result statement.
+        rw.erase_statement(nop).unwrap();
+        assert_eq!(
+            rw.replace_results(nop, &[]),
+            Err(RewriteError::UnknownStatement(nop))
+        );
+
+        // Replacing every result by itself is a no-op.
+        assert_eq!(rw.replace_results(split, &[a, b]), Ok(()));
+        rw.drain_events()
+    };
+
+    // Only the erase recorded anything; no rejected call moved a use list.
+    assert_eq!(events, vec![MutationEvent::ErasedStatement { stmt: nop }]);
+    assert_eq!((uses_set(&stage, a), uses_set(&stage, b)), before);
 }
