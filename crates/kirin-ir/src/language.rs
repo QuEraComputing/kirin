@@ -94,6 +94,19 @@ pub trait IsConstant {
     fn is_constant(&self) -> bool;
 }
 
+/// Strong purity contract used by semantics-informed rewrites.
+///
+/// `true` means the operation has no observable behavior except through its
+/// SSA results and is referentially transparent: equal operation kind,
+/// semantic attributes, and operand values produce interchangeable results.
+/// Consequently an instance may be erased when all of its results are
+/// unobservable and may participate in common-subexpression elimination.
+/// Nondeterminism, hidden-state reads, defined errors, and divergence require
+/// `false`. Dialect authors are responsible for classifying their operations
+/// according to the dialect's semantics.
+///
+/// This is distinct from [`IsSpeculatable`], which governs whether an
+/// operation may be moved or evaluated earlier.
 pub trait IsPure {
     fn is_pure(&self) -> bool;
 }
