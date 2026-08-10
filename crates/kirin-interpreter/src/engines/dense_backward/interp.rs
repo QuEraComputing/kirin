@@ -55,7 +55,7 @@ use crate::Body;
 use crate::core::query;
 use crate::engines::sparse_backward::BodyScope;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, BodyTopology, ClassicLiveness, DenseBackwardSemantic,
+    AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic,
     DensePointStore, EnvIndex, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
     InterpreterError, OwnerSemantics, ProgramPoint, Scoped, StageQuery,
     StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
@@ -372,12 +372,12 @@ pub enum DenseBackwardCompletion<V> {
     Structured,
 }
 
-/// Analysis-local state carried in the driver's `store` slot: the scope,
-/// the body topology, and an optional per-point recorder filled by the
-/// block frames during [`reconstruct_points`](DenseBackwardInterpreter::reconstruct_points).
+/// Analysis-local state carried in the driver's `store` slot: the scope, the
+/// root block owners, and an optional per-point recorder filled by block frames
+/// during [`reconstruct_points`](DenseBackwardInterpreter::reconstruct_points).
 pub struct DenseAnalysisState<V> {
     scope: Option<BodyScope>,
-    topology: BodyTopology,
+    blocks: Vec<Block>,
     recorder: Option<DensePointStore<V>>,
 }
 
@@ -385,7 +385,7 @@ impl<V> Default for DenseAnalysisState<V> {
     fn default() -> Self {
         Self {
             scope: None,
-            topology: BodyTopology::default(),
+            blocks: Vec::new(),
             recorder: None,
         }
     }
@@ -419,7 +419,11 @@ pub trait DenseBackwardFrameEngine: Interp<Effect = DenseBackwardEffect<Self::Fr
     ) -> Result<Self::Effect, Self::Error>;
 
     /// A block's statements in program order (terminator, if any, last).
-    fn block_statements(&self, block: Block) -> Result<Vec<Statement>, Self::Error>;
+    fn block_statements(
+        &self,
+        stage: CompileStage,
+        block: Block,
+    ) -> Result<Vec<Statement>, Self::Error>;
 
     /// The parameters of `block` (structured frames map carried demand).
     fn block_params(&self, stage: CompileStage, block: Block)
@@ -490,12 +494,8 @@ where
         result
     }
 
-    fn block_statements(&self, block: Block) -> Result<Vec<Statement>, E> {
-        self.store()
-            .topology
-            .block_statements(block)
-            .map(<[Statement]>::to_vec)
-            .ok_or_else(|| E::from(InterpreterError::MissingBlock(block)))
+    fn block_statements(&self, stage: CompileStage, block: Block) -> Result<Vec<Statement>, E> {
+        query::block_statements(self.inner().pipeline(), stage, block).map_err(E::from)
     }
 
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
@@ -691,12 +691,7 @@ where
 
     /// The analyzed CFG's own top-level blocks (post-`analyze`).
     pub fn cfg_blocks(&self) -> Vec<Block> {
-        self.driver
-            .store()
-            .topology
-            .cfg_blocks()
-            .map(|block| block.block)
-            .collect()
+        self.driver.store().blocks.clone()
     }
 }
 
@@ -715,14 +710,15 @@ where
     pub fn analyze(&mut self, stage: CompileStage, body: impl Into<Body>) -> Result<(), E> {
         let body = body.into();
         let scope = (stage, body);
-        let topology = query::body_topology(self.driver.inner().pipeline(), stage, body)?;
-        let owners: Vec<Scoped<BodyScope, Block>> = topology
-            .cfg_blocks()
-            .map(|block| Scoped::new(scope, block.block))
+        let blocks = query::direct_body_blocks(self.driver.inner().pipeline(), stage, body)?;
+        let owners: Vec<Scoped<BodyScope, Block>> = blocks
+            .iter()
+            .copied()
+            .map(|block| Scoped::new(scope, block))
             .collect();
         *self.driver.store_mut() = DenseAnalysisState {
             scope: Some(scope),
-            topology,
+            blocks,
             recorder: None,
         };
 

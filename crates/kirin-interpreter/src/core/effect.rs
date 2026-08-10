@@ -7,8 +7,8 @@ use kirin_ir::{
 ///
 /// Interpreter vocabulary, not an IR concept — dialect ops keep their precise
 /// field types (`Block`, `CFG`, `DiGraph`, `UnGraph`); a `Body` appears only at
-/// the moment a body is handed to the interpreter (callable entry, topology
-/// queries, analysis scopes). Bodies carry no semantics of their own: the
+/// the moment a body is handed to the interpreter (callable entry,
+/// body-containment queries, analysis scopes). Bodies carry no semantics of their own: the
 /// statement that owns a body defines what entering and exiting it means.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum Body {

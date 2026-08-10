@@ -10,7 +10,7 @@ pub mod stmt;
 pub mod symbol;
 pub(crate) mod ungraph;
 
-pub use block::{Block, BlockInfo, Successor};
+pub use block::{Block, BlockInfo, BlockParent, Successor};
 pub use cfg::{CFG, CFGInfo};
 pub use digraph::{DiGraph, DiGraphInfo};
 pub use function::{

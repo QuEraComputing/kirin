@@ -1,4 +1,7 @@
-use std::ops::{Deref, DerefMut};
+use std::{
+    collections::HashSet,
+    ops::{Deref, DerefMut},
+};
 
 use crate::arena::{Arena, Id};
 use crate::node::ssa::{SSAInfo, Use};
@@ -174,6 +177,53 @@ impl<L: Dialect> StageInfo<L> {
                     && let Some(info) = (**slot).as_mut()
                 {
                     info.uses_mut().push(Use::DiGraphYield { graph, index });
+                }
+            }
+        }
+    }
+
+    /// Rebuild the reverse control-flow index stored in
+    /// [`BlockInfo::predecessors`](crate::BlockInfo::predecessors).
+    ///
+    /// Successor references on statements are the authoritative forward
+    /// edges. This method clears every live block's cached predecessors, then
+    /// scans each live statement whose structural parent is a block. For every
+    /// successor target, the source block is recorded as a predecessor of that
+    /// target.
+    ///
+    /// Multiple successor edges from one source block to the same target still
+    /// represent one predecessor block, so duplicate `(source, target)` pairs
+    /// are recorded only once. Blocks directly owned by statements do not need
+    /// synthetic predecessor entries: backward traversal reaches their owner
+    /// through [`BlockParent::Statement`](crate::BlockParent::Statement).
+    ///
+    /// Idempotent — safe to re-run after successor edges change. Called during
+    /// finalization so finalized IR ships with a populated reverse index.
+    pub fn rebuild_predecessor_index(&mut self) {
+        let StageInfo { nodes, .. } = self;
+        let (blocks, statements) = (&mut nodes.blocks, &nodes.statements);
+
+        for block in blocks.iter_mut() {
+            block.predecessors.clear();
+        }
+
+        let mut seen = HashSet::new();
+        for statement in statements.iter() {
+            let Some(StatementParent::Block(source)) = statement.parent else {
+                continue;
+            };
+
+            for successor in statement.definition.successors() {
+                let target = successor.target();
+                if !seen.insert((source, target)) {
+                    continue;
+                }
+
+                let Some(target_info) = blocks.get_mut(target) else {
+                    continue;
+                };
+                if !target_info.deleted() {
+                    target_info.predecessors.push(source);
                 }
             }
         }

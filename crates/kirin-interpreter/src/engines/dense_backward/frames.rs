@@ -95,7 +95,7 @@ where
         let statements = match self.statements.as_ref() {
             Some(statements) => statements,
             None => {
-                let statements = interp.block_statements(self.block)?;
+                let statements = interp.block_statements(self.stage, self.block)?;
                 self.remaining = statements.len();
                 self.statements.insert(statements)
             }

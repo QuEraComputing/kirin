@@ -1,6 +1,5 @@
 //! Locations in the IR that dataflow reasoning refers to: lattice anchors
-//! (*where* facts attach), boundary locations, scope qualification, and change
-//! detection.
+//! (*where* facts attach), scope qualification, and change detection.
 //!
 //! Following MLIR's terminology, a lattice fact is attached to a *lattice
 //! anchor*: sparse analyses anchor facts to [`SSAValue`]s; dense analyses
@@ -64,26 +63,6 @@ pub enum DenseAnchor {
 }
 
 impl LatticeAnchor for DenseAnchor {}
-
-// ===========================================================================
-// Boundary locations
-// ===========================================================================
-
-/// Where a graph port sits on its owning statement's boundary.
-///
-/// This is a **location**, not a value mapping: the owning statement's
-/// dialect rule translates port/index into its operands, captures, or
-/// results — for values (forward) and demand (backward) alike. Unlike a
-/// [`LatticeAnchor`] no fact attaches here; it is what
-/// [`BodyTopology::port_boundary`](crate::BodyTopology::port_boundary) hands
-/// a rule so it can reach the statement owning a port.
-#[derive(Clone, Copy, Debug)]
-pub struct PortBoundary {
-    /// The statement that owns the graph.
-    pub owner: Statement,
-    /// Which boundary slot this port occupies.
-    pub index: usize,
-}
 
 // ===========================================================================
 // Scope qualification

@@ -7,15 +7,14 @@
 //! bound that any well-formed stage enum satisfies automatically.
 
 use kirin_ir::{
-    Block, CFG, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCFG, HasStageInfo,
-    HasSuccessors, Pipeline, SSAKind, SSAValue, SpecializedFunction, StageAction, StageInfo,
-    StageMeta, StagedFunction, Statement, SupportsStageDispatch, Symbol,
-    UniqueLiveSpecializationError,
+    Block, BlockParent, CFG, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCFG,
+    HasDigraphs, HasStageInfo, HasUngraphs, Pipeline, PortParent, SSAKind, SSAValue,
+    SpecializedFunction, StageAction, StageInfo, StageMeta, StagedFunction, Statement,
+    SupportsStageDispatch, Symbol, UniqueLiveSpecializationError,
 };
 
 use crate::Body;
 use crate::InterpreterError;
-use crate::core::topology::{self, BodyTopology};
 
 /// Block parameters as SSA values.
 pub struct BlockParams(pub Block);
@@ -43,6 +42,39 @@ where
             .copied()
             .map(SSAValue::from)
             .collect())
+    }
+}
+
+/// A block's statements in program order, with the terminator last.
+pub struct BlockStatements(pub Block);
+
+impl BlockStatements {
+    fn collect<L: Dialect>(&self, info: &StageInfo<L>) -> Result<Vec<Statement>, InterpreterError> {
+        self.0
+            .get_info(info)
+            .ok_or(InterpreterError::MissingBlock(self.0))?;
+        let mut statements: Vec<Statement> = self.0.statements(info).collect();
+        if let Some(terminator) = self.0.terminator(info) {
+            statements.push(terminator);
+        }
+        Ok(statements)
+    }
+}
+
+impl<S, L> StageAction<S, L> for BlockStatements
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+{
+    type Output = Vec<Statement>;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        self.collect(info)
     }
 }
 
@@ -277,23 +309,19 @@ where
     }
 }
 
-/// The topology of a body: blocks and graph parts (including nested
-/// structured bodies), statements per part, block feeders, and graph-port
-/// boundaries. Forward CFG successors are deliberately absent — those are a
-/// local IR query on a block's terminator.
-pub struct BodyTopologyQuery(pub Body);
+/// Statements whose backward rules translate demand on a block argument.
+///
+/// A directly owned single-block body is translated by its structural owner.
+/// A CFG block is translated by the terminator of each block in its finalized
+/// predecessor index.
+pub struct BlockArgumentPredecessors(pub Block);
 
-impl<S, L> StageAction<S, L> for BodyTopologyQuery
+impl<S, L> StageAction<S, L> for BlockArgumentPredecessors
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
-    for<'a> L: HasSuccessors<'a>
-        + HasBlocks<'a>
-        + HasCFG<'a>
-        + kirin_ir::HasDigraphs<'a>
-        + kirin_ir::HasUngraphs<'a>,
 {
-    type Output = BodyTopology;
+    type Output = Vec<Statement>;
     type Error = InterpreterError;
 
     fn run(
@@ -301,7 +329,142 @@ where
         _stage: CompileStage,
         info: &StageInfo<L>,
     ) -> Result<Self::Output, Self::Error> {
-        Ok(topology::body_topology(info, self.0))
+        let block = self
+            .0
+            .get_info(info)
+            .ok_or(InterpreterError::MissingBlock(self.0))?;
+
+        match block.parent {
+            Some(BlockParent::Statement(owner)) => Ok(vec![owner]),
+            Some(BlockParent::CFG(_)) => block
+                .predecessors
+                .iter()
+                .map(|predecessor| {
+                    predecessor.terminator(info).ok_or(InterpreterError::Custom(
+                        "CFG predecessor block has no terminator",
+                    ))
+                })
+                .collect(),
+            None => Ok(Vec::new()),
+        }
+    }
+}
+
+/// The statement structurally owning a graph port's parent graph.
+///
+/// The port's [`PortParent`] identifies the authoritative graph, whose
+/// `GraphInfo::parent` field identifies the statement whose dialect rule
+/// translates values and demand across the graph boundary.
+pub struct GraphPortOwner(pub PortParent);
+
+impl<S, L> StageAction<S, L> for GraphPortOwner
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+{
+    type Output = Statement;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        let owner = match self.0 {
+            PortParent::DiGraph(graph) => graph.get_info(info).and_then(|graph| graph.parent()),
+            PortParent::UnGraph(graph) => graph.get_info(info).and_then(|graph| graph.parent()),
+        };
+        owner.ok_or(InterpreterError::Custom(
+            "graph port has no owning statement",
+        ))
+    }
+}
+
+/// Blocks directly selected as dense fixpoint owners by an analysis root.
+pub struct DirectBodyBlocks(pub Body);
+
+impl<S, L> StageAction<S, L> for DirectBodyBlocks
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+{
+    type Output = Vec<Block>;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        Ok(match self.0 {
+            Body::CFG(cfg) => cfg.blocks(info).collect(),
+            Body::Block(block) => vec![block],
+            Body::DiGraph(_) | Body::UnGraph(_) => Vec::new(),
+        })
+    }
+}
+
+/// One step of a body-containment walk: the statements directly in this body
+/// part and the child body parts reached from it.
+pub struct BodyContents {
+    pub statements: Vec<Statement>,
+    pub children: Vec<Body>,
+}
+
+pub struct BodyContentsQuery(pub Body);
+
+impl<S, L> StageAction<S, L> for BodyContentsQuery
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+    for<'a> L: HasBlocks<'a> + HasCFG<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
+{
+    type Output = BodyContents;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        let (statements, mut children) = match self.0 {
+            Body::CFG(cfg) => (
+                Vec::new(),
+                cfg.blocks(info).map(Body::Block).collect::<Vec<_>>(),
+            ),
+            Body::Block(block) => (BlockStatements(block).collect(info)?, Vec::new()),
+            Body::DiGraph(graph) => (
+                graph
+                    .expect_info(info)
+                    .graph()
+                    .node_weights()
+                    .copied()
+                    .collect(),
+                Vec::new(),
+            ),
+            Body::UnGraph(graph) => (
+                graph
+                    .expect_info(info)
+                    .graph()
+                    .node_weights()
+                    .copied()
+                    .collect(),
+                Vec::new(),
+            ),
+        };
+
+        for &statement in &statements {
+            let definition = statement.definition(info);
+            children.extend(definition.blocks().copied().map(Body::Block));
+            children.extend(definition.cfgs().copied().map(Body::CFG));
+            children.extend(definition.digraphs().copied().map(Body::DiGraph));
+            children.extend(definition.ungraphs().copied().map(Body::UnGraph));
+        }
+
+        Ok(BodyContents {
+            statements,
+            children,
+        })
     }
 }
 
@@ -333,6 +496,7 @@ where
 pub trait StageQuery:
     StageMeta
     + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
+    + SupportsStageDispatch<BlockStatements, Vec<Statement>, InterpreterError>
     + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
     + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
     + SupportsStageDispatch<CFGEntry, Option<Block>, InterpreterError>
@@ -344,7 +508,10 @@ pub trait StageQuery:
     + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
     + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
     + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-    + SupportsStageDispatch<BodyTopologyQuery, BodyTopology, InterpreterError>
+    + SupportsStageDispatch<BlockArgumentPredecessors, Vec<Statement>, InterpreterError>
+    + SupportsStageDispatch<GraphPortOwner, Statement, InterpreterError>
+    + SupportsStageDispatch<DirectBodyBlocks, Vec<Block>, InterpreterError>
+    + SupportsStageDispatch<BodyContentsQuery, BodyContents, InterpreterError>
     + SupportsStageDispatch<DiGraphWalkQuery, GraphWalkPlan, InterpreterError>
 {
 }
@@ -352,6 +519,7 @@ pub trait StageQuery:
 impl<S> StageQuery for S where
     S: StageMeta
         + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
+        + SupportsStageDispatch<BlockStatements, Vec<Statement>, InterpreterError>
         + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
         + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
         + SupportsStageDispatch<CFGEntry, Option<Block>, InterpreterError>
@@ -363,7 +531,10 @@ impl<S> StageQuery for S where
         + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
         + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
         + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-        + SupportsStageDispatch<BodyTopologyQuery, BodyTopology, InterpreterError>
+        + SupportsStageDispatch<BlockArgumentPredecessors, Vec<Statement>, InterpreterError>
+        + SupportsStageDispatch<GraphPortOwner, Statement, InterpreterError>
+        + SupportsStageDispatch<DirectBodyBlocks, Vec<Block>, InterpreterError>
+        + SupportsStageDispatch<BodyContentsQuery, BodyContents, InterpreterError>
         + SupportsStageDispatch<DiGraphWalkQuery, GraphWalkPlan, InterpreterError>
 {
 }
@@ -390,6 +561,14 @@ pub(crate) fn block_params<S: StageQuery>(
     block: Block,
 ) -> Result<Vec<SSAValue>, InterpreterError> {
     dispatch(pipeline, stage, BlockParams(block))
+}
+
+pub(crate) fn block_statements<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    block: Block,
+) -> Result<Vec<Statement>, InterpreterError> {
+    dispatch(pipeline, stage, BlockStatements(block))
 }
 
 pub(crate) fn first_statement<S: StageQuery>(
@@ -457,6 +636,22 @@ pub(crate) fn terminator_arguments<S: StageQuery>(
     dispatch(pipeline, stage, TerminatorArguments(block))
 }
 
+pub(crate) fn block_argument_predecessors<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    block: Block,
+) -> Result<Vec<Statement>, InterpreterError> {
+    dispatch(pipeline, stage, BlockArgumentPredecessors(block))
+}
+
+pub(crate) fn graph_port_owner<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    parent: PortParent,
+) -> Result<Statement, InterpreterError> {
+    dispatch(pipeline, stage, GraphPortOwner(parent))
+}
+
 pub(crate) fn digraph_walk_plan<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
@@ -465,10 +660,18 @@ pub(crate) fn digraph_walk_plan<S: StageQuery>(
     dispatch(pipeline, stage, DiGraphWalkQuery(graph))
 }
 
-pub(crate) fn body_topology<S: StageQuery>(
+pub(crate) fn direct_body_blocks<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
     body: Body,
-) -> Result<BodyTopology, InterpreterError> {
-    dispatch(pipeline, stage, BodyTopologyQuery(body))
+) -> Result<Vec<Block>, InterpreterError> {
+    dispatch(pipeline, stage, DirectBodyBlocks(body))
+}
+
+pub(crate) fn body_contents<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    body: Body,
+) -> Result<BodyContents, InterpreterError> {
+    dispatch(pipeline, stage, BodyContentsQuery(body))
 }

@@ -241,6 +241,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             ssas,
         };
         stage.rebuild_use_index();
+        stage.rebuild_predecessor_index();
         Ok(stage)
     }
 
@@ -286,6 +287,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             ssas,
         };
         stage.rebuild_use_index();
+        stage.rebuild_predecessor_index();
         stage
     }
 }

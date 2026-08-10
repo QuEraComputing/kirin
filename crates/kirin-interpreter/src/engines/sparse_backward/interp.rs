@@ -20,7 +20,7 @@
 //!   the real dispatch location, and the per-rule demand buffer.
 //! - the **[`StandardFixpointInterpreter`]** driver owns the demand facts
 //!   (summaries keyed by [`Scoped`] SSA values — never bare values), the value
-//!   worklist, and the analysis state (scope + body topology).
+//!   worklist, and the analysis scope.
 //!
 //! # Owners are values; scheduling is demand propagation
 //!
@@ -31,20 +31,20 @@
 //! that can translate its demand:
 //!
 //! - a statement **result** → the defining statement's backward rule;
-//! - a **block argument** → each of the block's *feeders* (terminators
-//!   targeting the block, statements owning it as a structured body) from the
-//!   [`BodyTopology`];
-//! - a graph **port** → unsupported (loud error).
+//! - a **block argument** → its directly owning structured statement, or each
+//!   indexed CFG predecessor block's terminator;
+//! - a graph **port** → the statement owning the graph boundary.
 //!
 //! Rules read converged facts ([`DemandInterp::is_demanded`]) and raise new
 //! demands ([`DemandInterp::demand`], strong liveness's spelling of the
 //! shape-generic [`SparseBackwardInterp::raise_fact`]); each rule returns the
 //! facts it raised as its [`SparseBackwardEffect`]. All fact mutation flows
 //! through the driver's single merge path. Facts only rise in a finite-height
-//! lattice, so the fixpoint terminates with O(feeders) rule runs per rise —
+//! lattice, so the fixpoint terminates with O(predecessors) rule runs per rise —
 //! no block re-walks, no widening, and no frames for structured control:
 //! loop-carried demand (e.g. `scf.for`) converges through the value worklist.
 
+use std::collections::{HashSet, VecDeque};
 use std::marker::PhantomData;
 use std::mem;
 
@@ -55,7 +55,7 @@ use kirin_ir::{
 
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, Body, BodyTopology, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
+    AbstractInterpreter, Body, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
     InterpDispatch, InterpLocation, InterpreterError, OwnerSemantics, OwnerSummaryDeps, Scoped,
     SparseBackwardSemantic, SparseStore, StageQuery, StandardFixpointInterpreter, StrongDemand,
     Summary, SummaryEffect,
@@ -88,7 +88,7 @@ pub enum SparseBackwardEffect<V> {
 /// sparse-backward semantics ([`StrongDemand`] today, downstream keys
 /// tomorrow) shares this surface: read a converged per-value fact, raise a
 /// fact, drain the raised facts into the rule's effect, and query the block
-/// topology facts terminator/structured rules map across. Rules are
+/// boundary facts terminator/structured rules map across. Rules are
 /// scope-blind: they name bare SSA values, and the engine qualifies them with
 /// the current analysis scope.
 ///
@@ -302,11 +302,10 @@ where
 }
 
 /// Analysis-local state carried in the driver's `store` slot: the scope facts
-/// are qualified with, and the body topology (feeders for block arguments).
+/// are qualified with.
 #[derive(Default)]
 pub struct BackwardAnalysisState {
     scope: Option<BodyScope>,
-    topology: BodyTopology,
 }
 
 /// The sparse backward driver: a [`StandardFixpointInterpreter`] over
@@ -500,21 +499,14 @@ where
         let kind = query::value_kind(interp.inner().pipeline(), stage, owner.item)?;
         let work = match kind {
             SSAKind::Result(statement, _) => vec![statement],
-            SSAKind::BlockArgument(block, _) => interp.store().topology.feeders(block).to_vec(),
-            SSAKind::Port(..) => {
-                // A port is a boundary SSA value: the statement owning the
-                // graph translates demand across the boundary (its rule maps
-                // port/index to operands, captures, or results).
-                let boundary = interp.store().topology.port_boundary(owner.item);
-                match boundary {
-                    Some(boundary) => vec![boundary.owner],
-                    None => {
-                        return Err(E::from(InterpreterError::Custom(
-                            "graph port outside the analyzed body",
-                        )));
-                    }
-                }
+            SSAKind::BlockArgument(block, _) => {
+                query::block_argument_predecessors(interp.inner().pipeline(), stage, block)?
             }
+            SSAKind::Port(parent, _) => vec![query::graph_port_owner(
+                interp.inner().pipeline(),
+                stage,
+                parent,
+            )?],
         };
         Ok(DemandFrame::new(stage, work))
     }
@@ -623,30 +615,34 @@ where
 {
     /// Run the demand fixpoint over `body` in `stage`.
     ///
-    /// **Prepass**: enumerate the body topology (blocks and graph parts,
-    /// including structured bodies, statements, feeders, port boundaries),
-    /// then run every statement's rule once with nothing demanded — impure
-    /// statements and terminators contribute the demand roots.
+    /// **Prepass**: walk the body's containment hierarchy, running every
+    /// statement's rule once with nothing demanded — impure statements and
+    /// terminators contribute the demand roots.
     /// **Propagation**: drain the value worklist; each risen value dispatches
     /// the rules that translate its demand.
     pub fn analyze(&mut self, stage: CompileStage, body: impl Into<Body>) -> Result<(), E> {
         let body = body.into();
         let scope = (stage, body);
-        let topology = query::body_topology(self.driver.inner().pipeline(), stage, body)?;
-        let statements: Vec<Statement> = topology.statements().collect();
-        *self.driver.store_mut() = BackwardAnalysisState {
-            scope: Some(scope),
-            topology,
-        };
+        *self.driver.store_mut() = BackwardAnalysisState { scope: Some(scope) };
 
         let mut semantics = SparseBackwardSemantics;
 
-        // Prepass: collect the demand roots.
+        // Prepass: visit each contained body part once and collect all demand
+        // roots before merging any of them, so every rule observes bottom.
+        let mut bodies = VecDeque::from([body]);
+        let mut visited = HashSet::new();
         let mut seeds: Vec<(SSAValue, V)> = Vec::new();
-        for statement in statements {
-            let SparseBackwardEffect::Demands(demands) =
-                self.driver.run_statement(stage, statement)?;
-            seeds.extend(demands);
+        while let Some(body) = bodies.pop_front() {
+            if !visited.insert(body) {
+                continue;
+            }
+            let contents = query::body_contents(self.driver.inner().pipeline(), stage, body)?;
+            bodies.extend(contents.children);
+            for statement in contents.statements {
+                let SparseBackwardEffect::Demands(demands) =
+                    self.driver.run_statement(stage, statement)?;
+                seeds.extend(demands);
+            }
         }
 
         // Propagate to the fixpoint.

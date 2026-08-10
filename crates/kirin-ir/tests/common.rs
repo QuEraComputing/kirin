@@ -42,6 +42,11 @@ impl Placeholder for TestType {
 /// - `Gate(a, b)`: two SSAValue operands (ungraph node)
 /// - `Wire(r)`: edge that produces a ResultValue (ungraph edge)
 /// - `Isolated`: no operands, no results (ungraph isolated node)
+/// - `Branch(target)`: one-successor control-flow terminator
+/// - `CondBranch(a, b)`: two-successor control-flow terminator
+/// - `OwnBlocks(a, b)`: structurally owns two blocks
+/// - `OwnCFG(cfg)`: structurally owns one CFG
+/// - `OwnGraphs(dg, ug)`: structurally owns one directed and one undirected graph
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BuilderDialect {
@@ -52,6 +57,11 @@ pub enum BuilderDialect {
     Gate(SSAValue, SSAValue),
     Wire(ResultValue),
     Isolated,
+    Branch(Successor),
+    CondBranch(Successor, Successor),
+    OwnBlocks(Block, Block),
+    OwnCFG(CFG),
+    OwnGraphs(DiGraph, UnGraph),
 }
 
 impl<'a> HasArguments<'a> for BuilderDialect {
@@ -97,50 +107,73 @@ impl<'a> HasResultsMut<'a> for BuilderDialect {
 }
 
 impl<'a> HasBlocks<'a> for BuilderDialect {
-    type Iter = std::iter::Empty<&'a Block>;
+    type Iter = std::vec::IntoIter<&'a Block>;
     fn blocks(&'a self) -> Self::Iter {
-        std::iter::empty()
+        match self {
+            BuilderDialect::OwnBlocks(a, b) => vec![a, b].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 
 impl<'a> HasBlocksMut<'a> for BuilderDialect {
-    type IterMut = std::iter::Empty<&'a mut Block>;
+    type IterMut = std::vec::IntoIter<&'a mut Block>;
     fn blocks_mut(&'a mut self) -> Self::IterMut {
-        std::iter::empty()
+        match self {
+            BuilderDialect::OwnBlocks(a, b) => vec![a, b].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 
 impl<'a> HasSuccessors<'a> for BuilderDialect {
-    type Iter = std::iter::Empty<&'a Successor>;
+    type Iter = std::vec::IntoIter<&'a Successor>;
     fn successors(&'a self) -> Self::Iter {
-        std::iter::empty()
+        match self {
+            BuilderDialect::Branch(target) => vec![target].into_iter(),
+            BuilderDialect::CondBranch(a, b) => vec![a, b].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 
 impl<'a> HasSuccessorsMut<'a> for BuilderDialect {
-    type IterMut = std::iter::Empty<&'a mut Successor>;
+    type IterMut = std::vec::IntoIter<&'a mut Successor>;
     fn successors_mut(&'a mut self) -> Self::IterMut {
-        std::iter::empty()
+        match self {
+            BuilderDialect::Branch(target) => vec![target].into_iter(),
+            BuilderDialect::CondBranch(a, b) => vec![a, b].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 
 impl<'a> HasCFG<'a> for BuilderDialect {
-    type Iter = std::iter::Empty<&'a CFG>;
+    type Iter = std::vec::IntoIter<&'a CFG>;
     fn cfgs(&'a self) -> Self::Iter {
-        std::iter::empty()
+        match self {
+            BuilderDialect::OwnCFG(cfg) => vec![cfg].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 
 impl<'a> HasCFGMut<'a> for BuilderDialect {
-    type IterMut = std::iter::Empty<&'a mut CFG>;
+    type IterMut = std::vec::IntoIter<&'a mut CFG>;
     fn cfgs_mut(&'a mut self) -> Self::IterMut {
-        std::iter::empty()
+        match self {
+            BuilderDialect::OwnCFG(cfg) => vec![cfg].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 
 impl IsTerminator for BuilderDialect {
     fn is_terminator(&self) -> bool {
-        matches!(self, BuilderDialect::Return)
+        matches!(
+            self,
+            BuilderDialect::Return | BuilderDialect::Branch(_) | BuilderDialect::CondBranch(_, _)
+        )
     }
 }
 
@@ -163,30 +196,42 @@ impl IsSpeculatable for BuilderDialect {
 }
 
 impl<'a> HasDigraphs<'a> for BuilderDialect {
-    type Iter = std::iter::Empty<&'a DiGraph>;
+    type Iter = std::vec::IntoIter<&'a DiGraph>;
     fn digraphs(&'a self) -> Self::Iter {
-        std::iter::empty()
+        match self {
+            BuilderDialect::OwnGraphs(graph, _) => vec![graph].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 
 impl<'a> HasDigraphsMut<'a> for BuilderDialect {
-    type IterMut = std::iter::Empty<&'a mut DiGraph>;
+    type IterMut = std::vec::IntoIter<&'a mut DiGraph>;
     fn digraphs_mut(&'a mut self) -> Self::IterMut {
-        std::iter::empty()
+        match self {
+            BuilderDialect::OwnGraphs(graph, _) => vec![graph].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 
 impl<'a> HasUngraphs<'a> for BuilderDialect {
-    type Iter = std::iter::Empty<&'a UnGraph>;
+    type Iter = std::vec::IntoIter<&'a UnGraph>;
     fn ungraphs(&'a self) -> Self::Iter {
-        std::iter::empty()
+        match self {
+            BuilderDialect::OwnGraphs(_, graph) => vec![graph].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 
 impl<'a> HasUngraphsMut<'a> for BuilderDialect {
-    type IterMut = std::iter::Empty<&'a mut UnGraph>;
+    type IterMut = std::vec::IntoIter<&'a mut UnGraph>;
     fn ungraphs_mut(&'a mut self) -> Self::IterMut {
-        std::iter::empty()
+        match self {
+            BuilderDialect::OwnGraphs(_, graph) => vec![graph].into_iter(),
+            _ => vec![].into_iter(),
+        }
     }
 }
 

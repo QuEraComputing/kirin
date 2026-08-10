@@ -1,7 +1,7 @@
 use crate::{
     Dialect, LinkedList,
     node::{
-        Block, BlockInfo, CFG, CFGInfo, LinkedListNode, Statement, StatementInfo,
+        Block, BlockInfo, BlockParent, CFGInfo, LinkedListNode, Statement, StatementInfo,
         stmt::StatementParent,
     },
 };
@@ -26,7 +26,7 @@ impl<L: Dialect> ParentInfo<L> for StatementInfo<L> {
 }
 
 impl<L: Dialect> ParentInfo<L> for BlockInfo<L> {
-    type ParentPtr = CFG;
+    type ParentPtr = BlockParent;
     fn get_parent(&self) -> &Option<Self::ParentPtr> {
         &self.parent
     }
