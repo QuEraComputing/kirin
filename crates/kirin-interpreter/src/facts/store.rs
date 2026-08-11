@@ -8,14 +8,14 @@
 //! this is where analyses keep dataflow facts. The familiar stores are
 //! instantiations picked by the analysis's anchor: sparse analyses anchor
 //! facts to SSA values ([`SparseStore`], scope-qualified as
-//! [`ScopedSparseStore`]), while dense analyses anchor facts to block and
-//! statement boundaries ([`DenseFactStore`]).
+//! [`ScopedSparseStore`]), while dense analyses use
+//! `FactStore<Scoped<BodyScope, ProgramPoint>, F>` directly.
 
 use std::collections::HashMap;
 
 use kirin_ir::SSAValue;
 
-use super::anchor::{Change, LatticeAnchor, ProgramPoint, Scoped};
+use super::anchor::{Change, LatticeAnchor, Scoped};
 
 /// One dataflow fact per lattice anchor.
 ///
@@ -105,11 +105,9 @@ pub type SparseStore<F> = FactStore<SSAValue, F>;
 /// under two scopes is two distinct facts.
 pub type ScopedSparseStore<K, F> = FactStore<Scoped<K, SSAValue>, F>;
 
-/// A dense store keyed uniformly by block and statement program points.
-pub type DenseFactStore<F> = FactStore<ProgramPoint, F>;
-
 #[cfg(test)]
 mod tests {
+    use crate::{Body, BodyScope, ProgramPoint};
     use kirin_ir::{Block, CFG, CompileStage, Id, Statement, TestSSAValue};
 
     use super::*;
@@ -167,22 +165,39 @@ mod tests {
     }
 
     #[test]
-    fn dense_fact_store_keeps_block_and_statement_boundaries_distinct() {
+    fn scoped_dense_facts_keep_block_and_statement_boundaries_distinct() {
         let block = Block::from(Id::from(ssa(0)));
         let other = Block::from(Id::from(ssa(1)));
         let statement = Statement::from(Id::from(ssa(3)));
 
-        let mut store: DenseFactStore<&'static str> = FactStore::new();
-        store.set(ProgramPoint::BlockEntry(block), "in");
-        store.set(ProgramPoint::BlockExit(block), "out");
-        store.set(ProgramPoint::Before(statement), "before");
-        store.set(ProgramPoint::After(statement), "after");
+        let scope: BodyScope = (
+            CompileStage::from(Id::from(ssa(10))),
+            Body::CFG(CFG::from(Id::from(ssa(11)))),
+        );
+        let point = |item| Scoped::new(scope, item);
+        let mut store: FactStore<Scoped<BodyScope, ProgramPoint>, &'static str> = FactStore::new();
+        store.set(point(ProgramPoint::BlockEntry(block)), "in");
+        store.set(point(ProgramPoint::BlockExit(block)), "out");
+        store.set(point(ProgramPoint::Before(statement)), "before");
+        store.set(point(ProgramPoint::After(statement)), "after");
 
-        assert_eq!(store.get(ProgramPoint::BlockEntry(block)), Some(&"in"));
-        assert_eq!(store.get(ProgramPoint::BlockExit(block)), Some(&"out"));
-        assert_eq!(store.get(ProgramPoint::BlockEntry(other)), None);
-        assert_eq!(store.get(ProgramPoint::Before(statement)), Some(&"before"));
-        assert_eq!(store.get(ProgramPoint::After(statement)), Some(&"after"));
+        assert_eq!(
+            store.get(point(ProgramPoint::BlockEntry(block))),
+            Some(&"in")
+        );
+        assert_eq!(
+            store.get(point(ProgramPoint::BlockExit(block))),
+            Some(&"out")
+        );
+        assert_eq!(store.get(point(ProgramPoint::BlockEntry(other))), None);
+        assert_eq!(
+            store.get(point(ProgramPoint::Before(statement))),
+            Some(&"before")
+        );
+        assert_eq!(
+            store.get(point(ProgramPoint::After(statement))),
+            Some(&"after")
+        );
         assert_eq!(store.len(), 4);
     }
 }

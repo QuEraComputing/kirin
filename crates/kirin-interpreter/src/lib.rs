@@ -110,19 +110,17 @@ pub use engines::sparse_backward::{
 };
 // Dense backward engine (`Sem = ClassicLiveness`) + the dense standard frames.
 pub use engines::dense_backward::{
-    BlockLiveness, ClassicLivenessInterp, DenseAnalysisState, DenseBackwardCompletion,
-    DenseBackwardDriver, DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp,
-    DenseBackwardInterpreter, DenseBackwardProfile, DenseBackwardState, DenseBackwardTransfer,
-    DenseBlockFrame, DenseBlockMode, DenseFrameBuild, PointFacts, StandardDenseBackwardFrame,
-    SuccessorEdge,
+    BlockLiveness, ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver,
+    DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter,
+    DenseBackwardProfile, DenseBackwardState, DenseBackwardTransfer, DenseBlockFrame,
+    DenseBlockMode, DenseFrameBuild, PointFacts, StandardDenseBackwardFrame, SuccessorEdge,
 };
 
 // Lattice anchors (*where* facts attach), scope qualification, and the
 // polymorphic fact stores. Anchor family is a property of the solver shape;
 // dispatch meaning lives in `semantics`.
 pub use facts::{
-    Change, DenseFactStore, FactStore, LatticeAnchor, ProgramPoint, Scoped, ScopedSparseStore,
-    SparseStore,
+    Change, FactStore, LatticeAnchor, ProgramPoint, Scoped, ScopedSparseStore, SparseStore,
 };
 
 // Semantic keys (*what* a rule means — the `Interpretable`/`Interp::Semantics`

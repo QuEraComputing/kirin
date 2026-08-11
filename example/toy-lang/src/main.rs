@@ -5,6 +5,7 @@ mod stage;
 use clap::{Parser, Subcommand};
 use kirin::prelude::*;
 use kirin::pretty::PipelinePrintExt;
+use kirin_interpreter::{Body, ProgramPoint, Scoped};
 
 use stage::Stage;
 
@@ -108,10 +109,25 @@ fn run_program(
     }
 
     if liveness {
-        let dense = interpreter::analyze_classic_liveness(&pipeline, stage_name, func_name)?;
-        let mut boundaries: Vec<_> = dense
-            .blocks()
-            .map(|(block, live_in, live_out)| format!("{block:?}: in={live_in:?} out={live_out:?}"))
+        let (stage, cfg, dense) =
+            interpreter::analyze_classic_liveness(&pipeline, stage_name, func_name)?;
+        let blocks: Vec<_> = match pipeline
+            .stage(stage)
+            .ok_or_else(|| anyhow::anyhow!("resolved stage is missing"))?
+        {
+            Stage::Source(info) => cfg.blocks(info).collect(),
+            Stage::Lowered(info) => cfg.blocks(info).collect(),
+        };
+        let scope = (stage, Body::CFG(cfg));
+        let mut boundaries: Vec<_> = blocks
+            .into_iter()
+            .filter_map(|block| {
+                let live_in =
+                    dense.point_facts(Scoped::new(scope, ProgramPoint::BlockEntry(block)))?;
+                let live_out =
+                    dense.point_facts(Scoped::new(scope, ProgramPoint::BlockExit(block)))?;
+                Some(format!("{block:?}: in={live_in:?} out={live_out:?}"))
+            })
             .collect();
         boundaries.sort();
         for line in boundaries {

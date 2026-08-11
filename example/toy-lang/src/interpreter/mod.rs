@@ -185,9 +185,11 @@ pub fn analyze_classic_liveness(
     pipeline: &Pipeline<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<DenseLivenessResult, InterpreterError> {
+) -> Result<(CompileStage, CFG, DenseLivenessResult), InterpreterError> {
     let (stage, cfg) = function_cfg(pipeline, stage_name, function_name)?;
-    kirin_liveness::analyze_dense_with_frame::<_, ToyDenseBackwardFrame<LiveSet, InterpreterError>>(
-        pipeline, stage, cfg,
-    )
+    let result = kirin_liveness::analyze_dense_with_frame::<
+        _,
+        ToyDenseBackwardFrame<LiveSet, InterpreterError>,
+    >(pipeline, stage, cfg)?;
+    Ok((stage, cfg, result))
 }

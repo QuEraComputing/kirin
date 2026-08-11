@@ -23,7 +23,7 @@ use crate::{
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DenseBlockMode {
     /// A CFG block owner: the terminator's [`Edges`](DenseBackwardEffect::Edges)
-    /// are absorbed (seeding the state and recording `live_out`); completes
+    /// are absorbed (seeding the state and producing `live_out`); completes
     /// with [`DenseBackwardCompletion::Block`].
     CFGOwner,
     /// A structured body walked by a dialect frame against the current point
@@ -108,7 +108,9 @@ where
 
         if self.remaining == 0 {
             let live_in = interp.state();
-            interp.record_point(ProgramPoint::BlockEntry(self.block), live_in.clone());
+            if self.mode == DenseBlockMode::StructuredBody {
+                interp.record_point(ProgramPoint::BlockEntry(self.block), live_in.clone());
+            }
             return Ok(FrameEffect::Complete(match self.mode {
                 DenseBlockMode::CFGOwner => DenseBackwardCompletion::Block {
                     live_in: live_in.clone(),
@@ -140,7 +142,6 @@ where
                 match self.mode {
                     DenseBlockMode::CFGOwner => {
                         let out = interp.absorb_edges(self.stage, &edges)?;
-                        interp.record_point(ProgramPoint::BlockExit(self.block), out.clone());
                         self.live_out = Some(out);
                         let before = interp.state();
                         interp.record_point(ProgramPoint::Before(statement), before);

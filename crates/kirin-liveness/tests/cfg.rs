@@ -4,8 +4,8 @@
 
 use kirin::prelude::{GetInfo, ParsePipelineText, Pipeline, SSAValue, StageInfo};
 use kirin_arith::Arith;
-use kirin_interpreter::ProgramPoint;
-use kirin_liveness::analyze_demand;
+use kirin_interpreter::{Body, InterpreterError, ProgramPoint, Scoped};
+use kirin_liveness::{DenseLiveness, analyze_demand};
 use kirin_test_languages::ArithFunctionLanguage;
 
 const PROGRAM: &str = r#"
@@ -313,21 +313,84 @@ fn classic_liveness_boundary_sets() {
     let entry = nth_block(&pipeline, cfg, 0);
     let then_block = nth_block(&pipeline, cfg, 1);
     let else_block = nth_block(&pipeline, cfg, 2);
+    let scope = (stage, Body::CFG(cfg));
+    let point = |item| Scoped::new(scope, item);
 
     // live_in(entry): %x (used by add and both edges) and %cond (branch use).
-    assert_eq!(result.live_in(entry), Some(&live_set(&[x, cond])));
     assert_eq!(
-        result.point_facts(ProgramPoint::BlockEntry(entry)),
+        result.point_facts(point(ProgramPoint::BlockEntry(entry))),
         Some(&live_set(&[x, cond]))
+    );
+    assert_eq!(
+        result.point_facts(Scoped::new(
+            (stage, Body::Block(entry)),
+            ProgramPoint::BlockEntry(entry),
+        )),
+        None,
+        "the same point under another body scope is a different fact"
     );
     // live_out(entry): both successors' live-ins mapped across the edges —
     // {%a} → {%x}, {%b} → {%x}; the branch condition is a terminator *use*,
     // not part of the boundary set.
-    assert_eq!(result.live_out(entry), Some(&live_set(&[x])));
-    assert_eq!(result.live_in(then_block), Some(&live_set(&[then_param])));
-    assert_eq!(result.live_out(then_block), Some(&live_set(&[])));
-    assert_eq!(result.live_in(else_block), Some(&live_set(&[else_param])));
-    assert_eq!(result.live_out(else_block), Some(&live_set(&[])));
+    assert_eq!(
+        result.point_facts(point(ProgramPoint::BlockExit(entry))),
+        Some(&live_set(&[x]))
+    );
+    assert_eq!(
+        result.point_facts(point(ProgramPoint::BlockEntry(then_block))),
+        Some(&live_set(&[then_param]))
+    );
+    assert_eq!(
+        result.point_facts(point(ProgramPoint::BlockExit(then_block))),
+        Some(&live_set(&[]))
+    );
+    assert_eq!(
+        result.point_facts(point(ProgramPoint::BlockEntry(else_block))),
+        Some(&live_set(&[else_param]))
+    );
+    assert_eq!(
+        result.point_facts(point(ProgramPoint::BlockExit(else_block))),
+        Some(&live_set(&[]))
+    );
+}
+
+#[test]
+fn reusing_dense_engine_replaces_the_previous_scoped_result() {
+    let pipeline = parse(PROGRAM);
+    let (stage, cfg) = main_cfg(&pipeline);
+    let entry = nth_block(&pipeline, cfg, 0);
+    let then_block = nth_block(&pipeline, cfg, 1);
+    let mut engine = DenseLiveness::<_, InterpreterError>::new(&pipeline);
+
+    engine.analyze(stage, cfg).expect("CFG analysis succeeds");
+    assert!(
+        engine
+            .point_facts(Scoped::new(
+                (stage, Body::CFG(cfg)),
+                ProgramPoint::BlockEntry(entry),
+            ))
+            .is_some()
+    );
+
+    engine
+        .analyze(stage, then_block)
+        .expect("block analysis succeeds");
+    assert_eq!(
+        engine.point_facts(Scoped::new(
+            (stage, Body::CFG(cfg)),
+            ProgramPoint::BlockEntry(entry),
+        )),
+        None,
+        "facts from the previous analysis are not retained"
+    );
+    assert!(
+        engine
+            .point_facts(Scoped::new(
+                (stage, Body::Block(then_block)),
+                ProgramPoint::BlockEntry(then_block),
+            ))
+            .is_some()
+    );
 }
 
 #[test]
@@ -341,12 +404,19 @@ fn classic_per_point_sets_gen_dead_uses() {
     let add = find_stmt(&pipeline, cfg, |definition| {
         matches!(definition, ArithFunctionLanguage::Arith(Arith::Add { .. }))
     });
+    let scope = (stage, Body::CFG(cfg));
 
     // Classic semantics: the dead add still GENS its operands, so %b is live
     // before it — this is the conventional per-point meaning (the old strong
     // expectations were demand projections, not dense liveness).
-    assert_eq!(result.live_before(add), Some(&live_set(&[a, b])));
-    assert_eq!(result.live_after(add), Some(&live_set(&[a])));
+    assert_eq!(
+        result.point_facts(Scoped::new(scope, ProgramPoint::Before(add))),
+        Some(&live_set(&[a, b]))
+    );
+    assert_eq!(
+        result.point_facts(Scoped::new(scope, ProgramPoint::After(add))),
+        Some(&live_set(&[a]))
+    );
 }
 
 #[test]
@@ -365,7 +435,10 @@ fn strong_per_point_sets_are_classic_intersect_demanded() {
     // The composition recovers the strong (needed) per-point view: %b is
     // classically live before the dead add but not demanded, so it drops out.
     let strong = dense
-        .strong_live_before(add, &demand)
+        .strong_point_facts(
+            Scoped::new((stage, Body::CFG(cfg)), ProgramPoint::Before(add)),
+            &demand,
+        )
         .expect("point reconstructed");
     assert_eq!(strong, live_set(&[a]));
     assert!(!strong.contains(b));

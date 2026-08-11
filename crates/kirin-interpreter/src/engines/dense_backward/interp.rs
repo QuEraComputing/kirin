@@ -39,9 +39,11 @@
 //! argument, pass-through for non-parameters) — which both seeds the walk
 //! state and records the block's `live_out`. Structured dialects push
 //! dialect-owned frames ([`DenseBackwardEffect::Push`]) that walk their bodies
-//! against the same point state. Every block walk records its block and
-//! statement program-point facts; later fixpoint iterations overwrite earlier
-//! approximations, leaving the final stable facts in the analysis store.
+//! against the same point state. Each block walk records statement points and
+//! nested structured-block boundaries; later fixpoint iterations overwrite
+//! earlier approximations. CFG-owner boundaries remain canonical in their
+//! converged summaries. The public fact view merges those disjoint sources
+//! into one scope-qualified program-point store.
 
 use std::marker::PhantomData;
 
@@ -55,10 +57,10 @@ use crate::Body;
 use crate::core::query;
 use crate::engines::sparse_backward::BodyScope;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic,
-    DenseFactStore, EnvIndex, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, OwnerSemantics, ProgramPoint, Scoped, StageQuery,
-    StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
+    AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
+    FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
+    OwnerSemantics, ProgramPoint, Scoped, StageQuery, StandardFixpointInterpreter, Summary,
+    SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
 
 // ===========================================================================
@@ -372,29 +374,13 @@ pub enum DenseBackwardCompletion<V> {
     Structured,
 }
 
-/// Analysis-local state carried in the driver's `store` slot: the active scope
-/// and the latest fact recorded at every visited program point.
-pub struct DenseAnalysisState<V> {
-    scope: Option<BodyScope>,
-    points: DenseFactStore<V>,
-}
-
-impl<V> Default for DenseAnalysisState<V> {
-    fn default() -> Self {
-        Self {
-            scope: None,
-            points: DenseFactStore::new(),
-        }
-    }
-}
-
 /// The dense backward driver: a [`StandardFixpointInterpreter`] over
 /// [`DenseBackwardTransfer`] with scope-qualified block owners and
 /// successor→predecessor dependencies.
 pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardFixpointInterpreter<
     DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
-    DenseAnalysisState<V>,
+    FactStore<Scoped<BodyScope, ProgramPoint>, V>,
     BackwardSummaryDeps<Scoped<BodyScope, Block>>,
 >;
 
@@ -508,25 +494,28 @@ where
     }
 
     fn record_point(&mut self, point: ProgramPoint, facts: V) {
-        self.store_mut().points.set(point, facts);
+        let scope = self
+            .current_owner()
+            .map(|owner| owner.scope)
+            .expect("dense frames only run while analyzing an owner");
+        self.store_mut().set(Scoped::new(scope, point), facts);
     }
 
     fn absorb_edges(&mut self, stage: CompileStage, edges: &[SuccessorEdge]) -> Result<V, E> {
-        let scope = self
-            .store()
-            .scope
-            .ok_or_else(|| E::from(InterpreterError::Custom("no active backward analysis")))?;
+        let current = self
+            .current_owner()
+            .cloned()
+            .ok_or_else(|| E::from(InterpreterError::Custom("no active backward owner")))?;
+        let scope = current.scope;
 
         let mut out = V::bottom();
         for edge in edges {
             let owner = Scoped::new(scope, edge.target);
 
             // Successor changed → reanalyse the current block.
-            if let Some(current) = self.current_owner().cloned() {
-                self.dependency_index_mut()
-                    .register(&owner, SummaryDependency::Reanalyze(current))
-                    .expect("backward dependency index is infallible");
-            }
+            self.dependency_index_mut()
+                .register(&owner, SummaryDependency::Reanalyze(current.clone()))
+                .expect("backward dependency index is infallible");
 
             let Some(summary) = self.summary(&owner) else {
                 continue;
@@ -620,7 +609,8 @@ where
 /// ```ignore
 /// let mut analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
 /// analysis.analyze(stage, cfg)?;
-/// let boundary = analysis.block_summary(stage, cfg, block);
+/// let point = Scoped::new((stage, Body::CFG(cfg)), ProgramPoint::BlockEntry(block));
+/// let live_in = analysis.point_facts(point);
 /// ```
 pub struct DenseBackwardInterpreter<
     'ir,
@@ -649,7 +639,7 @@ where
         Self {
             driver: StandardFixpointInterpreter::with_dependency_index(
                 DenseBackwardTransfer::new(pipeline),
-                DenseAnalysisState::default(),
+                FactStore::new(),
                 (),
                 BackwardSummaryDeps::new(),
             ),
@@ -660,26 +650,46 @@ where
         self.driver.inner().pipeline()
     }
 
-    /// The converged boundary states of `block` under the `(stage, cfg)`
-    /// scope.
-    pub fn block_summary(
-        &self,
-        stage: CompileStage,
-        body: impl Into<Body>,
-        block: Block,
-    ) -> Option<&BlockLiveness<V>> {
-        self.driver
-            .summary(&Scoped::new((stage, body.into()), block))
+    /// The converged fact at a scope-qualified program point.
+    ///
+    /// CFG-owner boundaries come directly from their fixpoint summaries;
+    /// statement and nested structured-block points come from the point store.
+    /// Each fact therefore has one mutable source during solving.
+    pub fn point_facts(&self, point: Scoped<BodyScope, ProgramPoint>) -> Option<&V> {
+        let summary_fact = match point.item {
+            ProgramPoint::BlockEntry(block) => self
+                .driver
+                .summary(&Scoped::new(point.scope, block))
+                .map(|summary| &summary.live_in),
+            ProgramPoint::BlockExit(block) => self
+                .driver
+                .summary(&Scoped::new(point.scope, block))
+                .map(|summary| &summary.live_out),
+            ProgramPoint::Before(_) | ProgramPoint::After(_) => None,
+        };
+        summary_fact.or_else(|| self.driver.store().get(point))
     }
 
-    /// The latest fact recorded at `point` for the active dense analysis.
-    pub fn point_facts(&self, point: ProgramPoint) -> Option<&V> {
-        self.driver.store().points.get(point)
-    }
+    /// Snapshot the active analysis as one scope-qualified program-point fact
+    /// store.
+    ///
+    /// The solver keeps CFG-owner boundaries in summaries because they drive
+    /// convergence. This copies each final boundary into the returned result;
+    /// it does not create a second mutable representation inside the engine.
+    pub fn facts(&self) -> FactStore<Scoped<BodyScope, ProgramPoint>, V> {
+        let mut facts = self.driver.store().clone();
 
-    /// All block- and statement-boundary facts for the active analysis.
-    pub fn fact_store(&self) -> &DenseFactStore<V> {
-        &self.driver.store().points
+        for (owner, summary) in self.driver.summaries() {
+            facts.set(
+                Scoped::new(owner.scope, ProgramPoint::BlockEntry(owner.item)),
+                summary.live_in.clone(),
+            );
+            facts.set(
+                Scoped::new(owner.scope, ProgramPoint::BlockExit(owner.item)),
+                summary.live_out.clone(),
+            );
+        }
+        facts
     }
 }
 
@@ -716,37 +726,10 @@ where
             .copied()
             .map(|block| Scoped::new(scope, block))
             .collect();
-        *self.driver.store_mut() = DenseAnalysisState {
-            scope: Some(scope),
-            points: DenseFactStore::new(),
-        };
+        let pipeline = self.driver.inner().pipeline();
+        self.driver = Self::new(pipeline).driver;
 
         let mut semantics = DenseBackwardSemantics;
-        self.driver.solve_many(&mut semantics, owners)?;
-
-        // Block summaries are the authoritative converged boundary facts.
-        // Refresh their program points after the worklist drains; structured
-        // block boundaries were recorded by their final containing walk.
-        let boundaries: Vec<_> = blocks
-            .into_iter()
-            .filter_map(|block| {
-                self.driver
-                    .summary(&Scoped::new(scope, block))
-                    .cloned()
-                    .map(|summary| (block, summary))
-            })
-            .collect();
-        for (block, summary) in boundaries {
-            self.driver
-                .store_mut()
-                .points
-                .set(ProgramPoint::BlockEntry(block), summary.live_in);
-            self.driver
-                .store_mut()
-                .points
-                .set(ProgramPoint::BlockExit(block), summary.live_out);
-        }
-
-        Ok(())
+        self.driver.solve_many(&mut semantics, owners)
     }
 }
