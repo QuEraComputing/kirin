@@ -109,5 +109,5 @@ where
     let body = body.into();
     let mut engine = DenseLiveness::<S, InterpreterError, F>::new(pipeline);
     engine.analyze(stage, body)?;
-    DenseLivenessResult::from_engine(&mut engine, stage, body)
+    Ok(DenseLivenessResult::from_engine(&engine))
 }

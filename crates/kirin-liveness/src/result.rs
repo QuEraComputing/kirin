@@ -2,9 +2,8 @@
 //! per-point sets (classic liveness), plus their composition.
 
 use kirin_interpreter::{
-    Body, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardInterpreter,
-    DenseBackwardTransfer, DenseBlockStore, DenseFrameBuild, DensePointStore, Frame,
-    InterpDispatch, InterpreterError, ProgramPoint, SparseBackwardInterpreter, StageQuery,
+    Body, DenseBackwardInterpreter, DenseFactStore, InterpreterError, ProgramPoint,
+    SparseBackwardInterpreter,
 };
 use kirin_ir::{Block, CompileStage, Lattice, SSAValue, StageMeta, Statement};
 
@@ -44,8 +43,8 @@ impl DemandResult {
     }
 }
 
-/// The result of [`analyze_dense`](crate::analyze_dense): classic per-point
-/// liveness — block-boundary sets plus reconstructed per-statement sets.
+/// The result of [`analyze_dense`](crate::analyze_dense): classic liveness at
+/// every block and statement program point.
 ///
 /// These sets carry the conventional (regalloc-grade) meaning: every use gens,
 /// purity-irrelevant. Strong per-point sets are the composition
@@ -53,69 +52,58 @@ impl DemandResult {
 /// intersected with the demand set.
 #[derive(Clone, Debug)]
 pub struct DenseLivenessResult {
-    blocks: DenseBlockStore<LiveSet>,
-    points: DensePointStore<LiveSet>,
+    facts: DenseFactStore<LiveSet>,
 }
 
 impl DenseLivenessResult {
-    /// Build the result from a converged dense engine: copy the boundary
-    /// summaries and reconstruct every per-statement state by replaying each
-    /// block through the dialect rules.
+    /// Copy the facts recorded by a converged dense engine.
     pub fn from_engine<'ir, S, F>(
-        engine: &mut DenseBackwardInterpreter<'ir, S, LiveSet, InterpreterError, F>,
-        stage: CompileStage,
-        body: impl Into<Body>,
-    ) -> Result<Self, InterpreterError>
+        engine: &DenseBackwardInterpreter<'ir, S, LiveSet, InterpreterError, F>,
+    ) -> Self
     where
-        S: StageMeta
-            + StageQuery
-            + InterpDispatch<DenseBackwardTransfer<'ir, S, LiveSet, InterpreterError, F>>,
-        F: Frame<
-                DenseBackwardDriver<'ir, S, LiveSet, InterpreterError, F>,
-                F,
-                Completion = DenseBackwardCompletion<LiveSet>,
-            > + DenseFrameBuild<LiveSet, InterpreterError>,
+        S: StageMeta,
     {
-        let body = body.into();
-        let mut blocks = DenseBlockStore::new();
-        for block in engine.cfg_blocks() {
-            if let Some(summary) = engine.block_summary(stage, body, block) {
-                blocks.set_entry(block, summary.live_in.clone());
-                blocks.set_exit(block, summary.live_out.clone());
-            }
+        Self {
+            facts: engine.fact_store().clone(),
         }
-        let points = engine.reconstruct_points(stage, body)?;
-        Ok(Self { blocks, points })
+    }
+
+    /// The liveness fact recorded at `point`.
+    pub fn point_facts(&self, point: ProgramPoint) -> Option<&LiveSet> {
+        self.facts.get(point)
     }
 
     /// Iterate `(block, live_in, live_out)` triples (order unspecified).
     pub fn blocks(&self) -> impl Iterator<Item = (Block, &LiveSet, &LiveSet)> {
-        self.blocks.entries().filter_map(|(block, live_in)| {
-            self.blocks
-                .exit(block)
+        self.facts.iter().filter_map(|(point, live_in)| {
+            let ProgramPoint::BlockEntry(block) = point else {
+                return None;
+            };
+            self.facts
+                .get(ProgramPoint::BlockExit(block))
                 .map(|live_out| (block, live_in, live_out))
         })
     }
 
     /// The set of values live on entry to `block`.
     pub fn live_in(&self, block: Block) -> Option<&LiveSet> {
-        self.blocks.entry(block)
+        self.point_facts(ProgramPoint::BlockEntry(block))
     }
 
     /// The set of values live on exit from `block` (excludes the terminator's
     /// own uses, e.g. the branch condition).
     pub fn live_out(&self, block: Block) -> Option<&LiveSet> {
-        self.blocks.exit(block)
+        self.point_facts(ProgramPoint::BlockExit(block))
     }
 
     /// The set of values live immediately before `statement`.
     pub fn live_before(&self, statement: Statement) -> Option<&LiveSet> {
-        self.points.get(ProgramPoint::Before(statement))
+        self.point_facts(ProgramPoint::Before(statement))
     }
 
     /// The set of values live immediately after `statement`.
     pub fn live_after(&self, statement: Statement) -> Option<&LiveSet> {
-        self.points.get(ProgramPoint::After(statement))
+        self.point_facts(ProgramPoint::After(statement))
     }
 
     /// Strong per-point set: the classic set intersected with the demand set

@@ -121,8 +121,8 @@ pub use engines::dense_backward::{
 // polymorphic fact stores. Anchor family is a property of the solver shape;
 // dispatch meaning lives in `semantics`.
 pub use facts::{
-    Change, DenseAnchor, DenseBlockStore, DensePointStore, FactStore, LatticeAnchor, ProgramPoint,
-    Scoped, ScopedSparseStore, SparseStore,
+    Change, DenseFactStore, FactStore, LatticeAnchor, ProgramPoint, Scoped, ScopedSparseStore,
+    SparseStore,
 };
 
 // Semantic keys (*what* a rule means — the `Interpretable`/`Interp::Semantics`

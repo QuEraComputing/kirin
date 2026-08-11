@@ -16,7 +16,7 @@ use kirin_ir::{Block, CompileStage, Statement};
 
 use crate::{
     DenseBackwardCompletion, DenseBackwardEffect, DenseBackwardFrameEngine, Frame, FrameEffect,
-    InterpreterError,
+    InterpreterError, ProgramPoint,
 };
 
 /// How a [`DenseBlockFrame`] treats its block.
@@ -95,6 +95,10 @@ where
         let statements = match self.statements.as_ref() {
             Some(statements) => statements,
             None => {
+                if self.mode == DenseBlockMode::StructuredBody {
+                    let facts = interp.state();
+                    interp.record_point(ProgramPoint::BlockExit(self.block), facts);
+                }
                 let statements = interp.block_statements(self.stage, self.block)?;
                 self.remaining = statements.len();
                 self.statements.insert(statements)
@@ -103,10 +107,12 @@ where
         let total = statements.len();
 
         if self.remaining == 0 {
+            let live_in = interp.state();
+            interp.record_point(ProgramPoint::BlockEntry(self.block), live_in.clone());
             return Ok(FrameEffect::Complete(match self.mode {
                 DenseBlockMode::CFGOwner => DenseBackwardCompletion::Block {
-                    live_in: interp.state(),
-                    live_out: self.live_out.take().unwrap_or_else(|| interp.state()),
+                    live_in: live_in.clone(),
+                    live_out: self.live_out.take().unwrap_or(live_in),
                 },
                 DenseBlockMode::StructuredBody => DenseBackwardCompletion::Structured,
             }));
@@ -117,10 +123,12 @@ where
         let statement = self.statements.as_ref().expect("materialized")[index];
         self.remaining = index;
 
-        interp.record_after(statement);
+        let after = interp.state();
+        interp.record_point(ProgramPoint::After(statement), after);
         match interp.run_statement(self.stage, statement)? {
             DenseBackwardEffect::Next => {
-                interp.record_before(statement);
+                let before = interp.state();
+                interp.record_point(ProgramPoint::Before(statement), before);
                 Ok(FrameEffect::Continue(F::from_block(self)))
             }
             DenseBackwardEffect::Edges(edges) => {
@@ -132,8 +140,10 @@ where
                 match self.mode {
                     DenseBlockMode::CFGOwner => {
                         let out = interp.absorb_edges(self.stage, &edges)?;
+                        interp.record_point(ProgramPoint::BlockExit(self.block), out.clone());
                         self.live_out = Some(out);
-                        interp.record_before(statement);
+                        let before = interp.state();
+                        interp.record_point(ProgramPoint::Before(statement), before);
                         Ok(FrameEffect::Continue(F::from_block(self)))
                     }
                     DenseBlockMode::StructuredBody => Err(E::from(InterpreterError::Custom(
@@ -170,7 +180,8 @@ where
         match completion {
             DenseBackwardCompletion::Structured => {
                 if let Some(statement) = self.pending_point.take() {
-                    interp.record_before(statement);
+                    let before = interp.state();
+                    interp.record_point(ProgramPoint::Before(statement), before);
                 }
                 Ok(FrameEffect::Continue(F::from_block(self)))
             }

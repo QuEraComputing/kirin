@@ -865,11 +865,15 @@ mod advanced {
 // ===========================================================================
 
 mod demand {
+    use std::collections::HashSet;
+
     use kirin::prelude::{
-        CFG, CompileStage, GetInfo, HasCFGBody, HasResults, ParsePipelineText, Pipeline, SSAValue,
+        CFG, CompileStage, GetInfo, HasBlocks, HasCFG, HasCFGBody, HasDigraphs, HasResults,
+        HasUngraphs, ParsePipelineText, Pipeline, SSAValue, Statement,
     };
     use kirin_arith::{Arith, ArithValue};
     use kirin_function::Lexical;
+    use kirin_interpreter::Body;
     use kirin_liveness::analyze_demand;
 
     use crate::language::HighLevel;
@@ -915,27 +919,83 @@ mod demand {
             .collect()
     }
 
-    /// Find something by matching statement definitions anywhere in the
-    /// cfg (including scf bodies, via the topology's nested-block
-    /// enumeration).
-    pub(super) fn find_value<R>(
+    /// Find something by walking statement definitions anywhere in the CFG,
+    /// including bodies nested under statements.
+    fn find_in_body<R>(
         pipeline: &Pipeline<Stage>,
         cfg: CFG,
-        select: impl Fn(&HighLevel) -> Option<R>,
+        mut select: impl FnMut(Statement, &HighLevel) -> Option<R>,
     ) -> R {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
         };
-        let topology = kirin_interpreter::body_topology(info, kirin_interpreter::Body::CFG(cfg));
-        for block in &topology.blocks {
-            for &stmt in &block.stmts {
-                if let Some(value) = select(stmt.definition(info)) {
+
+        let mut bodies = vec![Body::CFG(cfg)];
+        let mut visited = HashSet::new();
+        while let Some(body) = bodies.pop() {
+            if !visited.insert(body) {
+                continue;
+            }
+
+            let statements: Vec<Statement> = match body {
+                Body::CFG(cfg) => {
+                    bodies.extend(cfg.blocks(info).map(Body::Block));
+                    continue;
+                }
+                Body::Block(block) => {
+                    let mut statements: Vec<Statement> = block.statements(info).collect();
+                    if let Some(terminator) = block.terminator(info) {
+                        statements.push(terminator);
+                    }
+                    statements
+                }
+                Body::DiGraph(graph) => graph
+                    .expect_info(info)
+                    .graph()
+                    .node_weights()
+                    .copied()
+                    .collect(),
+                Body::UnGraph(graph) => graph
+                    .expect_info(info)
+                    .graph()
+                    .node_weights()
+                    .copied()
+                    .collect(),
+            };
+
+            for statement in statements {
+                let definition = statement.definition(info);
+                if let Some(value) = select(statement, definition) {
                     return value;
                 }
+                bodies.extend(definition.blocks().copied().map(Body::Block));
+                bodies.extend(definition.cfgs().copied().map(Body::CFG));
+                bodies.extend(definition.digraphs().copied().map(Body::DiGraph));
+                bodies.extend(definition.ungraphs().copied().map(Body::UnGraph));
             }
         }
         panic!("no matching statement in cfg");
+    }
+
+    pub(super) fn find_value<R>(
+        pipeline: &Pipeline<Stage>,
+        cfg: CFG,
+        select: impl FnMut(&HighLevel) -> Option<R>,
+    ) -> R {
+        let mut select = select;
+        find_in_body(pipeline, cfg, |_, definition| select(definition))
+    }
+
+    pub(super) fn find_statement(
+        pipeline: &Pipeline<Stage>,
+        cfg: CFG,
+        select: impl FnMut(&HighLevel) -> bool,
+    ) -> Statement {
+        let mut select = select;
+        find_in_body(pipeline, cfg, |statement, definition| {
+            select(definition).then_some(statement)
+        })
     }
 
     /// The result of the `constant <value> -> i64` statement.
@@ -1211,13 +1271,16 @@ specialize @source fn @main(i64, i64) -> i64 {
 // ===========================================================================
 
 mod dense {
-    use kirin::prelude::{CFG, CompileStage, Pipeline, SSAValue, Statement};
+    use kirin::prelude::{CFG, CompileStage, Pipeline, SSAValue};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_interpreter::InterpreterError;
+    use kirin_interpreter::{InterpreterError, ProgramPoint};
     use kirin_liveness::{DenseLivenessResult, LiveSet};
+    use kirin_scf::StructuredControlFlow;
 
     use super::demand::{FOR_CARRIED_DEMAND, IF_DEAD_RESULT};
-    use super::demand::{constant_result, entry_params, find_value, parse, source_cfg};
+    use super::demand::{
+        constant_result, entry_params, find_statement, find_value, parse, source_cfg,
+    };
     use crate::interpreter::ToyDenseBackwardFrame;
     use crate::language::HighLevel;
     use crate::stage::Stage;
@@ -1233,28 +1296,6 @@ mod dense {
             ToyDenseBackwardFrame<LiveSet, InterpreterError>,
         >(pipeline, stage, cfg)
         .expect("analysis succeeds")
-    }
-
-    /// The statement whose definition matches `select` (anywhere in the
-    /// cfg, including scf bodies).
-    fn find_statement(
-        pipeline: &Pipeline<Stage>,
-        cfg: CFG,
-        select: impl Fn(&HighLevel) -> bool,
-    ) -> Statement {
-        let stage_id = pipeline.stage_by_name("source").expect("source stage");
-        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
-            panic!("source stage holds HighLevel");
-        };
-        let topology = kirin_interpreter::body_topology(info, kirin_interpreter::Body::CFG(cfg));
-        for block in &topology.blocks {
-            for &stmt in &block.stmts {
-                if select(stmt.definition(info)) {
-                    return stmt;
-                }
-            }
-        }
-        panic!("no matching statement in cfg");
     }
 
     fn live_set(values: &[SSAValue]) -> LiveSet {
@@ -1289,6 +1330,19 @@ mod dense {
             matches!(definition, HighLevel::Structured(_))
         });
         assert_eq!(dense.live_before(if_stmt), Some(&live_set(&[cond])));
+
+        let then_block = find_value(&pipeline, cfg, |definition| match definition {
+            HighLevel::Structured(StructuredControlFlow::If(if_op)) => Some(if_op.then_block()),
+            _ => None,
+        });
+        assert_eq!(
+            dense.point_facts(ProgramPoint::BlockEntry(then_block)),
+            Some(&live_set(&[cond]))
+        );
+        assert_eq!(
+            dense.point_facts(ProgramPoint::BlockExit(then_block)),
+            Some(&live_set(&[cond]))
+        );
     }
 
     const IF_ARMS_DIFFERENT_USES: &str = r#"

@@ -3,8 +3,8 @@
 //!
 //! Following MLIR's terminology, a lattice fact is attached to a *lattice
 //! anchor*: sparse analyses anchor facts to [`SSAValue`]s; dense analyses
-//! anchor facts to blocks, program points, or edges. Which anchor family an
-//! analysis uses is part of its solver *shape*
+//! anchor facts to [`ProgramPoint`]s. Which anchor family an analysis uses is
+//! part of its solver *shape*
 //! ([`AnalysisShape`](crate::AnalysisShape) — see
 //! [`semantics`](crate::semantics)); anchors themselves carry no dispatch
 //! meaning. What a rule *means* is a separate concern entirely: the
@@ -27,20 +27,25 @@ use kirin_ir::{Block, SSAValue, Statement};
 ///
 /// Anchors key fact stores ([`FactStore`](crate::FactStore)) and summaries, so
 /// they must be cheap to clone, compare, and hash. Sparse anchors are
-/// [`SSAValue`]s; dense anchors are [`Block`]s, [`ProgramPoint`]s, or
-/// [`DenseAnchor`]s; [`Scoped`] qualifies any anchor with its scope.
+/// [`SSAValue`]s; dense anchors are [`ProgramPoint`]s; [`Scoped`] qualifies any
+/// anchor with its scope.
 pub trait LatticeAnchor: Clone + Eq + Hash {}
 
 impl LatticeAnchor for SSAValue {}
 
 impl LatticeAnchor for Block {}
 
-/// A program point: immediately before or after a statement.
+/// A location at which a dense dataflow fact is defined.
 ///
-/// Never anchor a fact to a raw statement without saying *before* or *after* —
-/// the two carry different facts for any non-trivial analysis.
+/// Blocks and statements each have two distinct boundary points. Whole CFG and
+/// graph bodies are deliberately not points: unlike a block, they do not have
+/// one unambiguous entry/exit fact.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum ProgramPoint {
+    /// State on entry to a CFG-owned or statement-owned block.
+    BlockEntry(Block),
+    /// State on exit from a CFG-owned or statement-owned block.
+    BlockExit(Block),
     /// The point immediately before `stmt` executes.
     Before(Statement),
     /// The point immediately after `stmt` executes.
@@ -48,21 +53,6 @@ pub enum ProgramPoint {
 }
 
 impl LatticeAnchor for ProgramPoint {}
-
-/// A dense lattice anchor: a block boundary, program point, or CFG edge.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum DenseAnchor {
-    /// State on entry to a block.
-    BlockEntry(Block),
-    /// State on exit from a block.
-    BlockExit(Block),
-    /// State at a specific [`ProgramPoint`].
-    Point(ProgramPoint),
-    /// State on a specific CFG edge.
-    Edge { from: Block, to: Block },
-}
-
-impl LatticeAnchor for DenseAnchor {}
 
 // ===========================================================================
 // Scope qualification

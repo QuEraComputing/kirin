@@ -39,9 +39,9 @@
 //! argument, pass-through for non-parameters) — which both seeds the walk
 //! state and records the block's `live_out`. Structured dialects push
 //! dialect-owned frames ([`DenseBackwardEffect::Push`]) that walk their bodies
-//! against the same point state. Per-statement states are not persisted:
-//! reconstruct them on demand with
-//! [`reconstruct_points`](DenseBackwardInterpreter::reconstruct_points).
+//! against the same point state. Every block walk records its block and
+//! statement program-point facts; later fixpoint iterations overwrite earlier
+//! approximations, leaving the final stable facts in the analysis store.
 
 use std::marker::PhantomData;
 
@@ -56,7 +56,7 @@ use crate::core::query;
 use crate::engines::sparse_backward::BodyScope;
 use crate::{
     AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic,
-    DensePointStore, EnvIndex, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
+    DenseFactStore, EnvIndex, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
     InterpreterError, OwnerSemantics, ProgramPoint, Scoped, StageQuery,
     StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
@@ -372,21 +372,18 @@ pub enum DenseBackwardCompletion<V> {
     Structured,
 }
 
-/// Analysis-local state carried in the driver's `store` slot: the scope, the
-/// root block owners, and an optional per-point recorder filled by block frames
-/// during [`reconstruct_points`](DenseBackwardInterpreter::reconstruct_points).
+/// Analysis-local state carried in the driver's `store` slot: the active scope
+/// and the latest fact recorded at every visited program point.
 pub struct DenseAnalysisState<V> {
     scope: Option<BodyScope>,
-    blocks: Vec<Block>,
-    recorder: Option<DensePointStore<V>>,
+    points: DenseFactStore<V>,
 }
 
 impl<V> Default for DenseAnalysisState<V> {
     fn default() -> Self {
         Self {
             scope: None,
-            blocks: Vec::new(),
-            recorder: None,
+            points: DenseFactStore::new(),
         }
     }
 }
@@ -443,13 +440,9 @@ pub trait DenseBackwardFrameEngine: Interp<Effect = DenseBackwardEffect<Self::Fr
     /// structured dialect frames to save/restore around body walks).
     fn replace_state(&mut self, state: Self::Value) -> Self::Value;
 
-    /// Record the current state as the point *before* `statement` (no-op
-    /// unless a per-point reconstruction is running).
-    fn record_before(&mut self, statement: Statement);
-
-    /// Record the current state as the point *after* `statement` (no-op
-    /// unless a per-point reconstruction is running).
-    fn record_after(&mut self, statement: Statement);
+    /// Store `facts` at a block or statement program point, overwriting the
+    /// approximation recorded by any earlier fixpoint iteration.
+    fn record_point(&mut self, point: ProgramPoint, facts: Self::Value);
 
     /// Absorb a CFG terminator's edges atomically: for each successor, map
     /// its converged live-in across the edge (parameter → matching edge
@@ -514,18 +507,8 @@ where
         std::mem::replace(&mut self.inner_mut().state, state)
     }
 
-    fn record_before(&mut self, statement: Statement) {
-        let state = self.inner().state.clone();
-        if let Some(recorder) = self.store_mut().recorder.as_mut() {
-            recorder.set(ProgramPoint::Before(statement), state);
-        }
-    }
-
-    fn record_after(&mut self, statement: Statement) {
-        let state = self.inner().state.clone();
-        if let Some(recorder) = self.store_mut().recorder.as_mut() {
-            recorder.set(ProgramPoint::After(statement), state);
-        }
+    fn record_point(&mut self, point: ProgramPoint, facts: V) {
+        self.store_mut().points.set(point, facts);
     }
 
     fn absorb_edges(&mut self, stage: CompileStage, edges: &[SuccessorEdge]) -> Result<V, E> {
@@ -689,9 +672,14 @@ where
             .summary(&Scoped::new((stage, body.into()), block))
     }
 
-    /// The analyzed CFG's own top-level blocks (post-`analyze`).
-    pub fn cfg_blocks(&self) -> Vec<Block> {
-        self.driver.store().blocks.clone()
+    /// The latest fact recorded at `point` for the active dense analysis.
+    pub fn point_facts(&self, point: ProgramPoint) -> Option<&V> {
+        self.driver.store().points.get(point)
+    }
+
+    /// All block- and statement-boundary facts for the active analysis.
+    pub fn fact_store(&self) -> &DenseFactStore<V> {
+        &self.driver.store().points
     }
 }
 
@@ -704,13 +692,25 @@ where
     F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, F, Completion = DenseBackwardCompletion<V>>
         + DenseFrameBuild<V, E>,
 {
+    /// The blocks directly selected as fixpoint owners for `body`.
+    ///
+    /// This reads the current IR rather than returning cached analysis state.
+    pub fn direct_body_blocks(
+        &self,
+        stage: CompileStage,
+        body: impl Into<Body>,
+    ) -> Result<Vec<Block>, E> {
+        query::direct_body_blocks(self.driver.inner().pipeline(), stage, body.into())
+            .map_err(E::from)
+    }
+
     /// Run the block-boundary fixpoint over `cfg` in `stage`: seed every
     /// CFG block (a backward analysis must visit them all) and drain the
     /// worklist; dependencies are discovered from the terminators' edges.
     pub fn analyze(&mut self, stage: CompileStage, body: impl Into<Body>) -> Result<(), E> {
         let body = body.into();
         let scope = (stage, body);
-        let blocks = query::direct_body_blocks(self.driver.inner().pipeline(), stage, body)?;
+        let blocks = self.direct_body_blocks(stage, body)?;
         let owners: Vec<Scoped<BodyScope, Block>> = blocks
             .iter()
             .copied()
@@ -718,48 +718,35 @@ where
             .collect();
         *self.driver.store_mut() = DenseAnalysisState {
             scope: Some(scope),
-            blocks,
-            recorder: None,
+            points: DenseFactStore::new(),
         };
 
         let mut semantics = DenseBackwardSemantics;
-        self.driver.solve_many(&mut semantics, owners)
-    }
+        self.driver.solve_many(&mut semantics, owners)?;
 
-    /// Reconstruct every per-statement state — including statements inside
-    /// structured bodies, at any nesting depth — by re-walking each converged
-    /// CFG block with the recorder enabled. Per-point states are never
-    /// persisted by the fixpoint itself; loop bodies record their final
-    /// (stable) iteration.
-    pub fn reconstruct_points(
-        &mut self,
-        stage: CompileStage,
-        body: impl Into<Body>,
-    ) -> Result<DensePointStore<V>, E> {
-        let scope = (stage, body.into());
-        self.driver.store_mut().recorder = Some(DensePointStore::new());
-        for block in self.cfg_blocks() {
-            // The CFGOwner walk re-absorbs the converged successor summaries,
-            // so it replays exactly the fixpoint's final states.
-            let _ = scope;
-            self.driver.replace_state(V::bottom());
-            match self
-                .driver
-                .run_frame(F::from_block(DenseBlockFrame::cfg_owner(stage, block)))?
-            {
-                DenseBackwardCompletion::Block { .. } => {}
-                DenseBackwardCompletion::Structured => {
-                    return Err(E::from(InterpreterError::Custom(
-                        "a CFG block walk completed as a structured frame",
-                    )));
-                }
-            }
+        // Block summaries are the authoritative converged boundary facts.
+        // Refresh their program points after the worklist drains; structured
+        // block boundaries were recorded by their final containing walk.
+        let boundaries: Vec<_> = blocks
+            .into_iter()
+            .filter_map(|block| {
+                self.driver
+                    .summary(&Scoped::new(scope, block))
+                    .cloned()
+                    .map(|summary| (block, summary))
+            })
+            .collect();
+        for (block, summary) in boundaries {
+            self.driver
+                .store_mut()
+                .points
+                .set(ProgramPoint::BlockEntry(block), summary.live_in);
+            self.driver
+                .store_mut()
+                .points
+                .set(ProgramPoint::BlockExit(block), summary.live_out);
         }
-        Ok(self
-            .driver
-            .store_mut()
-            .recorder
-            .take()
-            .expect("recorder installed above"))
+
+        Ok(())
     }
 }

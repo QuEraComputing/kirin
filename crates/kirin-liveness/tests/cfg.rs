@@ -4,6 +4,7 @@
 
 use kirin::prelude::{GetInfo, ParsePipelineText, Pipeline, SSAValue, StageInfo};
 use kirin_arith::Arith;
+use kirin_interpreter::ProgramPoint;
 use kirin_liveness::analyze_demand;
 use kirin_test_languages::ArithFunctionLanguage;
 
@@ -315,6 +316,10 @@ fn classic_liveness_boundary_sets() {
 
     // live_in(entry): %x (used by add and both edges) and %cond (branch use).
     assert_eq!(result.live_in(entry), Some(&live_set(&[x, cond])));
+    assert_eq!(
+        result.point_facts(ProgramPoint::BlockEntry(entry)),
+        Some(&live_set(&[x, cond]))
+    );
     // live_out(entry): both successors' live-ins mapped across the edges —
     // {%a} → {%x}, {%b} → {%x}; the branch condition is a terminator *use*,
     // not part of the boundary set.
