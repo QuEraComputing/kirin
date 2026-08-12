@@ -1,3 +1,5 @@
+use smallvec::SmallVec;
+
 use crate::{
     Dialect, Symbol,
     arena::{GetInfo, Id, Item},
@@ -67,7 +69,12 @@ pub struct BlockInfo<L: Dialect> {
     pub arguments: Vec<BlockArgument>,
     /// Reverse control-flow index: blocks whose terminators may transfer
     /// control to this block.
-    pub predecessors: Vec<Block>,
+    ///
+    /// Inline capacity 4: a straight-line block has one predecessor, an
+    /// if-merge or loop header has two, and a small switch join or a loop
+    /// with a couple of `break`s stays under four. Wider joins spill to the
+    /// heap rather than making every block pay for the worst case.
+    pub predecessors: SmallVec<[Block; 4]>,
     pub statements: LinkedList<Statement>,
     pub terminator: Option<Statement>,
     _marker: std::marker::PhantomData<L>,
@@ -86,7 +93,7 @@ impl<L: Dialect> BlockInfo<L> {
         /// The arguments of this block.
         arguments: Vec<BlockArgument>,
         /// The predecessor blocks in the reverse control-flow index.
-        predecessors: Vec<Block>,
+        predecessors: SmallVec<[Block; 4]>,
         /// The statements contained in this block.
         statements: Option<LinkedList<Statement>>,
         /// The terminator statement of this block, if any.

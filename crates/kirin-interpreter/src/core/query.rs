@@ -538,7 +538,7 @@ impl<S> StageQuery for S where
         + SupportsStageDispatch<DiGraphWalkQuery, GraphWalkPlan, InterpreterError>
 {
 }
-
+/// TODO: add caching (with red-green tree) to avoid repeated queries for the same stage and block/statement.
 /// Run a stage action against the stage with id `stage`.
 pub(crate) fn dispatch<S, A, R>(
     pipeline: &Pipeline<S>,

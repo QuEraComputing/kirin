@@ -49,6 +49,7 @@ fn parse(program: &str) -> Pipeline<StageInfo<ArithFunctionLanguage>> {
 }
 
 /// The finalized stage id and the body cfg of `@main`.
+/// TODO: `analyze` method is wrong, calling demand analysis.
 fn main_cfg(
     pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
 ) -> (kirin::prelude::CompileStage, kirin_ir::CFG) {

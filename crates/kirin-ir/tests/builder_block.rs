@@ -332,8 +332,8 @@ fn finalize_populates_block_predecessor_index() {
 
     let stage = stage.finalize().unwrap();
     assert_eq!(
-        target.expect_info(&stage).predecessors,
-        vec![source0, source1]
+        target.expect_info(&stage).predecessors.as_slice(),
+        [source0, source1]
     );
     assert!(source0.expect_info(&stage).predecessors.is_empty());
     assert!(source1.expect_info(&stage).predecessors.is_empty());
@@ -352,7 +352,7 @@ fn predecessor_index_deduplicates_edges_from_the_same_block() {
     let _cfg = stage.cfg().add_block(source).add_block(target).new();
 
     let stage = stage.finalize().unwrap();
-    assert_eq!(target.expect_info(&stage).predecessors, vec![source]);
+    assert_eq!(target.expect_info(&stage).predecessors.as_slice(), [source]);
 }
 
 #[test]

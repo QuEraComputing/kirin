@@ -1,3 +1,5 @@
+use smallvec::SmallVec;
+
 use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, ResolutionInfo, SSAValue};
 use crate::node::stmt::StatementParent;
 use crate::node::*;
@@ -186,7 +188,7 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
             .maybe_name(self.name.map(|n| self.stage.symbols.intern(n)))
             .node(LinkedListNode::new(id))
             .arguments(block_args)
-            .predecessors(Vec::new())
+            .predecessors(SmallVec::new())
             .statements(self.stage.link_statements(&self.statements))
             .maybe_terminator(self.terminator)
             .new();
