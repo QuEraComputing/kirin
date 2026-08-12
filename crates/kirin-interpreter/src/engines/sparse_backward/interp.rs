@@ -58,7 +58,7 @@ use crate::{
     AbstractInterpreter, Body, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
     InterpDispatch, InterpLocation, InterpreterError, OwnerSemantics, OwnerSummaryDeps, Scoped,
     SparseBackwardSemantic, SparseStore, StageQuery, StandardFixpointInterpreter, StrongDemand,
-    Summary, SummaryEffect,
+    Summary, SummaryEffect, TerminatorArgs,
 };
 
 /// The scope a body-level backward analysis qualifies its facts with.
@@ -119,7 +119,7 @@ pub trait SparseBackwardInterp:
     fn block_params(&self, block: Block) -> Result<Vec<SSAValue>, Self::Error>;
 
     /// The operands of `block`'s terminator — a structured body's yield slots.
-    fn terminator_args(&self, block: Block) -> Result<Vec<SSAValue>, Self::Error>;
+    fn terminator_args(&self, block: Block) -> Result<TerminatorArgs, Self::Error>;
 }
 
 /// [`StrongDemand`]'s helper vocabulary on top of the shape-generic
@@ -455,7 +455,7 @@ where
         query::block_params(self.inner().pipeline(), self.stage(), block).map_err(E::from)
     }
 
-    fn terminator_args(&self, block: Block) -> Result<Vec<SSAValue>, E> {
+    fn terminator_args(&self, block: Block) -> Result<TerminatorArgs, E> {
         query::terminator_arguments(self.inner().pipeline(), self.stage(), block).map_err(E::from)
     }
 }
@@ -501,6 +501,7 @@ where
             SSAKind::Result(statement, _) => vec![statement],
             SSAKind::BlockArgument(block, _) => {
                 query::block_argument_predecessors(interp.inner().pipeline(), stage, block)?
+                    .into_vec()
             }
             SSAKind::Port(parent, _) => vec![query::graph_port_owner(
                 interp.inner().pipeline(),

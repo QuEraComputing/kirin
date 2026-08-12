@@ -36,6 +36,7 @@ use kirin_interpreter::{
     Completion, ConcreteInterpreter, DenseBackwardCompletion, DenseBackwardFrameEngine,
     DenseBackwardState, DenseBlockFrame, DenseFrameBuild, Env, EnvIndex,
     ForwardDataflowFrameEngine, Frame, FrameBuild, FrameEffect, FrameEngine, SparseForwardTransfer,
+    TerminatorArgs,
 };
 
 use crate::{For, ForLoopValue, If, Yield};
@@ -380,7 +381,7 @@ pub struct DenseScfForFrame<V, E> {
     /// Captured on the first step.
     seed: Option<V>,
     params: Vec<SSAValue>,
-    yields: Vec<SSAValue>,
+    yields: TerminatorArgs,
     /// The current body-exit state estimate.
     entry: Option<V>,
     _marker: PhantomData<fn() -> E>,
@@ -393,7 +394,7 @@ impl<V, E> DenseScfForFrame<V, E> {
             body,
             seed: None,
             params: Vec::new(),
-            yields: Vec::new(),
+            yields: TerminatorArgs::new(),
             entry: None,
             _marker: PhantomData,
         }

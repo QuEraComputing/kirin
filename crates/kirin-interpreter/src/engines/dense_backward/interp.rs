@@ -60,7 +60,7 @@ use crate::{
     AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
     FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
     OwnerSemantics, ProgramPoint, Scoped, StageQuery, StandardFixpointInterpreter, Summary,
-    SummaryDependency, SummaryDependencyIndex, SummaryEffect,
+    SummaryDependency, SummaryDependencyIndex, SummaryEffect, TerminatorArgs,
 };
 
 // ===========================================================================
@@ -401,12 +401,21 @@ pub trait DenseBackwardFrameEngine: Interp<Effect = DenseBackwardEffect<Self::Fr
         statement: Statement,
     ) -> Result<Self::Effect, Self::Error>;
 
-    /// A block's statements in program order (terminator, if any, last).
-    fn block_statements(
+    /// The last logical statement of a block (the terminator when present).
+    fn last_statement(
         &self,
         stage: CompileStage,
         block: Block,
-    ) -> Result<Vec<Statement>, Self::Error>;
+    ) -> Result<Option<Statement>, Self::Error>;
+
+    /// The statement immediately before `before` in the block's logical
+    /// statement order.
+    fn previous_statement(
+        &self,
+        stage: CompileStage,
+        block: Block,
+        before: Statement,
+    ) -> Result<Option<Statement>, Self::Error>;
 
     /// The parameters of `block` (structured frames map carried demand).
     fn block_params(&self, stage: CompileStage, block: Block)
@@ -417,7 +426,7 @@ pub trait DenseBackwardFrameEngine: Interp<Effect = DenseBackwardEffect<Self::Fr
         &self,
         stage: CompileStage,
         block: Block,
-    ) -> Result<Vec<SSAValue>, Self::Error>;
+    ) -> Result<TerminatorArgs, Self::Error>;
 
     /// The current point state (cloned).
     fn state(&self) -> Self::Value;
@@ -473,15 +482,24 @@ where
         result
     }
 
-    fn block_statements(&self, stage: CompileStage, block: Block) -> Result<Vec<Statement>, E> {
-        query::block_statements(self.inner().pipeline(), stage, block).map_err(E::from)
+    fn last_statement(&self, stage: CompileStage, block: Block) -> Result<Option<Statement>, E> {
+        query::last_statement(self.inner().pipeline(), stage, block).map_err(E::from)
+    }
+
+    fn previous_statement(
+        &self,
+        stage: CompileStage,
+        block: Block,
+        before: Statement,
+    ) -> Result<Option<Statement>, E> {
+        query::previous_statement(self.inner().pipeline(), stage, block, before).map_err(E::from)
     }
 
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
         query::block_params(self.inner().pipeline(), stage, block).map_err(E::from)
     }
 
-    fn terminator_args(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
+    fn terminator_args(&self, stage: CompileStage, block: Block) -> Result<TerminatorArgs, E> {
         query::terminator_arguments(self.inner().pipeline(), stage, block).map_err(E::from)
     }
 
@@ -705,7 +723,7 @@ where
     /// The blocks directly selected as fixpoint owners for `body`.
     ///
     /// This reads the current IR rather than returning cached analysis state.
-    pub fn direct_body_blocks(
+    fn direct_body_blocks(
         &self,
         stage: CompileStage,
         body: impl Into<Body>,

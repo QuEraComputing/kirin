@@ -37,10 +37,14 @@ pub enum DenseBlockMode {
 pub struct DenseBlockFrame<V, E> {
     stage: CompileStage,
     block: Block,
-    /// Materialized on the first step (needs the driver).
-    statements: Option<Vec<Statement>>,
-    /// Number of statements not yet walked (walks from the end).
-    remaining: usize,
+    /// Current position in the reverse statement walk.
+    cursor: Option<Statement>,
+    /// `false` until the cursor has been positioned at the block's last
+    /// logical statement.
+    initialized: bool,
+    /// `true` only while visiting the first reverse position (the block's
+    /// logical terminator position).
+    at_block_exit: bool,
     mode: DenseBlockMode,
     /// The absorbed edge mapping (`CFGOwner` only).
     live_out: Option<V>,
@@ -59,8 +63,9 @@ where
         Self {
             stage,
             block,
-            statements: None,
-            remaining: 0,
+            cursor: None,
+            initialized: false,
+            at_block_exit: false,
             mode,
             live_out: None,
             pending_point: None,
@@ -92,21 +97,17 @@ where
         mut self,
         interp: &mut I,
     ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
-        let statements = match self.statements.as_ref() {
-            Some(statements) => statements,
-            None => {
-                if self.mode == DenseBlockMode::StructuredBody {
-                    let facts = interp.state();
-                    interp.record_point(ProgramPoint::BlockExit(self.block), facts);
-                }
-                let statements = interp.block_statements(self.stage, self.block)?;
-                self.remaining = statements.len();
-                self.statements.insert(statements)
+        if !self.initialized {
+            if self.mode == DenseBlockMode::StructuredBody {
+                let facts = interp.state();
+                interp.record_point(ProgramPoint::BlockExit(self.block), facts);
             }
-        };
-        let total = statements.len();
+            self.cursor = interp.last_statement(self.stage, self.block)?;
+            self.initialized = true;
+            self.at_block_exit = true;
+        }
 
-        if self.remaining == 0 {
+        let Some(statement) = self.cursor else {
             let live_in = interp.state();
             if self.mode == DenseBlockMode::StructuredBody {
                 interp.record_point(ProgramPoint::BlockEntry(self.block), live_in.clone());
@@ -118,12 +119,11 @@ where
                 },
                 DenseBlockMode::StructuredBody => DenseBackwardCompletion::Structured,
             }));
-        }
+        };
 
-        let index = self.remaining - 1;
-        let is_terminator_position = self.remaining == total;
-        let statement = self.statements.as_ref().expect("materialized")[index];
-        self.remaining = index;
+        let is_terminator_position = self.at_block_exit;
+        self.cursor = interp.previous_statement(self.stage, self.block, statement)?;
+        self.at_block_exit = false;
 
         let after = interp.state();
         interp.record_point(ProgramPoint::After(statement), after);

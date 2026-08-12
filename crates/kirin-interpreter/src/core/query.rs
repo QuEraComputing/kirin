@@ -6,15 +6,26 @@
 //! kirin-ir's `StageDispatch` machinery; [`StageQuery`] bundles them into one
 //! bound that any well-formed stage enum satisfies automatically.
 
+use crate::Body;
+use crate::InterpreterError;
 use kirin_ir::{
     Block, BlockParent, CFG, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCFG,
     HasDigraphs, HasStageInfo, HasUngraphs, Pipeline, PortParent, SSAKind, SSAValue,
     SpecializedFunction, StageAction, StageInfo, StageMeta, StagedFunction, Statement,
     SupportsStageDispatch, Symbol, UniqueLiveSpecializationError,
 };
+use smallvec::{SmallVec, smallvec};
 
-use crate::Body;
-use crate::InterpreterError;
+/// Operands yielded by a structured body's terminator.
+///
+/// Most structured operations yield zero, one, or two values. Wider products
+/// remain supported by spilling to the heap.
+pub type TerminatorArgs = SmallVec<[SSAValue; 2]>;
+
+/// Statements that can translate demand on a block argument.
+///
+/// Capacity matches [`kirin_ir::BlockInfo`]'s inline predecessor capacity.
+pub(crate) type BlockArgumentPredecessorStatements = SmallVec<[Statement; 4]>;
 
 /// Block parameters as SSA values.
 pub struct BlockParams(pub Block);
@@ -42,39 +53,6 @@ where
             .copied()
             .map(SSAValue::from)
             .collect())
-    }
-}
-
-/// A block's statements in program order, with the terminator last.
-pub struct BlockStatements(pub Block);
-
-impl BlockStatements {
-    fn collect<L: Dialect>(&self, info: &StageInfo<L>) -> Result<Vec<Statement>, InterpreterError> {
-        self.0
-            .get_info(info)
-            .ok_or(InterpreterError::MissingBlock(self.0))?;
-        let mut statements: Vec<Statement> = self.0.statements(info).collect();
-        if let Some(terminator) = self.0.terminator(info) {
-            statements.push(terminator);
-        }
-        Ok(statements)
-    }
-}
-
-impl<S, L> StageAction<S, L> for BlockStatements
-where
-    S: StageMeta + HasStageInfo<L>,
-    L: Dialect,
-{
-    type Output = Vec<Statement>;
-    type Error = InterpreterError;
-
-    fn run(
-        &mut self,
-        _stage: CompileStage,
-        info: &StageInfo<L>,
-    ) -> Result<Self::Output, Self::Error> {
-        self.collect(info)
     }
 }
 
@@ -124,6 +102,61 @@ where
                 Ok(self.block.last_statement(info))
             }
             None => Ok(None),
+        }
+    }
+}
+
+/// Last statement of a block (the cached terminator when present, otherwise
+/// the tail of the statement list).
+pub struct LastStatement(pub Block);
+
+impl<S, L> StageAction<S, L> for LastStatement
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+{
+    type Output = Option<Statement>;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        self.0
+            .get_info(info)
+            .ok_or(InterpreterError::MissingBlock(self.0))?;
+        Ok(self.0.last_statement(info))
+    }
+}
+
+/// Statement before `before` within `block`, starting after the cached
+/// terminator and then walking the statement list backwards.
+pub struct PreviousStatement {
+    pub block: Block,
+    pub before: Statement,
+}
+
+impl<S, L> StageAction<S, L> for PreviousStatement
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+{
+    type Output = Option<Statement>;
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        self.block
+            .get_info(info)
+            .ok_or(InterpreterError::MissingBlock(self.block))?;
+        if self.block.terminator(info) == Some(self.before) {
+            Ok(self.block.statements(info).next_back())
+        } else {
+            Ok(*self.before.prev(info))
         }
     }
 }
@@ -287,7 +320,7 @@ where
     L: Dialect,
     for<'a> L: HasArguments<'a>,
 {
-    type Output = Vec<SSAValue>;
+    type Output = TerminatorArgs;
     type Error = InterpreterError;
 
     fn run(
@@ -303,7 +336,7 @@ where
                     .definition(info)
                     .arguments()
                     .copied()
-                    .collect::<Vec<_>>()
+                    .collect::<TerminatorArgs>()
             })
             .unwrap_or_default())
     }
@@ -321,7 +354,7 @@ where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
 {
-    type Output = Vec<Statement>;
+    type Output = BlockArgumentPredecessorStatements;
     type Error = InterpreterError;
 
     fn run(
@@ -335,7 +368,7 @@ where
             .ok_or(InterpreterError::MissingBlock(self.0))?;
 
         match block.parent {
-            Some(BlockParent::Statement(owner)) => Ok(vec![owner]),
+            Some(BlockParent::Statement(owner)) => Ok(smallvec![owner]),
             Some(BlockParent::CFG(_)) => block
                 .predecessors
                 .iter()
@@ -345,7 +378,7 @@ where
                     ))
                 })
                 .collect(),
-            None => Ok(Vec::new()),
+            None => Ok(SmallVec::new()),
         }
     }
 }
@@ -432,7 +465,16 @@ where
                 Vec::new(),
                 cfg.blocks(info).map(Body::Block).collect::<Vec<_>>(),
             ),
-            Body::Block(block) => (BlockStatements(block).collect(info)?, Vec::new()),
+            Body::Block(block) => {
+                block
+                    .get_info(info)
+                    .ok_or(InterpreterError::MissingBlock(block))?;
+                let mut statements: Vec<Statement> = block.statements(info).collect();
+                if let Some(terminator) = block.terminator(info) {
+                    statements.push(terminator);
+                }
+                (statements, Vec::new())
+            }
             Body::DiGraph(graph) => (
                 graph
                     .expect_info(info)
@@ -496,9 +538,10 @@ where
 pub trait StageQuery:
     StageMeta
     + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
-    + SupportsStageDispatch<BlockStatements, Vec<Statement>, InterpreterError>
     + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
     + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
+    + SupportsStageDispatch<LastStatement, Option<Statement>, InterpreterError>
+    + SupportsStageDispatch<PreviousStatement, Option<Statement>, InterpreterError>
     + SupportsStageDispatch<CFGEntry, Option<Block>, InterpreterError>
     + SupportsStageDispatch<
         UniqueSpecialization,
@@ -507,9 +550,12 @@ pub trait StageQuery:
     > + SupportsStageDispatch<FunctionBody, Result<Statement, InterpreterError>, InterpreterError>
     + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
     + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
-    + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-    + SupportsStageDispatch<BlockArgumentPredecessors, Vec<Statement>, InterpreterError>
-    + SupportsStageDispatch<GraphPortOwner, Statement, InterpreterError>
+    + SupportsStageDispatch<TerminatorArguments, TerminatorArgs, InterpreterError>
+    + SupportsStageDispatch<
+        BlockArgumentPredecessors,
+        BlockArgumentPredecessorStatements,
+        InterpreterError,
+    > + SupportsStageDispatch<GraphPortOwner, Statement, InterpreterError>
     + SupportsStageDispatch<DirectBodyBlocks, Vec<Block>, InterpreterError>
     + SupportsStageDispatch<BodyContentsQuery, BodyContents, InterpreterError>
     + SupportsStageDispatch<DiGraphWalkQuery, GraphWalkPlan, InterpreterError>
@@ -519,9 +565,10 @@ pub trait StageQuery:
 impl<S> StageQuery for S where
     S: StageMeta
         + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
-        + SupportsStageDispatch<BlockStatements, Vec<Statement>, InterpreterError>
         + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
         + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
+        + SupportsStageDispatch<LastStatement, Option<Statement>, InterpreterError>
+        + SupportsStageDispatch<PreviousStatement, Option<Statement>, InterpreterError>
         + SupportsStageDispatch<CFGEntry, Option<Block>, InterpreterError>
         + SupportsStageDispatch<
             UniqueSpecialization,
@@ -530,9 +577,12 @@ impl<S> StageQuery for S where
         > + SupportsStageDispatch<FunctionBody, Result<Statement, InterpreterError>, InterpreterError>
         + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
         + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
-        + SupportsStageDispatch<TerminatorArguments, Vec<SSAValue>, InterpreterError>
-        + SupportsStageDispatch<BlockArgumentPredecessors, Vec<Statement>, InterpreterError>
-        + SupportsStageDispatch<GraphPortOwner, Statement, InterpreterError>
+        + SupportsStageDispatch<TerminatorArguments, TerminatorArgs, InterpreterError>
+        + SupportsStageDispatch<
+            BlockArgumentPredecessors,
+            BlockArgumentPredecessorStatements,
+            InterpreterError,
+        > + SupportsStageDispatch<GraphPortOwner, Statement, InterpreterError>
         + SupportsStageDispatch<DirectBodyBlocks, Vec<Block>, InterpreterError>
         + SupportsStageDispatch<BodyContentsQuery, BodyContents, InterpreterError>
         + SupportsStageDispatch<DiGraphWalkQuery, GraphWalkPlan, InterpreterError>
@@ -563,14 +613,6 @@ pub(crate) fn block_params<S: StageQuery>(
     dispatch(pipeline, stage, BlockParams(block))
 }
 
-pub(crate) fn block_statements<S: StageQuery>(
-    pipeline: &Pipeline<S>,
-    stage: CompileStage,
-    block: Block,
-) -> Result<Vec<Statement>, InterpreterError> {
-    dispatch(pipeline, stage, BlockStatements(block))
-}
-
 pub(crate) fn first_statement<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
@@ -586,6 +628,23 @@ pub(crate) fn next_statement<S: StageQuery>(
     after: Statement,
 ) -> Result<Option<Statement>, InterpreterError> {
     dispatch(pipeline, stage, NextStatement { block, after })
+}
+
+pub(crate) fn last_statement<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    block: Block,
+) -> Result<Option<Statement>, InterpreterError> {
+    dispatch(pipeline, stage, LastStatement(block))
+}
+
+pub(crate) fn previous_statement<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    block: Block,
+    before: Statement,
+) -> Result<Option<Statement>, InterpreterError> {
+    dispatch(pipeline, stage, PreviousStatement { block, before })
 }
 
 pub(crate) fn cfg_entry<S: StageQuery>(
@@ -632,7 +691,7 @@ pub(crate) fn terminator_arguments<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
     block: Block,
-) -> Result<Vec<SSAValue>, InterpreterError> {
+) -> Result<TerminatorArgs, InterpreterError> {
     dispatch(pipeline, stage, TerminatorArguments(block))
 }
 
@@ -640,7 +699,7 @@ pub(crate) fn block_argument_predecessors<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
     block: Block,
-) -> Result<Vec<Statement>, InterpreterError> {
+) -> Result<BlockArgumentPredecessorStatements, InterpreterError> {
     dispatch(pipeline, stage, BlockArgumentPredecessors(block))
 }
 

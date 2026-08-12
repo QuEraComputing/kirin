@@ -24,5 +24,5 @@ pub use frame::{
 };
 pub use interp::{AbstractInterpreter, Env, Interp, InterpLocation, SparseForwardInterp};
 pub use linker::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
-pub use query::{GraphWalkPlan, StageQuery};
+pub use query::{GraphWalkPlan, StageQuery, TerminatorArgs};
 pub use value::{BranchCondition, HasProductValue, expect_single};

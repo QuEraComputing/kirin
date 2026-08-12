@@ -74,7 +74,7 @@ pub use self::core::{BranchCondition, HasProductValue, expect_single};
 pub use self::core::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
 pub use self::core::{EnvIndex, EnvStackStore, Store};
 pub use self::core::{FunctionEntry, InterpDispatch, Interpretable};
-pub use self::core::{InterpreterError, StageQuery};
+pub use self::core::{InterpreterError, StageQuery, TerminatorArgs};
 // The shared, direction-neutral frame protocol: `Frame`/`FrameEffect`/
 // `drive_frames` (the frame-stack driver loop) anchored on `FrameEngine`, the
 // minimal engine contract. On top of it, the forward engine capabilities a frame
