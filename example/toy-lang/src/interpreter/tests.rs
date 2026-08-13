@@ -564,7 +564,8 @@ mod advanced {
     use std::hash::Hash;
 
     use kirin_constprop::{ConstPropContext, ConstPropValue};
-    use kirin_interpreter::engine::{
+    use kirin_interpreter::SameStageLinker;
+use kirin_interpreter::engine::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, BlockFrame,
         CFGFrame, CallContext, CallFrame, Completion, ConcreteInterpreter, CrossStageLinker,
         DefaultBodyFrames, DiGraphFrame, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
@@ -717,7 +718,7 @@ mod advanced {
         let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
         let mut analysis = crate::interpreter::ToyConstProp::new(&pipeline)
             .with_policy(ConstPropContext::with_budget(2))
-            .with_linker(CrossStageLinker);
+            .with_linker(SameStageLinker);
         let result = expect_single::<ConstPropValue, ToyError>(
             analysis
                 .analyze_by_name("source", "factorial", [ConstPropValue::Const(5)])

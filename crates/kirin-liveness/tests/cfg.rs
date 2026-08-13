@@ -49,7 +49,8 @@ fn parse(program: &str) -> Pipeline<StageInfo<ArithFunctionLanguage>> {
 }
 
 /// The finalized stage id and the body cfg of `@main`.
-/// TODO: `analyze` method is wrong, calling demand analysis.
+// TODO: `analyze` method is wrong, calling demand analysis.
+// TODO: `analyze` should use the same entry point. i.e. Callee not CFG/Body.
 fn main_cfg(
     pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
 ) -> (kirin::prelude::CompileStage, kirin_ir::CFG) {

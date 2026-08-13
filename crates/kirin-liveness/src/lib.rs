@@ -42,7 +42,10 @@ pub type Demand<'ir, S, E = InterpreterError> = SparseBackwardInterpreter<'ir, S
 pub type DenseLiveness<'ir, S, E = InterpreterError, F = StandardDenseBackwardFrame<LiveSet, E>> =
     DenseBackwardInterpreter<'ir, S, LiveSet, E, F>;
 
-/// Run strong liveness (sparse backward demand) over `body` in `stage`.
+/// Run strong liveness (sparse backward demand) over `body` in `stage`. TODO:
+/// analyze() should accept Callee similar to concrete and constprop's
+/// analyze(CompileStage, Callee, args) instead of Body, so that the caller can
+/// select a specialization and pass its args.
 pub fn analyze_demand<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
