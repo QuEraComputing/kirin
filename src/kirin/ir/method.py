@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import typing
+import weakref
 from types import ModuleType
 
 # from typing import TYPE_CHECKING, Generic, TypeVar, Callable, ParamSpec
@@ -60,7 +61,7 @@ class Method(Printable, typing.Generic[Param, RetType]):
     inferred: bool = False
     """if typeinfer has been run on this method
     """
-    backedges: set[Method] = field(init=False, repr=False)
+    backedges: weakref.WeakSet[Method] = field(init=False, repr=False)
     """Cache for the backedges. (who calls this method)"""
     run_passes: typing.Callable[[Method], None] | None = field(init=False, repr=False)
 
@@ -107,9 +108,9 @@ class Method(Printable, typing.Generic[Param, RetType]):
         self.file = file
         self.lineno_begin = lineno_begin
         self.inferred = inferred
-        self.backedges = set()
-        self.update_backedges()
         self.run_passes = None
+        self.backedges = weakref.WeakSet()
+        self.update_backedges()
 
     def __hash__(self) -> int:
         return id(self)
