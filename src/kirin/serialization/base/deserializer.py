@@ -1,3 +1,4 @@
+import weakref
 from typing import Any, cast
 from dataclasses import field, dataclass
 
@@ -101,7 +102,7 @@ class Deserializer:
             out.mod = None
             out.py_func = None
             out.code = ir.Statement.__new__(ir.Statement)
-            out.backedges = set()
+            out.backedges = weakref.WeakSet()
             out.run_passes = None
             self._ctx.Method_Runtime[mangled] = out
 
@@ -120,7 +121,7 @@ class Deserializer:
         out.dialects = self.dialect_group
 
         out.code = self.deserialize_statement(serUnit.data["code"])
-        out.backedges = set()
+        out.backedges = weakref.WeakSet()
         out.fields = self.deserialize_tuple(serUnit.data.get("fields", ()))
         computed = mangle(
             out.sym_name,
