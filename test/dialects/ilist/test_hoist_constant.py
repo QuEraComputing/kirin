@@ -41,11 +41,7 @@ def body_stmts(mt: ir.Method) -> list[ir.Statement]:
 
 
 def all_body_stmts(mt: ir.Method) -> list[ir.Statement]:
-    return [
-        stmt
-        for block in body_lambda(mt).body.blocks
-        for stmt in block.stmts
-    ]
+    return [stmt for block in body_lambda(mt).body.blocks for stmt in block.stmts]
 
 
 def apply_hoist(mt: ir.Method) -> RewriteResult:

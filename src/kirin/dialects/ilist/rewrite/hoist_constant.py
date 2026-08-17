@@ -1,7 +1,7 @@
 from kirin import ir
 from kirin.dialects import py, func
 from kirin.rewrite.abc import RewriteRule, RewriteResult
-from kirin.dialects.ilist.stmts import ForEach, Map
+from kirin.dialects.ilist.stmts import Map, ForEach
 
 from .._dialect import dialect
 
