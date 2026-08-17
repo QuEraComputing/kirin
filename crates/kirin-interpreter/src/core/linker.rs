@@ -4,12 +4,12 @@ use super::query;
 use crate::{Callee, InterpreterError, StageQuery};
 
 /// A fully resolved call target: the stage to execute in, the specialization,
-/// and its body statement.
+/// and its callable definition statement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct FunctionTarget {
     pub stage: CompileStage,
     pub function: SpecializedFunction,
-    pub body: Statement,
+    pub definition: Statement,
 }
 
 /// The calling-convention component of an engine.
@@ -76,11 +76,11 @@ fn target_at_stage<S: StageQuery>(
         Callee::Staged(staged) => query::unique_specialization(pipeline, stage, staged)?,
         Callee::Specialized(specialized) => specialized,
     };
-    let body = query::function_body(pipeline, stage, specialized)?;
+    let definition = query::function_definition(pipeline, stage, specialized)?;
     Ok(FunctionTarget {
         stage,
         function: specialized,
-        body,
+        definition,
     })
 }
 

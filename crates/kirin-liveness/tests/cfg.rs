@@ -62,11 +62,11 @@ fn main_cfg(
         .expect("@main is staged at @test");
     let sf_info = sf.get_info(stage).expect("staged function info");
     let spec = &sf_info.specializations()[0];
-    let body = *spec.body();
+    let definition = *spec.definition();
 
-    let cfg = match body.definition(stage) {
+    let cfg = match definition.definition(stage) {
         ArithFunctionLanguage::Function { body, .. } => *body,
-        other => panic!("expected a function body, got {other:?}"),
+        other => panic!("expected a function definition, got {other:?}"),
     };
     (stage_id, cfg)
 }

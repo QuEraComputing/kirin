@@ -538,8 +538,8 @@ fn test_function_parse_error_kind_display() {
         "missing stage declaration"
     );
     assert_eq!(
-        format!("{}", crate::FunctionParseErrorKind::BodyParseFailed),
-        "function body parse failed"
+        format!("{}", crate::FunctionParseErrorKind::DefinitionParseFailed),
+        "function definition parse failed"
     );
     assert_eq!(
         format!("{}", crate::FunctionParseErrorKind::EmitFailed),
@@ -559,7 +559,7 @@ fn test_function_parse_error_source() {
     // With source
     let source_err = std::io::Error::other("inner");
     let err = crate::FunctionParseError::new(
-        crate::FunctionParseErrorKind::BodyParseFailed,
+        crate::FunctionParseErrorKind::DefinitionParseFailed,
         None,
         "outer",
     )
@@ -1117,7 +1117,7 @@ fn test_function_parse_error_all_kinds_display() {
         crate::FunctionParseErrorKind::UnknownStage,
         crate::FunctionParseErrorKind::InconsistentFunctionName,
         crate::FunctionParseErrorKind::MissingStageDeclaration,
-        crate::FunctionParseErrorKind::BodyParseFailed,
+        crate::FunctionParseErrorKind::DefinitionParseFailed,
         crate::FunctionParseErrorKind::EmitFailed,
     ];
     let mut displays: Vec<String> = kinds.iter().map(|k| format!("{k}")).collect();
@@ -1328,7 +1328,7 @@ fn test_function_parse_error_chained_source() {
 
     let inner = std::io::Error::new(std::io::ErrorKind::NotFound, "not found");
     let middle = crate::FunctionParseError::new(
-        crate::FunctionParseErrorKind::BodyParseFailed,
+        crate::FunctionParseErrorKind::DefinitionParseFailed,
         None,
         "body failed",
     )

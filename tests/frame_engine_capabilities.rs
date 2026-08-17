@@ -270,7 +270,7 @@ impl CallServices for CallOnlyEngine {
     fn enter_function(
         &mut self,
         _stage: CompileStage,
-        _body: Statement,
+        _definition: Statement,
         _args: Product<i64>,
         _index: EnvIndex,
     ) -> Result<CallableBody<i64>, InterpreterError> {

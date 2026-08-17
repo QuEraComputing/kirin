@@ -34,7 +34,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         let specialized_function = SpecializedFunctionInfo::builder()
             .id(id)
             .signature(error.signature)
-            .body(error.body)
+            .definition(error.definition)
             .maybe_backedges(error.backedges)
             .new();
         staged_function_info

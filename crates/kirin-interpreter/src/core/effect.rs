@@ -126,6 +126,12 @@ pub enum Callee {
     Specialized(SpecializedFunction),
 }
 
+impl From<Symbol> for Callee {
+    fn from(symbol: Symbol) -> Self {
+        Self::Named(symbol)
+    }
+}
+
 /// The body a callable statement enters when invoked, plus the entry
 /// arguments bound to its boundary (block parameters / graph ports).
 ///

@@ -234,17 +234,17 @@ where
         let staged_info = staged_fn.expect_info(self.stage);
         let spec = &staged_info.specializations()[idx];
 
-        // Set function context so the body's PrettyPrint can access it
+        // Set function context so the definition's PrettyPrint can access it
         // via doc.print_function_name() and doc.print_return_types().
         let prev_name = self.function_name();
         self.set_function_name(staged_info.name());
 
         let header = self.text("specialize @") + self.text(self.stage_symbol_text());
 
-        let body = self.print_statement(spec.body());
+        let definition = self.print_statement(spec.definition());
         self.set_function_name(prev_name);
 
-        header + self.text(" ") + body
+        header + self.text(" ") + definition
     }
 
     /// Pretty print a staged function with all its non-invalidated specializations.
@@ -271,14 +271,14 @@ where
             return doc;
         }
 
-        // Set function context for body PrettyPrint projections.
+        // Set function context for definition PrettyPrint projections.
         let prev_name = self.function_name();
         self.set_function_name(info.name());
 
         for spec in active {
             doc += self.line_();
             doc += self.text("specialize @") + self.text(self.stage_symbol_text());
-            doc += self.text(" ") + self.print_statement(spec.body());
+            doc += self.text(" ") + self.print_statement(spec.definition());
         }
 
         self.set_function_name(prev_name);

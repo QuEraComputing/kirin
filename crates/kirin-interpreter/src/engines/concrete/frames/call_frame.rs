@@ -136,7 +136,7 @@ where
             } => {
                 let target = interp.resolve_call(resolve_stage, &callee)?;
                 let index = interp.alloc_env();
-                let entry = interp.enter_function(target.stage, target.body, args, index)?;
+                let entry = interp.enter_function(target.stage, target.definition, args, index)?;
                 // The closed `Body` enum is the framework's supported body
                 // vocabulary, so this match is intentionally exhaustive;
                 // only the `UnGraph` arm delegates to a language traversal.

@@ -262,10 +262,10 @@ where
     }
 }
 
-/// Body statement of a specialized function.
-pub struct FunctionBody(pub SpecializedFunction);
+/// Definition statement of a specialized function.
+pub struct FunctionDefinition(pub SpecializedFunction);
 
-impl<S, L> StageAction<S, L> for FunctionBody
+impl<S, L> StageAction<S, L> for FunctionDefinition
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
@@ -281,8 +281,10 @@ where
         Ok(self
             .0
             .get_info(info)
-            .map(|info| *info.body())
-            .ok_or(InterpreterError::Custom("specialized function has no body")))
+            .map(|info| *info.definition())
+            .ok_or(InterpreterError::Custom(
+                "specialized function has no definition",
+            )))
     }
 }
 
@@ -535,8 +537,7 @@ where
 /// Satisfied automatically by any stage enum built from `StageInfo<L>`
 /// variants (and by `StageInfo<L>` itself for single-language pipelines);
 /// compiler authors never implement it by hand.
-pub trait StageQuery:
-    StageMeta
+pub trait StageQuery: StageMeta
     + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
     + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
     + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
@@ -547,7 +548,7 @@ pub trait StageQuery:
         UniqueSpecialization,
         Result<SpecializedFunction, InterpreterError>,
         InterpreterError,
-    > + SupportsStageDispatch<FunctionBody, Result<Statement, InterpreterError>, InterpreterError>
+    > + SupportsStageDispatch<FunctionDefinition, Result<Statement, InterpreterError>, InterpreterError>
     + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
     + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
     + SupportsStageDispatch<TerminatorArguments, TerminatorArgs, InterpreterError>
@@ -574,8 +575,11 @@ impl<S> StageQuery for S where
             UniqueSpecialization,
             Result<SpecializedFunction, InterpreterError>,
             InterpreterError,
-        > + SupportsStageDispatch<FunctionBody, Result<Statement, InterpreterError>, InterpreterError>
-        + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
+        > + SupportsStageDispatch<
+            FunctionDefinition,
+            Result<Statement, InterpreterError>,
+            InterpreterError,
+        > + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
         + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
         + SupportsStageDispatch<TerminatorArguments, TerminatorArgs, InterpreterError>
         + SupportsStageDispatch<
@@ -663,12 +667,12 @@ pub(crate) fn unique_specialization<S: StageQuery>(
     dispatch(pipeline, stage, UniqueSpecialization(staged))?
 }
 
-pub(crate) fn function_body<S: StageQuery>(
+pub(crate) fn function_definition<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
     specialized: SpecializedFunction,
 ) -> Result<Statement, InterpreterError> {
-    dispatch(pipeline, stage, FunctionBody(specialized))?
+    dispatch(pipeline, stage, FunctionDefinition(specialized))?
 }
 
 pub(crate) fn resolve_symbol_name<S: StageQuery>(

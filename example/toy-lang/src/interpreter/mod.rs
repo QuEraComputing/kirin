@@ -170,15 +170,16 @@ fn function_cfg(
                     });
                 }
             };
-            let spec_info = spec
-                .get_info(info)
-                .ok_or(InterpreterError::Custom("specialized function has no body"))?;
-            match spec_info.body().definition(info) {
+            let spec_info = spec.get_info(info).ok_or(InterpreterError::Custom(
+                "specialized function has no definition",
+            ))?;
+            let definition = *spec_info.definition();
+            match definition.definition(info) {
                 HighLevel::Lexical(Lexical::Function(function)) => {
                     use kirin::prelude::HasCFGBody;
                     *function.cfg()
                 }
-                _ => return Err(InterpreterError::Custom("expected a function body")),
+                _ => return Err(InterpreterError::Custom("expected a function definition")),
             }
         }
         Stage::Lowered(info) => {
@@ -197,15 +198,16 @@ fn function_cfg(
                     });
                 }
             };
-            let spec_info = spec
-                .get_info(info)
-                .ok_or(InterpreterError::Custom("specialized function has no body"))?;
-            match spec_info.body().definition(info) {
+            let spec_info = spec.get_info(info).ok_or(InterpreterError::Custom(
+                "specialized function has no definition",
+            ))?;
+            let definition = *spec_info.definition();
+            match definition.definition(info) {
                 LowLevel::Lifted(Lifted::Function(function)) => {
                     use kirin::prelude::HasCFGBody;
                     *function.cfg()
                 }
-                _ => return Err(InterpreterError::Custom("expected a function body")),
+                _ => return Err(InterpreterError::Custom("expected a function definition")),
             }
         }
     };

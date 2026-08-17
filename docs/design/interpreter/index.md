@@ -297,7 +297,7 @@ pub trait Linker<S: StageMeta> {
 ```
 
 A linker resolves `Callee::{Named, Function, Staged, Specialized}` to a
-`(stage, specialization, body)` target. It is a *field of the engine*, never
+`(stage, specialization, definition)` target. It is a *field of the engine*, never
 a trait the user implements on the engine type — this is a deliberate
 coherence rule: policies must be swappable without newtype-cloning a driver.
 

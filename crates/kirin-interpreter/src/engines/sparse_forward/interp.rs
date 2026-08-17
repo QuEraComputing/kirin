@@ -37,7 +37,7 @@ use std::marker::PhantomData;
 
 use kirin_ir::{
     Block, CFG, CompileStage, DiGraph, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
-    StageMeta, Statement, Widen,
+    StageMeta, Statement, Symbol, Widen,
 };
 
 use crate::core::query;
@@ -304,7 +304,7 @@ enum ForwardUpdate<K, V> {
     FunctionEntry {
         key: K,
         stage: CompileStage,
-        body: Statement,
+        definition: Statement,
         args: Product<V>,
     },
     /// Merge a return contribution into a function context's return (join); on
@@ -635,7 +635,7 @@ where
     fn enter_function(
         &mut self,
         stage: CompileStage,
-        body: Statement,
+        definition: Statement,
         args: Product<V>,
         index: EnvIndex,
     ) -> Result<CallableBody<V>, E> {
@@ -645,10 +645,10 @@ where
             .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
         let previous = self.location.replace(InterpLocation {
             stage,
-            statement: body,
+            statement: definition,
             index,
         });
-        let result = info.dispatch_function_entry(body, args, self);
+        let result = info.dispatch_function_entry(definition, args, self);
         self.location = previous;
         result
     }
@@ -775,11 +775,12 @@ where
     fn enter_function(
         &mut self,
         stage: CompileStage,
-        body: Statement,
+        definition: Statement,
         args: Product<V>,
         index: EnvIndex,
     ) -> Result<CallableBody<V>, E> {
-        self.inner_mut().enter_function(stage, body, args, index)
+        self.inner_mut()
+            .enter_function(stage, definition, args, index)
     }
 }
 
@@ -913,7 +914,7 @@ where
         self.apply_update(ForwardUpdate::FunctionEntry {
             key: key.clone(),
             stage: target.stage,
-            body: target.body,
+            definition: target.definition,
             args,
         })?;
 
@@ -963,7 +964,7 @@ where
             ForwardUpdate::FunctionEntry {
                 key,
                 stage,
-                body,
+                definition,
                 args,
             } => {
                 let owner = Owner::Function(key.clone());
@@ -971,7 +972,7 @@ where
                     self.summaries_mut().insert(
                         owner.clone(),
                         ForwardSummary::Function(FunctionSummary {
-                            meta: Some((stage, body)),
+                            meta: Some((stage, definition)),
                             entry: args,
                             entry_joins: 0,
                             ret: None,
@@ -1003,7 +1004,7 @@ where
                     changed
                 };
                 if changed {
-                    self.seed_entry_block(&key, stage, body)?;
+                    self.seed_entry_block(&key, stage, definition)?;
                 }
                 Ok(())
             }
@@ -1132,7 +1133,7 @@ where
         &mut self,
         key: &<P as CallContext<V>>::Key,
         stage: CompileStage,
-        body: Statement,
+        definition: Statement,
     ) -> Result<(), E> {
         let env = match self.store().env(key) {
             Some(env) => env,
@@ -1147,8 +1148,8 @@ where
             .and_then(|info| info.as_function())
             .map(|function| function.entry.clone())
             .expect("function summary present");
-        let body_info = self.enter_function(stage, body, entry_args, env)?;
-        let owner = match body_info.body {
+        let entry = self.enter_function(stage, definition, entry_args, env)?;
+        let owner = match entry.body {
             Body::CFG(cfg) => Owner::Block {
                 function: key.clone(),
                 block: self
@@ -1181,7 +1182,7 @@ where
         }
         self.apply_update(ForwardUpdate::OwnerEntry {
             owner,
-            args: body_info.args,
+            args: entry.args,
         })
     }
 }
@@ -1576,6 +1577,19 @@ where
         self.analyze(stage, Callee::Function(function), args)
     }
 
+    /// Resolve a stage-local `symbol` through the linker and analyze the
+    /// selected callable. This is the convenience form of
+    /// [`analyze`](Self::analyze) with [`Callee::Named`], and returns its
+    /// inferred return product at the fixpoint.
+    pub fn analyze_by_symbol(
+        &mut self,
+        stage: CompileStage,
+        symbol: Symbol,
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        self.analyze(stage, symbol.into(), args)
+    }
+
     /// Run the fixpoint from a single entry. Seeds the entry function's entry block
     /// owner and drains the owner worklist.
     pub fn analyze(
@@ -1591,7 +1605,7 @@ where
         self.driver.apply_update(ForwardUpdate::FunctionEntry {
             key: key.clone(),
             stage: target.stage,
-            body: target.body,
+            definition: target.definition,
             args,
         })?;
 

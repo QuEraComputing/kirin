@@ -1,6 +1,6 @@
 use kirin::prelude::*;
 
-/// Structural function-body statement used by function text parsing.
+/// Structural function-definition statement used by function text parsing.
 ///
 /// The `sig` field stores the function's type signature (`(T, T) -> T`),
 /// parsed from the format string. `derive(Dialect)` generates `HasSignature`
