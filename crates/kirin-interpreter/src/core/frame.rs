@@ -340,7 +340,7 @@ pub trait CallServices: Env {
     fn enter_function(
         &mut self,
         stage: CompileStage,
-        body: Statement,
+        definition: Statement,
         args: Product<Self::Value>,
         index: EnvIndex,
     ) -> Result<CallableBody<Self::Value>, Self::Error>;

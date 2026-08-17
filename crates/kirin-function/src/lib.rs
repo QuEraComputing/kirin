@@ -18,19 +18,16 @@ use kirin::prelude::*;
 use kirin_interpreter::{FunctionEntry, Interpretable};
 
 pub mod bind;
-pub mod body;
 pub mod call;
+pub mod function;
 pub mod lambda;
 pub mod ret;
 
 pub use bind::Bind;
-pub use body::Function;
 pub use call::{Call, CallFunction, CallLike, CallNamed, CallSpecialized, CallStaged};
+pub use function::Function;
 pub use lambda::Lambda;
 pub use ret::Return;
-
-#[deprecated(note = "use Function<T>")]
-pub type FunctionBody<T> = Function<T>;
 
 pub mod interpreter;
 

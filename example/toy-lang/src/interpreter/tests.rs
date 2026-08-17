@@ -263,7 +263,7 @@ fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
             .terminator(ret)
             .new();
         let cfg = builder.cfg().add_block(block).new();
-        let body = Function::<ArithType>::new(
+        let definition = Function::<ArithType>::new(
             builder,
             cfg,
             Signature::new(vec![ArithType::I64], ArithType::I64, ()),
@@ -271,7 +271,7 @@ fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
         builder
             .specialize()
             .staged_func(caller)
-            .body(body)
+            .definition(definition)
             .new()
             .unwrap();
     });
@@ -624,10 +624,10 @@ mod demand {
             .resolve_staged_function(name, stage_id)
             .expect("staged function");
         let sf_info = sf.get_info(info).expect("staged function info");
-        let body = *sf_info.specializations()[0].body();
-        let cfg = match body.definition(info) {
+        let definition = *sf_info.specializations()[0].definition();
+        let cfg = match definition.definition(info) {
             HighLevel::Lexical(Lexical::Function(function)) => *function.cfg(),
-            other => panic!("expected a function body, got {other:?}"),
+            other => panic!("expected a function definition, got {other:?}"),
         };
         (stage_id, cfg)
     }

@@ -1,7 +1,7 @@
 use crate::types::QubitType;
 use kirin::prelude::*;
 
-/// Function body holding a DiGraph for circuit-stage programs.
+/// Function definition whose body is a DiGraph for circuit-stage programs.
 /// Circuits are naturally directed acyclic graphs: qubit values flow
 /// forward through gates.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]

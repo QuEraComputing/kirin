@@ -51,7 +51,7 @@ pub trait InterpDispatch<I: Interp>: StageMeta {
 
     fn dispatch_function_entry(
         &self,
-        body: Statement,
+        definition: Statement,
         args: Product<I::Value>,
         interp: &mut I,
     ) -> Result<CallableBody<I::Value>, I::Error>;
@@ -73,11 +73,11 @@ where
 
     fn dispatch_function_entry(
         &self,
-        body: Statement,
+        definition: Statement,
         args: Product<I::Value>,
         interp: &mut I,
     ) -> Result<CallableBody<I::Value>, I::Error> {
-        let definition = body.definition(self).clone();
-        definition.function_entry(args, interp)
+        let callable = definition.definition(self).clone();
+        callable.function_entry(args, interp)
     }
 }

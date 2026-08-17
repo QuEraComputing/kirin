@@ -87,7 +87,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let entry_arms = build_arms(&variants, enum_ident, |_| {
         quote! {
             #interp_crate::InterpDispatch::dispatch_function_entry(
-                stage_info, body, args, interp,
+                stage_info, definition, args, interp,
             )
         }
     });
@@ -112,7 +112,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 
             fn dispatch_function_entry(
                 &self,
-                body: #ir_crate::Statement,
+                definition: #ir_crate::Statement,
                 args: #ir_crate::Product<<__InterpI as #interp_crate::Interp>::Value>,
                 interp: &mut __InterpI,
             ) -> Result<

@@ -19,7 +19,7 @@ fn test_sprint_with_globals() {
     let _ = stage
         .specialize()
         .staged_func(staged_function)
-        .body(fdef)
+        .definition(fdef)
         .new()
         .unwrap();
 
