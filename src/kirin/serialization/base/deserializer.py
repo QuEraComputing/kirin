@@ -142,8 +142,7 @@ class Deserializer:
         self._ctx.Statement_Lookup[data["id"]] = out
         out.dialect = self.deserialize(data["dialect"])
         out.name = self.deserialize_str(data["name"])
-        out._args = ()
-        out.args = self.deserialize_tuple(data["_args"])
+        out._args = self.deserialize_tuple(data["_args"])
         out._results = self.deserialize_list(data["_results"])
         out._name_args_slice = self.deserialize_dict(data["_name_args_slice"])
         out.attributes = self.deserialize_dict(data["attributes"])
