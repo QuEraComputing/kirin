@@ -13,7 +13,8 @@ mod tests;
 
 pub use error::ToyError;
 use frame::FrameStackItem;
-pub use frame::{ToyAbstractFrame, ToyDenseBackwardFrame};
+pub use frame::ToyAbstractFrame;
+pub(crate) use frame::ToyDenseBackwardFrame;
 
 use kirin::prelude::{CFG, CompileStage, GetInfo, Pipeline, UniqueLiveSpecializationError};
 use kirin_constprop::{ConstPropContext, ConstPropValue};

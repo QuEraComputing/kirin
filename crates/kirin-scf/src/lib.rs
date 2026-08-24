@@ -29,8 +29,7 @@ mod value;
 pub use value::ForLoopValue;
 pub mod interpreter;
 pub use interpreter::{
-    AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf,
-    BuildDenseScfFor, BuildDenseScfIf, DenseScfForFrame, DenseScfIfFrame, ScfForDispatch,
+    AbstractScfForFrame, AbstractScfIfFrame, DenseScfForFrame, DenseScfIfFrame, ScfForDispatch,
     ScfForFrame, ScfIfDispatch, ScfIfFrame,
 };
 

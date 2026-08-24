@@ -42,10 +42,10 @@ where
     }
 }
 
-impl<I, R, V, E> Frame<I, Self, R> for BlockFrame<V, E>
+impl<I, F, V, E> Frame<I, F> for BlockFrame<V, E>
 where
-    I: BlockQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = R>,
-    R: From<CallRequest<V>>,
+    I: BlockQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = F>,
+    F: From<CallRequest<V>>,
     V: Clone,
     E: From<InterpreterError>,
 {
@@ -53,7 +53,7 @@ where
 
     /// Execute the next statement and translate its [`SparseForwardEffect`]
     /// into a [`FrameEffect`] over this walker and the configured child type.
-    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         if self.cursor.bind_entry(interp)? {
             return Ok(FrameEffect::Continue(self));
         }
@@ -94,7 +94,7 @@ where
     /// A child finished without a payload (its results are already in the
     /// shared activation, e.g. a returned call): resume at the advanced
     /// cursor.
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         Ok(FrameEffect::Continue(self))
     }
 
@@ -105,7 +105,7 @@ where
         mut self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         match completion {
             Completion::Finished(values) | Completion::Yielded(values) => {
                 self.cursor.write_child_results(interp, values)?;

@@ -1,6 +1,5 @@
 extern crate proc_macro;
 
-mod frame_build;
 mod function_entry;
 mod interp_dispatch;
 mod interpretable;
@@ -38,28 +37,6 @@ pub fn derive_function_entry(input: TokenStream) -> TokenStream {
 pub fn derive_interp_dispatch(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     match interp_dispatch::generate(&ast) {
-        Ok(tokens) => tokens.into(),
-        Err(e) => e.into_compile_error().into(),
-    }
-}
-
-/// Derive `AbstractFrameBuild<V, E, K>` for a **sparse forward** total frame
-/// enum. `from_digraph` is emitted only when a variant carries an
-/// `AbstractDiGraphFrame`; otherwise the trait's refusing default is inherited.
-#[proc_macro_derive(AbstractFrameBuild, attributes(interpret))]
-pub fn derive_abstract_frame_build(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as syn::DeriveInput);
-    match frame_build::generate(&ast, &frame_build::SPARSE_FORWARD) {
-        Ok(tokens) => tokens.into(),
-        Err(e) => e.into_compile_error().into(),
-    }
-}
-
-/// Derive `DenseFrameBuild<V, E>` for a **dense backward** total frame enum.
-#[proc_macro_derive(DenseFrameBuild, attributes(interpret))]
-pub fn derive_dense_frame_build(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as syn::DeriveInput);
-    match frame_build::generate(&ast, &frame_build::DENSE_BACKWARD) {
         Ok(tokens) => tokens.into(),
         Err(e) => e.into_compile_error().into(),
     }

@@ -117,16 +117,16 @@ impl<V, T> From<CallRequest<V>> for CallFrame<V, T> {
     }
 }
 
-impl<I, R, V, E, T> Frame<I, Self, R> for CallFrame<V, T>
+impl<I, F, V, E, T> Frame<I, F> for CallFrame<V, T>
 where
     I: CallServices<Value = V, Error = E>,
-    T: CallBodyTraversal<V, E, R>,
+    T: CallBodyTraversal<V, E, F>,
     V: Clone,
     E: From<InterpreterError>,
 {
     type Completion = Completion<V>;
 
-    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         match self.state {
             CallState::Pending {
                 resolve_stage,
@@ -187,7 +187,7 @@ where
         }
     }
 
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         Err(E::from(InterpreterError::Custom(
             "call frame resumed without a return",
         )))
@@ -199,7 +199,7 @@ where
         self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         let CallState::Awaiting { callee_env, dest } = self.state else {
             return Err(E::from(InterpreterError::Custom(
                 "call frame resumed before dispatch",

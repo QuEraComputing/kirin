@@ -51,10 +51,10 @@ where
     }
 }
 
-impl<I, R, V, E> Frame<I, Self, R> for CFGFrame<V, E>
+impl<I, F, V, E> Frame<I, F> for CFGFrame<V, E>
 where
-    I: CFGQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = R>,
-    R: From<CallRequest<V>>,
+    I: CFGQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = F>,
+    F: From<CallRequest<V>>,
     V: Clone,
     E: From<InterpreterError>,
 {
@@ -62,7 +62,7 @@ where
 
     /// Execute the next statement and translate its [`SparseForwardEffect`]
     /// into a [`FrameEffect`] over this walker and the configured child type.
-    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         // First step: find the entry block and bind the entry arguments.
         if let Some(args) = self.pending.take() {
             let entry = interp
@@ -114,7 +114,7 @@ where
     /// A child finished without a payload (its results are already in the
     /// shared activation, e.g. a returned call): resume at the advanced
     /// cursor.
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         Ok(FrameEffect::Continue(self))
     }
 
@@ -125,7 +125,7 @@ where
         mut self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         match completion {
             Completion::Finished(values) | Completion::Yielded(values) => {
                 let cursor = self.cursor.as_mut().ok_or_else(|| {

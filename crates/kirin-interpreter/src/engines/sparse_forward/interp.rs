@@ -42,14 +42,13 @@ use kirin_ir::{
 
 use crate::core::query;
 use crate::{
-    AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractFrameBuild,
-    AbstractInterpreter, BlockQueries, Body, CFGQueries, CallEffect, CallServices, CallableBody,
-    Callee, DiGraphQueries, Env, EnvIndex, EnvStackStore, FixpointProfile,
-    ForwardDataflowFrameEngine, ForwardEval, ForwardSummaryDeps, Frame, FunctionTarget, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics, SameStageLinker,
-    SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
-    StandardFixpointInterpreter, StatementDispatch, Store, Summary, SummaryDependency,
-    SummaryDependencyIndex, SummaryEffect,
+    AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
+    BlockQueries, Body, CFGQueries, CallEffect, CallServices, CallableBody, Callee, DiGraphQueries,
+    Env, EnvIndex, EnvStackStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval,
+    ForwardSummaryDeps, Frame, FunctionTarget, Interp, InterpDispatch, InterpLocation,
+    InterpreterError, Linker, OwnerSemantics, SameStageLinker, SparseForwardEffect,
+    SparseForwardSemantic, StageQuery, StandardAbstractFrame, StandardFixpointInterpreter,
+    StatementDispatch, Store, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
 
 // ===========================================================================
@@ -1224,7 +1223,8 @@ where
     Lk: Linker<S>,
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
-    F: AbstractFrameBuild<V, E, <P as CallContext<V>>::Key>,
+    F: From<AbstractBlockFrame<V, E, <P as CallContext<V>>::Key>>
+        + From<AbstractDiGraphFrame<V, E, <P as CallContext<V>>::Key>>,
 {
     fn bottom_summary(
         &mut self,
@@ -1283,16 +1283,13 @@ where
         })?;
         interp.inner_mut().begin_block_log();
         match owner {
-            Owner::Block { block, .. } => Ok(F::from_block(AbstractBlockFrame::new_cfg_block(
-                stage,
-                env,
-                *block,
-                block_entry,
-            ))),
+            Owner::Block { block, .. } => {
+                Ok(AbstractBlockFrame::new_cfg_block(stage, env, *block, block_entry).into())
+            }
             // One dependency-ordered pass over the whole graph. Exact for a DAG,
             // so the pass never needs to iterate internally.
             Owner::Graph { graph, .. } => {
-                F::from_digraph(AbstractDiGraphFrame::new(stage, env, *graph, block_entry))
+                Ok(AbstractDiGraphFrame::new(stage, env, *graph, block_entry).into())
             }
             Owner::Function(_) => Err(E::from(InterpreterError::Custom(
                 "function owners are storage-only and never executed",
@@ -1553,7 +1550,8 @@ where
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
     F: Frame<ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>, F, Completion = AbstractCompletion<V>>
-        + AbstractFrameBuild<V, E, <P as CallContext<V>>::Key>,
+        + From<AbstractBlockFrame<V, E, <P as CallContext<V>>::Key>>
+        + From<AbstractDiGraphFrame<V, E, <P as CallContext<V>>::Key>>,
 {
     /// Resolve `stage`/`function` by name and analyze. Returns the function's
     /// inferred return product at the fixpoint (empty if it never returns).

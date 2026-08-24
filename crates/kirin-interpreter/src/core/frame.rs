@@ -69,16 +69,15 @@ use crate::{
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
 ///
-/// `N` is how the current frame represents its next state; `Ch` is how it
-/// represents a child computation. A directly reusable frame normally uses
-/// `N = Self`. A private composition root maps the member's next state into its
-/// private stack-item enum; whether children need a distinct request type is a
-/// separate design choice.
-pub enum FrameEffect<N, C, Ch = N> {
-    /// Keep running with `N` as the frame's next state.
-    Continue(N),
+/// `P` is the current frame's own next/parent state; `F` is the configured
+/// representation of a child frame. A reusable member frame returns itself for
+/// `Continue` and as the suspended parent of `Push`. A private composition root
+/// maps that member into the configured stack-item type.
+pub enum FrameEffect<P, C, F = P> {
+    /// Keep running the current frame.
+    Continue(P),
     /// Suspend `parent` and run `child` first.
-    Push { parent: N, child: Ch },
+    Push { parent: P, child: F },
     /// This frame finished with no payload; its parent's
     /// [`Frame::resume_done_into`] is called.
     Done,
@@ -88,10 +87,10 @@ pub enum FrameEffect<N, C, Ch = N> {
     Complete(C),
 }
 
-impl<N, C, Ch> FrameEffect<N, C, Ch> {
+impl<P, C, F> FrameEffect<P, C, F> {
     /// Map a reusable frame's next state into its stack-item representation.
     /// The child is already expressed in the configured stack-item type.
-    pub fn map_next<N2>(self, map_next: impl FnOnce(N) -> N2) -> FrameEffect<N2, C, Ch> {
+    pub fn map_next<P2>(self, map_next: impl FnOnce(P) -> P2) -> FrameEffect<P2, C, F> {
         match self {
             FrameEffect::Continue(next) => FrameEffect::Continue(map_next(next)),
             FrameEffect::Push { parent, child } => FrameEffect::Push {
@@ -117,10 +116,9 @@ impl<T: Interp> FrameEngine for T {
 /// A resumable interpreter continuation.
 ///
 /// Every method consumes `self` and returns the next structural move as one
-/// [`FrameEffect`]. `N` is the representation of the resumed parent and `Ch` is
-/// the representation of a child. By default the parent is `Self` and the child
-/// uses the same representation; a heterogeneous composition instead keeps the
-/// member's parent as `Self` and selects its private stack-item type as `Ch`.
+/// [`FrameEffect`]. The resumed parent is always `Self`; `F` is the configured
+/// representation of a child frame. By default `F = Self`; a heterogeneous
+/// composition instead uses its private stack-item type as `F`.
 ///
 /// The closed `FrameStackItem` enum is an implementation detail that also
 /// implements this protocol: it dispatches to a member frame and maps that
@@ -128,27 +126,28 @@ impl<T: Interp> FrameEngine for T {
 /// `FrameEffect<FrameStackItem, C, FrameStackItem>`. It is not a second kind of
 /// frame protocol.
 ///
-/// [`drive_frames`] requires the stack element `F` to use itself for both `N`
-/// and `Ch`, because every value placed on that homogeneous stack has type `F`.
-pub trait Frame<I: FrameEngine, N = Self, Ch = N>: Sized {
+/// [`drive_frames`] requires the stack element `F` to use itself as its child
+/// representation,
+/// because every value placed on that homogeneous stack has type `F`.
+pub trait Frame<I: FrameEngine, F = Self>: Sized {
     /// The completion payload this frame family bubbles to parents/root.
     type Completion;
 
     /// Do this frame's next unit of work.
-    fn step_into(self, interp: &mut I) -> Result<FrameEffect<N, Self::Completion, Ch>, I::Error>;
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion, F>, I::Error>;
 
     /// A pushed child finished with no payload.
     fn resume_done_into(
         self,
         interp: &mut I,
-    ) -> Result<FrameEffect<N, Self::Completion, Ch>, I::Error>;
+    ) -> Result<FrameEffect<Self, Self::Completion, F>, I::Error>;
 
     /// A pushed child finished with a completion payload.
     fn resume_into(
         self,
         completion: Self::Completion,
         interp: &mut I,
-    ) -> Result<FrameEffect<N, Self::Completion, Ch>, I::Error>;
+    ) -> Result<FrameEffect<Self, Self::Completion, F>, I::Error>;
 }
 
 /// Shared frame-stepping loop.
@@ -156,7 +155,7 @@ pub fn drive_frames<I, F>(engine: &mut I, frames: &mut Vec<F>) -> Result<F::Comp
 where
     I: FrameEngine,
     I::Error: From<InterpreterError>,
-    F: Frame<I, F, F>,
+    F: Frame<I, F>,
 {
     loop {
         let frame = frames

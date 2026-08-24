@@ -42,10 +42,13 @@ struct PhaseFrame;
 
 type PhaseInterp = StandardFixpointInterpreter<UnitInterp, PhaseProfile, (), OwnerSummaryDeps<u8>>;
 
-impl<F> Frame<PhaseInterp, F> for PhaseFrame {
+impl Frame<PhaseInterp> for PhaseFrame {
     type Completion = u8;
 
-    fn step_into(self, interp: &mut PhaseInterp) -> Result<FrameEffect<F, u8>, InterpreterError> {
+    fn step_into(
+        self,
+        interp: &mut PhaseInterp,
+    ) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         let completion = match interp.phase() {
             FixpointPhase::Join => 1,
             FixpointPhase::Widen => 10,
@@ -57,7 +60,7 @@ impl<F> Frame<PhaseInterp, F> for PhaseFrame {
     fn resume_done_into(
         self,
         _interp: &mut PhaseInterp,
-    ) -> Result<FrameEffect<F, u8>, InterpreterError> {
+    ) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         Ok(FrameEffect::Done)
     }
 
@@ -65,7 +68,7 @@ impl<F> Frame<PhaseInterp, F> for PhaseFrame {
         self,
         completion: u8,
         _interp: &mut PhaseInterp,
-    ) -> Result<FrameEffect<F, u8>, InterpreterError> {
+    ) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         Ok(FrameEffect::Complete(completion))
     }
 }

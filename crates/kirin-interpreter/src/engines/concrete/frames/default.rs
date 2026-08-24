@@ -42,11 +42,10 @@ impl<V, E> From<DiGraphFrame<V, E>> for FrameStackItem<V, E> {
 impl<I, V, E> Frame<I> for FrameStackItem<V, E>
 where
     I: FrameEngine,
-    BlockFrame<V, E>: Frame<I, BlockFrame<V, E>, FrameStackItem<V, E>, Completion = Completion<V>>,
-    CFGFrame<V, E>: Frame<I, CFGFrame<V, E>, FrameStackItem<V, E>, Completion = Completion<V>>,
-    CallFrame<V>: Frame<I, CallFrame<V>, FrameStackItem<V, E>, Completion = Completion<V>>,
-    DiGraphFrame<V, E>:
-        Frame<I, DiGraphFrame<V, E>, FrameStackItem<V, E>, Completion = Completion<V>>,
+    BlockFrame<V, E>: Frame<I, FrameStackItem<V, E>, Completion = Completion<V>>,
+    CFGFrame<V, E>: Frame<I, FrameStackItem<V, E>, Completion = Completion<V>>,
+    CallFrame<V>: Frame<I, FrameStackItem<V, E>, Completion = Completion<V>>,
+    DiGraphFrame<V, E>: Frame<I, FrameStackItem<V, E>, Completion = Completion<V>>,
 {
     type Completion = Completion<V>;
 

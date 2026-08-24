@@ -73,7 +73,7 @@ where
     ///
     /// Reading the yields is all this step needs, so it asks for [`Env`] alone —
     /// not [`DiGraphQueries`], whose schedule was already consumed.
-    fn finish<I, R>(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E>
+    fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E>
     where
         I: Env<Value = V, Error = E>,
     {
@@ -86,10 +86,10 @@ where
     }
 }
 
-impl<I, R, V, E> Frame<I, Self, R> for DiGraphFrame<V, E>
+impl<I, F, V, E> Frame<I, F> for DiGraphFrame<V, E>
 where
-    I: DiGraphQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = R>,
-    R: From<CallRequest<V>>,
+    I: DiGraphQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = F>,
+    F: From<CallRequest<V>>,
     V: Clone,
     E: From<InterpreterError>,
 {
@@ -98,7 +98,7 @@ where
     /// Execute the next scheduled node and translate its
     /// [`SparseForwardEffect`] into a [`FrameEffect`] over the total frame
     /// stack-item type selected by the engine configuration.
-    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         // First step: fetch the walk plan and bind the boundary ports.
         if let Some(args) = self.pending.take() {
             let plan = interp.digraph_walk_plan(self.stage, self.graph)?;
@@ -117,7 +117,7 @@ where
         }
 
         let Some(statement) = self.schedule.as_mut().and_then(|s| s.pop_front()) else {
-            return self.finish::<I, R>(interp);
+            return self.finish::<I, F>(interp);
         };
 
         match interp.run_statement(self.stage, statement, self.index)? {
@@ -150,7 +150,7 @@ where
 
     /// A child finished without a payload (e.g. a returned call whose results
     /// are already written): resume the schedule.
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         Ok(FrameEffect::Continue(self))
     }
 
@@ -161,7 +161,7 @@ where
         mut self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         match completion {
             Completion::Finished(values) | Completion::Yielded(values) => {
                 let slots = self.resume_slots.take().ok_or_else(|| {

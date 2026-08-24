@@ -27,9 +27,6 @@
 //! re-run the owner when several call sites share one key, and a directed cycle
 //! is rejected identically by both engines.
 
-use std::cell::RefCell;
-use std::hash::Hash;
-
 use kirin::prelude::*;
 use kirin_arith::{
     Arith, ArithConversionError, ArithType, ArithValue, interpreter::DivisionByZero,
@@ -39,15 +36,15 @@ use kirin_constant::Constant;
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::Lexical;
 use kirin_interpreter::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-    AbstractFrameBuild, BlockFrame, Body, BodyFrameEntry, CFGFrame, CallBodyTraversal, CallContext,
-    CallFrame, CallRequest, Completion, ConcreteInterpreter, ConcreteInterpreterCore,
-    ContextInsensitive, DefaultCallBodyTraversal, DiGraphFrame, ForwardDataflowFrameEngine, Frame,
-    FrameEffect, FrameEngine, FunctionEntry, Interpretable, InterpreterError, SameStageLinker,
-    SparseForwardInterp, SparseForwardInterpreter, expect_single,
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, BlockFrame,
+    Body, BodyFrameEntry, CFGFrame, CallBodyTraversal, CallContext, CallFrame, CallRequest,
+    Completion, ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive,
+    DefaultCallBodyTraversal, DiGraphFrame, Frame, FrameEffect, FrameEngine, FunctionEntry,
+    Interpretable, InterpreterError, SameStageLinker, SparseForwardInterpreter, expect_single,
 };
 use kirin_scf::{ScfForFrame, ScfIfFrame, StructuredControlFlow};
 use kirin_test_languages::GraphFunctionLanguage;
+use std::cell::RefCell;
 
 /// Total error for the test engines: the framework error plus the value
 /// conversion/trap errors the languages' rules can raise.
@@ -328,12 +325,12 @@ impl<V, E, T> From<ScfForFrame<V, E>> for FrameStackItem<V, E, T> {
 impl<I, V, E, T> Frame<I> for FrameStackItem<V, E, T>
 where
     I: FrameEngine,
-    BlockFrame<V, E>: Frame<I, BlockFrame<V, E>, Self, Completion = Completion<V>>,
-    CFGFrame<V, E>: Frame<I, CFGFrame<V, E>, Self, Completion = Completion<V>>,
-    CallFrame<V, T>: Frame<I, CallFrame<V, T>, Self, Completion = Completion<V>>,
-    DiGraphFrame<V, E>: Frame<I, DiGraphFrame<V, E>, Self, Completion = Completion<V>>,
-    ScfIfFrame<V, E>: Frame<I, ScfIfFrame<V, E>, Self, Completion = Completion<V>>,
-    ScfForFrame<V, E>: Frame<I, ScfForFrame<V, E>, Self, Completion = Completion<V>>,
+    BlockFrame<V, E>: Frame<I, Self, Completion = Completion<V>>,
+    CFGFrame<V, E>: Frame<I, Self, Completion = Completion<V>>,
+    CallFrame<V, T>: Frame<I, Self, Completion = Completion<V>>,
+    DiGraphFrame<V, E>: Frame<I, Self, Completion = Completion<V>>,
+    ScfIfFrame<V, E>: Frame<I, Self, Completion = Completion<V>>,
+    ScfForFrame<V, E>: Frame<I, Self, Completion = Completion<V>>,
 {
     type Completion = Completion<V>;
 
@@ -587,14 +584,13 @@ type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
 /// The language's `Interpretable` rule bounds `I::Frame: From<DiGraphFrame<..>>`
 /// because its `graph_eval` variant pushes a **concrete** `DiGraphFrame`, so an
 /// abstract frame type for this language must satisfy that bound even though
-/// the abstract engine itself only ever calls `AbstractFrameBuild`. The
+/// the abstract engine itself requests only abstract member frames. The
 /// concrete walkers cannot be embedded here — their completion type is
 /// `Completion<V>`, not `AbstractCompletion<V>` — so the conversion builds
 /// `NoWalker`, which reports the gap if it is ever stepped instead of
 /// silently running concrete traversal over lattice values. Giving `graph_eval`
 /// a per-engine dispatch trait (as `kirin-scf` does for `scf.if`/`scf.for`)
 /// would remove the need for both the bound and this variant.
-#[derive(AbstractFrameBuild)]
 enum GraphAbstractFrame<V, E, K> {
     Block(AbstractBlockFrame<V, E, K>),
     Call(AbstractCallFrame<V, E, K>),
@@ -603,51 +599,70 @@ enum GraphAbstractFrame<V, E, K> {
     NoWalker(&'static str),
 }
 
+impl<V, E, K> From<AbstractBlockFrame<V, E, K>> for GraphAbstractFrame<V, E, K> {
+    fn from(frame: AbstractBlockFrame<V, E, K>) -> Self {
+        Self::Block(frame)
+    }
+}
+
+impl<V, E, K> From<AbstractCallFrame<V, E, K>> for GraphAbstractFrame<V, E, K> {
+    fn from(frame: AbstractCallFrame<V, E, K>) -> Self {
+        Self::Call(frame)
+    }
+}
+
+impl<V, E, K> From<AbstractDiGraphFrame<V, E, K>> for GraphAbstractFrame<V, E, K> {
+    fn from(frame: AbstractDiGraphFrame<V, E, K>) -> Self {
+        Self::DiGraph(frame)
+    }
+}
+
 impl<V, E, K> From<DiGraphFrame<V, E>> for GraphAbstractFrame<V, E, K> {
     fn from(_: DiGraphFrame<V, E>) -> Self {
         GraphAbstractFrame::NoWalker("no abstract digraph walker")
     }
 }
 
-impl<I, F, V, E, K> Frame<I, F> for GraphAbstractFrame<V, E, K>
+impl<I, V, E, K> Frame<I> for GraphAbstractFrame<V, E, K>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
-        + SparseForwardInterp<Frame = F>,
-    F: AbstractFrameBuild<V, E, K>,
-    V: Clone + PartialEq,
+    I: FrameEngine<Error = E>,
+    AbstractBlockFrame<V, E, K>: Frame<I, Self, Completion = AbstractCompletion<V>>,
+    AbstractCallFrame<V, E, K>: Frame<I, Self, Completion = AbstractCompletion<V>>,
+    AbstractDiGraphFrame<V, E, K>: Frame<I, Self, Completion = AbstractCompletion<V>>,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
-    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, E> {
         match self {
-            GraphAbstractFrame::Block(frame) => frame.step_into(interp),
-            GraphAbstractFrame::Call(frame) => frame.step_into(interp),
-            GraphAbstractFrame::DiGraph(frame) => frame.step_into(interp),
-            GraphAbstractFrame::NoWalker(reason) => Err(E::from(InterpreterError::Custom(reason))),
+            Self::Block(frame) => Ok(frame.step_into(interp)?.map_next(Self::Block)),
+            Self::Call(frame) => Ok(frame.step_into(interp)?.map_next(Self::Call)),
+            Self::DiGraph(frame) => Ok(frame.step_into(interp)?.map_next(Self::DiGraph)),
+            Self::NoWalker(reason) => Err(E::from(InterpreterError::Custom(reason))),
         }
     }
 
-    fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+    fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, E> {
         match self {
-            GraphAbstractFrame::Block(frame) => frame.resume_done_into(interp),
-            GraphAbstractFrame::Call(frame) => frame.resume_done_into(interp),
-            GraphAbstractFrame::DiGraph(frame) => frame.resume_done_into(interp),
-            GraphAbstractFrame::NoWalker(reason) => Err(E::from(InterpreterError::Custom(reason))),
+            Self::Block(frame) => Ok(frame.resume_done_into(interp)?.map_next(Self::Block)),
+            Self::Call(frame) => Ok(frame.resume_done_into(interp)?.map_next(Self::Call)),
+            Self::DiGraph(frame) => Ok(frame.resume_done_into(interp)?.map_next(Self::DiGraph)),
+            Self::NoWalker(reason) => Err(E::from(InterpreterError::Custom(reason))),
         }
     }
 
     fn resume_into(
         self,
-        completion: AbstractCompletion<V>,
+        completion: Self::Completion,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+    ) -> Result<FrameEffect<Self, Self::Completion>, E> {
         match self {
-            GraphAbstractFrame::Block(frame) => frame.resume_into(completion, interp),
-            GraphAbstractFrame::Call(frame) => frame.resume_into(completion, interp),
-            GraphAbstractFrame::DiGraph(frame) => frame.resume_into(completion, interp),
-            GraphAbstractFrame::NoWalker(reason) => Err(E::from(InterpreterError::Custom(reason))),
+            Self::Block(frame) => Ok(frame.resume_into(completion, interp)?.map_next(Self::Block)),
+            Self::Call(frame) => Ok(frame.resume_into(completion, interp)?.map_next(Self::Call)),
+            Self::DiGraph(frame) => Ok(frame
+                .resume_into(completion, interp)?
+                .map_next(Self::DiGraph)),
+            Self::NoWalker(reason) => Err(E::from(InterpreterError::Custom(reason))),
         }
     }
 }

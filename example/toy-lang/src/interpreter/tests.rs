@@ -555,29 +555,14 @@ fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
     assert_eq!(result, ConstProp::Const(1));
 }
 
-/// Analysis-author surface retained for the abstract-engine review: a custom
-/// policy budget and a custom abstract frame wrapper.
+/// Analysis-author surface for a custom abstract policy budget.
 mod advanced {
-    use std::cell::RefCell;
-    use std::hash::Hash;
-
     use kirin_constprop::{ConstPropContext, ConstPropValue};
-    use kirin_interpreter::SameStageLinker;
-use kirin_interpreter::engine::{
-        AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, CallContext,
-        CrossStageLinker, ForwardDataflowFrameEngine, Frame, FrameEffect, InterpreterError,
-        SparseForwardInterp, SparseForwardInterpreter, expect_single,
-    };
-    use kirin_scf::{
-        AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf,
-        ForLoopValue,
-    };
+    use kirin_interpreter::{SameStageLinker, engine::expect_single};
 
     use super::build_pipeline;
-    use kirin::prelude::Lattice;
 
-    use crate::interpreter::{ToyAbstractFrame, ToyError};
-    use crate::stage::Stage;
+    use crate::interpreter::ToyError;
 
     // --- A capped custom abstract policy -----------------------------------
 
@@ -598,135 +583,6 @@ use kirin_interpreter::engine::{
         )
         .unwrap();
         assert_eq!(result, ConstPropValue::Top);
-    }
-
-    // --- A custom total ABSTRACT frame enum --------------------------------
-    //
-    // The abstract analogue of `TracingFrame`: it reuses the standard abstract
-    // frames verbatim (via `AbstractFrameBuild` + the `*_into` methods) and adds
-    // observation. The engine is not forked — only `SparseForwardInterpreter`'s `F`
-    // type parameter changes. This proves abstract *traversal* is frame-
-    // parametric, distinct from the analysis-policy `P` budget customized above.
-
-    thread_local! {
-        static ATRACE: RefCell<AbstractTrace> = const {
-            RefCell::new(AbstractTrace {
-                block_steps: 0,
-                if_steps: 0,
-                calls: 0,
-            })
-        };
-    }
-
-    #[derive(Clone, Copy, Default)]
-    struct AbstractTrace {
-        block_steps: usize,
-        if_steps: usize,
-        calls: usize,
-    }
-
-    /// The abstract analogue of [`TracingFrame`]: a wrapper universe embedding
-    /// `ToyAbstractFrame` whole rather than re-listing its variants.
-    struct TracingAbstractFrame<V, E, K>(ToyAbstractFrame<V, E, K>);
-
-    impl<V, E, K> AbstractFrameBuild<V, E, K> for TracingAbstractFrame<V, E, K> {
-        fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
-            Self(ToyAbstractFrame::Block(frame))
-        }
-        fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
-            Self(ToyAbstractFrame::Call(frame))
-        }
-    }
-
-    impl<V, E, K> BuildAbstractScfIf<V, E, K> for TracingAbstractFrame<V, E, K> {
-        fn scf_if(frame: AbstractScfIfFrame<V, E, K>) -> Self {
-            Self(ToyAbstractFrame::ScfIf(frame))
-        }
-    }
-
-    impl<V, E, K> BuildAbstractScfFor<V, E, K> for TracingAbstractFrame<V, E, K> {
-        fn scf_for(frame: AbstractScfForFrame<V, E, K>) -> Self {
-            Self(ToyAbstractFrame::ScfFor(frame))
-        }
-    }
-
-    impl<I, F, V, E, K> Frame<I, F> for TracingAbstractFrame<V, E, K>
-    where
-        I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
-            + SparseForwardInterp<Frame = F>,
-        F: AbstractFrameBuild<V, E, K> + BuildAbstractScfIf<V, E, K> + BuildAbstractScfFor<V, E, K>,
-        V: Clone + PartialEq + ForLoopValue + Lattice,
-        E: From<InterpreterError>,
-        K: Clone + Eq + Hash,
-    {
-        type Completion = AbstractCompletion<V>;
-
-        fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
-            match &self.0 {
-                ToyAbstractFrame::Block(_) => ATRACE.with(|t| t.borrow_mut().block_steps += 1),
-                ToyAbstractFrame::Call(_) => ATRACE.with(|t| t.borrow_mut().calls += 1),
-                ToyAbstractFrame::ScfIf(_) => ATRACE.with(|t| t.borrow_mut().if_steps += 1),
-                ToyAbstractFrame::ScfFor(_) => {}
-            }
-            self.0.step_into(interp)
-        }
-
-        fn resume_done_into(
-            self,
-            interp: &mut I,
-        ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
-            self.0.resume_done_into(interp)
-        }
-
-        fn resume_into(
-            self,
-            completion: AbstractCompletion<V>,
-            interp: &mut I,
-        ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
-            self.0.resume_into(completion, interp)
-        }
-    }
-
-    type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
-
-    type TracingAnalysis<'ir> = SparseForwardInterpreter<
-        'ir,
-        Stage,
-        ConstPropValue,
-        ToyError,
-        CrossStageLinker,
-        ConstPropContext,
-        TracingAbstractFrame<ConstPropValue, ToyError, CpKey>,
-    >;
-
-    #[test]
-    fn custom_abstract_frame_analyzes_program_and_observes_traversal() {
-        ATRACE.with(|t| *t.borrow_mut() = AbstractTrace::default());
-        let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
-
-        // SparseForwardInterpreter parameterized by the *custom* abstract frame enum.
-        let mut analysis: TracingAnalysis<'_> =
-            SparseForwardInterpreter::new(&pipeline).with_linker(CrossStageLinker);
-        let result = expect_single::<ConstPropValue, ToyError>(
-            analysis
-                .analyze_by_name("source", "factorial", [ConstPropValue::Const(5)])
-                .unwrap(),
-        )
-        .unwrap();
-
-        // (1)+(2): the custom abstract frame ran the real interprocedural fixpoint
-        // correctly by reusing the standard abstract frames — precise recursive
-        // constant propagation, no engine fork.
-        assert_eq!(result, ConstPropValue::Const(120));
-
-        // (3): abstract traversal is observable through the custom frame — a real
-        // frame type `F`, not merely a custom analysis policy `P`. Counts are not
-        // pinned (the interprocedural fixpoint re-enqueues summaries). Since M3b,
-        // CFG convergence is owner-based: each block is a block owner walked by a
-        // block frame, so traversal shows up as block + call steps.
-        let trace = ATRACE.with(|t| *t.borrow());
-        assert!(trace.block_steps > 0, "block frames must be stepped");
-        assert!(trace.calls > 0, "call frames must be stepped");
     }
 }
 
