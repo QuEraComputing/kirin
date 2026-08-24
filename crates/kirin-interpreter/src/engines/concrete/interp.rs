@@ -4,34 +4,20 @@ use kirin_ir::{Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta,
 
 use crate::core::query;
 use crate::{
-    BlockQueries, CFGQueries, CallFrame, CallServices, CallableBody, Callee, Completion,
-    DiGraphQueries, Env, EnvIndex, EnvStackStore, ForwardEval, Frame, FrameBuild, FunctionTarget,
-    Interp, InterpDispatch, InterpLocation, InterpreterError, Linker, SameStageLinker,
-    SparseForwardEffect, StageQuery, StandardFrame, StatementDispatch, Store, drive_frames,
+    BlockQueries, CFGQueries, CallServices, CallableBody, Callee, Completion, DiGraphQueries, Env,
+    EnvIndex, EnvStackStore, ForwardEval, Frame, FunctionTarget, Interp, InterpDispatch,
+    InterpLocation, InterpreterError, Linker, SameStageLinker, SparseForwardEffect, StageQuery,
+    StatementDispatch, Store, drive_frames,
 };
 
-/// Concrete executor: runs IR over a concrete value domain with an explicit
-/// frame stack (no Rust-stack recursion for interpreter control flow).
+use super::frames::{CallRequest, FrameStackItem};
+
+/// Concrete interpreter mechanism parameterized by one private frame-stack-item type.
 ///
-/// Traversal lives in [`Frame`]s, not in the engine: the driver pops a frame,
-/// steps it, and applies the returned [`FrameEffect`](crate::FrameEffect). The total frame type `F`
-/// defaults to [`StandardFrame`]; a compiler author can supply a custom frame
-/// enum — reusing the standard frames via [`FrameBuild`] — to customize
-/// traversal without forking the engine.
-///
-/// ```ignore
-/// let mut interp = ConcreteInterpreter::<Stage, i64, MyError>::new(&pipeline)
-///     .with_linker(CrossStageLinker);
-/// let result = interp.call_by_name("source", "main", [3, 5])?;
-/// ```
-pub struct ConcreteInterpreter<
-    'ir,
-    S: StageMeta,
-    V,
-    E,
-    Lk = SameStageLinker,
-    F = StandardFrame<V, E>,
-> {
+/// Language crates keep `F` private and expose a domain-specific wrapper, as
+/// [`ConcreteInterpreter`] does for the framework-default composition. Member
+/// frames stay generic over `F` and never name or construct its variants.
+pub struct ConcreteInterpreterCore<'ir, S: StageMeta, V, E, Lk, F> {
     pipeline: &'ir Pipeline<S>,
     linker: Lk,
     store: EnvStackStore<V>,
@@ -42,7 +28,41 @@ pub struct ConcreteInterpreter<
     _marker: PhantomData<fn() -> E>,
 }
 
-impl<'ir, S: StageMeta, V, E, F> ConcreteInterpreter<'ir, S, V, E, SameStageLinker, F> {
+type DefaultConcreteCore<'ir, S, V, E, Lk> =
+    ConcreteInterpreterCore<'ir, S, V, E, Lk, FrameStackItem<V, E>>;
+
+/// Public concrete interpreter using the framework-default continuation
+/// composition (`Block`, `CFG`, `Call`, and `DiGraph`).
+///
+/// The heterogeneous [`FrameStackItem`] enum is hidden behind this wrapper. A
+/// language that adds dialect-owned continuations builds the same kind of
+/// wrapper around [`ConcreteInterpreterCore`] with its own private stack-item
+/// enum.
+pub struct ConcreteInterpreter<'ir, S: StageMeta, V, E, Lk = SameStageLinker> {
+    inner: DefaultConcreteCore<'ir, S, V, E, Lk>,
+}
+
+impl<'ir, S: StageMeta, V, E> ConcreteInterpreter<'ir, S, V, E, SameStageLinker> {
+    pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
+        Self {
+            inner: ConcreteInterpreterCore::new(pipeline),
+        }
+    }
+}
+
+impl<'ir, S: StageMeta, V, E, Lk> ConcreteInterpreter<'ir, S, V, E, Lk> {
+    pub fn with_linker<Lk2>(self, linker: Lk2) -> ConcreteInterpreter<'ir, S, V, E, Lk2> {
+        ConcreteInterpreter {
+            inner: self.inner.with_linker(linker),
+        }
+    }
+
+    pub fn pipeline(&self) -> &'ir Pipeline<S> {
+        self.inner.pipeline()
+    }
+}
+
+impl<'ir, S: StageMeta, V, E, F> ConcreteInterpreterCore<'ir, S, V, E, SameStageLinker, F> {
     pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
             pipeline,
@@ -55,10 +75,10 @@ impl<'ir, S: StageMeta, V, E, F> ConcreteInterpreter<'ir, S, V, E, SameStageLink
     }
 }
 
-impl<'ir, S: StageMeta, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F> {
+impl<'ir, S: StageMeta, V, E, Lk, F> ConcreteInterpreterCore<'ir, S, V, E, Lk, F> {
     /// Swap the calling-convention component (the [`Linker`]).
-    pub fn with_linker<Lk2>(self, linker: Lk2) -> ConcreteInterpreter<'ir, S, V, E, Lk2, F> {
-        ConcreteInterpreter {
+    pub fn with_linker<Lk2>(self, linker: Lk2) -> ConcreteInterpreterCore<'ir, S, V, E, Lk2, F> {
+        ConcreteInterpreterCore {
             pipeline: self.pipeline,
             linker,
             store: self.store,
@@ -73,7 +93,7 @@ impl<'ir, S: StageMeta, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F> {
     }
 }
 
-impl<'ir, S, V, E, Lk, F> Interp for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> Interp for ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: StageMeta,
     V: Clone,
@@ -97,7 +117,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, F> Env for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> Env for ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: StageMeta,
     V: Clone,
@@ -116,7 +136,7 @@ where
 // into one impl block per capability so the components stay individually
 // nameable, and the blanket impl gives it `ForwardFrameEngine`/`ForwardFrameEngine`.
 
-impl<'ir, S, V, E, Lk, F> CallServices for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> CallServices for ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: StageQuery + InterpDispatch<Self>,
     V: Clone,
@@ -159,7 +179,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, F> StatementDispatch for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> StatementDispatch for ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: StageQuery + InterpDispatch<Self>,
     V: Clone,
@@ -187,7 +207,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, F> BlockQueries for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> BlockQueries for ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: StageQuery + InterpDispatch<Self>,
     V: Clone,
@@ -212,7 +232,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, F> CFGQueries for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> CFGQueries for ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: StageQuery + InterpDispatch<Self>,
     V: Clone,
@@ -224,7 +244,7 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, F> DiGraphQueries for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> DiGraphQueries for ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: StageQuery + InterpDispatch<Self>,
     V: Clone,
@@ -240,13 +260,13 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, F> ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: StageQuery + InterpDispatch<Self>,
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,
-    F: Frame<Self, F, Completion = Completion<V>> + FrameBuild<V, E>,
+    F: Frame<Self, F, F, Completion = Completion<V>> + From<CallRequest<V>>,
 {
     /// Resolve `stage`/`function` by name and execute it to completion.
     pub fn call_by_name(
@@ -268,7 +288,7 @@ where
 
     /// Execute a function to completion and return its return product.
     ///
-    /// The root call is an ordinary [`CallFrame`]: the same call boundary
+    /// The root call is an ordinary [`CallFrame`](crate::CallFrame): the same call boundary
     /// that nested `Call` effects go through owns callee resolution, the
     /// callee activation, body-kind selection, and completion validation —
     /// there is exactly one implementation of that behavior.
@@ -280,7 +300,7 @@ where
     ) -> Result<Product<V>, E> {
         let args: Product<V> = args.into_iter().collect();
         self.frames
-            .push(F::from_call(CallFrame::root(stage, callee, args)));
+            .push(CallRequest::root(stage, callee, args).into());
         self.run()
     }
 
@@ -297,5 +317,35 @@ where
                 InterpreterError::Custom("body completion reached the frame-stack root"),
             )),
         }
+    }
+}
+
+// The bound intentionally mentions the private stack-item type: this is the seam that
+// proves the public wrapper's methods are supported without exposing that
+// representation in the wrapper's type parameters.
+#[allow(private_bounds)]
+impl<'ir, S, V, E, Lk> ConcreteInterpreter<'ir, S, V, E, Lk>
+where
+    S: StageQuery + InterpDispatch<DefaultConcreteCore<'ir, S, V, E, Lk>>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
+    pub fn call_by_name(
+        &mut self,
+        stage_name: &str,
+        function_name: &str,
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        self.inner.call_by_name(stage_name, function_name, args)
+    }
+
+    pub fn call(
+        &mut self,
+        stage: CompileStage,
+        callee: Callee,
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        self.inner.call(stage, callee, args)
     }
 }

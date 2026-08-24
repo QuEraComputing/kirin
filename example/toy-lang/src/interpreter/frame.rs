@@ -2,38 +2,33 @@
 //!
 //! The toy language uses `kirin-scf`, whose `scf.for` pushes a dialect-owned
 //! loop frame ([`ScfForFrame`]/[`AbstractScfForFrame`]). A language that uses
-//! such a dialect composes its own total frame enum embedding the standard
-//! framework frames — the representation walkers
+//! such a dialect explicitly composes the standard framework frames — the representation walkers
 //! ([`BlockFrame`]/[`CFGFrame`]/[`DiGraphFrame`]) and the [`CallFrame`] call
-//! boundary, via [`FrameBuild`]/[`AbstractFrameBuild`] — plus the dialect
-//! frames (via [`BuildScfFor`]/[`BuildAbstractScfFor`]). The engine is
-//! not forked — only the engine's `F` type parameter changes.
+//! boundary — plus the dialect frames. The abstract engines retain
+//! [`AbstractFrameBuild`] and [`BuildAbstractScfFor`] pending separate review.
 
 use std::hash::Hash;
 
 use kirin_interpreter::engine::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, BlockFrame,
-    CFGFrame, CallFrame, Completion, DefaultBodyFrames, DiGraphFrame, ForwardDataflowFrameEngine,
-    ForwardFrameEngine, Frame, FrameBuild, FrameEffect, InterpreterError, SparseForwardInterp,
+    CFGFrame, CallFrame, CallRequest, Completion, DiGraphFrame, ForwardDataflowFrameEngine, Frame,
+    FrameEffect, FrameEngine, InterpreterError, SparseForwardInterp,
 };
 use kirin_scf::{
-    AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf, BuildScfFor,
-    BuildScfIf, ForLoopValue, ScfForFrame, ScfIfFrame,
+    AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf, ForLoopValue,
+    ScfForFrame, ScfIfFrame,
 };
 
 // ===========================================================================
 // Concrete
 // ===========================================================================
 
-/// Concrete total frame: the standard representation walkers and call
-/// boundary plus the SCF if/for frames.
+/// The toy language's private concrete continuation stack element.
 ///
-/// The framework injections are derived — one constructor per walker, matched by
-/// field type. The two scf variants are injected through `kirin-scf`'s own
-/// `BuildScfIf`/`BuildScfFor`, which the dialect declares and a language
-/// implements by hand.
-#[derive(FrameBuild)]
-pub enum ToyFrame<V, E> {
+/// This enum is the language's explicit composition root: it records which
+/// framework and dialect-owned computations may coexist on one stack. Member
+/// frames never name it or construct its variants.
+pub(crate) enum FrameStackItem<V, E> {
     Block(BlockFrame<V, E>),
     CFG(CFGFrame<V, E>),
     Call(CallFrame<V>),
@@ -42,61 +37,95 @@ pub enum ToyFrame<V, E> {
     ScfFor(ScfForFrame<V, E>),
 }
 
-impl<V, E> BuildScfIf<V, E> for ToyFrame<V, E> {
-    fn scf_if(frame: ScfIfFrame<V, E>) -> Self {
-        ToyFrame::ScfIf(frame)
+impl<V, E> From<BlockFrame<V, E>> for FrameStackItem<V, E> {
+    fn from(frame: BlockFrame<V, E>) -> Self {
+        Self::Block(frame)
     }
 }
 
-impl<V, E> BuildScfFor<V, E> for ToyFrame<V, E> {
-    fn scf_for(frame: ScfForFrame<V, E>) -> Self {
-        ToyFrame::ScfFor(frame)
+impl<V, E> From<CFGFrame<V, E>> for FrameStackItem<V, E> {
+    fn from(frame: CFGFrame<V, E>) -> Self {
+        Self::CFG(frame)
     }
 }
 
-impl<I, F, V, E> Frame<I, F> for ToyFrame<V, E>
+impl<V, E> From<CallRequest<V>> for FrameStackItem<V, E> {
+    fn from(request: CallRequest<V>) -> Self {
+        Self::Call(request.into())
+    }
+}
+
+impl<V, E> From<DiGraphFrame<V, E>> for FrameStackItem<V, E> {
+    fn from(frame: DiGraphFrame<V, E>) -> Self {
+        Self::DiGraph(frame)
+    }
+}
+
+impl<V, E> From<ScfIfFrame<V, E>> for FrameStackItem<V, E> {
+    fn from(frame: ScfIfFrame<V, E>) -> Self {
+        Self::ScfIf(frame)
+    }
+}
+
+impl<V, E> From<ScfForFrame<V, E>> for FrameStackItem<V, E> {
+    fn from(frame: ScfForFrame<V, E>) -> Self {
+        Self::ScfFor(frame)
+    }
+}
+
+impl<I, V, E> Frame<I> for FrameStackItem<V, E>
 where
-    I: ForwardFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
-    F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames> + BuildScfIf<V, E> + BuildScfFor<V, E>,
-    V: Clone + ForLoopValue,
-    E: From<InterpreterError>,
+    I: FrameEngine,
+    BlockFrame<V, E>: Frame<I, BlockFrame<V, E>, Self, Completion = Completion<V>>,
+    CFGFrame<V, E>: Frame<I, CFGFrame<V, E>, Self, Completion = Completion<V>>,
+    CallFrame<V>: Frame<I, CallFrame<V>, Self, Completion = Completion<V>>,
+    DiGraphFrame<V, E>: Frame<I, DiGraphFrame<V, E>, Self, Completion = Completion<V>>,
+    ScfIfFrame<V, E>: Frame<I, ScfIfFrame<V, E>, Self, Completion = Completion<V>>,
+    ScfForFrame<V, E>: Frame<I, ScfForFrame<V, E>, Self, Completion = Completion<V>>,
 {
     type Completion = Completion<V>;
 
-    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
-            ToyFrame::Block(frame) => frame.step_into(interp),
-            ToyFrame::CFG(frame) => frame.step_into(interp),
-            ToyFrame::Call(frame) => frame.step_into(interp),
-            ToyFrame::DiGraph(frame) => frame.step_into(interp),
-            ToyFrame::ScfIf(frame) => frame.step_into(interp),
-            ToyFrame::ScfFor(frame) => frame.step_into(interp),
+            Self::Block(frame) => Ok(frame.step_into(interp)?.map_next(Self::Block)),
+            Self::CFG(frame) => Ok(frame.step_into(interp)?.map_next(Self::CFG)),
+            Self::Call(frame) => Ok(frame.step_into(interp)?.map_next(Self::Call)),
+            Self::DiGraph(frame) => Ok(frame.step_into(interp)?.map_next(Self::DiGraph)),
+            Self::ScfIf(frame) => Ok(frame.step_into(interp)?.map_next(Self::ScfIf)),
+            Self::ScfFor(frame) => Ok(frame.step_into(interp)?.map_next(Self::ScfFor)),
         }
     }
 
-    fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    fn resume_done_into(
+        self,
+        interp: &mut I,
+    ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
-            ToyFrame::Block(frame) => frame.resume_done_into(interp),
-            ToyFrame::CFG(frame) => frame.resume_done_into(interp),
-            ToyFrame::Call(frame) => frame.resume_done_into(interp),
-            ToyFrame::DiGraph(frame) => frame.resume_done_into(interp),
-            ToyFrame::ScfIf(frame) => frame.resume_done_into(interp),
-            ToyFrame::ScfFor(frame) => frame.resume_done_into(interp),
+            Self::Block(frame) => Ok(frame.resume_done_into(interp)?.map_next(Self::Block)),
+            Self::CFG(frame) => Ok(frame.resume_done_into(interp)?.map_next(Self::CFG)),
+            Self::Call(frame) => Ok(frame.resume_done_into(interp)?.map_next(Self::Call)),
+            Self::DiGraph(frame) => Ok(frame.resume_done_into(interp)?.map_next(Self::DiGraph)),
+            Self::ScfIf(frame) => Ok(frame.resume_done_into(interp)?.map_next(Self::ScfIf)),
+            Self::ScfFor(frame) => Ok(frame.resume_done_into(interp)?.map_next(Self::ScfFor)),
         }
     }
 
     fn resume_into(
         self,
-        completion: Completion<V>,
+        completion: Self::Completion,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, E> {
+    ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
         match self {
-            ToyFrame::Block(frame) => frame.resume_into(completion, interp),
-            ToyFrame::CFG(frame) => frame.resume_into(completion, interp),
-            ToyFrame::Call(frame) => frame.resume_into(completion, interp),
-            ToyFrame::DiGraph(frame) => frame.resume_into(completion, interp),
-            ToyFrame::ScfIf(frame) => frame.resume_into(completion, interp),
-            ToyFrame::ScfFor(frame) => frame.resume_into(completion, interp),
+            Self::Block(frame) => Ok(frame.resume_into(completion, interp)?.map_next(Self::Block)),
+            Self::CFG(frame) => Ok(frame.resume_into(completion, interp)?.map_next(Self::CFG)),
+            Self::Call(frame) => Ok(frame.resume_into(completion, interp)?.map_next(Self::Call)),
+            Self::DiGraph(frame) => Ok(frame
+                .resume_into(completion, interp)?
+                .map_next(Self::DiGraph)),
+            Self::ScfIf(frame) => Ok(frame.resume_into(completion, interp)?.map_next(Self::ScfIf)),
+            Self::ScfFor(frame) => Ok(frame
+                .resume_into(completion, interp)?
+                .map_next(Self::ScfFor)),
         }
     }
 }

@@ -68,11 +68,17 @@ use crate::{
 };
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
-pub enum FrameEffect<F, C> {
-    /// Replace the top of the stack with `F` and keep running.
-    Continue(F),
-    /// Push `parent` then `child`; `child` runs next, `parent` resumes after.
-    Push { parent: F, child: F },
+///
+/// `N` is how the current frame represents its next state; `Ch` is how it
+/// represents a child computation. A directly reusable frame normally uses
+/// `N = Self`. A private composition root maps the member's next state into its
+/// private stack-item enum; whether children need a distinct request type is a
+/// separate design choice.
+pub enum FrameEffect<N, C, Ch = N> {
+    /// Keep running with `N` as the frame's next state.
+    Continue(N),
+    /// Suspend `parent` and run `child` first.
+    Push { parent: N, child: Ch },
     /// This frame finished with no payload; its parent's
     /// [`Frame::resume_done_into`] is called.
     Done,
@@ -80,6 +86,22 @@ pub enum FrameEffect<F, C> {
     /// [`Frame::resume_into`] is called (or, at the root, the run finishes with
     /// `C`).
     Complete(C),
+}
+
+impl<N, C, Ch> FrameEffect<N, C, Ch> {
+    /// Map a reusable frame's next state into its stack-item representation.
+    /// The child is already expressed in the configured stack-item type.
+    pub fn map_next<N2>(self, map_next: impl FnOnce(N) -> N2) -> FrameEffect<N2, C, Ch> {
+        match self {
+            FrameEffect::Continue(next) => FrameEffect::Continue(map_next(next)),
+            FrameEffect::Push { parent, child } => FrameEffect::Push {
+                parent: map_next(parent),
+                child,
+            },
+            FrameEffect::Done => FrameEffect::Done,
+            FrameEffect::Complete(completion) => FrameEffect::Complete(completion),
+        }
+    }
 }
 
 /// Minimal capability a [`Frame`] stack needs from the engine driving it.
@@ -92,43 +114,41 @@ impl<T: Interp> FrameEngine for T {
     type Error = <T as Interp>::Error;
 }
 
-/// A continuation frame anchored in an IR traversal, expressed over the total
-/// frame type `F` it composes into.
+/// A resumable interpreter continuation.
 ///
-/// Every method consumes `self` and returns the next structural move as a
-/// [`FrameEffect`] **over `F`** — never over `Self`. That single choice is what
-/// lets one trait serve both roles a frame stack needs:
+/// Every method consumes `self` and returns the next structural move as one
+/// [`FrameEffect`]. `N` is the representation of the resumed parent and `Ch` is
+/// the representation of a child. By default the parent is `Self` and the child
+/// uses the same representation; a heterogeneous composition instead keeps the
+/// member's parent as `Self` and selects its private stack-item type as `Ch`.
 ///
-/// - a **member** — an individual walker ([`BlockFrame`](crate::BlockFrame),
-///   [`CallFrame`](crate::CallFrame), a dialect's own frame). It is one variant
-///   of `F` and names its successors in `F`, re-wrapping itself through the
-///   relevant `*FrameBuild` hook. Members are generic over `F`, so the same
-///   walker composes into any language's frame type.
-/// - a **universe** — a language's total frame enum. It implements
-///   `Frame<I, Self>` when it is the stack's element type, and stays generic
-///   over `F` so that it can *also* be embedded in a larger enum (an
-///   instrumenting wrapper, or another language's frame type) without
-///   re-enumerating its variants.
+/// The closed `FrameStackItem` enum is an implementation detail that also
+/// implements this protocol: it dispatches to a member frame and maps that
+/// member's `FrameEffect<Self, C, FrameStackItem>` into
+/// `FrameEffect<FrameStackItem, C, FrameStackItem>`. It is not a second kind of
+/// frame protocol.
 ///
-/// [`drive_frames`] bounds on `F: Frame<I, F>`: the stack's element type must be
-/// a universe — a type able to represent every frame that can appear on it.
-pub trait Frame<I: FrameEngine, F>: Sized {
+/// [`drive_frames`] requires the stack element `F` to use itself for both `N`
+/// and `Ch`, because every value placed on that homogeneous stack has type `F`.
+pub trait Frame<I: FrameEngine, N = Self, Ch = N>: Sized {
     /// The completion payload this frame family bubbles to parents/root.
     type Completion;
 
     /// Do this frame's next unit of work.
-    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<N, Self::Completion, Ch>, I::Error>;
 
     /// A pushed child finished with no payload.
-    fn resume_done_into(self, interp: &mut I)
-    -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+    fn resume_done_into(
+        self,
+        interp: &mut I,
+    ) -> Result<FrameEffect<N, Self::Completion, Ch>, I::Error>;
 
     /// A pushed child finished with a completion payload.
     fn resume_into(
         self,
         completion: Self::Completion,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+    ) -> Result<FrameEffect<N, Self::Completion, Ch>, I::Error>;
 }
 
 /// Shared frame-stepping loop.
@@ -136,7 +156,7 @@ pub fn drive_frames<I, F>(engine: &mut I, frames: &mut Vec<F>) -> Result<F::Comp
 where
     I: FrameEngine,
     I::Error: From<InterpreterError>,
-    F: Frame<I, F>,
+    F: Frame<I, F, F>,
 {
     loop {
         let frame = frames
@@ -276,9 +296,9 @@ pub trait DiGraphQueries: Interp {
     /// yields). Errors on cyclic digraphs.
     ///
     /// Digraph bodies are opt-in: an engine that never walks one inherits this
-    /// rejection rather than inventing a schedule, the same way
-    /// [`FrameBuild::from_ungraph_entry`](crate::FrameBuild::from_ungraph_entry)
-    /// rejects a callable `UnGraph` without a compiler-supplied policy.
+    /// rejection rather than inventing a schedule, the same way the default
+    /// [`CallBodyTraversal`](crate::CallBodyTraversal) rejects a callable
+    /// `UnGraph` without a compiler-supplied policy.
     fn digraph_walk_plan(
         &self,
         stage: CompileStage,
@@ -332,9 +352,9 @@ pub trait CallServices: Env {
 ///
 /// This is an umbrella, not a definition — it adds no methods and is
 /// [blanket-implemented](#impl-ForwardFrameEngine-for-T) for any engine
-/// providing the four components. Use it at the *universe* level, where a total
-/// frame enum's engine must support the union of all its variants
-/// ([`StandardFrame`](crate::StandardFrame) and downstream frame enums do).
+/// providing the four components. Use it at the *composition* level, where the
+/// engine driving a configured `FrameStackItem` enum must support the union of
+/// all its variants.
 /// Individual member frames should bound only the components they use, so a
 /// partial engine can still run them.
 pub trait ForwardFrameEngine:

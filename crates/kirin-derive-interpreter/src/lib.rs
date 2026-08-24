@@ -43,19 +43,6 @@ pub fn derive_interp_dispatch(input: TokenStream) -> TokenStream {
     }
 }
 
-/// Derive `FrameBuild<V, E>` for a **concrete** total frame enum: one
-/// constructor per framework walker it carries, matched by field type. Variants
-/// holding dialect frames are ignored — those are injected through the dialect's
-/// own `Build*` trait.
-#[proc_macro_derive(FrameBuild, attributes(interpret))]
-pub fn derive_frame_build(input: TokenStream) -> TokenStream {
-    let ast = parse_macro_input!(input as syn::DeriveInput);
-    match frame_build::generate(&ast, &frame_build::CONCRETE) {
-        Ok(tokens) => tokens.into(),
-        Err(e) => e.into_compile_error().into(),
-    }
-}
-
 /// Derive `AbstractFrameBuild<V, E, K>` for a **sparse forward** total frame
 /// enum. `from_digraph` is emitted only when a variant carries an
 /// `AbstractDiGraphFrame`; otherwise the trait's refusing default is inherited.

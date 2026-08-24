@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::block_cursor::BlockCursor;
-use super::{CallFrame, Completion, FrameBuild};
+use super::{CallRequest, Completion};
 
 /// Representation walker for exactly one [`Block`]: bind its parameters,
 /// run its statements in order, and surface the exit through the
@@ -16,7 +16,7 @@ use super::{CallFrame, Completion, FrameBuild};
 ///
 /// Traversal mechanics only. A `BlockFrame` does not own an activation, is
 /// not a call boundary, and does not know whether it is a callable function
-/// body ([`CallFrame`] → `BlockFrame`) or a nested structured-operation body
+/// body ([`CallFrame`](crate::CallFrame) → `BlockFrame`) or a nested structured-operation body
 /// (dialect frame → `BlockFrame`): the parent frame defines the role and
 /// interprets the completion. CFG transitions (`Jump`/`Branch`) are rejected
 /// — a single block owns no CFG edges; multi-block traversal is
@@ -42,20 +42,20 @@ where
     }
 }
 
-impl<I, F, V, E> Frame<I, F> for BlockFrame<V, E>
+impl<I, R, V, E> Frame<I, Self, R> for BlockFrame<V, E>
 where
-    I: BlockQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = F>,
-    F: FrameBuild<V, E>,
+    I: BlockQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = R>,
+    R: From<CallRequest<V>>,
     V: Clone,
     E: From<InterpreterError>,
 {
     type Completion = Completion<V>;
 
     /// Execute the next statement and translate its [`SparseForwardEffect`]
-    /// into a [`FrameEffect`] over the total frame type `F`.
-    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    /// into a [`FrameEffect`] over this walker and the configured child type.
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
         if self.cursor.bind_entry(interp)? {
-            return Ok(FrameEffect::Continue(F::from_block(self)));
+            return Ok(FrameEffect::Continue(self));
         }
         let Some(statement) = self.cursor.advance(interp)? else {
             return Err(E::from(InterpreterError::BlockFellThrough(
@@ -64,22 +64,22 @@ where
         };
 
         match interp.run_statement(self.cursor.stage, statement, self.cursor.index)? {
-            SparseForwardEffect::Next => Ok(FrameEffect::Continue(F::from_block(self))),
+            SparseForwardEffect::Next => Ok(FrameEffect::Continue(self)),
             SparseForwardEffect::Jump(_) | SparseForwardEffect::Branch(_) => {
                 Err(E::from(InterpreterError::CFGControlFlowInStructuredBody))
             }
             SparseForwardEffect::Push { frame, results } => {
                 self.cursor.expect_results(results);
                 Ok(FrameEffect::Push {
-                    parent: F::from_block(self),
+                    parent: self,
                     child: frame,
                 })
             }
             SparseForwardEffect::Call(call) => {
-                let pending = CallFrame::pending(self.cursor.stage, self.cursor.index, call);
+                let pending = CallRequest::pending(self.cursor.stage, self.cursor.index, call);
                 Ok(FrameEffect::Push {
-                    parent: F::from_block(self),
-                    child: F::from_call(pending),
+                    parent: self,
+                    child: pending.into(),
                 })
             }
             SparseForwardEffect::Yield(values) => {
@@ -94,22 +94,22 @@ where
     /// A child finished without a payload (its results are already in the
     /// shared activation, e.g. a returned call): resume at the advanced
     /// cursor.
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
-        Ok(FrameEffect::Continue(F::from_block(self)))
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
+        Ok(FrameEffect::Continue(self))
     }
 
     /// A child bubbled a completion: a pushed frame's values land in the
     /// push's result slots; a `Returned` keeps bubbling toward the nearest
-    /// [`CallFrame`] (this frame owns no activation to free).
+    /// [`CallFrame`](crate::CallFrame) (this frame owns no activation to free).
     fn resume_into(
         mut self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
         match completion {
             Completion::Finished(values) | Completion::Yielded(values) => {
                 self.cursor.write_child_results(interp, values)?;
-                Ok(FrameEffect::Continue(F::from_block(self)))
+                Ok(FrameEffect::Continue(self))
             }
             Completion::Returned(values) => Ok(FrameEffect::Complete(Completion::Returned(values))),
         }

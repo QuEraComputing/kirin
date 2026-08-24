@@ -48,8 +48,8 @@ pub enum GraphFunctionLanguage {
     },
     /// UnGraph-bodied callable. The framework has no default walker for an
     /// undirected graph body: calling one requires the compiler to supply a
-    /// traversal policy (`FrameBuild::from_ungraph_entry`), otherwise the
-    /// engine reports `NoDefaultWalker`.
+    /// custom `CallBodyTraversal`, otherwise the engine reports
+    /// `NoDefaultWalker`.
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
         chumsky(format = "fn {:name}{sig} {body}")
@@ -88,7 +88,7 @@ mod interpreter {
     use kirin_arith::{ArithValue, CheckedDiv, CheckedRem, interpreter::DivisionByZero};
     use kirin_interpreter::BranchCondition;
     use kirin_interpreter::{
-        CallableBody, DiGraphFrame, ForwardEval, FrameBuild, FunctionEntry, Interp, Interpretable,
+        CallableBody, DiGraphFrame, ForwardEval, FunctionEntry, Interp, Interpretable,
         InterpreterError, SparseForwardEffect, SparseForwardInterp,
     };
     use kirin_ir::{Product, SSAValue};
@@ -98,7 +98,7 @@ mod interpreter {
     impl<I> Interpretable<I, ForwardEval> for GraphFunctionLanguage
     where
         I: SparseForwardInterp,
-        I::Frame: FrameBuild<I::Value, I::Error>,
+        I::Frame: From<DiGraphFrame<I::Value, I::Error>>,
         I::Value: std::ops::Add<Output = I::Value>
             + std::ops::Sub<Output = I::Value>
             + std::ops::Mul<Output = I::Value>
@@ -129,7 +129,7 @@ mod interpreter {
                     // directly into the current activation.
                     let frame = DiGraphFrame::new(interp.stage(), interp.index(), *graph, args);
                     Ok(SparseForwardEffect::Push {
-                        frame: I::Frame::from_digraph(frame),
+                        frame: frame.into(),
                         results: [SSAValue::from(*result)].into_iter().collect(),
                     })
                 }

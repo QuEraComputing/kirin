@@ -555,10 +555,8 @@ fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
     assert_eq!(result, ConstProp::Const(1));
 }
 
-/// Compiler/analysis-author surface: a *custom total frame enum* used
-/// as the engine's `F` parameter (frame generalization), and a *custom abstract
-/// policy* budget (summary-key generalization). Both reuse the standard engine
-/// — no fork.
+/// Analysis-author surface retained for the abstract-engine review: a custom
+/// policy budget and a custom abstract frame wrapper.
 mod advanced {
     use std::cell::RefCell;
     use std::hash::Hash;
@@ -566,146 +564,20 @@ mod advanced {
     use kirin_constprop::{ConstPropContext, ConstPropValue};
     use kirin_interpreter::SameStageLinker;
 use kirin_interpreter::engine::{
-        AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, BlockFrame,
-        CFGFrame, CallContext, CallFrame, Completion, ConcreteInterpreter, CrossStageLinker,
-        DefaultBodyFrames, DiGraphFrame, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
-        FrameBuild, FrameEffect, InterpreterError, SparseForwardInterp, SparseForwardInterpreter,
-        expect_single,
+        AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, CallContext,
+        CrossStageLinker, ForwardDataflowFrameEngine, Frame, FrameEffect, InterpreterError,
+        SparseForwardInterp, SparseForwardInterpreter, expect_single,
     };
     use kirin_scf::{
         AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf,
-        BuildScfFor, BuildScfIf, ForLoopValue, ScfForFrame, ScfIfFrame,
+        ForLoopValue,
     };
 
     use super::build_pipeline;
     use kirin::prelude::Lattice;
 
-    use crate::interpreter::{ToyAbstractFrame, ToyError, ToyFrame};
+    use crate::interpreter::{ToyAbstractFrame, ToyError};
     use crate::stage::Stage;
-
-    // --- A custom total frame enum -----------------------------------------
-    //
-    // It reuses the standard representation walkers (`BlockFrame`/`CFGFrame`/
-    // `DiGraphFrame`), the `CallFrame` call boundary, and the SCF frames
-    // verbatim via `FrameBuild`/`BuildScfFor` + the delegating `*_into`
-    // methods, and adds *observation*: every call and every body step is counted
-    // in a side log. The engine is not forked — only `ConcreteInterpreter`'s `F`
-    // type parameter changes.
-
-    thread_local! {
-        static TRACE: RefCell<Trace> = const { RefCell::new(Trace { calls: 0, body_steps: 0 }) };
-    }
-
-    #[derive(Clone, Copy, Default)]
-    struct Trace {
-        calls: usize,
-        body_steps: usize,
-    }
-
-    /// A *wrapper* universe: it does not re-enumerate the language's frames, it
-    /// embeds `ToyFrame` whole and observes it. Only possible because `Frame`'s
-    /// effects are over the outer total type `F`, not over `Self` — so
-    /// `ToyFrame: Frame<I, TracingFrame>` holds as soon as `TracingFrame`
-    /// implements the build traits.
-    struct TracingFrame<V, E>(ToyFrame<V, E>);
-
-    impl<V, E> FrameBuild<V, E> for TracingFrame<V, E> {
-        type BodyFrames = DefaultBodyFrames;
-
-        fn from_block(frame: BlockFrame<V, E>) -> Self {
-            Self(ToyFrame::Block(frame))
-        }
-        fn from_cfg(frame: CFGFrame<V, E>) -> Self {
-            Self(ToyFrame::CFG(frame))
-        }
-        fn from_call(frame: CallFrame<V>) -> Self {
-            Self(ToyFrame::Call(frame))
-        }
-        fn from_digraph(frame: DiGraphFrame<V, E>) -> Self {
-            Self(ToyFrame::DiGraph(frame))
-        }
-    }
-
-    impl<V, E> BuildScfIf<V, E> for TracingFrame<V, E> {
-        fn scf_if(frame: ScfIfFrame<V, E>) -> Self {
-            Self(ToyFrame::ScfIf(frame))
-        }
-    }
-
-    impl<V, E> BuildScfFor<V, E> for TracingFrame<V, E> {
-        fn scf_for(frame: ScfForFrame<V, E>) -> Self {
-            Self(ToyFrame::ScfFor(frame))
-        }
-    }
-
-    impl<I, F, V, E> Frame<I, F> for TracingFrame<V, E>
-    where
-        I: ForwardFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
-        F: FrameBuild<V, E, BodyFrames = DefaultBodyFrames> + BuildScfIf<V, E> + BuildScfFor<V, E>,
-        V: Clone + ForLoopValue,
-        E: From<InterpreterError>,
-    {
-        type Completion = Completion<V>;
-
-        fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
-            match &self.0 {
-                ToyFrame::Block(_) | ToyFrame::CFG(_) => {
-                    TRACE.with(|t| t.borrow_mut().body_steps += 1)
-                }
-                ToyFrame::Call(_) => TRACE.with(|t| t.borrow_mut().calls += 1),
-                _ => {}
-            }
-            self.0.step_into(interp)
-        }
-
-        fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
-            self.0.resume_done_into(interp)
-        }
-
-        fn resume_into(
-            self,
-            completion: Completion<V>,
-            interp: &mut I,
-        ) -> Result<FrameEffect<F, Completion<V>>, E> {
-            self.0.resume_into(completion, interp)
-        }
-    }
-
-    type TracingInterpreter<'ir> = ConcreteInterpreter<
-        'ir,
-        Stage,
-        i64,
-        ToyError,
-        CrossStageLinker,
-        TracingFrame<i64, ToyError>,
-    >;
-
-    #[test]
-    fn custom_frame_runs_program_and_observes_traversal() {
-        TRACE.with(|t| *t.borrow_mut() = Trace::default());
-        let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
-
-        // ConcreteInterpreter parameterized by the *custom* frame enum.
-        let mut interp: TracingInterpreter<'_> =
-            ConcreteInterpreter::new(&pipeline).with_linker(CrossStageLinker);
-        let result = expect_single::<i64, ToyError>(
-            interp.call_by_name("source", "factorial", [5]).unwrap(),
-        )
-        .unwrap();
-
-        // (1)+(2): the custom frame ran the real program correctly by reusing
-        // the standard walker/CallFrame traversal (no engine fork).
-        assert_eq!(result, 120);
-
-        // (3): traversal is observable through the custom frame. factorial(5)
-        // is 5 activations: the root call plus 4 recursive calls (5→4→3→2→1;
-        // the base case at 1 makes none) — every call, root included, is one
-        // `CallFrame` routed through the custom Call arm; body statements run
-        // through its Block/CFG arms.
-        let trace = TRACE.with(|t| *t.borrow());
-        assert_eq!(trace.calls, 5);
-        assert!(trace.body_steps > 0);
-    }
 
     // --- A capped custom abstract policy -----------------------------------
 

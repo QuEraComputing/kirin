@@ -12,15 +12,16 @@ mod frame;
 mod tests;
 
 pub use error::ToyError;
-pub use frame::{ToyAbstractFrame, ToyDenseBackwardFrame, ToyFrame};
+use frame::FrameStackItem;
+pub use frame::{ToyAbstractFrame, ToyDenseBackwardFrame};
 
 use kirin::prelude::{CFG, CompileStage, GetInfo, Pipeline, UniqueLiveSpecializationError};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::{Lexical, Lifted};
 use kirin_interpreter::InterpreterError;
 use kirin_interpreter::engine::{
-    CallContext, ConcreteInterpreter, CrossStageLinker, SameStageLinker, SparseForwardInterpreter,
-    expect_single,
+    CallContext, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
+    SparseForwardInterpreter, expect_single,
 };
 use kirin_liveness::{DenseLivenessResult, LiveSet};
 
@@ -30,10 +31,45 @@ use crate::stage::Stage;
 /// Summary key of the constant-propagation analysis policy.
 type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
 
-/// Concrete cross-language interpreter over machine integers. Its frame type
-/// embeds the SCF loop frame (the toy language uses `scf.for`).
-pub type ToyInterpreter<'ir, Lk = CrossStageLinker> =
-    ConcreteInterpreter<'ir, Stage, i64, ToyError, Lk, ToyFrame<i64, ToyError>>;
+type ToyEngine<'ir, Lk> =
+    ConcreteInterpreterCore<'ir, Stage, i64, ToyError, Lk, FrameStackItem<i64, ToyError>>;
+
+/// Concrete toy-language interpreter. Its explicitly declared frame-stack-item enum
+/// includes the dialect-owned SCF continuations but remains private behind
+/// this wrapper.
+pub struct ToyInterpreter<'ir, Lk = CrossStageLinker> {
+    inner: ToyEngine<'ir, Lk>,
+}
+
+impl<'ir> ToyInterpreter<'ir, CrossStageLinker> {
+    pub fn new(pipeline: &'ir Pipeline<Stage>) -> Self {
+        Self {
+            inner: ConcreteInterpreterCore::new(pipeline).with_linker(CrossStageLinker),
+        }
+    }
+}
+
+impl<'ir> ToyInterpreter<'ir, SameStageLinker> {
+    fn same_stage(pipeline: &'ir Pipeline<Stage>) -> Self {
+        Self {
+            inner: ConcreteInterpreterCore::new(pipeline),
+        }
+    }
+}
+
+impl<'ir, Lk> ToyInterpreter<'ir, Lk>
+where
+    Lk: Linker<Stage>,
+{
+    pub fn call_by_name(
+        &mut self,
+        stage_name: &str,
+        function_name: &str,
+        args: impl IntoIterator<Item = i64>,
+    ) -> Result<kirin::prelude::Product<i64>, ToyError> {
+        self.inner.call_by_name(stage_name, function_name, args)
+    }
+}
 
 /// Cross-language constant propagation, with a frame type embedding the SCF
 /// loop frame.
@@ -55,8 +91,7 @@ pub fn run_i64(
     function_name: &str,
     args: &[i64],
 ) -> Result<i64, ToyError> {
-    let mut interp: ToyInterpreter<'_> =
-        ConcreteInterpreter::new(pipeline).with_linker(CrossStageLinker);
+    let mut interp = ToyInterpreter::new(pipeline);
     expect_single(interp.call_by_name(stage_name, function_name, args.iter().copied())?)
 }
 
@@ -84,7 +119,7 @@ fn run_same_stage_i64(
     function_name: &str,
     args: &[i64],
 ) -> Result<i64, ToyError> {
-    let mut interp: ToyInterpreter<'_, SameStageLinker> = ConcreteInterpreter::new(pipeline);
+    let mut interp = ToyInterpreter::same_stage(pipeline);
     expect_single(interp.call_by_name(stage_name, function_name, args.iter().copied())?)
 }
 

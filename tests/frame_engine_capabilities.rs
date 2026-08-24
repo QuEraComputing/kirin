@@ -28,29 +28,29 @@
 //! the point — these are type-level assertions, and the behavioral coverage
 //! lives in `tests/body_kinds.rs` and the engine crates.
 
-// Everything here exists to be *type-checked*, not read: the frame variants
-// prove the universes are constructible and the storage exists only to satisfy
-// `Env`, so "never read" is the expected state of this file.
+// Everything here exists to be *type-checked*, not read: the child variants
+// prove the narrow conversion bounds are satisfiable and the storage exists
+// only to satisfy `Env`, so "never read" is the expected state of this file.
 #![allow(dead_code)]
 
 use std::collections::HashMap;
 
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCallFrame, AbstractDiGraphFrame, AbstractFrameBuild, BlockFrame,
-    BlockQueries, CFGFrame, CFGQueries, CallEffect, CallFrame, CallServices, CallableBody, Callee,
-    DefaultBodyFrames, DiGraphFrame, DiGraphQueries, Env, EnvIndex, ForwardDataflowFrameEngine,
-    ForwardEval, ForwardFrameEngine, Frame, FrameBuild, FunctionTarget, Interp, InterpreterError,
-    SparseForwardEffect, StatementDispatch,
+    BlockQueries, CFGFrame, CFGQueries, CallEffect, CallFrame, CallRequest, CallServices,
+    CallableBody, Callee, DefaultCallBodyTraversal, DiGraphFrame, DiGraphQueries, Env, EnvIndex,
+    ForwardDataflowFrameEngine, ForwardEval, ForwardFrameEngine, Frame, FunctionTarget, Interp,
+    InterpreterError, SparseForwardEffect, StatementDispatch,
 };
 use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
 
 /// The compile-time assertions this file is made of.
 ///
 /// None is ever called; instantiating them is what type-checks the bounds.
-fn assert_frame<I, F, T>()
+fn assert_frame<I, N, R, T>()
 where
     I: kirin_interpreter::FrameEngine,
-    T: Frame<I, F>,
+    T: Frame<I, N, R>,
 {
 }
 
@@ -59,6 +59,38 @@ fn assert_dataflow_engine<I: ForwardDataflowFrameEngine>() {}
 /// The `*Queries` traits must be satisfiable **without** [`Env`] — that is what
 /// makes their names truthful.
 fn assert_read_only_queries<I: BlockQueries + CFGQueries + DiGraphQueries>() {}
+
+/// Minimal child representation for the concrete member proofs.
+enum CapabilityChild {
+    Block(BlockFrame<i64, InterpreterError>),
+    CFG(CFGFrame<i64, InterpreterError>),
+    Call(CallRequest<i64>),
+    DiGraph(DiGraphFrame<i64, InterpreterError>),
+}
+
+impl From<BlockFrame<i64, InterpreterError>> for CapabilityChild {
+    fn from(frame: BlockFrame<i64, InterpreterError>) -> Self {
+        Self::Block(frame)
+    }
+}
+
+impl From<CFGFrame<i64, InterpreterError>> for CapabilityChild {
+    fn from(frame: CFGFrame<i64, InterpreterError>) -> Self {
+        Self::CFG(frame)
+    }
+}
+
+impl From<CallRequest<i64>> for CapabilityChild {
+    fn from(request: CallRequest<i64>) -> Self {
+        Self::Call(request)
+    }
+}
+
+impl From<DiGraphFrame<i64, InterpreterError>> for CapabilityChild {
+    fn from(frame: DiGraphFrame<i64, InterpreterError>) -> Self {
+        Self::DiGraph(frame)
+    }
+}
 
 // ===========================================================================
 // Shared mock storage
@@ -89,7 +121,7 @@ struct BlockOnlyEngine {
 impl Interp for BlockOnlyEngine {
     type Value = i64;
     type Error = InterpreterError;
-    type Effect = SparseForwardEffect<i64, MockFrame>;
+    type Effect = SparseForwardEffect<i64, CapabilityChild>;
     type Semantics = ForwardEval;
 
     fn stage(&self) -> CompileStage {
@@ -159,41 +191,14 @@ impl BlockQueries for BlockOnlyEngine {
     }
 }
 
-/// A total concrete frame type for the mocks.
-///
-/// Note it *carries* a [`CallFrame`] variant and implements
-/// [`FrameBuild::from_call`]: **building** the universe is independent of whether
-/// a given engine can **step** every variant. `BlockOnlyEngine` can step the
-/// block walker but could never step this `Call` variant — and that is exactly
-/// the separation the capability split expresses, so no `Frame` impl is
-/// asserted for `MockFrame` itself.
-enum MockFrame {
-    Block(BlockFrame<i64, InterpreterError>),
-    CFG(CFGFrame<i64, InterpreterError>),
-    Call(CallFrame<i64, DefaultBodyFrames>),
-    DiGraph(DiGraphFrame<i64, InterpreterError>),
-}
-
-impl FrameBuild<i64, InterpreterError> for MockFrame {
-    type BodyFrames = DefaultBodyFrames;
-
-    fn from_block(frame: BlockFrame<i64, InterpreterError>) -> Self {
-        MockFrame::Block(frame)
-    }
-    fn from_cfg(frame: CFGFrame<i64, InterpreterError>) -> Self {
-        MockFrame::CFG(frame)
-    }
-    fn from_call(frame: CallFrame<i64, DefaultBodyFrames>) -> Self {
-        MockFrame::Call(frame)
-    }
-    fn from_digraph(frame: DiGraphFrame<i64, InterpreterError>) -> Self {
-        MockFrame::DiGraph(frame)
-    }
-}
-
 #[test]
 fn block_frame_runs_on_an_engine_with_only_block_queries_and_dispatch() {
-    assert_frame::<BlockOnlyEngine, MockFrame, BlockFrame<i64, InterpreterError>>();
+    assert_frame::<
+        BlockOnlyEngine,
+        BlockFrame<i64, InterpreterError>,
+        CapabilityChild,
+        BlockFrame<i64, InterpreterError>,
+    >();
 }
 
 // ===========================================================================
@@ -280,7 +285,12 @@ impl CallServices for CallOnlyEngine {
 
 #[test]
 fn call_frame_runs_on_an_engine_with_only_call_services() {
-    assert_frame::<CallOnlyEngine, MockFrame, CallFrame<i64, DefaultBodyFrames>>();
+    assert_frame::<
+        CallOnlyEngine,
+        CallFrame<i64, DefaultCallBodyTraversal>,
+        CapabilityChild,
+        CallFrame<i64, DefaultCallBodyTraversal>,
+    >();
 }
 
 // ===========================================================================
@@ -417,8 +427,8 @@ impl ForwardDataflowFrameEngine for AbstractOnlyEngine {
     }
 }
 
-/// The abstract counterpart of [`MockFrame`], again carrying the call variant it
-/// can build but this engine could never step.
+/// Legacy abstract total enum used to prove the abstract member bounds. Its
+/// composition model is intentionally unchanged pending the abstract review.
 enum MockAbstractFrame {
     Block(AbstractBlockFrame<i64, InterpreterError, ()>),
     Call(AbstractCallFrame<i64, InterpreterError, ()>),
@@ -449,15 +459,18 @@ fn abstract_engine_needs_no_concrete_call_lifecycle() {
     assert_frame::<
         AbstractOnlyEngine,
         MockAbstractFrame,
+        MockAbstractFrame,
         AbstractBlockFrame<i64, InterpreterError, ()>,
     >();
     assert_frame::<
         AbstractOnlyEngine,
         MockAbstractFrame,
+        MockAbstractFrame,
         AbstractCallFrame<i64, InterpreterError, ()>,
     >();
     assert_frame::<
         AbstractOnlyEngine,
+        MockAbstractFrame,
         MockAbstractFrame,
         AbstractDiGraphFrame<i64, InterpreterError, ()>,
     >();

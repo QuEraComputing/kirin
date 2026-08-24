@@ -17,8 +17,9 @@
 //! structured `Yield` as [`Completion::Yielded`], which the SCF frame consumes,
 //! while a function `Return` ([`Completion::Returned`]) is relayed unchanged so
 //! it bubbles to the nearest `CallFrame`. A language that uses `scf`
-//! composes a total frame type embedding these via [`BuildScfIf`]/[`BuildScfFor`]
-//! (and the abstract equivalents [`BuildAbstractScfIf`]/[`BuildAbstractScfFor`]).
+//! contributes the concrete continuations through an explicit engine
+//! composition (the abstract engines retain
+//! [`BuildAbstractScfIf`]/[`BuildAbstractScfFor`] pending their separate review).
 
 use std::collections::VecDeque;
 use std::hash::Hash;
@@ -33,9 +34,9 @@ use kirin_interpreter::dialect::{
 };
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, BlockFrame, CallContext,
-    Completion, ConcreteInterpreter, DenseBackwardCompletion, DenseBackwardFrameEngine,
+    Completion, ConcreteInterpreterCore, DenseBackwardCompletion, DenseBackwardFrameEngine,
     DenseBackwardState, DenseBlockFrame, DenseFrameBuild, Env, EnvIndex,
-    ForwardDataflowFrameEngine, Frame, FrameBuild, FrameEffect, FrameEngine, SparseForwardTransfer,
+    ForwardDataflowFrameEngine, Frame, FrameEffect, FrameEngine, SparseForwardTransfer,
     TerminatorArgs,
 };
 
@@ -503,23 +504,18 @@ pub trait ScfForDispatch: SparseForwardInterp {
     ) -> Result<Self::Frame, Self::Error>;
 }
 
-/// Embed the concrete [`ScfForFrame`] into a language's total frame type.
-pub trait BuildScfFor<V, E>: Sized {
-    fn scf_for(frame: ScfForFrame<V, E>) -> Self;
-}
-
 /// Embed the abstract [`AbstractScfForFrame`] into a language's total abstract
 /// frame type.
 pub trait BuildAbstractScfFor<V, E, K>: Sized {
     fn scf_for(frame: AbstractScfForFrame<V, E, K>) -> Self;
 }
 
-impl<'ir, S, V, E, Lk, F> ScfForDispatch for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> ScfForDispatch for ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: kirin::prelude::StageMeta,
     V: Clone + ForLoopValue + 'static,
     E: From<InterpreterError>,
-    F: FrameBuild<V, E> + BuildScfFor<V, E>,
+    F: From<ScfForFrame<V, E>>,
 {
     fn scf_for_frame(
         &mut self,
@@ -532,9 +528,7 @@ where
         carried: Product<V>,
         _results_arity: usize,
     ) -> Result<F, E> {
-        Ok(F::scf_for(ScfForFrame::new(
-            stage, env, body, induction, end, step, carried,
-        )))
+        Ok(ScfForFrame::new(stage, env, body, induction, end, step, carried).into())
     }
 }
 
@@ -580,23 +574,18 @@ pub trait ScfIfDispatch: SparseForwardInterp {
     ) -> Result<Self::Frame, Self::Error>;
 }
 
-/// Embed the concrete [`ScfIfFrame`] into a language's total frame type.
-pub trait BuildScfIf<V, E>: Sized {
-    fn scf_if(frame: ScfIfFrame<V, E>) -> Self;
-}
-
 /// Embed the abstract [`AbstractScfIfFrame`] into a language's total abstract
 /// frame type.
 pub trait BuildAbstractScfIf<V, E, K>: Sized {
     fn scf_if(frame: AbstractScfIfFrame<V, E, K>) -> Self;
 }
 
-impl<'ir, S, V, E, Lk, F> ScfIfDispatch for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+impl<'ir, S, V, E, Lk, F> ScfIfDispatch for ConcreteInterpreterCore<'ir, S, V, E, Lk, F>
 where
     S: kirin::prelude::StageMeta,
     V: Clone,
     E: From<InterpreterError>,
-    F: FrameBuild<V, E> + BuildScfIf<V, E>,
+    F: From<ScfIfFrame<V, E>>,
 {
     fn scf_if_frame(
         &mut self,
@@ -606,9 +595,7 @@ where
         else_body: Block,
         decided: Option<bool>,
     ) -> Result<F, E> {
-        Ok(F::scf_if(ScfIfFrame::new(
-            stage, env, then_body, else_body, decided,
-        )))
+        Ok(ScfIfFrame::new(stage, env, then_body, else_body, decided).into())
     }
 }
 
@@ -682,16 +669,16 @@ where
 /// error type. This is the narrowest bound in the codebase, and it is the point
 /// of splitting the driver: a dialect frame that makes a decision and delegates
 /// the walking should not have to name an engine that can allocate activations.
-impl<I, F, V, E> Frame<I, F> for ScfIfFrame<V, E>
+impl<I, R, V, E> Frame<I, Self, R> for ScfIfFrame<V, E>
 where
     I: FrameEngine<Error = E>,
-    F: FrameBuild<V, E> + BuildScfIf<V, E>,
+    R: From<BlockFrame<V, E>>,
     V: Clone,
     E: From<InterpreterError>,
 {
     type Completion = Completion<V>;
 
-    fn step_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    fn step_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
         let arm = match self.decided {
             Some(true) => self.then_body,
             Some(false) => self.else_body,
@@ -699,12 +686,12 @@ where
         };
         let body = BlockFrame::new(self.stage, self.env, arm, Product::new());
         Ok(FrameEffect::Push {
-            parent: F::scf_if(self),
-            child: F::from_block(body),
+            parent: self,
+            child: body.into(),
         })
     }
 
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
         Err(E::from(InterpreterError::Custom(
             "scf.if frame resumed without a body completion",
         )))
@@ -714,7 +701,7 @@ where
         self,
         completion: Completion<V>,
         _interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
         match completion {
             // The arm's structured yield: its values are this operation's
             // results, delivered to the pusher as a finished sub-computation.
@@ -886,16 +873,16 @@ where
 
 /// `scf.for` reads the loop bound/step out of the activation it was given and
 /// otherwise only pushes a [`BlockFrame`] — so [`Env`] is its whole requirement.
-impl<I, F, V, E> Frame<I, F> for ScfForFrame<V, E>
+impl<I, R, V, E> Frame<I, Self, R> for ScfForFrame<V, E>
 where
     I: Env<Value = V, Error = E>,
-    F: FrameBuild<V, E> + BuildScfFor<V, E>,
+    R: From<BlockFrame<V, E>>,
     V: Clone + ForLoopValue,
     E: From<InterpreterError>,
 {
     type Completion = Completion<V>;
 
-    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
         let end = interp.env_read(self.env, self.end)?;
         match self.induction.loop_condition(&end) {
             Some(true) => {
@@ -904,8 +891,8 @@ where
                     .collect();
                 let body = BlockFrame::new(self.stage, self.env, self.body, args);
                 Ok(FrameEffect::Push {
-                    parent: F::scf_for(self),
-                    child: F::from_block(body),
+                    parent: self,
+                    child: body.into(),
                 })
             }
             Some(false) => Ok(FrameEffect::Complete(Completion::Finished(self.carried))),
@@ -913,7 +900,7 @@ where
         }
     }
 
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
         Err(E::from(InterpreterError::Custom(
             "scf.for frame resumed without a body completion",
         )))
@@ -923,7 +910,7 @@ where
         mut self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, R>, E> {
         match completion {
             // The body's structured yield: advance the induction variable,
             // carry the yielded values forward, and re-check the condition.
@@ -935,7 +922,7 @@ where
                     .ok_or_else(|| E::from(InterpreterError::LoopStepOverflow))?;
                 self.induction = next;
                 self.carried = yielded;
-                Ok(FrameEffect::Continue(F::scf_for(self)))
+                Ok(FrameEffect::Continue(self))
             }
             // A `ret` inside the body: relay it toward the nearest `CallFrame`.
             Completion::Returned(values) => Ok(FrameEffect::Complete(Completion::Returned(values))),

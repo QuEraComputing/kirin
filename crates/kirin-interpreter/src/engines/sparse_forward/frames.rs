@@ -45,7 +45,7 @@ pub enum AbstractCompletion<V> {
 }
 
 /// Construction trait letting any total abstract frame enum embed the standard
-/// abstract frames (the analogue of [`FrameBuild`](crate::FrameBuild)).
+/// abstract frames (the legacy analogue of concrete explicit composition).
 pub trait AbstractFrameBuild<V, E, K>: Sized {
     fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self;
     fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self;
@@ -54,8 +54,7 @@ pub trait AbstractFrameBuild<V, E, K>: Sized {
     ///
     /// Graph bodies are opt-in: a total abstract frame enum that carries no
     /// [`AbstractDiGraphFrame`] inherits this rejection rather than pretending
-    /// to analyze one, the same way
-    /// [`FrameBuild::from_ungraph_entry`](crate::FrameBuild::from_ungraph_entry)
+    /// to analyze one, the same way the default concrete call-body traversal
     /// rejects a callable `UnGraph` without a compiler-supplied policy.
     fn from_digraph(frame: AbstractDiGraphFrame<V, E, K>) -> Result<Self, E>
     where

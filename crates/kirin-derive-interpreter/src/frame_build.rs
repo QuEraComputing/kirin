@@ -1,5 +1,5 @@
-//! Code generation for the frame-injection derives: `#[derive(FrameBuild)]`,
-//! `#[derive(AbstractFrameBuild)]`, `#[derive(DenseFrameBuild)]`.
+//! Code generation for the legacy abstract/backward frame-injection derives:
+//! `#[derive(AbstractFrameBuild)]` and `#[derive(DenseFrameBuild)]`.
 //!
 //! A language that runs the interpreter declares a **total frame enum** — the
 //! one Rust type the driver's `Vec<F>` stack holds. Each framework walker it
@@ -8,9 +8,8 @@
 //! framework frame, each body `Self::Variant(frame)`.
 //!
 //! These derives write that transcription. The **derive name selects the
-//! family** — `FrameBuild` (concrete), `AbstractFrameBuild` (sparse forward),
-//! `DenseFrameBuild` (dense backward) — so no attribute is needed, and the name
-//! matches the trait it implements as the other interpreter derives do.
+//! family** — `AbstractFrameBuild` (sparse forward) or `DenseFrameBuild`
+//! (dense backward) — so no attribute is needed.
 //!
 //! Variants are matched to constructors by their **field type**, not their
 //! variant name, so renaming a variant cannot silently change what is
@@ -18,10 +17,8 @@
 //! those are injected through the dialect's own `Build*` trait, declared by the
 //! dialect and implemented by hand.
 //!
-//! Not derivable, by design: an enum that supplies a callable-`UnGraph` policy.
-//! `FrameBuild::from_ungraph_entry` is a defaulted method and a derive emits the
-//! whole impl block, so such an enum keeps its hand-written impl (see
-//! `UnPolicyFrame` in the workspace `body_kinds` test).
+//! Concrete composition no longer uses this module: it declares a private
+//! `FrameStackItem` enum and its mechanical wiring explicitly.
 
 use proc_macro2::TokenStream;
 use quote::quote;
@@ -53,45 +50,7 @@ pub struct Family {
     /// the deriving enum declares.
     arity: usize,
     ctors: &'static [Ctor],
-    /// `true` for the concrete family, whose `FrameBuild` carries a
-    /// `BodyFrames` associated type selecting the callable-body walkers. The
-    /// abstract and dense families have no such policy — forward abstract
-    /// interpretation summarizes calls rather than descending into them, and the
-    /// backward engines do not walk callable bodies through a call frame.
-    body_frames: bool,
 }
-
-pub const CONCRETE: Family = Family {
-    trait_name: "FrameBuild",
-    arity: 2,
-    ctors: &[
-        Ctor {
-            frame: "BlockFrame",
-            method: "from_block",
-            required: true,
-            fallible: false,
-        },
-        Ctor {
-            frame: "CFGFrame",
-            method: "from_cfg",
-            required: true,
-            fallible: false,
-        },
-        Ctor {
-            frame: "CallFrame",
-            method: "from_call",
-            required: true,
-            fallible: false,
-        },
-        Ctor {
-            frame: "DiGraphFrame",
-            method: "from_digraph",
-            required: true,
-            fallible: false,
-        },
-    ],
-    body_frames: true,
-};
 
 pub const SPARSE_FORWARD: Family = Family {
     trait_name: "AbstractFrameBuild",
@@ -118,7 +77,6 @@ pub const SPARSE_FORWARD: Family = Family {
             fallible: true,
         },
     ],
-    body_frames: false,
 };
 
 pub const DENSE_BACKWARD: Family = Family {
@@ -130,21 +88,16 @@ pub const DENSE_BACKWARD: Family = Family {
         required: true,
         fallible: false,
     }],
-    body_frames: false,
 };
 
 /// The `#[interpret(..)]` options these derives read, reusing the namespace the
 /// other interpreter derives already use.
 struct Options {
     crate_path: syn::Path,
-    /// `#[interpret(body_frames = MyBodyFrames)]` — the callable-body walker
-    /// policy for the concrete family. `None` means [`DefaultBodyFrames`].
-    body_frames: Option<syn::Path>,
 }
 
 fn parse_options(input: &DeriveInput) -> syn::Result<Options> {
     let mut crate_path = None;
-    let mut body_frames = None;
     for attr in &input.attrs {
         if !attr.path().is_ident("interpret") {
             continue;
@@ -152,9 +105,6 @@ fn parse_options(input: &DeriveInput) -> syn::Result<Options> {
         attr.parse_nested_meta(|meta| {
             if meta.path.is_ident("crate") {
                 crate_path = Some(meta.value()?.parse()?);
-                Ok(())
-            } else if meta.path.is_ident("body_frames") {
-                body_frames = Some(meta.value()?.parse()?);
                 Ok(())
             } else {
                 Err(meta.error("unsupported attribute for #[interpret(...)]"))
@@ -166,7 +116,6 @@ fn parse_options(input: &DeriveInput) -> syn::Result<Options> {
             Some(path) => path,
             None => syn::parse_str(DEFAULT_INTERP_CRATE)?,
         },
-        body_frames,
     })
 }
 
@@ -183,16 +132,6 @@ pub fn generate(input: &DeriveInput, family: &Family) -> syn::Result<TokenStream
     let options = parse_options(input)?;
     let interp_crate = &options.crate_path;
 
-    if !family.body_frames && options.body_frames.is_some() {
-        return Err(syn::Error::new_spanned(
-            input,
-            format!(
-                "`body_frames` applies only to the concrete `FrameBuild` family; `{}` has no callable-body policy",
-                family.trait_name
-            ),
-        ));
-    }
-
     let syn::Data::Enum(data) = &input.data else {
         return Err(syn::Error::new_spanned(
             input,
@@ -203,8 +142,8 @@ pub fn generate(input: &DeriveInput, family: &Family) -> syn::Result<TokenStream
         ));
     };
 
-    // The trait's type arguments are the enum's own type parameters, in order —
-    // `enum ToyFrame<V, E>` implements `FrameBuild<V, E>`. Reject a mismatch
+    // The trait's type arguments are the enum's own type parameters, in order.
+    // Reject a mismatch
     // here rather than emitting an impl that fails to resolve later.
     let type_params: Vec<&syn::Ident> = input.generics.type_params().map(|p| &p.ident).collect();
     if type_params.len() != family.arity {
@@ -284,22 +223,11 @@ pub fn generate(input: &DeriveInput, family: &Family) -> syn::Result<TokenStream
     let enum_ident = &input.ident;
     let (impl_generics, ty_generics, where_clause) = input.generics.split_for_impl();
 
-    let assoc_body_frames = if family.body_frames {
-        let policy = match &options.body_frames {
-            Some(path) => quote! { #path },
-            None => quote! { #interp_crate::DefaultBodyFrames },
-        };
-        quote! { type BodyFrames = #policy; }
-    } else {
-        quote! {}
-    };
-
     Ok(quote! {
         #[automatically_derived]
         impl #impl_generics #interp_crate::#trait_ident<#(#type_params),*>
             for #enum_ident #ty_generics #where_clause
         {
-            #assoc_body_frames
             #(#methods)*
         }
     })
@@ -316,23 +244,6 @@ mod tests {
                 .expect("codegen failed")
                 .to_string(),
         )
-    }
-
-    #[test]
-    fn concrete_frame_enum_with_dialect_variants() {
-        // The two scf variants are ignored — they are injected through
-        // `BuildScfIf`/`BuildScfFor`, which the dialect declares.
-        let input: syn::DeriveInput = syn::parse_quote! {
-            enum ToyFrame<V, E> {
-                Block(BlockFrame<V, E>),
-                CFG(CFGFrame<V, E>),
-                Call(CallFrame<V>),
-                DiGraph(DiGraphFrame<V, E>),
-                ScfIf(ScfIfFrame<V, E>),
-                ScfFor(ScfForFrame<V, E>),
-            }
-        };
-        insta::assert_snapshot!(emit(input, &CONCRETE));
     }
 
     #[test]
@@ -368,100 +279,5 @@ mod tests {
             }
         };
         insta::assert_snapshot!(emit(input, &DENSE_BACKWARD));
-    }
-
-    #[test]
-    fn crate_path_override_is_honoured() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            #[interpret(crate = crate)]
-            enum StandardFrame<V, E> {
-                Block(BlockFrame<V, E>),
-                CFG(CFGFrame<V, E>),
-                Call(CallFrame<V>),
-                DiGraph(DiGraphFrame<V, E>),
-            }
-        };
-        insta::assert_snapshot!(emit(input, &CONCRETE));
-    }
-
-    #[test]
-    fn body_frames_override_is_honoured() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            #[interpret(body_frames = MyBodyFrames)]
-            enum MyFrame<V, E> {
-                Block(BlockFrame<V, E>),
-                CFG(CFGFrame<V, E>),
-                Call(CallFrame<V, MyBodyFrames>),
-                DiGraph(DiGraphFrame<V, E>),
-            }
-        };
-        insta::assert_snapshot!(emit(input, &CONCRETE));
-    }
-
-    #[test]
-    fn rejects_body_frames_on_a_family_without_a_call_policy() {
-        // Only the concrete family descends into a callee, so only it has a
-        // callable-body policy to configure.
-        let input: syn::DeriveInput = syn::parse_quote! {
-            #[interpret(body_frames = MyBodyFrames)]
-            enum MyAbstractFrame<V, E, K> {
-                Block(AbstractBlockFrame<V, E, K>),
-                Call(AbstractCallFrame<V, E, K>),
-            }
-        };
-        let err = generate(&input, &SPARSE_FORWARD).unwrap_err().to_string();
-        assert!(err.contains("applies only to the concrete"), "{err}");
-    }
-
-    #[test]
-    fn rejects_missing_required_frame() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            enum Incomplete<V, E> {
-                Block(BlockFrame<V, E>),
-            }
-        };
-        let err = generate(&input, &CONCRETE).unwrap_err().to_string();
-        assert!(err.contains("no variant holds a `CFGFrame`"), "{err}");
-    }
-
-    #[test]
-    fn rejects_wrong_type_param_count() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            enum Weird<V> {
-                Block(BlockFrame<V, V>),
-                CFG(CFGFrame<V, V>),
-                Call(CallFrame<V>),
-                DiGraph(DiGraphFrame<V, V>),
-            }
-        };
-        let err = generate(&input, &CONCRETE).unwrap_err().to_string();
-        assert!(
-            err.contains("expects an enum with 2 type parameter(s)"),
-            "{err}"
-        );
-    }
-
-    #[test]
-    fn rejects_ambiguous_duplicate_frame() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            enum Dup<V, E> {
-                Block(BlockFrame<V, E>),
-                AlsoBlock(BlockFrame<V, E>),
-                CFG(CFGFrame<V, E>),
-                Call(CallFrame<V>),
-                DiGraph(DiGraphFrame<V, E>),
-            }
-        };
-        let err = generate(&input, &CONCRETE).unwrap_err().to_string();
-        assert!(err.contains("would be ambiguous"), "{err}");
-    }
-
-    #[test]
-    fn rejects_non_enum() {
-        let input: syn::DeriveInput = syn::parse_quote! {
-            struct NotAnEnum<V, E>(BlockFrame<V, E>);
-        };
-        let err = generate(&input, &CONCRETE).unwrap_err().to_string();
-        assert!(err.contains("total frame enum"), "{err}");
     }
 }
