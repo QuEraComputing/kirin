@@ -344,7 +344,7 @@ VERBOSE_INT = {
 }
 VERBOSE_MODULE = {
     "__serialization_module__": True,
-    "version": "legacy-caller-version",
+    "version": "caller-version",
     "symbol_table": {},
     "body": {
         "__serialization_unit__": True,
@@ -361,7 +361,7 @@ VERBOSE_CONTROL_TAG_DATA = {
 }
 VERBOSE_CONTROL_TAG_MODULE = {
     "__serialization_module__": True,
-    "version": "legacy-control-tags",
+    "version": "caller-version",
     "symbol_table": {},
     "body": {
         "__serialization_unit__": True,
@@ -387,7 +387,7 @@ def test_public_readers_accept_verbose_v1_and_reencode_compact(
         decoded = serializer.decode(payload)
         compact_wire = bson.decode(gzip.decompress(serializer.encode(decoded)))
 
-    assert decoded.version == "legacy-caller-version"
+    assert decoded.version == "caller-version"
     assert decoded.body.kind == "list"
     assert decoded.body.data["value"][0].data["value"] == str(2**256 + 1)
     assert set(compact_wire["body"]) == {"$u"}
