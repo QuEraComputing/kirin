@@ -11,6 +11,7 @@ ESCAPED_MAP_TAG = "$m"  # Escaped singleton user mapping.
 # descriptor is omitted only when both strings match this table; extensions
 # that reuse a kind with another class keep their full descriptor on the wire.
 STATIC_DESCRIPTORS: dict[str, tuple[str, str]] = {
+    "attr_ref": ("", ""),
     "block": ("kirin.ir.nodes.block", "Block"),
     "block-arg": ("kirin.ir.ssa", "BlockArgument"),
     "block_ref": ("kirin.ir.nodes.block", "Block"),
@@ -71,30 +72,50 @@ class JSONtifiable:
             return [self._to_jsonifiable(v) for v in obj]
         return obj
 
-    def _from_jsonifiable(self, obj: Any) -> Any:
+    def _from_jsonifiable(self, obj: Any, *, allow_compact_tags: bool = True) -> Any:
         if isinstance(obj, dict):
             if obj.get("__serialization_module__"):
-                symbol_table = self._from_jsonifiable(obj.get("symbol_table", {}))
-                body = self._from_jsonifiable(obj.get("body"))
+                raw_body = obj.get("body")
+                is_verbose = isinstance(raw_body, dict) and bool(
+                    raw_body.get("__serialization_unit__")
+                )
+                child_allow_compact_tags = allow_compact_tags and not is_verbose
+                symbol_table = self._from_jsonifiable(
+                    obj.get("symbol_table", {}),
+                    allow_compact_tags=child_allow_compact_tags,
+                )
+                body = self._from_jsonifiable(
+                    raw_body, allow_compact_tags=child_allow_compact_tags
+                )
                 version = obj.get("version", "")
                 return SerializationModule(
                     symbol_table=symbol_table, body=body, version=version
                 )
             if obj.get("__serialization_unit__"):
-                data = self._from_jsonifiable(obj.get("data", {}))
+                data = self._from_jsonifiable(
+                    obj.get("data", {}), allow_compact_tags=False
+                )
                 return SerializationUnit(
                     kind=obj["kind"],
                     module_name=obj["module_name"],
                     class_name=obj["class_name"],
                     data=data,
                 )
-            if len(obj) == 1 and COMPACT_UNIT_TAG in obj:
+            if allow_compact_tags and len(obj) == 1 and COMPACT_UNIT_TAG in obj:
                 return self._decode_compact_unit(obj[COMPACT_UNIT_TAG])
-            if len(obj) == 1 and ESCAPED_MAP_TAG in obj:
+            if allow_compact_tags and len(obj) == 1 and ESCAPED_MAP_TAG in obj:
                 return self._decode_escaped_mapping(obj[ESCAPED_MAP_TAG])
-            return {k: self._from_jsonifiable(v) for k, v in obj.items()}
+            return {
+                key: self._from_jsonifiable(
+                    value, allow_compact_tags=allow_compact_tags
+                )
+                for key, value in obj.items()
+            }
         if isinstance(obj, list):
-            return [self._from_jsonifiable(v) for v in obj]
+            return [
+                self._from_jsonifiable(value, allow_compact_tags=allow_compact_tags)
+                for value in obj
+            ]
         return obj
 
     def _decode_compact_unit(self, payload: Any) -> SerializationUnit:

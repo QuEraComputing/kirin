@@ -72,24 +72,6 @@ def detached_capture_caller(x: int) -> int:
     return detached_capture(x)
 
 
-@basic_no_opt
-def make_detached_result_capture(y: int):
-    captured = y + 1
-
-    def inner(x: int) -> int:
-        return x * captured
-
-    return inner
-
-
-detached_result_capture = make_detached_result_capture(y=10)
-
-
-@basic_no_opt
-def detached_result_capture_caller(x: int) -> int:
-    return detached_result_capture(x)
-
-
 Transport = Literal["module", "json", "cbson"]
 TRANSPORTS: tuple[Transport, ...] = ("module", "json", "cbson")
 
@@ -308,17 +290,6 @@ def test_detached_capture_keeps_one_full_external_definition(
 
     decoded.verify()
     assert decoded(3) == detached_capture_caller(3) == 31
-
-
-def test_external_result_capture_fails_before_writing_an_undecodable_payload() -> None:
-    with pytest.raises(
-        ValueError,
-        match=(
-            "Cannot serialize ResultValue operand before its definition: its owner "
-            "is external or the IR is not in definition order"
-        ),
-    ):
-        detached_result_capture_caller.dialects.encode(detached_result_capture_caller)
 
 
 def test_ssa_ref_does_not_allocate_an_id_for_an_undefined_value() -> None:

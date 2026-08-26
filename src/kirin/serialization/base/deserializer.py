@@ -2,7 +2,7 @@ import weakref
 from typing import Any, cast
 from dataclasses import field, dataclass
 
-from kirin import ir
+from kirin import ir, types
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
@@ -34,11 +34,17 @@ class Deserializer:
         body = data.body
         if body is None:
             raise ValueError("Module envelope missing body for decoding.")
-        return self.deserialize_method(body)
+        self._ctx._type_attribute_root = body
+        try:
+            return self.deserialize_method(body)
+        finally:
+            self._ctx._type_attribute_root = None
 
     def deserialize(self, serUnit: SerializationUnit) -> Any:
         if serUnit.kind == "ssa_ref":
             return self.deserialize_ssa_ref(serUnit)
+        elif serUnit.kind == "attr_ref":
+            return self.deserialize_attr_ref(serUnit)
         elif serUnit.kind == "attribute":
             return self.deserialize_attribute(serUnit)
         elif serUnit.kind == "type":
@@ -61,6 +67,66 @@ class Deserializer:
             return self._ctx.SSA_Lookup[ssa_id]
         except KeyError:
             raise ValueError(f"dangling ssa_ref {ssa_id!r}") from None
+
+    def deserialize_attr_ref(self, serUnit: SerializationUnit) -> types.TypeAttribute:
+        if not isinstance(serUnit.data, dict):
+            raise ValueError("attr_ref data must be a mapping")
+        try:
+            attr_id = serUnit.data["id"]
+        except KeyError:
+            raise ValueError("attr_ref is missing required 'id'") from None
+        if not isinstance(attr_id, str):
+            raise ValueError(f"attr_ref id must be a string, got {attr_id!r}")
+
+        definition = self._ctx.TypeAttribute_Definitions.get(attr_id)
+        if definition is None:
+            self._index_type_attribute_definitions()
+            try:
+                definition = self._ctx.TypeAttribute_Definitions[attr_id]
+            except KeyError:
+                raise ValueError(f"dangling attr_ref {attr_id!r}") from None
+        return self._deserialize_type_attribute_definition(definition, attr_id)
+
+    def _index_type_attribute_definitions(self) -> None:
+        if self._ctx._type_attribute_indexed:
+            return
+        if self._ctx._type_attribute_root is None:
+            raise ValueError("cannot resolve attr_ref outside Method decoding")
+
+        seen: set[int] = set()
+
+        def visit(value: Any) -> None:
+            if isinstance(value, SerializationUnit):
+                identity = id(value)
+                if identity in seen:
+                    return
+                seen.add(identity)
+
+                if value.kind == "attribute":
+                    if not isinstance(value.data, dict):
+                        raise ValueError("Attribute data must be a mapping")
+                    if "id" in value.data:
+                        attr_id = value.data["id"]
+                        if not isinstance(attr_id, str):
+                            raise ValueError(
+                                f"TypeAttribute definition id must be a string, got {attr_id!r}"
+                            )
+                        existing = self._ctx.TypeAttribute_Definitions.get(attr_id)
+                        if existing is not None and existing is not value:
+                            raise ValueError(
+                                f"duplicate TypeAttribute definition id {attr_id!r}"
+                            )
+                        self._ctx.TypeAttribute_Definitions[attr_id] = value
+                visit(value.data)
+            elif isinstance(value, dict):
+                for item in value.values():
+                    visit(item)
+            elif isinstance(value, (list, tuple)):
+                for item in value:
+                    visit(item)
+
+        visit(self._ctx._type_attribute_root)
+        self._ctx._type_attribute_indexed = True
 
     def generic_deserialize(self, data: SerializationUnit) -> Any:
         if not hasattr(data, "kind"):
@@ -326,9 +392,39 @@ class Deserializer:
         return tuple(self.deserialize(x) for x in serUnit.data.get("value", []))
 
     def deserialize_attribute(self, serUnit: SerializationUnit) -> ir.Attribute:
+        if serUnit.kind == "attr_ref":
+            return self.deserialize_attr_ref(serUnit)
         if serUnit.kind != "attribute":
             raise ValueError(f"Expected kind='attribute', got {serUnit.kind}")
 
+        if not isinstance(serUnit.data, dict):
+            raise ValueError("Attribute data must be a mapping")
+        if "id" not in serUnit.data:
+            return self._deserialize_attribute_full(serUnit)
+
+        attr_id = serUnit.data["id"]
+        if not isinstance(attr_id, str):
+            raise ValueError(
+                f"TypeAttribute definition id must be a string, got {attr_id!r}"
+            )
+        existing = self._ctx.TypeAttribute_Definitions.get(attr_id)
+        if existing is not None and existing is not serUnit:
+            raise ValueError(f"duplicate TypeAttribute definition id {attr_id!r}")
+        self._ctx.TypeAttribute_Definitions[attr_id] = serUnit
+
+        return self._deserialize_type_attribute_definition(serUnit, attr_id)
+
+    def _deserialize_type_attribute_definition(
+        self, serUnit: SerializationUnit, attr_id: str
+    ) -> types.TypeAttribute:
+        attr = self._deserialize_attribute_full(serUnit)
+        if not isinstance(attr, types.TypeAttribute):
+            raise ValueError(
+                f"TypeAttribute definition {attr_id!r} decoded as {type(attr).__name__}"
+            )
+        return attr
+
+    def _deserialize_attribute_full(self, serUnit: SerializationUnit) -> ir.Attribute:
         inner = serUnit.data.get("data")
         if not isinstance(inner, SerializationUnit):
             raise ValueError("Attribute data must contain a SerializationUnit")

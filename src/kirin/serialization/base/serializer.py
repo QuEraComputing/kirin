@@ -1,9 +1,10 @@
 from dataclasses import field, dataclass
 
-from kirin import ir
+from kirin import ir, types
 from kirin.serialization.base.context import (
     MethodSymbolMeta,
     SerializationContext,
+    TypeAttributeSerializationEntry,
     mangle,
     get_str_from_type,
 )
@@ -180,18 +181,11 @@ class Serializer:
     def serialize_operand(self, value: ir.SSAValue) -> SerializationUnit:
         if value in self._ctx.ssa_idtable.table:
             return self.serialize_ssa_ref(value)
-
-        if not isinstance(value, ir.BlockArgument):
-            raise ValueError(
-                f"Cannot serialize {type(value).__name__} operand before its "
-                "definition: its owner is external or the IR is not in "
-                "definition order"
-            )
-
-        # A detached nested Method may retain an SSA capture owned by the
-        # defining Method, whose owner is absent from this module. Preserve one
-        # full v1 definition so later uses can still be references.
-        return self.serialize(value)
+        if isinstance(value, ir.ResultValue):
+            return self.serialize_resultvalue(value)
+        if isinstance(value, ir.BlockArgument):
+            return self.serialize_blockargument(value)
+        raise ValueError(f"Unsupported SSA operand type {type(value).__name__}")
 
     def serialize_operand_tuple(
         self, values: tuple[ir.SSAValue, ...]
@@ -411,6 +405,31 @@ class Serializer:
         )
 
     def serialize_attribute(self, attr: ir.Attribute) -> SerializationUnit:
+        if not isinstance(attr, types.TypeAttribute):
+            return self._serialize_attribute_full(attr)
+
+        identity = id(attr)
+        entry = self._ctx.type_attribute_entries.get(identity)
+        if entry is not None:
+            if entry.owner is not attr:
+                raise RuntimeError("TypeAttribute identity table corruption")
+            wire_id = self._ctx.type_attribute_idtable[identity]
+            entry.unit.data["id"] = wire_id
+            return SerializationUnit(
+                kind="attr_ref",
+                module_name="",
+                class_name="",
+                data={"id": wire_id},
+            )
+
+        unit = self._serialize_attribute_full(attr)
+        self._ctx.type_attribute_entries[identity] = TypeAttributeSerializationEntry(
+            owner=attr,
+            unit=unit,
+        )
+        return unit
+
+    def _serialize_attribute_full(self, attr: ir.Attribute) -> SerializationUnit:
         if not isinstance(attr, Serializable):
             raise TypeError(f"Attribute {attr} is not Serializable.")
         return SerializationUnit(

@@ -355,6 +355,23 @@ VERBOSE_MODULE = {
     },
 }
 
+VERBOSE_CONTROL_TAG_DATA = {
+    "unit-shaped": {"$u": ["int", {"value": "5"}]},
+    "map-shaped": {"$m": [["user", "value"]]},
+}
+VERBOSE_CONTROL_TAG_MODULE = {
+    "__serialization_module__": True,
+    "version": "legacy-control-tags",
+    "symbol_table": {},
+    "body": {
+        "__serialization_unit__": True,
+        "kind": "custom",
+        "module_name": "test.extension",
+        "class_name": "CustomUnit",
+        "data": VERBOSE_CONTROL_TAG_DATA,
+    },
+}
+
 
 @pytest.mark.parametrize("transport_name", ["json", "bson"])
 def test_public_readers_accept_verbose_v1_and_reencode_compact(
@@ -374,6 +391,19 @@ def test_public_readers_accept_verbose_v1_and_reencode_compact(
     assert decoded.body.kind == "list"
     assert decoded.body.data["value"][0].data["value"] == str(2**256 + 1)
     assert set(compact_wire["body"]) == {"$u"}
+
+
+@pytest.mark.parametrize("transport_name", ["json", "bson"])
+def test_verbose_v1_control_tag_shaped_mappings_remain_literal(
+    transport_name: str,
+) -> None:
+    if transport_name == "json":
+        module = JSONSerializer().decode(json.dumps(VERBOSE_CONTROL_TAG_MODULE))
+    else:
+        payload = gzip.compress(bson.encode(VERBOSE_CONTROL_TAG_MODULE), mtime=0)
+        module = CompressedBSONSerializer().decode(payload)
+
+    assert module.body.data == VERBOSE_CONTROL_TAG_DATA
 
 
 def test_missing_verbose_version_keeps_the_existing_empty_default() -> None:
