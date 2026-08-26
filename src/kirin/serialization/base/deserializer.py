@@ -37,7 +37,9 @@ class Deserializer:
         return self.deserialize_method(body)
 
     def deserialize(self, serUnit: SerializationUnit) -> Any:
-        if serUnit.kind == "attribute":
+        if serUnit.kind == "ssa_ref":
+            return self.deserialize_ssa_ref(serUnit)
+        elif serUnit.kind == "attribute":
             return self.deserialize_attribute(serUnit)
         elif serUnit.kind == "type":
             return self.deserialize_type(serUnit)
@@ -45,6 +47,20 @@ class Deserializer:
             self, "deserialize_" + serUnit.class_name.lower(), self.generic_deserialize
         )
         return ser_method(serUnit)
+
+    def deserialize_ssa_ref(self, serUnit: SerializationUnit) -> ir.SSAValue:
+        if not isinstance(serUnit.data, dict):
+            raise ValueError("ssa_ref data must be a mapping")
+        try:
+            ssa_id = serUnit.data["id"]
+        except KeyError:
+            raise ValueError("ssa_ref is missing required 'id'") from None
+        if not isinstance(ssa_id, str):
+            raise ValueError(f"ssa_ref id must be a string, got {ssa_id!r}")
+        try:
+            return self._ctx.SSA_Lookup[ssa_id]
+        except KeyError:
+            raise ValueError(f"dangling ssa_ref {ssa_id!r}") from None
 
     def generic_deserialize(self, data: SerializationUnit) -> Any:
         if not hasattr(data, "kind"):
