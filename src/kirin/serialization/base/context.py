@@ -17,11 +17,20 @@ class MethodSymbolMeta(TypedDict, total=False):
 
 
 @dataclass
+class TypeAttributeSerializationEntry:
+    owner: types.TypeAttribute
+    unit: SerializationUnit
+
+
+@dataclass
 class SerializationContext:
     ssa_idtable: IdTable[ir.SSAValue] = field(default_factory=IdTable[ir.SSAValue])
     stmt_idtable: IdTable[ir.Statement] = field(default_factory=IdTable[ir.Statement])
     blk_idtable: IdTable[ir.Block] = field(default_factory=IdTable[ir.Block])
     region_idtable: IdTable[ir.Region] = field(default_factory=IdTable[ir.Region])
+    type_attribute_idtable: IdTable[int] = field(
+        default_factory=lambda: IdTable[int](prefix="t")
+    )
 
     Dialect_Lookup: dict[str, ir.Dialect] = field(default_factory=dict)
     SSA_Lookup: dict[str, ir.SSAValue] = field(default_factory=dict)
@@ -31,6 +40,15 @@ class SerializationContext:
 
     Method_Symbol: dict[str, MethodSymbolMeta] = field(default_factory=dict)
     Method_Runtime: dict[str, ir.Method] = field(default_factory=dict)
+
+    type_attribute_entries: dict[int, TypeAttributeSerializationEntry] = field(
+        default_factory=dict
+    )
+    TypeAttribute_Definitions: dict[str, SerializationUnit] = field(
+        default_factory=dict
+    )
+    _type_attribute_root: SerializationUnit | None = None
+    _type_attribute_indexed: bool = False
 
     _block_reference_store: dict[str, ir.Block] = field(
         default_factory=dict[str, ir.Block]
@@ -45,10 +63,15 @@ class SerializationContext:
         self.stmt_idtable.clear()
         self.blk_idtable.clear()
         self.region_idtable.clear()
+        self.type_attribute_idtable.clear()
         self._block_reference_store.clear()
         self.Method_Symbol.clear()
         self.Method_Runtime.clear()
         self.Dialect_Lookup.clear()
+        self.type_attribute_entries.clear()
+        self.TypeAttribute_Definitions.clear()
+        self._type_attribute_root = None
+        self._type_attribute_indexed = False
 
 
 def get_str_from_type(typ: types.TypeAttribute) -> str:
