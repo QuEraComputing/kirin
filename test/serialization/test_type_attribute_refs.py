@@ -205,6 +205,48 @@ def test_nested_type_graph_preserves_identity_relationships(
 
 
 @pytest.mark.parametrize("transport", TRANSPORTS)
+def test_union_and_literal_roundtrip_by_value(transport: Transport) -> None:
+    literal = types.Literal(1)
+    union = types.Union(literal, types.String)
+    assert isinstance(union, types.Union)
+    method = _method_with_fields(union)
+
+    decoded = method.dialects.decode(
+        _through_transport(method.dialects.encode(method), transport)
+    )
+    decoded_union = decoded.fields[0]
+    assert isinstance(decoded_union, types.Union)
+    assert decoded_union.is_structurally_equal(union)
+    assert any(
+        isinstance(attr, types.Literal) and attr.is_structurally_equal(literal)
+        for attr in decoded_union.types
+    )
+
+
+@pytest.mark.parametrize("transport", TRANSPORTS)
+def test_literal_preserves_shared_type_identity(transport: Transport) -> None:
+    leaf = types.TypeVar(f"LiteralLeaf-{transport}")
+    literal = types.Literal(transport, leaf)
+    union = types.Union(literal, types.String)
+    generic = types.Generic(tuple, leaf)
+    assert isinstance(union, types.Union)
+    assert literal.type is generic.vars[0]
+    method = _method_with_fields(union, generic)
+
+    decoded = method.dialects.decode(
+        _through_transport(method.dialects.encode(method), transport)
+    )
+    decoded_union = decoded.fields[0]
+    decoded_generic = decoded.fields[1]
+    assert isinstance(decoded_union, types.Union)
+    decoded_literal = next(
+        attr for attr in decoded_union.types if isinstance(attr, types.Literal)
+    )
+    assert decoded_literal is not literal
+    assert decoded_literal.type is decoded_generic.vars[0]
+
+
+@pytest.mark.parametrize("transport", TRANSPORTS)
 def test_nested_repeated_type_attributes_preserve_dag_topology(
     transport: Transport,
 ) -> None:
