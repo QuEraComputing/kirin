@@ -29,26 +29,19 @@ pub fn do_derive_function_entry(input: &syn::DeriveInput) -> darling::Result<Tok
 fn emit_function_entry(
     ctx: &DeriveContext<'_, InterpreterLayout>,
     interp_crate: &syn::Path,
-    ir_crate: &syn::Path,
+    _ir_crate: &syn::Path,
 ) -> darling::Result<Vec<TokenStream>> {
     validate_function_entry(ctx)?;
 
     let type_name = &ctx.meta.name;
-    let mut impl_generics = ctx.meta.generics.clone();
-    // Specialized on the engine type `__EntryI`, mirroring `Interpretable`.
-    impl_generics
-        .params
-        .push(syn::GenericParam::Type(syn::parse_quote!(__EntryI)));
-
-    let (impl_generics, _, _) = impl_generics.split_for_impl();
+    let (impl_generics, _, _) = ctx.meta.generics.split_for_impl();
     let (_, ty_generics, original_where) = ctx.meta.generics.split_for_impl();
     let callable_wrappers = collect_callable_wrappers(ctx);
 
-    let mut predicates: Vec<syn::WherePredicate> =
-        vec![syn::parse_quote! { __EntryI: #interp_crate::Interp }];
+    let mut predicates: Vec<syn::WherePredicate> = Vec::new();
     for wrapper_ty in callable_wrappers {
         predicates.push(syn::parse_quote! {
-            #wrapper_ty: #interp_crate::FunctionEntry<__EntryI>
+            #wrapper_ty: #interp_crate::FunctionEntry
         });
     }
     let extra_where: syn::WhereClause = syn::parse_quote! { where #(#predicates),* };
@@ -78,15 +71,11 @@ fn emit_function_entry(
                 .as_ref()
                 .ok_or_else(|| darling::Error::custom("expected wrapper binding"))?;
             arms.push(quote! {
-                #arm_pattern => #binding.function_entry(args, interp)
+                #arm_pattern => #binding.function_entry()
             });
         } else {
             arms.push(quote! {
-                Self::#variant_name { .. } => Err(<__EntryI as #interp_crate::Interp>::Error::from(
-                    #interp_crate::InterpreterError::NotCallable(
-                        <__EntryI as #interp_crate::Interp>::statement(interp)
-                    )
-                ))
+                Self::#variant_name { .. } => None
             });
         }
     }
@@ -108,15 +97,8 @@ fn emit_function_entry(
 
     Ok(vec![quote! {
         #[automatically_derived]
-        impl #impl_generics #interp_crate::FunctionEntry<__EntryI> for #type_name #ty_generics #where_clause {
-            fn function_entry(
-                &self,
-                args: #ir_crate::Product<<__EntryI as #interp_crate::Interp>::Value>,
-                interp: &mut __EntryI,
-            ) -> Result<
-                #interp_crate::CallableBody<<__EntryI as #interp_crate::Interp>::Value>,
-                <__EntryI as #interp_crate::Interp>::Error,
-            > {
+        impl #impl_generics #interp_crate::FunctionEntry for #type_name #ty_generics #where_clause {
+            fn function_entry(&self) -> Option<#interp_crate::CallableBody> {
                 #body
             }
         }

@@ -54,13 +54,14 @@ use kirin_ir::{
 
 use super::frames::DenseBlockFrame;
 use crate::Body;
-use crate::core::query;
+use crate::core::{linker::resolve_callable as resolve_callable_root, query};
 use crate::engines::sparse_backward::BodyScope;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
-    FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
-    OwnerSemantics, ProgramPoint, Scoped, StageQuery, StandardFixpointInterpreter, Summary,
-    SummaryDependency, SummaryDependencyIndex, SummaryEffect, TerminatorArgs,
+    AbstractInterpreter, BackwardSummaryDeps, Callee, ClassicLiveness, DenseBackwardSemantic,
+    EnvIndex, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
+    InterpreterError, Linker, OwnerSemantics, ProgramPoint, SameStageLinker, Scoped, StageQuery,
+    StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
+    TerminatorArgs,
 };
 
 // ===========================================================================
@@ -626,8 +627,8 @@ where
 ///
 /// ```ignore
 /// let mut analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
-/// analysis.analyze(stage, cfg)?;
-/// let point = Scoped::new((stage, Body::CFG(cfg)), ProgramPoint::BlockEntry(block));
+/// let scope = analysis.analyze(stage, callee)?;
+/// let point = Scoped::new(scope, ProgramPoint::BlockEntry(block));
 /// let live_in = analysis.point_facts(point);
 /// ```
 pub struct DenseBackwardInterpreter<
@@ -636,6 +637,7 @@ pub struct DenseBackwardInterpreter<
     V,
     E = InterpreterError,
     F = DenseBlockFrame<V, E>,
+    Lk = SameStageLinker,
     Sem = ClassicLiveness,
 > where
     V: Clone + PartialEq + Lattice,
@@ -644,9 +646,10 @@ pub struct DenseBackwardInterpreter<
     Sem: DenseBackwardSemantic,
 {
     driver: DenseBackwardDriver<'ir, S, V, E, F, Sem>,
+    linker: Lk,
 }
 
-impl<'ir, S, V, E, F, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Sem>
+impl<'ir, S, V, E, F, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, SameStageLinker, Sem>
 where
     S: StageMeta,
     V: Clone + PartialEq + Lattice + HasBottom,
@@ -661,6 +664,26 @@ where
                 (),
                 BackwardSummaryDeps::new(),
             ),
+            linker: SameStageLinker,
+        }
+    }
+}
+
+impl<'ir, S, V, E, F, Lk, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Lk, Sem>
+where
+    S: StageMeta,
+    V: Clone + PartialEq + Lattice + HasBottom,
+    E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
+{
+    /// Replace the calling convention used by the canonical callable root.
+    pub fn with_linker<Lk2>(
+        self,
+        linker: Lk2,
+    ) -> DenseBackwardInterpreter<'ir, S, V, E, F, Lk2, Sem> {
+        DenseBackwardInterpreter {
+            driver: self.driver,
+            linker,
         }
     }
 
@@ -711,11 +734,12 @@ where
     }
 }
 
-impl<'ir, S, V, E, F, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Sem>
+impl<'ir, S, V, E, F, Lk, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Lk, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
     E: From<InterpreterError>,
+    Lk: Linker<S>,
     Sem: DenseBackwardSemantic,
     F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, F, Completion = DenseBackwardCompletion<V>>
         + From<DenseBlockFrame<V, E>>,
@@ -732,22 +756,35 @@ where
             .map_err(E::from)
     }
 
-    /// Run the block-boundary fixpoint over `cfg` in `stage`: seed every
-    /// CFG block (a backward analysis must visit them all) and drain the
-    /// worklist; dependencies are discovered from the terminators' edges.
-    pub fn analyze(&mut self, stage: CompileStage, body: impl Into<Body>) -> Result<(), E> {
-        let body = body.into();
-        let scope = (stage, body);
-        let blocks = self.direct_body_blocks(stage, body)?;
+    /// Resolve `callee`, seed every block selected by its CFG or Block body,
+    /// and drain the block-boundary worklist. Dependencies are discovered from
+    /// terminator edges; unsupported graph roots fail before solving.
+    pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
+        let (target, entry) = resolve_callable_root::<
+            DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
+            _,
+            _,
+        >(
+            self.driver.inner().pipeline(), &self.linker, stage, &callee
+        )?;
+        let body = entry.body;
+        let scope = (target.stage, body);
+        let blocks = self.direct_body_blocks(target.stage, body)?;
         let owners: Vec<Scoped<BodyScope, Block>> = blocks
             .iter()
             .copied()
             .map(|block| Scoped::new(scope, block))
             .collect();
         let pipeline = self.driver.inner().pipeline();
-        self.driver = Self::new(pipeline).driver;
+        self.driver = StandardFixpointInterpreter::with_dependency_index(
+            DenseBackwardTransfer::new(pipeline),
+            FactStore::new(),
+            (),
+            BackwardSummaryDeps::new(),
+        );
 
         let mut semantics = DenseBackwardSemantics;
-        self.driver.solve_many(&mut semantics, owners)
+        self.driver.solve_many(&mut semantics, owners)?;
+        Ok(scope)
     }
 }

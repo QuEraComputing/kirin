@@ -1,7 +1,7 @@
 use kirin::prelude::{CompileTimeValue, HasBottom, HasCFGBody, Product, SSAValue};
 use kirin_interpreter::dialect::{
     CallEffect, CallableBody, Callee, ClassicLiveness, ClassicLivenessInterp, DemandInterp,
-    DenseBackwardEffect, ForwardEval, FunctionEntry, Interp, Interpretable, InterpreterError,
+    DenseBackwardEffect, ForwardEval, FunctionEntry, Interpretable, InterpreterError,
     SparseForwardEffect, SparseForwardInterp, StrongDemand,
 };
 
@@ -89,31 +89,21 @@ where
     }
 }
 
-impl<I, T> FunctionEntry<I> for Function<T>
+impl<T> FunctionEntry for Function<T>
 where
-    I: Interp,
     T: CompileTimeValue,
 {
-    fn function_entry(
-        &self,
-        args: Product<I::Value>,
-        _interp: &mut I,
-    ) -> Result<CallableBody<I::Value>, I::Error> {
-        Ok(CallableBody::new(*self.cfg()).args(args))
+    fn function_entry(&self) -> Option<CallableBody> {
+        Some(CallableBody::new(*self.cfg()))
     }
 }
 
-impl<I, T> FunctionEntry<I> for Lambda<T>
+impl<T> FunctionEntry for Lambda<T>
 where
-    I: Interp,
     T: CompileTimeValue,
 {
-    fn function_entry(
-        &self,
-        args: Product<I::Value>,
-        _interp: &mut I,
-    ) -> Result<CallableBody<I::Value>, I::Error> {
-        Ok(CallableBody::new(*self.cfg()).args(args))
+    fn function_entry(&self) -> Option<CallableBody> {
+        Some(CallableBody::new(*self.cfg()))
     }
 }
 

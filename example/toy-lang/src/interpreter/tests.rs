@@ -597,12 +597,12 @@ mod demand {
     use std::collections::HashSet;
 
     use kirin::prelude::{
-        CFG, CompileStage, GetInfo, HasBlocks, HasCFG, HasCFGBody, HasDigraphs, HasResults,
-        HasUngraphs, ParsePipelineText, Pipeline, SSAValue, Statement,
+        CFG, CompileStage, GetInfo, HasBlocks, HasCFG, HasDigraphs, HasResults, HasUngraphs,
+        ParsePipelineText, Pipeline, SSAValue, Statement,
     };
     use kirin_arith::{Arith, ArithValue};
     use kirin_function::Lexical;
-    use kirin_interpreter::Body;
+    use kirin_interpreter::{Body, BodyScope, Callee};
     use kirin_liveness::analyze_demand;
 
     use crate::language::HighLevel;
@@ -614,22 +614,23 @@ mod demand {
         pipeline
     }
 
-    /// The source stage id, its info, and the body cfg of `name`.
-    pub(super) fn source_cfg(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, CFG) {
+    /// A source-stage callable root. Body discovery belongs to the interpreter,
+    /// so this helper deliberately stops at the pipeline-level function handle.
+    pub(super) fn source_root(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, Callee) {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
-        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
-            panic!("source stage holds HighLevel");
+        let function = pipeline
+            .lookup_function_by_name(name)
+            .expect("pipeline function");
+        (stage_id, Callee::Function(function))
+    }
+
+    /// Extract a CFG only after the interpreter has resolved the callable and
+    /// reported the target scope it actually analyzed.
+    pub(super) fn cfg_scope(scope: BodyScope) -> (CompileStage, CFG) {
+        let (stage, Body::CFG(cfg)) = scope else {
+            panic!("expected analysis root to resolve to a CFG, got {scope:?}");
         };
-        let sf = pipeline
-            .resolve_staged_function(name, stage_id)
-            .expect("staged function");
-        let sf_info = sf.get_info(info).expect("staged function info");
-        let definition = *sf_info.specializations()[0].definition();
-        let cfg = match definition.definition(info) {
-            HighLevel::Lexical(Lexical::Function(function)) => *function.cfg(),
-            other => panic!("expected a function definition, got {other:?}"),
-        };
-        (stage_id, cfg)
+        (stage, cfg)
     }
 
     /// The parameters of the CFG's entry block.
@@ -761,8 +762,9 @@ specialize @source fn @if_body(i64) -> i64 {
     #[test]
     fn scf_if_body_demand_follows_result_demand() {
         let pipeline = parse(IF_BODY_DEMAND);
-        let (stage, cfg) = source_cfg(&pipeline, "if_body");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "if_body");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let cond = entry_params(&pipeline, cfg)[0];
         let if_result = find_value(&pipeline, cfg, |definition| match definition {
@@ -810,8 +812,9 @@ specialize @source fn @if_dead(i64) -> i64 {
     #[test]
     fn scf_if_dead_result_keeps_only_condition() {
         let pipeline = parse(IF_DEAD_RESULT);
-        let (stage, cfg) = source_cfg(&pipeline, "if_dead");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "if_dead");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let cond = entry_params(&pipeline, cfg)[0];
         let if_result = find_value(&pipeline, cfg, |definition| match definition {
@@ -850,8 +853,9 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
     #[test]
     fn scf_for_loop_carried_demand_converges() {
         let pipeline = parse(FOR_CARRIED_DEMAND);
-        let (stage, cfg) = source_cfg(&pipeline, "loop_sum");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let params = entry_params(&pipeline, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
@@ -918,8 +922,9 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 {
     #[test]
     fn scf_for_dead_result_keeps_only_bounds() {
         let pipeline = parse(FOR_DEAD_RESULT);
-        let (stage, cfg) = source_cfg(&pipeline, "loop_dead");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "loop_dead");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let params = entry_params(&pipeline, cfg);
         let next = find_value(&pipeline, cfg, |definition| match definition {
@@ -968,8 +973,9 @@ specialize @source fn @main(i64, i64) -> i64 {
     #[test]
     fn call_arguments_are_demand_roots() {
         let pipeline = parse(CALL_PURITY);
-        let (stage, cfg) = source_cfg(&pipeline, "main");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "main");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let params = entry_params(&pipeline, cfg);
         let (x, y) = (params[0], params[1]);
@@ -1000,15 +1006,15 @@ specialize @source fn @main(i64, i64) -> i64 {
 // ===========================================================================
 
 mod dense {
-    use kirin::prelude::{CFG, CompileStage, Pipeline, SSAValue};
+    use kirin::prelude::{CompileStage, Pipeline, SSAValue};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_interpreter::{Body, InterpreterError, ProgramPoint, Scoped};
-    use kirin_liveness::{DenseLivenessResult, LiveSet};
+    use kirin_interpreter::{Callee, InterpreterError, ProgramPoint, Scoped};
+    use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
     use kirin_scf::StructuredControlFlow;
 
     use super::demand::{FOR_CARRIED_DEMAND, IF_DEAD_RESULT};
     use super::demand::{
-        constant_result, entry_params, find_statement, find_value, parse, source_cfg,
+        cfg_scope, constant_result, entry_params, find_statement, find_value, parse, source_root,
     };
     use crate::interpreter::ToyDenseBackwardFrame;
     use crate::language::HighLevel;
@@ -1017,14 +1023,19 @@ mod dense {
     /// Run classic dense liveness with the toy total frame.
     fn analyze_dense_toy(
         pipeline: &Pipeline<Stage>,
-        stage: CompileStage,
-        cfg: CFG,
+        caller_stage: CompileStage,
+        callee: Callee,
     ) -> DenseLivenessResult {
-        kirin_liveness::analyze_dense_with_frame::<
-            _,
+        let mut engine: DenseLiveness<
+            '_,
+            Stage,
+            InterpreterError,
             ToyDenseBackwardFrame<LiveSet, InterpreterError>,
-        >(pipeline, stage, cfg)
-        .expect("analysis succeeds")
+        > = DenseLiveness::new(pipeline);
+        let scope = engine
+            .analyze(caller_stage, callee)
+            .expect("analysis succeeds");
+        DenseLivenessResult::from_engine(&engine, scope)
     }
 
     fn live_set(values: &[SSAValue]) -> LiveSet {
@@ -1038,9 +1049,10 @@ mod dense {
     #[test]
     fn dense_per_point_inside_scf_if_arm() {
         let pipeline = parse(IF_DEAD_RESULT);
-        let (stage, cfg) = source_cfg(&pipeline, "if_dead");
-        let dense = analyze_dense_toy(&pipeline, stage, cfg);
-        let scope = (stage, Body::CFG(cfg));
+        let (caller_stage, callee) = source_root(&pipeline, "if_dead");
+        let dense = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let (_, cfg) = cfg_scope(dense.root_scope());
+        let scope = dense.root_scope();
         let point = |item| Scoped::new(scope, item);
 
         let cond = entry_params(&pipeline, cfg)[0];
@@ -1106,9 +1118,10 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 {
     #[test]
     fn dense_scf_if_joins_both_arm_entries() {
         let pipeline = parse(IF_ARMS_DIFFERENT_USES);
-        let (stage, cfg) = source_cfg(&pipeline, "if_arms");
-        let dense = analyze_dense_toy(&pipeline, stage, cfg);
-        let scope = (stage, Body::CFG(cfg));
+        let (caller_stage, callee) = source_root(&pipeline, "if_arms");
+        let dense = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let (_, cfg) = cfg_scope(dense.root_scope());
+        let scope = dense.root_scope();
 
         let params = entry_params(&pipeline, cfg);
         let (cond, x, y) = (params[0], params[1], params[2]);
@@ -1142,9 +1155,10 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 {
     #[test]
     fn dense_loop_carried_fixpoint() {
         let pipeline = parse(FOR_CARRIED_DEMAND);
-        let (stage, cfg) = source_cfg(&pipeline, "loop_sum");
-        let dense = analyze_dense_toy(&pipeline, stage, cfg);
-        let scope = (stage, Body::CFG(cfg));
+        let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
+        let dense = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let (_, cfg) = cfg_scope(dense.root_scope());
+        let scope = dense.root_scope();
 
         let params = entry_params(&pipeline, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
