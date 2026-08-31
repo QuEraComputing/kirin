@@ -12,10 +12,11 @@ use super::{BodyFrameEntry, CallBodyTraversal, Completion, DefaultCallBodyTraver
 /// A `CallFrame` owns the whole activation lifecycle that representation
 /// walkers deliberately don't:
 ///
-/// 1. resolve the callee through the engine's [`Linker`](crate::Linker);
+/// 1. resolve the callee and discover its value-independent body through the
+///    common callable-root protocol (`Linker` then `FunctionEntry` at the
+///    target stage);
 /// 2. allocate the callee activation;
-/// 3. ask [`FunctionEntry`](crate::FunctionEntry) for the callable body
-///    descriptor ([`CallableBody`](crate::CallableBody));
+/// 3. retain the concrete argument product for the selected body walker;
 /// 4. select the entry frame for the closed [`Body`] variant — **delegated to
 ///    the `T` traversal** ([`CallBodyTraversal`]), which defaults to
 ///    [`DefaultCallBodyTraversal`]: `CFG` → `CFGFrame`, `Block` → `BlockFrame`,
@@ -134,9 +135,8 @@ where
                 args,
                 dest,
             } => {
-                let target = interp.resolve_call(resolve_stage, &callee)?;
+                let (target, entry) = interp.resolve_callable(resolve_stage, &callee)?;
                 let index = interp.alloc_env();
-                let entry = interp.enter_function(target.stage, target.definition, args, index)?;
                 // The closed `Body` enum is the framework's supported body
                 // vocabulary, so this match is intentionally exhaustive;
                 // only the `UnGraph` arm delegates to a language traversal.
@@ -149,25 +149,25 @@ where
                         stage: target.stage,
                         index,
                         body: cfg,
-                        args: entry.args,
+                        args,
                     })?,
                     Body::Block(block) => T::from_block(BodyFrameEntry {
                         stage: target.stage,
                         index,
                         body: block,
-                        args: entry.args,
+                        args,
                     })?,
                     Body::DiGraph(graph) => T::from_digraph(BodyFrameEntry {
                         stage: target.stage,
                         index,
                         body: graph,
-                        args: entry.args,
+                        args,
                     })?,
                     Body::UnGraph(graph) => T::from_ungraph(BodyFrameEntry {
                         stage: target.stage,
                         index,
                         body: graph,
-                        args: entry.args,
+                        args,
                     })?,
                 };
                 Ok(FrameEffect::Push {

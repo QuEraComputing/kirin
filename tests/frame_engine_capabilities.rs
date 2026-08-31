@@ -8,8 +8,8 @@
 //!
 //! Before the split there was one monolithic capability trait carrying every
 //! operation, so *none* of these four engines could exist: running a block
-//! walker meant also supplying `alloc_env`/`free_env`/`resolve_call`/
-//! `enter_function`/`cfg_entry`/`digraph_walk_plan`, and an abstract dataflow
+//! walker meant also supplying `alloc_env`/`free_env`/`resolve_callable`/
+//! `cfg_entry`/`digraph_walk_plan`, and an abstract dataflow
 //! engine had to expose a concrete call convention it never performs.
 //!
 //! | mock engine | pins |
@@ -108,7 +108,7 @@ struct MockStore(HashMap<(usize, SSAValue), i64>);
 /// Implements: [`Interp`], [`Env`], [`StatementDispatch`], [`BlockQueries`].
 ///
 /// **Deliberately omits**: [`CallServices`] (no `alloc_env`/`free_env`/
-/// `resolve_call`/`enter_function`), [`CFGQueries`] (no
+/// `resolve_callable`), [`CFGQueries`] (no
 /// `cfg_entry`), and [`DiGraphQueries`] (no `digraph_walk_plan`).
 ///
 /// So this engine cannot enter a function, cannot find a CFG's entry block, and
@@ -260,20 +260,11 @@ impl CallServices for CallOnlyEngine {
     fn free_env(&mut self, _index: EnvIndex) -> Result<(), InterpreterError> {
         unimplemented!("type-level mock")
     }
-    fn resolve_call(
+    fn resolve_callable(
         &self,
         _stage: CompileStage,
         _callee: &Callee,
-    ) -> Result<FunctionTarget, InterpreterError> {
-        unimplemented!("type-level mock")
-    }
-    fn enter_function(
-        &mut self,
-        _stage: CompileStage,
-        _definition: Statement,
-        _args: Product<i64>,
-        _index: EnvIndex,
-    ) -> Result<CallableBody<i64>, InterpreterError> {
+    ) -> Result<(FunctionTarget, CallableBody), InterpreterError> {
         unimplemented!("type-level mock")
     }
 }
@@ -298,7 +289,7 @@ fn call_frame_runs_on_an_engine_with_only_call_services() {
 /// *summarizes* a call ([`ForwardDataflowFrameEngine::summarize_call`]) instead
 /// of descending into it, and reaches a callable body's entry block through
 /// owner seeding rather than `cfg_entry` — so it should not have to expose
-/// activation allocation, activation cleanup, `enter_function`, `resolve_call`,
+/// activation allocation, activation cleanup, `resolve_callable`,
 /// or `cfg_entry` merely to be an abstract dataflow engine. Before the split it
 /// did.
 #[derive(Default)]

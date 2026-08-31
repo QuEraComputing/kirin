@@ -35,9 +35,9 @@ pub enum ArithFunctionLanguage {
 mod interpreter {
     use kirin_interpreter::dialect::{
         CallableBody, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
-        FunctionEntry, Interp, Interpretable, InterpreterError, StrongDemand,
+        FunctionEntry, Interpretable, StrongDemand,
     };
-    use kirin_ir::{HasBottom, Product};
+    use kirin_ir::HasBottom;
 
     use super::ArithFunctionLanguage;
 
@@ -74,19 +74,11 @@ mod interpreter {
         }
     }
 
-    impl<I: Interp> FunctionEntry<I> for ArithFunctionLanguage {
-        fn function_entry(
-            &self,
-            args: Product<I::Value>,
-            interp: &mut I,
-        ) -> Result<CallableBody<I::Value>, I::Error> {
+    impl FunctionEntry for ArithFunctionLanguage {
+        fn function_entry(&self) -> Option<CallableBody> {
             match self {
-                ArithFunctionLanguage::Function { body, .. } => {
-                    Ok(CallableBody::new(*body).args(args))
-                }
-                _ => Err(I::Error::from(InterpreterError::NotCallable(
-                    interp.statement(),
-                ))),
+                ArithFunctionLanguage::Function { body, .. } => Some(CallableBody::new(*body)),
+                _ => None,
             }
         }
     }

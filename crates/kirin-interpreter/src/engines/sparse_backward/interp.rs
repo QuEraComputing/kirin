@@ -53,12 +53,12 @@ use kirin_ir::{
     SSAKind, SSAValue, StageMeta, Statement,
 };
 
-use crate::core::query;
+use crate::core::{linker::resolve_callable as resolve_callable_root, query};
 use crate::{
-    AbstractInterpreter, Body, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, OwnerSemantics, OwnerSummaryDeps, Scoped,
-    SparseBackwardSemantic, SparseStore, StageQuery, StandardFixpointInterpreter, StrongDemand,
-    Summary, SummaryEffect, TerminatorArgs,
+    AbstractInterpreter, Body, Callee, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
+    InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics, OwnerSummaryDeps,
+    SameStageLinker, Scoped, SparseBackwardSemantic, SparseStore, StageQuery,
+    StandardFixpointInterpreter, StrongDemand, Summary, SummaryEffect, TerminatorArgs,
 };
 
 /// The scope a body-level backward analysis qualifies its facts with.
@@ -532,19 +532,26 @@ where
 ///
 /// ```ignore
 /// let mut analysis = SparseBackwardInterpreter::<Stage, Live>::new(&pipeline);
-/// analysis.analyze(stage, cfg)?;
-/// let demanded = analysis.is_demanded(stage, cfg, value);
+/// let scope = analysis.analyze(stage, callee)?;
+/// let demanded = analysis.is_demanded(scope.0, scope.1, value);
 /// ```
-pub struct SparseBackwardInterpreter<'ir, S: StageMeta, V, E = InterpreterError, Sem = StrongDemand>
-where
+pub struct SparseBackwardInterpreter<
+    'ir,
+    S: StageMeta,
+    V,
+    E = InterpreterError,
+    Lk = SameStageLinker,
+    Sem = StrongDemand,
+> where
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
     Sem: SparseBackwardSemantic,
 {
     driver: SparseBackwardDriver<'ir, S, V, E, Sem>,
+    linker: Lk,
 }
 
-impl<'ir, S, V, E, Sem> SparseBackwardInterpreter<'ir, S, V, E, Sem>
+impl<'ir, S, V, E, Sem> SparseBackwardInterpreter<'ir, S, V, E, SameStageLinker, Sem>
 where
     S: StageMeta,
     V: Clone + PartialEq + Lattice,
@@ -559,6 +566,26 @@ where
                 (),
                 OwnerSummaryDeps::new(),
             ),
+            linker: SameStageLinker,
+        }
+    }
+}
+
+impl<'ir, S, V, E, Lk, Sem> SparseBackwardInterpreter<'ir, S, V, E, Lk, Sem>
+where
+    S: StageMeta,
+    V: Clone + PartialEq + Lattice,
+    E: From<InterpreterError>,
+    Sem: SparseBackwardSemantic,
+{
+    /// Replace the calling convention used by the canonical callable root.
+    pub fn with_linker<Lk2>(
+        self,
+        linker: Lk2,
+    ) -> SparseBackwardInterpreter<'ir, S, V, E, Lk2, Sem> {
+        SparseBackwardInterpreter {
+            driver: self.driver,
+            linker,
         }
     }
 
@@ -603,23 +630,33 @@ where
     }
 }
 
-impl<'ir, S, V, E, Sem> SparseBackwardInterpreter<'ir, S, V, E, Sem>
+impl<'ir, S, V, E, Lk, Sem> SparseBackwardInterpreter<'ir, S, V, E, Lk, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
+    Lk: Linker<S>,
     Sem: SparseBackwardSemantic,
 {
-    /// Run the demand fixpoint over `body` in `stage`.
+    /// Resolve `callee` and run the demand fixpoint over its callable body.
     ///
     /// **Prepass**: walk the body's containment hierarchy, running every
     /// statement's rule once with nothing demanded — impure statements and
     /// terminators contribute the demand roots.
     /// **Propagation**: drain the value worklist; each risen value dispatches
     /// the rules that translate its demand.
-    pub fn analyze(&mut self, stage: CompileStage, body: impl Into<Body>) -> Result<(), E> {
-        let body = body.into();
-        let scope = (stage, body);
+    pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
+        let (target, entry) = resolve_callable_root::<SparseBackwardDriver<'ir, S, V, E, Sem>, _, _>(
+            self.driver.inner().pipeline(),
+            &self.linker,
+            stage,
+            &callee,
+        )?;
+        let body = entry.body;
+        if matches!(body, Body::DiGraph(_) | Body::UnGraph(_)) {
+            return Err(E::from(InterpreterError::NoDefaultWalker(body)));
+        }
+        let scope = (target.stage, body);
         *self.driver.store_mut() = BackwardAnalysisState { scope: Some(scope) };
 
         let mut semantics = SparseBackwardSemantics;
@@ -633,11 +670,12 @@ where
             if !visited.insert(body) {
                 continue;
             }
-            let contents = query::body_contents(self.driver.inner().pipeline(), stage, body)?;
+            let contents =
+                query::body_contents(self.driver.inner().pipeline(), target.stage, body)?;
             bodies.extend(contents.children);
             for statement in contents.statements {
                 let SparseBackwardEffect::Demands(demands) =
-                    self.driver.run_statement(stage, statement)?;
+                    self.driver.run_statement(target.stage, statement)?;
                 seeds.extend(demands);
             }
         }
@@ -650,7 +688,8 @@ where
                 DemandSummary(fact),
             )?;
         }
-        self.driver.drain_worklist(&mut semantics)
+        self.driver.drain_worklist(&mut semantics)?;
+        Ok(scope)
     }
 
     /// `true` iff `value` carries a non-bottom demand fact under the scope.
