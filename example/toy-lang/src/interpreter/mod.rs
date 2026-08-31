@@ -16,17 +16,15 @@ use frame::FrameStackItem;
 pub use frame::ToyAbstractFrame;
 pub(crate) use frame::ToyDenseBackwardFrame;
 
-use kirin::prelude::{CFG, CompileStage, GetInfo, Pipeline, UniqueLiveSpecializationError};
+use kirin::prelude::{CFG, CompileStage, Pipeline};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
-use kirin_function::{Lexical, Lifted};
-use kirin_interpreter::InterpreterError;
 use kirin_interpreter::engine::{
     CallContext, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
     SparseForwardInterpreter, expect_single,
 };
-use kirin_liveness::{DenseLivenessResult, LiveSet};
+use kirin_interpreter::{Body, Callee, InterpreterError};
+use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
 
-use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
 
 /// Summary key of the constant-propagation analysis policy.
@@ -137,83 +135,6 @@ pub fn analyze_constprop(
     expect_single(analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?)
 }
 
-/// The body cfg of `function_name`'s specialization at `stage_name`.
-fn function_cfg(
-    pipeline: &Pipeline<Stage>,
-    stage_name: &str,
-    function_name: &str,
-) -> Result<(CompileStage, CFG), InterpreterError> {
-    let stage_id = pipeline
-        .stage_by_name(stage_name)
-        .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
-    let staged = pipeline
-        .resolve_staged_function(function_name, stage_id)
-        .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    let stage = pipeline
-        .stage(stage_id)
-        .ok_or(InterpreterError::MissingStage(stage_id))?;
-
-    let cfg = match stage {
-        Stage::Source(info) => {
-            let staged_info = staged
-                .get_info(info)
-                .ok_or(InterpreterError::MissingSpecialization(staged))?;
-            let spec = match staged_info.unique_live_specialization() {
-                Ok(spec) => spec,
-                Err(UniqueLiveSpecializationError::NoSpecialization) => {
-                    return Err(InterpreterError::MissingSpecialization(staged));
-                }
-                Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
-                    return Err(InterpreterError::AmbiguousSpecialization {
-                        function: staged,
-                        count,
-                    });
-                }
-            };
-            let spec_info = spec.get_info(info).ok_or(InterpreterError::Custom(
-                "specialized function has no definition",
-            ))?;
-            let definition = *spec_info.definition();
-            match definition.definition(info) {
-                HighLevel::Lexical(Lexical::Function(function)) => {
-                    use kirin::prelude::HasCFGBody;
-                    *function.cfg()
-                }
-                _ => return Err(InterpreterError::Custom("expected a function definition")),
-            }
-        }
-        Stage::Lowered(info) => {
-            let staged_info = staged
-                .get_info(info)
-                .ok_or(InterpreterError::MissingSpecialization(staged))?;
-            let spec = match staged_info.unique_live_specialization() {
-                Ok(spec) => spec,
-                Err(UniqueLiveSpecializationError::NoSpecialization) => {
-                    return Err(InterpreterError::MissingSpecialization(staged));
-                }
-                Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
-                    return Err(InterpreterError::AmbiguousSpecialization {
-                        function: staged,
-                        count,
-                    });
-                }
-            };
-            let spec_info = spec.get_info(info).ok_or(InterpreterError::Custom(
-                "specialized function has no definition",
-            ))?;
-            let definition = *spec_info.definition();
-            match definition.definition(info) {
-                LowLevel::Lifted(Lifted::Function(function)) => {
-                    use kirin::prelude::HasCFGBody;
-                    *function.cfg()
-                }
-                _ => return Err(InterpreterError::Custom("expected a function definition")),
-            }
-        }
-    };
-    Ok((stage_id, cfg))
-}
-
 /// Run classic per-point liveness (dense backward — regalloc-grade
 /// block-boundary and per-statement sets) over `function_name`'s body at
 /// `stage_name`. Consumes the finalized IR directly; strong demand
@@ -224,10 +145,25 @@ pub fn analyze_classic_liveness(
     stage_name: &str,
     function_name: &str,
 ) -> Result<(CompileStage, CFG, DenseLivenessResult), InterpreterError> {
-    let (stage, cfg) = function_cfg(pipeline, stage_name, function_name)?;
-    let result = kirin_liveness::analyze_dense_with_frame::<
-        _,
+    let caller_stage = pipeline
+        .stage_by_name(stage_name)
+        .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
+    let function = pipeline
+        .lookup_function_by_name(function_name)
+        .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
+    let mut engine: DenseLiveness<
+        '_,
+        Stage,
+        InterpreterError,
         ToyDenseBackwardFrame<LiveSet, InterpreterError>,
-    >(pipeline, stage, cfg)?;
+        CrossStageLinker,
+    > = DenseLiveness::new(pipeline).with_linker(CrossStageLinker);
+    let scope = engine.analyze(caller_stage, Callee::Function(function))?;
+    let result = DenseLivenessResult::from_engine(&engine, scope);
+    let (stage, Body::CFG(cfg)) = scope else {
+        return Err(InterpreterError::Custom(
+            "classic liveness target is not a CFG function",
+        ));
+    };
     Ok((stage, cfg, result))
 }

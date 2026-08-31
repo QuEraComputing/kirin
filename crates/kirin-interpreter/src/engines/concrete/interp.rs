@@ -4,7 +4,7 @@ use kirin_ir::{
     Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta, Statement, Symbol,
 };
 
-use crate::core::query;
+use crate::core::{linker::resolve_callable, query};
 use crate::{
     BlockQueries, CFGQueries, CallServices, CallableBody, Callee, Completion, DiGraphQueries, Env,
     EnvIndex, EnvStackStore, ForwardEval, Frame, FunctionTarget, Interp, InterpDispatch,
@@ -153,31 +153,12 @@ where
         self.store.free(index).map_err(E::from)
     }
 
-    fn resolve_call(&self, stage: CompileStage, callee: &Callee) -> Result<FunctionTarget, E> {
-        self.linker
-            .resolve(self.pipeline, stage, callee)
-            .map_err(E::from)
-    }
-
-    fn enter_function(
-        &mut self,
+    fn resolve_callable(
+        &self,
         stage: CompileStage,
-        definition: Statement,
-        args: Product<V>,
-        index: EnvIndex,
-    ) -> Result<CallableBody<V>, E> {
-        let pipeline = self.pipeline;
-        let info = pipeline
-            .stage(stage)
-            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let previous = self.location.replace(InterpLocation {
-            stage,
-            statement: definition,
-            index,
-        });
-        let result = info.dispatch_function_entry(definition, args, self);
-        self.location = previous;
-        result
+        callee: &Callee,
+    ) -> Result<(FunctionTarget, CallableBody), E> {
+        resolve_callable::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
     }
 }
 

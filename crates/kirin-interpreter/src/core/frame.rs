@@ -330,20 +330,13 @@ pub trait CallServices: Env {
     fn alloc_env(&mut self) -> EnvIndex;
     /// Free an activation record.
     fn free_env(&mut self, index: EnvIndex) -> Result<(), Self::Error>;
-    /// Resolve a callee to a concrete function target via the engine's linker.
-    fn resolve_call(
+    /// Resolve a callee and discover its value-independent callable body at
+    /// the selected target stage.
+    fn resolve_callable(
         &self,
         stage: CompileStage,
         callee: &Callee,
-    ) -> Result<FunctionTarget, Self::Error>;
-    /// Build the [`CallableBody`] a callable statement enters on invocation.
-    fn enter_function(
-        &mut self,
-        stage: CompileStage,
-        definition: Statement,
-        args: Product<Self::Value>,
-        index: EnvIndex,
-    ) -> Result<CallableBody<Self::Value>, Self::Error>;
+    ) -> Result<(FunctionTarget, CallableBody), Self::Error>;
 }
 
 /// An interpreter engine capable of running the complete standard **concrete**
@@ -375,7 +368,7 @@ impl<T> ForwardFrameEngine for T where
 /// not** [`CallServices`] or [`CFGQueries`]. An abstract engine does not descend
 /// into a callee (it [summarizes](Self::summarize_call) the call), so requiring
 /// it to expose concrete activation allocation, activation cleanup,
-/// `resolve_call`, and `enter_function` would be demanding a call convention it
+/// `resolve_callable` would be demanding a call convention it
 /// never performs. `cfg_entry` is likewise absent: the forward abstract engine
 /// reaches a callable body's entry block through [`Owner`](crate::Owner) seeding
 /// in the fixpoint driver, not by asking a frame to enter a CFG. A frame that

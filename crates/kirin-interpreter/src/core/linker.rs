@@ -1,7 +1,7 @@
 use kirin_ir::{CompileStage, Pipeline, SpecializedFunction, StageMeta, Statement};
 
 use super::query;
-use crate::{Callee, InterpreterError, StageQuery};
+use crate::{CallableBody, Callee, Interp, InterpDispatch, InterpreterError, StageQuery};
 
 /// A fully resolved call target: the stage to execute in, the specialization,
 /// and its callable definition statement.
@@ -28,6 +28,33 @@ pub trait Linker<S: StageMeta> {
     ) -> Result<FunctionTarget, InterpreterError>;
 }
 
+/// Run the framework's common callable-root protocol.
+///
+/// Linking selects a concrete target; callable-entry dispatch then discovers
+/// its body in the target's stage. Engines invoke this operation before
+/// applying their own boundary inputs (runtime arguments, abstract arguments,
+/// or analysis-specific seeds).
+pub(crate) fn resolve_callable<I, S, Lk>(
+    pipeline: &Pipeline<S>,
+    linker: &Lk,
+    caller_stage: CompileStage,
+    callee: &Callee,
+) -> Result<(FunctionTarget, CallableBody), I::Error>
+where
+    I: Interp,
+    S: StageMeta + InterpDispatch<I>,
+    Lk: Linker<S>,
+{
+    let target = linker
+        .resolve(pipeline, caller_stage, callee)
+        .map_err(I::Error::from)?;
+    let info = pipeline
+        .stage(target.stage)
+        .ok_or_else(|| I::Error::from(InterpreterError::MissingStage(target.stage)))?;
+    let body = info.dispatch_function_entry(target.definition)?;
+    Ok((target, body))
+}
+
 /// Resolve calls within the caller's stage only (the default).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct SameStageLinker;
@@ -47,7 +74,7 @@ fn callee_function<S: StageQuery>(
     match *callee {
         Callee::Named(symbol) => {
             let name = query::resolve_symbol_name(pipeline, caller_stage, symbol)?
-                .ok_or(InterpreterError::MissingCallTarget(symbol))?;
+                .ok_or(InterpreterError::MissingCallSymbol(symbol))?;
             let function = pipeline
                 .lookup_function_by_name(&name)
                 .ok_or(InterpreterError::MissingFunctionName(name))?;
@@ -64,7 +91,7 @@ fn target_at_stage<S: StageQuery>(
     callee: &Callee,
 ) -> Result<FunctionTarget, InterpreterError> {
     let specialized = match *callee {
-        Callee::Named(symbol) => return Err(InterpreterError::MissingCallTarget(symbol)),
+        Callee::Named(symbol) => return Err(InterpreterError::MissingCallSymbol(symbol)),
         Callee::Function(function) => {
             let staged = pipeline
                 .function_info(function)

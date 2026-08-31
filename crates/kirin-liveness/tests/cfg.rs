@@ -4,7 +4,7 @@
 
 use kirin::prelude::{GetInfo, ParsePipelineText, Pipeline, SSAValue, StageInfo};
 use kirin_arith::Arith;
-use kirin_interpreter::{Body, InterpreterError, ProgramPoint, Scoped};
+use kirin_interpreter::{Body, Callee, InterpreterError, ProgramPoint, Scoped};
 use kirin_liveness::{DenseLiveness, analyze_demand};
 use kirin_test_languages::ArithFunctionLanguage;
 
@@ -42,33 +42,40 @@ specialize @test fn @main(i64, i64, i64) -> i64 {
 }
 "#;
 
+const ENGINE_REUSE_PROGRAM: &str = r#"
+stage @test fn @first(i64) -> i64;
+stage @test fn @second(i64) -> i64;
+
+specialize @test fn @first(i64) -> i64 {
+  ^entry(%x: i64) {
+    ret %x;
+  }
+}
+
+specialize @test fn @second(i64) -> i64 {
+  ^entry(%y: i64) {
+    %neg = neg %y -> i64;
+    ret %neg;
+  }
+}
+"#;
+
 fn parse(program: &str) -> Pipeline<StageInfo<ArithFunctionLanguage>> {
     let mut pipeline: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
     ParsePipelineText::parse(&mut pipeline, program).expect("program parses");
     pipeline
 }
 
-/// The finalized stage id and the body cfg of `@main`.
-// TODO: `analyze` method is wrong, calling demand analysis.
-// TODO: `analyze` should use the same entry point. i.e. Callee not CFG/Body.
-fn main_cfg(
+/// The caller stage and canonical callable root for `function_name`.
+fn function_root(
     pipeline: &Pipeline<StageInfo<ArithFunctionLanguage>>,
-) -> (kirin::prelude::CompileStage, kirin_ir::CFG) {
+    function_name: &str,
+) -> (kirin::prelude::CompileStage, Callee) {
     let stage_id = pipeline.stage_by_name("test").expect("stage @test exists");
-    let stage = pipeline.stage(stage_id).expect("stage info");
-
-    let sf = pipeline
-        .resolve_staged_function("main", stage_id)
-        .expect("@main is staged at @test");
-    let sf_info = sf.get_info(stage).expect("staged function info");
-    let spec = &sf_info.specializations()[0];
-    let definition = *spec.definition();
-
-    let cfg = match definition.definition(stage) {
-        ArithFunctionLanguage::Function { body, .. } => *body,
-        other => panic!("expected a function definition, got {other:?}"),
-    };
-    (stage_id, cfg)
+    let function = pipeline
+        .lookup_function_by_name(function_name)
+        .unwrap_or_else(|| panic!("function @{function_name} exists"));
+    (stage_id, Callee::Function(function))
 }
 
 /// The parameters of the `index`-th block of `cfg`, as SSA values.
@@ -113,8 +120,11 @@ fn find_arith<R>(
 #[test]
 fn strong_liveness_over_branching_function() {
     let pipeline = parse(PROGRAM);
-    let (stage, cfg) = main_cfg(&pipeline);
-    let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+    let (caller_stage, callee) = function_root(&pipeline, "main");
+    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let (_, Body::CFG(cfg)) = result.root_scope() else {
+        panic!("@main resolves to a CFG body")
+    };
 
     let entry_params = block_params(&pipeline, cfg, 0);
     let (x, cond) = (entry_params[0], entry_params[1]);
@@ -153,8 +163,11 @@ fn strong_liveness_over_branching_function() {
 #[test]
 fn unused_successor_block_argument_does_not_keep_edge_arg_live() {
     let pipeline = parse(DEAD_EDGE_ARG_PROGRAM);
-    let (stage, cfg) = main_cfg(&pipeline);
-    let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+    let (caller_stage, callee) = function_root(&pipeline, "main");
+    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let (_, Body::CFG(cfg)) = result.root_scope() else {
+        panic!("@main resolves to a CFG body")
+    };
 
     let entry_params = block_params(&pipeline, cfg, 0);
     let (live, dead, cond) = (entry_params[0], entry_params[1], entry_params[2]);
@@ -213,8 +226,11 @@ specialize @test fn @main(i64, i64) -> i64 {
 #[test]
 fn terminator_operands_become_demanded() {
     let pipeline = parse(RET_PARAM_PROGRAM);
-    let (stage, cfg) = main_cfg(&pipeline);
-    let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+    let (caller_stage, callee) = function_root(&pipeline, "main");
+    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let (_, Body::CFG(cfg)) = result.root_scope() else {
+        panic!("@main resolves to a CFG body")
+    };
 
     let x = block_params(&pipeline, cfg, 0)[0];
     assert!(result.is_demanded(x));
@@ -223,8 +239,11 @@ fn terminator_operands_become_demanded() {
 #[test]
 fn demanded_result_marks_operands_demanded() {
     let pipeline = parse(DEMANDED_RESULT_PROGRAM);
-    let (stage, cfg) = main_cfg(&pipeline);
-    let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+    let (caller_stage, callee) = function_root(&pipeline, "main");
+    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let (_, Body::CFG(cfg)) = result.root_scope() else {
+        panic!("@main resolves to a CFG body")
+    };
 
     let params = block_params(&pipeline, cfg, 0);
     let sum = find_arith(&pipeline, cfg, |op| match op {
@@ -239,8 +258,11 @@ fn demanded_result_marks_operands_demanded() {
 #[test]
 fn dead_result_leaves_operands_dead() {
     let pipeline = parse(DEAD_RESULT_PROGRAM);
-    let (stage, cfg) = main_cfg(&pipeline);
-    let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+    let (caller_stage, callee) = function_root(&pipeline, "main");
+    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let (_, Body::CFG(cfg)) = result.root_scope() else {
+        panic!("@main resolves to a CFG body")
+    };
 
     let params = block_params(&pipeline, cfg, 0);
     let sum = find_arith(&pipeline, cfg, |op| match op {
@@ -305,8 +327,12 @@ fn live_set(values: &[SSAValue]) -> LiveSet {
 #[test]
 fn classic_liveness_boundary_sets() {
     let pipeline = parse(PROGRAM);
-    let (stage, cfg) = main_cfg(&pipeline);
-    let result = analyze_dense(&pipeline, stage, cfg).expect("analysis succeeds");
+    let (caller_stage, callee) = function_root(&pipeline, "main");
+    let result = analyze_dense(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let scope = result.root_scope();
+    let (stage, Body::CFG(cfg)) = scope else {
+        panic!("@main resolves to a CFG body")
+    };
 
     let entry_params = block_params(&pipeline, cfg, 0);
     let (x, cond) = (entry_params[0], entry_params[1]);
@@ -315,7 +341,6 @@ fn classic_liveness_boundary_sets() {
     let entry = nth_block(&pipeline, cfg, 0);
     let then_block = nth_block(&pipeline, cfg, 1);
     let else_block = nth_block(&pipeline, cfg, 2);
-    let scope = (stage, Body::CFG(cfg));
     let point = |item| Scoped::new(scope, item);
 
     // live_in(entry): %x (used by add and both edges) and %cond (branch use).
@@ -358,29 +383,38 @@ fn classic_liveness_boundary_sets() {
 
 #[test]
 fn reusing_dense_engine_replaces_the_previous_scoped_result() {
-    let pipeline = parse(PROGRAM);
-    let (stage, cfg) = main_cfg(&pipeline);
-    let entry = nth_block(&pipeline, cfg, 0);
-    let then_block = nth_block(&pipeline, cfg, 1);
+    let pipeline = parse(ENGINE_REUSE_PROGRAM);
+    let (stage, first) = function_root(&pipeline, "first");
+    let (_, second) = function_root(&pipeline, "second");
     let mut engine = DenseLiveness::<_, InterpreterError>::new(&pipeline);
 
-    engine.analyze(stage, cfg).expect("CFG analysis succeeds");
+    let first_scope = engine
+        .analyze(stage, first)
+        .expect("first callable analysis succeeds");
+    let (_, Body::CFG(first_cfg)) = first_scope else {
+        panic!("@first resolves to a CFG body")
+    };
+    let first_entry = nth_block(&pipeline, first_cfg, 0);
     assert!(
         engine
             .point_facts(Scoped::new(
-                (stage, Body::CFG(cfg)),
-                ProgramPoint::BlockEntry(entry),
+                first_scope,
+                ProgramPoint::BlockEntry(first_entry),
             ))
             .is_some()
     );
 
-    engine
-        .analyze(stage, then_block)
-        .expect("block analysis succeeds");
+    let second_scope = engine
+        .analyze(stage, second)
+        .expect("second callable analysis succeeds");
+    let (_, Body::CFG(second_cfg)) = second_scope else {
+        panic!("@second resolves to a CFG body")
+    };
+    let second_entry = nth_block(&pipeline, second_cfg, 0);
     assert_eq!(
         engine.point_facts(Scoped::new(
-            (stage, Body::CFG(cfg)),
-            ProgramPoint::BlockEntry(entry),
+            first_scope,
+            ProgramPoint::BlockEntry(first_entry),
         )),
         None,
         "facts from the previous analysis are not retained"
@@ -388,8 +422,8 @@ fn reusing_dense_engine_replaces_the_previous_scoped_result() {
     assert!(
         engine
             .point_facts(Scoped::new(
-                (stage, Body::Block(then_block)),
-                ProgramPoint::BlockEntry(then_block),
+                second_scope,
+                ProgramPoint::BlockEntry(second_entry),
             ))
             .is_some()
     );
@@ -398,16 +432,18 @@ fn reusing_dense_engine_replaces_the_previous_scoped_result() {
 #[test]
 fn classic_per_point_sets_gen_dead_uses() {
     let pipeline = parse(DEAD_RESULT_PROGRAM);
-    let (stage, cfg) = main_cfg(&pipeline);
-    let result = analyze_dense(&pipeline, stage, cfg).expect("analysis succeeds");
+    let (caller_stage, callee) = function_root(&pipeline, "main");
+    let result = analyze_dense(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let scope = result.root_scope();
+    let (_, Body::CFG(cfg)) = scope else {
+        panic!("@main resolves to a CFG body")
+    };
 
     let params = block_params(&pipeline, cfg, 0);
     let (a, b) = (params[0], params[1]);
     let add = find_stmt(&pipeline, cfg, |definition| {
         matches!(definition, ArithFunctionLanguage::Arith(Arith::Add { .. }))
     });
-    let scope = (stage, Body::CFG(cfg));
-
     // Classic semantics: the dead add still GENS its operands, so %b is live
     // before it — this is the conventional per-point meaning (the old strong
     // expectations were demand projections, not dense liveness).
@@ -424,9 +460,14 @@ fn classic_per_point_sets_gen_dead_uses() {
 #[test]
 fn strong_per_point_sets_are_classic_intersect_demanded() {
     let pipeline = parse(DEAD_RESULT_PROGRAM);
-    let (stage, cfg) = main_cfg(&pipeline);
-    let dense = analyze_dense(&pipeline, stage, cfg).expect("dense analysis succeeds");
-    let demand = analyze_demand(&pipeline, stage, cfg).expect("demand analysis succeeds");
+    let (caller_stage, callee) = function_root(&pipeline, "main");
+    let dense = analyze_dense(&pipeline, caller_stage, callee).expect("dense analysis succeeds");
+    let demand = analyze_demand(&pipeline, caller_stage, callee).expect("demand analysis succeeds");
+    let scope = dense.root_scope();
+    assert_eq!(scope, demand.root_scope());
+    let (_, Body::CFG(cfg)) = scope else {
+        panic!("@main resolves to a CFG body")
+    };
 
     let params = block_params(&pipeline, cfg, 0);
     let (a, b) = (params[0], params[1]);
@@ -437,10 +478,7 @@ fn strong_per_point_sets_are_classic_intersect_demanded() {
     // The composition recovers the strong (needed) per-point view: %b is
     // classically live before the dead add but not demanded, so it drops out.
     let strong = dense
-        .strong_point_facts(
-            Scoped::new((stage, Body::CFG(cfg)), ProgramPoint::Before(add)),
-            &demand,
-        )
+        .strong_point_facts(Scoped::new(scope, ProgramPoint::Before(add)), &demand)
         .expect("point reconstructed");
     assert_eq!(strong, live_set(&[a]));
     assert!(!strong.contains(b));

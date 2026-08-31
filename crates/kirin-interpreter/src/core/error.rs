@@ -37,8 +37,8 @@ pub enum InterpreterError {
         function: StagedFunction,
         count: usize,
     },
-    #[error("missing call target {0:?}")]
-    MissingCallTarget(Symbol),
+    #[error("missing call symbol {0:?}")]
+    MissingCallSymbol(Symbol),
     #[error("cfg has no entry block")]
     EmptyCFG,
     #[error("body {0:?} has no default walker in this engine")]

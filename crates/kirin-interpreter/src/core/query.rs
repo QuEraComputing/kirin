@@ -416,6 +416,7 @@ where
 }
 
 /// Blocks directly selected as dense fixpoint owners by an analysis root.
+/// Graph bodies have no block-owner interpretation and fail explicitly.
 pub struct DirectBodyBlocks(pub Body);
 
 impl<S, L> StageAction<S, L> for DirectBodyBlocks
@@ -434,7 +435,9 @@ where
         Ok(match self.0 {
             Body::CFG(cfg) => cfg.blocks(info).collect(),
             Body::Block(block) => vec![block],
-            Body::DiGraph(_) | Body::UnGraph(_) => Vec::new(),
+            body @ (Body::DiGraph(_) | Body::UnGraph(_)) => {
+                return Err(InterpreterError::NoDefaultWalker(body));
+            }
         })
     }
 }
