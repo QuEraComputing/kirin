@@ -1,9 +1,16 @@
+import json
+
 import pytest
 
 from kirin.prelude import basic
 from kirin.serialization.jsonserializer import JSONSerializer
 from kirin.serialization.base.serializer import Serializer
-from kirin.serialization.core.serializationmodule import SerializationModule
+from kirin.serialization.core.serializationmodule import (
+    CURRENT_CODEC_VERSION,
+    SUPPORTED_CODEC_VERSIONS,
+    CodecVersion,
+    SerializationModule,
+)
 
 
 @basic
@@ -19,6 +26,14 @@ def _empty_module(version: str = "") -> SerializationModule:
 def test_serialization_module_default_version_is_empty():
     mod = SerializationModule(body=basic.encode(simple_kernel).body)
     assert mod.version == ""
+
+
+def test_serialization_module_uses_current_codec_version():
+    mod = SerializationModule(body=basic.encode(simple_kernel).body)
+
+    assert mod.codec_version is CURRENT_CODEC_VERSION
+    assert CURRENT_CODEC_VERSION is CodecVersion.V2
+    assert SUPPORTED_CODEC_VERSIONS == {CodecVersion.V2}
 
 
 def test_serialization_module_stores_version():
@@ -66,8 +81,59 @@ def test_dialect_group_encode_with_version():
 
 def test_encode_json_round_trips_version():
     json_str = basic.encode_json(simple_kernel, version="0.9.0")
+    payload = json.loads(json_str)
     decoded_module = JSONSerializer().decode(json_str)
+
+    assert payload["codec_version"] == int(CURRENT_CODEC_VERSION)
+    assert decoded_module.codec_version is CURRENT_CODEC_VERSION
     assert decoded_module.version == "0.9.0"
+
+
+@pytest.mark.parametrize(
+    ("payload", "error"),
+    [
+        pytest.param(
+            {
+                "__serialization_module__": True,
+                "body": {"$u": None},
+            },
+            r"legacy unversioned serialization codec \(v1\) is unsupported",
+            id="missing-is-legacy-v1",
+        ),
+        pytest.param(
+            {
+                "__serialization_module__": True,
+                "codec_version": 1,
+                "body": {"$u": None},
+            },
+            r"unsupported codec version 1",
+            id="explicit-v1",
+        ),
+        pytest.param(
+            {
+                "__serialization_module__": True,
+                "codec_version": 3,
+                "body": {"$u": None},
+            },
+            r"unsupported future codec version 3",
+            id="future-before-body",
+        ),
+    ],
+)
+def test_unsupported_codec_versions_are_rejected_before_body(
+    payload: dict[str, object], error: str
+) -> None:
+    with pytest.raises(ValueError, match=error):
+        JSONSerializer().decode(json.dumps(payload))
+
+
+def test_missing_caller_version_keeps_empty_default() -> None:
+    payload = json.loads(basic.encode_json(simple_kernel))
+    payload.pop("version")
+
+    decoded = JSONSerializer().decode(json.dumps(payload))
+
+    assert decoded.version == ""
 
 
 def test_decode_json_no_expected_version_succeeds():
