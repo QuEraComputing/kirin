@@ -1,10 +1,10 @@
 """`Registry.interpreter` caches its table on the dialect group."""
 
 from kirin import ir
-from kirin.interp import Signature, MethodTable, impl
 from kirin.decl import info, statement
-from kirin.dialects import py
+from kirin.interp import Signature, MethodTable, impl
 from kirin.prelude import basic_no_opt
+from kirin.dialects import py
 
 dialect = ir.Dialect("test_registry_cache")
 
