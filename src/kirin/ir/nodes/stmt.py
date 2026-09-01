@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Mapping, TypeVar, ClassVar, Iterator, Sequence
+from typing import TYPE_CHECKING, Any, Mapping, TypeVar, ClassVar, Iterator, Sequence
 from dataclasses import field, dataclass
 
 from typing_extensions import Self
@@ -22,6 +22,18 @@ if TYPE_CHECKING:
     from kirin.ir.attrs.types import TypeAttribute
     from kirin.ir.nodes.block import Block
     from kirin.ir.nodes.region import Region
+
+
+_TRAIT_MISSING = object()
+"""Sentinel distinguishing "not cached yet" from a cached `None`."""
+
+_trait_cache: dict[tuple[type, type], Any] = {}
+"""Memoized `Statement.get_trait` results, keyed by `(statement class, trait class)`.
+
+Statement classes are module-level and their `traits` are an immutable ClassVar,
+so entries never go stale and the cache is bounded by the number of
+(statement, trait) pairs actually queried.
+"""
 
 
 @dataclass
@@ -746,29 +758,36 @@ class Statement(IRNode["Block"]):
         Returns:
             bool: True if the class has the specified trait, False otherwise.
         """
-        for trait in cls.traits:
-            if isinstance(trait, trait_type):
-                return True
-        return False
+        return cls.get_trait(trait_type) is not None
 
     TraitType = TypeVar("TraitType", bound=Trait["Statement"])
 
     @classmethod
     def get_trait(cls, trait: type[TraitType]) -> TraitType | None:
         """Get the trait of the Statement."""
-        for t in cls.traits:
-            if isinstance(t, trait):
-                return t
-        return None
+        # `traits` is an immutable ClassVar fixed at class creation, so the
+        # answer depends only on `(cls, trait)`. Rewrite passes ask this
+        # millions of times per run -- every purity check walks the trait set
+        # doing ABC isinstance dispatch -- so memoize it per class.
+        key = (cls, trait)
+        found = _trait_cache.get(key, _TRAIT_MISSING)
+        if found is _TRAIT_MISSING:
+            found = None
+            for t in cls.traits:
+                if isinstance(t, trait):
+                    found = t
+                    break
+            _trait_cache[key] = found
+        return found
 
     @classmethod
     def get_present_trait(cls, trait: type[TraitType]) -> TraitType:
         """Just like get_trait, but expects the trait to be there.
         Useful for linter checks, when you know the trait is present."""
-        for t in cls.traits:
-            if isinstance(t, trait):
-                return t
-        raise ValueError(f"Trait {trait} not present in statement {cls}")
+        found = cls.get_trait(trait)
+        if found is None:
+            raise ValueError(f"Trait {trait} not present in statement {cls}")
+        return found
 
     def expect_one_result(self) -> ResultValue:
         """Check if the statement contain only one result, and return it"""
