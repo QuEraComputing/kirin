@@ -57,7 +57,7 @@ def _through_transport(
 
 
 @pytest.mark.parametrize("transport", TRANSPORTS)
-def test_repeated_type_attribute_uses_one_definition_and_preserves_v1_isolation(
+def test_repeated_type_attribute_preserves_shared_identity(
     transport: Transport,
 ) -> None:
     shared = types.TypeVar("Shared")
@@ -79,13 +79,10 @@ def test_repeated_type_attribute_uses_one_definition_and_preserves_v1_isolation(
     decoded = method.dialects.decode(transported)
 
     first_decoded, second_decoded = decoded.fields
-    assert first_decoded is not second_decoded
+    assert first_decoded is not shared
+    assert first_decoded is second_decoded
     assert first_decoded == second_decoded
     assert isinstance(first_decoded, types.TypeVar)
-
-    new_bound = types.TypeVar("NewBound")
-    first_decoded.bound = new_bound
-    assert second_decoded.bound is not new_bound
     assert decoded(7) == 7
 
 
@@ -115,7 +112,7 @@ def test_standalone_attribute_serialization_uses_a_reference() -> None:
     deserializer = Deserializer(passthrough.dialects)
     first_decoded = deserializer.deserialize(first)
     second_decoded = deserializer.deserialize(second)
-    assert first_decoded is not second_decoded
+    assert first_decoded is second_decoded
     assert first_decoded == second_decoded
 
 
@@ -137,6 +134,8 @@ def test_distinct_but_equal_type_attributes_are_not_interned(
     assert "id" not in second_unit.data
 
     decoded = method.dialects.decode(_through_transport(module, transport))
+    assert decoded.fields[0] is not first
+    assert decoded.fields[1] is not second
     assert decoded.fields[0] is not decoded.fields[1]
     assert decoded.fields[0] == decoded.fields[1]
 
@@ -156,7 +155,7 @@ def test_general_pyattr_is_not_memoized(transport: Transport) -> None:
 
     decoded = method.dialects.decode(_through_transport(module, transport))
     assert decoded.fields[0] is not decoded.fields[1]
-    assert decoded.fields[0].type is not decoded.fields[1].type
+    assert decoded.fields[0].type is decoded.fields[1].type
     assert decoded.fields[0].type == decoded.fields[1].type
 
 
@@ -178,36 +177,98 @@ def test_forward_ref_from_reversed_pyattr_field_order(transport: Transport) -> N
 
     decoded = method.dialects.decode(_through_transport(module, transport))
     decoded_wrapper = decoded.fields[0]
-    assert decoded_wrapper.type is not decoded_wrapper.data
+    assert decoded_wrapper.type is decoded_wrapper.data
     assert decoded_wrapper.type == decoded_wrapper.data
 
 
 @pytest.mark.parametrize("transport", TRANSPORTS)
-def test_nested_type_graph_preserves_v1_value_semantics(
+def test_nested_type_graph_preserves_identity_relationships(
     transport: Transport,
 ) -> None:
-    leaf = types.TypeVar("Leaf")
-    literal = types.Literal(1, leaf)
-    union = types.Union(literal, types.String)
-    generic = types.Generic(tuple, leaf, types.Vararg(leaf))
-    method = _method_with_fields(union, union, generic, generic)
+    leaf = types.TypeVar(f"Leaf-{transport}")
+    first = types.Generic(tuple, leaf)
+    second = types.Generic(list, leaf)
+    assert first.vars[0] is second.vars[0]
+    method = _method_with_fields(first, first, second, second)
 
     module = method.dialects.encode(method)
     decoded = method.dialects.decode(_through_transport(module, transport))
-    decoded_union = decoded.fields[0]
-    decoded_generic = decoded.fields[2]
+    decoded_first = decoded.fields[0]
+    decoded_second = decoded.fields[2]
 
-    assert decoded_union is not decoded.fields[1]
-    assert decoded_union == decoded.fields[1]
+    assert decoded_first is not first
+    assert decoded_second is not second
+    assert decoded_first is decoded.fields[1]
+    assert decoded_second is decoded.fields[3]
+    assert decoded_first is not decoded_second
+    assert decoded_first.vars[0] is decoded_second.vars[0]
+
+
+@pytest.mark.parametrize("transport", TRANSPORTS)
+def test_union_and_literal_roundtrip_by_value(transport: Transport) -> None:
+    literal = types.Literal(1)
+    union = types.Union(literal, types.String)
+    assert isinstance(union, types.Union)
+    method = _method_with_fields(union)
+
+    decoded = method.dialects.decode(
+        _through_transport(method.dialects.encode(method), transport)
+    )
+    decoded_union = decoded.fields[0]
+    assert isinstance(decoded_union, types.Union)
+    assert decoded_union.is_structurally_equal(union)
+    assert any(
+        isinstance(attr, types.Literal) and attr.is_structurally_equal(literal)
+        for attr in decoded_union.types
+    )
+
+
+@pytest.mark.parametrize("transport", TRANSPORTS)
+def test_literal_preserves_shared_type_identity(transport: Transport) -> None:
+    leaf = types.TypeVar(f"LiteralLeaf-{transport}")
+    literal = types.Literal(transport, leaf)
+    union = types.Union(literal, types.String)
+    generic = types.Generic(tuple, leaf)
+    assert isinstance(union, types.Union)
+    assert literal.type is generic.vars[0]
+    method = _method_with_fields(union, generic)
+
+    decoded = method.dialects.decode(
+        _through_transport(method.dialects.encode(method), transport)
+    )
+    decoded_union = decoded.fields[0]
+    decoded_generic = decoded.fields[1]
+    assert isinstance(decoded_union, types.Union)
     decoded_literal = next(
         attr for attr in decoded_union.types if isinstance(attr, types.Literal)
     )
+    assert decoded_literal is not literal
+    assert decoded_literal.type is decoded_generic.vars[0]
 
-    assert decoded_generic is not decoded.fields[3]
-    assert decoded_generic == decoded.fields[3]
-    assert decoded_literal.is_structurally_equal(literal)
-    assert decoded_generic.vars[0] is not decoded_generic.vararg.typ
-    assert decoded_generic.vars[0] == decoded_generic.vararg.typ
+
+@pytest.mark.parametrize("transport", TRANSPORTS)
+def test_nested_repeated_type_attributes_preserve_dag_topology(
+    transport: Transport,
+) -> None:
+    depth = 8
+    typ: types.TypeAttribute = types.TypeVar("Leaf")
+    for _ in range(depth):
+        typ = types.Generic(tuple, typ, types.Vararg(typ))
+
+    method = _method_with_fields(typ)
+    decoded = method.dialects.decode(
+        _through_transport(method.dialects.encode(method), transport)
+    )
+    decoded_type = decoded.fields[0]
+
+    for _ in range(depth):
+        assert isinstance(decoded_type, types.Generic)
+        assert decoded_type.vararg is not None
+        nested_type = decoded_type.vars[0]
+        assert nested_type is decoded_type.vararg.typ
+        decoded_type = nested_type
+
+    assert isinstance(decoded_type, types.TypeVar)
 
 
 @pytest.mark.parametrize("transport_name", ["json", "cbson"])
