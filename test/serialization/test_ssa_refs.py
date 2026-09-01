@@ -367,7 +367,6 @@ def _to_verbose_v1(value: Any) -> Any:
         return {
             "__serialization_module__": True,
             "version": value.version,
-            "symbol_table": _to_verbose_v1(value.symbol_table),
             "body": _to_verbose_v1(value.body),
         }
     if isinstance(value, SerializationUnit):

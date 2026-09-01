@@ -160,28 +160,6 @@ def test_general_pyattr_is_not_memoized(transport: Transport) -> None:
 
 
 @pytest.mark.parametrize("transport", TRANSPORTS)
-def test_forward_ref_from_reversed_pyattr_field_order(transport: Transport) -> None:
-    shared = types.TypeVar("Reversed")
-    wrapper = ir.PyAttr(shared, pytype=shared)
-    method = _method_with_fields(wrapper)
-
-    module = method.dialects.encode(method)
-    (field,) = _field_units(module)
-    pyattr = field.data["data"]
-    definition = pyattr.data["data"]
-    reference = pyattr.data["pytype"]
-
-    assert definition.kind == "attribute"
-    assert reference.kind == "attr_ref"
-    assert reference.data["id"] == definition.data["id"]
-
-    decoded = method.dialects.decode(_through_transport(module, transport))
-    decoded_wrapper = decoded.fields[0]
-    assert decoded_wrapper.type is decoded_wrapper.data
-    assert decoded_wrapper.type == decoded_wrapper.data
-
-
-@pytest.mark.parametrize("transport", TRANSPORTS)
 def test_nested_type_graph_preserves_identity_relationships(
     transport: Transport,
 ) -> None:
@@ -309,7 +287,6 @@ def test_type_attribute_definitions_without_ids_still_decode() -> None:
     serializer = Serializer()
     body = serializer.serialize_method(method)
     module = SerializationModule(
-        symbol_table=dict(serializer._ctx.Method_Symbol),
         body=body,
         version="legacy-version",
     )
@@ -383,10 +360,44 @@ def test_attr_ref_to_general_attribute_is_rejected() -> None:
     wrong_definition = Serializer().serialize_attribute(ir.PyAttr(1))
     wrong_definition.data["id"] = attr_id
     fields = _field_units(module)
-    fields[:] = [reference, wrong_definition]
+    # definition first, so the payload is well ordered and the *kind* check is
+    # what must reject it. The out-of-order case is
+    # `test_attr_ref_before_its_definition_fails_loudly`.
+    fields[:] = [wrong_definition, reference]
 
     with pytest.raises(
         ValueError,
         match=rf"TypeAttribute definition {attr_id!r} decoded as PyAttr",
     ):
         method.dialects.decode(module)
+
+
+@pytest.mark.parametrize("transport", TRANSPORTS)
+def test_attr_ref_before_its_definition_fails_loudly(transport: Transport) -> None:
+    """A reference read before its definition is an error, not something to repair.
+
+    The decoder used to rescan the whole payload to locate a definition it had
+    not reached yet. That fallback existed for one reason: `PyAttr.serialize`
+    wrote `data` then `pytype`, while `PyAttr.deserialize` read them in the
+    opposite order, so a definition emitted in `data` could be referenced from
+    `pytype` before it was decoded.
+
+    With that pair aligned, no well-formed payload puts a reference first. The
+    rescan is gone and the contract is explicit: a `serialize` /`deserialize`
+    pair must read its fields in the order it writes them.
+    """
+    shared = types.TypeVar(f"OutOfOrder-{transport}")
+    method = _method_with_fields(shared, shared)
+    module = method.dialects.encode(method)
+
+    definition, reference = _field_units(module)
+    assert definition.kind == "attribute"
+    assert reference.kind == "attr_ref"
+    assert reference.data["id"] == definition.data["id"]
+
+    # swap them: the reference now precedes its definition on the wire
+    fields = _field_units(module)
+    fields[:] = [reference, definition]
+
+    with pytest.raises(ValueError, match=r"dangling attr_ref 't[0-9]+'"):
+        method.dialects.decode(_through_transport(module, transport))

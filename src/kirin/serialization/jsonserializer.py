@@ -26,6 +26,7 @@ STATIC_DESCRIPTORS: dict[str, tuple[str, str]] = {
     "int": ("builtins", "int"),
     "list": ("builtins", "list"),
     "method": ("kirin.ir.method", "Method"),
+    "method_ref": ("", ""),
     "none": ("builtins", "NoneType"),
     "range": ("builtins", "range"),
     "region": ("kirin.ir.nodes.region", "Region"),
@@ -50,7 +51,6 @@ class JSONtifiable:
             return {
                 "__serialization_module__": True,
                 "version": obj.version,
-                "symbol_table": self._to_jsonifiable(obj.symbol_table),
                 "body": self._to_jsonifiable(obj.body),
             }
         if isinstance(obj, SerializationUnit):
@@ -80,17 +80,11 @@ class JSONtifiable:
                     raw_body.get("__serialization_unit__")
                 )
                 child_allow_compact_tags = allow_compact_tags and not is_verbose
-                symbol_table = self._from_jsonifiable(
-                    obj.get("symbol_table", {}),
-                    allow_compact_tags=child_allow_compact_tags,
-                )
                 body = self._from_jsonifiable(
                     raw_body, allow_compact_tags=child_allow_compact_tags
                 )
                 version = obj.get("version", "")
-                return SerializationModule(
-                    symbol_table=symbol_table, body=body, version=version
-                )
+                return SerializationModule(body=body, version=version)
             if obj.get("__serialization_unit__"):
                 data = self._from_jsonifiable(
                     obj.get("data", {}), allow_compact_tags=False
