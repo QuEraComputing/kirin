@@ -368,7 +368,11 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
     ) -> "Literal":
         d = deserializer.deserialize(serUnit.data["value"])
         type_attr = deserializer.deserialize(serUnit.data["type"])
-        return Literal(d, type_attr)
+        # Reconstruct the serialized graph without reusing a process-local
+        # LiteralMeta cache entry that may reference a different type instance.
+        literal = object.__new__(cls)
+        literal.__init__(d, type_attr)
+        return literal
 
 
 @typing.final

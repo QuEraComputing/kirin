@@ -78,6 +78,10 @@ class Deserializer:
         if not isinstance(attr_id, str):
             raise ValueError(f"attr_ref id must be a string, got {attr_id!r}")
 
+        existing = self._ctx.TypeAttribute_Lookup.get(attr_id)
+        if existing is not None:
+            return existing
+
         definition = self._ctx.TypeAttribute_Definitions.get(attr_id)
         if definition is None:
             self._index_type_attribute_definitions()
@@ -417,11 +421,16 @@ class Deserializer:
     def _deserialize_type_attribute_definition(
         self, serUnit: SerializationUnit, attr_id: str
     ) -> types.TypeAttribute:
+        existing = self._ctx.TypeAttribute_Lookup.get(attr_id)
+        if existing is not None:
+            return existing
+
         attr = self._deserialize_attribute_full(serUnit)
         if not isinstance(attr, types.TypeAttribute):
             raise ValueError(
                 f"TypeAttribute definition {attr_id!r} decoded as {type(attr).__name__}"
             )
+        self._ctx.TypeAttribute_Lookup[attr_id] = attr
         return attr
 
     def _deserialize_attribute_full(self, serUnit: SerializationUnit) -> ir.Attribute:
