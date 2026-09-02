@@ -30,14 +30,14 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.rewrite.abc.RewriteRule</code>)' href=../../rewrite/abc/#kirin.rewrite.abc.RewriteRule>RewriteRule</a></code> </td> <td> <div class=doc-md-description> <p>The rewrite rule to register.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/dialect.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>170</span>
-<span class=normal>171</span>
-<span class=normal>172</span>
-<span class=normal>173</span>
+  </span> (<code>kirin.rewrite.abc.RewriteRule</code>)' href=../../rewrite/abc/#kirin.rewrite.abc.RewriteRule>RewriteRule</a></code> </td> <td> <div class=doc-md-description> <p>The rewrite rule to register.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/dialect.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>173</span>
 <span class=normal>174</span>
 <span class=normal>175</span>
 <span class=normal>176</span>
-<span class=normal>177</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>canonicalize</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>rule</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>RewriteRule</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=nb>type</span><span class=p>[</span><span class=n>RewriteRule</span><span class=p>]:</span>
+<span class=normal>177</span>
+<span class=normal>178</span>
+<span class=normal>179</span>
+<span class=normal>180</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>canonicalize</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>rule</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>RewriteRule</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=nb>type</span><span class=p>[</span><span class=n>RewriteRule</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Register a rewrite rule to the canonicalization pass.</span>
 
 <span class=sd>    Args:</span>
@@ -53,16 +53,16 @@
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.rewrite.abc.RewriteRule</code>)' href=../../rewrite/abc/#kirin.rewrite.abc.RewriteRule>RewriteRule</a></code> </td> <td> <div class=doc-md-description> <p>The rewrite rule to register.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/dialect.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>179</span>
-<span class=normal>180</span>
-<span class=normal>181</span>
-<span class=normal>182</span>
+  </span> (<code>kirin.rewrite.abc.RewriteRule</code>)' href=../../rewrite/abc/#kirin.rewrite.abc.RewriteRule>RewriteRule</a></code> </td> <td> <div class=doc-md-description> <p>The rewrite rule to register.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/dialect.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>182</span>
 <span class=normal>183</span>
 <span class=normal>184</span>
 <span class=normal>185</span>
 <span class=normal>186</span>
 <span class=normal>187</span>
-<span class=normal>188</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>post_inference</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>rule</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>RewriteRule</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=nb>type</span><span class=p>[</span><span class=n>RewriteRule</span><span class=p>]:</span>
+<span class=normal>188</span>
+<span class=normal>189</span>
+<span class=normal>190</span>
+<span class=normal>191</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>post_inference</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>rule</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>RewriteRule</span><span class=p>])</span> <span class=o>-&gt;</span> <span class=nb>type</span><span class=p>[</span><span class=n>RewriteRule</span><span class=p>]:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Register a rewrite rule to the inference pass.</span>
 <span class=sd>    Usually, this is used to register a rule that requires</span>
 <span class=sd>    type inference to be run first.</span>
@@ -158,7 +158,10 @@
 <span class=normal>140</span>
 <span class=normal>141</span>
 <span class=normal>142</span>
-<span class=normal>143</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@dataclass_transform</span><span class=p>()</span>
+<span class=normal>143</span>
+<span class=normal>144</span>
+<span class=normal>145</span>
+<span class=normal>146</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@dataclass_transform</span><span class=p>()</span>
 <span class=k>def</span><span class=w> </span><span class=nf>register</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=nb>type</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span> <span class=n>key</span><span class=p>:</span> <span class=nb>str</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;register is a decorator to register a node to the dialect.</span>
 
@@ -194,6 +197,7 @@
 
 
 <span class=sd>    &quot;&quot;&quot;</span>
+    <span class=kn>from</span><span class=w> </span><span class=nn>kirin.registry</span><span class=w> </span><span class=kn>import</span> <span class=n>invalidate_interpreter_cache</span>
     <span class=kn>from</span><span class=w> </span><span class=nn>kirin.interp.table</span><span class=w> </span><span class=kn>import</span> <span class=n>MethodTable</span>
     <span class=kn>from</span><span class=w> </span><span class=nn>kirin.lowering.python.dialect</span><span class=w> </span><span class=kn>import</span> <span class=n>FromPythonAST</span>
 
@@ -216,6 +220,8 @@
                     <span class=sa>f</span><span class=s2>&quot;Cannot register </span><span class=si>{</span><span class=n>node</span><span class=si>}</span><span class=s2> to Dialect, key </span><span class=si>{</span><span class=n>key</span><span class=si>}</span><span class=s2> exists in </span><span class=si>{</span><span class=bp>self</span><span class=si>}</span><span class=s2>&quot;</span>
                 <span class=p>)</span>
             <span class=bp>self</span><span class=o>.</span><span class=n>interps</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=n>node</span><span class=p>()</span>
+            <span class=c1># Any group already holding this dialect has a stale registry.</span>
+            <span class=n>invalidate_interpreter_cache</span><span class=p>()</span>
         <span class=k>elif</span> <span class=nb>issubclass</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>FromPythonAST</span><span class=p>):</span>
             <span class=k>if</span> <span class=n>key</span> <span class=ow>in</span> <span class=bp>self</span><span class=o>.</span><span class=n>lowering</span><span class=p>:</span>
                 <span class=k>raise</span> <span class=ne>ValueError</span><span class=p>(</span>
