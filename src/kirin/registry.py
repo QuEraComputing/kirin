@@ -31,6 +31,26 @@ class LoweringRegistry:
     callee_table: dict[object, CallLoweringFunction]
 
 
+_registry_epoch = 0
+"""Bumped whenever a dialect gains a new method table.
+
+`Registry.interpreter` caches the tables it builds on the `DialectGroup`, which
+is only sound while no dialect in that group registers new implementations.
+Registration normally happens at import time, before any group is built, but
+`Dialect.register` may be called at any point, so it bumps this counter to
+invalidate every cached table.
+"""
+
+
+def invalidate_interpreter_cache() -> None:
+    """Discard every cached interpreter registry.
+
+    Called by `Dialect.register` when a new method table is added.
+    """
+    global _registry_epoch
+    _registry_epoch += 1
+
+
 @dataclass
 class Registry:
     """Proxy class to build different registries from a dialect group."""
@@ -82,7 +102,33 @@ class Registry:
         Returns:
             a map of statement signatures to their interpretation functions,
             and a map of dialects to their fallback interpreters.
+
+        Note:
+            The returned mapping is cached and shared between callers. Treat it
+            as read-only; mutating it would corrupt other interpreters built
+            from the same dialect group.
         """
+        # Building this table walks every method table of every dialect with
+        # `inspect.getmembers`, which is expensive, and
+        # `Interpreter.__post_init__` asks for it on every interpreter instance.
+        # `Method.__call__` builds a fresh interpreter per call, so calling a
+        # kernel from Python in a loop rebuilds the identical table every time.
+        # The result depends only on the dialect group and the interpreter keys,
+        # so cache it on the group.
+        cache_key = tuple(keys)
+        cached = self.dialects._interpreter_cache.get(cache_key)
+        if cached is not None:
+            epoch, table = cached
+            if epoch == _registry_epoch:
+                return table
+
+        table = self._build_interpreter(cache_key)
+        self.dialects._interpreter_cache[cache_key] = (_registry_epoch, table)
+        return table
+
+    def _build_interpreter(
+        self, keys: tuple[str, ...]
+    ) -> dict["Signature", "BoundedDef"]:
         from kirin.interp.table import BoundedDef
 
         registry: dict[Signature, BoundedDef] = {}

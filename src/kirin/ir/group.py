@@ -65,12 +65,22 @@ class DialectGroup(Generic[PassParams]):
         default_factory=dict, init=False, repr=False
     )
 
+    _interpreter_cache: dict[tuple[str, ...], tuple[int, dict]] = field(
+        default_factory=dict, init=False, repr=False, compare=False
+    )
+    """Interpreter registries built from this group, keyed by the interpreter keys.
+
+    Each entry is `(registry epoch, table)`; see
+    [`Registry.interpreter`][kirin.registry.Registry.interpreter].
+    """
+
     def __init__(
         self,
         dialects: Iterable[Union["Dialect", ModuleType]],
         run_pass: RunPassGen[PassParams] | None = None,
     ):
         self.symbol_table = {}
+        self._interpreter_cache = {}
         self.data = frozenset(self.map_module(dialect) for dialect in dialects)
         if run_pass is None:
             self.run_pass_gen = None

@@ -105,6 +105,7 @@ class Dialect:
 
 
         """
+        from kirin.registry import invalidate_interpreter_cache
         from kirin.interp.table import MethodTable
         from kirin.lowering.python.dialect import FromPythonAST
 
@@ -127,6 +128,8 @@ class Dialect:
                         f"Cannot register {node} to Dialect, key {key} exists in {self}"
                     )
                 self.interps[key] = node()
+                # Any group already holding this dialect has a stale registry.
+                invalidate_interpreter_cache()
             elif issubclass(node, FromPythonAST):
                 if key in self.lowering:
                     raise ValueError(
