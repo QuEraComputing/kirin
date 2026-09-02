@@ -34,6 +34,7 @@ class SerializationContext:
 
     Dialect_Lookup: dict[str, ir.Dialect] = field(default_factory=dict)
     SSA_Lookup: dict[str, ir.SSAValue] = field(default_factory=dict)
+    TypeAttribute_Lookup: dict[str, types.TypeAttribute] = field(default_factory=dict)
     Statement_Lookup: dict[str, ir.Statement] = field(default_factory=dict)
     Block_Lookup: dict[str, ir.Block] = field(default_factory=dict)
     Region_Lookup: dict[str, ir.Region] = field(default_factory=dict)
@@ -56,6 +57,7 @@ class SerializationContext:
 
     def clear(self) -> None:
         self.SSA_Lookup.clear()
+        self.TypeAttribute_Lookup.clear()
         self.Block_Lookup.clear()
         self.Region_Lookup.clear()
         self.Statement_Lookup.clear()
