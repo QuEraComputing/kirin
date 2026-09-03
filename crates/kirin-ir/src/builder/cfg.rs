@@ -1,4 +1,4 @@
-use crate::{Block, BuilderStageInfo, CFG, Dialect, Statement, node::CFGInfo};
+use crate::{Block, BlockParent, BuilderStageInfo, CFG, Dialect, Statement, node::CFGInfo};
 
 pub struct CFGBuilder<'a, L: Dialect> {
     pub(super) stage: &'a mut BuilderStageInfo<L>,
@@ -31,6 +31,16 @@ impl<'a, L: Dialect> CFGBuilder<'a, L> {
     #[allow(clippy::wrong_self_convention, clippy::new_ret_no_self)]
     pub fn new(self) -> CFG {
         let id = self.stage.cfgs.next_id();
+        for &block in &self.blocks {
+            let parent = self.stage.blocks[block].parent;
+            assert!(
+                parent.is_none() || parent == Some(BlockParent::CFG(id)),
+                "Block `{block}` already has a different parent"
+            );
+        }
+        for &block in &self.blocks {
+            self.stage.blocks[block].parent = Some(BlockParent::CFG(id));
+        }
         let info = CFGInfo::builder()
             .id(id)
             .blocks(self.stage.link_blocks(&self.blocks))

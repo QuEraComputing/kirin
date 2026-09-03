@@ -1,11 +1,13 @@
+use smallvec::SmallVec;
+
 use crate::{
     Dialect, Symbol,
     arena::{GetInfo, Id, Item},
     identifier,
-    node::cfg::CFG,
 };
 
 use super::{
+    cfg::CFG,
     linked_list::{LinkedList, LinkedListNode},
     ssa::BlockArgument,
     stmt::Statement,
@@ -48,13 +50,31 @@ impl std::fmt::Display for Successor {
     }
 }
 
+/// The immediate structural owner of a block.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum BlockParent {
+    /// The block belongs to a block-list control-flow body.
+    CFG(CFG),
+    /// The block is a single-block body owned directly by a statement.
+    Statement(Statement),
+}
+
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlockInfo<L: Dialect> {
-    pub parent: Option<CFG>,
+    pub parent: Option<BlockParent>,
     pub name: Option<Symbol>,
     pub node: LinkedListNode<Block>,
     pub arguments: Vec<BlockArgument>,
+    /// Reverse control-flow index: blocks whose terminators may transfer
+    /// control to this block.
+    ///
+    /// Inline capacity 4: a straight-line block has one predecessor, an
+    /// if-merge or loop header has two, and a small switch join or a loop
+    /// with a couple of `break`s stays under four. Wider joins spill to the
+    /// heap rather than making every block pay for the worst case.
+    pub predecessors: SmallVec<[Block; 4]>,
     pub statements: LinkedList<Statement>,
     pub terminator: Option<Statement>,
     _marker: std::marker::PhantomData<L>,
@@ -64,14 +84,16 @@ pub struct BlockInfo<L: Dialect> {
 impl<L: Dialect> BlockInfo<L> {
     #[builder(finish_fn = new)]
     pub(crate) fn new(
-        /// The parent cfg of this block.
-        parent: Option<CFG>,
+        /// The immediate CFG or statement parent of this block.
+        parent: Option<BlockParent>,
         /// The name of this block.
         name: Option<Symbol>,
         /// The linked list node for this block.
         node: LinkedListNode<Block>,
         /// The arguments of this block.
         arguments: Vec<BlockArgument>,
+        /// The predecessor blocks in the reverse control-flow index.
+        predecessors: SmallVec<[Block; 4]>,
         /// The statements contained in this block.
         statements: Option<LinkedList<Statement>>,
         /// The terminator statement of this block, if any.
@@ -82,6 +104,7 @@ impl<L: Dialect> BlockInfo<L> {
             name,
             node,
             arguments,
+            predecessors,
             statements: statements.unwrap_or_default(),
             terminator,
             _marker: std::marker::PhantomData,

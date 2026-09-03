@@ -1,6 +1,6 @@
 use kirin_ir::{Dialect, Product, StageInfo, StageMeta, Statement};
 
-use crate::{FunctionBody, Interp};
+use crate::{CallableBody, Interp};
 
 /// Statement semantics. The single trait dialect authors implement.
 ///
@@ -18,7 +18,7 @@ pub trait Interpretable<I: Interp, Semantics>: Dialect {
 /// Function-entry semantics for callable statements.
 ///
 /// Implemented by statements that define function bodies (e.g.
-/// `kirin_function::Function`); describes the [`FunctionBody`] an engine enters
+/// `kirin_function::Function`); describes the [`CallableBody`] an engine enters
 /// when the function is invoked. Derived on language enums with
 /// `#[derive(FunctionEntry)]` where `#[callable]` marks the variants that wrap
 /// callable statements.
@@ -27,7 +27,7 @@ pub trait FunctionEntry<I: Interp>: Dialect {
         &self,
         args: Product<I::Value>,
         interp: &mut I,
-    ) -> Result<FunctionBody<I::Value>, I::Error>;
+    ) -> Result<CallableBody<I::Value>, I::Error>;
 }
 
 /// Monomorphic statement dispatch over a stage enum.
@@ -54,7 +54,7 @@ pub trait InterpDispatch<I: Interp>: StageMeta {
         body: Statement,
         args: Product<I::Value>,
         interp: &mut I,
-    ) -> Result<FunctionBody<I::Value>, I::Error>;
+    ) -> Result<CallableBody<I::Value>, I::Error>;
 }
 
 impl<I, L> InterpDispatch<I> for StageInfo<L>
@@ -76,7 +76,7 @@ where
         body: Statement,
         args: Product<I::Value>,
         interp: &mut I,
-    ) -> Result<FunctionBody<I::Value>, I::Error> {
+    ) -> Result<CallableBody<I::Value>, I::Error> {
         let definition = body.definition(self).clone();
         definition.function_entry(args, interp)
     }

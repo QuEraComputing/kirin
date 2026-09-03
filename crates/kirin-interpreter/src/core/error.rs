@@ -41,10 +41,14 @@ pub enum InterpreterError {
     MissingCallTarget(Symbol),
     #[error("cfg has no entry block")]
     EmptyCFG,
+    #[error("body {0:?} has no default walker in this engine")]
+    NoDefaultWalker(crate::Body),
+    #[error("digraph {0:?} has a cycle; the default walker only runs DAGs")]
+    GraphHasCycle(kirin_ir::DiGraph),
+    #[error("CFG control flow (jump/branch) inside a single-block or graph body")]
+    CFGControlFlowInStructuredBody,
     #[error("block {0:?} fell through without a terminator effect")]
     BlockFellThrough(Block),
-    #[error("function body fell through without returning")]
-    FunctionBodyFellThrough,
     #[error("yield outside of an enclosing scope at {0:?}")]
     UnexpectedYield(Statement),
     #[error("statement {0:?} is not callable")]

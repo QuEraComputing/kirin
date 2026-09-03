@@ -3,6 +3,7 @@ use crate::identifier;
 use crate::{Dialect, Symbol};
 use smallvec::SmallVec;
 
+use super::digraph::DiGraph;
 use super::port::{Port, PortParent};
 use super::{block::Block, stmt::Statement};
 
@@ -238,10 +239,32 @@ impl<L: Dialect> From<SSAInfo<L>> for BuilderSSAInfo<L> {
     }
 }
 
-#[derive(Clone, Debug, Hash, PartialEq, Eq)]
-pub struct Use {
-    stmt: Statement,
-    operand_index: usize,
+/// One def-use edge: a position in the IR that reads an SSA value.
+///
+/// Stored in [`SSAInfo::uses`] as the reverse index of the authoritative
+/// storage. Two kinds of position read a value:
+///
+/// - a **statement operand** slot (the usual case — `arith.add`'s operands,
+///   CFG branch arguments, `scf.yield` values, function returns), and
+/// - a **`DiGraph` body yield** — a value the graph exports across its body
+///   boundary. A yield has no backing statement (it lives in
+///   [`DiGraphInfo::yields`](crate::DiGraphInfo)), so it cannot be named as a
+///   statement operand, but it is a genuine use.
+///
+/// `UnGraph` has no analogue: its `Extra` is a list of edge *statements*, whose
+/// operands are already ordinary statement-operand uses.
+///
+/// Populated by
+/// [`StageInfo::rebuild_use_index`](crate::StageInfo::rebuild_use_index) at
+/// finalization; a mutation layer (the rewriter) must keep it in sync with
+/// every operand and yield change.
+#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum Use {
+    /// The `index`-th operand slot of `stmt`, in `HasArguments` order.
+    StatementOperand { stmt: Statement, index: usize },
+    /// The `index`-th yield slot of the directed graph body `graph`.
+    DiGraphYield { graph: DiGraph, index: usize },
 }
 
 /// A lookup key for builder placeholders — resolved at build time to the real SSA value.

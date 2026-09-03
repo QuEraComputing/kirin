@@ -14,7 +14,7 @@ where
         args: ::kirin::ir::Product<<__EntryI as ::kirin_interpreter::Interp>::Value>,
         interp: &mut __EntryI,
     ) -> Result<
-        ::kirin_interpreter::FunctionBody<<__EntryI as ::kirin_interpreter::Interp>::Value>,
+        ::kirin_interpreter::CallableBody<<__EntryI as ::kirin_interpreter::Interp>::Value>,
         <__EntryI as ::kirin_interpreter::Interp>::Error,
     > {
         match self {

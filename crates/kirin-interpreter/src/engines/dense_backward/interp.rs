@@ -19,14 +19,14 @@
 //! - **[`DenseBackwardTransfer`]** is the [`Interp`] delegate: pipeline access,
 //!   the real dispatch location, and the *current point state* the dialect
 //!   rules transform through the shape-generic
-//!   [`DenseBackwardInterp::insert_fact`] / [`DenseBackwardInterp::remove_fact`]
-//!   (liveness rules use the [`ClassicLivenessInterp`] `gen_live`/`kill_def`
-//!   spellings).
+//!   [`DenseBackwardInterp::point_state_mut`] (liveness rules use the
+//!   [`ClassicLivenessInterp`] `gen_live`/`kill_def` spellings, which is where
+//!   "a state is a set of values" lives — the engine never assumes it).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the block-boundary
 //!   summaries ([`BlockLiveness`], keyed by [`Scoped`] blocks), the block
 //!   worklist, and [`BackwardSummaryDeps`] (successor changed → reanalyse
 //!   predecessor, registered self-discoveringly by
-//!   [`absorb_edges`](DenseBackwardFrameDriver::absorb_edges)).
+//!   [`absorb_edges`](DenseBackwardFrameEngine::absorb_edges)).
 //!
 //! # Owners are blocks; one owner analysis is one backward walk
 //!
@@ -39,25 +39,28 @@
 //! argument, pass-through for non-parameters) — which both seeds the walk
 //! state and records the block's `live_out`. Structured dialects push
 //! dialect-owned frames ([`DenseBackwardEffect::Push`]) that walk their bodies
-//! against the same point state. Per-statement states are not persisted:
-//! reconstruct them on demand with
-//! [`reconstruct_points`](DenseBackwardInterpreter::reconstruct_points).
+//! against the same point state. Each block walk records statement points and
+//! nested structured-block boundaries; later fixpoint iterations overwrite
+//! earlier approximations. CFG-owner boundaries remain canonical in their
+//! converged summaries. The public fact view merges those disjoint sources
+//! into one scope-qualified program-point store.
 
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CFG, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, SSAValue,
+    Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, SSAValue,
     StageMeta, Statement,
 };
 
 use super::frames::{DenseBlockFrame, DenseFrameBuild};
+use crate::Body;
 use crate::core::query;
-use crate::engines::sparse_backward::CFGScope;
+use crate::engines::sparse_backward::BodyScope;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, CFGTopology, ClassicLiveness, DenseBackwardSemantic,
-    DensePointStore, EnvIndex, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, OwnerSemantics, ProgramPoint, Scoped, StageQuery,
-    StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
+    AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
+    FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
+    OwnerSemantics, ProgramPoint, Scoped, StageQuery, StandardFixpointInterpreter, Summary,
+    SummaryDependency, SummaryDependencyIndex, SummaryEffect, TerminatorArgs,
 };
 
 // ===========================================================================
@@ -86,10 +89,35 @@ pub enum DenseBackwardEffect<F> {
     Push { frame: F },
 }
 
-/// The point-state contract: a dense backward state is a set of SSA values.
+/// How a dense backward state moves across a control edge or out of a scope.
 ///
-/// Implemented by the analysis's state type (e.g. `kirin_liveness::LiveSet`);
-/// the join for merge points comes from [`Lattice`] (set union for liveness).
+/// A dense backward state names its facts by [`SSAValue`]. Crossing an edge
+/// renames them — the target's parameters become the edge's arguments; leaving
+/// a scope drops them. Neither operation says what a fact *is*, which is why
+/// this is the only state contract the engine and the dialect frames need:
+/// [`Lattice`] merges at join points, this moves facts between vocabularies.
+///
+/// Pass-through renaming (keep facts the rename does not cover) is the caller's
+/// choice, spelled `state.rename(p, a).join(&state.forget(p))` — the CFG edge
+/// transfer wants it, a loop back-edge does not.
+pub trait DenseBackwardState: Lattice + Sized {
+    /// Only the facts named by `params`, renamed to the matching `args`.
+    ///
+    /// A `params[i]` with no `args[i]` contributes nothing.
+    fn rename(&self, params: &[SSAValue], args: &[SSAValue]) -> Self;
+
+    /// Everything except the facts named by `values`.
+    fn forget(&self, values: &[SSAValue]) -> Self;
+}
+
+/// The point-state contract of [`ClassicLiveness`]: its state is a set of live
+/// SSA values.
+///
+/// This is *semantics*, not shape — it backs
+/// [`gen_live`](ClassicLivenessInterp::gen_live) /
+/// [`kill_def`](ClassicLivenessInterp::kill_def) and is required by nothing in
+/// the engine or the frames. A different dense-backward key brings its own
+/// state contract and implements only [`DenseBackwardState`].
 pub trait PointFacts {
     /// Insert `value`; `true` if newly added.
     fn insert(&mut self, value: SSAValue) -> bool;
@@ -115,11 +143,15 @@ pub trait DenseBackwardInterp:
     /// [`DenseBackwardEffect::Push`]. Ordinary dialects never name it.
     type Frame;
 
-    /// Insert `value` into the current point state.
-    fn insert_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
+    /// The point state being transformed: the state *after* the statement on
+    /// entry to a rule, *before* it on exit.
+    ///
+    /// The engine hands the state over opaquely; how a rule transforms it is
+    /// the semantics' business.
+    fn point_state(&self) -> &Self::Value;
 
-    /// Remove `value` from the current point state.
-    fn remove_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
+    /// The point state being transformed, mutably.
+    fn point_state_mut(&mut self) -> &mut Self::Value;
 }
 
 /// [`ClassicLiveness`]'s helper vocabulary on top of the shape-generic
@@ -131,16 +163,22 @@ pub trait DenseBackwardInterp:
 /// Pinned to `Semantics = ClassicLiveness` via the supertrait (rustc
 /// elaborates supertraits, so rules bounding `I: ClassicLivenessInterp` need
 /// no extra clauses), and blanket-implemented for every classic-liveness
-/// dense-backward engine.
-pub trait ClassicLivenessInterp: DenseBackwardInterp + Interp<Semantics = ClassicLiveness> {
+/// dense-backward engine. [`PointFacts`] rides in the same supertrait as an
+/// associated-type bound for the same reason: elaboration means liveness rules
+/// inherit it and never spell it.
+pub trait ClassicLivenessInterp:
+    DenseBackwardInterp + Interp<Semantics = ClassicLiveness, Value: PointFacts>
+{
     /// Gen: mark `value` live at the current point (a use).
     fn gen_live(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error> {
-        self.insert_fact(value)
+        self.point_state_mut().insert(value.into());
+        Ok(())
     }
 
     /// Kill: remove `value` (a definition) from the current point state.
     fn kill_def(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error> {
-        self.remove_fact(value)
+        self.point_state_mut().remove(value.into());
+        Ok(())
     }
 
     /// The classic (weak) liveness transfer for an ordinary statement: kill
@@ -160,8 +198,10 @@ pub trait ClassicLivenessInterp: DenseBackwardInterp + Interp<Semantics = Classi
     }
 }
 
-impl<I> ClassicLivenessInterp for I where
-    I: DenseBackwardInterp + Interp<Semantics = ClassicLiveness>
+impl<I> ClassicLivenessInterp for I
+where
+    I: DenseBackwardInterp + Interp<Semantics = ClassicLiveness>,
+    I::Value: PointFacts,
 {
 }
 
@@ -240,20 +280,18 @@ where
 impl<'ir, S, V, E, F, Sem> DenseBackwardInterp for DenseBackwardTransfer<'ir, S, V, E, F, Sem>
 where
     S: StageMeta,
-    V: Clone + PointFacts,
+    V: Clone,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
     type Frame = F;
 
-    fn insert_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
-        self.state.insert(value.into());
-        Ok(())
+    fn point_state(&self) -> &V {
+        &self.state
     }
 
-    fn remove_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
-        self.state.remove(value.into());
-        Ok(())
+    fn point_state_mut(&mut self) -> &mut V {
+        &mut self.state
     }
 }
 
@@ -321,7 +359,7 @@ where
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
-    type SummaryKey = Scoped<CFGScope, Block>;
+    type SummaryKey = Scoped<BodyScope, Block>;
     type Summary = BlockLiveness<V>;
     type Frame = F;
     type Completion = DenseBackwardCompletion<V>;
@@ -336,42 +374,23 @@ pub enum DenseBackwardCompletion<V> {
     Structured,
 }
 
-/// Analysis-local state carried in the driver's `store` slot: the scope,
-/// the CFG topology, and an optional per-point recorder filled by the
-/// block frames during [`reconstruct_points`](DenseBackwardInterpreter::reconstruct_points).
-pub struct DenseAnalysisState<V> {
-    scope: Option<CFGScope>,
-    topology: CFGTopology,
-    recorder: Option<DensePointStore<V>>,
-}
-
-impl<V> Default for DenseAnalysisState<V> {
-    fn default() -> Self {
-        Self {
-            scope: None,
-            topology: CFGTopology::default(),
-            recorder: None,
-        }
-    }
-}
-
 /// The dense backward driver: a [`StandardFixpointInterpreter`] over
 /// [`DenseBackwardTransfer`] with scope-qualified block owners and
 /// successor→predecessor dependencies.
 pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardFixpointInterpreter<
     DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
-    DenseAnalysisState<V>,
-    BackwardSummaryDeps<Scoped<CFGScope, Block>>,
+    FactStore<Scoped<BodyScope, ProgramPoint>, V>,
+    BackwardSummaryDeps<Scoped<BodyScope, Block>>,
 >;
 
 // ===========================================================================
 // Driver capabilities (frames run on the driver)
 // ===========================================================================
 
-/// The dense-backward frame-driver capability surface: what the dense frames
+/// The dense-backward engine-capability surface: what the dense frames
 /// need from the engine. Implemented on the driver (it needs the summaries).
-pub trait DenseBackwardFrameDriver: Interp<Effect = DenseBackwardEffect<Self::Frame>> {
+pub trait DenseBackwardFrameEngine: Interp<Effect = DenseBackwardEffect<Self::Frame>> {
     /// The engine's total backward frame type.
     type Frame;
 
@@ -382,8 +401,21 @@ pub trait DenseBackwardFrameDriver: Interp<Effect = DenseBackwardEffect<Self::Fr
         statement: Statement,
     ) -> Result<Self::Effect, Self::Error>;
 
-    /// A block's statements in program order (terminator, if any, last).
-    fn block_statements(&self, block: Block) -> Result<Vec<Statement>, Self::Error>;
+    /// The last logical statement of a block (the terminator when present).
+    fn last_statement(
+        &self,
+        stage: CompileStage,
+        block: Block,
+    ) -> Result<Option<Statement>, Self::Error>;
+
+    /// The statement immediately before `before` in the block's logical
+    /// statement order.
+    fn previous_statement(
+        &self,
+        stage: CompileStage,
+        block: Block,
+        before: Statement,
+    ) -> Result<Option<Statement>, Self::Error>;
 
     /// The parameters of `block` (structured frames map carried demand).
     fn block_params(&self, stage: CompileStage, block: Block)
@@ -394,7 +426,7 @@ pub trait DenseBackwardFrameDriver: Interp<Effect = DenseBackwardEffect<Self::Fr
         &self,
         stage: CompileStage,
         block: Block,
-    ) -> Result<Vec<SSAValue>, Self::Error>;
+    ) -> Result<TerminatorArgs, Self::Error>;
 
     /// The current point state (cloned).
     fn state(&self) -> Self::Value;
@@ -403,13 +435,9 @@ pub trait DenseBackwardFrameDriver: Interp<Effect = DenseBackwardEffect<Self::Fr
     /// structured dialect frames to save/restore around body walks).
     fn replace_state(&mut self, state: Self::Value) -> Self::Value;
 
-    /// Record the current state as the point *before* `statement` (no-op
-    /// unless a per-point reconstruction is running).
-    fn record_before(&mut self, statement: Statement);
-
-    /// Record the current state as the point *after* `statement` (no-op
-    /// unless a per-point reconstruction is running).
-    fn record_after(&mut self, statement: Statement);
+    /// Store `facts` at a block or statement program point, overwriting the
+    /// approximation recorded by any earlier fixpoint iteration.
+    fn record_point(&mut self, point: ProgramPoint, facts: Self::Value);
 
     /// Absorb a CFG terminator's edges atomically: for each successor, map
     /// its converged live-in across the edge (parameter → matching edge
@@ -425,10 +453,10 @@ pub trait DenseBackwardFrameDriver: Interp<Effect = DenseBackwardEffect<Self::Fr
     ) -> Result<Self::Value, Self::Error>;
 }
 
-impl<'ir, S, V, E, F, Sem> DenseBackwardFrameDriver for DenseBackwardDriver<'ir, S, V, E, F, Sem>
+impl<'ir, S, V, E, F, Sem> DenseBackwardFrameEngine for DenseBackwardDriver<'ir, S, V, E, F, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
+    V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
@@ -454,21 +482,24 @@ where
         result
     }
 
-    fn block_statements(&self, block: Block) -> Result<Vec<Statement>, E> {
-        self.store()
-            .topology
-            .blocks
-            .iter()
-            .find(|candidate| candidate.block == block)
-            .map(|candidate| candidate.stmts.clone())
-            .ok_or_else(|| E::from(InterpreterError::MissingBlock(block)))
+    fn last_statement(&self, stage: CompileStage, block: Block) -> Result<Option<Statement>, E> {
+        query::last_statement(self.inner().pipeline(), stage, block).map_err(E::from)
+    }
+
+    fn previous_statement(
+        &self,
+        stage: CompileStage,
+        block: Block,
+        before: Statement,
+    ) -> Result<Option<Statement>, E> {
+        query::previous_statement(self.inner().pipeline(), stage, block, before).map_err(E::from)
     }
 
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
         query::block_params(self.inner().pipeline(), stage, block).map_err(E::from)
     }
 
-    fn terminator_args(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
+    fn terminator_args(&self, stage: CompileStage, block: Block) -> Result<TerminatorArgs, E> {
         query::terminator_arguments(self.inner().pipeline(), stage, block).map_err(E::from)
     }
 
@@ -480,56 +511,43 @@ where
         std::mem::replace(&mut self.inner_mut().state, state)
     }
 
-    fn record_before(&mut self, statement: Statement) {
-        let state = self.inner().state.clone();
-        if let Some(recorder) = self.store_mut().recorder.as_mut() {
-            recorder.set(ProgramPoint::Before(statement), state);
-        }
-    }
-
-    fn record_after(&mut self, statement: Statement) {
-        let state = self.inner().state.clone();
-        if let Some(recorder) = self.store_mut().recorder.as_mut() {
-            recorder.set(ProgramPoint::After(statement), state);
-        }
+    fn record_point(&mut self, point: ProgramPoint, facts: V) {
+        let scope = self
+            .current_owner()
+            .map(|owner| owner.scope)
+            .expect("dense frames only run while analyzing an owner");
+        self.store_mut().set(Scoped::new(scope, point), facts);
     }
 
     fn absorb_edges(&mut self, stage: CompileStage, edges: &[SuccessorEdge]) -> Result<V, E> {
-        let scope = self
-            .store()
-            .scope
-            .ok_or_else(|| E::from(InterpreterError::Custom("no active backward analysis")))?;
+        let current = self
+            .current_owner()
+            .cloned()
+            .ok_or_else(|| E::from(InterpreterError::Custom("no active backward owner")))?;
+        let scope = current.scope;
 
         let mut out = V::bottom();
         for edge in edges {
             let owner = Scoped::new(scope, edge.target);
 
             // Successor changed → reanalyse the current block.
-            if let Some(current) = self.current_owner().cloned() {
-                self.dependency_index_mut()
-                    .register(&owner, SummaryDependency::Reanalyze(current))
-                    .expect("backward dependency index is infallible");
-            }
+            self.dependency_index_mut()
+                .register(&owner, SummaryDependency::Reanalyze(current.clone()))
+                .expect("backward dependency index is infallible");
 
             let Some(summary) = self.summary(&owner) else {
                 continue;
             };
             let params = query::block_params(self.inner().pipeline(), stage, edge.target)?;
-            let mut mapped = V::bottom();
-            for value in summary.live_in.values() {
-                match params.iter().position(|param| *param == value) {
-                    Some(index) => {
-                        if let Some(arg) = edge.args.get(index) {
-                            mapped.insert(*arg);
-                        }
-                    }
-                    // A live-in that is not a parameter of the successor is a
-                    // dominated direct cross-block use: pass it through.
-                    None => {
-                        mapped.insert(value);
-                    }
-                }
-            }
+            // The successor's entry state in this block's vocabulary: its
+            // parameters renamed to the edge's arguments, joined with the
+            // facts the rename does not cover — live-ins that are not
+            // parameters are dominated direct cross-block uses and pass
+            // through unchanged.
+            let entry = &summary.live_in;
+            let mapped = entry
+                .rename(&params, &edge.args)
+                .join(&entry.forget(&params));
             out = out.join(&mapped);
         }
 
@@ -548,7 +566,7 @@ struct DenseBackwardSemantics;
 impl<'ir, S, V, E, F, Sem>
     OwnerSemantics<
         DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        Scoped<CFGScope, Block>,
+        Scoped<BodyScope, Block>,
         BlockLiveness<V>,
         F,
         DenseBackwardCompletion<V>,
@@ -556,7 +574,7 @@ impl<'ir, S, V, E, F, Sem>
     > for DenseBackwardSemantics
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
+    V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
     F: DenseFrameBuild<V, E>,
@@ -564,7 +582,7 @@ where
     fn bottom_summary(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        _owner: &Scoped<CFGScope, Block>,
+        _owner: &Scoped<BodyScope, Block>,
     ) -> Result<BlockLiveness<V>, E> {
         Ok(BlockLiveness::bottom())
     }
@@ -572,7 +590,7 @@ where
     fn entry_frame(
         &mut self,
         interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: &Scoped<CFGScope, Block>,
+        owner: &Scoped<BodyScope, Block>,
         _summary: &BlockLiveness<V>,
     ) -> Result<F, E> {
         let (stage, _cfg) = owner.scope;
@@ -585,9 +603,9 @@ where
     fn complete_owner(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: Scoped<CFGScope, Block>,
+        owner: Scoped<BodyScope, Block>,
         completion: DenseBackwardCompletion<V>,
-    ) -> Result<SummaryEffect<Scoped<CFGScope, Block>, BlockLiveness<V>>, E> {
+    ) -> Result<SummaryEffect<Scoped<BodyScope, Block>, BlockLiveness<V>>, E> {
         match completion {
             DenseBackwardCompletion::Block { live_in, live_out } => Ok(SummaryEffect::Update {
                 owner,
@@ -609,7 +627,8 @@ where
 /// ```ignore
 /// let mut analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
 /// analysis.analyze(stage, cfg)?;
-/// let boundary = analysis.block_summary(stage, cfg, block);
+/// let point = Scoped::new((stage, Body::CFG(cfg)), ProgramPoint::BlockEntry(block));
+/// let live_in = analysis.point_facts(point);
 /// ```
 pub struct DenseBackwardInterpreter<
     'ir,
@@ -638,7 +657,7 @@ where
         Self {
             driver: StandardFixpointInterpreter::with_dependency_index(
                 DenseBackwardTransfer::new(pipeline),
-                DenseAnalysisState::default(),
+                FactStore::new(),
                 (),
                 BackwardSummaryDeps::new(),
             ),
@@ -649,91 +668,86 @@ where
         self.driver.inner().pipeline()
     }
 
-    /// The converged boundary states of `block` under the `(stage, cfg)`
-    /// scope.
-    pub fn block_summary(
-        &self,
-        stage: CompileStage,
-        cfg: CFG,
-        block: Block,
-    ) -> Option<&BlockLiveness<V>> {
-        self.driver.summary(&Scoped::new((stage, cfg), block))
+    /// The converged fact at a scope-qualified program point.
+    ///
+    /// CFG-owner boundaries come directly from their fixpoint summaries;
+    /// statement and nested structured-block points come from the point store.
+    /// Each fact therefore has one mutable source during solving.
+    pub fn point_facts(&self, point: Scoped<BodyScope, ProgramPoint>) -> Option<&V> {
+        let summary_fact = match point.item {
+            ProgramPoint::BlockEntry(block) => self
+                .driver
+                .summary(&Scoped::new(point.scope, block))
+                .map(|summary| &summary.live_in),
+            ProgramPoint::BlockExit(block) => self
+                .driver
+                .summary(&Scoped::new(point.scope, block))
+                .map(|summary| &summary.live_out),
+            ProgramPoint::Before(_) | ProgramPoint::After(_) => None,
+        };
+        summary_fact.or_else(|| self.driver.store().get(point))
     }
 
-    /// The analyzed CFG's own top-level blocks (post-`analyze`).
-    pub fn cfg_blocks(&self) -> Vec<Block> {
-        self.driver
-            .store()
-            .topology
-            .cfg_blocks()
-            .map(|block| block.block)
-            .collect()
+    /// Snapshot the active analysis as one scope-qualified program-point fact
+    /// store.
+    ///
+    /// The solver keeps CFG-owner boundaries in summaries because they drive
+    /// convergence. This copies each final boundary into the returned result;
+    /// it does not create a second mutable representation inside the engine.
+    pub fn facts(&self) -> FactStore<Scoped<BodyScope, ProgramPoint>, V> {
+        let mut facts = self.driver.store().clone();
+
+        for (owner, summary) in self.driver.summaries() {
+            facts.set(
+                Scoped::new(owner.scope, ProgramPoint::BlockEntry(owner.item)),
+                summary.live_in.clone(),
+            );
+            facts.set(
+                Scoped::new(owner.scope, ProgramPoint::BlockExit(owner.item)),
+                summary.live_out.clone(),
+            );
+        }
+        facts
     }
 }
 
 impl<'ir, S, V, E, F, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
+    V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
-    F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, Completion = DenseBackwardCompletion<V>>
+    F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, F, Completion = DenseBackwardCompletion<V>>
         + DenseFrameBuild<V, E>,
 {
+    /// The blocks directly selected as fixpoint owners for `body`.
+    ///
+    /// This reads the current IR rather than returning cached analysis state.
+    fn direct_body_blocks(
+        &self,
+        stage: CompileStage,
+        body: impl Into<Body>,
+    ) -> Result<Vec<Block>, E> {
+        query::direct_body_blocks(self.driver.inner().pipeline(), stage, body.into())
+            .map_err(E::from)
+    }
+
     /// Run the block-boundary fixpoint over `cfg` in `stage`: seed every
     /// CFG block (a backward analysis must visit them all) and drain the
     /// worklist; dependencies are discovered from the terminators' edges.
-    pub fn analyze(&mut self, stage: CompileStage, cfg: CFG) -> Result<(), E> {
-        let scope = (stage, cfg);
-        let topology = query::cfg_topology(self.driver.inner().pipeline(), stage, cfg)?;
-        let owners: Vec<Scoped<CFGScope, Block>> = topology
-            .cfg_blocks()
-            .map(|block| Scoped::new(scope, block.block))
+    pub fn analyze(&mut self, stage: CompileStage, body: impl Into<Body>) -> Result<(), E> {
+        let body = body.into();
+        let scope = (stage, body);
+        let blocks = self.direct_body_blocks(stage, body)?;
+        let owners: Vec<Scoped<BodyScope, Block>> = blocks
+            .iter()
+            .copied()
+            .map(|block| Scoped::new(scope, block))
             .collect();
-        *self.driver.store_mut() = DenseAnalysisState {
-            scope: Some(scope),
-            topology,
-            recorder: None,
-        };
+        let pipeline = self.driver.inner().pipeline();
+        self.driver = Self::new(pipeline).driver;
 
         let mut semantics = DenseBackwardSemantics;
         self.driver.solve_many(&mut semantics, owners)
-    }
-
-    /// Reconstruct every per-statement state — including statements inside
-    /// structured bodies, at any nesting depth — by re-walking each converged
-    /// CFG block with the recorder enabled. Per-point states are never
-    /// persisted by the fixpoint itself; loop bodies record their final
-    /// (stable) iteration.
-    pub fn reconstruct_points(
-        &mut self,
-        stage: CompileStage,
-        cfg: CFG,
-    ) -> Result<DensePointStore<V>, E> {
-        let scope = (stage, cfg);
-        self.driver.store_mut().recorder = Some(DensePointStore::new());
-        for block in self.cfg_blocks() {
-            // The CFGOwner walk re-absorbs the converged successor summaries,
-            // so it replays exactly the fixpoint's final states.
-            let _ = scope;
-            self.driver.replace_state(V::bottom());
-            match self
-                .driver
-                .run_frame(F::from_block(DenseBlockFrame::cfg_owner(stage, block)))?
-            {
-                DenseBackwardCompletion::Block { .. } => {}
-                DenseBackwardCompletion::Structured => {
-                    return Err(E::from(InterpreterError::Custom(
-                        "a CFG block walk completed as a structured frame",
-                    )));
-                }
-            }
-        }
-        Ok(self
-            .driver
-            .store_mut()
-            .recorder
-            .take()
-            .expect("recorder installed above"))
     }
 }

@@ -4,10 +4,10 @@ use kirin_ir::{Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta,
 
 use crate::core::query;
 use crate::{
-    BodyFrame, Callee, Completion, Env, EnvIndex, EnvStackStore, ForwardEval, Frame, FrameBuild,
-    FrameDriver, FunctionBody, FunctionTarget, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, Linker, SameStageLinker, SparseForwardEffect, StageQuery, StandardFrame,
-    Store, drive_frames,
+    BlockQueries, CFGQueries, CallFrame, CallServices, CallableBody, Callee, Completion,
+    DiGraphQueries, Env, EnvIndex, EnvStackStore, ForwardEval, Frame, FrameBuild, FunctionTarget,
+    Interp, InterpDispatch, InterpLocation, InterpreterError, Linker, SameStageLinker,
+    SparseForwardEffect, StageQuery, StandardFrame, StatementDispatch, Store, drive_frames,
 };
 
 /// Concrete executor: runs IR over a concrete value domain with an explicit
@@ -112,7 +112,11 @@ where
     }
 }
 
-impl<'ir, S, V, E, Lk, F> FrameDriver for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+// The concrete engine provides the whole forward capability surface; it is split
+// into one impl block per capability so the components stay individually
+// nameable, and the blanket impl gives it `ForwardFrameEngine`/`ForwardFrameEngine`.
+
+impl<'ir, S, V, E, Lk, F> CallServices for ConcreteInterpreter<'ir, S, V, E, Lk, F>
 where
     S: StageQuery + InterpDispatch<Self>,
     V: Clone,
@@ -133,6 +137,35 @@ where
             .map_err(E::from)
     }
 
+    fn enter_function(
+        &mut self,
+        stage: CompileStage,
+        body: Statement,
+        args: Product<V>,
+        index: EnvIndex,
+    ) -> Result<CallableBody<V>, E> {
+        let pipeline = self.pipeline;
+        let info = pipeline
+            .stage(stage)
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
+        let previous = self.location.replace(InterpLocation {
+            stage,
+            statement: body,
+            index,
+        });
+        let result = info.dispatch_function_entry(body, args, self);
+        self.location = previous;
+        result
+    }
+}
+
+impl<'ir, S, V, E, Lk, F> StatementDispatch for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
     fn run_statement(
         &mut self,
         stage: CompileStage,
@@ -152,28 +185,15 @@ where
         self.location = previous;
         result
     }
+}
 
-    fn enter_function(
-        &mut self,
-        stage: CompileStage,
-        body: Statement,
-        args: Product<V>,
-        index: EnvIndex,
-    ) -> Result<FunctionBody<V>, E> {
-        let pipeline = self.pipeline;
-        let info = pipeline
-            .stage(stage)
-            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let previous = self.location.replace(InterpLocation {
-            stage,
-            statement: body,
-            index,
-        });
-        let result = info.dispatch_function_entry(body, args, self);
-        self.location = previous;
-        result
-    }
-
+impl<'ir, S, V, E, Lk, F> BlockQueries for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
         query::block_params(self.pipeline, stage, block).map_err(E::from)
     }
@@ -190,9 +210,33 @@ where
     ) -> Result<Option<Statement>, E> {
         query::next_statement(self.pipeline, stage, block, after).map_err(E::from)
     }
+}
 
+impl<'ir, S, V, E, Lk, F> CFGQueries for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
     fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
         query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
+    }
+}
+
+impl<'ir, S, V, E, Lk, F> DiGraphQueries for ConcreteInterpreter<'ir, S, V, E, Lk, F>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+{
+    fn digraph_walk_plan(
+        &self,
+        stage: CompileStage,
+        graph: kirin_ir::DiGraph,
+    ) -> Result<crate::GraphWalkPlan, E> {
+        query::digraph_walk_plan(self.pipeline, stage, graph).map_err(E::from)
     }
 }
 
@@ -202,7 +246,7 @@ where
     V: Clone,
     E: From<InterpreterError>,
     Lk: Linker<S>,
-    F: Frame<Self, Completion = Completion<V>> + FrameBuild<V, E>,
+    F: Frame<Self, F, Completion = Completion<V>> + FrameBuild<V, E>,
 {
     /// Resolve `stage`/`function` by name and execute it to completion.
     pub fn call_by_name(
@@ -223,18 +267,20 @@ where
     }
 
     /// Execute a function to completion and return its return product.
+    ///
+    /// The root call is an ordinary [`CallFrame`]: the same call boundary
+    /// that nested `Call` effects go through owns callee resolution, the
+    /// callee activation, body-kind selection, and completion validation —
+    /// there is exactly one implementation of that behavior.
     pub fn call(
         &mut self,
         stage: CompileStage,
         callee: Callee,
         args: impl IntoIterator<Item = V>,
     ) -> Result<Product<V>, E> {
-        let target = self.resolve_call(stage, &callee)?;
-        let index = self.alloc_env();
         let args: Product<V> = args.into_iter().collect();
-        let body = self.enter_function(target.stage, target.body, args, index)?;
-        let frame = BodyFrame::function(self, target.stage, index, body.cfg, body.args)?;
-        self.frames.push(F::from_body(frame));
+        self.frames
+            .push(F::from_call(CallFrame::root(stage, callee, args)));
         self.run()
     }
 
@@ -247,9 +293,9 @@ where
         self.frames = frames;
         match completion? {
             Completion::Returned(values) => Ok(values),
-            Completion::Finished(_) => Err(E::from(InterpreterError::Custom(
-                "body completion reached the frame-stack root",
-            ))),
+            Completion::Yielded(_) | Completion::Finished(_) => Err(E::from(
+                InterpreterError::Custom("body completion reached the frame-stack root"),
+            )),
         }
     }
 }
