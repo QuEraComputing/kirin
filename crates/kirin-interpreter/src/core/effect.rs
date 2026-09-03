@@ -51,9 +51,10 @@ impl From<UnGraph> for Body {
 /// frame](SparseForwardEffect::Push) it owns (or is handed by the engine), so all
 /// structured traversal lives in dialect/engine frames, never in this enum.
 ///
-/// `F` is the engine's total frame type (the same `F` that parameterizes
-/// [`ConcreteInterpreter`](crate::ConcreteInterpreter)/
-/// [`SparseForwardInterpreter`](crate::SparseForwardInterpreter)).
+/// `F` is the engine's child-continuation representation. Concrete
+/// configurations currently use their private frame-stack-item type directly;
+/// whether to introduce a distinct child-request vocabulary is deliberately
+/// deferred until the backward engines' continuation needs are understood.
 /// Ordinary dialect rules never name `F`: they only build the frame-free
 /// variants, so `F` is inferred from `I::Effect`. Only a dialect whose operations
 /// own structured traversal (e.g. `kirin-scf`'s `scf.if`/`scf.for`) builds
@@ -134,8 +135,7 @@ pub enum Callee {
 /// body kind. Any body kind may be callable — the statement declaring itself
 /// callable defines the semantics; the framework supplies default walkers
 /// for `CFG`, `Block`, and `DiGraph`, while `UnGraph` traversal is a
-/// dialect/compiler-supplied policy (the concrete engine's
-/// `FrameBuild::from_ungraph_entry` hook), rejected with
+/// dialect/compiler-supplied call-body traversal, rejected with
 /// [`InterpreterError::NoDefaultWalker`](crate::InterpreterError) when no
 /// policy is provided.
 pub struct CallableBody<V> {

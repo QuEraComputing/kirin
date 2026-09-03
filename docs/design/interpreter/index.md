@@ -4,6 +4,11 @@ The interpreter framework (`kirin-interpreter`) supports concrete execution
 and lattice-based abstract interpretation over the same dialect semantics,
 including analyses that cross language boundaries in multi-stage pipelines.
 
+The working plan for removing the remaining abstract/dense total-frame
+injection dependencies, together with the deferred concrete facade/core API
+questions, is
+[`remaining-frame-composition-migration-plan.md`](remaining-frame-composition-migration-plan.md).
+
 The design is organized as a **two-persona contract**:
 
 - **Dialect authors** describe what each statement *means*, once, in a small
@@ -17,12 +22,14 @@ The design is organized as a **two-persona contract**:
 - **Compiler authors** compose languages into pipelines and *select*
   components: an engine, a value domain, an error type, and a linker. When they
   need more control, the same compiler-author surface also includes opt-in
-  traversal and analysis components: custom concrete frames
-  (`ConcreteInterpreter<.., F>`), custom forward-dataflow frames
+  traversal and analysis components: a private concrete continuation
+  composition behind a language-owned wrapper over `ConcreteInterpreterCore`,
+  custom forward-dataflow frames
   (`SparseForwardInterpreter<.., P, F>`), and abstract policies `P`
   (`CallContext` + `WideningStrategy`). A language that uses a structured-control
-  dialect composes its own total frame type embedding the standard frames plus
-  that dialect's frames. Ordinary dialects never name a frame type.
+  dialect explicitly lists the framework and dialect continuations that may
+  coexist in its private frame-stack-item enum. Ordinary dialects never name
+  that enum.
 
 Every derive macro is named after the trait it implements
 (`#[derive(Interpretable)]` → `trait Interpretable`), so learning the derive
@@ -130,14 +137,15 @@ statement location (`stage()`/`statement()`/`index()`). The engine stashes the
 location before dispatching each rule (`run_statement`/`enter_function`) and
 restores it afterward, so a rule can read it back without a separate context
 object. A rule produces `I::Effect` — the **analysis-specific** effect algebra —
-not a single universal enum. (The frame type stays the engine's own `F` generic,
-e.g. `ConcreteInterpreter<.., F>`, so traversal is customizable without an unused
-associated type on `Interp`.) Forward rules bound `I: SparseForwardInterp`, the
+not a single universal enum. Forward rules bound `I: SparseForwardInterp`, the
 flavor of `Interp` whose `Semantics = ForwardEval` and `Effect = SparseForwardEffect<I::Value,
 I::Frame>`, so they build and return `SparseForwardEffect` values (which are `I::Effect`).
-`I::Frame` is the engine's total frame type, re-exposed by `SparseForwardInterp`
-only so a structured dialect can name the frame it pushes; ordinary dialects never
-mention it (it is inferred from `I::Effect`). They constrain only:
+For concrete execution, `I::Frame` is the private frame-stack-item type. A
+structured dialect obtains a stack item through narrow generic conversions
+without naming its type or variants; ordinary dialects never mention it. A
+separate total request vocabulary was prototyped and tabled until the backward
+engines clarify whether request and stored-continuation states need to differ
+across engine families. Dialect rules constrain only:
 
 - the value domain, with plain Rust bounds — `I::Value: Add<Output = I::Value>`
   (kirin-arith), `I::Value: BranchCondition` (kirin-cf), `I::Value:
@@ -180,9 +188,10 @@ pub enum SparseForwardEffect<V, F> {
 }
 ```
 
-`F` is the engine's total frame type. The frame-free variants don't name it, so
-ordinary dialects never see it; only a dialect whose operations own structured
-traversal builds `Push` (naming the frame via `SparseForwardInterp::Frame`). The pushed
+`F` is the engine's configured child representation: current heterogeneous
+configurations instantiate it as their stack-item type. The frame-free variants
+don't name it, so ordinary dialects never see it; only a dialect whose operations
+own structured traversal builds `Push` (through `SparseForwardInterp::Frame`). The pushed
 `frame` is whatever traversal the dialect decided on — there is no framework-owned
 "scope", and no framework "explore alternatives" effect (a dialect frame that
 needs to explore several bodies pushes them one at a time and joins itself).
@@ -224,11 +233,15 @@ surfacing `Yield` to their parent) are reusable **building blocks**, not
 framework-owned structured semantics: the SCF frames build them to walk a
 chosen body, but the structured *decision* and result binding stay in the SCF
 frame. A language that
-uses SCF composes a total frame type embedding the standard frames plus
-`ScfIfFrame`/`ScfForFrame` (via `BuildScfIf`/`BuildScfFor` and the abstract
-equivalents); see `example/toy-lang`'s `ToyFrame`/`ToyAbstractFrame`. Future
-structured dialects would follow the same pattern; only the existing SCF
-operations are implemented.
+uses SCF includes `ScfIfFrame`/`ScfForFrame` in its private concrete
+frame-stack-item enum;
+concrete SCF construction crosses the engine boundary through
+`ScfIfDispatch`/`ScfForDispatch` and requires only `From<Scf*Frame>` on the
+child type. The SCF frame never names the language's stack-item type or constructs one
+of its variants. The abstract equivalents use the same narrow
+`From<AbstractScf*Frame>` boundary; `ToyAbstractFrame` owns those conversions
+and exhaustive dispatch. Future structured dialects would follow the same
+ownership rule; only the existing SCF operations are implemented.
 
 ### `FunctionEntry<I>` — callable statements
 
@@ -300,12 +313,22 @@ belongs to.
 
 ## Engines
 
-### `ConcreteInterpreter<'ir, S, V, E, Lk, F = StandardFrame<V, E>>`
+### `ConcreteInterpreter` and `ConcreteInterpreterCore`
 
-A generic **frame-stack driver**: it pops the top frame, calls `Frame::step`,
-and applies the returned `FrameEffect` (`Continue` / `Push` / `Done` /
-`Complete`) — it owns *no* traversal logic itself. Traversal lives in the
-frames, organized along two independent axes:
+`ConcreteInterpreter<'ir, S, V, E, Lk>` is the public, framework-default
+interpreter. It hides the concrete stack representation and supports the
+standard `Block`, `CFG`, `Call`, and `DiGraph` continuations.
+
+`ConcreteInterpreterCore<'ir, S, V, E, Lk, F>` is the reusable mechanism for a
+language that owns additional continuations. Its single composition parameter
+`F` is the homogeneous private frame-stack-item type. Such a language keeps `F` private
+and exposes its own domain-level wrapper; reusable members remain generic over
+`F` and require only the narrow `From<Child>` conversions they use.
+
+The core is a generic **frame-stack driver**: it pops the top stack item, calls
+`Frame::step_into`, and applies the returned `FrameEffect` (`Continue` / `Push`
+/ `Done` / `Complete`) — it owns *no* traversal logic itself. Traversal lives in
+member frames, organized along two independent axes:
 
 - **Body representation** (the closed `Body` vocabulary — an intentional IR
   design decision): each framework-walkable representation has one
@@ -314,8 +337,8 @@ frames, organized along two independent axes:
   (one linear block; `Jump`/`Branch` are errors), and `DiGraphFrame`
   (dependency-ordered DAG walk collecting the declared yields). `UnGraph` has
   **no default walker**: an undirected graph has no inherent execution order,
-  so callable-UnGraph traversal is a dialect/compiler-supplied policy
-  (`FrameBuild::from_ungraph_entry`, defaulting to `NoDefaultWalker`).
+  so callable-UnGraph traversal is a compiler-supplied
+  `CallBodyTraversal`; the default returns `NoDefaultWalker`.
 - **Entry context**: the same walker serves a *callable* body (entered
   through `CallFrame`) and a *nested structured-operation* body (entered
   through a dialect frame); analysis owners are the abstract engines' third
@@ -335,12 +358,12 @@ run's result for a root call (`ConcreteInterpreter::call` pushes a
 implementation). Representation walkers never free activations; a `Returned`
 bubbles through dialect frames to the nearest `CallFrame`.
 
-The default total frame type `StandardFrame<V, E>` bundles the three walkers
-plus `CallFrame`. The dialect-produced `SparseForwardEffect` is consumed by
-the walkers, which map it to a `FrameEffect` (handling `Push` by pushing the
-carried frame). `StandardFrame` is structured-control-free; a custom `F`
-([Custom traversal and policies](#custom-traversal-and-policies)) adds dialect
-frames or replaces traversal without touching the engine.
+The framework's default `FrameStackItem` enum is private. It enumerates the concrete
+continuations that can coexist on the stack, supplies narrow conversions for
+new children, and exhaustively dispatches member effects. A structured dialect
+therefore converts its own frame into the opaque child type, while `BlockFrame`,
+`CFGFrame`, `DiGraphFrame`, and `CallFrame` remain unaware of the language that
+composed them. See [Custom traversal and policies](#custom-traversal-and-policies).
 
 ### `SparseForwardInterpreter<'ir, S, V, E, Lk, P = ContextInsensitive, F = StandardAbstractFrame<..>>`
 
@@ -409,12 +432,19 @@ Two mechanisms keep engines generic over stage enums:
 ## Custom traversal and policies
 
 Both engines are frame-stack drivers over one **shared protocol**. Compiler
-authors can customize *how* an engine traverses (a custom frame type) or *how
-precisely* an abstract analysis summarizes (a custom policy `P`), without
-forking an engine. This is part of the compiler-author surface. The total frame
-type `F` is the engine's generic; it is named in `Interpretable<I, ForwardEval>`
-*only* by a structured dialect building `SparseForwardEffect::Push` (through
-`SparseForwardInterp::Frame`) — ordinary dialects never mention it.
+authors can customize *how* an engine traverses or *how precisely* an abstract
+analysis summarizes (a custom policy `P`) without forking the mechanism. In the
+concrete engine, the compiler author defines a private `FrameStackItem` enum, narrow
+child conversions, and a public language-level wrapper
+over `ConcreteInterpreterCore`. `SparseForwardEffect::Push` carries the private
+stack-item type, but dialect code reaches it only through generic conversion bounds and
+never names its type or variants. Sparse-forward abstract and dense backward now
+follow the same member-to-composition dependency rule; sparse backward needs no
+heterogeneous composition because its sole `DemandFrame` never pushes a
+differently typed child. A distinct request vocabulary remains tabled until an
+engine demonstrates that requesting and storing a child are meaningfully
+different states. `StandardAbstractFrame` remains public pending the separate
+abstract facade/core API review.
 
 ### Shared protocol vs. forward engine capabilities
 
@@ -434,8 +464,8 @@ surface at all — its `DemandFrame` dispatches rules directly on the transfer.
 |---|---|
 | `drive_frames` | the **frame-stack driver** — the loop. The only thing called a driver at this layer; `ForwardDriver`/`DenseBackwardDriver` are fixpoint-driver *structs*, not capability traits. |
 | `FrameEngine` | the **minimal engine contract** the generic frame stack needs: a total `Error` type, nothing more. |
-| `ForwardFrameEngine` | the **full engine capability set** for the standard concrete frame universe. |
-| `ForwardDataflowFrameEngine` | the capability set for the standard forward-abstract frame universe. |
+| `ForwardFrameEngine` | the **full engine capability set** used by the standard concrete composition. |
+| `ForwardDataflowFrameEngine` | the capability set used by the standard forward-abstract composition. |
 | component traits | narrowly scoped **services used by individual frames**. |
 
 #### The forward capability model
@@ -477,9 +507,9 @@ statement to the right dialect rule. `StatementDispatch` is implemented by the
 (`stage`/`statement`/`index`) so the rule can read it back through `Interp`, then
 delegates to `InterpDispatch`.
 
-Two umbrellas compose them, one per engine family. Use an umbrella at the
-*universe* level — a total frame enum's engine must support the union of all its
-variants — and the components at the *member* level:
+Two umbrellas compose them, one per engine family. A stack-item composition's
+engine must support the union of all admitted member continuations, while each
+member itself should name only the component capabilities it consumes:
 
 ```rust
 // Full concrete surface. Adds no methods; blanket-implemented.
@@ -517,22 +547,26 @@ dialect-facing helper, which binds into the engine's *current* activation,
 so neither name mentions the `Product` container it happens to accept.
 
 ```rust
-pub enum FrameEffect<F, C> { Continue(F), Push { parent: F, child: F }, Done, Complete(C) }
+pub enum FrameEffect<P, C, F = P> {
+    Continue(P),
+    Push { parent: P, child: F },
+    Done,
+    Complete(C),
+}
 
 pub trait FrameEngine { type Error; }          // direction-neutral anchor (no value domain)
 impl<T: Interp> FrameEngine for T { type Error = <T as Interp>::Error; }
 
-// ONE interface, implemented by every frame — individual walkers and total enums alike.
-// The effects are over `F`, the total frame type composed into, never over `Self`.
-pub trait Frame<I: FrameEngine, F>: Sized {
+// One interface. A reusable member always resumes as Self while remaining
+// generic over the configured child representation F.
+pub trait Frame<I: FrameEngine, F = Self>: Sized {
     type Completion;
-    fn step_into(self, &mut I)        -> Result<FrameEffect<F, Self::Completion>, I::Error>;
-    fn resume_done_into(self, &mut I) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
-    fn resume_into(self, Self::Completion, &mut I) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+    fn step_into(self, &mut I)        -> Result<FrameEffect<Self, Self::Completion, F>, I::Error>;
+    fn resume_done_into(self, &mut I) -> Result<FrameEffect<Self, Self::Completion, F>, I::Error>;
+    fn resume_into(self, Self::Completion, &mut I) -> Result<FrameEffect<Self, Self::Completion, F>, I::Error>;
 }
 
-// The one shared, direction-neutral driver loop, used by every engine. The
-// stack's element type must be a *universe* — `F: Frame<I, F>`.
+// The shared driver sees only the closed frame-stack-item enum.
 pub fn drive_frames<I: FrameEngine, F: Frame<I, F>>(engine: &mut I, frames: &mut Vec<F>)
     -> Result<F::Completion, I::Error>;
 
@@ -546,23 +580,25 @@ pub trait CallServices: Env          { /* alloc/free env, resolve_call, enter_fu
 pub(crate) trait BlockBinding: Env + BlockQueries { /* bind_block_args */ }
 ```
 
-**Members and universes.** The `F` parameter is what lets one trait serve both
-roles a frame stack needs:
+**Members and stack items.** Concrete composition separates two roles that the old
+total-frame design coupled in the wrong direction:
 
-- a **member** — an individual walker (`BlockFrame`, `CallFrame`, a dialect's own
-  frame). It is one variant of `F` and names its successors in `F`, re-wrapping
-  itself through the relevant `*FrameBuild` hook. Members are generic over `F`,
-  so the same walker composes into any language's frame type.
-- a **universe** — a total frame enum. It implements `Frame<I, Self>` when it is
-  the stack's element type, and stays generic over `F` so it can *also* be
-  embedded in a larger enum without re-enumerating its variants. `TracingFrame`
-  in `toy-lang`'s tests is exactly this: a newtype wrapping `ToyFrame` whole,
-  counting steps and delegating. (A leaf universe with no members, like the
-  sparse backward `DemandFrame`, honestly pins `F = Self`.)
+- a **member continuation** — `BlockFrame`, `CallFrame`, or a dialect-owned SCF
+  frame. On `Continue`/`Push.parent`, it returns `Self`; it never constructs an
+  enclosing enum variant;
+- a **frame stack item** — a value of the private closed enum stored in `Vec<F>`. The enum exhaustively
+  dispatches to members and maps `FrameEffect<Self, C, FrameStackItem>` into
+  `FrameEffect<FrameStackItem, C, FrameStackItem>` at one composition root. Members remain
+  generic over this child type and require only narrow conversions such as
+  `F: From<BlockFrame<..>>`; they never name the stack-item enum or its variants.
 
 The stack must be homogeneous in *type* while heterogeneous in *kind*, which is
 why `F` is a closed sum type rather than `Box<dyn Frame>`: a run holds a
 `CallFrame`, a `CFGFrame`, a `BlockFrame` and a dialect frame simultaneously.
+The enum itself is meaningful closed-world configuration rather than accidental
+boilerplate. Its repeated `From` and three-method dispatch arms are mechanical
+boilerplate, but remain handwritten during this prototype so the contract can
+stabilize before considering narrowly scoped code generation.
 
 `Frame` is anchored only on `FrameEngine` (a total `Error`), **not** on the
 forward value engine `Interp` — so the frame protocol is decoupled from forward
@@ -572,8 +608,12 @@ value interpretation and reusable by other analyses. Every `Interp` is a
 returned `FrameEffect`. The forward component traits above are the richer
 capability surfaces the *forward* frames call; each forward frame bounds only the
 components it uses, and the concrete engine implements all of them (so it also
-gets `ForwardFrameEngine` by blanket impl). The concrete and abstract standard
-frames are two *implementations* of this one protocol — not parallel frameworks.
+gets `ForwardFrameEngine` by blanket impl). `Frame<I, F>` encodes the settled
+invariant that a member's next/parent state is always `Self`; only the child
+representation varies. Concrete, sparse-forward abstract, and dense-backward
+members all use this form. The outer stack-item composition maps member parents
+with `map_next` and uses itself for `F`. Here `F` means only the configured
+representation of a pushed child, never the member's own next/parent state.
 
 Narrowest first, the shipped member frames now require:
 
@@ -588,25 +628,30 @@ Narrowest first, the shipped member frames now require:
 | `CFGFrame` | `CFGQueries + StatementDispatch + SparseForwardInterp` |
 | `DiGraphFrame` | `DiGraphQueries + StatementDispatch + SparseForwardInterp` |
 | `AbstractBlockFrame`, `AbstractCallFrame`, `AbstractDiGraphFrame` | `ForwardDataflowFrameEngine` (+ `SparseForwardInterp` for the walkers) |
-| `StandardFrame`, `ToyFrame`, other total concrete enums | `ForwardFrameEngine + SparseForwardInterp` — correct at the universe level |
-| `StandardAbstractFrame`, other total abstract enums | `ForwardDataflowFrameEngine + SparseForwardInterp` |
+| private concrete `FrameStackItem` enums | union of their member bounds; exhaustive dispatch is local to the composition root |
+| `StandardAbstractFrame`, other abstract stack-item enums | union of their member bounds; exhaustive dispatch is local to the composition root |
 
-### Concrete frames — `BlockFrame` / `CFGFrame` / `DiGraphFrame` / `CallFrame` / `StandardFrame`
+### Concrete frames — members and the private stack-item enum
 
-`ConcreteInterpreter` is generic over the total frame type `F` (default
-`StandardFrame`). A custom enum reuses the standard single-path traversal —
-the representation walkers and the call boundary — through `FrameBuild`
-(`from_block`/`from_cfg`/`from_call`/`from_digraph`) and their `*_into`
-delegating methods, adds dialect frames / observation, and instantiates the
-engine with that `F`. Overriding `FrameBuild::from_ungraph_entry` (default:
-`NoDefaultWalker`) supplies a callable-UnGraph traversal policy without
-touching the generic logic (see the workspace `tests/body_kinds.rs` policy
-test). (Further examples: `example/toy-lang`'s `ToyFrame`, which adds
-`kirin_scf`'s `ScfIfFrame`/`ScfForFrame` via `BuildScfIf`/`BuildScfFor`; and a
-`TracingFrame` counting call/body visitation while running the real program — see
-`example/toy-lang`'s `interpreter::tests::advanced`.)
+`ConcreteInterpreter` uses a private default composition containing
+`BlockFrame`, `CFGFrame`, `DiGraphFrame`, and `CallFrame`. A language that adds
+structured continuations defines its own private `FrameStackItem` enum and a
+small public wrapper over `ConcreteInterpreterCore<.., FrameStackItem>`.
 
-### Callable-body walkers — `CallBodyFramePolicy` / `DefaultBodyFrames`
+This is an explicit composition root, not a public interpreter abstraction. For
+example, toy-lang's `FrameStackItem` stores the four framework computations plus
+`ScfIfFrame`/`ScfForFrame`; only its `From<Child>` impls and exhaustive `Frame`
+dispatch name stack-item variants. None of the six member frames knows the enum
+exists. There is deliberately no
+`StandardFrame`, concrete `FrameBuild` family, member-side `*_into` injection,
+or composition macro in this prototype.
+
+A custom `CallBodyTraversal` can still replace callable-body traversal without
+changing call lifecycle. Its methods return the generic child type, which the
+current concrete configurations instantiate as their private stack-item type. The
+workspace `tests/body_kinds.rs` test demonstrates that seam.
+
+### Callable-body traversal — `CallBodyTraversal` / `DefaultCallBodyTraversal`
 
 `CallFrame` bundles two separable concerns, and only the second is
 configurable:
@@ -614,26 +659,26 @@ configurable:
 | Concern | Where | Configurable? |
 |---|---|---|
 | **call convention** — resolve the callee, allocate its activation, ask `FunctionEntry` for the body, suspend, validate the completion kind, free the activation *exactly once*, bind results | `CallFrame` itself | **no** — this is where double-frees would live |
-| **walker choice** — which frame traverses the callee body | `CallBodyFramePolicy<V, E, F>` | **yes** |
+| **walker choice** — which child enters the callee body | `CallBodyTraversal<V, E, F>` | **yes** |
 
 `Body` stays a closed vocabulary, so `CallFrame::step_into` still matches it
-exhaustively; only the frame each arm builds is chosen by the policy. The
+exhaustively; only the frame each arm builds is chosen by the traversal. The
 default reproduces today's behaviour exactly:
 
-| body | `DefaultBodyFrames` | a custom `MyBodyFrames` might use |
+| body | `DefaultCallBodyTraversal` | a custom `MyCallBodyTraversal` might use |
 |---|---|---|
 | `CFG` | `CFGFrame` | `MyCustomCFGFrame` |
 | `Block` | `BlockFrame` | `BlockFrame` (delegate to the default) |
 | `DiGraph` | `DiGraphFrame` | `MyScheduledGraphFrame` |
-| `UnGraph` | `FrameBuild::from_ungraph_entry` → `NoDefaultWalker` unless overridden | `MyCircuitWalker` |
+| `UnGraph` | `NoDefaultWalker` | `MyCircuitWalker` |
 
-The policy is selected by the **compiler/language author** through the concrete
-total frame type's `FrameBuild::BodyFrames`; `#[derive(FrameBuild)]` emits
-`DefaultBodyFrames` unless given
-`#[interpret(body_frames = MyBodyFrames)]`. `CallFrame<V>` continues to mean
-`CallFrame<V, DefaultBodyFrames>`. A dialect crate may *offer* reusable walkers
-or policies, but a callable dialect should not permanently fix one traversal for
-every engine.
+The traversal is selected by the **compiler/language author** as the `T` parameter
+of the `CallFrame<V, T>` variant in the private stack-item enum. `CallFrame<V>` continues
+to mean `CallFrame<V, DefaultCallBodyTraversal>`. The stack-item enum's focused
+`From<CallRequest<V>>` conversion constructs that configured `CallFrame<V, T>`.
+A dialect crate
+may *offer* reusable walkers or traversals, but a callable dialect should not
+permanently fix one traversal for every engine.
 
 **Concrete execution only, and deliberately so.** Concrete execution descends
 into a callee — `CallFrame` → body walker → completion → `CallFrame`. Forward
@@ -650,22 +695,20 @@ do not make IR owners supply walkers.
 through their own dialect frames (chosen per engine by `ScfIfDispatch` /
 `ScfForDispatch`), which then reuse a framework `BlockFrame`. Those are *nested*
 bodies — they borrow the caller's activation and exit by `Yield` — so the
-callable-body policy plays no part.
+call-body traversal plays no part.
 
-### Abstract frames — `StandardAbstractFrame` / `AbstractFrameBuild` / `ForwardDataflowFrameEngine`
+### Abstract frames — member continuations and abstract composition roots
 
-`SparseForwardInterpreter` is symmetrically generic over a total abstract frame type
-`F` (default `StandardAbstractFrame`). The standard abstract frames
+`SparseForwardInterpreter` is generic over an abstract stack-item type `F`
+(default `StandardAbstractFrame`). The standard abstract member frames
 (`AbstractBlockFrame`, `AbstractCallFrame`, `AbstractDiGraphFrame`) implement the
-*same*
-`Frame` protocol, but their traversal is the abstract one: a CFG block worklist
+same `Frame` protocol, but their traversal is the abstract one: a CFG block worklist
 that joins/widens at merge points, `Branch` exploration, single-block
 body walks that complete on `Yield`, dependency-ordered graph passes, and
-per-key call summarization. A custom
-enum reuses them through `AbstractFrameBuild` and the `*_into` methods — exactly
-mirroring the concrete pattern (see `ToyAbstractFrame`, which adds
-`AbstractScfIfFrame`/`AbstractScfForFrame`, and `TracingAbstractFrame` in the
-same test module).
+per-key call summarization. A custom enum composes them with ordinary
+`From<Member>` conversions and exhaustive `Frame` dispatch. `ToyAbstractFrame`
+adds the dialect-owned `AbstractScfIfFrame` and `AbstractScfForFrame`; no member
+constructs a `ToyAbstractFrame` variant.
 
 **Executable owners and the body vocabulary.** The forward fixpoint's work items
 are `Owner`s, and only *executable* owners run frames: `Owner::Block` (one CFG
@@ -680,11 +723,11 @@ from entry widening when a new call site raises the owner's entry product. On
 completion a graph owner has no successor edges; its declared yields become the
 function's return contribution. `UnGraph` bodies are rejected with
 `NoDefaultWalker`: an undirected graph has no derivable traversal order, and
-unlike the concrete engine's `FrameBuild::from_ungraph_entry` there is currently
-no seam through which a compiler could supply one. Analogously,
-`AbstractFrameBuild::from_digraph` defaults to rejecting, so a total abstract
-frame enum that carries no `AbstractDiGraphFrame` inherits the refusal rather
-than pretending to analyze a graph body.
+unlike the concrete engine's `CallBodyTraversal` there is currently no seam
+through which a compiler could supply one. Analogously,
+The generic engine requires `From<AbstractDiGraphFrame>` at the composition
+boundary, so omitting the graph owner walker is now a compile-time composition
+error rather than a fallible build-trait default.
 
 `AbstractDiGraphFrame` differs from the concrete `DiGraphFrame` in exactly one
 substantive way: a `Call` effect pushes an `AbstractCallFrame`, routing the call
@@ -747,13 +790,20 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
 
 ## Status and deferred work
 
-- Both engines are frame-parametric over the shared, direction-neutral
-  `FrameEngine`/`Frame`/`drive_frames` protocol: `ConcreteInterpreter<.., F>`
-  (default `StandardFrame`) and `SparseForwardInterpreter<.., P, F>`
-  (default `StandardAbstractFrame`). Abstract explore/join/summarize lives in dedicated
-  abstract frames reused via `AbstractFrameBuild`; there is no longer an un-framed
-  abstract worklist. `Frame` is anchored on `FrameEngine` (a total error), not on
-  `Interp`, so the protocol is reusable beyond forward value interpretation.
+- The engines share the direction-neutral `FrameEngine`/`Frame`/`FrameEffect`/
+  `drive_frames` protocol. Concrete execution hides its private default
+  stack-item enum behind `ConcreteInterpreter`; language-specific private roots
+  reuse `ConcreteInterpreterCore<.., F>`. Sparse-forward abstract and dense
+  backward now follow the same dependency rule: member continuations resume as
+  `Self`, and composition roots alone own conversions and exhaustive dispatch.
+  The parallel `FrameBuild` and SCF `Build*` injection families are gone, and
+  `Frame<I, F>` retains only the child-representation generic needed by
+  heterogeneous stacks. Sparse backward is the control case: its sole
+  `DemandFrame` never pushes a differently typed child, so it has no total-enum
+  composition problem. The request-versus-stack-item and public facade/core
+  API questions remain deferred. `Frame` stays anchored on `FrameEngine` (a
+  total error), not on `Interp`, so the protocol is reusable beyond forward
+  value interpretation.
 - The per-statement effect is the associated type `I::Effect`, **per analysis**
   — forward execution/abstract interpretation use the `ForwardEval` semantics
   whose `Effect` is `SparseForwardEffect`. The backward analyses are

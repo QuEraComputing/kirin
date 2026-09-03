@@ -5,7 +5,7 @@
 pub(crate) mod frames;
 pub(crate) mod interp;
 
-pub use frames::{DenseBlockFrame, DenseBlockMode, DenseFrameBuild, StandardDenseBackwardFrame};
+pub use frames::{DenseBlockFrame, DenseBlockMode};
 pub use interp::{
     BlockLiveness, ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver,
     DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter,

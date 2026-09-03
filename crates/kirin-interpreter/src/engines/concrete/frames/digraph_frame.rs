@@ -5,7 +5,7 @@ use crate::{
     SparseForwardInterp, StatementDispatch,
 };
 
-use super::{CallFrame, Completion, FrameBuild};
+use super::{CallRequest, Completion};
 
 /// Representation-specific walker for a [`DiGraph`](kirin_ir::DiGraph) body: bind
 /// entry arguments to the graph's boundary ports, run the node statements in
@@ -14,7 +14,7 @@ use super::{CallFrame, Completion, FrameBuild};
 ///
 /// Traversal mechanics only. A `DiGraphFrame` does not own an activation and
 /// does not know whether it is a callable graph-function body
-/// ([`CallFrame`] → `DiGraphFrame`, where the yields become the call's
+/// ([`CallFrame`](crate::CallFrame) → `DiGraphFrame`, where the yields become the call's
 /// returned values) or a graph nested inside another body (dialect frame →
 /// `DiGraphFrame`, where the yields return to the pushing operation): the
 /// parent interprets the completion.
@@ -73,10 +73,9 @@ where
     ///
     /// Reading the yields is all this step needs, so it asks for [`Env`] alone —
     /// not [`DiGraphQueries`], whose schedule was already consumed.
-    fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E>
+    fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E>
     where
         I: Env<Value = V, Error = E>,
-        F: FrameBuild<V, E>,
     {
         let values: Product<V> = self
             .yields
@@ -90,7 +89,7 @@ where
 impl<I, F, V, E> Frame<I, F> for DiGraphFrame<V, E>
 where
     I: DiGraphQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = F>,
-    F: FrameBuild<V, E>,
+    F: From<CallRequest<V>>,
     V: Clone,
     E: From<InterpreterError>,
 {
@@ -98,8 +97,8 @@ where
 
     /// Execute the next scheduled node and translate its
     /// [`SparseForwardEffect`] into a [`FrameEffect`] over the total frame
-    /// type `F`.
-    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    /// stack-item type selected by the engine configuration.
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         // First step: fetch the walk plan and bind the boundary ports.
         if let Some(args) = self.pending.take() {
             let plan = interp.digraph_walk_plan(self.stage, self.graph)?;
@@ -114,7 +113,7 @@ where
             }
             self.schedule = Some(plan.schedule.into());
             self.yields = plan.yields;
-            return Ok(FrameEffect::Continue(F::from_digraph(self)));
+            return Ok(FrameEffect::Continue(self));
         }
 
         let Some(statement) = self.schedule.as_mut().and_then(|s| s.pop_front()) else {
@@ -122,19 +121,19 @@ where
         };
 
         match interp.run_statement(self.stage, statement, self.index)? {
-            SparseForwardEffect::Next => Ok(FrameEffect::Continue(F::from_digraph(self))),
+            SparseForwardEffect::Next => Ok(FrameEffect::Continue(self)),
             SparseForwardEffect::Push { frame, results } => {
                 self.resume_slots = Some(results);
                 Ok(FrameEffect::Push {
-                    parent: F::from_digraph(self),
+                    parent: self,
                     child: frame,
                 })
             }
             SparseForwardEffect::Call(call) => {
-                let pending = CallFrame::pending(self.stage, self.index, call);
+                let pending = CallRequest::pending(self.stage, self.index, call);
                 Ok(FrameEffect::Push {
-                    parent: F::from_digraph(self),
-                    child: F::from_call(pending),
+                    parent: self,
+                    child: pending.into(),
                 })
             }
             SparseForwardEffect::Jump(_) | SparseForwardEffect::Branch(_) => {
@@ -151,8 +150,8 @@ where
 
     /// A child finished without a payload (e.g. a returned call whose results
     /// are already written): resume the schedule.
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
-        Ok(FrameEffect::Continue(F::from_digraph(self)))
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
+        Ok(FrameEffect::Continue(self))
     }
 
     /// A child bubbled a completion: a pushed frame's values land in the
@@ -162,7 +161,7 @@ where
         mut self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         match completion {
             Completion::Finished(values) | Completion::Yielded(values) => {
                 let slots = self.resume_slots.take().ok_or_else(|| {
@@ -171,7 +170,7 @@ where
                     ))
                 })?;
                 interp.bind_values(self.index, slots.as_slice(), values)?;
-                Ok(FrameEffect::Continue(F::from_digraph(self)))
+                Ok(FrameEffect::Continue(self))
             }
             Completion::Returned(_) => Err(E::from(InterpreterError::Custom(
                 "return bubbled into a digraph body",
