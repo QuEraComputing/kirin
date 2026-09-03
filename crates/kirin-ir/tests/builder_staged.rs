@@ -100,19 +100,19 @@ fn specialize_success_and_duplicate_error() {
 
     let sf = stage.staged_function().new().unwrap();
 
-    let body1 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition1 = stage.statement().definition(BuilderDialect::Return).new();
     let _spec1 = stage
         .specialize()
         .staged_func(sf)
-        .body(body1)
+        .definition(definition1)
         .new()
         .expect("first specialize should succeed");
 
-    let body2 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition2 = stage.statement().definition(BuilderDialect::Return).new();
     let err = stage
         .specialize()
         .staged_func(sf)
-        .body(body2)
+        .definition(definition2)
         .new()
         .expect_err("duplicate signature should fail");
 
@@ -124,19 +124,19 @@ fn redefine_specialization_invalidates_and_registers() {
     let mut stage = new_stage();
     let sf = stage.staged_function().new().unwrap();
 
-    let body1 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition1 = stage.statement().definition(BuilderDialect::Return).new();
     let spec1 = stage
         .specialize()
         .staged_func(sf)
-        .body(body1)
+        .definition(definition1)
         .new()
         .unwrap();
 
-    let body2 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition2 = stage.statement().definition(BuilderDialect::Return).new();
     let err = stage
         .specialize()
         .staged_func(sf)
-        .body(body2)
+        .definition(definition2)
         .new()
         .expect_err("duplicate");
 
@@ -181,23 +181,23 @@ fn staged_function_all_matching_returns_most_specific() {
     let mut stage = new_stage();
     let sf = stage.staged_function().new().unwrap();
 
-    let body1 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition1 = stage.statement().definition(BuilderDialect::Return).new();
     let sig_i32 = Signature::new(vec![TestType::I32], TestType::Any, ());
     let _spec1 = stage
         .specialize()
         .staged_func(sf)
         .signature(sig_i32.clone())
-        .body(body1)
+        .definition(definition1)
         .new()
         .unwrap();
 
-    let body2 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition2 = stage.statement().definition(BuilderDialect::Return).new();
     let sig_i64 = Signature::new(vec![TestType::I64], TestType::Any, ());
     let _spec2 = stage
         .specialize()
         .staged_func(sf)
         .signature(sig_i64)
-        .body(body2)
+        .definition(definition2)
         .new()
         .unwrap();
 
@@ -214,21 +214,21 @@ fn staged_function_all_matching_excludes_invalidated() {
     let mut stage = new_stage();
     let sf = stage.staged_function().new().unwrap();
 
-    let body1 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition1 = stage.statement().definition(BuilderDialect::Return).new();
     let default_sig: Signature<TestType> = Signature::placeholder();
     let spec1 = stage
         .specialize()
         .staged_func(sf)
-        .body(body1)
+        .definition(definition1)
         .new()
         .unwrap();
 
     // Invalidate spec1 by redefining
-    let body2 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition2 = stage.statement().definition(BuilderDialect::Return).new();
     let err = stage
         .specialize()
         .staged_func(sf)
-        .body(body2)
+        .definition(definition2)
         .new()
         .expect_err("duplicate");
     let _spec2 = stage.redefine_specialization(err);
@@ -248,8 +248,13 @@ fn staged_function_unique_live_specialization_returns_only_live_specialization()
     let mut stage = new_stage();
     let sf = stage.staged_function().new().unwrap();
 
-    let body = stage.statement().definition(BuilderDialect::Return).new();
-    let spec = stage.specialize().staged_func(sf).body(body).new().unwrap();
+    let definition = stage.statement().definition(BuilderDialect::Return).new();
+    let spec = stage
+        .specialize()
+        .staged_func(sf)
+        .definition(definition)
+        .new()
+        .unwrap();
 
     let stage = stage.finalize().unwrap();
     let sf_info = sf.get_info(&stage).unwrap();
@@ -262,23 +267,23 @@ fn staged_function_unique_live_specialization_rejects_ambiguous_live_set() {
     let mut stage = new_stage();
     let sf = stage.staged_function().new().unwrap();
 
-    let body1 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition1 = stage.statement().definition(BuilderDialect::Return).new();
     let sig_i32 = Signature::new(vec![TestType::I32], TestType::Any, ());
     stage
         .specialize()
         .staged_func(sf)
         .signature(sig_i32)
-        .body(body1)
+        .definition(definition1)
         .new()
         .unwrap();
 
-    let body2 = stage.statement().definition(BuilderDialect::Return).new();
+    let definition2 = stage.statement().definition(BuilderDialect::Return).new();
     let sig_i64 = Signature::new(vec![TestType::I64], TestType::Any, ());
     stage
         .specialize()
         .staged_func(sf)
         .signature(sig_i64)
-        .body(body2)
+        .definition(definition2)
         .new()
         .unwrap();
 

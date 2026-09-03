@@ -126,35 +126,34 @@ pub enum Callee {
     Specialized(SpecializedFunction),
 }
 
-/// The body a callable statement enters when invoked, plus the entry
-/// arguments bound to its boundary (block parameters / graph ports).
+impl From<Symbol> for Callee {
+    fn from(symbol: Symbol) -> Self {
+        Self::Named(symbol)
+    }
+}
+
+/// The body a callable statement enters when invoked.
 ///
 /// This is the function-call entry descriptor — the call mechanism, not a
 /// structured-control abstraction. A [`FunctionEntry`](crate::FunctionEntry)
 /// rule returns one; the call boundary picks the walker that matches the
-/// body kind. Any body kind may be callable — the statement declaring itself
-/// callable defines the semantics; the framework supplies default walkers
-/// for `CFG`, `Block`, and `DiGraph`, while `UnGraph` traversal is a
-/// dialect/compiler-supplied call-body traversal, rejected with
+/// body kind and binds its own boundary input. Callable-body discovery is
+/// deliberately value-independent: concrete execution and forward abstract
+/// interpretation carry different argument domains, while backward analyses
+/// have no argument product at this boundary. Any body kind may be callable —
+/// the statement declaring itself callable defines the semantics; the
+/// framework supplies default walkers for `CFG`, `Block`, and `DiGraph`, while
+/// `UnGraph` traversal is a dialect/compiler-supplied call-body traversal,
+/// rejected with
 /// [`InterpreterError::NoDefaultWalker`](crate::InterpreterError) when no
 /// policy is provided.
-pub struct CallableBody<V> {
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct CallableBody {
     pub body: Body,
-    pub args: Product<V>,
 }
 
-impl<V> CallableBody<V> {
-    /// A callable body, with no entry arguments yet.
+impl CallableBody {
     pub fn new(body: impl Into<Body>) -> Self {
-        Self {
-            body: body.into(),
-            args: Product::new(),
-        }
-    }
-
-    /// Entry arguments bound to the body's boundary parameters.
-    pub fn args(mut self, args: impl IntoIterator<Item = V>) -> Self {
-        self.args = args.into_iter().collect();
-        self
+        Self { body: body.into() }
     }
 }

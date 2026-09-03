@@ -134,7 +134,7 @@ shape without colliding.
 `Interp` is the interpreter/analysis **driver**: it exposes the value domain, the
 error type, the per-statement effect, the semantic key `Semantics`, and the current
 statement location (`stage()`/`statement()`/`index()`). The engine stashes the
-location before dispatching each rule (`run_statement`/`enter_function`) and
+location before dispatching each statement rule (`run_statement`) and
 restores it afterward, so a rule can read it back without a separate context
 object. A rule produces `I::Effect` — the **analysis-specific** effect algebra —
 not a single universal enum. Forward rules bound `I: SparseForwardInterp`, the
@@ -243,23 +243,40 @@ of its variants. The abstract equivalents use the same narrow
 and exhaustive dispatch. Future structured dialects would follow the same
 ownership rule; only the existing SCF operations are implemented.
 
-### `FunctionEntry<I>` — callable statements
+### `FunctionEntry` — value-independent callable statements
 
 ```rust
-pub trait FunctionEntry<I: Interp>: Dialect {
-    fn function_entry(&self, args: Product<I::Value>, interp: &mut I)
-        -> Result<CallableBody<I::Value>, I::Error>;
+pub trait FunctionEntry: Dialect {
+    fn function_entry(&self) -> Option<CallableBody>;
 }
 ```
 
-Like `Interpretable`, it receives the engine `interp` directly (function entry is
-forward-only, so there is no `Semantics` parameter).
-
 Statements that define function bodies (e.g. `kirin_function::Function`)
-return the `CallableBody { body, args }` to enter on invocation (the
-function-call entry descriptor — not a structured-control abstraction). On
-language enums it is derived; `#[callable]` marks the variants that forward, all
-others report `NotCallable`.
+return the `CallableBody { body }` to enter on invocation (the function-call
+entry descriptor — not a structured-control abstraction). Discovery is a
+structural operation: it never receives concrete values, abstract values, or a
+backward-analysis fact domain. Concrete execution and forward analysis retain
+their own argument products and bind them only after discovery; backward
+analyses manufacture no placeholder product. On language enums the trait is
+derived; `#[callable]` marks the variants that forward, while dispatch maps a
+non-callable variant to `NotCallable` with the actual definition statement.
+
+Every engine root follows the same validated prefix:
+
+```text
+caller stage + Callee
+    -> Linker::resolve
+    -> FunctionTarget
+    -> FunctionEntry dispatch at FunctionTarget.stage
+    -> CallableBody
+    -> engine-specific boundary initialization
+```
+
+The boundary input is intentionally not unified: concrete calls and forward
+abstract analysis accept values, while the current backward roots accept only
+`(stage, Callee)` until their analysis-specific boundary policies are added.
+Both backward `analyze` methods return the resolved `(target stage, Body)` scope
+used to qualify their facts.
 
 ## Compiler-author surface
 
@@ -297,7 +314,7 @@ pub trait Linker<S: StageMeta> {
 ```
 
 A linker resolves `Callee::{Named, Function, Staged, Specialized}` to a
-`(stage, specialization, body)` target. It is a *field of the engine*, never
+`(stage, specialization, definition)` target. It is a *field of the engine*, never
 a trait the user implements on the engine type — this is a deliberate
 coherence rule: policies must be swappable without newtype-cloning a driver.
 
@@ -481,7 +498,7 @@ surface still runs the frames it can support.
 | `BlockQueries: Interp` | `block_params`/`first_statement`/`next_statement` | `BlockCursor`, `BlockFrame`, `AbstractBlockFrame`, dialect block walkers |
 | `CFGQueries: BlockQueries` | `cfg_entry` | `CFGFrame` |
 | `DiGraphQueries: Interp` | `digraph_walk_plan` (default: `NoDefaultWalker`) | `DiGraphFrame`, `AbstractDiGraphFrame` |
-| `CallServices: Env` | `alloc_env`/`free_env`/`resolve_call`/`enter_function` | `CallFrame` |
+| `CallServices: Env` | `alloc_env`/`free_env`/`resolve_callable` | `CallFrame` |
 
 **The `*Queries` traits are read-only, and only require `Interp`** — so nothing
 on them can touch SSA storage, and their names cannot hide a store mutation. The
@@ -495,8 +512,10 @@ alone and `::write_child_results` takes `Env` alone.
 `CallServices` names *services*, not a convention: **`CallFrame` still owns the
 calling convention** — the operation order, which completions are legal, and
 freeing the activation exactly once — and this trait only supplies the
-primitives. It is deliberately **not** split further: the standard `CallFrame`
-consumes all four together, and their pairing is a safety property (an
+primitives. `resolve_callable` is the common linker-plus-target-stage body
+discovery protocol; it carries no value product. The trait is deliberately
+**not** split further: the standard `CallFrame` consumes all three services
+together, and their pairing is a safety property (an
 `alloc_env` without its `free_env` leaks; a second `free_env` double-frees), so
 no engine should be able to offer half a call convention.
 
@@ -533,8 +552,8 @@ An abstract engine therefore **no longer inherits the concrete call lifecycle**.
 That follows the semantics: forward abstract interpretation *summarizes* a call
 (`summarize_call` → `AbstractCallFrame`) rather than descending into it, and
 reaches a callable body's entry block through `Owner` seeding in the fixpoint
-driver rather than `cfg_entry`. Requiring it to expose `alloc_env`, `free_env`,
-`enter_function`, `resolve_call`, and `cfg_entry` was demanding a call
+driver rather than `cfg_entry`. Requiring its frame universe to expose
+`alloc_env`, `free_env`, `resolve_callable`, and `cfg_entry` was demanding a call
 convention it never performs. `tests/frame_engine_capabilities.rs` pins this
 down with deliberately incomplete mock engines whose ability to compile *is* the
 regression test.
@@ -576,7 +595,7 @@ pub trait StatementDispatch: Interp  { /* run_statement */ }
 pub trait BlockQueries: Interp       { /* read-only block queries */ }
 pub trait CFGQueries: BlockQueries   { /* cfg_entry */ }
 pub trait DiGraphQueries: Interp     { /* digraph_walk_plan */ }
-pub trait CallServices: Env          { /* alloc/free env, resolve_call, enter_function */ }
+pub trait CallServices: Env          { /* alloc/free env, resolve_callable */ }
 pub(crate) trait BlockBinding: Env + BlockQueries { /* bind_block_args */ }
 ```
 
@@ -658,7 +677,7 @@ configurable:
 
 | Concern | Where | Configurable? |
 |---|---|---|
-| **call convention** — resolve the callee, allocate its activation, ask `FunctionEntry` for the body, suspend, validate the completion kind, free the activation *exactly once*, bind results | `CallFrame` itself | **no** — this is where double-frees would live |
+| **call convention** — resolve the callee and body through the common callable-root protocol, allocate its activation, bind concrete boundary arguments, suspend, validate the completion kind, free the activation *exactly once*, bind results | `CallFrame` itself | **no** — this is where double-frees would live |
 | **walker choice** — which child enters the callee body | `CallBodyTraversal<V, E, F>` | **yes** |
 
 `Body` stays a closed vocabulary, so `CallFrame::step_into` still matches it

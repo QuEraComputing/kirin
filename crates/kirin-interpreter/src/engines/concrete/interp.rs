@@ -1,8 +1,10 @@
 use std::marker::PhantomData;
 
-use kirin_ir::{Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta, Statement};
+use kirin_ir::{
+    Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta, Statement, Symbol,
+};
 
-use crate::core::query;
+use crate::core::{linker::resolve_callable, query};
 use crate::{
     BlockQueries, CFGQueries, CallServices, CallableBody, Callee, Completion, DiGraphQueries, Env,
     EnvIndex, EnvStackStore, ForwardEval, Frame, FunctionTarget, Interp, InterpDispatch,
@@ -151,31 +153,12 @@ where
         self.store.free(index).map_err(E::from)
     }
 
-    fn resolve_call(&self, stage: CompileStage, callee: &Callee) -> Result<FunctionTarget, E> {
-        self.linker
-            .resolve(self.pipeline, stage, callee)
-            .map_err(E::from)
-    }
-
-    fn enter_function(
-        &mut self,
+    fn resolve_callable(
+        &self,
         stage: CompileStage,
-        body: Statement,
-        args: Product<V>,
-        index: EnvIndex,
-    ) -> Result<CallableBody<V>, E> {
-        let pipeline = self.pipeline;
-        let info = pipeline
-            .stage(stage)
-            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let previous = self.location.replace(InterpLocation {
-            stage,
-            statement: body,
-            index,
-        });
-        let result = info.dispatch_function_entry(body, args, self);
-        self.location = previous;
-        result
+        callee: &Callee,
+    ) -> Result<(FunctionTarget, CallableBody), E> {
+        resolve_callable::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
     }
 }
 
@@ -286,6 +269,18 @@ where
         self.call(stage, Callee::Function(function), args)
     }
 
+    /// Resolve a stage-local `symbol` through the linker and execute the
+    /// selected callable to completion. This is the convenience form of
+    /// [`call`](Self::call) with [`Callee::Named`].
+    pub fn call_by_symbol(
+        &mut self,
+        stage: CompileStage,
+        symbol: Symbol,
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        self.call(stage, symbol.into(), args)
+    }
+
     /// Execute a function to completion and return its return product.
     ///
     /// The root call is an ordinary [`CallFrame`](crate::CallFrame): the same call boundary
@@ -338,6 +333,15 @@ where
         args: impl IntoIterator<Item = V>,
     ) -> Result<Product<V>, E> {
         self.inner.call_by_name(stage_name, function_name, args)
+    }
+
+    pub fn call_by_symbol(
+        &mut self,
+        stage: CompileStage,
+        symbol: Symbol,
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        self.inner.call_by_symbol(stage, symbol, args)
     }
 
     pub fn call(

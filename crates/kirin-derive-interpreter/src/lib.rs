@@ -19,7 +19,7 @@ pub fn derive_interpretable(input: TokenStream) -> TokenStream {
     }
 }
 
-/// Derive `FunctionEntry<I>` for a `#[wraps]` wrapper enum. Variants marked
+/// Derive `FunctionEntry` for a `#[wraps]` wrapper enum. Variants marked
 /// `#[callable]` delegate; all other variants report `NotCallable`.
 #[proc_macro_derive(FunctionEntry, attributes(wraps, callable, kirin, interpret))]
 pub fn derive_function_entry(input: TokenStream) -> TokenStream {

@@ -2,7 +2,7 @@ use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cmp::Cmp;
 use kirin_constant::Constant;
-use kirin_function::{Function as FunctionBody, Lexical, Return};
+use kirin_function::{Function, Lexical, Return};
 use kirin_scf::StructuredControlFlow;
 use kirin_test_utils::roundtrip;
 
@@ -27,7 +27,7 @@ enum ComposedSourceLanguage {
 #[chumsky(crate = kirin::parsers)]
 enum WrappedConstantLanguage {
     #[wraps]
-    Function(FunctionBody<ArithType>),
+    Function(Function<ArithType>),
     #[wraps]
     Constant(Constant<ArithValue, ArithType>),
     #[wraps]

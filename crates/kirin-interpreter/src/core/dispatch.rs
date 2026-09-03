@@ -1,6 +1,6 @@
-use kirin_ir::{Dialect, Product, StageInfo, StageMeta, Statement};
+use kirin_ir::{Dialect, StageInfo, StageMeta, Statement};
 
-use crate::{CallableBody, Interp};
+use crate::{CallableBody, Interp, InterpreterError};
 
 /// Statement semantics. The single trait dialect authors implement.
 ///
@@ -22,12 +22,13 @@ pub trait Interpretable<I: Interp, Semantics>: Dialect {
 /// when the function is invoked. Derived on language enums with
 /// `#[derive(FunctionEntry)]` where `#[callable]` marks the variants that wrap
 /// callable statements.
-pub trait FunctionEntry<I: Interp>: Dialect {
-    fn function_entry(
-        &self,
-        args: Product<I::Value>,
-        interp: &mut I,
-    ) -> Result<CallableBody<I::Value>, I::Error>;
+pub trait FunctionEntry: Dialect {
+    /// Return this definition's callable body, or `None` when the statement is
+    /// not callable.
+    ///
+    /// Body discovery is structural and therefore independent of an engine's
+    /// value domain and boundary inputs.
+    fn function_entry(&self) -> Option<CallableBody>;
 }
 
 /// Monomorphic statement dispatch over a stage enum.
@@ -49,18 +50,13 @@ pub trait InterpDispatch<I: Interp>: StageMeta {
         interp: &mut I,
     ) -> Result<I::Effect, I::Error>;
 
-    fn dispatch_function_entry(
-        &self,
-        body: Statement,
-        args: Product<I::Value>,
-        interp: &mut I,
-    ) -> Result<CallableBody<I::Value>, I::Error>;
+    fn dispatch_function_entry(&self, definition: Statement) -> Result<CallableBody, I::Error>;
 }
 
 impl<I, L> InterpDispatch<I> for StageInfo<L>
 where
     I: Interp,
-    L: Dialect + Interpretable<I, <I as Interp>::Semantics> + FunctionEntry<I>,
+    L: Dialect + Interpretable<I, <I as Interp>::Semantics> + FunctionEntry,
 {
     fn dispatch_statement(
         &self,
@@ -71,13 +67,10 @@ where
         definition.interpret(interp)
     }
 
-    fn dispatch_function_entry(
-        &self,
-        body: Statement,
-        args: Product<I::Value>,
-        interp: &mut I,
-    ) -> Result<CallableBody<I::Value>, I::Error> {
-        let definition = body.definition(self).clone();
-        definition.function_entry(args, interp)
+    fn dispatch_function_entry(&self, definition: Statement) -> Result<CallableBody, I::Error> {
+        let callable = definition.definition(self).clone();
+        callable
+            .function_entry()
+            .ok_or_else(|| I::Error::from(InterpreterError::NotCallable(definition)))
     }
 }

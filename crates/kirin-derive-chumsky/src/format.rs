@@ -77,7 +77,7 @@
 //! // Quantum gate with multiple results:
 //! "$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}"
 //!
-//! // Function body with signature projections and context name:
+//! // Function definition with signature projections and context name:
 //! "fn {:name}({sig:inputs}) -> {sig:return} ({body:ports}) captures ({body:captures}) {{ {body:body} }}"
 //!
 //! // Block field with args/body projections:

@@ -68,7 +68,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
         // be interpretable for that engine's key — no higher-ranked GAT
         // projection.
         predicates.push(syn::parse_quote! {
-            #dialect_ty: #interp_crate::Interpretable<__InterpI, <__InterpI as #interp_crate::Interp>::Semantics> + #interp_crate::FunctionEntry<__InterpI>
+            #dialect_ty: #interp_crate::Interpretable<__InterpI, <__InterpI as #interp_crate::Interp>::Semantics> + #interp_crate::FunctionEntry
         });
     }
     let mut where_clause = original_where.cloned().unwrap_or_else(|| syn::WhereClause {
@@ -87,7 +87,7 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
     let entry_arms = build_arms(&variants, enum_ident, |_| {
         quote! {
             #interp_crate::InterpDispatch::dispatch_function_entry(
-                stage_info, body, args, interp,
+                stage_info, definition,
             )
         }
     });
@@ -112,13 +112,8 @@ pub fn generate(input: &DeriveInput) -> Result<TokenStream, syn::Error> {
 
             fn dispatch_function_entry(
                 &self,
-                body: #ir_crate::Statement,
-                args: #ir_crate::Product<<__InterpI as #interp_crate::Interp>::Value>,
-                interp: &mut __InterpI,
-            ) -> Result<
-                #interp_crate::CallableBody<<__InterpI as #interp_crate::Interp>::Value>,
-                <__InterpI as #interp_crate::Interp>::Error,
-            > {
+                definition: #ir_crate::Statement,
+            ) -> Result<#interp_crate::CallableBody, <__InterpI as #interp_crate::Interp>::Error> {
                 match self {
                     #entry_arms
                 }

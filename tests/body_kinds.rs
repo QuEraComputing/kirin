@@ -37,7 +37,7 @@ use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::Lexical;
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, BlockFrame,
-    Body, BodyFrameEntry, CFGFrame, CallBodyTraversal, CallContext, CallFrame, CallRequest,
+    Body, BodyFrameEntry, CFGFrame, CallBodyTraversal, CallContext, CallFrame, CallRequest, Callee,
     Completion, ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive,
     DefaultCallBodyTraversal, DiGraphFrame, Frame, FrameEffect, FrameEngine, FunctionEntry,
     Interpretable, InterpreterError, SameStageLinker, SparseForwardInterpreter, expect_single,
@@ -85,6 +85,23 @@ fn parse(program: &str) -> Pipeline<L> {
     let mut pipeline: Pipeline<L> = Pipeline::new();
     ParsePipelineText::parse(&mut pipeline, program).expect("program parses");
     pipeline
+}
+
+fn local_function_symbol(
+    pipeline: &Pipeline<L>,
+    stage_name: &str,
+    function_name: &str,
+) -> (CompileStage, Symbol) {
+    let stage = pipeline
+        .stage_by_name(stage_name)
+        .expect("named stage exists");
+    let symbol = pipeline
+        .stage(stage)
+        .expect("stage info exists")
+        .symbol_table()
+        .lookup(function_name)
+        .expect("function name is interned in the stage-local symbol table");
+    (stage, symbol)
 }
 
 fn run(pipeline: &Pipeline<L>, function: &str, args: &[i64]) -> Result<i64, TestError> {
@@ -714,6 +731,64 @@ fn analyze_insensitive(
     let mut analysis: InsensitiveEngine<'_> =
         SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
     expect_single(analysis.analyze_by_name("test", function, args.iter().cloned())?)
+}
+
+#[test]
+fn concrete_symbol_entry_matches_name_and_direct_callee() {
+    let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
+    let (stage, symbol) = local_function_symbol(&pipeline, "test", "gadd");
+    assert_eq!(Callee::from(symbol), Callee::Named(symbol));
+
+    let mut by_name: Engine<'_> = ConcreteInterpreter::new(&pipeline);
+    let by_name =
+        expect_single::<i64, TestError>(by_name.call_by_name("test", "gadd", [2, 3]).unwrap())
+            .unwrap();
+
+    let mut by_symbol: Engine<'_> = ConcreteInterpreter::new(&pipeline);
+    let by_symbol =
+        expect_single::<i64, TestError>(by_symbol.call_by_symbol(stage, symbol, [2, 3]).unwrap())
+            .unwrap();
+
+    let mut by_callee: Engine<'_> = ConcreteInterpreter::new(&pipeline);
+    let by_callee = expect_single::<i64, TestError>(
+        by_callee
+            .call(stage, Callee::Named(symbol), [2, 3])
+            .unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!((by_name, by_symbol, by_callee), (5, 5, 5));
+}
+
+#[test]
+fn sparse_forward_symbol_entry_matches_name_and_direct_callee() {
+    let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
+    let (stage, symbol) = local_function_symbol(&pipeline, "test", "gadd");
+    let args = || [ConstPropValue::Const(2), ConstPropValue::Const(3)];
+
+    let mut by_name: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
+    let by_name = expect_single::<ConstPropValue, TestError>(
+        by_name.analyze_by_name("test", "gadd", args()).unwrap(),
+    )
+    .unwrap();
+
+    let mut by_symbol: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
+    let by_symbol = expect_single::<ConstPropValue, TestError>(
+        by_symbol.analyze_by_symbol(stage, symbol, args()).unwrap(),
+    )
+    .unwrap();
+
+    let mut by_callee: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
+    let by_callee = expect_single::<ConstPropValue, TestError>(
+        by_callee
+            .analyze(stage, Callee::Named(symbol), args())
+            .unwrap(),
+    )
+    .unwrap();
+
+    assert_eq!(by_name, ConstPropValue::Const(5));
+    assert_eq!(by_symbol, by_name);
+    assert_eq!(by_callee, by_name);
 }
 
 /// A CFG body whose branch condition is an *unknown* argument, so neither

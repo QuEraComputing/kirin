@@ -37,10 +37,10 @@ use std::marker::PhantomData;
 
 use kirin_ir::{
     Block, CFG, CompileStage, DiGraph, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
-    StageMeta, Statement, Widen,
+    StageMeta, Statement, Symbol, Widen,
 };
 
-use crate::core::query;
+use crate::core::{linker::resolve_callable as resolve_callable_root, query};
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
     BlockQueries, Body, CFGQueries, CallEffect, CallServices, CallableBody, Callee, DiGraphQueries,
@@ -149,7 +149,7 @@ impl<K> Owner<K> {
 #[derive(Clone)]
 pub struct FunctionSummary<V> {
     /// `(stage, body)` — set when the owner is first seeded from a call site.
-    meta: Option<(CompileStage, Statement)>,
+    meta: Option<(CompileStage, Body)>,
     entry: Product<V>,
     entry_joins: usize,
     ret: Option<Product<V>>,
@@ -304,7 +304,7 @@ enum ForwardUpdate<K, V> {
     FunctionEntry {
         key: K,
         stage: CompileStage,
-        body: Statement,
+        body: Body,
         args: Product<V>,
     },
     /// Merge a return contribution into a function context's return (join); on
@@ -626,31 +626,12 @@ where
         self.store.free(index).map_err(E::from)
     }
 
-    fn resolve_call(&self, stage: CompileStage, callee: &Callee) -> Result<FunctionTarget, E> {
-        self.linker
-            .resolve(self.pipeline, stage, callee)
-            .map_err(E::from)
-    }
-
-    fn enter_function(
-        &mut self,
+    fn resolve_callable(
+        &self,
         stage: CompileStage,
-        body: Statement,
-        args: Product<V>,
-        index: EnvIndex,
-    ) -> Result<CallableBody<V>, E> {
-        let pipeline = self.pipeline;
-        let info = pipeline
-            .stage(stage)
-            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let previous = self.location.replace(InterpLocation {
-            stage,
-            statement: body,
-            index,
-        });
-        let result = info.dispatch_function_entry(body, args, self);
-        self.location = previous;
-        result
+        callee: &Callee,
+    ) -> Result<(FunctionTarget, CallableBody), E> {
+        resolve_callable_root::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
     }
 }
 
@@ -768,18 +749,12 @@ where
         self.inner_mut().free_env(index)
     }
 
-    fn resolve_call(&self, stage: CompileStage, callee: &Callee) -> Result<FunctionTarget, E> {
-        self.inner().resolve_call(stage, callee)
-    }
-
-    fn enter_function(
-        &mut self,
+    fn resolve_callable(
+        &self,
         stage: CompileStage,
-        body: Statement,
-        args: Product<V>,
-        index: EnvIndex,
-    ) -> Result<CallableBody<V>, E> {
-        self.inner_mut().enter_function(stage, body, args, index)
+        callee: &Callee,
+    ) -> Result<(FunctionTarget, CallableBody), E> {
+        self.inner().resolve_callable(stage, callee)
     }
 }
 
@@ -907,13 +882,13 @@ where
             results,
         } = call;
         let resolve_stage = call_stage.unwrap_or(stage);
-        let target = self.inner().resolve_call(resolve_stage, &callee)?;
+        let (target, entry) = self.inner().resolve_callable(resolve_stage, &callee)?;
         let key = self.inner_mut().key(&target, &args);
 
         self.apply_update(ForwardUpdate::FunctionEntry {
             key: key.clone(),
             stage: target.stage,
-            body: target.body,
+            body: entry.body,
             args,
         })?;
 
@@ -1132,23 +1107,18 @@ where
         &mut self,
         key: &<P as CallContext<V>>::Key,
         stage: CompileStage,
-        body: Statement,
+        body: Body,
     ) -> Result<(), E> {
-        let env = match self.store().env(key) {
-            Some(env) => env,
-            None => {
-                let env = self.alloc_env();
-                self.store_mut().set_env(key.clone(), env);
-                env
-            }
-        };
+        if self.store().env(key).is_none() {
+            let env = self.alloc_env();
+            self.store_mut().set_env(key.clone(), env);
+        }
         let entry_args = self
             .summary(&Owner::Function(key.clone()))
             .and_then(|info| info.as_function())
             .map(|function| function.entry.clone())
             .expect("function summary present");
-        let body_info = self.enter_function(stage, body, entry_args, env)?;
-        let owner = match body_info.body {
+        let owner = match body {
             Body::CFG(cfg) => Owner::Block {
                 function: key.clone(),
                 block: self
@@ -1181,7 +1151,7 @@ where
         }
         self.apply_update(ForwardUpdate::OwnerEntry {
             owner,
-            args: body_info.args,
+            args: entry_args,
         })
     }
 }
@@ -1576,6 +1546,19 @@ where
         self.analyze(stage, Callee::Function(function), args)
     }
 
+    /// Resolve a stage-local `symbol` through the linker and analyze the
+    /// selected callable. This is the convenience form of
+    /// [`analyze`](Self::analyze) with [`Callee::Named`], and returns its
+    /// inferred return product at the fixpoint.
+    pub fn analyze_by_symbol(
+        &mut self,
+        stage: CompileStage,
+        symbol: Symbol,
+        args: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        self.analyze(stage, symbol.into(), args)
+    }
+
     /// Run the fixpoint from a single entry. Seeds the entry function's entry block
     /// owner and drains the owner worklist.
     pub fn analyze(
@@ -1584,14 +1567,14 @@ where
         callee: Callee,
         args: impl IntoIterator<Item = V>,
     ) -> Result<Product<V>, E> {
-        let target = self.driver.inner().resolve_call(stage, &callee)?;
+        let (target, entry) = self.driver.inner().resolve_callable(stage, &callee)?;
         let args: Product<V> = args.into_iter().collect();
         let key = self.driver.inner_mut().key(&target, &args);
 
         self.driver.apply_update(ForwardUpdate::FunctionEntry {
             key: key.clone(),
             stage: target.stage,
-            body: target.body,
+            body: entry.body,
             args,
         })?;
 

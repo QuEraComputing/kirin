@@ -88,10 +88,11 @@ mod interpreter {
     use kirin_arith::{ArithValue, CheckedDiv, CheckedRem, interpreter::DivisionByZero};
     use kirin_interpreter::BranchCondition;
     use kirin_interpreter::{
-        CallableBody, DiGraphFrame, ForwardEval, FunctionEntry, Interp, Interpretable,
-        InterpreterError, SparseForwardEffect, SparseForwardInterp,
+        CallableBody, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
+        DiGraphFrame, ForwardEval, FunctionEntry, Interpretable, SparseForwardEffect,
+        SparseForwardInterp, StrongDemand,
     };
-    use kirin_ir::{Product, SSAValue};
+    use kirin_ir::{HasBottom, Product, SSAValue};
 
     use super::GraphFunctionLanguage;
 
@@ -142,28 +143,59 @@ mod interpreter {
         }
     }
 
-    impl<I: Interp> FunctionEntry<I> for GraphFunctionLanguage {
-        fn function_entry(
-            &self,
-            args: Product<I::Value>,
-            interp: &mut I,
-        ) -> Result<CallableBody<I::Value>, I::Error> {
+    impl<I> Interpretable<I, StrongDemand> for GraphFunctionLanguage
+    where
+        I: DemandInterp,
+        I::Value: HasBottom + PartialEq,
+    {
+        fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
             match self {
-                GraphFunctionLanguage::Function { body, .. } => {
-                    Ok(CallableBody::new(*body).args(args))
-                }
-                GraphFunctionLanguage::GraphFunction { body, .. } => {
-                    Ok(CallableBody::new(*body).args(args))
-                }
+                GraphFunctionLanguage::Function { .. }
+                | GraphFunctionLanguage::GraphFunction { .. }
+                | GraphFunctionLanguage::LinearFunction { .. }
+                | GraphFunctionLanguage::UnGraphFunction { .. } => Ok(interp.effect()),
+                GraphFunctionLanguage::GraphEval { .. } => interp.demand_uses_if_observable(self),
+                GraphFunctionLanguage::Arith(op) => op.interpret(interp),
+                GraphFunctionLanguage::Cf(op) => op.interpret(interp),
+                GraphFunctionLanguage::Constant(op) => op.interpret(interp),
+                GraphFunctionLanguage::Call(op) => op.interpret(interp),
+                GraphFunctionLanguage::Return(op) => op.interpret(interp),
+            }
+        }
+    }
+
+    impl<I> Interpretable<I, ClassicLiveness> for GraphFunctionLanguage
+    where
+        I: ClassicLivenessInterp,
+    {
+        fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+            match self {
+                GraphFunctionLanguage::Function { .. }
+                | GraphFunctionLanguage::GraphFunction { .. }
+                | GraphFunctionLanguage::LinearFunction { .. }
+                | GraphFunctionLanguage::UnGraphFunction { .. } => Ok(DenseBackwardEffect::Next),
+                GraphFunctionLanguage::GraphEval { .. } => interp.gen_uses_kill_defs(self),
+                GraphFunctionLanguage::Arith(op) => op.interpret(interp),
+                GraphFunctionLanguage::Cf(op) => op.interpret(interp),
+                GraphFunctionLanguage::Constant(op) => op.interpret(interp),
+                GraphFunctionLanguage::Call(op) => op.interpret(interp),
+                GraphFunctionLanguage::Return(op) => op.interpret(interp),
+            }
+        }
+    }
+
+    impl FunctionEntry for GraphFunctionLanguage {
+        fn function_entry(&self) -> Option<CallableBody> {
+            match self {
+                GraphFunctionLanguage::Function { body, .. } => Some(CallableBody::new(*body)),
+                GraphFunctionLanguage::GraphFunction { body, .. } => Some(CallableBody::new(*body)),
                 GraphFunctionLanguage::LinearFunction { body, .. } => {
-                    Ok(CallableBody::new(*body).args(args))
+                    Some(CallableBody::new(*body))
                 }
                 GraphFunctionLanguage::UnGraphFunction { body, .. } => {
-                    Ok(CallableBody::new(*body).args(args))
+                    Some(CallableBody::new(*body))
                 }
-                _ => Err(I::Error::from(InterpreterError::NotCallable(
-                    interp.statement(),
-                ))),
+                _ => None,
             }
         }
     }
