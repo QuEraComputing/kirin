@@ -4,14 +4,18 @@ from dataclasses import field, dataclass
 
 from kirin import ir, types
 from kirin.serialization.base.context import (
-    MethodSymbolMeta,
     SerializationContext,
-    mangle,
     get_cls_from_name,
 )
 from kirin.serialization.core.deserializable import Deserializable
 from kirin.serialization.core.serializationunit import SerializationUnit
 from kirin.serialization.core.serializationmodule import SerializationModule
+
+_DANGLING_REF_CAUSES = (
+    "no definition has been decoded for it. Either the payload contains no "
+    "definition for this reference, or a serialize/deserialize pair does not "
+    "decode the fields in the order it encodes them."
+)
 
 
 @dataclass
@@ -21,28 +25,16 @@ class Deserializer:
 
     def decode(self, data: SerializationModule) -> ir.Method:
         self._ctx.clear()
-        for mangled, meta in data.symbol_table.items():
-            sym_name = meta.get("sym_name", None)
-            if sym_name is None:
-                raise ValueError(f"symbol_table[{mangled}] missing 'sym_name'")
-            arg_types = meta.get("arg_types", []) or []
-            self._ctx.Method_Symbol[mangled] = MethodSymbolMeta(
-                sym_name=sym_name,
-                arg_types=list(arg_types),
-            )
-
         body = data.body
         if body is None:
             raise ValueError("Module envelope missing body for decoding.")
-        self._ctx._type_attribute_root = body
-        try:
-            return self.deserialize_method(body)
-        finally:
-            self._ctx._type_attribute_root = None
+        return self.deserialize_method(body)
 
     def deserialize(self, serUnit: SerializationUnit) -> Any:
         if serUnit.kind == "ssa_ref":
             return self.deserialize_ssa_ref(serUnit)
+        elif serUnit.kind == "method_ref":
+            return self.deserialize_method_ref(serUnit)
         elif serUnit.kind == "attr_ref":
             return self.deserialize_attr_ref(serUnit)
         elif serUnit.kind == "attribute":
@@ -82,55 +74,7 @@ class Deserializer:
         if existing is not None:
             return existing
 
-        definition = self._ctx.TypeAttribute_Definitions.get(attr_id)
-        if definition is None:
-            self._index_type_attribute_definitions()
-            try:
-                definition = self._ctx.TypeAttribute_Definitions[attr_id]
-            except KeyError:
-                raise ValueError(f"dangling attr_ref {attr_id!r}") from None
-        return self._deserialize_type_attribute_definition(definition, attr_id)
-
-    def _index_type_attribute_definitions(self) -> None:
-        if self._ctx._type_attribute_indexed:
-            return
-        if self._ctx._type_attribute_root is None:
-            raise ValueError("cannot resolve attr_ref outside Method decoding")
-
-        seen: set[int] = set()
-
-        def visit(value: Any) -> None:
-            if isinstance(value, SerializationUnit):
-                identity = id(value)
-                if identity in seen:
-                    return
-                seen.add(identity)
-
-                if value.kind == "attribute":
-                    if not isinstance(value.data, dict):
-                        raise ValueError("Attribute data must be a mapping")
-                    if "id" in value.data:
-                        attr_id = value.data["id"]
-                        if not isinstance(attr_id, str):
-                            raise ValueError(
-                                f"TypeAttribute definition id must be a string, got {attr_id!r}"
-                            )
-                        existing = self._ctx.TypeAttribute_Definitions.get(attr_id)
-                        if existing is not None and existing is not value:
-                            raise ValueError(
-                                f"duplicate TypeAttribute definition id {attr_id!r}"
-                            )
-                        self._ctx.TypeAttribute_Definitions[attr_id] = value
-                visit(value.data)
-            elif isinstance(value, dict):
-                for item in value.values():
-                    visit(item)
-            elif isinstance(value, (list, tuple)):
-                for item in value:
-                    visit(item)
-
-        visit(self._ctx._type_attribute_root)
-        self._ctx._type_attribute_indexed = True
+        raise ValueError(f"dangling attr_ref {attr_id!r}: {_DANGLING_REF_CAUSES}")
 
     def generic_deserialize(self, data: SerializationUnit) -> Any:
         if not hasattr(data, "kind"):
@@ -177,20 +121,43 @@ class Deserializer:
                         f"Unsupported kind {data.kind} for deserialization."
                     )
 
-    def deserialize_method(self, serUnit: SerializationUnit) -> ir.Method:
-        mangled = serUnit.data.get("mangled")
-        if mangled is None:
-            raise ValueError("Missing 'mangled' key for method deserialization.")
+    def deserialize_method_ref(self, serUnit: SerializationUnit) -> ir.Method:
+        if not isinstance(serUnit.data, dict):
+            raise ValueError("method_ref data must be a mapping")
+        try:
+            method_id = serUnit.data["id"]
+        except KeyError:
+            raise ValueError("method_ref is missing required 'id'") from None
+        if not isinstance(method_id, str):
+            raise ValueError(f"method_ref id must be a string, got {method_id!r}")
+        try:
+            return self._ctx.Method_Lookup[method_id]
+        except KeyError:
+            raise ValueError(
+                f"dangling method_ref {method_id!r}: {_DANGLING_REF_CAUSES}"
+            ) from None
 
-        out = self._ctx.Method_Runtime.get(mangled)
-        if out is None:
-            out = ir.Method.__new__(ir.Method)
-            out.mod = None
-            out.py_func = None
-            out.code = ir.Statement.__new__(ir.Statement)
-            out.backedges = weakref.WeakSet()
-            out.run_passes = None
-            self._ctx.Method_Runtime[mangled] = out
+    def deserialize_method(self, serUnit: SerializationUnit) -> ir.Method:
+        try:
+            method_id = serUnit.data["id"]
+        except KeyError:
+            raise ValueError(
+                "method unit is missing required 'id'; payloads written before "
+                "method identity references are not supported"
+            ) from None
+
+        existing = self._ctx.Method_Lookup.get(method_id)
+        if existing is not None:
+            return existing
+
+        out = ir.Method.__new__(ir.Method)
+        out.mod = None
+        out.py_func = None
+        out.code = ir.Statement.__new__(ir.Statement)
+        out.backedges = weakref.WeakSet()
+        out.run_passes = None
+
+        self._ctx.Method_Lookup[method_id] = out
 
         out.sym_name = serUnit.data["sym_name"]
         out.arg_names = serUnit.data.get("arg_names", [])
@@ -207,17 +174,7 @@ class Deserializer:
         out.dialects = self.dialect_group
 
         out.code = self.deserialize_statement(serUnit.data["code"])
-        out.backedges = weakref.WeakSet()
         out.fields = self.deserialize_tuple(serUnit.data.get("fields", ()))
-        computed = mangle(
-            out.sym_name,
-            getattr(out, "arg_types", ()),
-            getattr(out, "ret_type", None),
-        )
-        if computed != mangled:
-            raise ValueError(
-                f"Mangled name mismatch: expected {mangled}, got {computed}"
-            )
         out.update_backedges()
         return out
 

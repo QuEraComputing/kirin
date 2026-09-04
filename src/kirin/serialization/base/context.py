@@ -1,19 +1,9 @@
-from typing import List, TypedDict
 from importlib import import_module
 from dataclasses import field, dataclass
 
 from kirin import ir, types
 from kirin.idtable import IdTable
 from kirin.serialization.core.serializationunit import SerializationUnit
-
-PREFIX = "_method_@"
-PARAM_SEP = "->"
-
-
-class MethodSymbolMeta(TypedDict, total=False):
-    sym_name: str
-    arg_types: List[str]
-    ret_type: str
 
 
 @dataclass
@@ -31,6 +21,9 @@ class SerializationContext:
     type_attribute_idtable: IdTable[int] = field(
         default_factory=lambda: IdTable[int](prefix="t")
     )
+    method_idtable: IdTable[int] = field(
+        default_factory=lambda: IdTable[int](prefix="m")
+    )
 
     Dialect_Lookup: dict[str, ir.Dialect] = field(default_factory=dict)
     SSA_Lookup: dict[str, ir.SSAValue] = field(default_factory=dict)
@@ -38,9 +31,7 @@ class SerializationContext:
     Statement_Lookup: dict[str, ir.Statement] = field(default_factory=dict)
     Block_Lookup: dict[str, ir.Block] = field(default_factory=dict)
     Region_Lookup: dict[str, ir.Region] = field(default_factory=dict)
-
-    Method_Symbol: dict[str, MethodSymbolMeta] = field(default_factory=dict)
-    Method_Runtime: dict[str, ir.Method] = field(default_factory=dict)
+    Method_Lookup: dict[str, ir.Method] = field(default_factory=dict)
 
     type_attribute_entries: dict[int, TypeAttributeSerializationEntry] = field(
         default_factory=dict
@@ -48,8 +39,6 @@ class SerializationContext:
     TypeAttribute_Definitions: dict[str, SerializationUnit] = field(
         default_factory=dict
     )
-    _type_attribute_root: SerializationUnit | None = None
-    _type_attribute_indexed: bool = False
 
     _block_reference_store: dict[str, ir.Block] = field(
         default_factory=dict[str, ir.Block]
@@ -61,39 +50,17 @@ class SerializationContext:
         self.Block_Lookup.clear()
         self.Region_Lookup.clear()
         self.Statement_Lookup.clear()
+        self.Method_Lookup.clear()
         self.ssa_idtable.clear()
         self.stmt_idtable.clear()
         self.blk_idtable.clear()
         self.region_idtable.clear()
         self.type_attribute_idtable.clear()
+        self.method_idtable.clear()
         self._block_reference_store.clear()
-        self.Method_Symbol.clear()
-        self.Method_Runtime.clear()
         self.Dialect_Lookup.clear()
         self.type_attribute_entries.clear()
         self.TypeAttribute_Definitions.clear()
-        self._type_attribute_root = None
-        self._type_attribute_indexed = False
-
-
-def get_str_from_type(typ: types.TypeAttribute) -> str:
-    if isinstance(typ, types.PyClass):
-        return typ.typ.__name__
-    return "None"
-
-
-def mangle(
-    symbol_name: str | None,
-    param_types: tuple[types.TypeAttribute, ...],
-    output: types.TypeAttribute | None = None,
-) -> str:
-    mangled_name = f"{PREFIX}{symbol_name}"
-    if param_types:
-        for typ in param_types:
-            mangled_name += f"{PARAM_SEP}{get_str_from_type(typ)}"
-    if output is not None:
-        mangled_name += f"{PARAM_SEP}{get_str_from_type(output)}"
-    return mangled_name
 
 
 def get_cls_from_name(serUnit: SerializationUnit) -> type:

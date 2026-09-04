@@ -40,7 +40,7 @@ def transport(request: pytest.FixtureRequest) -> Transport:
 
 
 def _module(body: SerializationUnit, *, version: str = "") -> SerializationModule:
-    return SerializationModule(symbol_table={}, body=body, version=version)
+    return SerializationModule(body=body, version=version)
 
 
 def _assert_unit_equal(actual: SerializationUnit, expected: SerializationUnit) -> None:
@@ -345,7 +345,6 @@ VERBOSE_INT = {
 VERBOSE_MODULE = {
     "__serialization_module__": True,
     "version": "caller-version",
-    "symbol_table": {},
     "body": {
         "__serialization_unit__": True,
         "kind": "list",
@@ -362,7 +361,6 @@ VERBOSE_CONTROL_TAG_DATA = {
 VERBOSE_CONTROL_TAG_MODULE = {
     "__serialization_module__": True,
     "version": "caller-version",
-    "symbol_table": {},
     "body": {
         "__serialization_unit__": True,
         "kind": "custom",
