@@ -2,7 +2,12 @@ import json
 from typing import Any, Optional
 
 from kirin.serialization.core.serializationunit import SerializationUnit
-from kirin.serialization.core.serializationmodule import SerializationModule
+from kirin.serialization.core.serializationmodule import (
+    CURRENT_CODEC_VERSION,
+    SUPPORTED_CODEC_VERSIONS,
+    CodecVersion,
+    SerializationModule,
+)
 
 COMPACT_UNIT_TAG = "$u"  # Compact SerializationUnit wrapper.
 ESCAPED_MAP_TAG = "$m"  # Escaped singleton user mapping.
@@ -50,6 +55,7 @@ class JSONtifiable:
         if isinstance(obj, SerializationModule):
             return {
                 "__serialization_module__": True,
+                "codec_version": int(CURRENT_CODEC_VERSION),
                 "version": obj.version,
                 "body": self._to_jsonifiable(obj.body),
             }
@@ -75,6 +81,7 @@ class JSONtifiable:
     def _from_jsonifiable(self, obj: Any, *, allow_compact_tags: bool = True) -> Any:
         if isinstance(obj, dict):
             if obj.get("__serialization_module__"):
+                codec_version = self._decode_codec_version(obj)
                 raw_body = obj.get("body")
                 is_verbose = isinstance(raw_body, dict) and bool(
                     raw_body.get("__serialization_unit__")
@@ -84,7 +91,9 @@ class JSONtifiable:
                     raw_body, allow_compact_tags=child_allow_compact_tags
                 )
                 version = obj.get("version", "")
-                return SerializationModule(body=body, version=version)
+                module = SerializationModule(body=body, version=version)
+                module.codec_version = codec_version
+                return module
             if obj.get("__serialization_unit__"):
                 data = self._from_jsonifiable(
                     obj.get("data", {}), allow_compact_tags=False
@@ -111,6 +120,33 @@ class JSONtifiable:
                 for value in obj
             ]
         return obj
+
+    def _decode_codec_version(self, envelope: dict[str, Any]) -> CodecVersion:
+        if "codec_version" not in envelope:
+            raise ValueError(
+                "legacy unversioned serialization codec (v1) is unsupported; "
+                f"current codec version is v{int(CURRENT_CODEC_VERSION)}"
+            )
+
+        raw_version = envelope["codec_version"]
+        if isinstance(raw_version, bool) or not isinstance(raw_version, int):
+            raise ValueError(f"codec_version must be an integer, got {raw_version!r}")
+
+        try:
+            codec_version = CodecVersion(raw_version)
+        except ValueError:
+            qualifier = "future " if raw_version > int(CURRENT_CODEC_VERSION) else ""
+            raise ValueError(
+                f"unsupported {qualifier}codec version {raw_version}; "
+                f"current codec version is {int(CURRENT_CODEC_VERSION)}"
+            ) from None
+
+        if codec_version not in SUPPORTED_CODEC_VERSIONS:
+            raise ValueError(
+                f"unsupported codec version {int(codec_version)}; "
+                f"current codec version is {int(CURRENT_CODEC_VERSION)}"
+            )
+        return codec_version
 
     def _decode_compact_unit(self, payload: Any) -> SerializationUnit:
         if not isinstance(payload, list) or len(payload) not in (2, 4):

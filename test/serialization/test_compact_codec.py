@@ -10,7 +10,10 @@ from kirin import ir
 from kirin.serialization.bsonserializer import CompressedBSONSerializer
 from kirin.serialization.jsonserializer import JSONtifiable, JSONSerializer
 from kirin.serialization.core.serializationunit import SerializationUnit
-from kirin.serialization.core.serializationmodule import SerializationModule
+from kirin.serialization.core.serializationmodule import (
+    CURRENT_CODEC_VERSION,
+    SerializationModule,
+)
 
 Transport = tuple[
     Callable[[SerializationModule], str | bytes],
@@ -331,83 +334,34 @@ def test_public_transports_preserve_caller_version(
 
     payload = encode(module)
 
+    assert load(payload)["codec_version"] == int(CURRENT_CODEC_VERSION)
     assert load(payload)["version"] == version
+    assert decode(payload).codec_version is CURRENT_CODEC_VERSION
     assert decode(payload).version == version
 
 
-VERBOSE_INT = {
-    "__serialization_unit__": True,
-    "kind": "int",
-    "module_name": "builtins",
-    "class_name": "int",
-    "data": {"value": str(2**256 + 1)},
-}
-VERBOSE_MODULE = {
+LEGACY_UNVERSIONED_MODULE = {
     "__serialization_module__": True,
     "version": "caller-version",
-    "body": {
-        "__serialization_unit__": True,
-        "kind": "list",
-        "module_name": "builtins",
-        "class_name": "list",
-        "data": {"value": [VERBOSE_INT]},
-    },
-}
-
-VERBOSE_CONTROL_TAG_DATA = {
-    "unit-shaped": {"$u": ["int", {"value": "5"}]},
-    "map-shaped": {"$m": [["user", "value"]]},
-}
-VERBOSE_CONTROL_TAG_MODULE = {
-    "__serialization_module__": True,
-    "version": "caller-version",
-    "body": {
-        "__serialization_unit__": True,
-        "kind": "custom",
-        "module_name": "test.extension",
-        "class_name": "CustomUnit",
-        "data": VERBOSE_CONTROL_TAG_DATA,
-    },
+    "body": {"$u": None},
 }
 
 
 @pytest.mark.parametrize("transport_name", ["json", "bson"])
-def test_public_readers_accept_verbose_v1_and_reencode_compact(
+def test_public_readers_reject_legacy_unversioned_payloads(
     transport_name: str,
 ) -> None:
     if transport_name == "json":
-        serializer = JSONSerializer()
-        decoded = serializer.decode(json.dumps(VERBOSE_MODULE))
-        compact_wire = json.loads(serializer.encode(decoded))
+        payload = json.dumps(LEGACY_UNVERSIONED_MODULE)
+        with pytest.raises(
+            ValueError,
+            match=r"legacy unversioned serialization codec \(v1\) is unsupported",
+        ):
+            JSONSerializer().decode(payload)
     else:
-        serializer = CompressedBSONSerializer()
-        payload = gzip.compress(bson.encode(VERBOSE_MODULE), mtime=0)
-        decoded = serializer.decode(payload)
-        compact_wire = bson.decode(gzip.decompress(serializer.encode(decoded)))
-
-    assert decoded.version == "caller-version"
-    assert decoded.body.kind == "list"
-    assert decoded.body.data["value"][0].data["value"] == str(2**256 + 1)
-    assert set(compact_wire["body"]) == {"$u"}
-
-
-@pytest.mark.parametrize("transport_name", ["json", "bson"])
-def test_verbose_v1_control_tag_shaped_mappings_remain_literal(
-    transport_name: str,
-) -> None:
-    if transport_name == "json":
-        module = JSONSerializer().decode(json.dumps(VERBOSE_CONTROL_TAG_MODULE))
-    else:
-        payload = gzip.compress(bson.encode(VERBOSE_CONTROL_TAG_MODULE), mtime=0)
-        module = CompressedBSONSerializer().decode(payload)
-
-    assert module.body.data == VERBOSE_CONTROL_TAG_DATA
-
-
-def test_missing_verbose_version_keeps_the_existing_empty_default() -> None:
-    payload = dict(VERBOSE_MODULE)
-    payload.pop("version")
-
-    decoded = JSONSerializer().decode(json.dumps(payload))
-
-    assert decoded.version == ""
+        payload = gzip.compress(bson.encode(LEGACY_UNVERSIONED_MODULE), mtime=0)
+        with pytest.raises(
+            ValueError,
+            match=r"legacy unversioned serialization codec \(v1\) is unsupported",
+        ):
+            CompressedBSONSerializer().decode(payload)
