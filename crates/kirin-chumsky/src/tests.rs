@@ -1488,6 +1488,138 @@ fn test_digraph_multiple_yields() {
     assert_eq!(dg.yields[2].value, "c");
 }
 
+// === Body Kind Discriminator Tests ===
+//
+// Every body kind carries an explicit textual discriminator in the default
+// (whole-field `{body}`) form:
+//
+//   cfg { ^entry(..) { .. } }      block ^body(..) { .. }
+//   digraph ^g0(..) { .. }        ungraph ^u0(..) { .. }
+//
+// A CFG's member blocks stay *untagged* — `cfg` names the body kind once for
+// the whole container.
+
+#[test]
+fn test_cfg_requires_the_cfg_keyword() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "cfg { ^bb0 ( %x : 1 ) { 42 ; } }",
+        cfg::<_, i32, _>(language)
+    );
+    let cfg = result.expect("tagged cfg should parse");
+    assert_eq!(cfg.blocks.len(), 1);
+    assert_eq!(cfg.blocks[0].value.label.unwrap().value, "bb0");
+    assert_eq!(cfg.blocks[0].value.arguments.len(), 1);
+    assert_eq!(cfg.blocks[0].value.statements.len(), 1);
+}
+
+#[test]
+fn test_cfg_member_blocks_are_untagged() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "cfg { ^entry { 1 ; } ^next { 2 ; } }",
+        cfg::<_, i32, _>(language)
+    );
+    let cfg = result.expect("multi-block tagged cfg should parse");
+    assert_eq!(cfg.blocks.len(), 2);
+    assert_eq!(cfg.blocks[0].value.label.unwrap().value, "entry");
+    assert_eq!(cfg.blocks[1].value.label.unwrap().value, "next");
+}
+
+#[test]
+fn test_block_requires_the_block_keyword() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "block ^body ( %x : 1 ) { 42 ; }",
+        block::<_, i32, _>(language)
+    );
+    let block = result.expect("tagged block should parse").value;
+    assert_eq!(block.label.unwrap().value, "body");
+    assert_eq!(block.arguments.len(), 1);
+    assert_eq!(block.statements.len(), 1);
+}
+
+#[test]
+fn test_digraph_keeps_its_discriminator() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "digraph ^g0 ( %x : 1 ) { 42 ; yield %x ; }",
+        digraph::<_, i32, _>(language)
+    );
+    let dg = result.expect("tagged digraph should parse");
+    assert_eq!(dg.name.unwrap().value, "g0");
+    assert_eq!(dg.statements.len(), 1);
+    assert_eq!(dg.yields.len(), 1);
+}
+
+#[test]
+fn test_ungraph_keeps_its_discriminator() {
+    let language = graph_lang!();
+    let result = test_parse!(
+        "ungraph ^u0 ( %x : 1 ) { edge 10 ; 20 ; }",
+        ungraph::<_, i32, _>(language)
+    );
+    let ug = result.expect("tagged ungraph should parse");
+    assert_eq!(ug.name.unwrap().value, "u0");
+    assert_eq!(ug.statements.len(), 2);
+    assert!(ug.statements[0].is_edge);
+}
+
+#[test]
+fn test_legacy_untagged_cfg_is_rejected() {
+    let language = graph_lang!();
+    let result: Result<CFG<'_, i32, i32>, _> =
+        test_parse!("{ ^bb0 { 42 ; } }", cfg::<_, i32, _>(language));
+    assert!(
+        result.is_err(),
+        "the pre-discriminator CFG form `{{ ^bb0 .. }}` must not parse"
+    );
+}
+
+#[test]
+fn test_legacy_untagged_block_is_rejected() {
+    let language = graph_lang!();
+    let result: Result<Spanned<Block<'_, i32, i32>>, _> =
+        test_parse!("^body ( %x : 1 ) { 42 ; }", block::<_, i32, _>(language));
+    assert!(
+        result.is_err(),
+        "the pre-discriminator Block form `^body(..) {{ .. }}` must not parse"
+    );
+}
+
+#[test]
+fn test_block_keyword_with_cfg_shape_is_rejected() {
+    let language = graph_lang!();
+    let result: Result<Spanned<Block<'_, i32, i32>>, _> =
+        test_parse!("block { ^entry { 42 ; } }", block::<_, i32, _>(language));
+    assert!(
+        result.is_err(),
+        "`block {{ ^entry .. }}` mixes the Block tag with the CFG shape"
+    );
+}
+
+#[test]
+fn test_cfg_keyword_with_block_shape_is_rejected() {
+    let language = graph_lang!();
+    let result: Result<CFG<'_, i32, i32>, _> =
+        test_parse!("cfg ^body ( %x : 1 ) { 42 ; }", cfg::<_, i32, _>(language));
+    assert!(
+        result.is_err(),
+        "`cfg ^body(..) {{ .. }}` mixes the CFG tag with the Block shape"
+    );
+}
+
+#[test]
+fn test_tagged_member_block_inside_cfg_is_rejected() {
+    let language = graph_lang!();
+    let result: Result<CFG<'_, i32, i32>, _> =
+        test_parse!("cfg { block ^bb0 { 42 ; } }", cfg::<_, i32, _>(language));
+    assert!(
+        result.is_err(),
+        "a CFG's member blocks must stay untagged — `cfg {{ block ^bb0 .. }}` is not valid"
+    );
+}
+
 // === Scope Guard Tests (P1-5, P1-6 regression) ===
 
 #[test]

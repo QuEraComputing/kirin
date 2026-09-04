@@ -131,7 +131,7 @@ enum MixedStage {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const BODY: &str = "{ ^0() {} }";
+const BODY: &str = "cfg { ^0() {} }";
 
 fn unit_sig() -> Signature<UnitType> {
     Signature::new(vec![UnitType], UnitType, ())
@@ -445,7 +445,7 @@ fn test_invalid_body_parse_has_source() {
     let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
     // Valid header but invalid body tokens
     let err = pipeline
-        .parse("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () { invalid }")
+        .parse("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () cfg { invalid }")
         .unwrap_err();
     // The body parse failure should chain a source error
     // (may or may not have source depending on where it fails)
@@ -477,4 +477,99 @@ fn test_invalid_declaration_keyword() {
     let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
     let err = pipeline.parse("define @A fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
+}
+
+// ---------------------------------------------------------------------------
+// Body-span scanner
+//
+// The framework only strips `specialize @stage`; the rest of the declaration —
+// discriminator, header, and brace-balanced body — is handed to the dialect
+// statement parser as one span. The scanner skips tokens until the first `{`,
+// so it is agnostic to *which* discriminator precedes the body, and stays
+// correct for all four body kinds without knowing any of them.
+// ---------------------------------------------------------------------------
+
+/// Scan one `specialize` declaration and return the exact source slice handed
+/// to the dialect statement parser.
+///
+/// `LowerBody`'s `I32Type` only affects the *header* type list; the scanner
+/// never parses body contents, so any body kind can be scanned through it.
+fn scanned_body_span(src: &str) -> String {
+    let tokens = super::syntax::tokenize(src);
+    let (declaration, _) = super::syntax::parse_one_declaration::<LowerBody>(&tokens)
+        .expect("declaration should scan");
+    match declaration {
+        super::syntax::Declaration::Specialize { body_span, .. } => {
+            src[body_span.start..body_span.end].to_string()
+        }
+        super::syntax::Declaration::Stage(_) => panic!("expected a specialize declaration"),
+    }
+}
+
+#[test]
+fn test_body_span_scans_tagged_cfg() {
+    let body = "fn @f(i32) -> i32 cfg { ^entry(%x: i32) { %r = add %x, %x; ret %r; } }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_scans_tagged_block() {
+    let body = "fn @f(i32) -> i32 block ^body(%x: i32) { %r = add %x, %x; ret %r; }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_scans_digraph() {
+    let body = "fn @f(i32) -> i32 digraph ^g0(%x: i32) { %r = add %x, %x; yield %r; }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_scans_ungraph() {
+    let body = "fn @f(i32) -> i32 ungraph ^u0(%x: i32) { edge %w = wire; node(%x, %w); }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_scans_a_projected_body_without_a_discriminator() {
+    // Projections stay raw, so a dialect can spell its own wrapper. The
+    // scanner does not require a keyword — only a brace-balanced body.
+    let body = "fn @f(i32) -> i32 (%x: i32) { %r = add %x, %x; ret %r; }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_stops_at_the_matching_brace() {
+    // Two declarations: the first span must end at *its* closing brace, not
+    // run on into the second.
+    let first = "fn @f(i32) -> i32 cfg { ^entry(%x: i32) { ret %x; } }";
+    let second = "fn @g(i32) -> i32 cfg { ^e { } }";
+    let src = format!("specialize @A {first} specialize @A {second}");
+    assert_eq!(scanned_body_span(&src), first);
+}
+
+#[test]
+fn test_body_span_requires_an_opening_brace() {
+    let tokens = super::syntax::tokenize("specialize @A fn @f(i32) -> i32 cfg;");
+    let errors = super::syntax::parse_one_declaration::<LowerBody>(&tokens)
+        .expect_err("a body with no `{` should not scan");
+    assert!(
+        errors
+            .iter()
+            .any(|e| format!("{e}").contains("expected '{'")),
+        "expected a missing-brace diagnostic, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_body_span_rejects_an_unclosed_brace() {
+    let tokens = super::syntax::tokenize("specialize @A fn @f(i32) -> i32 cfg { ^entry {");
+    let errors = super::syntax::parse_one_declaration::<LowerBody>(&tokens)
+        .expect_err("an unbalanced body should not scan");
+    assert!(
+        errors
+            .iter()
+            .any(|e| format!("{e}").contains("unclosed '{'")),
+        "expected an unclosed-brace diagnostic, got: {errors:?}"
+    );
 }

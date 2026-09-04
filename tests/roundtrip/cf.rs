@@ -6,7 +6,7 @@ fn test_branch_roundtrip() {
     let input = r#"
 stage @test fn @main(i64) -> i64;
 
-specialize @test fn @main(i64) -> i64 {
+specialize @test fn @main(i64) -> i64 cfg {
   ^entry(%x: i64) {
     br ^exit(%x);
   }
@@ -23,7 +23,7 @@ fn test_conditional_branch_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %cond: i64) {
     cond_br %cond then=^then(%x) else=^else(%x);
   }
@@ -44,7 +44,7 @@ fn test_branch_with_multiple_args_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %y: i64) {
     br ^target(%x, %y);
   }
@@ -62,7 +62,7 @@ fn test_diamond_control_flow_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %cond: i64) {
     cond_br %cond then=^left(%x) else=^right(%x);
   }

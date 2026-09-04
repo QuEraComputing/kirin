@@ -56,6 +56,36 @@
 //! category must be present for roundtrip correctness. For example, a DiGraph field
 //! with `:body` must also have `:ports` and `:captures`.
 //!
+//! # Body Kinds: Default Interpolation vs Projections
+//!
+//! A body field's **default** interpolation (`{body}`, no projection) parses and
+//! prints the *canonical tagged* form — every body kind carries an explicit
+//! textual discriminator, supplied centrally rather than typed into each format
+//! string:
+//!
+//! | Field Category | `{body}` parses/prints |
+//! |----------------|------------------------|
+//! | Block          | `block ^name(%arg: T, ..) { stmt; .. }` |
+//! | CFG            | `cfg { ^name(%arg: T, ..) { stmt; .. } .. }` |
+//! | DiGraph        | `digraph ^name(%port: T) [capture(%c: T)] { stmt; .. [yield %v;] }` |
+//! | UnGraph        | `ungraph ^name(%port: T) [capture(%c: T)] { [edge] stmt; .. }` |
+//!
+//! A CFG's member blocks stay **untagged** — `cfg` names the body kind once for
+//! the whole container, so `cfg { block ^entry { .. } }` is not valid.
+//!
+//! **Projections stay raw.** `:args`, `:body`, `:ports`, and `:captures` never
+//! inject a discriminator, delimiters, or a header — they are the seam a dialect
+//! author uses to define custom syntax, so the format string supplies whatever
+//! surrounds them:
+//!
+//! ```text
+//! // Default: the canonical tagged Block form, `block ^body(..) { .. }`.
+//! "fn {:name}{sig} {body}"
+//!
+//! // Projected: the dialect's own wrapper — no `block` keyword is added.
+//! "fn {:name}{sig} ({body:args}) {{ {body:body} }}"
+//! ```
+//!
 //! # Escaping
 //!
 //! To include a literal `{` character in the format string, use `{{`:

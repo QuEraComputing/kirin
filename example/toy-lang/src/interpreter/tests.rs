@@ -11,7 +11,7 @@ type ConstProp = kirin_constprop::ConstPropValue;
 const ADD_LOWERED: &str = r#"
 stage @lowered fn @add(i64, i64) -> i64;
 
-specialize @lowered fn @add(i64, i64) -> i64 {
+specialize @lowered fn @add(i64, i64) -> i64 cfg {
   ^entry(%a: i64, %b: i64) {
     %result = add %a, %b -> i64;
     ret %result;
@@ -22,7 +22,7 @@ specialize @lowered fn @add(i64, i64) -> i64 {
 const BRANCH_LOWERED: &str = r#"
 stage @lowered fn @sign(i64) -> i64;
 
-specialize @lowered fn @sign(i64) -> i64 {
+specialize @lowered fn @sign(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %zero = constant 0 -> i64;
     %is_neg = lt %x, %zero -> i64;
@@ -41,7 +41,7 @@ specialize @lowered fn @sign(i64) -> i64 {
 
 const SAME_BRANCH_LOWERED: &str = r#"
 stage @lowered fn @same(i64) -> i64;
-specialize @lowered fn @same(i64) -> i64 {
+specialize @lowered fn @same(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %zero = constant 0 -> i64;
     %is_neg = lt %x, %zero -> i64;
@@ -59,7 +59,7 @@ specialize @lowered fn @same(i64) -> i64 {
 const CROSS_BLOCK_DIRECT_USE: &str = r#"
 stage @lowered fn @cross(i64) -> i64;
 
-specialize @lowered fn @cross(i64) -> i64 {
+specialize @lowered fn @cross(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %v = add %x, %x -> i64;
     %zero = constant 0 -> i64;
@@ -86,7 +86,7 @@ specialize @lowered fn @cross(i64) -> i64 {
 const LOOP_CARRIED_CROSS_BLOCK_RISE: &str = r#"
 stage @lowered fn @rise(i64) -> i64;
 
-specialize @lowered fn @rise(i64) -> i64 {
+specialize @lowered fn @rise(i64) -> i64 cfg {
   ^entry(%n: i64) {
     %z = constant 0 -> i64;
     br ^head(%z);
@@ -110,10 +110,10 @@ specialize @lowered fn @rise(i64) -> i64 {
 const SOURCE_FOR_CARRIED_STABLE: &str = r#"
 stage @source fn @stable(i64, i64, i64) -> i64;
 
-specialize @source fn @stable(i64, i64, i64) -> i64 {
+specialize @source fn @stable(i64, i64, i64) -> i64 cfg {
   ^entry(%lo: i64, %hi: i64, %s: i64) {
     %init = constant 0 -> i64;
-    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do block ^body(%i: i64, %acc: i64) {
       yield %acc;
     } -> i64;
     ret %sum;
@@ -127,12 +127,12 @@ specialize @source fn @stable(i64, i64, i64) -> i64 {
 const SOURCE_IF_SAME_CONST: &str = r#"
 stage @source fn @if_same(i64) -> i64;
 
-specialize @source fn @if_same(i64) -> i64 {
+specialize @source fn @if_same(i64) -> i64 cfg {
   ^entry(%cond: i64) {
-    %result = if %cond then ^then() {
+    %result = if %cond then block ^then() {
       %a = constant 1 -> i64;
       yield %a;
-    } else ^else() {
+    } else block ^else() {
       %b = constant 1 -> i64;
       yield %b;
     } -> i64;
@@ -146,12 +146,12 @@ specialize @source fn @if_same(i64) -> i64 {
 const SOURCE_IF_DIFF_CONST: &str = r#"
 stage @source fn @if_diff(i64) -> i64;
 
-specialize @source fn @if_diff(i64) -> i64 {
+specialize @source fn @if_diff(i64) -> i64 cfg {
   ^entry(%cond: i64) {
-    %result = if %cond then ^then() {
+    %result = if %cond then block ^then() {
       %a = constant 1 -> i64;
       yield %a;
-    } else ^else() {
+    } else block ^else() {
       %b = constant 2 -> i64;
       yield %b;
     } -> i64;
@@ -167,28 +167,28 @@ stage @source fn @source_abs(i64) -> i64;
 stage @lowered fn @low_then_high(i64) -> i64;
 stage @lowered fn @source_abs(i64) -> i64;
 
-specialize @source fn @source_to_lowered_to_source(i64) -> i64 {
+specialize @source fn @source_to_lowered_to_source(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %result = call.named @low_then_high(%x) -> i64;
     ret %result;
   }
 }
 
-specialize @source fn @source_abs(i64) -> i64 {
+specialize @source fn @source_abs(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %zero = constant 0 -> i64;
     %is_neg = lt %x, %zero -> i64;
-    %result = if %is_neg then ^then() {
+    %result = if %is_neg then block ^then() {
       %negated = neg %x -> i64;
       yield %negated;
-    } else ^else() {
+    } else block ^else() {
       yield %x;
     } -> i64;
     ret %result;
   }
 }
 
-specialize @lowered fn @low_then_high(i64) -> i64 {
+specialize @lowered fn @low_then_high(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %abs = call.named @source_abs(%x) -> i64;
     %one = constant 1 -> i64;
@@ -203,7 +203,7 @@ stage @source fn @source_direct_specialized(i64) -> i64;
 stage @source fn @dual_impl(i64) -> i64;
 stage @lowered fn @dual_impl(i64) -> i64;
 
-specialize @source fn @dual_impl(i64) -> i64 {
+specialize @source fn @dual_impl(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %one = constant 1 -> i64;
     %result = add %x, %one -> i64;
@@ -211,7 +211,7 @@ specialize @source fn @dual_impl(i64) -> i64 {
   }
 }
 
-specialize @lowered fn @dual_impl(i64) -> i64 {
+specialize @lowered fn @dual_impl(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %hundred = constant 100 -> i64;
     %result = add %x, %hundred -> i64;
@@ -1012,13 +1012,13 @@ mod demand {
     const IF_BODY_DEMAND: &str = r#"
 stage @source fn @if_body(i64) -> i64;
 
-specialize @source fn @if_body(i64) -> i64 {
+specialize @source fn @if_body(i64) -> i64 cfg {
   ^entry(%cond: i64) {
-    %result = if %cond then ^then() {
+    %result = if %cond then block ^then() {
       %a = constant 1 -> i64;
       %junk = constant 9 -> i64;
       yield %a;
-    } else ^else() {
+    } else block ^else() {
       %b = constant 2 -> i64;
       yield %b;
     } -> i64;
@@ -1061,12 +1061,12 @@ specialize @source fn @if_body(i64) -> i64 {
     pub(super) const IF_DEAD_RESULT: &str = r#"
 stage @source fn @if_dead(i64) -> i64;
 
-specialize @source fn @if_dead(i64) -> i64 {
+specialize @source fn @if_dead(i64) -> i64 cfg {
   ^entry(%cond: i64) {
-    %result = if %cond then ^then() {
+    %result = if %cond then block ^then() {
       %a = constant 1 -> i64;
       yield %a;
-    } else ^else() {
+    } else block ^else() {
       %b = constant 2 -> i64;
       yield %b;
     } -> i64;
@@ -1101,10 +1101,10 @@ specialize @source fn @if_dead(i64) -> i64 {
     pub(super) const FOR_CARRIED_DEMAND: &str = r#"
 stage @source fn @loop_sum(i64, i64, i64) -> i64;
 
-specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
+specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
   ^entry(%lo: i64, %hi: i64, %s: i64) {
     %init = constant 0 -> i64;
-    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do block ^body(%i: i64, %acc: i64) {
       %one = constant 1 -> i64;
       %next = add %acc, %one -> i64;
       yield %next;
@@ -1171,10 +1171,10 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
     const FOR_DEAD_RESULT: &str = r#"
 stage @source fn @loop_dead(i64, i64, i64) -> i64;
 
-specialize @source fn @loop_dead(i64, i64, i64) -> i64 {
+specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
   ^entry(%lo: i64, %hi: i64, %s: i64) {
     %init = constant 0 -> i64;
-    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do block ^body(%i: i64, %acc: i64) {
       %one = constant 1 -> i64;
       %next = add %acc, %one -> i64;
       yield %next;
@@ -1218,13 +1218,13 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 {
 stage @source fn @callee(i64) -> i64;
 stage @source fn @main(i64, i64) -> i64;
 
-specialize @source fn @callee(i64) -> i64 {
+specialize @source fn @callee(i64) -> i64 cfg {
   ^entry(%v: i64) {
     ret %v;
   }
 }
 
-specialize @source fn @main(i64, i64) -> i64 {
+specialize @source fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %y: i64) {
     %unused = call.named @callee(%x) -> i64;
     %deadsum = add %y, %y -> i64;
@@ -1360,11 +1360,11 @@ mod dense {
     const IF_ARMS_DIFFERENT_USES: &str = r#"
 stage @source fn @if_arms(i64, i64, i64) -> i64;
 
-specialize @source fn @if_arms(i64, i64, i64) -> i64 {
+specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
   ^entry(%cond: i64, %x: i64, %y: i64) {
-    %r = if %cond then ^then() {
+    %r = if %cond then block ^then() {
       yield %x;
-    } else ^else() {
+    } else block ^else() {
       yield %y;
     } -> i64;
     ret %r;

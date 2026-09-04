@@ -157,7 +157,7 @@ fn test_roundtrip_return() {
 fn test_roundtrip_function() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
-    let input = r#"%f = function {
+    let input = r#"%f = function cfg {
     ^entry(%x: f64) {
         %y = add %x, %x -> f64;
         %z = constant 42 -> f64;
@@ -204,7 +204,7 @@ fn test_roundtrip_function() {
 fn test_roundtrip_function_multiple_blocks() {
     let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
 
-    let input = r#"%f = function {
+    let input = r#"%f = function cfg {
     ^entry(%x: f64) {
         %y = add %x, %x -> f64;
         return %y;
