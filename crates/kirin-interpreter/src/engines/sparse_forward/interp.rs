@@ -43,10 +43,10 @@ use kirin_ir::{
 use crate::core::{linker::link_and_discover_callable, query};
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
-    BlockQueries, Body, CFGQueries, CallEffect, CallServices, CallableBody, Callee, DiGraphQueries,
-    Env, EnvIndex, EnvStackStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval,
-    ForwardSummaryDeps, Frame, FunctionTarget, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, Linker, OwnerSemantics, SameStageLinker, SparseForwardEffect,
+    BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
+    EnvIndex, EnvStackStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval,
+    ForwardSummaryDeps, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
+    LinkTarget, Linker, OwnerSemantics, ResolvedCallable, SameStageLinker, SparseForwardEffect,
     SparseForwardSemantic, StageQuery, StandardAbstractFrame, StandardFixpointInterpreter,
     StatementDispatch, Store, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
@@ -60,7 +60,7 @@ use crate::{
 pub trait CallContext<V> {
     type Key: Clone + Eq + Hash;
 
-    fn key(&mut self, target: &FunctionTarget, args: &Product<V>) -> Self::Key;
+    fn key(&mut self, target: &LinkTarget, args: &Product<V>) -> Self::Key;
 }
 
 /// Explore/join strategy: combines an `incoming` abstract state into the
@@ -90,8 +90,8 @@ impl Default for ContextInsensitive {
 impl<V> CallContext<V> for ContextInsensitive {
     type Key = (CompileStage, SpecializedFunction);
 
-    fn key(&mut self, target: &FunctionTarget, _args: &Product<V>) -> Self::Key {
-        (target.stage, target.function)
+    fn key(&mut self, target: &LinkTarget, _args: &Product<V>) -> Self::Key {
+        (target.stage, target.specialization)
     }
 }
 
@@ -512,7 +512,7 @@ where
     }
 
     /// Key a resolved call target through the analysis.
-    fn key(&mut self, target: &FunctionTarget, args: &Product<V>) -> <P as CallContext<V>>::Key {
+    fn key(&mut self, target: &LinkTarget, args: &Product<V>) -> <P as CallContext<V>>::Key {
         self.analysis.key(target, args)
     }
 
@@ -628,10 +628,11 @@ where
 
     fn resolve_callable(
         &self,
-        stage: CompileStage,
+        lookup_stage: CompileStage,
         callee: &Callee,
-    ) -> Result<(FunctionTarget, CallableBody), E> {
-        link_and_discover_callable::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
+    ) -> Result<ResolvedCallable, E> {
+        link_and_discover_callable(self.pipeline, &self.linker, lookup_stage, callee)
+            .map_err(E::from)
     }
 }
 
@@ -751,10 +752,10 @@ where
 
     fn resolve_callable(
         &self,
-        stage: CompileStage,
+        lookup_stage: CompileStage,
         callee: &Callee,
-    ) -> Result<(FunctionTarget, CallableBody), E> {
-        self.inner().resolve_callable(stage, callee)
+    ) -> Result<ResolvedCallable, E> {
+        self.inner().resolve_callable(lookup_stage, callee)
     }
 }
 
@@ -881,14 +882,15 @@ where
             args,
             results,
         } = call;
-        let resolve_stage = call_stage.unwrap_or(stage);
-        let (target, entry) = self.inner().resolve_callable(resolve_stage, &callee)?;
+        let lookup_stage = call_stage.unwrap_or(stage);
+        let ResolvedCallable { target, body } =
+            self.inner().resolve_callable(lookup_stage, &callee)?;
         let key = self.inner_mut().key(&target, &args);
 
         self.apply_update(ForwardUpdate::FunctionEntry {
             key: key.clone(),
             stage: target.stage,
-            body: entry.body,
+            body,
             args,
         })?;
 
@@ -1567,14 +1569,15 @@ where
         callee: Callee,
         args: impl IntoIterator<Item = V>,
     ) -> Result<Product<V>, E> {
-        let (target, entry) = self.driver.inner().resolve_callable(stage, &callee)?;
+        let ResolvedCallable { target, body } =
+            self.driver.inner().resolve_callable(stage, &callee)?;
         let args: Product<V> = args.into_iter().collect();
         let key = self.driver.inner_mut().key(&target, &args);
 
         self.driver.apply_update(ForwardUpdate::FunctionEntry {
             key: key.clone(),
             stage: target.stage,
-            body: entry.body,
+            body,
             args,
         })?;
 

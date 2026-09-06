@@ -32,6 +32,8 @@ pub struct Statement<L: Layout> {
     pub attrs: StatementOptions,
     /// Classified fields (arguments, results, values, etc.).
     pub fields: Vec<FieldInfo<L>>,
+    /// The explicitly designated callable body, if this is a direct definition.
+    pub callable_body: Option<FieldIndex>,
     /// Delegation target if this variant uses `#[wraps]`.
     pub wraps: Option<Wrapper>,
     /// Layout-specific extra data computed per statement.
@@ -55,6 +57,7 @@ impl<L: Layout> Statement<L> {
             name,
             attrs,
             fields: Vec::new(),
+            callable_body: None,
             wraps: None,
             extra,
             extra_attrs,
@@ -122,13 +125,42 @@ impl<L: Layout> Statement<L> {
         fields: &syn::Fields,
         ir_type: &syn::Path,
     ) -> darling::Result<Self> {
-        let mut errors = darling::Error::accumulator();
         let field_wraps = fields
             .iter()
             .map(|field| WrapperOptions::from_attrs(&field.attrs))
             .collect::<darling::Result<Vec<_>>>()?;
 
-        if wraps.is_some() || field_wraps.iter().any(Option::is_some) {
+        let is_wrapper = wraps.is_some() || field_wraps.iter().any(Option::is_some);
+        for (index, field) in fields.iter().enumerate() {
+            if !KirinFieldOptions::from_field(field)?.callable_body {
+                continue;
+            }
+            if is_wrapper {
+                return Err(darling::Error::custom(
+                    "#[wraps] delegates callable-body discovery; mark the body on the wrapped definition",
+                ).with_span(field));
+            }
+            if self.callable_body.is_some() {
+                return Err(darling::Error::custom(
+                    "at most one #[kirin(callable_body)] field is allowed per definition",
+                )
+                .with_span(field));
+            }
+            if !["Block", "CFG", "DiGraph", "UnGraph"].iter().any(|kind| {
+                matches!(
+                    Collection::from_type(&field.ty, kind),
+                    Some(Collection::Single)
+                )
+            }) {
+                return Err(darling::Error::custom(
+                    "#[kirin(callable_body)] requires a single Block, CFG, DiGraph, or UnGraph field; Option and Vec are unsupported",
+                ).with_span(field));
+            }
+            self.callable_body = Some(FieldIndex::new(field.ident.clone(), index));
+        }
+
+        let mut errors = darling::Error::accumulator();
+        if is_wrapper {
             if fields.len() == 1 {
                 let field = fields.iter().next().unwrap();
                 let options = merge_wrapper_options(wraps, field_wraps.into_iter().next().unwrap())

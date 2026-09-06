@@ -3,7 +3,7 @@
 
 use kirin::prelude::*;
 use kirin_interpreter::{
-    Body, Callee, CrossStageLinker, FunctionTarget, InterpreterError, Linker, SameStageLinker,
+    Body, Callee, CrossStageLinker, InterpreterError, LinkTarget, Linker, SameStageLinker,
 };
 use kirin_liveness::{Demand, DenseLiveness};
 use kirin_test_languages::GraphFunctionLanguage;
@@ -125,9 +125,9 @@ impl Linker<TestStage> for RejectingLinker {
     fn resolve(
         &self,
         _pipeline: &Pipeline<TestStage>,
-        _caller_stage: CompileStage,
+        _lookup_stage: CompileStage,
         _callee: &Callee,
-    ) -> Result<FunctionTarget, InterpreterError> {
+    ) -> Result<LinkTarget, InterpreterError> {
         Err(InterpreterError::Custom("rejecting linker reached"))
     }
 }
@@ -200,28 +200,29 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
 }
 
 #[derive(Clone, Copy)]
-struct FixedTargetLinker(FunctionTarget);
+struct FixedTargetLinker(LinkTarget);
 
 impl Linker<TestStage> for FixedTargetLinker {
     fn resolve(
         &self,
         _pipeline: &Pipeline<TestStage>,
-        _caller_stage: CompileStage,
+        _lookup_stage: CompileStage,
         _callee: &Callee,
-    ) -> Result<FunctionTarget, InterpreterError> {
+    ) -> Result<LinkTarget, InterpreterError> {
         Ok(self.0)
     }
 }
 
 #[test]
 fn a_resolved_non_callable_definition_is_reported_by_shared_body_discovery() {
-    let pipeline = parse(BLOCK_PROGRAM);
+    let mut pipeline = parse(BLOCK_PROGRAM);
     let (stage, callee) = function_callee(&pipeline, "linear");
-    let mut target = SameStageLinker
+    let target = SameStageLinker
         .resolve(&pipeline, stage, &callee)
         .expect("function resolves");
     let info = pipeline.stage(stage).expect("stage info exists");
-    let body = match target.definition.definition(info) {
+    let definition = *target.specialization.get_info(info).unwrap().definition();
+    let body = match definition.definition(info) {
         GraphFunctionLanguage::LinearFunction { body, .. } => *body,
         other => panic!("expected linear function, got {other:?}"),
     };
@@ -229,19 +230,115 @@ fn a_resolved_non_callable_definition_is_reported_by_shared_body_discovery() {
         .statements(info)
         .next()
         .expect("body contains an arithmetic statement");
-    target.definition = non_callable;
+    // The specialization record is the sole source of its definition.
+    *target
+        .specialization
+        .get_info_mut(pipeline.stage_mut(stage).unwrap())
+        .unwrap()
+        .definition_mut() = non_callable;
 
     let demand_error = Demand::<TestStage>::new(&pipeline)
-        .with_linker(FixedTargetLinker(target))
         .analyze(stage, callee)
         .expect_err("non-callable definition must fail");
     assert_eq!(demand_error, InterpreterError::NotCallable(non_callable));
 
     let dense_error = DenseLiveness::<TestStage>::new(&pipeline)
-        .with_linker(FixedTargetLinker(target))
         .analyze(stage, callee)
         .expect_err("non-callable definition must fail");
     assert_eq!(dense_error, InterpreterError::NotCallable(non_callable));
+}
+
+#[test]
+fn specialized_handles_are_validated_before_accepting_a_candidate_stage() {
+    let pipeline = parse(CROSS_STAGE_PROGRAM);
+    let source = pipeline.stage_by_name("source").unwrap();
+    let lowered = pipeline.stage_by_name("lowered").unwrap();
+    let function = pipeline.lookup_function_by_name("linear").unwrap();
+    let target = SameStageLinker
+        .resolve(&pipeline, lowered, &Callee::Function(function))
+        .unwrap();
+    let callee = Callee::Specialized(target.specialization);
+
+    assert!(SameStageLinker.resolve(&pipeline, source, &callee).is_err());
+    assert_eq!(
+        CrossStageLinker
+            .resolve(&pipeline, source, &callee)
+            .unwrap(),
+        target
+    );
+    let demand = Demand::<TestStage>::new(&pipeline)
+        .with_linker(CrossStageLinker)
+        .analyze(source, callee)
+        .unwrap();
+    let dense = DenseLiveness::<TestStage>::new(&pipeline)
+        .with_linker(CrossStageLinker)
+        .analyze(source, callee)
+        .unwrap();
+    assert_eq!(demand.0, lowered);
+    assert_eq!(dense, demand);
+}
+
+#[test]
+fn malformed_custom_targets_return_errors_without_panicking() {
+    let mut pipeline = parse(CROSS_STAGE_PROGRAM);
+    let source = pipeline.stage_by_name("source").unwrap();
+    let lowered = pipeline.stage_by_name("lowered").unwrap();
+    let function = pipeline.lookup_function_by_name("linear").unwrap();
+    let callee = Callee::Function(function);
+    let target = SameStageLinker
+        .resolve(&pipeline, lowered, &callee)
+        .unwrap();
+
+    let mut foreign_stages = kirin::ir::Arena::<CompileStage, ()>::default();
+    for _ in pipeline.stages() {
+        let _ = foreign_stages.alloc(());
+    }
+    let missing_stage = foreign_stages.next_id();
+    for (stage, expected) in [
+        (missing_stage, InterpreterError::MissingStage(missing_stage)),
+        (
+            source,
+            InterpreterError::MissingSpecializationRecord(target.specialization),
+        ),
+    ] {
+        let linker = FixedTargetLinker(LinkTarget { stage, ..target });
+        assert_eq!(
+            Demand::<TestStage>::new(&pipeline)
+                .with_linker(linker)
+                .analyze(source, callee)
+                .unwrap_err(),
+            expected
+        );
+        assert_eq!(
+            DenseLiveness::<TestStage>::new(&pipeline)
+                .with_linker(linker)
+                .analyze(source, callee)
+                .unwrap_err(),
+            expected
+        );
+    }
+
+    let missing_definition = pipeline.stage(lowered).unwrap().statement_arena().next_id();
+    *target
+        .specialization
+        .get_info_mut(pipeline.stage_mut(lowered).unwrap())
+        .unwrap()
+        .definition_mut() = missing_definition;
+    let expected = InterpreterError::MissingStatement(missing_definition);
+    assert_eq!(
+        Demand::<TestStage>::new(&pipeline)
+            .with_linker(FixedTargetLinker(target))
+            .analyze(source, callee)
+            .unwrap_err(),
+        expected
+    );
+    assert_eq!(
+        DenseLiveness::<TestStage>::new(&pipeline)
+            .with_linker(FixedTargetLinker(target))
+            .analyze(source, callee)
+            .unwrap_err(),
+        expected
+    );
 }
 
 #[test]

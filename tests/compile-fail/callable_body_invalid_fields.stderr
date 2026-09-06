@@ -1,0 +1,17 @@
+error: #[kirin(callable_body)] requires a single Block, CFG, DiGraph, or UnGraph field; Option and Vec are unsupported
+ --> tests/compile-fail/callable_body_invalid_fields.rs:6:5
+  |
+6 |     #[kirin(callable_body)]
+  |     ^
+
+error: #[kirin(callable_body)] requires a single Block, CFG, DiGraph, or UnGraph field; Option and Vec are unsupported
+  --> tests/compile-fail/callable_body_invalid_fields.rs:13:5
+   |
+13 |     #[kirin(callable_body)]
+   |     ^
+
+error: #[kirin(callable_body)] requires a single Block, CFG, DiGraph, or UnGraph field; Option and Vec are unsupported
+  --> tests/compile-fail/callable_body_invalid_fields.rs:20:5
+   |
+20 |     #[kirin(callable_body)]
+   |     ^

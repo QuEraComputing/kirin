@@ -9,14 +9,9 @@ use kirin::prelude::*;
 #[kirin(builders, type = T)]
 #[chumsky(format = "fn {:name}{sig} {body}")]
 pub struct Function<T: CompileTimeValue> {
+    #[kirin(callable_body)]
     pub(crate) body: CFG,
     pub(crate) sig: Signature<T>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
-}
-
-impl<T: CompileTimeValue> HasCFGBody for Function<T> {
-    fn cfg(&self) -> &CFG {
-        &self.body
-    }
 }

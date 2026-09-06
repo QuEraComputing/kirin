@@ -17,6 +17,7 @@ pub enum ArithFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     Function {
+        #[kirin(callable_body)]
         body: CFG,
         sig: Signature<ArithType>,
     },
@@ -34,8 +35,8 @@ pub enum ArithFunctionLanguage {
 #[cfg(feature = "interpreter")]
 mod interpreter {
     use kirin_interpreter::dialect::{
-        CallableBody, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
-        FunctionEntry, Interpretable, StrongDemand,
+        ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, Interpretable,
+        StrongDemand,
     };
     use kirin_ir::HasBottom;
 
@@ -70,15 +71,6 @@ mod interpreter {
                 ArithFunctionLanguage::Arith(op) => op.interpret(interp),
                 ArithFunctionLanguage::ControlFlow(op) => op.interpret(interp),
                 ArithFunctionLanguage::Return(op) => op.interpret(interp),
-            }
-        }
-    }
-
-    impl FunctionEntry for ArithFunctionLanguage {
-        fn function_entry(&self) -> Option<CallableBody> {
-            match self {
-                ArithFunctionLanguage::Function { body, .. } => Some(CallableBody::new(*body)),
-                _ => None,
             }
         }
     }
