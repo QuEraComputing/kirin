@@ -63,9 +63,7 @@ use std::hash::Hash;
 
 use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
-use crate::{
-    Body, CallEffect, CallableBody, Callee, Env, EnvIndex, FunctionTarget, Interp, InterpreterError,
-};
+use crate::{Body, CallEffect, Callee, Env, EnvIndex, Interp, InterpreterError, ResolvedCallable};
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
 ///
@@ -311,13 +309,13 @@ pub trait DiGraphQueries: Interp {
 }
 
 /// Engine services used by [`CallFrame`](crate::CallFrame): activation storage,
-/// linking, and callable-entry dispatch.
+/// linking, and structural callable-body discovery.
 ///
 /// **[`CallFrame`](crate::CallFrame) still owns the calling convention** — the
 /// order of operations, which completions are legal, and freeing the activation
 /// exactly once. This trait only supplies the primitives it calls.
 ///
-/// Kept whole on purpose: the standard `CallFrame` consumes all four together,
+/// Kept whole on purpose: the standard `CallFrame` consumes these services together,
 /// and their pairing is a safety property — an `alloc_env` without its matching
 /// `free_env` is a leak, a second `free_env` a double free. Splitting them into
 /// separate capabilities would let an engine offer half a call convention.
@@ -334,9 +332,9 @@ pub trait CallServices: Env {
     /// the selected target stage.
     fn resolve_callable(
         &self,
-        stage: CompileStage,
+        lookup_stage: CompileStage,
         callee: &Callee,
-    ) -> Result<(FunctionTarget, CallableBody), Self::Error>;
+    ) -> Result<ResolvedCallable, Self::Error>;
 }
 
 /// An interpreter engine capable of running the complete standard **concrete**

@@ -4,6 +4,7 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
 mod generate;
+mod has_callable_body;
 mod has_signature;
 mod project;
 

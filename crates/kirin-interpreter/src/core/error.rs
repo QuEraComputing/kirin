@@ -1,6 +1,8 @@
 use std::convert::Infallible;
 
-use kirin_ir::{Block, CompileStage, Function, SSAValue, StagedFunction, Statement, Symbol};
+use kirin_ir::{
+    Block, CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction, Statement, Symbol,
+};
 use thiserror::Error;
 
 use crate::EnvIndex;
@@ -21,6 +23,8 @@ pub enum InterpreterError {
     MissingStageInfo(CompileStage),
     #[error("missing block info for block {0:?}")]
     MissingBlock(Block),
+    #[error("missing statement info for statement {0:?}")]
+    MissingStatement(Statement),
     #[error("missing SSA value {0:?}")]
     MissingValue(SSAValue),
     #[error("missing function {0:?}")]
@@ -32,6 +36,8 @@ pub enum InterpreterError {
     },
     #[error("staged function {0:?} has no live specialization")]
     MissingSpecialization(StagedFunction),
+    #[error("missing specialization record for {0:?}")]
+    MissingSpecializationRecord(SpecializedFunction),
     #[error("staged function {function:?} has {count} live specializations")]
     AmbiguousSpecialization {
         function: StagedFunction,

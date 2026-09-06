@@ -481,6 +481,19 @@ impl ::kirin::ir::HasSignature<Self> for ArithLanguage {
     }
 }
 #[automatically_derived]
+impl ::kirin::ir::HasCallableBody for ArithLanguage
+where
+    AddOp: ::kirin::ir::HasCallableBody,
+    SubOp: ::kirin::ir::HasCallableBody,
+{
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::HasCallableBody>::callable_body(field_0),
+            Self::Sub(field_0) => <SubOp as ::kirin::ir::HasCallableBody>::callable_body(field_0),
+        }
+    }
+}
+#[automatically_derived]
 impl ::core::convert::From<AddOp> for ArithLanguage {
     fn from(from: AddOp) -> Self {
         ArithLanguage::Add(from)

@@ -22,7 +22,7 @@
 use std::collections::{HashMap, HashSet};
 
 use kirin_interpreter::{
-    CallContext, ContextInsensitive, FunctionTarget, InterpreterError, WideningStrategy,
+    CallContext, ContextInsensitive, InterpreterError, LinkTarget, WideningStrategy,
 };
 use kirin_ir::{CompileStage, Product, SpecializedFunction};
 
@@ -69,9 +69,9 @@ impl Default for ConstPropContext {
 impl CallContext<ConstPropValue> for ConstPropContext {
     type Key = (CompileStage, SpecializedFunction, CallCtx);
 
-    fn key(&mut self, target: &FunctionTarget, args: &Product<ConstPropValue>) -> Self::Key {
+    fn key(&mut self, target: &LinkTarget, args: &Product<ConstPropValue>) -> Self::Key {
         let stage = target.stage;
-        let function = target.function;
+        let function = target.specialization;
         let ctx = match all_const(args) {
             Some(consts) => {
                 let admitted = self.admitted.entry((stage, function)).or_default();

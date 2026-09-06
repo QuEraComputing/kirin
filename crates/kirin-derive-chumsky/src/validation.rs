@@ -610,6 +610,7 @@ mod tests {
                 edge: false,
             },
             fields,
+            callable_body: None,
             wraps: None,
             extra: (),
             extra_attrs: ChumskyStatementAttrs { format: None },
