@@ -15,7 +15,7 @@
 //! in how functions are *introduced* (inline `Lambda` vs top-level `Bind`).
 
 use kirin::prelude::*;
-use kirin_interpreter::{FunctionEntry, Interpretable};
+use kirin_interpreter::Interpretable;
 
 pub mod bind;
 pub mod call;
@@ -34,27 +34,20 @@ pub mod interpreter;
 #[cfg(test)]
 mod tests;
 
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Dialect, FunctionEntry, HasParser, PrettyPrint, Interpretable,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[wraps]
 #[kirin(builders, type = T)]
 pub enum Lexical<T: CompileTimeValue> {
-    #[callable]
     Function(Function<T>),
     Call(Call<T>),
-    #[callable]
     Lambda(Lambda<T>),
     Return(Return<T>),
 }
 
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Dialect, FunctionEntry, HasParser, PrettyPrint, Interpretable,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[wraps]
 #[kirin(builders, type = T)]
 pub enum Lifted<T: CompileTimeValue> {
-    #[callable]
     Function(Function<T>),
     Call(Call<T>),
     Bind(Bind<T>),

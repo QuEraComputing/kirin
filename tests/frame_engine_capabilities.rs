@@ -37,10 +37,10 @@ use std::collections::HashMap;
 
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCallFrame, AbstractDiGraphFrame, BlockFrame, BlockQueries,
-    CFGFrame, CFGQueries, CallEffect, CallFrame, CallRequest, CallServices, CallableBody, Callee,
+    CFGFrame, CFGQueries, CallEffect, CallFrame, CallRequest, CallServices, Callee,
     DefaultCallBodyTraversal, DiGraphFrame, DiGraphQueries, Env, EnvIndex,
-    ForwardDataflowFrameEngine, ForwardEval, ForwardFrameEngine, Frame, FunctionTarget, Interp,
-    InterpreterError, SparseForwardEffect, StatementDispatch,
+    ForwardDataflowFrameEngine, ForwardEval, ForwardFrameEngine, Frame, Interp, InterpreterError,
+    ResolvedCallable, SparseForwardEffect, StatementDispatch,
 };
 use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
 
@@ -264,7 +264,7 @@ impl CallServices for CallOnlyEngine {
         &self,
         _stage: CompileStage,
         _callee: &Callee,
-    ) -> Result<(FunctionTarget, CallableBody), InterpreterError> {
+    ) -> Result<ResolvedCallable, InterpreterError> {
         unimplemented!("type-level mock")
     }
 }

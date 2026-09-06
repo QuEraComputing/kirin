@@ -39,7 +39,7 @@ use kirin_interpreter::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, BlockFrame,
     Body, CFGFrame, CallContext, CallFrame, CallRequest, Callee, Completion, ConcreteInterpreter,
     ConcreteInterpreterCore, ContextInsensitive, DefaultCallBodyTraversal, DiGraphFrame, Frame,
-    FrameEffect, FrameEngine, FunctionEntry, Interpretable, InterpreterError, SameStageLinker,
+    FrameEffect, FrameEngine, Interpretable, InterpreterError, SameStageLinker,
     SparseForwardInterpreter, expect_single,
 };
 use kirin_scf::{ScfForFrame, ScfIfFrame, StructuredControlFlow};
@@ -50,7 +50,7 @@ use kirin_test_languages::GraphFunctionLanguage;
 #[derive(Debug)]
 enum TestError {
     Core(InterpreterError),
-    ArithConversion(ArithConversionError),
+    ArithConversion((ArithConversionError)),
     DivisionByZero,
 }
 
@@ -273,13 +273,10 @@ fn digraph_runs_in_topological_order() {
 /// Inline language wrapping functions (CFG bodies), scf, and arithmetic.
 /// Specific to this integration suite; shared test dialects live in
 /// `kirin-test-languages`.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Dialect, FunctionEntry, HasParser, PrettyPrint, Interpretable,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[kirin(builders, type = ArithType)]
 enum ScfLanguage {
     #[wraps]
-    #[callable]
     Lexical(Lexical<ArithType>),
     #[wraps]
     Structured(StructuredControlFlow<ArithType>),

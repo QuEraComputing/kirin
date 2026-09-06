@@ -10,8 +10,8 @@ use crate::Body;
 use crate::InterpreterError;
 use kirin_ir::{
     Block, BlockParent, CFG, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCFG,
-    HasDigraphs, HasStageInfo, HasUngraphs, Pipeline, PortParent, SSAKind, SSAValue,
-    SpecializedFunction, StageAction, StageInfo, StageMeta, StagedFunction, Statement,
+    HasCallableBody, HasDigraphs, HasStageInfo, HasUngraphs, Pipeline, PortParent, SSAKind,
+    SSAValue, SpecializedFunction, StageAction, StageInfo, StageMeta, StagedFunction, Statement,
     SupportsStageDispatch, Symbol, UniqueLiveSpecializationError,
 };
 use smallvec::{SmallVec, smallvec};
@@ -262,15 +262,15 @@ where
     }
 }
 
-/// Definition statement of a specialized function.
-pub struct FunctionDefinition(pub SpecializedFunction);
+/// Check that a specialization belongs to a candidate stage before linking it.
+pub struct ValidateSpecialization(pub SpecializedFunction);
 
-impl<S, L> StageAction<S, L> for FunctionDefinition
+impl<S, L> StageAction<S, L> for ValidateSpecialization
 where
     S: StageMeta + HasStageInfo<L>,
     L: Dialect,
 {
-    type Output = Result<Statement, InterpreterError>;
+    type Output = ();
     type Error = InterpreterError;
 
     fn run(
@@ -278,13 +278,36 @@ where
         _stage: CompileStage,
         info: &StageInfo<L>,
     ) -> Result<Self::Output, Self::Error> {
-        Ok(self
+        self.0
+            .get_info(info)
+            .map(|_| ())
+            .ok_or(InterpreterError::MissingSpecializationRecord(self.0))
+    }
+}
+
+/// Discover a specialization's callable body using only IR structure.
+pub struct CallableBodyQuery(pub SpecializedFunction);
+
+impl<S, L> StageAction<S, L> for CallableBodyQuery
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect + HasCallableBody,
+{
+    type Output = Body;
+    type Error = InterpreterError;
+
+    fn run(&mut self, _stage: CompileStage, info: &StageInfo<L>) -> Result<Body, InterpreterError> {
+        let specialization = self
             .0
             .get_info(info)
-            .map(|info| *info.definition())
-            .ok_or(InterpreterError::Custom(
-                "specialized function has no definition",
-            )))
+            .ok_or(InterpreterError::MissingSpecializationRecord(self.0))?;
+        let definition = *specialization.definition();
+        definition
+            .get_info(info)
+            .ok_or(InterpreterError::MissingStatement(definition))?
+            .definition()
+            .callable_body()
+            .ok_or(InterpreterError::NotCallable(definition))
     }
 }
 
@@ -537,10 +560,12 @@ where
 
 /// Bound bundle for stage enums usable by interpreter engines.
 ///
-/// Satisfied automatically by any stage enum built from `StageInfo<L>`
-/// variants (and by `StageInfo<L>` itself for single-language pipelines);
-/// compiler authors never implement it by hand.
-pub trait StageQuery: StageMeta
+/// Satisfied automatically by stages whose dialects implement `HasCallableBody`,
+/// including derived dialects with no callables. Manual dialects provide that
+/// structural capability when used here; no interpreter or semantic rules
+/// are required for these queries.
+pub trait StageQuery:
+    StageMeta
     + SupportsStageDispatch<BlockParams, Vec<SSAValue>, InterpreterError>
     + SupportsStageDispatch<FirstStatement, Option<Statement>, InterpreterError>
     + SupportsStageDispatch<NextStatement, Option<Statement>, InterpreterError>
@@ -551,7 +576,8 @@ pub trait StageQuery: StageMeta
         UniqueSpecialization,
         Result<SpecializedFunction, InterpreterError>,
         InterpreterError,
-    > + SupportsStageDispatch<FunctionDefinition, Result<Statement, InterpreterError>, InterpreterError>
+    > + SupportsStageDispatch<ValidateSpecialization, (), InterpreterError>
+    + SupportsStageDispatch<CallableBodyQuery, Body, InterpreterError>
     + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
     + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
     + SupportsStageDispatch<TerminatorArguments, TerminatorArgs, InterpreterError>
@@ -578,11 +604,9 @@ impl<S> StageQuery for S where
             UniqueSpecialization,
             Result<SpecializedFunction, InterpreterError>,
             InterpreterError,
-        > + SupportsStageDispatch<
-            FunctionDefinition,
-            Result<Statement, InterpreterError>,
-            InterpreterError,
-        > + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
+        > + SupportsStageDispatch<ValidateSpecialization, (), InterpreterError>
+        + SupportsStageDispatch<CallableBodyQuery, Body, InterpreterError>
+        + SupportsStageDispatch<ResolveSymbolName, Option<String>, InterpreterError>
         + SupportsStageDispatch<ValueKind, SSAKind, InterpreterError>
         + SupportsStageDispatch<TerminatorArguments, TerminatorArgs, InterpreterError>
         + SupportsStageDispatch<
@@ -670,12 +694,20 @@ pub(crate) fn unique_specialization<S: StageQuery>(
     dispatch(pipeline, stage, UniqueSpecialization(staged))?
 }
 
-pub(crate) fn function_definition<S: StageQuery>(
+pub(crate) fn validate_specialization<S: StageQuery>(
     pipeline: &Pipeline<S>,
     stage: CompileStage,
     specialized: SpecializedFunction,
-) -> Result<Statement, InterpreterError> {
-    dispatch(pipeline, stage, FunctionDefinition(specialized))?
+) -> Result<(), InterpreterError> {
+    dispatch(pipeline, stage, ValidateSpecialization(specialized))
+}
+
+pub(crate) fn callable_body<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    specialized: SpecializedFunction,
+) -> Result<Body, InterpreterError> {
+    dispatch(pipeline, stage, CallableBodyQuery(specialized))
 }
 
 pub(crate) fn resolve_symbol_name<S: StageQuery>(
