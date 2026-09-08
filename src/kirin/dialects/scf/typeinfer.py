@@ -2,10 +2,15 @@ from kirin import types, interp
 from kirin.analysis import ForwardFrame, TypeInference
 from kirin.dialects import func
 from kirin.dialects.eltype import ElType
+from kirin.analysis.typeinfer.widen import widen
 
 from . import absint
 from .stmts import For, IfElse
 from ._dialect import dialect
+
+# Precision/performance heuristic: allow structural widening before falling back
+# to top. Correctness requires a verified invariant regardless of this budget.
+_LOOP_WIDENING_BUDGET = 16
 
 
 @dialect.register(key="typeinfer")
@@ -40,16 +45,48 @@ class TypeInfer(absint.Methods):
         if not isinstance(eltype, tuple):  # error
             return
         item = eltype[0]
-        frame.set_values(block_args, (item,) + loop_vars)
 
         if isinstance(body_block.last_stmt, func.Return):
+            frame.set_values(block_args, (item,) + loop_vars)
             frame.worklist.append(interp.Successor(body_block, item, *loop_vars))
             return  # if terminate is Return, there is no result
 
-        loop_vars_ = interp_.frame_call_region(frame, stmt, stmt.body, item, *loop_vars)
-        if isinstance(loop_vars_, interp.ReturnValue):
-            return loop_vars_
-        elif isinstance(loop_vars_, tuple):
-            return interp_.join_results(loop_vars, loop_vars_)
-        else:  # None, loop has no result
-            return
+        candidate = loop_vars
+        # Each fallback update promotes at least one changing component to top.
+        # Allow one update per component and a final invariant check.
+        max_iterations = _LOOP_WIDENING_BUDGET + len(candidate) + 1
+        for iteration in range(max_iterations):
+            # A fresh frame prevents earlier visits and intermediate types from
+            # contaminating inference under the current loop invariant.
+            with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
+                yielded = interp_.frame_call_region(
+                    body_frame, stmt, stmt.body, item, *candidate
+                )
+
+            if not isinstance(yielded, tuple):
+                frame.set_values(body_frame.entries.keys(), body_frame.entries.values())
+                return yielded
+
+            required = tuple(
+                initial.join(value) for initial, value in zip(loop_vars, yielded)
+            )
+            if all(new.is_subseteq(old) for old, new in zip(candidate, required)):
+                frame.set_values(body_frame.entries.keys(), body_frame.entries.values())
+                frame.set_values(block_args, (item,) + candidate)
+                return candidate
+
+            # Structural growth can also produce unbounded unions or nesting.
+            # Fall back to top for changing components, then verify the invariant
+            # with another body evaluation rather than returning a partial result.
+            candidate = tuple(
+                (
+                    widen(old, new)
+                    if iteration < _LOOP_WIDENING_BUDGET
+                    else old if new.is_subseteq(old) else types.Any
+                )
+                for old, new in zip(candidate, yielded)
+            )
+
+        raise interp.InterpreterError(
+            f"scf.For type inference did not converge after {max_iterations} iterations"
+        )
