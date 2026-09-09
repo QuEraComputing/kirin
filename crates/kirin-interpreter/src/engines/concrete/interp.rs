@@ -1,3 +1,4 @@
+use std::convert::Infallible;
 use std::marker::PhantomData;
 
 use kirin_ir::{
@@ -7,12 +8,20 @@ use kirin_ir::{
 use crate::core::query;
 use crate::{
     BlockQueries, Body, CFGQueries, CallServices, Callee, Completion, DiGraphQueries, Env,
-    EnvIndex, EnvStackStore, ForwardEval, Frame, Interp, InterpDispatch, InterpLocation,
+    EnvIndex, EnvStore, ForwardEval, Frame, Interp, InterpDispatch, InterpLocation,
     InterpreterError, LinkTarget, Linker, SameStageLinker, SparseForwardEffect, StageQuery,
-    StatementDispatch, Store, drive_frames,
+    StatementDispatch, drive_frames,
 };
 
 use super::frames::{CallRequest, FrameStackItem};
+
+/// The concrete engine's environments.
+///
+/// Concrete execution has no analysis contexts: every call allocates its own
+/// activation, so the context key is [`Infallible`] — uninhabited, which makes
+/// it *impossible* for two calls to share an environment through a common key.
+/// Only [`EnvStore::alloc`] is reachable.
+type ConcreteEnv<V> = EnvStore<Infallible, SSAValue, V>;
 
 /// Concrete interpreter mechanism parameterized by one private frame-stack-item type.
 ///
@@ -22,7 +31,7 @@ use super::frames::{CallRequest, FrameStackItem};
 pub struct ConcreteInterpreterCore<'ir, S: StageMeta, V, E, Lk, F> {
     pipeline: &'ir Pipeline<S>,
     linker: Lk,
-    store: EnvStackStore<V>,
+    env: ConcreteEnv<V>,
     frames: Vec<F>,
     /// The statement location currently being dispatched, exposed to dialect
     /// rules through [`Interp::stage`]/[`Interp::statement`]/[`Interp::index`].
@@ -69,7 +78,7 @@ impl<'ir, S: StageMeta, V, E, F> ConcreteInterpreterCore<'ir, S, V, E, SameStage
         Self {
             pipeline,
             linker: SameStageLinker,
-            store: EnvStackStore::new(),
+            env: EnvStore::new(),
             frames: Vec::new(),
             location: None,
             _marker: PhantomData,
@@ -83,7 +92,7 @@ impl<'ir, S: StageMeta, V, E, Lk, F> ConcreteInterpreterCore<'ir, S, V, E, Lk, F
         ConcreteInterpreterCore {
             pipeline: self.pipeline,
             linker,
-            store: self.store,
+            env: self.env,
             frames: self.frames,
             location: self.location,
             _marker: PhantomData,
@@ -125,12 +134,17 @@ where
     V: Clone,
     E: From<InterpreterError>,
 {
+    /// Concrete execution has no bottom to fall back on: reading a slot nothing
+    /// has written yet is a program error, not a fact about the value.
     fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<V, E> {
-        self.store.read(index, value).map_err(E::from)
+        self.env
+            .read(index, value)
+            .map_err(E::from)?
+            .ok_or_else(|| E::from(InterpreterError::UnboundValue { index, value }))
     }
 
     fn env_write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
-        self.store.write(index, value, data).map_err(E::from)
+        self.env.write(index, value, data).map_err(E::from)
     }
 }
 
@@ -146,11 +160,11 @@ where
     Lk: Linker<S>,
 {
     fn alloc_env(&mut self) -> EnvIndex {
-        self.store.alloc()
+        self.env.alloc()
     }
 
     fn free_env(&mut self, index: EnvIndex) -> Result<(), E> {
-        self.store.free(index).map_err(E::from)
+        self.env.free(index).map_err(E::from)
     }
 
     fn resolve_callee(&self, lookup_stage: CompileStage, callee: &Callee) -> Result<LinkTarget, E> {
