@@ -16,7 +16,7 @@ pub(crate) mod value;
 
 pub use dispatch::{InterpDispatch, Interpretable};
 pub use effect::{CallEffect, Callee, Edge, SparseForwardEffect};
-pub use env::{Env, EnvIndex, EnvStore};
+pub use env::{Env, EnvIndex, EnvStore, SSABinding};
 pub use error::InterpreterError;
 pub use frame::{
     BlockQueries, CFGQueries, CallServices, DiGraphQueries, ForwardDataflowFrameEngine,

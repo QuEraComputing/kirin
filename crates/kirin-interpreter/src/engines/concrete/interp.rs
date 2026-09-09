@@ -134,6 +134,10 @@ where
     V: Clone,
     E: From<InterpreterError>,
 {
+    /// Concrete execution is SSA-anchored: a runtime value lives at the SSA
+    /// value that defines it.
+    type Anchor = SSAValue;
+
     /// Concrete execution has no bottom to fall back on: reading a slot nothing
     /// has written yet is a program error, not a fact about the value.
     fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<V, E> {

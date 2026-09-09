@@ -1,9 +1,10 @@
 use kirin_ir::{Product, SSAValue};
 
-use crate::{EnvIndex, Interp, InterpreterError};
+use crate::{EnvIndex, Interp, InterpreterError, LatticeAnchor};
 
-/// The engine capability for *using* an environment: reading values out of one,
-/// writing values into one, and binding a list of values positionally.
+/// The engine capability for *using* an environment: reading a fact out of one
+/// and writing a fact into one, at whichever [`Anchor`](Env::Anchor) family the
+/// engine attaches facts to.
 ///
 /// This is the layer where mechanism becomes policy. [`EnvStore`](crate::EnvStore) is
 /// storage — it maps a context key to an environment and holds facts. This
@@ -11,6 +12,15 @@ use crate::{EnvIndex, Interp, InterpreterError};
 /// decides what its own accesses *mean*: concrete execution reports an unbound
 /// SSA read as an error, while a sparse-forward analysis logs the read and
 /// treats an absent binding as bottom.
+///
+/// **The access interface is anchor-generic.** A sparse engine anchors facts to
+/// [`SSAValue`]s; a dense engine anchors them to
+/// [`ProgramPoint`](crate::ProgramPoint)s. Both *use* an environment the same
+/// way — read a fact, write a fact — so that shared vocabulary must not name one
+/// anchor family. Operations that are genuinely SSA-shaped live on
+/// [`SSABinding`] instead, which pins `Anchor = SSAValue` and is
+/// blanket-implemented, so an SSA-anchored engine gets them for free and a
+/// point-anchored engine is never asked for them.
 ///
 /// **Environment *lifetime* is deliberately not here.** Allocating and freeing
 /// an activation belongs to the call boundary, so `alloc_env`/`free_env` live on
@@ -26,16 +36,35 @@ use crate::{EnvIndex, Interp, InterpreterError};
 /// ([`EnvStore::get_or_allocate`](crate::EnvStore::get_or_allocate)) stays internal to the
 /// engine that has a policy, and never appears on this shared surface.
 pub trait Env: Interp {
-    /// Read an SSA value from an activation.
-    fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<Self::Value, Self::Error>;
-    /// Write an SSA value into an activation.
+    /// Where this engine's environments attach facts: [`SSAValue`] for the
+    /// sparse shapes, [`ProgramPoint`](crate::ProgramPoint) for the dense ones.
+    ///
+    /// It is the same anchor the engine's
+    /// [`EnvStore<_, Anchor, _>`](crate::EnvStore) is parameterized by, which is
+    /// why it carries only [`LatticeAnchor`]'s `Clone + Eq + Hash`.
+    type Anchor: LatticeAnchor;
+
+    /// Read the fact anchored at `anchor` in an activation.
+    fn env_read(&self, index: EnvIndex, anchor: Self::Anchor) -> Result<Self::Value, Self::Error>;
+    /// Write the fact anchored at `anchor` in an activation.
     fn env_write(
         &mut self,
         index: EnvIndex,
-        value: SSAValue,
+        anchor: Self::Anchor,
         data: Self::Value,
     ) -> Result<(), Self::Error>;
+}
 
+/// Positional SSA binding, for engines whose environments are anchored on
+/// [`SSAValue`].
+///
+/// Split out of [`Env`] rather than defaulted on it: binding a *list* of values
+/// to a *list* of slots is meaningful only where the anchor is an SSA value, so
+/// it is bounded `Env<Anchor = SSAValue>` and blanket-implemented. That keeps
+/// [`Env`]'s own vocabulary free of one anchor family while every SSA-anchored
+/// engine still gets this for free — no engine implements it, and no dense
+/// engine is asked to.
+pub trait SSABinding: Env<Anchor = SSAValue> {
     /// Positionally bind runtime values to SSA slots in an **explicitly
     /// selected** activation, checking arity.
     ///
@@ -47,9 +76,9 @@ pub trait Env: Interp {
     /// executing in. The two differ by *which activation*, not by what they do —
     /// hence neither name mentions the [`Product`] container.
     ///
-    /// It writes through [`env_write`](Self::env_write) rather than reaching
-    /// into storage, so an engine's logging and absence policy apply to bound
-    /// values exactly as they do to a dialect rule's writes.
+    /// It writes through [`Env::env_write`] rather than reaching into storage,
+    /// so an engine's logging and absence policy apply to bound values exactly
+    /// as they do to a dialect rule's writes.
     fn bind_values(
         &mut self,
         index: EnvIndex,
@@ -68,3 +97,5 @@ pub trait Env: Interp {
         Ok(())
     }
 }
+
+impl<T: Env<Anchor = SSAValue>> SSABinding for T {}
