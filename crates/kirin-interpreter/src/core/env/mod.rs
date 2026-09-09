@@ -7,5 +7,5 @@ mod store;
 #[cfg(test)]
 mod tests;
 
-pub use services::Env;
+pub use services::{Env, SSABinding};
 pub use store::{EnvIndex, EnvStore};

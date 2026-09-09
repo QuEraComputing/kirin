@@ -54,11 +54,20 @@ pub trait Interp: Sized {               // the engine-side driver — ANALYSIS-A
 
 // The engine's capability for *using* an environment. `EnvStore<K, A, V>` is the
 // storage container underneath; activation lifetime is on `CallServices`.
+// Anchor-generic: `SSAValue` for the sparse shapes, `ProgramPoint` for the dense
+// ones. The access interface names no anchor family.
 pub trait Env: Interp {
-    fn env_read(..) -> Result<Self::Value, Self::Error>;
-    fn env_write(..) -> Result<(), Self::Error>;
+    type Anchor: LatticeAnchor;
+    fn env_read(&self, EnvIndex, Self::Anchor) -> Result<Self::Value, Self::Error>;
+    fn env_write(&mut self, EnvIndex, Self::Anchor, Self::Value) -> Result<(), Self::Error>;
+}
+
+// SSA-shaped positional binding, split out and blanket-implemented so `Env`
+// itself stays anchor-generic and no dense engine is asked for it.
+pub trait SSABinding: Env<Anchor = SSAValue> {
     fn bind_values(..) -> Result<(), Self::Error>;  // default, writes via env_write
 }
+impl<T: Env<Anchor = SSAValue>> SSABinding for T {}
 ```
 
 ```rust
@@ -159,8 +168,9 @@ both execution and analysis**: `kirin-arith`'s `Add` rule computes `3 + 5`
 under `ConcreteInterpreter<.., i64, ..>` and folds `Const(3) + Const(5)`
 under constant propagation, with no analysis-specific code in the dialect.
 
-`SparseForwardInterp` is the **forward engine** trait: it requires `Env`
-and `Semantics = ForwardEval`, and exposes the SSA read/write helpers as **default
+`SparseForwardInterp` is the **forward engine** trait: it requires
+`Env<Anchor = SSAValue>` (the sparse-forward shape *is* SSA-anchored) and a
+`SparseForwardSemantic` key, and exposes the SSA read/write helpers as **default
 methods**, hiding environment indices and locations: `interp.read(ssa)`,
 `interp.write(result, value)`, `interp.read_many(&values)`,
 `interp.write_results(&results, product)`. They delegate to the engine's [`Env`]
@@ -495,7 +505,7 @@ frames:
   until stable — `scf.for` loops converge. The fixpoint is the dialect frame's,
   using the engine's `analysis_merge`.
 - **Functions**: each resolved call target is summarized under a key chosen by
-  the `CallContext` strategy (`ContextInsensitive` → `(stage, specialization)`), with an
+  the `CallContext` strategy (`ContextInsensitive` → the resolved `LinkTarget`), with an
   entry/return `Product<V>` summary. Calls join arguments into the callee's
   entry (enqueueing it on change) and read its current return summary
   (`bottom` until it converges); return-summary changes re-enqueue recorded
@@ -574,24 +584,31 @@ surface still runs the frames it can support.
 | trait | capability | required by |
 |---|---|---|
 | `StatementDispatch: Interp` | `run_statement` — dispatch to the dialect rule | every executing frame |
-| `Env: Interp` | `env_read`/`env_write`/`bind_values` (`core/env/services.rs`) | every frame that touches storage |
+| `Env: Interp` | `env_read`/`env_write` at `Env::Anchor` (`core/env/services.rs`) | every frame that touches storage |
+| `SSABinding: Env<Anchor = SSAValue>` | `bind_values` (blanket-implemented, `core/env/services.rs`) | `CallFrame`, the block/graph walkers |
 | `BlockQueries: Interp` | `block_params`/`first_statement`/`next_statement` | `BlockCursor`, `BlockFrame`, `AbstractBlockFrame`, dialect block walkers |
 | `CFGQueries: BlockQueries` | `cfg_entry` | `CFGFrame` |
 | `DiGraphQueries: Interp` | `digraph_walk_plan` (default: `NoDefaultWalker`) | `DiGraphFrame`, `AbstractDiGraphFrame` |
-| `CallServices: Interp` | `alloc_env`/`free_env`/`resolve_callee`/`discover_body` | `CallFrame`, *together with* `Env` |
+| `CallServices: Interp` | `alloc_env`/`free_env`/`resolve_callee`/`discover_body` | `CallFrame`, *together with* `Env<Anchor = SSAValue>` |
 
 **The `*Queries` traits are read-only, and only require `Interp`** — so nothing
 on them can touch SSA storage, and their names cannot hide a store mutation. The
 one operation that needs both a query and a write, binding a block's parameters
 to incoming actuals, lives on the crate-private `BlockBinding` extension
-(bounded `Env + BlockQueries`) instead. A frame that binds a block entry
+(bounded `SSABinding + BlockQueries`) instead. A frame that binds a block entry
 therefore spells that requirement out: `BlockCursor::bind_entry` and
-`::enter_block` take `Env + BlockQueries`, while `::advance` takes
-`BlockQueries` alone and `::write_child_results` takes `Env` alone.
+`::enter_block` take `Env<Anchor = SSAValue> + BlockQueries`, while `::advance`
+takes `BlockQueries` alone and `::write_child_results` takes
+`Env<Anchor = SSAValue>` alone.
 
-`Env` is *using* an activation: reads, writes, and `bind_values`
-(positional binding, which goes through `env_write` so an engine's logging and
-absence policy apply to bound values too). It deliberately stops there. Choosing
+`Env` is *using* an environment: one read and one write, at whichever
+`Env::Anchor` family the engine attaches facts to. Positional binding into SSA
+slots is only meaningful for an SSA-anchored engine, so it lives on the
+blanket-implemented `SSABinding` rather than narrowing `Env` for everyone — the
+same read/write vocabulary then serves a dense, `ProgramPoint`-anchored engine
+unchanged (`PointAnchoredEngine` in `tests/frame_engine_capabilities.rs` is that
+assertion). Binding still goes through `env_write`, so an engine's logging and
+absence policy apply to bound values too. `Env` deliberately stops there. Choosing
 a *context key* is analysis policy, so `EnvStore::get_or_allocate` stays internal to
 the engine that has a policy; and *creating or retiring* an activation is the
 call boundary's business, so `alloc_env`/`free_env` are on `CallServices`.
@@ -603,7 +620,7 @@ I entering?". A frame consuming both names both:
 
 ```rust
 impl<I, F, V, E, T> Frame<I, F> for CallFrame<V, T>
-where I: CallServices<Value = V, Error = E> + Env, ..
+where I: CallServices<Value = V, Error = E> + Env<Anchor = SSAValue>, ..
 ```
 
 That keeps the bounds honest in both directions. A frame that only reads and
@@ -644,14 +661,14 @@ member itself should name only the component capabilities it consumes:
 // Full concrete surface. Adds no methods; blanket-implemented. `Env`
 // is listed explicitly: `CallServices` does not imply it.
 pub trait ForwardFrameEngine:
-    StatementDispatch + Env + CFGQueries + DiGraphQueries + CallServices {}
+    StatementDispatch + Env<Anchor = SSAValue> + CFGQueries + DiGraphQueries + CallServices {}
 impl<T> ForwardFrameEngine for T
-where T: StatementDispatch + Env + CFGQueries + DiGraphQueries + CallServices {}
+where T: StatementDispatch + Env<Anchor = SSAValue> + CFGQueries + DiGraphQueries + CallServices {}
 
 // Abstract dataflow: the traversal it *shares*, plus merge/summarization.
 // Notably NOT CallServices, and NOT CFGQueries.
 pub trait ForwardDataflowFrameEngine:
-    Env + StatementDispatch + BlockQueries + DiGraphQueries
+    Env<Anchor = SSAValue> + StatementDispatch + BlockQueries + DiGraphQueries
 {
     type SummaryKey: Clone + Eq + Hash;
     fn analysis_merge(..); fn contribute_return(..); fn current_function_key(..);
@@ -670,7 +687,7 @@ demanding a call convention it never performs.
 incomplete mock engines whose ability to compile *is* the regression test.
 
 Binding values into an **explicitly selected** activation is
-`Env::bind_values(index, slots, values)`, not a method on any umbrella, so it is
+`SSABinding::bind_values(index, slots, values)`, not a method on any umbrella, so it is
 no longer confusable with `SparseForwardInterp::write_results` (the
 dialect-facing helper, which binds into the engine's *current* activation,
 `interp.index()`). The two differ by *which activation*, not by what they do —
@@ -706,9 +723,10 @@ pub trait StatementDispatch: Interp  { /* run_statement */ }
 pub trait BlockQueries: Interp       { /* read-only block queries */ }
 pub trait CFGQueries: BlockQueries   { /* cfg_entry */ }
 pub trait DiGraphQueries: Interp     { /* digraph_walk_plan */ }
-pub trait Env: Interp        { /* env read/write, bind_values */ }
+pub trait Env: Interp                { /* type Anchor; env read/write */ }
+pub trait SSABinding: Env<Anchor = SSAValue> { /* bind_values (blanket) */ }
 pub trait CallServices: Interp       { /* alloc/free env, resolve_callee, discover_body */ }
-pub(crate) trait BlockBinding: Env + BlockQueries { /* bind_block_args */ }
+pub(crate) trait BlockBinding: SSABinding + BlockQueries { /* bind_block_args */ }
 ```
 
 **Members and stack items.** Concrete composition separates two roles that the old
@@ -751,10 +769,10 @@ Narrowest first, the shipped member frames now require:
 | frame | bound |
 |---|---|
 | `ScfIfFrame` | `FrameEngine<Error = E>` — decides its arm before being built, so it touches no engine capability at all |
-| `ScfForFrame` | `Env<Value = V, Error = E>` — reads the loop bound/step, pushes a `BlockFrame` |
-| `CallFrame` | `CallServices + Env` — creates/frees the callee activation and binds results into the caller's |
-| `BlockCursor` | per operation: `BlockQueries` (query) / `Env + BlockQueries` (bind entry) / `Env` (bind child results) |
-| `DiGraphFrame::finish`, `AbstractDiGraphFrame::finish` | `Env` — the schedule is already consumed; only the yields are read |
+| `ScfForFrame` | `Env<Value = V, Error = E, Anchor = SSAValue>` — reads the loop bound/step, pushes a `BlockFrame` |
+| `CallFrame` | `CallServices + Env<Anchor = SSAValue>` — creates/frees the callee activation and binds results into the caller's; no dispatch, no statement-effect algebra |
+| `BlockCursor` | per operation: `BlockQueries` (query) / `Env<Anchor = SSAValue> + BlockQueries` (bind entry) / `Env<Anchor = SSAValue>` (bind child results) |
+| `DiGraphFrame::finish`, `AbstractDiGraphFrame::finish` | `Env<Anchor = SSAValue>` — the schedule is already consumed; only the yields are read |
 | `BlockFrame` | `BlockQueries + StatementDispatch + SparseForwardInterp` |
 | `CFGFrame` | `CFGQueries + StatementDispatch + SparseForwardInterp` |
 | `DiGraphFrame` | `DiGraphQueries + StatementDispatch + SparseForwardInterp` |
@@ -911,16 +929,17 @@ The container is deliberately ignorant of what it stores. It knows nothing about
 constprop, bottom values, widening, dependencies, or scheduling; `write` assigns
 and never joins; and `read` reports an absent anchor as `Ok(None)` rather than
 interpreting it, so an invalid `EnvIndex` (an error) stays distinguishable from
-an anchor that holds nothing. Backward analyses use `FactStore` directly with
-their existing scoped anchors instead of allocating environments.
+an anchor that holds nothing. Backward analyses still use `FactStore` directly
+with their existing scoped anchors instead of allocating environments; migrating
+them onto `EnvStore<LinkTarget, _, _>` is the remaining work.
 
 **Who decides what.** The layering is:
 
 | layer | decides |
 |---|---|
-| analysis policy (`CallContext`) | context identity — the key `K` from a resolved target plus abstract arguments |
+| analysis policy (`CallContext`) | context identity — the key `K` from a resolved target plus abstract arguments. Context-*insensitive* means `K = LinkTarget`: one environment and one summary per resolved target, shared across its call sites |
 | `EnvStore<K, A, V>` | mapping that identity to a live environment, and holding its facts |
-| `Env` | what an access *means* for this engine (unbound-is-an-error vs. bottom, read/write logging) |
+| `Env` | what an access *means* for this engine (unbound-is-an-error vs. bottom, read/write logging), at its `Env::Anchor` family |
 | `CallServices` | activation lifetime (`alloc_env`/`free_env`) plus callable resolution (`resolve_callee`/`discover_body`) — a sibling of `Env`, not a subtrait |
 | `CallFrame` | *when* those lifetime operations run, and pairing them exactly once |
 | fixpoint driver | summaries, dependencies, worklist |
@@ -942,11 +961,13 @@ pub trait CallContext<V>     { type Key: Eq + Hash + Clone;
 pub trait WideningStrategy<V> { fn merge(&self, current, incoming, visits) -> Result<Product<V>, _>; }
 ```
 
-`ContextInsensitive` keys by `(stage, specialization)` — every call site of a
-function shares one summary — and joins-then-widens after `widen_after` visits.
+`ContextInsensitive` keys by the resolved `LinkTarget` — every call site of a
+target shares one summary — and joins-then-widens after `widen_after` visits.
+The target already *is* that identity, so the key does not re-spell it as a
+tuple, and a context-sensitive policy *adds* to it rather than replacing it:
 `kirin-constprop`'s
-`ConstPropContext` keys distinct fully-constant argument tuples to distinct
-summaries — bounded by a per-function budget, with overflow and non-constant
+`ConstPropContext` keys `(LinkTarget, CallCtx)`, mapping distinct fully-constant
+argument tuples to distinct summaries — bounded by a per-target budget, with overflow and non-constant
 arguments collapsing to one shared `Unknown` context (joined → sound `Top`).
 That is what makes recursive constant propagation precise on both linear
 recursion (`factorial(Const(5)) → Const(120)`) and overlapping-subproblem

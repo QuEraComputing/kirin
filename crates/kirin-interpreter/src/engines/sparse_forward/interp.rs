@@ -44,11 +44,11 @@ use crate::core::query;
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
     BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
-    EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval,
-    ForwardSummaryDeps, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
-    LinkTarget, Linker, OwnerSemantics, SameStageLinker, SparseForwardEffect,
-    SparseForwardSemantic, StageQuery, StandardAbstractFrame, StandardFixpointInterpreter,
-    StatementDispatch, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
+    EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval, Frame, Interp,
+    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, OwnerSemantics,
+    SSABinding, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
+    StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, Summary,
+    SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
 
 use super::deps::{ForwardDeps, ValueFactKey};
@@ -89,11 +89,18 @@ impl Default for ContextInsensitive {
     }
 }
 
+/// One summary per resolved [`LinkTarget`], shared by every call site of that
+/// target.
+///
+/// The target *is* the context-insensitive key: it already identifies the stage
+/// and specialization a call resolved to, so re-deriving a tuple from it would
+/// only be a second spelling of the same identity. Context sensitivity is what
+/// *adds* to this key (see `ConstPropContext`), never what re-spells it.
 impl<V> CallContext<V> for ContextInsensitive {
-    type Key = (CompileStage, SpecializedFunction);
+    type Key = LinkTarget;
 
     fn key(&mut self, target: &LinkTarget, _args: &Product<V>) -> Self::Key {
-        (target.stage, target.specialization)
+        *target
     }
 }
 
@@ -543,6 +550,9 @@ where
     P: CallContext<V>,
     Sem: SparseForwardSemantic,
 {
+    /// The sparse-forward shape anchors its facts on SSA values.
+    type Anchor = SSAValue;
+
     fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<V, E> {
         // Log the read regardless of whether it resolves to a bound value or
         // bottom — an unbound read of a value defined elsewhere is exactly the
@@ -1487,8 +1497,12 @@ where
         stage: CompileStage,
         function: SpecializedFunction,
     ) -> Option<&Product<V>> {
+        let target = LinkTarget {
+            stage,
+            specialization: function,
+        };
         self.driver
-            .summary(&Owner::Function((stage, function)))
+            .summary(&Owner::Function(target))
             .and_then(|info| info.as_function())
             .and_then(|function| function.ret.as_ref())
     }
