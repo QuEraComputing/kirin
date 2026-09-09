@@ -15,7 +15,7 @@
 //! | mock engine | pins |
 //! |---|---|
 //! | `BlockOnlyEngine` | `BlockFrame` needs only `Env + StatementDispatch + BlockQueries` |
-//! | `CallOnlyEngine` | `CallFrame` needs only `CallServices` — not even a statement-effect algebra |
+//! | `CallOnlyEngine` | `CallFrame` needs only `CallServices + Env` — not even a statement-effect algebra |
 //! | `AbstractOnlyEngine` | `ForwardDataflowFrameEngine` requires neither `CallServices` nor `CFGQueries` |
 //! | `QueriesOnlyEngine` | the `*Queries` traits are honestly read-only: satisfiable with no `Env` at all |
 //!
@@ -470,14 +470,14 @@ fn abstract_engine_needs_no_concrete_call_lifecycle() {
 ///
 /// This needs no instantiation — a generic function body is type-checked at
 /// *definition* time, so `needs_all::<I>()` fails to compile the moment
-/// `ForwardFrameEngine` stops implying all four components (e.g. if the blanket
-/// impl were dropped, or a fifth component added to the umbrella without an
+/// `ForwardFrameEngine` stops implying all five components (e.g. if the blanket
+/// impl were dropped, or a sixth component added to the umbrella without an
 /// impl).
 #[allow(dead_code)]
 fn umbrella_still_covers_every_component<I: ForwardFrameEngine>() {
     fn needs_all<J>()
     where
-        J: StatementDispatch + BlockQueries + DiGraphQueries + CallServices,
+        J: StatementDispatch + Env + BlockQueries + DiGraphQueries + CallServices,
     {
     }
     needs_all::<I>();
