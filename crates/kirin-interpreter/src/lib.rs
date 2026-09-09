@@ -74,7 +74,7 @@ pub use self::core::{
 pub use self::core::{BranchCondition, HasProductValue, expect_single};
 pub use self::core::{CallEffect, Callee, Edge, SparseForwardEffect};
 pub use self::core::{CrossStageLinker, LinkTarget, Linker, ResolvedCallable, SameStageLinker};
-pub use self::core::{Env, EnvIndex, EnvStore};
+pub use self::core::{Env, EnvIndex, EnvStore, SSABinding};
 pub use self::core::{InterpDispatch, Interpretable};
 pub use self::core::{InterpreterError, StageQuery, TerminatorArgs};
 pub use engines::concrete::{
@@ -159,8 +159,8 @@ pub mod engine {
         DenseBackwardInterp, DenseBackwardInterpreter, DenseBackwardState, DenseBlockFrame,
         DiGraphFrame, DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
         FrameEffect, FrameEngine, Interp, InterpDispatch, InterpreterError, LinkTarget, Linker,
-        ResolvedCallable, SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter,
-        SparseForwardInterp, SparseForwardInterpreter, StandardAbstractFrame, StatementDispatch,
-        WideningStrategy, drive_frames, expect_single,
+        ResolvedCallable, SSABinding, SameStageLinker, SparseBackwardInterp,
+        SparseBackwardInterpreter, SparseForwardInterp, SparseForwardInterpreter,
+        StandardAbstractFrame, StatementDispatch, WideningStrategy, drive_frames, expect_single,
     };
 }

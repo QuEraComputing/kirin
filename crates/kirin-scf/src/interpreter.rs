@@ -844,10 +844,11 @@ where
 }
 
 /// `scf.for` reads the loop bound/step out of the activation it was given and
-/// otherwise only pushes a [`BlockFrame`] — so [`Env`] is its whole requirement.
+/// otherwise only pushes a [`BlockFrame`] — so an SSA-anchored [`Env`] is its
+/// whole requirement.
 impl<I, F, V, E> Frame<I, F> for ScfForFrame<V, E>
 where
-    I: Env<Value = V, Error = E>,
+    I: Env<Value = V, Error = E, Anchor = SSAValue>,
     F: From<BlockFrame<V, E>>,
     V: Clone + ForLoopValue,
     E: From<InterpreterError>,

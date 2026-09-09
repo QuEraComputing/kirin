@@ -31,20 +31,24 @@
 //! | trait | capability | consumed by |
 //! |---|---|---|
 //! | [`StatementDispatch`] | dispatch a statement to its dialect rule | every executing frame |
-//! | [`Env`] | read/write/bind SSA values in an activation | every frame that touches storage |
+//! | [`Env`] | read/write one fact at an [`Anchor`](Env::Anchor) in an activation | every frame that touches storage |
+//! | [`SSABinding`] | positional binding into SSA slots (`: Env<Anchor = SSAValue>`) | [`CallFrame`](crate::CallFrame), block/graph walkers |
 //! | [`BlockQueries`] | read-only structural queries for walking one block | [`BlockFrame`](crate::BlockFrame), [`AbstractBlockFrame`](crate::AbstractBlockFrame), dialect block walkers |
 //! | [`CFGQueries`] | find a CFG's entry block (`: BlockQueries`) | [`CFGFrame`](crate::CFGFrame) |
 //! | [`DiGraphQueries`] | schedule a digraph body | [`DiGraphFrame`](crate::DiGraphFrame) |
-//! | [`CallServices`] | activation lifetime + callable discovery | [`CallFrame`](crate::CallFrame), *with* [`Env`] |
+//! | [`CallServices`] | activation lifetime + callable discovery | [`CallFrame`](crate::CallFrame), *with* [`SSABinding`] |
 //!
-//! [`Env`] is *using* an activation — reads, writes, and positional
-//! binding. Creating and retiring one is the call boundary's business, so
+//! [`Env`] is *using* an activation — one read, one write, at whichever anchor
+//! family the engine attaches facts to. Binding a *list* of values to SSA slots
+//! is only meaningful for an SSA-anchored engine, so it lives on the
+//! blanket-implemented [`SSABinding`] instead of narrowing [`Env`] itself.
+//! Creating and retiring an activation is the call boundary's business, so
 //! `alloc_env`/`free_env` sit on [`CallServices`] next to `resolve_callable`.
 //! The two are **siblings on [`Interp`]**, neither a supertrait of the other, so
 //! a frame that only reads and writes never claims a lifecycle it does not
 //! exercise, and the abstract dataflow engine stays free of a call convention it
 //! never performs. A frame needing both spells both: `CallFrame` is
-//! `I: CallServices + Env`.
+//! `I: CallServices + Env<Anchor = SSAValue>`.
 //!
 //! The `*Queries` traits are exactly that: **read-only**. The one operation that
 //! needs both a query and a write — binding a block's parameters to incoming
@@ -75,7 +79,9 @@ use std::hash::Hash;
 
 use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
-use crate::{Body, CallEffect, Callee, Env, EnvIndex, Interp, InterpreterError, ResolvedCallable};
+use crate::{
+    Body, CallEffect, Callee, Env, EnvIndex, Interp, InterpreterError, ResolvedCallable, SSABinding,
+};
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
 ///
@@ -266,8 +272,10 @@ pub trait CFGQueries: BlockQueries {
 /// Deliberately not on [`BlockQueries`] (whose name promises read-only) and
 /// deliberately not public: it is frame-internal mechanics, blanket-implemented
 /// for every engine with both capabilities, so a frame that binds a block entry
-/// spells its requirement honestly as `Env + BlockQueries`.
-pub(crate) trait BlockBinding: Env + BlockQueries {
+/// spells its requirement honestly as `Env<Anchor = SSAValue> + BlockQueries`.
+/// It builds on [`SSABinding`] rather than [`Env`] directly, because a block's
+/// parameters are SSA slots.
+pub(crate) trait BlockBinding: SSABinding + BlockQueries {
     /// Positionally bind a block's parameters to incoming actuals in `index`,
     /// checking arity.
     fn bind_block_args(
@@ -292,7 +300,7 @@ pub(crate) trait BlockBinding: Env + BlockQueries {
     }
 }
 
-impl<T: Env + BlockQueries> BlockBinding for T {}
+impl<T: SSABinding + BlockQueries> BlockBinding for T {}
 
 /// Structural/scheduling queries needed to traverse a
 /// [`DiGraph`](kirin_ir::DiGraph) body.
@@ -328,7 +336,7 @@ pub trait DiGraphQueries: Interp {
 /// "where do activations come from, and whose body am I entering?" — so neither
 /// silently drags the other in, and each frame states exactly which it
 /// consumes. [`CallFrame`](crate::CallFrame) consumes both, and says so:
-/// `I: CallServices + Env`. A frame that only reads and writes
+/// `I: CallServices + Env<Anchor = SSAValue>`. A frame that only reads and writes
 /// (`ScfForFrame`, `BlockCursor::write_child_results`) names [`Env`]
 /// alone and claims no lifecycle it never exercises.
 ///
@@ -376,14 +384,16 @@ pub trait CallServices: Interp {
 /// [`Env`] and [`CallServices`] are both listed because they are
 /// independent siblings: the standard concrete universe both *uses* activations
 /// (every walker) and *creates* them (`CallFrame`), and neither trait implies
-/// the other.
+/// the other. The env is pinned to `Anchor = SSAValue`: every walker in this
+/// universe binds block parameters and result slots, so the umbrella would not
+/// actually cover its variants with a free anchor.
 pub trait ForwardFrameEngine:
-    StatementDispatch + Env + CFGQueries + DiGraphQueries + CallServices
+    StatementDispatch + Env<Anchor = SSAValue> + CFGQueries + DiGraphQueries + CallServices
 {
 }
 
 impl<T> ForwardFrameEngine for T where
-    T: StatementDispatch + Env + CFGQueries + DiGraphQueries + CallServices
+    T: StatementDispatch + Env<Anchor = SSAValue> + CFGQueries + DiGraphQueries + CallServices
 {
 }
 
@@ -415,7 +425,7 @@ impl<T> ForwardFrameEngine for T where
 /// custom frame cannot reorder it and break soundness. Frames only decide
 /// *traversal*: which frame to step next.
 pub trait ForwardDataflowFrameEngine:
-    Env + StatementDispatch + BlockQueries + DiGraphQueries
+    Env<Anchor = SSAValue> + StatementDispatch + BlockQueries + DiGraphQueries
 {
     /// The key under which function entry/return summaries are tracked
     /// (the analysis [`CallContext::Key`](crate::CallContext::Key)).

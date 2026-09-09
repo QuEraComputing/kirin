@@ -26,7 +26,7 @@ use kirin_ir::{Block, CompileStage, DiGraph, Product, SSAValue, Statement};
 use crate::core::frame::BlockBinding;
 use crate::{
     CallEffect, Edge, Env, EnvIndex, ForwardDataflowFrameEngine, Frame, FrameEffect,
-    InterpreterError, SparseForwardEffect, SparseForwardInterp,
+    InterpreterError, SSABinding, SparseForwardEffect, SparseForwardInterp,
 };
 
 /// Completion payloads produced by the standard abstract frames.
@@ -310,7 +310,7 @@ where
     /// Reading the yields needs [`Env`] alone, not the whole dataflow surface.
     fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<Self, AbstractCompletion<V>, F>, E>
     where
-        I: Env<Value = V, Error = E>,
+        I: Env<Value = V, Error = E, Anchor = SSAValue>,
     {
         let values: Product<V> = self
             .yields
