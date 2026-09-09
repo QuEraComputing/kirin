@@ -52,10 +52,12 @@ pub trait Interp: Sized {               // the engine-side driver — ANALYSIS-A
     fn index(&self) -> EnvIndex;        //   (the SSA activation)
 }
 
-// SSA environment access used by forward engines.
+// The engine's capability for *using* an environment. `EnvStore<K, A, V>` is the
+// storage container underneath; activation lifetime is on `CallServices`.
 pub trait Env: Interp {
     fn env_read(..) -> Result<Self::Value, Self::Error>;
     fn env_write(..) -> Result<(), Self::Error>;
+    fn bind_values(..) -> Result<(), Self::Error>;  // default, writes via env_write
 }
 ```
 
@@ -157,8 +159,8 @@ both execution and analysis**: `kirin-arith`'s `Add` rule computes `3 + 5`
 under `ConcreteInterpreter<.., i64, ..>` and folds `Const(3) + Const(5)`
 under constant propagation, with no analysis-specific code in the dialect.
 
-`SparseForwardInterp` is the **forward engine** trait: it requires `Env` and
-`Semantics = ForwardEval`, and exposes the SSA read/write helpers as **default
+`SparseForwardInterp` is the **forward engine** trait: it requires `Env`
+and `Semantics = ForwardEval`, and exposes the SSA read/write helpers as **default
 methods**, hiding environment indices and locations: `interp.read(ssa)`,
 `interp.write(result, value)`, `interp.read_many(&values)`,
 `interp.write_results(&results, product)`. They delegate to the engine's [`Env`]
@@ -438,8 +440,8 @@ composed them. See [Custom traversal and policies](#custom-traversal-and-policie
 
 The **forward dataflow** engine — a lattice-based forward abstract interpreter,
 and one *specialization* of the shared framework in the forward direction (it sets
-`Effect = SparseForwardEffect` and `Semantics = ForwardEval`, stores SSA activations via
-`Env`, and drives forward frames). The name
+`Effect = SparseForwardEffect` and `Semantics = ForwardEval`, stores SSA activations in
+an `EnvStore` container, and drives forward frames). The name
 `AbstractInterpreter` is reserved for the shared trait implemented by
 lattice-valued abstract engines. `SparseForwardInterpreter` is the forward
 engine; `SparseBackwardInterpreter` (per-SSA demand / strong liveness) and
@@ -549,10 +551,11 @@ surface still runs the frames it can support.
 | trait | capability | required by |
 |---|---|---|
 | `StatementDispatch: Interp` | `run_statement` — dispatch to the dialect rule | every executing frame |
+| `Env: Interp` | `env_read`/`env_write`/`bind_values` (`core/env/services.rs`) | every frame that touches storage |
 | `BlockQueries: Interp` | `block_params`/`first_statement`/`next_statement` | `BlockCursor`, `BlockFrame`, `AbstractBlockFrame`, dialect block walkers |
 | `CFGQueries: BlockQueries` | `cfg_entry` | `CFGFrame` |
 | `DiGraphQueries: Interp` | `digraph_walk_plan` (default: `NoDefaultWalker`) | `DiGraphFrame`, `AbstractDiGraphFrame` |
-| `CallServices: Env` | `alloc_env`/`free_env`/`resolve_callable` | `CallFrame` |
+| `CallServices: Interp` | `alloc_env`/`free_env`/`resolve_callable` | `CallFrame`, *together with* `Env` |
 
 **The `*Queries` traits are read-only, and only require `Interp`** — so nothing
 on them can touch SSA storage, and their names cannot hide a store mutation. The
@@ -560,22 +563,46 @@ one operation that needs both a query and a write, binding a block's parameters
 to incoming actuals, lives on the crate-private `BlockBinding` extension
 (bounded `Env + BlockQueries`) instead. A frame that binds a block entry
 therefore spells that requirement out: `BlockCursor::bind_entry` and
-`::enter_block` take `Env + BlockQueries`, while `::advance` takes `BlockQueries`
-alone and `::write_child_results` takes `Env` alone.
+`::enter_block` take `Env + BlockQueries`, while `::advance` takes
+`BlockQueries` alone and `::write_child_results` takes `Env` alone.
 
-`CallServices` names *services*, not a convention: **`CallFrame` still owns the
-calling convention** — the operation order, which completions are legal, and
-freeing the activation exactly once — and this trait only supplies the
-primitives. The public `CallServices::resolve_callable` method exposes
+`Env` is *using* an activation: reads, writes, and `bind_values`
+(positional binding, which goes through `env_write` so an engine's logging and
+absence policy apply to bound values too). It deliberately stops there. Choosing
+a *context key* is analysis policy, so `EnvStore::get_or_allocate` stays internal to
+the engine that has a policy; and *creating or retiring* an activation is the
+call boundary's business, so `alloc_env`/`free_env` are on `CallServices`.
+
+**The two are independent siblings on `Interp`** — neither is a supertrait of
+the other — because they answer different questions: "what does an access to
+this activation mean?" versus "where do activations come from, and whose body am
+I entering?". A frame consuming both names both:
+
+```rust
+impl<I, F, V, E, T> Frame<I, F> for CallFrame<V, T>
+where I: CallServices<Value = V, Error = E> + Env, ..
+```
+
+That keeps the bounds honest in both directions. A frame that only reads and
+writes an activation — `ScfForFrame`, `BlockCursor::write_child_results` — names
+`Env` and claims no lifecycle it never exercises. An engine that can
+create and retire activations owes no value-access policy for doing so. And the
+forward abstract engine gets storage access without a call convention it never
+performs — `AbstractOnlyEngine` in `tests/frame_engine_capabilities.rs`
+implements `Env` with no `CallServices` at all.
+
+Within `CallServices` the lifetime pair is deliberately **not** split further:
+the standard `CallFrame` consumes `alloc_env`/`free_env` together, and their
+pairing is a safety property (an `alloc_env` without its `free_env` leaks; a
+second `free_env` double-frees), so no engine should be able to offer half a
+lifecycle. The public `CallServices::resolve_callable` method exposes
 linker-plus-target-stage body discovery using the engine's configured pipeline
 and linker; it carries no value product. The built-in engines share the
 crate-private `link_and_discover_callable` helper for root entry and nested
-calls. Compiler authors configure resolution policy through `.with_linker(...)`.
-The trait is deliberately
-**not** split further: the standard `CallFrame` consumes all three services
-together, and their pairing is a safety property (an
-`alloc_env` without its `free_env` leaks; a second `free_env` double-frees), so
-no engine should be able to offer half a call convention.
+calls, and compiler authors configure resolution policy through
+`.with_linker(...)`. None of this makes the trait a convention: **`CallFrame`
+still owns the calling convention** — the operation order, which completions are
+legal, and freeing the activation exactly once.
 
 `StatementDispatch` and `InterpDispatch` face opposite directions and are easy
 to confuse. `InterpDispatch<I>` is implemented by a **stage/language** to route a
@@ -589,11 +616,12 @@ engine must support the union of all admitted member continuations, while each
 member itself should name only the component capabilities it consumes:
 
 ```rust
-// Full concrete surface. Adds no methods; blanket-implemented.
+// Full concrete surface. Adds no methods; blanket-implemented. `Env`
+// is listed explicitly: `CallServices` does not imply it.
 pub trait ForwardFrameEngine:
-    StatementDispatch + CFGQueries + DiGraphQueries + CallServices {}
+    StatementDispatch + Env + CFGQueries + DiGraphQueries + CallServices {}
 impl<T> ForwardFrameEngine for T
-where T: StatementDispatch + CFGQueries + DiGraphQueries + CallServices {}
+where T: StatementDispatch + Env + CFGQueries + DiGraphQueries + CallServices {}
 
 // Abstract dataflow: the traversal it *shares*, plus merge/summarization.
 // Notably NOT CallServices, and NOT CFGQueries.
@@ -612,9 +640,8 @@ That follows the semantics: forward abstract interpretation *summarizes* a call
 reaches a callable body's entry block through `Owner` seeding in the fixpoint
 driver rather than `cfg_entry`. Requiring its frame universe to expose
 `alloc_env`, `free_env`, `resolve_callable`, and `cfg_entry` was demanding a call
-convention it never performs. `tests/frame_engine_capabilities.rs` pins this
-down with deliberately incomplete mock engines whose ability to compile *is* the
-regression test.
+convention it never performs. `tests/frame_engine_capabilities.rs` pins this down with deliberately
+incomplete mock engines whose ability to compile *is* the regression test.
 
 Binding values into an **explicitly selected** activation is
 `Env::bind_values(index, slots, values)`, not a method on any umbrella, so it is
@@ -653,7 +680,8 @@ pub trait StatementDispatch: Interp  { /* run_statement */ }
 pub trait BlockQueries: Interp       { /* read-only block queries */ }
 pub trait CFGQueries: BlockQueries   { /* cfg_entry */ }
 pub trait DiGraphQueries: Interp     { /* digraph_walk_plan */ }
-pub trait CallServices: Env          { /* alloc/free env, resolve_callable */ }
+pub trait Env: Interp        { /* env read/write, bind_values */ }
+pub trait CallServices: Interp       { /* alloc/free env, resolve_callable */ }
 pub(crate) trait BlockBinding: Env + BlockQueries { /* bind_block_args */ }
 ```
 
@@ -698,7 +726,7 @@ Narrowest first, the shipped member frames now require:
 |---|---|
 | `ScfIfFrame` | `FrameEngine<Error = E>` — decides its arm before being built, so it touches no engine capability at all |
 | `ScfForFrame` | `Env<Value = V, Error = E>` — reads the loop bound/step, pushes a `BlockFrame` |
-| `CallFrame` | `CallServices` |
+| `CallFrame` | `CallServices + Env` — creates/frees the callee activation and binds results into the caller's |
 | `BlockCursor` | per operation: `BlockQueries` (query) / `Env + BlockQueries` (bind entry) / `Env` (bind child results) |
 | `DiGraphFrame::finish`, `AbstractDiGraphFrame::finish` | `Env` — the schedule is already consumed; only the yields are read |
 | `BlockFrame` | `BlockQueries + StatementDispatch + SparseForwardInterp` |
@@ -815,8 +843,8 @@ through `summarize_call` instead of descending into the callee. Descending would
 neither widen nor terminate on recursion.
 
 Abstract frames need a few capabilities beyond the traversal they share with
-concrete execution, on `ForwardDataflowFrameEngine: Env + StatementDispatch +
-BlockQueries + DiGraphQueries` —
+concrete execution, on `ForwardDataflowFrameEngine: Env +
+StatementDispatch + BlockQueries + DiGraphQueries` —
 `analysis_merge`, `contribute_return`, and `summarize_call`. It does **not**
 extend `CallServices`: `AbstractCallFrame`'s single engine requirement is
 `summarize_call`, so summarizing a call needs no call convention at all. Nor
@@ -827,6 +855,56 @@ the engine**:
 (*including same-key recursion*) → read-return-summary in one step, so a custom
 frame chooses *what to traverse* but cannot reorder the summary protocol and
 break soundness.
+
+### Shared fact storage and environments
+
+`FactStore<A, V>` is the common anchor-to-payload map for interpreter values and
+analysis facts. Anchors need only `Eq + Hash`; payloads need no lattice contract
+for ordinary lookup and assignment. `set` assigns, `get` returns `None` for an
+absent anchor, and `join_with` explicitly receives the analysis's bottom and merge
+operation and reports whether the stored fact changed.
+
+`EnvStore<K, A, V>` is the environment **storage container**, and it owns both halves
+of environment identity:
+
+```rust
+context_indices: HashMap<K, EnvIndex>,          // which context an environment belongs to
+environments:    Vec<Option<Environment<K, A, V>>>,  // its facts (one FactStore each)
+```
+
+Fact maps stay separate per environment, so equal anchors under different
+contexts never collide. `alloc()` returns a fresh unkeyed environment;
+`get_or_allocate(K)` returns the live environment for a context or allocates and
+registers one; `read`/`write`/`free`/`environment` are the remaining operations.
+Each environment remembers the key it was registered under, so `free` drops the
+context association in constant time — a later `get_or_allocate` of the same key
+therefore allocates a fresh environment rather than resurrecting a dead one.
+Freed indices are never reused.
+
+The container is deliberately ignorant of what it stores. It knows nothing about
+constprop, bottom values, widening, dependencies, or scheduling; `write` assigns
+and never joins; and `read` reports an absent anchor as `Ok(None)` rather than
+interpreting it, so an invalid `EnvIndex` (an error) stays distinguishable from
+an anchor that holds nothing. Backward analyses use `FactStore` directly with
+their existing scoped anchors instead of allocating environments.
+
+**Who decides what.** The layering is:
+
+| layer | decides |
+|---|---|
+| analysis policy (`CallContext`) | context identity — the key `K` from a resolved target plus abstract arguments |
+| `EnvStore<K, A, V>` | mapping that identity to a live environment, and holding its facts |
+| `Env` | what an access *means* for this engine (unbound-is-an-error vs. bottom, read/write logging) |
+| `CallServices` | activation lifetime (`alloc_env`/`free_env`) plus callable resolution (`resolve_callable`) — a sibling of `Env`, not a subtrait |
+| `CallFrame` | *when* those lifetime operations run, and pairing them exactly once |
+| fixpoint driver | summaries, dependencies, worklist |
+
+Keyed allocation never reaches a shared engine surface: `CallServices` exposes
+only the unkeyed `alloc_env`/`free_env`, and the sparse-forward engine calls
+`get_or_allocate` internally, because only it has a context policy.
+Concrete execution has no context identity at all — its container is
+`EnvStore<Infallible, SSAValue, V>`, whose uninhabited key type makes it *impossible*
+for two calls to share an environment through a common key.
 
 ### Abstract policies — `CallContext` and `WideningStrategy`
 

@@ -1,7 +1,7 @@
 use kirin_ir::{CompileStage, Product, SSAValue};
 
 use crate::{
-    Body, CallEffect, CallServices, Callee, EnvIndex, Frame, FrameEffect, InterpreterError,
+    Body, CallEffect, CallServices, Callee, Env, EnvIndex, Frame, FrameEffect, InterpreterError,
     ResolvedCallable,
 };
 
@@ -119,9 +119,13 @@ impl<V, T> From<CallRequest<V>> for CallFrame<V, T> {
     }
 }
 
+/// The call boundary consumes two independent capabilities and names both:
+/// [`CallServices`] to create the callee activation, resolve its body, and free
+/// it again, and [`Env`] to bind the completion's results back into the
+/// *caller's* activation.
 impl<I, F, V, E, T> Frame<I, F> for CallFrame<V, T>
 where
-    I: CallServices<Value = V, Error = E>,
+    I: CallServices<Value = V, Error = E> + Env,
     T: CallBodyTraversal<V, E, F>,
     V: Clone,
     E: From<InterpreterError>,

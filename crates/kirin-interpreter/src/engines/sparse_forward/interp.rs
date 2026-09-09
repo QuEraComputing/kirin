@@ -6,15 +6,15 @@
 //! wrapper over a [`StandardFixpointInterpreter`] driving a summary-free
 //! [`SparseForwardTransfer`]:
 //!
-//! - **[`SparseForwardTransfer`]** is the [`Interp`] delegate: pipeline, linker, SSA
-//!   env, analysis policy, per-function return accumulator, and read/write logging;
-//!   it provides the dialect-dispatch / IR-query surface ([`StatementDispatch`],
-//!   [`BlockQueries`], [`CFGQueries`], [`DiGraphQueries`], and — for
-//!   concrete-shaped callers — [`CallServices`]).
+//! - **[`SparseForwardTransfer`]** is the [`Interp`] delegate: pipeline, linker,
+//!   the [`EnvStore`] container (one environment per analysis context, addressed by
+//!   the policy's context key), analysis policy, per-function return
+//!   accumulator, and read/write logging; it provides the dialect-dispatch /
+//!   IR-query surface ([`StatementDispatch`], [`BlockQueries`], [`CFGQueries`],
+//!   [`DiGraphQueries`], and — for concrete-shaped callers — [`CallServices`]).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the summaries, the
-//!   dependency graph ([`ForwardSummaryDeps`]), the owner worklist, and the
-//!   owner-local [`ForwardStore`] (shared envs + context-qualified value-reader
-//!   deps).
+//!   forward dependency bookkeeping ([`ForwardDeps`] — callee-summary edges plus
+//!   context-qualified value-reader edges), and the owner worklist.
 //!
 //! # Owner kinds
 //!
@@ -44,12 +44,14 @@ use crate::core::{linker::link_and_discover_callable, query};
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
     BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
-    EnvIndex, EnvStackStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval,
-    ForwardSummaryDeps, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
-    LinkTarget, Linker, OwnerSemantics, ResolvedCallable, SameStageLinker, SparseForwardEffect,
-    SparseForwardSemantic, StageQuery, StandardAbstractFrame, StandardFixpointInterpreter,
-    StatementDispatch, Store, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
+    EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval, Frame, Interp,
+    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, OwnerSemantics,
+    ResolvedCallable, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
+    StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, Summary,
+    SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
+
+use super::deps::{ForwardDeps, ValueFactKey};
 
 // ===========================================================================
 // Pluggable analysis seams (policy `P`)
@@ -247,56 +249,6 @@ impl<V: Clone> Summary for ForwardSummary<V> {
     }
 }
 
-/// Context-qualified key for value-reader dependencies: the same [`SSAValue`] under
-/// two different function contexts is two distinct facts, so readers never
-/// cross-contaminate.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ValueFactKey<K> {
-    pub function: K,
-    pub value: SSAValue,
-}
-
-/// Owner-local analysis state carried in the driver's `store`: one shared env per
-/// function context (so direct dominated cross-block uses resolve), plus the
-/// context-qualified value-reader dependency index. **Not** part of the public
-/// function-summary surface.
-pub struct ForwardStore<K, V> {
-    envs: HashMap<K, EnvIndex>,
-    value_readers: HashMap<ValueFactKey<K>, HashSet<Owner<K>>>,
-    _marker: PhantomData<fn() -> V>,
-}
-
-impl<K, V> ForwardStore<K, V> {
-    fn new() -> Self {
-        Self {
-            envs: HashMap::new(),
-            value_readers: HashMap::new(),
-            _marker: PhantomData,
-        }
-    }
-}
-
-impl<K: Clone + Eq + Hash, V> ForwardStore<K, V> {
-    fn env(&self, function: &K) -> Option<EnvIndex> {
-        self.envs.get(function).copied()
-    }
-
-    fn set_env(&mut self, function: K, index: EnvIndex) {
-        self.envs.insert(function, index);
-    }
-
-    fn register_reader(&mut self, key: ValueFactKey<K>, reader: Owner<K>) {
-        self.value_readers.entry(key).or_default().insert(reader);
-    }
-
-    fn readers_of(&self, key: &ValueFactKey<K>) -> Vec<Owner<K>> {
-        self.value_readers
-            .get(key)
-            .map(|readers| readers.iter().cloned().collect())
-            .unwrap_or_default()
-    }
-}
-
 /// A single mutation the driver applies through [`apply_update`](ForwardDriver::apply_update).
 enum ForwardUpdate<K, V> {
     /// Merge call args into a function context's entry (widen by visits); on rise,
@@ -345,14 +297,16 @@ where
     type Completion = AbstractCompletion<V>;
 }
 
-/// The forward driver: a [`StandardFixpointInterpreter`] over [`SparseForwardTransfer`]
-/// with owner summaries, forward dependencies, and the owner-local
-/// [`ForwardStore`].
+/// The forward driver: a [`StandardFixpointInterpreter`] over
+/// [`SparseForwardTransfer`] with owner summaries and [`ForwardDeps`].
+///
+/// It needs no side store: environments live in the transfer's [`EnvStore`]
+/// container, and both dependency kinds live in the dependency index.
 type ForwardDriver<'ir, S, V, E, Lk, P, F, Sem> = StandardFixpointInterpreter<
     SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>,
     SparseForwardProfile<V, E, <P as CallContext<V>>::Key, F>,
-    ForwardStore<<P as CallContext<V>>::Key, V>,
-    ForwardSummaryDeps<Owner<<P as CallContext<V>>::Key>>,
+    (),
+    ForwardDeps<<P as CallContext<V>>::Key>,
 >;
 
 // ===========================================================================
@@ -375,7 +329,10 @@ pub struct SparseForwardTransfer<
 {
     pipeline: &'ir Pipeline<S>,
     linker: Lk,
-    store: EnvStackStore<V>,
+    /// One environment per analysis context, addressed by the policy's context
+    /// key. Blocks of the same context share it (so direct dominated cross-block
+    /// uses resolve); distinct contexts are isolated.
+    env: EnvStore<<P as CallContext<V>>::Key, SSAValue, V>,
     analysis: P,
     max_iterations: usize,
     location: Option<InterpLocation>,
@@ -401,7 +358,7 @@ where
         Self {
             pipeline,
             linker: SameStageLinker,
-            store: EnvStackStore::new(),
+            env: EnvStore::new(),
             analysis: P::default(),
             max_iterations: 1000,
             location: None,
@@ -423,7 +380,7 @@ where
         SparseForwardTransfer {
             pipeline: self.pipeline,
             linker,
-            store: self.store,
+            env: self.env,
             analysis: self.analysis,
             max_iterations: self.max_iterations,
             location: self.location,
@@ -455,7 +412,7 @@ where
         SparseForwardTransfer {
             pipeline: self.pipeline,
             linker: self.linker,
-            store: EnvStackStore::new(),
+            env: EnvStore::new(),
             analysis,
             max_iterations: self.max_iterations,
             location: None,
@@ -473,6 +430,22 @@ where
 
     fn pipeline(&self) -> &'ir Pipeline<S> {
         self.pipeline
+    }
+
+    /// The environment shared by every owner of analysis context `key`,
+    /// allocating and registering it on first use.
+    ///
+    /// Keyed allocation is *this engine's* business: the analysis policy chooses
+    /// the context key, so no shared engine surface exposes this method.
+    /// [`CallServices`] offers only the unkeyed `alloc_env`/`free_env`, and
+    /// [`Env`] does not deal in activation lifetime at all.
+    fn context_env(&mut self, key: <P as CallContext<V>>::Key) -> EnvIndex {
+        self.env.get_or_allocate(key)
+    }
+
+    /// The environment of an already-seeded context, if it has one.
+    fn lookup_context_env(&self, key: &<P as CallContext<V>>::Key) -> Option<EnvIndex> {
+        self.env.context_env(key)
     }
 
     /// Begin logging reads/writes for a block-owner walk.
@@ -577,18 +550,21 @@ where
         if self.logging {
             self.read_log.borrow_mut().push(value);
         }
-        match self.store.read(index, value) {
-            Ok(value) => Ok(value),
-            Err(InterpreterError::UnboundValue { .. }) => Ok(V::bottom()),
-            Err(error) => Err(E::from(error)),
-        }
+        // An absent binding is bottom, not an error: this analysis may reach a
+        // use before the definition's owner has run. An invalid environment
+        // handle is still an error.
+        Ok(self
+            .env
+            .read(index, value)
+            .map_err(E::from)?
+            .unwrap_or_else(V::bottom))
     }
 
     fn env_write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
         if self.logging {
             self.write_log.push(value);
         }
-        self.store.write(index, value, data).map_err(E::from)
+        self.env.write(index, value, data).map_err(E::from)
     }
 }
 
@@ -619,11 +595,11 @@ where
     Sem: SparseForwardSemantic,
 {
     fn alloc_env(&mut self) -> EnvIndex {
-        self.store.alloc()
+        self.env.alloc()
     }
 
     fn free_env(&mut self, index: EnvIndex) -> Result<(), E> {
-        self.store.free(index).map_err(E::from)
+        self.env.free(index).map_err(E::from)
     }
 
     fn resolve_callable(
@@ -1084,7 +1060,7 @@ where
                     }
                 }
                 for value in risen {
-                    let readers = self.store().readers_of(&ValueFactKey {
+                    let readers = self.dependency_index().readers_of(&ValueFactKey {
                         function: function.clone(),
                         value,
                     });
@@ -1097,8 +1073,9 @@ where
         }
     }
 
-    /// Resolve the executable entry owner of `key`'s function (allocating its
-    /// shared env on first use) and seed it with the entry arguments.
+    /// Resolve the executable entry owner of `key`'s function (allocating the
+    /// context's shared environment on first use) and seed it with the entry
+    /// arguments.
     ///
     /// This is the one place a *function* becomes runnable *work*: it translates
     /// the callable [`Body`] into the executable [`Owner`] the worklist can
@@ -1111,10 +1088,7 @@ where
         stage: CompileStage,
         body: Body,
     ) -> Result<(), E> {
-        if self.store().env(key).is_none() {
-            let env = self.alloc_env();
-            self.store_mut().set_env(key.clone(), env);
-        }
+        self.inner_mut().context_env(key.clone());
         let entry_args = self
             .summary(&Owner::Function(key.clone()))
             .and_then(|info| info.as_function())
@@ -1248,11 +1222,14 @@ where
                     "block owner's function is unseeded",
                 ))
             })?;
-        let env = interp.store().env(&function).ok_or_else(|| {
-            E::from(InterpreterError::Custom(
-                "block owner's function has no shared env",
-            ))
-        })?;
+        let env = interp
+            .inner()
+            .lookup_context_env(&function)
+            .ok_or_else(|| {
+                E::from(InterpreterError::Custom(
+                    "block owner's function has no shared env",
+                ))
+            })?;
         interp.inner_mut().begin_block_log();
         match owner {
             Owner::Block { block, .. } => {
@@ -1300,18 +1277,21 @@ where
         }
 
         let (reads, writes) = interp.inner_mut().take_logs();
-        let env = interp.store().env(&function).ok_or_else(|| {
-            E::from(InterpreterError::Custom(
-                "block owner's function has no shared env",
-            ))
-        })?;
+        let env = interp
+            .inner()
+            .lookup_context_env(&function)
+            .ok_or_else(|| {
+                E::from(InterpreterError::Custom(
+                    "block owner's function has no shared env",
+                ))
+            })?;
 
         // Register external direct reads (values read but not written locally) as
         // context-qualified value-reader deps on this block owner.
         let written: HashSet<SSAValue> = writes.iter().copied().collect();
         for value in reads {
             if !written.contains(&value) {
-                interp.store_mut().register_reader(
+                interp.dependency_index_mut().register_reader(
                     ValueFactKey {
                         function: function.clone(),
                         value,
@@ -1403,9 +1383,9 @@ where
         Self {
             driver: StandardFixpointInterpreter::with_dependency_index(
                 SparseForwardTransfer::new(pipeline),
-                ForwardStore::new(),
                 (),
-                ForwardSummaryDeps::new(),
+                (),
+                ForwardDeps::new(),
             ),
         }
     }
@@ -1428,9 +1408,9 @@ where
         SparseForwardInterpreter {
             driver: StandardFixpointInterpreter::with_dependency_index(
                 transfer,
-                ForwardStore::new(),
                 (),
-                ForwardSummaryDeps::new(),
+                (),
+                ForwardDeps::new(),
             ),
         }
     }
@@ -1458,9 +1438,9 @@ where
         SparseForwardInterpreter {
             driver: StandardFixpointInterpreter::with_dependency_index(
                 transfer,
-                ForwardStore::new(),
                 (),
-                ForwardSummaryDeps::new(),
+                (),
+                ForwardDeps::new(),
             ),
         }
     }
@@ -1473,9 +1453,9 @@ where
         Self {
             driver: StandardFixpointInterpreter::with_dependency_index(
                 transfer,
-                ForwardStore::new(),
                 (),
-                ForwardSummaryDeps::new(),
+                (),
+                ForwardDeps::new(),
             ),
         }
     }

@@ -13,8 +13,6 @@ pub enum InterpreterError {
     InvalidEnvIndex(EnvIndex),
     #[error("unbound SSA value {value} in environment {index:?}")]
     UnboundValue { index: EnvIndex, value: SSAValue },
-    #[error("environment stack is empty")]
-    EmptyEnvStack,
     #[error("frame stack is empty")]
     EmptyFrameStack,
     #[error("missing stage {0:?}")]
