@@ -49,7 +49,7 @@ use std::marker::PhantomData;
 
 use kirin_ir::{
     Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, SSAValue,
-    StageMeta, Statement,
+    StageMeta, Statement, Symbol,
 };
 
 use super::frames::DenseBlockFrame;
@@ -754,6 +754,36 @@ where
     ) -> Result<Vec<Block>, E> {
         query::direct_body_blocks(self.driver.inner().pipeline(), stage, body.into())
             .map_err(E::from)
+    }
+
+    /// Resolve a stage and function by name, then seed and solve its blocks.
+    pub fn analyze_by_name(
+        &mut self,
+        stage_name: &str,
+        function_name: &str,
+    ) -> Result<BodyScope, E> {
+        let stage = self
+            .driver
+            .inner()
+            .pipeline()
+            .stage_by_name(stage_name)
+            .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
+        let function = self
+            .driver
+            .inner()
+            .pipeline()
+            .lookup_function_by_name(function_name)
+            .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
+        self.analyze(stage, Callee::Function(function))
+    }
+
+    /// Seed and solve a callable body named by a stage-local symbol.
+    pub fn analyze_by_symbol(
+        &mut self,
+        stage: CompileStage,
+        symbol: Symbol,
+    ) -> Result<BodyScope, E> {
+        self.analyze(stage, symbol.into())
     }
 
     /// Resolve `callee`, seed every block selected by its CFG or Block body,
