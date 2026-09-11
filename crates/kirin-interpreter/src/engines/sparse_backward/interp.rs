@@ -50,7 +50,7 @@ use std::mem;
 
 use kirin_ir::{
     Block, CompileStage, HasArguments, HasBottom, HasResults, HasTop, IsPure, Lattice, Pipeline,
-    SSAKind, SSAValue, StageMeta, Statement,
+    SSAKind, SSAValue, StageMeta, Statement, Symbol,
 };
 
 use crate::core::{linker::link_and_discover_callable, query};
@@ -638,6 +638,36 @@ where
     Lk: Linker<S>,
     Sem: SparseBackwardSemantic,
 {
+    /// Resolve a stage and function by name, then run the demand fixpoint.
+    pub fn analyze_by_name(
+        &mut self,
+        stage_name: &str,
+        function_name: &str,
+    ) -> Result<BodyScope, E> {
+        let stage = self
+            .driver
+            .inner()
+            .pipeline()
+            .stage_by_name(stage_name)
+            .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
+        let function = self
+            .driver
+            .inner()
+            .pipeline()
+            .lookup_function_by_name(function_name)
+            .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
+        self.analyze(stage, Callee::Function(function))
+    }
+
+    /// Run the demand fixpoint from a stage-local symbol.
+    pub fn analyze_by_symbol(
+        &mut self,
+        stage: CompileStage,
+        symbol: Symbol,
+    ) -> Result<BodyScope, E> {
+        self.analyze(stage, symbol.into())
+    }
+
     /// Resolve `callee` and run the demand fixpoint over its callable body.
     ///
     /// **Prepass**: walk the body's containment hierarchy, running every
