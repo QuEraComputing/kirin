@@ -59,9 +59,13 @@ use super::arenas::Arenas;
 ///     let ret = b.statement().definition(MyDialect::Return(arg)).new();
 ///     let block = b.block().argument(MyType::I64).terminator(ret).new();
 ///     let cfg = b.cfg().add_block(block).new();
-///     let body = b.statement().definition(MyDialect::FuncBody(cfg)).new();
+///     let definition = b.statement().definition(MyDialect::Function(cfg)).new();
 ///
-///     b.specialize().staged_func(sf).body(body).new().unwrap();
+///     b.specialize()
+///         .staged_func(sf)
+///         .definition(definition)
+///         .new()
+///         .unwrap();
 /// });
 /// // stage is back to StageInfo with the new function added
 /// ```
