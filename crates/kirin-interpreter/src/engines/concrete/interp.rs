@@ -4,7 +4,7 @@ use kirin_ir::{
     Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta, Statement, Symbol,
 };
 
-use crate::core::{linker::resolve_callable, query};
+use crate::core::{linker::link_and_discover_callable, query};
 use crate::{
     BlockQueries, CFGQueries, CallServices, CallableBody, Callee, Completion, DiGraphQueries, Env,
     EnvIndex, EnvStackStore, ForwardEval, Frame, FunctionTarget, Interp, InterpDispatch,
@@ -158,7 +158,7 @@ where
         stage: CompileStage,
         callee: &Callee,
     ) -> Result<(FunctionTarget, CallableBody), E> {
-        resolve_callable::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
+        link_and_discover_callable::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
     }
 }
 
