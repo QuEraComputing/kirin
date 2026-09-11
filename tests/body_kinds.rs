@@ -37,14 +37,13 @@ use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::Lexical;
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, BlockFrame,
-    Body, BodyFrameEntry, CFGFrame, CallBodyTraversal, CallContext, CallFrame, CallRequest,
-    Completion, ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive,
-    DefaultCallBodyTraversal, DiGraphFrame, Frame, FrameEffect, FrameEngine, FunctionEntry,
-    Interpretable, InterpreterError, SameStageLinker, SparseForwardInterpreter, expect_single,
+    Body, CFGFrame, CallContext, CallFrame, CallRequest, Completion, ConcreteInterpreter,
+    ConcreteInterpreterCore, ContextInsensitive, DefaultCallBodyTraversal, DiGraphFrame, Frame,
+    FrameEffect, FrameEngine, FunctionEntry, Interpretable, InterpreterError, SameStageLinker,
+    SparseForwardInterpreter, expect_single,
 };
 use kirin_scf::{ScfForFrame, ScfIfFrame, StructuredControlFlow};
 use kirin_test_languages::GraphFunctionLanguage;
-use std::cell::RefCell;
 
 /// Total error for the test engines: the framework error plus the value
 /// conversion/trap errors the languages' rules can raise.
@@ -1215,129 +1214,4 @@ fn digraph_port_arity_mismatch_is_reported() {
         ),
         "expected a port arity mismatch abstractly, got {abstract_:?}"
     );
-}
-
-// ===========================================================================
-// 13. A custom call-body traversal.
-// ===========================================================================
-
-// `CallFrame` owns the call convention — resolve, allocate, enter, suspend,
-// validate the completion, free the activation exactly once, bind results — and
-// delegates only *which walker enters the callee body* to a
-// `CallBodyTraversal`. These tests show a language replacing that choice for
-// two body kinds without reimplementing any of the lifecycle, and confirm the
-// choice does not leak into `scf.if`, which picks its own dialect frame.
-
-thread_local! {
-    /// Which body kinds the custom traversal was asked for, in order.
-    static TRAVERSAL_LOG: RefCell<Vec<&'static str>> = const { RefCell::new(Vec::new()) };
-}
-
-/// A custom traversal: instrument `CFG` and `DiGraph` entry, delegate `Block` and
-/// `UnGraph` to the framework default. Each arm still builds the *standard*
-/// walker — the point is that the language chose it, not that it walks
-/// differently.
-struct LoggingCallBodyTraversal;
-
-impl CallBodyTraversal<i64, TestError, FrameStackItem<i64, TestError, Self>>
-    for LoggingCallBodyTraversal
-{
-    fn from_cfg(
-        entry: BodyFrameEntry<CFG, i64>,
-    ) -> Result<FrameStackItem<i64, TestError, Self>, TestError> {
-        TRAVERSAL_LOG.with(|log| log.borrow_mut().push("cfg"));
-        Ok(CFGFrame::new(entry.stage, entry.index, entry.body, entry.args).into())
-    }
-
-    fn from_block(
-        entry: BodyFrameEntry<Block, i64>,
-    ) -> Result<FrameStackItem<i64, TestError, Self>, TestError> {
-        TRAVERSAL_LOG.with(|log| log.borrow_mut().push("block"));
-        <DefaultCallBodyTraversal as CallBodyTraversal<
-            i64,
-            TestError,
-            FrameStackItem<i64, TestError, Self>,
-        >>::from_block(entry)
-    }
-
-    fn from_digraph(
-        entry: BodyFrameEntry<DiGraph, i64>,
-    ) -> Result<FrameStackItem<i64, TestError, Self>, TestError> {
-        TRAVERSAL_LOG.with(|log| log.borrow_mut().push("digraph"));
-        Ok(DiGraphFrame::new(entry.stage, entry.index, entry.body, entry.args).into())
-    }
-
-    fn from_ungraph(
-        entry: BodyFrameEntry<UnGraph, i64>,
-    ) -> Result<FrameStackItem<i64, TestError, Self>, TestError> {
-        TRAVERSAL_LOG.with(|log| log.borrow_mut().push("ungraph"));
-        <DefaultCallBodyTraversal as CallBodyTraversal<
-            i64,
-            TestError,
-            FrameStackItem<i64, TestError, Self>,
-        >>::from_ungraph(entry)
-    }
-}
-
-type TraversalEngine<'ir> = ConcreteInterpreterCore<
-    'ir,
-    L,
-    i64,
-    TestError,
-    SameStageLinker,
-    FrameStackItem<i64, TestError, LoggingCallBodyTraversal>,
->;
-
-fn run_with_traversal(
-    pipeline: &Pipeline<L>,
-    function: &str,
-    args: &[i64],
-) -> Result<i64, TestError> {
-    TRAVERSAL_LOG.with(|log| log.borrow_mut().clear());
-    let mut interp: TraversalEngine<'_> = ConcreteInterpreterCore::new(pipeline);
-    expect_single(interp.call_by_name("test", function, args.iter().copied())?)
-}
-
-fn traversal_log() -> Vec<&'static str> {
-    TRAVERSAL_LOG.with(|log| log.borrow().clone())
-}
-
-/// A root call and a nested call, both routed through the custom traversal. The
-/// returned values are unchanged — only the *selection* of the walker moved.
-#[test]
-fn custom_call_body_traversal_enters_callable_bodies() {
-    let pipeline = parse(DIGRAPH_CALLABLE_PROGRAM);
-
-    // Root call into a CFG body, which then calls a DiGraph body.
-    assert_eq!(run_with_traversal(&pipeline, "main", &[]).unwrap(), 5);
-    assert_eq!(traversal_log(), vec!["cfg", "digraph"]);
-
-    // Root call straight into the DiGraph body.
-    assert_eq!(run_with_traversal(&pipeline, "gadd", &[2, 3]).unwrap(), 5);
-    assert_eq!(traversal_log(), vec!["digraph"]);
-}
-
-/// The `Block` arm delegates to `DefaultCallBodyTraversal`, so a traversal can override
-/// only the body kinds it cares about.
-#[test]
-fn custom_call_body_traversal_can_delegate_to_the_default() {
-    let pipeline = parse(BLOCK_CALLABLE_PROGRAM);
-    assert_eq!(run_with_traversal(&pipeline, "main", &[]).unwrap(), 42);
-    assert_eq!(traversal_log(), vec!["cfg", "block"]);
-}
-
-/// Isolation: `scf.if` builds its *own* dialect frame via `ScfIfDispatch` and
-/// walks the chosen arm with a framework `BlockFrame`. It is a nested body, not
-/// a callable one, so call-body traversal selection must never be consulted for it.
-#[test]
-fn scf_if_does_not_use_call_body_traversal() {
-    let pipeline = parse_scf(SCF_ABS_PROGRAM);
-    let mut interp: ScfEngine<'_> = ConcreteInterpreterCore::new(&pipeline);
-    TRAVERSAL_LOG.with(|log| log.borrow_mut().clear());
-    let result =
-        expect_single::<i64, TestError>(interp.call_by_name("test", "abs", [-7]).unwrap()).unwrap();
-    assert_eq!(result, 7);
-    // The SCF composition uses the default traversal, and in any case the scf arm never
-    // reaches a call boundary — the log stays empty.
-    assert!(traversal_log().is_empty(), "got {:?}", traversal_log());
 }
