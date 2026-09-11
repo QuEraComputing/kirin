@@ -512,8 +512,12 @@ alone and `::write_child_results` takes `Env` alone.
 `CallServices` names *services*, not a convention: **`CallFrame` still owns the
 calling convention** — the operation order, which completions are legal, and
 freeing the activation exactly once — and this trait only supplies the
-primitives. `resolve_callable` is the common linker-plus-target-stage body
-discovery protocol; it carries no value product. The trait is deliberately
+primitives. The public `CallServices::resolve_callable` method exposes
+linker-plus-target-stage body discovery using the engine's configured pipeline
+and linker; it carries no value product. The built-in engines share the
+crate-private `link_and_discover_callable` helper for root entry and nested
+calls. Compiler authors configure resolution policy through `.with_linker(...)`.
+The trait is deliberately
 **not** split further: the standard `CallFrame` consumes all three services
 together, and their pairing is a safety property (an
 `alloc_env` without its `free_env` leaks; a second `free_env` double-frees), so

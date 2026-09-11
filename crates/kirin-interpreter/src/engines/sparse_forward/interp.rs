@@ -40,7 +40,7 @@ use kirin_ir::{
     StageMeta, Statement, Symbol, Widen,
 };
 
-use crate::core::{linker::resolve_callable as resolve_callable_root, query};
+use crate::core::{linker::link_and_discover_callable, query};
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
     BlockQueries, Body, CFGQueries, CallEffect, CallServices, CallableBody, Callee, DiGraphQueries,
@@ -631,7 +631,7 @@ where
         stage: CompileStage,
         callee: &Callee,
     ) -> Result<(FunctionTarget, CallableBody), E> {
-        resolve_callable_root::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
+        link_and_discover_callable::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
     }
 }
 

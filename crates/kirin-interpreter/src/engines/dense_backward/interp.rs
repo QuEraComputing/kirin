@@ -54,7 +54,7 @@ use kirin_ir::{
 
 use super::frames::DenseBlockFrame;
 use crate::Body;
-use crate::core::{linker::resolve_callable as resolve_callable_root, query};
+use crate::core::{linker::link_and_discover_callable, query};
 use crate::engines::sparse_backward::BodyScope;
 use crate::{
     AbstractInterpreter, BackwardSummaryDeps, Callee, ClassicLiveness, DenseBackwardSemantic,
@@ -760,7 +760,7 @@ where
     /// and drain the block-boundary worklist. Dependencies are discovered from
     /// terminator edges; unsupported graph roots fail before solving.
     pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
-        let (target, entry) = resolve_callable_root::<
+        let (target, entry) = link_and_discover_callable::<
             DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
             _,
             _,

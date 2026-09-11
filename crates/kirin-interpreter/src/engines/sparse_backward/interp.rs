@@ -53,7 +53,7 @@ use kirin_ir::{
     SSAKind, SSAValue, StageMeta, Statement,
 };
 
-use crate::core::{linker::resolve_callable as resolve_callable_root, query};
+use crate::core::{linker::link_and_discover_callable, query};
 use crate::{
     AbstractInterpreter, Body, Callee, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
     InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics, OwnerSummaryDeps,
@@ -646,11 +646,12 @@ where
     /// **Propagation**: drain the value worklist; each risen value dispatches
     /// the rules that translate its demand.
     pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
-        let (target, entry) = resolve_callable_root::<SparseBackwardDriver<'ir, S, V, E, Sem>, _, _>(
-            self.driver.inner().pipeline(),
-            &self.linker,
-            stage,
-            &callee,
+        let (target, entry) = link_and_discover_callable::<
+            SparseBackwardDriver<'ir, S, V, E, Sem>,
+            _,
+            _,
+        >(
+            self.driver.inner().pipeline(), &self.linker, stage, &callee
         )?;
         let body = entry.body;
         if matches!(body, Body::DiGraph(_) | Body::UnGraph(_)) {

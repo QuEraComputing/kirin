@@ -28,13 +28,13 @@ pub trait Linker<S: StageMeta> {
     ) -> Result<FunctionTarget, InterpreterError>;
 }
 
-/// Run the framework's common callable-root protocol.
+/// Link a callee and discover its body for root entry or a nested call.
 ///
 /// Linking selects a concrete target; callable-entry dispatch then discovers
 /// its body in the target's stage. Engines invoke this operation before
 /// applying their own boundary inputs (runtime arguments, abstract arguments,
 /// or analysis-specific seeds).
-pub(crate) fn resolve_callable<I, S, Lk>(
+pub(crate) fn link_and_discover_callable<I, S, Lk>(
     pipeline: &Pipeline<S>,
     linker: &Lk,
     caller_stage: CompileStage,
