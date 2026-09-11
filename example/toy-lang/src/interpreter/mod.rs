@@ -12,9 +12,9 @@ mod frame;
 mod tests;
 
 pub use error::ToyError;
-use frame::FrameStackItem;
 pub use frame::ToyAbstractFrame;
 pub(crate) use frame::ToyDenseBackwardFrame;
+use frame::ToyFrame;
 
 use kirin::prelude::{CFG, CompileStage, GetInfo, Pipeline, UniqueLiveSpecializationError};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
@@ -33,7 +33,7 @@ use crate::stage::Stage;
 type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
 
 type ToyEngine<'ir, Lk> =
-    ConcreteInterpreterCore<'ir, Stage, i64, ToyError, Lk, FrameStackItem<i64, ToyError>>;
+    ConcreteInterpreterCore<'ir, Stage, i64, ToyError, Lk, ToyFrame<i64, ToyError>>;
 
 /// Concrete toy-language interpreter. Its explicitly declared frame-stack-item enum
 /// includes the dialect-owned SCF continuations but remains private behind

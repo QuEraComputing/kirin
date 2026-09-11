@@ -144,7 +144,7 @@ pub use fixpoint::{
 };
 
 #[cfg(feature = "derive")]
-pub use kirin_derive_interpreter::{FunctionEntry, InterpDispatch, Interpretable};
+pub use kirin_derive_interpreter::{Frame, FunctionEntry, InterpDispatch, Interpretable};
 
 /// Everything a dialect author needs to implement statement semantics —
 /// forward evaluation (`Interpretable<I, ForwardEval>`), backward demand

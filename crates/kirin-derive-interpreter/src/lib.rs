@@ -1,5 +1,6 @@
 extern crate proc_macro;
 
+mod frame;
 mod function_entry;
 mod interp_dispatch;
 mod interpretable;
@@ -39,5 +40,16 @@ pub fn derive_interp_dispatch(input: TokenStream) -> TokenStream {
     match interp_dispatch::generate(&ast) {
         Ok(tokens) => tokens.into(),
         Err(e) => e.into_compile_error().into(),
+    }
+}
+
+/// Derive stack-item `Frame` dispatch and `From<Member>` for a nonempty enum
+/// of single-field tuple variants. All members must share a completion type.
+#[proc_macro_derive(Frame)]
+pub fn derive_frame(input: TokenStream) -> TokenStream {
+    let ast = parse_macro_input!(input as syn::DeriveInput);
+    match frame::generate(&ast) {
+        Ok(tokens) => tokens.into(),
+        Err(error) => error.into_compile_error().into(),
     }
 }

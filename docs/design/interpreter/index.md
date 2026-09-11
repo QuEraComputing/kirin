@@ -639,12 +639,15 @@ structured continuations defines its own private `FrameStackItem` enum and a
 small public wrapper over `ConcreteInterpreterCore<.., FrameStackItem>`.
 
 This is an explicit composition root, not a public interpreter abstraction. For
-example, toy-lang's `FrameStackItem` stores the four framework computations plus
+example, toy-lang's `ToyFrame` stores the four framework computations plus
 `ScfIfFrame`/`ScfForFrame`; only its `From<Child>` impls and exhaustive `Frame`
 dispatch name stack-item variants. None of the six member frames knows the enum
-exists. There is deliberately no
-`StandardFrame`, concrete `FrameBuild` family, member-side `*_into` injection,
-or composition macro in this prototype.
+exists. `#[derive(Frame)]` generates the three dispatch methods and ordinary
+`From<Member>` injections for single-field enum variants. All members share the
+first variant's completion type. Toy-lang keeps `From<CallRequest>` manual to
+construct the configured `CallFrame`.
+The derive preserves the composition's ownership; it introduces no `FrameBuild`
+trait or member-side self-injection.
 
 A custom `CallBodyTraversal` can still replace callable-body traversal without
 changing call lifecycle. Its methods return the generic child type, which the
