@@ -112,12 +112,14 @@ pub trait Env: Interp {
 /// [`read`](Self::read), [`read_many`](Self::read_many),
 /// [`write`](Self::write), [`write_results`](Self::write_results) — which
 /// operate on the engine's *current* activation ([`Interp::index`]). The
-/// associated frame type is exposed only because [`SparseForwardEffect::Push`]
-/// carries a frame; ordinary dialects do not name it.
+/// associated continuation type is exposed only because
+/// [`SparseForwardEffect::Push`] carries a child; ordinary dialects do not name
+/// it.
 pub trait SparseForwardInterp:
     Env + Interp<Effect = SparseForwardEffect<<Self as Interp>::Value, Self::Frame>>
 {
-    /// The engine's total frame type, carried by [`SparseForwardEffect::Push`].
+    /// The engine's child-continuation representation carried by
+    /// [`SparseForwardEffect::Push`].
     type Frame;
 
     /// Read one SSA value from the current activation.

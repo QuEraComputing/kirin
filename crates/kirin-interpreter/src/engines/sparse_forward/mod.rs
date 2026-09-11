@@ -7,7 +7,7 @@ pub(crate) mod interp;
 
 pub use frames::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-    AbstractFrameBuild, StandardAbstractFrame,
+    StandardAbstractFrame,
 };
 pub use interp::{
     CallContext, ContextInsensitive, Owner, SparseForwardInterpreter, SparseForwardTransfer,

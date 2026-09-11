@@ -41,14 +41,14 @@ struct DepFrame {
     owner: u8,
 }
 
-impl<D: FrameEngine<Error = InterpreterError>, F> Frame<D, F> for DepFrame {
+impl<D: FrameEngine<Error = InterpreterError>> Frame<D> for DepFrame {
     type Completion = u8;
 
-    fn step_into(self, _interp: &mut D) -> Result<FrameEffect<F, u8>, InterpreterError> {
+    fn step_into(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         Ok(FrameEffect::Complete(self.owner.saturating_add(1)))
     }
 
-    fn resume_done_into(self, _interp: &mut D) -> Result<FrameEffect<F, u8>, InterpreterError> {
+    fn resume_done_into(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         Ok(FrameEffect::Done)
     }
 
@@ -56,7 +56,7 @@ impl<D: FrameEngine<Error = InterpreterError>, F> Frame<D, F> for DepFrame {
         self,
         completion: u8,
         _interp: &mut D,
-    ) -> Result<FrameEffect<F, u8>, InterpreterError> {
+    ) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         Ok(FrameEffect::Complete(completion))
     }
 }
