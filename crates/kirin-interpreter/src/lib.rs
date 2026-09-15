@@ -64,39 +64,24 @@ mod facts;
 mod fixpoint;
 mod semantics;
 
-// The shared chassis: engine trait + dialect dispatch, effect types,
-// activation storage, calling conventions, errors, and IR queries.
 pub use self::core::{
-    AbstractInterpreter, Env, GraphWalkPlan, Interp, InterpLocation, SparseForwardInterp,
+    AbstractInterpreter, GraphWalkPlan, Interp, InterpLocation, SparseForwardInterp,
 };
-pub use self::core::{BranchCondition, HasProductValue, expect_single};
-pub use self::core::{CallEffect, Callee, Edge, SparseForwardEffect};
-pub use self::core::{CrossStageLinker, LinkTarget, Linker, ResolvedCallable, SameStageLinker};
-pub use self::core::{EnvIndex, EnvStackStore, Store};
-pub use self::core::{InterpDispatch, Interpretable};
-pub use self::core::{InterpreterError, StageQuery, TerminatorArgs};
-pub use kirin_ir::Body;
-// The shared, direction-neutral frame protocol: `Frame`/`FrameEffect`/
-// `drive_frames` (the frame-stack driver loop) anchored on `FrameEngine`, the
-// minimal engine contract. On top of it, the forward engine capabilities a frame
-// can require: one narrowly scoped component trait per kind of traversal
-// (`StatementDispatch`, `BlockQueries`, `CFGQueries`, `DiGraphQueries`,
-// `CallServices`), so a member frame bounds only what it consumes, plus two
-// whole-universe umbrellas — `ForwardFrameEngine` (full standard concrete
-// surface) and `ForwardDataflowFrameEngine` (standard forward-abstract surface).
 pub use self::core::{
     BlockQueries, CFGQueries, CallServices, DiGraphQueries, ForwardDataflowFrameEngine,
     ForwardFrameEngine, Frame, FrameEffect, FrameEngine, StatementDispatch, drive_frames,
 };
-
-// Concrete execution engine + the concrete standard frames: the
-// representation walkers (`BlockFrame`/`CFGFrame`/`DiGraphFrame` — `UnGraph`
-// traversal is a dialect/compiler call-body traversal) and the `CallFrame`
-// call boundary.
+pub use self::core::{BranchCondition, HasProductValue, expect_single};
+pub use self::core::{CallEffect, Callee, Edge, SparseForwardEffect};
+pub use self::core::{CrossStageLinker, LinkTarget, Linker, ResolvedCallable, SameStageLinker};
+pub use self::core::{Env, EnvIndex, EnvStore, SSABinding};
+pub use self::core::{InterpDispatch, Interpretable};
+pub use self::core::{InterpreterError, StageQuery, TerminatorArgs};
 pub use engines::concrete::{
     BlockFrame, BodyFrameEntry, CFGFrame, CallBodyTraversal, CallFrame, CallRequest, Completion,
     ConcreteInterpreter, ConcreteInterpreterCore, DefaultCallBodyTraversal, DiGraphFrame,
 };
+pub use kirin_ir::Body;
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
 pub use engines::sparse_forward::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, CallContext,
@@ -174,8 +159,8 @@ pub mod engine {
         DenseBackwardInterp, DenseBackwardInterpreter, DenseBackwardState, DenseBlockFrame,
         DiGraphFrame, DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
         FrameEffect, FrameEngine, Interp, InterpDispatch, InterpreterError, LinkTarget, Linker,
-        ResolvedCallable, SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter,
-        SparseForwardInterp, SparseForwardInterpreter, StandardAbstractFrame, StatementDispatch,
-        WideningStrategy, drive_frames, expect_single,
+        ResolvedCallable, SSABinding, SameStageLinker, SparseBackwardInterp,
+        SparseBackwardInterpreter, SparseForwardInterp, SparseForwardInterpreter,
+        StandardAbstractFrame, StatementDispatch, WideningStrategy, drive_frames, expect_single,
     };
 }
