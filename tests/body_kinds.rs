@@ -50,7 +50,7 @@ use kirin_test_languages::GraphFunctionLanguage;
 #[derive(Debug)]
 enum TestError {
     Core(InterpreterError),
-    ArithConversion((ArithConversionError)),
+    ArithConversion(ArithConversionError),
     DivisionByZero,
 }
 
