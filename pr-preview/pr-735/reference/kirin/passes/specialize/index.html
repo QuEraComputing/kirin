@@ -43,13 +43,7 @@
             </script> <p>Specialize statically reachable func methods on supported constants.</p> <p>Each invocation starts from one method and owns a fresh cache. Generic methods retain their signatures; visited bodies may be folded. A zero budget disables specialization.</p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.passes.specialize.Specialize.materialize class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">materialize</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>materialize</span><span class=p>(</span>
     <span class=n>original</span><span class=p>:</span> <span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Result</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>int</span><span class=p>,</span> <span class=o>...</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Reuse a specialization or create and schedule one within the budget.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>144</span>
-<span class=normal>145</span>
-<span class=normal>146</span>
-<span class=normal>147</span>
-<span class=normal>148</span>
-<span class=normal>149</span>
-<span class=normal>150</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Reuse a specialization or create and schedule one within the budget.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>150</span>
 <span class=normal>151</span>
 <span class=normal>152</span>
 <span class=normal>153</span>
@@ -79,7 +73,13 @@
 <span class=normal>177</span>
 <span class=normal>178</span>
 <span class=normal>179</span>
-<span class=normal>180</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>materialize</span><span class=p>(</span>
+<span class=normal>180</span>
+<span class=normal>181</span>
+<span class=normal>182</span>
+<span class=normal>183</span>
+<span class=normal>184</span>
+<span class=normal>185</span>
+<span class=normal>186</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>materialize</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>original</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>Result</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>int</span><span class=p>,</span> <span class=o>...</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Reuse a specialization or create and schedule one within the budget.&quot;&quot;&quot;</span>
