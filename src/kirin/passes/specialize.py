@@ -19,23 +19,29 @@ from kirin.rewrite.specialize_invoke import SpecializeInvoke
 def _constant_key(value: object) -> tuple | None:
     """None means dynamic; keys never invoke arbitrary user equality/hash."""
     kind = type(value)
-    if kind is float:
-        return (float, struct.pack("!d", value))
-    if kind is complex:
-        return (complex, struct.pack("!dd", value.real, value.imag))
     if kind in (type(None), bool, int, str, bytes):
         return (kind, value)
-    if kind is range:
+    if type(value) is float:
+        return (float, struct.pack("!d", value))
+    if type(value) is complex:
+        return (complex, struct.pack("!dd", value.real, value.imag))
+    if type(value) is range:
         return (range, value.start, value.stop, value.step)
-    if kind in (tuple, frozenset, IList):
+    if type(value) is tuple:
         items = tuple(_constant_key(item) for item in value)
         if any(item is None for item in items):
             return None
-        if kind is frozenset:
-            return (frozenset, frozenset(items))
-        if kind is IList:
-            return (IList, id(value.elem), items)
         return (tuple, items)
+    if type(value) is frozenset:
+        items = tuple(_constant_key(item) for item in value)
+        if any(item is None for item in items):
+            return None
+        return (frozenset, frozenset(items))
+    if type(value) is IList:
+        items = tuple(_constant_key(item) for item in value)
+        if any(item is None for item in items):
+            return None
+        return (IList, id(value.elem), items)
     return None
 
 
