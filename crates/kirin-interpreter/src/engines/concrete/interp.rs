@@ -6,10 +6,10 @@ use kirin_ir::{
 
 use crate::core::{linker::link_and_discover_callable, query};
 use crate::{
-    BlockQueries, CFGQueries, CallServices, CallableBody, Callee, Completion, DiGraphQueries, Env,
-    EnvIndex, EnvStackStore, ForwardEval, Frame, FunctionTarget, Interp, InterpDispatch,
-    InterpLocation, InterpreterError, Linker, SameStageLinker, SparseForwardEffect, StageQuery,
-    StatementDispatch, Store, drive_frames,
+    BlockQueries, CFGQueries, CallServices, Callee, Completion, DiGraphQueries, Env, EnvIndex,
+    EnvStackStore, ForwardEval, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
+    Linker, ResolvedCallable, SameStageLinker, SparseForwardEffect, StageQuery, StatementDispatch,
+    Store, drive_frames,
 };
 
 use super::frames::{CallRequest, FrameStackItem};
@@ -155,10 +155,11 @@ where
 
     fn resolve_callable(
         &self,
-        stage: CompileStage,
+        lookup_stage: CompileStage,
         callee: &Callee,
-    ) -> Result<(FunctionTarget, CallableBody), E> {
-        link_and_discover_callable::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
+    ) -> Result<ResolvedCallable, E> {
+        link_and_discover_callable(self.pipeline, &self.linker, lookup_stage, callee)
+            .map_err(E::from)
     }
 }
 

@@ -37,7 +37,7 @@
 //! # Two-persona contract
 //!
 //! - **Dialect authors** implement [`Interpretable<I, Semantics>`](Interpretable)
-//!   per semantic key (and [`FunctionEntry`] for callable statements). A rule
+//!   per semantic key; callable bodies are declared through `kirin_ir::HasCallableBody`. A rule
 //!   receives the engine `interp` directly. Shape-generic mechanics live on
 //!   the engine traits (read/write on [`SparseForwardInterp`];
 //!   fact/raise-fact on [`SparseBackwardInterp`]; opaque point-state access on
@@ -69,12 +69,13 @@ mod semantics;
 pub use self::core::{
     AbstractInterpreter, Env, GraphWalkPlan, Interp, InterpLocation, SparseForwardInterp,
 };
-pub use self::core::{Body, CallEffect, CallableBody, Callee, Edge, SparseForwardEffect};
 pub use self::core::{BranchCondition, HasProductValue, expect_single};
-pub use self::core::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
+pub use self::core::{CallEffect, Callee, Edge, SparseForwardEffect};
+pub use self::core::{CrossStageLinker, LinkTarget, Linker, ResolvedCallable, SameStageLinker};
 pub use self::core::{EnvIndex, EnvStackStore, Store};
-pub use self::core::{FunctionEntry, InterpDispatch, Interpretable};
+pub use self::core::{InterpDispatch, Interpretable};
 pub use self::core::{InterpreterError, StageQuery, TerminatorArgs};
+pub use kirin_ir::Body;
 // The shared, direction-neutral frame protocol: `Frame`/`FrameEffect`/
 // `drive_frames` (the frame-stack driver loop) anchored on `FrameEngine`, the
 // minimal engine contract. On top of it, the forward engine capabilities a frame
@@ -144,7 +145,7 @@ pub use fixpoint::{
 };
 
 #[cfg(feature = "derive")]
-pub use kirin_derive_interpreter::{Frame, FunctionEntry, InterpDispatch, Interpretable};
+pub use kirin_derive_interpreter::{Frame, InterpDispatch, Interpretable};
 
 /// Everything a dialect author needs to implement statement semantics —
 /// forward evaluation (`Interpretable<I, ForwardEval>`), backward demand
@@ -153,10 +154,10 @@ pub use kirin_derive_interpreter::{Frame, FunctionEntry, InterpDispatch, Interpr
 /// (`impl SemanticKey for MyKey { type Shape = ...; }`).
 pub mod dialect {
     pub use crate::{
-        AnalysisShape, Body, BranchCondition, CallEffect, CallableBody, Callee, ClassicLiveness,
+        AnalysisShape, Body, BranchCondition, CallEffect, Callee, ClassicLiveness,
         ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, DenseBackwardInterp,
-        DenseBackwardShape, DenseForwardShape, Edge, ForwardEval, FunctionEntry, HasProductValue,
-        Interp, Interpretable, InterpreterError, PointFacts, SemanticKey, SparseBackwardEffect,
+        DenseBackwardShape, DenseForwardShape, Edge, ForwardEval, HasProductValue, Interp,
+        Interpretable, InterpreterError, PointFacts, SemanticKey, SparseBackwardEffect,
         SparseBackwardInterp, SparseBackwardShape, SparseForwardEffect, SparseForwardInterp,
         SparseForwardShape, StrongDemand, SuccessorEdge,
     };
@@ -172,9 +173,9 @@ pub mod engine {
         DefaultCallBodyTraversal, DenseBackwardCompletion, DenseBackwardFrameEngine,
         DenseBackwardInterp, DenseBackwardInterpreter, DenseBackwardState, DenseBlockFrame,
         DiGraphFrame, DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
-        FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch, InterpreterError, Linker,
-        SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter, SparseForwardInterp,
-        SparseForwardInterpreter, StandardAbstractFrame, StatementDispatch, WideningStrategy,
-        drive_frames, expect_single,
+        FrameEffect, FrameEngine, Interp, InterpDispatch, InterpreterError, LinkTarget, Linker,
+        ResolvedCallable, SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter,
+        SparseForwardInterp, SparseForwardInterpreter, StandardAbstractFrame, StatementDispatch,
+        WideningStrategy, drive_frames, expect_single,
     };
 }

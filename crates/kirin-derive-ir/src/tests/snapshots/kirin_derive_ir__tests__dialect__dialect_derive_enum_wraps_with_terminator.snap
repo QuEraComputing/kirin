@@ -493,6 +493,23 @@ impl ::kirin::ir::HasSignature<Self> for CfOps {
     }
 }
 #[automatically_derived]
+impl ::kirin::ir::HasCallableBody for CfOps
+where
+    BranchOp: ::kirin::ir::HasCallableBody,
+    ReturnOp: ::kirin::ir::HasCallableBody,
+{
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        match self {
+            Self::Branch(field_0) => {
+                <BranchOp as ::kirin::ir::HasCallableBody>::callable_body(field_0)
+            }
+            Self::Return(field_0) => {
+                <ReturnOp as ::kirin::ir::HasCallableBody>::callable_body(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
 impl ::core::convert::From<BranchOp> for CfOps {
     fn from(from: BranchOp) -> Self {
         CfOps::Branch(from)

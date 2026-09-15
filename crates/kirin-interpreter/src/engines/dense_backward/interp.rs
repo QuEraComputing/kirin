@@ -53,7 +53,6 @@ use kirin_ir::{
 };
 
 use super::frames::DenseBlockFrame;
-use crate::Body;
 use crate::core::{linker::link_and_discover_callable, query};
 use crate::engines::sparse_backward::BodyScope;
 use crate::{
@@ -63,6 +62,7 @@ use crate::{
     StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
     TerminatorArgs,
 };
+use crate::{Body, ResolvedCallable};
 
 // ===========================================================================
 // Effect + point-state contract + dialect-facing trait
@@ -790,14 +790,12 @@ where
     /// and drain the block-boundary worklist. Dependencies are discovered from
     /// terminator edges; unsupported graph roots fail before solving.
     pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
-        let (target, entry) = link_and_discover_callable::<
-            DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
-            _,
-            _,
-        >(
-            self.driver.inner().pipeline(), &self.linker, stage, &callee
+        let ResolvedCallable { target, body } = link_and_discover_callable(
+            self.driver.inner().pipeline(),
+            &self.linker,
+            stage,
+            &callee,
         )?;
-        let body = entry.body;
         let scope = (target.stage, body);
         let blocks = self.direct_body_blocks(target.stage, body)?;
         let owners: Vec<Scoped<BodyScope, Block>> = blocks

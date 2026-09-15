@@ -139,10 +139,14 @@ enum LambdaLanguage {
 
 #[test]
 fn test_lambda_parse_roundtrip() {
-    roundtrip::assert_statement_roundtrip::<LambdaLanguage>(
-        "%f = lambda @closure captures(%x, %y) { } -> i32",
-        &[("x", SimpleType::I32), ("y", SimpleType::I32)],
-    );
+    let input = "%f = lambda @closure captures(%x, %y) { } -> i32";
+    let operands = &[("x", SimpleType::I32), ("y", SimpleType::I32)];
+    roundtrip::assert_statement_roundtrip::<LambdaLanguage>(input, operands);
+
+    let (stage, statement) = roundtrip::emit_statement::<LambdaLanguage>(input, operands);
+    let lambda = statement.definition(&stage);
+    assert!(matches!(lambda.callable_body(), Some(Body::CFG(_))));
+    assert!(lambda.signature().is_none());
 }
 
 #[test]
