@@ -53,8 +53,7 @@ use kirin_ir::{
     SSAKind, SSAValue, StageMeta, Statement, Symbol,
 };
 
-use crate::ResolvedCallable;
-use crate::core::{linker::link_and_discover_callable, query};
+use crate::core::query;
 use crate::{
     AbstractInterpreter, Body, Callee, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
     InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics, OwnerSummaryDeps,
@@ -677,12 +676,9 @@ where
     /// **Propagation**: drain the value worklist; each risen value dispatches
     /// the rules that translate its demand.
     pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
-        let ResolvedCallable { target, body } = link_and_discover_callable(
-            self.driver.inner().pipeline(),
-            &self.linker,
-            stage,
-            &callee,
-        )?;
+        let pipeline = self.driver.inner().pipeline();
+        let target = self.linker.resolve(pipeline, stage, &callee)?;
+        let body = target.body(pipeline)?;
         if matches!(body, Body::DiGraph(_) | Body::UnGraph(_)) {
             return Err(E::from(InterpreterError::NoDefaultWalker(body)));
         }

@@ -288,8 +288,8 @@ Every engine root follows the same validated prefix:
 lookup stage + Callee
     -> Linker::resolve
     -> LinkTarget { stage, specialization }
-    -> target-stage IR query: specialization -> definition -> callable_body()
-    -> ResolvedCallable { target, body }
+    -> LinkTarget::body: target-stage IR query
+       (specialization -> definition -> callable_body())
     -> engine-specific boundary initialization
 ```
 
@@ -338,9 +338,12 @@ pub struct LinkTarget {
     pub specialization: SpecializedFunction,
 }
 
-pub struct ResolvedCallable {
-    pub target: LinkTarget,
-    pub body: Body,
+impl LinkTarget {
+    // Discovery: look the definition up in `stage`, then project its body.
+    pub fn body<S: StageQuery>(
+        &self,
+        pipeline: &Pipeline<S>,
+    ) -> Result<Body, InterpreterError>;
 }
 ```
 
@@ -368,11 +371,31 @@ linkers also check specialization presence before accepting a candidate stage,
 including for an already specialized callee; removing the copied definition
 must not remove this validation.
 
-`ResolvedCallable` retains the target for analysis context/summary identity
-and the body for traversal. It does not decide whether an engine supports the
-representation: for example, an undirected body can be discovered successfully
-and subsequently rejected with `NoDefaultWalker` by the engine's traversal
-policy. Callable discovery also does not bind arguments or seed backward exits.
+Discovery is a getter on the target that reads the specialization's
+authoritative definition on demand. Removing the combined result eliminates
+a redundant target/body representation. The target remains the analysis
+context/summary identity, and the body selects the IR to traverse.
+
+Two getters sit at different layers. `HasCallableBody::callable_body` projects
+a body from an *already available* dialect operation. `LinkTarget::body` looks
+that operation up first — specialization record, then its definition statement —
+and only then projects; every lookup failure (missing stage, specialization
+record, or statement) belongs to this layer and is invisible to the projection.
+
+Engines holding a pipeline call `LinkTarget::body` directly. `CallFrame` cannot:
+it reaches the IR only through the engine, so `CallServices` exposes
+`resolve_callee` (identity) and `discover_body` (discovery) as two methods
+rather than one returning a pair.
+
+Built-in `CallServices::discover_body` implementations delegate to
+`LinkTarget::body`. Custom implementations must preserve that lookup and its
+error behavior; the trait does not make mismatched target/body results
+unrepresentable.
+
+Discovery does not decide whether an engine supports the representation: an
+undirected body can be discovered successfully and subsequently rejected with
+`NoDefaultWalker` by the engine's traversal policy. It also does not bind
+arguments or seed backward exits.
 
 Because the linker is shared by all engines, cross-language *analysis* is the
 same one-line choice as cross-language *execution*: the abstract engine calls
@@ -552,7 +575,7 @@ surface still runs the frames it can support.
 | `BlockQueries: Interp` | `block_params`/`first_statement`/`next_statement` | `BlockCursor`, `BlockFrame`, `AbstractBlockFrame`, dialect block walkers |
 | `CFGQueries: BlockQueries` | `cfg_entry` | `CFGFrame` |
 | `DiGraphQueries: Interp` | `digraph_walk_plan` (default: `NoDefaultWalker`) | `DiGraphFrame`, `AbstractDiGraphFrame` |
-| `CallServices: Env` | `alloc_env`/`free_env`/`resolve_callable` | `CallFrame` |
+| `CallServices: Env` | `alloc_env`/`free_env`/`resolve_callee`/`discover_body` | `CallFrame` |
 
 **The `*Queries` traits are read-only, and only require `Interp`** — so nothing
 on them can touch SSA storage, and their names cannot hide a store mutation. The
@@ -566,14 +589,18 @@ alone and `::write_child_results` takes `Env` alone.
 `CallServices` names *services*, not a convention: **`CallFrame` still owns the
 calling convention** — the operation order, which completions are legal, and
 freeing the activation exactly once — and this trait only supplies the
-primitives. The public `CallServices::resolve_callable` method exposes
-linker-plus-target-stage body discovery using the engine's configured pipeline
-and linker; it carries no value product. The built-in engines share the
-crate-private `link_and_discover_callable` helper for root entry and nested
-calls. Compiler authors configure resolution policy through `.with_linker(...)`.
+primitives. `CallServices::resolve_callee` applies the engine's configured
+linker; `CallServices::discover_body` performs discovery on the returned target.
+Neither carries a value product. Separating the methods lets callers retain
+target identity and discover the body from the authoritative specialization
+record when needed. Backward engine roots call `Linker::resolve` plus
+`LinkTarget::body` directly; sparse-forward entry uses the resolution service
+and then calls the getter directly.
+`CallFrame` needs the trait because it reaches the IR only through the engine.
+Compiler authors configure resolution policy through `.with_linker(...)`.
 The trait is deliberately
-**not** split further: the standard `CallFrame` consumes all three services
-together, and their pairing is a safety property (an
+**not** split further: the standard `CallFrame` consumes these services
+together, and the lifecycle pairing is a safety property (an
 `alloc_env` without its `free_env` leaks; a second `free_env` double-frees), so
 no engine should be able to offer half a call convention.
 
@@ -611,7 +638,7 @@ That follows the semantics: forward abstract interpretation *summarizes* a call
 (`summarize_call` → `AbstractCallFrame`) rather than descending into it, and
 reaches a callable body's entry block through `Owner` seeding in the fixpoint
 driver rather than `cfg_entry`. Requiring its frame universe to expose
-`alloc_env`, `free_env`, `resolve_callable`, and `cfg_entry` was demanding a call
+`alloc_env`, `free_env`, `resolve_callee`, and `cfg_entry` was demanding a call
 convention it never performs. `tests/frame_engine_capabilities.rs` pins this
 down with deliberately incomplete mock engines whose ability to compile *is* the
 regression test.
@@ -653,7 +680,7 @@ pub trait StatementDispatch: Interp  { /* run_statement */ }
 pub trait BlockQueries: Interp       { /* read-only block queries */ }
 pub trait CFGQueries: BlockQueries   { /* cfg_entry */ }
 pub trait DiGraphQueries: Interp     { /* digraph_walk_plan */ }
-pub trait CallServices: Env          { /* alloc/free env, resolve_callable */ }
+pub trait CallServices: Env          { /* alloc/free env, resolve_callee, discover_body */ }
 pub(crate) trait BlockBinding: Env + BlockQueries { /* bind_block_args */ }
 ```
 
