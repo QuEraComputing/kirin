@@ -5,7 +5,7 @@ mod stage;
 use clap::{Parser, Subcommand};
 use kirin::prelude::*;
 use kirin::pretty::PipelinePrintExt;
-use kirin_interpreter::{Body, ProgramPoint, Scoped};
+use kirin_interpreter::{ProgramPoint, Scoped};
 
 use stage::Stage;
 
@@ -118,7 +118,7 @@ fn run_program(
             Stage::Source(info) => cfg.blocks(info).collect(),
             Stage::Lowered(info) => cfg.blocks(info).collect(),
         };
-        let scope = (stage, Body::CFG(cfg));
+        let scope = dense.root_scope();
         let mut boundaries: Vec<_> = blocks
             .into_iter()
             .filter_map(|block| {

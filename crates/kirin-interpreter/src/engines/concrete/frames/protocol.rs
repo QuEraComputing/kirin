@@ -54,11 +54,11 @@ pub struct BodyFrameEntry<B, V> {
 /// This is the *body-entry* half of [`CallFrame`](crate::CallFrame), split out so the two
 /// concerns are separately replaceable:
 ///
-/// - the **call convention** — resolve the callee, allocate its activation,
-///   ask [`FunctionEntry`](crate::FunctionEntry) for the body, suspend,
+/// - the **call convention** — resolve the callee and value-independent body,
+///   allocate its activation, bind the concrete boundary arguments, suspend,
 ///   validate the completion kind, free the activation exactly once, bind the
-///   results — stays in [`CallFrame`](crate::CallFrame) and is *not* configurable. It is where
-///   double-frees would live.
+///   results — stays in [`CallFrame`](crate::CallFrame) and is *not*
+///   configurable. It is where double-frees would live.
 /// - the **walker choice** — which frame traverses that body — is this trait.
 ///
 /// So a language can say "walk my CFGs with my own scheduler" without forking

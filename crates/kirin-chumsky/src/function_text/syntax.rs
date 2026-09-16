@@ -24,8 +24,8 @@ pub(super) enum Declaration<'src, T> {
     Stage(Header<'src, T>),
     Specialize {
         stage: SymbolName<'src>,
-        /// Span of the body portion (from keyword through closing `}`).
-        body_span: SimpleSpan,
+        /// Span of the definition (from keyword through closing `}`).
+        definition_span: SimpleSpan,
         /// Span of the entire specialize declaration.
         span: SimpleSpan,
     },
@@ -69,11 +69,11 @@ where
         .labelled("function signature")
 }
 
-/// Body span scanner. Matches an optional keyword prefix (e.g. `digraph`,
+/// Definition span scanner. Matches an optional keyword prefix (e.g. `digraph`,
 /// `ungraph`) followed by a brace-balanced `{ ... }` CFG. Returns the
 /// span covering everything from the first non-brace token (or the opening
-/// brace) through the matching closing brace. Does not parse body contents.
-fn body_span<'src, I>() -> impl Parser<'src, I, SimpleSpan, ParserError<'src>>
+/// brace) through the matching closing brace. Does not parse the definition.
+fn definition_span<'src, I>() -> impl Parser<'src, I, SimpleSpan, ParserError<'src>>
 where
     I: TokenInput<'src>,
 {
@@ -88,7 +88,7 @@ where
                 None => {
                     return Err(Rich::custom(
                         input.span_since(&start),
-                        "expected '{' in body",
+                        "expected '{' in function definition",
                     ));
                 }
             }
@@ -132,10 +132,10 @@ where
     // The function name is extracted post-parse from EmitContext::function_name().
     let specialize_decl = identifier("specialize")
         .ignore_then(symbol())
-        .then(body_span::<I>()) // captures from keyword (e.g. `fn`) through closing `}`
-        .map_with(|(stage, body_span), extra| Declaration::Specialize {
+        .then(definition_span::<I>()) // captures from keyword (e.g. `fn`) through closing `}`
+        .map_with(|(stage, definition_span), extra| Declaration::Specialize {
             stage,
-            body_span,
+            definition_span,
             span: extra.span(),
         });
 

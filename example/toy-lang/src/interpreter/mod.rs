@@ -16,17 +16,15 @@ pub use frame::ToyAbstractFrame;
 pub(crate) use frame::ToyDenseBackwardFrame;
 use frame::ToyFrame;
 
-use kirin::prelude::{CFG, CompileStage, GetInfo, Pipeline, UniqueLiveSpecializationError};
+use kirin::prelude::{CFG, CompileStage, Pipeline};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
-use kirin_function::{Lexical, Lifted};
-use kirin_interpreter::InterpreterError;
 use kirin_interpreter::engine::{
     CallContext, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
     SparseForwardInterpreter, expect_single,
 };
-use kirin_liveness::{DenseLivenessResult, LiveSet};
+use kirin_interpreter::{Body, InterpreterError};
+use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
 
-use crate::language::{HighLevel, LowLevel};
 use crate::stage::Stage;
 
 /// Summary key of the constant-propagation analysis policy.
@@ -84,6 +82,18 @@ pub type ToyConstProp<'ir, Lk = CrossStageLinker> = SparseForwardInterpreter<
     ToyAbstractFrame<ConstPropValue, ToyError, CpKey>,
 >;
 
+/// Classic per-point liveness over toy's private dense stack item: the reverse
+/// block walk plus the SCF dense continuations. Defaults to [`SameStageLinker`]:
+/// unlike execution and constprop, liveness is pinned to the stage it is asked
+/// for.
+pub(crate) type ToyDenseLiveness<'ir, Lk = SameStageLinker> = DenseLiveness<
+    'ir,
+    Stage,
+    InterpreterError,
+    ToyDenseBackwardFrame<LiveSet, InterpreterError>,
+    Lk,
+>;
+
 /// Execute `function_name` starting at `stage_name`, following calls across
 /// language boundaries.
 pub fn run_i64(
@@ -137,95 +147,26 @@ pub fn analyze_constprop(
     expect_single(analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?)
 }
 
-/// The body cfg of `function_name`'s specialization at `stage_name`.
-fn function_cfg(
-    pipeline: &Pipeline<Stage>,
-    stage_name: &str,
-    function_name: &str,
-) -> Result<(CompileStage, CFG), InterpreterError> {
-    let stage_id = pipeline
-        .stage_by_name(stage_name)
-        .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
-    let staged = pipeline
-        .resolve_staged_function(function_name, stage_id)
-        .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    let stage = pipeline
-        .stage(stage_id)
-        .ok_or(InterpreterError::MissingStage(stage_id))?;
-
-    let cfg = match stage {
-        Stage::Source(info) => {
-            let staged_info = staged
-                .get_info(info)
-                .ok_or(InterpreterError::MissingSpecialization(staged))?;
-            let spec = match staged_info.unique_live_specialization() {
-                Ok(spec) => spec,
-                Err(UniqueLiveSpecializationError::NoSpecialization) => {
-                    return Err(InterpreterError::MissingSpecialization(staged));
-                }
-                Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
-                    return Err(InterpreterError::AmbiguousSpecialization {
-                        function: staged,
-                        count,
-                    });
-                }
-            };
-            let spec_info = spec
-                .get_info(info)
-                .ok_or(InterpreterError::Custom("specialized function has no body"))?;
-            match spec_info.body().definition(info) {
-                HighLevel::Lexical(Lexical::Function(function)) => {
-                    use kirin::prelude::HasCFGBody;
-                    *function.cfg()
-                }
-                _ => return Err(InterpreterError::Custom("expected a function body")),
-            }
-        }
-        Stage::Lowered(info) => {
-            let staged_info = staged
-                .get_info(info)
-                .ok_or(InterpreterError::MissingSpecialization(staged))?;
-            let spec = match staged_info.unique_live_specialization() {
-                Ok(spec) => spec,
-                Err(UniqueLiveSpecializationError::NoSpecialization) => {
-                    return Err(InterpreterError::MissingSpecialization(staged));
-                }
-                Err(UniqueLiveSpecializationError::Ambiguous { count }) => {
-                    return Err(InterpreterError::AmbiguousSpecialization {
-                        function: staged,
-                        count,
-                    });
-                }
-            };
-            let spec_info = spec
-                .get_info(info)
-                .ok_or(InterpreterError::Custom("specialized function has no body"))?;
-            match spec_info.body().definition(info) {
-                LowLevel::Lifted(Lifted::Function(function)) => {
-                    use kirin::prelude::HasCFGBody;
-                    *function.cfg()
-                }
-                _ => return Err(InterpreterError::Custom("expected a function body")),
-            }
-        }
-    };
-    Ok((stage_id, cfg))
-}
-
 /// Run classic per-point liveness (dense backward — regalloc-grade
 /// block-boundary and per-statement sets) over `function_name`'s body at
 /// `stage_name`. Consumes the finalized IR directly; strong demand
 /// ([`kirin_liveness::analyze_demand`]) is an independent analysis and is
 /// not involved.
+///
+/// Stage-pinned: a `function_name` with no live specialization at `stage_name`
+/// is an error, not a cue to analyze some other stage's body.
 pub fn analyze_classic_liveness(
     pipeline: &Pipeline<Stage>,
     stage_name: &str,
     function_name: &str,
 ) -> Result<(CompileStage, CFG, DenseLivenessResult), InterpreterError> {
-    let (stage, cfg) = function_cfg(pipeline, stage_name, function_name)?;
-    let result = kirin_liveness::analyze_dense_with_frame::<
-        _,
-        ToyDenseBackwardFrame<LiveSet, InterpreterError>,
-    >(pipeline, stage, cfg)?;
+    let mut analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
+    let scope = analysis.analyze_by_name(stage_name, function_name)?;
+    let result = DenseLivenessResult::from_engine(&analysis, scope);
+    let (stage, Body::CFG(cfg)) = scope else {
+        return Err(InterpreterError::Custom(
+            "classic liveness target is not a CFG function",
+        ));
+    };
     Ok((stage, cfg, result))
 }
