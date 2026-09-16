@@ -1,6 +1,6 @@
 //! Shared anchor-keyed storage for interpreter values and analysis facts.
 //!
-//! [`FactStore<A, F>`] holds one payload `F` per hashable anchor `A`.
+//! [`FactStore<A, F>`] holds one payload `F` per [`LatticeAnchor`] `A`.
 //! [`EnvStore`](crate::EnvStore) allocates one of these per environment, addressed by
 //! analysis context, for concrete and forward abstract interpretation. Backward
 //! analyses use the map directly with SSA or program-point anchors, qualified by
@@ -8,13 +8,12 @@
 //! join.
 
 use std::collections::HashMap;
-use std::hash::Hash;
 
 use kirin_ir::SSAValue;
 
-use super::anchor::{Change, Scoped};
+use super::anchor::{Change, LatticeAnchor, Scoped};
 
-/// One interpreter value or analysis fact per anchor.
+/// One interpreter value or analysis fact per [`LatticeAnchor`].
 ///
 /// Missing anchors return `None`. Concrete engines report unbound values;
 /// abstract engines can interpret absence as bottom. Assignment never joins
@@ -22,18 +21,18 @@ use super::anchor::{Change, Scoped};
 #[derive(Clone, Debug)]
 pub struct FactStore<A, F>
 where
-    A: Eq + Hash,
+    A: LatticeAnchor,
 {
     facts: HashMap<A, F>,
 }
 
-impl<A: Eq + Hash, F> Default for FactStore<A, F> {
+impl<A: LatticeAnchor, F> Default for FactStore<A, F> {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<A: Eq + Hash, F> FactStore<A, F> {
+impl<A: LatticeAnchor, F> FactStore<A, F> {
     pub fn new() -> Self {
         Self {
             facts: HashMap::new(),
@@ -75,7 +74,7 @@ impl<A: Eq + Hash, F> FactStore<A, F> {
     }
 }
 
-impl<A: Eq + Hash, F: PartialEq> FactStore<A, F> {
+impl<A: LatticeAnchor, F: PartialEq> FactStore<A, F> {
     /// Join `incoming` into the fact at `anchor` using `merge`, reporting
     /// whether the stored fact changed. `bottom` supplies the implicit fact
     /// for an absent anchor.
