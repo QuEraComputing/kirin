@@ -121,14 +121,9 @@ class Specialize(Pass):
             for stmt in mt.code.walk():
                 if isinstance(stmt, Constant) and isinstance(stmt.value, ir.PyAttr):
                     stmt.result.hints["const"] = const.Value(stmt.value.data)
-            normalized = Walk(Call2Invoke()).rewrite(mt.code)
-            result = normalized.join(result)
-            if normalized.has_done_something:
-                frame = self._analyze(mt)
+            result = Walk(Call2Invoke()).rewrite(mt.code).join(result)
             result = (
-                Walk(SpecializeInvoke(frame.entries, self.materialize))
-                .rewrite(mt.code)
-                .join(result)
+                Walk(SpecializeInvoke(self.materialize)).rewrite(mt.code).join(result)
             )
             result = Fold(mt.dialects, no_raise=self.no_raise)(mt).join(result)
             new_callees = self._callees(mt)

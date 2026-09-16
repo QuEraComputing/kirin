@@ -1,6 +1,6 @@
 """Rewrite static calls using a pass-owned specialization factory."""
 
-from typing import Mapping, Callable
+from typing import Callable
 from dataclasses import dataclass
 
 from kirin import ir
@@ -12,13 +12,12 @@ from kirin.dialects.py.constant import Constant
 
 @dataclass
 class SpecializeInvoke(RewriteRule):
-    """Specialize Invokes using fresh constant facts and a shared factory.
+    """Specialize Invokes using constant hints and a shared factory.
 
     The factory returns a method and the input positions it retains, or None
     when specialization is unsupported or exceeds its budget.
     """
 
-    facts: Mapping[ir.SSAValue, const.Result]
     specialize: Callable[
         [ir.Method, tuple[const.Result, ...]],
         tuple[ir.Method, tuple[int, ...]] | None,
@@ -34,7 +33,8 @@ class SpecializeInvoke(RewriteRule):
             ):
                 args.append(const.Value(value.owner.value.data))
             else:
-                args.append(self.facts.get(value, const.Unknown()))
+                hint = value.hints.get("const")
+                args.append(hint if isinstance(hint, const.Result) else const.Unknown())
         specialized = self.specialize(node.callee, tuple(args))
         if specialized is None:
             return RewriteResult()
