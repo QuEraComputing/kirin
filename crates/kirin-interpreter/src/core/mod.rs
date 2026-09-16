@@ -23,6 +23,6 @@ pub use frame::{
     ForwardFrameEngine, Frame, FrameEffect, FrameEngine, StatementDispatch, drive_frames,
 };
 pub use interp::{AbstractInterpreter, Env, Interp, InterpLocation, SparseForwardInterp};
-pub use linker::{CrossStageLinker, LinkTarget, Linker, ResolvedCallable, SameStageLinker};
+pub use linker::{CrossStageLinker, LinkTarget, Linker, SameStageLinker};
 pub use query::{GraphWalkPlan, StageQuery, TerminatorArgs};
 pub use value::{BranchCondition, HasProductValue, expect_single};

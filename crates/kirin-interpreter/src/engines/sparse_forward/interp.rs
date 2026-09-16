@@ -40,13 +40,13 @@ use kirin_ir::{
     StageMeta, Statement, Symbol, Widen,
 };
 
-use crate::core::{linker::link_and_discover_callable, query};
+use crate::core::query;
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
     BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
     EnvIndex, EnvStackStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval,
     ForwardSummaryDeps, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
-    LinkTarget, Linker, OwnerSemantics, ResolvedCallable, SameStageLinker, SparseForwardEffect,
+    LinkTarget, Linker, OwnerSemantics, SameStageLinker, SparseForwardEffect,
     SparseForwardSemantic, StageQuery, StandardAbstractFrame, StandardFixpointInterpreter,
     StatementDispatch, Store, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
@@ -626,13 +626,14 @@ where
         self.store.free(index).map_err(E::from)
     }
 
-    fn resolve_callable(
-        &self,
-        lookup_stage: CompileStage,
-        callee: &Callee,
-    ) -> Result<ResolvedCallable, E> {
-        link_and_discover_callable(self.pipeline, &self.linker, lookup_stage, callee)
+    fn resolve_callee(&self, lookup_stage: CompileStage, callee: &Callee) -> Result<LinkTarget, E> {
+        self.linker
+            .resolve(self.pipeline, lookup_stage, callee)
             .map_err(E::from)
+    }
+
+    fn discover_body(&self, target: &LinkTarget) -> Result<Body, E> {
+        target.body(self.pipeline).map_err(E::from)
     }
 }
 
@@ -750,12 +751,12 @@ where
         self.inner_mut().free_env(index)
     }
 
-    fn resolve_callable(
-        &self,
-        lookup_stage: CompileStage,
-        callee: &Callee,
-    ) -> Result<ResolvedCallable, E> {
-        self.inner().resolve_callable(lookup_stage, callee)
+    fn resolve_callee(&self, lookup_stage: CompileStage, callee: &Callee) -> Result<LinkTarget, E> {
+        self.inner().resolve_callee(lookup_stage, callee)
+    }
+
+    fn discover_body(&self, target: &LinkTarget) -> Result<Body, E> {
+        self.inner().discover_body(target)
     }
 }
 
@@ -883,8 +884,8 @@ where
             results,
         } = call;
         let lookup_stage = call_stage.unwrap_or(stage);
-        let ResolvedCallable { target, body } =
-            self.inner().resolve_callable(lookup_stage, &callee)?;
+        let target = self.inner().resolve_callee(lookup_stage, &callee)?;
+        let body = target.body(self.inner().pipeline()).map_err(E::from)?;
         let key = self.inner_mut().key(&target, &args);
 
         self.apply_update(ForwardUpdate::FunctionEntry {
@@ -1569,8 +1570,10 @@ where
         callee: Callee,
         args: impl IntoIterator<Item = V>,
     ) -> Result<Product<V>, E> {
-        let ResolvedCallable { target, body } =
-            self.driver.inner().resolve_callable(stage, &callee)?;
+        let target = self.driver.inner().resolve_callee(stage, &callee)?;
+        let body = target
+            .body(self.driver.inner().pipeline())
+            .map_err(E::from)?;
         let args: Product<V> = args.into_iter().collect();
         let key = self.driver.inner_mut().key(&target, &args);
 

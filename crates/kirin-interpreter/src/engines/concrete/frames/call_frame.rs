@@ -2,7 +2,6 @@ use kirin_ir::{CompileStage, Product, SSAValue};
 
 use crate::{
     Body, CallEffect, CallServices, Callee, EnvIndex, Frame, FrameEffect, InterpreterError,
-    ResolvedCallable,
 };
 
 use super::{BodyFrameEntry, CallBodyTraversal, Completion, DefaultCallBodyTraversal};
@@ -136,8 +135,8 @@ where
                 args,
                 dest,
             } => {
-                let ResolvedCallable { target, body } =
-                    interp.resolve_callable(lookup_stage, &callee)?;
+                let target = interp.resolve_callee(lookup_stage, &callee)?;
+                let body = interp.discover_body(&target)?;
                 let index = interp.alloc_env();
                 // The closed `Body` enum is the framework's supported body
                 // vocabulary, so this match is intentionally exhaustive;

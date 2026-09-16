@@ -14,14 +14,21 @@ pub struct LinkTarget {
     pub specialization: SpecializedFunction,
 }
 
-/// A linked target together with its discovered Kirin implementation.
-///
-/// Target identity is used for analysis contexts; the body selects the IR to
-/// traverse. Engine-specific boundary initialization follows discovery.
-#[derive(Clone, Copy, Debug)]
-pub struct ResolvedCallable {
-    pub target: LinkTarget,
-    pub body: Body,
+impl LinkTarget {
+    /// Discover this target's Kirin implementation in its own stage.
+    ///
+    /// Distinct from [`HasCallableBody::callable_body`](kirin_ir::HasCallableBody::callable_body),
+    /// which projects a body from an *already available* dialect operation.
+    /// This looks that operation up first — specialization record, then its
+    /// authoritative definition statement — and only then projects. The
+    /// lookup owns every failure mode the projection cannot express: a
+    /// missing stage, specialization record, or statement.
+    ///
+    /// Each lookup reads the specialization's authoritative definition rather
+    /// than retaining a separate body alongside the target.
+    pub fn body<S: StageQuery>(&self, pipeline: &Pipeline<S>) -> Result<Body, InterpreterError> {
+        query::callable_body(pipeline, self.stage, self.specialization)
+    }
 }
 
 /// The calling-convention component of an engine.
@@ -40,27 +47,6 @@ pub trait Linker<S: StageMeta> {
         lookup_stage: CompileStage,
         callee: &Callee,
     ) -> Result<LinkTarget, InterpreterError>;
-}
-
-/// Link a callee and discover its body for root entry or a nested call.
-///
-/// Linking selects a concrete target; an IR query then discovers
-/// its body in the target's stage. Engines invoke this operation before
-/// applying their own boundary inputs (runtime arguments, abstract arguments,
-/// or analysis-specific seeds).
-pub(crate) fn link_and_discover_callable<S, Lk>(
-    pipeline: &Pipeline<S>,
-    linker: &Lk,
-    lookup_stage: CompileStage,
-    callee: &Callee,
-) -> Result<ResolvedCallable, InterpreterError>
-where
-    S: StageQuery,
-    Lk: Linker<S>,
-{
-    let target = linker.resolve(pipeline, lookup_stage, callee)?;
-    let body = query::callable_body(pipeline, target.stage, target.specialization)?;
-    Ok(ResolvedCallable { target, body })
 }
 
 /// Resolve calls within the lookup stage only (the default).
