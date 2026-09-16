@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 
-use crate::{FactStore, InterpreterError};
+use crate::{FactStore, InterpreterError, LatticeAnchor};
 
 /// A handle to one allocated environment. The owning engine controls its
 /// lifetime; the handle stays invalid once freed, because indices are never
@@ -26,7 +26,7 @@ impl EnvIndex {
 #[derive(Clone, Debug)]
 struct Environment<K, A, V>
 where
-    A: Eq + Hash,
+    A: LatticeAnchor,
 {
     key: Option<K>,
     facts: FactStore<A, V>,
@@ -53,7 +53,7 @@ where
 #[derive(Clone, Debug)]
 pub struct EnvStore<K, A, V>
 where
-    A: Eq + Hash,
+    A: LatticeAnchor,
 {
     context_indices: HashMap<K, EnvIndex>,
     environments: Vec<Option<Environment<K, A, V>>>,
@@ -61,7 +61,7 @@ where
 
 impl<K, A, V> Default for EnvStore<K, A, V>
 where
-    A: Eq + Hash,
+    A: LatticeAnchor,
 {
     fn default() -> Self {
         Self::new()
@@ -70,7 +70,7 @@ where
 
 impl<K, A, V> EnvStore<K, A, V>
 where
-    A: Eq + Hash,
+    A: LatticeAnchor,
 {
     pub fn new() -> Self {
         Self {
@@ -137,7 +137,7 @@ where
 impl<K, A, V> EnvStore<K, A, V>
 where
     K: Clone + Eq + Hash,
-    A: Eq + Hash,
+    A: LatticeAnchor,
 {
     /// The environment registered under `key`, without allocating one.
     ///
