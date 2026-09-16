@@ -22,7 +22,7 @@ use kirin_interpreter::engine::{
     CallContext, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
     SparseForwardInterpreter, expect_single,
 };
-use kirin_interpreter::{Body, Callee, InterpreterError};
+use kirin_interpreter::{Body, InterpreterError};
 use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
 
 use crate::stage::Stage;
@@ -80,6 +80,18 @@ pub type ToyConstProp<'ir, Lk = CrossStageLinker> = SparseForwardInterpreter<
     Lk,
     ConstPropContext,
     ToyAbstractFrame<ConstPropValue, ToyError, CpKey>,
+>;
+
+/// Classic per-point liveness over toy's private dense stack item: the reverse
+/// block walk plus the SCF dense continuations. Defaults to [`SameStageLinker`]:
+/// unlike execution and constprop, liveness is pinned to the stage it is asked
+/// for.
+pub(crate) type ToyDenseLiveness<'ir, Lk = SameStageLinker> = DenseLiveness<
+    'ir,
+    Stage,
+    InterpreterError,
+    ToyDenseBackwardFrame<LiveSet, InterpreterError>,
+    Lk,
 >;
 
 /// Execute `function_name` starting at `stage_name`, following calls across
@@ -140,26 +152,17 @@ pub fn analyze_constprop(
 /// `stage_name`. Consumes the finalized IR directly; strong demand
 /// ([`kirin_liveness::analyze_demand`]) is an independent analysis and is
 /// not involved.
+///
+/// Stage-pinned: a `function_name` with no live specialization at `stage_name`
+/// is an error, not a cue to analyze some other stage's body.
 pub fn analyze_classic_liveness(
     pipeline: &Pipeline<Stage>,
     stage_name: &str,
     function_name: &str,
 ) -> Result<(CompileStage, CFG, DenseLivenessResult), InterpreterError> {
-    let caller_stage = pipeline
-        .stage_by_name(stage_name)
-        .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
-    let function = pipeline
-        .lookup_function_by_name(function_name)
-        .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    let mut engine: DenseLiveness<
-        '_,
-        Stage,
-        InterpreterError,
-        ToyDenseBackwardFrame<LiveSet, InterpreterError>,
-        CrossStageLinker,
-    > = DenseLiveness::new(pipeline).with_linker(CrossStageLinker);
-    let scope = engine.analyze(caller_stage, Callee::Function(function))?;
-    let result = DenseLivenessResult::from_engine(&engine, scope);
+    let mut analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
+    let scope = analysis.analyze_by_name(stage_name, function_name)?;
+    let result = DenseLivenessResult::from_engine(&analysis, scope);
     let (stage, Body::CFG(cfg)) = scope else {
         return Err(InterpreterError::Custom(
             "classic liveness target is not a CFG function",

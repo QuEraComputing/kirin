@@ -1008,15 +1008,15 @@ specialize @source fn @main(i64, i64) -> i64 {
 mod dense {
     use kirin::prelude::{CompileStage, Pipeline, SSAValue};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_interpreter::{Callee, InterpreterError, ProgramPoint, Scoped};
-    use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
+    use kirin_interpreter::{Callee, ProgramPoint, Scoped};
+    use kirin_liveness::{DenseLivenessResult, LiveSet};
     use kirin_scf::StructuredControlFlow;
 
     use super::demand::{FOR_CARRIED_DEMAND, IF_DEAD_RESULT};
     use super::demand::{
         cfg_scope, constant_result, entry_params, find_statement, find_value, parse, source_root,
     };
-    use crate::interpreter::ToyDenseBackwardFrame;
+    use crate::interpreter::ToyDenseLiveness;
     use crate::language::HighLevel;
     use crate::stage::Stage;
 
@@ -1026,12 +1026,7 @@ mod dense {
         caller_stage: CompileStage,
         callee: Callee,
     ) -> DenseLivenessResult {
-        let mut engine: DenseLiveness<
-            '_,
-            Stage,
-            InterpreterError,
-            ToyDenseBackwardFrame<LiveSet, InterpreterError>,
-        > = DenseLiveness::new(pipeline);
+        let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
         let scope = engine
             .analyze(caller_stage, callee)
             .expect("analysis succeeds");
