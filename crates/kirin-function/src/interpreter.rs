@@ -1,8 +1,8 @@
-use kirin::prelude::{CompileTimeValue, HasBottom, HasCFGBody, Product, SSAValue};
+use kirin::prelude::{CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
-    CallEffect, CallableBody, Callee, ClassicLiveness, ClassicLivenessInterp, DemandInterp,
-    DenseBackwardEffect, ForwardEval, FunctionEntry, Interpretable, InterpreterError,
-    SparseForwardEffect, SparseForwardInterp, StrongDemand,
+    CallEffect, Callee, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
+    ForwardEval, Interpretable, InterpreterError, SparseForwardEffect, SparseForwardInterp,
+    StrongDemand,
 };
 
 use crate::{
@@ -89,27 +89,9 @@ where
     }
 }
 
-impl<T> FunctionEntry for Function<T>
-where
-    T: CompileTimeValue,
-{
-    fn function_entry(&self) -> Option<CallableBody> {
-        Some(CallableBody::new(*self.cfg()))
-    }
-}
-
-impl<T> FunctionEntry for Lambda<T>
-where
-    T: CompileTimeValue,
-{
-    fn function_entry(&self) -> Option<CallableBody> {
-        Some(CallableBody::new(*self.cfg()))
-    }
-}
-
 /// Function definitions are inert at runtime: defining a function does not
-/// execute its body. Bodies run when the function is invoked (via
-/// [`FunctionEntry`]).
+/// execute its body. Invocation discovers the body through
+/// `kirin_ir::HasCallableBody`, then the engine initializes and runs it.
 impl<I, T> Interpretable<I, ForwardEval> for Function<T>
 where
     I: SparseForwardInterp,

@@ -25,6 +25,7 @@ pub enum GraphFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     Function {
+        #[kirin(callable_body)]
         body: CFG,
         sig: Signature<ArithType>,
     },
@@ -34,6 +35,7 @@ pub enum GraphFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     GraphFunction {
+        #[kirin(callable_body)]
         body: DiGraph,
         sig: Signature<ArithType>,
     },
@@ -43,6 +45,7 @@ pub enum GraphFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     LinearFunction {
+        #[kirin(callable_body)]
         body: Block,
         sig: Signature<ArithType>,
     },
@@ -55,6 +58,7 @@ pub enum GraphFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     UnGraphFunction {
+        #[kirin(callable_body)]
         body: UnGraph,
         sig: Signature<ArithType>,
     },
@@ -88,9 +92,8 @@ mod interpreter {
     use kirin_arith::{ArithValue, CheckedDiv, CheckedRem, interpreter::DivisionByZero};
     use kirin_interpreter::BranchCondition;
     use kirin_interpreter::{
-        CallableBody, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
-        DiGraphFrame, ForwardEval, FunctionEntry, Interpretable, SparseForwardEffect,
-        SparseForwardInterp, StrongDemand,
+        ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, DiGraphFrame,
+        ForwardEval, Interpretable, SparseForwardEffect, SparseForwardInterp, StrongDemand,
     };
     use kirin_ir::{HasBottom, Product, SSAValue};
 
@@ -180,22 +183,6 @@ mod interpreter {
                 GraphFunctionLanguage::Constant(op) => op.interpret(interp),
                 GraphFunctionLanguage::Call(op) => op.interpret(interp),
                 GraphFunctionLanguage::Return(op) => op.interpret(interp),
-            }
-        }
-    }
-
-    impl FunctionEntry for GraphFunctionLanguage {
-        fn function_entry(&self) -> Option<CallableBody> {
-            match self {
-                GraphFunctionLanguage::Function { body, .. } => Some(CallableBody::new(*body)),
-                GraphFunctionLanguage::GraphFunction { body, .. } => Some(CallableBody::new(*body)),
-                GraphFunctionLanguage::LinearFunction { body, .. } => {
-                    Some(CallableBody::new(*body))
-                }
-                GraphFunctionLanguage::UnGraphFunction { body, .. } => {
-                    Some(CallableBody::new(*body))
-                }
-                _ => None,
             }
         }
     }

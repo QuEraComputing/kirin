@@ -1,46 +1,6 @@
 use kirin_ir::{
-    Block, CFG, CompileStage, DiGraph, Function, Product, SSAValue, SpecializedFunction,
-    StagedFunction, Symbol, UnGraph,
+    Block, CompileStage, Function, Product, SSAValue, SpecializedFunction, StagedFunction, Symbol,
 };
-
-/// A traversal descriptor: which body was the engine handed?
-///
-/// Interpreter vocabulary, not an IR concept — dialect ops keep their precise
-/// field types (`Block`, `CFG`, `DiGraph`, `UnGraph`); a `Body` appears only at
-/// the moment a body is handed to the interpreter (callable entry,
-/// body-containment queries, analysis scopes). Bodies carry no semantics of their own: the
-/// statement that owns a body defines what entering and exiting it means.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Body {
-    Block(Block),
-    CFG(CFG),
-    DiGraph(DiGraph),
-    UnGraph(UnGraph),
-}
-
-impl From<Block> for Body {
-    fn from(block: Block) -> Self {
-        Self::Block(block)
-    }
-}
-
-impl From<CFG> for Body {
-    fn from(cfg: CFG) -> Self {
-        Self::CFG(cfg)
-    }
-}
-
-impl From<DiGraph> for Body {
-    fn from(graph: DiGraph) -> Self {
-        Self::DiGraph(graph)
-    }
-}
-
-impl From<UnGraph> for Body {
-    fn from(graph: UnGraph) -> Self {
-        Self::UnGraph(graph)
-    }
-}
 
 /// The closed forward control algebra a statement produces.
 ///
@@ -104,8 +64,8 @@ impl<V> Edge<V> {
 pub struct CallEffect<V> {
     /// What to call.
     pub callee: Callee,
-    /// Optional explicit target stage (e.g. staged calls); defaults to the
-    /// caller's stage.
+    /// Optional explicit lookup stage (e.g. staged calls); defaults to the
+    /// caller's stage. The linker may select a different target stage.
     pub stage: Option<CompileStage>,
     /// Argument values.
     pub args: Product<V>,
@@ -129,31 +89,5 @@ pub enum Callee {
 impl From<Symbol> for Callee {
     fn from(symbol: Symbol) -> Self {
         Self::Named(symbol)
-    }
-}
-
-/// The body a callable statement enters when invoked.
-///
-/// This is the function-call entry descriptor — the call mechanism, not a
-/// structured-control abstraction. A [`FunctionEntry`](crate::FunctionEntry)
-/// rule returns one; the call boundary picks the walker that matches the
-/// body kind and binds its own boundary input. Callable-body discovery is
-/// deliberately value-independent: concrete execution and forward abstract
-/// interpretation carry different argument domains, while backward analyses
-/// have no argument product at this boundary. Any body kind may be callable —
-/// the statement declaring itself callable defines the semantics; the
-/// framework supplies default walkers for `CFG`, `Block`, and `DiGraph`, while
-/// `UnGraph` traversal is a dialect/compiler-supplied call-body traversal,
-/// rejected with
-/// [`InterpreterError::NoDefaultWalker`](crate::InterpreterError) when no
-/// policy is provided.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct CallableBody {
-    pub body: Body,
-}
-
-impl CallableBody {
-    pub fn new(body: impl Into<Body>) -> Self {
-        Self { body: body.into() }
     }
 }

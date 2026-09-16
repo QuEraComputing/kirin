@@ -8,7 +8,7 @@
 //!
 //! Before the split there was one monolithic capability trait carrying every
 //! operation, so *none* of these four engines could exist: running a block
-//! walker meant also supplying `alloc_env`/`free_env`/`resolve_callable`/
+//! walker meant also supplying `alloc_env`/`free_env`/`resolve_callee`/
 //! `cfg_entry`/`digraph_walk_plan`, and an abstract dataflow
 //! engine had to expose a concrete call convention it never performs.
 //!
@@ -36,11 +36,11 @@
 use std::collections::HashMap;
 
 use kirin_interpreter::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractDiGraphFrame, BlockFrame, BlockQueries,
-    CFGFrame, CFGQueries, CallEffect, CallFrame, CallRequest, CallServices, CallableBody, Callee,
+    AbstractBlockFrame, AbstractCallFrame, AbstractDiGraphFrame, BlockFrame, BlockQueries, Body,
+    CFGFrame, CFGQueries, CallEffect, CallFrame, CallRequest, CallServices, Callee,
     DefaultCallBodyTraversal, DiGraphFrame, DiGraphQueries, Env, EnvIndex,
-    ForwardDataflowFrameEngine, ForwardEval, ForwardFrameEngine, Frame, FunctionTarget, Interp,
-    InterpreterError, SparseForwardEffect, StatementDispatch,
+    ForwardDataflowFrameEngine, ForwardEval, ForwardFrameEngine, Frame, Interp, InterpreterError,
+    LinkTarget, SparseForwardEffect, StatementDispatch,
 };
 use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
 
@@ -108,7 +108,7 @@ struct MockStore(HashMap<(usize, SSAValue), i64>);
 /// Implements: [`Interp`], [`Env`], [`StatementDispatch`], [`BlockQueries`].
 ///
 /// **Deliberately omits**: [`CallServices`] (no `alloc_env`/`free_env`/
-/// `resolve_callable`), [`CFGQueries`] (no
+/// `resolve_callee`), [`CFGQueries`] (no
 /// `cfg_entry`), and [`DiGraphQueries`] (no `digraph_walk_plan`).
 ///
 /// So this engine cannot enter a function, cannot find a CFG's entry block, and
@@ -260,11 +260,14 @@ impl CallServices for CallOnlyEngine {
     fn free_env(&mut self, _index: EnvIndex) -> Result<(), InterpreterError> {
         unimplemented!("type-level mock")
     }
-    fn resolve_callable(
+    fn resolve_callee(
         &self,
         _stage: CompileStage,
         _callee: &Callee,
-    ) -> Result<(FunctionTarget, CallableBody), InterpreterError> {
+    ) -> Result<LinkTarget, InterpreterError> {
+        unimplemented!("type-level mock")
+    }
+    fn discover_body(&self, _target: &LinkTarget) -> Result<Body, InterpreterError> {
         unimplemented!("type-level mock")
     }
 }
@@ -289,7 +292,7 @@ fn call_frame_runs_on_an_engine_with_only_call_services() {
 /// *summarizes* a call ([`ForwardDataflowFrameEngine::summarize_call`]) instead
 /// of descending into it, and reaches a callable body's entry block through
 /// owner seeding rather than `cfg_entry` — so it should not have to expose
-/// activation allocation, activation cleanup, `resolve_callable`,
+/// activation allocation, activation cleanup, `resolve_callee`,
 /// or `cfg_entry` merely to be an abstract dataflow engine. Before the split it
 /// did.
 #[derive(Default)]

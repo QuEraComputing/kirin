@@ -35,7 +35,8 @@
 //! ## Layout Extensibility
 //!
 //! [`StandardLayout`] works for most derives. If your derive needs custom attributes
-//! on statements or fields (e.g., `#[callable]`), define a custom [`Layout`] impl.
+//! on statements or fields (e.g., parser formatting), define a custom [`Layout`] impl.
+//! Structural `#[kirin(callable_body)]` is part of the shared IR metadata.
 //! See [`ir::Layout`] for details.
 //!
 //! [`Layout`]: ir::Layout

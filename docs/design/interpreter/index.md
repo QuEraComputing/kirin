@@ -243,32 +243,53 @@ of its variants. The abstract equivalents use the same narrow
 and exhaustive dispatch. Future structured dialects would follow the same
 ownership rule; only the existing SCF operations are implemented.
 
-### `FunctionEntry` — value-independent callable statements
+### `HasCallableBody` — IR-level callable-body discovery
 
 ```rust
-pub trait FunctionEntry: Dialect {
-    fn function_entry(&self) -> Option<CallableBody>;
+// kirin-ir: independent of an interpreter, signature type, and value domain.
+pub trait HasCallableBody {
+    fn callable_body(&self) -> Option<Body>;
 }
 ```
 
-Statements that define function bodies (e.g. `kirin_function::Function`)
-return the `CallableBody { body }` to enter on invocation (the function-call
-entry descriptor — not a structured-control abstraction). Discovery is a
-structural operation: it never receives concrete values, abstract values, or a
-backward-analysis fact domain. Concrete execution and forward analysis retain
-their own argument products and bind them only after discovery; backward
-analyses manufacture no placeholder product. On language enums the trait is
-derived; `#[callable]` marks the variants that forward, while dispatch maps a
-non-callable variant to `NotCallable` with the actual definition statement.
+`Body` is the IR-owned sum of `Block`, `CFG`, `DiGraph`, and `UnGraph` handles.
+Dialect definitions retain their precise field types. `#[derive(Dialect)]`
+always generates `HasCallableBody`: a direct definition marks zero or one field
+with `#[kirin(callable_body)]`; zero markers returns `None`. Multiple marked
+fields, unsupported types, and marked `Option`/`Vec` fields are derive errors.
+Every `#[wraps]` variant delegates automatically, including through nested
+language enums. Merely owning a body does not make an operation callable.
+
+```rust
+#[derive(Clone, Debug, PartialEq, Dialect)]
+#[kirin(type = T)]
+struct Function<T: CompileTimeValue> {
+    #[kirin(callable_body)]
+    body: CFG,
+    sig: Signature<T>,
+}
+```
+
+Follow `HasSignature` as a derive-code-generation precedent, not as a shared
+semantic abstraction. A `Lambda` exposes a body without a stored signature;
+an external declaration can have a signature without a Kirin body. Body
+queries need no dialect type parameter. Manual `Dialect` implementations add
+`HasCallableBody` when used in this query path; it is not a `Dialect`
+supertrait.
+
+Concrete execution and forward analysis retain their own argument products
+and bind them after discovery. Backward analyses manufacture no placeholder
+product. The common query reports `NotCallable` with the actual definition
+statement when the operation has no marked body.
 
 Every engine root follows the same validated prefix:
 
 ```text
-caller stage + Callee
+lookup stage + Callee
     -> Linker::resolve
-    -> FunctionTarget
-    -> FunctionEntry dispatch at FunctionTarget.stage
-    -> CallableBody
+    -> LinkTarget { stage, specialization }
+    -> LinkTarget::body: target-stage IR query
+       (specialization -> definition -> callable_body())
     -> engine-specific boundary initialization
 ```
 
@@ -284,8 +305,8 @@ Everything is exported from `kirin_interpreter::engine`. Compiler authors
 usually write zero framework-trait impls:
 
 1. **Language enums** — the same `#[wraps]` enums used for parsing/printing,
-   with `Interpretable` (and `FunctionEntry` + `#[callable]`) added to the
-   derive list.
+   with `Interpretable` added to the derive list. Their existing `Dialect`
+   derive delegates callable-body discovery to the marked leaf definitions.
 2. **Stage enum** — add `#[derive(InterpDispatch)]` next to `StageMeta` and
    `ParseDispatch`. Single-language pipelines (`Pipeline<StageInfo<L>>`) get a
    blanket impl.
@@ -308,19 +329,73 @@ let value = expect_single(analysis.analyze_by_name("source", "abs", [Const(7)])?
 
 ```rust
 pub trait Linker<S: StageMeta> {
-    fn resolve(&self, pipeline: &Pipeline<S>, caller_stage: CompileStage, callee: &Callee)
-        -> Result<FunctionTarget, InterpreterError>;
+    fn resolve(&self, pipeline: &Pipeline<S>, lookup_stage: CompileStage, callee: &Callee)
+        -> Result<LinkTarget, InterpreterError>;
+}
+
+pub struct LinkTarget {
+    pub stage: CompileStage,
+    pub specialization: SpecializedFunction,
+}
+
+impl LinkTarget {
+    // Discovery: look the definition up in `stage`, then project its body.
+    pub fn body<S: StageQuery>(
+        &self,
+        pipeline: &Pipeline<S>,
+    ) -> Result<Body, InterpreterError>;
 }
 ```
 
 A linker resolves `Callee::{Named, Function, Staged, Specialized}` to a
-`(stage, specialization, definition)` target. It is a *field of the engine*, never
+`(stage, specialization)` target. It is a *field of the engine*, never
 a trait the user implements on the engine type — this is a deliberate
 coherence rule: policies must be swappable without newtype-cloning a driver.
 
-- `SameStageLinker` (default): resolve within the caller's stage.
-- `CrossStageLinker`: prefer a live specialization at the caller's stage,
+- `SameStageLinker` (default): resolve within the lookup stage.
+- `CrossStageLinker`: prefer a live specialization at the lookup stage,
   otherwise any stage that has one.
+
+The input and selected stage have the same `CompileStage` type but distinct
+roles. If `linear` is declared in `source` and implemented only in `lowered`,
+cross-stage resolution can accept `lookup_stage = source` and return
+`target.stage = lowered`. Fetching that target stage retrieves its IR storage;
+it does not resolve the callee again or perform lowering.
+
+`SpecializedFunctionInfo` authoritatively owns the definition statement.
+`LinkTarget` carries no copied definition, so custom linkers cannot pair a
+specialization with a contradictory definition. The shared, engine-independent
+query reads the specialization record, statement, and marked body in the
+selected stage. Missing records produce errors instead of panics. Default
+linkers also check specialization presence before accepting a candidate stage,
+including for an already specialized callee; removing the copied definition
+must not remove this validation.
+
+Discovery is a getter on the target that reads the specialization's
+authoritative definition on demand. Removing the combined result eliminates
+a redundant target/body representation. The target remains the analysis
+context/summary identity, and the body selects the IR to traverse.
+
+Two getters sit at different layers. `HasCallableBody::callable_body` projects
+a body from an *already available* dialect operation. `LinkTarget::body` looks
+that operation up first — specialization record, then its definition statement —
+and only then projects; every lookup failure (missing stage, specialization
+record, or statement) belongs to this layer and is invisible to the projection.
+
+Engines holding a pipeline call `LinkTarget::body` directly. `CallFrame` cannot:
+it reaches the IR only through the engine, so `CallServices` exposes
+`resolve_callee` (identity) and `discover_body` (discovery) as two methods
+rather than one returning a pair.
+
+Built-in `CallServices::discover_body` implementations delegate to
+`LinkTarget::body`. Custom implementations must preserve that lookup and its
+error behavior; the trait does not make mismatched target/body results
+unrepresentable.
+
+Discovery does not decide whether an engine supports the representation: an
+undirected body can be discovered successfully and subsequently rejected with
+`NoDefaultWalker` by the engine's traversal policy. It also does not bind
+arguments or seed backward exits.
 
 Because the linker is shared by all engines, cross-language *analysis* is the
 same one-line choice as cross-language *execution*: the abstract engine calls
@@ -437,14 +512,16 @@ specialization.
 
 Two mechanisms keep engines generic over stage enums:
 
-- `InterpDispatch<C>` (derived) — monomorphic dispatch of statement
-  interpretation and function entry to each stage's language, mirroring
-  `ParseDispatch`. The engine builds its context and dispatch forwards it to the
-  matching `Interpretable`/`FunctionEntry` rule.
+- `InterpDispatch<I>` (derived) — monomorphic dispatch of statement
+  interpretation to each stage's language, mirroring `ParseDispatch`. The
+  engine sets its current location and dispatch forwards it to the matching
+  `Interpretable<I, I::Semantics>` rule.
 - `StageQuery` — a bound bundle over kirin-ir's `StageDispatch`/`StageAction`
   machinery for language-independent IR facts (block parameters, statement
-  order, CFG entry, specialization lookup, symbol resolution). Satisfied
-  automatically by any stage enum; used by engines and linkers internally.
+  order, CFG entry, specialization validation, callable-body discovery, symbol
+  resolution). Derived dialects, including those with no callables, supply
+  `HasCallableBody` without requiring an interpreter or semantic rules for the
+  query. Used by engines and linkers internally.
 
 ## Custom traversal and policies
 
@@ -498,7 +575,7 @@ surface still runs the frames it can support.
 | `BlockQueries: Interp` | `block_params`/`first_statement`/`next_statement` | `BlockCursor`, `BlockFrame`, `AbstractBlockFrame`, dialect block walkers |
 | `CFGQueries: BlockQueries` | `cfg_entry` | `CFGFrame` |
 | `DiGraphQueries: Interp` | `digraph_walk_plan` (default: `NoDefaultWalker`) | `DiGraphFrame`, `AbstractDiGraphFrame` |
-| `CallServices: Env` | `alloc_env`/`free_env`/`resolve_callable` | `CallFrame` |
+| `CallServices: Env` | `alloc_env`/`free_env`/`resolve_callee`/`discover_body` | `CallFrame` |
 
 **The `*Queries` traits are read-only, and only require `Interp`** — so nothing
 on them can touch SSA storage, and their names cannot hide a store mutation. The
@@ -512,14 +589,18 @@ alone and `::write_child_results` takes `Env` alone.
 `CallServices` names *services*, not a convention: **`CallFrame` still owns the
 calling convention** — the operation order, which completions are legal, and
 freeing the activation exactly once — and this trait only supplies the
-primitives. The public `CallServices::resolve_callable` method exposes
-linker-plus-target-stage body discovery using the engine's configured pipeline
-and linker; it carries no value product. The built-in engines share the
-crate-private `link_and_discover_callable` helper for root entry and nested
-calls. Compiler authors configure resolution policy through `.with_linker(...)`.
+primitives. `CallServices::resolve_callee` applies the engine's configured
+linker; `CallServices::discover_body` performs discovery on the returned target.
+Neither carries a value product. Separating the methods lets callers retain
+target identity and discover the body from the authoritative specialization
+record when needed. Backward engine roots call `Linker::resolve` plus
+`LinkTarget::body` directly; sparse-forward entry uses the resolution service
+and then calls the getter directly.
+`CallFrame` needs the trait because it reaches the IR only through the engine.
+Compiler authors configure resolution policy through `.with_linker(...)`.
 The trait is deliberately
-**not** split further: the standard `CallFrame` consumes all three services
-together, and their pairing is a safety property (an
+**not** split further: the standard `CallFrame` consumes these services
+together, and the lifecycle pairing is a safety property (an
 `alloc_env` without its `free_env` leaks; a second `free_env` double-frees), so
 no engine should be able to offer half a call convention.
 
@@ -557,7 +638,7 @@ That follows the semantics: forward abstract interpretation *summarizes* a call
 (`summarize_call` → `AbstractCallFrame`) rather than descending into it, and
 reaches a callable body's entry block through `Owner` seeding in the fixpoint
 driver rather than `cfg_entry`. Requiring its frame universe to expose
-`alloc_env`, `free_env`, `resolve_callable`, and `cfg_entry` was demanding a call
+`alloc_env`, `free_env`, `resolve_callee`, and `cfg_entry` was demanding a call
 convention it never performs. `tests/frame_engine_capabilities.rs` pins this
 down with deliberately incomplete mock engines whose ability to compile *is* the
 regression test.
@@ -599,7 +680,7 @@ pub trait StatementDispatch: Interp  { /* run_statement */ }
 pub trait BlockQueries: Interp       { /* read-only block queries */ }
 pub trait CFGQueries: BlockQueries   { /* cfg_entry */ }
 pub trait DiGraphQueries: Interp     { /* digraph_walk_plan */ }
-pub trait CallServices: Env          { /* alloc/free env, resolve_callable */ }
+pub trait CallServices: Env          { /* alloc/free env, resolve_callee, discover_body */ }
 pub(crate) trait BlockBinding: Env + BlockQueries { /* bind_block_args */ }
 ```
 
@@ -862,3 +943,6 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
   `CallContext` impl, no engine change.
 - First-class function values (`Lambda`/`Bind` as values, `Callee` from an
   SSA value) are not yet supported by either engine.
+- Custom-linker targets are checked during body discovery: an absent record
+  returns `MissingSpecializationRecord`, and an absent definition statement
+  returns `MissingStatement`.
