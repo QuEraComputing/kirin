@@ -13,13 +13,11 @@ def simple_kernel(x: int):
 
 def _empty_module(version: str = "") -> SerializationModule:
     encoded = basic.encode(simple_kernel)
-    return SerializationModule(
-        symbol_table=encoded.symbol_table, body=encoded.body, version=version
-    )
+    return SerializationModule(body=encoded.body, version=version)
 
 
 def test_serialization_module_default_version_is_empty():
-    mod = SerializationModule(symbol_table={}, body=basic.encode(simple_kernel).body)
+    mod = SerializationModule(body=basic.encode(simple_kernel).body)
     assert mod.version == ""
 
 
