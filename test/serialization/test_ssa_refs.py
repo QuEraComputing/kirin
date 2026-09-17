@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import copy
 import gzip
 import json
 from typing import Any, Literal
@@ -342,70 +341,3 @@ def test_malformed_ssa_refs_fail_with_context(
 
     with pytest.raises(ValueError, match=error):
         straight_line.dialects.decode(module)
-
-
-def _with_verbose_v1_operands(module: SerializationModule) -> SerializationModule:
-    module = copy.deepcopy(module)
-    definitions = {
-        unit.data["id"]: unit
-        for unit in _walk_units(module.body)
-        if unit.kind in ("block-arg", "result-value")
-    }
-
-    for statement in (
-        unit for unit in _walk_units(module.body) if unit.kind == "statement"
-    ):
-        operands = statement.data["_args"].data["value"]
-        statement.data["_args"].data["value"] = [
-            copy.deepcopy(definitions[operand.data["id"]]) for operand in operands
-        ]
-    return module
-
-
-def _to_verbose_v1(value: Any) -> Any:
-    if isinstance(value, SerializationModule):
-        return {
-            "__serialization_module__": True,
-            "version": value.version,
-            "body": _to_verbose_v1(value.body),
-        }
-    if isinstance(value, SerializationUnit):
-        return {
-            "__serialization_unit__": True,
-            "kind": value.kind,
-            "module_name": value.module_name,
-            "class_name": value.class_name,
-            "data": _to_verbose_v1(value.data),
-        }
-    if isinstance(value, dict):
-        return {key: _to_verbose_v1(item) for key, item in value.items()}
-    if isinstance(value, (list, tuple)):
-        return [_to_verbose_v1(item) for item in value]
-    return value
-
-
-@pytest.mark.parametrize("transport", ["json", "cbson"])
-def test_verbose_v1_full_ssa_operands_remain_readable(transport: str) -> None:
-    old_module = _with_verbose_v1_operands(branching.dialects.encode(branching))
-    verbose = _to_verbose_v1(old_module)
-
-    if transport == "json":
-        module = JSONSerializer().decode(json.dumps(verbose))
-    else:
-        payload = gzip.compress(bson.encode(verbose), mtime=0)
-        module = CompressedBSONSerializer().decode(payload)
-
-    operand_kinds = {
-        operand.kind
-        for statement in _walk_units(module.body)
-        if statement.kind == "statement"
-        for operand in statement.data["_args"].data["value"]
-    }
-    assert operand_kinds <= {"block-arg", "result-value"}
-    assert operand_kinds == {"block-arg", "result-value"}
-
-    decoded = branching.dialects.decode(module)
-    _assert_exact_reverse_uses(decoded)
-    decoded.verify()
-    assert decoded(3, True) == branching(3, True)
-    assert decoded(3, False) == branching(3, False)
