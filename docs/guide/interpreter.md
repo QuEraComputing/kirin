@@ -617,3 +617,5 @@ context-insensitive meaning that every call site of a function shares the same
 analysis value. We would like the constant propagation to be more granular, and
 compute distinct analysis values depending on the arguments passed at each call
 site. For this purpose, the `CallCtx` and `ConstPropContext` types are defined.
+
+For further details, take a look at the [ConstProp Framework documentation](../design/constprop-framework.md).
