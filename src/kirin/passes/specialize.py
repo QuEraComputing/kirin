@@ -1,4 +1,4 @@
-"""Bounded constant-argument specialization of Python function methods."""
+"""Bounded constant-argument specialization of function and closure methods."""
 
 import struct
 from collections import deque
@@ -51,6 +51,8 @@ class Specialize(Pass):
 
     Each invocation starts from one method and owns a fresh cache.
     Generic methods retain their signatures; visited bodies may be folded.
+    Known lambda-backed methods retain their bound closure fields. Local
+    lambdas whose captures are still dynamic are not specialized.
     A zero budget disables specialization.
     """
 
@@ -84,7 +86,7 @@ class Specialize(Pass):
                 continue
             seen.add(mt)
             self.names.add(mt.sym_name)
-            if isinstance(mt.code, func.Function):
+            if isinstance(mt.code, (func.Function, func.Lambda)):
                 self.names.add(mt.code.sym_name)
             for stmt in mt.code.walk():
                 if isinstance(stmt, func.Invoke):
@@ -147,7 +149,7 @@ class Specialize(Pass):
     ) -> tuple[ir.Method, tuple[int, ...]] | None:
         """Reuse a specialization or create and schedule one within the budget."""
         if (
-            not isinstance(original.code, func.Function)
+            not isinstance(original.code, (func.Function, func.Lambda))
             or original in self.generated
             or Constant.dialect not in original.dialects
         ):
@@ -189,7 +191,11 @@ class Specialize(Pass):
         """Build and verify a clone with constants replacing omitted parameters."""
         clone = original.similar()
         code = clone.code
-        assert isinstance(code, func.Function)
+        assert isinstance(code, (func.Function, func.Lambda))
+        if isinstance(code, func.Lambda):
+            # This is an already-bound method: its fields hold the captures.
+            # The detached clone must not reference the original creation site.
+            code.captured = ()
         entry = clone.callable_region.blocks[0]
         first = entry.first_stmt
         assert first is not None
