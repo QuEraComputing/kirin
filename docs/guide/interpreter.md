@@ -458,6 +458,38 @@ implemented by `ConcreteInterpreter`) that dialects can define rules upon to
 remove the need of specifying individually that this rule’s interpreter has an
 `Env` and pushes `SparseForwardEffect`s.
 
+### Running the Interpreter
+
+Finally, to actually use a `ConcreteInterpreter`, the compiler writer will
+create an object of the `ConcreteInterpreter` struct, defining the open type
+parameters. The following is the example from the `example/toy-lang` crate:
+
+```rust
+pub type ToyInterpreter<'ir, Lk = CrossStageLinker> = ConcreteInterpreter<
+    'ir,
+    Stage,                  // an enum defining the compiler's stages
+    i64,                    // The type of values produced by the language
+    ToyError,               // Some error type
+    Lk,                     // A linker
+    ToyFrame<i64, ToyError> // A frame enum composing engine and dialect frames
+>;
+
+let mut interp: ToyInterpreter<'_> =
+    ConcreteInterpreter::new(pipeline).with_linker(CrossStageLinker);
+```
+
+Here, the `pipeline` object contains the source code that we want to execute. To
+run this code, it is simply a matter of calling `ConcreteInterpreter`'s
+`call_by_name` method:
+
+```rust
+interp.call_by_name(stage_name, function_name, args.iter().copied())
+```
+
+where `stage_name` and `function_name` are the names of the stage and function
+in the code that we want to run, and `args` are the arguments to be passed to
+this function.
+
 ## Dialect Rules
 
 Now that we have explained the mechanisms and abstractions behind an interpreter
@@ -485,3 +517,103 @@ The `Interpretable` abstraction allows use to define a different rule for
 different interpreters. If our interpreter were instead a liveness analysis,
 then the rule will mark the arithmetic op’s uses as live and kill the value the
 op is bound to.
+
+## Constant Propagation
+
+Another interpreter that is implemented in Kirin is a constant propagation
+interpreter. This is implemented in the `kirin-constprop` sub-crate. When we
+take a look at this crate, we see that it implements a type alias:
+
+```rust
+pub type ConstProp<'ir, S, E, Lk = kirin_interpreter::SameStageLinker> =
+    kirin_interpreter::SparseForwardInterpreter<'ir, S, ConstPropValue, E, Lk, ConstPropContext>;
+```
+
+We see that the `ConstProp` interpreter engine is a specialization of a
+`SparseForwardInterpreter`.
+
+Be careful: `SparseForwardInterpreter` ≠ `SparseForwardInterp`!
+
+`SparseForwardInterpreter` is a struct describing the forward
+abstract-interpretation engine, whereas `SparseForwardInterp` is a trait
+describing a set of capabilities that a dialect rule can use. So the
+`Interpreter` is what the compiler-author calls to run an analysis, and the
+`Interp` is what the dialect-author implements to define the semantic rules for
+their operations.
+
+More concretely, the author of an arithmetic operation dialect will implement
+the [`Interpretable` trait](#dialect-rules) with `I: SparseForwardInterp` for
+each of the arithmetic operations.  These dialect rules only need to be
+implemented once to be used by both a `ConcreteInterpreter` and a `ConstProp`.
+The compiler-author, if they want to use a `ConcreteInterpreter` or a
+`ConstProp` struct, will instantiate such objects. They can then use the `call`
+and `analyze` methods respectively to run the two interpreters without needing
+to implement any of the underlying mechanism.
+
+### SparseForwardInterpreter
+
+Unlike `ConcreteInterpreter` which uses the standard `drive_frames` function in
+its execution, when `SparseForwardInterpreter::analyze` is called, it uses an
+internal driver that underpins its analysis mechanism.
+
+```rust
+pub struct SparseForwardInterpreter<
+    'ir,
+    S: StageMeta,
+    V,
+    E,
+    Lk = SameStageLinker,
+    P = ContextInsensitive,
+    F = StandardAbstractFrame<V, E, <P as CallContext<V>>::Key>,
+    Sem = ForwardEval,
+> where
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
+    driver: ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
+}
+```
+
+It is this `ForwardDriver` that implements the fixpoint analysis mechanism that
+runs constant propagation until there are no more changes in the analysis:
+
+```rust
+type ForwardDriver<'ir, S, V, E, Lk, P, F, Sem> = StandardFixpointInterpreter<
+    SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>,
+    SparseForwardProfile<V, E, <P as CallContext<V>>::Key, F>,
+    ForwardStore<<P as CallContext<V>>::Key, V>,
+    ForwardSummaryDeps<Owner<<P as CallContext<V>>::Key>>,
+>;
+```
+
+Without delving into the details, the forward driver is the mechanism that
+traverses the IR and computes the given analysis at each SSA-value. Remember,
+these values are computed from [dialect rules](#dialect-rules). It will do this
+until the analysis no longer updates and reaches a fixed point.
+
+`ConstProp` doesn’t need to re-implement any of this mechanism. Instead, it
+defines the lattice of values (`ConstPropValue`) that the constant propagation
+analysis can compute, including the `join` and `meet` methods used to merge two
+such `ConstPropValue`s.
+
+```rust
+pub enum ConstPropValue<C = i64, S = String, F = String> {
+    Bottom,
+    Const(C),
+    PartialTuple(Box<PartialTuple<Self>>),
+    PartialStruct(Box<PartialStruct<S, F, Self>>),
+    Top,
+}
+```
+
+It also defines functions for converting from other value kinds (e.g.
+`ArithValue` to `Const` or `Top` if not `i64`) that are produced by the dialect
+rules.
+
+Additionally, `SparseForwardInterpreter`'s default `CallContext` is
+context-insensitive meaning that every call site of a function shares the same
+analysis value. We would like the constant propagation to be more granular, and
+compute distinct analysis values depending on the arguments passed at each call
+site. For this purpose, the `CallCtx` and `ConstPropContext` types are defined.
