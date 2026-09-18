@@ -33,9 +33,7 @@ No test for graph bodies as function bodies in the full pipeline parse:
 
 ```
 stage @A fn @f(f64) -> f64;
-specialize @A fn @f(f64) -> f64 {
-  digraph ^dg0(%p0: f64) { ... yield %r; }
-}
+specialize @A fn @f(f64) -> f64 digraph ^dg0(%p0: f64) { ... yield %r; }
 ```
 
 **What to test**: `roundtrip::assert_pipeline_roundtrip` with a language that has a graph-body function variant.

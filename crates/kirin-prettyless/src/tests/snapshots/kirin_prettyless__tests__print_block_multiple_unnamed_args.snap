@@ -2,6 +2,6 @@
 source: crates/kirin-prettyless/src/tests/edge_cases.rs
 expression: buf
 ---
-^0(%1: i64, %2: f64, %3: i64) {
+block ^0(%1: i64, %2: f64, %3: i64) {
   return %1;
 }

@@ -2,5 +2,5 @@
 source: crates/kirin-prettyless/src/tests/impls.rs
 expression: buf
 ---
-{
+cfg {
 }

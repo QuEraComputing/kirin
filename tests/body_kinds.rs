@@ -129,7 +129,7 @@ specialize @test fn @gadd(i64, i64) -> i64 digraph ^g0(%x: i64, %y: i64) {
   yield %s;
 }
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %a = constant 2 -> i64;
     %b = constant 3 -> i64;
@@ -159,7 +159,7 @@ fn cfg_main_calls_digraph_function() {
 const NESTED_DIGRAPH_PROGRAM: &str = r#"
 stage @test fn @main() -> i64;
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %a = constant 20 -> i64;
     %b = constant 22 -> i64;
@@ -192,12 +192,12 @@ const BLOCK_CALLABLE_PROGRAM: &str = r#"
 stage @test fn @ladd(i64, i64) -> i64;
 stage @test fn @main() -> i64;
 
-specialize @test fn @ladd(i64, i64) -> i64 ^body(%x: i64, %y: i64) {
+specialize @test fn @ladd(i64, i64) -> i64 block ^body(%x: i64, %y: i64) {
   %s = add %x, %y -> i64;
   ret %s;
 }
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %a = constant 40 -> i64;
     %b = constant 2 -> i64;
@@ -239,7 +239,7 @@ specialize @test fn @g(i64) -> i64 digraph ^g0(%x: i64) {
   yield %d;
 }
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %a = constant 3 -> i64;
     %r = call.named @g(%a) -> i64;
@@ -379,14 +379,14 @@ fn run_scf(pipeline: &Pipeline<ScfL>, function: &str, args: &[i64]) -> Result<i6
 const SCF_ABS_PROGRAM: &str = r#"
 stage @test fn @abs(i64) -> i64;
 
-specialize @test fn @abs(i64) -> i64 {
+specialize @test fn @abs(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %zero = constant 0 -> i64;
     %is_neg = lt %x, %zero -> i64;
-    %result = if %is_neg then ^then() {
+    %result = if %is_neg then block ^then() {
       %negated = neg %x -> i64;
       yield %negated;
-    } else ^else() {
+    } else block ^else() {
       yield %x;
     } -> i64;
     ret %result;
@@ -410,11 +410,11 @@ fn scf_for_loop_carries_yielded_values() {
         r#"
 stage @test fn @sum_below(i64) -> i64;
 
-specialize @test fn @sum_below(i64) -> i64 {
+specialize @test fn @sum_below(i64) -> i64 cfg {
   ^entry(%n: i64) {
     %zero = constant 0 -> i64;
     %one = constant 1 -> i64;
-    %sum = for %zero in %zero..%n step %one iter_args(%zero) do ^body(%i: i64, %acc: i64) {
+    %sum = for %zero in %zero..%n step %one iter_args(%zero) do block ^body(%i: i64, %acc: i64) {
       %next = add %acc, %i -> i64;
       yield %next;
     } -> i64;
@@ -446,13 +446,13 @@ fn return_bubbles_through_scf_frames_to_call_frame() {
 stage @test fn @clamp0(i64) -> i64;
 stage @test fn @twice(i64) -> i64;
 
-specialize @test fn @clamp0(i64) -> i64 {
+specialize @test fn @clamp0(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %zero = constant 0 -> i64;
     %is_neg = lt %x, %zero -> i64;
-    %kept = if %is_neg then ^then() {
+    %kept = if %is_neg then block ^then() {
       ret %zero;
-    } else ^else() {
+    } else block ^else() {
       yield %x;
     } -> i64;
     %one = constant 1 -> i64;
@@ -461,7 +461,7 @@ specialize @test fn @clamp0(i64) -> i64 {
   }
 }
 
-specialize @test fn @twice(i64) -> i64 {
+specialize @test fn @twice(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %a = call.named @clamp0(%x) -> i64;
     %b = call.named @clamp0(%x) -> i64;
@@ -697,7 +697,7 @@ specialize @test fn @usq(i64, i64) -> i64 ungraph ^u0(%x: i64, %y: i64) {
   %t = mul %s, %s -> i64;
 }
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %a = constant 2 -> i64;
     %b = constant 3 -> i64;
@@ -907,7 +907,7 @@ stage @test fn @same(i64) -> i64;
 stage @test fn @diff(i64) -> i64;
 stage @test fn @caller(i64) -> i64;
 
-specialize @test fn @same(i64) -> i64 {
+specialize @test fn @same(i64) -> i64 cfg {
   ^entry(%c: i64) {
     cond_br %c then=^t() else=^f();
   }
@@ -921,7 +921,7 @@ specialize @test fn @same(i64) -> i64 {
   }
 }
 
-specialize @test fn @diff(i64) -> i64 {
+specialize @test fn @diff(i64) -> i64 cfg {
   ^entry(%c: i64) {
     cond_br %c then=^t() else=^f();
   }
@@ -935,7 +935,7 @@ specialize @test fn @diff(i64) -> i64 {
   }
 }
 
-specialize @test fn @caller(i64) -> i64 {
+specialize @test fn @caller(i64) -> i64 cfg {
   ^entry(%c: i64) {
     %r = call.named @same(%c) -> i64;
     %one = constant 1 -> i64;
@@ -1106,7 +1106,7 @@ stage @test fn @inc(i64) -> i64;
 stage @test fn @gcall(i64) -> i64;
 stage @test fn @main() -> i64;
 
-specialize @test fn @inc(i64) -> i64 {
+specialize @test fn @inc(i64) -> i64 cfg {
   ^entry(%v: i64) {
     %one = constant 1 -> i64;
     %s = add %v, %one -> i64;
@@ -1120,7 +1120,7 @@ specialize @test fn @gcall(i64) -> i64 digraph ^g0(%x: i64) {
   yield %b;
 }
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %c = constant 5 -> i64;
     %r = call.named @gcall(%c) -> i64;
@@ -1202,7 +1202,7 @@ specialize @test fn @gdouble(i64) -> i64 digraph ^g0(%x: i64) {
   yield %s;
 }
 
-specialize @test fn @twocalls() -> i64 {
+specialize @test fn @twocalls() -> i64 cfg {
   ^entry() {
     %a = constant 1 -> i64;
     %b = constant 2 -> i64;
@@ -1312,7 +1312,7 @@ specialize @test fn @gpair(i64) -> i64 digraph ^g0(%x: i64) {
   yield %a, %b;
 }
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %c = constant 3 -> i64;
     %p, %q = call.named @gpair(%c) -> i64, i64;
@@ -1363,7 +1363,7 @@ specialize @test fn @g2(i64) -> i64 digraph ^g0(%x: i64, %y: i64) {
   yield %s;
 }
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %c = constant 3 -> i64;
     %r = call.named @g2(%c) -> i64;

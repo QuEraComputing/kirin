@@ -43,7 +43,7 @@
 //!
 //! ```text
 //! stage @A fn @foo(()) -> ();
-//! specialize @A fn @foo(()) -> () { ^0() {} }
+//! specialize @A fn @foo(()) -> () cfg { ^0() {} }
 //! ```
 //!
 //! - Pass 1 creates/finds function `@foo` and staged function `(A, foo)`.
@@ -53,9 +53,9 @@
 //!
 //! ```text
 //! stage @A fn @foo(()) -> ();
-//! specialize @A fn @foo(()) -> () { ^0() {} }
+//! specialize @A fn @foo(()) -> () cfg { ^0() {} }
 //! stage @B fn @bar(i32) -> i32;
-//! specialize @B fn @bar(i32) -> i32 { ^0() {} }
+//! specialize @B fn @bar(i32) -> i32 cfg { ^0() {} }
 //! ```
 //!
 //! - declarations for `@A` are parsed with stage `A`'s dialect;
@@ -64,7 +64,7 @@
 //! Missing header before specialize:
 //!
 //! ```text
-//! specialize @A fn @missing(()) -> () { ^0() {} }
+//! specialize @A fn @missing(()) -> () cfg { ^0() {} }
 //! ```
 //!
 //! - pass 2 cannot find `(A, missing)` in the staged lookup;
