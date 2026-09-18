@@ -8,7 +8,9 @@
 //!
 //! - **[`SparseForwardTransfer`]** is the [`Interp`] delegate: pipeline, linker, SSA
 //!   env, analysis policy, per-function return accumulator, and read/write logging;
-//!   it provides the dialect-dispatch / IR-query surface ([`ForwardFrameDriver`]).
+//!   it provides the dialect-dispatch / IR-query surface ([`StatementDispatch`],
+//!   [`BlockQueries`], [`CFGQueries`], [`DiGraphQueries`], and — for
+//!   concrete-shaped callers — [`CallServices`]).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the summaries, the
 //!   dependency graph ([`ForwardSummaryDeps`]), the owner worklist, and the
 //!   owner-local [`ForwardStore`] (shared envs + context-qualified value-reader
@@ -17,9 +19,10 @@
 //! # Owner kinds
 //!
 //! [`Owner::Function`] is a **summary/storage** owner — it is *never scheduled*; it
-//! records a function context's entry/return/entry-block. [`Owner::Block`] is the
-//! **executable** owner: exactly the block owners run frames (one single-pass CFG
-//! walk each). CFG convergence is owner-summary convergence: a block emits its
+//! records a function context's entry/return/entry-block. [`Owner::Block`] and
+//! [`Owner::Graph`] are the **executable** owners: exactly those run frames (one
+//! single-pass walk each — a CFG block, or a whole graph body in dependency
+//! order). CFG convergence is owner-summary convergence: a block emits its
 //! successor block-entries, its function return, its outputs, and its external
 //! read dependencies through the single [`apply_update`](ForwardDriver::apply_update)
 //! path, which merges via the analysis policy and reschedules owners / value
@@ -33,19 +36,20 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CFG, CompileStage, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
+    Block, CFG, CompileStage, DiGraph, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
     StageMeta, Statement, Widen,
 };
 
 use crate::core::query;
 use crate::{
-    AbstractBlockFrame, AbstractCompletion, AbstractFrameBuild, AbstractFrameDriver,
-    AbstractInterpreter, CallEffect, Callee, Env, EnvIndex, EnvStackStore, FixpointProfile,
-    ForwardEval, ForwardFrameDriver, ForwardSummaryDeps, Frame, FunctionBody, FunctionTarget,
-    Interp, InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics,
-    SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
-    StandardFixpointInterpreter, Store, Summary, SummaryDependency, SummaryDependencyIndex,
-    SummaryEffect,
+    AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractFrameBuild,
+    AbstractInterpreter, BlockQueries, Body, CFGQueries, CallEffect, CallServices, CallableBody,
+    Callee, DiGraphQueries, Env, EnvIndex, EnvStackStore, FixpointProfile,
+    ForwardDataflowFrameEngine, ForwardEval, ForwardSummaryDeps, Frame, FunctionTarget, Interp,
+    InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics, SameStageLinker,
+    SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
+    StandardFixpointInterpreter, StatementDispatch, Store, Summary, SummaryDependency,
+    SummaryDependencyIndex, SummaryEffect,
 };
 
 // ===========================================================================
@@ -57,12 +61,7 @@ use crate::{
 pub trait CallContext<V> {
     type Key: Clone + Eq + Hash;
 
-    fn key(
-        &mut self,
-        stage: CompileStage,
-        function: SpecializedFunction,
-        args: &Product<V>,
-    ) -> Self::Key;
+    fn key(&mut self, target: &FunctionTarget, args: &Product<V>) -> Self::Key;
 }
 
 /// Explore/join strategy: combines an `incoming` abstract state into the
@@ -92,13 +91,8 @@ impl Default for ContextInsensitive {
 impl<V> CallContext<V> for ContextInsensitive {
     type Key = (CompileStage, SpecializedFunction);
 
-    fn key(
-        &mut self,
-        stage: CompileStage,
-        function: SpecializedFunction,
-        _args: &Product<V>,
-    ) -> Self::Key {
-        (stage, function)
+    fn key(&mut self, target: &FunctionTarget, _args: &Product<V>) -> Self::Key {
+        (target.stage, target.function)
     }
 }
 
@@ -123,7 +117,8 @@ where
 /// Owner of a summary in the forward fixpoint.
 ///
 /// [`Owner::Function`] is a **summary/storage** owner (never scheduled);
-/// [`Owner::Block`] is the **executable** owner (frame-executed). `Owner` is a
+/// [`Owner::Block`] and [`Owner::Graph`] are the **executable** owners
+/// (frame-executed) — one per unit of re-analysis. `Owner` is a
 /// dataflow-equation identity — deliberately **not** a
 /// [`LatticeAnchor`](crate::LatticeAnchor).
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -132,6 +127,22 @@ pub enum Owner<K> {
     Function(K),
     /// A CFG block executable owner within function context `K`.
     Block { function: K, block: Block },
+    /// A graph-body executable owner within function context `K`: the whole
+    /// graph is one unit, re-analyzed as a single dependency-ordered pass
+    /// whenever its entry product rises. One pass is exact for a DAG, so there
+    /// is no intra-graph fixpoint to split into finer owners.
+    Graph { function: K, graph: DiGraph },
+}
+
+impl<K> Owner<K> {
+    /// The function context this owner belongs to.
+    pub fn function(&self) -> &K {
+        match self {
+            Owner::Function(function)
+            | Owner::Block { function, .. }
+            | Owner::Graph { function, .. } => function,
+        }
+    }
 }
 
 /// Per-function summary/storage record: call-site metadata, the joined entry
@@ -300,18 +311,15 @@ enum ForwardUpdate<K, V> {
     /// Merge a return contribution into a function context's return (join); on
     /// rise, reschedule its callers.
     FunctionReturn { key: K, values: Product<V> },
-    /// Merge edge args into a block owner's entry (widen by visits); on rise,
-    /// (re)schedule that block owner.
-    BlockEntry {
-        function: K,
-        block: Block,
-        args: Product<V>,
-    },
-    /// Merge a block's freshly computed outputs (join); on any value's rise,
+    /// Merge incoming args into an **executable** owner's entry (widen by
+    /// visits); on rise, (re)schedule that owner. The incoming args are a CFG
+    /// edge's arguments for a block owner, or the boundary-port values for a
+    /// graph owner.
+    OwnerEntry { owner: Owner<K>, args: Product<V> },
+    /// Merge an owner's freshly computed outputs (join); on any value's rise,
     /// reschedule that value's readers.
-    BlockOutputs {
-        function: K,
-        block: Block,
+    OwnerOutputs {
+        owner: Owner<K>,
         outputs: HashMap<SSAValue, V>,
     },
 }
@@ -485,7 +493,7 @@ where
 }
 
 // Policy-driven merge + return accumulation, kept on the transfer (the analysis `P`
-// lives here). The driver's `AbstractFrameDriver` impl delegates to these.
+// lives here). The driver's `ForwardDataflowFrameEngine` impl delegates to these.
 impl<'ir, S: StageMeta, V, E, Lk, P, F, Sem> SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
     V: Clone + PartialEq + Widen,
@@ -505,13 +513,8 @@ where
     }
 
     /// Key a resolved call target through the analysis.
-    fn key(
-        &mut self,
-        stage: CompileStage,
-        function: SpecializedFunction,
-        args: &Product<V>,
-    ) -> <P as CallContext<V>>::Key {
-        self.analysis.key(stage, function, args)
+    fn key(&mut self, target: &FunctionTarget, args: &Product<V>) -> <P as CallContext<V>>::Key {
+        self.analysis.key(target, args)
     }
 
     fn take_ret_acc(&mut self) -> Option<Product<V>> {
@@ -601,8 +604,12 @@ where
 {
 }
 
-// The IR-query / dispatch capability surface. Dialect rules dispatch on the transfer.
-impl<'ir, S, V, E, Lk, P, F, Sem> ForwardFrameDriver
+// The IR-query / dispatch capability surface. Dialect rules dispatch on the
+// transfer. The transfer implements the *concrete* call lifecycle too, even
+// though the abstract frames never use it: `SparseForwardTransfer` is also the
+// engine a concrete-shaped caller can drive, and keeping it whole preserves the
+// existing delegation to `ForwardDriver` unchanged.
+impl<'ir, S, V, E, Lk, P, F, Sem> CallServices
     for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageQuery + InterpDispatch<Self>,
@@ -626,6 +633,38 @@ where
             .map_err(E::from)
     }
 
+    fn enter_function(
+        &mut self,
+        stage: CompileStage,
+        body: Statement,
+        args: Product<V>,
+        index: EnvIndex,
+    ) -> Result<CallableBody<V>, E> {
+        let pipeline = self.pipeline;
+        let info = pipeline
+            .stage(stage)
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
+        let previous = self.location.replace(InterpLocation {
+            stage,
+            statement: body,
+            index,
+        });
+        let result = info.dispatch_function_entry(body, args, self);
+        self.location = previous;
+        result
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F, Sem> StatementDispatch
+    for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn run_statement(
         &mut self,
         stage: CompileStage,
@@ -645,28 +684,18 @@ where
         self.location = previous;
         result
     }
+}
 
-    fn enter_function(
-        &mut self,
-        stage: CompileStage,
-        body: Statement,
-        args: Product<V>,
-        index: EnvIndex,
-    ) -> Result<FunctionBody<V>, E> {
-        let pipeline = self.pipeline;
-        let info = pipeline
-            .stage(stage)
-            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let previous = self.location.replace(InterpLocation {
-            stage,
-            statement: body,
-            index,
-        });
-        let result = info.dispatch_function_entry(body, args, self);
-        self.location = previous;
-        result
-    }
-
+impl<'ir, S, V, E, Lk, P, F, Sem> BlockQueries
+    for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
         query::block_params(self.pipeline, stage, block).map_err(E::from)
     }
@@ -683,9 +712,38 @@ where
     ) -> Result<Option<Statement>, E> {
         query::next_statement(self.pipeline, stage, block, after).map_err(E::from)
     }
+}
 
+impl<'ir, S, V, E, Lk, P, F, Sem> CFGQueries for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
         query::cfg_entry(self.pipeline, stage, cfg).map_err(E::from)
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F, Sem> DiGraphQueries
+    for SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<Self>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
+    fn digraph_walk_plan(
+        &self,
+        stage: CompileStage,
+        graph: kirin_ir::DiGraph,
+    ) -> Result<crate::GraphWalkPlan, E> {
+        query::digraph_walk_plan(self.pipeline, stage, graph).map_err(E::from)
     }
 }
 
@@ -693,7 +751,8 @@ where
 // Driver capability impls (frames run on the driver, which delegates to the transfer)
 // ===========================================================================
 
-impl<'ir, S, V, E, Lk, P, F, Sem> ForwardFrameDriver for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+// Delegation is unchanged; only the trait each group of methods belongs to.
+impl<'ir, S, V, E, Lk, P, F, Sem> CallServices for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + HasBottom,
@@ -714,6 +773,26 @@ where
         self.inner().resolve_call(stage, callee)
     }
 
+    fn enter_function(
+        &mut self,
+        stage: CompileStage,
+        body: Statement,
+        args: Product<V>,
+        index: EnvIndex,
+    ) -> Result<CallableBody<V>, E> {
+        self.inner_mut().enter_function(stage, body, args, index)
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F, Sem> StatementDispatch for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn run_statement(
         &mut self,
         stage: CompileStage,
@@ -722,17 +801,17 @@ where
     ) -> Result<Self::Effect, E> {
         self.inner_mut().run_statement(stage, statement, index)
     }
+}
 
-    fn enter_function(
-        &mut self,
-        stage: CompileStage,
-        body: Statement,
-        args: Product<V>,
-        index: EnvIndex,
-    ) -> Result<FunctionBody<V>, E> {
-        self.inner_mut().enter_function(stage, body, args, index)
-    }
-
+impl<'ir, S, V, E, Lk, P, F, Sem> BlockQueries for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn block_params(&self, stage: CompileStage, block: Block) -> Result<Vec<SSAValue>, E> {
         self.inner().block_params(stage, block)
     }
@@ -749,13 +828,42 @@ where
     ) -> Result<Option<Statement>, E> {
         self.inner().next_statement(stage, block, after)
     }
+}
 
+impl<'ir, S, V, E, Lk, P, F, Sem> CFGQueries for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
     fn cfg_entry(&self, stage: CompileStage, cfg: CFG) -> Result<Option<Block>, E> {
         self.inner().cfg_entry(stage, cfg)
     }
 }
 
-impl<'ir, S, V, E, Lk, P, F, Sem> AbstractFrameDriver for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+impl<'ir, S, V, E, Lk, P, F, Sem> DiGraphQueries for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
+    V: Clone + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
+    fn digraph_walk_plan(
+        &self,
+        stage: CompileStage,
+        graph: kirin_ir::DiGraph,
+    ) -> Result<crate::GraphWalkPlan, E> {
+        self.inner().digraph_walk_plan(stage, graph)
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F, Sem> ForwardDataflowFrameEngine
+    for ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + PartialEq + Widen + HasBottom,
@@ -780,11 +888,7 @@ where
     }
 
     fn current_function_key(&self) -> Option<<P as CallContext<V>>::Key> {
-        match self.current_owner() {
-            Some(Owner::Function(key)) => Some(key.clone()),
-            Some(Owner::Block { function, .. }) => Some(function.clone()),
-            None => None,
-        }
+        self.current_owner().map(|owner| owner.function().clone())
     }
 
     /// Summarize a call atomically: resolve, merge the callee entry (which seeds
@@ -805,7 +909,7 @@ where
         } = call;
         let resolve_stage = call_stage.unwrap_or(stage);
         let target = self.inner().resolve_call(resolve_stage, &callee)?;
-        let key = self.inner_mut().key(target.stage, target.function, &args);
+        let key = self.inner_mut().key(&target, &args);
 
         self.apply_update(ForwardUpdate::FunctionEntry {
             key: key.clone(),
@@ -826,7 +930,7 @@ where
             .and_then(|info| info.as_function())
             .and_then(|function| function.ret.clone());
         match ret {
-            Some(values) => self.write_results(index, &results, values),
+            Some(values) => self.bind_values(index, results.as_slice(), values),
             None => {
                 for slot in results.iter().copied() {
                     self.env_write(index, slot, V::bottom())?;
@@ -942,12 +1046,7 @@ where
                 Ok(())
             }
 
-            ForwardUpdate::BlockEntry {
-                function,
-                block,
-                args,
-            } => {
-                let owner = Owner::Block { function, block };
+            ForwardUpdate::OwnerEntry { owner, args } => {
                 let changed = if self.summary(&owner).is_none() {
                     self.summaries_mut().insert(
                         owner.clone(),
@@ -987,15 +1086,8 @@ where
                 Ok(())
             }
 
-            ForwardUpdate::BlockOutputs {
-                function,
-                block,
-                outputs,
-            } => {
-                let owner = Owner::Block {
-                    function: function.clone(),
-                    block,
-                };
+            ForwardUpdate::OwnerOutputs { owner, outputs } => {
+                let function = owner.function().clone();
                 let mut risen = Vec::new();
                 for (value, incoming) in outputs {
                     let old = self
@@ -1029,8 +1121,14 @@ where
         }
     }
 
-    /// Resolve the entry block of `key`'s function (allocating its shared env on
-    /// first use) and seed the entry block owner with the entry-block arguments.
+    /// Resolve the executable entry owner of `key`'s function (allocating its
+    /// shared env on first use) and seed it with the entry arguments.
+    ///
+    /// This is the one place a *function* becomes runnable *work*: it translates
+    /// the callable [`Body`] into the executable [`Owner`] the worklist can
+    /// hold — a `CFG`'s entry block or a `Block` body become an
+    /// [`Owner::Block`], a `DiGraph` body becomes an [`Owner::Graph`]. An
+    /// `UnGraph` has no derivable traversal order at all, so it is rejected.
     fn seed_entry_block(
         &mut self,
         key: &<P as CallContext<V>>::Key,
@@ -1051,30 +1149,53 @@ where
             .map(|function| function.entry.clone())
             .expect("function summary present");
         let body_info = self.enter_function(stage, body, entry_args, env)?;
-        let entry_block = self
-            .cfg_entry(stage, body_info.cfg)?
-            .ok_or_else(|| E::from(InterpreterError::EmptyCFG))?;
+        let owner = match body_info.body {
+            Body::CFG(cfg) => Owner::Block {
+                function: key.clone(),
+                block: self
+                    .cfg_entry(stage, cfg)?
+                    .ok_or_else(|| E::from(InterpreterError::EmptyCFG))?,
+            },
+            Body::Block(block) => Owner::Block {
+                function: key.clone(),
+                block,
+            },
+            // A graph body has no blocks: it is its own unit of re-analysis.
+            Body::DiGraph(graph) => Owner::Graph {
+                function: key.clone(),
+                graph,
+            },
+            // An undirected graph has no producer/consumer direction, so no
+            // traversal order can be derived from its structure.
+            graph @ Body::UnGraph(_) => {
+                return Err(E::from(InterpreterError::NoDefaultWalker(graph)));
+            }
+        };
         if let Some(function) = self
             .summary_mut(&Owner::Function(key.clone()))
             .and_then(|info| info.as_function_mut())
         {
-            function.entry_block = Some(entry_block);
+            function.entry_block = match &owner {
+                Owner::Block { block, .. } => Some(*block),
+                _ => None,
+            };
         }
-        self.apply_update(ForwardUpdate::BlockEntry {
-            function: key.clone(),
-            block: entry_block,
+        self.apply_update(ForwardUpdate::OwnerEntry {
+            owner,
             args: body_info.args,
         })
     }
 }
 
 // ===========================================================================
-// Owner semantics: only block owners are executable.
+// Owner semantics: block and graph owners are executable.
 // ===========================================================================
 
-/// The forward owner semantics. Only [`Owner::Block`] owners are analyzed: bind
-/// the block-entry, walk the block once, then route its outputs / successor edges /
-/// return / read-deps through [`apply_update`](ForwardDriver::apply_update).
+/// The forward owner semantics. [`Owner::Block`] and [`Owner::Graph`] owners are
+/// analyzed: bind the entry product, walk the unit once, then route its outputs /
+/// successor edges / return / read-deps through
+/// [`apply_update`](ForwardDriver::apply_update). A graph owner has no successor
+/// edges — its declared yields are the function's return instead.
 struct SparseForwardSemantics<V> {
     _marker: PhantomData<fn() -> V>,
 }
@@ -1114,7 +1235,11 @@ where
         // safe default for the dependency-index bookkeeping path.
         Ok(match owner {
             Owner::Function(_) => ForwardSummary::Function(FunctionSummary::bottom()),
-            Owner::Block { .. } => ForwardSummary::Block(BlockSummary::bottom()),
+            // Both executable owners carry the same shape of summary: a joined
+            // entry product plus the output facts they define.
+            Owner::Block { .. } | Owner::Graph { .. } => {
+                ForwardSummary::Block(BlockSummary::bottom())
+            }
         })
     }
 
@@ -1124,8 +1249,8 @@ where
         owner: &Owner<<P as CallContext<V>>::Key>,
         summary: &ForwardSummary<V>,
     ) -> Result<F, E> {
-        let (function, block) = match owner {
-            Owner::Block { function, block } => (function.clone(), *block),
+        let function = match owner {
+            Owner::Block { function, .. } | Owner::Graph { function, .. } => function.clone(),
             Owner::Function(_) => {
                 return Err(E::from(InterpreterError::Custom(
                     "function owners are storage-only and never executed",
@@ -1157,12 +1282,22 @@ where
             ))
         })?;
         interp.inner_mut().begin_block_log();
-        Ok(F::from_block(AbstractBlockFrame::new_cfg_block(
-            stage,
-            env,
-            block,
-            block_entry,
-        )))
+        match owner {
+            Owner::Block { block, .. } => Ok(F::from_block(AbstractBlockFrame::new_cfg_block(
+                stage,
+                env,
+                *block,
+                block_entry,
+            ))),
+            // One dependency-ordered pass over the whole graph. Exact for a DAG,
+            // so the pass never needs to iterate internally.
+            Owner::Graph { graph, .. } => {
+                F::from_digraph(AbstractDiGraphFrame::new(stage, env, *graph, block_entry))
+            }
+            Owner::Function(_) => Err(E::from(InterpreterError::Custom(
+                "function owners are storage-only and never executed",
+            ))),
+        }
     }
 
     fn complete_owner(
@@ -1171,22 +1306,29 @@ where
         owner: Owner<<P as CallContext<V>>::Key>,
         completion: AbstractCompletion<V>,
     ) -> Result<SummaryEffect<Owner<<P as CallContext<V>>::Key>, ForwardSummary<V>>, E> {
-        let (function, block) = match &owner {
-            Owner::Block { function, block } => (function.clone(), *block),
+        let function = match &owner {
+            Owner::Block { function, .. } | Owner::Graph { function, .. } => function.clone(),
             Owner::Function(_) => {
                 return Err(E::from(InterpreterError::Custom(
                     "function owners are storage-only and never executed",
                 )));
             }
         };
-        let edges = match completion {
-            AbstractCompletion::CFGBlock { edges } => edges,
+        // A block owner completes with its outgoing CFG edges. A graph owner has
+        // no successors at all — it completes with the graph's declared yields,
+        // which for a callable graph body *are* the function's return values.
+        let (edges, graph_yields) = match (&owner, completion) {
+            (Owner::Block { .. }, AbstractCompletion::CFGBlock { edges }) => (edges, None),
+            (Owner::Graph { .. }, AbstractCompletion::Finished(values)) => (Vec::new(), values),
             _ => {
                 return Err(E::from(InterpreterError::Custom(
-                    "block owner completed with a non-CFG-block completion",
+                    "executable owner completed with a mismatched completion",
                 )));
             }
         };
+        if let Some(values) = graph_yields {
+            interp.contribute_return(values)?;
+        }
 
         let (reads, writes) = interp.inner_mut().take_logs();
         let env = interp.store().env(&function).ok_or_else(|| {
@@ -1217,17 +1359,19 @@ where
             let fact = interp.inner().env_read(env, value)?;
             outputs.insert(value, fact);
         }
-        interp.apply_update(ForwardUpdate::BlockOutputs {
-            function: function.clone(),
-            block,
+        interp.apply_update(ForwardUpdate::OwnerOutputs {
+            owner: owner.clone(),
             outputs,
         })?;
 
-        // Propagate CFG successor edges as block-entry updates.
+        // Propagate CFG successor edges as block-owner entry updates. Empty for a
+        // returning block and for a graph owner.
         for edge in edges {
-            interp.apply_update(ForwardUpdate::BlockEntry {
-                function: function.clone(),
-                block: edge.target,
+            interp.apply_update(ForwardUpdate::OwnerEntry {
+                owner: Owner::Block {
+                    function: function.clone(),
+                    block: edge.target,
+                },
                 args: edge.args,
             })?;
         }
@@ -1408,7 +1552,7 @@ where
     Lk: Linker<S>,
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
-    F: Frame<ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>, Completion = AbstractCompletion<V>>
+    F: Frame<ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>, F, Completion = AbstractCompletion<V>>
         + AbstractFrameBuild<V, E, <P as CallContext<V>>::Key>,
 {
     /// Resolve `stage`/`function` by name and analyze. Returns the function's
@@ -1444,10 +1588,7 @@ where
     ) -> Result<Product<V>, E> {
         let target = self.driver.inner().resolve_call(stage, &callee)?;
         let args: Product<V> = args.into_iter().collect();
-        let key = self
-            .driver
-            .inner_mut()
-            .key(target.stage, target.function, &args);
+        let key = self.driver.inner_mut().key(&target, &args);
 
         self.driver.apply_update(ForwardUpdate::FunctionEntry {
             key: key.clone(),
@@ -1456,6 +1597,9 @@ where
             args,
         })?;
 
+        // TODO: Rename this, "semantics" is a bit misleading, sounds like the
+        // Semantic Keys, e.g. ForwardEval.
+        // Alternative: Rename the keys to: SparseForwardKey / SparseBackwardKey / DenseBackwardKey.
         let mut semantics = SparseForwardSemantics::new();
         self.driver.drain_worklist(&mut semantics)?;
 

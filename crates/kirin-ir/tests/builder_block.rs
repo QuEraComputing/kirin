@@ -89,6 +89,58 @@ fn block_builder_substitutes_builder_block_arguments() {
 }
 
 #[test]
+fn finalize_populates_def_use_index() {
+    let mut stage = new_stage();
+
+    let arg0 = stage.block_argument().index(0);
+    let arg1 = stage.block_argument().index(1);
+
+    // arg0 is read twice (add operand 0, use operand 0); arg1 once (add operand 1).
+    let add_stmt = stage
+        .statement()
+        .definition(BuilderDialect::Add(arg0, arg1))
+        .new();
+    let use_stmt = stage
+        .statement()
+        .definition(BuilderDialect::Use(arg0))
+        .new();
+
+    let block = stage
+        .block()
+        .argument(TestType::I32)
+        .argument(TestType::I64)
+        .stmt(add_stmt)
+        .stmt(use_stmt)
+        .new();
+
+    let stage = stage.finalize().unwrap();
+    let block_info = block.expect_info(&stage);
+    let real_arg0: SSAValue = block_info.arguments[0].into();
+    let real_arg1: SSAValue = block_info.arguments[1].into();
+
+    let uses0 = real_arg0.get_info(&stage).unwrap().uses();
+    assert_eq!(uses0.len(), 2, "arg0 is read by two statements");
+    assert!(uses0.contains(&Use::StatementOperand {
+        stmt: add_stmt,
+        index: 0
+    }));
+    assert!(uses0.contains(&Use::StatementOperand {
+        stmt: use_stmt,
+        index: 0
+    }));
+
+    let uses1 = real_arg1.get_info(&stage).unwrap().uses();
+    assert_eq!(uses1.len(), 1, "arg1 is read only by the add");
+    assert_eq!(
+        uses1[0],
+        Use::StatementOperand {
+            stmt: add_stmt,
+            index: 1
+        }
+    );
+}
+
+#[test]
 #[should_panic(expected = "is not a terminator")]
 fn block_builder_terminator_rejects_non_terminator() {
     let mut stage = new_stage();
@@ -197,6 +249,7 @@ fn empty_block_iteration() {
     assert_eq!(block.first_statement(&stage), None);
     assert_eq!(block.last_statement(&stage), None);
     assert_eq!(block.terminator(&stage), None);
+    assert!(block.expect_info(&stage).predecessors.is_empty());
 }
 
 #[test]
@@ -243,13 +296,118 @@ fn cfg_builder_creates_cfg_with_ordered_blocks() {
     assert_eq!(blocks, vec![b0, b1, b2]);
 
     let b0_info = b0.expect_info(&stage);
+    assert_eq!(b0_info.parent, Some(BlockParent::CFG(cfg)));
     assert_eq!(b0_info.node.next, Some(b1));
     let b1_info = b1.expect_info(&stage);
+    assert_eq!(b1_info.parent, Some(BlockParent::CFG(cfg)));
     assert_eq!(b1_info.node.prev, Some(b0));
     assert_eq!(b1_info.node.next, Some(b2));
     let b2_info = b2.expect_info(&stage);
+    assert_eq!(b2_info.parent, Some(BlockParent::CFG(cfg)));
     assert_eq!(b2_info.node.prev, Some(b1));
     assert_eq!(b2_info.node.next, None);
+}
+
+#[test]
+fn finalize_populates_block_predecessor_index() {
+    let mut stage = new_stage();
+    let target = stage.block().new();
+
+    let branch0 = stage
+        .statement()
+        .definition(BuilderDialect::Branch(Successor::from_block(target)))
+        .new();
+    let branch1 = stage
+        .statement()
+        .definition(BuilderDialect::Branch(Successor::from_block(target)))
+        .new();
+    let source0 = stage.block().terminator(branch0).new();
+    let source1 = stage.block().terminator(branch1).new();
+    let _cfg = stage
+        .cfg()
+        .add_block(source0)
+        .add_block(source1)
+        .add_block(target)
+        .new();
+
+    let stage = stage.finalize().unwrap();
+    assert_eq!(
+        target.expect_info(&stage).predecessors.as_slice(),
+        [source0, source1]
+    );
+    assert!(source0.expect_info(&stage).predecessors.is_empty());
+    assert!(source1.expect_info(&stage).predecessors.is_empty());
+}
+
+#[test]
+fn predecessor_index_deduplicates_edges_from_the_same_block() {
+    let mut stage = new_stage();
+    let target = stage.block().new();
+    let successor = Successor::from_block(target);
+    let branch = stage
+        .statement()
+        .definition(BuilderDialect::CondBranch(successor, successor))
+        .new();
+    let source = stage.block().terminator(branch).new();
+    let _cfg = stage.cfg().add_block(source).add_block(target).new();
+
+    let stage = stage.finalize().unwrap();
+    assert_eq!(target.expect_info(&stage).predecessors.as_slice(), [source]);
+}
+
+#[test]
+fn statement_builder_assigns_parent_to_directly_owned_blocks() {
+    let mut stage = new_stage();
+    let then_block = stage.block().new();
+    let else_block = stage.block().new();
+
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnBlocks(then_block, else_block))
+        .new();
+
+    let stage = stage.finalize().unwrap();
+    assert_eq!(
+        then_block.expect_info(&stage).parent,
+        Some(BlockParent::Statement(owner))
+    );
+    assert_eq!(
+        else_block.expect_info(&stage).parent,
+        Some(BlockParent::Statement(owner))
+    );
+}
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn statement_builder_records_cfg_parent() {
+    let mut stage = new_stage();
+    let cfg = stage.cfg().new();
+
+    let _owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnCFG(cfg))
+        .new();
+
+    // A second owner is rejected only if the first statement recorded itself
+    // in the crate-private `CFGInfo.parent` field.
+    let _other_owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnCFG(cfg))
+        .new();
+}
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn statement_builder_rejects_block_owned_by_cfg() {
+    let mut stage = new_stage();
+    let cfg_block = stage.block().new();
+    let other_block = stage.block().new();
+    let _cfg = stage.cfg().add_block(cfg_block).new();
+
+    let _owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnBlocks(cfg_block, other_block))
+        .new();
 }
 
 #[test]

@@ -15,17 +15,19 @@
 //! policy lives in that dialect frame (it may reuse [`AbstractBlockFrame`] to
 //! walk a chosen body). The interprocedural
 //! *policy* (summary keying, join/widen, caller recording — including same-key
-//! recursion) stays atomic in the engine behind [`AbstractFrameDriver`]; frames
+//! recursion) stays atomic in the engine behind [`ForwardDataflowFrameEngine`]; frames
 //! only choose what to step next.
 
+use std::collections::VecDeque;
 use std::hash::Hash;
 use std::marker::PhantomData;
 
-use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
+use kirin_ir::{Block, CompileStage, DiGraph, Product, SSAValue, Statement};
 
+use crate::core::frame::BlockBinding;
 use crate::{
-    AbstractFrameDriver, CallEffect, Edge, EnvIndex, Frame, FrameEffect, InterpreterError,
-    SparseForwardEffect, SparseForwardInterp,
+    Body, CallEffect, Edge, Env, EnvIndex, ForwardDataflowFrameEngine, Frame, FrameEffect,
+    InterpreterError, SparseForwardEffect, SparseForwardInterp,
 };
 
 /// Completion payloads produced by the standard abstract frames.
@@ -47,6 +49,22 @@ pub enum AbstractCompletion<V> {
 pub trait AbstractFrameBuild<V, E, K>: Sized {
     fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self;
     fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self;
+
+    /// Embed the standard abstract digraph walker.
+    ///
+    /// Graph bodies are opt-in: a total abstract frame enum that carries no
+    /// [`AbstractDiGraphFrame`] inherits this rejection rather than pretending
+    /// to analyze one, the same way
+    /// [`FrameBuild::from_ungraph_entry`](crate::FrameBuild::from_ungraph_entry)
+    /// rejects a callable `UnGraph` without a compiler-supplied policy.
+    fn from_digraph(frame: AbstractDiGraphFrame<V, E, K>) -> Result<Self, E>
+    where
+        E: From<InterpreterError>,
+    {
+        Err(E::from(InterpreterError::NoDefaultWalker(Body::DiGraph(
+            frame.graph(),
+        ))))
+    }
 }
 
 // ===========================================================================
@@ -75,7 +93,7 @@ pub struct AbstractBlockFrame<V, E, K> {
     cursor: Option<Statement>,
     mode: BlockMode,
     /// Entry arguments not yet bound — bound on the first step, so building the
-    /// frame needs no engine access (see [`BodyFrame`](crate::BodyFrame)).
+    /// frame needs no engine access (see [`BlockFrame`](crate::BlockFrame)).
     pending: Option<Product<V>>,
     resume_slots: Option<Product<SSAValue>>,
     _marker: PhantomData<fn() -> (E, K)>,
@@ -121,16 +139,20 @@ where
             _marker: PhantomData,
         }
     }
+}
 
-    pub fn step_into<I, F>(
-        mut self,
-        interp: &mut I,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-            + SparseForwardInterp<Frame = F>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
+impl<I, F, V, E, K> Frame<I, F> for AbstractBlockFrame<V, E, K>
+where
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
+        + SparseForwardInterp<Frame = F>,
+    F: AbstractFrameBuild<V, E, K>,
+    V: Clone + PartialEq,
+    E: From<InterpreterError>,
+    K: Clone + Eq + Hash,
+{
+    type Completion = AbstractCompletion<V>;
+
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         // Bind entry arguments lazily on the first step.
         if let Some(args) = self.pending.take() {
             interp.bind_block_args(self.stage, self.index, self.block, &args)?;
@@ -201,22 +223,15 @@ where
     }
 
     /// A pushed call frame finished: continue walking the body.
-    pub fn resume_done_into<F>(self) -> FrameEffect<F, AbstractCompletion<V>>
-    where
-        F: AbstractFrameBuild<V, E, K>,
-    {
-        FrameEffect::Continue(F::from_block(self))
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+        Ok(FrameEffect::Continue(F::from_block(self)))
     }
 
-    pub fn resume_into<I, F>(
+    fn resume_into(
         mut self,
         completion: AbstractCompletion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match completion {
             AbstractCompletion::Finished(Some(values)) => {
                 let slots = self.resume_slots.take().ok_or_else(|| {
@@ -224,7 +239,7 @@ where
                         "block resume without result slots",
                     ))
                 })?;
-                interp.write_results(self.index, &slots, values)?;
+                interp.bind_values(self.index, slots.as_slice(), values)?;
                 Ok(FrameEffect::Continue(F::from_block(self)))
             }
             // A nested push returned without finishing: this pass left via return.
@@ -243,6 +258,192 @@ where
             ))),
             AbstractCompletion::CFGBlock { .. } => Err(E::from(InterpreterError::Custom(
                 "block frame resumed with a CFG-block completion",
+            ))),
+        }
+    }
+}
+
+// ===========================================================================
+// DiGraph frame: one dependency-ordered pass over a graph body
+// ===========================================================================
+
+/// Abstract walker for a [`DiGraph`] body: bind the boundary ports, run the
+/// node statements in dependency (topological) order, and complete
+/// [`Finished`](AbstractCompletion::Finished) with the graph's declared yields.
+///
+/// A single pass is **exact** for a DAG — there is no loop inside the graph, so
+/// no widening happens here. Convergence pressure comes only from *outside*:
+/// the owner's entry product is widened at
+/// [`Owner`](crate::Owner) entry when a new call site raises it, and the whole
+/// pass is re-run.
+///
+/// The one substantive difference from the concrete
+/// [`DiGraphFrame`](crate::DiGraphFrame) is call handling: a `Call` effect
+/// pushes an [`AbstractCallFrame`], so the call goes through the engine's
+/// interprocedural summarization protocol (`summarize_call`) instead of
+/// descending into the callee. Descending would neither widen nor terminate on
+/// recursion.
+///
+/// Like the other frames, construction is pure — the walk plan is fetched and
+/// the ports are bound on the first `step`, so a dialect frame can build one
+/// without engine access.
+pub struct AbstractDiGraphFrame<V, E, K> {
+    stage: CompileStage,
+    index: EnvIndex,
+    graph: DiGraph,
+    /// Entry arguments not yet bound (bound on the first `step`).
+    pending: Option<Product<V>>,
+    /// Remaining schedule in dependency order; `None` until the first step.
+    schedule: Option<VecDeque<Statement>>,
+    yields: Vec<SSAValue>,
+    /// Result slots awaiting a pushed child frame's completion values.
+    resume_slots: Option<Product<SSAValue>>,
+    _marker: PhantomData<fn() -> (E, K)>,
+}
+
+impl<V, E, K> AbstractDiGraphFrame<V, E, K> {
+    /// The graph body this frame walks. Available without the walking bounds so
+    /// [`AbstractFrameBuild::from_digraph`]'s rejecting default can name it.
+    pub fn graph(&self) -> DiGraph {
+        self.graph
+    }
+}
+
+impl<V, E, K> AbstractDiGraphFrame<V, E, K>
+where
+    V: Clone + PartialEq,
+    E: From<InterpreterError>,
+    K: Clone + Eq + Hash,
+{
+    /// Walk `graph`, binding `args` to its boundary ports on the first step.
+    pub fn new(stage: CompileStage, index: EnvIndex, graph: DiGraph, args: Product<V>) -> Self {
+        Self {
+            stage,
+            index,
+            graph,
+            pending: Some(args),
+            schedule: None,
+            yields: Vec::new(),
+            resume_slots: None,
+            _marker: PhantomData,
+        }
+    }
+
+    /// Schedule exhausted: read the declared yields out of the activation and
+    /// complete. The parent decides what the values mean — a graph **owner**
+    /// turns them into the function's return, a pushing statement binds them
+    /// into its result slots.
+    /// Reading the yields needs [`Env`] alone, not the whole dataflow surface.
+    fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
+    where
+        I: Env<Value = V, Error = E>,
+        F: AbstractFrameBuild<V, E, K>,
+    {
+        let values: Product<V> = self
+            .yields
+            .iter()
+            .map(|&value| interp.env_read(self.index, value))
+            .collect::<Result<_, _>>()?;
+        Ok(FrameEffect::Complete(AbstractCompletion::Finished(Some(
+            values,
+        ))))
+    }
+}
+
+impl<I, F, V, E, K> Frame<I, F> for AbstractDiGraphFrame<V, E, K>
+where
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
+        + SparseForwardInterp<Frame = F>,
+    F: AbstractFrameBuild<V, E, K>,
+    V: Clone + PartialEq,
+    E: From<InterpreterError>,
+    K: Clone + Eq + Hash,
+{
+    type Completion = AbstractCompletion<V>;
+
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+        // First step: fetch the walk plan and bind the boundary ports.
+        if let Some(args) = self.pending.take() {
+            let plan = interp.digraph_walk_plan(self.stage, self.graph)?;
+            if plan.ports.len() != args.len() {
+                return Err(E::from(InterpreterError::ProductArityMismatch {
+                    expected: plan.ports.len(),
+                    actual: args.len(),
+                }));
+            }
+            for (port, value) in plan.ports.iter().copied().zip(args) {
+                interp.env_write(self.index, SSAValue::from(port), value)?;
+            }
+            self.schedule = Some(plan.schedule.into());
+            self.yields = plan.yields;
+            return Ok(FrameEffect::Continue(F::from_digraph(self)?));
+        }
+
+        let Some(statement) = self.schedule.as_mut().and_then(|s| s.pop_front()) else {
+            return self.finish::<I, F>(interp);
+        };
+
+        match interp.run_statement(self.stage, statement, self.index)? {
+            SparseForwardEffect::Next => Ok(FrameEffect::Continue(F::from_digraph(self)?)),
+            SparseForwardEffect::Push { frame, results } => {
+                self.resume_slots = Some(results);
+                Ok(FrameEffect::Push {
+                    parent: F::from_digraph(self)?,
+                    child: frame,
+                })
+            }
+            // Summarize, don't descend: the interprocedural fixpoint
+            // re-evaluates the callee under its own key.
+            SparseForwardEffect::Call(call) => {
+                let call_frame = AbstractCallFrame::new(self.stage, call, self.index);
+                Ok(FrameEffect::Push {
+                    parent: F::from_digraph(self)?,
+                    child: F::from_call(call_frame),
+                })
+            }
+            SparseForwardEffect::Jump(_) | SparseForwardEffect::Branch(_) => {
+                Err(E::from(InterpreterError::CFGControlFlowInStructuredBody))
+            }
+            SparseForwardEffect::Yield(_) => Err(E::from(InterpreterError::Custom(
+                "yield inside a digraph body (a digraph's outputs are its declared yields)",
+            ))),
+            SparseForwardEffect::Return(_) => Err(E::from(InterpreterError::Custom(
+                "return inside a digraph body",
+            ))),
+        }
+    }
+
+    /// A pushed child finished without a payload (e.g. a summarized call whose
+    /// results are already written): resume the schedule.
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+        Ok(FrameEffect::Continue(F::from_digraph(self)?))
+    }
+
+    fn resume_into(
+        mut self,
+        completion: AbstractCompletion<V>,
+        interp: &mut I,
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+        match completion {
+            AbstractCompletion::Finished(Some(values)) => {
+                let slots = self.resume_slots.take().ok_or_else(|| {
+                    E::from(InterpreterError::Custom(
+                        "digraph resume without result slots",
+                    ))
+                })?;
+                interp.bind_values(self.index, slots.as_slice(), values)?;
+                Ok(FrameEffect::Continue(F::from_digraph(self)?))
+            }
+            // A nested push left via `return`. A digraph has no function-return
+            // convention, so this cannot be relayed.
+            AbstractCompletion::Finished(None) => Err(E::from(InterpreterError::Custom(
+                "return bubbled into a digraph body",
+            ))),
+            AbstractCompletion::FunctionDone => Err(E::from(InterpreterError::Custom(
+                "digraph frame resumed with a function completion",
+            ))),
+            AbstractCompletion::CFGBlock { .. } => Err(E::from(InterpreterError::Custom(
+                "digraph frame resumed with a CFG-block completion",
             ))),
         }
     }
@@ -276,25 +477,33 @@ where
             _marker: PhantomData,
         }
     }
+}
 
-    pub fn step_into<I, F>(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>,
-        F: AbstractFrameBuild<V, E, K>,
-    {
+impl<I, F, V, E, K> Frame<I, F> for AbstractCallFrame<V, E, K>
+where
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>,
+    F: AbstractFrameBuild<V, E, K>,
+    V: Clone + PartialEq,
+    E: From<InterpreterError>,
+    K: Clone + Eq + Hash,
+{
+    type Completion = AbstractCompletion<V>;
+
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         interp.summarize_call(self.stage, self.call, self.index)?;
         Ok(FrameEffect::Done)
     }
 
-    pub fn resume_done_into<F>(self) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         Err(E::from(InterpreterError::Custom(
             "call frame resumed without a return",
         )))
     }
 
-    pub fn resume_into<F>(
+    fn resume_into(
         self,
         _completion: AbstractCompletion<V>,
+        _interp: &mut I,
     ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         Err(E::from(InterpreterError::Custom(
             "call frame resumed with a completion",
@@ -312,6 +521,7 @@ where
 pub enum StandardAbstractFrame<V, E, K> {
     Block(AbstractBlockFrame<V, E, K>),
     Call(AbstractCallFrame<V, E, K>),
+    DiGraph(AbstractDiGraphFrame<V, E, K>),
 }
 
 impl<V, E, K> AbstractFrameBuild<V, E, K> for StandardAbstractFrame<V, E, K> {
@@ -321,40 +531,49 @@ impl<V, E, K> AbstractFrameBuild<V, E, K> for StandardAbstractFrame<V, E, K> {
     fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
         StandardAbstractFrame::Call(frame)
     }
+    fn from_digraph(frame: AbstractDiGraphFrame<V, E, K>) -> Result<Self, E> {
+        Ok(StandardAbstractFrame::DiGraph(frame))
+    }
 }
 
-impl<I, V, E, K> Frame<I> for StandardAbstractFrame<V, E, K>
+/// A *universe* impl, generic over the outer total frame type `F` — see
+/// [`Frame`] for what that buys.
+impl<I, F, V, E, K> Frame<I, F> for StandardAbstractFrame<V, E, K>
 where
-    I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-        + SparseForwardInterp<Frame = StandardAbstractFrame<V, E, K>>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
+        + SparseForwardInterp<Frame = F>,
+    F: AbstractFrameBuild<V, E, K>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
     K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
-    fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match self {
-            StandardAbstractFrame::Block(frame) => frame.step_into::<I, Self>(interp),
-            StandardAbstractFrame::Call(frame) => frame.step_into::<I, Self>(interp),
+            StandardAbstractFrame::Block(frame) => frame.step_into(interp),
+            StandardAbstractFrame::Call(frame) => frame.step_into(interp),
+            StandardAbstractFrame::DiGraph(frame) => frame.step_into(interp),
         }
     }
 
-    fn resume_done(self, _interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    fn resume_done_into(self, interp: &mut I) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match self {
-            StandardAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-            StandardAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
+            StandardAbstractFrame::Block(frame) => frame.resume_done_into(interp),
+            StandardAbstractFrame::Call(frame) => frame.resume_done_into(interp),
+            StandardAbstractFrame::DiGraph(frame) => frame.resume_done_into(interp),
         }
     }
 
-    fn resume(
+    fn resume_into(
         self,
-        completion: Self::Completion,
+        completion: AbstractCompletion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
+    ) -> Result<FrameEffect<F, AbstractCompletion<V>>, E> {
         match self {
-            StandardAbstractFrame::Block(frame) => frame.resume_into::<I, Self>(completion, interp),
-            StandardAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
+            StandardAbstractFrame::Block(frame) => frame.resume_into(completion, interp),
+            StandardAbstractFrame::Call(frame) => frame.resume_into(completion, interp),
+            StandardAbstractFrame::DiGraph(frame) => frame.resume_into(completion, interp),
         }
     }
 }

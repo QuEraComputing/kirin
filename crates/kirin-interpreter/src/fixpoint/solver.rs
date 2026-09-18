@@ -45,7 +45,7 @@ where
     /// Analyse `entry` and everything it transitively schedules, to a fixpoint.
     pub fn solve<Sem>(&mut self, semantics: &mut Sem, entry: P::SummaryKey) -> Result<(), I::Error>
     where
-        P::Frame: Frame<Self, Completion = P::Completion>,
+        P::Frame: Frame<Self, P::Frame, Completion = P::Completion>,
         Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
@@ -69,7 +69,7 @@ where
         entries: impl IntoIterator<Item = P::SummaryKey>,
     ) -> Result<(), I::Error>
     where
-        P::Frame: Frame<Self, Completion = P::Completion>,
+        P::Frame: Frame<Self, P::Frame, Completion = P::Completion>,
         Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
@@ -90,7 +90,7 @@ where
         iterations: usize,
     ) -> Result<(), I::Error>
     where
-        P::Frame: Frame<Self, Completion = P::Completion>,
+        P::Frame: Frame<Self, P::Frame, Completion = P::Completion>,
         Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
@@ -113,7 +113,7 @@ where
     /// Pop and analyse owners until the worklist is empty.
     pub fn drain_worklist<Sem>(&mut self, semantics: &mut Sem) -> Result<(), I::Error>
     where
-        P::Frame: Frame<Self, Completion = P::Completion>,
+        P::Frame: Frame<Self, P::Frame, Completion = P::Completion>,
         Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
@@ -184,7 +184,7 @@ where
         owner: P::SummaryKey,
     ) -> Result<(), I::Error>
     where
-        P::Frame: Frame<Self, Completion = P::Completion>,
+        P::Frame: Frame<Self, P::Frame, Completion = P::Completion>,
         Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,

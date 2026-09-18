@@ -1,6 +1,7 @@
 //! The shared interpreter chassis: the engine trait ([`Interp`]) and dialect
 //! dispatch ([`Interpretable`]), effect types, the direction-neutral frame
-//! protocol, activation storage, calling conventions, errors, and IR queries.
+//! protocol, activation storage, calling conventions, errors, and the IR
+//! queries ([`query`]) engines run against a stage.
 //! Everything here is engine-agnostic; the engines compose these pieces.
 
 pub(crate) mod dispatch;
@@ -14,13 +15,14 @@ pub(crate) mod query;
 pub(crate) mod value;
 
 pub use dispatch::{FunctionEntry, InterpDispatch, Interpretable};
-pub use effect::{CallEffect, Callee, Edge, FunctionBody, SparseForwardEffect};
+pub use effect::{Body, CallEffect, CallableBody, Callee, Edge, SparseForwardEffect};
 pub use env::{EnvIndex, EnvStackStore, Store};
 pub use error::InterpreterError;
 pub use frame::{
-    ForwardDataflowFrameDriver, ForwardFrameDriver, Frame, FrameEffect, FrameEngine, drive_frames,
+    BlockQueries, CFGQueries, CallServices, DiGraphQueries, ForwardDataflowFrameEngine,
+    ForwardFrameEngine, Frame, FrameEffect, FrameEngine, StatementDispatch, drive_frames,
 };
 pub use interp::{AbstractInterpreter, Env, Interp, InterpLocation, SparseForwardInterp};
 pub use linker::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
-pub use query::StageQuery;
+pub use query::{GraphWalkPlan, StageQuery, TerminatorArgs};
 pub use value::{BranchCondition, HasProductValue, expect_single};

@@ -1,0 +1,13 @@
+error[E0053]: method `from_call` has an incompatible type for trait
+  --> tests/compile-fail/call_frame_policy_mismatch.rs:42:10
+   |
+42 |     Call(CallFrame<V, MyBodyFrames>),
+   |          ^^^^^^^^^^^^^^^^^^^^^^^^^^ expected `DefaultBodyFrames`, found `MyBodyFrames`
+   |
+   = note: expected signature `fn(CallFrame<V, DefaultBodyFrames>) -> MismatchedFrame<V, E>`
+              found signature `fn(CallFrame<V, MyBodyFrames>) -> MismatchedFrame<V, E>`
+help: change the parameter type to match the trait
+   |
+42 -     Call(CallFrame<V, MyBodyFrames>),
+42 +     Call(CallFrame<V>),
+   |

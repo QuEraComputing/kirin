@@ -1,0 +1,17 @@
+---
+source: crates/kirin-derive-interpreter/src/frame_build.rs
+assertion_line: 280
+expression: "emit(input, &SPARSE_FORWARD)"
+---
+#[automatically_derived]
+impl<V, E, K> ::kirin_interpreter::AbstractFrameBuild<V, E, K> for StandardAbstractFrame<V, E, K> {
+    fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
+        Self::Block(frame)
+    }
+    fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
+        Self::Call(frame)
+    }
+    fn from_digraph(frame: AbstractDiGraphFrame<V, E, K>) -> ::core::result::Result<Self, E> {
+        ::core::result::Result::Ok(Self::DiGraph(frame))
+    }
+}

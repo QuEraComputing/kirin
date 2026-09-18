@@ -26,10 +26,11 @@ pub use live::{Live, LiveSet};
 pub use result::{DemandResult, DenseLivenessResult};
 
 use kirin_interpreter::{
-    DenseBackwardInterpreter, DenseBackwardTransfer, InterpDispatch, InterpreterError,
+    Body, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardInterpreter,
+    DenseBackwardTransfer, DenseFrameBuild, Frame, InterpDispatch, InterpreterError,
     SparseBackwardDriver, SparseBackwardInterpreter, StageQuery, StandardDenseBackwardFrame,
 };
-use kirin_ir::{CFG, CompileStage, Pipeline, StageMeta};
+use kirin_ir::{CompileStage, Pipeline, StageMeta};
 
 /// The sparse backward demand engine instantiated at the [`Live`] lattice:
 /// strong liveness.
@@ -41,30 +42,34 @@ pub type Demand<'ir, S, E = InterpreterError> = SparseBackwardInterpreter<'ir, S
 pub type DenseLiveness<'ir, S, E = InterpreterError, F = StandardDenseBackwardFrame<LiveSet, E>> =
     DenseBackwardInterpreter<'ir, S, LiveSet, E, F>;
 
-/// Run strong liveness (sparse backward demand) over `cfg` in `stage`.
+/// Run strong liveness (sparse backward demand) over `body` in `stage`. TODO:
+/// analyze() should accept Callee similar to concrete and constprop's
+/// analyze(CompileStage, Callee, args) instead of Body, so that the caller can
+/// select a specialization and pass its args.
 pub fn analyze_demand<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
-    cfg: CFG,
+    body: impl Into<Body>,
 ) -> Result<DemandResult, InterpreterError>
 where
     S: StageMeta
         + StageQuery
         + InterpDispatch<SparseBackwardDriver<'ir, S, Live, InterpreterError>>,
 {
+    let body = body.into();
     let mut engine = Demand::<S>::new(pipeline);
-    engine.analyze(stage, cfg)?;
-    Ok(DemandResult::from_engine(&engine, stage, cfg))
+    engine.analyze(stage, body)?;
+    Ok(DemandResult::from_engine(&engine, stage, body))
 }
 
-/// Run classic per-point liveness (dense backward) over `cfg` in `stage`,
-/// with the standard (structured-control-free) frames. Languages with scf
-/// compose [`DenseLiveness`] with their own frame type and build the result
-/// via [`DenseLivenessResult::from_engine`].
+/// Run classic per-point liveness (dense backward) over `body` in `stage`,
+/// with the standard (structured-control-free) frames. Languages with
+/// structured dialects select their total frame through
+/// [`analyze_dense_with_frame`] instead.
 pub fn analyze_dense<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
-    cfg: CFG,
+    body: impl Into<Body>,
 ) -> Result<DenseLivenessResult, InterpreterError>
 where
     S: StageMeta
@@ -79,7 +84,33 @@ where
             >,
         >,
 {
-    let mut engine = DenseLiveness::<S>::new(pipeline);
-    engine.analyze(stage, cfg)?;
-    DenseLivenessResult::from_engine(&mut engine, stage, cfg)
+    analyze_dense_with_frame::<S, StandardDenseBackwardFrame<LiveSet, InterpreterError>>(
+        pipeline, stage, body,
+    )
+}
+
+/// Run classic per-point liveness (dense backward) over `body` in `stage`
+/// with a caller-selected total frame type `F` — the entry point for
+/// languages whose structured dialects require a language-specific total
+/// frame. The analysis consumes the finalized IR directly; it neither
+/// requires nor computes a demand ([`DemandResult`]) pre-pass.
+pub fn analyze_dense_with_frame<'ir, S, F>(
+    pipeline: &'ir Pipeline<S>,
+    stage: CompileStage,
+    body: impl Into<Body>,
+) -> Result<DenseLivenessResult, InterpreterError>
+where
+    S: StageMeta
+        + StageQuery
+        + InterpDispatch<DenseBackwardTransfer<'ir, S, LiveSet, InterpreterError, F>>,
+    F: Frame<
+            DenseBackwardDriver<'ir, S, LiveSet, InterpreterError, F>,
+            F,
+            Completion = DenseBackwardCompletion<LiveSet>,
+        > + DenseFrameBuild<LiveSet, InterpreterError>,
+{
+    let body = body.into();
+    let mut engine = DenseLiveness::<S, InterpreterError, F>::new(pipeline);
+    engine.analyze(stage, body)?;
+    Ok(DenseLivenessResult::from_engine(&engine))
 }

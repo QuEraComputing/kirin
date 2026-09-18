@@ -114,7 +114,7 @@ fn emit_function_entry(
                 args: #ir_crate::Product<<__EntryI as #interp_crate::Interp>::Value>,
                 interp: &mut __EntryI,
             ) -> Result<
-                #interp_crate::FunctionBody<<__EntryI as #interp_crate::Interp>::Value>,
+                #interp_crate::CallableBody<<__EntryI as #interp_crate::Interp>::Value>,
                 <__EntryI as #interp_crate::Interp>::Error,
             > {
                 #body

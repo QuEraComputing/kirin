@@ -34,7 +34,7 @@ pub enum ArithFunctionLanguage {
 #[cfg(feature = "interpreter")]
 mod interpreter {
     use kirin_interpreter::dialect::{
-        ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, FunctionBody,
+        CallableBody, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
         FunctionEntry, Interp, Interpretable, InterpreterError, StrongDemand,
     };
     use kirin_ir::{HasBottom, Product};
@@ -79,10 +79,10 @@ mod interpreter {
             &self,
             args: Product<I::Value>,
             interp: &mut I,
-        ) -> Result<FunctionBody<I::Value>, I::Error> {
+        ) -> Result<CallableBody<I::Value>, I::Error> {
             match self {
                 ArithFunctionLanguage::Function { body, .. } => {
-                    Ok(FunctionBody::new(*body).args(args))
+                    Ok(CallableBody::new(*body).args(args))
                 }
                 _ => Err(I::Error::from(InterpreterError::NotCallable(
                     interp.statement(),
