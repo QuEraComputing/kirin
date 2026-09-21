@@ -551,6 +551,144 @@ fn replace_statement_preserves_result_identity() {
     assert_eq!(uses_set(&stage, wire_ssa), HashSet::from([so(consumer, 0)]));
 }
 
+#[test]
+fn replace_statement_rejects_illegal_edits() {
+    let mut stage = new_stage();
+
+    // A digraph-owned statement, for the body-kind guard.
+    let graph_stmt = stage.statement().definition(BuilderDialect::Nop).new();
+    let _digraph = stage.digraph().node(graph_stmt).new();
+
+    // A block holding a plain statement, a two-result statement, and a branch.
+    let x = stage.block_argument().index(0);
+    let plain = stage.statement().definition(BuilderDialect::Use(x)).new();
+    let (split, _r0, _r1) = make_split(&mut stage);
+    let target = stage.block().new();
+    let branch = stage
+        .statement()
+        .definition(BuilderDialect::Branch(Successor::from_block(target)))
+        .new();
+    let source = stage
+        .block()
+        .argument(TestType::I32)
+        .stmt(plain)
+        .stmt(split)
+        .terminator(branch)
+        .new();
+    let _cfg = stage.cfg().add_block(source).add_block(target).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let real_x = SSAValue::from(source.expect_info(&stage).arguments[0]);
+    // Ids past the end of their arenas.
+    let dead_value = SSAValue::from(Id::from(TestSSAValue(9_999)));
+    let dead_block = Block::from(Id::from(TestSSAValue(9_999)));
+
+    let mut rw = Rewriter::new(&mut stage);
+
+    // Graph bodies need topology surgery, which is a later slice.
+    assert_eq!(
+        rw.replace_statement(graph_stmt, BuilderDialect::Nop),
+        Err(RewriteError::NotInBlockBody(graph_stmt))
+    );
+    // Result arity is fixed: dropping results would orphan their SSA values.
+    assert_eq!(
+        rw.replace_statement(split, BuilderDialect::Nop),
+        Err(RewriteError::ResultArityMismatch {
+            stmt: split,
+            expected: 2,
+            found: 0,
+        })
+    );
+    // Terminator-ness is fixed in both directions, or the block's terminator
+    // cache would desync.
+    assert_eq!(
+        rw.replace_statement(plain, BuilderDialect::Return),
+        Err(RewriteError::TerminatorKindMismatch(plain))
+    );
+    assert_eq!(
+        rw.replace_statement(branch, BuilderDialect::Nop),
+        Err(RewriteError::TerminatorKindMismatch(branch))
+    );
+    // Operands must be live...
+    assert_eq!(
+        rw.replace_statement(plain, BuilderDialect::Use(dead_value)),
+        Err(RewriteError::UnknownValue(dead_value))
+    );
+    // ...and so must successor targets, or the new edge would dangle.
+    assert_eq!(
+        rw.replace_statement(
+            branch,
+            BuilderDialect::Branch(Successor::from_block(dead_block))
+        ),
+        Err(RewriteError::UnknownBlock(dead_block))
+    );
+
+    // None of the rejections above mutated the stage
+    assert_eq!(uses_set(rw.stage(), real_x), HashSet::from([so(plain, 0)]));
+    assert_eq!(
+        target.expect_info(rw.stage()).predecessors.as_slice(),
+        [source]
+    );
+    match branch.definition(rw.stage()) {
+        BuilderDialect::Branch(successor) => assert_eq!(successor.target(), target),
+        other => panic!("expected Branch, got {other:?}"),
+    }
+}
+
+#[test]
+fn replace_statement_maintains_predecessors_when_retargeting() {
+    let mut stage = new_stage();
+
+    let old_target = stage.block().new();
+    let new_target = stage.block().new();
+    let branch = stage
+        .statement()
+        .definition(BuilderDialect::Branch(Successor::from_block(old_target)))
+        .new();
+    let source = stage.block().terminator(branch).new();
+    let _cfg = stage
+        .cfg()
+        .add_block(source)
+        .add_block(old_target)
+        .add_block(new_target)
+        .new();
+
+    let mut stage = stage.finalize().unwrap();
+    assert_eq!(
+        old_target.expect_info(&stage).predecessors.as_slice(),
+        [source]
+    );
+
+    let events = {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.replace_statement(
+            branch,
+            BuilderDialect::Branch(Successor::from_block(new_target)),
+        )
+        .unwrap();
+        rw.drain_events()
+    };
+
+    // The reverse control-flow index followed the edge.
+    assert!(old_target.expect_info(&stage).predecessors.is_empty());
+    assert_eq!(
+        new_target.expect_info(&stage).predecessors.as_slice(),
+        [source]
+    );
+    assert_eq!(
+        events,
+        vec![MutationEvent::ReplacedStatement { stmt: branch }]
+    );
+
+    // The maintained index equals a from-scratch rebuild.
+    stage.rebuild_predecessor_index();
+    assert!(old_target.expect_info(&stage).predecessors.is_empty());
+    assert_eq!(
+        new_target.expect_info(&stage).predecessors.as_slice(),
+        [source]
+    );
+}
+
 /// The CSE shape `replace_results` exists for: redirect a duplicate's whole
 /// result list at the original's, then erase the duplicate.
 #[test]
