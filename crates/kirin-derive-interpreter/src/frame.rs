@@ -87,3 +87,21 @@ pub fn generate(input: &DeriveInput) -> syn::Result<TokenStream> {
         }
     })
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kirin_test_utils::rustfmt;
+
+    #[test]
+    fn member_conversions_and_dispatch() {
+        let input = syn::parse_quote! {
+            enum TestFrame {
+                Block(BlockFrame),
+                ScfFor(ScfForFrame),
+            }
+        };
+        let tokens = generate(&input).expect("codegen failed");
+        insta::assert_snapshot!(rustfmt(tokens.to_string()));
+    }
+}
