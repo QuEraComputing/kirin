@@ -14,47 +14,54 @@
 //! often need several individually incomplete edits.
 //!
 //! Whole-stage usability is meant to be re-established at a *pass boundary*
-//! that rebuilds derived metadata before returning success and marks the stage
-//! unusable on failure. **That boundary does not exist yet** (see M1 in the
-//! design doc): there is no `Ready` / `Rewriting` / `Unusable` lifecycle or
-//! rebuild step. Callers
-//! of this module today get referential integrity, an accurate def-use index,
-//! and traversable block lists — nothing above that.
+//! that derives the expected metadata, compares it with what is installed, and
+//! marks the stage unusable on failure — it never repairs. **That boundary does
+//! not exist yet** (see M1 in the design doc): there is no `run_pass` ownership
+//! scope and no `Quarantined` failure path. The comparison half is available
+//! today as [`verify_derived`](crate::verify_derived), but nothing invokes it
+//! automatically. Callers of this module get referential integrity, accurate
+//! derived mirrors, and traversable block lists — nothing above that.
 //!
 //! Scope is operand/yield rewriting (including bulk result redirection through
 //! [`Rewriter::replace_results`]) plus block-body statement surgery:
 //! [`Rewriter::erase_statement`], [`Rewriter::insert_before`],
 //! [`Rewriter::insert_after`], and [`Rewriter::replace_statement`]. The rewriter
-//! **maintains** the def-use index ([`SSAInfo::uses`](crate::SSAInfo))
-//! incrementally on every edit, so it stays valid without a rebuild. Deferred
-//! to later slices: terminator/graph-body surgery, result-defining insertion,
-//! and full cross-block dominance/visibility preflight.
+//! **maintains** both derived mirrors incrementally on every edit —
+//! [`SSAInfo::uses`](crate::SSAInfo) and
+//! [`BlockInfo::predecessors`](crate::BlockInfo) — so they stay valid without a
+//! rebuild. Deferred to later slices: terminator/graph-body surgery,
+//! result-defining insertion, and full cross-block dominance/visibility
+//! preflight.
 //!
 //! # Known gap: graph-body operand edits
 //!
-//! [`Rewriter::erase_statement`] and the `insert_*` methods reject
-//! `DiGraph`/`UnGraph`-owned statements with [`RewriteError::NotInBlockBody`].
-//! [`Rewriter::replace_operand`], [`Rewriter::replace_all_uses`],
-//! [`Rewriter::replace_results`], and [`Rewriter::replace_statement`] do **not**
+//! [`Rewriter::erase_statement`], [`Rewriter::replace_statement`], and the
+//! `insert_*` methods reject `DiGraph`/`UnGraph`-owned statements with
+//! [`RewriteError::NotInBlockBody`]. [`Rewriter::replace_operand`],
+//! [`Rewriter::replace_all_uses`], and [`Rewriter::replace_results`] do **not**
 //! check body kind: on a graph-owned statement they rewrite the operand and
 //! leave the petgraph edge weights that mirror it stale. Until graph surgery
 //! lands, prefer not to point them at graph bodies.
 //!
-//! Because edits are index-driven (they consult and update `SSAInfo::uses`
-//! rather than scanning), correctness depends on the index being accurate at
-//! entry — every mutation path must keep it in lockstep. Direct arena writes
-//! that bypass the `Rewriter` desync it, and `StageInfo::statement_arena_mut`
-//! is still public, so that bypass is currently reachable.
+//! Because value rewrites are index-driven (they consult and update
+//! `SSAInfo::uses` rather than scanning), correctness depends on the use index
+//! being accurate at entry — every mutation path must keep it in lockstep.
+//! `BlockInfo::predecessors` is maintained differently: it is recomputed from
+//! the statement's own `successors()`, so it does not depend on its own prior
+//! accuracy. Direct arena writes that bypass the `Rewriter` desync both, and
+//! `StageInfo::statement_arena_mut` is still public, so that bypass is
+//! currently reachable.
 //!
 //! Statement surgery uses arena tombstones: an erased statement is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
 //! removed.
 
+use std::collections::HashSet;
 use std::fmt;
 
 use crate::arena::GetInfo;
 use crate::node::linked_list::LinkedListNode;
-use crate::{Dialect, SSAValue, StageInfo, Statement, StatementInfo, StatementParent, Use};
+use crate::{Block, Dialect, SSAValue, StageInfo, Statement, StatementInfo, StatementParent, Use};
 
 /// A structured record of one mutation performed through a [`Rewriter`].
 ///
@@ -85,6 +92,8 @@ pub enum RewriteError {
     UnknownStatement(Statement),
     /// The SSA value ID does not resolve to a live value in this stage.
     UnknownValue(SSAValue),
+    /// The block ID does not resolve to a live block in this stage.
+    UnknownBlock(Block),
     /// The operand index is out of range for the statement's operand list.
     OperandIndexOutOfRange { stmt: Statement, index: usize },
     /// The statement's parent is not a block body. Erasing/inserting relative to
@@ -131,6 +140,9 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::UnknownValue(value) => {
                 write!(f, "SSA value {value} is not a live value in this stage")
+            }
+            RewriteError::UnknownBlock(block) => {
+                write!(f, "block {block:?} is not a live block in this stage")
             }
             RewriteError::OperandIndexOutOfRange { stmt, index } => {
                 write!(
@@ -516,6 +528,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for (index, operand) in operands.into_iter().enumerate() {
             remove_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
+        // Predecessor mirror does not need to be updated since we rejected terminators earlier.
         for result in results {
             let _ = self.stage.ssas.delete(result);
         }
@@ -642,6 +655,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 },
             );
         }
+        // Predecessor mirror does not need to be updated since we rejected terminators earlier.
         self.events
             .push(MutationEvent::InsertedStatement { stmt: new_stmt });
         Ok(new_stmt)
@@ -653,25 +667,41 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// The replacement must declare the same number of results and the same
     /// terminator-ness as the original, so result SSA values and the block's
     /// terminator cache stay valid; the original result ids are preserved
-    /// regardless of what `definition` carries in its result slots. Operand uses
-    /// are updated to match the new operands. Records
-    /// [`MutationEvent::ReplacedStatement`].
+    /// regardless of what `definition` carries in its result slots.
+    ///
+    /// Both mirrors are maintained: operand uses are updated to match the new
+    /// operands, and `BlockInfo::predecessors` is updated for any control-flow
+    /// edge the replacement adds or drops.
+    ///
+    /// Rejects (leaving the stage untouched) if `stmt` is unknown, is not
+    /// owned by a block body (i.e. in a graph), changes result arity or
+    /// terminator-ness, or names an operand or successor target that is not live.
+    ///
+    /// Records [`MutationEvent::ReplacedStatement`].
     pub fn replace_statement(
         &mut self,
         stmt: Statement,
         definition: L,
     ) -> Result<(), RewriteError> {
-        let (old_operands, old_results, old_is_terminator) = {
+        let (old_operands, old_results, old_successors, parent_block, old_is_terminator) = {
             let item = stmt
                 .get_info(self.stage)
                 .filter(|item| !item.deleted())
                 .ok_or(RewriteError::UnknownStatement(stmt))?;
+            let Some(StatementParent::Block(parent_block)) = item.parent else {
+                return Err(RewriteError::NotInBlockBody(stmt));
+            };
             (
                 item.definition
                     .arguments()
                     .copied()
                     .collect::<Vec<SSAValue>>(),
                 item.definition.results().copied().collect::<Vec<_>>(),
+                item.definition
+                    .successors()
+                    .map(|successor| successor.target())
+                    .collect::<HashSet<Block>>(),
+                parent_block,
                 item.definition.is_terminator(),
             )
         };
@@ -693,6 +723,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 return Err(RewriteError::UnknownValue(operand));
             }
         }
+        let new_successors: HashSet<Block> = definition
+            .successors()
+            .map(|successor| successor.target())
+            .collect();
+        for &target in &new_successors {
+            if !block_is_live(self.stage, target) {
+                return Err(RewriteError::UnknownBlock(target));
+            }
+        }
 
         // Preserve the original result ids in the incoming definition so its
         // results keep their SSA identity and types.
@@ -711,6 +750,20 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for (index, operand) in new_operands.into_iter().enumerate() {
             add_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
+
+        // Update the predecessor mirror
+        // Remove the parent_block from the predecessor list of any successor that is
+        // also not a successor of the new definition. Similarly, only add parent_block
+        // to the predecessor list of any successor that does not already have it.
+        // For example, when making the replacement cond_branch(t, t) -> cond_branch(t, u)
+        // there is still an edge from parent_block to t, so we don't update t's predecessors
+        for &target in old_successors.difference(&new_successors) {
+            remove_predecessor(self.stage, target, parent_block);
+        }
+        for &target in new_successors.difference(&old_successors) {
+            add_predecessor(self.stage, target, parent_block);
+        }
+
         self.events.push(MutationEvent::ReplacedStatement { stmt });
         Ok(())
     }
@@ -731,4 +784,32 @@ fn add_use<L: Dialect>(stage: &mut StageInfo<L>, value: SSAValue, site: Use) {
     if let Some(info) = value.get_info_mut(stage) {
         info.uses_mut().push(site);
     }
+}
+
+/// Remove one occurrence of `pred` from `block`'s predecessor list, if present.
+///
+/// One entry per `(source, target)` pair, so callers must only reach this for
+/// a target that does not have any other edges from `block`
+fn remove_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Block, pred: Block) {
+    let Some(block_info) = block.get_info_mut(stage).filter(|item| !item.deleted()) else {
+        return;
+    };
+    if let Some(pos) = block_info.predecessors.iter().position(|p| *p == pred) {
+        block_info.predecessors.swap_remove(pos);
+    }
+}
+
+/// Record `pred` on `block`'s predecessor list.
+///
+/// One entry per `(source, target)` pair, so callers must only reach this for
+/// a target that did not already have an edge from `pred`.
+fn add_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Block, pred: Block) {
+    if let Some(info) = block.get_info_mut(stage).filter(|item| !item.deleted()) {
+        info.predecessors.push(pred);
+    }
+}
+
+/// Whether `block` resolves to a live block in `stage`.
+fn block_is_live<L: Dialect>(stage: &StageInfo<L>, block: Block) -> bool {
+    block.get_info(stage).is_some_and(|item| !item.deleted())
 }

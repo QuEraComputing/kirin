@@ -35,6 +35,7 @@ use kirin_scf::{
 #[derive(FrameBuild)]
 pub enum ToyFrame<V, E> {
     Block(BlockFrame<V, E>),
+    #[allow(clippy::upper_case_acronyms)]
     CFG(CFGFrame<V, E>),
     Call(CallFrame<V>),
     DiGraph(DiGraphFrame<V, E>),
