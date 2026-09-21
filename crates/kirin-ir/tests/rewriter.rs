@@ -202,10 +202,7 @@ fn replace_operand_maintains_def_use_index() {
     assert_eq!(*real_y.get_info(&stage).unwrap().kind(), y_kind);
 
     // The incrementally maintained index equals a from-scratch rebuild.
-    let (mx, my) = (uses_set(&stage, real_x), uses_set(&stage, real_y));
-    stage.rebuild_use_index();
-    assert_eq!(uses_set(&stage, real_x), mx);
-    assert_eq!(uses_set(&stage, real_y), my);
+    verify_derived(&stage).unwrap();
 }
 
 #[test]
@@ -276,10 +273,7 @@ fn replace_all_uses_maintains_def_use_index_including_yields() {
     );
 
     // Maintained index equals a from-scratch rebuild.
-    let (ma, mb) = (uses_set(&stage, a), uses_set(&stage, real_b));
-    stage.rebuild_use_index();
-    assert_eq!(uses_set(&stage, a), ma);
-    assert_eq!(uses_set(&stage, real_b), mb);
+    verify_derived(&stage).unwrap();
 }
 
 #[test]
@@ -322,9 +316,7 @@ fn erase_statement_unlinks_and_maintains_index() {
     assert_eq!(uses_set(&stage, real_x), HashSet::from([so(s0, 0)]));
 
     // Maintained index equals a from-scratch rebuild.
-    let m = uses_set(&stage, real_x);
-    stage.rebuild_use_index();
-    assert_eq!(uses_set(&stage, real_x), m);
+    verify_derived(&stage).unwrap();
 }
 
 #[test]
@@ -437,10 +429,7 @@ fn insert_before_and_after_splice_and_maintain_index() {
     assert!(rw.events().is_empty());
 
     // Maintained index equals a from-scratch rebuild.
-    let (mx, my) = (uses_set(&stage, real_x), uses_set(&stage, real_y));
-    stage.rebuild_use_index();
-    assert_eq!(uses_set(&stage, real_x), mx);
-    assert_eq!(uses_set(&stage, real_y), my);
+    verify_derived(&stage).unwrap();
 }
 
 #[test]
@@ -512,10 +501,7 @@ fn replace_statement_swaps_def_and_updates_uses() {
         Err(RewriteError::TerminatorKindMismatch(s0))
     );
 
-    let (mx, my) = (uses_set(&stage, real_x), uses_set(&stage, real_y));
-    stage.rebuild_use_index();
-    assert_eq!(uses_set(&stage, real_x), mx);
-    assert_eq!(uses_set(&stage, real_y), my);
+    verify_derived(&stage).unwrap();
 }
 
 #[test]
@@ -681,12 +667,7 @@ fn replace_statement_maintains_predecessors_when_retargeting() {
     );
 
     // The maintained index equals a from-scratch rebuild.
-    stage.rebuild_predecessor_index();
-    assert!(old_target.expect_info(&stage).predecessors.is_empty());
-    assert_eq!(
-        new_target.expect_info(&stage).predecessors.as_slice(),
-        [source]
-    );
+    verify_derived(&stage).unwrap();
 }
 
 /// The CSE shape `replace_results` exists for: redirect a duplicate's whole
@@ -768,10 +749,7 @@ fn replace_results_redirects_every_result_and_unblocks_erase() {
     }
     assert!(dup.get_info(&stage).unwrap().deleted());
 
-    let (ma, mb) = (uses_set(&stage, orig_a), uses_set(&stage, orig_b));
-    stage.rebuild_use_index();
-    assert_eq!(uses_set(&stage, orig_a), ma);
-    assert_eq!(uses_set(&stage, orig_b), mb);
+    verify_derived(&stage).unwrap();
 }
 
 /// Substitution is simultaneous, so naming one of the statement's own results
@@ -816,15 +794,7 @@ fn replace_results_substitutes_simultaneously() {
     assert_eq!(uses_set(&stage, b), HashSet::from([so(reads_a, 0)]));
     assert_eq!(uses_set(&stage, x), HashSet::from([so(reads_b, 0)]));
 
-    let (ma, mb, mx) = (
-        uses_set(&stage, a),
-        uses_set(&stage, b),
-        uses_set(&stage, x),
-    );
-    stage.rebuild_use_index();
-    assert_eq!(uses_set(&stage, a), ma);
-    assert_eq!(uses_set(&stage, b), mb);
-    assert_eq!(uses_set(&stage, x), mx);
+    verify_derived(&stage).unwrap();
 }
 
 #[test]

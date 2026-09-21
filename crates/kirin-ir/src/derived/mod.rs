@@ -120,11 +120,18 @@ pub(crate) fn derive_mirrors<L: Dialect>(stage: &StageInfo<L>) -> Result<Mirrors
 }
 
 /// Write derived mirrors into a stage.
-#[allow(dead_code, clippy::unused_self)]
 pub(crate) fn install_mirrors<L: Dialect>(stage: &mut StageInfo<L>, mirrors: Mirrors) {
     let Mirrors { uses, predecessors } = mirrors;
     uses.install(stage);
     predecessors.install(stage);
+}
+
+/// Best-effort: for use by `finalize_unchecked`.
+/// Installs every entry that could be derived and discards the findings;
+/// If the IR is then genuinely broken, `verify_derived` will say so.
+pub(crate) fn install_and_derive_mirrors_unchecked<L: Dialect>(stage: &mut StageInfo<L>) {
+    let (mirrors, _findings) = derive_partial(stage);
+    install_mirrors(stage, mirrors);
 }
 
 /// Check that the mirrors installed in `stage` match a fresh derivation.

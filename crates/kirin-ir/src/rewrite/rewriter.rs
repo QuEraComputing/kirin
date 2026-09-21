@@ -14,21 +14,24 @@
 //! often need several individually incomplete edits.
 //!
 //! Whole-stage usability is meant to be re-established at a *pass boundary*
-//! that rebuilds derived metadata before returning success and marks the stage
-//! unusable on failure. **That boundary does not exist yet** (see M1 in the
-//! design doc): there is no `Ready` / `Rewriting` / `Unusable` lifecycle or
-//! rebuild step. Callers
-//! of this module today get referential integrity, an accurate def-use index,
-//! and traversable block lists — nothing above that.
+//! that derives the expected metadata, compares it with what is installed, and
+//! marks the stage unusable on failure — it never repairs. **That boundary does
+//! not exist yet** (see M1 in the design doc): there is no `run_pass` ownership
+//! scope and no `Quarantined` failure path. The comparison half is available
+//! today as [`verify_derived`](crate::verify_derived), but nothing invokes it
+//! automatically. Callers of this module get referential integrity, accurate
+//! derived mirrors, and traversable block lists — nothing above that.
 //!
 //! Scope is operand/yield rewriting (including bulk result redirection through
 //! [`Rewriter::replace_results`]) plus block-body statement surgery:
 //! [`Rewriter::erase_statement`], [`Rewriter::insert_before`],
 //! [`Rewriter::insert_after`], and [`Rewriter::replace_statement`]. The rewriter
-//! **maintains** the def-use index ([`SSAInfo::uses`](crate::SSAInfo))
-//! incrementally on every edit, so it stays valid without a rebuild. Deferred
-//! to later slices: terminator/graph-body surgery, result-defining insertion,
-//! and full cross-block dominance/visibility preflight.
+//! **maintains** both derived mirrors incrementally on every edit —
+//! [`SSAInfo::uses`](crate::SSAInfo) and
+//! [`BlockInfo::predecessors`](crate::BlockInfo) — so they stay valid without a
+//! rebuild. Deferred to later slices: terminator/graph-body surgery,
+//! result-defining insertion, and full cross-block dominance/visibility
+//! preflight.
 //!
 //! # Known gap: graph-body operand edits
 //!
@@ -40,11 +43,14 @@
 //! leave the petgraph edge weights that mirror it stale. Until graph surgery
 //! lands, prefer not to point them at graph bodies.
 //!
-//! Because edits are index-driven (they consult and update `SSAInfo::uses`
-//! rather than scanning), correctness depends on the index being accurate at
-//! entry — every mutation path must keep it in lockstep. Direct arena writes
-//! that bypass the `Rewriter` desync it, and `StageInfo::statement_arena_mut`
-//! is still public, so that bypass is currently reachable.
+//! Because value rewrites are index-driven (they consult and update
+//! `SSAInfo::uses` rather than scanning), correctness depends on the use index
+//! being accurate at entry — every mutation path must keep it in lockstep.
+//! `BlockInfo::predecessors` is maintained differently: it is recomputed from
+//! the statement's own `successors()`, so it does not depend on its own prior
+//! accuracy. Direct arena writes that bypass the `Rewriter` desync both, and
+//! `StageInfo::statement_arena_mut` is still public, so that bypass is
+//! currently reachable.
 //!
 //! Statement surgery uses arena tombstones: an erased statement is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
