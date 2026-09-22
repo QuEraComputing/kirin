@@ -8,6 +8,8 @@
 //! *pass-boundary* property that is not implemented yet. See the
 //! [`rewriter`] module docs for exactly what is and is not guaranteed.
 
+pub(crate) mod quarantine;
 pub(crate) mod rewriter;
 
+pub use quarantine::{QuarantineCause, Quarantined};
 pub use rewriter::{MutationEvent, RewriteError, Rewriter};
