@@ -11,8 +11,9 @@ from kirin.dialects import func
 from kirin.passes.abc import Pass
 from kirin.passes.fold import Fold
 from kirin.rewrite.abc import RewriteResult
-from kirin.dialects.ilist import IList
+from kirin.dialects.ilist import Map, New, Scan, Foldl, Foldr, IList, ForEach
 from kirin.dialects.py.constant import Constant
+from kirin.dialects.ilist.rewrite import Unroll, InlineGetItem
 from kirin.rewrite.specialize_invoke import SpecializeInvoke
 
 
@@ -53,6 +54,9 @@ class Specialize(Pass):
     Generic methods retain their signatures; visited bodies may be folded.
     Known lambda-backed methods retain their bound closure fields. Local
     lambdas whose captures are still dynamic are not specialized.
+    Map, ForEach, Foldl, Foldr, and Scan operations with a statically known
+    length are expanded to expose callback calls when at least one element
+    is constant with a supported specialization key.
     A zero budget disables specialization.
     """
 
@@ -106,23 +110,50 @@ class Specialize(Pass):
             frame, _ = analysis.run(mt)
         return frame
 
+    @staticmethod
+    def _has_specializable_element(collection: ir.SSAValue) -> bool:
+        def fact(value: ir.SSAValue):
+            if isinstance(value.owner, Constant):
+                return const.Value(value.owner.value.unwrap())
+            return value.hints.get("const")
+
+        known = fact(collection)
+        if isinstance(known, const.Value) and isinstance(known.data, IList):
+            return any(_constant_key(element) is not None for element in known.data)
+        if isinstance(collection.owner, New):
+            # A partially static list need not have a constant collection fact.
+            return any(
+                isinstance(element := fact(value), const.Value)
+                and _constant_key(element.data) is not None
+                for value in collection.owner.values
+            )
+        return False
+
     def _run(self, root: ir.Method) -> RewriteResult:
         self._discover(root)
         self.pending.append(root)
         result = RewriteResult()
+        unroll = Unroll()
+        rolled_ilist = (Map, ForEach, Foldl, Foldr, Scan)
         while self.pending:
             mt = self.pending.popleft()
             if mt in self.seen:
                 continue
             self.seen.add(mt)
             old_callees = self._callees(mt)
+            if any(isinstance(stmt, rolled_ilist) for stmt in mt.code.walk()):
+                result = Fold(mt.dialects, no_raise=self.no_raise)(mt).join(result)
+                for stmt in tuple(mt.code.walk()):
+                    if not isinstance(stmt, rolled_ilist):
+                        continue
+                    if self._has_specializable_element(stmt.collection):
+                        result = unroll.rewrite(stmt).join(result)
             frame = self._analyze(mt)
             result = Walk(WrapConst(frame)).rewrite(mt.code).join(result)
-            # Literal method references remain sound even when recursive
-            # analysis failed and returned an empty frame.
             for stmt in mt.code.walk():
                 if isinstance(stmt, Constant) and isinstance(stmt.value, ir.PyAttr):
                     stmt.result.hints["const"] = const.Value(stmt.value.data)
+            result = Walk(InlineGetItem()).rewrite(mt.code).join(result)
             result = Walk(Call2Invoke()).rewrite(mt.code).join(result)
             result = (
                 Walk(SpecializeInvoke(self.materialize)).rewrite(mt.code).join(result)
@@ -137,7 +168,6 @@ class Specialize(Pass):
 
     @staticmethod
     def _callees(mt: ir.Method) -> tuple[ir.Method, ...]:
-        # Stable traversal makes names and budget allocation reproducible.
         return tuple(
             dict.fromkeys(
                 stmt.callee for stmt in mt.code.walk() if isinstance(stmt, func.Invoke)
