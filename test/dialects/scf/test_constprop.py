@@ -1,8 +1,8 @@
 from pytest import mark
 
-from kirin import ir, lowering
+from kirin import ir, types, lowering
 from kirin.decl import statement
-from kirin.prelude import structural_no_opt
+from kirin.prelude import structural, structural_no_opt
 from kirin.analysis import const
 from kirin.dialects import scf, func
 
@@ -160,3 +160,78 @@ def test_no_early_termination_when_body_uses_iter_var():
     # The for-loop must NOT be in should_be_pure — it contains a
     # conditionally-impure operation on a later iteration.
     assert for_stmt not in frame.should_be_pure
+
+
+def test_loop_body_values_keep_their_results():
+    @structural_no_opt
+    def main(n: int):
+        total = 0
+        for i in range(3):
+            step = 2
+            total = total + step * i
+        for j in range(n):
+            width = 5
+            total = total + width * j
+        return total
+
+    frame, _ = prop.run(main)
+    steps = [s for s in main.callable_region.walk() if s.name == "constant"]
+    values = {frame.entries[s.results[0]].data for s in steps if s.results[0].uses}
+    assert {2, 5} <= values
+    products = [s for s in main.callable_region.walk() if s.name == "mult"]
+    assert all(isinstance(frame.entries[p.results[0]], const.Unknown) for p in products)
+
+
+def test_a_loop_over_an_unknown_range_keeps_an_unchanged_carried_constant():
+    @structural_no_opt
+    def main(n: int):
+        fixed = 3
+        total = 0
+        for i in range(n):
+            fixed = 3
+            total = total + i
+        return fixed, total
+
+    _, ret = prop.run(main)
+    assert isinstance(ret, const.PartialTuple)
+    assert ret.data[0] == const.Value(3)
+    assert isinstance(ret.data[1], const.Unknown)
+
+
+def test_a_tuple_index_inside_a_loop_types_the_member():
+    """Type inference reads the constant index from the hint that const prop leaves."""
+
+    @structural_no_opt
+    def pair(n: int):
+        return n, n * 0.5
+
+    @structural(typeinfer=True)
+    def main(n: int):
+        last = 0.0
+        for i in range(n):
+            last = pair(i)[1]
+        return last
+
+    reads = [s for s in main.callable_region.walk() if s.name == "getitem"]
+    assert [r.results[0].type for r in reads] == [types.Float]
+    assert main.return_type == types.Float
+
+
+def test_nested_loops_over_unknown_ranges_keep_body_constants():
+    @structural_no_opt
+    def main(n: int, m: int):
+        total = 0
+        for i in range(n):
+            for j in range(m):
+                step = 4
+                total = total + step
+        return total
+
+    frame, ret = prop.run(main)
+    assert isinstance(ret, const.Unknown)
+    step = next(
+        s
+        for s in main.callable_region.walk()
+        if s.name == "constant" and s.value.unwrap() == 4  # type: ignore
+    )
+    assert frame.entries[step.results[0]] == const.Value(4)
