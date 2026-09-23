@@ -28,10 +28,8 @@ class SpecializeInvoke(RewriteRule):
             return RewriteResult()
         args: list[const.Result] = []
         for value in node.inputs:
-            if isinstance(value.owner, Constant) and isinstance(
-                value.owner.value, ir.PyAttr
-            ):
-                args.append(const.Value(value.owner.value.data))
+            if isinstance(value.owner, Constant):
+                args.append(const.Value(value.owner.value))
             else:
                 hint = value.hints.get("const")
                 args.append(hint if isinstance(hint, const.Result) else const.Unknown())

@@ -1,5 +1,7 @@
 """Bounded constant-argument specialization of function and closure methods."""
 
+from __future__ import annotations
+
 import struct
 from collections import deque
 from dataclasses import dataclass
@@ -17,32 +19,40 @@ from kirin.dialects.ilist.rewrite import Unroll, InlineGetItem
 from kirin.rewrite.specialize_invoke import SpecializeInvoke
 
 
-def _constant_key(value: object) -> tuple | None:
-    """None means dynamic; keys never invoke arbitrary user equality/hash."""
+def constant_key(value: object) -> tuple | None:
+    """Build a structural specialization key, or ``None`` if dynamic.
+    The key is a tuple of the value's type and its contents, recursively.
+    """
+    if isinstance(value, ir.PyAttr):
+        return constant_key(value.data)
+    if isinstance(value, ir.Data):
+        kind = type(value)
+        if kind is IList:
+            items = tuple(constant_key(item) for item in value)
+            if any(item is None for item in items):
+                return None
+            return (IList, id(value.elem), items)
+        return (kind, value)
+
     kind = type(value)
     if kind in (type(None), bool, int, str, bytes):
         return (kind, value)
-    if type(value) is float:
+    if kind is float:
         return (float, struct.pack("!d", value))
-    if type(value) is complex:
+    if kind is complex:
         return (complex, struct.pack("!dd", value.real, value.imag))
-    if type(value) is range:
+    if kind is range:
         return (range, value.start, value.stop, value.step)
-    if type(value) is tuple:
-        items = tuple(_constant_key(item) for item in value)
+    if kind is tuple:
+        items = tuple(constant_key(item) for item in value)
         if any(item is None for item in items):
             return None
         return (tuple, items)
-    if type(value) is frozenset:
-        items = tuple(_constant_key(item) for item in value)
+    if kind is frozenset:
+        items = tuple(constant_key(item) for item in value)
         if any(item is None for item in items):
             return None
         return (frozenset, frozenset(items))
-    if type(value) is IList:
-        items = tuple(_constant_key(item) for item in value)
-        if any(item is None for item in items):
-            return None
-        return (IList, id(value.elem), items)
     return None
 
 
@@ -58,6 +68,10 @@ class Specialize(Pass):
     length are expanded to expose callback calls when at least one element
     is constant with a supported specialization key.
     A zero budget disables specialization.
+
+    DSLs extend the bindable set by registering [`ir.Data`][kirin.ir.Data]
+    attributes with structural ``__hash__`` / ``__eq__``. Builtin Python
+    values in [`ir.PyAttr`][kirin.ir.PyAttr] stay on the careful whitelist.
     """
 
     max_specializations: int = 32
@@ -119,12 +133,12 @@ class Specialize(Pass):
 
         known = fact(collection)
         if isinstance(known, const.Value) and isinstance(known.data, IList):
-            return any(_constant_key(element) is not None for element in known.data)
+            return any(constant_key(element) is not None for element in known.data)
         if isinstance(collection.owner, New):
             # A partially static list need not have a constant collection fact.
             return any(
                 isinstance(element := fact(value), const.Value)
-                and _constant_key(element.data) is not None
+                and constant_key(element.data) is not None
                 for value in collection.owner.values
             )
         return False
@@ -187,7 +201,7 @@ class Specialize(Pass):
         if len(args) != len(original.args):
             return None
         keys = tuple(
-            _constant_key(arg.data) if isinstance(arg, const.Value) else None
+            constant_key(arg.data) if isinstance(arg, const.Value) else None
             for arg in args
         )
         if all(key is None for key in keys):
