@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import TypeVar, TypeAlias, overload
+from typing import Generic, TypeVar, TypeAlias, overload
 from dataclasses import field, dataclass
 
 from kirin import ir
@@ -63,6 +63,18 @@ AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
 
 
 @dataclass
+class _RunningCall(Generic[ResultType]):
+    """A call on the stack of an abstract interpreter."""
+
+    node: ir.Statement
+    args: tuple[ResultType, ...]
+    assumed: ResultType
+    """The result that a recursive call of `node` with `args` returns."""
+    reached: bool = False
+    """True if a recursive call of `node` with `args` returned `assumed`."""
+
+
+@dataclass
 class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
     """Abstract interpreter for the IR.
 
@@ -90,6 +102,12 @@ class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
     lattice: type[BoundedLattice[ResultType]] = field(init=False)
     """lattice type for the abstract interpreter.
     """
+    recursion_rounds: int = field(default=8, kw_only=True)
+    """The rounds a call that reaches itself may take to settle before it is top."""
+    _running: list[_RunningCall[ResultType]] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """The calls on the stack, innermost last."""
 
     def __init_subclass__(cls) -> None:
         if ABC in cls.__bases__:
@@ -105,6 +123,53 @@ class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
 
     def recursion_limit_reached(self) -> ResultType:
         return self.lattice.bottom()
+
+    def initialize(self):
+        self._running = []
+        return super().initialize()
+
+    def call(
+        self, node: ir.Statement | ir.Method, *args: ResultType, **kwargs: ResultType
+    ) -> tuple[AbstractFrameType, ResultType]:
+        """Call `node`, and solve a call that reaches itself as a fixpoint.
+
+        A call of a callable node with the arguments of a call that is still on
+        the stack returns the result assumed for that call, at first bottom. The
+        outer call then runs again with its own result joined in, until the
+        result stays within the assumption, which is then the result. A result
+        that keeps growing, such as a tuple that nests deeper at every round,
+        is assumed to be top after `recursion_rounds` rounds. This bounds the
+        stack by the number of distinct calls.
+        """
+        if isinstance(node, ir.Method):
+            return super().call(node, *args, **kwargs)
+        trait = node.get_trait(ir.CallableStmtInterface)
+        if trait is None:
+            return super().call(node, *args, **kwargs)
+        aligned = trait.align_input_args(node, *args, **kwargs)
+        for running in self._running:
+            if running.node is node and running.args == aligned:
+                running.reached = True
+                with self.new_frame(node) as frame:
+                    return frame, running.assumed
+        running = _RunningCall(node, aligned, self.lattice.bottom())
+        self._running.append(running)
+        try:
+            for round in range(self.recursion_rounds + 1):
+                frame, result = super().call(node, *args, **kwargs)
+                if not running.reached:
+                    return frame, result
+                if result.is_subseteq(running.assumed):
+                    return frame, running.assumed
+                if round < self.recursion_rounds:
+                    running.assumed = running.assumed.join(result)
+                else:
+                    running.assumed = self.lattice.top()
+                running.reached = False
+            frame, _ = super().call(node, *args, **kwargs)
+            return frame, running.assumed
+        finally:
+            self._running.pop()
 
     # helper methods
     @overload
