@@ -41,7 +41,7 @@ class InterpreterABC(ABC, Generic[FrameType, ValueType]):
     dialects: ir.DialectGroup
     """The dialects this interpreter supports."""
 
-    max_depth: int = field(default=800, kw_only=True)
+    max_depth: int = field(default=256, kw_only=True)
     """The maximum depth of the interpreter stack."""
     max_python_recursion_depth: int = field(default=131072, kw_only=True)
     """The maximum recursion depth of the Python interpreter.
