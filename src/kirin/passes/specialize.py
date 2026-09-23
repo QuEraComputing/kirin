@@ -26,29 +26,28 @@ def constant_key(value: object) -> tuple | None:
     if isinstance(value, ir.PyAttr):
         return constant_key(value.data)
     if isinstance(value, ir.Data):
-        kind = type(value)
-        if kind is IList:
+        if type(value) is IList:
             items = tuple(constant_key(item) for item in value)
             if any(item is None for item in items):
                 return None
             return (IList, id(value.elem), items)
-        return (kind, value)
+        return (type(value), value)
 
     kind = type(value)
     if kind in (type(None), bool, int, str, bytes):
         return (kind, value)
-    if kind is float:
+    if type(value) is float:
         return (float, struct.pack("!d", value))
-    if kind is complex:
+    if type(value) is complex:
         return (complex, struct.pack("!dd", value.real, value.imag))
-    if kind is range:
+    if type(value) is range:
         return (range, value.start, value.stop, value.step)
-    if kind is tuple:
+    if type(value) is tuple:
         items = tuple(constant_key(item) for item in value)
         if any(item is None for item in items):
             return None
         return (tuple, items)
-    if kind is frozenset:
+    if type(value) is frozenset:
         items = tuple(constant_key(item) for item in value)
         if any(item is None for item in items):
             return None
