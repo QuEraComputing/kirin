@@ -53,7 +53,8 @@
   </span>' href=../../ir/attrs/py/#kirin.ir.attrs.py.PyAttr><code>ir.PyAttr</code></a> stay on the careful whitelist.</p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.passes.specialize.Specialize.materialize class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">materialize</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>materialize</span><span class=p>(</span>
     <span class=n>original</span><span class=p>:</span> <span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Result</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>int</span><span class=p>,</span> <span class=o>...</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Reuse a specialization or create and schedule one within the budget.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>191</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Reuse a specialization or create and schedule one within the budget.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>190</span>
+<span class=normal>191</span>
 <span class=normal>192</span>
 <span class=normal>193</span>
 <span class=normal>194</span>
@@ -88,8 +89,7 @@
 <span class=normal>223</span>
 <span class=normal>224</span>
 <span class=normal>225</span>
-<span class=normal>226</span>
-<span class=normal>227</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>materialize</span><span class=p>(</span>
+<span class=normal>226</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>materialize</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>original</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>Result</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>int</span><span class=p>,</span> <span class=o>...</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Reuse a specialization or create and schedule one within the budget.&quot;&quot;&quot;</span>
@@ -160,37 +160,35 @@
 <span class=normal>52</span>
 <span class=normal>53</span>
 <span class=normal>54</span>
-<span class=normal>55</span>
-<span class=normal>56</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>constant_key</span><span class=p>(</span><span class=n>value</span><span class=p>:</span> <span class=nb>object</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
+<span class=normal>55</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>constant_key</span><span class=p>(</span><span class=n>value</span><span class=p>:</span> <span class=nb>object</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Build a structural specialization key, or ``None`` if dynamic.</span>
 <span class=sd>    The key is a tuple of the value&#39;s type and its contents, recursively.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>value</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>PyAttr</span><span class=p>):</span>
         <span class=k>return</span> <span class=n>constant_key</span><span class=p>(</span><span class=n>value</span><span class=o>.</span><span class=n>data</span><span class=p>)</span>
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>value</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Data</span><span class=p>):</span>
-        <span class=n>kind</span> <span class=o>=</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span>
-        <span class=k>if</span> <span class=n>kind</span> <span class=ow>is</span> <span class=n>IList</span><span class=p>:</span>
+        <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=n>IList</span><span class=p>:</span>
             <span class=n>items</span> <span class=o>=</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>constant_key</span><span class=p>(</span><span class=n>item</span><span class=p>)</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>value</span><span class=p>)</span>
             <span class=k>if</span> <span class=nb>any</span><span class=p>(</span><span class=n>item</span> <span class=ow>is</span> <span class=kc>None</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>items</span><span class=p>):</span>
                 <span class=k>return</span> <span class=kc>None</span>
             <span class=k>return</span> <span class=p>(</span><span class=n>IList</span><span class=p>,</span> <span class=nb>id</span><span class=p>(</span><span class=n>value</span><span class=o>.</span><span class=n>elem</span><span class=p>),</span> <span class=n>items</span><span class=p>)</span>
-        <span class=k>return</span> <span class=p>(</span><span class=n>kind</span><span class=p>,</span> <span class=n>value</span><span class=p>)</span>
+        <span class=k>return</span> <span class=p>(</span><span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>),</span> <span class=n>value</span><span class=p>)</span>
 
     <span class=n>kind</span> <span class=o>=</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span>
     <span class=k>if</span> <span class=n>kind</span> <span class=ow>in</span> <span class=p>(</span><span class=nb>type</span><span class=p>(</span><span class=kc>None</span><span class=p>),</span> <span class=nb>bool</span><span class=p>,</span> <span class=nb>int</span><span class=p>,</span> <span class=nb>str</span><span class=p>,</span> <span class=nb>bytes</span><span class=p>):</span>
         <span class=k>return</span> <span class=p>(</span><span class=n>kind</span><span class=p>,</span> <span class=n>value</span><span class=p>)</span>
-    <span class=k>if</span> <span class=n>kind</span> <span class=ow>is</span> <span class=nb>float</span><span class=p>:</span>
+    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>float</span><span class=p>:</span>
         <span class=k>return</span> <span class=p>(</span><span class=nb>float</span><span class=p>,</span> <span class=n>struct</span><span class=o>.</span><span class=n>pack</span><span class=p>(</span><span class=s2>&quot;!d&quot;</span><span class=p>,</span> <span class=n>value</span><span class=p>))</span>
-    <span class=k>if</span> <span class=n>kind</span> <span class=ow>is</span> <span class=nb>complex</span><span class=p>:</span>
+    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>complex</span><span class=p>:</span>
         <span class=k>return</span> <span class=p>(</span><span class=nb>complex</span><span class=p>,</span> <span class=n>struct</span><span class=o>.</span><span class=n>pack</span><span class=p>(</span><span class=s2>&quot;!dd&quot;</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>real</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>imag</span><span class=p>))</span>
-    <span class=k>if</span> <span class=n>kind</span> <span class=ow>is</span> <span class=nb>range</span><span class=p>:</span>
+    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>range</span><span class=p>:</span>
         <span class=k>return</span> <span class=p>(</span><span class=nb>range</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>start</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>stop</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>step</span><span class=p>)</span>
-    <span class=k>if</span> <span class=n>kind</span> <span class=ow>is</span> <span class=nb>tuple</span><span class=p>:</span>
+    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>tuple</span><span class=p>:</span>
         <span class=n>items</span> <span class=o>=</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>constant_key</span><span class=p>(</span><span class=n>item</span><span class=p>)</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>value</span><span class=p>)</span>
         <span class=k>if</span> <span class=nb>any</span><span class=p>(</span><span class=n>item</span> <span class=ow>is</span> <span class=kc>None</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>items</span><span class=p>):</span>
             <span class=k>return</span> <span class=kc>None</span>
         <span class=k>return</span> <span class=p>(</span><span class=nb>tuple</span><span class=p>,</span> <span class=n>items</span><span class=p>)</span>
-    <span class=k>if</span> <span class=n>kind</span> <span class=ow>is</span> <span class=nb>frozenset</span><span class=p>:</span>
+    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>frozenset</span><span class=p>:</span>
         <span class=n>items</span> <span class=o>=</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>constant_key</span><span class=p>(</span><span class=n>item</span><span class=p>)</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>value</span><span class=p>)</span>
         <span class=k>if</span> <span class=nb>any</span><span class=p>(</span><span class=n>item</span> <span class=ow>is</span> <span class=kc>None</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>items</span><span class=p>):</span>
             <span class=k>return</span> <span class=kc>None</span>
