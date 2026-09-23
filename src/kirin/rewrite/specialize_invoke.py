@@ -45,5 +45,7 @@ class SpecializeInvoke(RewriteRule):
         replacement.source = node.source
         replacement.result.name = node.result.name
         replacement.result.type = node.result.type
+        if hint := node.result.hints.get("const"):
+            replacement.result.hints["const"] = hint
         node.replace_by(replacement)
         return RewriteResult(has_done_something=True)

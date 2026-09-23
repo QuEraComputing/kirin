@@ -322,3 +322,27 @@ def test_specialization_preserves_effectful_argument_evaluation():
     # Baking in argument's return value must not eliminate its side effect.
     root(10)
     assert out == [10, 13]
+
+
+def test_return_of_specialized_call_binds_consumer():
+    @kernel
+    def produce(n: int):
+        Append(out, n)
+        return n * 10
+
+    @kernel
+    def consume(a: int, x: int):
+        Append(out, a + x)
+
+    @kernel
+    def root(a: int):
+        consume(a, produce(3))
+
+    Specialize(root.dialects, no_raise=False)(root)
+    first, second = get_invokes(root)
+    # Specializing produce(3) replaces its result, which must keep the
+    # constant hint so that consume still sees the returned 30.
+    assert first.callee is not produce and not first.inputs
+    assert second.callee is not consume and len(second.inputs) == 1
+    root(1)
+    assert out == [3, 31]
