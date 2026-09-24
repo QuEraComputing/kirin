@@ -3,7 +3,7 @@ use crate::derived::chain::{ChainScan, derive_chains};
 use crate::{
     Block, Dialect, Finding, LinkedList, StageInfo, Statement, StatementParent, derived::SlotMap,
 };
-use crate::{ChainDefect, ChainFinding, Mismatch};
+use crate::{ChainDefect, ChainFinding, DanglingParent, Mismatch};
 
 /// One block's body: the two mirrors that fall out of partitioning its members
 /// into the non-terminator chain and the terminator that sits outside it.
@@ -45,7 +45,10 @@ pub(in crate::derived) fn derive<L: Dialect>(
         // membership, so both would otherwise file the statement under a block
         // that no longer exists.
         if !is_live_block(stage, parent) {
-            findings.push(Finding::DanglingParent { stmt, parent });
+            findings.push(Finding::DanglingParent(DanglingParent::StatementInBlock {
+                stmt,
+                parent,
+            }));
             continue;
         }
 

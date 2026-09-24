@@ -3,7 +3,31 @@ use std::fmt;
 use crate::derived::chain::ChainFinding;
 use crate::derived::mirrors::block_body::BlockBody;
 use crate::node::ssa::Use;
-use crate::{Block, DiGraph, SSAValue, Statement};
+use crate::{Block, CFG, DiGraph, LinkedList, SSAValue, Statement};
+
+/// A membership pointer naming a container that is not live.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum DanglingParent {
+    /// `stmt` claims membership of a block that is not live.
+    StatementInBlock { stmt: Statement, parent: Block },
+    /// `block` claims membership of a CFG that is not live.
+    BlockInCFG { block: Block, parent: CFG },
+}
+
+impl fmt::Display for DanglingParent {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            DanglingParent::StatementInBlock { stmt, parent } => write!(
+                f,
+                "{stmt:?} claims membership of {parent}, which is not live"
+            ),
+            DanglingParent::BlockInCFG { block, parent } => write!(
+                f,
+                "{block} claims membership of {parent:?}, which is not live"
+            ),
+        }
+    }
+}
 
 /// One defect found in the **authoritative** IR while deriving mirrors.
 ///
@@ -33,8 +57,8 @@ pub enum Finding {
         block: Block,
         terminators: Vec<Statement>,
     },
-    /// The parent of `stmt` is not live
-    DanglingParent { stmt: Statement, parent: Block },
+    /// A membership pointer names a container that is not live.
+    DanglingParent(DanglingParent),
 }
 
 impl fmt::Display for Finding {
@@ -62,10 +86,7 @@ impl fmt::Display for Finding {
                 "{block} has {} terminators, but a block has at most one: {terminators:?}",
                 terminators.len()
             ),
-            Finding::DanglingParent { stmt, parent } => write!(
-                f,
-                "{stmt:?} claims membership of {parent}, which is not live"
-            ),
+            Finding::DanglingParent(finding) => write!(f, "{finding}"),
         }
     }
 }
@@ -129,6 +150,12 @@ pub enum Mismatch {
         installed: BlockBody,
         derived: BlockBody,
     },
+    /// `CFGInfo::blocks` disagrees for `cfg`.
+    CFGBlocks {
+        cfg: CFG,
+        installed: LinkedList<Block>,
+        derived: LinkedList<Block>,
+    },
 }
 
 impl fmt::Display for Mismatch {
@@ -157,6 +184,14 @@ impl fmt::Display for Mismatch {
             } => write!(
                 f,
                 "body of {block}: installed {installed:?}, derived {derived:?}"
+            ),
+            Mismatch::CFGBlocks {
+                cfg,
+                installed,
+                derived,
+            } => write!(
+                f,
+                "blocks of {cfg:?}: installed {installed:?}, derived {derived:?}"
             ),
         }
     }

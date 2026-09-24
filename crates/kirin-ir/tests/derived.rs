@@ -781,3 +781,100 @@ fn a_block_holding_only_a_terminator_has_an_empty_chain() {
     assert_eq!(info.terminator, Some(terminator));
     assert_eq!(verify_derived(&stage), Ok(()));
 }
+
+// ---------------------------------------------------------------------------
+// CFG block-list mirror
+//
+// `CFGInfo::blocks` is `pub(crate)`, so these read it through the public
+// `CFG::blocks()` iterator and cannot corrupt it from out here. There is no
+// verifier failure tests for this mirror as a result, nor any public path
+// that could desync it since block-list surgery does not exist yet.
+// ---------------------------------------------------------------------------
+
+/// A CFG holding three blocks, each with its own terminator.
+struct CfgStage {
+    stage: StageInfo<BuilderDialect>,
+    cfg: CFG,
+    first: Block,
+    middle: Block,
+    last: Block,
+}
+
+fn cfg_stage() -> CfgStage {
+    let mut stage = new_stage();
+
+    let mut block = || {
+        let terminator = stage.statement().definition(BuilderDialect::Return).new();
+        stage.block().terminator(terminator).new()
+    };
+    let (first, middle, last) = (block(), block(), block());
+    let cfg = stage
+        .cfg()
+        .add_block(first)
+        .add_block(middle)
+        .add_block(last)
+        .new();
+
+    CfgStage {
+        stage: stage.finalize().unwrap(),
+        cfg,
+        first,
+        middle,
+        last,
+    }
+}
+
+#[test]
+fn finalize_populates_the_cfg_block_list_mirror() {
+    let f = cfg_stage();
+
+    assert_eq!(
+        f.cfg.blocks(&f.stage).collect::<Vec<_>>(),
+        vec![f.first, f.middle, f.last]
+    );
+    // `BlockIter` is double-ended, so walking backwards exercises `tail` and
+    // the `prev` links rather than `head`/`next` a second time.
+    assert_eq!(
+        f.cfg.blocks(&f.stage).rev().collect::<Vec<_>>(),
+        vec![f.last, f.middle, f.first]
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn a_cfg_with_one_block_is_its_own_head_and_tail() {
+    let mut stage = new_stage();
+    let terminator = stage.statement().definition(BuilderDialect::Return).new();
+    let only = stage.block().terminator(terminator).new();
+    let cfg = stage.cfg().add_block(only).new();
+    let stage = stage.finalize().unwrap();
+
+    assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![only]);
+    assert_eq!(cfg.blocks(&stage).rev().collect::<Vec<_>>(), vec![only]);
+    assert_eq!(verify_derived(&stage), Ok(()));
+}
+
+#[test]
+fn blocks_owned_directly_by_a_statement_join_no_cfg_chain() {
+    let mut stage = new_stage();
+
+    // A single-block body hanging off an operation — an `scf.if` arm in a real
+    // dialect. Its parent is a statement, not a CFG, so it is a member of no
+    // block list and must not be reported as an orphan of one.
+    let arm_term = stage.statement().definition(BuilderDialect::Return).new();
+    let arm = stage.block().terminator(arm_term).new();
+    let other_term = stage.statement().definition(BuilderDialect::Return).new();
+    let other = stage.block().terminator(other_term).new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnBlocks(arm, other))
+        .new();
+    let outer_term = stage.statement().definition(BuilderDialect::Return).new();
+    let outer = stage.block().stmt(owner).terminator(outer_term).new();
+    let cfg = stage.cfg().add_block(outer).new();
+    let stage = stage.finalize().unwrap();
+
+    // The CFG lists only the block actually parented to it.
+    assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![outer]);
+    assert_eq!(verify_derived(&stage), Ok(()));
+}
