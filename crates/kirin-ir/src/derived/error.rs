@@ -1,6 +1,7 @@
 use std::fmt;
 
 use crate::derived::chain::ChainFinding;
+use crate::derived::mirrors::block_body::BlockBody;
 use crate::node::ssa::Use;
 use crate::{Block, DiGraph, SSAValue, Statement};
 
@@ -27,6 +28,13 @@ pub enum Finding {
     DanglingSuccessor { stmt: Statement, target: Block },
     /// The chain comprising a `Block` or `CFG` has a defect.
     Chain(ChainFinding),
+    /// A block has multiple terminator statements
+    MultipleTerminators {
+        block: Block,
+        terminators: Vec<Statement>,
+    },
+    /// The parent of `stmt` is not live
+    DanglingParent { stmt: Statement, parent: Block },
 }
 
 impl fmt::Display for Finding {
@@ -49,6 +57,15 @@ impl fmt::Display for Finding {
                 "successor of {stmt:?} targets {target}, which is not live"
             ),
             Finding::Chain(finding) => write!(f, "{finding}"),
+            Finding::MultipleTerminators { block, terminators } => write!(
+                f,
+                "{block} has {} terminators, but a block has at most one: {terminators:?}",
+                terminators.len()
+            ),
+            Finding::DanglingParent { stmt, parent } => write!(
+                f,
+                "{stmt:?} claims membership of {parent}, which is not live"
+            ),
         }
     }
 }
@@ -106,6 +123,12 @@ pub enum Mismatch {
         installed: Vec<Block>,
         derived: Vec<Block>,
     },
+    /// `BlockInfo::statements` or `BlockInfo::terminator` disagrees for `block`.
+    BlockBody {
+        block: Block,
+        installed: BlockBody,
+        derived: BlockBody,
+    },
 }
 
 impl fmt::Display for Mismatch {
@@ -126,6 +149,14 @@ impl fmt::Display for Mismatch {
             } => write!(
                 f,
                 "predecessors of {block}: installed {installed:?}, derived {derived:?}"
+            ),
+            Mismatch::BlockBody {
+                block,
+                installed,
+                derived,
+            } => write!(
+                f,
+                "body of {block}: installed {installed:?}, derived {derived:?}"
             ),
         }
     }

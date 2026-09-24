@@ -6,8 +6,6 @@
 //! rebuilds the former from the latter, reporting every way the links can fail
 //! to describe one well-formed chain.
 
-#![allow(dead_code)]
-
 use std::{collections::HashSet, fmt};
 
 use smallvec::SmallVec;
