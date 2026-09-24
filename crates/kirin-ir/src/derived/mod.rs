@@ -39,10 +39,12 @@ mod mirrors;
 
 pub use chain::{ChainDefect, ChainFinding};
 pub use error::{DeriveError, Finding, Mismatch, VerifyError};
+pub use mirrors::block_body::BlockBody;
 
 use std::marker::PhantomData;
 
 use crate::arena::{Arena, Id, Identifier};
+use crate::derived::mirrors::block_body::{self, BlockBodyMap};
 use crate::{Dialect, StageInfo};
 
 use self::mirrors::predecessors::{self, PredecessorMap};
@@ -94,7 +96,6 @@ impl<I: Identifier, T> SlotMap<I, T> {
     ///
     /// [`SlotMap::into_iter`] drops the id, but a caller that walks containers
     /// needs to know which one each entry belongs to.
-    #[allow(dead_code)]
     fn iter(&self) -> impl Iterator<Item = (I, &T)> {
         self.slots
             .iter()
@@ -113,6 +114,7 @@ impl<I: Identifier, T> SlotMap<I, T> {
 pub(crate) struct Mirrors {
     uses: UseMap,
     predecessors: PredecessorMap,
+    block_bodies: BlockBodyMap,
 }
 
 fn derive_partial<L: Dialect>(stage: &StageInfo<L>) -> (Mirrors, Vec<Finding>) {
@@ -120,8 +122,16 @@ fn derive_partial<L: Dialect>(stage: &StageInfo<L>) -> (Mirrors, Vec<Finding>) {
 
     let uses = uses::derive(stage, &mut findings);
     let predecessors = predecessors::derive(stage, &mut findings);
+    let block_bodies = block_body::derive(stage, &mut findings);
 
-    (Mirrors { uses, predecessors }, findings)
+    (
+        Mirrors {
+            uses,
+            predecessors,
+            block_bodies,
+        },
+        findings,
+    )
 }
 
 /// Compute what every mirror of `stage` should be. Pure: `stage` is not written.
@@ -141,9 +151,14 @@ pub(crate) fn derive_mirrors<L: Dialect>(stage: &StageInfo<L>) -> Result<Mirrors
 
 /// Write derived mirrors into a stage.
 pub(crate) fn install_mirrors<L: Dialect>(stage: &mut StageInfo<L>, mirrors: Mirrors) {
-    let Mirrors { uses, predecessors } = mirrors;
+    let Mirrors {
+        uses,
+        predecessors,
+        block_bodies,
+    } = mirrors;
     uses.install(stage);
     predecessors.install(stage);
+    block_bodies.install(stage);
 }
 
 /// Best-effort: for use by `finalize_unchecked`.
@@ -169,6 +184,7 @@ pub fn verify_derived<L: Dialect>(stage: &StageInfo<L>) -> Result<(), VerifyErro
     let mut mismatches: Vec<Mismatch> = Vec::new();
     mirrors.uses.verify(stage, &mut mismatches);
     mirrors.predecessors.verify(stage, &mut mismatches);
+    mirrors.block_bodies.verify(stage, &mut mismatches);
 
     if mismatches.is_empty() {
         Ok(())

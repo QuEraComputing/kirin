@@ -6,5 +6,6 @@
 //! comparison helper, and the bundle itself live in the parent module, since
 //! they are shared by every mirror rather than owned by any one of them.
 
+pub(super) mod block_body;
 pub(super) mod predecessors;
 pub(super) mod uses;
