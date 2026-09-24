@@ -24,7 +24,9 @@ pub use builder::error::{
 };
 pub use builder::{AsBuildStage, BuilderStageInfo, FinalizeError};
 pub use comptime::{CompileTimeValue, Placeholder, Typeof};
-pub use derived::{DeriveError, Finding, Mismatch, VerifyError, verify_derived};
+pub use derived::{
+    ChainDefect, ChainFinding, DeriveError, Finding, Mismatch, VerifyError, verify_derived,
+};
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
