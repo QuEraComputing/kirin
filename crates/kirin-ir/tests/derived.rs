@@ -582,3 +582,299 @@ fn replace_statement_rejects_a_successor_that_is_not_live() {
     );
     assert_eq!(verify_derived(&stage), Ok(()));
 }
+
+// ---------------------------------------------------------------------------
+// Block-body mirror: the chain summary and the terminator
+// ---------------------------------------------------------------------------
+
+/// A block whose body is a three-statement chain plus a terminator, so the
+/// chain and the terminator can move independently of one another.
+struct BodyStage {
+    stage: StageInfo<BuilderDialect>,
+    block: Block,
+    first: Statement,
+    middle: Statement,
+    last: Statement,
+    terminator: Statement,
+}
+
+fn body_stage() -> BodyStage {
+    let mut stage = new_stage();
+
+    let first = stage.statement().definition(BuilderDialect::Nop).new();
+    let middle = stage.statement().definition(BuilderDialect::Nop).new();
+    let last = stage.statement().definition(BuilderDialect::Nop).new();
+    let terminator = stage.statement().definition(BuilderDialect::Return).new();
+    let block = stage
+        .block()
+        .stmt(first)
+        .stmt(middle)
+        .stmt(last)
+        .terminator(terminator)
+        .new();
+
+    BodyStage {
+        stage: stage.finalize().unwrap(),
+        block,
+        first,
+        middle,
+        last,
+        terminator,
+    }
+}
+
+impl BodyStage {
+    fn body(
+        &self,
+    ) -> (
+        Option<Statement>,
+        Option<Statement>,
+        usize,
+        Option<Statement>,
+    ) {
+        let info = self.block.expect_info(&self.stage);
+        (
+            info.statements.head().copied(),
+            info.statements.tail().copied(),
+            info.statements.len(),
+            info.terminator,
+        )
+    }
+}
+
+#[test]
+fn finalize_populates_the_block_body_mirror() {
+    let f = body_stage();
+
+    // The terminator is a member of the block but not a link in the chain, so
+    // `len` counts three, not four, and `tail` is the last non-terminator.
+    assert_eq!(
+        f.body(),
+        (Some(f.first), Some(f.last), 3, Some(f.terminator))
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn a_hand_corrupted_block_body_is_reported_as_a_mismatch() {
+    let mut f = body_stage();
+
+    // Corrupt the mirror only — the `prev`/`next` links still describe the
+    // same three-statement chain.
+    f.block.expect_info_mut(&mut f.stage).statements = LinkedList::new();
+
+    let Err(VerifyError::Mismatch(mismatches)) = verify_derived(&f.stage) else {
+        panic!("expected a mirror mismatch");
+    };
+    assert_eq!(mismatches.len(), 1);
+    let Mismatch::BlockBody {
+        block,
+        installed,
+        derived,
+    } = &mismatches[0]
+    else {
+        panic!("expected a block-body mismatch, got {:?}", mismatches[0]);
+    };
+    assert_eq!(*block, f.block);
+    assert_eq!(installed.statements.len(), 0);
+    assert_eq!(derived.statements.len(), 3);
+    // The terminator half is untouched and agrees.
+    assert_eq!(installed.terminator, derived.terminator);
+}
+
+#[test]
+fn erase_statement_keeps_the_block_body_in_step() {
+    let mut f = body_stage();
+
+    {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        rewriter.erase_statement(f.middle).unwrap();
+    }
+
+    assert_eq!(
+        f.body(),
+        (Some(f.first), Some(f.last), 2, Some(f.terminator))
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn erasing_the_head_of_the_chain_keeps_the_block_body_in_step() {
+    let mut f = body_stage();
+
+    {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        rewriter.erase_statement(f.first).unwrap();
+    }
+
+    // `head` moves; the terminator is unaffected.
+    assert_eq!(
+        f.body(),
+        (Some(f.middle), Some(f.last), 2, Some(f.terminator))
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn erasing_the_tail_of_the_chain_keeps_the_block_body_in_step() {
+    let mut f = body_stage();
+
+    {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        rewriter.erase_statement(f.last).unwrap();
+    }
+
+    // `tail` moves back to the last surviving non-terminator, not to the
+    // terminator, which was never in the chain.
+    assert_eq!(
+        f.body(),
+        (Some(f.first), Some(f.middle), 2, Some(f.terminator))
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn insert_before_keeps_the_block_body_in_step() {
+    let mut f = body_stage();
+
+    let inserted = {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        rewriter
+            .insert_before(f.first, BuilderDialect::Nop)
+            .unwrap()
+    };
+
+    assert_eq!(
+        f.body(),
+        (Some(inserted), Some(f.last), 4, Some(f.terminator))
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn insert_after_keeps_the_block_body_in_step() {
+    let mut f = body_stage();
+
+    let inserted = {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        rewriter.insert_after(f.last, BuilderDialect::Nop).unwrap()
+    };
+
+    assert_eq!(
+        f.body(),
+        (Some(f.first), Some(inserted), 4, Some(f.terminator))
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn a_block_holding_only_a_terminator_has_an_empty_chain() {
+    let mut stage = new_stage();
+    let terminator = stage.statement().definition(BuilderDialect::Return).new();
+    let block = stage.block().terminator(terminator).new();
+    let stage = stage.finalize().unwrap();
+
+    // Empty is a chain, not a failure: the mirror derives and installs.
+    let info = block.expect_info(&stage);
+    assert_eq!(info.statements.head(), None);
+    assert_eq!(info.statements.len(), 0);
+    assert_eq!(info.terminator, Some(terminator));
+    assert_eq!(verify_derived(&stage), Ok(()));
+}
+
+// ---------------------------------------------------------------------------
+// CFG block-list mirror
+//
+// `CFGInfo::blocks` is `pub(crate)`, so these read it through the public
+// `CFG::blocks()` iterator and cannot corrupt it from out here. There is no
+// verifier failure tests for this mirror as a result, nor any public path
+// that could desync it since block-list surgery does not exist yet.
+// ---------------------------------------------------------------------------
+
+/// A CFG holding three blocks, each with its own terminator.
+struct CfgStage {
+    stage: StageInfo<BuilderDialect>,
+    cfg: CFG,
+    first: Block,
+    middle: Block,
+    last: Block,
+}
+
+fn cfg_stage() -> CfgStage {
+    let mut stage = new_stage();
+
+    let mut block = || {
+        let terminator = stage.statement().definition(BuilderDialect::Return).new();
+        stage.block().terminator(terminator).new()
+    };
+    let (first, middle, last) = (block(), block(), block());
+    let cfg = stage
+        .cfg()
+        .add_block(first)
+        .add_block(middle)
+        .add_block(last)
+        .new();
+
+    CfgStage {
+        stage: stage.finalize().unwrap(),
+        cfg,
+        first,
+        middle,
+        last,
+    }
+}
+
+#[test]
+fn finalize_populates_the_cfg_block_list_mirror() {
+    let f = cfg_stage();
+
+    assert_eq!(
+        f.cfg.blocks(&f.stage).collect::<Vec<_>>(),
+        vec![f.first, f.middle, f.last]
+    );
+    // `BlockIter` is double-ended, so walking backwards exercises `tail` and
+    // the `prev` links rather than `head`/`next` a second time.
+    assert_eq!(
+        f.cfg.blocks(&f.stage).rev().collect::<Vec<_>>(),
+        vec![f.last, f.middle, f.first]
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn a_cfg_with_one_block_is_its_own_head_and_tail() {
+    let mut stage = new_stage();
+    let terminator = stage.statement().definition(BuilderDialect::Return).new();
+    let only = stage.block().terminator(terminator).new();
+    let cfg = stage.cfg().add_block(only).new();
+    let stage = stage.finalize().unwrap();
+
+    assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![only]);
+    assert_eq!(cfg.blocks(&stage).rev().collect::<Vec<_>>(), vec![only]);
+    assert_eq!(verify_derived(&stage), Ok(()));
+}
+
+#[test]
+fn blocks_owned_directly_by_a_statement_join_no_cfg_chain() {
+    let mut stage = new_stage();
+
+    // A single-block body hanging off an operation — an `scf.if` arm in a real
+    // dialect. Its parent is a statement, not a CFG, so it is a member of no
+    // block list and must not be reported as an orphan of one.
+    let arm_term = stage.statement().definition(BuilderDialect::Return).new();
+    let arm = stage.block().terminator(arm_term).new();
+    let other_term = stage.statement().definition(BuilderDialect::Return).new();
+    let other = stage.block().terminator(other_term).new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnBlocks(arm, other))
+        .new();
+    let outer_term = stage.statement().definition(BuilderDialect::Return).new();
+    let outer = stage.block().stmt(owner).terminator(outer_term).new();
+    let cfg = stage.cfg().add_block(outer).new();
+    let stage = stage.finalize().unwrap();
+
+    // The CFG lists only the block actually parented to it.
+    assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![outer]);
+    assert_eq!(verify_derived(&stage), Ok(()));
+}
