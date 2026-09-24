@@ -32,10 +32,12 @@
 //! - [`VerifyError::Mismatch`] — the authoritative IR is fine, but installed
 //!   metadata disagrees with it, so the **mutation layer** is at fault.
 
+mod chain;
 mod compare;
 mod error;
 mod mirrors;
 
+pub use chain::{ChainDefect, ChainFinding};
 pub use error::{DeriveError, Finding, Mismatch, VerifyError};
 
 use std::marker::PhantomData;
@@ -45,6 +47,7 @@ use crate::{Dialect, StageInfo};
 
 use self::mirrors::predecessors::{self, PredecessorMap};
 use self::mirrors::uses::{self, UseMap};
+
 /// A map from an arena id to a value.
 ///
 /// Used to collect the mirrors [`SSAInfo::uses`](crate::SSAInfo) and
@@ -57,13 +60,18 @@ struct SlotMap<I: Identifier, T> {
 }
 
 impl<I: Identifier, T: Clone + Default> SlotMap<I, T> {
+    /// An empty map with `len` entries, indexed by raw arena slot.
+    fn with_len(len: usize) -> Self {
+        Self {
+            slots: vec![T::default(); len],
+            marker: PhantomData,
+        }
+    }
+
     /// An empty map with one entry per slot of `source`, tombstones included,
     /// so an id indexes both the source Arena and this SlotMap identically.
     fn sized_like<U>(source: &Arena<I, U>) -> Self {
-        Self {
-            slots: vec![T::default(); source.len()],
-            marker: PhantomData,
-        }
+        Self::with_len(source.len())
     }
 }
 
@@ -80,6 +88,18 @@ impl<I: Identifier, T> SlotMap<I, T> {
 
     fn into_iter(self) -> std::vec::IntoIter<T> {
         self.slots.into_iter()
+    }
+
+    /// Iterate `(id, &value)` over every slot, tombstones included.
+    ///
+    /// [`SlotMap::into_iter`] drops the id, but a caller that walks containers
+    /// needs to know which one each entry belongs to.
+    #[allow(dead_code)]
+    fn iter(&self) -> impl Iterator<Item = (I, &T)> {
+        self.slots
+            .iter()
+            .enumerate()
+            .map(|(raw, value)| (I::from(Id(raw)), value))
     }
 
     fn len(&self) -> usize {
