@@ -1,5 +1,6 @@
 use std::fmt;
 
+use crate::derived::chain::ChainFinding;
 use crate::node::ssa::Use;
 use crate::{Block, DiGraph, SSAValue, Statement};
 
@@ -8,7 +9,7 @@ use crate::{Block, DiGraph, SSAValue, Statement};
 /// A finding means a slot was expecting a live node that is not actually live. Derivation
 /// records the finding and carries on, so one scan reports every independent
 /// problem rather than just the first.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Finding {
     /// The `index`-th operand of `stmt` names a value that is not live.
     DanglingOperand {
@@ -24,6 +25,8 @@ pub enum Finding {
     },
     /// A successor reference on `stmt` targets a block that is not live.
     DanglingSuccessor { stmt: Statement, target: Block },
+    /// The chain comprising a `Block` or `CFG` has a defect.
+    Chain(ChainFinding),
 }
 
 impl fmt::Display for Finding {
@@ -45,6 +48,7 @@ impl fmt::Display for Finding {
                 f,
                 "successor of {stmt:?} targets {target}, which is not live"
             ),
+            Finding::Chain(finding) => write!(f, "{finding}"),
         }
     }
 }
