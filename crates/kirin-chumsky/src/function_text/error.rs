@@ -9,7 +9,7 @@ pub enum FunctionParseErrorKind {
     UnknownStage,
     InconsistentFunctionName,
     MissingStageDeclaration,
-    BodyParseFailed,
+    DefinitionParseFailed,
     EmitFailed,
 }
 
@@ -24,7 +24,9 @@ impl Display for FunctionParseErrorKind {
             FunctionParseErrorKind::MissingStageDeclaration => {
                 write!(f, "missing stage declaration")
             }
-            FunctionParseErrorKind::BodyParseFailed => write!(f, "function body parse failed"),
+            FunctionParseErrorKind::DefinitionParseFailed => {
+                write!(f, "function definition parse failed")
+            }
             FunctionParseErrorKind::EmitFailed => write!(f, "IR emission failed"),
         }
     }

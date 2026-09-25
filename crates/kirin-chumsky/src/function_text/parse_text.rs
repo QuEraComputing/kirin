@@ -15,10 +15,10 @@
 //!    - collect `(stage, function) -> staged_function` mappings;
 //!    - record offsets of `specialize` declarations for pass 2.
 //!
-//! 2. **Pass 2 (specialize bodies)**
+//! 2. **Pass 2 (specialization definitions)**
 //!    - re-parse only the previously recorded `specialize` declarations;
 //!    - resolve the target staged function from the pass-1 lookup;
-//!    - emit specialization bodies into the resolved stage dialect.
+//!    - emit specialization definitions into the resolved stage dialect.
 //!
 //! This separation guarantees that specialization emission sees a complete
 //! staged-function header set, which keeps behavior deterministic even when
@@ -27,7 +27,7 @@
 //! ## Why stage dispatch is central
 //!
 //! A pipeline can contain different dialects per stage (for example stage `A`
-//! with `FunctionBody`, stage `B` with `LowerBody`). The parser does not guess
+//! with `FunctionDefinition`, stage `B` with `LowerDefinition`). The parser does not guess
 //! which dialect to use from text alone. Instead it:
 //!
 //! - resolves/creates the stage symbol first (`@A`, `@B`, ...);
@@ -39,7 +39,7 @@
 //!
 //! ## Illustrative examples
 //!
-//! Same-stage header + body:
+//! Same-stage header + definition:
 //!
 //! ```text
 //! stage @A fn @foo(()) -> ();
@@ -275,7 +275,7 @@ where
 
     let Declaration::Specialize {
         stage: _stage_sym,
-        body_span,
+        definition_span,
         span,
     } = declaration
     else {
@@ -286,7 +286,7 @@ where
         ));
     };
 
-    let body_text = &ctx.src[body_span.start..body_span.end];
+    let definition_text = &ctx.src[definition_span.start..definition_span.end];
 
     // Use the function name from parse_declaration_head (always available),
     // not from the chumsky Declaration (empty for dialect-controlled format).
@@ -300,7 +300,7 @@ where
         stage_id,
         &function_name,
         ctx.function_symbol,
-        body_text,
+        definition_text,
         span,
         &mut *ctx.function_lookup,
         &mut *ctx.staged_lookup,
@@ -607,7 +607,7 @@ fn apply_specialize_declaration<L>(
     stage_id: CompileStage,
     function_name: &SymbolName<'_>,
     function_symbol: GlobalSymbol,
-    body_text: &str,
+    definition_text: &str,
     span: SimpleSpan,
     function_lookup: &mut FxHashMap<String, Function>,
     staged_lookup: &mut FxHashMap<StagedKey, StagedFunction>,
@@ -617,14 +617,14 @@ where
     L: Dialect + ParseEmit<L> + kirin_ir::HasSignature<L>,
     L::Type: kirin_ir::Placeholder,
 {
-    // Parse and emit the body first — we need it to extract signature if needed
-    let body_statement = stage
+    // Parse and emit the definition first — we need it to extract the signature.
+    let definition = stage
         .with_builder(|builder| {
             let mut emit_ctx = EmitContext::new(builder);
-            L::parse_and_emit(body_text, &mut emit_ctx).map_err(|err| {
+            L::parse_and_emit(definition_text, &mut emit_ctx).map_err(|err| {
                 let (kind, message) = match &err {
                     crate::ChumskyError::Parse(errs) => (
-                        FunctionParseErrorKind::BodyParseFailed,
+                        FunctionParseErrorKind::DefinitionParseFailed,
                         errs.iter()
                             .map(|e| e.to_string())
                             .collect::<Vec<_>>()
@@ -645,11 +645,11 @@ where
             )
         })?;
 
-    // Get signature from HasSignature on the body statement.
+    // Get the signature from HasSignature on the definition statement.
     // The Signature field is populated by the statement parser from format string elements.
-    let def = body_statement.expect_info(stage).definition();
-    let signature = def.signature().unwrap_or_else(|| {
-        // Fallback: create a placeholder signature if the body type
+    let definition_value = definition.expect_info(stage).definition();
+    let signature = definition_value.signature().unwrap_or_else(|| {
+        // Fallback: create a placeholder signature if the definition type
         // doesn't carry one (e.g., no Signature field).
         kirin_ir::Signature::placeholder()
     });
@@ -673,7 +673,7 @@ where
                 .specialize()
                 .staged_func(staged_function)
                 .signature(signature.clone())
-                .body(body_statement)
+                .definition(definition)
                 .new()
                 .map_err(|err| {
                     FunctionParseError::new(

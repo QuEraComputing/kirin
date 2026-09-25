@@ -18,14 +18,15 @@ impl SpecializedFunction {
 /// A concrete instantiation of a staged function for a specific signature.
 ///
 /// The specialized signature is a subset of the parent [`StagedFunctionInfo`](super::staged::StagedFunctionInfo)'s
-/// generic signature. This is the level that owns the IR [`body`](Self::body).
+/// generic signature. This is the level that owns the IR
+/// [`definition`](Self::definition).
 /// Like staged functions, specializations can be invalidated and are then
 /// excluded from dispatch while remaining available for backedge tracking.
 #[derive(Clone, Debug)]
 pub struct SpecializedFunctionInfo<L: Dialect> {
     id: SpecializedFunction,
     signature: Signature<L::Type>,
-    body: Statement,
+    definition: Statement,
     /// Functions that call this function (used for inter-procedural analyses).
     backedges: Vec<SpecializedFunction>,
     /// Whether this specialization has been invalidated by a redefinition.
@@ -42,15 +43,15 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         id: SpecializedFunction,
         /// The signature of this specialized function.
         signature: Signature<L::Type>,
-        /// The body of this specialized function.
-        body: Statement,
+        /// The definition statement of this specialized function.
+        definition: Statement,
         /// The functions that call this specialized function.
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Self {
         Self {
             id,
             signature,
-            body,
+            definition,
             backedges: backedges.unwrap_or_default(),
             invalidated: false,
         }
@@ -68,12 +69,12 @@ impl<L: Dialect> SpecializedFunctionInfo<L> {
         self.id
     }
 
-    pub fn body(&self) -> &Statement {
-        &self.body
+    pub fn definition(&self) -> &Statement {
+        &self.definition
     }
 
-    pub fn body_mut(&mut self) -> &mut Statement {
-        &mut self.body
+    pub fn definition_mut(&mut self) -> &mut Statement {
+        &mut self.definition
     }
 
     pub fn return_type(&self) -> &L::Type {
