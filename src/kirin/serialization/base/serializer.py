@@ -2,11 +2,8 @@ from dataclasses import field, dataclass
 
 from kirin import ir, types
 from kirin.serialization.base.context import (
-    MethodSymbolMeta,
     SerializationContext,
     TypeAttributeSerializationEntry,
-    mangle,
-    get_str_from_type,
 )
 from kirin.serialization.core.serializable import Serializable
 from kirin.serialization.core.supportedtypes import SUPPORTED_PYTHON_TYPES
@@ -20,27 +17,7 @@ class Serializer:
 
     def encode(self, obj: ir.Method, version: str = "") -> SerializationModule:
         self._ctx.clear()
-        body = self.serialize_method(obj)
-        if getattr(self._ctx, "Method_Symbol", None):
-            st: dict[str, MethodSymbolMeta] = {}
-            for mangled, meta in self._ctx.Method_Symbol.items():
-                sym_name = meta.get("sym_name")
-                if sym_name is None:
-                    raise ValueError(f"symbol_table[{mangled}] missing 'sym_name'")
-                st[mangled] = (
-                    MethodSymbolMeta(
-                        sym_name=sym_name,
-                        arg_types=meta.get("arg_types", []),
-                    )
-                    if isinstance(meta, dict)
-                    else meta
-                )
-            symbol_table: dict[str, MethodSymbolMeta] = st
-        else:
-            symbol_table = dict[str, MethodSymbolMeta]()
-        return SerializationModule(
-            symbol_table=symbol_table, body=body, version=version
-        )
+        return SerializationModule(body=self.serialize_method(obj), version=version)
 
     def serialize(
         self,
@@ -103,33 +80,16 @@ class Serializer:
             )
 
     def serialize_method(self, mthd: ir.Method) -> SerializationUnit:
-        mangled = mangle(
-            mthd.sym_name,
-            getattr(mthd, "arg_types", ()),
-            getattr(mthd, "ret_type", None),
-        )
-        arg_types_list: list[str] = []
-        ret_type: str = get_str_from_type(mthd.return_type)
-        for t in getattr(mthd, "arg_types", ()):
-            arg_types_list.append(get_str_from_type(t))
         if mthd.sym_name is None:
             raise ValueError("Method.sym_name is None, cannot serialize.")
-        meta: MethodSymbolMeta = {
-            "sym_name": mthd.sym_name,
-            "arg_types": arg_types_list,
-            "ret_type": ret_type,
-        }
 
-        existing = self._ctx.Method_Symbol.get(mangled)
-        if existing is not None:
-            if existing != meta:
-                raise ValueError(
-                    f"Mangled name collision for {mangled}: existing={existing} new={meta}"
-                )
-        else:
-            self._ctx.Method_Symbol[mangled] = meta
+        method_id = self._ctx.method_idtable[id(mthd)]
+        if method_id in self._ctx.Method_Lookup:
+            return self.serialize_method_ref(mthd)
 
-        out = SerializationUnit(
+        self._ctx.Method_Lookup[method_id] = mthd
+
+        return SerializationUnit(
             kind="method",
             module_name=ir.Method.__module__,
             class_name=ir.Method.__name__,
@@ -140,10 +100,22 @@ class Serializer:
                 "code": self.serialize_statement(mthd.code),
                 "nargs": self.serialize_int(mthd.nargs),
                 "fields": self.serialize_tuple(mthd.fields),
-                "mangled": mangled,
+                "id": method_id,
             },
         )
-        return out
+
+    def serialize_method_ref(self, mthd: ir.Method) -> SerializationUnit:
+        method_id = self._ctx.method_idtable[id(mthd)]
+        if method_id not in self._ctx.Method_Lookup:
+            raise ValueError(
+                f"Cannot reference method {mthd.sym_name!r} before its definition"
+            )
+        return SerializationUnit(
+            kind="method_ref",
+            module_name="",
+            class_name="",
+            data={"id": method_id},
+        )
 
     def serialize_statement(self, stmt: ir.Statement) -> SerializationUnit:
         return SerializationUnit(
