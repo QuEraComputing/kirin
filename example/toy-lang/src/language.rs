@@ -5,17 +5,14 @@ use kirin_cf::ControlFlow;
 use kirin_cmp::Cmp;
 use kirin_constant::Constant;
 use kirin_function::{Call, Function, Lexical, Lifted, Return};
-use kirin_interpreter::{FunctionEntry, Interpretable};
+use kirin_interpreter::Interpretable;
 use kirin_scf::StructuredControlFlow;
 
 /// Source-stage language: structured control flow + lexical lambdas.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Dialect, FunctionEntry, HasParser, PrettyPrint, Interpretable,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[kirin(builders, type = ArithType)]
 pub enum HighLevel {
     #[wraps]
-    #[callable]
     Lexical(Lexical<ArithType>),
     #[wraps]
     Structured(StructuredControlFlow<ArithType>),
@@ -48,13 +45,10 @@ impl From<Return<ArithType>> for HighLevel {
 }
 
 /// Lowered-stage language: unstructured CF + lifted functions.
-#[derive(
-    Debug, Clone, PartialEq, Eq, Hash, Dialect, FunctionEntry, HasParser, PrettyPrint, Interpretable,
-)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[kirin(builders, type = ArithType)]
 pub enum LowLevel {
     #[wraps]
-    #[callable]
     Lifted(Lifted<ArithType>),
     #[wraps]
     Constant(Constant<ArithValue, ArithType>),

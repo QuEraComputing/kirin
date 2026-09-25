@@ -24,8 +24,8 @@ pub(super) enum Declaration<'src, T> {
     Stage(Header<'src, T>),
     Specialize {
         stage: SymbolName<'src>,
-        /// Span of the body portion (from keyword through closing `}`).
-        body_span: SimpleSpan,
+        /// Span of the definition (from keyword through closing `}`).
+        definition_span: SimpleSpan,
         /// Span of the entire specialize declaration.
         span: SimpleSpan,
     },
@@ -69,18 +69,36 @@ where
         .labelled("function signature")
 }
 
-/// Body span scanner. Matches an optional keyword prefix (e.g. `digraph`,
-/// `ungraph`) followed by a brace-balanced `{ ... }` CFG. Returns the
-/// span covering everything from the first non-brace token (or the opening
-/// brace) through the matching closing brace. Does not parse body contents.
-fn body_span<'src, I>() -> impl Parser<'src, I, SimpleSpan, ParserError<'src>>
+/// Definition span scanner. Skips everything before the first `{` — the
+/// definition's keyword and signature plus the body's discriminator and
+/// header, i.e. whatever the dialect's format string puts there — then matches
+/// a brace-balanced `{ ... }`. Returns the span covering everything from the
+/// first token through the matching closing brace. Does not parse the
+/// definition; that is the dialect statement parser's job, which is what keeps
+/// dialect-level validation intact.
+///
+/// All four body kinds carry an explicit textual discriminator, and each is
+/// scanned by the same rule:
+///
+/// ```text
+/// fn @f(..) -> T cfg { ^entry(..) { .. } }      // keyword, then the CFG's braces
+/// fn @f(..) -> T block ^body(..) { .. }         // keyword + header, then braces
+/// fn @f(..) -> T digraph ^g0(..) { .. }         // keyword + header, then braces
+/// fn @f(..) -> T ungraph ^u0(..) { .. }         // keyword + header, then braces
+/// ```
+///
+/// Projected formats (`fn @f(..) -> T (%x: T) { .. }`) work the same way: the
+/// scanner does not care what the prefix tokens are, only where the first `{`
+/// is.
+fn definition_span<'src, I>() -> impl Parser<'src, I, SimpleSpan, ParserError<'src>>
 where
     I: TokenInput<'src>,
 {
     chumsky::primitive::custom(|input: &mut chumsky::input::InputRef<'src, '_, I, _>| {
         let start = input.cursor();
-        // Skip tokens until we find the opening brace. This allows keyword
-        // prefixes like `digraph ^name(ports...) {` or `ungraph ^name(...) {`.
+        // Skip tokens until we find the opening brace. This is what lets the
+        // discriminator and header through: `cfg {`, `block ^name(args...) {`,
+        // `digraph ^name(ports...) {`, `ungraph ^name(...) {`.
         loop {
             match input.next() {
                 Some(Token::LBrace) => break,
@@ -88,7 +106,7 @@ where
                 None => {
                     return Err(Rich::custom(
                         input.span_since(&start),
-                        "expected '{' in body",
+                        "expected '{' in function definition",
                     ));
                 }
             }
@@ -132,10 +150,10 @@ where
     // The function name is extracted post-parse from EmitContext::function_name().
     let specialize_decl = identifier("specialize")
         .ignore_then(symbol())
-        .then(body_span::<I>()) // captures from keyword (e.g. `fn`) through closing `}`
-        .map_with(|(stage, body_span), extra| Declaration::Specialize {
+        .then(definition_span::<I>()) // captures from keyword (e.g. `fn`) through closing `}`
+        .map_with(|(stage, definition_span), extra| Declaration::Specialize {
             stage,
-            body_span,
+            definition_span,
             span: extra.span(),
         });
 

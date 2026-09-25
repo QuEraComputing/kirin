@@ -48,7 +48,7 @@ Language       ::= DialectEnumVariant*
 
 Function       ::= FunctionInfo + staged variants
 StagedFunction ::= stage-specific callable variant
-Specialized    ::= concrete specialization with body Statement
+Specialized    ::= concrete specialization with definition Statement
 
 Statement      ::= dialect definition + operands + results + nested blocks/cfgs/successors
 CFG            ::= Block*

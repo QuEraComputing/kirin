@@ -2,11 +2,12 @@
 //! constant propagation, interval analysis — the value domain, not the key,
 //! distinguishes them.
 
+pub(crate) mod deps;
 pub(crate) mod frames;
 pub(crate) mod interp;
 
 pub use frames::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
     StandardAbstractFrame,
 };
 pub use interp::{

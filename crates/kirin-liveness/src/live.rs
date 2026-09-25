@@ -2,7 +2,7 @@
 
 use std::collections::HashSet;
 
-use kirin_interpreter::PointFacts;
+use kirin_interpreter::{DenseBackwardState, PointFacts};
 use kirin_ir::{HasBottom, HasTop, Lattice, SSAValue};
 
 /// The two-point liveness lattice: `Dead` (bottom) ⊑ `Live` (top).
@@ -140,7 +140,28 @@ impl HasBottom for LiveSet {
     }
 }
 
-/// The dense backward point-state contract: gen/kill mutate the set.
+/// How a live set moves between vocabularies. Renaming keeps only the values
+/// the rename covers, so a caller that wants pass-through joins
+/// [`forget`](DenseBackwardState::forget) itself.
+impl DenseBackwardState for LiveSet {
+    fn rename(&self, params: &[SSAValue], args: &[SSAValue]) -> Self {
+        let mut out = LiveSet::new();
+        for (index, param) in params.iter().enumerate() {
+            if self.contains(*param)
+                && let Some(arg) = args.get(index)
+            {
+                out.insert(*arg);
+            }
+        }
+        out
+    }
+
+    fn forget(&self, values: &[SSAValue]) -> Self {
+        self.iter().filter(|v| !values.contains(v)).collect()
+    }
+}
+
+/// The classic-liveness point-state contract: gen/kill mutate the set.
 impl PointFacts for LiveSet {
     fn insert(&mut self, value: SSAValue) -> bool {
         LiveSet::insert(self, value)

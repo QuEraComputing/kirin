@@ -4,6 +4,7 @@ use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
 mod generate;
+mod has_callable_body;
 mod has_signature;
 mod project;
 
@@ -113,9 +114,9 @@ pub fn derive_stage_meta(input: TokenStream) -> TokenStream {
 /// #[stage(crate = "kirin_ir", chumsky_crate = "kirin_chumsky")]
 /// enum MixedStage {
 ///     #[stage(name = "A")]
-///     StageA(StageInfo<FunctionBody>),
+///     StageA(StageInfo<FunctionDefinition>),
 ///     #[stage(name = "B")]
-///     StageB(StageInfo<LowerBody>),
+///     StageB(StageInfo<LowerDefinition>),
 /// }
 /// ```
 #[proc_macro_derive(ParseDispatch, attributes(stage))]

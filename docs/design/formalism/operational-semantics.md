@@ -18,7 +18,7 @@
 | Loop transition strategy | `ScopeHook`, `ScopeStep` | [`crates/kirin-interpreter/src/effect.rs`](../../../crates/kirin-interpreter/src/effect.rs) |
 | Statement dispatch | `Interpretable<I, Kind>`, `InterpDispatch<I, Kind>` | [`crates/kirin-interpreter/src/dispatch.rs`](../../../crates/kirin-interpreter/src/dispatch.rs) |
 | Current statement location | `InterpLocation` | [`crates/kirin-interpreter/src/interp.rs`](../../../crates/kirin-interpreter/src/interp.rs) |
-| Frame protocol | `Frame<I>`, `FrameDriver` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |
+| Frame protocol | `Frame<I>`, `ForwardFrameEngine` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |
 | Scope continuation frame | `ScopeFrame<V, E>` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |
 | Call continuation frame | `CallFrame<V>` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |
 | Total frame enum | `StandardFrame<V, E>` | [`crates/kirin-interpreter/src/frame.rs`](../../../crates/kirin-interpreter/src/frame.rs) |

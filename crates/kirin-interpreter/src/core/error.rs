@@ -1,6 +1,8 @@
 use std::convert::Infallible;
 
-use kirin_ir::{Block, CompileStage, Function, SSAValue, StagedFunction, Statement, Symbol};
+use kirin_ir::{
+    Block, CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction, Statement, Symbol,
+};
 use thiserror::Error;
 
 use crate::EnvIndex;
@@ -11,8 +13,6 @@ pub enum InterpreterError {
     InvalidEnvIndex(EnvIndex),
     #[error("unbound SSA value {value} in environment {index:?}")]
     UnboundValue { index: EnvIndex, value: SSAValue },
-    #[error("environment stack is empty")]
-    EmptyEnvStack,
     #[error("frame stack is empty")]
     EmptyFrameStack,
     #[error("missing stage {0:?}")]
@@ -21,6 +21,8 @@ pub enum InterpreterError {
     MissingStageInfo(CompileStage),
     #[error("missing block info for block {0:?}")]
     MissingBlock(Block),
+    #[error("missing statement info for statement {0:?}")]
+    MissingStatement(Statement),
     #[error("missing SSA value {0:?}")]
     MissingValue(SSAValue),
     #[error("missing function {0:?}")]
@@ -32,19 +34,25 @@ pub enum InterpreterError {
     },
     #[error("staged function {0:?} has no live specialization")]
     MissingSpecialization(StagedFunction),
+    #[error("missing specialization record for {0:?}")]
+    MissingSpecializationRecord(SpecializedFunction),
     #[error("staged function {function:?} has {count} live specializations")]
     AmbiguousSpecialization {
         function: StagedFunction,
         count: usize,
     },
-    #[error("missing call target {0:?}")]
-    MissingCallTarget(Symbol),
+    #[error("missing call symbol {0:?}")]
+    MissingCallSymbol(Symbol),
     #[error("cfg has no entry block")]
     EmptyCFG,
+    #[error("body {0:?} has no default walker in this engine")]
+    NoDefaultWalker(crate::Body),
+    #[error("digraph {0:?} has a cycle; the default walker only runs DAGs")]
+    GraphHasCycle(kirin_ir::DiGraph),
+    #[error("CFG control flow (jump/branch) inside a single-block or graph body")]
+    CFGControlFlowInStructuredBody,
     #[error("block {0:?} fell through without a terminator effect")]
     BlockFellThrough(Block),
-    #[error("function body fell through without returning")]
-    FunctionBodyFellThrough,
     #[error("yield outside of an enclosing scope at {0:?}")]
     UnexpectedYield(Statement),
     #[error("statement {0:?} is not callable")]

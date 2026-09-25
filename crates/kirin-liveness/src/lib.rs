@@ -15,7 +15,7 @@
 //! sets are the intersection of the dense sets with this demand set.
 //!
 //! ```ignore
-//! let result = kirin_liveness::analyze_demand(&pipeline, stage, cfg)?;
+//! let result = kirin_liveness::analyze_demand(&pipeline, stage, callee)?;
 //! assert!(result.is_demanded(some_value));
 //! ```
 
@@ -26,26 +26,34 @@ pub use live::{Live, LiveSet};
 pub use result::{DemandResult, DenseLivenessResult};
 
 use kirin_interpreter::{
-    DenseBackwardInterpreter, DenseBackwardTransfer, InterpDispatch, InterpreterError,
-    SparseBackwardDriver, SparseBackwardInterpreter, StageQuery, StandardDenseBackwardFrame,
+    Callee, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardInterpreter,
+    DenseBackwardTransfer, DenseBlockFrame, Frame, InterpDispatch, InterpreterError,
+    SameStageLinker, SparseBackwardDriver, SparseBackwardInterpreter, StageQuery,
 };
-use kirin_ir::{CFG, CompileStage, Pipeline, StageMeta};
+use kirin_ir::{CompileStage, Pipeline, StageMeta};
 
 /// The sparse backward demand engine instantiated at the [`Live`] lattice:
 /// strong liveness.
-pub type Demand<'ir, S, E = InterpreterError> = SparseBackwardInterpreter<'ir, S, Live, E>;
+pub type Demand<'ir, S, E = InterpreterError, Lk = SameStageLinker> =
+    SparseBackwardInterpreter<'ir, S, Live, E, Lk>;
 
 /// The dense backward engine instantiated at [`LiveSet`] point states:
 /// classic per-program-point liveness. A language with structured dialects
-/// supplies its own total frame `F` embedding the dialect's dense frames.
-pub type DenseLiveness<'ir, S, E = InterpreterError, F = StandardDenseBackwardFrame<LiveSet, E>> =
-    DenseBackwardInterpreter<'ir, S, LiveSet, E, F>;
+/// supplies its own private stack-item `F` embedding the dialect's dense frames.
+pub type DenseLiveness<
+    'ir,
+    S,
+    E = InterpreterError,
+    F = DenseBlockFrame<LiveSet, E>,
+    Lk = SameStageLinker,
+> = DenseBackwardInterpreter<'ir, S, LiveSet, E, F, Lk>;
 
-/// Run strong liveness (sparse backward demand) over `cfg` in `stage`.
+/// Resolve `callee` and run strong liveness (sparse backward demand) over its
+/// callable body.
 pub fn analyze_demand<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
-    cfg: CFG,
+    callee: Callee,
 ) -> Result<DemandResult, InterpreterError>
 where
     S: StageMeta
@@ -53,18 +61,18 @@ where
         + InterpDispatch<SparseBackwardDriver<'ir, S, Live, InterpreterError>>,
 {
     let mut engine = Demand::<S>::new(pipeline);
-    engine.analyze(stage, cfg)?;
-    Ok(DemandResult::from_engine(&engine, stage, cfg))
+    let scope = engine.analyze(stage, callee)?;
+    Ok(DemandResult::from_engine(&engine, scope))
 }
 
-/// Run classic per-point liveness (dense backward) over `cfg` in `stage`,
-/// with the standard (structured-control-free) frames. Languages with scf
-/// compose [`DenseLiveness`] with their own frame type and build the result
-/// via [`DenseLivenessResult::from_engine`].
+/// Resolve `callee` and run classic per-point liveness over its body,
+/// with the standard reverse block walker. Languages with structured dialects
+/// select their stack-item type through
+/// [`analyze_dense_with_frame`] instead.
 pub fn analyze_dense<'ir, S>(
     pipeline: &'ir Pipeline<S>,
     stage: CompileStage,
-    cfg: CFG,
+    callee: Callee,
 ) -> Result<DenseLivenessResult, InterpreterError>
 where
     S: StageMeta
@@ -75,11 +83,36 @@ where
                 S,
                 LiveSet,
                 InterpreterError,
-                StandardDenseBackwardFrame<LiveSet, InterpreterError>,
+                DenseBlockFrame<LiveSet, InterpreterError>,
             >,
         >,
 {
-    let mut engine = DenseLiveness::<S>::new(pipeline);
-    engine.analyze(stage, cfg)?;
-    DenseLivenessResult::from_engine(&mut engine, stage, cfg)
+    analyze_dense_with_frame::<S, DenseBlockFrame<LiveSet, InterpreterError>>(
+        pipeline, stage, callee,
+    )
+}
+
+/// Resolve `callee` and run classic per-point liveness over its body with a
+/// caller-selected stack-item type `F` — the entry point for
+/// languages whose structured dialects require a language-specific private
+/// composition. The analysis consumes the finalized IR directly; it neither
+/// requires nor computes a demand ([`DemandResult`]) pre-pass.
+pub fn analyze_dense_with_frame<'ir, S, F>(
+    pipeline: &'ir Pipeline<S>,
+    stage: CompileStage,
+    callee: Callee,
+) -> Result<DenseLivenessResult, InterpreterError>
+where
+    S: StageMeta
+        + StageQuery
+        + InterpDispatch<DenseBackwardTransfer<'ir, S, LiveSet, InterpreterError, F>>,
+    F: Frame<
+            DenseBackwardDriver<'ir, S, LiveSet, InterpreterError, F>,
+            F,
+            Completion = DenseBackwardCompletion<LiveSet>,
+        > + From<DenseBlockFrame<LiveSet, InterpreterError>>,
+{
+    let mut engine = DenseLiveness::<S, InterpreterError, F>::new(pipeline);
+    let scope = engine.analyze(stage, callee)?;
+    Ok(DenseLivenessResult::from_engine(&engine, scope))
 }

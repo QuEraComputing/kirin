@@ -1,6 +1,5 @@
 use kirin_ir::{
-    Block, CFG, CompileStage, Function, Product, SSAValue, SpecializedFunction, StagedFunction,
-    Symbol,
+    Block, CompileStage, Function, Product, SSAValue, SpecializedFunction, StagedFunction, Symbol,
 };
 
 /// The closed forward control algebra a statement produces.
@@ -12,9 +11,10 @@ use kirin_ir::{
 /// frame](SparseForwardEffect::Push) it owns (or is handed by the engine), so all
 /// structured traversal lives in dialect/engine frames, never in this enum.
 ///
-/// `F` is the engine's total frame type (the same `F` that parameterizes
-/// [`ConcreteInterpreter`](crate::ConcreteInterpreter)/
-/// [`SparseForwardInterpreter`](crate::SparseForwardInterpreter)).
+/// `F` is the engine's child-continuation representation. Concrete
+/// configurations currently use their private frame-stack-item type directly;
+/// whether to introduce a distinct child-request vocabulary is deliberately
+/// deferred until the backward engines' continuation needs are understood.
 /// Ordinary dialect rules never name `F`: they only build the frame-free
 /// variants, so `F` is inferred from `I::Effect`. Only a dialect whose operations
 /// own structured traversal (e.g. `kirin-scf`'s `scf.if`/`scf.for`) builds
@@ -64,8 +64,8 @@ impl<V> Edge<V> {
 pub struct CallEffect<V> {
     /// What to call.
     pub callee: Callee,
-    /// Optional explicit target stage (e.g. staged calls); defaults to the
-    /// caller's stage.
+    /// Optional explicit lookup stage (e.g. staged calls); defaults to the
+    /// caller's stage. The linker may select a different target stage.
     pub stage: Option<CompileStage>,
     /// Argument values.
     pub args: Product<V>,
@@ -86,29 +86,8 @@ pub enum Callee {
     Specialized(SpecializedFunction),
 }
 
-/// The body a callable statement enters when invoked: a CFG plus the
-/// entry arguments bound to its entry block.
-///
-/// This is the function-call entry descriptor — the call mechanism, not a
-/// structured-control abstraction. A [`FunctionEntry`](crate::FunctionEntry)
-/// rule returns one; the engine builds the body frame that walks the CFG.
-pub struct FunctionBody<V> {
-    pub cfg: CFG,
-    pub args: Product<V>,
-}
-
-impl<V> FunctionBody<V> {
-    /// A function body over `cfg`, with no entry arguments yet.
-    pub fn new(cfg: CFG) -> Self {
-        Self {
-            cfg,
-            args: Product::new(),
-        }
-    }
-
-    /// Entry arguments bound to the CFG entry block's parameters.
-    pub fn args(mut self, args: impl IntoIterator<Item = V>) -> Self {
-        self.args = args.into_iter().collect();
-        self
+impl From<Symbol> for Callee {
+    fn from(symbol: Symbol) -> Self {
+        Self::Named(symbol)
     }
 }

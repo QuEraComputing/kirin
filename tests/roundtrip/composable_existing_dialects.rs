@@ -2,7 +2,7 @@ use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_cmp::Cmp;
 use kirin_constant::Constant;
-use kirin_function::{Function as FunctionBody, Lexical, Return};
+use kirin_function::{Function, Lexical, Return};
 use kirin_scf::StructuredControlFlow;
 use kirin_test_utils::roundtrip;
 
@@ -27,7 +27,7 @@ enum ComposedSourceLanguage {
 #[chumsky(crate = kirin::parsers)]
 enum WrappedConstantLanguage {
     #[wraps]
-    Function(FunctionBody<ArithType>),
+    Function(Function<ArithType>),
     #[wraps]
     Constant(Constant<ArithValue, ArithType>),
     #[wraps]
@@ -53,16 +53,16 @@ fn test_composed_source_language_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %cond: i64) {
     %doubled = add %x, %x -> i64;
-    %if_result = if %cond then ^then() {
+    %if_result = if %cond then block ^then() {
       yield %doubled;
-    } else ^else() {
+    } else block ^else() {
       yield %x;
     } -> i64;
     %captured = constant 41 -> i64;
-    %closure = lambda @adder captures(%captured) {
+    %closure = lambda @adder captures(%captured) cfg {
       ^bb0(%arg: i64) {
         %sum = add %captured, %arg -> i64;
         ret %sum;
@@ -82,7 +82,7 @@ fn test_wrapped_constant_roundtrip() {
     let input = r#"
 stage @test fn @main() -> i64;
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %lhs = constant 20 -> i64;
     %rhs = constant 22 -> i64;

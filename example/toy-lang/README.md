@@ -11,7 +11,7 @@ toy-lang composes several Kirin dialects into two compilation stages:
 - Comparison: `lt`, `le`, `gt`, `ge`, `eq`, `ne`
 - Bitwise: `and`, `or`, `xor`, `not`, `shl`, `shr`
 - Constants: `constant <value> -> <type>`
-- Control flow: `if <cond> then ^then() { ... } else ^else() { ... }`
+- Control flow: `if <cond> then block ^then() { ... } else block ^else() { ... }`
 - Functions: `call.named @name(args...) -> <type>`, `ret <value>`
 
 **Lowered stage** (`@lowered`): unstructured control flow with lifted functions
@@ -59,7 +59,7 @@ Use `--` before negative arguments so they aren't parsed as flags.
 ```
 stage @source fn @main(i64, i64) -> i64;
 
-specialize @source fn @main(i64, i64) -> i64 {
+specialize @source fn @main(i64, i64) -> i64 cfg {
   ^entry(%a: i64, %b: i64) {
     %result = add %a, %b -> i64;
     ret %result;

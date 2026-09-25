@@ -21,6 +21,7 @@ kirin-derive-chumsky = { workspace = true, optional = true }
 default = []
 simple-language = ["kirin-ir/derive"]
 arith-function-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-function", "parser", "pretty"]
+graph-function-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-constant", "kirin-function", "parser", "pretty"]
 bitwise-function-language = ["kirin-ir/derive", "kirin-arith", "kirin-bitwise", "kirin-cf", "kirin-function", "parser", "pretty"]
 callable-language = ["kirin-ir/derive", "kirin-arith", "kirin-function", "parser", "pretty"]
 namespaced-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-function", "parser", "pretty"]

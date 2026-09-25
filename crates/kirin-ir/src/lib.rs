@@ -1,4 +1,5 @@
 mod arena;
+mod body;
 mod builder;
 mod comptime;
 mod detach;
@@ -16,6 +17,7 @@ mod stage;
 pub mod query;
 
 pub use arena::{Arena, DenseHint, GetInfo, Id, Identifier, Item, SparseHint};
+pub use body::{Body, HasCallableBody};
 pub use builder::error::{
     PipelineError, PipelineStagedError, SpecializeError, StagedFunctionConflictKind,
     StagedFunctionError,
@@ -25,18 +27,19 @@ pub use comptime::{CompileTimeValue, Placeholder, Typeof};
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
-    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGBody, HasCFGMut,
+    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut,
     HasDigraphs, HasDigraphsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
     HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator,
 };
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice, Widen};
 pub use node::{
-    Block, BlockArgument, BlockInfo, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CFG, CompileStage,
-    DeletedSSAValue, DiGraph, DiGraphExtra, DiGraphInfo, Function, FunctionInfo, GlobalSymbol,
-    GraphInfo, LinkedList, LinkedListNode, Port, PortParent, ResolutionInfo, ResultValue, SSAInfo,
-    SSAKind, SSAValue, SpecializedFunction, SpecializedFunctionInfo, StagedFunction,
-    StagedFunctionInfo, StagedNamePolicy, Statement, StatementInfo, StatementParent, Successor,
-    Symbol, TestSSAValue, UnGraph, UnGraphExtra, UnGraphInfo, UniqueLiveSpecializationError,
+    Block, BlockArgument, BlockInfo, BlockParent, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CFG,
+    CompileStage, DeletedSSAValue, DiGraph, DiGraphExtra, DiGraphInfo, Function, FunctionInfo,
+    GlobalSymbol, GraphInfo, LinkedList, LinkedListNode, Port, PortParent, ResolutionInfo,
+    ResultValue, SSAInfo, SSAKind, SSAValue, SpecializedFunction, SpecializedFunctionInfo,
+    StagedFunction, StagedFunctionInfo, StagedNamePolicy, Statement, StatementInfo,
+    StatementParent, Successor, Symbol, TestSSAValue, UnGraph, UnGraphExtra, UnGraphInfo,
+    UniqueLiveSpecializationError, Use,
 };
 pub use pipeline::Pipeline;
 pub use product::{HasProduct, Product};
@@ -53,9 +56,9 @@ pub use stage::{
 /// Re-exports of the most commonly used types for dialect authors.
 pub mod prelude {
     pub use crate::{
-        Block, BuilderStageInfo, CFG, CompileStage, Dialect, Function, GetInfo, HasCFGBody,
-        HasSignature, HasStageInfo, Pipeline, ResultValue, SSAValue, Signature, SignatureSemantics,
-        StageInfo, StageMeta, Statement,
+        Block, Body, BuilderStageInfo, CFG, CompileStage, Dialect, Function, GetInfo,
+        HasCallableBody, HasSignature, HasStageInfo, Pipeline, ResultValue, SSAValue, Signature,
+        SignatureSemantics, StageInfo, StageMeta, Statement,
     };
     pub use crate::{
         CompileTimeValue, HasProduct, Placeholder, Product, Project, ProjectError, TryProject,

@@ -104,12 +104,59 @@ impl<L: Dialect> BuilderStageInfo<L> {
     #[builder(finish_fn = new)]
     pub fn statement(&mut self, #[builder(into)] definition: L) -> Statement {
         let id = self.statements.next_id();
+        let owned_blocks: Vec<Block> = definition.blocks().copied().collect();
+        let owned_cfgs: Vec<CFG> = definition.cfgs().copied().collect();
+        let owned_digraphs: Vec<DiGraph> = definition.digraphs().copied().collect();
+        let owned_ungraphs: Vec<UnGraph> = definition.ungraphs().copied().collect();
+
+        for &block in &owned_blocks {
+            let parent = self.blocks[block].parent;
+            assert!(
+                parent.is_none() || parent == Some(BlockParent::Statement(id)),
+                "Block `{block}` already has a different parent"
+            );
+        }
+        for &cfg in &owned_cfgs {
+            let parent = self.cfgs[cfg].parent;
+            assert!(
+                parent.is_none() || parent == Some(id),
+                "CFG `{cfg:?}` already has a different parent"
+            );
+        }
+        for &graph in &owned_digraphs {
+            let parent = self.digraphs[graph].parent;
+            assert!(
+                parent.is_none() || parent == Some(id),
+                "DiGraph `{graph:?}` already has a different parent"
+            );
+        }
+        for &graph in &owned_ungraphs {
+            let parent = self.ungraphs[graph].parent;
+            assert!(
+                parent.is_none() || parent == Some(id),
+                "UnGraph `{graph:?}` already has a different parent"
+            );
+        }
+
         let statement = StatementInfo {
             node: LinkedListNode::new(id),
             parent: None,
             definition,
         };
         let _ = self.statements.alloc(statement);
+
+        for block in owned_blocks {
+            self.blocks[block].parent = Some(BlockParent::Statement(id));
+        }
+        for cfg in owned_cfgs {
+            self.cfgs[cfg].parent = Some(id);
+        }
+        for graph in owned_digraphs {
+            self.digraphs[graph].parent = Some(id);
+        }
+        for graph in owned_ungraphs {
+            self.ungraphs[graph].parent = Some(id);
+        }
 
         // Resolve Unresolved(Result(idx)) SSAs now that the statement ID is known
         let result_ssas: Vec<SSAValue> = self.statements[id]
@@ -208,7 +255,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         &mut self,
         #[builder(name = staged_func)] func: StagedFunction,
         signature: Option<Signature<L::Type>>,
-        #[builder(into)] body: Statement,
+        #[builder(into)] definition: Statement,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Result<SpecializedFunction, SpecializeError<L>> {
         let staged_function_info = &mut self.staged_functions[func];
@@ -227,7 +274,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
                 staged_function: func,
                 signature,
                 conflicting,
-                body,
+                definition,
                 backedges,
             });
         }
@@ -237,7 +284,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         let specialized_function = SpecializedFunctionInfo::builder()
             .id(id)
             .signature(signature)
-            .body(body)
+            .definition(definition)
             .maybe_backedges(backedges)
             .new();
         staged_function_info

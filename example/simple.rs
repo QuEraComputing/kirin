@@ -93,15 +93,15 @@ enum Stage {
 const PROGRAM: &str = r#"
 stage @source fn @main(i64, i64) -> i64;
 
-specialize @source fn @main(i64, i64) -> i64 {
+specialize @source fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %cond: i64) {
     %doubled = add %x, %x -> i64;
-    if %cond then ^then() {
+    if %cond then block ^then() {
       %r = add %doubled, %doubled -> i64;
-    } else ^else() {
+    } else block ^else() {
       %r2 = sub %doubled, %doubled -> i64;
     };
-    %f = lambda @adder captures(%doubled) {
+    %f = lambda @adder captures(%doubled) cfg {
       ^bb0(%a: i64) {
         %sum = add %a, %a -> i64;
         ret %sum;
@@ -115,14 +115,14 @@ specialize @source fn @main(i64, i64) -> i64 {
 stage @lowered fn @main(i64, i64) -> i64;
 stage @lowered fn @adder(i64, i64) -> i64;
 
-specialize @lowered fn @adder(i64, i64) -> i64 {
+specialize @lowered fn @adder(i64, i64) -> i64 cfg {
   ^entry(%capture: i64, %a: i64) {
     %sum = add %a, %capture -> i64;
     ret %sum;
   }
 }
 
-specialize @lowered fn @main(i64, i64) -> i64 {
+specialize @lowered fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %cond: i64) {
     %doubled = add %x, %x -> i64;
     %f = bind @adder captures(%doubled) -> i64;
