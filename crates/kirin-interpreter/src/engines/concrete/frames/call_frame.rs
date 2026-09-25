@@ -1,7 +1,8 @@
 use kirin_ir::{CompileStage, Product, SSAValue};
 
 use crate::{
-    Body, CallEffect, CallServices, Callee, EnvIndex, Frame, FrameEffect, InterpreterError,
+    Body, CallEffect, CallServices, Callee, Env, EnvIndex, Frame, FrameEffect, InterpreterError,
+    SSABinding,
 };
 
 use super::{BodyFrameEntry, CallBodyTraversal, Completion, DefaultCallBodyTraversal};
@@ -118,9 +119,20 @@ impl<V, T> From<CallRequest<V>> for CallFrame<V, T> {
     }
 }
 
+/// The call boundary consumes two independent capabilities and names both:
+/// [`CallServices`] to create the callee activation, resolve its body, and free
+/// it again, and an SSA-anchored [`Env`] to bind the completion's results back
+/// into the *caller's* activation ([`SSABinding::bind_values`], which is
+/// blanket-implemented, so `Env<Anchor = SSAValue>` is the whole storage
+/// requirement).
+///
+/// Notably absent: [`StatementDispatch`](crate::StatementDispatch) and any
+/// statement-effect algebra. A call boundary resolves, allocates, enters,
+/// suspends, frees, and binds — it never interprets a statement, so it must not
+/// be made to require the forward engine surface.
 impl<I, F, V, E, T> Frame<I, F> for CallFrame<V, T>
 where
-    I: CallServices<Value = V, Error = E>,
+    I: CallServices<Value = V, Error = E> + Env<Anchor = SSAValue>,
     T: CallBodyTraversal<V, E, F>,
     V: Clone,
     E: From<InterpreterError>,

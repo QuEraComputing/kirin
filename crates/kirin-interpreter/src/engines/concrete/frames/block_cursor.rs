@@ -1,7 +1,7 @@
 use kirin_ir::{Block, CompileStage, Product, SSAValue, Statement};
 
 use crate::core::frame::BlockBinding;
-use crate::{BlockQueries, Env, EnvIndex, InterpreterError};
+use crate::{BlockQueries, Env, EnvIndex, InterpreterError, SSABinding};
 
 /// Block-cursor mechanics shared by the block-shaped walkers
 /// ([`BlockFrame`](super::BlockFrame) and [`CFGFrame`](super::CFGFrame)):
@@ -44,7 +44,7 @@ impl<V: Clone> BlockCursor<V> {
     /// on this call (the frame should `Continue` and step again).
     pub(super) fn bind_entry<I>(&mut self, interp: &mut I) -> Result<bool, I::Error>
     where
-        I: Env<Value = V> + BlockQueries,
+        I: Env<Value = V, Anchor = SSAValue> + BlockQueries,
     {
         match self.pending.take() {
             Some(args) => {
@@ -77,7 +77,7 @@ impl<V: Clone> BlockCursor<V> {
         args: &Product<V>,
     ) -> Result<(), I::Error>
     where
-        I: Env<Value = V> + BlockQueries,
+        I: Env<Value = V, Anchor = SSAValue> + BlockQueries,
     {
         interp.bind_block_args(self.stage, self.index, target, args)?;
         self.cursor = interp.first_statement(self.stage, target)?;
@@ -97,7 +97,7 @@ impl<V: Clone> BlockCursor<V> {
         values: Product<V>,
     ) -> Result<(), I::Error>
     where
-        I: Env<Value = V>,
+        I: Env<Value = V, Anchor = SSAValue>,
         I::Error: From<InterpreterError>,
     {
         let slots = self.resume_slots.take().ok_or_else(|| {

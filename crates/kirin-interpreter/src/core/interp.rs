@@ -1,6 +1,8 @@
 use kirin_ir::{CompileStage, Product, SSAValue, Statement};
 
-use crate::{EnvIndex, InterpreterError, SemanticKey, SparseForwardEffect, SparseForwardSemantic};
+use crate::{
+    Env, EnvIndex, InterpreterError, SemanticKey, SparseForwardEffect, SparseForwardSemantic,
+};
 
 // An engine names its semantics through [`Interp::Semantics`], a
 // [`SemanticKey`] from [`semantics`](crate::semantics): [`ForwardEval`](crate::ForwardEval) is
@@ -58,49 +60,11 @@ pub trait Interp: Sized {
 /// by concrete engine specializations, not by this marker.
 pub trait AbstractInterpreter: Interp {}
 
-/// SSA storage access used by forward engines.
-pub trait Env: Interp {
-    /// Read an SSA value from an activation.
-    fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<Self::Value, Self::Error>;
-    /// Write an SSA value into an activation.
-    fn env_write(
-        &mut self,
-        index: EnvIndex,
-        value: SSAValue,
-        data: Self::Value,
-    ) -> Result<(), Self::Error>;
-
-    /// Positionally bind runtime values to SSA slots in an **explicitly
-    /// selected** activation, checking arity.
-    ///
-    /// The explicitly-addressed counterpart of
-    /// [`SparseForwardInterp::write_results`], which always binds into the
-    /// engine's *current* activation ([`Interp::index`]). Frames need this one:
-    /// a frame binds results into the activation it owns, which is not
-    /// necessarily the one a dialect rule is executing in. The two differ by
-    /// *which activation*, not by what they do — hence neither name mentions the
-    /// [`Product`] container.
-    fn bind_values(
-        &mut self,
-        index: EnvIndex,
-        slots: &[SSAValue],
-        values: Product<Self::Value>,
-    ) -> Result<(), Self::Error> {
-        if slots.len() != values.len() {
-            return Err(Self::Error::from(InterpreterError::ProductArityMismatch {
-                expected: slots.len(),
-                actual: values.len(),
-            }));
-        }
-        for (slot, value) in slots.iter().copied().zip(values) {
-            self.env_write(index, slot, value)?;
-        }
-        Ok(())
-    }
-}
-
-/// [`SparseForwardShape`](crate::SparseForwardShape)-engine flavor: env
-/// access plus [`SparseForwardEffect`]. This is the *shape-generic* engine
+/// [`SparseForwardShape`](crate::SparseForwardShape)-engine flavor:
+/// SSA-anchored env access plus [`SparseForwardEffect`]. The anchor is pinned to
+/// [`SSAValue`] because that is what the shape *is* — a sparse-forward analysis
+/// attaches its facts to SSA values — and the helpers below take SSA values
+/// directly. This is the *shape-generic* engine
 /// surface: env/read/write are how any sparse-forward semantics executes
 /// statements, so the blanket impl below covers every engine whose
 /// [`Semantics`](Interp::Semantics) is a [`SparseForwardSemantic`] —
@@ -116,7 +80,7 @@ pub trait Env: Interp {
 /// [`SparseForwardEffect::Push`] carries a child; ordinary dialects do not name
 /// it.
 pub trait SparseForwardInterp:
-    Env + Interp<Effect = SparseForwardEffect<<Self as Interp>::Value, Self::Frame>>
+    Env<Anchor = SSAValue> + Interp<Effect = SparseForwardEffect<<Self as Interp>::Value, Self::Frame>>
 {
     /// The engine's child-continuation representation carried by
     /// [`SparseForwardEffect::Push`].
@@ -159,7 +123,7 @@ pub trait SparseForwardInterp:
 
 impl<V, F, I> SparseForwardInterp for I
 where
-    I: Env + Interp<Value = V, Effect = SparseForwardEffect<V, F>>,
+    I: Env<Anchor = SSAValue> + Interp<Value = V, Effect = SparseForwardEffect<V, F>>,
     I::Semantics: SparseForwardSemantic,
 {
     type Frame = F;

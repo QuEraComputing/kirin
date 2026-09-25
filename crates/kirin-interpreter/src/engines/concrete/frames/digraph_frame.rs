@@ -1,8 +1,8 @@
 use kirin_ir::{CompileStage, Product, SSAValue, Statement};
 
 use crate::{
-    DiGraphQueries, Env, EnvIndex, Frame, FrameEffect, InterpreterError, SparseForwardEffect,
-    SparseForwardInterp, StatementDispatch,
+    DiGraphQueries, Env, EnvIndex, Frame, FrameEffect, InterpreterError, SSABinding,
+    SparseForwardEffect, SparseForwardInterp, StatementDispatch,
 };
 
 use super::{CallRequest, Completion};
@@ -75,7 +75,7 @@ where
     /// not [`DiGraphQueries`], whose schedule was already consumed.
     fn finish<I, F>(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E>
     where
-        I: Env<Value = V, Error = E>,
+        I: Env<Value = V, Error = E, Anchor = SSAValue>,
     {
         let values: Product<V> = self
             .yields
