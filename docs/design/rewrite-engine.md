@@ -2560,12 +2560,15 @@ legality, and dialect validity remains a separate future subsystem.
 
 **Rewrite-pass contract machinery:**
 
-- [ ] Add a free ownership boundary `run_pass(StageInfo<L>, closure)` and a
-  pipeline wrapper that takes/reinserts the whole stage-enum slot. Exclusive
-  ownership replaces runtime `Ready`/`Rewriting` flags. A failed slot uses
-  `Option<S>` or an explicit poisoned variant; never `mem::take` plus a default
-  empty stage.
-- [ ] Catch panics at the outer owner with `AssertUnwindSafe`. This is justified
+- [x] Add a free ownership boundary `run_pass(StageInfo<L>, closure)`. Exclusive
+  ownership replaces runtime `Ready`/`Rewriting` flags. The closure receives
+  `&mut Rewriter<'_, L>` rather than `&mut StageInfo<L>`: the boundary owns the
+  `Rewriter`, so its event log survives an unwind, and a pass cannot reach raw
+  arenas ahead of the escape-hatch lockdown below.
+- [ ] Add the pipeline wrapper that takes/reinserts the whole stage-enum slot.
+  A failed slot uses `Option<S>` or an explicit poisoned variant; never
+  `mem::take` plus a default empty stage.
+- [x] Catch panics at the outer owner with `AssertUnwindSafe`. This is justified
   because Kirin forbids unsafe/raw storage: an unwind can leave logical
   incoherence, not memory unsafety. Error and panic paths return a non-`Clone`,
   non-`Default` `Quarantined<StageInfo<L>>` with no ordinary IR access.

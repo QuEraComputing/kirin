@@ -13,14 +13,14 @@
 //! or (see below) with desynchronized graph topology, because valid rewrites
 //! often need several individually incomplete edits.
 //!
-//! Whole-stage usability is meant to be re-established at a *pass boundary*
-//! that derives the expected metadata, compares it with what is installed, and
-//! marks the stage unusable on failure — it never repairs. **That boundary does
-//! not exist yet** (see M1 in the design doc): there is no `run_pass` ownership
-//! scope and no `Quarantined` failure path. The comparison half is available
-//! today as [`verify_derived`](crate::verify_derived), but nothing invokes it
-//! automatically. Callers of this module get referential integrity, accurate
-//! derived mirrors, and traversable block lists — nothing above that.
+//! Whole-stage usability is re-established at the *pass boundary*
+//! [`run_pass`](crate::run_pass): it owns the stage for the duration of the
+//! pass, then derives the expected metadata and compares it with what is
+//! installed — it never repairs.
+//!
+//! A pass that errors, panics, or leaves a mirror stale yields a [`Quarantined`](crate::Quarantined)
+//! stage instead of a usable one; there is no rollback, so edits already
+//! applied are available for diagnosis only.
 //!
 //! Scope is operand/yield rewriting (including bulk result redirection through
 //! [`Rewriter::replace_results`]) plus block-body statement surgery:
