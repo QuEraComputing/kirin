@@ -1,79 +1,64 @@
 from kirin import types, interp
+from kirin.analysis import ForwardFrame, TypeInference
 
 from . import stmts
 from ._dialect import dialect
+
+NUMBER = types.Int | types.Float
 
 
 @dialect.register(key="typeinfer")
 class TypeInfer(interp.MethodTable):
 
-    @interp.impl(stmts.Add, types.Float, types.Float)
-    @interp.impl(stmts.Add, types.Float, types.Int)
-    @interp.impl(stmts.Add, types.Int, types.Float)
-    def addf(self, interp, frame, stmt):
-        return (types.Float,)
+    @interp.impl(stmts.Add)
+    @interp.impl(stmts.Sub)
+    @interp.impl(stmts.Mult)
+    @interp.impl(stmts.Mod)
+    @interp.impl(stmts.FloorDiv)
+    @interp.impl(stmts.Pow)
+    def arithmetic(
+        self,
+        interp_: TypeInference,
+        frame: ForwardFrame[types.TypeAttribute],
+        stmt: stmts.BinOp,
+    ):
+        """Type an arithmetic operation on two numbers.
 
-    @interp.impl(stmts.Add, types.Int, types.Int)
-    def addi(self, interp, frame, stmt):
-        return (types.Int,)
-
-    @interp.impl(stmts.Sub, types.Float, types.Float)
-    @interp.impl(stmts.Sub, types.Float, types.Int)
-    @interp.impl(stmts.Sub, types.Int, types.Float)
-    def subf(self, *_):
-        return (types.Float,)
-
-    @interp.impl(stmts.Sub, types.Int, types.Int)
-    def subi(self, *_):
-        return (types.Int,)
-
-    @interp.impl(stmts.Mult, types.Float, types.Float)
-    @interp.impl(stmts.Mult, types.Float, types.Int)
-    @interp.impl(stmts.Mult, types.Int, types.Float)
-    def multf(self, *_):
-        return (types.Float,)
-
-    @interp.impl(stmts.Mult, types.Int, types.Int)
-    def multi(self, *_):
+        The result is a float if either operand is a float, else an int. A bool
+        counts as an int, since `True + True` is `2`. Any other operand falls
+        back to type resolution.
+        """
+        lhs, rhs = frame.get(stmt.lhs), frame.get(stmt.rhs)
+        if lhs is types.Bottom or rhs is types.Bottom:
+            return (types.Bottom,)
+        if not (lhs.is_subseteq(NUMBER) and rhs.is_subseteq(NUMBER)):
+            return interp_.eval_fallback(frame, stmt)
+        if lhs.is_subseteq(types.Float) or rhs.is_subseteq(types.Float):
+            return (types.Float,)
         return (types.Int,)
 
     @interp.impl(stmts.Div)
     def divf(self, typeinfer_, frame, stmt):
         return (types.Float,)
 
-    @interp.impl(stmts.Mod, types.Float, types.Float)
-    @interp.impl(stmts.Mod, types.Float, types.Int)
-    @interp.impl(stmts.Mod, types.Int, types.Float)
-    def modf(self, *_):
-        return (types.Float,)
-
-    @interp.impl(stmts.Mod, types.Int, types.Int)
-    def modi(self, *_):
-        return (types.Int,)
-
-    @interp.impl(stmts.BitAnd, types.Int, types.Int)
-    def bit_andi(self, interp, frame, stmt):
-        return (types.Int,)
-
-    @interp.impl(stmts.BitAnd, types.Bool, types.Bool)
-    def bit_andb(self, interp, frame, stmt):
-        return (types.Bool,)
-
-    @interp.impl(stmts.BitOr, types.Int, types.Int)
-    def bit_ori(self, interp, frame, stmt):
-        return (types.Int,)
-
-    @interp.impl(stmts.BitOr, types.Bool, types.Bool)
-    def bit_orb(self, interp, frame, stmt):
-        return (types.Bool,)
-
-    @interp.impl(stmts.BitXor, types.Int, types.Int)
-    def bit_xori(self, interp, frame, stmt):
-        return (types.Int,)
-
-    @interp.impl(stmts.BitXor, types.Bool, types.Bool)
-    def bit_xorb(self, interp, frame, stmt):
-        return (types.Bool,)
+    @interp.impl(stmts.BitAnd)
+    @interp.impl(stmts.BitOr)
+    @interp.impl(stmts.BitXor)
+    def bitwise(
+        self,
+        interp_: TypeInference,
+        frame: ForwardFrame[types.TypeAttribute],
+        stmt: stmts.BinOp,
+    ):
+        """Type a bitwise operation on two ints, which is a bool for two bools."""
+        lhs, rhs = frame.get(stmt.lhs), frame.get(stmt.rhs)
+        if lhs is types.Bottom or rhs is types.Bottom:
+            return (types.Bottom,)
+        if lhs.is_subseteq(types.Bool) and rhs.is_subseteq(types.Bool):
+            return (types.Bool,)
+        if lhs.is_subseteq(types.Int) and rhs.is_subseteq(types.Int):
+            return (types.Int,)
+        return interp_.eval_fallback(frame, stmt)
 
     @interp.impl(stmts.LShift, types.Int)
     def lshift(self, interp, frame, stmt):
@@ -81,26 +66,6 @@ class TypeInfer(interp.MethodTable):
 
     @interp.impl(stmts.RShift, types.Int)
     def rshift(self, interp, frame, stmt):
-        return (types.Int,)
-
-    @interp.impl(stmts.FloorDiv, types.Float, types.Float)
-    @interp.impl(stmts.FloorDiv, types.Int, types.Float)
-    @interp.impl(stmts.FloorDiv, types.Float, types.Int)
-    def floor_divf(self, interp, frame, stmt):
-        return (types.Float,)
-
-    @interp.impl(stmts.FloorDiv, types.Int, types.Int)
-    def floor_divi(self, interp, frame, stmt):
-        return (types.Int,)
-
-    @interp.impl(stmts.Pow, types.Float, types.Float)
-    @interp.impl(stmts.Pow, types.Float, types.Int)
-    @interp.impl(stmts.Pow, types.Int, types.Float)
-    def powf(self, interp, frame, stmt):
-        return (types.Float,)
-
-    @interp.impl(stmts.Pow, types.Int, types.Int)
-    def powi(self, interp, frame, stmt):
         return (types.Int,)
 
     @interp.impl(stmts.MatMult)
