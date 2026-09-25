@@ -6,16 +6,6 @@ mod common;
 use common::{BuilderDialect, TestType, new_stage};
 use kirin_ir::*;
 
-struct CFGBodyOp {
-    cfg: CFG,
-}
-
-impl HasCFGBody for CFGBodyOp {
-    fn cfg(&self) -> &CFG {
-        &self.cfg
-    }
-}
-
 // --- BlockBuilder tests ---
 
 #[test]
@@ -408,18 +398,6 @@ fn statement_builder_rejects_block_owned_by_cfg() {
         .statement()
         .definition(BuilderDialect::OwnBlocks(cfg_block, other_block))
         .new();
-}
-
-#[test]
-fn has_cfg_body_entry_block_returns_first_block() {
-    let mut stage = new_stage();
-    let b0 = stage.block().new();
-    let b1 = stage.block().new();
-    let cfg = stage.cfg().add_block(b0).add_block(b1).new();
-    let op = CFGBodyOp { cfg };
-
-    let stage = stage.finalize().unwrap();
-    assert_eq!(op.entry_block(&stage), Some(b0));
 }
 
 #[test]

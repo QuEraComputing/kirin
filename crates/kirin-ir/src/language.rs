@@ -72,20 +72,6 @@ pub trait HasUngraphsMut<'a> {
     fn ungraphs_mut(&'a mut self) -> Self::IterMut;
 }
 
-/// Structural trait for dialect operations that have a single CFG body.
-///
-/// This trait is intentionally not a supertrait of `Dialect` — it applies to
-/// individual operations (e.g., `Function`, `Lambda`) that contain a single
-/// `CFG`, not to the dialect enum itself.  It enables shared helper functions
-/// for interpreter and analysis code that operate on CFG-bearing operations.
-pub trait HasCFGBody {
-    fn cfg(&self) -> &crate::CFG;
-
-    fn entry_block<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<crate::Block> {
-        self.cfg().blocks(stage).next()
-    }
-}
-
 pub trait IsTerminator {
     fn is_terminator(&self) -> bool;
 }

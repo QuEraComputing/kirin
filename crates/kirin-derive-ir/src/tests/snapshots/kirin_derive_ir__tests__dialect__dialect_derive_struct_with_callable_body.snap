@@ -3,356 +3,402 @@ source: crates/kirin-derive-ir/src/tests/dialect.rs
 expression: generate_dialect_code(input)
 ---
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasArguments<'a> for ZxWire {
-    type Iter = ZxWireArgumentsIter<'a>;
+impl<'a> ::kirin::ir::HasArguments<'a> for FuncOp {
+    type Iter = FuncOpArgumentsIter<'a>;
     fn arguments(&'a self) -> Self::Iter {
-        let Self { res } = self;
-        ZxWireArgumentsIter {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpArgumentsIter {
             inner: std::iter::empty::<&'a ::kirin::ir::SSAValue>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireArgumentsIter<'a> {
+pub struct FuncOpArgumentsIter<'a> {
     inner: std::iter::Empty<&'a ::kirin::ir::SSAValue>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireArgumentsIter<'a> {
+impl<'a> Iterator for FuncOpArgumentsIter<'a> {
     type Item = &'a ::kirin::ir::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasArgumentsMut<'a> for ZxWire {
-    type IterMut = ZxWireArgumentsMutIter<'a>;
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for FuncOp {
+    type IterMut = FuncOpArgumentsMutIter<'a>;
     fn arguments_mut(&'a mut self) -> Self::IterMut {
-        let Self { res } = self;
-        ZxWireArgumentsMutIter {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpArgumentsMutIter {
             inner: std::iter::empty::<&'a mut ::kirin::ir::SSAValue>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireArgumentsMutIter<'a> {
+pub struct FuncOpArgumentsMutIter<'a> {
     inner: std::iter::Empty<&'a mut ::kirin::ir::SSAValue>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireArgumentsMutIter<'a> {
+impl<'a> Iterator for FuncOpArgumentsMutIter<'a> {
     type Item = &'a mut ::kirin::ir::SSAValue;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasResults<'a> for ZxWire {
-    type Iter = ZxWireResultsIter<'a>;
+impl<'a> ::kirin::ir::HasResults<'a> for FuncOp {
+    type Iter = FuncOpResultsIter<'a>;
     fn results(&'a self) -> Self::Iter {
-        let Self { res } = self;
-        ZxWireResultsIter {
-            inner: std::iter::once(res),
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpResultsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::ResultValue>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireResultsIter<'a> {
-    inner: std::iter::Once<&'a ::kirin::ir::ResultValue>,
+pub struct FuncOpResultsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::ResultValue>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireResultsIter<'a> {
+impl<'a> Iterator for FuncOpResultsIter<'a> {
     type Item = &'a ::kirin::ir::ResultValue;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasResultsMut<'a> for ZxWire {
-    type IterMut = ZxWireResultsMutIter<'a>;
+impl<'a> ::kirin::ir::HasResultsMut<'a> for FuncOp {
+    type IterMut = FuncOpResultsMutIter<'a>;
     fn results_mut(&'a mut self) -> Self::IterMut {
-        let Self { res } = self;
-        ZxWireResultsMutIter {
-            inner: std::iter::once(res),
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpResultsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::ResultValue>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireResultsMutIter<'a> {
-    inner: std::iter::Once<&'a mut ::kirin::ir::ResultValue>,
+pub struct FuncOpResultsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::ResultValue>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireResultsMutIter<'a> {
+impl<'a> Iterator for FuncOpResultsMutIter<'a> {
     type Item = &'a mut ::kirin::ir::ResultValue;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasBlocks<'a> for ZxWire {
-    type Iter = ZxWireBlocksIter<'a>;
+impl<'a> ::kirin::ir::HasBlocks<'a> for FuncOp {
+    type Iter = FuncOpBlocksIter<'a>;
     fn blocks(&'a self) -> Self::Iter {
-        let Self { res } = self;
-        ZxWireBlocksIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::Block>(),
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpBlocksIter {
+            inner: std::iter::once(auxiliary),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireBlocksIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::Block>,
+pub struct FuncOpBlocksIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::Block>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireBlocksIter<'a> {
+impl<'a> Iterator for FuncOpBlocksIter<'a> {
     type Item = &'a ::kirin::ir::Block;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasBlocksMut<'a> for ZxWire {
-    type IterMut = ZxWireBlocksMutIter<'a>;
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for FuncOp {
+    type IterMut = FuncOpBlocksMutIter<'a>;
     fn blocks_mut(&'a mut self) -> Self::IterMut {
-        let Self { res } = self;
-        ZxWireBlocksMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::Block>(),
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpBlocksMutIter {
+            inner: std::iter::once(auxiliary),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireBlocksMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::Block>,
+pub struct FuncOpBlocksMutIter<'a> {
+    inner: std::iter::Once<&'a mut ::kirin::ir::Block>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireBlocksMutIter<'a> {
+impl<'a> Iterator for FuncOpBlocksMutIter<'a> {
     type Item = &'a mut ::kirin::ir::Block;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasSuccessors<'a> for ZxWire {
-    type Iter = ZxWireSuccessorsIter<'a>;
+impl<'a> ::kirin::ir::HasSuccessors<'a> for FuncOp {
+    type Iter = FuncOpSuccessorsIter<'a>;
     fn successors(&'a self) -> Self::Iter {
-        let Self { res } = self;
-        ZxWireSuccessorsIter {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpSuccessorsIter {
             inner: std::iter::empty::<&'a ::kirin::ir::Successor>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireSuccessorsIter<'a> {
+pub struct FuncOpSuccessorsIter<'a> {
     inner: std::iter::Empty<&'a ::kirin::ir::Successor>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireSuccessorsIter<'a> {
+impl<'a> Iterator for FuncOpSuccessorsIter<'a> {
     type Item = &'a ::kirin::ir::Successor;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for ZxWire {
-    type IterMut = ZxWireSuccessorsMutIter<'a>;
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for FuncOp {
+    type IterMut = FuncOpSuccessorsMutIter<'a>;
     fn successors_mut(&'a mut self) -> Self::IterMut {
-        let Self { res } = self;
-        ZxWireSuccessorsMutIter {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpSuccessorsMutIter {
             inner: std::iter::empty::<&'a mut ::kirin::ir::Successor>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireSuccessorsMutIter<'a> {
+pub struct FuncOpSuccessorsMutIter<'a> {
     inner: std::iter::Empty<&'a mut ::kirin::ir::Successor>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireSuccessorsMutIter<'a> {
+impl<'a> Iterator for FuncOpSuccessorsMutIter<'a> {
     type Item = &'a mut ::kirin::ir::Successor;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCFG<'a> for ZxWire {
-    type Iter = ZxWireCFGIter<'a>;
+impl<'a> ::kirin::ir::HasCFG<'a> for FuncOp {
+    type Iter = FuncOpCFGIter<'a>;
     fn cfgs(&'a self) -> Self::Iter {
-        let Self { res } = self;
-        ZxWireCFGIter {
-            inner: std::iter::empty::<&'a ::kirin::ir::CFG>(),
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpCFGIter {
+            inner: std::iter::once(implementation),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireCFGIter<'a> {
-    inner: std::iter::Empty<&'a ::kirin::ir::CFG>,
+pub struct FuncOpCFGIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireCFGIter<'a> {
+impl<'a> Iterator for FuncOpCFGIter<'a> {
     type Item = &'a ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasCFGMut<'a> for ZxWire {
-    type IterMut = ZxWireCFGMutIter<'a>;
+impl<'a> ::kirin::ir::HasCFGMut<'a> for FuncOp {
+    type IterMut = FuncOpCFGMutIter<'a>;
     fn cfgs_mut(&'a mut self) -> Self::IterMut {
-        let Self { res } = self;
-        ZxWireCFGMutIter {
-            inner: std::iter::empty::<&'a mut ::kirin::ir::CFG>(),
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpCFGMutIter {
+            inner: std::iter::once(implementation),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireCFGMutIter<'a> {
-    inner: std::iter::Empty<&'a mut ::kirin::ir::CFG>,
+pub struct FuncOpCFGMutIter<'a> {
+    inner: std::iter::Once<&'a mut ::kirin::ir::CFG>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireCFGMutIter<'a> {
+impl<'a> Iterator for FuncOpCFGMutIter<'a> {
     type Item = &'a mut ::kirin::ir::CFG;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasDigraphs<'a> for ZxWire {
-    type Iter = ZxWireDigraphsIter<'a>;
+impl<'a> ::kirin::ir::HasDigraphs<'a> for FuncOp {
+    type Iter = FuncOpDigraphsIter<'a>;
     fn digraphs(&'a self) -> Self::Iter {
-        let Self { res } = self;
-        ZxWireDigraphsIter {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpDigraphsIter {
             inner: std::iter::empty::<&'a ::kirin::ir::DiGraph>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireDigraphsIter<'a> {
+pub struct FuncOpDigraphsIter<'a> {
     inner: std::iter::Empty<&'a ::kirin::ir::DiGraph>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireDigraphsIter<'a> {
+impl<'a> Iterator for FuncOpDigraphsIter<'a> {
     type Item = &'a ::kirin::ir::DiGraph;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasDigraphsMut<'a> for ZxWire {
-    type IterMut = ZxWireDigraphsMutIter<'a>;
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for FuncOp {
+    type IterMut = FuncOpDigraphsMutIter<'a>;
     fn digraphs_mut(&'a mut self) -> Self::IterMut {
-        let Self { res } = self;
-        ZxWireDigraphsMutIter {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpDigraphsMutIter {
             inner: std::iter::empty::<&'a mut ::kirin::ir::DiGraph>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireDigraphsMutIter<'a> {
+pub struct FuncOpDigraphsMutIter<'a> {
     inner: std::iter::Empty<&'a mut ::kirin::ir::DiGraph>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireDigraphsMutIter<'a> {
+impl<'a> Iterator for FuncOpDigraphsMutIter<'a> {
     type Item = &'a mut ::kirin::ir::DiGraph;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasUngraphs<'a> for ZxWire {
-    type Iter = ZxWireUngraphsIter<'a>;
+impl<'a> ::kirin::ir::HasUngraphs<'a> for FuncOp {
+    type Iter = FuncOpUngraphsIter<'a>;
     fn ungraphs(&'a self) -> Self::Iter {
-        let Self { res } = self;
-        ZxWireUngraphsIter {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpUngraphsIter {
             inner: std::iter::empty::<&'a ::kirin::ir::UnGraph>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireUngraphsIter<'a> {
+pub struct FuncOpUngraphsIter<'a> {
     inner: std::iter::Empty<&'a ::kirin::ir::UnGraph>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireUngraphsIter<'a> {
+impl<'a> Iterator for FuncOpUngraphsIter<'a> {
     type Item = &'a ::kirin::ir::UnGraph;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl<'a> ::kirin::ir::HasUngraphsMut<'a> for ZxWire {
-    type IterMut = ZxWireUngraphsMutIter<'a>;
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for FuncOp {
+    type IterMut = FuncOpUngraphsMutIter<'a>;
     fn ungraphs_mut(&'a mut self) -> Self::IterMut {
-        let Self { res } = self;
-        ZxWireUngraphsMutIter {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpUngraphsMutIter {
             inner: std::iter::empty::<&'a mut ::kirin::ir::UnGraph>(),
         }
     }
 }
 #[automatically_derived]
 #[doc(hidden)]
-pub struct ZxWireUngraphsMutIter<'a> {
+pub struct FuncOpUngraphsMutIter<'a> {
     inner: std::iter::Empty<&'a mut ::kirin::ir::UnGraph>,
 }
 #[automatically_derived]
-impl<'a> Iterator for ZxWireUngraphsMutIter<'a> {
+impl<'a> Iterator for FuncOpUngraphsMutIter<'a> {
     type Item = &'a mut ::kirin::ir::UnGraph;
     fn next(&mut self) -> Option<Self::Item> {
         self.inner.next()
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::IsTerminator for ZxWire {
+impl ::kirin::ir::IsTerminator for FuncOp {
     fn is_terminator(&self) -> bool {
         false
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::IsConstant for ZxWire {
+impl ::kirin::ir::IsConstant for FuncOp {
     fn is_constant(&self) -> bool {
         false
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::IsPure for ZxWire {
+impl ::kirin::ir::IsPure for FuncOp {
     fn is_pure(&self) -> bool {
         false
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::IsSpeculatable for ZxWire {
+impl ::kirin::ir::IsSpeculatable for FuncOp {
     fn is_speculatable(&self) -> bool {
         false
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::IsEdge for ZxWire {
+impl ::kirin::ir::IsEdge for FuncOp {
     fn is_edge(&self) -> bool {
-        true
+        false
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::Dialect for ZxWire {
+impl ::kirin::ir::Dialect for FuncOp {
     type Type = SimpleType;
 }
 #[automatically_derived]
-impl ::kirin::ir::HasSignature<Self> for ZxWire {
+impl ::kirin::ir::HasSignature<Self> for FuncOp {
     fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         None
     }
 }
 #[automatically_derived]
-impl ::kirin::ir::HasCallableBody for ZxWire {
+impl ::kirin::ir::HasCallableBody for FuncOp {
     fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
-        ::core::option::Option::None
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        ::core::option::Option::Some(::kirin::ir::Body::from(*implementation))
     }
 }

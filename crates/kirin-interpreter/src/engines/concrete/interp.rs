@@ -4,11 +4,11 @@ use kirin_ir::{
     Block, CFG, CompileStage, Pipeline, Product, SSAValue, StageMeta, Statement, Symbol,
 };
 
-use crate::core::{linker::link_and_discover_callable, query};
+use crate::core::query;
 use crate::{
-    BlockQueries, CFGQueries, CallServices, CallableBody, Callee, Completion, DiGraphQueries, Env,
-    EnvIndex, EnvStackStore, ForwardEval, Frame, FunctionTarget, Interp, InterpDispatch,
-    InterpLocation, InterpreterError, Linker, SameStageLinker, SparseForwardEffect, StageQuery,
+    BlockQueries, Body, CFGQueries, CallServices, Callee, Completion, DiGraphQueries, Env,
+    EnvIndex, EnvStackStore, ForwardEval, Frame, Interp, InterpDispatch, InterpLocation,
+    InterpreterError, LinkTarget, Linker, SameStageLinker, SparseForwardEffect, StageQuery,
     StatementDispatch, Store, drive_frames,
 };
 
@@ -153,12 +153,14 @@ where
         self.store.free(index).map_err(E::from)
     }
 
-    fn resolve_callable(
-        &self,
-        stage: CompileStage,
-        callee: &Callee,
-    ) -> Result<(FunctionTarget, CallableBody), E> {
-        link_and_discover_callable::<Self, _, _>(self.pipeline, &self.linker, stage, callee)
+    fn resolve_callee(&self, lookup_stage: CompileStage, callee: &Callee) -> Result<LinkTarget, E> {
+        self.linker
+            .resolve(self.pipeline, lookup_stage, callee)
+            .map_err(E::from)
+    }
+
+    fn discover_body(&self, target: &LinkTarget) -> Result<Body, E> {
+        target.body(self.pipeline).map_err(E::from)
     }
 }
 

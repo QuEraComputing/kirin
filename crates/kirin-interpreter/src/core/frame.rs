@@ -63,9 +63,7 @@ use std::hash::Hash;
 
 use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
-use crate::{
-    Body, CallEffect, CallableBody, Callee, Env, EnvIndex, FunctionTarget, Interp, InterpreterError,
-};
+use crate::{Body, CallEffect, Callee, Env, EnvIndex, Interp, InterpreterError, LinkTarget};
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
 ///
@@ -311,16 +309,23 @@ pub trait DiGraphQueries: Interp {
 }
 
 /// Engine services used by [`CallFrame`](crate::CallFrame): activation storage,
-/// linking, and callable-entry dispatch.
+/// linking, and structural callable-body discovery.
 ///
 /// **[`CallFrame`](crate::CallFrame) still owns the calling convention** — the
 /// order of operations, which completions are legal, and freeing the activation
 /// exactly once. This trait only supplies the primitives it calls.
 ///
-/// Kept whole on purpose: the standard `CallFrame` consumes all four together,
+/// Kept whole on purpose: the standard `CallFrame` consumes these services together,
 /// and their pairing is a safety property — an `alloc_env` without its matching
 /// `free_env` is a leak, a second `free_env` a double free. Splitting them into
 /// separate capabilities would let an engine offer half a call convention.
+///
+/// Linking selects a target; discovery reads its body from the authoritative
+/// specialization record without storing a redundant target/body pair.
+/// Built-in engines delegate discovery to [`LinkTarget::body`]; custom
+/// implementations must preserve the same lookup contract. The trait does not
+/// enforce that relationship. [`CallFrame`](crate::CallFrame) reaches the IR
+/// through these services without needing direct pipeline access.
 ///
 /// Notably *not* required by abstract dataflow: forward abstract interpretation
 /// summarizes a call instead of descending into it, so
@@ -330,13 +335,16 @@ pub trait CallServices: Env {
     fn alloc_env(&mut self) -> EnvIndex;
     /// Free an activation record.
     fn free_env(&mut self, index: EnvIndex) -> Result<(), Self::Error>;
-    /// Resolve a callee and discover its value-independent callable body at
-    /// the selected target stage.
-    fn resolve_callable(
+    /// Resolve a callee to the stage and specialization selected by the linker.
+    fn resolve_callee(
         &self,
-        stage: CompileStage,
+        lookup_stage: CompileStage,
         callee: &Callee,
-    ) -> Result<(FunctionTarget, CallableBody), Self::Error>;
+    ) -> Result<LinkTarget, Self::Error>;
+    /// Discover `target`'s value-independent callable body in its own stage.
+    /// Implementations must read the target specialization's authoritative
+    /// definition, preserving the lookup and error behavior of [`LinkTarget::body`].
+    fn discover_body(&self, target: &LinkTarget) -> Result<Body, Self::Error>;
 }
 
 /// An interpreter engine capable of running the complete standard **concrete**
@@ -368,7 +376,7 @@ impl<T> ForwardFrameEngine for T where
 /// not** [`CallServices`] or [`CFGQueries`]. An abstract engine does not descend
 /// into a callee (it [summarizes](Self::summarize_call) the call), so requiring
 /// it to expose concrete activation allocation, activation cleanup,
-/// `resolve_callable` would be demanding a call convention it
+/// `resolve_callee` would be demanding a call convention it
 /// never performs. `cfg_entry` is likewise absent: the forward abstract engine
 /// reaches a callable body's entry block through [`Owner`](crate::Owner) seeding
 /// in the fixpoint driver, not by asking a frame to enter a CFG. A frame that

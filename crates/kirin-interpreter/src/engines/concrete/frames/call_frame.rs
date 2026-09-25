@@ -13,7 +13,7 @@ use super::{BodyFrameEntry, CallBodyTraversal, Completion, DefaultCallBodyTraver
 /// walkers deliberately don't:
 ///
 /// 1. resolve the callee and discover its value-independent body through the
-///    common callable-root protocol (`Linker` then `FunctionEntry` at the
+///    common callable-root protocol (`Linker` then IR body discovery at the
 ///    target stage);
 /// 2. allocate the callee activation;
 /// 3. retain the concrete argument product for the selected body walker;
@@ -53,7 +53,7 @@ pub struct CallRequest<V> {
 enum CallState<V> {
     /// Not yet dispatched: resolve the callee and enter its body.
     Pending {
-        resolve_stage: CompileStage,
+        lookup_stage: CompileStage,
         callee: Callee,
         args: Product<V>,
         dest: CallDest,
@@ -84,7 +84,7 @@ impl<V> CallRequest<V> {
     pub fn pending(scope_stage: CompileStage, caller_env: EnvIndex, call: CallEffect<V>) -> Self {
         Self {
             state: CallState::Pending {
-                resolve_stage: call.stage.unwrap_or(scope_stage),
+                lookup_stage: call.stage.unwrap_or(scope_stage),
                 callee: call.callee,
                 args: call.args,
                 dest: CallDest::Caller {
@@ -100,7 +100,7 @@ impl<V> CallRequest<V> {
     pub fn root(stage: CompileStage, callee: Callee, args: Product<V>) -> Self {
         Self {
             state: CallState::Pending {
-                resolve_stage: stage,
+                lookup_stage: stage,
                 callee,
                 args,
                 dest: CallDest::Root,
@@ -130,12 +130,13 @@ where
     fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         match self.state {
             CallState::Pending {
-                resolve_stage,
+                lookup_stage,
                 callee,
                 args,
                 dest,
             } => {
-                let (target, entry) = interp.resolve_callable(resolve_stage, &callee)?;
+                let target = interp.resolve_callee(lookup_stage, &callee)?;
+                let body = interp.discover_body(&target)?;
                 let index = interp.alloc_env();
                 // The closed `Body` enum is the framework's supported body
                 // vocabulary, so this match is intentionally exhaustive;
@@ -144,7 +145,7 @@ where
                 // exhaustive; only *which frame* each arm builds is
                 // configurable, via the `T` traversal. Activation ownership and
                 // completion handling deliberately stay out of the traversal.
-                let child = match entry.body {
+                let child = match body {
                     Body::CFG(cfg) => T::from_cfg(BodyFrameEntry {
                         stage: target.stage,
                         index,
