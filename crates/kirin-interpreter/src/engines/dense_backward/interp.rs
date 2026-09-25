@@ -52,7 +52,7 @@ use kirin_ir::{
     StageMeta, Statement,
 };
 
-use super::frames::{DenseBlockFrame, DenseFrameBuild};
+use super::frames::DenseBlockFrame;
 use crate::Body;
 use crate::core::query;
 use crate::engines::sparse_backward::BodyScope;
@@ -577,7 +577,7 @@ where
     V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
-    F: DenseFrameBuild<V, E>,
+    F: From<DenseBlockFrame<V, E>>,
 {
     fn bottom_summary(
         &mut self,
@@ -597,7 +597,7 @@ where
         // Each owner walk starts from an empty exit state; the terminator's
         // absorbed edges seed the real live-out.
         interp.replace_state(V::bottom());
-        Ok(F::from_block(DenseBlockFrame::cfg_owner(stage, owner.item)))
+        Ok(DenseBlockFrame::cfg_owner(stage, owner.item).into())
     }
 
     fn complete_owner(
@@ -635,7 +635,7 @@ pub struct DenseBackwardInterpreter<
     S: StageMeta,
     V,
     E = InterpreterError,
-    F = crate::StandardDenseBackwardFrame<V, E>,
+    F = DenseBlockFrame<V, E>,
     Sem = ClassicLiveness,
 > where
     V: Clone + PartialEq + Lattice,
@@ -718,7 +718,7 @@ where
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
     F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, F, Completion = DenseBackwardCompletion<V>>
-        + DenseFrameBuild<V, E>,
+        + From<DenseBlockFrame<V, E>>,
 {
     /// The blocks directly selected as fixpoint owners for `body`.
     ///
