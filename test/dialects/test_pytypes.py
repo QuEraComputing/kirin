@@ -130,3 +130,12 @@ def test_method_type():
     Var = TypeVar("Var")
     t5 = MethodType[[Int, Var], Bool]
     assert t1.is_subseteq(t5)
+
+
+def test_literal_tells_equal_data_of_different_types_apart():
+    assert Literal(False) is not Literal(0.0)
+    assert Literal(1) != Literal(True)
+    assert Literal((3, False)) != Literal((3, 0.0))
+    assert Literal(1.0).type == Float
+    assert Literal(1) is Literal(1)
+    assert hash(Literal(1)) != hash(Literal(True))
