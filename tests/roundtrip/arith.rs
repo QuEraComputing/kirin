@@ -160,7 +160,7 @@ fn test_composes_with_constant_and_control_flow() {
 fn test_arithmetic_function_roundtrip_print_parse_print() {
     let input = r#"
 stage @arith fn @compose(i64, i64, f64, f64) -> i64;
-specialize @arith fn @compose(i64, i64, f64, f64) -> i64 {
+specialize @arith fn @compose(i64, i64, f64, f64) -> i64 cfg {
   ^entry(%a: i64, %b: i64, %x: f64, %y: f64) {
     %sum = add %a, %b -> i64;
     %diff = sub %sum, %b -> i64;
