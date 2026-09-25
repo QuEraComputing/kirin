@@ -109,7 +109,8 @@ class Unroll(RewriteRule):
             elt = GetItem(node.collection, index.result)
             elt.insert_before(node)
 
-            acc_stmt = Call(node.fn, (acc, elt.result), ())
+            inputs = (elt.result, acc) if reversed else (acc, elt.result)
+            acc_stmt = Call(node.fn, inputs, ())
             acc_stmt.insert_before(node)
             acc = acc_stmt.result
 

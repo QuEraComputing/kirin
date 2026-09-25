@@ -1,6 +1,14 @@
 from .list import List2IList as List2IList
 from .const import ConstList2IList as ConstList2IList
 from .unroll import Unroll as Unroll
+from .to_loop import (
+    AllToForLoop as AllToForLoop,
+    AnyToForLoop as AnyToForLoop,
+    MapToForLoop as MapToForLoop,
+    FoldToForLoop as FoldToForLoop,
+    ScanToForLoop as ScanToForLoop,
+    ForEachToForLoop as ForEachToForLoop,
+)
 from .hint_len import HintLen as HintLen
 from .flatten_add import FlattenAdd as FlattenAdd
 from .to_range_loop import ToRangeFor as ToRangeFor
