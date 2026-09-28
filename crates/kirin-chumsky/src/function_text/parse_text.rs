@@ -930,7 +930,7 @@ where
     S: StageMeta,
 {
     let mut names = Vec::new();
-    for (index, stage) in pipeline.stages().iter().enumerate() {
+    for (index, stage) in pipeline.stages().enumerate() {
         if let Some(name) = stage
             .stage_name()
             .and_then(|symbol| pipeline.resolve(symbol).map(str::to_string))

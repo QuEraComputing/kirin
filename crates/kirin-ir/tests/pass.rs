@@ -1,23 +1,25 @@
-//! Integration tests for [`run_pass`], the rewrite-pass ownership boundary.
+//! Integration tests for [`Pipeline::run_pass`], the rewrite-pass ownership
+//! boundary.
 //!
 //! The boundary has one success route and three failure routes, and the tests
 //! are grouped that way: the pass returns a value, the pass returns an error,
 //! the pass panics, or the pass finishes but leaves derived metadata stale.
-//! Only the first hands back a [`StageInfo`]; the other three yield a
-//! [`Quarantined`] the caller cannot rewrite or re-enter.
+//! Only the first leaves the stage in its slot; the other three poison the
+//! position, so the stage can be inspected through
+//! [`Pipeline::quarantined`] but never rewritten or re-entered.
 //!
 //! Two properties are asserted repeatedly because they are the ones easiest to
 //! regress:
 //!
 //! - **no rollback** — edits made before a failure are still in the stage and
 //!   still named by the event log;
-//! - **events outlive the closure** — [`run_pass`] builds the [`Rewriter`]
+//! - **events outlive the closure** — the boundary builds the [`Rewriter`]
 //!   before running the pass, so a panic caused by the pass does not take
 //!   the edit history with it.
-
-// Every `run_pass` result carries a stage on both sides; see the note on
-// `run_pass` itself for why the `Err` variant is deliberately large.
-#![allow(clippy::result_large_err)]
+//!
+//! [`StagePassError`] distinguishes the *outcomes*; the
+//! [`QuarantineCause`] behind a [`StagePassError::PassFailed`] distinguishes
+//! the three ways a pass can fail, and is what most of these tests read.
 
 mod common;
 
@@ -43,23 +45,56 @@ fn without_panic_output<T>(f: impl FnOnce() -> T) -> T {
 // Fixture
 // ---------------------------------------------------------------------------
 
-/// One block with two arguments, an `add` reading both, and an operand-less
-/// `nop`. `nop` is the handle for provoking a rejected edit: it has no operand
-/// slots, so any `replace_operand` on it fails without touching the stage.
+/// A one-stage pipeline whose stage holds one block with two arguments, an
+/// `add` reading both, and an operand-less `nop`. `nop` is the handle for
+/// provoking a rejected edit: it has no operand slots, so any `replace_operand`
+/// on it fails without touching the stage.
+///
+/// The stage is a bare [`StageInfo`], which is its own stage container —
+/// `StageInfo<L>` implements both [`StageMeta`] and [`HasStageInfo<L>`] — so a
+/// single-dialect pipeline needs no enum.
 struct Fixture {
-    stage: StageInfo<BuilderDialect>,
+    pipeline: Pipeline<StageInfo<BuilderDialect>>,
+    id: CompileStage,
     block: Block,
     add: Statement,
     nop: Statement,
 }
 
 impl Fixture {
+    /// The stage still in its slot. Panics once a failed pass has poisoned it.
+    fn stage(&self) -> &StageInfo<BuilderDialect> {
+        self.pipeline.stage(self.id).expect("stage is still usable")
+    }
+
+    fn stage_mut(&mut self) -> &mut StageInfo<BuilderDialect> {
+        self.pipeline
+            .stage_mut(self.id)
+            .expect("stage is still usable")
+    }
+
+    /// The artifact a failed pass left at this position.
+    fn quarantined(&self) -> &Quarantined<StageInfo<BuilderDialect>> {
+        self.pipeline
+            .quarantined(self.id)
+            .expect("the position was poisoned")
+    }
+
     fn x(&self) -> SSAValue {
-        SSAValue::from(self.block.expect_info(&self.stage).arguments[0])
+        SSAValue::from(self.block.expect_info(self.stage()).arguments[0])
     }
 
     fn y(&self) -> SSAValue {
-        SSAValue::from(self.block.expect_info(&self.stage).arguments[1])
+        SSAValue::from(self.block.expect_info(self.stage()).arguments[1])
+    }
+
+    fn run_pass<F, T, E>(&mut self, pass: F) -> Result<T, StagePassError>
+    where
+        E: std::error::Error + Send + Sync + 'static,
+        F: FnOnce(&mut Rewriter<BuilderDialect>) -> Result<T, E>,
+    {
+        self.pipeline
+            .run_pass::<BuilderDialect, _, _, _>(self.id, pass)
     }
 }
 
@@ -81,8 +116,12 @@ fn fixture() -> Fixture {
         .stmt(nop)
         .new();
 
+    let mut pipeline: Pipeline<StageInfo<BuilderDialect>> = Pipeline::new();
+    let id = pipeline.add_stage_raw(stage.finalize().unwrap());
+
     Fixture {
-        stage: stage.finalize().unwrap(),
+        pipeline,
+        id,
         block,
         add,
         nop,
@@ -95,40 +134,42 @@ fn fixture() -> Fixture {
 
 #[test]
 fn a_successful_pass_returns_the_stage_and_the_pass_value() {
-    let f = fixture();
+    let mut f = fixture();
     let (x, y, add) = (f.x(), f.y(), f.add);
 
-    let (stage, replaced) = run_pass(f.stage, |rewriter| rewriter.replace_operand(add, 1, x))
+    let replaced = f
+        .run_pass(|rewriter| rewriter.replace_operand(add, 1, x))
         .expect("a pass making only legal edits should succeed");
 
     // The pass's own return value comes back untouched.
     assert_eq!(replaced, y, "replace_operand returns the previous operand");
     // The edit landed.
     assert_eq!(
-        add.expect_info(&stage).definition(),
+        add.expect_info(f.stage()).definition(),
         &BuilderDialect::Add(x, x)
     );
-    // And the stage is ordinary IR again, mirrors included.
-    assert_eq!(verify_derived(&stage), Ok(()));
+    // And the stage is ordinary IR again, back in its slot, mirrors included.
+    assert_eq!(verify_derived(f.stage()), Ok(()));
+    assert!(f.pipeline.quarantined(f.id).is_none());
 }
 
 #[test]
 fn a_stage_returned_by_one_pass_can_be_handed_to_the_next() {
-    let f = fixture();
+    let mut f = fixture();
     let (x, y, add) = (f.x(), f.y(), f.add);
 
-    // Ownership goes out and comes back, so passes chain without any
+    // The stage leaves its slot and comes back, so passes chain without any
     // "is this stage currently being rewritten" bookkeeping.
-    let (stage, _) = run_pass(f.stage, |rewriter| rewriter.replace_operand(add, 1, x))
+    f.run_pass(|rewriter| rewriter.replace_operand(add, 1, x))
         .expect("first pass should succeed");
-    let (stage, _) = run_pass(stage, |rewriter| rewriter.replace_operand(add, 0, y))
+    f.run_pass(|rewriter| rewriter.replace_operand(add, 0, y))
         .expect("second pass should succeed");
 
     assert_eq!(
-        add.expect_info(&stage).definition(),
+        add.expect_info(f.stage()).definition(),
         &BuilderDialect::Add(y, x)
     );
-    assert_eq!(verify_derived(&stage), Ok(()));
+    assert_eq!(verify_derived(f.stage()), Ok(()));
 }
 
 // ---------------------------------------------------------------------------
@@ -137,22 +178,30 @@ fn a_stage_returned_by_one_pass_can_be_handed_to_the_next() {
 
 #[test]
 fn a_pass_that_returns_an_error_quarantines_the_stage() {
-    let f = fixture();
+    let mut f = fixture();
     let (x, add, nop) = (f.x(), f.add, f.nop);
 
-    let quarantined = run_pass(f.stage, |rewriter| -> Result<(), RewriteError> {
-        rewriter.replace_operand(add, 1, x)?;
-        // `Nop` declares no operands, so this is rejected.
-        rewriter.replace_operand(nop, 0, x)?;
-        Ok(())
-    })
-    .expect_err("an erroring pass must not hand back a usable stage");
+    let error = f
+        .run_pass(|rewriter| -> Result<(), RewriteError> {
+            rewriter.replace_operand(add, 1, x)?;
+            // `Nop` declares no operands, so this is rejected.
+            rewriter.replace_operand(nop, 0, x)?;
+            Ok(())
+        })
+        .expect_err("an erroring pass must not hand back a usable stage");
 
-    let QuarantineCause::Pass(error) = quarantined.cause() else {
+    assert_eq!(error, StagePassError::PassFailed);
+    assert!(
+        f.pipeline.stage(f.id).is_none(),
+        "the position is poisoned, so its stage is not lent out again"
+    );
+
+    let quarantined = f.quarantined();
+    let QuarantineCause::Pass(cause) = quarantined.cause() else {
         panic!("expected a pass-error cause, got {:?}", quarantined.cause());
     };
     assert_eq!(
-        error.to_string(),
+        cause.to_string(),
         RewriteError::OperandIndexOutOfRange {
             stmt: nop,
             index: 0
@@ -163,16 +212,17 @@ fn a_pass_that_returns_an_error_quarantines_the_stage() {
 
 #[test]
 fn a_quarantined_stage_keeps_the_edits_made_before_the_failure() {
-    let f = fixture();
+    let mut f = fixture();
     let (x, add, nop) = (f.x(), f.add, f.nop);
 
-    let quarantined = run_pass(f.stage, |rewriter| -> Result<(), RewriteError> {
+    f.run_pass(|rewriter| -> Result<(), RewriteError> {
         rewriter.replace_operand(add, 1, x)?;
         rewriter.replace_operand(nop, 0, x)?;
         Ok(())
     })
     .expect_err("expected the second edit to fail");
 
+    let quarantined = f.quarantined();
     // There is no rollback: the first edit happened and is reported as such.
     assert_eq!(
         quarantined.events().to_vec(),
@@ -195,11 +245,12 @@ fn a_stale_mirror_is_caught_at_the_pass_boundary() {
     // Desync before the pass runs. A pass cannot do this through the
     // `Rewriter` — which is the point — so this stands in for a mutation path
     // that bypassed the boundary entirely.
-    x.get_info_mut(&mut f.stage).unwrap().uses_mut().clear();
+    x.get_info_mut(f.stage_mut()).unwrap().uses_mut().clear();
 
-    let quarantined = run_pass(f.stage, |_| Ok::<(), RewriteError>(()))
+    f.run_pass(|_| Ok::<(), RewriteError>(()))
         .expect_err("a stale mirror must not survive the boundary");
 
+    let quarantined = f.quarantined();
     let QuarantineCause::Verify(VerifyError::Mismatch(mismatches)) = quarantined.cause() else {
         panic!("expected a mirror mismatch, got {:?}", quarantined.cause());
     };
@@ -213,14 +264,14 @@ fn a_stale_mirror_is_caught_at_the_pass_boundary() {
 fn a_pass_error_is_reported_even_when_the_mirrors_are_also_stale() {
     let mut f = fixture();
     let (x, nop) = (f.x(), f.nop);
-    x.get_info_mut(&mut f.stage).unwrap().uses_mut().clear();
+    x.get_info_mut(f.stage_mut()).unwrap().uses_mut().clear();
 
-    let quarantined = run_pass(f.stage, |rewriter| rewriter.replace_operand(nop, 0, x))
+    f.run_pass(|rewriter| rewriter.replace_operand(nop, 0, x))
         .expect_err("the pass error alone should quarantine the stage");
 
     // Verification never ran, so the cause names what actually went wrong
     // rather than a stale mirror that was already there.
-    assert!(matches!(quarantined.cause(), QuarantineCause::Pass(_)));
+    assert!(matches!(f.quarantined().cause(), QuarantineCause::Pass(_)));
 }
 
 // ---------------------------------------------------------------------------
@@ -229,17 +280,18 @@ fn a_pass_error_is_reported_even_when_the_mirrors_are_also_stale() {
 
 #[test]
 fn a_panicking_pass_is_quarantined_with_the_edits_it_already_made() {
-    let f = fixture();
+    let mut f = fixture();
     let (x, add) = (f.x(), f.add);
 
-    let quarantined = without_panic_output(|| {
-        run_pass(f.stage, |rewriter| -> Result<(), RewriteError> {
+    without_panic_output(|| {
+        f.run_pass(|rewriter| -> Result<(), RewriteError> {
             rewriter.replace_operand(add, 1, x)?;
             panic!("rule invariant violated")
         })
     })
     .expect_err("a panicking pass must not hand back a usable stage");
 
+    let quarantined = f.quarantined();
     let QuarantineCause::Panic(message) = quarantined.cause() else {
         panic!("expected a panic cause, got {:?}", quarantined.cause());
     };
@@ -254,16 +306,15 @@ fn a_panicking_pass_is_quarantined_with_the_edits_it_already_made() {
 
 #[test]
 fn a_formatted_panic_message_survives_the_boundary() {
-    let f = fixture();
+    let mut f = fixture();
     let add = f.add;
 
-    let quarantined = without_panic_output(|| {
-        run_pass(f.stage, |_| -> Result<(), RewriteError> {
-            panic!("unexpected statement {add:?}")
-        })
+    without_panic_output(|| {
+        f.run_pass(|_| -> Result<(), RewriteError> { panic!("unexpected statement {add:?}") })
     })
     .expect_err("a panicking pass must not hand back a usable stage");
 
+    let quarantined = f.quarantined();
     let QuarantineCause::Panic(message) = quarantined.cause() else {
         panic!("expected a panic cause, got {:?}", quarantined.cause());
     };
@@ -277,15 +328,14 @@ fn a_formatted_panic_message_survives_the_boundary() {
 
 #[test]
 fn a_non_string_panic_payload_still_produces_a_cause() {
-    let f = fixture();
+    let mut f = fixture();
 
-    let quarantined = without_panic_output(|| {
-        run_pass(f.stage, |_| -> Result<(), RewriteError> {
-            std::panic::panic_any(7u32)
-        })
+    without_panic_output(|| {
+        f.run_pass(|_| -> Result<(), RewriteError> { std::panic::panic_any(7u32) })
     })
     .expect_err("a panicking pass must not hand back a usable stage");
 
+    let quarantined = f.quarantined();
     let QuarantineCause::Panic(message) = quarantined.cause() else {
         panic!("expected a panic cause, got {:?}", quarantined.cause());
     };

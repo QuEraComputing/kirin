@@ -48,14 +48,14 @@ pub use node::{
 pub use pipeline::Pipeline;
 pub use product::{HasProduct, Product};
 pub use project::{Project, ProjectError, TryProject, TryProjectTo};
-pub use rewrite::{MutationEvent, QuarantineCause, Quarantined, RewriteError, Rewriter, run_pass};
+pub use rewrite::{MutationEvent, QuarantineCause, Quarantined, RewriteError, Rewriter};
 pub use signature::{
     ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
 pub use stage::{
     HasStageInfo, StageAction, StageActionMut, StageArenas, StageDispatch, StageDispatchMiss,
-    StageDispatchMut, StageDispatchRequiredError, StageInfo, StageMeta, SupportsStageDispatch,
-    SupportsStageDispatchMut,
+    StageDispatchMut, StageDispatchRequiredError, StageInfo, StageMeta, StagePassError,
+    StageStatus, SupportsStageDispatch, SupportsStageDispatchMut,
 };
 
 /// Re-exports of the most commonly used types for dialect authors.
