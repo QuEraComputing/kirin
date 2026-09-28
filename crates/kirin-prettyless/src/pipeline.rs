@@ -107,9 +107,21 @@ impl<'a, S: RenderDispatch> PipelineDocument<'a, S> {
 
         let mut output = String::new();
         for (&stage_id, &sf_id) in func_info.staged_functions() {
-            if let Some(stage) = self.pipeline.stage(stage_id)
-                && let Some(rendered) = stage.render_staged_function(sf_id, &self.config, gs)?
-            {
+            // A stage a rewrite pass took or poisoned cannot be rendered.
+            // `Quarantined::report` exists for that case. Be explicit rather than
+            // dropping the stage.
+            let Some(stage) = self.pipeline.stage(stage_id) else {
+                let note = match self.pipeline.stage_status(stage_id) {
+                    Some(status) => format!("// <stage {stage_id:?} unavailable: {status:?}>"),
+                    None => format!("// <stage {stage_id:?} not in pipeline>"),
+                };
+                if !output.is_empty() {
+                    output.push_str("\n\n");
+                }
+                output.push_str(&note);
+                continue;
+            };
+            if let Some(rendered) = stage.render_staged_function(sf_id, &self.config, gs)? {
                 if !output.is_empty() {
                     output.push_str("\n\n");
                 }
