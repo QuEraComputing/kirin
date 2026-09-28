@@ -6,18 +6,18 @@
 
 use std::fmt;
 
-use crate::{Dialect, MutationEvent, StageInfo};
+use crate::{Dialect, HasStageInfo, MutationEvent, StageInfo};
 
 use super::cause::QuarantineCause;
 use super::report;
 
 /// Whatever a failed pass left in an unknown state.
 ///
-/// `S` is what the quarantine took custody of, typically a [`StageInfo`].
-/// A pass over a standalone stage yields `Quarantined<StageInfo<L>>`;
-/// a pass over a stage that lives in a [`Pipeline`](crate::Pipeline) yields
-/// `Quarantined<S>` over the whole stage container, which is what lets a
-/// container wrapping several dialects be quarantined without naming them.
+/// `S` is what the quarantine took custody of. A pass over standalone stage
+/// info yields `Quarantined<StageInfo<L>>`; a pass over a stage that lives in a
+/// [`Pipeline`](crate::Pipeline) yields `Quarantined<S>` over the whole stage
+/// container. This allows a stage wrapping several dialects be
+/// quarantined without naming them.
 ///
 /// Access to the poisoned stage is restricted; the caller can never regain ordinary
 /// access to the stage, forcing them to abandon this compilation unit. The
@@ -53,7 +53,8 @@ impl<S> Quarantined<S> {
     /// Crate-private because rendering and construction must not drift apart:
     /// a caller that forgot to render would produce an artifact with an empty
     /// report, and the failure would only surface when someone needed it.
-    /// Callers that hold a stage should use [`Quarantined::from_stage`].
+    /// Use [`Quarantined::from_stage_info`] to take custody of a bare stage
+    /// info, or [`Quarantined::from_stage`] for a stage enum wrapping one.
     pub(crate) fn new(
         _poisoned_stage: S,
         cause: QuarantineCause,
@@ -80,23 +81,47 @@ impl<S> Quarantined<S> {
     pub fn report(&self) -> &str {
         &self.report
     }
+
+    /// Take custody of a whole stage, rendering the report from the `L` stage
+    /// info inside it before the stage moves in.
+    ///
+    /// The counterpart to [`Quarantined::from_stage_info`] for a stage enum: a
+    /// [`Pipeline`](crate::Pipeline) holds StageSlots which `wrap stage: S`,
+    /// so we need to be able to quarantine these. However, the report can only
+    /// be rendered from the [`StageInfo`] a pass actually rewrote.
+    #[allow(dead_code)]
+    pub(crate) fn from_stage<L>(
+        stage: S,
+        cause: QuarantineCause,
+        events: Vec<MutationEvent>,
+    ) -> Self
+    where
+        L: Dialect,
+        S: HasStageInfo<L>,
+    {
+        let report = match stage.try_stage_info() {
+            Some(stage_info) => report::render(stage_info, &events),
+            None => report::render_without_stage_info(&events),
+        };
+        Self::new(stage, cause, events, report)
+    }
 }
 
 impl<L: Dialect> Quarantined<StageInfo<L>> {
-    /// Take ownership of a stage a failed pass has already mutated, rendering
-    /// its report before the stage moves in.
+    /// Take ownership of a bare stage info a failed pass has already mutated,
+    /// rendering its report before it moves in.
     ///
-    /// [`run_pass`](crate::run_pass) is the only caller in ordinary use; this
+    /// [`Pipeline::run_pass`](crate::Pipeline::run_pass) is the only caller in ordinary use; this
     /// stays public so that tests can build a `Quarantined` over a stage
     /// corrupted on purpose, which no pass can produce through a
     /// [`Rewriter`](crate::Rewriter).
-    pub fn from_stage(
-        stage: StageInfo<L>,
+    pub fn from_stage_info(
+        stage_info: StageInfo<L>,
         cause: QuarantineCause,
         events: Vec<MutationEvent>,
     ) -> Self {
-        let report = report::render(&stage, &events);
-        Self::new(stage, cause, events, report)
+        let report = report::render(&stage_info, &events);
+        Self::new(stage_info, cause, events, report)
     }
 }
 

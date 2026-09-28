@@ -42,7 +42,7 @@ fn fixture(cause: QuarantineCause) -> Fixture {
     let events = rewriter.drain_events();
 
     Fixture {
-        quarantine: Quarantined::from_stage(stage, cause, events),
+        quarantine: Quarantined::from_stage_info(stage, cause, events),
         add,
         nop,
     }
@@ -194,7 +194,7 @@ fn report_renders_a_stage_whose_mirrors_are_desynced() {
         .push(block);
 
     let quarantine =
-        Quarantined::from_stage(stage, QuarantineCause::Panic("desync".into()), vec![]);
+        Quarantined::from_stage_info(stage, QuarantineCause::Panic("desync".into()), vec![]);
     let report = quarantine.report();
 
     assert!(
@@ -222,7 +222,7 @@ fn report_tolerates_a_terminator_pointing_at_a_tombstone() {
     block.get_info_mut(&mut stage).expect("live").terminator = Some(nop);
 
     let quarantine =
-        Quarantined::from_stage(stage, QuarantineCause::Panic("dangling".into()), vec![]);
+        Quarantined::from_stage_info(stage, QuarantineCause::Panic("dangling".into()), vec![]);
     let report = quarantine.report();
     let blocks = section(report, "== blocks");
 
@@ -273,7 +273,7 @@ fn source_chains_to_a_pass_error_but_not_to_a_panic() {
 fn empty_stage_reports_every_section() {
     let stage = new_stage().finalize().expect("an empty stage is valid");
     let quarantine =
-        Quarantined::from_stage(stage, QuarantineCause::Panic("empty".to_string()), vec![]);
+        Quarantined::from_stage_info(stage, QuarantineCause::Panic("empty".to_string()), vec![]);
     let report = quarantine.report();
 
     for title in [

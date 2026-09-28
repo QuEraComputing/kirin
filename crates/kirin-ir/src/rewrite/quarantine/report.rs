@@ -20,6 +20,22 @@ pub(super) fn render<L: Dialect>(stage: &StageInfo<L>, events: &[MutationEvent])
     report
 }
 
+/// The report for a stage that could not produce the stage info it was
+/// quarantined over.
+///
+/// Unreachable in ordinary use: a caller only quarantines a stage after a pass
+/// has already rewritten the stage info inside it.
+pub(super) fn render_without_stage_info(events: &[MutationEvent]) -> String {
+    let mut report = String::new();
+    let _ = writeln!(
+        report,
+        "== no stage info ==\nthe quarantined stage held no stage info for the \
+         dialect the pass ran on, so no arena dump could be taken\n"
+    );
+    mutation_events(&mut report, events);
+    report
+}
+
 fn statements<L: Dialect>(report: &mut String, stage: &StageInfo<L>) {
     let items = &stage.nodes.statements.items;
     let _ = writeln!(report, "== statements ({} ids) ==", items.len());
