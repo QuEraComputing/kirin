@@ -124,9 +124,21 @@ where
         stage_id: kirin_ir::CompileStage,
         input: &str,
     ) -> Result<kirin_ir::Statement, ChumskyError> {
+        let status = self.stage_status(stage_id);
         let stage_entry = self.stage_mut(stage_id).ok_or_else(|| {
+            let message = match status {
+                None | Some(kirin_ir::StageStatus::Present) => {
+                    format!("stage {stage_id:?} not found in pipeline")
+                }
+                Some(kirin_ir::StageStatus::Transferred) => format!(
+                    "stage {stage_id:?} is on loan to a rewrite pass that never returned it"
+                ),
+                Some(kirin_ir::StageStatus::Poisoned) => {
+                    format!("stage {stage_id:?} was poisoned by a failed rewrite pass")
+                }
+            };
             ChumskyError::Parse(vec![ParseError {
-                message: format!("stage {stage_id:?} not found in pipeline"),
+                message,
                 span: SimpleSpan::from(0..0),
             }])
         })?;
