@@ -46,7 +46,7 @@ where
     let pass_result = match panic_or_result {
         Ok(pass_result) => pass_result,
         Err(payload) => {
-            return Err(Quarantined::from_stage(
+            return Err(Quarantined::from_stage_info(
                 stage,
                 QuarantineCause::from_panic(payload),
                 events,
@@ -58,7 +58,7 @@ where
     let pass_output = match pass_result {
         Ok(output) => output,
         Err(error) => {
-            return Err(Quarantined::from_stage(
+            return Err(Quarantined::from_stage_info(
                 stage,
                 QuarantineCause::Pass(Box::new(error)),
                 events,
@@ -68,7 +68,7 @@ where
 
     // Verify the generated IR
     if let Err(error) = verify_derived(&stage) {
-        return Err(Quarantined::from_stage(
+        return Err(Quarantined::from_stage_info(
             stage,
             QuarantineCause::Verify(error),
             events,
