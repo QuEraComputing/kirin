@@ -13,7 +13,11 @@ fn test_pipeline_function_print() {
         .staged_function()
         .func(func)
         .stage(stage0_id)
-        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ()))
+        .signature(kirin_ir::Signature::new(
+            vec![SimpleType::I64],
+            SimpleType::I64,
+            (),
+        ))
         .new()
         .unwrap();
 
@@ -36,7 +40,11 @@ fn test_pipeline_function_print() {
         .staged_function()
         .func(func)
         .stage(stage1_id)
-        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::I64, ()))
+        .signature(kirin_ir::Signature::new(
+            vec![SimpleType::I64],
+            SimpleType::I64,
+            (),
+        ))
         .new()
         .unwrap();
 
@@ -70,7 +78,11 @@ fn test_pipeline_unnamed_stage() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature::new(vec![SimpleType::I64, SimpleType::F64], SimpleType::I64, ()))
+        .signature(kirin_ir::Signature::new(
+            vec![SimpleType::I64, SimpleType::F64],
+            SimpleType::I64,
+            (),
+        ))
         .new()
         .unwrap();
 
@@ -103,11 +115,74 @@ fn test_pipeline_staged_function_no_specialization() {
         .staged_function()
         .func(func)
         .stage(stage_id)
-        .signature(kirin_ir::Signature::new(vec![SimpleType::I64], SimpleType::F64, ()))
+        .signature(kirin_ir::Signature::new(
+            vec![SimpleType::I64],
+            SimpleType::F64,
+            (),
+        ))
         .new()
         .unwrap();
 
     // No specialize() call — staged function has no body / specializations
     let output = PrintExt::sprint(&func, &pipeline);
     insta::assert_snapshot!(output);
+}
+
+/// A stage a failed rewrite pass poisoned is reported, not silently skipped.
+#[test]
+fn test_pipeline_marks_a_poisoned_stage_instead_of_dropping_it() {
+    use kirin_ir::RewriteError;
+
+    let mut pipeline: Pipeline<kirin_ir::StageInfo<SimpleLanguage>> = Pipeline::new();
+    let func = pipeline.function().name("foo").new().unwrap();
+
+    let add_stage =
+        |pipeline: &mut Pipeline<kirin_ir::StageInfo<SimpleLanguage>>, name: &str, value: i64| {
+            let stage_id = pipeline
+                .add_stage()
+                .stage(kirin_ir::StageInfo::default())
+                .name(name.to_string())
+                .new();
+            let sf = pipeline
+                .staged_function()
+                .func(func)
+                .stage(stage_id)
+                .signature(kirin_ir::Signature::new(
+                    vec![SimpleType::I64],
+                    SimpleType::I64,
+                    (),
+                ))
+                .new()
+                .unwrap();
+            pipeline.stage_mut(stage_id).unwrap().with_builder(|ctx| {
+                let a = SimpleLanguage::op_constant(ctx, value);
+                let ret = SimpleLanguage::op_return(ctx, a.result);
+                let block = ctx.block().stmt(a).terminator(ret).new();
+                let body = ctx.cfg().add_block(block).new();
+                let fdef = SimpleLanguage::op_function(ctx, body);
+                ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+            });
+            stage_id
+        };
+
+    let stage_a = add_stage(&mut pipeline, "A", 42);
+    let _stage_b = add_stage(&mut pipeline, "B", 7);
+
+    let _ = pipeline.run_pass::<SimpleLanguage, _, (), _>(stage_a, |_| {
+        Err(RewriteError::CannotInsertTerminator)
+    });
+
+    let output = PrintExt::sprint(&func, &pipeline);
+    assert!(
+        output.contains("unavailable"),
+        "the poisoned stage must be named in the output, got:\n{output}"
+    );
+    assert!(
+        output.contains("constant 7"),
+        "the surviving stage must still print, got:\n{output}"
+    );
+    assert!(
+        !output.contains("constant 42"),
+        "the poisoned stage must not be rendered, got:\n{output}"
+    );
 }
