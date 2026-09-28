@@ -108,7 +108,7 @@ impl<S: StageQuery> Linker<S> for CrossStageLinker {
         if home.is_ok() {
             return home;
         }
-        for stage in pipeline.stages().iter().filter_map(StageMeta::stage_id) {
+        for stage in pipeline.stages().filter_map(StageMeta::stage_id) {
             if stage == caller_stage {
                 continue;
             }
