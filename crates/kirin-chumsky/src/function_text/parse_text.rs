@@ -84,7 +84,7 @@ use rustc_hash::FxHashMap;
 use chumsky::span::SimpleSpan;
 use kirin_ir::{
     CompileStage, Dialect, Function, GetInfo, GlobalSymbol, Id, Pipeline, Signature, StageInfo,
-    StageMeta, StagedFunction,
+    StageMeta, StageStatus, StagedFunction,
 };
 use kirin_lexer::Token;
 use strsim::levenshtein;
@@ -360,9 +360,10 @@ where
                 state: &mut state,
             };
 
-            let stage = self
-                .stage_mut(stage_id)
-                .ok_or_else(|| stage_missing_error(head.stage.name, Some(head.stage.span)))?;
+            let status = self.stage_status(stage_id);
+            let stage = self.stage_mut(stage_id).ok_or_else(|| {
+                stage_missing_error(head.stage.name, status, Some(head.stage.span))
+            })?;
             let dispatch = stage
                 .dispatch_first_pass(stage_id, &mut ctx)
                 .and_then(|opt| {
@@ -422,9 +423,10 @@ where
                 function_name: head.function.name,
                 link: None,
             };
-            let stage = self
-                .stage_mut(stage_id)
-                .ok_or_else(|| stage_missing_error(stage_symbol.name, Some(stage_symbol.span)))?;
+            let status = self.stage_status(stage_id);
+            let stage = self.stage_mut(stage_id).ok_or_else(|| {
+                stage_missing_error(stage_symbol.name, status, Some(stage_symbol.span))
+            })?;
             let next_index = stage
                 .dispatch_second_pass(stage_id, &mut ctx)
                 .and_then(|opt| {
@@ -897,52 +899,25 @@ where
 }
 
 /// Lookup a stage by symbolic name (`@A`) or numeric symbol (`@1`).
-fn find_stage_symbol<S>(pipeline: &Pipeline<S>, stage_symbol: &str) -> Option<CompileStage>
-where
-    S: StageMeta,
-{
-    for stage in pipeline.stages() {
-        if let Some(name) = stage
-            .stage_name()
-            .and_then(|symbol| pipeline.resolve(symbol).map(str::to_string))
-            && name == stage_symbol
-            && let Some(stage_id) = stage.stage_id()
-        {
-            return Some(stage_id);
-        }
+fn find_stage_symbol<S>(pipeline: &Pipeline<S>, stage_symbol: &str) -> Option<CompileStage> {
+    if let Some(stage_id) = pipeline.stage_by_name(stage_symbol) {
+        return Some(stage_id);
     }
 
-    if let Ok(raw_id) = stage_symbol.parse::<usize>() {
-        for stage in pipeline.stages() {
-            if let Some(stage_id) = stage.stage_id()
-                && Id::from(stage_id).raw() == raw_id
-            {
-                return Some(stage_id);
-            }
-        }
-    }
-
-    None
+    let raw_id = stage_symbol.parse::<usize>().ok()?;
+    pipeline
+        .stage_names()
+        .map(|(stage_id, _)| stage_id)
+        .find(|stage_id| Id::from(*stage_id).raw() == raw_id)
 }
 
-fn stage_candidates<S>(pipeline: &Pipeline<S>) -> Vec<String>
-where
-    S: StageMeta,
-{
+fn stage_candidates<S>(pipeline: &Pipeline<S>) -> Vec<String> {
     let mut names = Vec::new();
-    for (index, stage) in pipeline.stages().enumerate() {
-        if let Some(name) = stage
-            .stage_name()
-            .and_then(|symbol| pipeline.resolve(symbol).map(str::to_string))
-        {
-            names.push(name);
-            continue;
+    for (stage_id, name) in pipeline.stage_names() {
+        match name.and_then(|symbol| pipeline.resolve(symbol).map(str::to_string)) {
+            Some(name) => names.push(name),
+            None => names.push(Id::from(stage_id).raw().to_string()),
         }
-        let raw_id = stage
-            .stage_id()
-            .map(|id| Id::from(id).raw())
-            .unwrap_or(index);
-        names.push(raw_id.to_string());
     }
     names.sort();
     names.dedup();
@@ -990,10 +965,22 @@ fn stage_dialect_mismatch_error(
     )
 }
 
-fn stage_missing_error(stage_symbol: &str, span: Option<SimpleSpan>) -> FunctionParseError {
-    FunctionParseError::new(
-        FunctionParseErrorKind::EmitFailed,
-        span,
-        format!("stage '@{stage_symbol}' does not exist in the pipeline"),
-    )
+/// Report a stage lookup that found no usable stage.
+fn stage_missing_error(
+    stage_symbol: &str,
+    status: Option<StageStatus>,
+    span: Option<SimpleSpan>,
+) -> FunctionParseError {
+    let message = match status {
+        None | Some(StageStatus::Present) => {
+            format!("stage '@{stage_symbol}' does not exist in the pipeline")
+        }
+        Some(StageStatus::Transferred) => {
+            format!("stage '@{stage_symbol}' is on loan to a rewrite pass that never returned it")
+        }
+        Some(StageStatus::Poisoned) => format!(
+            "stage '@{stage_symbol}' was poisoned by a failed rewrite pass and cannot be used"
+        ),
+    };
+    FunctionParseError::new(FunctionParseErrorKind::EmitFailed, span, message)
 }

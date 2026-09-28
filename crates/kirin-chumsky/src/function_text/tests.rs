@@ -477,3 +477,34 @@ fn test_invalid_declaration_keyword() {
     let err = pipeline.parse("define @A fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
 }
+
+/// A position a failed pass poisoned still answers to its name, so parsing
+/// `@A` must resolve to it rather than silently create a second stage called
+/// `@A`.
+#[test]
+fn test_parse_does_not_duplicate_a_poisoned_stage() {
+    use kirin_ir::{RewriteError, StageStatus};
+
+    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let stage_a = pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("A")
+        .new();
+
+    let _ = pipeline
+        .run_pass::<FunctionBody, _, (), _>(stage_a, |_| Err(RewriteError::CannotInsertTerminator));
+    assert_eq!(
+        pipeline.stage_status(stage_a),
+        Some(StageStatus::Poisoned),
+        "the pass should have poisoned @A"
+    );
+
+    let input = format!("specialize @A fn @foo(()) -> () {BODY}");
+    assert!(pipeline.parse(&input).is_err());
+    assert_eq!(
+        pipeline.stage_names().count(),
+        1,
+        "@A must resolve to the existing position, not create a second one"
+    );
+}
