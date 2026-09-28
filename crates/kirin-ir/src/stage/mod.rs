@@ -6,15 +6,18 @@ mod helpers;
 pub(crate) mod info;
 mod meta;
 mod pipeline_impl;
+mod slot;
 
 pub use action::{StageAction, StageActionMut};
 pub use arenas::Arenas as StageArenas;
 pub use dispatch::{
     StageDispatch, StageDispatchMut, SupportsStageDispatch, SupportsStageDispatchMut,
 };
-pub use error::{StageDispatchMiss, StageDispatchRequiredError};
+pub use error::{StageDispatchMiss, StageDispatchRequiredError, StagePassError};
 pub use info::StageInfo;
 pub use meta::{HasStageInfo, StageMeta};
+pub(crate) use slot::StageSlot;
+pub use slot::StageStatus;
 
 #[cfg(test)]
 mod tests;

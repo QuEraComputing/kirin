@@ -10,8 +10,9 @@ use crate::node::function::{
 };
 use crate::node::stmt::Statement;
 use crate::node::symbol::{GlobalSymbol, Symbol};
+use crate::rewrite::Quarantined;
 use crate::signature::Signature;
-use crate::stage::{HasStageInfo, StageInfo, StageMeta};
+use crate::stage::{HasStageInfo, StageDispatchMiss, StageInfo, StageMeta, StageSlot, StageStatus};
 
 /// A compilation pipeline that holds stages and a global symbol table.
 ///
@@ -19,7 +20,7 @@ use crate::stage::{HasStageInfo, StageInfo, StageMeta};
 /// for identifiers like function names. Stage-local symbols (SSA names, blocks)
 /// remain in each stage's [`StageInfo`].
 pub struct Pipeline<S> {
-    stages: Vec<S>,
+    stages: Vec<StageSlot<S>>,
     functions: Arena<Function, FunctionInfo>,
     global_symbols: InternTable<String, GlobalSymbol>,
     name_index: FxHashMap<GlobalSymbol, Function>,
@@ -31,24 +32,39 @@ impl<S> Default for Pipeline<S> {
     }
 }
 
-impl<S: StageMeta> Pipeline<S> {
+impl<S> Pipeline<S> {
     /// Look up a stage by its human-readable name, returning its [`CompileStage`].
+    ///
+    /// Resolves the name against the slot rather than the stage, so a position
+    /// stays addressable even once its stage has been lent to a pass or
+    /// poisoned by a failed one.
     ///
     /// Returns `None` if no stage has the given name.
     pub fn stage_by_name(&self, name: &str) -> Option<CompileStage> {
-        self.stages.iter().find_map(|s| {
-            let sym = s.stage_name()?;
-            let resolved = self.global_symbols.resolve(sym)?;
-            if resolved.as_str() == name {
-                s.stage_id()
-            } else {
-                None
-            }
-        })
+        // Names are interned, so symbol equality is name equality — no need to
+        // resolve every slot back to a string.
+        let symbol = self.global_symbols.lookup(name)?;
+        self.stages
+            .iter()
+            .position(|slot| slot.name() == Some(symbol))
+            .map(|index| CompileStage::new(Id(index)))
     }
-}
 
-impl<S> Pipeline<S> {
+    /// Every position in the pipeline with the name it answers to, in order.
+    ///
+    /// The reverse of [`Pipeline::stage_by_name`], and like it this reads the
+    /// name off the position rather than the stage, so a position a pass has
+    /// taken or poisoned is still listed.
+    ///
+    /// Unlike [`Pipeline::stages`], this yields *every* position, so the
+    /// [`CompileStage`] it hands back is always the real one.
+    pub fn stage_names(&self) -> impl Iterator<Item = (CompileStage, Option<GlobalSymbol>)> + '_ {
+        self.stages
+            .iter()
+            .enumerate()
+            .map(|(index, slot)| (CompileStage::new(Id(index)), slot.name()))
+    }
+
     pub fn new() -> Self {
         Self {
             stages: Vec::new(),
@@ -64,28 +80,97 @@ impl<S> Pipeline<S> {
     /// in the `#[bon::bon]` block) when you want to set a stage name.
     pub fn add_stage_raw(&mut self, stage: S) -> CompileStage {
         let id = CompileStage::new(Id(self.stages.len()));
-        self.stages.push(stage);
+        self.stages.push(StageSlot::present(stage, None));
         id
     }
 
     /// Get a reference to a stage by its [`CompileStage`].
+    ///
+    /// Returns `None` both when `id` names no position at all and when the
+    /// position exists but the stage is either transferred to or poisoned
+    /// by a pass. Use [`Pipeline::stage_status`] to tell those apart.
     pub fn stage(&self, id: CompileStage) -> Option<&S> {
-        self.stages.get(Id::from(id).raw())
+        self.stage_or_miss(id).ok()
     }
 
     /// Get a mutable reference to a stage by its [`CompileStage`].
+    ///
+    /// Shares [`Pipeline::stage`]'s `None` cases.
     pub fn stage_mut(&mut self, id: CompileStage) -> Option<&mut S> {
+        self.stage_or_miss_mut(id).ok()
+    }
+
+    /// The slot at `id`, whatever state it is in.
+    ///
+    /// Crate-private: a slot exposes its own state and its
+    /// [`Quarantined`](crate::Quarantined), which
+    /// [`Pipeline::stage`] deliberately does not. Callers outside the crate go
+    /// through the accessors that answer one question each.
+    pub(crate) fn slot(&self, id: CompileStage) -> Option<&StageSlot<S>> {
+        self.stages.get(Id::from(id).raw())
+    }
+
+    /// The slot at `id`, mutably, whatever state it is in.
+    ///
+    /// The pass wrapper needs this rather than [`Pipeline::stage_mut`]: running
+    /// a pass moves the stage out of its slot and back, which is a change of
+    /// slot *state*, not a mutation of the stage.
+    pub(crate) fn slot_mut(&mut self, id: CompileStage) -> Option<&mut StageSlot<S>> {
         self.stages.get_mut(Id::from(id).raw())
     }
 
-    /// Get a slice of all stages.
-    pub fn stages(&self) -> &[S] {
-        &self.stages
+    /// Which state the position at `id` is in, or `None` if there is no such
+    /// position.
+    ///
+    /// [`Pipeline::stage`] answers "can I use this stage?"; this answers "why
+    /// not?"
+    pub fn stage_status(&self, id: CompileStage) -> Option<StageStatus> {
+        self.slot(id).map(StageSlot::status)
     }
 
-    /// Get a mutable slice of all stages.
-    pub fn stages_mut(&mut self) -> &mut [S] {
-        &mut self.stages
+    /// The artifact left by a pass that failed at `id`, if one did.
+    ///
+    /// `None` when `id` names no position, or when its stage is still usable.
+    /// This is the only way to read the cause, mutation events, and report
+    /// behind [`StagePassError::PassFailed`](crate::StagePassError): the stage
+    /// itself stays inside the [`Quarantined`](crate::Quarantined) and is never
+    /// lent out again.
+    pub fn quarantined(&self, id: CompileStage) -> Option<&Quarantined<S>> {
+        self.slot(id).and_then(StageSlot::quarantined)
+    }
+
+    /// The stage at `id`, or the reason dispatch cannot reach it.
+    ///
+    /// The same lookup as [`Pipeline::stage`], but it keeps *why* it failed
+    /// rather than folding both reasons into `None`. Dispatch reports that
+    /// reason to its caller, so a poisoned position is not mistaken for a
+    /// missing one.
+    pub(crate) fn stage_or_miss(&self, id: CompileStage) -> Result<&S, StageDispatchMiss> {
+        let slot = self.slot(id).ok_or(StageDispatchMiss::MissingStage)?;
+        slot.stage().ok_or(StageDispatchMiss::StageUnavailable)
+    }
+
+    /// Mutable counterpart of [`Pipeline::stage_or_miss`].
+    pub(crate) fn stage_or_miss_mut(
+        &mut self,
+        id: CompileStage,
+    ) -> Result<&mut S, StageDispatchMiss> {
+        let slot = self.slot_mut(id).ok_or(StageDispatchMiss::MissingStage)?;
+        slot.stage_mut().ok_or(StageDispatchMiss::StageUnavailable)
+    }
+
+    /// Iterate every stage the pipeline still holds, in pipeline order.
+    ///
+    /// Skips positions whose stage is absent, so the yielded items are always
+    /// usable. Positions are not renumbered: use [`Pipeline::stage_by_name`] or
+    /// a [`CompileStage`] to address one.
+    pub fn stages(&self) -> impl Iterator<Item = &S> {
+        self.stages.iter().filter_map(StageSlot::stage)
+    }
+
+    /// Iterate every stage the pipeline still holds, mutably, in pipeline order.
+    pub fn stages_mut(&mut self) -> impl Iterator<Item = &mut S> {
+        self.stages.iter_mut().filter_map(StageSlot::stage_mut)
     }
 
     /// Get the [`FunctionInfo`] for a function by its [`Function`] ID.
@@ -238,11 +323,13 @@ impl<S> Pipeline<S> {
     {
         let id = CompileStage::new(Id(self.stages.len()));
         stage.set_stage_id(Some(id));
-        if let Some(n) = name {
-            let sym = self.global_symbols.intern(n);
+        // The slot's copy is what `stage_by_name` matches on; the stage's own
+        // copy is what the printer and parser read.
+        let symbol = name.map(|n| self.global_symbols.intern(n));
+        if let Some(sym) = symbol {
             stage.set_stage_name(Some(sym));
         }
-        self.stages.push(stage);
+        self.stages.push(StageSlot::present(stage, symbol));
         id
     }
 
@@ -335,6 +422,7 @@ impl<S> Pipeline<S> {
         let stage_info = self
             .stages
             .get_mut(Id::from(stage).raw())
+            .and_then(StageSlot::stage_mut)
             .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
             .ok_or(PipelineError::UnknownFunction(func))?;
 
@@ -404,6 +492,7 @@ impl<S> Pipeline<S> {
         let stage_info = self
             .stages
             .get_mut(Id::from(stage).raw())
+            .and_then(StageSlot::stage_mut)
             .and_then(|s| HasStageInfo::<L>::try_stage_info_mut(s))
             .ok_or(PipelineError::UnknownFunction(func))?;
 
@@ -515,10 +604,8 @@ mod tests {
         pipeline.add_stage_raw("a".to_string());
         pipeline.add_stage_raw("b".to_string());
         pipeline.add_stage_raw("c".to_string());
-        assert_eq!(pipeline.stages().len(), 3);
-        assert_eq!(pipeline.stages()[0], "a");
-        assert_eq!(pipeline.stages()[1], "b");
-        assert_eq!(pipeline.stages()[2], "c");
+        let stages: Vec<&String> = pipeline.stages().collect();
+        assert_eq!(stages, vec!["a", "b", "c"]);
     }
 
     #[test]

@@ -14,7 +14,7 @@
 //! often need several individually incomplete edits.
 //!
 //! Whole-stage usability is re-established at the *pass boundary*
-//! [`run_pass`](crate::run_pass): it owns the stage for the duration of the
+//! [`Pipeline::run_pass`](crate::Pipeline::run_pass): it owns the stage for the duration of the
 //! pass, then derives the expected metadata and compares it with what is
 //! installed — it never repairs.
 //!
