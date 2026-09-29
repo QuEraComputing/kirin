@@ -9,6 +9,7 @@
         * [typeinfer](kirin/analysis/typeinfer/index.md)
             * [analysis](kirin/analysis/typeinfer/analysis.md)
             * [solve](kirin/analysis/typeinfer/solve.md)
+            * [widen](kirin/analysis/typeinfer/widen.md)
     * [decl](kirin/decl/index.md)
         * [base](kirin/decl/base.md)
         * [camel2snake](kirin/decl/camel2snake.md)
