@@ -70,13 +70,14 @@ impl std::fmt::Debug for BlockParent {
     }
 }
 
+/// What a block holds.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlockInfo<L: Dialect> {
-    pub parent: Option<BlockParent>,
-    pub name: Option<Symbol>,
-    pub node: LinkedListNode<Block>,
-    pub arguments: Vec<BlockArgument>,
+    pub(crate) parent: Option<BlockParent>,
+    pub(crate) name: Option<Symbol>,
+    pub(crate) node: LinkedListNode<Block>,
+    pub(crate) arguments: Vec<BlockArgument>,
     /// Reverse control-flow index: blocks whose terminators may transfer
     /// control to this block.
     ///
@@ -84,9 +85,9 @@ pub struct BlockInfo<L: Dialect> {
     /// if-merge or loop header has two, and a small switch join or a loop
     /// with a couple of `break`s stays under four. Wider joins spill to the
     /// heap rather than making every block pay for the worst case.
-    pub predecessors: SmallVec<[Block; 4]>,
-    pub statements: LinkedList<Statement>,
-    pub terminator: Option<Statement>,
+    pub(crate) predecessors: SmallVec<[Block; 4]>,
+    pub(crate) statements: LinkedList<Statement>,
+    pub(crate) terminator: Option<Statement>,
     _marker: std::marker::PhantomData<L>,
 }
 
@@ -124,6 +125,45 @@ impl<L: Dialect> BlockInfo<L> {
     /// Returns the name of this block, if any.
     pub fn name(&self) -> Option<Symbol> {
         self.name
+    }
+
+    /// The CFG or statement that structurally owns this block.
+    pub fn parent(&self) -> Option<BlockParent> {
+        self.parent
+    }
+
+    /// This block's position among its siblings.
+    pub fn node(&self) -> &LinkedListNode<Block> {
+        &self.node
+    }
+
+    /// The values this block takes on entry.
+    pub fn arguments(&self) -> &[BlockArgument] {
+        &self.arguments
+    }
+
+    /// The blocks whose terminators may transfer control here.
+    ///
+    /// A derived mirror of those terminators' successor operands, so it is
+    /// readable but not writable from outside the crate.
+    pub fn predecessors(&self) -> &[Block] {
+        &self.predecessors
+    }
+
+    /// The head/tail/length summary of this block's non-terminator statements.
+    ///
+    /// A derived mirror of the `prev`/`next` links on those statements. To walk
+    /// the body, prefer [`Block::statements`], which follows the links.
+    pub fn statements(&self) -> &LinkedList<Statement> {
+        &self.statements
+    }
+
+    /// The cached pointer to this block's terminator.
+    ///
+    /// A derived mirror of which member statement is a terminator, not a
+    /// statement separate from the body.
+    pub fn terminator(&self) -> Option<Statement> {
+        self.terminator
     }
 }
 

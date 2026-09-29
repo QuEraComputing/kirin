@@ -68,7 +68,7 @@ fn operand_stage() -> OperandStage {
 
 impl OperandStage {
     fn x(&self) -> SSAValue {
-        SSAValue::from(self.block.expect_info(&self.stage).arguments[0])
+        SSAValue::from(self.block.expect_info(&self.stage).arguments()[0])
     }
 }
 

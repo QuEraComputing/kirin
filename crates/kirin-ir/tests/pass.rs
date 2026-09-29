@@ -75,11 +75,11 @@ impl Fixture {
     }
 
     fn x(&self) -> SSAValue {
-        SSAValue::from(self.block.expect_info(self.stage()).arguments[0])
+        SSAValue::from(self.block.expect_info(self.stage()).arguments()[0])
     }
 
     fn y(&self) -> SSAValue {
-        SSAValue::from(self.block.expect_info(self.stage()).arguments[1])
+        SSAValue::from(self.block.expect_info(self.stage()).arguments()[1])
     }
 
     fn run_pass<F, T, E>(&mut self, pass: F) -> Result<T, StagePassError>

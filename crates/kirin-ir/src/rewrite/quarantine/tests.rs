@@ -69,7 +69,7 @@ fn report_renders_a_stage_whose_mirrors_are_desynced() {
         .new();
     let mut stage = builder.finalize().expect("fixture should finalize");
 
-    let real_arg: SSAValue = block.expect_info(&stage).arguments[0].into();
+    let real_arg: SSAValue = block.expect_info(&stage).arguments()[0].into();
     // Invent a use that no operand slot backs.
     push_use(
         &mut stage,
