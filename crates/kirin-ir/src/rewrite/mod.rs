@@ -19,6 +19,8 @@
 
 pub(crate) mod cfg;
 pub(crate) mod pass;
+#[cfg(test)]
+mod pass_tests;
 pub(crate) mod quarantine;
 pub(crate) mod rewriter;
 
