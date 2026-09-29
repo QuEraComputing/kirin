@@ -1,6 +1,6 @@
 use smallvec::SmallVec;
 
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::{
     Block, BlockArgument, Dialect, SSAKind, SSAValue, Statement, StatementParent, Successor,
 };

@@ -1,4 +1,4 @@
-use crate::arena::GetInfo;
+use crate::arena::GetInfoMut;
 use crate::node::linked_list::LinkedList;
 use crate::{Block, Dialect, Statement, StatementParent};
 

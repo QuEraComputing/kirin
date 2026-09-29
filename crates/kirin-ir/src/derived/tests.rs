@@ -6,7 +6,7 @@
 
 use std::collections::HashSet;
 
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::testing::dialect::{TestLang, TestType, new_stage};
 use crate::{
     Block, LinkedList, Mismatch, SSAValue, StageInfo, Statement, Use, VerifyError, verify_derived,

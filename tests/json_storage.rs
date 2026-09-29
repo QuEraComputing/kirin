@@ -151,9 +151,28 @@ specialize @target fn @f(i64) -> i64 cfg { ^entry(%x: i64) { ret %x; } }
     let source_fn = ir.resolve_staged_function("f", source).unwrap();
     let target_fn = ir.resolve_staged_function("f", target).unwrap();
     let stage = ir.stage_mut(source).unwrap();
-    let specialization = source_fn.expect_info(stage).specializations()[0].id();
-    specialization.expect_info_mut(stage).invalidate();
-    source_fn.expect_info_mut(stage).invalidate();
+    let source_info = source_fn.expect_info(stage);
+    let specialization = source_info.specializations()[0].id();
+    let (name, signature) = (source_info.name(), source_info.signature().clone());
+    let definition = *specialization.expect_info(stage).definition();
+    // Redefinition is the public route to invalidation: each conflicting
+    // redefinition invalidates the entry it replaces.
+    stage.with_builder(|b| {
+        let conflict = b
+            .specialize()
+            .staged_func(source_fn)
+            .definition(definition)
+            .new()
+            .expect_err("the existing specialization holds this signature");
+        b.redefine_specialization(conflict);
+        let conflict = b
+            .staged_function()
+            .maybe_name(name)
+            .signature(signature)
+            .new()
+            .expect_err("the existing staged function holds this signature");
+        b.redefine_staged_function(conflict);
+    });
     let restored = json_roundtrip(&ir);
     assert!(
         source_fn
