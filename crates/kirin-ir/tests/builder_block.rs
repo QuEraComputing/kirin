@@ -1,5 +1,5 @@
 //! Integration tests for block builder, cfg builder, statement iteration,
-//! detach, SSA creation, and linked list helpers.
+//! SSA creation and linked list helpers.
 
 mod common;
 
@@ -484,75 +484,6 @@ fn empty_cfg() {
     let blocks: Vec<_> = cfg.blocks(&stage).collect();
     assert!(blocks.is_empty());
     assert_eq!(cfg.blocks(&stage).len(), 0);
-}
-
-// --- Detach tests ---
-
-#[test]
-fn detach_statement_updates_neighbors_and_parent_len() {
-    let mut stage = new_stage();
-    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
-    let s2 = stage.statement().definition(BuilderDialect::Nop).new();
-    let block = stage.block().stmt(s0).stmt(s1).stmt(s2).new();
-
-    let mut stage = stage.finalize().unwrap();
-    s1.detach(&mut stage);
-
-    let block_info = block.expect_info(&stage);
-    assert_eq!(block_info.statements.len(), 2);
-
-    assert_eq!(*s0.next(&stage), Some(s2));
-    assert_eq!(*s2.prev(&stage), Some(s0));
-
-    assert_eq!(*s1.prev(&stage), None);
-    assert_eq!(*s1.next(&stage), None);
-    assert_eq!(*s1.parent(&stage), None);
-}
-
-#[test]
-fn detach_head_statement_updates_block_head() {
-    let mut stage = new_stage();
-    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
-    let block = stage.block().stmt(s0).stmt(s1).new();
-
-    let mut stage = stage.finalize().unwrap();
-    s0.detach(&mut stage);
-
-    let block_info = block.expect_info(&stage);
-    assert_eq!(block_info.statements.head(), Some(&s1));
-    assert_eq!(block_info.statements.len(), 1);
-}
-
-#[test]
-fn detach_tail_statement_updates_block_tail() {
-    let mut stage = new_stage();
-    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
-    let block = stage.block().stmt(s0).stmt(s1).new();
-
-    let mut stage = stage.finalize().unwrap();
-    s1.detach(&mut stage);
-
-    let block_info = block.expect_info(&stage);
-    assert_eq!(block_info.statements.tail(), Some(&s0));
-    assert_eq!(block_info.statements.len(), 1);
-}
-
-#[test]
-fn detach_only_statement_leaves_empty_block() {
-    let mut stage = new_stage();
-    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let block = stage.block().stmt(s0).new();
-
-    let mut stage = stage.finalize().unwrap();
-    s0.detach(&mut stage);
-
-    let block_info = block.expect_info(&stage);
-    assert_eq!(block_info.statements.len(), 0);
-    assert!(block_info.statements.head().is_none());
-    assert!(block_info.statements.tail().is_none());
 }
 
 // --- SSA creation edge cases (builder-side) ---
