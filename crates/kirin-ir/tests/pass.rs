@@ -67,12 +67,6 @@ impl Fixture {
         self.pipeline.stage(self.id).expect("stage is still usable")
     }
 
-    fn stage_mut(&mut self) -> &mut StageInfo<BuilderDialect> {
-        self.pipeline
-            .stage_mut(self.id)
-            .expect("stage is still usable")
-    }
-
     /// The artifact a failed pass left at this position.
     fn quarantined(&self) -> &Quarantined<StageInfo<BuilderDialect>> {
         self.pipeline
@@ -231,47 +225,6 @@ fn a_quarantined_stage_keeps_the_edits_made_before_the_failure() {
     // The diagnostic dump is the other half — the events name ids, the report
     // is what makes those ids mean something.
     assert!(quarantined.report().contains("ChangedOperands"));
-}
-
-// ---------------------------------------------------------------------------
-// The pass leaves derived metadata stale
-// ---------------------------------------------------------------------------
-
-#[test]
-fn a_stale_mirror_is_caught_at_the_pass_boundary() {
-    let mut f = fixture();
-    let x = f.x();
-
-    // Desync before the pass runs. A pass cannot do this through the
-    // `Rewriter` — which is the point — so this stands in for a mutation path
-    // that bypassed the boundary entirely.
-    x.get_info_mut(f.stage_mut()).unwrap().uses_mut().clear();
-
-    f.run_pass(|_| Ok::<(), RewriteError>(()))
-        .expect_err("a stale mirror must not survive the boundary");
-
-    let quarantined = f.quarantined();
-    let QuarantineCause::Verify(VerifyError::Mismatch(mismatches)) = quarantined.cause() else {
-        panic!("expected a mirror mismatch, got {:?}", quarantined.cause());
-    };
-    assert!(matches!(
-        mismatches.as_slice(),
-        [Mismatch::Uses { value, .. }] if *value == x
-    ));
-}
-
-#[test]
-fn a_pass_error_is_reported_even_when_the_mirrors_are_also_stale() {
-    let mut f = fixture();
-    let (x, nop) = (f.x(), f.nop);
-    x.get_info_mut(f.stage_mut()).unwrap().uses_mut().clear();
-
-    f.run_pass(|rewriter| rewriter.replace_operand(nop, 0, x))
-        .expect_err("the pass error alone should quarantine the stage");
-
-    // Verification never ran, so the cause names what actually went wrong
-    // rather than a stale mirror that was already there.
-    assert!(matches!(f.quarantined().cause(), QuarantineCause::Pass(_)));
 }
 
 // ---------------------------------------------------------------------------

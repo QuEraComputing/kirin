@@ -235,36 +235,6 @@ fn parallel_edges_contribute_one_predecessor_entry() {
     assert_eq!(verify_derived(&stage), Ok(()));
 }
 
-/// Load-bearing: every other test below asserts `Ok(())`, so without this one
-/// a `verify_derived` that never reported anything would pass the whole file.
-#[test]
-fn a_hand_corrupted_mirror_is_reported_as_a_mismatch() {
-    let mut f = operand_stage();
-    let x = f.x();
-
-    // Corrupt the mirror only — both operand slots still read `x`.
-    x.get_info_mut(&mut f.stage).unwrap().uses_mut().clear();
-
-    let Err(VerifyError::Mismatch(mismatches)) = verify_derived(&f.stage) else {
-        panic!("expected a mirror mismatch");
-    };
-    assert_eq!(mismatches.len(), 1);
-    let Mismatch::Uses {
-        value,
-        installed,
-        derived,
-    } = &mismatches[0]
-    else {
-        panic!("expected a use-list mismatch, got {:?}", mismatches[0]);
-    };
-    assert_eq!(*value, x);
-    assert!(installed.is_empty());
-    assert_eq!(
-        derived.iter().copied().collect::<HashSet<_>>(),
-        HashSet::from([operand(f.add, 0), operand(f.consumer, 0)])
-    );
-}
-
 // ---------------------------------------------------------------------------
 // Uses mirror: one test per Rewriter method
 // ---------------------------------------------------------------------------
@@ -653,33 +623,6 @@ fn finalize_populates_the_block_body_mirror() {
         (Some(f.first), Some(f.last), 3, Some(f.terminator))
     );
     assert_eq!(verify_derived(&f.stage), Ok(()));
-}
-
-#[test]
-fn a_hand_corrupted_block_body_is_reported_as_a_mismatch() {
-    let mut f = body_stage();
-
-    // Corrupt the mirror only — the `prev`/`next` links still describe the
-    // same three-statement chain.
-    f.block.expect_info_mut(&mut f.stage).statements = LinkedList::new();
-
-    let Err(VerifyError::Mismatch(mismatches)) = verify_derived(&f.stage) else {
-        panic!("expected a mirror mismatch");
-    };
-    assert_eq!(mismatches.len(), 1);
-    let Mismatch::BlockBody {
-        block,
-        installed,
-        derived,
-    } = &mismatches[0]
-    else {
-        panic!("expected a block-body mismatch, got {:?}", mismatches[0]);
-    };
-    assert_eq!(*block, f.block);
-    assert_eq!(installed.statements.len(), 0);
-    assert_eq!(derived.statements.len(), 3);
-    // The terminator half is untouched and agrees.
-    assert_eq!(installed.terminator, derived.terminator);
 }
 
 #[test]

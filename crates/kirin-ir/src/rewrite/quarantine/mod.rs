@@ -7,6 +7,8 @@
 mod cause;
 mod quarantined;
 mod report;
+#[cfg(test)]
+mod tests;
 
 pub use cause::QuarantineCause;
 pub use quarantined::Quarantined;
