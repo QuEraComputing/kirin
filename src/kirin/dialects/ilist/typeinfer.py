@@ -43,7 +43,7 @@ class TypeInfer(MethodTable):
     def new(self, interp: TypeInference, frame: Frame[types.TypeAttribute], stmt: New):
         values = frame.get_values(stmt.values)
         if not values:
-            return (IListType[types.Any, types.Literal(0)],)
+            return (IListType[stmt.elem_type, types.Literal(0)],)
 
         elem_type = values[0]
         for v in values:
