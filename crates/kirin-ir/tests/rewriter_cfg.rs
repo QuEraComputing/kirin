@@ -28,13 +28,13 @@ fn br(target: Block) -> BuilderDialect {
 
 /// The `index`-th argument of `block`.
 fn arg(stage: &StageInfo<BuilderDialect>, block: Block, index: usize) -> SSAValue {
-    block.expect_info(stage).arguments[index].into()
+    block.expect_info(stage).arguments()[index].into()
 }
 
 fn preds(stage: &StageInfo<BuilderDialect>, block: Block) -> HashSet<Block> {
     block
         .expect_info(stage)
-        .predecessors
+        .predecessors()
         .iter()
         .copied()
         .collect()
@@ -82,7 +82,7 @@ fn append_and_insert_blocks_link_into_cfg() {
         (after, vec![TestType::I64, TestType::I32]),
         (tail, vec![TestType::I32]),
     ] {
-        let args = &block.expect_info(&stage).arguments;
+        let args = block.expect_info(&stage).arguments();
         assert_eq!(args.len(), expected.len(), "argument count of {block}");
         for (index, (&arg, ty)) in args.iter().zip(&expected).enumerate() {
             let info = SSAValue::from(arg).get_info(&stage).unwrap();
@@ -434,7 +434,7 @@ fn split_block_moves_suffix_and_leaves_original_unterminated() {
     for stmt in [s1, s2, entry_br] {
         assert_eq!(stmt.parent(&stage), &Some(StatementParent::Block(tail)));
     }
-    assert!(tail.expect_info(&stage).arguments.is_empty());
+    assert!(tail.expect_info(&stage).arguments().is_empty());
     assert_eq!(
         cfg.blocks(&stage).collect::<Vec<_>>(),
         vec![entry, tail, exit]
@@ -1069,7 +1069,7 @@ fn jump_args(stage: &StageInfo<BuilderDialect>, jump: Statement) -> Vec<SSAValue
 fn insert_block_arg_shifts_arguments_and_rewrites_edges() {
     // entry(a, b) -jump(a)-> target(x) { use x }
     let (mut stage, entry, target, jump, use_x) = jump_into_target(&[0], &[TestType::I32], 0);
-    let cfg = match target.expect_info(&stage).parent {
+    let cfg = match target.expect_info(&stage).parent() {
         Some(BlockParent::CFG(cfg)) => cfg,
         other => panic!("expected a CFG parent, got {other:?}"),
     };
@@ -1100,7 +1100,7 @@ fn insert_block_arg_shifts_arguments_and_rewrites_edges() {
 
     // The fresh argument is first; x keeps its identity and uses but moves to 1.
     assert_eq!(
-        target.expect_info(&stage).arguments,
+        target.expect_info(&stage).arguments(),
         vec![BlockArgument::from(fresh), BlockArgument::from(real_x)]
     );
     let fresh_info = fresh.get_info(&stage).unwrap();
@@ -1123,7 +1123,7 @@ fn insert_block_arg_shifts_arguments_and_rewrites_edges() {
 #[test]
 fn insert_block_arg_rejects_without_mutating() {
     let (mut stage, _entry, target, jump, _use_x) = jump_into_target(&[0], &[TestType::I32], 0);
-    let args_before = target.expect_info(&stage).arguments.clone();
+    let args_before = target.expect_info(&stage).arguments().to_vec();
     let ssas_before = stage.ssa_arena().len();
     let dead_value = SSAValue::from(TestSSAValue(9_999));
 
@@ -1142,7 +1142,7 @@ fn insert_block_arg_rejects_without_mutating() {
     );
 
     assert!(rw.events().is_empty());
-    assert_eq!(target.expect_info(rw.stage()).arguments, args_before);
+    assert_eq!(target.expect_info(rw.stage()).arguments(), args_before);
     assert_eq!(
         rw.stage().ssa_arena().len(),
         ssas_before,
@@ -1167,7 +1167,7 @@ fn erase_block_arg_shifts_arguments_and_rewrites_edges() {
     }
 
     assert_eq!(
-        target.expect_info(&stage).arguments,
+        target.expect_info(&stage).arguments(),
         vec![BlockArgument::from(real_y)]
     );
     assert!(ssa_deleted(&stage, real_x));
@@ -1187,7 +1187,7 @@ fn erase_block_arg_shifts_arguments_and_rewrites_edges() {
 #[test]
 fn erase_block_arg_rejects_used_and_out_of_range_arguments() {
     let (mut stage, _entry, target, _jump, _use_x) = jump_into_target(&[0], &[TestType::I32], 0);
-    let args_before = target.expect_info(&stage).arguments.clone();
+    let args_before = target.expect_info(&stage).arguments().to_vec();
 
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
@@ -1206,7 +1206,7 @@ fn erase_block_arg_rejects_used_and_out_of_range_arguments() {
     );
 
     assert!(rw.events().is_empty());
-    assert_eq!(target.expect_info(rw.stage()).arguments, args_before);
+    assert_eq!(target.expect_info(rw.stage()).arguments(), args_before);
 }
 
 #[test]
@@ -1221,7 +1221,7 @@ fn block_arg_edits_reject_edges_without_successor_operands() {
     let _cfg = stage.cfg().add_block(entry).add_block(target).new();
 
     let mut stage = stage.finalize().unwrap();
-    let args_before = target.expect_info(&stage).arguments.clone();
+    let args_before = target.expect_info(&stage).arguments().to_vec();
     let x = arg(&stage, target, 0);
 
     let mut rw = Rewriter::new(&mut stage);
@@ -1237,6 +1237,6 @@ fn block_arg_edits_reject_edges_without_successor_operands() {
     );
 
     assert!(rw.events().is_empty());
-    assert_eq!(target.expect_info(rw.stage()).arguments, args_before);
+    assert_eq!(target.expect_info(rw.stage()).arguments(), args_before);
     verify_derived(rw.stage()).unwrap();
 }
