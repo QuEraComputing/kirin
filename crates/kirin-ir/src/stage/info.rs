@@ -127,11 +127,31 @@ impl<L: Dialect> StageInfo<L> {
     /// The SSA arena is converted in each direction (O(n)), so prefer
     /// batching construction inside a single `with_builder` call rather than
     /// calling it per-statement.
+    ///
+    /// # Panics and partial construction
+    ///
+    /// A panic inside `f` resumes after the stage has been put back, so `self`
+    /// holds whatever had been built when the panic struck.
+    ///
+    /// Derived metadata is reinstalled on both paths via `finalize_unchecked()`
+    /// which discards any issues found about the authoritative IR. So a
+    /// half-built stage comes back with mirrors derived from whatever state it
+    /// is in, rather than with a diagnosis. Run
+    /// [`verify_derived`](crate::verify_derived) if you need one.
     pub fn with_builder<R>(&mut self, f: impl FnOnce(&mut BuilderStageInfo<L>) -> R) -> R {
         let stage = std::mem::take(self);
         let mut builder = BuilderStageInfo::from(stage);
-        let result = f(&mut builder);
+
+        // `builder` outlives the catch, so the stage can be put back on both
+        // paths. We hand back the half-built IR rather than lose it.
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| f(&mut builder)));
         *self = builder.finalize_unchecked();
-        result
+
+        match result {
+            Ok(value) => value,
+            // Not `panic!`: this re-raises the original payload without
+            // running the panic hook a second time.
+            Err(payload) => std::panic::resume_unwind(payload),
+        }
     }
 }
