@@ -10,30 +10,45 @@ class TypeInfer(interp.MethodTable):
     @interp.impl(stmts.Add, types.Float, types.Float)
     @interp.impl(stmts.Add, types.Float, types.Int)
     @interp.impl(stmts.Add, types.Int, types.Float)
+    @interp.impl(stmts.Add, types.Float, types.Bool)
+    @interp.impl(stmts.Add, types.Bool, types.Float)
     def addf(self, interp, frame, stmt):
         return (types.Float,)
 
     @interp.impl(stmts.Add, types.Int, types.Int)
+    @interp.impl(stmts.Add, types.Int, types.Bool)
+    @interp.impl(stmts.Add, types.Bool, types.Int)
+    @interp.impl(stmts.Add, types.Bool, types.Bool)
     def addi(self, interp, frame, stmt):
         return (types.Int,)
 
     @interp.impl(stmts.Sub, types.Float, types.Float)
     @interp.impl(stmts.Sub, types.Float, types.Int)
     @interp.impl(stmts.Sub, types.Int, types.Float)
+    @interp.impl(stmts.Sub, types.Float, types.Bool)
+    @interp.impl(stmts.Sub, types.Bool, types.Float)
     def subf(self, *_):
         return (types.Float,)
 
     @interp.impl(stmts.Sub, types.Int, types.Int)
+    @interp.impl(stmts.Sub, types.Int, types.Bool)
+    @interp.impl(stmts.Sub, types.Bool, types.Int)
+    @interp.impl(stmts.Sub, types.Bool, types.Bool)
     def subi(self, *_):
         return (types.Int,)
 
     @interp.impl(stmts.Mult, types.Float, types.Float)
     @interp.impl(stmts.Mult, types.Float, types.Int)
     @interp.impl(stmts.Mult, types.Int, types.Float)
+    @interp.impl(stmts.Mult, types.Float, types.Bool)
+    @interp.impl(stmts.Mult, types.Bool, types.Float)
     def multf(self, *_):
         return (types.Float,)
 
     @interp.impl(stmts.Mult, types.Int, types.Int)
+    @interp.impl(stmts.Mult, types.Int, types.Bool)
+    @interp.impl(stmts.Mult, types.Bool, types.Int)
+    @interp.impl(stmts.Mult, types.Bool, types.Bool)
     def multi(self, *_):
         return (types.Int,)
 
@@ -44,14 +59,21 @@ class TypeInfer(interp.MethodTable):
     @interp.impl(stmts.Mod, types.Float, types.Float)
     @interp.impl(stmts.Mod, types.Float, types.Int)
     @interp.impl(stmts.Mod, types.Int, types.Float)
+    @interp.impl(stmts.Mod, types.Float, types.Bool)
+    @interp.impl(stmts.Mod, types.Bool, types.Float)
     def modf(self, *_):
         return (types.Float,)
 
     @interp.impl(stmts.Mod, types.Int, types.Int)
+    @interp.impl(stmts.Mod, types.Int, types.Bool)
+    @interp.impl(stmts.Mod, types.Bool, types.Int)
+    @interp.impl(stmts.Mod, types.Bool, types.Bool)
     def modi(self, *_):
         return (types.Int,)
 
     @interp.impl(stmts.BitAnd, types.Int, types.Int)
+    @interp.impl(stmts.BitAnd, types.Int, types.Bool)
+    @interp.impl(stmts.BitAnd, types.Bool, types.Int)
     def bit_andi(self, interp, frame, stmt):
         return (types.Int,)
 
@@ -60,6 +82,8 @@ class TypeInfer(interp.MethodTable):
         return (types.Bool,)
 
     @interp.impl(stmts.BitOr, types.Int, types.Int)
+    @interp.impl(stmts.BitOr, types.Int, types.Bool)
+    @interp.impl(stmts.BitOr, types.Bool, types.Int)
     def bit_ori(self, interp, frame, stmt):
         return (types.Int,)
 
@@ -68,6 +92,8 @@ class TypeInfer(interp.MethodTable):
         return (types.Bool,)
 
     @interp.impl(stmts.BitXor, types.Int, types.Int)
+    @interp.impl(stmts.BitXor, types.Int, types.Bool)
+    @interp.impl(stmts.BitXor, types.Bool, types.Int)
     def bit_xori(self, interp, frame, stmt):
         return (types.Int,)
 
@@ -86,20 +112,30 @@ class TypeInfer(interp.MethodTable):
     @interp.impl(stmts.FloorDiv, types.Float, types.Float)
     @interp.impl(stmts.FloorDiv, types.Int, types.Float)
     @interp.impl(stmts.FloorDiv, types.Float, types.Int)
+    @interp.impl(stmts.FloorDiv, types.Float, types.Bool)
+    @interp.impl(stmts.FloorDiv, types.Bool, types.Float)
     def floor_divf(self, interp, frame, stmt):
         return (types.Float,)
 
     @interp.impl(stmts.FloorDiv, types.Int, types.Int)
+    @interp.impl(stmts.FloorDiv, types.Int, types.Bool)
+    @interp.impl(stmts.FloorDiv, types.Bool, types.Int)
+    @interp.impl(stmts.FloorDiv, types.Bool, types.Bool)
     def floor_divi(self, interp, frame, stmt):
         return (types.Int,)
 
     @interp.impl(stmts.Pow, types.Float, types.Float)
     @interp.impl(stmts.Pow, types.Float, types.Int)
     @interp.impl(stmts.Pow, types.Int, types.Float)
+    @interp.impl(stmts.Pow, types.Float, types.Bool)
+    @interp.impl(stmts.Pow, types.Bool, types.Float)
     def powf(self, interp, frame, stmt):
         return (types.Float,)
 
     @interp.impl(stmts.Pow, types.Int, types.Int)
+    @interp.impl(stmts.Pow, types.Int, types.Bool)
+    @interp.impl(stmts.Pow, types.Bool, types.Int)
+    @interp.impl(stmts.Pow, types.Bool, types.Bool)
     def powi(self, interp, frame, stmt):
         return (types.Int,)
 
