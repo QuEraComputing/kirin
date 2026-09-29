@@ -1,5 +1,5 @@
 use crate::Statement;
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::language::Dialect;
 use crate::signature::Signature;
 
@@ -109,7 +109,9 @@ impl<L: Dialect> GetInfo<L> for SpecializedFunction {
             .get(staged_func)
             .and_then(|f| f.specializations.get(idx))
     }
+}
 
+impl<L: Dialect> GetInfoMut<L> for SpecializedFunction {
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         let (staged_func, idx) = self.id();
         stage

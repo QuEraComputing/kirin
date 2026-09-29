@@ -4,7 +4,7 @@
 //! cannot do through a [`Rewriter`](crate::Rewriter). The rest of the
 //! boundary's behaviour is covered through the public API in `tests/pass.rs`.
 
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::testing::dialect::{TestLang, TestType, new_stage};
 use crate::{
     Block, CompileStage, Mismatch, Pipeline, QuarantineCause, Quarantined, RewriteError, Rewriter,

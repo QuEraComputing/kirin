@@ -7,7 +7,7 @@
 //! derivation. A quarantine exists to show what the IR actually holds, so
 //! recomputing would hide exactly the defect being diagnosed.
 
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::testing::dialect::{TestLang, TestType, new_stage};
 use crate::{Block, QuarantineCause, Quarantined, Rewriter, SSAValue, StageInfo, Statement, Use};
 

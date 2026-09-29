@@ -1,4 +1,4 @@
-use crate::arena::{GetInfo, Id, Item};
+use crate::arena::{GetInfo, GetInfoMut, Id, Item};
 use crate::identifier;
 use crate::language::Dialect;
 use crate::signature::{Signature, SignatureCmp, SignatureSemantics};
@@ -190,7 +190,9 @@ impl<L: Dialect> GetInfo<L> for StagedFunction {
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.staged_functions.get(*self)
     }
+}
 
+impl<L: Dialect> GetInfoMut<L> for StagedFunction {
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         stage.staged_functions.get_mut(*self)
     }

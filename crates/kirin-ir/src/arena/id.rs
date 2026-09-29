@@ -20,12 +20,16 @@ pub trait Identifier:
 {
 }
 
+/// Look up the info a node id points at.
+///
+/// Read-only. Mutable lookup lives in the crate-private [`GetInfoMut`], because
+/// modifying nodes from outside kirin-ir should exclusively be done using
+/// [`Rewriter`](crate::Rewriter). In other words, outside this crate, IR is
+/// read through this trait [`GetInfo`] and written through the `Rewriter`.
 pub trait GetInfo<L: Dialect>: std::fmt::Debug {
     type Info;
     /// Get a reference to the context info for the given node pointer.
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info>;
-    /// Get a mutable reference to the context info for the given node pointer.
-    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info>;
     /// Get a reference to the context info for the given node pointer, panicking if not found.
     fn expect_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> &'a Self::Info {
         self.get_info(stage).unwrap_or_else(|| {
@@ -35,15 +39,15 @@ pub trait GetInfo<L: Dialect>: std::fmt::Debug {
             )
         })
     }
-    /// Get a mutable reference to the context info for the given node pointer, panicking if not found.
-    fn expect_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> &'a mut Self::Info {
-        self.get_info_mut(stage).unwrap_or_else(|| {
-            panic!(
-                "Expected to find mutable info for ID {:?} in stage, but none was found.",
-                self
-            )
-        })
-    }
+}
+
+/// Mutable node lookup, the write half of [`GetInfo`].
+///
+/// Crate-private: reaching a node's info mutably bypasses every guarantee the
+/// mutation layer makes given that there is no maintenance of the derived mirrors.
+pub(crate) trait GetInfoMut<L: Dialect>: GetInfo<L> {
+    /// Get a mutable reference to the context info for the given node pointer.
+    fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info>;
 }
 
 #[macro_export(local_inner_macros)]
