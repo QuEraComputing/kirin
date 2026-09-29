@@ -37,6 +37,7 @@ class ToRangeFor(RewriteRule):
 
         ele_arg = body_block.args[0]
         index = body_block.args.insert_from(0, types.Int)
+        assert body_block.first_stmt is not None, "first stmt does not exists"
         (ele_getitem := py.GetItem(iterable, index)).insert_before(
             body_block.first_stmt
         )

@@ -1,32 +1,38 @@
 name: Lint
+
 on:
   pull_request:
   push:
     branches:
       - main
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
 jobs:
-  ruff:
+  pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
-      - uses: chartboost/ruff-action@v1
-  black:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: psf/black@stable
-  pyright:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
+
       - name: Install uv
         uses: astral-sh/setup-uv@v7
         with:
-          # Install a specific version of uv.
+          version: "0.6.14"
+          enable-cache: true
+          cache-dependency-glob: "uv.lock"
+
+      - name: Run pre-commit
+        run: uv run --locked pre-commit run --all-files
+
+  pyright:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Install uv
+        uses: astral-sh/setup-uv@v7
+        with:
           version: "0.6.14"
           enable-cache: true
           cache-dependency-glob: "uv.lock"
