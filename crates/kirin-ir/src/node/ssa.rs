@@ -1,4 +1,4 @@
-use crate::arena::{GetInfo, Id, Identifier};
+use crate::arena::{GetInfo, GetInfoMut, Id, Identifier};
 use crate::identifier;
 use crate::{Dialect, Symbol};
 use smallvec::SmallVec;
@@ -428,7 +428,12 @@ where
         // Deref through Item to Option<SSAInfo<L>>, then unwrap the Option ref
         (**item).as_ref()
     }
+}
 
+impl<L: Dialect, T> GetInfoMut<L> for T
+where
+    T: Into<SSAValue> + Identifier,
+{
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         let item = stage.ssas.get_mut(*self)?;
         if item.deleted() {

@@ -2,7 +2,7 @@ use smallvec::SmallVec;
 
 use crate::{
     Dialect, Symbol,
-    arena::{GetInfo, Id, Item},
+    arena::{GetInfo, GetInfoMut, Id, Item},
     identifier,
 };
 
@@ -183,7 +183,9 @@ impl<L: Dialect> GetInfo<L> for Block {
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.blocks.get(*self)
     }
+}
 
+impl<L: Dialect> GetInfoMut<L> for Block {
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         stage.blocks.get_mut(*self)
     }
@@ -195,7 +197,9 @@ impl<L: Dialect> GetInfo<L> for Successor {
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.blocks.get(self.target())
     }
+}
 
+impl<L: Dialect> GetInfoMut<L> for Successor {
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         stage.blocks.get_mut(self.target())
     }

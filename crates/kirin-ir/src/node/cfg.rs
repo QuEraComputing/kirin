@@ -1,4 +1,4 @@
-use crate::arena::{GetInfo, Id, Item};
+use crate::arena::{GetInfo, GetInfoMut, Id, Item};
 use crate::{Dialect, identifier};
 
 use super::block::Block;
@@ -44,7 +44,9 @@ impl<L: Dialect> GetInfo<L> for CFG {
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.cfgs.get(*self)
     }
+}
 
+impl<L: Dialect> GetInfoMut<L> for CFG {
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         stage.cfgs.get_mut(*self)
     }
