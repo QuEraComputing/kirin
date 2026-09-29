@@ -120,7 +120,7 @@ impl<L: Dialect> SSAInfo<L> {
         &self.uses
     }
 
-    pub fn uses_mut(&mut self) -> &mut SmallVec<[Use; 2]> {
+    pub(crate) fn uses_mut(&mut self) -> &mut SmallVec<[Use; 2]> {
         &mut self.uses
     }
 }
@@ -203,10 +203,6 @@ impl<L: Dialect> BuilderSSAInfo<L> {
 
     pub fn uses(&self) -> &SmallVec<[Use; 2]> {
         &self.uses
-    }
-
-    pub fn uses_mut(&mut self) -> &mut SmallVec<[Use; 2]> {
-        &mut self.uses
     }
 
     /// Convert to finalized SSAInfo. Fails if kind unresolved or type missing.
