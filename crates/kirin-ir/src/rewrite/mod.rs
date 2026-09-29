@@ -18,6 +18,8 @@
 //! guarantee, and [`pass`] for the boundary's failure routes.
 
 pub(crate) mod pass;
+#[cfg(test)]
+mod pass_tests;
 pub(crate) mod quarantine;
 pub(crate) mod rewriter;
 

@@ -13,6 +13,8 @@ mod project;
 mod rewrite;
 mod signature;
 mod stage;
+#[cfg(test)]
+mod testing;
 
 /// Queries from the IRContext.
 pub mod query;
