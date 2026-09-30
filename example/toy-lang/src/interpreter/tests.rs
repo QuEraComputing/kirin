@@ -565,7 +565,7 @@ mod advanced {
 
     use kirin_constprop::{ConstPropContext, ConstPropValue};
     use kirin_interpreter::SameStageLinker;
-use kirin_interpreter::engine::{
+    use kirin_interpreter::engine::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild, BlockFrame,
         CFGFrame, CallContext, CallFrame, Completion, ConcreteInterpreter, CrossStageLinker,
         DefaultBodyFrames, DiGraphFrame, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,

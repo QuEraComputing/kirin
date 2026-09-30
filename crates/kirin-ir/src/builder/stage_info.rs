@@ -3,10 +3,11 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 use crate::arena::Arena;
+use crate::derived::{derive_mirrors, install_and_derive_mirrors_unchecked, install_mirrors};
 use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, SSAValue};
 use crate::node::stmt::StatementParent;
 use crate::stage::arenas::Arenas;
-use crate::{Dialect, StageInfo, node::*};
+use crate::{Dialect, Finding, StageInfo, node::*};
 
 /// Trait for types that provide mutable access to a [`BuilderStageInfo`].
 ///
@@ -41,6 +42,8 @@ pub enum FinalizeError {
     TestSSA(SSAValue),
     /// An SSA value has no type set (`ty` is `None`).
     MissingType(SSAValue),
+    /// The IR being finalized has dangling references. These are all reported as [`Finding`]s
+    MalformedIR(Vec<Finding>),
 }
 
 impl fmt::Display for FinalizeError {
@@ -54,6 +57,13 @@ impl fmt::Display for FinalizeError {
             }
             FinalizeError::MissingType(ssa) => {
                 write!(f, "SSA value {ssa} has no type set in finalized IR")
+            }
+            FinalizeError::MalformedIR(findings) => {
+                write!(f, "IR is malformed: ({} findings)", findings.len())?;
+                for finding in findings {
+                    write!(f, "\n  - {finding}")?;
+                }
+                Ok(())
             }
         }
     }
@@ -240,8 +250,9 @@ impl<L: Dialect> BuilderStageInfo<L> {
             nodes: self.nodes,
             ssas,
         };
-        stage.rebuild_use_index();
-        stage.rebuild_predecessor_index();
+        let mirrors = derive_mirrors(&stage)
+            .map_err(|e| FinalizeError::MalformedIR(e.findings().to_vec()))?;
+        install_mirrors(&mut stage, mirrors);
         Ok(stage)
     }
 
@@ -286,8 +297,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             nodes: self.nodes,
             ssas,
         };
-        stage.rebuild_use_index();
-        stage.rebuild_predecessor_index();
+        install_and_derive_mirrors_unchecked(&mut stage);
         stage
     }
 }

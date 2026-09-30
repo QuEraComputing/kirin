@@ -1407,19 +1407,20 @@ This initial model has landed as the public `Use` enum. The design task remains
 to inventory all semantic SSA reference positions and separately list the
 derived metadata that each mutation must synchronize. The reverse
 `SSAValue -> uses` index (`SSAInfo::uses`) records statement operands and
-`DiGraph` yields. The current `StageInfo::finalize` populates it through
-`rebuild_use_index`; the M1 target replaces that public recovery operation with
-pure derivation and a finalize-only installer. Every current `Rewriter` edit (`replace_operand`,
-`replace_all_uses`, `erase_statement`, `insert_before`/`insert_after`,
-`replace_statement`) maintains it incrementally.
+`DiGraph` yields. After M1, `StageInfo::finalize` now populates it through pure
+derivation and a finalize-only installer; the public mutating
+`rebuild_use_index` is gone. Every current `Rewriter` edit (`replace_operand`,
+`replace_all_uses`, `replace_results`, `erase_statement`,
+`insert_before`/`insert_after`, `replace_statement`) maintains it
+incrementally.
 
 The index is derived metadata over authoritative statement/yield slots, not a
 substitute for them. The pass-boundary checker must derive it independently
-because raw legacy mutation paths can still bypass `Rewriter`. The current
-rewriter also does not yet provide the complete ownership, graph-topology, and
-derived-comparison contract described below. Type, visibility, dominance, and
-dialect validity remain responsibilities of the separate future whole-stage
-verifier.
+because raw legacy mutation paths can still bypass `Rewriter`. Derived
+comparison has landed for the two mirrors that exist today (see below); the
+ownership boundary and graph-topology mirrors have not. Type, visibility,
+dominance, and dialect validity remain responsibilities of the separate future
+whole-stage verifier.
 
 The pass boundary derives expected uses from authoritative slots and compares
 them with the installed index. It never installs the expected value into a
@@ -1436,22 +1437,27 @@ left to the separate whole-stage verifier.
 
 ### Derive, install, verify — never repair
 
-All derived services follow one split:
+**Landed** for the use and predecessor mirrors, in `kirin-ir`'s `derived`
+module. All derived services follow one split:
 
 ```rust,ignore
 pub(crate) fn derive_mirrors<L: Dialect>(
     stage: &StageInfo<L>,
-) -> Result<Mirrors<L>, DeriveError>;
+) -> Result<Mirrors, DeriveError>;
 
 pub(crate) fn install_mirrors<L: Dialect>(
     stage: &mut StageInfo<L>,
-    mirrors: Mirrors<L>,
+    mirrors: Mirrors,
 ); // finalize only
 
 pub fn verify_derived<L: Dialect>(
     stage: &StageInfo<L>,
 ) -> Result<(), VerifyError>;
 ```
+
+`Mirrors` is deliberately not parameterized by the dialect: every mirror holds
+arena ids (`Statement`, `SSAValue`, `Block`, `DiGraph`) and nothing
+dialect-specific, so an `L` would only be `PhantomData`.
 
 Finalize first assembles a `StageInfo`, derives from `&StageInfo`, and installs
 before the stage is published. A pass boundary derives a complete fresh mirror,
@@ -1460,13 +1466,32 @@ would duplicate derivation rules and invite drift. `DeriveError` means
 authoritative input is broken; `VerifyError::Mismatch` means maintained metadata
 disagrees and therefore a mutation path is broken. Component derivation helpers
 and installers remain crate-private; no mutating recovery entry point is public.
+The only public names are `verify_derived`, `DeriveError`, `Finding`,
+`Mismatch`, and `VerifyError`.
 
-`derive_use_index` replaces public mutating `rebuild_use_index`. Missing or
+
+Pure derivation replaces the public mutating `rebuild_use_index` and
+`rebuild_predecessor_index`, both now deleted. Missing or
 out-of-range/tombstoned statement operands produce
 `DanglingOperand { stmt, index, value }`; directed-graph yields produce
-`DanglingYield { graph, index, value }`.
+`DanglingYield { graph, index, value }`; successor references to a dead block
+produce `DanglingSuccessor { stmt, target }`.
 Later derivations apply the same rule to body ownership and mirrors. Derivation
-collects independent findings rather than stopping at the first one.
+collects independent findings rather than stopping at the first one — component
+derivations share one findings buffer instead of returning early, so a single
+scan reports every independent defect.
+
+Mirrors are never compared with `==` on their storage. Incremental maintenance
+reorders lists so an accurate mirror and a fresh derivation routinely hold the same entries in a
+different order. Comparison is therefore order-insensitive but
+multiplicity-preserving: a statement can read one value twice (`add %x, %x` is
+two distinct uses of `%x`), so collapsing to a set would hide a real defect.
+
+For the two per-node mirrors, derivation writes into a dense side table keyed by
+the arena id rather than an `Arena`. An arena *owns* its contents, carrying a
+`deleted` flag whose iterators honour it; a mirror owns nothing, so a second
+liveness claim would be exactly the duplicated truth this layer exists to
+detect. Liveness stays authoritative in the source arena.
 
 For graph bodies, `StatementInfo::parent` is authoritative membership.
 `StableGraph` plus `IndexMap<Statement, GraphMember>` is one derived mirror:
@@ -1816,6 +1841,7 @@ does not duplicate the whole verifier:
 | unknown/dead id, bad index | reject with `RewriteError` | independently diagnosed if present |
 | statement links and parent ownership | maintain mechanically | derive chains and compare summaries |
 | use queries | incrementally maintain | derive and compare the exact index |
+| control-flow edges | incrementally maintain `BlockInfo::predecessors` | derive from parents/successors and compare as multisets |
 | graph topology | maintain `StableGraph` and ordered member map atomically | derive from membership/values and compare normalized multisets |
 | types | no general preflight | verify |
 | visibility/dominance | no general preflight | verify |
@@ -1869,8 +1895,9 @@ axis — hence the column.
 |---|---|---|---|
 | `UnknownStatement(stmt)` | liveness | id does not resolve to a live (non-tombstoned) statement | all statement methods |
 | `UnknownValue(value)` | liveness | SSA id does not resolve to a live value | `replace_operand`, `replace_all_uses`, `insert_*`, `replace_statement` |
+| `UnknownBlock(block)` | liveness | a successor target does not resolve to a live block; the new edge would dangle | `replace_statement` |
 | `OperandIndexOutOfRange { stmt, index }` | liveness | operand index past the statement's operand list | `replace_operand` |
-| `NotInBlockBody(stmt)` | deferred | statement is owned by a `DiGraph`/`UnGraph` (or nothing), not a block — graph surgery deferred | `erase_statement`, `insert_*` |
+| `NotInBlockBody(stmt)` | deferred | statement is owned by a `DiGraph`/`UnGraph` (or nothing), not a block — graph surgery deferred | `erase_statement`, `insert_*`, `replace_statement` |
 | `CannotEraseTerminator(stmt)` | deferred | erasing a block terminator would need control-flow repair, deferred | `erase_statement` |
 | `StatementResultsInUse(stmt)` | guard | a result of the statement is still used elsewhere; replace those uses first | `erase_statement` |
 | `AnchorIsTerminator(stmt)` | deferred | insertion relative to a terminator is deferred | `insert_*` |
@@ -2498,7 +2525,9 @@ have.
   semantic uses.
 - [x] Add the public `Use` representation for statement operands and directed-
   graph yields.
-- [x] Populate `SSAInfo::uses` at finalize through `rebuild_use_index`.
+- [x] Populate `SSAInfo::uses` at finalize. (Originally through the public
+  `rebuild_use_index`; M1 replaced that with pure derivation plus a
+  finalize-only installer and deleted the public method.)
 - [x] Maintain the index in the first `replace_operand` / `replace_all_uses`
   rewriter slice.
 
@@ -2519,11 +2548,15 @@ legality, and dialect validity remains a separate future subsystem.
   definitions).
 - [x] Implement `replace_statement` (in-place definition swap preserving id and
   result identity).
+- [x] Maintain `BlockInfo::predecessors` across `replace_statement`, comparing
+  old and new successor *sets* so a target keeping any edge keeps its single
+  entry.
 - [x] Emit mutation events (`ChangedOperands`, `ReplacedUses`,
   `InsertedStatement`, `ErasedStatement`, `ReplacedStatement`).
 - [x] Precondition-check current executable/mechanical failures with typed
   `RewriteError`; tests cover use-lists, block-list surgery, and
-  index-equals-rebuild.
+  index-equals-rebuild (now expressed as `verify_derived`, which compares every
+  value and block rather than the few a test names).
 
 **Rewrite-pass contract machinery:**
 
@@ -2536,7 +2569,7 @@ legality, and dialect validity remains a separate future subsystem.
   because Kirin forbids unsafe/raw storage: an unwind can leave logical
   incoherence, not memory unsafety. Error and panic paths return a non-`Clone`,
   non-`Default` `Quarantined<StageInfo<L>>` with no ordinary IR access.
-- [ ] Add pure `derive_mirrors(&StageInfo) -> Result<Mirrors, DeriveError>`, a
+- [x] Add pure `derive_mirrors(&StageInfo) -> Result<Mirrors, DeriveError>`, a
   crate-private installer used only by finalize, and public read-only
   `verify_derived(&StageInfo) -> Result<(), VerifyError>`. `VerifyError`
   distinguishes broken authoritative IR (`Derive`) from a mutation-layer mirror
