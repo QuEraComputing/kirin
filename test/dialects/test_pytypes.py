@@ -139,3 +139,8 @@ def test_literal_tells_equal_data_of_different_types_apart():
     assert Literal(1.0).type == Float
     assert Literal(1) is Literal(1)
     assert hash(Literal(1)) != hash(Literal(True))
+    assert not Literal(1, Int).is_structurally_equal(Literal(True, Int))
+    assert not Literal((3, False), AnyType()).is_structurally_equal(
+        Literal((3, 0.0), AnyType())
+    )
+    assert Literal(1).is_structurally_equal(Literal(1))

@@ -356,7 +356,7 @@ class Literal(TypeAttribute, typing.Generic[LiteralType], metaclass=LiteralMeta)
     ) -> bool:
         return (
             isinstance(other, Literal)
-            and self.data == other.data
+            and _literal_key(self.data) == _literal_key(other.data)
             and self.type.is_structurally_equal(other.type, context=context)
         )
 
