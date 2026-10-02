@@ -3,20 +3,32 @@
 from __future__ import annotations
 
 import struct
+from typing import Callable
 from collections import deque
 from dataclasses import dataclass
 
 from kirin import ir, types
-from kirin.rewrite import Walk, WrapConst, Call2Invoke
+from kirin.rewrite import Walk, Chain, WrapConst, Call2Invoke
 from kirin.analysis import const
 from kirin.dialects import func
 from kirin.passes.abc import Pass
 from kirin.passes.fold import Fold
-from kirin.rewrite.abc import RewriteResult
+from kirin.rewrite.abc import RewriteRule, RewriteResult
 from kirin.dialects.ilist import Map, New, Scan, Foldl, Foldr, IList, ForEach
 from kirin.dialects.py.constant import Constant
 from kirin.dialects.ilist.rewrite import Unroll, InlineGetItem
-from kirin.rewrite.specialize_invoke import SpecializeInvoke
+from kirin.rewrite.specialize_invoke import (
+    SpecializeInvoke,
+    SpecializationFactory,
+    SpecializeClosureCall,
+)
+
+
+def _fact(value: ir.SSAValue) -> const.Result:
+    if isinstance(value.owner, Constant):
+        return const.Value(value.owner.value.unwrap())
+    hint = value.hints.get("const")
+    return hint if isinstance(hint, const.Result) else const.Unknown()
 
 
 def constant_key(value: object) -> tuple | None:
@@ -61,8 +73,12 @@ class Specialize(Pass):
 
     Each invocation starts from one method and owns a fresh cache.
     Generic methods retain their signatures; visited bodies may be folded.
-    Known lambda-backed methods retain their bound closure fields. Local
-    lambdas whose captures are still dynamic are not specialized.
+    Known lambda-backed methods retain their bound closure fields. A call to a
+    local lambda whose captures are still dynamic uses a clone of the lambda
+    statement, created next to it with the same captures and the constant
+    arguments bound; the clone's body is analyzed with the captures' facts.
+    A closure shares its body with the lambda statement that created it, so
+    it is cloned before that body is rewritten, even when no argument binds.
     Map, ForEach, Foldl, Foldr, and Scan operations with a statically known
     length are expanded to expose callback calls when at least one element
     is constant with a supported specialization key.
@@ -71,9 +87,18 @@ class Specialize(Pass):
     DSLs extend the bindable set by registering [`ir.Data`][kirin.ir.Data]
     attributes with structural ``__hash__`` / ``__eq__``. Builtin Python
     values in [`ir.PyAttr`][kirin.ir.PyAttr] stay on the careful whitelist.
+
+    ``extra_rules`` supplies rewrite-rule factories for DSL-specific callsites.
+    Each factory receives ``materialize`` and is instantiated once per pass run.
+    Rules run after constant hinting alongside ``SpecializeInvoke``. They map
+    operands to callee argument facts and retarget their own statements using
+    the returned method and retained argument indices. Materialization shares
+    this pass's cache, budget, and queue; created variants are processed normally.
+    Custom callsites that are not rewritten are not traversed by this hook.
     """
 
     max_specializations: int = 32
+    extra_rules: tuple[Callable[[SpecializationFactory], RewriteRule], ...] = ()
 
     def __post_init__(self):
         if self.max_specializations < 0:
@@ -88,6 +113,9 @@ class Specialize(Pass):
         self.seen: set[ir.Method] = set()
         self.names: set[str | None] = set()
         self.ordinal = 0
+        self.closure_cache: dict[tuple, tuple[func.Lambda, tuple[int, ...]]] = {}
+        self.closure_counts: dict[func.Lambda, int] = {}
+        self.closures: list[func.Lambda] = []
         if self.max_specializations == 0:
             return RewriteResult()
         return self._run(mt)
@@ -147,12 +175,19 @@ class Specialize(Pass):
         self.pending.append(root)
         result = RewriteResult()
         unroll = Unroll()
+        specialize = Chain(
+            SpecializeInvoke(self.materialize),
+            SpecializeClosureCall(self.materialize_closure),
+            *(factory(self.materialize) for factory in self.extra_rules),
+        )
         rolled_ilist = (Map, ForEach, Foldl, Foldr, Scan)
         while self.pending:
             mt = self.pending.popleft()
             if mt in self.seen:
                 continue
             self.seen.add(mt)
+            if mt is not root and not self._owns_body(mt):
+                continue
             old_callees = self._callees(mt)
             if any(isinstance(stmt, rolled_ilist) for stmt in mt.code.walk()):
                 result = Fold(mt.dialects, no_raise=self.no_raise)(mt).join(result)
@@ -168,9 +203,12 @@ class Specialize(Pass):
                     stmt.result.hints["const"] = const.Value(stmt.value.data)
             result = Walk(InlineGetItem()).rewrite(mt.code).join(result)
             result = Walk(Call2Invoke()).rewrite(mt.code).join(result)
-            result = (
-                Walk(SpecializeInvoke(self.materialize)).rewrite(mt.code).join(result)
-            )
+            result = Walk(specialize).rewrite(mt.code).join(result)
+            while self.closures:
+                clone = self.closures.pop()
+                result = self._specialize_closure(mt.dialects, clone, specialize).join(
+                    result
+                )
             result = Fold(mt.dialects, no_raise=self.no_raise)(mt).join(result)
             new_callees = self._callees(mt)
             for callee in set(old_callees) - set(new_callees):
@@ -178,6 +216,16 @@ class Specialize(Pass):
             mt.update_backedges()
             self.pending.extend(new_callees)
         return result
+
+    @staticmethod
+    def _owns_body(mt: ir.Method) -> bool:
+        # A closure's code is the lambda statement that created it: still in a
+        # block, or deleted by folding, which orphans the body. Only a detached
+        # lambda, such as a clone from this pass, belongs to one method alone.
+        code = mt.code
+        return not isinstance(code, func.Lambda) or (
+            code.parent is None and code.body.parent_node is code
+        )
 
     @staticmethod
     def _callees(mt: ir.Method) -> tuple[ir.Method, ...]:
@@ -203,7 +251,7 @@ class Specialize(Pass):
             constant_key(arg.data) if isinstance(arg, const.Value) else None
             for arg in args
         )
-        if all(key is None for key in keys):
+        if all(key is None for key in keys) and self._owns_body(original):
             return None
         key = (original, keys)
         if key in self.cache:
@@ -239,7 +287,98 @@ class Specialize(Pass):
             # This is an already-bound method: its fields hold the captures.
             # The detached clone must not reference the original creation site.
             code.captured = ()
-        entry = clone.callable_region.blocks[0]
+        clone.sym_name = self._bind(code, args, retained, original.sym_name, original)
+        clone.nargs = len(clone.callable_region.blocks[0].args)
+        if original.arg_names is not None:
+            clone.arg_names = [original.arg_names[0]] + [
+                original.arg_names[i + 1] for i in retained
+            ]
+        clone.inferred = False
+        clone.verify()
+        return clone
+
+    def materialize_closure(
+        self, lam: func.Lambda, args: tuple[const.Result, ...]
+    ) -> tuple[func.Lambda, tuple[int, ...]] | None:
+        """Reuse or create a clone of a local closure with constant arguments.
+
+        The clone is a lambda statement next to `lam` with the same captures,
+        so a capture known only at run time stays a capture.
+        """
+        entry = lam.body.blocks[0]
+        if lam.parent is None or not len(args) == len(lam.slots) == len(entry.args) - 1:
+            return None
+        keys = tuple(
+            constant_key(arg.data) if isinstance(arg, const.Value) else None
+            for arg in args
+        )
+        if all(key is None for key in keys):
+            return None
+        key = (lam, keys)
+        if key in self.closure_cache:
+            return self.closure_cache[key]
+        count = self.closure_counts.get(lam, 0)
+        if count >= self.max_specializations:
+            return None
+        if entry.first_stmt is None or any(
+            entry in stmt.successors for stmt in lam.walk()
+        ):
+            # Entry backedges would require adapting their argument lists too.
+            return None
+        if any(not isinstance(use.stmt, func.GetField) for use in entry.args[0].uses):
+            # The clone takes fewer arguments, so `self` may only read captures.
+            return None
+        retained = tuple(i for i, key in enumerate(keys) if key is None)
+        clone = lam.from_stmt(lam, regions=[lam.body.clone()])
+        self._bind(clone, args, retained, lam.sym_name)
+        clone.insert_after(lam)
+        self.closure_counts[lam] = count + 1
+        self.closure_cache[key] = (clone, retained)
+        self.closures.append(clone)
+        return clone, retained
+
+    def _specialize_closure(
+        self, dialects: ir.DialectGroup, clone: func.Lambda, specialize: RewriteRule
+    ) -> RewriteResult:
+        """Hint and rewrite the body of a closure clone as for a method body.
+
+        The enclosing method's analysis never enters a lambda body's frame, so
+        the clone is analyzed on its own, with the facts of its captures.
+        """
+        captured = tuple(_fact(value) for value in clone.captured)
+        inputs = tuple(const.Unknown() for _ in clone.signature.inputs)
+        analysis = const.Propagate(dialects)
+        try:
+            with analysis.eval_context():
+                frame, _ = analysis.call(
+                    clone, const.PartialLambda(clone, captured), *inputs
+                )
+        except Exception:
+            if not self.no_raise:
+                raise
+            return RewriteResult()
+        body = clone.body
+        result = Walk(WrapConst(frame)).rewrite(body)
+        for stmt in body.walk():
+            if isinstance(stmt, Constant) and isinstance(stmt.value, ir.PyAttr):
+                stmt.result.hints["const"] = const.Value(stmt.value.data)
+        result = Walk(InlineGetItem()).rewrite(body).join(result)
+        result = Walk(Call2Invoke()).rewrite(body).join(result)
+        return Walk(specialize).rewrite(body).join(result)
+
+    def _bind(
+        self,
+        code: func.Function | func.Lambda,
+        args: tuple[const.Result, ...],
+        retained: tuple[int, ...],
+        base: str,
+        original: ir.Method | None = None,
+    ) -> str:
+        """Replace omitted parameters with constants and give `code` a new name.
+
+        With `original`, `self` in the body is replaced by that method.
+        """
+        entry = code.body.blocks[0]
         first = entry.first_stmt
         assert first is not None
         # Hints belong to the analysis context, not the original syntax.
@@ -248,7 +387,7 @@ class Specialize(Pass):
                 value.hints.pop("const", None)
         # Self inside the original body denotes the original method, including
         # recursive calls with its original arity and accesses to captures.
-        if entry.args[0].uses:
+        if original is not None and entry.args[0].uses:
             method_const = Constant(original)
             method_const.insert_before(first)
             entry.args[0].replace_by(method_const.result)
@@ -272,16 +411,9 @@ class Specialize(Pass):
         )
         while True:
             self.ordinal += 1
-            name = f"{original.sym_name}_specialized_{self.ordinal}"
+            name = f"{base}_specialized_{self.ordinal}"
             if name not in self.names:
                 break
         self.names.add(name)
-        code.sym_name = clone.sym_name = name
-        clone.nargs = len(entry.args)
-        if original.arg_names is not None:
-            clone.arg_names = [original.arg_names[0]] + [
-                original.arg_names[i + 1] for i in retained
-            ]
-        clone.inferred = False
-        clone.verify()
-        return clone
+        code.sym_name = name
+        return name

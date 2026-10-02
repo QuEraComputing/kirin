@@ -86,7 +86,10 @@ def test_lambda_with_dynamic_captures_remains_a_call():
     Specialize(root.dialects, no_raise=False)(root)
     assert not get_invokes(root)
     (call,) = [stmt for stmt in root.code.walk() if isinstance(stmt, func.Call)]
-    assert call.callee.owner is source
+    clone = call.callee.owner
+    assert isinstance(clone, func.Lambda) and clone is not source
+    assert clone.slots == ("z",)
+    assert len(clone.captured) == 1
     assert source.slots == ("x", "z")
     root(10, 4)
     root(20, 4)
