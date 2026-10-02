@@ -600,7 +600,10 @@ where
 {
     let info = pipeline
         .stage(stage)
-        .ok_or(InterpreterError::MissingStage(stage))?;
+        .ok_or_else(|| match pipeline.stage_status(stage) {
+            Some(status) => InterpreterError::UnavailableStage(stage, status),
+            None => InterpreterError::MissingStage(stage),
+        })?;
     S::dispatch_stage_action(info, stage, &mut action)?
         .ok_or(InterpreterError::MissingStageInfo(stage))
 }

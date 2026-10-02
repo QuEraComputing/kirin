@@ -162,7 +162,7 @@ fn test_pipeline_parse_accepts_mixed_function_names() {
     );
 
     let parsed = pipeline.parse(&input).unwrap();
-    assert_eq!(pipeline.stages().len(), 2);
+    assert_eq!(pipeline.stages().count(), 2);
     assert_eq!(
         parsed_names(&pipeline, parsed),
         BTreeSet::from(["bar".into(), "foo".into()])
@@ -195,7 +195,7 @@ fn test_stage_enum_pipeline_parse_uses_stage_symbol_mapping() {
     let parsed = pipeline.parse(&input).unwrap();
     assert_eq!(parsed.len(), 2);
     assert!(matches!(
-        pipeline.stages(),
+        pipeline.stages().collect::<Vec<_>>().as_slice(),
         [StageBucket::Parse(_), StageBucket::Lower(_)]
     ));
 }
@@ -322,7 +322,7 @@ fn test_pipeline_parse_uses_stage_language_dispatch() {
     let parsed = pipeline.parse(&input).unwrap();
     assert_eq!(parsed.len(), 2);
     assert!(matches!(
-        pipeline.stages(),
+        pipeline.stages().collect::<Vec<_>>().as_slice(),
         [MixedStage::StageA(_), MixedStage::StageB(_)]
     ));
 
@@ -333,7 +333,6 @@ fn test_pipeline_parse_uses_stage_language_dispatch() {
 
     let stage_b = pipeline
         .stages()
-        .iter()
         .find_map(|s| match s {
             MixedStage::StageB(stage) => Some(stage),
             _ => None,
@@ -396,7 +395,7 @@ fn test_pipeline_numeric_stage_lookup_by_existing_id() {
     assert!(result.is_ok());
 
     // The stage exists with name "A" at some ID
-    assert_eq!(pipeline.stages().len(), 1);
+    assert_eq!(pipeline.stages().count(), 1);
     let _ = stage_id; // stage was pre-created
 }
 
@@ -477,4 +476,35 @@ fn test_invalid_declaration_keyword() {
     let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
     let err = pipeline.parse("define @A fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
+}
+
+/// A position a failed pass poisoned still answers to its name, so parsing
+/// `@A` must resolve to it rather than silently create a second stage called
+/// `@A`.
+#[test]
+fn test_parse_does_not_duplicate_a_poisoned_stage() {
+    use kirin_ir::{RewriteError, StageStatus};
+
+    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let stage_a = pipeline
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("A")
+        .new();
+
+    let _ = pipeline
+        .run_pass::<FunctionBody, _, (), _>(stage_a, |_| Err(RewriteError::CannotInsertTerminator));
+    assert_eq!(
+        pipeline.stage_status(stage_a),
+        Some(StageStatus::Poisoned),
+        "the pass should have poisoned @A"
+    );
+
+    let input = format!("specialize @A fn @foo(()) -> () {BODY}");
+    assert!(pipeline.parse(&input).is_err());
+    assert_eq!(
+        pipeline.stage_names().count(),
+        1,
+        "@A must resolve to the existing position, not create a second one"
+    );
 }

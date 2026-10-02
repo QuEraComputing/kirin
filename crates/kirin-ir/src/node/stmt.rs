@@ -11,12 +11,23 @@ identifier! {
     struct Statement
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StatementParent {
     Block(Block),
     DiGraph(DiGraph),
     UnGraph(UnGraph),
+}
+
+/// Produces Block(id) instead of Block(Block(id))
+impl std::fmt::Debug for StatementParent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StatementParent::Block(block) => write!(f, "{block:?}"),
+            StatementParent::DiGraph(digraph) => write!(f, "{digraph:?}"),
+            StatementParent::UnGraph(ungraph) => write!(f, "{ungraph:?}"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
