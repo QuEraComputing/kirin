@@ -1,10 +1,10 @@
-from typing import final
+from typing import Iterable, final
 from dataclasses import field, dataclass
 
 from kirin import ir, types, interp
 from kirin.analysis.forward import ForwardExtra, ForwardFrame
 
-from .lattice import Value, Result, Unknown
+from .lattice import Value, Result, Unknown, PartialTuple, PartialLambda
 
 
 @dataclass
@@ -13,6 +13,40 @@ class Frame(ForwardFrame[Result]):
     """If any ir.MaybePure is actually pure."""
     frame_is_not_pure: bool = False
     """If we hit any non-pure statement."""
+
+
+def _fact_id(fact: Result) -> int:
+    """Get the ID of a fact for use in a cache key."""
+    return id(fact.data) if type(fact) is Value else id(fact)
+
+
+def _holds_closure(facts: Iterable[Result]) -> bool:
+    """Whether `facts` contain a closure fact, possibly inside a partial tuple."""
+    return any(
+        type(fact) is PartialLambda
+        or (type(fact) is PartialTuple and _holds_closure(fact.data))
+        for fact in facts
+    )
+
+
+@dataclass(frozen=True)
+class _CallSummary:
+    """What an analyzed call returned and left in its frame."""
+
+    arguments: tuple[Result, ...]
+    """Kept alive so that the ids in the call's key cannot be reused."""
+    result: Result
+    entries: tuple[tuple[ir.SSAValue, Result], ...]
+    should_be_pure: frozenset[ir.Statement]
+    frame_is_not_pure: bool
+
+    def frame(self, node: ir.Statement) -> Frame:
+        return Frame(
+            node,
+            entries=dict(self.entries),
+            should_be_pure=set(self.should_be_pure),
+            frame_is_not_pure=self.frame_is_not_pure,
+        )
 
 
 @final
@@ -32,12 +66,30 @@ class Propagate(ForwardExtra[Frame, Result]):
     When a statement is registered under the "constprop" key in the method table,
     the analysis will call the method to evaluate the statement instead of using
     the interpreter. This allows for custom handling of statements.
+
+    With `cache_calls` set, within one run, a call with the same callee and the
+    same argument facts as a call already analyzed reuses that call's result
+    and frame instead of analyzing the callee again. A run starts whenever a
+    frame is created without a caller; the IR may change between runs, so
+    nothing is reused across them. Calls cut off at the depth limit, and calls
+    whose frame holds a closure, are analyzed every time.
     """
 
     keys = ("constprop",)
     lattice = Result
 
+    cache_calls: bool = field(default=False, kw_only=True)
+    """Whether identical calls within a run reuse one analysis. Off unless asked
+    for: a reused call skips the method tables that would have run for it, and
+    hands out the same facts where the callee would have produced fresh ones."""
+
     _interp: interp.Interpreter = field(init=False)
+    _call_summaries: dict[tuple, _CallSummary] = field(
+        default_factory=dict, init=False, repr=False
+    )
+    _cutoffs: int = field(default=0, init=False, repr=False)
+    """Calls cut off at the depth limit so far; a call during which this grows
+    is not reused."""
 
     def __post_init__(self) -> None:
         super().__post_init__()
@@ -53,9 +105,53 @@ class Propagate(ForwardExtra[Frame, Result]):
         self._interp.initialize()
         return self
 
+    def call(
+        self, node: ir.Statement | ir.Method, *args: Result, **kwargs: Result
+    ) -> tuple[Frame, Result]:
+        # `ForwardExtra.call(self, ...)` rather than `super().call(...)`: CPython
+        # gives a starred call to a bound method its own C frame, which would
+        # lower the recursion depth that analyses survive.
+        if not self.cache_calls or isinstance(node, ir.Method) or not self.state.depth:
+            # A `Method` comes back as its code once its run is set up, and a
+            # call without a caller is a whole run, whose frame its caller reads.
+            return ForwardExtra.call(self, node, *args, **kwargs)
+
+        key = (
+            node,
+            tuple(map(_fact_id, args)),
+            tuple((name, _fact_id(value)) for name, value in kwargs.items()),
+        )
+        if (summary := self._call_summaries.get(key)) is not None:
+            return summary.frame(node), summary.result
+
+        cutoffs = self._cutoffs
+        frame, result = ForwardExtra.call(self, node, *args, **kwargs)
+        # Skip caching if the call hit the recursion limit (its result depends on
+        # the call stack) or yields a closure (closures are told apart by
+        # identity, so each call site needs its own).
+        if self._cutoffs == cutoffs and not _holds_closure(
+            (result, *frame.entries.values())
+        ):
+            self._call_summaries[key] = _CallSummary(
+                (*args, *kwargs.values()),
+                result,
+                tuple(frame.entries.items()),
+                frozenset(frame.should_be_pure),
+                frame.frame_is_not_pure,
+            )
+        return frame, result
+
+    def recursion_limit_reached(self) -> Result:
+        self._cutoffs += 1
+        return super().recursion_limit_reached()
+
     def initialize_frame(
         self, node: ir.Statement, *, has_parent_access: bool = False
     ) -> Frame:
+        state = getattr(self, "state", None)  # unset before `initialize`
+        if state is None or not state.depth:
+            # A frame without a caller starts a new run.
+            self._call_summaries.clear()
         return Frame(node, has_parent_access=has_parent_access)
 
     def method_self(self, method: ir.Method) -> Result:
