@@ -1,4 +1,4 @@
-use crate::arena::{GetInfo, Id, Identifier};
+use crate::arena::{GetInfo, GetInfoMut, Id, Identifier};
 use crate::identifier;
 use crate::{Dialect, Symbol};
 use smallvec::SmallVec;
@@ -120,7 +120,7 @@ impl<L: Dialect> SSAInfo<L> {
         &self.uses
     }
 
-    pub fn uses_mut(&mut self) -> &mut SmallVec<[Use; 2]> {
+    pub(crate) fn uses_mut(&mut self) -> &mut SmallVec<[Use; 2]> {
         &mut self.uses
     }
 }
@@ -203,10 +203,6 @@ impl<L: Dialect> BuilderSSAInfo<L> {
 
     pub fn uses(&self) -> &SmallVec<[Use; 2]> {
         &self.uses
-    }
-
-    pub fn uses_mut(&mut self) -> &mut SmallVec<[Use; 2]> {
-        &mut self.uses
     }
 
     /// Convert to finalized SSAInfo. Fails if kind unresolved or type missing.
@@ -428,7 +424,12 @@ where
         // Deref through Item to Option<SSAInfo<L>>, then unwrap the Option ref
         (**item).as_ref()
     }
+}
 
+impl<L: Dialect, T> GetInfoMut<L> for T
+where
+    T: Into<SSAValue> + Identifier,
+{
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         let item = stage.ssas.get_mut(*self)?;
         if item.deleted() {

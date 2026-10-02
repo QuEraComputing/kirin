@@ -48,7 +48,7 @@ where
             .get_info(info)
             .ok_or(InterpreterError::MissingBlock(self.0))?;
         Ok(block
-            .arguments
+            .arguments()
             .iter()
             .copied()
             .map(SSAValue::from)
@@ -367,10 +367,10 @@ where
             .get_info(info)
             .ok_or(InterpreterError::MissingBlock(self.0))?;
 
-        match block.parent {
+        match block.parent() {
             Some(BlockParent::Statement(owner)) => Ok(smallvec![owner]),
             Some(BlockParent::CFG(_)) => block
-                .predecessors
+                .predecessors()
                 .iter()
                 .map(|predecessor| {
                     predecessor.terminator(info).ok_or(InterpreterError::Custom(

@@ -1,4 +1,4 @@
-use crate::arena::{GetInfo, Id, Item};
+use crate::arena::{GetInfo, GetInfoMut, Id, Item};
 use crate::identifier;
 use crate::{Dialect, node::linked_list::LinkedListNode};
 
@@ -118,7 +118,9 @@ impl<L: Dialect> GetInfo<L> for Statement {
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.statements.get(*self)
     }
+}
 
+impl<L: Dialect> GetInfoMut<L> for Statement {
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         stage.statements.get_mut(*self)
     }

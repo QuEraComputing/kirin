@@ -877,3 +877,40 @@ fn stage_names_lists_every_position_including_poisoned_ones() {
     let listed: Vec<CompileStage> = pipeline.stage_names().map(|(id, _)| id).collect();
     assert_eq!(listed, vec![first, second]);
 }
+
+// ---------------------------------------------------------------------------
+// `StageInfo::with_builder` panic safety
+// ---------------------------------------------------------------------------
+
+#[test]
+fn a_panic_inside_with_builder_keeps_what_was_built() {
+    let mut stage: StageInfo<LangA> = StageInfo::default();
+    stage.with_builder(|b| {
+        b.statement().definition(LangA).new();
+        b.statement().definition(LangA).new();
+    });
+    assert_eq!(stage.statement_arena().len(), 2);
+
+    let caught = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        stage.with_builder(|b| {
+            b.statement().definition(LangA).new();
+            panic!("construction failed halfway");
+        })
+    }));
+
+    // The panic still reaches the caller, payload intact.
+    let payload = caught.expect_err("the panic must not be swallowed");
+    assert_eq!(
+        payload.downcast_ref::<&'static str>(),
+        Some(&"construction failed halfway")
+    );
+
+    // The outward conversion leaves a `Default` behind. Keeping it would make
+    // the stage look like a program that compiled to nothing. Instead the
+    // builder's contents are reverted.
+    assert_eq!(
+        stage.statement_arena().len(),
+        3,
+        "a panic must not empty the stage"
+    );
+}

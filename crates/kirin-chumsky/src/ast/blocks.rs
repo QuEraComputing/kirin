@@ -151,7 +151,7 @@ where
         .get(block)
         .expect("block should exist");
     let block_args: Vec<kirin_ir::SSAValue> = block_info
-        .arguments
+        .arguments()
         .iter()
         .map(|arg| kirin_ir::SSAValue::from(Id::from(*arg)))
         .collect();

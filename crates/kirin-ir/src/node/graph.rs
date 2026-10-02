@@ -106,19 +106,9 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         &self.graph
     }
 
-    /// A mutable reference to the underlying petgraph.
-    pub fn graph_mut(&mut self) -> &mut petgraph::Graph<Statement, SSAValue, D> {
-        &mut self.graph
-    }
-
     /// A reference to the direction-specific extra data.
     pub fn extra(&self) -> &Extra {
         &self.extra
-    }
-
-    /// A mutable reference to the direction-specific extra data.
-    pub fn extra_mut(&mut self) -> &mut Extra {
-        &mut self.extra
     }
 }
 
@@ -137,7 +127,7 @@ impl<L: Dialect> GraphInfo<L, petgraph::Directed, DiGraphExtra> {
 
     /// Mutable access to the yield slots, for the rewriter to replace a
     /// yielded value in place while maintaining the def-use index.
-    pub fn yields_mut(&mut self) -> &mut [SSAValue] {
+    pub(crate) fn yields_mut(&mut self) -> &mut [SSAValue] {
         &mut self.extra.yields
     }
 }
