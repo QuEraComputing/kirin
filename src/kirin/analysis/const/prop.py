@@ -84,7 +84,7 @@ class Propagate(ForwardExtra[Frame, Result]):
     hands out the same facts where the callee would have produced fresh ones."""
 
     _interp: interp.Interpreter = field(init=False)
-    _call_cache: dict[tuple, _CallSummary] = field(
+    _call_summaries: dict[tuple, _CallSummary] = field(
         default_factory=dict, init=False, repr=False
     )
     _cutoffs: int = field(default=0, init=False, repr=False)
@@ -121,17 +121,18 @@ class Propagate(ForwardExtra[Frame, Result]):
             tuple(map(_fact_id, args)),
             tuple((name, _fact_id(value)) for name, value in kwargs.items()),
         )
-        if (summary := self._call_cache.get(key)) is not None:
+        if (summary := self._call_summaries.get(key)) is not None:
             return summary.frame(node), summary.result
 
         cutoffs = self._cutoffs
         frame, result = ForwardExtra.call(self, node, *args, **kwargs)
-        # A cut-off result depends on where the call was made, and analyses
-        # downstream tell closures apart by fact identity, so neither is shared.
+        # Skip caching if the call hit the recursion limit (its result depends on
+        # the call stack) or yields a closure (closures are told apart by
+        # identity, so each call site needs its own).
         if self._cutoffs == cutoffs and not _holds_closure(
             (result, *frame.entries.values())
         ):
-            self._call_cache[key] = _CallSummary(
+            self._call_summaries[key] = _CallSummary(
                 (*args, *kwargs.values()),
                 result,
                 tuple(frame.entries.items()),
@@ -150,7 +151,7 @@ class Propagate(ForwardExtra[Frame, Result]):
         state = getattr(self, "state", None)  # unset before `initialize`
         if state is None or not state.depth:
             # A frame without a caller starts a new run.
-            self._call_cache.clear()
+            self._call_summaries.clear()
         return Frame(node, has_parent_access=has_parent_access)
 
     def method_self(self, method: ir.Method) -> Result:
