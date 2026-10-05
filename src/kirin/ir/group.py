@@ -20,6 +20,7 @@ from collections.abc import Iterable
 
 from typing_extensions import Self
 
+from kirin.ir import compile_cache
 from kirin.ir.method import Method
 from kirin.ir.traits import SymbolTable, SymbolOpInterface
 from kirin.ir.exception import CompilerError, ValidationError
@@ -238,6 +239,13 @@ class DialectGroup(Generic[PassParams]):
             code = self.lowering.python_function(py_func, lineno_offset=lineno_offset)
             arg_names = ["#self#"] + inspect.getfullargspec(py_func).args
 
+            cache_dir = compile_cache.directory()
+            fingerprint = None
+            if cache_dir is not None:
+                if mt:
+                    compile_cache.forget(mt)
+                fingerprint = compile_cache.fingerprint(self, code, args, options)
+
             if mt:
                 mt.mod = inspect.getmodule(py_func)
                 mt.dialects = self
@@ -276,7 +284,16 @@ class DialectGroup(Generic[PassParams]):
                         raise e
 
             mt.run_passes = run_pass
-            run_pass(mt)
+            if cache_dir is None or fingerprint is None:
+                run_pass(mt)
+            else:
+                key = fingerprint.key
+                if not compile_cache.load(
+                    cache_dir, py_func.__name__, key, mt, fingerprint.callees
+                ):
+                    run_pass(mt)
+                    compile_cache.store(cache_dir, py_func.__name__, key, mt)
+                compile_cache.remember(mt, key)
             self.update_symbol_table(mt)
             return mt
 
