@@ -1,8 +1,12 @@
-"""Opt-in on-disk cache of compiled kernels.
+"""On-disk cache of compiled kernels, enabled by default.
 
-Setting the environment variable `KIRIN_COMPILE_CACHE_DIR` to a directory makes the
-dialect group decorators save every kernel they compile there, and load a saved
-kernel instead of running the passes again when nothing it depends on has changed.
+Dialect group decorators cache kernels in `__kirincache__` beside the Python
+source file, loading saved kernels instead of running the passes again when the
+fingerprint matches. Set `KIRIN_COMPILE_CACHE_DIR` to override the directory, or
+set it to `FALSE` (case-insensitive) to disable caching. Unset or empty values
+use the default directory. Without an override, functions
+without a real source file are compiled without caching. Unwritable cache
+directories also fall back to normal compilation.
 
 A kernel is looked up by a key over
 
@@ -47,7 +51,7 @@ if TYPE_CHECKING:
     from kirin.ir.nodes.stmt import Statement
 
 ENV_VAR = "KIRIN_COMPILE_CACHE_DIR"
-"""Directory of the cache; the cache is off when this is unset or empty."""
+"""Override the source-local cache directory; `FALSE` disables caching (case-insensitive)."""
 
 FORMAT = "1"
 """Part of every key; bump it when the key or the file layout changes."""
@@ -61,9 +65,18 @@ _toolchain: str | None = None
 reading them takes tens of milliseconds."""
 
 
-def directory() -> Path | None:
+def directory(source_file: str) -> Path | None:
+    """Choose an override or the cache beside the function's source file."""
     path = os.environ.get(ENV_VAR)
-    return Path(path) if path else None
+    if path:
+        return None if path.casefold() == "false" else Path(path)
+    if not source_file or source_file.startswith("<"):
+        return None
+    try:
+        source = Path(source_file).absolute()
+        return source.parent / "__kirincache__" if source.is_file() else None
+    except OSError:
+        return None
 
 
 @dataclasses.dataclass(frozen=True)
@@ -167,7 +180,10 @@ def store(root: Path, name: str, key: str, mt: Method) -> None:
         tmp.write_bytes(buffer.getvalue())
         os.replace(tmp, path)
     except OSError:
-        tmp.unlink(missing_ok=True)
+        try:
+            tmp.unlink(missing_ok=True)
+        except OSError:
+            pass  # read-only/inaccessible source directories must still compile
 
 
 def _path(root: Path, name: str, key: str) -> Path:

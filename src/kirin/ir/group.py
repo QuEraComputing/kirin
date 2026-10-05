@@ -239,7 +239,7 @@ class DialectGroup(Generic[PassParams]):
             code = self.lowering.python_function(py_func, lineno_offset=lineno_offset)
             arg_names = ["#self#"] + inspect.getfullargspec(py_func).args
 
-            cache_dir = compile_cache.directory()
+            cache_dir = compile_cache.directory(py_func.__code__.co_filename)
             fingerprint = None
             if cache_dir is not None:
                 if mt:
