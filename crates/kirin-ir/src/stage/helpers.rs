@@ -3,7 +3,7 @@ use crate::CompileStage;
 use super::{StageDispatchMiss, StageDispatchRequiredError};
 
 pub(super) fn dispatch_optional_with<StageRef, A, R, E, F>(
-    stage: Option<StageRef>,
+    stage: Result<StageRef, StageDispatchMiss>,
     stage_id: CompileStage,
     action: &mut A,
     dispatch: F,
@@ -11,14 +11,14 @@ pub(super) fn dispatch_optional_with<StageRef, A, R, E, F>(
 where
     F: FnOnce(StageRef, CompileStage, &mut A) -> Result<Option<R>, E>,
 {
-    let Some(stage) = stage else {
+    let Ok(stage) = stage else {
         return Ok(None);
     };
     dispatch(stage, stage_id, action)
 }
 
 pub(super) fn dispatch_required_with<StageRef, A, R, E, F>(
-    stage: Option<StageRef>,
+    stage: Result<StageRef, StageDispatchMiss>,
     stage_id: CompileStage,
     action: &mut A,
     dispatch: F,
@@ -26,11 +26,7 @@ pub(super) fn dispatch_required_with<StageRef, A, R, E, F>(
 where
     F: FnOnce(StageRef, CompileStage, &mut A) -> Result<Option<R>, E>,
 {
-    let Some(stage) = stage else {
-        return Err(StageDispatchRequiredError::Miss(
-            StageDispatchMiss::MissingStage,
-        ));
-    };
+    let stage = stage.map_err(StageDispatchRequiredError::Miss)?;
     let Some(result) =
         dispatch(stage, stage_id, action).map_err(StageDispatchRequiredError::Action)?
     else {
