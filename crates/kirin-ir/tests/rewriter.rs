@@ -433,6 +433,34 @@ fn insert_before_and_after_splice_and_maintain_index() {
 }
 
 #[test]
+fn insert_before_terminator_fills_a_terminator_only_block() {
+    let mut stage = new_stage();
+
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let block = stage.block().terminator(ret).new();
+    let mut stage = stage.finalize().unwrap();
+
+    // With no non-terminator to anchor on, the terminator is the only way in.
+    let (n0, events) = {
+        let mut rw = Rewriter::new(&mut stage);
+        let n0 = rw.insert_before(ret, BuilderDialect::Nop).unwrap();
+        (n0, rw.drain_events())
+    };
+
+    assert_eq!(events, vec![MutationEvent::InsertedStatement { stmt: n0 }]);
+    // The new statement is both ends of the chain: walking from `head` and
+    // from `tail` each finds it alone.
+    assert_eq!(block.statements(&stage).collect::<Vec<_>>(), vec![n0]);
+    assert_eq!(block.statements(&stage).rev().collect::<Vec<_>>(), vec![n0]);
+    // The terminator is unchanged and still last.
+    assert_eq!(block.terminator(&stage), Some(ret));
+    assert_eq!(block.last_statement(&stage), Some(ret));
+
+    // Maintained mirrors equal a from-scratch rebuild.
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
 fn replace_statement_swaps_def_and_updates_uses() {
     let mut stage = new_stage();
 

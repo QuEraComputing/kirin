@@ -447,8 +447,8 @@ fn replace_statement_keeps_the_use_index_in_step() {
 //
 // `replace_statement` is the only method that can change a control-flow edge.
 // The operand-rewriting methods write through `arguments_mut()`, which yields
-// `&mut SSAValue` and so cannot reach a `Successor`; `erase_statement` and the
-// `insert_*` methods reject terminators outright.
+// `&mut SSAValue` and so cannot reach a `Successor`; `erase_statement` rejects
+// terminators, and the `insert_*` methods never insert one.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -764,6 +764,61 @@ fn insert_after_keeps_the_block_body_in_step() {
         f.body(),
         (Some(f.first), Some(inserted), 4, Some(f.terminator))
     );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn insert_before_the_terminator_keeps_the_block_body_in_step() {
+    let mut f = body_stage();
+
+    let inserted = {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        rewriter
+            .insert_before(f.terminator, BuilderDialect::Nop)
+            .unwrap()
+    };
+
+    // Appended to the chain: `tail` moves to the new statement, while the
+    // terminator stays outside the chain.
+    assert_eq!(
+        f.body(),
+        (Some(f.first), Some(inserted), 4, Some(f.terminator))
+    );
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn insert_after_the_terminator_leaves_the_block_body_intact() {
+    let mut f = body_stage();
+    let before = f.body();
+
+    {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        // Nothing can follow a terminator.
+        assert_eq!(
+            rewriter.insert_after(f.terminator, BuilderDialect::Nop),
+            Err(RewriteError::AnchorIsTerminator(f.terminator))
+        );
+    }
+
+    assert_eq!(f.body(), before);
+    assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn erasing_the_terminator_leaves_the_block_body_intact() {
+    let mut f = body_stage();
+    let before = f.body();
+
+    {
+        let mut rewriter = Rewriter::new(&mut f.stage);
+        assert_eq!(
+            rewriter.erase_statement(f.terminator),
+            Err(RewriteError::CannotEraseTerminator(f.terminator))
+        );
+    }
+
+    assert_eq!(f.body(), before);
     assert_eq!(verify_derived(&f.stage), Ok(()));
 }
 

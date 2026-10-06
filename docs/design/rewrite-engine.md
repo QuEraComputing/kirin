@@ -1740,7 +1740,7 @@ stage remains valid.
 | `replace_operand` | Rewrite one operand slot; move its use record `old → new`. | `ChangedOperands` (none if slot unchanged) | operand-index and live-value checked |
 | `replace_all_uses` | Rewrite every operand **and `DiGraph` yield** reading `old` to `new`; transfer use records. | one `ChangedOperands` per affected statement, then one `ReplacedUses` | returns count of slots rewritten; self-replace is `Ok(0)` |
 | `erase_statement` | Tombstone the statement, unlink it from its block list, drop its operand uses, tombstone its (unused) result values. | `ErasedStatement` | block-parented, non-terminator, no live result uses |
-| `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented non-terminator; `definition` is a non-terminator with **no results**; operands must be live |
+| `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with **no results**; operands must be live |
 | `replace_statement` | Swap the definition in place, keeping id, block position, and result SSA identity; fix operand uses. | `ReplacedStatement` | same result arity and terminator-ness as the original |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
 
@@ -1912,7 +1912,7 @@ axis — hence the column.
 | `NotInBlockBody(stmt)` | deferred | statement is owned by a `DiGraph`/`UnGraph` (or nothing), not a block — graph surgery deferred | `erase_statement`, `insert_*`, `replace_statement` |
 | `CannotEraseTerminator(stmt)` | deferred | erasing a block terminator would need control-flow repair, deferred | `erase_statement` |
 | `StatementResultsInUse(stmt)` | guard | a result of the statement is still used elsewhere; replace those uses first | `erase_statement` |
-| `AnchorIsTerminator(stmt)` | deferred | insertion relative to a terminator is deferred | `insert_*` |
+| `AnchorIsTerminator(stmt)` | guard | nothing can follow a terminator, so `insert_after` cannot anchor on one | `insert_after` |
 | `CannotInsertTerminator` | guard | the inserted definition is a terminator (not spliced mid-block) | `insert_*` |
 | `CannotInsertWithResults` | deferred | the inserted definition declares results (fresh result allocation deferred) | `insert_*` |
 | `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
@@ -2625,9 +2625,8 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
 - [ ] Until topology maintenance lands, guard graph-owned statements in
   operand and definition replacement. Once it lands, every successful graph
   edit maintains the topology mirror atomically; there is no dirty interval.
-- [ ] Terminator surgery: erase/replace a terminator and insert relative to one,
-  maintaining `BlockInfo::terminator` and successor edges. Emits
-  `ChangedTerminator`.
+- [ ] Terminator surgery: erase/replace a terminator, maintaining
+  `BlockInfo::terminator` and successor edges. Emits `ChangedTerminator`.
 - [ ] Add the grouped operation-owned `HasCfgEdges` view that preserves each
   successor together with its forwarded arguments and separates non-edge
   operands.
