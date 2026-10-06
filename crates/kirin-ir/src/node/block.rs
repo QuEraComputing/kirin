@@ -51,13 +51,23 @@ impl std::fmt::Display for Successor {
 }
 
 /// The immediate structural owner of a block.
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum BlockParent {
     /// The block belongs to a block-list control-flow body.
     CFG(CFG),
     /// The block is a single-block body owned directly by a statement.
     Statement(Statement),
+}
+
+/// Produces CFG(id) instead of CFG(CFG(id))
+impl std::fmt::Debug for BlockParent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            BlockParent::CFG(cfg) => write!(f, "{cfg:?}"),
+            BlockParent::Statement(stmt) => write!(f, "{stmt:?}"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
