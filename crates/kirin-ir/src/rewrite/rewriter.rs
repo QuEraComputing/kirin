@@ -46,6 +46,9 @@
 //! Because value rewrites are index-driven (they consult and update
 //! `SSAInfo::uses` rather than scanning), correctness depends on the use index
 //! being accurate at entry — every mutation path must keep it in lockstep.
+//! Inserting before a terminator likewise depends on `BlockInfo::statements`:
+//! the terminator has no chain links, so its neighbour is read from the
+//! chain's `tail`.
 //! `BlockInfo::predecessors` is maintained differently: it is recomputed from
 //! the statement's own `successors()`, so it does not depend on its own prior
 //! accuracy. Direct arena writes that bypass the `Rewriter` desync both, and
@@ -106,8 +109,8 @@ pub enum RewriteError {
     /// The statement defines results that are still used elsewhere, so erasing it
     /// would leave dangling uses. Replace those uses first.
     StatementResultsInUse(Statement),
-    /// Insertion relative to a terminator is deferred (it would append to the
-    /// non-terminator prefix or move past the terminator).
+    /// Nothing can follow a block's terminator, so `insert_after` cannot anchor
+    /// on one. (`insert_before` can: it appends to the end of the chain.)
     AnchorIsTerminator(Statement),
     /// The inserted definition is a terminator; terminators are not spliced into
     /// the middle of a block's statement list.
@@ -163,7 +166,7 @@ impl fmt::Display for RewriteError {
                 )
             }
             RewriteError::AnchorIsTerminator(stmt) => {
-                write!(f, "cannot insert relative to terminator {stmt:?}")
+                write!(f, "cannot insert after terminator {stmt:?}")
             }
             RewriteError::CannotInsertTerminator => {
                 write!(
@@ -539,7 +542,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// Insert `definition` as a new statement immediately before `anchor`.
-    /// Shares [`Rewriter::insert_after`]'s preconditions.
+    ///
+    /// Shares [`Rewriter::insert_after`]'s preconditions, except that `anchor`
+    /// may be the block's terminator: the new statement is then appended to the
+    /// end of the block's statement chain.
     pub fn insert_before(
         &mut self,
         anchor: Statement,
@@ -570,7 +576,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         definition: L,
         after: bool,
     ) -> Result<Statement, RewriteError> {
-        let (block, anchor_prev, anchor_next) = {
+        let (block, prev, next) = {
             let item = anchor
                 .get_info(self.stage)
                 .filter(|item| !item.deleted())
@@ -579,10 +585,24 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 Some(StatementParent::Block(block)) => block,
                 _ => return Err(RewriteError::NotInBlockBody(anchor)),
             };
-            if item.definition.is_terminator() {
-                return Err(RewriteError::AnchorIsTerminator(anchor));
+            match (item.definition.is_terminator(), after) {
+                // Nothing can follow a terminator.
+                (true, true) => return Err(RewriteError::AnchorIsTerminator(anchor)),
+                // The terminator sits outside the chain, so inserting before it
+                // appends to the end of the chain
+                (true, false) => {
+                    let tail = block
+                        .get_info(self.stage)
+                        .and_then(|b| b.statements.tail().copied());
+
+                    // The tail ends the chain, so the new statement becomes the tail.
+                    debug_assert!(tail.is_none_or(|t| t.next(self.stage).is_none()));
+
+                    (block, tail, None)
+                }
+                (false, true) => (block, Some(anchor), item.node.next),
+                (false, false) => (block, item.node.prev, Some(anchor)),
             }
-            (block, item.node.prev, item.node.next)
         };
 
         if definition.is_terminator() {
@@ -598,11 +618,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             }
         }
 
-        let (prev, next) = if after {
-            (Some(anchor), anchor_next)
-        } else {
-            (anchor_prev, Some(anchor))
-        };
         let new_stmt = self
             .stage
             .statement_arena_mut()
