@@ -29,13 +29,20 @@ import json, time
 import kirin.prelude
 start = time.perf_counter()
 import kernels
-print(json.dumps({"seconds": time.perf_counter() - start, "main": kernels.main(1.0)}))
+print(json.dumps({
+    "seconds": time.perf_counter() - start,
+    "main": kernels.main(1.0),
+    "lines": [s.source.lineno + s.source.lineno_begin
+              for s in kernels.helper.code.walk() if s.source is not None],
+}))
 """
 
 
-def run(tmp_path, offset, factor):
+def run(tmp_path, offset, factor, leading_lines=0):
     """Run the kernels in a new process; return the kernels it saved and its output."""
-    (tmp_path / "kernels.py").write_text(KERNELS.format(offset=offset, factor=factor))
+    (tmp_path / "kernels.py").write_text(
+        "\n" * leading_lines + KERNELS.format(offset=offset, factor=factor)
+    )
     cache = tmp_path / "cache"
 
     def saved():
@@ -83,3 +90,14 @@ def test_compile_cache(tmp_path):
         f"importing the kernels: {cold['seconds'] * 1e3:.2f} ms compiling, "
         f"{warm['seconds'] * 1e3:.2f} ms loading from the cache"
     )
+
+
+def test_compile_cache_relocation(tmp_path):
+    written, cold = run(tmp_path, offset=5.0, factor=2.0)
+    assert written == {"helper", "main"}
+    assert cold["lines"]
+
+    written, moved = run(tmp_path, offset=5.0, factor=2.0, leading_lines=10)
+    assert written == set()
+    assert moved["main"] == cold["main"] == 7.0
+    assert moved["lines"] == [line + 10 for line in cold["lines"]]

@@ -17,7 +17,8 @@ A kernel is looked up by a key over
   own IR and captured values),
 - the dialect group, the source of its `run_pass` generator and the decorator's
   options,
-- the file and line the function starts at, which its source locations refer to,
+- the file the function is in, but not the line it starts at: a kernel that moved
+  within its file is loaded, and its source locations are moved with it,
 - the Python version and the versions of all installed distributions.
 
 Values are described by their content: built-in scalars, tuples, lists, frozensets,
@@ -53,7 +54,7 @@ if TYPE_CHECKING:
 ENV_VAR = "KIRIN_COMPILE_CACHE_DIR"
 """Override the source-local cache directory; `FALSE` disables caching (case-insensitive)."""
 
-FORMAT = "1"
+FORMAT = "2"
 """Part of every key; bump it when the key or the file layout changes."""
 
 _keys: dict[int, str] = {}
@@ -102,13 +103,8 @@ def fingerprint(
         names = ",".join(sorted(dialect.name for dialect in group.data))
         gen = group.run_pass_gen
         passes = inspect.getsource(gen) if gen is not None else ""
-        origin = next(
-            (
-                (stmt.source.file, stmt.source.lineno_begin)
-                for stmt in code.walk()
-                if stmt.source is not None
-            ),
-            None,
+        file = next(
+            (stmt.source.file for stmt in code.walk() if stmt.source is not None), None
         )
         text = "\n".join(
             (
@@ -116,7 +112,7 @@ def fingerprint(
                 _toolchain,
                 f"{names};{passes}",
                 _value_text((args, sorted(options.items())), state),
-                repr(origin),
+                repr(file),
                 _ir_text(code, state),
             )
         )
@@ -159,6 +155,12 @@ def load(
     except Exception:
         # missing, unreadable, or refers to a kernel that is gone: compile it
         return False
+    if code.source is not None and code.source.lineno_begin != mt.lineno_begin:
+        file, saved = code.source.file, code.source.lineno_begin
+        for stmt in code.walk():
+            source = stmt.source
+            if source and source.file == file and source.lineno_begin == saved:
+                source.lineno_begin = mt.lineno_begin
     mt.code = code
     mt.inferred = inferred
     mt.update_backedges()
@@ -231,6 +233,13 @@ def _ir_text(code: Statement, state: _Keying) -> str:
                 for name, value in sorted(stmt.attributes.items())
             ),
             ",".join(str(number(blocks, block)) for block in stmt.successors),
+            # positions relative to the function's start: an edit inside the
+            # function moves them, a move of the whole function does not
+            (
+                f"@{s.lineno}:{s.col_offset}-{s.end_lineno}:{s.end_col_offset}"
+                if (s := stmt.source) is not None
+                else ""
+            ),
         ]
         lines.append(" ".join(parts))
         for region in stmt.regions:
