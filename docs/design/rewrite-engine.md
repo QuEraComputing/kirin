@@ -1417,10 +1417,9 @@ incrementally.
 The index is derived metadata over authoritative statement/yield slots, not a
 substitute for them. The pass-boundary checker must derive it independently
 because raw legacy mutation paths can still bypass `Rewriter`. Derived
-comparison has landed for the two mirrors that exist today (see below); the
-ownership boundary and graph-topology mirrors have not. Type, visibility,
-dominance, and dialect validity remain responsibilities of the separate future
-whole-stage verifier.
+comparison has landed for the four mirrors that exist today (see below); the
+graph-topology mirrors have not. Type, visibility, dominance, and dialect
+validity remain responsibilities of the separate future whole-stage verifier.
 
 The pass boundary derives expected uses from authoritative slots and compares
 them with the installed index. It never installs the expected value into a
@@ -1437,8 +1436,8 @@ left to the separate whole-stage verifier.
 
 ### Derive, install, verify — never repair
 
-**Landed** for the use and predecessor mirrors, in `kirin-ir`'s `derived`
-module. All derived services follow one split:
+**Landed** for the use, predecessor, block-body, and CFG-block-list mirrors, in
+`kirin-ir`'s `derived` module. All derived services follow one split:
 
 ```rust,ignore
 pub(crate) fn derive_mirrors<L: Dialect>(
@@ -1467,7 +1466,8 @@ authoritative input is broken; `VerifyError::Mismatch` means maintained metadata
 disagrees and therefore a mutation path is broken. Component derivation helpers
 and installers remain crate-private; no mutating recovery entry point is public.
 The only public names are `verify_derived`, `DeriveError`, `Finding`,
-`Mismatch`, and `VerifyError`.
+`Mismatch`, `VerifyError`, and the payloads those carry: `ChainDefect`,
+`ChainFinding`, `DanglingParent`, and `BlockBody`.
 
 
 Pure derivation replaces the public mutating `rebuild_use_index` and
@@ -1475,23 +1475,33 @@ Pure derivation replaces the public mutating `rebuild_use_index` and
 out-of-range/tombstoned statement operands produce
 `DanglingOperand { stmt, index, value }`; directed-graph yields produce
 `DanglingYield { graph, index, value }`; successor references to a dead block
-produce `DanglingSuccessor { stmt, target }`.
-Later derivations apply the same rule to body ownership and mirrors. Derivation
+produce `DanglingSuccessor { stmt, target }`. Body ownership follows the same
+rule: a membership pointer naming a dead container produces `DanglingParent`,
+and the chain walker's own defects arrive as `Chain(ChainFinding)`.
+Later derivations apply the same rule to graph membership and topology. Derivation
 collects independent findings rather than stopping at the first one — component
 derivations share one findings buffer instead of returning early, so a single
 scan reports every independent defect.
 
-Mirrors are never compared with `==` on their storage. Incremental maintenance
-reorders lists so an accurate mirror and a fresh derivation routinely hold the same entries in a
-different order. Comparison is therefore order-insensitive but
-multiplicity-preserving: a statement can read one value twice (`add %x, %x` is
-two distinct uses of `%x`), so collapsing to a set would hide a real defect.
+How a mirror is compared depends on whether it is a bag or a sequence.
 
-For the two per-node mirrors, derivation writes into a dense side table keyed by
-the arena id rather than an `Arena`. An arena *owns* its contents, carrying a
-`deleted` flag whose iterators honour it; a mirror owns nothing, so a second
-liveness claim would be exactly the duplicated truth this layer exists to
-detect. Liveness stays authoritative in the source arena.
+*Collection mirrors* — reverse use-lists and predecessor lists — are never
+compared with `==` on their storage. Incremental maintenance reorders them
+(`swap_remove` in particular) so an accurate mirror and a fresh derivation
+routinely hold the same entries in a different order. Comparison is therefore
+order-insensitive but multiplicity-preserving: a statement can read one value
+twice (`add %x, %x` is two distinct uses of `%x`), so collapsing to a set would
+hide a real defect.
+
+*Chain summaries* — `BlockInfo::statements` and `CFGInfo::blocks` — are compared
+exactly. A summary is three scalars in a fixed relationship, not a bag, so an
+order-insensitive comparison would accept a `head` and `tail` that had swapped.
+
+Derivation writes into a dense side table keyed by the arena id rather than an
+`Arena`. An arena *owns* its contents, carrying a `deleted` flag whose iterators
+honour it; a mirror owns nothing, so a second liveness claim would be exactly
+the duplicated truth this layer exists to detect. Liveness stays authoritative
+in the source arena.
 
 For graph bodies, `StatementInfo::parent` is authoritative membership.
 `StableGraph` plus `IndexMap<Statement, GraphMember>` is one derived mirror:
@@ -1499,19 +1509,21 @@ the map supplies stable insertion-order presentation and direct node lookup;
 petgraph supplies connectivity. Verification compares member keys as sets and
 edges as normalized multisets over statement weights. It excludes `NodeIndex`
 and order, retains parallel-edge multiplicity, and normalizes undirected
-endpoints. A dangling statement owner is
-`DanglingParent { stmt, parent }`.
+endpoints. A dangling statement owner is a `DanglingParent` finding; the variant
+pairing a statement with its graph does not exist yet, because graph membership
+derivation has not landed.
 
 For blocks, membership also comes from `StatementInfo::parent`, but order is
 authoritative in child `prev`/`next` links. The member set partitions into
 non-terminators, which must form one reciprocal acyclic chain, and the unique
 `is_terminator()` member, which is not in that chain. `head`/`tail`/`len` and
 `BlockInfo::terminator` are derived mirrors. CFG block order uses the analogous
-`BlockInfo::parent` plus block links. Errors distinguish cycles, forks, orphans,
-cross-body links, dangling links, and multiple terminators as `ChainCycle`,
-`ChainForked`, `ChainOrphan`, `ChainCrossBlock`, `DanglingLink`, and
-`MultipleTerminators` findings. Iterators follow
-links until `None`; cached lengths are size information, never traversal control.
+`BlockInfo::parent` plus block links. Both are reconstructed by the shared
+walker implemented by `kirin_ir::derived::chain::derive_chains`, which
+reports cycles, disconnection, non-reciprocal links, cross-container links, and
+orphans as `ChainDefect` variants. Blocks with multiple terminators are reported as
+`MultipleTerminators`. Iterators follow links until `None`; cached lengths are
+size information, never traversal control.
 
 `DeriveError` aggregates all independent findings found in one scan. In
 particular, `UnGraphDegreeExceeded { edge_value, incidences }` retains every
@@ -1728,7 +1740,7 @@ stage remains valid.
 | `replace_operand` | Rewrite one operand slot; move its use record `old → new`. | `ChangedOperands` (none if slot unchanged) | operand-index and live-value checked |
 | `replace_all_uses` | Rewrite every operand **and `DiGraph` yield** reading `old` to `new`; transfer use records. | one `ChangedOperands` per affected statement, then one `ReplacedUses` | returns count of slots rewritten; self-replace is `Ok(0)` |
 | `erase_statement` | Tombstone the statement, unlink it from its block list, drop its operand uses, tombstone its (unused) result values. | `ErasedStatement` | block-parented, non-terminator, no live result uses |
-| `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented non-terminator; `definition` is a non-terminator with **no results**; operands must be live |
+| `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with **no results**; operands must be live |
 | `replace_statement` | Swap the definition in place, keeping id, block position, and result SSA identity; fix operand uses. | `ReplacedStatement` | same result arity and terminator-ness as the original |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
 
@@ -1900,7 +1912,7 @@ axis — hence the column.
 | `NotInBlockBody(stmt)` | deferred | statement is owned by a `DiGraph`/`UnGraph` (or nothing), not a block — graph surgery deferred | `erase_statement`, `insert_*`, `replace_statement` |
 | `CannotEraseTerminator(stmt)` | deferred | erasing a block terminator would need control-flow repair, deferred | `erase_statement` |
 | `StatementResultsInUse(stmt)` | guard | a result of the statement is still used elsewhere; replace those uses first | `erase_statement` |
-| `AnchorIsTerminator(stmt)` | deferred | insertion relative to a terminator is deferred | `insert_*` |
+| `AnchorIsTerminator(stmt)` | guard | nothing can follow a terminator, so `insert_after` cannot anchor on one | `insert_after` |
 | `CannotInsertTerminator` | guard | the inserted definition is a terminator (not spliced mid-block) | `insert_*` |
 | `CannotInsertWithResults` | deferred | the inserted definition declares results (fresh result allocation deferred) | `insert_*` |
 | `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
@@ -2228,6 +2240,14 @@ kirin-ir
     DeriveError
     VerifyError
     verify_derived
+    chain
+      ChainDefect
+      ChainFinding
+    mirrors
+      uses
+      predecessors
+      block_body
+      cfg_blocks
 
 kirin-wildcard
   dialect
@@ -2575,6 +2595,11 @@ legality, and dialect validity remains a separate future subsystem.
   distinguishes broken authoritative IR (`Derive`) from a mutation-layer mirror
   bug (`Mismatch`). Apply the same split to `SSAInfo::uses`; remove public
   mutating recovery methods such as `rebuild_use_index`.
+- [x] Derive and verify the two chain summaries — `BlockInfo::statements` with
+  `BlockInfo::terminator`, and `CFGInfo::blocks` — from membership plus
+  `prev`/`next` links, through one shared walker that never reads the summary it
+  is deriving. Graph membership and topology remain, and wait on the
+  `StableGraph` migration below.
 - [ ] Restrict raw mutable escape hatches: statement/block arenas, SSA uses,
   and petgraph mutation become crate-private; split the mutable half of
   `GetInfo` into crate-private `GetInfoMut`. Keep metadata-only `set_name` and
@@ -2600,9 +2625,8 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
 - [ ] Until topology maintenance lands, guard graph-owned statements in
   operand and definition replacement. Once it lands, every successful graph
   edit maintains the topology mirror atomically; there is no dirty interval.
-- [ ] Terminator surgery: erase/replace a terminator and insert relative to one,
-  maintaining `BlockInfo::terminator` and successor edges. Emits
-  `ChangedTerminator`.
+- [ ] Terminator surgery: erase/replace a terminator, maintaining
+  `BlockInfo::terminator` and successor edges. Emits `ChangedTerminator`.
 - [ ] Add the grouped operation-owned `HasCfgEdges` view that preserves each
   successor together with its forwarded arguments and separates non-edge
   operands.
