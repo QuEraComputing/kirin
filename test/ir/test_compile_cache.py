@@ -1,4 +1,5 @@
 import os
+import re
 import sys
 import json
 import subprocess
@@ -101,3 +102,34 @@ def test_compile_cache_relocation(tmp_path):
     assert written == set()
     assert moved["main"] == cold["main"] == 7.0
     assert moved["lines"] == [line + 10 for line in cold["lines"]]
+
+
+# an error in a kernel, reported by Kirin's stack trace since it is not caught
+RAISE = """\
+import kernels
+kernels.helper("x")
+"""
+
+
+def test_compile_cache_relocated_error(tmp_path):
+    shift = 10
+    run(tmp_path, offset=5.0, factor=2.0)
+    lines = (tmp_path / "kernels.py").read_text().splitlines()
+    before = next(i for i, text in enumerate(lines, 1) if "return x *" in text)
+
+    # moved down `shift` lines: loaded from the cache, not recompiled
+    written, _ = run(tmp_path, offset=5.0, factor=2.0, leading_lines=shift)
+    assert written == set()
+
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1", KIRIN_PYTHON_STACKTRACE="0")
+    env[ENV_VAR] = str(tmp_path / "cache")
+    out = subprocess.run(
+        [sys.executable, "-c", RAISE],
+        cwd=tmp_path,
+        env=env,
+        capture_output=True,
+        text=True,
+    )
+    reported = re.search(r'kernels\.py", line (\d+),', out.stderr)
+    assert reported is not None, out.stderr
+    assert int(reported.group(1)) == before + shift
