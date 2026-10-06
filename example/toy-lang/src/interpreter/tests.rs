@@ -913,7 +913,7 @@ mod demand {
         let block = cfg.blocks(info).next().expect("entry block");
         block
             .expect_info(info)
-            .arguments
+            .arguments()
             .iter()
             .copied()
             .map(SSAValue::from)
@@ -1143,7 +1143,7 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
             });
             let params: Vec<SSAValue> = body
                 .expect_info(info)
-                .arguments
+                .arguments()
                 .iter()
                 .copied()
                 .map(SSAValue::from)

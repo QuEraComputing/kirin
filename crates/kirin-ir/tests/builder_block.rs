@@ -1,5 +1,5 @@
 //! Integration tests for block builder, cfg builder, statement iteration,
-//! detach, SSA creation, and linked list helpers.
+//! SSA creation and linked list helpers.
 
 mod common;
 
@@ -37,9 +37,9 @@ fn block_builder_creates_block_with_arguments_and_statements() {
 
     let stage = stage.finalize().unwrap();
     let info = block.expect_info(&stage);
-    assert_eq!(info.arguments.len(), 2);
+    assert_eq!(info.arguments().len(), 2);
 
-    for (idx, &arg) in info.arguments.iter().enumerate() {
+    for (idx, &arg) in info.arguments().iter().enumerate() {
         let ssa = arg.expect_info(&stage);
         assert_eq!(*ssa.kind(), SSAKind::BlockArgument(block, idx));
     }
@@ -71,8 +71,8 @@ fn block_builder_substitutes_builder_block_arguments() {
 
     let stage = stage.finalize().unwrap();
     let block_info = block.expect_info(&stage);
-    let real_arg0: SSAValue = block_info.arguments[0].into();
-    let real_arg1: SSAValue = block_info.arguments[1].into();
+    let real_arg0: SSAValue = block_info.arguments()[0].into();
+    let real_arg1: SSAValue = block_info.arguments()[1].into();
 
     match add_stmt.definition(&stage) {
         BuilderDialect::Add(a, b) => {
@@ -115,8 +115,8 @@ fn finalize_populates_def_use_index() {
 
     let stage = stage.finalize().unwrap();
     let block_info = block.expect_info(&stage);
-    let real_arg0: SSAValue = block_info.arguments[0].into();
-    let real_arg1: SSAValue = block_info.arguments[1].into();
+    let real_arg0: SSAValue = block_info.arguments()[0].into();
+    let real_arg1: SSAValue = block_info.arguments()[1].into();
 
     let uses0 = real_arg0.get_info(&stage).unwrap().uses();
     assert_eq!(uses0.len(), 2, "arg0 is read by two statements");
@@ -249,7 +249,7 @@ fn empty_block_iteration() {
     assert_eq!(block.first_statement(&stage), None);
     assert_eq!(block.last_statement(&stage), None);
     assert_eq!(block.terminator(&stage), None);
-    assert!(block.expect_info(&stage).predecessors.is_empty());
+    assert!(block.expect_info(&stage).predecessors().is_empty());
 }
 
 #[test]
@@ -276,7 +276,7 @@ fn block_argument_placeholder_substitution_with_zero_args() {
 
     let stage = stage.finalize().unwrap();
     let info = block.expect_info(&stage);
-    assert!(info.arguments.is_empty());
+    assert!(info.arguments().is_empty());
 }
 
 // --- CFGBuilder tests ---
@@ -296,16 +296,16 @@ fn cfg_builder_creates_cfg_with_ordered_blocks() {
     assert_eq!(blocks, vec![b0, b1, b2]);
 
     let b0_info = b0.expect_info(&stage);
-    assert_eq!(b0_info.parent, Some(BlockParent::CFG(cfg)));
-    assert_eq!(b0_info.node.next, Some(b1));
+    assert_eq!(b0_info.parent(), Some(BlockParent::CFG(cfg)));
+    assert_eq!(b0_info.node().next, Some(b1));
     let b1_info = b1.expect_info(&stage);
-    assert_eq!(b1_info.parent, Some(BlockParent::CFG(cfg)));
-    assert_eq!(b1_info.node.prev, Some(b0));
-    assert_eq!(b1_info.node.next, Some(b2));
+    assert_eq!(b1_info.parent(), Some(BlockParent::CFG(cfg)));
+    assert_eq!(b1_info.node().prev, Some(b0));
+    assert_eq!(b1_info.node().next, Some(b2));
     let b2_info = b2.expect_info(&stage);
-    assert_eq!(b2_info.parent, Some(BlockParent::CFG(cfg)));
-    assert_eq!(b2_info.node.prev, Some(b1));
-    assert_eq!(b2_info.node.next, None);
+    assert_eq!(b2_info.parent(), Some(BlockParent::CFG(cfg)));
+    assert_eq!(b2_info.node().prev, Some(b1));
+    assert_eq!(b2_info.node().next, None);
 }
 
 #[test]
@@ -332,11 +332,11 @@ fn finalize_populates_block_predecessor_index() {
 
     let stage = stage.finalize().unwrap();
     assert_eq!(
-        target.expect_info(&stage).predecessors.as_slice(),
+        target.expect_info(&stage).predecessors(),
         [source0, source1]
     );
-    assert!(source0.expect_info(&stage).predecessors.is_empty());
-    assert!(source1.expect_info(&stage).predecessors.is_empty());
+    assert!(source0.expect_info(&stage).predecessors().is_empty());
+    assert!(source1.expect_info(&stage).predecessors().is_empty());
 }
 
 #[test]
@@ -352,7 +352,7 @@ fn predecessor_index_deduplicates_edges_from_the_same_block() {
     let _cfg = stage.cfg().add_block(source).add_block(target).new();
 
     let stage = stage.finalize().unwrap();
-    assert_eq!(target.expect_info(&stage).predecessors.as_slice(), [source]);
+    assert_eq!(target.expect_info(&stage).predecessors(), [source]);
 }
 
 #[test]
@@ -368,11 +368,11 @@ fn statement_builder_assigns_parent_to_directly_owned_blocks() {
 
     let stage = stage.finalize().unwrap();
     assert_eq!(
-        then_block.expect_info(&stage).parent,
+        then_block.expect_info(&stage).parent(),
         Some(BlockParent::Statement(owner))
     );
     assert_eq!(
-        else_block.expect_info(&stage).parent,
+        else_block.expect_info(&stage).parent(),
         Some(BlockParent::Statement(owner))
     );
 }
@@ -486,75 +486,6 @@ fn empty_cfg() {
     assert_eq!(cfg.blocks(&stage).len(), 0);
 }
 
-// --- Detach tests ---
-
-#[test]
-fn detach_statement_updates_neighbors_and_parent_len() {
-    let mut stage = new_stage();
-    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
-    let s2 = stage.statement().definition(BuilderDialect::Nop).new();
-    let block = stage.block().stmt(s0).stmt(s1).stmt(s2).new();
-
-    let mut stage = stage.finalize().unwrap();
-    s1.detach(&mut stage);
-
-    let block_info = block.expect_info(&stage);
-    assert_eq!(block_info.statements.len(), 2);
-
-    assert_eq!(*s0.next(&stage), Some(s2));
-    assert_eq!(*s2.prev(&stage), Some(s0));
-
-    assert_eq!(*s1.prev(&stage), None);
-    assert_eq!(*s1.next(&stage), None);
-    assert_eq!(*s1.parent(&stage), None);
-}
-
-#[test]
-fn detach_head_statement_updates_block_head() {
-    let mut stage = new_stage();
-    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
-    let block = stage.block().stmt(s0).stmt(s1).new();
-
-    let mut stage = stage.finalize().unwrap();
-    s0.detach(&mut stage);
-
-    let block_info = block.expect_info(&stage);
-    assert_eq!(block_info.statements.head(), Some(&s1));
-    assert_eq!(block_info.statements.len(), 1);
-}
-
-#[test]
-fn detach_tail_statement_updates_block_tail() {
-    let mut stage = new_stage();
-    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
-    let block = stage.block().stmt(s0).stmt(s1).new();
-
-    let mut stage = stage.finalize().unwrap();
-    s1.detach(&mut stage);
-
-    let block_info = block.expect_info(&stage);
-    assert_eq!(block_info.statements.tail(), Some(&s0));
-    assert_eq!(block_info.statements.len(), 1);
-}
-
-#[test]
-fn detach_only_statement_leaves_empty_block() {
-    let mut stage = new_stage();
-    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let block = stage.block().stmt(s0).new();
-
-    let mut stage = stage.finalize().unwrap();
-    s0.detach(&mut stage);
-
-    let block_info = block.expect_info(&stage);
-    assert_eq!(block_info.statements.len(), 0);
-    assert!(block_info.statements.head().is_none());
-    assert!(block_info.statements.tail().is_none());
-}
-
 // --- SSA creation edge cases (builder-side) ---
 
 #[test]
@@ -606,10 +537,10 @@ fn finalize_succeeds_with_resolved_typed_ssas() {
 
     // Verify it's a StageInfo (not BuilderStageInfo)
     let info = block.expect_info(&finalized);
-    assert_eq!(info.arguments.len(), 1);
+    assert_eq!(info.arguments().len(), 1);
 
     // SSAInfo has non-optional ty and clean SSAKind
-    let arg_ssa: SSAValue = info.arguments[0].into();
+    let arg_ssa: SSAValue = info.arguments()[0].into();
     let ssa_info = arg_ssa.expect_info(&finalized);
     assert_eq!(*ssa_info.ty(), TestType::I32);
     assert!(matches!(*ssa_info.kind(), SSAKind::BlockArgument(_, 0)));
@@ -670,7 +601,7 @@ fn finalized_ssa_info_has_non_optional_type() {
     let finalized = stage.finalize().expect("finalize should succeed");
 
     let block_info = block.expect_info(&finalized);
-    let arg_ssa: SSAValue = block_info.arguments[0].into();
+    let arg_ssa: SSAValue = block_info.arguments()[0].into();
     let ssa_info = arg_ssa.expect_info(&finalized);
 
     // ty() returns &L::Type directly (not Option)
@@ -706,7 +637,7 @@ fn finalize_block_with_statements_produces_clean_stage() {
 
     // All block args have clean SSAInfo
     let block_info = block.expect_info(&finalized);
-    for (idx, &arg) in block_info.arguments.iter().enumerate() {
+    for (idx, &arg) in block_info.arguments().iter().enumerate() {
         let ssa_info = arg.expect_info(&finalized);
         assert!(matches!(*ssa_info.kind(), SSAKind::BlockArgument(b, i) if b == block && i == idx));
     }
@@ -723,10 +654,10 @@ fn finalize_produces_stage_info() {
     let block = stage.block().argument(TestType::I32).new();
     let finalized = stage.finalize().unwrap();
     let info = block.expect_info(&finalized);
-    assert_eq!(info.arguments.len(), 1);
+    assert_eq!(info.arguments().len(), 1);
 
     // SSAInfo has non-optional ty and clean SSAKind
-    let arg: SSAValue = info.arguments[0].into();
+    let arg: SSAValue = info.arguments()[0].into();
     assert_eq!(*arg.expect_info(&finalized).ty(), TestType::I32);
 }
 
@@ -792,8 +723,8 @@ fn remap_block_identity_remaps_parents_and_ssa_kinds() {
     assert_eq!(*s0.parent(&stage), Some(StatementParent::Block(stub)));
 
     let stub_info = stub.expect_info(&stage);
-    assert_eq!(stub_info.arguments.len(), 1);
-    let arg = stub_info.arguments[0];
+    assert_eq!(stub_info.arguments().len(), 1);
+    let arg = stub_info.arguments()[0];
     let arg_info = arg.expect_info(&stage);
     assert!(matches!(*arg_info.kind(), SSAKind::BlockArgument(owner, 0) if owner == stub));
 

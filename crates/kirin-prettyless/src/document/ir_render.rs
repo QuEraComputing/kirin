@@ -125,11 +125,11 @@ where
         let block_info = block.expect_info(self.stage);
 
         // Build block header with arguments: ^name(%arg0: type, %arg1: type)
-        let block_name = self.resolve_caret_name(block_info.name, block);
+        let block_name = self.resolve_caret_name(block_info.name(), block);
         let mut header = self.text(block_name);
 
         // Add arguments
-        let args = &block_info.arguments;
+        let args = block_info.arguments();
         if !args.is_empty() {
             let args_doc = self.list(args.iter(), ", ", |arg| self.format_typed_ssa_binding(*arg));
             header += args_doc.enclose("(", ")");
@@ -491,7 +491,7 @@ where
     /// No parentheses — the caller adds those via literal tokens.
     pub fn print_block_args_only(&'a self, block: &Block) -> ArenaDoc<'a> {
         let block_info = block.expect_info(self.stage);
-        let args = &block_info.arguments;
+        let args = block_info.arguments();
         self.list(args.iter(), ", ", |arg| self.format_typed_ssa_binding(*arg))
     }
 

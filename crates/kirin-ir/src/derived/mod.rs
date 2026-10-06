@@ -45,6 +45,8 @@ mod chain;
 mod compare;
 mod error;
 mod mirrors;
+#[cfg(test)]
+mod tests;
 
 pub use chain::{ChainDefect, ChainFinding};
 pub use error::{DanglingParent, DeriveError, Finding, Mismatch, VerifyError};

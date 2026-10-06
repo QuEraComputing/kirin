@@ -82,7 +82,7 @@ fn block_params(
     let block = cfg.blocks(stage).nth(index).expect("block index in range");
     block
         .expect_info(stage)
-        .arguments
+        .arguments()
         .iter()
         .copied()
         .map(SSAValue::from)

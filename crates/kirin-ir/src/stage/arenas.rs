@@ -98,7 +98,7 @@ impl<L: Dialect> Arenas<L> {
     }
 
     /// Get a mutable reference to the statements arena.
-    pub fn statement_arena_mut(&mut self) -> &mut Arena<Statement, StatementInfo<L>> {
+    pub(crate) fn statement_arena_mut(&mut self) -> &mut Arena<Statement, StatementInfo<L>> {
         &mut self.statements
     }
 
@@ -135,11 +135,6 @@ impl<L: Dialect> Arenas<L> {
     /// Get a reference to the blocks arena.
     pub fn block_arena(&self) -> &Arena<Block, BlockInfo<L>> {
         &self.blocks
-    }
-
-    /// Get a mutable reference to the blocks arena.
-    pub fn block_arena_mut(&mut self) -> &mut Arena<Block, BlockInfo<L>> {
-        &mut self.blocks
     }
 
     /// Get a reference to the directed graph arena.

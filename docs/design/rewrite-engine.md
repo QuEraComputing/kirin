@@ -2608,12 +2608,11 @@ legality, and dialect validity remains a separate future subsystem.
   `prev`/`next` links, through one shared walker that never reads the summary it
   is deriving. Graph membership and topology remain, and wait on the
   `StableGraph` migration below.
-- [ ] Restrict raw mutable escape hatches: statement/block arenas, SSA uses,
+- [x] Restrict raw mutable escape hatches: statement/block arenas, SSA uses,
   and petgraph mutation become crate-private; split the mutable half of
   `GetInfo` into crate-private `GetInfoMut`. Keep metadata-only `set_name` and
   `set_stage_id` public; downstream stage-enum derives delegate to them and
-  neither can desynchronize a mirror. The repo audit found no external callers
-  of the restricted methods, so this has no downstream migration cost.
+  neither can desynchronize a mirror.
 
 This machinery is an M1 exit criterion, not a dependency that prevents the
 remaining action methods from landing independently.
