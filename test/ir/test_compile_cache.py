@@ -133,3 +133,44 @@ def test_compile_cache_relocated_error(tmp_path):
     reported = re.search(r'kernels\.py", line (\d+),', out.stderr)
     assert reported is not None, out.stderr
     assert int(reported.group(1)) == before + shift
+
+
+def test_compile_cache_directory(tmp_path, monkeypatch):
+    monkeypatch.setenv(ENV_VAR, "FALSE")
+    from kirin.ir.compile_cache import directory
+
+    source = tmp_path / "kernels.py"
+    source.touch()
+
+    assert directory(str(source)) is None
+
+    monkeypatch.setenv(ENV_VAR, "")
+    assert directory(str(source)) == tmp_path / "__kirincache__"
+    assert directory("") is None
+    assert directory("<stdin>") is None
+    assert directory(str(tmp_path / "missing.py")) is None
+
+    def fail_absolute(_):
+        raise OSError
+
+    monkeypatch.setattr(type(source), "absolute", fail_absolute)
+    assert directory(str(source)) is None
+
+    override = tmp_path / "custom-cache"
+    monkeypatch.setenv(ENV_VAR, str(override))
+    assert directory(str(source)) == override
+
+
+def test_compile_cache_fingerprint(monkeypatch):
+    monkeypatch.setenv(ENV_VAR, "FALSE")
+    from kirin.ir.compile_cache import fingerprint
+    from kirin.prelude import basic
+
+    @basic
+    def kernel(x):
+        return x + 1
+
+    key = fingerprint(kernel.dialects, kernel.code, (), {})
+    assert key is not None
+    assert fingerprint(kernel.dialects, kernel.code, (), {}).key == key.key
+    assert fingerprint(kernel.dialects, kernel.code, (object(),), {}) is None
