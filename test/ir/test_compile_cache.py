@@ -163,8 +163,8 @@ def test_compile_cache_directory(tmp_path, monkeypatch):
 
 def test_compile_cache_fingerprint(monkeypatch):
     monkeypatch.setenv(ENV_VAR, "FALSE")
-    from kirin.ir.compile_cache import fingerprint
     from kirin.prelude import basic
+    from kirin.ir.compile_cache import fingerprint
 
     @basic
     def kernel(x):
@@ -174,3 +174,41 @@ def test_compile_cache_fingerprint(monkeypatch):
     assert key is not None
     assert fingerprint(kernel.dialects, kernel.code, (), {}).key == key.key
     assert fingerprint(kernel.dialects, kernel.code, (object(),), {}) is None
+
+
+# `use` folds to a constant closure, which has no key and is saved by value
+CLOSURE = """\
+from kirin.prelude import basic
+
+
+@basic
+def make(x: int):
+    def inner(y: int):
+        return x + y
+
+    return inner
+
+
+@basic(fold=True)
+def use():
+    return make(1)
+"""
+
+
+def test_compile_cache_closure(tmp_path, monkeypatch):
+    import importlib.util
+
+    monkeypatch.setenv(ENV_VAR, str(tmp_path / "cache"))
+    source = tmp_path / "closures.py"
+    source.write_text(CLOSURE)
+
+    def load(name):
+        spec = importlib.util.spec_from_file_location(name, source)
+        assert spec is not None and spec.loader is not None
+        module = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(module)
+        return module
+
+    cold = load("closures_cold")  # compiles and saves
+    warm = load("closures_warm")  # loads, rebuilding the closure
+    assert warm.use()(2) == cold.use()(2) == 3
