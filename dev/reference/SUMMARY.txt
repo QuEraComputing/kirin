@@ -151,6 +151,7 @@
             * [data](kirin/ir/attrs/data.md)
             * [py](kirin/ir/attrs/py.md)
             * [types](kirin/ir/attrs/types.md)
+        * [compile_cache](kirin/ir/compile_cache.md)
         * [dialect](kirin/ir/dialect.md)
         * [exception](kirin/ir/exception.md)
         * [group](kirin/ir/group.md)
