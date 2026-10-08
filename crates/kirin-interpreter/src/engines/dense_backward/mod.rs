@@ -9,5 +9,5 @@ pub use frames::{DenseBlockFrame, DenseBlockMode};
 pub use interp::{
     BlockLiveness, ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver,
     DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter,
-    DenseBackwardProfile, DenseBackwardState, DenseBackwardTransfer, PointFacts, SuccessorEdge,
+    DenseBackwardProfile, DenseBackwardTransfer, PointFacts, SuccessorEdge,
 };

@@ -40,7 +40,7 @@
 //!   per semantic key; callable bodies are declared through `kirin_ir::HasCallableBody`. A rule
 //!   receives the engine `interp` directly. Shape-generic mechanics live on
 //!   the engine traits (read/write on [`SparseForwardInterp`];
-//!   fact/raise-fact on [`SparseBackwardInterp`]; opaque point-state access on
+//!   fact/raise-fact on [`SparseBackwardInterp`]; insert/remove point facts on
 //!   [`DenseBackwardInterp`]); semantics-specific vocabulary lives in helper
 //!   traits — demand rules bind [`DemandInterp`]
 //!   (`demand`/`is_demanded`/`demand_uses_if_observable`), classic-liveness rules bind
@@ -98,8 +98,8 @@ pub use engines::sparse_backward::{
 pub use engines::dense_backward::{
     BlockLiveness, ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver,
     DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter,
-    DenseBackwardProfile, DenseBackwardState, DenseBackwardTransfer, DenseBlockFrame,
-    DenseBlockMode, PointFacts, SuccessorEdge,
+    DenseBackwardProfile, DenseBackwardTransfer, DenseBlockFrame, DenseBlockMode, PointFacts,
+    SuccessorEdge,
 };
 
 // Lattice anchors (*where* facts attach), scope qualification, and the
@@ -156,11 +156,11 @@ pub mod engine {
         CallBodyTraversal, CallContext, CallFrame, CallRequest, CallServices, Callee, Completion,
         ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive, CrossStageLinker,
         DefaultCallBodyTraversal, DenseBackwardCompletion, DenseBackwardFrameEngine,
-        DenseBackwardInterp, DenseBackwardInterpreter, DenseBackwardState, DenseBlockFrame,
-        DiGraphFrame, DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
-        FrameEffect, FrameEngine, Interp, InterpDispatch, InterpreterError, LinkTarget, Linker,
-        SSABinding, SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter,
-        SparseForwardInterp, SparseForwardInterpreter, StandardAbstractFrame, StatementDispatch,
-        WideningStrategy, drive_frames, expect_single,
+        DenseBackwardInterp, DenseBackwardInterpreter, DenseBlockFrame, DiGraphFrame,
+        DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame, FrameEffect,
+        FrameEngine, Interp, InterpDispatch, InterpreterError, LinkTarget, Linker, SSABinding,
+        SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter, SparseForwardInterp,
+        SparseForwardInterpreter, StandardAbstractFrame, StatementDispatch, WideningStrategy,
+        drive_frames, expect_single,
     };
 }

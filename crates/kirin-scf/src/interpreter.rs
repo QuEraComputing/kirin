@@ -32,8 +32,8 @@ use kirin_interpreter::dialect::{
 };
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, BlockFrame, CallContext, Completion,
-    ConcreteInterpreterCore, DenseBackwardCompletion, DenseBackwardFrameEngine, DenseBackwardState,
-    DenseBlockFrame, Env, EnvIndex, ForwardDataflowFrameEngine, Frame, FrameEffect, FrameEngine,
+    ConcreteInterpreterCore, DenseBackwardCompletion, DenseBackwardFrameEngine, DenseBlockFrame,
+    Env, EnvIndex, ForwardDataflowFrameEngine, Frame, FrameEffect, FrameEngine, PointFacts,
     SparseForwardTransfer, TerminatorArgs,
 };
 
@@ -385,18 +385,19 @@ impl<V, E> DenseScfForFrame<V, E> {
         }
     }
 
-    /// The loop-carried estimate: the state after the loop, plus the body's
-    /// carried parameters renamed across the back-edge to the slots that yield
-    /// them. Unlike a CFG edge this does *not* pass anything through — the
-    /// body's own vocabulary does not escape backwards through the back-edge.
-    ///
-    /// `params[0]` is the induction variable, which no yield slot feeds.
     fn carry(&self, body_entry: &V) -> V
     where
-        V: Clone + Lattice + DenseBackwardState,
+        V: Clone + Lattice + PointFacts,
     {
-        let seed = self.seed.clone().expect("seed captured");
-        seed.join(&body_entry.rename(&self.params[1..], &self.yields))
+        let mut next = self.seed.clone().expect("seed captured");
+        for (index, param) in self.params.iter().skip(1).enumerate() {
+            if body_entry.contains(*param)
+                && let Some(slot) = self.yields.get(index)
+            {
+                next.insert(*slot);
+            }
+        }
+        next
     }
 }
 
@@ -404,7 +405,7 @@ impl<I, F, V, E> Frame<I, F> for DenseScfForFrame<V, E>
 where
     I: DenseBackwardFrameEngine<Value = V, Error = E, Frame = F>,
     F: From<DenseBlockFrame<V, E>>,
-    V: Clone + PartialEq + Lattice + DenseBackwardState,
+    V: Clone + PartialEq + Lattice + PointFacts,
     E: From<InterpreterError>,
 {
     type Completion = DenseBackwardCompletion<V>;
@@ -445,7 +446,10 @@ where
                 } else {
                     // Stable: the final body entry, minus the body-local
                     // parameters, is the state before the loop.
-                    let before = body_entry.forget(&self.params);
+                    let mut before = body_entry;
+                    for param in &self.params {
+                        before.remove(*param);
+                    }
                     interp.replace_state(before);
                     Ok(FrameEffect::Complete(DenseBackwardCompletion::Structured))
                 }

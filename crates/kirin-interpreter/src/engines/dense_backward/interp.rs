@@ -19,9 +19,9 @@
 //! - **[`DenseBackwardTransfer`]** is the [`Interp`] delegate: pipeline access,
 //!   the real dispatch location, and the *current point state* the dialect
 //!   rules transform through the shape-generic
-//!   [`DenseBackwardInterp::point_state_mut`] (liveness rules use the
-//!   [`ClassicLivenessInterp`] `gen_live`/`kill_def` spellings, which is where
-//!   "a state is a set of values" lives — the engine never assumes it).
+//!   [`DenseBackwardInterp::insert_fact`] / [`DenseBackwardInterp::remove_fact`]
+//!   (liveness rules use the [`ClassicLivenessInterp`] `gen_live`/`kill_def`
+//!   spellings).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the block-boundary
 //!   summaries ([`BlockLiveness`], keyed by [`Scoped`] blocks), the block
 //!   worklist, and [`BackwardSummaryDeps`] (successor changed → reanalyse
@@ -90,35 +90,10 @@ pub enum DenseBackwardEffect<F> {
     Push { frame: F },
 }
 
-/// How a dense backward state moves across a control edge or out of a scope.
+/// The point-state contract: a dense backward state is a set of SSA values.
 ///
-/// A dense backward state names its facts by [`SSAValue`]. Crossing an edge
-/// renames them — the target's parameters become the edge's arguments; leaving
-/// a scope drops them. Neither operation says what a fact *is*, which is why
-/// this is the only state contract the engine and the dialect frames need:
-/// [`Lattice`] merges at join points, this moves facts between vocabularies.
-///
-/// Pass-through renaming (keep facts the rename does not cover) is the caller's
-/// choice, spelled `state.rename(p, a).join(&state.forget(p))` — the CFG edge
-/// transfer wants it, a loop back-edge does not.
-pub trait DenseBackwardState: Lattice + Sized {
-    /// Only the facts named by `params`, renamed to the matching `args`.
-    ///
-    /// A `params[i]` with no `args[i]` contributes nothing.
-    fn rename(&self, params: &[SSAValue], args: &[SSAValue]) -> Self;
-
-    /// Everything except the facts named by `values`.
-    fn forget(&self, values: &[SSAValue]) -> Self;
-}
-
-/// The point-state contract of [`ClassicLiveness`]: its state is a set of live
-/// SSA values.
-///
-/// This is *semantics*, not shape — it backs
-/// [`gen_live`](ClassicLivenessInterp::gen_live) /
-/// [`kill_def`](ClassicLivenessInterp::kill_def) and is required by nothing in
-/// the engine or the frames. A different dense-backward key brings its own
-/// state contract and implements only [`DenseBackwardState`].
+/// Implemented by the analysis's state type (e.g. `kirin_liveness::LiveSet`);
+/// the join for merge points comes from [`Lattice`] (set union for liveness).
 pub trait PointFacts {
     /// Insert `value`; `true` if newly added.
     fn insert(&mut self, value: SSAValue) -> bool;
@@ -144,15 +119,11 @@ pub trait DenseBackwardInterp:
     /// [`DenseBackwardEffect::Push`]. Ordinary dialects never name it.
     type Frame;
 
-    /// The point state being transformed: the state *after* the statement on
-    /// entry to a rule, *before* it on exit.
-    ///
-    /// The engine hands the state over opaquely; how a rule transforms it is
-    /// the semantics' business.
-    fn point_state(&self) -> &Self::Value;
+    /// Insert `value` into the current point state.
+    fn insert_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
 
-    /// The point state being transformed, mutably.
-    fn point_state_mut(&mut self) -> &mut Self::Value;
+    /// Remove `value` from the current point state.
+    fn remove_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
 }
 
 /// [`ClassicLiveness`]'s helper vocabulary on top of the shape-generic
@@ -164,22 +135,16 @@ pub trait DenseBackwardInterp:
 /// Pinned to `Semantics = ClassicLiveness` via the supertrait (rustc
 /// elaborates supertraits, so rules bounding `I: ClassicLivenessInterp` need
 /// no extra clauses), and blanket-implemented for every classic-liveness
-/// dense-backward engine. [`PointFacts`] rides in the same supertrait as an
-/// associated-type bound for the same reason: elaboration means liveness rules
-/// inherit it and never spell it.
-pub trait ClassicLivenessInterp:
-    DenseBackwardInterp + Interp<Semantics = ClassicLiveness, Value: PointFacts>
-{
+/// dense-backward engine.
+pub trait ClassicLivenessInterp: DenseBackwardInterp + Interp<Semantics = ClassicLiveness> {
     /// Gen: mark `value` live at the current point (a use).
     fn gen_live(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error> {
-        self.point_state_mut().insert(value.into());
-        Ok(())
+        self.insert_fact(value)
     }
 
     /// Kill: remove `value` (a definition) from the current point state.
     fn kill_def(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error> {
-        self.point_state_mut().remove(value.into());
-        Ok(())
+        self.remove_fact(value)
     }
 
     /// The classic (weak) liveness transfer for an ordinary statement: kill
@@ -199,10 +164,8 @@ pub trait ClassicLivenessInterp:
     }
 }
 
-impl<I> ClassicLivenessInterp for I
-where
-    I: DenseBackwardInterp + Interp<Semantics = ClassicLiveness>,
-    I::Value: PointFacts,
+impl<I> ClassicLivenessInterp for I where
+    I: DenseBackwardInterp + Interp<Semantics = ClassicLiveness>
 {
 }
 
@@ -281,18 +244,20 @@ where
 impl<'ir, S, V, E, F, Sem> DenseBackwardInterp for DenseBackwardTransfer<'ir, S, V, E, F, Sem>
 where
     S: StageMeta,
-    V: Clone,
+    V: Clone + PointFacts,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
     type Frame = F;
 
-    fn point_state(&self) -> &V {
-        &self.state
+    fn insert_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
+        self.state.insert(value.into());
+        Ok(())
     }
 
-    fn point_state_mut(&mut self) -> &mut V {
-        &mut self.state
+    fn remove_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
+        self.state.remove(value.into());
+        Ok(())
     }
 }
 
@@ -457,7 +422,7 @@ pub trait DenseBackwardFrameEngine: Interp<Effect = DenseBackwardEffect<Self::Fr
 impl<'ir, S, V, E, F, Sem> DenseBackwardFrameEngine for DenseBackwardDriver<'ir, S, V, E, F, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
+    V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
@@ -540,15 +505,21 @@ where
                 continue;
             };
             let params = query::block_params(self.inner().pipeline(), stage, edge.target)?;
-            // The successor's entry state in this block's vocabulary: its
-            // parameters renamed to the edge's arguments, joined with the
-            // facts the rename does not cover — live-ins that are not
-            // parameters are dominated direct cross-block uses and pass
-            // through unchanged.
-            let entry = &summary.live_in;
-            let mapped = entry
-                .rename(&params, &edge.args)
-                .join(&entry.forget(&params));
+            let mut mapped = V::bottom();
+            for value in summary.live_in.values() {
+                match params.iter().position(|param| *param == value) {
+                    Some(index) => {
+                        if let Some(arg) = edge.args.get(index) {
+                            mapped.insert(*arg);
+                        }
+                    }
+                    // A live-in that is not a parameter of the successor is a
+                    // dominated direct cross-block use: pass it through.
+                    None => {
+                        mapped.insert(value);
+                    }
+                }
+            }
             out = out.join(&mapped);
         }
 
@@ -575,7 +546,7 @@ impl<'ir, S, V, E, F, Sem>
     > for DenseBackwardSemantics
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
+    V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
     F: From<DenseBlockFrame<V, E>>,
@@ -737,7 +708,7 @@ where
 impl<'ir, S, V, E, F, Lk, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Lk, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
+    V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
     E: From<InterpreterError>,
     Lk: Linker<S>,
     Sem: DenseBackwardSemantic,

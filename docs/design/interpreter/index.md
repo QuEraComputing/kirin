@@ -114,15 +114,9 @@ conflict):
   (= `SparseBackwardEffect`); ordinary dialects are the one-liner
   `interp.demand_uses_if_observable(self)` (purity-aware neededness via `IsPure`).
 - `ClassicLiveness` (on `DenseBackwardShape`) — likewise split: the
-  shape-generic `DenseBackwardInterp` (`point_state`/`point_state_mut`, which
-  hand the state over opaquely) serves any dense-backward key, and
-  `ClassicLivenessInterp` adds liveness's spellings — `PointFacts` ("a state is
-  a set of live values") is that key's contract, required by no engine and no
-  frame. What the shape *does* need of a state is `Lattice` for merges and
-  `DenseBackwardState` (`rename`/`forget`) for crossing edges and leaving
-  scopes; the parameter-to-argument substitution the CFG edge transfer and
-  `scf.for`'s back-edge both perform lives in those two methods, implemented
-  for `LiveSet` in `kirin-liveness`. Rules bind `ClassicLivenessInterp`: `gen_live`/
+  shape-generic `DenseBackwardInterp` (`insert_fact`/`remove_fact` point-state
+  mechanics) serves any dense-backward key, and `ClassicLivenessInterp` adds
+  liveness's spellings. Rules bind `ClassicLivenessInterp`: `gen_live`/
   `kill_def`; ordinary dialects (and calls — purity is irrelevant to dense
   sets) are `interp.gen_uses_kill_defs(self)`; CFG terminators name their edges
   (`Edges`, in `DenseBackwardEffect`), structured dialects push dense frames
