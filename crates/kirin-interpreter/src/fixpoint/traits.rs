@@ -4,7 +4,7 @@
 //! runs one work item per **summary owner** and delegates intra-owner traversal
 //! to a frame stack. These traits describe only the convergence boundary:
 //! [`Summary`] (the facts at an owner, plus how they merge under a
-//! [`FixpointPhase`]), [`OwnerSemantics`] (how to seed, enter, and complete an
+//! [`FixpointPhase`]), [`OwnerAnalysis`] (how to seed, enter, and complete an
 //! owner), and [`SummaryEffect`] (the summary updates an owner produces). The
 //! value/error/effect/semantics of the analysis stay on the wrapped
 //! [`Interp`](crate::Interp).
@@ -48,10 +48,10 @@ pub trait Summary: Clone {
 
 /// How the driver seeds, enters, and completes one summary owner.
 ///
-/// `I` is the wrapped interpreter (the driver passes itself, so the semantics can
-/// use the interpreter's env/query helpers); `K`/`S`/`F`/`C` are the profile's
+/// `I` is the wrapped interpreter (the driver passes itself, so the owner analysis
+/// can use the interpreter's env/query helpers); `K`/`S`/`F`/`C` are the profile's
 /// owner key / summary / frame / completion; `E` is the interpreter's error.
-pub trait OwnerSemantics<I, K, S, F, C, E>
+pub trait OwnerAnalysis<I, K, S, F, C, E>
 where
     S: Summary,
 {

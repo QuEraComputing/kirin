@@ -56,7 +56,7 @@ use kirin_ir::{
 use crate::core::query;
 use crate::{
     AbstractInterpreter, Body, Callee, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerSemantics, OwnerSummaryDeps,
+    InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerAnalysis, OwnerSummaryDeps,
     SameStageLinker, Scoped, SparseBackwardSemantic, SparseStore, StageQuery,
     StandardFixpointInterpreter, StrongDemand, Summary, SummaryEffect, TerminatorArgs,
 };
@@ -457,20 +457,20 @@ where
 }
 
 // ===========================================================================
-// Owner semantics: analyzing one value = running its translating rules
+// Owner analysis: analyzing one value = running its translating rules
 // ===========================================================================
 
-struct SparseBackwardSemantics;
+struct SparseBackwardOwnerAnalysis;
 
 impl<'ir, S, V, E, Sem>
-    OwnerSemantics<
+    OwnerAnalysis<
         SparseBackwardDriver<'ir, S, V, E, Sem>,
         Scoped<BodyScope, SSAValue>,
         DemandSummary<V>,
         DemandFrame<V>,
         Vec<(SSAValue, V)>,
         E,
-    > for SparseBackwardSemantics
+    > for SparseBackwardOwnerAnalysis
 where
     S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom,
@@ -685,7 +685,7 @@ where
         let scope = (target.stage, body);
         *self.driver.store_mut() = BackwardAnalysisState { scope: Some(scope) };
 
-        let mut semantics = SparseBackwardSemantics;
+        let mut owner_analysis = SparseBackwardOwnerAnalysis;
 
         // Prepass: visit each contained body part once and collect all demand
         // roots before merging any of them, so every rule observes bottom.
@@ -709,12 +709,12 @@ where
         // Propagate to the fixpoint.
         for (value, fact) in seeds {
             self.driver.merge_summary(
-                &mut semantics,
+                &mut owner_analysis,
                 Scoped::new(scope, value),
                 DemandSummary(fact),
             )?;
         }
-        self.driver.drain_worklist(&mut semantics)?;
+        self.driver.drain_worklist(&mut owner_analysis)?;
         Ok(scope)
     }
 

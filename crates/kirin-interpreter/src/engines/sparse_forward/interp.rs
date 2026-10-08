@@ -45,7 +45,7 @@ use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
     BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
     EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval, Frame, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, OwnerSemantics,
+    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, OwnerAnalysis,
     SSABinding, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
     StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, Summary,
     SummaryDependency, SummaryDependencyIndex, SummaryEffect,
@@ -1144,19 +1144,19 @@ where
 }
 
 // ===========================================================================
-// Owner semantics: block and graph owners are executable.
+// Owner analysis: block and graph owners are executable.
 // ===========================================================================
 
-/// The forward owner semantics. [`Owner::Block`] and [`Owner::Graph`] owners are
+/// The forward owner analysis. [`Owner::Block`] and [`Owner::Graph`] owners are
 /// analyzed: bind the entry product, walk the unit once, then route its outputs /
 /// successor edges / return / read-deps through
 /// [`apply_update`](ForwardDriver::apply_update). A graph owner has no successor
 /// edges — its declared yields are the function's return instead.
-struct SparseForwardSemantics<V> {
+struct SparseForwardOwnerAnalysis<V> {
     _marker: PhantomData<fn() -> V>,
 }
 
-impl<V> SparseForwardSemantics<V> {
+impl<V> SparseForwardOwnerAnalysis<V> {
     fn new() -> Self {
         Self {
             _marker: PhantomData,
@@ -1165,14 +1165,14 @@ impl<V> SparseForwardSemantics<V> {
 }
 
 impl<'ir, S, V, E, Lk, P, F, Sem>
-    OwnerSemantics<
+    OwnerAnalysis<
         ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
         Owner<<P as CallContext<V>>::Key>,
         ForwardSummary<V>,
         F,
         AbstractCompletion<V>,
         E,
-    > for SparseForwardSemantics<V>
+    > for SparseForwardOwnerAnalysis<V>
 where
     S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + PartialEq + Widen + HasBottom,
@@ -1578,11 +1578,8 @@ where
             args,
         })?;
 
-        // TODO: Rename this, "semantics" is a bit misleading, sounds like the
-        // Semantic Keys, e.g. ForwardEval.
-        // Alternative: Rename the keys to: SparseForwardKey / SparseBackwardKey / DenseBackwardKey.
-        let mut semantics = SparseForwardSemantics::new();
-        self.driver.drain_worklist(&mut semantics)?;
+        let mut owner_analysis = SparseForwardOwnerAnalysis::new();
+        self.driver.drain_worklist(&mut owner_analysis)?;
 
         Ok(self
             .driver

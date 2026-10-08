@@ -124,7 +124,7 @@ pub use semantics::{
 // source of value/error/effect/semantics; a [`FixpointProfile`] adds only the
 // owner-summary types.
 pub use fixpoint::{
-    BackwardSummaryDeps, FixpointPhase, FixpointProfile, ForwardSummaryDeps, OwnerSemantics,
+    BackwardSummaryDeps, FixpointPhase, FixpointProfile, ForwardSummaryDeps, OwnerAnalysis,
     OwnerSummaryDeps, SimpleFixpointInterpreter, StandardFixpointInterpreter, Summary,
     SummaryDependencies, SummaryDependency, SummaryDependencyIndex, SummaryEffect, WorkItem,
 };

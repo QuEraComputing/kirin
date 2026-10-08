@@ -24,4 +24,4 @@ pub use deps::{
 };
 pub use driver::{SimpleFixpointInterpreter, StandardFixpointInterpreter};
 pub use profile::FixpointProfile;
-pub use traits::{FixpointPhase, OwnerSemantics, Summary, SummaryEffect, WorkItem};
+pub use traits::{FixpointPhase, OwnerAnalysis, Summary, SummaryEffect, WorkItem};

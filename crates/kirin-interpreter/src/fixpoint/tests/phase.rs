@@ -73,10 +73,10 @@ impl Frame<PhaseInterp> for PhaseFrame {
     }
 }
 
-struct PhaseSemantics;
+struct PhaseOwnerAnalysis;
 
-impl OwnerSemantics<PhaseInterp, u8, PhaseSummary, PhaseFrame, u8, InterpreterError>
-    for PhaseSemantics
+impl OwnerAnalysis<PhaseInterp, u8, PhaseSummary, PhaseFrame, u8, InterpreterError>
+    for PhaseOwnerAnalysis
 {
     fn bottom_summary(
         &mut self,
@@ -111,11 +111,11 @@ impl OwnerSemantics<PhaseInterp, u8, PhaseSummary, PhaseFrame, u8, InterpreterEr
 #[test]
 fn narrowing_revisits_summaries_after_widening() {
     let mut interp = PhaseInterp::new(UnitInterp, (), ());
-    let mut semantics = PhaseSemantics;
+    let mut owner_analysis = PhaseOwnerAnalysis;
 
-    interp.solve(&mut semantics, 0).unwrap();
+    interp.solve(&mut owner_analysis, 0).unwrap();
     assert_eq!(interp.summary(&0), Some(&PhaseSummary(10)));
 
-    interp.run_narrowing(&mut semantics, 1).unwrap();
+    interp.run_narrowing(&mut owner_analysis, 1).unwrap();
     assert_eq!(interp.summary(&0), Some(&PhaseSummary(3)));
 }

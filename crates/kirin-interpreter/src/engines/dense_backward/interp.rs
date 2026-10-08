@@ -59,7 +59,7 @@ use crate::engines::sparse_backward::BodyScope;
 use crate::{
     AbstractInterpreter, BackwardSummaryDeps, Callee, ClassicLiveness, DenseBackwardSemantic,
     EnvIndex, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, Linker, OwnerSemantics, ProgramPoint, SameStageLinker, Scoped, StageQuery,
+    InterpreterError, Linker, OwnerAnalysis, ProgramPoint, SameStageLinker, Scoped, StageQuery,
     StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
     TerminatorArgs,
 };
@@ -530,20 +530,20 @@ where
 }
 
 // ===========================================================================
-// Owner semantics: one block owner = one backward walk
+// Owner analysis: one block owner = one backward walk
 // ===========================================================================
 
-struct DenseBackwardSemantics;
+struct DenseBackwardOwnerAnalysis;
 
 impl<'ir, S, V, E, F, Sem>
-    OwnerSemantics<
+    OwnerAnalysis<
         DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         Scoped<BodyScope, Block>,
         BlockLiveness<V>,
         F,
         DenseBackwardCompletion<V>,
         E,
-    > for DenseBackwardSemantics
+    > for DenseBackwardOwnerAnalysis
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
@@ -779,8 +779,8 @@ where
             BackwardSummaryDeps::new(),
         );
 
-        let mut semantics = DenseBackwardSemantics;
-        self.driver.solve_many(&mut semantics, owners)?;
+        let mut owner_analysis = DenseBackwardOwnerAnalysis;
+        self.driver.solve_many(&mut owner_analysis, owners)?;
         Ok(scope)
     }
 }

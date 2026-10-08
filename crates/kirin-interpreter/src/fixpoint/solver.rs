@@ -10,7 +10,7 @@
 use crate::{Frame, Interp, InterpreterError};
 
 use super::{
-    FixpointPhase, FixpointProfile, OwnerSemantics, StandardFixpointInterpreter, Summary,
+    FixpointPhase, FixpointProfile, OwnerAnalysis, StandardFixpointInterpreter, Summary,
     SummaryDependencies, SummaryDependency, SummaryDependencyIndex, SummaryEffect, WorkItem,
 };
 
@@ -20,13 +20,13 @@ where
     P: FixpointProfile<I>,
 {
     /// Ensure `owner` has a (bottom) summary and is registered in the index.
-    pub fn ensure_owner<Sem>(
+    pub fn ensure_owner<Analysis>(
         &mut self,
-        semantics: &mut Sem,
+        owner_analysis: &mut Analysis,
         owner: P::SummaryKey,
     ) -> Result<(), I::Error>
     where
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
@@ -34,7 +34,7 @@ where
             return Ok(());
         }
 
-        let summary = semantics.bottom_summary(self, &owner)?;
+        let summary = owner_analysis.bottom_summary(self, &owner)?;
         self.summaries.insert(owner.clone(), summary);
         self.deps
             .ensure_owner(&owner)
@@ -43,17 +43,21 @@ where
     }
 
     /// Analyse `entry` and everything it transitively schedules, to a fixpoint.
-    pub fn solve<Sem>(&mut self, semantics: &mut Sem, entry: P::SummaryKey) -> Result<(), I::Error>
+    pub fn solve<Analysis>(
+        &mut self,
+        owner_analysis: &mut Analysis,
+        entry: P::SummaryKey,
+    ) -> Result<(), I::Error>
     where
         P::Frame: Frame<Self, Completion = P::Completion>,
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
-        self.ensure_owner(semantics, entry.clone())?;
+        self.ensure_owner(owner_analysis, entry.clone())?;
         self.phase = FixpointPhase::Widen;
         self.schedule(entry);
-        self.drain_worklist(semantics)
+        self.drain_worklist(owner_analysis)
     }
 
     /// Seed several owners and analyse them (and everything they schedule) to a
@@ -63,35 +67,35 @@ where
     /// where every block must be visited even if unreachable from one seed — seeds
     /// every owner up front rather than relying on the dependency graph to reach
     /// them.
-    pub fn solve_many<Sem>(
+    pub fn solve_many<Analysis>(
         &mut self,
-        semantics: &mut Sem,
+        owner_analysis: &mut Analysis,
         entries: impl IntoIterator<Item = P::SummaryKey>,
     ) -> Result<(), I::Error>
     where
         P::Frame: Frame<Self, Completion = P::Completion>,
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
         self.phase = FixpointPhase::Widen;
         for entry in entries {
-            self.ensure_owner(semantics, entry.clone())?;
+            self.ensure_owner(owner_analysis, entry.clone())?;
             self.schedule(entry);
         }
-        self.drain_worklist(semantics)
+        self.drain_worklist(owner_analysis)
     }
 
     /// Re-run every owner under [`FixpointPhase::Narrow`] up to `iterations`
     /// times, refining a post-fixpoint back towards the least fixpoint.
-    pub fn run_narrowing<Sem>(
+    pub fn run_narrowing<Analysis>(
         &mut self,
-        semantics: &mut Sem,
+        owner_analysis: &mut Analysis,
         iterations: usize,
     ) -> Result<(), I::Error>
     where
         P::Frame: Frame<Self, Completion = P::Completion>,
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
@@ -104,22 +108,25 @@ where
             if self.worklist.is_empty() {
                 break;
             }
-            self.drain_worklist(semantics)?;
+            self.drain_worklist(owner_analysis)?;
         }
 
         Ok(())
     }
 
     /// Pop and analyse owners until the worklist is empty.
-    pub fn drain_worklist<Sem>(&mut self, semantics: &mut Sem) -> Result<(), I::Error>
+    pub fn drain_worklist<Analysis>(
+        &mut self,
+        owner_analysis: &mut Analysis,
+    ) -> Result<(), I::Error>
     where
         P::Frame: Frame<Self, Completion = P::Completion>,
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
         while let Some(WorkItem::Analyze(owner)) = self.worklist.pop_front() {
-            self.analyze_owner(semantics, owner)?;
+            self.analyze_owner(owner_analysis, owner)?;
         }
 
         Ok(())
@@ -127,18 +134,18 @@ where
 
     /// Merge `candidate` into `owner`'s summary; on change, schedule dependents.
     /// Returns whether the summary changed.
-    pub fn merge_summary<Sem>(
+    pub fn merge_summary<Analysis>(
         &mut self,
-        semantics: &mut Sem,
+        owner_analysis: &mut Analysis,
         owner: P::SummaryKey,
         candidate: P::Summary,
     ) -> Result<bool, I::Error>
     where
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
-        self.ensure_owner(semantics, owner.clone())?;
+        self.ensure_owner(owner_analysis, owner.clone())?;
         let summary = self.summaries.get_mut(&owner).ok_or_else(|| {
             <I::Error as From<InterpreterError>>::from(InterpreterError::Custom(
                 "missing summary after owner initialization",
@@ -152,25 +159,25 @@ where
                 .deps
                 .on_summary_changed(&owner, change)
                 .map_err(|error| I::Error::from(InterpreterError::from(error)))?;
-            self.schedule_dependencies(semantics, deps)?;
+            self.schedule_dependencies(owner_analysis, deps)?;
         }
         Ok(changed)
     }
 
-    fn schedule_dependencies<Sem>(
+    fn schedule_dependencies<Analysis>(
         &mut self,
-        semantics: &mut Sem,
+        owner_analysis: &mut Analysis,
         deps: SummaryDependencies<P::SummaryKey>,
     ) -> Result<(), I::Error>
     where
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
         for dep in deps {
             match dep {
                 SummaryDependency::Reanalyze(owner) => {
-                    self.ensure_owner(semantics, owner.clone())?;
+                    self.ensure_owner(owner_analysis, owner.clone())?;
                     self.schedule(owner);
                 }
             }
@@ -178,14 +185,14 @@ where
         Ok(())
     }
 
-    fn analyze_owner<Sem>(
+    fn analyze_owner<Analysis>(
         &mut self,
-        semantics: &mut Sem,
+        owner_analysis: &mut Analysis,
         owner: P::SummaryKey,
     ) -> Result<(), I::Error>
     where
         P::Frame: Frame<Self, Completion = P::Completion>,
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
@@ -199,7 +206,7 @@ where
             })?
             .clone();
         self.current_owner = Some(owner.clone());
-        let root = match semantics.entry_frame(self, &owner, &summary) {
+        let root = match owner_analysis.entry_frame(self, &owner, &summary) {
             Ok(root) => root,
             Err(error) => {
                 self.current_owner = None;
@@ -214,46 +221,49 @@ where
             }
         };
         self.current_owner = None;
-        let effect = semantics.complete_owner(self, owner, completion)?;
-        self.apply_summary_effect(semantics, effect)?;
-        self.apply_pending_summary_effects(semantics)?;
+        let effect = owner_analysis.complete_owner(self, owner, completion)?;
+        self.apply_summary_effect(owner_analysis, effect)?;
+        self.apply_pending_summary_effects(owner_analysis)?;
         Ok(())
     }
 
-    fn apply_summary_effect<Sem>(
+    fn apply_summary_effect<Analysis>(
         &mut self,
-        semantics: &mut Sem,
+        owner_analysis: &mut Analysis,
         effect: SummaryEffect<P::SummaryKey, P::Summary>,
     ) -> Result<(), I::Error>
     where
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
         match effect {
             SummaryEffect::None => Ok(()),
             SummaryEffect::Update { owner, candidate } => {
-                self.merge_summary(semantics, owner, candidate)?;
+                self.merge_summary(owner_analysis, owner, candidate)?;
                 Ok(())
             }
             SummaryEffect::Many(updates) => {
                 for (owner, candidate) in updates {
-                    self.merge_summary(semantics, owner, candidate)?;
+                    self.merge_summary(owner_analysis, owner, candidate)?;
                 }
                 Ok(())
             }
         }
     }
 
-    fn apply_pending_summary_effects<Sem>(&mut self, semantics: &mut Sem) -> Result<(), I::Error>
+    fn apply_pending_summary_effects<Analysis>(
+        &mut self,
+        owner_analysis: &mut Analysis,
+    ) -> Result<(), I::Error>
     where
-        Sem: OwnerSemantics<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
+        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
         let effects = std::mem::take(&mut self.pending_effects);
         for effect in effects {
-            self.apply_summary_effect(semantics, effect)?;
+            self.apply_summary_effect(owner_analysis, effect)?;
         }
         Ok(())
     }

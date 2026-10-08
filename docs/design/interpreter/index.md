@@ -411,6 +411,14 @@ belongs to.
 
 ## Engines
 
+The fixpoint driver uses `OwnerAnalysis` callbacks to initialize an owner's
+summary, construct its entry frame, and process its completion. The adapters
+`SparseForwardOwnerAnalysis`, `SparseBackwardOwnerAnalysis`, and
+`DenseBackwardOwnerAnalysis` supply these operations for their respective
+engines. They do not select statement rules: `Interp::Semantics` remains the
+`SemanticKey` used for that dispatch. Solver parameters named `owner_analysis`
+and their generic type `Analysis` refer to these callbacks.
+
 ### `ConcreteInterpreter` and `ConcreteInterpreterCore`
 
 `ConcreteInterpreter<'ir, S, V, E, Lk>` is the public, framework-default
