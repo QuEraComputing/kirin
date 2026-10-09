@@ -799,6 +799,9 @@ first variant's completion type. Toy-lang keeps `From<CallRequest>` manual to
 construct the configured `CallFrame`.
 The derive preserves the composition's ownership; it introduces no `FrameBuild`
 trait or member-side self-injection.
+The derive defaults to `::kirin_interpreter`; use
+`#[interpret(crate = path::to::interpreter)]` to select a renamed dependency or
+re-export, matching the `Interpretable` derive's crate-path option.
 
 A custom `CallBodyTraversal` can still replace callable-body traversal without
 changing call lifecycle. Its methods return the generic child type, which the

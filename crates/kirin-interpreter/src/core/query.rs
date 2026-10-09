@@ -194,6 +194,7 @@ pub struct GraphWalkPlan {
 ///
 /// Fails with [`InterpreterError::GraphHasCycle`] on cyclic digraphs: they
 /// are structurally legal IR but have no single-pass execution order.
+/// A graph absent from the queried stage yields [`InterpreterError::MissingDiGraph`].
 pub struct DiGraphWalkQuery(pub kirin_ir::DiGraph);
 
 impl<S, L> StageAction<S, L> for DiGraphWalkQuery
@@ -206,13 +207,16 @@ where
 
     fn run(
         &mut self,
-        _stage: CompileStage,
+        stage: CompileStage,
         info: &StageInfo<L>,
     ) -> Result<Self::Output, Self::Error> {
         let graph_info = self
             .0
             .get_info(info)
-            .ok_or(InterpreterError::GraphHasCycle(self.0))?;
+            .ok_or(InterpreterError::MissingDiGraph {
+                stage,
+                graph: self.0,
+            })?;
         let order = petgraph::algo::toposort(graph_info.graph(), None)
             .map_err(|_| InterpreterError::GraphHasCycle(self.0))?;
         let schedule = order

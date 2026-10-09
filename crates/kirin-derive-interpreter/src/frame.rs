@@ -5,7 +5,7 @@ use quote::quote;
 use syn::{DeriveInput, parse_quote};
 
 pub fn generate(input: &DeriveInput) -> syn::Result<TokenStream> {
-    let path: syn::Path = parse_quote!(::kirin_interpreter);
+    let path = crate::interpretable::parse_interpret_crate_path(input)?;
     let syn::Data::Enum(data) = &input.data else {
         return Err(syn::Error::new_spanned(input, "Frame requires an enum"));
     };
@@ -103,5 +103,18 @@ mod tests {
         };
         let tokens = generate(&input).expect("codegen failed");
         insta::assert_snapshot!(rustfmt(tokens.to_string()));
+    }
+
+    #[test]
+    fn custom_crate_path_replaces_default_in_generated_code() {
+        let input = syn::parse_quote! {
+            #[interpret(crate = crate::runtime)]
+            enum TestFrame {
+                Block(BlockFrame),
+            }
+        };
+        let tokens = generate(&input).expect("codegen failed").to_string();
+        assert!(tokens.contains("crate :: runtime :: Frame"));
+        assert!(!tokens.contains("kirin_interpreter"));
     }
 }

@@ -21,6 +21,11 @@ pub enum InterpreterError {
     MissingStageInfo(CompileStage),
     #[error("missing block info for block {0:?}")]
     MissingBlock(Block),
+    #[error("digraph {graph:?} does not exist in stage {stage:?}")]
+    MissingDiGraph {
+        stage: CompileStage,
+        graph: kirin_ir::DiGraph,
+    },
     #[error("missing statement info for statement {0:?}")]
     MissingStatement(Statement),
     #[error("missing SSA value {0:?}")]

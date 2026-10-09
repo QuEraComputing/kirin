@@ -32,7 +32,8 @@ pub fn derive_interp_dispatch(input: TokenStream) -> TokenStream {
 
 /// Derive stack-item `Frame` dispatch and `From<Member>` for a nonempty enum
 /// of single-field tuple variants. All members must share a completion type.
-#[proc_macro_derive(Frame)]
+/// Uses `::kirin_interpreter` unless overridden with `#[interpret(crate = path)]`.
+#[proc_macro_derive(Frame, attributes(interpret))]
 pub fn derive_frame(input: TokenStream) -> TokenStream {
     let ast = parse_macro_input!(input as syn::DeriveInput);
     match frame::generate(&ast) {
