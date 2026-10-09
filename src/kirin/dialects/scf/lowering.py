@@ -129,7 +129,7 @@ class Lowering(lowering.FromPythonAST):
             # if a variable is assigned in loop body and exist in parent frame
             # it should be captured as initializers and yielded
             for name, value in body_frame.defs.items():
-                if name in parent_frame.defs:
+                if name in parent_frame.defs and name not in yields:
                     yields.append(name)
                     body_frame.curr_block.args.append_from(value.type, name)
 
