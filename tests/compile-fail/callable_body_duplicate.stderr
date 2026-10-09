@@ -1,0 +1,5 @@
+error: at most one #[kirin(callable_body)] field is allowed per definition
+ --> tests/compile-fail/callable_body_duplicate.rs:8:5
+  |
+8 |     #[kirin(callable_body)]
+  |     ^

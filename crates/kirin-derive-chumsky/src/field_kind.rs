@@ -93,6 +93,12 @@ pub fn ast_type<L: Layout>(
 }
 
 /// Generates the parser expression for a field.
+///
+/// For body fields the split is: [`FormatOption::Default`] selects the
+/// **canonical tagged** parser (`cfg`, `block`, `digraph`, `ungraph` — each
+/// requires its discriminator keyword), while `FormatOption::Body(_)`
+/// projections select **raw** component parsers that inject no keyword and no
+/// delimiters, so a dialect author can spell their own syntax around them.
 pub fn parser_expr<L: Layout>(
     field: &FieldInfo<L>,
     crate_path: &syn::Path,
@@ -225,6 +231,11 @@ pub fn parser_expr<L: Layout>(
 }
 
 /// Generates pretty print expression for a field.
+///
+/// Mirrors [`parser_expr`] exactly: [`FormatOption::Default`] emits the
+/// **canonical tagged** printer (`print_cfg`/`print_block`/`print_digraph`/
+/// `print_ungraph`), while `FormatOption::Body(_)` projections emit the **raw**
+/// `*_only` helpers, which print no discriminator and no delimiters.
 pub fn print_expr<L: Layout>(
     field: &FieldInfo<L>,
     prettyless_path: &syn::Path,

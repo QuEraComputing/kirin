@@ -5,6 +5,7 @@ mod stage;
 use clap::{Parser, Subcommand};
 use kirin::prelude::*;
 use kirin::pretty::PipelinePrintExt;
+use kirin_interpreter::{ProgramPoint, Scoped};
 
 use stage::Stage;
 
@@ -41,10 +42,14 @@ enum Command {
         /// Run constant propagation instead of concrete execution.
         #[arg(long)]
         constprop: bool,
-        /// Run liveness analysis (strong demand + classic per-point) instead
-        /// of concrete execution.
+        /// Run classic per-program-point liveness analysis (dense backward)
+        /// instead of concrete execution.
         #[arg(long)]
         liveness: bool,
+        /// Run strong liveness (sparse backward demand) instead of concrete
+        /// execution.
+        #[arg(long)]
+        demand: bool,
         /// Restrict execution to the entry stage's language; reject calls
         /// that would dispatch into a different stage. Default is cross-
         /// language.
@@ -71,6 +76,7 @@ fn main() -> anyhow::Result<()> {
             args,
             constprop,
             liveness,
+            demand,
             per_language,
         } => run_program(
             &file,
@@ -79,6 +85,7 @@ fn main() -> anyhow::Result<()> {
             &args,
             constprop,
             liveness,
+            demand,
             per_language,
         ),
     }
@@ -92,6 +99,7 @@ fn run_program(
     cli_args: &[String],
     constprop: bool,
     liveness: bool,
+    demand: bool,
     per_language: bool,
 ) -> anyhow::Result<()> {
     let src = std::fs::read_to_string(file)?;
@@ -103,16 +111,41 @@ fn run_program(
         .map(|s| s.parse::<i64>())
         .collect::<Result<_, _>>()?;
 
-    if liveness && constprop {
-        anyhow::bail!("--liveness and --constprop are mutually exclusive");
+    if [constprop, liveness, demand]
+        .iter()
+        .filter(|&&flag| flag)
+        .count()
+        > 1
+    {
+        anyhow::bail!("--constprop, --liveness and --demand are mutually exclusive");
+    }
+
+    if demand {
+        let result = interpreter::analyze_demand(&pipeline, stage_name, func_name)?;
+        println!("demanded: {:?}", result.demanded());
+        return Ok(());
     }
 
     if liveness {
-        let (demand, dense) = interpreter::analyze_liveness(&pipeline, stage_name, func_name)?;
-        println!("demanded: {:?}", demand.demanded());
-        let mut boundaries: Vec<_> = dense
-            .blocks()
-            .map(|(block, live_in, live_out)| format!("{block:?}: in={live_in:?} out={live_out:?}"))
+        let (stage, cfg, dense) =
+            interpreter::analyze_classic_liveness(&pipeline, stage_name, func_name)?;
+        let blocks: Vec<_> = match pipeline
+            .stage(stage)
+            .ok_or_else(|| anyhow::anyhow!("resolved stage is missing"))?
+        {
+            Stage::Source(info) => cfg.blocks(info).collect(),
+            Stage::Lowered(info) => cfg.blocks(info).collect(),
+        };
+        let scope = dense.root_scope();
+        let mut boundaries: Vec<_> = blocks
+            .into_iter()
+            .filter_map(|block| {
+                let live_in =
+                    dense.point_facts(Scoped::new(scope, ProgramPoint::BlockEntry(block)))?;
+                let live_out =
+                    dense.point_facts(Scoped::new(scope, ProgramPoint::BlockExit(block)))?;
+                Some(format!("{block:?}: in={live_in:?} out={live_out:?}"))
+            })
             .collect();
         boundaries.sort();
         for line in boundaries {

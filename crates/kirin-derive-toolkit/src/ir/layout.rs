@@ -17,7 +17,7 @@ impl HasCratePath for () {
 /// Each associated type corresponds to a level in the IR hierarchy where
 /// a derive macro can inject extra parsed attributes. [`StandardLayout`]
 /// sets all extras to `()` — use it unless your derive needs custom
-/// attributes like `#[callable]` or `#[format(...)]`.
+/// attributes like `#[format(...)]`.
 ///
 /// # Custom Layout Example
 ///

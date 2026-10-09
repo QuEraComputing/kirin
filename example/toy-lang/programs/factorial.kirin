@@ -1,12 +1,12 @@
 stage @source fn @factorial(i64) -> i64;
 
-specialize @source fn @factorial(i64) -> i64 {
+specialize @source fn @factorial(i64) -> i64 cfg {
   ^entry(%n: i64) {
     %one = constant 1 -> i64;
     %is_base = le %n, %one -> i64;
-    %result = if %is_base then ^then() {
+    %result = if %is_base then block ^then() {
       yield %one;
-    } else ^else() {
+    } else block ^else() {
       %n_minus_1 = sub %n, %one -> i64;
       %rec = call.named @factorial(%n_minus_1) -> i64;
       %prod = mul %n, %rec -> i64;

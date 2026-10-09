@@ -361,7 +361,7 @@ impl<S> Pipeline<S> {
     ///
     /// This is a convenience shorthand for the common case of creating the full
     /// three-level function hierarchy (Function → StagedFunction → SpecializedFunction)
-    /// with a single body.
+    /// with a single definition.
     ///
     /// # Errors
     ///
@@ -374,7 +374,7 @@ impl<S> Pipeline<S> {
     /// ```ignore
     /// let (func, sf, spec) = pipeline.define_function::<MyDialect>()
     ///     .stage(stage_id)
-    ///     .body(body_stmt)
+    ///     .definition(definition)
     ///     .name("my_func")
     ///     .signature(sig)
     ///     .new()
@@ -386,7 +386,7 @@ impl<S> Pipeline<S> {
         #[builder(into)] name: Option<String>,
         stage: CompileStage,
         signature: Option<Signature<L::Type>>,
-        #[builder(into)] body: Statement,
+        #[builder(into)] definition: Statement,
     ) -> Result<(Function, StagedFunction, SpecializedFunction), PipelineStagedError<L>>
     where
         S: HasStageInfo<L>,
@@ -409,7 +409,7 @@ impl<S> Pipeline<S> {
 
         // Omit signature — specialize defaults to the staged function's signature.
         let spec = stage_info
-            .with_builder(|b| b.specialize().staged_func(sf).body(body).new())
+            .with_builder(|b| b.specialize().staged_func(sf).definition(definition).new())
             .expect("specialization conflict on newly created staged function");
 
         Ok((func, sf, spec))

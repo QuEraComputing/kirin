@@ -17,6 +17,7 @@ pub enum NamespacedLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     Function {
+        #[kirin(callable_body)]
         body: CFG,
         sig: Signature<ArithType>,
     },

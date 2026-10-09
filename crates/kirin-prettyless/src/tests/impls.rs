@@ -432,7 +432,7 @@ fn test_render_builder_config() {
     let f = stage
         .specialize()
         .staged_func(sf)
-        .body(fdef)
+        .definition(fdef)
         .new()
         .unwrap();
 

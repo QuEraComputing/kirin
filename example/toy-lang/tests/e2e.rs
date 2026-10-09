@@ -177,3 +177,28 @@ fn test_run_missing_stage() {
         .assert()
         .failure();
 }
+
+#[test]
+fn test_liveness_prints_dense_sets_without_demand() {
+    // `--liveness` runs exactly one analysis: classic dense-backward
+    // per-point liveness. It prints block boundary sets and must NOT run or
+    // print the independent strong-demand analysis.
+    toy_lang()
+        .args([
+            "run",
+            "programs/branching.kirin",
+            "--stage",
+            "source",
+            "--function",
+            "abs",
+            "--liveness",
+        ])
+        .current_dir(env!("CARGO_MANIFEST_DIR"))
+        .assert()
+        .success()
+        .stdout(
+            predicate::str::contains("in=")
+                .and(predicate::str::contains("out="))
+                .and(predicate::str::contains("demanded:").not()),
+        );
+}

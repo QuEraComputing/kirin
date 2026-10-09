@@ -44,15 +44,15 @@ struct DepFrame {
 impl<D: FrameEngine<Error = InterpreterError>> Frame<D> for DepFrame {
     type Completion = u8;
 
-    fn step(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
+    fn step_into(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         Ok(FrameEffect::Complete(self.owner.saturating_add(1)))
     }
 
-    fn resume_done(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
+    fn resume_done_into(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         Ok(FrameEffect::Done)
     }
 
-    fn resume(
+    fn resume_into(
         self,
         completion: u8,
         _interp: &mut D,
@@ -61,12 +61,12 @@ impl<D: FrameEngine<Error = InterpreterError>> Frame<D> for DepFrame {
     }
 }
 
-struct DepSemantics;
+struct DepOwnerAnalysis;
 
 type DepInterp<Deps> = StandardFixpointInterpreter<UnitInterp, DepProfile, (), Deps>;
 
-impl<Deps> OwnerSemantics<DepInterp<Deps>, u8, DepSummary, DepFrame, u8, InterpreterError>
-    for DepSemantics
+impl<Deps> OwnerAnalysis<DepInterp<Deps>, u8, DepSummary, DepFrame, u8, InterpreterError>
+    for DepOwnerAnalysis
 where
     Deps: SummaryDependencyIndex<u8>,
 {
@@ -105,9 +105,9 @@ fn forward_dependencies_schedule_successors_when_summary_changes() {
     let mut deps = ForwardSummaryDeps::new();
     deps.register(&0, SummaryDependency::Reanalyze(1)).unwrap();
     let mut interp = DepInterp::with_dependency_index(UnitInterp, (), (), deps);
-    let mut semantics = DepSemantics;
+    let mut owner_analysis = DepOwnerAnalysis;
 
-    interp.solve(&mut semantics, 0).unwrap();
+    interp.solve(&mut owner_analysis, 0).unwrap();
 
     assert_eq!(interp.summary(&0), Some(&DepSummary(1)));
     assert_eq!(interp.summary(&1), Some(&DepSummary(2)));
@@ -117,9 +117,9 @@ fn forward_dependencies_schedule_successors_when_summary_changes() {
 fn forward_dependencies_do_not_implicitly_reanalyze_the_same_owner() {
     let mut interp =
         DepInterp::with_dependency_index(UnitInterp, (), (), ForwardSummaryDeps::new());
-    let mut semantics = DepSemantics;
+    let mut owner_analysis = DepOwnerAnalysis;
 
-    interp.solve(&mut semantics, 0).unwrap();
+    interp.solve(&mut owner_analysis, 0).unwrap();
 
     assert_eq!(interp.summary(&0), Some(&DepSummary(1)));
 }
@@ -129,9 +129,9 @@ fn backward_dependencies_schedule_predecessors_when_summary_changes() {
     let mut deps = BackwardSummaryDeps::new();
     deps.register(&1, SummaryDependency::Reanalyze(0)).unwrap();
     let mut interp = DepInterp::with_dependency_index(UnitInterp, (), (), deps);
-    let mut semantics = DepSemantics;
+    let mut owner_analysis = DepOwnerAnalysis;
 
-    interp.solve(&mut semantics, 1).unwrap();
+    interp.solve(&mut owner_analysis, 1).unwrap();
 
     assert_eq!(interp.summary(&1), Some(&DepSummary(2)));
     assert_eq!(interp.summary(&0), Some(&DepSummary(1)));
@@ -141,9 +141,9 @@ fn backward_dependencies_schedule_predecessors_when_summary_changes() {
 fn backward_dependencies_do_not_implicitly_reanalyze_the_same_owner() {
     let mut interp =
         DepInterp::with_dependency_index(UnitInterp, (), (), BackwardSummaryDeps::new());
-    let mut semantics = DepSemantics;
+    let mut owner_analysis = DepOwnerAnalysis;
 
-    interp.solve(&mut semantics, 1).unwrap();
+    interp.solve(&mut owner_analysis, 1).unwrap();
 
     assert_eq!(interp.summary(&1), Some(&DepSummary(2)));
 }

@@ -35,6 +35,39 @@ fn digraph_builder_two_node_dag() {
 }
 
 #[test]
+fn finalize_indexes_digraph_yields_as_uses() {
+    let mut stage = new_stage();
+
+    // s0 produces %r; the graph yields %r. No statement reads %r, so its only
+    // use is the boundary yield — invisible to an operand-only scan.
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let result_ssa = stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Result(s0, 0))
+        .new();
+
+    let dg = stage
+        .digraph()
+        .node(s0)
+        .yield_value(result_ssa)
+        .name("yielder")
+        .new();
+
+    let stage = stage.finalize().unwrap();
+
+    let uses = result_ssa.get_info(&stage).unwrap().uses();
+    assert_eq!(uses.len(), 1, "%r is used only by the graph yield");
+    assert_eq!(
+        uses[0],
+        Use::DiGraphYield {
+            graph: dg,
+            index: 0
+        }
+    );
+}
+
+#[test]
 fn digraph_builder_port_and_capture_creation() {
     let mut stage = new_stage();
 
@@ -70,6 +103,50 @@ fn digraph_builder_port_and_capture_creation() {
     assert!(ssa0.name().is_some());
     assert!(ssa1.name().is_some());
     assert!(ssa_cap.name().is_some());
+}
+
+#[test]
+fn statement_builder_assigns_parent_to_directly_owned_graphs() {
+    let mut stage = new_stage();
+    let digraph = stage.digraph().new();
+    let ungraph = stage.ungraph().new();
+
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnGraphs(digraph, ungraph))
+        .new();
+
+    let stage = stage.finalize().unwrap();
+    assert_eq!(digraph.expect_info(&stage).parent(), Some(owner));
+    assert_eq!(ungraph.expect_info(&stage).parent(), Some(owner));
+}
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn statement_builder_rejects_digraph_with_existing_owner() {
+    let mut stage = new_stage();
+    let existing_owner = stage.statement().definition(BuilderDialect::Nop).new();
+    let digraph = stage.digraph().parent(existing_owner).new();
+    let ungraph = stage.ungraph().new();
+
+    let _other_owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnGraphs(digraph, ungraph))
+        .new();
+}
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn statement_builder_rejects_ungraph_with_existing_owner() {
+    let mut stage = new_stage();
+    let existing_owner = stage.statement().definition(BuilderDialect::Nop).new();
+    let digraph = stage.digraph().new();
+    let ungraph = stage.ungraph().parent(existing_owner).new();
+
+    let _other_owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnGraphs(digraph, ungraph))
+        .new();
 }
 
 #[test]

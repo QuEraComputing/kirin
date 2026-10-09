@@ -7,6 +7,8 @@ mod arith_function_language;
 mod bitwise_function_language;
 #[cfg(feature = "callable-language")]
 mod callable_language;
+#[cfg(feature = "graph-function-language")]
+mod graph_function_language;
 #[cfg(feature = "namespaced-language")]
 mod namespaced_language;
 #[cfg(feature = "simple-language")]
@@ -20,6 +22,8 @@ pub use arith_function_language::ArithFunctionLanguage;
 pub use bitwise_function_language::BitwiseFunctionLanguage;
 #[cfg(feature = "callable-language")]
 pub use callable_language::CallableLanguage;
+#[cfg(feature = "graph-function-language")]
+pub use graph_function_language::GraphFunctionLanguage;
 #[cfg(feature = "namespaced-language")]
 pub use namespaced_language::NamespacedLanguage;
 #[cfg(feature = "simple-language")]

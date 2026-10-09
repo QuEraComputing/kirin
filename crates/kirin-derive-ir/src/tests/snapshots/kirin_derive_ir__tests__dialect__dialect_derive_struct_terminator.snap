@@ -350,3 +350,9 @@ impl ::kirin::ir::HasSignature<Self> for Return {
         None
     }
 }
+#[automatically_derived]
+impl ::kirin::ir::HasCallableBody for Return {
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        ::core::option::Option::None
+    }
+}

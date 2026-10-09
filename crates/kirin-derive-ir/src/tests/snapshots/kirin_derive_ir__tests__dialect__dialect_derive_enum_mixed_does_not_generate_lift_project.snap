@@ -480,3 +480,15 @@ impl ::kirin::ir::HasSignature<Self> for MixedOps {
         }
     }
 }
+#[automatically_derived]
+impl ::kirin::ir::HasCallableBody for MixedOps
+where
+    AddOp: ::kirin::ir::HasCallableBody,
+{
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        match self {
+            Self::Add(field_0) => <AddOp as ::kirin::ir::HasCallableBody>::callable_body(field_0),
+            Self::Literal { value } => ::core::option::Option::None,
+        }
+    }
+}

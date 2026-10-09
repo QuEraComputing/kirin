@@ -357,6 +357,16 @@ impl ::kirin::ir::HasSignature<Self> for WrapperOp {
     }
 }
 #[automatically_derived]
+impl ::kirin::ir::HasCallableBody for WrapperOp
+where
+    InnerOp: ::kirin::ir::HasCallableBody,
+{
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        let Self(field_0) = self;
+        <InnerOp as ::kirin::ir::HasCallableBody>::callable_body(field_0)
+    }
+}
+#[automatically_derived]
 impl ::core::convert::From<InnerOp> for WrapperOp {
     fn from(from: InnerOp) -> Self {
         WrapperOp(from)

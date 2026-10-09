@@ -2,7 +2,7 @@
 source: crates/kirin-prettyless/src/tests/impls.rs
 expression: output
 ---
-specialize @0 %3 = {
+specialize @0 %3 = cfg {
   ^0 {
     %0 = constant 1;
     %1 = constant 2;

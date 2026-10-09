@@ -9,7 +9,7 @@
 //! blanket [`SparseForwardInterp`](crate::SparseForwardInterp) impl and its
 //! `read`/`write` helpers.
 
-use kirin_ir::{CompileStage, SSAValue, Statement};
+use kirin_ir::{CompileStage, Statement};
 
 use crate::{Env, EnvIndex, Interp};
 
@@ -43,16 +43,18 @@ where
     I: Env,
     P: FixpointProfile<I>,
 {
-    fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<Self::Value, Self::Error> {
-        self.inner.env_read(index, value)
+    type Anchor = I::Anchor;
+
+    fn env_read(&self, index: EnvIndex, anchor: I::Anchor) -> Result<Self::Value, Self::Error> {
+        self.inner.env_read(index, anchor)
     }
 
     fn env_write(
         &mut self,
         index: EnvIndex,
-        value: SSAValue,
+        anchor: I::Anchor,
         data: Self::Value,
     ) -> Result<(), Self::Error> {
-        self.inner.env_write(index, value, data)
+        self.inner.env_write(index, anchor, data)
     }
 }

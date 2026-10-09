@@ -42,15 +42,15 @@ struct CounterFrame(u8);
 impl<D: FrameEngine<Error = InterpreterError>> Frame<D> for CounterFrame {
     type Completion = u8;
 
-    fn step(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
+    fn step_into(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         Ok(FrameEffect::Complete(self.0.saturating_add(1).min(2)))
     }
 
-    fn resume_done(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
+    fn resume_done_into(self, _interp: &mut D) -> Result<FrameEffect<Self, u8>, InterpreterError> {
         Ok(FrameEffect::Done)
     }
 
-    fn resume(
+    fn resume_into(
         self,
         completion: u8,
         _interp: &mut D,
@@ -59,13 +59,13 @@ impl<D: FrameEngine<Error = InterpreterError>> Frame<D> for CounterFrame {
     }
 }
 
-struct CounterSemantics;
+struct CounterOwnerAnalysis;
 
 type CounterInterp =
     StandardFixpointInterpreter<UnitInterp, CounterProfile, (), OwnerSummaryDeps<u8>>;
 
-impl OwnerSemantics<CounterInterp, u8, CounterSummary, CounterFrame, u8, InterpreterError>
-    for CounterSemantics
+impl OwnerAnalysis<CounterInterp, u8, CounterSummary, CounterFrame, u8, InterpreterError>
+    for CounterOwnerAnalysis
 {
     fn bottom_summary(
         &mut self,
@@ -100,9 +100,9 @@ impl OwnerSemantics<CounterInterp, u8, CounterSummary, CounterFrame, u8, Interpr
 #[test]
 fn simple_fixpoint_reanalyzes_until_summary_stops_changing() {
     let mut interp = CounterInterp::new(UnitInterp, (), ());
-    let mut semantics = CounterSemantics;
+    let mut owner_analysis = CounterOwnerAnalysis;
 
-    interp.solve(&mut semantics, 0).unwrap();
+    interp.solve(&mut owner_analysis, 0).unwrap();
 
     assert_eq!(interp.summary(&0), Some(&CounterSummary(2)));
 }

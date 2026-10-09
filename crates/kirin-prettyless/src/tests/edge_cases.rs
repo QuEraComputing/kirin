@@ -311,7 +311,11 @@ fn test_staged_function_unnamed() {
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
-        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+        ctx.specialize()
+            .staged_func(sf)
+            .definition(fdef)
+            .new()
+            .unwrap();
     });
 
     let output = PrintExt::sprint(&func, &pipeline);
@@ -341,7 +345,7 @@ fn test_staged_function_no_params() {
     let _ = stage
         .specialize()
         .staged_func(staged_function)
-        .body(fdef)
+        .definition(fdef)
         .new()
         .unwrap();
 
@@ -392,7 +396,11 @@ fn test_pipeline_render_builder_write_to() {
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
-        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+        ctx.specialize()
+            .staged_func(sf)
+            .definition(fdef)
+            .new()
+            .unwrap();
     });
 
     let mut output = Vec::new();
@@ -428,7 +436,11 @@ fn test_function_render_builder_write_to() {
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
-        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+        ctx.specialize()
+            .staged_func(sf)
+            .definition(fdef)
+            .new()
+            .unwrap();
     });
 
     let mut output = Vec::new();
@@ -462,7 +474,7 @@ fn test_render_very_narrow_width() {
     let _ = stage
         .specialize()
         .staged_func(sf)
-        .body(fdef)
+        .definition(fdef)
         .new()
         .unwrap();
 

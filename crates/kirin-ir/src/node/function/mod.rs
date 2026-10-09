@@ -20,7 +20,7 @@
 //!
 //! - [`SpecializedFunction`] / [`SpecializedFunctionInfo`] — A concrete
 //!   instantiation of a staged function for a particular (possibly narrower)
-//!   signature. Owns the IR body. Dispatch selects the most specific
+//!   signature. Owns the IR definition statement. Dispatch selects the most specific
 //!   non-invalidated specialization via [`SignatureSemantics`].
 //!
 //! Each level can be *invalidated* (staged or specialized) when the function is

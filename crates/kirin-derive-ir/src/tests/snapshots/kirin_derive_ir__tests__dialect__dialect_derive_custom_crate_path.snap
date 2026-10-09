@@ -336,3 +336,9 @@ impl kirin_ir::HasSignature<Self> for Nop {
         None
     }
 }
+#[automatically_derived]
+impl kirin_ir::HasCallableBody for Nop {
+    fn callable_body(&self) -> ::core::option::Option<kirin_ir::Body> {
+        ::core::option::Option::None
+    }
+}

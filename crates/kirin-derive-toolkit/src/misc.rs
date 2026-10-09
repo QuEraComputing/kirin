@@ -150,9 +150,7 @@ pub fn error_unknown_attribute(meta: &syn::meta::ParseNestedMeta) -> syn::Error 
             meta.path.get_ident().unwrap()
         ))
     } else if meta.path.is_ident("callable") {
-        meta.error(
-            "the 'callable' attribute is not part of #[kirin(...)]; use #[callable] with #[derive(CallSemantics)]",
-        )
+        meta.error("use #[kirin(callable_body)] on the definition's body field")
     } else if [
         "constant",
         "pure",

@@ -21,8 +21,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use kirin_interpreter::{CallContext, ContextInsensitive, InterpreterError, WideningStrategy};
-use kirin_ir::{CompileStage, Product, SpecializedFunction};
+use kirin_interpreter::{
+    CallContext, ContextInsensitive, InterpreterError, LinkTarget, WideningStrategy,
+};
+use kirin_ir::Product;
 
 use crate::ConstPropValue;
 
@@ -41,7 +43,11 @@ pub enum CallCtx {
 pub struct ConstPropContext {
     control: ContextInsensitive,
     max_contexts: usize,
-    admitted: HashMap<(CompileStage, SpecializedFunction), HashSet<Vec<i64>>>,
+    /// Per-target admitted constant tuples. Keyed by the resolved
+    /// [`LinkTarget`] — the same identity [`ContextInsensitive`] uses as its
+    /// whole key, so the budget is spent per function-in-a-stage exactly as
+    /// before.
+    admitted: HashMap<LinkTarget, HashSet<Vec<i64>>>,
 }
 
 impl ConstPropContext {
@@ -64,18 +70,16 @@ impl Default for ConstPropContext {
     }
 }
 
+/// The context-insensitive key ([`LinkTarget`]) plus the call context that
+/// refines it. Context sensitivity *adds* to the resolved target's identity
+/// rather than re-spelling it.
 impl CallContext<ConstPropValue> for ConstPropContext {
-    type Key = (CompileStage, SpecializedFunction, CallCtx);
+    type Key = (LinkTarget, CallCtx);
 
-    fn key(
-        &mut self,
-        stage: CompileStage,
-        function: SpecializedFunction,
-        args: &Product<ConstPropValue>,
-    ) -> Self::Key {
+    fn key(&mut self, target: &LinkTarget, args: &Product<ConstPropValue>) -> Self::Key {
         let ctx = match all_const(args) {
             Some(consts) => {
-                let admitted = self.admitted.entry((stage, function)).or_default();
+                let admitted = self.admitted.entry(*target).or_default();
                 if admitted.contains(&consts) {
                     CallCtx::Args(consts)
                 } else if admitted.len() < self.max_contexts {
@@ -88,7 +92,7 @@ impl CallContext<ConstPropValue> for ConstPropContext {
             }
             None => CallCtx::Unknown,
         };
-        (stage, function, ctx)
+        (*target, ctx)
     }
 }
 

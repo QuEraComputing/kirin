@@ -11,7 +11,7 @@ type ConstProp = kirin_constprop::ConstPropValue;
 const ADD_LOWERED: &str = r#"
 stage @lowered fn @add(i64, i64) -> i64;
 
-specialize @lowered fn @add(i64, i64) -> i64 {
+specialize @lowered fn @add(i64, i64) -> i64 cfg {
   ^entry(%a: i64, %b: i64) {
     %result = add %a, %b -> i64;
     ret %result;
@@ -22,7 +22,7 @@ specialize @lowered fn @add(i64, i64) -> i64 {
 const BRANCH_LOWERED: &str = r#"
 stage @lowered fn @sign(i64) -> i64;
 
-specialize @lowered fn @sign(i64) -> i64 {
+specialize @lowered fn @sign(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %zero = constant 0 -> i64;
     %is_neg = lt %x, %zero -> i64;
@@ -41,7 +41,7 @@ specialize @lowered fn @sign(i64) -> i64 {
 
 const SAME_BRANCH_LOWERED: &str = r#"
 stage @lowered fn @same(i64) -> i64;
-specialize @lowered fn @same(i64) -> i64 {
+specialize @lowered fn @same(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %zero = constant 0 -> i64;
     %is_neg = lt %x, %zero -> i64;
@@ -59,7 +59,7 @@ specialize @lowered fn @same(i64) -> i64 {
 const CROSS_BLOCK_DIRECT_USE: &str = r#"
 stage @lowered fn @cross(i64) -> i64;
 
-specialize @lowered fn @cross(i64) -> i64 {
+specialize @lowered fn @cross(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %v = add %x, %x -> i64;
     %zero = constant 0 -> i64;
@@ -86,7 +86,7 @@ specialize @lowered fn @cross(i64) -> i64 {
 const LOOP_CARRIED_CROSS_BLOCK_RISE: &str = r#"
 stage @lowered fn @rise(i64) -> i64;
 
-specialize @lowered fn @rise(i64) -> i64 {
+specialize @lowered fn @rise(i64) -> i64 cfg {
   ^entry(%n: i64) {
     %z = constant 0 -> i64;
     br ^head(%z);
@@ -110,10 +110,10 @@ specialize @lowered fn @rise(i64) -> i64 {
 const SOURCE_FOR_CARRIED_STABLE: &str = r#"
 stage @source fn @stable(i64, i64, i64) -> i64;
 
-specialize @source fn @stable(i64, i64, i64) -> i64 {
+specialize @source fn @stable(i64, i64, i64) -> i64 cfg {
   ^entry(%lo: i64, %hi: i64, %s: i64) {
     %init = constant 0 -> i64;
-    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do block ^body(%i: i64, %acc: i64) {
       yield %acc;
     } -> i64;
     ret %sum;
@@ -127,12 +127,12 @@ specialize @source fn @stable(i64, i64, i64) -> i64 {
 const SOURCE_IF_SAME_CONST: &str = r#"
 stage @source fn @if_same(i64) -> i64;
 
-specialize @source fn @if_same(i64) -> i64 {
+specialize @source fn @if_same(i64) -> i64 cfg {
   ^entry(%cond: i64) {
-    %result = if %cond then ^then() {
+    %result = if %cond then block ^then() {
       %a = constant 1 -> i64;
       yield %a;
-    } else ^else() {
+    } else block ^else() {
       %b = constant 1 -> i64;
       yield %b;
     } -> i64;
@@ -146,12 +146,12 @@ specialize @source fn @if_same(i64) -> i64 {
 const SOURCE_IF_DIFF_CONST: &str = r#"
 stage @source fn @if_diff(i64) -> i64;
 
-specialize @source fn @if_diff(i64) -> i64 {
+specialize @source fn @if_diff(i64) -> i64 cfg {
   ^entry(%cond: i64) {
-    %result = if %cond then ^then() {
+    %result = if %cond then block ^then() {
       %a = constant 1 -> i64;
       yield %a;
-    } else ^else() {
+    } else block ^else() {
       %b = constant 2 -> i64;
       yield %b;
     } -> i64;
@@ -167,28 +167,28 @@ stage @source fn @source_abs(i64) -> i64;
 stage @lowered fn @low_then_high(i64) -> i64;
 stage @lowered fn @source_abs(i64) -> i64;
 
-specialize @source fn @source_to_lowered_to_source(i64) -> i64 {
+specialize @source fn @source_to_lowered_to_source(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %result = call.named @low_then_high(%x) -> i64;
     ret %result;
   }
 }
 
-specialize @source fn @source_abs(i64) -> i64 {
+specialize @source fn @source_abs(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %zero = constant 0 -> i64;
     %is_neg = lt %x, %zero -> i64;
-    %result = if %is_neg then ^then() {
+    %result = if %is_neg then block ^then() {
       %negated = neg %x -> i64;
       yield %negated;
-    } else ^else() {
+    } else block ^else() {
       yield %x;
     } -> i64;
     ret %result;
   }
 }
 
-specialize @lowered fn @low_then_high(i64) -> i64 {
+specialize @lowered fn @low_then_high(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %abs = call.named @source_abs(%x) -> i64;
     %one = constant 1 -> i64;
@@ -203,7 +203,7 @@ stage @source fn @source_direct_specialized(i64) -> i64;
 stage @source fn @dual_impl(i64) -> i64;
 stage @lowered fn @dual_impl(i64) -> i64;
 
-specialize @source fn @dual_impl(i64) -> i64 {
+specialize @source fn @dual_impl(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %one = constant 1 -> i64;
     %result = add %x, %one -> i64;
@@ -211,7 +211,7 @@ specialize @source fn @dual_impl(i64) -> i64 {
   }
 }
 
-specialize @lowered fn @dual_impl(i64) -> i64 {
+specialize @lowered fn @dual_impl(i64) -> i64 cfg {
   ^entry(%x: i64) {
     %hundred = constant 100 -> i64;
     %result = add %x, %hundred -> i64;
@@ -263,7 +263,7 @@ fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
             .terminator(ret)
             .new();
         let cfg = builder.cfg().add_block(block).new();
-        let body = Function::<ArithType>::new(
+        let definition = Function::<ArithType>::new(
             builder,
             cfg,
             Signature::new(vec![ArithType::I64], ArithType::I64, ()),
@@ -271,7 +271,7 @@ fn build_cross_stage_specialized_pipeline() -> Pipeline<Stage> {
         builder
             .specialize()
             .staged_func(caller)
-            .body(body)
+            .definition(definition)
             .new()
             .unwrap();
     });
@@ -555,161 +555,14 @@ fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
     assert_eq!(result, ConstProp::Const(1));
 }
 
-/// Compiler/analysis-author surface: a *custom total frame enum* used
-/// as the engine's `F` parameter (frame generalization), and a *custom abstract
-/// policy* budget (summary-key generalization). Both reuse the standard engine
-/// — no fork.
+/// Analysis-author surface for a custom abstract policy budget.
 mod advanced {
-    use std::cell::RefCell;
-    use std::hash::Hash;
-
     use kirin_constprop::{ConstPropContext, ConstPropValue};
-    use kirin_interpreter::engine::{
-        AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractFrameBuild,
-        AbstractFrameDriver, BodyFrame, CallContext, CallFrame, Completion, ConcreteInterpreter,
-        CrossStageLinker, Frame, FrameBuild, FrameDriver, FrameEffect, InterpreterError,
-        SparseForwardInterp, SparseForwardInterpreter, expect_single,
-    };
-    use kirin_scf::{
-        AbstractScfForFrame, AbstractScfIfFrame, BuildAbstractScfFor, BuildAbstractScfIf,
-        BuildScfFor, BuildScfIf, ForLoopValue, ScfForFrame, ScfIfFrame,
-    };
+    use kirin_interpreter::{SameStageLinker, engine::expect_single};
 
     use super::build_pipeline;
+
     use crate::interpreter::ToyError;
-    use crate::stage::Stage;
-
-    // --- A custom total frame enum -----------------------------------------
-    //
-    // It reuses the standard `BodyFrame`/`CallFrame` traversal (and the SCF loop
-    // frame) verbatim via `FrameBuild`/`BuildScfFor` + the delegating `*_into`
-    // methods, and adds *observation*: every call and every body step is counted
-    // in a side log. The engine is not forked — only `ConcreteInterpreter`'s `F`
-    // type parameter changes.
-
-    thread_local! {
-        static TRACE: RefCell<Trace> = const { RefCell::new(Trace { calls: 0, body_steps: 0 }) };
-    }
-
-    #[derive(Clone, Copy, Default)]
-    struct Trace {
-        calls: usize,
-        body_steps: usize,
-    }
-
-    enum TracingFrame<V, E> {
-        Body(BodyFrame<V, E>),
-        Call(CallFrame<V>),
-        ScfIf(ScfIfFrame<V, E>),
-        ScfFor(ScfForFrame<V, E>),
-    }
-
-    impl<V, E> FrameBuild<V, E> for TracingFrame<V, E> {
-        fn from_body(frame: BodyFrame<V, E>) -> Self {
-            TracingFrame::Body(frame)
-        }
-        fn from_call(frame: CallFrame<V>) -> Self {
-            TracingFrame::Call(frame)
-        }
-    }
-
-    impl<V, E> BuildScfIf<V, E> for TracingFrame<V, E> {
-        fn scf_if(frame: ScfIfFrame<V, E>) -> Self {
-            TracingFrame::ScfIf(frame)
-        }
-    }
-
-    impl<V, E> BuildScfFor<V, E> for TracingFrame<V, E> {
-        fn scf_for(frame: ScfForFrame<V, E>) -> Self {
-            TracingFrame::ScfFor(frame)
-        }
-    }
-
-    impl<I, V, E> Frame<I> for TracingFrame<V, E>
-    where
-        I: FrameDriver<Value = V, Error = E> + SparseForwardInterp<Frame = TracingFrame<V, E>>,
-        V: Clone + ForLoopValue,
-        E: From<InterpreterError>,
-    {
-        type Completion = Completion<V>;
-
-        fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingFrame::Body(frame) => {
-                    TRACE.with(|t| t.borrow_mut().body_steps += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingFrame::Call(frame) => {
-                    TRACE.with(|t| t.borrow_mut().calls += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingFrame::ScfIf(frame) => frame.step_into::<I, Self>(interp),
-                TracingFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
-            }
-        }
-
-        fn resume_done(
-            self,
-            _interp: &mut I,
-        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingFrame::Body(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingFrame::Call(frame) => {
-                    frame.resume_done_into::<Self>().map_err(I::Error::from)
-                }
-                TracingFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
-                TracingFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
-            }
-        }
-
-        fn resume(
-            self,
-            completion: Self::Completion,
-            interp: &mut I,
-        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingFrame::Body(frame) => frame.resume_into::<I, Self>(completion, interp),
-                TracingFrame::Call(frame) => frame.resume_into::<I, Self>(completion, interp),
-                TracingFrame::ScfIf(frame) => frame.resume_into::<Self>(completion),
-                TracingFrame::ScfFor(frame) => frame.resume_into::<I, Self>(completion, interp),
-            }
-        }
-    }
-
-    type TracingInterpreter<'ir> = ConcreteInterpreter<
-        'ir,
-        Stage,
-        i64,
-        ToyError,
-        CrossStageLinker,
-        TracingFrame<i64, ToyError>,
-    >;
-
-    #[test]
-    fn custom_frame_runs_program_and_observes_traversal() {
-        TRACE.with(|t| *t.borrow_mut() = Trace::default());
-        let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
-
-        // ConcreteInterpreter parameterized by the *custom* frame enum.
-        let mut interp: TracingInterpreter<'_> =
-            ConcreteInterpreter::new(&pipeline).with_linker(CrossStageLinker);
-        let result = expect_single::<i64, ToyError>(
-            interp.call_by_name("source", "factorial", [5]).unwrap(),
-        )
-        .unwrap();
-
-        // (1)+(2): the custom frame ran the real program correctly by reusing
-        // the standard BodyFrame/CallFrame traversal (no engine fork).
-        assert_eq!(result, 120);
-
-        // (3): traversal is observable through the custom frame. factorial(5)
-        // makes 4 recursive calls (5→4→3→2→1; the base case at 1 makes none),
-        // all routed through the custom Call arm; body statements run through
-        // its Body arm.
-        let trace = TRACE.with(|t| *t.borrow());
-        assert_eq!(trace.calls, 4);
-        assert!(trace.body_steps > 0);
-    }
 
     // --- A capped custom abstract policy -----------------------------------
 
@@ -722,7 +575,7 @@ mod advanced {
         let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
         let mut analysis = crate::interpreter::ToyConstProp::new(&pipeline)
             .with_policy(ConstPropContext::with_budget(2))
-            .with_linker(CrossStageLinker);
+            .with_linker(SameStageLinker);
         let result = expect_single::<ConstPropValue, ToyError>(
             analysis
                 .analyze_by_name("source", "factorial", [ConstPropValue::Const(5)])
@@ -730,161 +583,6 @@ mod advanced {
         )
         .unwrap();
         assert_eq!(result, ConstPropValue::Top);
-    }
-
-    // --- A custom total ABSTRACT frame enum --------------------------------
-    //
-    // The abstract analogue of `TracingFrame`: it reuses the standard abstract
-    // frames verbatim (via `AbstractFrameBuild` + the `*_into` methods) and adds
-    // observation. The engine is not forked — only `SparseForwardInterpreter`'s `F`
-    // type parameter changes. This proves abstract *traversal* is frame-
-    // parametric, distinct from the analysis-policy `P` budget customized above.
-
-    thread_local! {
-        static ATRACE: RefCell<AbstractTrace> = const {
-            RefCell::new(AbstractTrace {
-                block_steps: 0,
-                if_steps: 0,
-                calls: 0,
-            })
-        };
-    }
-
-    #[derive(Clone, Copy, Default)]
-    struct AbstractTrace {
-        block_steps: usize,
-        if_steps: usize,
-        calls: usize,
-    }
-
-    enum TracingAbstractFrame<V, E, K> {
-        Block(AbstractBlockFrame<V, E, K>),
-        Call(AbstractCallFrame<V, E, K>),
-        ScfIf(AbstractScfIfFrame<V, E, K>),
-        ScfFor(AbstractScfForFrame<V, E, K>),
-    }
-
-    impl<V, E, K> AbstractFrameBuild<V, E, K> for TracingAbstractFrame<V, E, K> {
-        fn from_block(frame: AbstractBlockFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::Block(frame)
-        }
-        fn from_call(frame: AbstractCallFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::Call(frame)
-        }
-    }
-
-    impl<V, E, K> BuildAbstractScfIf<V, E, K> for TracingAbstractFrame<V, E, K> {
-        fn scf_if(frame: AbstractScfIfFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::ScfIf(frame)
-        }
-    }
-
-    impl<V, E, K> BuildAbstractScfFor<V, E, K> for TracingAbstractFrame<V, E, K> {
-        fn scf_for(frame: AbstractScfForFrame<V, E, K>) -> Self {
-            TracingAbstractFrame::ScfFor(frame)
-        }
-    }
-
-    impl<I, V, E, K> Frame<I> for TracingAbstractFrame<V, E, K>
-    where
-        I: AbstractFrameDriver<Value = V, Error = E, SummaryKey = K>
-            + SparseForwardInterp<Frame = TracingAbstractFrame<V, E, K>>,
-        V: Clone + PartialEq + ForLoopValue,
-        E: From<InterpreterError>,
-        K: Clone + Eq + Hash,
-    {
-        type Completion = AbstractCompletion<V>;
-
-        fn step(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingAbstractFrame::Block(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().block_steps += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingAbstractFrame::Call(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().calls += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingAbstractFrame::ScfIf(frame) => {
-                    ATRACE.with(|t| t.borrow_mut().if_steps += 1);
-                    frame.step_into::<I, Self>(interp)
-                }
-                TracingAbstractFrame::ScfFor(frame) => frame.step_into::<I, Self>(interp),
-            }
-        }
-
-        fn resume_done(
-            self,
-            _interp: &mut I,
-        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingAbstractFrame::Block(frame) => Ok(frame.resume_done_into::<Self>()),
-                TracingAbstractFrame::Call(frame) => frame.resume_done_into::<Self>(),
-                TracingAbstractFrame::ScfIf(frame) => frame.resume_done_into::<Self>(),
-                TracingAbstractFrame::ScfFor(frame) => frame.resume_done_into::<Self>(),
-            }
-        }
-
-        fn resume(
-            self,
-            completion: Self::Completion,
-            interp: &mut I,
-        ) -> Result<FrameEffect<Self, Self::Completion>, I::Error> {
-            match self {
-                TracingAbstractFrame::Block(frame) => {
-                    frame.resume_into::<I, Self>(completion, interp)
-                }
-                TracingAbstractFrame::Call(frame) => frame.resume_into::<Self>(completion),
-                TracingAbstractFrame::ScfIf(frame) => {
-                    frame.resume_into::<I, Self>(completion, interp)
-                }
-                TracingAbstractFrame::ScfFor(frame) => {
-                    frame.resume_into::<I, Self>(completion, interp)
-                }
-            }
-        }
-    }
-
-    type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
-
-    type TracingAnalysis<'ir> = SparseForwardInterpreter<
-        'ir,
-        Stage,
-        ConstPropValue,
-        ToyError,
-        CrossStageLinker,
-        ConstPropContext,
-        TracingAbstractFrame<ConstPropValue, ToyError, CpKey>,
-    >;
-
-    #[test]
-    fn custom_abstract_frame_analyzes_program_and_observes_traversal() {
-        ATRACE.with(|t| *t.borrow_mut() = AbstractTrace::default());
-        let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
-
-        // SparseForwardInterpreter parameterized by the *custom* abstract frame enum.
-        let mut analysis: TracingAnalysis<'_> =
-            SparseForwardInterpreter::new(&pipeline).with_linker(CrossStageLinker);
-        let result = expect_single::<ConstPropValue, ToyError>(
-            analysis
-                .analyze_by_name("source", "factorial", [ConstPropValue::Const(5)])
-                .unwrap(),
-        )
-        .unwrap();
-
-        // (1)+(2): the custom abstract frame ran the real interprocedural fixpoint
-        // correctly by reusing the standard abstract frames — precise recursive
-        // constant propagation, no engine fork.
-        assert_eq!(result, ConstPropValue::Const(120));
-
-        // (3): abstract traversal is observable through the custom frame — a real
-        // frame type `F`, not merely a custom analysis policy `P`. Counts are not
-        // pinned (the interprocedural fixpoint re-enqueues summaries). Since M3b,
-        // CFG convergence is owner-based: each block is a block owner walked by a
-        // block frame, so traversal shows up as block + call steps.
-        let trace = ATRACE.with(|t| *t.borrow());
-        assert!(trace.block_steps > 0, "block frames must be stepped");
-        assert!(trace.calls > 0, "call frames must be stepped");
     }
 }
 
@@ -896,11 +594,15 @@ mod advanced {
 // ===========================================================================
 
 mod demand {
+    use std::collections::HashSet;
+
     use kirin::prelude::{
-        CFG, CompileStage, GetInfo, HasCFGBody, HasResults, ParsePipelineText, Pipeline, SSAValue,
+        CFG, CompileStage, GetInfo, HasBlocks, HasCFG, HasDigraphs, HasResults, HasUngraphs,
+        ParsePipelineText, Pipeline, SSAValue, Statement,
     };
     use kirin_arith::{Arith, ArithValue};
     use kirin_function::Lexical;
+    use kirin_interpreter::{Body, BodyScope, Callee};
     use kirin_liveness::analyze_demand;
 
     use crate::language::HighLevel;
@@ -912,22 +614,23 @@ mod demand {
         pipeline
     }
 
-    /// The source stage id, its info, and the body cfg of `name`.
-    pub(super) fn source_cfg(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, CFG) {
+    /// A source-stage callable root. Body discovery belongs to the interpreter,
+    /// so this helper deliberately stops at the pipeline-level function handle.
+    pub(super) fn source_root(pipeline: &Pipeline<Stage>, name: &str) -> (CompileStage, Callee) {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
-        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
-            panic!("source stage holds HighLevel");
+        let function = pipeline
+            .lookup_function_by_name(name)
+            .expect("pipeline function");
+        (stage_id, Callee::Function(function))
+    }
+
+    /// Extract a CFG only after the interpreter has resolved the callable and
+    /// reported the target scope it actually analyzed.
+    pub(super) fn cfg_scope(scope: BodyScope) -> (CompileStage, CFG) {
+        let (stage, Body::CFG(cfg)) = scope else {
+            panic!("expected analysis root to resolve to a CFG, got {scope:?}");
         };
-        let sf = pipeline
-            .resolve_staged_function(name, stage_id)
-            .expect("staged function");
-        let sf_info = sf.get_info(info).expect("staged function info");
-        let body = *sf_info.specializations()[0].body();
-        let cfg = match body.definition(info) {
-            HighLevel::Lexical(Lexical::Function(function)) => *function.cfg(),
-            other => panic!("expected a function body, got {other:?}"),
-        };
-        (stage_id, cfg)
+        (stage, cfg)
     }
 
     /// The parameters of the CFG's entry block.
@@ -946,27 +649,83 @@ mod demand {
             .collect()
     }
 
-    /// Find something by matching statement definitions anywhere in the
-    /// cfg (including scf bodies, via the topology's nested-block
-    /// enumeration).
-    pub(super) fn find_value<R>(
+    /// Find something by walking statement definitions anywhere in the CFG,
+    /// including bodies nested under statements.
+    fn find_in_body<R>(
         pipeline: &Pipeline<Stage>,
         cfg: CFG,
-        select: impl Fn(&HighLevel) -> Option<R>,
+        mut select: impl FnMut(Statement, &HighLevel) -> Option<R>,
     ) -> R {
         let stage_id = pipeline.stage_by_name("source").expect("source stage");
         let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
             panic!("source stage holds HighLevel");
         };
-        let topology = kirin_interpreter::cfg_topology(info, &cfg);
-        for block in &topology.blocks {
-            for &stmt in &block.stmts {
-                if let Some(value) = select(stmt.definition(info)) {
+
+        let mut bodies = vec![Body::CFG(cfg)];
+        let mut visited = HashSet::new();
+        while let Some(body) = bodies.pop() {
+            if !visited.insert(body) {
+                continue;
+            }
+
+            let statements: Vec<Statement> = match body {
+                Body::CFG(cfg) => {
+                    bodies.extend(cfg.blocks(info).map(Body::Block));
+                    continue;
+                }
+                Body::Block(block) => {
+                    let mut statements: Vec<Statement> = block.statements(info).collect();
+                    if let Some(terminator) = block.terminator(info) {
+                        statements.push(terminator);
+                    }
+                    statements
+                }
+                Body::DiGraph(graph) => graph
+                    .expect_info(info)
+                    .graph()
+                    .node_weights()
+                    .copied()
+                    .collect(),
+                Body::UnGraph(graph) => graph
+                    .expect_info(info)
+                    .graph()
+                    .node_weights()
+                    .copied()
+                    .collect(),
+            };
+
+            for statement in statements {
+                let definition = statement.definition(info);
+                if let Some(value) = select(statement, definition) {
                     return value;
                 }
+                bodies.extend(definition.blocks().copied().map(Body::Block));
+                bodies.extend(definition.cfgs().copied().map(Body::CFG));
+                bodies.extend(definition.digraphs().copied().map(Body::DiGraph));
+                bodies.extend(definition.ungraphs().copied().map(Body::UnGraph));
             }
         }
         panic!("no matching statement in cfg");
+    }
+
+    pub(super) fn find_value<R>(
+        pipeline: &Pipeline<Stage>,
+        cfg: CFG,
+        select: impl FnMut(&HighLevel) -> Option<R>,
+    ) -> R {
+        let mut select = select;
+        find_in_body(pipeline, cfg, |_, definition| select(definition))
+    }
+
+    pub(super) fn find_statement(
+        pipeline: &Pipeline<Stage>,
+        cfg: CFG,
+        select: impl FnMut(&HighLevel) -> bool,
+    ) -> Statement {
+        let mut select = select;
+        find_in_body(pipeline, cfg, |statement, definition| {
+            select(definition).then_some(statement)
+        })
     }
 
     /// The result of the `constant <value> -> i64` statement.
@@ -982,13 +741,13 @@ mod demand {
     const IF_BODY_DEMAND: &str = r#"
 stage @source fn @if_body(i64) -> i64;
 
-specialize @source fn @if_body(i64) -> i64 {
+specialize @source fn @if_body(i64) -> i64 cfg {
   ^entry(%cond: i64) {
-    %result = if %cond then ^then() {
+    %result = if %cond then block ^then() {
       %a = constant 1 -> i64;
       %junk = constant 9 -> i64;
       yield %a;
-    } else ^else() {
+    } else block ^else() {
       %b = constant 2 -> i64;
       yield %b;
     } -> i64;
@@ -1003,8 +762,9 @@ specialize @source fn @if_body(i64) -> i64 {
     #[test]
     fn scf_if_body_demand_follows_result_demand() {
         let pipeline = parse(IF_BODY_DEMAND);
-        let (stage, cfg) = source_cfg(&pipeline, "if_body");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "if_body");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let cond = entry_params(&pipeline, cfg)[0];
         let if_result = find_value(&pipeline, cfg, |definition| match definition {
@@ -1031,12 +791,12 @@ specialize @source fn @if_body(i64) -> i64 {
     pub(super) const IF_DEAD_RESULT: &str = r#"
 stage @source fn @if_dead(i64) -> i64;
 
-specialize @source fn @if_dead(i64) -> i64 {
+specialize @source fn @if_dead(i64) -> i64 cfg {
   ^entry(%cond: i64) {
-    %result = if %cond then ^then() {
+    %result = if %cond then block ^then() {
       %a = constant 1 -> i64;
       yield %a;
-    } else ^else() {
+    } else block ^else() {
       %b = constant 2 -> i64;
       yield %b;
     } -> i64;
@@ -1052,8 +812,9 @@ specialize @source fn @if_dead(i64) -> i64 {
     #[test]
     fn scf_if_dead_result_keeps_only_condition() {
         let pipeline = parse(IF_DEAD_RESULT);
-        let (stage, cfg) = source_cfg(&pipeline, "if_dead");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "if_dead");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let cond = entry_params(&pipeline, cfg)[0];
         let if_result = find_value(&pipeline, cfg, |definition| match definition {
@@ -1071,10 +832,10 @@ specialize @source fn @if_dead(i64) -> i64 {
     pub(super) const FOR_CARRIED_DEMAND: &str = r#"
 stage @source fn @loop_sum(i64, i64, i64) -> i64;
 
-specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
+specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
   ^entry(%lo: i64, %hi: i64, %s: i64) {
     %init = constant 0 -> i64;
-    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do block ^body(%i: i64, %acc: i64) {
       %one = constant 1 -> i64;
       %next = add %acc, %one -> i64;
       yield %next;
@@ -1092,8 +853,9 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
     #[test]
     fn scf_for_loop_carried_demand_converges() {
         let pipeline = parse(FOR_CARRIED_DEMAND);
-        let (stage, cfg) = source_cfg(&pipeline, "loop_sum");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let params = entry_params(&pipeline, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
@@ -1141,10 +903,10 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 {
     const FOR_DEAD_RESULT: &str = r#"
 stage @source fn @loop_dead(i64, i64, i64) -> i64;
 
-specialize @source fn @loop_dead(i64, i64, i64) -> i64 {
+specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
   ^entry(%lo: i64, %hi: i64, %s: i64) {
     %init = constant 0 -> i64;
-    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do block ^body(%i: i64, %acc: i64) {
       %one = constant 1 -> i64;
       %next = add %acc, %one -> i64;
       yield %next;
@@ -1160,8 +922,9 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 {
     #[test]
     fn scf_for_dead_result_keeps_only_bounds() {
         let pipeline = parse(FOR_DEAD_RESULT);
-        let (stage, cfg) = source_cfg(&pipeline, "loop_dead");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "loop_dead");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let params = entry_params(&pipeline, cfg);
         let next = find_value(&pipeline, cfg, |definition| match definition {
@@ -1188,13 +951,13 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 {
 stage @source fn @callee(i64) -> i64;
 stage @source fn @main(i64, i64) -> i64;
 
-specialize @source fn @callee(i64) -> i64 {
+specialize @source fn @callee(i64) -> i64 cfg {
   ^entry(%v: i64) {
     ret %v;
   }
 }
 
-specialize @source fn @main(i64, i64) -> i64 {
+specialize @source fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %y: i64) {
     %unused = call.named @callee(%x) -> i64;
     %deadsum = add %y, %y -> i64;
@@ -1210,8 +973,9 @@ specialize @source fn @main(i64, i64) -> i64 {
     #[test]
     fn call_arguments_are_demand_roots() {
         let pipeline = parse(CALL_PURITY);
-        let (stage, cfg) = source_cfg(&pipeline, "main");
-        let result = analyze_demand(&pipeline, stage, cfg).expect("analysis succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "main");
+        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let (_, cfg) = cfg_scope(result.root_scope());
 
         let params = entry_params(&pipeline, cfg);
         let (x, y) = (params[0], params[1]);
@@ -1235,69 +999,56 @@ specialize @source fn @main(i64, i64) -> i64 {
 }
 
 // ===========================================================================
-// Classic (dense, per-point) liveness through scf's dialect-owned dense
-// frames: arm-join for `scf.if`, the loop-carried fixpoint for `scf.for`, and
-// per-point reconstruction inside structured bodies.
+// Classic (dense, per-point) liveness through the toy language's total dense
+// frame: arm-join for `scf.if`, the loop-carried fixpoint for `scf.for`, and
+// per-point reconstruction inside structured bodies. Runs on the finalized IR
+// alone — no demand pre-pass.
 // ===========================================================================
 
 mod dense {
-    use kirin::prelude::{CFG, CompileStage, Pipeline, SSAValue, Statement};
+    use kirin::prelude::{CompileStage, Pipeline, SSAValue};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_liveness::{DenseLivenessResult, LiveSet, analyze_demand};
+    use kirin_interpreter::{Callee, ProgramPoint, Scoped};
+    use kirin_liveness::{DenseLivenessResult, LiveSet};
+    use kirin_scf::StructuredControlFlow;
 
     use super::demand::{FOR_CARRIED_DEMAND, IF_DEAD_RESULT};
-    use super::demand::{constant_result, entry_params, find_value, parse, source_cfg};
+    use super::demand::{
+        cfg_scope, constant_result, entry_params, find_statement, find_value, parse, source_root,
+    };
     use crate::interpreter::ToyDenseLiveness;
     use crate::language::HighLevel;
     use crate::stage::Stage;
 
-    /// Run classic dense liveness with the toy total frame (scf frames
-    /// embedded).
+    /// Run classic dense liveness with the toy total frame.
     fn analyze_dense_toy(
         pipeline: &Pipeline<Stage>,
-        stage: CompileStage,
-        cfg: CFG,
+        caller_stage: CompileStage,
+        callee: Callee,
     ) -> DenseLivenessResult {
         let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-        engine.analyze(stage, cfg).expect("analysis succeeds");
-        DenseLivenessResult::from_engine(&mut engine, stage, cfg).expect("reconstruction succeeds")
-    }
-
-    /// The statement whose definition matches `select` (anywhere in the
-    /// cfg, including scf bodies).
-    fn find_statement(
-        pipeline: &Pipeline<Stage>,
-        cfg: CFG,
-        select: impl Fn(&HighLevel) -> bool,
-    ) -> Statement {
-        let stage_id = pipeline.stage_by_name("source").expect("source stage");
-        let Stage::Source(info) = pipeline.stage(stage_id).expect("stage info") else {
-            panic!("source stage holds HighLevel");
-        };
-        let topology = kirin_interpreter::cfg_topology(info, &cfg);
-        for block in &topology.blocks {
-            for &stmt in &block.stmts {
-                if select(stmt.definition(info)) {
-                    return stmt;
-                }
-            }
-        }
-        panic!("no matching statement in cfg");
+        let scope = engine
+            .analyze(caller_stage, callee)
+            .expect("analysis succeeds");
+        DenseLivenessResult::from_engine(&engine, scope)
     }
 
     fn live_set(values: &[SSAValue]) -> LiveSet {
         values.iter().copied().collect()
     }
 
-    /// Per-point sets inside an `scf.if` arm follow classic semantics (the
-    /// yield's operand is live after its def even though the result is dead),
-    /// and intersecting with the demand set recovers the strong view.
+    /// Per-point sets inside an `scf.if` arm follow classic semantics: the
+    /// yield's operand is live after its def even though the result is dead.
+    /// (The strong view is the `dense ∩ demanded` composition, covered in
+    /// kirin-liveness — no demand pass runs here.)
     #[test]
     fn dense_per_point_inside_scf_if_arm() {
         let pipeline = parse(IF_DEAD_RESULT);
-        let (stage, cfg) = source_cfg(&pipeline, "if_dead");
-        let dense = analyze_dense_toy(&pipeline, stage, cfg);
-        let demand = analyze_demand(&pipeline, stage, cfg).expect("demand succeeds");
+        let (caller_stage, callee) = source_root(&pipeline, "if_dead");
+        let dense = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let (_, cfg) = cfg_scope(dense.root_scope());
+        let scope = dense.root_scope();
+        let point = |item| Scoped::new(scope, item);
 
         let cond = entry_params(&pipeline, cfg)[0];
         let a = constant_result(&pipeline, cfg, 1);
@@ -1308,23 +1059,88 @@ mod dense {
 
         // Classic: after `%a = constant 1`, %a is live (the yield uses it)
         // and %cond flows through the arm; before it, %a is killed.
-        assert_eq!(dense.live_after(a_const), Some(&live_set(&[cond, a])));
-        assert_eq!(dense.live_before(a_const), Some(&live_set(&[cond])));
+        assert_eq!(
+            dense.point_facts(point(ProgramPoint::After(a_const))),
+            Some(&live_set(&[cond, a]))
+        );
+        assert_eq!(
+            dense.point_facts(point(ProgramPoint::Before(a_const))),
+            Some(&live_set(&[cond]))
+        );
 
-        // The if's own points: its dead result is live after it (classic
-        // records what the walk saw: nothing uses it, so it is NOT live), and
-        // before it only the condition survives the arm join.
+        // The if's dead result is not live after it because nothing uses it;
+        // before it, only the condition survives the arm join.
         let if_stmt = find_statement(&pipeline, cfg, |definition| {
             matches!(definition, HighLevel::Structured(_))
         });
-        assert_eq!(dense.live_before(if_stmt), Some(&live_set(&[cond])));
+        assert_eq!(
+            dense.point_facts(point(ProgramPoint::Before(if_stmt))),
+            Some(&live_set(&[cond]))
+        );
 
-        // Strong per-point view: %a is classically live after its def but not
-        // demanded (the if result is dead), so the composition drops it.
-        let strong = dense
-            .strong_live_after(a_const, &demand)
-            .expect("point reconstructed");
-        assert_eq!(strong, live_set(&[cond]));
+        let then_block = find_value(&pipeline, cfg, |definition| match definition {
+            HighLevel::Structured(StructuredControlFlow::If(if_op)) => Some(if_op.then_block()),
+            _ => None,
+        });
+        assert_eq!(
+            dense.point_facts(point(ProgramPoint::BlockEntry(then_block))),
+            Some(&live_set(&[cond]))
+        );
+        assert_eq!(
+            dense.point_facts(point(ProgramPoint::BlockExit(then_block))),
+            Some(&live_set(&[cond]))
+        );
+    }
+
+    const IF_ARMS_DIFFERENT_USES: &str = r#"
+stage @source fn @if_arms(i64, i64, i64) -> i64;
+
+specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
+  ^entry(%cond: i64, %x: i64, %y: i64) {
+    %r = if %cond then block ^then() {
+      yield %x;
+    } else block ^else() {
+      yield %y;
+    } -> i64;
+    ret %r;
+  }
+}
+"#;
+
+    /// The scf.if liveness frame walks BOTH arms backward and joins their
+    /// live-entry states: the arms use different SSA values (%x vs %y), so
+    /// the state before the `if` must contain the condition and both.
+    #[test]
+    fn dense_scf_if_joins_both_arm_entries() {
+        let pipeline = parse(IF_ARMS_DIFFERENT_USES);
+        let (caller_stage, callee) = source_root(&pipeline, "if_arms");
+        let dense = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let (_, cfg) = cfg_scope(dense.root_scope());
+        let scope = dense.root_scope();
+
+        let params = entry_params(&pipeline, cfg);
+        let (cond, x, y) = (params[0], params[1], params[2]);
+        let if_stmt = find_statement(&pipeline, cfg, |definition| {
+            matches!(definition, HighLevel::Structured(_))
+        });
+        let r = find_value(&pipeline, cfg, |definition| match definition {
+            HighLevel::Structured(_) => {
+                use kirin::prelude::HasResults;
+                definition.results().next().map(|v| SSAValue::from(*v))
+            }
+            _ => None,
+        });
+
+        // After the if only its result matters; before it, the then-arm
+        // contributed %x, the else-arm %y, and the rule genned %cond.
+        assert_eq!(
+            dense.point_facts(Scoped::new(scope, ProgramPoint::After(if_stmt))),
+            Some(&live_set(&[r]))
+        );
+        assert_eq!(
+            dense.point_facts(Scoped::new(scope, ProgramPoint::Before(if_stmt))),
+            Some(&live_set(&[cond, x, y]))
+        );
     }
 
     /// The scf.for dense frame iterates the body walk to the loop-carried
@@ -1334,8 +1150,10 @@ mod dense {
     #[test]
     fn dense_loop_carried_fixpoint() {
         let pipeline = parse(FOR_CARRIED_DEMAND);
-        let (stage, cfg) = source_cfg(&pipeline, "loop_sum");
-        let dense = analyze_dense_toy(&pipeline, stage, cfg);
+        let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
+        let dense = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let (_, cfg) = cfg_scope(dense.root_scope());
+        let scope = dense.root_scope();
 
         let params = entry_params(&pipeline, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
@@ -1362,9 +1180,12 @@ mod dense {
         });
 
         // Around the loop.
-        assert_eq!(dense.live_after(for_stmt), Some(&live_set(&[sum])));
         assert_eq!(
-            dense.live_before(for_stmt),
+            dense.point_facts(Scoped::new(scope, ProgramPoint::After(for_stmt))),
+            Some(&live_set(&[sum]))
+        );
+        assert_eq!(
+            dense.point_facts(Scoped::new(scope, ProgramPoint::Before(for_stmt))),
             Some(&live_set(&[lo, hi, step, init]))
         );
 
@@ -1372,11 +1193,11 @@ mod dense {
         // constant are live before the add; the yield slot is live after it
         // (it feeds the next iteration through the carry).
         assert_eq!(
-            dense.live_before(add_stmt),
+            dense.point_facts(Scoped::new(scope, ProgramPoint::Before(add_stmt))),
             Some(&live_set(&[lo, hi, step, init, acc, one]))
         );
         assert_eq!(
-            dense.live_after(add_stmt),
+            dense.point_facts(Scoped::new(scope, ProgramPoint::After(add_stmt))),
             Some(&live_set(&[lo, hi, step, init, next]))
         );
     }

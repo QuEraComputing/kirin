@@ -33,7 +33,7 @@ fn test_constant_i64() {
     let input = r#"
 stage @test fn @main() -> i64;
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %x = constant 42 -> i64;
     ret %x;
@@ -48,7 +48,7 @@ fn test_constant_f64() {
     let input = r#"
 stage @test fn @main() -> f64;
 
-specialize @test fn @main() -> f64 {
+specialize @test fn @main() -> f64 cfg {
   ^entry() {
     %x = constant 3.14 -> f64;
     ret %x;
@@ -63,7 +63,7 @@ fn test_constant_with_arithmetic() {
     let input = r#"
 stage @test fn @main() -> i64;
 
-specialize @test fn @main() -> i64 {
+specialize @test fn @main() -> i64 cfg {
   ^entry() {
     %a = constant 10 -> i64;
     %b = constant 20 -> i64;
