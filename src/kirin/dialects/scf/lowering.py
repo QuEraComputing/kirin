@@ -45,9 +45,8 @@ class Lowering(lowering.FromPythonAST):
         yield_names: list[str] = []
         body_yields: list[ir.SSAValue] = []
         else_yields: list[ir.SSAValue] = []
-        all_names: set[str] = set(body_frame.defs.keys()) | (
-            set(else_frame.defs.keys())
-        )
+        # a dict rather than a set: set order depends on the hash seed
+        all_names = dict.fromkeys([*body_frame.defs, *else_frame.defs])
         for name in all_names:
             if name in body_frame.defs and name in else_frame.defs:
                 yield_names.append(name)
