@@ -22,8 +22,8 @@ use kirin_interpreter::engine::{
     CallContext, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
     SparseForwardInterpreter, expect_single,
 };
-use kirin_interpreter::{Body, InterpreterError};
-use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
+use kirin_interpreter::{Body, Callee, InterpreterError};
+use kirin_liveness::{DemandResult, DenseLiveness, DenseLivenessResult, LiveSet};
 
 use crate::stage::Stage;
 
@@ -169,4 +169,21 @@ pub fn analyze_classic_liveness(
         ));
     };
     Ok((stage, cfg, result))
+}
+
+/// Run strong liveness (sparse backward demand) over `function_name`'s body
+/// at `stage_name`. Independent of [`analyze_classic_liveness`], and
+/// stage-pinned in the same way.
+pub fn analyze_demand(
+    pipeline: &Pipeline<Stage>,
+    stage_name: &str,
+    function_name: &str,
+) -> Result<DemandResult, InterpreterError> {
+    let stage = pipeline
+        .stage_by_name(stage_name)
+        .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
+    let function = pipeline
+        .lookup_function_by_name(function_name)
+        .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
+    kirin_liveness::analyze_demand(pipeline, stage, Callee::Function(function))
 }

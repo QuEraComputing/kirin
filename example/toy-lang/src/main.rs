@@ -46,6 +46,10 @@ enum Command {
         /// instead of concrete execution.
         #[arg(long)]
         liveness: bool,
+        /// Run strong liveness (sparse backward demand) instead of concrete
+        /// execution.
+        #[arg(long)]
+        demand: bool,
         /// Restrict execution to the entry stage's language; reject calls
         /// that would dispatch into a different stage. Default is cross-
         /// language.
@@ -72,6 +76,7 @@ fn main() -> anyhow::Result<()> {
             args,
             constprop,
             liveness,
+            demand,
             per_language,
         } => run_program(
             &file,
@@ -80,6 +85,7 @@ fn main() -> anyhow::Result<()> {
             &args,
             constprop,
             liveness,
+            demand,
             per_language,
         ),
     }
@@ -93,6 +99,7 @@ fn run_program(
     cli_args: &[String],
     constprop: bool,
     liveness: bool,
+    demand: bool,
     per_language: bool,
 ) -> anyhow::Result<()> {
     let src = std::fs::read_to_string(file)?;
@@ -104,8 +111,19 @@ fn run_program(
         .map(|s| s.parse::<i64>())
         .collect::<Result<_, _>>()?;
 
-    if liveness && constprop {
-        anyhow::bail!("--liveness and --constprop are mutually exclusive");
+    if [constprop, liveness, demand]
+        .iter()
+        .filter(|&&flag| flag)
+        .count()
+        > 1
+    {
+        anyhow::bail!("--constprop, --liveness and --demand are mutually exclusive");
+    }
+
+    if demand {
+        let result = interpreter::analyze_demand(&pipeline, stage_name, func_name)?;
+        println!("demanded: {:?}", result.demanded());
+        return Ok(());
     }
 
     if liveness {
