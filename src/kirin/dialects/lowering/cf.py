@@ -95,16 +95,17 @@ class CfLowering(lowering.FromPythonAST):
 
         with state.frame(frame.stream.split(), region=frame.curr_region) as after_frame:
             after_frame.defs.update(frame.defs)
-            phi: set[str] = set()
+            # a dict rather than a set: set order depends on the hash seed
+            phi: dict[str, None] = {}
             for name in if_frame.defs.keys():
                 if frame.get(name):
-                    phi.add(name)
+                    phi[name] = None
                 elif name in else_frame.defs:
-                    phi.add(name)
+                    phi[name] = None
 
             for name in else_frame.defs.keys():
                 if frame.get(name):  # not defined in if_frame
-                    phi.add(name)
+                    phi[name] = None
 
             for name in phi:
                 after_frame.defs[name] = after_frame.entr_block.args.append_from(

@@ -6,11 +6,15 @@ from kirin.dialects.ilist.stmts import Map, New, Scan, Foldl, Foldr, ForEach, IL
 from kirin.dialects.py.constant import Constant
 from kirin.dialects.py.indexing import GetItem
 
-from .._dialect import dialect
 
-
-@dialect.post_inference
 class Unroll(RewriteRule):
+    """Unroll `ilist` higher-order statements over collections whose type carries
+    a literal length (e.g. `IList[int, Literal(2)]`).
+
+    This is an optimization, so it is intentionally not registered as a
+    post-inference rule; run it explicitly after type inference, e.g.
+    `Walk(Unroll()).rewrite(mt.code)`.
+    """
 
     def rewrite_Statement(self, node: ir.Statement) -> RewriteResult:
         return getattr(
