@@ -214,6 +214,59 @@ def test_compile_cache_closure(tmp_path, monkeypatch):
     assert warm.use()(2) == cold.use()(2) == 3
 
 
+def build_twice(tmp_path, monkeypatch, kernels):
+    """Build the kernels in this process, then again with `leaf` rewritten."""
+    import importlib.util
+
+    monkeypatch.setenv(ENV_VAR, str(tmp_path / "cache"))
+    source = tmp_path / "rewritten.py"
+    source.write_text(kernels)
+    spec = importlib.util.spec_from_file_location("rewritten", source)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.build(False)
+    return module.build(True)
+
+
+# the example from issue #778: `leaf` is rewritten in place to return 2
+REPLACE_CONST = """\
+from kirin import rewrite
+from kirin.prelude import basic
+from kirin.dialects import py
+
+
+class ReplaceConst(rewrite.abc.RewriteRule):
+    def rewrite_Statement(self, node):
+        if isinstance(node, py.Constant) and node.value.unwrap() == 1:
+            node.replace_by(py.Constant(2))
+            return rewrite.abc.RewriteResult(has_done_something=True)
+        return rewrite.abc.RewriteResult()
+
+
+def build(rewrite_leaf: bool):
+    @basic(aggressive=True)
+    def leaf() -> int:
+        return 1
+
+    if rewrite_leaf:
+        rewrite.Walk(ReplaceConst()).rewrite(leaf.code)
+        assert leaf() == 2
+
+    @basic(aggressive=True)
+    def root() -> int:
+        return leaf()
+
+    return leaf, root
+"""
+
+
+def test_compile_cache_rewritten_callee_value(tmp_path, monkeypatch):
+    leaf, root = build_twice(tmp_path, monkeypatch, REPLACE_CONST)
+    assert len(list((tmp_path / "cache").glob("root-*.pickle"))) == 2
+    assert leaf() == root() == 2
+
+
 # `leaf` is lowered to branches in place after it is decorated; `mid` keeps its
 # call to `leaf`, so `root` reaches `leaf` only through `mid`
 REWRITTEN = """\
@@ -250,25 +303,10 @@ def build(lower: bool):
 """
 
 
-def build_twice(tmp_path, monkeypatch):
-    """Build the kernels in this process, then again with `leaf` lowered."""
-    import importlib.util
-
-    monkeypatch.setenv(ENV_VAR, str(tmp_path / "cache"))
-    source = tmp_path / "rewritten.py"
-    source.write_text(REWRITTEN)
-    spec = importlib.util.spec_from_file_location("rewritten", source)
-    assert spec is not None and spec.loader is not None
-    module = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(module)
-    module.build(lower=False)
-    return module.build(lower=True)
-
-
 def test_compile_cache_rewritten_callee(tmp_path, monkeypatch):
     from kirin.dialects import scf
 
-    caller, _ = build_twice(tmp_path, monkeypatch)
+    caller, _ = build_twice(tmp_path, monkeypatch, REWRITTEN)
     assert len(list((tmp_path / "cache").glob("caller-*.pickle"))) == 2
     assert all(stmt.dialect is not scf.dialect for stmt in caller.code.walk())
 
@@ -276,7 +314,7 @@ def test_compile_cache_rewritten_callee(tmp_path, monkeypatch):
 def test_compile_cache_rewritten_callee_of_callee(tmp_path, monkeypatch):
     from kirin.dialects import scf
 
-    _, root = build_twice(tmp_path, monkeypatch)
+    _, root = build_twice(tmp_path, monkeypatch, REWRITTEN)
     assert len(list((tmp_path / "cache").glob("mid-*.pickle"))) == 1
     assert len(list((tmp_path / "cache").glob("root-*.pickle"))) == 2
     assert all(stmt.dialect is not scf.dialect for stmt in root.code.walk())
