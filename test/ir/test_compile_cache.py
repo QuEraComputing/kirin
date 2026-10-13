@@ -212,3 +212,118 @@ def test_compile_cache_closure(tmp_path, monkeypatch):
     cold = load("closures_cold")  # compiles and saves
     warm = load("closures_warm")  # loads, rebuilding the closure
     assert warm.use()(2) == cold.use()(2) == 3
+
+
+# `leaf` is lowered to branches in place after it is decorated; `mid` keeps its
+# call to `leaf`, so `root` reaches `leaf` only through `mid`
+REWRITTEN = """\
+from kirin import rewrite
+from kirin.prelude import structural, structural_no_opt
+from kirin.dialects.scf.scf2cf import ScfToCfRule
+
+
+def build(lower: bool):
+    @structural(aggressive=True)
+    def leaf(x: int) -> int:
+        if x > 0:
+            y = 1
+        else:
+            y = 2
+        return y
+
+    @structural_no_opt
+    def mid(x: int) -> int:
+        return leaf(x)
+
+    if lower:
+        rewrite.Walk(ScfToCfRule()).rewrite(leaf.code)
+
+    @structural(aggressive=True)
+    def caller(x: int) -> int:
+        return leaf(x) + 10
+
+    @structural(aggressive=True)
+    def root(x: int) -> int:
+        return mid(x) + 10
+
+    return caller, root
+"""
+
+
+def build_twice(tmp_path, monkeypatch):
+    """Build the kernels in this process, then again with `leaf` lowered."""
+    import importlib.util
+
+    monkeypatch.setenv(ENV_VAR, str(tmp_path / "cache"))
+    source = tmp_path / "rewritten.py"
+    source.write_text(REWRITTEN)
+    spec = importlib.util.spec_from_file_location("rewritten", source)
+    assert spec is not None and spec.loader is not None
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    module.build(lower=False)
+    return module.build(lower=True)
+
+
+def test_compile_cache_rewritten_callee(tmp_path, monkeypatch):
+    from kirin.dialects import scf
+
+    caller, _ = build_twice(tmp_path, monkeypatch)
+    assert len(list((tmp_path / "cache").glob("caller-*.pickle"))) == 2
+    assert all(stmt.dialect is not scf.dialect for stmt in caller.code.walk())
+
+
+def test_compile_cache_rewritten_callee_of_callee(tmp_path, monkeypatch):
+    from kirin.dialects import scf
+
+    _, root = build_twice(tmp_path, monkeypatch)
+    assert len(list((tmp_path / "cache").glob("mid-*.pickle"))) == 1
+    assert len(list((tmp_path / "cache").glob("root-*.pickle"))) == 2
+    assert all(stmt.dialect is not scf.dialect for stmt in root.code.walk())
+
+
+# one run of a script that builds the kernels, with `leaf` lowered if asked
+RUN_REWRITTEN = """\
+import sys, json
+from kirin.dialects import scf
+import rewritten
+caller, _ = rewritten.build(lower=sys.argv[1] == "1")
+print(json.dumps(any(stmt.dialect is scf.dialect for stmt in caller.code.walk())))
+"""
+
+
+def test_compile_cache_rewritten_callee_across_runs(tmp_path):
+    (tmp_path / "rewritten.py").write_text(REWRITTEN)
+    cache = tmp_path / "cache"
+    env = dict(os.environ, PYTHONDONTWRITEBYTECODE="1")
+    env[ENV_VAR] = str(cache)
+
+    def run_rewritten(lower: bool):
+        def saved():
+            return {p.name: p.stat().st_mtime_ns for p in cache.glob("*.pickle")}
+
+        before = saved()
+        out = subprocess.run(
+            [sys.executable, "-c", RUN_REWRITTEN, "1" if lower else "0"],
+            cwd=tmp_path,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        written = {
+            name.split("-")[0] for name, t in saved().items() if before.get(name) != t
+        }
+        return written & {"leaf", "mid", "caller", "root"}, json.loads(out.stdout)
+
+    written, scf_left = run_rewritten(lower=False)
+    assert written == {"leaf", "mid", "caller", "root"}
+    assert scf_left
+
+    written, scf_left = run_rewritten(lower=True)
+    assert written == {"caller", "root"}
+    assert not scf_left
+
+    written, scf_left = run_rewritten(lower=True)
+    assert written == set()
+    assert not scf_left
