@@ -150,7 +150,10 @@ class TypeInfer(MethodTable):
         # more.
         result = frame.get(stmt.init)
         for _ in range(_FOLD_WIDENING_BUDGET):
-            fn_ret = self._call_fn(interp, frame, stmt.fn, result, elem)
+            if isinstance(stmt, Foldr):
+                fn_ret = self._call_fn(interp, frame, stmt.fn, elem, result)
+            else:
+                fn_ret = self._call_fn(interp, frame, stmt.fn, result, elem)
             if fn_ret.is_subseteq(result):
                 break
             result = widen(result, fn_ret)
