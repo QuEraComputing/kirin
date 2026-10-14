@@ -9,7 +9,7 @@ from kirin.rewrite import Walk, Chain, Fixpoint
 from kirin.analysis import TypeInference
 from kirin.dialects import ilist
 
-# Foldl and Foldr both call `fn(acc, elem)`; they differ in iteration order only.
+# Foldl calls fn(acc, elem); Foldr calls fn(elem, acc).
 folds = mark.parametrize("fold", [ilist.foldl, ilist.foldr], ids=["foldl", "foldr"])
 hint_consts = mark.parametrize("hint_const", [True, False])
 
@@ -44,10 +44,17 @@ def unroll(mt):
 @hint_consts
 def test_fold_seeded_with_empty_list(fold, hint_const):
     @structural_no_opt
-    def flatten(xs: ilist.IList[int, Any]):
-        def step(acc: ilist.IList[float, Any], i: int):
-            return acc + [1.0, 2.0]
+    def step_left(acc: ilist.IList[float, Any], i: int) -> ilist.IList[float, Any]:
+        return acc + [1.0, 2.0]
 
+    @structural_no_opt
+    def step_right(i: int, acc: ilist.IList[float, Any]) -> ilist.IList[float, Any]:
+        return acc + [1.0, 2.0]
+
+    step = step_left if fold is ilist.foldl else step_right
+
+    @structural_no_opt
+    def flatten(xs: ilist.IList[int, Any]):
         return fold(step, xs, ilist.IList([], elem=types.Float))
 
     result = fold_type(flatten.similar(), hint_const)
@@ -64,6 +71,15 @@ def test_fold_closure_seeded_with_empty_list(fold, hint_const):
 
         return fold(step, xs, ilist.IList([], elem=types.Float))
 
+    if fold is ilist.foldr:
+
+        @structural_no_opt
+        def gather(xs: ilist.IList[int, Any], ys: ilist.IList[float, Any]):
+            def step(i: int, acc: ilist.IList[float, Any]):
+                return acc + [ys[i]]
+
+            return fold(step, xs, ilist.IList([], elem=types.Float))
+
     result = fold_type(gather.similar(), hint_const)
     assert result == ilist.IListType[types.Float, types.Any]
 
@@ -72,10 +88,17 @@ def test_fold_closure_seeded_with_empty_list(fold, hint_const):
 @hint_consts
 def test_fold_unannotated_step(fold, hint_const):
     @structural_no_opt
-    def collect(xs: ilist.IList[int, Any]):
-        def step(acc, i):
-            return acc + [i]
+    def step_left(acc, i):
+        return acc + [i]
 
+    @structural_no_opt
+    def step_right(i, acc):
+        return acc + [i]
+
+    step = step_left if fold is ilist.foldl else step_right
+
+    @structural_no_opt
+    def collect(xs: ilist.IList[int, Any]):
         return fold(step, xs, ilist.IList([]))
 
     result = fold_type(collect.similar(), hint_const)
@@ -98,10 +121,17 @@ def test_fold_stable_accumulator(fold):
 @mark.parametrize("n", [0, 1, 3])
 def test_unroll_after_fold_seeded_with_empty_list(fold, n):
     @structural_no_opt
-    def flatten_then_copy(xs: ilist.IList[int, Any]):
-        def step(acc: ilist.IList[float, Any], i: int):
-            return acc + [1.0, 2.0]
+    def step_left(acc: ilist.IList[float, Any], i: int) -> ilist.IList[float, Any]:
+        return acc + [1.0, 2.0]
 
+    @structural_no_opt
+    def step_right(i: int, acc: ilist.IList[float, Any]) -> ilist.IList[float, Any]:
+        return acc + [1.0, 2.0]
+
+    step = step_left if fold is ilist.foldl else step_right
+
+    @structural_no_opt
+    def flatten_then_copy(xs: ilist.IList[int, Any]):
         flat = fold(step, xs, ilist.IList([], elem=types.Float))
 
         def get(i: int):
@@ -118,10 +148,17 @@ def test_unroll_after_fold_seeded_with_empty_list(fold, n):
 @folds
 def test_fold_untyped_collection_type_checks(fold):
     @structural_no_opt
-    def collect(indices):
-        def step(acc, i):
-            return acc + [i]
+    def step_left(acc, i):
+        return acc + [i]
 
+    @structural_no_opt
+    def step_right(i, acc):
+        return acc + [i]
+
+    step = step_left if fold is ilist.foldl else step_right
+
+    @structural_no_opt
+    def collect(indices):
         return fold(step, indices, ilist.IList([]))
 
     TypeInfer(collect.dialects, no_raise=False)(collect)
