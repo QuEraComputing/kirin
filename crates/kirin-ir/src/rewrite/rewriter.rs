@@ -23,15 +23,18 @@
 //! derived mirrors, and traversable block lists — nothing above that.
 //!
 //! Scope is operand/yield rewriting (including bulk result redirection through
-//! [`Rewriter::replace_results`]) plus block-body statement surgery:
-//! [`Rewriter::erase_statement`], [`Rewriter::insert_before`],
-//! [`Rewriter::insert_after`], and [`Rewriter::replace_statement`]. The rewriter
-//! **maintains** both derived mirrors incrementally on every edit —
-//! [`SSAInfo::uses`](crate::SSAInfo) and
-//! [`BlockInfo::predecessors`](crate::BlockInfo) — so they stay valid without a
-//! rebuild. Deferred to later slices: terminator/graph-body surgery,
-//! result-defining insertion, and full cross-block dominance/visibility
-//! preflight.
+//! [`Rewriter::replace_results`]), block-body statement surgery
+//! ([`Rewriter::erase_statement`], [`Rewriter::insert_before`],
+//! [`Rewriter::insert_after`], [`Rewriter::replace_statement`]), and `CFG`
+//! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
+//! merge blocks, [`Rewriter::retarget_successor`], and block-argument insertion
+//! and erasure). The rewriter **maintains** all four derived mirrors
+//! incrementally on every edit — [`SSAInfo::uses`](crate::SSAInfo),
+//! [`BlockInfo::predecessors`](crate::BlockInfo), the block-body summary
+//! (`BlockInfo::statements`/`terminator`), and the CFG chain summary
+//! (`CFGInfo::blocks`) — so they stay valid without a rebuild. Deferred to
+//! later slices: terminator and graph-body surgery, result-defining insertion,
+//! and full cross-block dominance/visibility preflight.
 //!
 //! # Known gap: graph-body operand edits
 //!
@@ -51,13 +54,15 @@
 //! chain's `tail`.
 //! `BlockInfo::predecessors` is maintained differently: it is recomputed from
 //! the statement's own `successors()`, so it does not depend on its own prior
-//! accuracy. Direct arena writes that bypass the `Rewriter` desync both, and
+//! accuracy. Direct arena writes that bypass the `Rewriter` desync the mirrors, and
 //! `StageInfo::statement_arena_mut` is still public, so that bypass is
 //! currently reachable.
 //!
-//! Statement surgery uses arena tombstones: an erased statement is marked
+//! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
-//! removed.
+//! removed. Erasure is eager: the statement-owned blocks and `CFG`s nested in
+//! an erased statement or block are tombstoned with it. `DiGraph`/`UnGraph`
+//! bodies are not tombstoned yet and survive their owner.
 
 use std::collections::HashSet;
 use std::fmt;
