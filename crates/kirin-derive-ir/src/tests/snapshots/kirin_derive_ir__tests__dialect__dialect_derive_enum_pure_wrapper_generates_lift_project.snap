@@ -569,6 +569,25 @@ impl ::kirin::ir::HasSignature<Self> for CompositeOps {
     }
 }
 #[automatically_derived]
+impl ::kirin::ir::HasCallableBody for CompositeOps
+where
+    AlphaOp: ::kirin::ir::HasCallableBody,
+    BetaOp: ::kirin::ir::HasCallableBody,
+    GammaOp: ::kirin::ir::HasCallableBody,
+{
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        match self {
+            Self::Alpha(field_0) => {
+                <AlphaOp as ::kirin::ir::HasCallableBody>::callable_body(field_0)
+            }
+            Self::Beta(field_0) => <BetaOp as ::kirin::ir::HasCallableBody>::callable_body(field_0),
+            Self::Gamma(field_0) => {
+                <GammaOp as ::kirin::ir::HasCallableBody>::callable_body(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
 impl ::core::convert::From<AlphaOp> for CompositeOps {
     fn from(from: AlphaOp) -> Self {
         CompositeOps::Alpha(from)

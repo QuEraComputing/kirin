@@ -1,46 +1,6 @@
 use kirin_ir::{
-    Block, CFG, CompileStage, DiGraph, Function, Product, SSAValue, SpecializedFunction,
-    StagedFunction, Symbol, UnGraph,
+    Block, CompileStage, Function, Product, SSAValue, SpecializedFunction, StagedFunction, Symbol,
 };
-
-/// A traversal descriptor: which body was the engine handed?
-///
-/// Interpreter vocabulary, not an IR concept — dialect ops keep their precise
-/// field types (`Block`, `CFG`, `DiGraph`, `UnGraph`); a `Body` appears only at
-/// the moment a body is handed to the interpreter (callable entry,
-/// body-containment queries, analysis scopes). Bodies carry no semantics of their own: the
-/// statement that owns a body defines what entering and exiting it means.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum Body {
-    Block(Block),
-    CFG(CFG),
-    DiGraph(DiGraph),
-    UnGraph(UnGraph),
-}
-
-impl From<Block> for Body {
-    fn from(block: Block) -> Self {
-        Self::Block(block)
-    }
-}
-
-impl From<CFG> for Body {
-    fn from(cfg: CFG) -> Self {
-        Self::CFG(cfg)
-    }
-}
-
-impl From<DiGraph> for Body {
-    fn from(graph: DiGraph) -> Self {
-        Self::DiGraph(graph)
-    }
-}
-
-impl From<UnGraph> for Body {
-    fn from(graph: UnGraph) -> Self {
-        Self::UnGraph(graph)
-    }
-}
 
 /// The closed forward control algebra a statement produces.
 ///
@@ -51,9 +11,10 @@ impl From<UnGraph> for Body {
 /// frame](SparseForwardEffect::Push) it owns (or is handed by the engine), so all
 /// structured traversal lives in dialect/engine frames, never in this enum.
 ///
-/// `F` is the engine's total frame type (the same `F` that parameterizes
-/// [`ConcreteInterpreter`](crate::ConcreteInterpreter)/
-/// [`SparseForwardInterpreter`](crate::SparseForwardInterpreter)).
+/// `F` is the engine's child-continuation representation. Concrete
+/// configurations currently use their private frame-stack-item type directly;
+/// whether to introduce a distinct child-request vocabulary is deliberately
+/// deferred until the backward engines' continuation needs are understood.
 /// Ordinary dialect rules never name `F`: they only build the frame-free
 /// variants, so `F` is inferred from `I::Effect`. Only a dialect whose operations
 /// own structured traversal (e.g. `kirin-scf`'s `scf.if`/`scf.for`) builds
@@ -103,8 +64,8 @@ impl<V> Edge<V> {
 pub struct CallEffect<V> {
     /// What to call.
     pub callee: Callee,
-    /// Optional explicit target stage (e.g. staged calls); defaults to the
-    /// caller's stage.
+    /// Optional explicit lookup stage (e.g. staged calls); defaults to the
+    /// caller's stage. The linker may select a different target stage.
     pub stage: Option<CompileStage>,
     /// Argument values.
     pub args: Product<V>,
@@ -125,36 +86,8 @@ pub enum Callee {
     Specialized(SpecializedFunction),
 }
 
-/// The body a callable statement enters when invoked, plus the entry
-/// arguments bound to its boundary (block parameters / graph ports).
-///
-/// This is the function-call entry descriptor — the call mechanism, not a
-/// structured-control abstraction. A [`FunctionEntry`](crate::FunctionEntry)
-/// rule returns one; the call boundary picks the walker that matches the
-/// body kind. Any body kind may be callable — the statement declaring itself
-/// callable defines the semantics; the framework supplies default walkers
-/// for `CFG`, `Block`, and `DiGraph`, while `UnGraph` traversal is a
-/// dialect/compiler-supplied policy (the concrete engine's
-/// `FrameBuild::from_ungraph_entry` hook), rejected with
-/// [`InterpreterError::NoDefaultWalker`](crate::InterpreterError) when no
-/// policy is provided.
-pub struct CallableBody<V> {
-    pub body: Body,
-    pub args: Product<V>,
-}
-
-impl<V> CallableBody<V> {
-    /// A callable body, with no entry arguments yet.
-    pub fn new(body: impl Into<Body>) -> Self {
-        Self {
-            body: body.into(),
-            args: Product::new(),
-        }
-    }
-
-    /// Entry arguments bound to the body's boundary parameters.
-    pub fn args(mut self, args: impl IntoIterator<Item = V>) -> Self {
-        self.args = args.into_iter().collect();
-        self
+impl From<Symbol> for Callee {
+    fn from(symbol: Symbol) -> Self {
+        Self::Named(symbol)
     }
 }

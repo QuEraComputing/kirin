@@ -120,14 +120,25 @@ where
         .labelled("block header")
 }
 
-/// Parses a complete block with header and statements.
+/// Parses a block with header and statements, **without** the `block`
+/// discriminator keyword.
+///
+/// Matches: `^bb0(%arg: i32) { ... }`
+///
+/// This is the shared block grammar. It is internal on purpose: the two public
+/// entry points differ only in what wraps it.
+///
+/// - [`block`] prefixes the `block` keyword — a standalone `Block` body is
+///   always tagged.
+/// - [`cfg()`] and [`cfg_body()`] use it directly — a CFG's member blocks stay
+///   untagged, because the enclosing `cfg { ... }` already names the body kind.
 ///
 /// Requires a parser for the language/dialect statements.
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The type parameter `S` is the statement AST type produced by the language parser.
 /// The parser produces `Block<'t, <T as HasParser>::Output, S>`.
-pub fn block<'t, I, T, S>(
+fn untagged_block<'t, I, T, S>(
     language: RecursiveParser<'t, I, S>,
 ) -> impl Parser<'t, I, Spanned<Block<'t, <T as HasParser<'t>>::Output, S>>, ParserError<'t>>
 where
@@ -162,17 +173,55 @@ where
     })
 }
 
-/// Parses a CFG containing multiple blocks.
+/// Parses a complete standalone `Block` body, including its `block` discriminator.
 ///
 /// Matches:
 /// ```text
-/// {
+/// block ^bb0(%arg: i32) {
+///     %x = add %arg, %arg;
+///     ret %x;
+/// }
+/// ```
+///
+/// This is the parser behind the default `{body}` interpolation of a `Block`
+/// field. The `block` keyword is **required** — the untagged form
+/// `^bb0(...) { ... }` is only valid for a CFG's member blocks, where
+/// [`cfg()`] supplies the discriminator once for the whole body.
+///
+/// Requires a parser for the language/dialect statements.
+///
+/// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
+/// The type parameter `S` is the statement AST type produced by the language parser.
+/// The parser produces `Block<'t, <T as HasParser>::Output, S>`.
+pub fn block<'t, I, T, S>(
+    language: RecursiveParser<'t, I, S>,
+) -> impl Parser<'t, I, Spanned<Block<'t, <T as HasParser<'t>>::Output, S>>, ParserError<'t>>
+where
+    I: TokenInput<'t>,
+    T: HasParser<'t>,
+    S: Clone,
+{
+    just(Token::Identifier("block"))
+        .ignore_then(untagged_block::<_, T, S>(language))
+        .labelled("block")
+}
+
+/// Parses a CFG containing multiple blocks, including its `cfg` discriminator.
+///
+/// Matches:
+/// ```text
+/// cfg {
 ///     ^bb0(%arg: i32) {
 ///         %x = add %arg, %arg;
-///         return %x;
+///         ret %x;
 ///     }
 /// }
 /// ```
+///
+/// This is the parser behind the default `{body}` interpolation of a `CFG`
+/// field. The `cfg` keyword is **required**; the member blocks are untagged
+/// (`^bb0 { ... }`, never `block ^bb0 { ... }`) because `cfg` already names
+/// the body kind for the whole container.
 ///
 /// The type parameter `T` specifies the type annotation type (typically the TypeLattice).
 /// The type parameter `S` is the statement AST type produced by the language parser.
@@ -185,11 +234,14 @@ where
     T: HasParser<'t>,
     S: Clone,
 {
-    block::<_, T, S>(language)
-        .then_ignore(just(Token::Semicolon).or_not())
-        .repeated()
-        .collect::<Vec<_>>()
-        .delimited_by(just(Token::LBrace), just(Token::RBrace))
+    just(Token::Identifier("cfg"))
+        .ignore_then(
+            untagged_block::<_, T, S>(language)
+                .then_ignore(just(Token::Semicolon).or_not())
+                .repeated()
+                .collect::<Vec<_>>()
+                .delimited_by(just(Token::LBrace), just(Token::RBrace)),
+        )
         .map(|blocks| CFG { blocks })
         .labelled("cfg")
 }
@@ -197,8 +249,9 @@ where
 /// Parses block body statements (without header, without braces).
 ///
 /// Matches a sequence of `statement ;` pairs. This is the inner content of
-/// a block body, used for `:body` projections on Block fields where the
-/// caller provides surrounding syntax via the format string.
+/// a block body, used for `{field:body}` projections on Block fields where the
+/// caller provides surrounding syntax via the format string. It stays raw: no
+/// `block` keyword and no braces are injected.
 pub fn block_body_statements<'t, I, S>(
     language: RecursiveParser<'t, I, S>,
 ) -> impl Parser<'t, I, Vec<Spanned<S>>, ParserError<'t>>
@@ -217,11 +270,13 @@ where
         .labelled("block body statements")
 }
 
-/// Parses CFG body (blocks without outer braces).
+/// Parses CFG body (untagged blocks, without the `cfg` keyword or outer braces).
 ///
-/// Matches a sequence of blocks, each optionally terminated by a semicolon.
-/// This is the inner content of a CFG, used for `:body` projections on
-/// CFG fields where the caller provides surrounding syntax via the format string.
+/// Matches a sequence of untagged blocks, each optionally terminated by a
+/// semicolon. This is the inner content of a CFG, used for `{field:body}`
+/// projections on CFG fields where the caller provides surrounding syntax via
+/// the format string. It stays raw: no `cfg` keyword is injected, so a dialect
+/// author can spell their own wrapper.
 pub fn cfg_body<'t, I, T, S>(
     language: RecursiveParser<'t, I, S>,
 ) -> impl Parser<'t, I, Vec<Spanned<Block<'t, <T as HasParser<'t>>::Output, S>>>, ParserError<'t>>
@@ -230,7 +285,7 @@ where
     T: HasParser<'t>,
     S: Clone,
 {
-    block::<_, T, S>(language)
+    untagged_block::<_, T, S>(language)
         .then_ignore(just(Token::Semicolon).or_not())
         .repeated()
         .collect::<Vec<_>>()

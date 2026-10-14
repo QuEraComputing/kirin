@@ -255,7 +255,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         &mut self,
         #[builder(name = staged_func)] func: StagedFunction,
         signature: Option<Signature<L::Type>>,
-        #[builder(into)] body: Statement,
+        #[builder(into)] definition: Statement,
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Result<SpecializedFunction, SpecializeError<L>> {
         let staged_function_info = &mut self.staged_functions[func];
@@ -274,7 +274,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
                 staged_function: func,
                 signature,
                 conflicting,
-                body,
+                definition,
                 backedges,
             });
         }
@@ -284,7 +284,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         let specialized_function = SpecializedFunctionInfo::builder()
             .id(id)
             .signature(signature)
-            .body(body)
+            .definition(definition)
             .maybe_backedges(backedges)
             .new();
         staged_function_info

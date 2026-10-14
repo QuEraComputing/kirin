@@ -377,3 +377,35 @@ fn test_lift_project_derive_rejects_non_wrapper_enum() {
         "unexpected error: {error}"
     );
 }
+
+#[test]
+fn test_dialect_derive_struct_with_callable_body() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType)]
+        struct FuncOp {
+            auxiliary: Block,
+            #[kirin(callable_body)]
+            implementation: CFG,
+        }
+    };
+    insta::assert_snapshot!(generate_dialect_code(input));
+}
+
+#[test]
+fn test_dialect_derive_enum_mixed_callable_body_and_wraps() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType)]
+        enum CallableLanguage {
+            Function {
+                #[kirin(callable_body)]
+                body: CFG,
+            },
+            Nop {
+                value: Value,
+            },
+            #[wraps]
+            Lambda(LambdaOp),
+        }
+    };
+    insta::assert_snapshot!(generate_dialect_code(input));
+}

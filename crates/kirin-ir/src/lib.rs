@@ -1,4 +1,5 @@
 mod arena;
+mod body;
 mod builder;
 mod comptime;
 mod derived;
@@ -18,6 +19,7 @@ mod stage;
 pub mod query;
 
 pub use arena::{Arena, DenseHint, GetInfo, Id, Identifier, Item, SparseHint};
+pub use body::{Body, HasCallableBody};
 pub use builder::error::{
     PipelineError, PipelineStagedError, SpecializeError, StagedFunctionConflictKind,
     StagedFunctionError,
@@ -28,7 +30,7 @@ pub use derived::{DeriveError, Finding, Mismatch, VerifyError, verify_derived};
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
-    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGBody, HasCFGMut,
+    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut,
     HasDigraphs, HasDigraphsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
     HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator,
 };
@@ -58,9 +60,9 @@ pub use stage::{
 /// Re-exports of the most commonly used types for dialect authors.
 pub mod prelude {
     pub use crate::{
-        Block, BuilderStageInfo, CFG, CompileStage, Dialect, Function, GetInfo, HasCFGBody,
-        HasSignature, HasStageInfo, Pipeline, ResultValue, SSAValue, Signature, SignatureSemantics,
-        StageInfo, StageMeta, Statement,
+        Block, Body, BuilderStageInfo, CFG, CompileStage, Dialect, Function, GetInfo,
+        HasCallableBody, HasSignature, HasStageInfo, Pipeline, ResultValue, SSAValue, Signature,
+        SignatureSemantics, StageInfo, StageMeta, Statement,
     };
     pub use crate::{
         CompileTimeValue, HasProduct, Placeholder, Product, Project, ProjectError, TryProject,

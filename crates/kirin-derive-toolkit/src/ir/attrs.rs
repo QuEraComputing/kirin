@@ -69,6 +69,8 @@ pub struct StatementOptions {
 #[darling(attributes(kirin))]
 pub struct KirinFieldOptions {
     #[darling(default)]
+    pub callable_body: bool,
+    #[darling(default)]
     pub into: bool,
     pub default: Option<DefaultValue>,
     #[darling(rename = "type")]

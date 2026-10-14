@@ -1,6 +1,6 @@
 # Native Graph IR Node — Text Format and Semantics Design
 
-This design introduces two new IR body kinds — `digraph` and `ungraph` — alongside Block and CFG (`CFG`). A graph body uses standard statement syntax where SSAValues represent edges. The leading keyword (`^`, `digraph`, `ungraph`) selects the backing storage: Block (linked list), petgraph DiGraph, or petgraph UnGraph.
+This design introduces two new IR body kinds — `digraph` and `ungraph` — alongside Block and CFG (`CFG`). A graph body uses standard statement syntax where SSAValues represent edges. A leading keyword (`cfg`, `block`, `digraph`, `ungraph`) selects the backing storage: block list, linked list, petgraph DiGraph, or petgraph UnGraph.
 
 - For **directed graphs**, the text format follows MLIR graph region semantics (relaxed dominance, SSA def-use = directed edges).
 - For **undirected graphs**, `edge`-prefixed statements introduce edge SSAValues, and statements that share edge references are connected.
@@ -15,15 +15,72 @@ This design introduces two new IR body kinds — `digraph` and `ungraph` — alo
 
 ## Overview
 
-### Three Body Kinds
+### Four Body Kinds
 
-| Keyword | Body Kind | Storage | Dominance | Edge Semantics |
-|---------|-----------|---------|-----------|----------------|
-| `^bb0(args)` | Block | Linked list | Enforced | N/A (sequential) |
-| `digraph ^dg0(args)` | Directed graph | petgraph DiGraph | Relaxed | SSA def-use = directed edge |
-| `ungraph ^ug0(args)` | Undirected graph | petgraph UnGraph | Relaxed | Shared edge reference = connection |
+Every body kind carries an **explicit textual discriminator**. There is no
+implicit form — nothing is disambiguated by peeking at whether the next token is
+`{` or `^`.
 
-All three use standard statement syntax.
+| Discriminator | Body Kind | Storage | Dominance | Edge Semantics |
+|---------------|-----------|---------|-----------|----------------|
+| `cfg { ^bb0(args) { .. } .. }` | CFG | Block list | Enforced | N/A (control-flow edges) |
+| `block ^bb0(args) { .. }` | Block | Linked list | Enforced | N/A (sequential) |
+| `digraph ^dg0(args) { .. }` | Directed graph | petgraph DiGraph | Relaxed | SSA def-use = directed edge |
+| `ungraph ^ug0(args) { .. }` | Undirected graph | petgraph UnGraph | Relaxed | Shared edge reference = connection |
+
+All four use standard statement syntax.
+
+#### A CFG's member blocks stay untagged
+
+`cfg` names the body kind once for the whole container, so the blocks inside it
+are written bare:
+
+```
+fn @f(i64) -> i64 cfg {
+  ^entry(%x: i64) {
+    br ^next(%x);
+  }
+  ^next(%r: i64) {
+    ret %r;
+  }
+}
+```
+
+`cfg { block ^entry { .. } }` is **not** valid — the inner `block` tag would
+claim each member block is a standalone Block body.
+
+#### Where the discriminator comes from
+
+The discriminator belongs to the **default whole-field interpolation** of a body
+field, so it is produced centrally rather than typed into every dialect format
+string. A dialect writes `{body}` and gets the tagged canonical form:
+
+| Field type | Default `{body}` parses/prints | Parser | Printer |
+|------------|-------------------------------|--------|---------|
+| `CFG` | `cfg { ^bb0(..) { .. } .. }` | `kirin_chumsky::cfg` | `Document::print_cfg` |
+| `Block` | `block ^bb0(..) { .. }` | `kirin_chumsky::block` | `Document::print_block` |
+| `DiGraph` | `digraph ^dg0(..) [capture(..)] { .. }` | `kirin_chumsky::digraph` | `Document::print_digraph` |
+| `UnGraph` | `ungraph ^ug0(..) [capture(..)] { .. }` | `kirin_chumsky::ungraph` | `Document::print_ungraph` |
+
+`cfg` and `block` share one internal untagged block grammar (and one untagged
+block-rendering helper), so the member-block form is defined in exactly one
+place.
+
+#### Projections stay raw
+
+Body **projections** are the escape hatch for a dialect that wants its own
+syntax, so they never inject a discriminator:
+
+| Projection | Parses/prints |
+|------------|---------------|
+| `{body:args}` | `%name: Type, %name: Type` — Block arguments only |
+| `{body:body}` | the inner statements (Block) or the untagged member blocks (CFG) |
+| `{graph:ports}` | `%name: Type, %name: Type` — edge ports |
+| `{graph:captures}` | `%name: Type, %name: Type` — capture ports |
+| `{graph:body}` | the inner statements (plus `yield` / `edge` prefixes) |
+
+A dialect using `{body:body}` supplies its own delimiters and, if it wants one,
+its own keyword.
 
 ### The `capture(...)` Clause
 
@@ -66,12 +123,10 @@ digraph ^name(edge_args...) {
 ### Example: Quantum Circuit
 
 ```
-specialize @quantum fn @bell_pair(Qubit, Qubit) -> (Qubit, Qubit) {
-  digraph ^dg0(%q0: Qubit, %q1: Qubit) {
-    %0 = hadamard %q0 -> Qubit;
-    %1, %2 = cnot %0, %q1 -> (Qubit, Qubit);
-    yield %1, %2;
-  }
+specialize @quantum fn @bell_pair(Qubit, Qubit) -> (Qubit, Qubit) digraph ^dg0(%q0: Qubit, %q1: Qubit) {
+  %0 = hadamard %q0 -> Qubit;
+  %1, %2 = cnot %0, %q1 -> (Qubit, Qubit);
+  yield %1, %2;
 }
 ```
 
@@ -82,12 +137,10 @@ specialize @quantum fn @bell_pair(Qubit, Qubit) -> (Qubit, Qubit) {
 ### Example: Parameterized Quantum Circuit
 
 ```
-specialize @quantum fn @variational(Qubit, f64, f64) -> Qubit {
-  digraph ^dg0(%q: Qubit) capture(%theta: f64, %phi: f64) {
-    %0 = rz(%theta) %q -> Qubit;
-    %1 = rx(%phi) %0 -> Qubit;
-    yield %1;
-  }
+specialize @quantum fn @variational(Qubit, f64, f64) -> Qubit digraph ^dg0(%q: Qubit) capture(%theta: f64, %phi: f64) {
+  %0 = rz(%theta) %q -> Qubit;
+  %1 = rx(%phi) %0 -> Qubit;
+  yield %1;
 }
 ```
 
@@ -98,13 +151,11 @@ specialize @quantum fn @variational(Qubit, f64, f64) -> Qubit {
 ### Example: Dataflow / Computational Graph
 
 ```
-specialize @nn fn @layer(Tensor, Tensor, Tensor) -> Tensor {
-  digraph ^dg0(%input: Tensor, %weights: Tensor, %bias: Tensor) {
-    %0 = matmul %input, %weights -> Tensor;
-    %1 = add %0, %bias -> Tensor;
-    %2 = relu %1 -> Tensor;
-    yield %2;
-  }
+specialize @nn fn @layer(Tensor, Tensor, Tensor) -> Tensor digraph ^dg0(%input: Tensor, %weights: Tensor, %bias: Tensor) {
+  %0 = matmul %input, %weights -> Tensor;
+  %1 = add %0, %bias -> Tensor;
+  %2 = relu %1 -> Tensor;
+  yield %2;
 }
 ```
 
@@ -155,17 +206,15 @@ The edge type (`-> Type`) is dialect-defined and carries whatever metadata the d
 ### Example: ZX Diagram
 
 ```
-specialize @zx fn @simplify(Wire, Wire, f64, f64, f64) -> (Wire, Wire) {
-  ungraph ^ug0(%p0: Wire, %p1: Wire) capture(%zero: f64, %pi: f64, %half_pi: f64) {
-    edge %w0 = wire -> Wire;
-    edge %w1 = wire -> Wire;
-    edge %w2 = wire -> Wire;
-    edge %w3 = wire -> Wire;
-    edge %w4 = wire -> Wire;
-    z_spider(%zero, %p0, %w0, %w1);
-    x_spider(%pi, %w0, %w2, %w3);
-    z_spider(%half_pi, %w1, %w3, %w4);
-  }
+specialize @zx fn @simplify(Wire, Wire, f64, f64, f64) -> (Wire, Wire) ungraph ^ug0(%p0: Wire, %p1: Wire) capture(%zero: f64, %pi: f64, %half_pi: f64) {
+  edge %w0 = wire -> Wire;
+  edge %w1 = wire -> Wire;
+  edge %w2 = wire -> Wire;
+  edge %w3 = wire -> Wire;
+  edge %w4 = wire -> Wire;
+  z_spider(%zero, %p0, %w0, %w1);
+  x_spider(%pi, %w0, %w2, %w3);
+  z_spider(%half_pi, %w1, %w3, %w4);
 }
 ```
 
@@ -176,13 +225,11 @@ specialize @zx fn @simplify(Wire, Wire, f64, f64, f64) -> (Wire, Wire) {
 ### Example: ZX Diagram with Edge Metadata
 
 ```
-specialize @zx fn @colored(Wire, Wire, f64, f64) -> Wire {
-  ungraph ^ug0(%p0: Wire, %p1: Wire) capture(%theta: f64, %phi: f64) {
-    edge %w0 = hadamard_wire -> ZXEdge;
-    edge %w1 = plain_wire -> ZXEdge;
-    z_spider(%theta, %p0, %w0);
-    x_spider(%phi, %w0, %w1);
-  }
+specialize @zx fn @colored(Wire, Wire, f64, f64) -> Wire ungraph ^ug0(%p0: Wire, %p1: Wire) capture(%theta: f64, %phi: f64) {
+  edge %w0 = hadamard_wire -> ZXEdge;
+  edge %w1 = plain_wire -> ZXEdge;
+  z_spider(%theta, %p0, %w0);
+  x_spider(%phi, %w0, %w1);
 }
 ```
 
@@ -195,10 +242,8 @@ specialize @zx fn @colored(Wire, Wire, f64, f64) -> Wire {
 A statement inside a graph body can contain an inner graph body, creating a compound node. It follows the same convention as a function call: operands map positionally to the inner graph's `[edge_args ++ captures]`.
 
 ```
-%out = compound_op(%edge0, %edge1, %captured0) {
-  ungraph ^ug1(%ip0: Wire, %ip1: Wire) capture(%c: f64) {
-    ...
-  }
+%out = compound_op(%edge0, %edge1, %captured0) ungraph ^ug1(%ip0: Wire, %ip1: Wire) capture(%c: f64) {
+  ...
 } -> Wire;
 // %edge0 → %ip0, %edge1 → %ip1, %captured0 → %c
 ```
@@ -209,22 +254,19 @@ A statement inside a graph body can contain an inner graph body, creating a comp
 ### Example: Nested ZX Diagram
 
 ```
-specialize @zx fn @composed(Wire, Wire, f64, f64, f64, f64) -> Wire {
-  ungraph ^ug0(%p0: Wire, %p1: Wire)
-      capture(%theta: f64, %phi: f64, %alpha: f64, %beta: f64) {
-    edge %w0 = wire -> Wire;
-    edge %w1 = wire -> Wire;
-    edge %w3 = wire -> Wire;
-    z_spider(%theta, %p0, %w0, %w1);
-    x_spider(%phi, %w2, %w3);
-    %w2 = zx_sub(%w0, %w1, %alpha, %beta) {
-      ungraph ^ug1(%ip0: Wire, %ip1: Wire) capture(%a: f64, %b: f64) {
-        edge %iw0 = wire -> Wire;
-        z_spider(%a, %ip0, %iw0);
-        x_spider(%b, %ip1, %iw0);
-      }
-    } -> Wire;
-  }
+specialize @zx fn @composed(Wire, Wire, f64, f64, f64, f64) -> Wire
+    ungraph ^ug0(%p0: Wire, %p1: Wire)
+    capture(%theta: f64, %phi: f64, %alpha: f64, %beta: f64) {
+  edge %w0 = wire -> Wire;
+  edge %w1 = wire -> Wire;
+  edge %w3 = wire -> Wire;
+  z_spider(%theta, %p0, %w0, %w1);
+  x_spider(%phi, %w2, %w3);
+  %w2 = zx_sub(%w0, %w1, %alpha, %beta) ungraph ^ug1(%ip0: Wire, %ip1: Wire) capture(%a: f64, %b: f64) {
+    edge %iw0 = wire -> Wire;
+    z_spider(%a, %ip0, %iw0);
+    x_spider(%b, %ip1, %iw0);
+  } -> Wire;
 }
 ```
 
@@ -235,19 +277,15 @@ specialize @zx fn @composed(Wire, Wire, f64, f64, f64, f64) -> Wire {
 ### Example: Nested Directed Graph
 
 ```
-specialize @hybrid fn @nested(Qubit, Qubit, f64) -> (Qubit, Qubit) {
-  digraph ^dg0(%q0: Qubit, %q1: Qubit) capture(%theta: f64) {
-    %0 = hadamard %q0 -> Qubit;
-    %1 = sub_circuit(%q1, %theta) {
-      digraph ^dg1(%iq: Qubit) capture(%t: f64) {
-        %2 = rz(%t) %iq -> Qubit;
-        %3 = hadamard %2 -> Qubit;
-        yield %3;
-      }
-    } -> Qubit;
-    %4, %5 = cnot %0, %1 -> (Qubit, Qubit);
-    yield %4, %5;
-  }
+specialize @hybrid fn @nested(Qubit, Qubit, f64) -> (Qubit, Qubit) digraph ^dg0(%q0: Qubit, %q1: Qubit) capture(%theta: f64) {
+  %0 = hadamard %q0 -> Qubit;
+  %1 = sub_circuit(%q1, %theta) digraph ^dg1(%iq: Qubit) capture(%t: f64) {
+    %2 = rz(%t) %iq -> Qubit;
+    %3 = hadamard %2 -> Qubit;
+    yield %3;
+  } -> Qubit;
+  %4, %5 = cnot %0, %1 -> (Qubit, Qubit);
+  yield %4, %5;
 }
 ```
 
@@ -258,12 +296,10 @@ specialize @hybrid fn @nested(Qubit, Qubit, f64) -> (Qubit, Qubit) {
 A function can have a graph body directly. The function signature maps positionally to `[edge_args ++ captures]`:
 
 ```
-specialize @quantum fn @bell_pair(Qubit, Qubit) -> (Qubit, Qubit) {
-  digraph ^dg0(%q0: Qubit, %q1: Qubit) {
-    %0 = hadamard %q0 -> Qubit;
-    %1, %2 = cnot %0, %q1 -> (Qubit, Qubit);
-    yield %1, %2;
-  }
+specialize @quantum fn @bell_pair(Qubit, Qubit) -> (Qubit, Qubit) digraph ^dg0(%q0: Qubit, %q1: Qubit) {
+  %0 = hadamard %q0 -> Qubit;
+  %1, %2 = cnot %0, %q1 -> (Qubit, Qubit);
+  yield %1, %2;
 }
 ```
 
@@ -276,16 +312,14 @@ specialize @quantum fn @bell_pair(Qubit, Qubit) -> (Qubit, Qubit) {
 Classical computation in a Block feeds into a graph body via a wrapping statement:
 
 ```
-specialize @hybrid fn @vqe(f64, f64) -> Qubit {
+specialize @hybrid fn @vqe(f64, f64) -> Qubit cfg {
   ^entry(%theta: f64, %phi: f64) {
     %angle = arith.add %theta, %phi -> f64;
     %q = qubit_alloc() -> Qubit;
-    %result = quantum_eval(%q, %angle) {
-      digraph ^dg0(%q_in: Qubit) capture(%angle: f64) {
-        %0 = rz(%angle) %q_in -> Qubit;
-        %1 = hadamard %0 -> Qubit;
-        yield %1;
-      }
+    %result = quantum_eval(%q, %angle) digraph ^dg0(%q_in: Qubit) capture(%angle: f64) {
+      %0 = rz(%angle) %q_in -> Qubit;
+      %1 = hadamard %0 -> Qubit;
+      yield %1;
     } -> Qubit;
     ret %result;
   }
@@ -388,7 +422,8 @@ For undirected graphs, the Block form uses `edge`-prefixed statements plus relax
 
 ### Reserved Keywords
 
-Inside a graph body: `digraph`, `ungraph`, `edge`, `capture`.
+Body discriminators: `cfg`, `block`, `digraph`, `ungraph`.
+Inside a graph body, additionally: `edge`, `capture`, `yield`.
 
 ## Deferred (Backlog)
 

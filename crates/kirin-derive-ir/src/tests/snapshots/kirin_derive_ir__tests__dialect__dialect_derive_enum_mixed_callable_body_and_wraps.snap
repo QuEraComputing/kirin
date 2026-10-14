@@ -1,0 +1,587 @@
+---
+source: crates/kirin-derive-ir/src/tests/dialect.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArguments<'a> for CallableLanguage {
+    type Iter = CallableLanguageArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Function { body } => CallableLanguageArgumentsIter::Function(std::iter::empty::<
+                &'a ::kirin::ir::SSAValue,
+            >()),
+            Self::Nop { value } => {
+                CallableLanguageArgumentsIter::Nop(std::iter::empty::<&'a ::kirin::ir::SSAValue>())
+            }
+            Self::Lambda(field_0) => CallableLanguageArgumentsIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageArgumentsIter<'a> {
+    Function(std::iter::Empty<&'a ::kirin::ir::SSAValue>),
+    Nop(std::iter::Empty<&'a ::kirin::ir::SSAValue>),
+    Lambda(<LambdaOp as ::kirin::ir::HasArguments<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasArgumentsMut<'a> for CallableLanguage {
+    type IterMut = CallableLanguageArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Function { body } => {
+                CallableLanguageArgumentsMutIter::Function(std::iter::empty::<
+                    &'a mut ::kirin::ir::SSAValue,
+                >())
+            }
+            Self::Nop { value } => CallableLanguageArgumentsMutIter::Nop(std::iter::empty::<
+                &'a mut ::kirin::ir::SSAValue,
+            >()),
+            Self::Lambda(field_0) => CallableLanguageArgumentsMutIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageArgumentsMutIter<'a> {
+    Function(std::iter::Empty<&'a mut ::kirin::ir::SSAValue>),
+    Nop(std::iter::Empty<&'a mut ::kirin::ir::SSAValue>),
+    Lambda(<LambdaOp as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResults<'a> for CallableLanguage {
+    type Iter = CallableLanguageResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        match self {
+            Self::Function { body } => CallableLanguageResultsIter::Function(std::iter::empty::<
+                &'a ::kirin::ir::ResultValue,
+            >()),
+            Self::Nop { value } => {
+                CallableLanguageResultsIter::Nop(std::iter::empty::<&'a ::kirin::ir::ResultValue>())
+            }
+            Self::Lambda(field_0) => CallableLanguageResultsIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasResults>::results(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageResultsIter<'a> {
+    Function(std::iter::Empty<&'a ::kirin::ir::ResultValue>),
+    Nop(std::iter::Empty<&'a ::kirin::ir::ResultValue>),
+    Lambda(<LambdaOp as ::kirin::ir::HasResults<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasResultsMut<'a> for CallableLanguage {
+    type IterMut = CallableLanguageResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Function { body } => {
+                CallableLanguageResultsMutIter::Function(std::iter::empty::<
+                    &'a mut ::kirin::ir::ResultValue,
+                >())
+            }
+            Self::Nop { value } => CallableLanguageResultsMutIter::Nop(std::iter::empty::<
+                &'a mut ::kirin::ir::ResultValue,
+            >()),
+            Self::Lambda(field_0) => CallableLanguageResultsMutIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageResultsMutIter<'a> {
+    Function(std::iter::Empty<&'a mut ::kirin::ir::ResultValue>),
+    Nop(std::iter::Empty<&'a mut ::kirin::ir::ResultValue>),
+    Lambda(<LambdaOp as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocks<'a> for CallableLanguage {
+    type Iter = CallableLanguageBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        match self {
+            Self::Function { body } => {
+                CallableLanguageBlocksIter::Function(std::iter::empty::<&'a ::kirin::ir::Block>())
+            }
+            Self::Nop { value } => {
+                CallableLanguageBlocksIter::Nop(std::iter::empty::<&'a ::kirin::ir::Block>())
+            }
+            Self::Lambda(field_0) => CallableLanguageBlocksIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasBlocks>::blocks(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageBlocksIter<'a> {
+    Function(std::iter::Empty<&'a ::kirin::ir::Block>),
+    Nop(std::iter::Empty<&'a ::kirin::ir::Block>),
+    Lambda(<LambdaOp as ::kirin::ir::HasBlocks<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasBlocksMut<'a> for CallableLanguage {
+    type IterMut = CallableLanguageBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Function { body } => CallableLanguageBlocksMutIter::Function(std::iter::empty::<
+                &'a mut ::kirin::ir::Block,
+            >()),
+            Self::Nop { value } => {
+                CallableLanguageBlocksMutIter::Nop(std::iter::empty::<&'a mut ::kirin::ir::Block>())
+            }
+            Self::Lambda(field_0) => CallableLanguageBlocksMutIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageBlocksMutIter<'a> {
+    Function(std::iter::Empty<&'a mut ::kirin::ir::Block>),
+    Nop(std::iter::Empty<&'a mut ::kirin::ir::Block>),
+    Lambda(<LambdaOp as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessors<'a> for CallableLanguage {
+    type Iter = CallableLanguageSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        match self {
+            Self::Function { body } => {
+                CallableLanguageSuccessorsIter::Function(std::iter::empty::<
+                    &'a ::kirin::ir::Successor,
+                >())
+            }
+            Self::Nop { value } => {
+                CallableLanguageSuccessorsIter::Nop(std::iter::empty::<&'a ::kirin::ir::Successor>())
+            }
+            Self::Lambda(field_0) => CallableLanguageSuccessorsIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageSuccessorsIter<'a> {
+    Function(std::iter::Empty<&'a ::kirin::ir::Successor>),
+    Nop(std::iter::Empty<&'a ::kirin::ir::Successor>),
+    Lambda(<LambdaOp as ::kirin::ir::HasSuccessors<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSuccessorsMut<'a> for CallableLanguage {
+    type IterMut = CallableLanguageSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Function { body } => {
+                CallableLanguageSuccessorsMutIter::Function(std::iter::empty::<
+                    &'a mut ::kirin::ir::Successor,
+                >())
+            }
+            Self::Nop { value } => CallableLanguageSuccessorsMutIter::Nop(std::iter::empty::<
+                &'a mut ::kirin::ir::Successor,
+            >()),
+            Self::Lambda(field_0) => CallableLanguageSuccessorsMutIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageSuccessorsMutIter<'a> {
+    Function(std::iter::Empty<&'a mut ::kirin::ir::Successor>),
+    Nop(std::iter::Empty<&'a mut ::kirin::ir::Successor>),
+    Lambda(<LambdaOp as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasCFG<'a> for CallableLanguage {
+    type Iter = CallableLanguageCFGIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
+        match self {
+            Self::Function { body } => CallableLanguageCFGIter::Function(std::iter::once(body)),
+            Self::Nop { value } => {
+                CallableLanguageCFGIter::Nop(std::iter::empty::<&'a ::kirin::ir::CFG>())
+            }
+            Self::Lambda(field_0) => {
+                CallableLanguageCFGIter::Lambda(<LambdaOp as ::kirin::ir::HasCFG>::cfgs(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageCFGIter<'a> {
+    Function(std::iter::Once<&'a ::kirin::ir::CFG>),
+    Nop(std::iter::Empty<&'a ::kirin::ir::CFG>),
+    Lambda(<LambdaOp as ::kirin::ir::HasCFG<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasCFGMut<'a> for CallableLanguage {
+    type IterMut = CallableLanguageCFGMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Function { body } => CallableLanguageCFGMutIter::Function(std::iter::once(body)),
+            Self::Nop { value } => {
+                CallableLanguageCFGMutIter::Nop(std::iter::empty::<&'a mut ::kirin::ir::CFG>())
+            }
+            Self::Lambda(field_0) => CallableLanguageCFGMutIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasCFGMut>::cfgs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageCFGMutIter<'a> {
+    Function(std::iter::Once<&'a mut ::kirin::ir::CFG>),
+    Nop(std::iter::Empty<&'a mut ::kirin::ir::CFG>),
+    Lambda(<LambdaOp as ::kirin::ir::HasCFGMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageCFGMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::CFG;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphs<'a> for CallableLanguage {
+    type Iter = CallableLanguageDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Function { body } => CallableLanguageDigraphsIter::Function(std::iter::empty::<
+                &'a ::kirin::ir::DiGraph,
+            >()),
+            Self::Nop { value } => {
+                CallableLanguageDigraphsIter::Nop(std::iter::empty::<&'a ::kirin::ir::DiGraph>())
+            }
+            Self::Lambda(field_0) => CallableLanguageDigraphsIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasDigraphs>::digraphs(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageDigraphsIter<'a> {
+    Function(std::iter::Empty<&'a ::kirin::ir::DiGraph>),
+    Nop(std::iter::Empty<&'a ::kirin::ir::DiGraph>),
+    Lambda(<LambdaOp as ::kirin::ir::HasDigraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasDigraphsMut<'a> for CallableLanguage {
+    type IterMut = CallableLanguageDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Function { body } => {
+                CallableLanguageDigraphsMutIter::Function(std::iter::empty::<
+                    &'a mut ::kirin::ir::DiGraph,
+                >())
+            }
+            Self::Nop { value } => CallableLanguageDigraphsMutIter::Nop(std::iter::empty::<
+                &'a mut ::kirin::ir::DiGraph,
+            >()),
+            Self::Lambda(field_0) => CallableLanguageDigraphsMutIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageDigraphsMutIter<'a> {
+    Function(std::iter::Empty<&'a mut ::kirin::ir::DiGraph>),
+    Nop(std::iter::Empty<&'a mut ::kirin::ir::DiGraph>),
+    Lambda(<LambdaOp as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphs<'a> for CallableLanguage {
+    type Iter = CallableLanguageUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Function { body } => CallableLanguageUngraphsIter::Function(std::iter::empty::<
+                &'a ::kirin::ir::UnGraph,
+            >()),
+            Self::Nop { value } => {
+                CallableLanguageUngraphsIter::Nop(std::iter::empty::<&'a ::kirin::ir::UnGraph>())
+            }
+            Self::Lambda(field_0) => CallableLanguageUngraphsIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasUngraphs>::ungraphs(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageUngraphsIter<'a> {
+    Function(std::iter::Empty<&'a ::kirin::ir::UnGraph>),
+    Nop(std::iter::Empty<&'a ::kirin::ir::UnGraph>),
+    Lambda(<LambdaOp as ::kirin::ir::HasUngraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasUngraphsMut<'a> for CallableLanguage {
+    type IterMut = CallableLanguageUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Function { body } => {
+                CallableLanguageUngraphsMutIter::Function(std::iter::empty::<
+                    &'a mut ::kirin::ir::UnGraph,
+                >())
+            }
+            Self::Nop { value } => CallableLanguageUngraphsMutIter::Nop(std::iter::empty::<
+                &'a mut ::kirin::ir::UnGraph,
+            >()),
+            Self::Lambda(field_0) => CallableLanguageUngraphsMutIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageUngraphsMutIter<'a> {
+    Function(std::iter::Empty<&'a mut ::kirin::ir::UnGraph>),
+    Nop(std::iter::Empty<&'a mut ::kirin::ir::UnGraph>),
+    Lambda(<LambdaOp as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsTerminator for CallableLanguage {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::Function { body } => false || false,
+            Self::Nop { value } => false || false,
+            Self::Lambda(field_0) => {
+                <LambdaOp as ::kirin::ir::IsTerminator>::is_terminator(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsConstant for CallableLanguage {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::Function { body } => false || false,
+            Self::Nop { value } => false || false,
+            Self::Lambda(field_0) => <LambdaOp as ::kirin::ir::IsConstant>::is_constant(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsPure for CallableLanguage {
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::Function { body } => false || false,
+            Self::Nop { value } => false || false,
+            Self::Lambda(field_0) => <LambdaOp as ::kirin::ir::IsPure>::is_pure(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsSpeculatable for CallableLanguage {
+    fn is_speculatable(&self) -> bool {
+        match self {
+            Self::Function { body } => false || false,
+            Self::Nop { value } => false || false,
+            Self::Lambda(field_0) => {
+                <LambdaOp as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::IsEdge for CallableLanguage {
+    fn is_edge(&self) -> bool {
+        match self {
+            Self::Function { body } => false || false,
+            Self::Nop { value } => false || false,
+            Self::Lambda(field_0) => <LambdaOp as ::kirin::ir::IsEdge>::is_edge(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::Dialect for CallableLanguage {
+    type Type = SimpleType;
+}
+#[automatically_derived]
+impl ::kirin::ir::HasSignature<Self> for CallableLanguage {
+    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+        match self {
+            Self::Function { body } => None,
+            Self::Nop { value } => None,
+            Self::Lambda(field_0) => {
+                <LambdaOp as ::kirin::ir::HasSignature<LambdaOp>>::signature(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::HasCallableBody for CallableLanguage
+where
+    LambdaOp: ::kirin::ir::HasCallableBody,
+{
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        match self {
+            Self::Function { body } => ::core::option::Option::Some(::kirin::ir::Body::from(*body)),
+            Self::Nop { value } => ::core::option::Option::None,
+            Self::Lambda(field_0) => {
+                <LambdaOp as ::kirin::ir::HasCallableBody>::callable_body(field_0)
+            }
+        }
+    }
+}

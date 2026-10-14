@@ -88,7 +88,7 @@ trivial_type_lattice!(I32Type, "i32", just(Token::Identifier("i32")));
 #[derive(Clone, Debug, PartialEq, Eq, Hash, kirin_ir::Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = UnitType, crate = kirin_ir)]
 #[chumsky(crate = crate, format = "fn {:name}{sig} {body}")]
-struct FunctionBody {
+struct FunctionDefinition {
     body: CFG,
     sig: Signature<UnitType>,
 }
@@ -109,9 +109,9 @@ struct LowerBody {
 #[stage(crate = "kirin_ir", chumsky_crate = "crate")]
 enum StageBucket {
     #[stage(name = "A")]
-    Parse(StageInfo<FunctionBody>),
+    Parse(StageInfo<FunctionDefinition>),
     #[stage(name = "B")]
-    Lower(StageInfo<FunctionBody>),
+    Lower(StageInfo<FunctionDefinition>),
 }
 
 // ---------------------------------------------------------------------------
@@ -122,7 +122,7 @@ enum StageBucket {
 #[stage(crate = "kirin_ir", chumsky_crate = "crate")]
 enum MixedStage {
     #[stage(name = "A")]
-    StageA(StageInfo<FunctionBody>),
+    StageA(StageInfo<FunctionDefinition>),
     #[stage(name = "B")]
     StageB(StageInfo<LowerBody>),
 }
@@ -131,7 +131,7 @@ enum MixedStage {
 // Helpers
 // ---------------------------------------------------------------------------
 
-const BODY: &str = "{ ^0() {} }";
+const BODY: &str = "cfg { ^0() {} }";
 
 fn unit_sig() -> Signature<UnitType> {
     Signature::new(vec![UnitType], UnitType, ())
@@ -155,7 +155,7 @@ fn parsed_names<S>(pipeline: &Pipeline<S>, functions: Vec<Function>) -> BTreeSet
 
 #[test]
 fn test_pipeline_parse_accepts_mixed_function_names() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let input = format!(
         "stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY} \
          stage @B fn @bar(()) -> (); specialize @B fn @bar(()) -> () {BODY}"
@@ -171,7 +171,7 @@ fn test_pipeline_parse_accepts_mixed_function_names() {
 
 #[test]
 fn test_pipeline_parse_uses_pipeline_global_table() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let input = format!("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () {BODY}");
 
     let parsed = pipeline.parse(&input).unwrap();
@@ -217,14 +217,14 @@ fn test_stage_enum_pipeline_parse_suggests_declared_name() {
 
 #[test]
 fn test_stage_requires_semicolon() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let err = pipeline.parse("stage @A fn @foo(()) -> ()").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
 }
 
 #[test]
 fn test_specialize_requires_body() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let err = pipeline
         .parse("specialize @A fn @foo(()) -> ();")
         .unwrap_err();
@@ -233,7 +233,7 @@ fn test_specialize_requires_body() {
 
 #[test]
 fn test_global_symbol_prefix_is_required() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let err = pipeline.parse("stage 1 fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
 }
@@ -242,7 +242,7 @@ fn test_global_symbol_prefix_is_required() {
 fn test_specialize_without_stage_auto_creates() {
     // With auto-creation, specialize without a prior stage declaration
     // succeeds by auto-creating the staged function.
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     pipeline
         .add_stage()
         .stage(StageInfo::default())
@@ -259,17 +259,17 @@ fn test_specialize_without_stage_auto_creates() {
 
 #[test]
 fn test_comments_and_whitespace_are_accepted() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let input = format!(
         "/* stage declaration */ stage @A fn @foo(()) -> (); \
-         // specialization body\n specialize @A fn @foo(()) -> () /* body */ {BODY}"
+         // specialization definition\n specialize @A fn @foo(()) -> () /* definition */ {BODY}"
     );
     pipeline.parse(&input).unwrap();
 }
 
 #[test]
 fn test_pipeline_roundtrip_print_parse_print() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let stage_a = pipeline
         .add_stage()
         .stage(StageInfo::default())
@@ -287,18 +287,18 @@ fn test_pipeline_roundtrip_print_parse_print() {
     pipeline.stage_mut(stage_a).unwrap().with_builder(|b| {
         let block = b.block().new();
         let cfg = b.cfg().add_block(block).new();
-        let body = FunctionBody::new(b, cfg, Signature::new(vec![], UnitType, ()));
+        let definition = FunctionDefinition::new(b, cfg, Signature::new(vec![], UnitType, ()));
         b.specialize()
             .staged_func(staged_function)
             .signature(unit_sig())
-            .body(body)
+            .definition(definition)
             .new()
             .unwrap();
     });
 
     let rendered = function.sprint(&pipeline);
 
-    let mut parsed_pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut parsed_pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let parsed_functions = parsed_pipeline.parse(&rendered).unwrap();
     let parsed_function = parsed_functions
         .into_iter()
@@ -355,7 +355,7 @@ fn test_pipeline_parse_uses_stage_language_dispatch() {
 
 #[test]
 fn test_pipeline_parse_empty_input() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let err = pipeline.parse("").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
     assert!(err.message.contains("expected at least one declaration"));
@@ -363,7 +363,7 @@ fn test_pipeline_parse_empty_input() {
 
 #[test]
 fn test_pipeline_parse_whitespace_only() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let err = pipeline.parse("   \n\t  ").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
 }
@@ -374,7 +374,7 @@ fn test_pipeline_parse_whitespace_only() {
 
 #[test]
 fn test_pipeline_parse_numeric_stage_symbol_rejected() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     // Numeric tokens like `1` are not prefixed with `@`, so `stage 1` should fail
     let err = pipeline.parse("stage 1 fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
@@ -383,7 +383,7 @@ fn test_pipeline_parse_numeric_stage_symbol_rejected() {
 #[test]
 fn test_pipeline_numeric_stage_lookup_by_existing_id() {
     // When a stage already exists in the pipeline, @<numeric> can find it by raw ID
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let stage_id = pipeline
         .add_stage()
         .stage(StageInfo::default())
@@ -442,10 +442,10 @@ fn test_stage_suggestion_very_distant_name() {
 #[test]
 fn test_invalid_body_parse_has_source() {
     use std::error::Error;
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     // Valid header but invalid body tokens
     let err = pipeline
-        .parse("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () { invalid }")
+        .parse("stage @A fn @foo(()) -> (); specialize @A fn @foo(()) -> () cfg { invalid }")
         .unwrap_err();
     // The body parse failure should chain a source error
     // (may or may not have source depending on where it fails)
@@ -458,7 +458,7 @@ fn test_invalid_body_parse_has_source() {
 
 #[test]
 fn test_duplicate_stage_declaration_same_signature() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let input = format!(
         "stage @A fn @foo(()) -> (); \
          stage @A fn @foo(()) -> (); \
@@ -474,7 +474,102 @@ fn test_duplicate_stage_declaration_same_signature() {
 
 #[test]
 fn test_invalid_declaration_keyword() {
-    let mut pipeline: Pipeline<StageInfo<FunctionBody>> = Pipeline::new();
+    let mut pipeline: Pipeline<StageInfo<FunctionDefinition>> = Pipeline::new();
     let err = pipeline.parse("define @A fn @foo(()) -> ();").unwrap_err();
     assert_eq!(err.kind, crate::FunctionParseErrorKind::InvalidHeader);
+}
+
+// ---------------------------------------------------------------------------
+// Body-span scanner
+//
+// The framework only strips `specialize @stage`; the rest of the declaration —
+// discriminator, header, and brace-balanced body — is handed to the dialect
+// statement parser as one span. The scanner skips tokens until the first `{`,
+// so it is agnostic to *which* discriminator precedes the body, and stays
+// correct for all four body kinds without knowing any of them.
+// ---------------------------------------------------------------------------
+
+/// Scan one `specialize` declaration and return the exact source slice handed
+/// to the dialect statement parser.
+///
+/// `LowerBody`'s `I32Type` only affects the *header* type list; the scanner
+/// never parses body contents, so any body kind can be scanned through it.
+fn scanned_body_span(src: &str) -> String {
+    let tokens = super::syntax::tokenize(src);
+    let (declaration, _) = super::syntax::parse_one_declaration::<LowerBody>(&tokens)
+        .expect("declaration should scan");
+    match declaration {
+        super::syntax::Declaration::Specialize {
+            definition_span, ..
+        } => src[definition_span.start..definition_span.end].to_string(),
+        super::syntax::Declaration::Stage(_) => panic!("expected a specialize declaration"),
+    }
+}
+
+#[test]
+fn test_body_span_scans_tagged_cfg() {
+    let body = "fn @f(i32) -> i32 cfg { ^entry(%x: i32) { %r = add %x, %x; ret %r; } }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_scans_tagged_block() {
+    let body = "fn @f(i32) -> i32 block ^body(%x: i32) { %r = add %x, %x; ret %r; }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_scans_digraph() {
+    let body = "fn @f(i32) -> i32 digraph ^g0(%x: i32) { %r = add %x, %x; yield %r; }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_scans_ungraph() {
+    let body = "fn @f(i32) -> i32 ungraph ^u0(%x: i32) { edge %w = wire; node(%x, %w); }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_scans_a_projected_body_without_a_discriminator() {
+    // Projections stay raw, so a dialect can spell its own wrapper. The
+    // scanner does not require a keyword — only a brace-balanced body.
+    let body = "fn @f(i32) -> i32 (%x: i32) { %r = add %x, %x; ret %r; }";
+    assert_eq!(scanned_body_span(&format!("specialize @A {body}")), body);
+}
+
+#[test]
+fn test_body_span_stops_at_the_matching_brace() {
+    // Two declarations: the first span must end at *its* closing brace, not
+    // run on into the second.
+    let first = "fn @f(i32) -> i32 cfg { ^entry(%x: i32) { ret %x; } }";
+    let second = "fn @g(i32) -> i32 cfg { ^e { } }";
+    let src = format!("specialize @A {first} specialize @A {second}");
+    assert_eq!(scanned_body_span(&src), first);
+}
+
+#[test]
+fn test_body_span_requires_an_opening_brace() {
+    let tokens = super::syntax::tokenize("specialize @A fn @f(i32) -> i32 cfg;");
+    let errors = super::syntax::parse_one_declaration::<LowerBody>(&tokens)
+        .expect_err("a body with no `{` should not scan");
+    assert!(
+        errors
+            .iter()
+            .any(|e| format!("{e}").contains("expected '{'")),
+        "expected a missing-brace diagnostic, got: {errors:?}"
+    );
+}
+
+#[test]
+fn test_body_span_rejects_an_unclosed_brace() {
+    let tokens = super::syntax::tokenize("specialize @A fn @f(i32) -> i32 cfg { ^entry {");
+    let errors = super::syntax::parse_one_declaration::<LowerBody>(&tokens)
+        .expect_err("an unbalanced body should not scan");
+    assert!(
+        errors
+            .iter()
+            .any(|e| format!("{e}").contains("unclosed '{'")),
+        "expected an unclosed-brace diagnostic, got: {errors:?}"
+    );
 }

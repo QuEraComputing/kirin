@@ -21,7 +21,7 @@ where
     /// a fresh stack.
     pub fn run_frame(&mut self, root: P::Frame) -> Result<P::Completion, I::Error>
     where
-        P::Frame: Frame<Self, P::Frame, Completion = P::Completion>,
+        P::Frame: Frame<Self, Completion = P::Completion>,
     {
         if !self.frame_stack.is_empty() {
             return Err(I::Error::from(InterpreterError::Custom(

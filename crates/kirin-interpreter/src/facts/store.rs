@@ -1,15 +1,11 @@
-//! Anchor-keyed dataflow fact stores.
+//! Shared anchor-keyed storage for interpreter values and analysis facts.
 //!
-//! [`FactStore<A, F>`] is the reusable fact container: one fact `F` per
-//! [`LatticeAnchor`] `A`, with absent anchors carrying the analysis's bottom
-//! fact. It is deliberately separate from the operational activation store
-//! ([`EnvIndex`](crate::EnvIndex) / [`EnvStackStore`](crate::EnvStackStore)):
-//! that is the CESK-style runtime/abstract-execution environment handle, while
-//! this is where analyses keep dataflow facts. The familiar stores are
-//! instantiations picked by the analysis's anchor: sparse analyses anchor
-//! facts to SSA values ([`SparseStore`], scope-qualified as
-//! [`ScopedSparseStore`]), while dense analyses use
-//! `FactStore<Scoped<BodyScope, ProgramPoint>, F>` directly.
+//! [`FactStore<A, F>`] holds one payload `F` per [`LatticeAnchor`] `A`.
+//! [`EnvStore`](crate::EnvStore) allocates one of these per environment, addressed by
+//! analysis context, for concrete and forward abstract interpretation. Backward
+//! analyses use the map directly with SSA or program-point anchors, qualified by
+//! scope where needed. Engines decide what absence means and when facts must
+//! join.
 
 use std::collections::HashMap;
 
@@ -17,9 +13,11 @@ use kirin_ir::SSAValue;
 
 use super::anchor::{Change, LatticeAnchor, Scoped};
 
-/// One dataflow fact per lattice anchor.
+/// One interpreter value or analysis fact per [`LatticeAnchor`].
 ///
-/// Anchors absent from the store carry the analysis's bottom fact.
+/// Missing anchors return `None`. Concrete engines report unbound values;
+/// abstract engines can interpret absence as bottom. Assignment never joins
+/// implicitly; [`join_with`](Self::join_with) takes an explicit bottom and merge.
 #[derive(Clone, Debug)]
 pub struct FactStore<A, F>
 where
@@ -41,7 +39,7 @@ impl<A: LatticeAnchor, F> FactStore<A, F> {
         }
     }
 
-    /// Read the fact stored at `anchor`, or `None` if it carries bottom.
+    /// Read the fact stored at `anchor`, or `None` if absent.
     pub fn get(&self, anchor: A) -> Option<&F> {
         self.facts.get(&anchor)
     }
@@ -51,12 +49,12 @@ impl<A: LatticeAnchor, F> FactStore<A, F> {
         self.facts.insert(anchor, fact);
     }
 
-    /// `true` if a (non-bottom) fact is stored at `anchor`.
+    /// `true` if a fact is explicitly stored at `anchor`, including bottom.
     pub fn contains(&self, anchor: A) -> bool {
         self.facts.contains_key(&anchor)
     }
 
-    /// Number of anchors carrying a non-bottom fact.
+    /// Number of explicitly stored facts.
     pub fn len(&self) -> usize {
         self.facts.len()
     }
@@ -65,9 +63,11 @@ impl<A: LatticeAnchor, F> FactStore<A, F> {
         self.facts.is_empty()
     }
 
-    /// Iterate `(anchor, fact)` pairs for anchors carrying a non-bottom fact
-    /// (anchors cloned; order unspecified).
-    pub fn iter(&self) -> impl Iterator<Item = (A, &F)> {
+    /// Iterate stored `(anchor, fact)` pairs (anchors cloned; order unspecified).
+    pub fn iter(&self) -> impl Iterator<Item = (A, &F)>
+    where
+        A: Clone,
+    {
         self.facts
             .iter()
             .map(|(anchor, fact)| (anchor.clone(), fact))

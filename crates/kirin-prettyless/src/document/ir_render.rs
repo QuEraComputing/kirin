@@ -18,7 +18,7 @@ where
 {
     /// Resolve a block/graph name to `^resolved` or fall back to `fallback`'s Display output.
     ///
-    /// Used by `print_block`, `print_digraph`, and `print_ungraph` to avoid
+    /// Used by `print_untagged_block`, `print_digraph`, and `print_ungraph` to avoid
     /// duplicating the symbol-table lookup + caret-prefix logic.
     pub(crate) fn resolve_caret_name(
         &self,
@@ -120,8 +120,33 @@ where
         }
     }
 
-    /// Pretty print a block with its header and statements.
+    /// Pretty print a standalone `Block` body, tagged with its `block` discriminator.
+    ///
+    /// Renders as:
+    /// ```text
+    /// block ^name(%arg0: type) {
+    ///   <statements>
+    /// }
+    /// ```
+    ///
+    /// This is the printer behind the default `{body}` interpolation of a
+    /// `Block` field, and is the exact inverse of `kirin_chumsky::block`.
+    /// A CFG's member blocks are *not* printed through here — they stay
+    /// untagged; the shared untagged block-rendering helper handles those.
     pub fn print_block(&'a self, block: &Block) -> ArenaDoc<'a> {
+        self.text("block ") + self.print_untagged_block(block)
+    }
+
+    /// Pretty print a block with its header and statements, **without** the
+    /// `block` discriminator keyword.
+    ///
+    /// Renders as `^name(%arg0: type) { <statements> }`.
+    ///
+    /// Internal: this is the shared block-rendering helper. [`Document::print_block`]
+    /// wraps it with the `block` keyword; [`Document::print_cfg`] and
+    /// [`Document::print_cfg_body_only`] use it directly, because the enclosing
+    /// `cfg { ... }` already names the body kind for every member block.
+    pub(crate) fn print_untagged_block(&'a self, block: &Block) -> ArenaDoc<'a> {
         let block_info = block.expect_info(self.stage);
 
         // Build block header with arguments: ^name(%arg0: type, %arg1: type)
@@ -153,14 +178,24 @@ where
         header + self.text(" {") + self.block_indent(inner) + self.line_() + self.text("}")
     }
 
-    /// Pretty print a CFG with its blocks.
+    /// Pretty print a CFG body, tagged with its `cfg` discriminator.
+    ///
+    /// Renders as:
+    /// ```text
+    /// cfg {
+    ///   ^entry(%arg0: type) {
+    ///     <statements>
+    ///   }
+    /// }
+    /// ```
+    ///
+    /// This is the printer behind the default `{body}` interpolation of a `CFG`
+    /// field, and is the exact inverse of `kirin_chumsky::cfg`. Member blocks
+    /// are rendered untagged — `cfg` names the body kind once for the whole
+    /// container.
     pub fn print_cfg(&'a self, cfg: &CFG) -> ArenaDoc<'a> {
-        let mut inner = self.nil();
-        for block in cfg.blocks(self.stage) {
-            inner += self.print_block(&block);
-            inner += self.line_();
-        }
-        self.block_indent(inner).enclose("{", "}")
+        let inner = self.print_cfg_body_only(cfg);
+        self.text("cfg ") + self.block_indent(inner).enclose("{", "}")
     }
 
     /// Pretty print a list of ports.
@@ -220,10 +255,14 @@ where
 
     /// Pretty print a specialized function with its full header.
     ///
-    /// Renders as:
+    /// The framework contributes only the `specialize @stage` prefix; everything
+    /// after it is the dialect's own format string. With the common
+    /// `"fn {:name}{sig} {body}"` over a `CFG` field that renders as:
     /// ```text
-    /// specialize @stage fn @name(Type0, Type1) -> RetType {
-    ///   <body>
+    /// specialize @stage fn @name(Type0, Type1) -> RetType cfg {
+    ///   ^entry(%arg0: Type0, %arg1: Type1) {
+    ///     <statements>
+    ///   }
     /// }
     /// ```
     ///
@@ -234,17 +273,17 @@ where
         let staged_info = staged_fn.expect_info(self.stage);
         let spec = &staged_info.specializations()[idx];
 
-        // Set function context so the body's PrettyPrint can access it
+        // Set function context so the definition's PrettyPrint can access it
         // via doc.print_function_name() and doc.print_return_types().
         let prev_name = self.function_name();
         self.set_function_name(staged_info.name());
 
         let header = self.text("specialize @") + self.text(self.stage_symbol_text());
 
-        let body = self.print_statement(spec.body());
+        let definition = self.print_statement(spec.definition());
         self.set_function_name(prev_name);
 
-        header + self.text(" ") + body
+        header + self.text(" ") + definition
     }
 
     /// Pretty print a staged function with all its non-invalidated specializations.
@@ -254,9 +293,10 @@ where
     /// stage @A fn @name(Type0, Type1) -> RetType;
     /// ```
     ///
-    /// Each active specialization is then rendered as:
+    /// Each active specialization is then rendered as (body layout is
+    /// dialect-controlled; `cfg { ... }` is what a `CFG` field's `{body}` gives):
     /// ```text
-    /// specialize @A fn @name(Type0, Type1) -> RetType { ... }
+    /// specialize @A fn @name(Type0, Type1) -> RetType cfg { ... }
     /// ```
     pub fn print_staged_function(&'a self, func: &StagedFunction) -> ArenaDoc<'a> {
         let info = func.expect_info(self.stage);
@@ -271,14 +311,14 @@ where
             return doc;
         }
 
-        // Set function context for body PrettyPrint projections.
+        // Set function context for definition PrettyPrint projections.
         let prev_name = self.function_name();
         self.set_function_name(info.name());
 
         for spec in active {
             doc += self.line_();
             doc += self.text("specialize @") + self.text(self.stage_symbol_text());
-            doc += self.text(" ") + self.print_statement(spec.body());
+            doc += self.text(" ") + self.print_statement(spec.definition());
         }
 
         self.set_function_name(prev_name);
@@ -458,17 +498,22 @@ where
         inner
     }
 
-    /// Print a CFG body only: blocks without outer braces.
+    /// Print a CFG body only: untagged blocks, without the `cfg` keyword or
+    /// outer braces.
+    ///
+    /// Stays raw for `{field:body}` projections — no `cfg` keyword is injected,
+    /// and the member blocks are untagged, matching `kirin_chumsky::cfg_body`.
     pub fn print_cfg_body_only(&'a self, cfg: &CFG) -> ArenaDoc<'a> {
         let mut inner = self.nil();
         for block in cfg.blocks(self.stage) {
-            inner += self.print_block(&block);
+            inner += self.print_untagged_block(&block);
             inner += self.line_();
         }
         inner
     }
 
-    /// Print a Block body only: statements without the header or braces.
+    /// Print a Block body only: statements without the `block` keyword, the
+    /// header, or the braces.
     pub fn print_block_body_only(&'a self, block: &Block) -> ArenaDoc<'a> {
         let mut inner = self.nil();
         for (i, stmt) in block.statements(self.stage).enumerate() {

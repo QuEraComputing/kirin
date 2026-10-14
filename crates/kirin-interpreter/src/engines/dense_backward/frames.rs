@@ -6,9 +6,9 @@
 //! point state; structured dialects push their own frames
 //! ([`DenseBackwardEffect::Push`]) that reuse it in
 //! [`DenseBlockMode::StructuredBody`] to walk a chosen body. A language
-//! composes a total frame enum via [`DenseFrameBuild`] (plus the structured
-//! dialect's own `Build*` traits) — [`StandardDenseBackwardFrame`] is the
-//! structured-control-free default.
+//! supplies the configured child representation. The framework default needs
+//! only [`DenseBlockFrame`] itself; a language with structured continuations
+//! owns a private stack-item enum containing this walker and its dialect frames.
 
 use std::marker::PhantomData;
 
@@ -87,7 +87,6 @@ where
 impl<I, F, V, E> Frame<I, F> for DenseBlockFrame<V, E>
 where
     I: DenseBackwardFrameEngine<Value = V, Error = E, Frame = F>,
-    F: DenseFrameBuild<V, E>,
     V: Clone,
     E: From<InterpreterError>,
 {
@@ -96,7 +95,7 @@ where
     fn step_into(
         mut self,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
         if !self.initialized {
             if self.mode == DenseBlockMode::StructuredBody {
                 let facts = interp.state();
@@ -131,7 +130,7 @@ where
             DenseBackwardEffect::Next => {
                 let before = interp.state();
                 interp.record_point(ProgramPoint::Before(statement), before);
-                Ok(FrameEffect::Continue(F::from_block(self)))
+                Ok(FrameEffect::Continue(self))
             }
             DenseBackwardEffect::Edges(edges) => {
                 if !is_terminator_position {
@@ -145,7 +144,7 @@ where
                         self.live_out = Some(out);
                         let before = interp.state();
                         interp.record_point(ProgramPoint::Before(statement), before);
-                        Ok(FrameEffect::Continue(F::from_block(self)))
+                        Ok(FrameEffect::Continue(self))
                     }
                     DenseBlockMode::StructuredBody => Err(E::from(InterpreterError::Custom(
                         "a structured body block cannot branch into the CFG",
@@ -157,7 +156,7 @@ where
                 // completes; record it on resume.
                 self.pending_point = Some(statement);
                 Ok(FrameEffect::Push {
-                    parent: F::from_block(self),
+                    parent: self,
                     child: frame,
                 })
             }
@@ -167,7 +166,7 @@ where
     fn resume_done_into(
         self,
         _interp: &mut I,
-    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
         Err(E::from(InterpreterError::Custom(
             "dense block frames resume only with completions",
         )))
@@ -177,76 +176,18 @@ where
         mut self,
         completion: DenseBackwardCompletion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
         match completion {
             DenseBackwardCompletion::Structured => {
                 if let Some(statement) = self.pending_point.take() {
                     let before = interp.state();
                     interp.record_point(ProgramPoint::Before(statement), before);
                 }
-                Ok(FrameEffect::Continue(F::from_block(self)))
+                Ok(FrameEffect::Continue(self))
             }
             DenseBackwardCompletion::Block { .. } => Err(E::from(InterpreterError::Custom(
                 "a nested frame completed as a block owner",
             ))),
-        }
-    }
-}
-
-/// Construction trait letting a total dense backward frame enum embed the
-/// standard block frame (the analogue of
-/// [`AbstractFrameBuild`](crate::AbstractFrameBuild)); structured dialects add
-/// their own `Build*` traits beside it.
-pub trait DenseFrameBuild<V, E>: Sized {
-    fn from_block(frame: DenseBlockFrame<V, E>) -> Self;
-}
-
-/// The structured-control-free default frame: just the block walk. A language
-/// with a structured dialect supplies its own total enum embedding this plus
-/// the dialect's frames.
-pub enum StandardDenseBackwardFrame<V, E> {
-    Block(DenseBlockFrame<V, E>),
-}
-
-impl<V, E> DenseFrameBuild<V, E> for StandardDenseBackwardFrame<V, E> {
-    fn from_block(frame: DenseBlockFrame<V, E>) -> Self {
-        Self::Block(frame)
-    }
-}
-
-/// A *universe* impl, generic over the outer total frame type `F` — see
-/// [`Frame`] for what that buys.
-impl<I, F, V, E> Frame<I, F> for StandardDenseBackwardFrame<V, E>
-where
-    I: DenseBackwardFrameEngine<Value = V, Error = E, Frame = F>,
-    F: DenseFrameBuild<V, E>,
-    V: Clone,
-    E: From<InterpreterError>,
-{
-    type Completion = DenseBackwardCompletion<V>;
-
-    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
-        match self {
-            Self::Block(frame) => frame.step_into(interp),
-        }
-    }
-
-    fn resume_done_into(
-        self,
-        interp: &mut I,
-    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
-        match self {
-            Self::Block(frame) => frame.resume_done_into(interp),
-        }
-    }
-
-    fn resume_into(
-        self,
-        completion: DenseBackwardCompletion<V>,
-        interp: &mut I,
-    ) -> Result<FrameEffect<F, DenseBackwardCompletion<V>>, E> {
-        match self {
-            Self::Block(frame) => frame.resume_into(completion, interp),
         }
     }
 }

@@ -1,6 +1,6 @@
 stage @source fn @main(i64, i64) -> i64;
 
-specialize @source fn @main(i64, i64) -> i64 {
+specialize @source fn @main(i64, i64) -> i64 cfg {
   ^entry(%a: i64, %b: i64) {
     %result = add %a, %b -> i64;
     ret %result;

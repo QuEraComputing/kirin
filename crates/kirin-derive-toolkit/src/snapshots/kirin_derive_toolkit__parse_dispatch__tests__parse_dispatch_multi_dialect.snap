@@ -1,6 +1,5 @@
 ---
 source: crates/kirin-derive-toolkit/src/parse_dispatch.rs
-assertion_line: 177
 expression: generate_parse_dispatch_code(input)
 ---
 #[automatically_derived]
@@ -15,11 +14,11 @@ impl kirin_chumsky::ParseDispatch for MixedStage {
     > {
         match self {
             MixedStage::StageA(stage_info) => {
-                kirin_chumsky::first_pass_concrete::<FunctionBody>(stage_info, stage_id, ctx)
+                kirin_chumsky::first_pass_concrete::<FunctionDefinition>(stage_info, stage_id, ctx)
                     .map(::core::option::Option::Some)
             }
             MixedStage::StageB(stage_info) => {
-                kirin_chumsky::first_pass_concrete::<LowerBody>(stage_info, stage_id, ctx)
+                kirin_chumsky::first_pass_concrete::<LowerDefinition>(stage_info, stage_id, ctx)
                     .map(::core::option::Option::Some)
             }
         }
@@ -32,11 +31,11 @@ impl kirin_chumsky::ParseDispatch for MixedStage {
     {
         match self {
             MixedStage::StageA(stage_info) => {
-                kirin_chumsky::second_pass_concrete::<FunctionBody>(stage_info, stage_id, ctx)
+                kirin_chumsky::second_pass_concrete::<FunctionDefinition>(stage_info, stage_id, ctx)
                     .map(::core::option::Option::Some)
             }
             MixedStage::StageB(stage_info) => {
-                kirin_chumsky::second_pass_concrete::<LowerBody>(stage_info, stage_id, ctx)
+                kirin_chumsky::second_pass_concrete::<LowerDefinition>(stage_info, stage_id, ctx)
                     .map(::core::option::Option::Some)
             }
         }

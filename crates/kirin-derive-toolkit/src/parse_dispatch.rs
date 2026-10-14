@@ -169,9 +169,9 @@ mod tests {
             #[stage(crate = "kirin_ir", chumsky_crate = "kirin_chumsky")]
             enum MixedStage {
                 #[stage(name = "A")]
-                StageA(StageInfo<FunctionBody>),
+                StageA(StageInfo<FunctionDefinition>),
                 #[stage(name = "B")]
-                StageB(StageInfo<LowerBody>),
+                StageB(StageInfo<LowerDefinition>),
             }
         };
         insta::assert_snapshot!(generate_parse_dispatch_code(input));
@@ -183,9 +183,9 @@ mod tests {
             #[stage(crate = "kirin_ir", chumsky_crate = "kirin_chumsky")]
             enum StageBucket {
                 #[stage(name = "A")]
-                Parse(StageInfo<FunctionBody>),
+                Parse(StageInfo<FunctionDefinition>),
                 #[stage(name = "B")]
-                Lower(StageInfo<FunctionBody>),
+                Lower(StageInfo<FunctionDefinition>),
             }
         };
         insta::assert_snapshot!(generate_parse_dispatch_code(input));

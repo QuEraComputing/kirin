@@ -6,7 +6,7 @@ use crate::{
 };
 
 use super::block_cursor::BlockCursor;
-use super::{CallFrame, Completion, FrameBuild};
+use super::{CallRequest, Completion};
 
 /// Representation walker for a [`CFG`]: enter the entry block, run
 /// statements, follow `Jump` edges between blocks (binding successor
@@ -16,7 +16,7 @@ use super::{CallFrame, Completion, FrameBuild};
 /// Traversal mechanics only. A `CFGFrame` does not own an activation, is not
 /// a call boundary, and does not decide whether a `Return` belongs to a
 /// function call — it completes [`Returned`](Completion::Returned) and lets
-/// the completion bubble to the nearest [`CallFrame`]. An undecided concrete
+/// the completion bubble to the nearest [`CallFrame`](crate::CallFrame). An undecided concrete
 /// `Branch` is an error (single-path execution); exploring branch
 /// alternatives is the abstract engine's business.
 pub struct CFGFrame<V, E> {
@@ -54,15 +54,15 @@ where
 impl<I, F, V, E> Frame<I, F> for CFGFrame<V, E>
 where
     I: CFGQueries<Value = V, Error = E> + StatementDispatch + SparseForwardInterp<Frame = F>,
-    F: FrameBuild<V, E>,
+    F: From<CallRequest<V>>,
     V: Clone,
     E: From<InterpreterError>,
 {
     type Completion = Completion<V>;
 
     /// Execute the next statement and translate its [`SparseForwardEffect`]
-    /// into a [`FrameEffect`] over the total frame type `F`.
-    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    /// into a [`FrameEffect`] over this walker and the configured child type.
+    fn step_into(mut self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         // First step: find the entry block and bind the entry arguments.
         if let Some(args) = self.pending.take() {
             let entry = interp
@@ -71,7 +71,7 @@ where
             let mut cursor = BlockCursor::new(self.stage, self.index, entry, args);
             cursor.bind_entry(interp)?;
             self.cursor = Some(cursor);
-            return Ok(FrameEffect::Continue(F::from_cfg(self)));
+            return Ok(FrameEffect::Continue(self));
         }
         let cursor = self
             .cursor
@@ -82,24 +82,24 @@ where
         };
 
         match interp.run_statement(self.stage, statement, self.index)? {
-            SparseForwardEffect::Next => Ok(FrameEffect::Continue(F::from_cfg(self))),
+            SparseForwardEffect::Next => Ok(FrameEffect::Continue(self)),
             SparseForwardEffect::Jump(edge) => {
                 cursor.enter_block(interp, edge.target, &edge.args)?;
-                Ok(FrameEffect::Continue(F::from_cfg(self)))
+                Ok(FrameEffect::Continue(self))
             }
             SparseForwardEffect::Branch(_) => Err(E::from(InterpreterError::IndeterminateBranch)),
             SparseForwardEffect::Push { frame, results } => {
                 cursor.expect_results(results);
                 Ok(FrameEffect::Push {
-                    parent: F::from_cfg(self),
+                    parent: self,
                     child: frame,
                 })
             }
             SparseForwardEffect::Call(call) => {
-                let pending = CallFrame::pending(self.stage, self.index, call);
+                let pending = CallRequest::pending(self.stage, self.index, call);
                 Ok(FrameEffect::Push {
-                    parent: F::from_cfg(self),
-                    child: F::from_call(pending),
+                    parent: self,
+                    child: pending.into(),
                 })
             }
             SparseForwardEffect::Yield(values) => {
@@ -114,25 +114,25 @@ where
     /// A child finished without a payload (its results are already in the
     /// shared activation, e.g. a returned call): resume at the advanced
     /// cursor.
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
-        Ok(FrameEffect::Continue(F::from_cfg(self)))
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
+        Ok(FrameEffect::Continue(self))
     }
 
     /// A child bubbled a completion: a pushed frame's values land in the
     /// push's result slots; a `Returned` keeps bubbling toward the nearest
-    /// [`CallFrame`] (this frame owns no activation to free).
+    /// [`CallFrame`](crate::CallFrame) (this frame owns no activation to free).
     fn resume_into(
         mut self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         match completion {
             Completion::Finished(values) | Completion::Yielded(values) => {
                 let cursor = self.cursor.as_mut().ok_or_else(|| {
                     E::from(InterpreterError::Custom("cfg frame resumed before entry"))
                 })?;
                 cursor.write_child_results(interp, values)?;
-                Ok(FrameEffect::Continue(F::from_cfg(self)))
+                Ok(FrameEffect::Continue(self))
             }
             Completion::Returned(values) => Ok(FrameEffect::Complete(Completion::Returned(values))),
         }

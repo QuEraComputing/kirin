@@ -110,7 +110,7 @@ fn test_projected_digraph_empty_body_roundtrip() {
 
 // --- Pipeline-level projected format e2e test ---
 
-/// A dialect where the function body uses projected DiGraph format.
+/// A dialect where the function definition uses projected DiGraph format.
 /// The body format is `({body:ports}) {{ {body:body} }}` — ports and body
 /// are parsed from projections, and the function signature is extracted
 /// from the IR after emit.
@@ -129,11 +129,11 @@ enum ProjectedFuncLang {
         #[kirin(into)] kirin_test_languages::Value,
         #[kirin(type = SimpleType::F64)] ResultValue,
     ),
-    /// Function body: `fn {:name}{sig} ({graph:ports}) captures ({graph:captures}) {{ {graph:body} }}`
+    /// Function definition: `fn {:name}{sig} ({graph:ports}) captures ({graph:captures}) {{ {graph:body} }}`
     #[chumsky(
         format = "fn {:name}{sig} ({graph:ports}) captures ({graph:captures}) {{ {graph:body} }}"
     )]
-    FuncBody {
+    FunctionDefinition {
         graph: DiGraph,
         sig: Signature<SimpleType>,
     },
@@ -180,7 +180,7 @@ specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0;
 
 // --- Use Case 5: Block projections pipeline test ---
 
-/// A dialect using Block projections for the function body.
+/// A dialect using Block projections for the function definition.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
@@ -194,9 +194,9 @@ enum BlockProjectedLang {
     #[chumsky(format = "$ret {0}")]
     #[kirin(terminator)]
     Ret(SSAValue),
-    /// Function body: `fn {:name}{sig} ({body:args}) {{ {body:body} }}`
+    /// Function definition: `fn {:name}{sig} ({body:args}) {{ {body:body} }}`
     #[chumsky(format = "fn {:name}{sig} ({body:args}) {{ {body:body} }}")]
-    FuncBody {
+    FunctionDefinition {
         body: Block,
         sig: Signature<SimpleType>,
     },
@@ -244,9 +244,9 @@ enum CFGProjectedLang {
     #[chumsky(format = "$ret {0}")]
     #[kirin(terminator)]
     Ret(SSAValue),
-    /// Function body: `fn {:name}{sig} {{ {body:body} }}`
+    /// Function definition: `fn {:name}{sig} {{ {body:body} }}`
     #[chumsky(format = "fn {:name}{sig} {{ {body:body} }}")]
-    FuncBody {
+    FunctionDefinition {
         body: CFG,
         sig: Signature<SimpleType>,
     },
@@ -296,11 +296,11 @@ enum DialectControlledLang {
         #[kirin(into)] kirin_test_languages::Value,
         #[kirin(type = SimpleType::F64)] ResultValue,
     ),
-    /// Function body: `fn {:name}{sig} ({graph:ports}) captures ({graph:captures}) {{ {graph:body} }}`
+    /// Function definition: `fn {:name}{sig} ({graph:ports}) captures ({graph:captures}) {{ {graph:body} }}`
     #[chumsky(
         format = "fn {:name}{sig} ({graph:ports}) captures ({graph:captures}) {{ {graph:body} }}"
     )]
-    FuncBody {
+    FunctionDefinition {
         graph: DiGraph,
         sig: Signature<SimpleType>,
     },

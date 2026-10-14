@@ -16,7 +16,9 @@
 //! - the **component traits** below are narrowly scoped services an interpreter
 //!   engine supplies *to individual frames*, and the two **umbrellas**
 //!   ([`ForwardFrameEngine`], [`ForwardDataflowFrameEngine`]) name the full
-//!   capability set for a whole standard frame universe.
+//!   capability set for a whole standard frame universe. [`Env`] is the
+//!   exception that lives elsewhere ([`env`](super::env)), next to the [`EnvStore`]
+//!   container it operates on.
 //!
 //! # The capability model
 //!
@@ -29,10 +31,25 @@
 //! | trait | capability | consumed by |
 //! |---|---|---|
 //! | [`StatementDispatch`] | dispatch a statement to its dialect rule | every executing frame |
+//! | [`Env`] | read/write one fact at an [`Anchor`](Env::Anchor) in an activation | every frame that touches storage |
+//! | [`SSABinding`] | positional binding into SSA slots (`: Env<Anchor = SSAValue>`) | [`CallFrame`](crate::CallFrame), block/graph walkers |
 //! | [`BlockQueries`] | read-only structural queries for walking one block | [`BlockFrame`](crate::BlockFrame), [`AbstractBlockFrame`](crate::AbstractBlockFrame), dialect block walkers |
 //! | [`CFGQueries`] | find a CFG's entry block (`: BlockQueries`) | [`CFGFrame`](crate::CFGFrame) |
 //! | [`DiGraphQueries`] | schedule a digraph body | [`DiGraphFrame`](crate::DiGraphFrame) |
-//! | [`CallServices`] | activation storage, linking, callable-entry dispatch | [`CallFrame`](crate::CallFrame) |
+//! | [`CallServices`] | activation lifetime + callable discovery | [`CallFrame`](crate::CallFrame), *with* [`SSABinding`] |
+//!
+//! [`Env`] is *using* an activation — one read, one write, at whichever anchor
+//! family the engine attaches facts to. Binding a *list* of values to SSA slots
+//! is only meaningful for an SSA-anchored engine, so it lives on the
+//! blanket-implemented [`SSABinding`] instead of narrowing [`Env`] itself.
+//! Creating and retiring an activation is the call boundary's business, so
+//! `alloc_env`/`free_env` sit on [`CallServices`] next to
+//! `resolve_callee`/`discover_body`.
+//! The two are **siblings on [`Interp`]**, neither a supertrait of the other, so
+//! a frame that only reads and writes never claims a lifecycle it does not
+//! exercise, and the abstract dataflow engine stays free of a call convention it
+//! never performs. A frame needing both spells both: `CallFrame` is
+//! `I: CallServices + Env<Anchor = SSAValue>`.
 //!
 //! The `*Queries` traits are exactly that: **read-only**. The one operation that
 //! needs both a query and a write — binding a block's parameters to incoming
@@ -52,7 +69,7 @@
 //! frame enum belongs on an umbrella — a universe's engine must support the
 //! union of all its variants — while a member frame names only its components:
 //!
-//! - [`ForwardFrameEngine`] — the full concrete surface: all four components,
+//! - [`ForwardFrameEngine`] — the full concrete surface: all five components,
 //!   blanket-implemented.
 //! - [`ForwardDataflowFrameEngine`] — abstract dataflow: the traversal
 //!   components abstract execution *shares*, plus merge/summarization. It does
@@ -64,15 +81,20 @@ use std::hash::Hash;
 use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
 use crate::{
-    Body, CallEffect, CallableBody, Callee, Env, EnvIndex, FunctionTarget, Interp, InterpreterError,
+    Body, CallEffect, Callee, Env, EnvIndex, Interp, InterpreterError, LinkTarget, SSABinding,
 };
 
 /// Structural effect a [`Frame`] returns to the engine driver loop.
-pub enum FrameEffect<F, C> {
-    /// Replace the top of the stack with `F` and keep running.
-    Continue(F),
-    /// Push `parent` then `child`; `child` runs next, `parent` resumes after.
-    Push { parent: F, child: F },
+///
+/// `P` is the current frame's own next/parent state; `F` is the configured
+/// representation of a child frame. A reusable member frame returns itself for
+/// `Continue` and as the suspended parent of `Push`. A private composition root
+/// maps that member into the configured stack-item type.
+pub enum FrameEffect<P, C, F = P> {
+    /// Keep running the current frame.
+    Continue(P),
+    /// Suspend `parent` and run `child` first.
+    Push { parent: P, child: F },
     /// This frame finished with no payload; its parent's
     /// [`Frame::resume_done_into`] is called.
     Done,
@@ -80,6 +102,22 @@ pub enum FrameEffect<F, C> {
     /// [`Frame::resume_into`] is called (or, at the root, the run finishes with
     /// `C`).
     Complete(C),
+}
+
+impl<P, C, F> FrameEffect<P, C, F> {
+    /// Map a reusable frame's next state into its stack-item representation.
+    /// The child is already expressed in the configured stack-item type.
+    pub fn map_next<P2>(self, map_next: impl FnOnce(P) -> P2) -> FrameEffect<P2, C, F> {
+        match self {
+            FrameEffect::Continue(next) => FrameEffect::Continue(map_next(next)),
+            FrameEffect::Push { parent, child } => FrameEffect::Push {
+                parent: map_next(parent),
+                child,
+            },
+            FrameEffect::Done => FrameEffect::Done,
+            FrameEffect::Complete(completion) => FrameEffect::Complete(completion),
+        }
+    }
 }
 
 /// Minimal capability a [`Frame`] stack needs from the engine driving it.
@@ -92,43 +130,41 @@ impl<T: Interp> FrameEngine for T {
     type Error = <T as Interp>::Error;
 }
 
-/// A continuation frame anchored in an IR traversal, expressed over the total
-/// frame type `F` it composes into.
+/// A resumable interpreter continuation.
 ///
-/// Every method consumes `self` and returns the next structural move as a
-/// [`FrameEffect`] **over `F`** — never over `Self`. That single choice is what
-/// lets one trait serve both roles a frame stack needs:
+/// Every method consumes `self` and returns the next structural move as one
+/// [`FrameEffect`]. The resumed parent is always `Self`; `F` is the configured
+/// representation of a child frame. By default `F = Self`; a heterogeneous
+/// composition instead uses its private stack-item type as `F`.
 ///
-/// - a **member** — an individual walker ([`BlockFrame`](crate::BlockFrame),
-///   [`CallFrame`](crate::CallFrame), a dialect's own frame). It is one variant
-///   of `F` and names its successors in `F`, re-wrapping itself through the
-///   relevant `*FrameBuild` hook. Members are generic over `F`, so the same
-///   walker composes into any language's frame type.
-/// - a **universe** — a language's total frame enum. It implements
-///   `Frame<I, Self>` when it is the stack's element type, and stays generic
-///   over `F` so that it can *also* be embedded in a larger enum (an
-///   instrumenting wrapper, or another language's frame type) without
-///   re-enumerating its variants.
+/// The closed `FrameStackItem` enum is an implementation detail that also
+/// implements this protocol: it dispatches to a member frame and maps that
+/// member's `FrameEffect<Self, C, FrameStackItem>` into
+/// `FrameEffect<FrameStackItem, C, FrameStackItem>`. It is not a second kind of
+/// frame protocol.
 ///
-/// [`drive_frames`] bounds on `F: Frame<I, F>`: the stack's element type must be
-/// a universe — a type able to represent every frame that can appear on it.
-pub trait Frame<I: FrameEngine, F>: Sized {
+/// [`drive_frames`] requires the stack element `F` to use itself as its child
+/// representation,
+/// because every value placed on that homogeneous stack has type `F`.
+pub trait Frame<I: FrameEngine, F = Self>: Sized {
     /// The completion payload this frame family bubbles to parents/root.
     type Completion;
 
     /// Do this frame's next unit of work.
-    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Self::Completion, F>, I::Error>;
 
     /// A pushed child finished with no payload.
-    fn resume_done_into(self, interp: &mut I)
-    -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+    fn resume_done_into(
+        self,
+        interp: &mut I,
+    ) -> Result<FrameEffect<Self, Self::Completion, F>, I::Error>;
 
     /// A pushed child finished with a completion payload.
     fn resume_into(
         self,
         completion: Self::Completion,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Self::Completion>, I::Error>;
+    ) -> Result<FrameEffect<Self, Self::Completion, F>, I::Error>;
 }
 
 /// Shared frame-stepping loop.
@@ -237,8 +273,10 @@ pub trait CFGQueries: BlockQueries {
 /// Deliberately not on [`BlockQueries`] (whose name promises read-only) and
 /// deliberately not public: it is frame-internal mechanics, blanket-implemented
 /// for every engine with both capabilities, so a frame that binds a block entry
-/// spells its requirement honestly as `Env + BlockQueries`.
-pub(crate) trait BlockBinding: Env + BlockQueries {
+/// spells its requirement honestly as `Env<Anchor = SSAValue> + BlockQueries`.
+/// It builds on [`SSABinding`] rather than [`Env`] directly, because a block's
+/// parameters are SSA slots.
+pub(crate) trait BlockBinding: SSABinding + BlockQueries {
     /// Positionally bind a block's parameters to incoming actuals in `index`,
     /// checking arity.
     fn bind_block_args(
@@ -263,7 +301,7 @@ pub(crate) trait BlockBinding: Env + BlockQueries {
     }
 }
 
-impl<T: Env + BlockQueries> BlockBinding for T {}
+impl<T: SSABinding + BlockQueries> BlockBinding for T {}
 
 /// Structural/scheduling queries needed to traverse a
 /// [`DiGraph`](kirin_ir::DiGraph) body.
@@ -276,9 +314,9 @@ pub trait DiGraphQueries: Interp {
     /// yields). Errors on cyclic digraphs.
     ///
     /// Digraph bodies are opt-in: an engine that never walks one inherits this
-    /// rejection rather than inventing a schedule, the same way
-    /// [`FrameBuild::from_ungraph_entry`](crate::FrameBuild::from_ungraph_entry)
-    /// rejects a callable `UnGraph` without a compiler-supplied policy.
+    /// rejection rather than inventing a schedule, the same way the default
+    /// [`CallBodyTraversal`](crate::CallBodyTraversal) rejects a callable
+    /// `UnGraph` without a compiler-supplied policy.
     fn digraph_walk_plan(
         &self,
         stage: CompileStage,
@@ -291,40 +329,57 @@ pub trait DiGraphQueries: Interp {
     }
 }
 
-/// Engine services used by [`CallFrame`](crate::CallFrame): activation storage,
-/// linking, and callable-entry dispatch.
+/// Engine services a call boundary needs beyond *using* an activation:
+/// creating and retiring one, and discovering the callee's body.
+///
+/// A **sibling** of [`Env`], not a subtrait of it. The two answer
+/// different questions — "what does an access to this activation mean?" versus
+/// "where do activations come from, and whose body am I entering?" — so neither
+/// silently drags the other in, and each frame states exactly which it
+/// consumes. [`CallFrame`](crate::CallFrame) consumes both, and says so:
+/// `I: CallServices + Env<Anchor = SSAValue>`. A frame that only reads and writes
+/// (`ScfForFrame`, `BlockCursor::write_child_results`) names [`Env`]
+/// alone and claims no lifecycle it never exercises.
+///
+/// `alloc_env` and `free_env` do stay together: the standard `CallFrame`
+/// consumes them as a pair, and their pairing is a safety property — an
+/// `alloc_env` without its matching `free_env` is a leak, a second `free_env` a
+/// double free. Splitting *those* would let an engine offer half a lifecycle.
+/// [`resolve_callee`](Self::resolve_callee) and
+/// [`discover_body`](Self::discover_body) are the linker-plus-target-stage body
+/// discovery protocol; they carry no value product, and their mechanism lives
+/// in [`linker`](super::linker) — selecting identity is the
+/// [`Linker`](crate::Linker)'s job, reading structure is IR's.
 ///
 /// **[`CallFrame`](crate::CallFrame) still owns the calling convention** — the
 /// order of operations, which completions are legal, and freeing the activation
 /// exactly once. This trait only supplies the primitives it calls.
 ///
-/// Kept whole on purpose: the standard `CallFrame` consumes all four together,
-/// and their pairing is a safety property — an `alloc_env` without its matching
-/// `free_env` is a leak, a second `free_env` a double free. Splitting them into
-/// separate capabilities would let an engine offer half a call convention.
+/// Linking selects a target; discovery reads its body from the authoritative
+/// specialization record without storing a redundant target/body pair.
+/// Built-in engines delegate discovery to [`LinkTarget::body`]; custom
+/// implementations must preserve the same lookup contract. The trait does not
+/// enforce that relationship. [`CallFrame`](crate::CallFrame) reaches the IR
+/// through these services without needing direct pipeline access.
 ///
 /// Notably *not* required by abstract dataflow: forward abstract interpretation
 /// summarizes a call instead of descending into it, so
-/// [`ForwardDataflowFrameEngine`] does not extend this trait.
-pub trait CallServices: Env {
+/// [`ForwardDataflowFrameEngine`] requires [`Env`] and not this trait.
+pub trait CallServices: Interp {
     /// Allocate a fresh SSA activation record.
     fn alloc_env(&mut self) -> EnvIndex;
     /// Free an activation record.
     fn free_env(&mut self, index: EnvIndex) -> Result<(), Self::Error>;
-    /// Resolve a callee to a concrete function target via the engine's linker.
-    fn resolve_call(
+    /// Resolve a callee to the stage and specialization selected by the linker.
+    fn resolve_callee(
         &self,
-        stage: CompileStage,
+        lookup_stage: CompileStage,
         callee: &Callee,
-    ) -> Result<FunctionTarget, Self::Error>;
-    /// Build the [`CallableBody`] a callable statement enters on invocation.
-    fn enter_function(
-        &mut self,
-        stage: CompileStage,
-        body: Statement,
-        args: Product<Self::Value>,
-        index: EnvIndex,
-    ) -> Result<CallableBody<Self::Value>, Self::Error>;
+    ) -> Result<LinkTarget, Self::Error>;
+    /// Discover `target`'s value-independent callable body in its own stage.
+    /// Implementations must read the target specialization's authoritative
+    /// definition, preserving the lookup and error behavior of [`LinkTarget::body`].
+    fn discover_body(&self, target: &LinkTarget) -> Result<Body, Self::Error>;
 }
 
 /// An interpreter engine capable of running the complete standard **concrete**
@@ -332,18 +387,25 @@ pub trait CallServices: Env {
 ///
 /// This is an umbrella, not a definition — it adds no methods and is
 /// [blanket-implemented](#impl-ForwardFrameEngine-for-T) for any engine
-/// providing the four components. Use it at the *universe* level, where a total
-/// frame enum's engine must support the union of all its variants
-/// ([`StandardFrame`](crate::StandardFrame) and downstream frame enums do).
+/// providing the five components. Use it at the *composition* level, where the
+/// engine driving a configured `FrameStackItem` enum must support the union of
+/// all its variants.
 /// Individual member frames should bound only the components they use, so a
 /// partial engine can still run them.
+///
+/// [`Env`] and [`CallServices`] are both listed because they are
+/// independent siblings: the standard concrete universe both *uses* activations
+/// (every walker) and *creates* them (`CallFrame`), and neither trait implies
+/// the other. The env is pinned to `Anchor = SSAValue`: every walker in this
+/// universe binds block parameters and result slots, so the umbrella would not
+/// actually cover its variants with a free anchor.
 pub trait ForwardFrameEngine:
-    StatementDispatch + CFGQueries + DiGraphQueries + CallServices
+    StatementDispatch + Env<Anchor = SSAValue> + CFGQueries + DiGraphQueries + CallServices
 {
 }
 
 impl<T> ForwardFrameEngine for T where
-    T: StatementDispatch + CFGQueries + DiGraphQueries + CallServices
+    T: StatementDispatch + Env<Anchor = SSAValue> + CFGQueries + DiGraphQueries + CallServices
 {
 }
 
@@ -355,8 +417,8 @@ impl<T> ForwardFrameEngine for T where
 /// [`DiGraphQueries`] — the traversal it genuinely shares — and **deliberately
 /// not** [`CallServices`] or [`CFGQueries`]. An abstract engine does not descend
 /// into a callee (it [summarizes](Self::summarize_call) the call), so requiring
-/// it to expose concrete activation allocation, activation cleanup,
-/// `resolve_call`, and `enter_function` would be demanding a call convention it
+/// it to expose activation allocation, activation cleanup, and
+/// `resolve_callee`/`discover_body` would be demanding a call convention it
 /// never performs. `cfg_entry` is likewise absent: the forward abstract engine
 /// reaches a callable body's entry block through [`Owner`](crate::Owner) seeding
 /// in the fixpoint driver, not by asking a frame to enter a CFG. A frame that
@@ -375,7 +437,7 @@ impl<T> ForwardFrameEngine for T where
 /// custom frame cannot reorder it and break soundness. Frames only decide
 /// *traversal*: which frame to step next.
 pub trait ForwardDataflowFrameEngine:
-    Env + StatementDispatch + BlockQueries + DiGraphQueries
+    Env<Anchor = SSAValue> + StatementDispatch + BlockQueries + DiGraphQueries
 {
     /// The key under which function entry/return summaries are tracked
     /// (the analysis [`CallContext::Key`](crate::CallContext::Key)).

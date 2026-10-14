@@ -37,10 +37,10 @@
 //! # Two-persona contract
 //!
 //! - **Dialect authors** implement [`Interpretable<I, Semantics>`](Interpretable)
-//!   per semantic key (and [`FunctionEntry`] for callable statements). A rule
+//!   per semantic key; callable bodies are declared through `kirin_ir::HasCallableBody`. A rule
 //!   receives the engine `interp` directly. Shape-generic mechanics live on
 //!   the engine traits (read/write on [`SparseForwardInterp`];
-//!   fact/raise-fact on [`SparseBackwardInterp`]; opaque point-state access on
+//!   fact/raise-fact on [`SparseBackwardInterp`]; insert/remove point facts on
 //!   [`DenseBackwardInterp`]); semantics-specific vocabulary lives in helper
 //!   traits — demand rules bind [`DemandInterp`]
 //!   (`demand`/`is_demanded`/`demand_uses_if_observable`), classic-liveness rules bind
@@ -64,43 +64,29 @@ mod facts;
 mod fixpoint;
 mod semantics;
 
-// The shared chassis: engine trait + dialect dispatch, effect types,
-// activation storage, calling conventions, errors, and IR queries.
 pub use self::core::{
-    AbstractInterpreter, Env, GraphWalkPlan, Interp, InterpLocation, SparseForwardInterp,
+    AbstractInterpreter, GraphWalkPlan, Interp, InterpLocation, SparseForwardInterp,
 };
-pub use self::core::{Body, CallEffect, CallableBody, Callee, Edge, SparseForwardEffect};
-pub use self::core::{BranchCondition, HasProductValue, expect_single};
-pub use self::core::{CrossStageLinker, FunctionTarget, Linker, SameStageLinker};
-pub use self::core::{EnvIndex, EnvStackStore, Store};
-pub use self::core::{FunctionEntry, InterpDispatch, Interpretable};
-pub use self::core::{InterpreterError, StageQuery, TerminatorArgs};
-// The shared, direction-neutral frame protocol: `Frame`/`FrameEffect`/
-// `drive_frames` (the frame-stack driver loop) anchored on `FrameEngine`, the
-// minimal engine contract. On top of it, the forward engine capabilities a frame
-// can require: one narrowly scoped component trait per kind of traversal
-// (`StatementDispatch`, `BlockQueries`, `CFGQueries`, `DiGraphQueries`,
-// `CallServices`), so a member frame bounds only what it consumes, plus two
-// whole-universe umbrellas — `ForwardFrameEngine` (full standard concrete
-// surface) and `ForwardDataflowFrameEngine` (standard forward-abstract surface).
 pub use self::core::{
     BlockQueries, CFGQueries, CallServices, DiGraphQueries, ForwardDataflowFrameEngine,
     ForwardFrameEngine, Frame, FrameEffect, FrameEngine, StatementDispatch, drive_frames,
 };
-
-// Concrete execution engine + the concrete standard frames: the
-// representation walkers (`BlockFrame`/`CFGFrame`/`DiGraphFrame` — `UnGraph`
-// traversal is a dialect/compiler policy supplied through
-// `FrameBuild::from_ungraph_entry`) and the `CallFrame` call boundary.
+pub use self::core::{BranchCondition, HasProductValue, expect_single};
+pub use self::core::{CallEffect, Callee, Edge, SparseForwardEffect};
+pub use self::core::{CrossStageLinker, LinkTarget, Linker, SameStageLinker};
+pub use self::core::{Env, EnvIndex, EnvStore, SSABinding};
+pub use self::core::{InterpDispatch, Interpretable};
+pub use self::core::{InterpreterError, StageQuery, TerminatorArgs};
 pub use engines::concrete::{
-    BlockFrame, BodyFrameEntry, CFGFrame, CallBodyFramePolicy, CallFrame, Completion,
-    ConcreteInterpreter, DefaultBodyFrames, DiGraphFrame, FrameBuild, StandardFrame, UnGraphEntry,
+    BlockFrame, BodyFrameEntry, CFGFrame, CallBodyTraversal, CallFrame, CallRequest, Completion,
+    ConcreteInterpreter, ConcreteInterpreterCore, DefaultCallBodyTraversal, DiGraphFrame,
 };
+pub use kirin_ir::Body;
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
 pub use engines::sparse_forward::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-    AbstractFrameBuild, CallContext, ContextInsensitive, Owner, SparseForwardInterpreter,
-    SparseForwardTransfer, StandardAbstractFrame, WideningStrategy,
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, CallContext,
+    ContextInsensitive, Owner, SparseForwardInterpreter, SparseForwardTransfer,
+    StandardAbstractFrame, WideningStrategy,
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{
@@ -112,8 +98,8 @@ pub use engines::sparse_backward::{
 pub use engines::dense_backward::{
     BlockLiveness, ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver,
     DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter,
-    DenseBackwardProfile, DenseBackwardState, DenseBackwardTransfer, DenseBlockFrame,
-    DenseBlockMode, DenseFrameBuild, PointFacts, StandardDenseBackwardFrame, SuccessorEdge,
+    DenseBackwardProfile, DenseBackwardTransfer, DenseBlockFrame, DenseBlockMode, PointFacts,
+    SuccessorEdge,
 };
 
 // Lattice anchors (*where* facts attach), scope qualification, and the
@@ -138,15 +124,13 @@ pub use semantics::{
 // source of value/error/effect/semantics; a [`FixpointProfile`] adds only the
 // owner-summary types.
 pub use fixpoint::{
-    BackwardSummaryDeps, FixpointPhase, FixpointProfile, ForwardSummaryDeps, OwnerSemantics,
+    BackwardSummaryDeps, FixpointPhase, FixpointProfile, ForwardSummaryDeps, OwnerAnalysis,
     OwnerSummaryDeps, SimpleFixpointInterpreter, StandardFixpointInterpreter, Summary,
     SummaryDependencies, SummaryDependency, SummaryDependencyIndex, SummaryEffect, WorkItem,
 };
 
 #[cfg(feature = "derive")]
-pub use kirin_derive_interpreter::{
-    AbstractFrameBuild, DenseFrameBuild, FrameBuild, FunctionEntry, InterpDispatch, Interpretable,
-};
+pub use kirin_derive_interpreter::{Frame, InterpDispatch, Interpretable};
 
 /// Everything a dialect author needs to implement statement semantics —
 /// forward evaluation (`Interpretable<I, ForwardEval>`), backward demand
@@ -155,10 +139,10 @@ pub use kirin_derive_interpreter::{
 /// (`impl SemanticKey for MyKey { type Shape = ...; }`).
 pub mod dialect {
     pub use crate::{
-        AnalysisShape, Body, BranchCondition, CallEffect, CallableBody, Callee, ClassicLiveness,
+        AnalysisShape, Body, BranchCondition, CallEffect, Callee, ClassicLiveness,
         ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, DenseBackwardInterp,
-        DenseBackwardShape, DenseForwardShape, Edge, ForwardEval, FunctionEntry, HasProductValue,
-        Interp, Interpretable, InterpreterError, PointFacts, SemanticKey, SparseBackwardEffect,
+        DenseBackwardShape, DenseForwardShape, Edge, ForwardEval, HasProductValue, Interp,
+        Interpretable, InterpreterError, PointFacts, SemanticKey, SparseBackwardEffect,
         SparseBackwardInterp, SparseBackwardShape, SparseForwardEffect, SparseForwardInterp,
         SparseForwardShape, StrongDemand, SuccessorEdge,
     };
@@ -168,16 +152,15 @@ pub mod dialect {
 pub mod engine {
     pub use crate::{
         AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
-        AbstractFrameBuild, AbstractInterpreter, BlockFrame, BlockQueries, BodyFrameEntry,
-        CFGFrame, CFGQueries, CallBodyFramePolicy, CallContext, CallFrame, CallServices, Callee,
-        Completion, ConcreteInterpreter, ContextInsensitive, CrossStageLinker, DefaultBodyFrames,
-        DenseBackwardCompletion, DenseBackwardFrameEngine, DenseBackwardInterp,
-        DenseBackwardInterpreter, DenseBackwardState, DenseBlockFrame, DenseFrameBuild,
-        DiGraphFrame, DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame,
-        FrameBuild, FrameEffect, FrameEngine, FunctionTarget, Interp, InterpDispatch,
-        InterpreterError, Linker, SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter,
-        SparseForwardInterp, SparseForwardInterpreter, StandardAbstractFrame,
-        StandardDenseBackwardFrame, StandardFrame, StatementDispatch, UnGraphEntry,
-        WideningStrategy, drive_frames, expect_single,
+        AbstractInterpreter, BlockFrame, BlockQueries, BodyFrameEntry, CFGFrame, CFGQueries,
+        CallBodyTraversal, CallContext, CallFrame, CallRequest, CallServices, Callee, Completion,
+        ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive, CrossStageLinker,
+        DefaultCallBodyTraversal, DenseBackwardCompletion, DenseBackwardFrameEngine,
+        DenseBackwardInterp, DenseBackwardInterpreter, DenseBlockFrame, DiGraphFrame,
+        DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame, FrameEffect,
+        FrameEngine, Interp, InterpDispatch, InterpreterError, LinkTarget, Linker, SSABinding,
+        SameStageLinker, SparseBackwardInterp, SparseBackwardInterpreter, SparseForwardInterp,
+        SparseForwardInterpreter, StandardAbstractFrame, StatementDispatch, WideningStrategy,
+        drive_frames, expect_single,
     };
 }

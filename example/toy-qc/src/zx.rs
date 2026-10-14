@@ -1,7 +1,7 @@
 use crate::types::QubitType;
 use kirin::prelude::*;
 
-/// Function body holding an UnGraph for ZX-stage programs.
+/// Function definition whose body is an UnGraph for ZX-stage programs.
 /// ZX calculus diagrams are undirected graphs: wires are edges
 /// and spiders/boxes are nodes connected by those edges.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]

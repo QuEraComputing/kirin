@@ -76,7 +76,7 @@ fn create_test_function() -> (
     let f = stage
         .specialize()
         .staged_func(staged_function)
-        .body(fdef)
+        .definition(fdef)
         .new()
         .unwrap();
 

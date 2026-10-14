@@ -19,9 +19,9 @@
 //! - **[`DenseBackwardTransfer`]** is the [`Interp`] delegate: pipeline access,
 //!   the real dispatch location, and the *current point state* the dialect
 //!   rules transform through the shape-generic
-//!   [`DenseBackwardInterp::point_state_mut`] (liveness rules use the
-//!   [`ClassicLivenessInterp`] `gen_live`/`kill_def` spellings, which is where
-//!   "a state is a set of values" lives — the engine never assumes it).
+//!   [`DenseBackwardInterp::insert_fact`] / [`DenseBackwardInterp::remove_fact`]
+//!   (liveness rules use the [`ClassicLivenessInterp`] `gen_live`/`kill_def`
+//!   spellings).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the block-boundary
 //!   summaries ([`BlockLiveness`], keyed by [`Scoped`] blocks), the block
 //!   worklist, and [`BackwardSummaryDeps`] (successor changed → reanalyse
@@ -49,18 +49,19 @@ use std::marker::PhantomData;
 
 use kirin_ir::{
     Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, SSAValue,
-    StageMeta, Statement,
+    StageMeta, Statement, Symbol,
 };
 
-use super::frames::{DenseBlockFrame, DenseFrameBuild};
+use super::frames::DenseBlockFrame;
 use crate::Body;
 use crate::core::query;
 use crate::engines::sparse_backward::BodyScope;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
-    FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError,
-    OwnerSemantics, ProgramPoint, Scoped, StageQuery, StandardFixpointInterpreter, Summary,
-    SummaryDependency, SummaryDependencyIndex, SummaryEffect, TerminatorArgs,
+    AbstractInterpreter, BackwardSummaryDeps, Callee, ClassicLiveness, DenseBackwardSemantic,
+    EnvIndex, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
+    InterpreterError, Linker, OwnerAnalysis, ProgramPoint, SameStageLinker, Scoped, StageQuery,
+    StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
+    TerminatorArgs,
 };
 
 // ===========================================================================
@@ -89,35 +90,10 @@ pub enum DenseBackwardEffect<F> {
     Push { frame: F },
 }
 
-/// How a dense backward state moves across a control edge or out of a scope.
+/// The point-state contract: a dense backward state is a set of SSA values.
 ///
-/// A dense backward state names its facts by [`SSAValue`]. Crossing an edge
-/// renames them — the target's parameters become the edge's arguments; leaving
-/// a scope drops them. Neither operation says what a fact *is*, which is why
-/// this is the only state contract the engine and the dialect frames need:
-/// [`Lattice`] merges at join points, this moves facts between vocabularies.
-///
-/// Pass-through renaming (keep facts the rename does not cover) is the caller's
-/// choice, spelled `state.rename(p, a).join(&state.forget(p))` — the CFG edge
-/// transfer wants it, a loop back-edge does not.
-pub trait DenseBackwardState: Lattice + Sized {
-    /// Only the facts named by `params`, renamed to the matching `args`.
-    ///
-    /// A `params[i]` with no `args[i]` contributes nothing.
-    fn rename(&self, params: &[SSAValue], args: &[SSAValue]) -> Self;
-
-    /// Everything except the facts named by `values`.
-    fn forget(&self, values: &[SSAValue]) -> Self;
-}
-
-/// The point-state contract of [`ClassicLiveness`]: its state is a set of live
-/// SSA values.
-///
-/// This is *semantics*, not shape — it backs
-/// [`gen_live`](ClassicLivenessInterp::gen_live) /
-/// [`kill_def`](ClassicLivenessInterp::kill_def) and is required by nothing in
-/// the engine or the frames. A different dense-backward key brings its own
-/// state contract and implements only [`DenseBackwardState`].
+/// Implemented by the analysis's state type (e.g. `kirin_liveness::LiveSet`);
+/// the join for merge points comes from [`Lattice`] (set union for liveness).
 pub trait PointFacts {
     /// Insert `value`; `true` if newly added.
     fn insert(&mut self, value: SSAValue) -> bool;
@@ -143,15 +119,11 @@ pub trait DenseBackwardInterp:
     /// [`DenseBackwardEffect::Push`]. Ordinary dialects never name it.
     type Frame;
 
-    /// The point state being transformed: the state *after* the statement on
-    /// entry to a rule, *before* it on exit.
-    ///
-    /// The engine hands the state over opaquely; how a rule transforms it is
-    /// the semantics' business.
-    fn point_state(&self) -> &Self::Value;
+    /// Insert `value` into the current point state.
+    fn insert_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
 
-    /// The point state being transformed, mutably.
-    fn point_state_mut(&mut self) -> &mut Self::Value;
+    /// Remove `value` from the current point state.
+    fn remove_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error>;
 }
 
 /// [`ClassicLiveness`]'s helper vocabulary on top of the shape-generic
@@ -163,22 +135,16 @@ pub trait DenseBackwardInterp:
 /// Pinned to `Semantics = ClassicLiveness` via the supertrait (rustc
 /// elaborates supertraits, so rules bounding `I: ClassicLivenessInterp` need
 /// no extra clauses), and blanket-implemented for every classic-liveness
-/// dense-backward engine. [`PointFacts`] rides in the same supertrait as an
-/// associated-type bound for the same reason: elaboration means liveness rules
-/// inherit it and never spell it.
-pub trait ClassicLivenessInterp:
-    DenseBackwardInterp + Interp<Semantics = ClassicLiveness, Value: PointFacts>
-{
+/// dense-backward engine.
+pub trait ClassicLivenessInterp: DenseBackwardInterp + Interp<Semantics = ClassicLiveness> {
     /// Gen: mark `value` live at the current point (a use).
     fn gen_live(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error> {
-        self.point_state_mut().insert(value.into());
-        Ok(())
+        self.insert_fact(value)
     }
 
     /// Kill: remove `value` (a definition) from the current point state.
     fn kill_def(&mut self, value: impl Into<SSAValue>) -> Result<(), Self::Error> {
-        self.point_state_mut().remove(value.into());
-        Ok(())
+        self.remove_fact(value)
     }
 
     /// The classic (weak) liveness transfer for an ordinary statement: kill
@@ -198,10 +164,8 @@ pub trait ClassicLivenessInterp:
     }
 }
 
-impl<I> ClassicLivenessInterp for I
-where
-    I: DenseBackwardInterp + Interp<Semantics = ClassicLiveness>,
-    I::Value: PointFacts,
+impl<I> ClassicLivenessInterp for I where
+    I: DenseBackwardInterp + Interp<Semantics = ClassicLiveness>
 {
 }
 
@@ -280,18 +244,20 @@ where
 impl<'ir, S, V, E, F, Sem> DenseBackwardInterp for DenseBackwardTransfer<'ir, S, V, E, F, Sem>
 where
     S: StageMeta,
-    V: Clone,
+    V: Clone + PointFacts,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
     type Frame = F;
 
-    fn point_state(&self) -> &V {
-        &self.state
+    fn insert_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
+        self.state.insert(value.into());
+        Ok(())
     }
 
-    fn point_state_mut(&mut self) -> &mut V {
-        &mut self.state
+    fn remove_fact(&mut self, value: impl Into<SSAValue>) -> Result<(), E> {
+        self.state.remove(value.into());
+        Ok(())
     }
 }
 
@@ -456,7 +422,7 @@ pub trait DenseBackwardFrameEngine: Interp<Effect = DenseBackwardEffect<Self::Fr
 impl<'ir, S, V, E, F, Sem> DenseBackwardFrameEngine for DenseBackwardDriver<'ir, S, V, E, F, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
+    V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
@@ -539,15 +505,21 @@ where
                 continue;
             };
             let params = query::block_params(self.inner().pipeline(), stage, edge.target)?;
-            // The successor's entry state in this block's vocabulary: its
-            // parameters renamed to the edge's arguments, joined with the
-            // facts the rename does not cover — live-ins that are not
-            // parameters are dominated direct cross-block uses and pass
-            // through unchanged.
-            let entry = &summary.live_in;
-            let mapped = entry
-                .rename(&params, &edge.args)
-                .join(&entry.forget(&params));
+            let mut mapped = V::bottom();
+            for value in summary.live_in.values() {
+                match params.iter().position(|param| *param == value) {
+                    Some(index) => {
+                        if let Some(arg) = edge.args.get(index) {
+                            mapped.insert(*arg);
+                        }
+                    }
+                    // A live-in that is not a parameter of the successor is a
+                    // dominated direct cross-block use: pass it through.
+                    None => {
+                        mapped.insert(value);
+                    }
+                }
+            }
             out = out.join(&mapped);
         }
 
@@ -558,26 +530,26 @@ where
 }
 
 // ===========================================================================
-// Owner semantics: one block owner = one backward walk
+// Owner analysis: one block owner = one backward walk
 // ===========================================================================
 
-struct DenseBackwardSemantics;
+struct DenseBackwardOwnerAnalysis;
 
 impl<'ir, S, V, E, F, Sem>
-    OwnerSemantics<
+    OwnerAnalysis<
         DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         Scoped<BodyScope, Block>,
         BlockLiveness<V>,
         F,
         DenseBackwardCompletion<V>,
         E,
-    > for DenseBackwardSemantics
+    > for DenseBackwardOwnerAnalysis
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
+    V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
-    F: DenseFrameBuild<V, E>,
+    F: From<DenseBlockFrame<V, E>>,
 {
     fn bottom_summary(
         &mut self,
@@ -597,7 +569,7 @@ where
         // Each owner walk starts from an empty exit state; the terminator's
         // absorbed edges seed the real live-out.
         interp.replace_state(V::bottom());
-        Ok(F::from_block(DenseBlockFrame::cfg_owner(stage, owner.item)))
+        Ok(DenseBlockFrame::cfg_owner(stage, owner.item).into())
     }
 
     fn complete_owner(
@@ -626,8 +598,8 @@ where
 ///
 /// ```ignore
 /// let mut analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
-/// analysis.analyze(stage, cfg)?;
-/// let point = Scoped::new((stage, Body::CFG(cfg)), ProgramPoint::BlockEntry(block));
+/// let scope = analysis.analyze(stage, callee)?;
+/// let point = Scoped::new(scope, ProgramPoint::BlockEntry(block));
 /// let live_in = analysis.point_facts(point);
 /// ```
 pub struct DenseBackwardInterpreter<
@@ -635,7 +607,8 @@ pub struct DenseBackwardInterpreter<
     S: StageMeta,
     V,
     E = InterpreterError,
-    F = crate::StandardDenseBackwardFrame<V, E>,
+    F = DenseBlockFrame<V, E>,
+    Lk = SameStageLinker,
     Sem = ClassicLiveness,
 > where
     V: Clone + PartialEq + Lattice,
@@ -644,9 +617,10 @@ pub struct DenseBackwardInterpreter<
     Sem: DenseBackwardSemantic,
 {
     driver: DenseBackwardDriver<'ir, S, V, E, F, Sem>,
+    linker: Lk,
 }
 
-impl<'ir, S, V, E, F, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Sem>
+impl<'ir, S, V, E, F, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, SameStageLinker, Sem>
 where
     S: StageMeta,
     V: Clone + PartialEq + Lattice + HasBottom,
@@ -661,6 +635,26 @@ where
                 (),
                 BackwardSummaryDeps::new(),
             ),
+            linker: SameStageLinker,
+        }
+    }
+}
+
+impl<'ir, S, V, E, F, Lk, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Lk, Sem>
+where
+    S: StageMeta,
+    V: Clone + PartialEq + Lattice + HasBottom,
+    E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
+{
+    /// Replace the calling convention used by the canonical callable root.
+    pub fn with_linker<Lk2>(
+        self,
+        linker: Lk2,
+    ) -> DenseBackwardInterpreter<'ir, S, V, E, F, Lk2, Sem> {
+        DenseBackwardInterpreter {
+            driver: self.driver,
+            linker,
         }
     }
 
@@ -711,14 +705,15 @@ where
     }
 }
 
-impl<'ir, S, V, E, F, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Sem>
+impl<'ir, S, V, E, F, Lk, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Lk, Sem>
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom + DenseBackwardState,
+    V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
     E: From<InterpreterError>,
+    Lk: Linker<S>,
     Sem: DenseBackwardSemantic,
     F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, F, Completion = DenseBackwardCompletion<V>>
-        + DenseFrameBuild<V, E>,
+        + From<DenseBlockFrame<V, E>>,
 {
     /// The blocks directly selected as fixpoint owners for `body`.
     ///
@@ -732,22 +727,60 @@ where
             .map_err(E::from)
     }
 
-    /// Run the block-boundary fixpoint over `cfg` in `stage`: seed every
-    /// CFG block (a backward analysis must visit them all) and drain the
-    /// worklist; dependencies are discovered from the terminators' edges.
-    pub fn analyze(&mut self, stage: CompileStage, body: impl Into<Body>) -> Result<(), E> {
-        let body = body.into();
-        let scope = (stage, body);
-        let blocks = self.direct_body_blocks(stage, body)?;
+    /// Resolve a stage and function by name, then seed and solve its blocks.
+    pub fn analyze_by_name(
+        &mut self,
+        stage_name: &str,
+        function_name: &str,
+    ) -> Result<BodyScope, E> {
+        let stage = self
+            .driver
+            .inner()
+            .pipeline()
+            .stage_by_name(stage_name)
+            .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
+        let function = self
+            .driver
+            .inner()
+            .pipeline()
+            .lookup_function_by_name(function_name)
+            .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
+        self.analyze(stage, Callee::Function(function))
+    }
+
+    /// Seed and solve a callable body named by a stage-local symbol.
+    pub fn analyze_by_symbol(
+        &mut self,
+        stage: CompileStage,
+        symbol: Symbol,
+    ) -> Result<BodyScope, E> {
+        self.analyze(stage, symbol.into())
+    }
+
+    /// Resolve `callee`, seed every block selected by its CFG or Block body,
+    /// and drain the block-boundary worklist. Dependencies are discovered from
+    /// terminator edges; unsupported graph roots fail before solving.
+    pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
+        let pipeline = self.driver.inner().pipeline();
+        let target = self.linker.resolve(pipeline, stage, &callee)?;
+        let body = target.body(pipeline)?;
+        let scope = (target.stage, body);
+        let blocks = self.direct_body_blocks(target.stage, body)?;
         let owners: Vec<Scoped<BodyScope, Block>> = blocks
             .iter()
             .copied()
             .map(|block| Scoped::new(scope, block))
             .collect();
         let pipeline = self.driver.inner().pipeline();
-        self.driver = Self::new(pipeline).driver;
+        self.driver = StandardFixpointInterpreter::with_dependency_index(
+            DenseBackwardTransfer::new(pipeline),
+            FactStore::new(),
+            (),
+            BackwardSummaryDeps::new(),
+        );
 
-        let mut semantics = DenseBackwardSemantics;
-        self.driver.solve_many(&mut semantics, owners)
+        let mut owner_analysis = DenseBackwardOwnerAnalysis;
+        self.driver.solve_many(&mut owner_analysis, owners)?;
+        Ok(scope)
     }
 }

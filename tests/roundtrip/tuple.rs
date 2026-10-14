@@ -61,7 +61,7 @@ fn test_new_tuple_pipeline_roundtrip() {
     let input = r#"
 stage @test fn @main(i32, i32) -> i32;
 
-specialize @test fn @main(i32, i32) -> i32 {
+specialize @test fn @main(i32, i32) -> i32 cfg {
   ^entry(%x: i32, %y: i32) {
     %t = new_tuple(%x, %y) -> i32;
     ret %t;
@@ -76,7 +76,7 @@ fn test_unpack_pipeline_roundtrip() {
     let input = r#"
 stage @test fn @main(i32) -> i32;
 
-specialize @test fn @main(i32) -> i32 {
+specialize @test fn @main(i32) -> i32 cfg {
   ^entry(%t: i32) {
     %a, %b = unpack %t -> i32, i32;
     ret %a;
@@ -91,7 +91,7 @@ fn test_new_tuple_then_unpack_pipeline_roundtrip() {
     let input = r#"
 stage @test fn @main(i32, i32) -> i32;
 
-specialize @test fn @main(i32, i32) -> i32 {
+specialize @test fn @main(i32, i32) -> i32 cfg {
   ^entry(%x: i32, %y: i32) {
     %t = new_tuple(%x, %y) -> i32;
     %a, %b = unpack %t -> i32, i32;

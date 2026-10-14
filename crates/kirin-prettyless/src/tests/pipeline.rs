@@ -23,7 +23,11 @@ fn test_pipeline_function_print() {
         let block = ctx0.block().stmt(a).terminator(ret).new();
         let body = ctx0.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx0, body);
-        ctx0.specialize().staged_func(sf0).body(fdef).new().unwrap();
+        ctx0.specialize()
+            .staged_func(sf0)
+            .definition(fdef)
+            .new()
+            .unwrap();
     });
 
     // --- Stage B: a different version with two constants ---
@@ -48,7 +52,11 @@ fn test_pipeline_function_print() {
         let block = ctx1.block().stmt(a).stmt(b).stmt(c).terminator(ret).new();
         let body = ctx1.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx1, body);
-        ctx1.specialize().staged_func(sf1).body(fdef).new().unwrap();
+        ctx1.specialize()
+            .staged_func(sf1)
+            .definition(fdef)
+            .new()
+            .unwrap();
     });
 
     // Print the function across both stages
@@ -80,7 +88,11 @@ fn test_pipeline_unnamed_stage() {
         let block = ctx.block().stmt(a).terminator(ret).new();
         let body = ctx.cfg().add_block(block).new();
         let fdef = SimpleLanguage::op_function(ctx, body);
-        ctx.specialize().staged_func(sf).body(fdef).new().unwrap();
+        ctx.specialize()
+            .staged_func(sf)
+            .definition(fdef)
+            .new()
+            .unwrap();
     });
 
     // Should fall back to numeric symbol form: "stage @0"

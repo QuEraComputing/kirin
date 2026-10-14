@@ -1,6 +1,6 @@
 ---
 source: crates/kirin-derive-ir/src/tests/dialect.rs
-expression: code
+expression: generate_dialect_code(input)
 ---
 #[automatically_derived]
 impl<'a> ::kirin::ir::HasArguments<'a> for WrapperOp {
@@ -354,6 +354,16 @@ impl ::kirin::ir::HasSignature<Self> for WrapperOp {
     fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
         let Self(field_0) = self;
         <InnerOp as ::kirin::ir::HasSignature<InnerOp>>::signature(field_0)
+    }
+}
+#[automatically_derived]
+impl ::kirin::ir::HasCallableBody for WrapperOp
+where
+    InnerOp: ::kirin::ir::HasCallableBody,
+{
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        let Self(field_0) = self;
+        <InnerOp as ::kirin::ir::HasCallableBody>::callable_body(field_0)
     }
 }
 #[automatically_derived]

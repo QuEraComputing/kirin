@@ -1,6 +1,6 @@
 use kirin::prelude::*;
 
-/// Structural function-body statement used by function text parsing.
+/// Structural function-definition statement used by function text parsing.
 ///
 /// The `sig` field stores the function's type signature (`(T, T) -> T`),
 /// parsed from the format string. `derive(Dialect)` generates `HasSignature`
@@ -9,14 +9,9 @@ use kirin::prelude::*;
 #[kirin(builders, type = T)]
 #[chumsky(format = "fn {:name}{sig} {body}")]
 pub struct Function<T: CompileTimeValue> {
+    #[kirin(callable_body)]
     pub(crate) body: CFG,
     pub(crate) sig: Signature<T>,
     #[kirin(default)]
     marker: std::marker::PhantomData<T>,
-}
-
-impl<T: CompileTimeValue> HasCFGBody for Function<T> {
-    fn cfg(&self) -> &CFG {
-        &self.body
-    }
 }

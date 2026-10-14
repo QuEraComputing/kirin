@@ -510,3 +510,20 @@ impl ::kirin::ir::HasSignature<Self> for MixedWraps {
         }
     }
 }
+#[automatically_derived]
+impl ::kirin::ir::HasCallableBody for MixedWraps
+where
+    SimpleOp: ::kirin::ir::HasCallableBody,
+    InnerOp: ::kirin::ir::HasCallableBody,
+{
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        match self {
+            Self::Simple(field_0) => {
+                <SimpleOp as ::kirin::ir::HasCallableBody>::callable_body(field_0)
+            }
+            Self::Wrapped { inner, tag } => {
+                <InnerOp as ::kirin::ir::HasCallableBody>::callable_body(inner)
+            }
+        }
+    }
+}

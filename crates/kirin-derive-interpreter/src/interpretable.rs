@@ -139,7 +139,7 @@ fn validate_global_wrapper<L: kirin_derive_toolkit::ir::Layout>(
     Ok(())
 }
 
-pub fn parse_interpret_crate_path(input: &syn::DeriveInput) -> darling::Result<syn::Path> {
+pub fn parse_interpret_crate_path(input: &syn::DeriveInput) -> syn::Result<syn::Path> {
     let mut crate_path = None;
     for attr in &input.attrs {
         if !attr.path().is_ident("interpret") {

@@ -1,0 +1,5 @@
+error: #[wraps] delegates callable-body discovery; mark the body on the wrapped definition
+ --> tests/compile-fail/callable_body_on_wrapper.rs:6:16
+  |
+6 | struct Invalid(#[kirin(callable_body)] CFG);
+  |                ^

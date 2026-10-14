@@ -1,12 +1,12 @@
 stage @source fn @fib(i64) -> i64;
 
-specialize @source fn @fib(i64) -> i64 {
+specialize @source fn @fib(i64) -> i64 cfg {
   ^entry(%n: i64) {
     %one = constant 1 -> i64;
     %is_base = le %n, %one -> i64;
-    %result = if %is_base then ^base() {
+    %result = if %is_base then block ^base() {
       yield %n;
-    } else ^rec() {
+    } else block ^rec() {
       %two = constant 2 -> i64;
       %n1 = sub %n, %one -> i64;
       %n2 = sub %n, %two -> i64;

@@ -27,12 +27,12 @@ fn test_if_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %cond: i64) {
     %doubled = add %x, %x -> i64;
-    %r = if %cond then ^then() {
+    %r = if %cond then block ^then() {
       %r2 = add %doubled, %doubled -> i64;
-    } else ^else() {
+    } else block ^else() {
       %r3 = sub %doubled, %doubled -> i64;
     } -> i64;
   }
@@ -46,11 +46,11 @@ fn test_yield_in_if_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %cond: i64) {
-    %result = if %cond then ^then() {
+    %result = if %cond then block ^then() {
       yield %x;
-    } else ^else() {
+    } else block ^else() {
       yield %x;
     } -> i64;
   }
@@ -64,10 +64,10 @@ fn test_for_with_iter_args_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64, i64) -> i64 {
+specialize @test fn @main(i64, i64, i64) -> i64 cfg {
   ^entry(%lo: i64, %hi: i64, %s: i64) {
     %init = add %lo, %lo -> i64;
-    %sum = for %lo in %lo..%hi step %s iter_args(%init) do ^body(%i: i64, %acc: i64) {
+    %sum = for %lo in %lo..%hi step %s iter_args(%init) do block ^body(%i: i64, %acc: i64) {
       %next = add %acc, %i -> i64;
       yield %next;
     } -> i64;
@@ -83,9 +83,9 @@ fn test_for_no_iter_args_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64, i64) -> i64 {
+specialize @test fn @main(i64, i64, i64) -> i64 cfg {
   ^entry(%lo: i64, %hi: i64, %s: i64) {
-    %r = for %lo in %lo..%hi step %s iter_args() do ^body(%i: i64) {
+    %r = for %lo in %lo..%hi step %s iter_args() do block ^body(%i: i64) {
       yield %i;
     } -> i64;
     ret %r;
@@ -100,11 +100,11 @@ fn test_void_if_roundtrip() {
     let input = r#"
 stage @test fn @main(i64) -> i64;
 
-specialize @test fn @main(i64) -> i64 {
+specialize @test fn @main(i64) -> i64 cfg {
   ^entry(%cond: i64) {
-    if %cond then ^then() {
+    if %cond then block ^then() {
       yield;
-    } else ^else() {
+    } else block ^else() {
       yield;
     };
   }
@@ -118,11 +118,11 @@ fn test_multi_result_if_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64) -> i64 {
+specialize @test fn @main(i64, i64) -> i64 cfg {
   ^entry(%x: i64, %cond: i64) {
-    %a, %b = if %cond then ^then() {
+    %a, %b = if %cond then block ^then() {
       yield %x, %x;
-    } else ^else() {
+    } else block ^else() {
       yield %x, %x;
     } -> i64, i64;
   }
@@ -136,10 +136,10 @@ fn test_multi_accumulator_for_roundtrip() {
     let input = r#"
 stage @test fn @main(i64, i64, i64, i64) -> i64;
 
-specialize @test fn @main(i64, i64, i64, i64) -> i64 {
+specialize @test fn @main(i64, i64, i64, i64) -> i64 cfg {
   ^entry(%lo: i64, %hi: i64, %s: i64, %init2: i64) {
     %init1 = add %lo, %lo -> i64;
-    %r1, %r2 = for %lo in %lo..%hi step %s iter_args(%init1, %init2) do ^body(%i: i64, %acc1: i64, %acc2: i64) {
+    %r1, %r2 = for %lo in %lo..%hi step %s iter_args(%init1, %init2) do block ^body(%i: i64, %acc1: i64, %acc2: i64) {
       %next1 = add %acc1, %i -> i64;
       %next2 = add %acc2, %i -> i64;
       yield %next1, %next2;

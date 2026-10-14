@@ -1,10 +1,11 @@
 use kirin_ir::{CompileStage, Product, SSAValue};
 
 use crate::{
-    Body, CallEffect, CallServices, Callee, EnvIndex, Frame, FrameEffect, InterpreterError,
+    Body, CallEffect, CallServices, Callee, Env, EnvIndex, Frame, FrameEffect, InterpreterError,
+    SSABinding,
 };
 
-use super::{BodyFrameEntry, CallBodyFramePolicy, Completion, DefaultBodyFrames, FrameBuild};
+use super::{BodyFrameEntry, CallBodyTraversal, Completion, DefaultCallBodyTraversal};
 
 /// The function-call boundary frame: interpreter runtime bookkeeping, not a
 /// function dialect operation and not the callable itself.
@@ -12,16 +13,17 @@ use super::{BodyFrameEntry, CallBodyFramePolicy, Completion, DefaultBodyFrames, 
 /// A `CallFrame` owns the whole activation lifecycle that representation
 /// walkers deliberately don't:
 ///
-/// 1. resolve the callee through the engine's [`Linker`](crate::Linker);
+/// 1. resolve the callee and discover its value-independent body through the
+///    common callable-root protocol (`Linker` then IR body discovery at the
+///    target stage);
 /// 2. allocate the callee activation;
-/// 3. ask [`FunctionEntry`](crate::FunctionEntry) for the callable body
-///    descriptor ([`CallableBody`](crate::CallableBody));
+/// 3. retain the concrete argument product for the selected body walker;
 /// 4. select the entry frame for the closed [`Body`] variant — **delegated to
-///    the `P` policy** ([`CallBodyFramePolicy`]), which defaults to
-///    [`DefaultBodyFrames`]: `CFG` → `CFGFrame`, `Block` → `BlockFrame`,
+///    the `T` traversal** ([`CallBodyTraversal`]), which defaults to
+///    [`DefaultCallBodyTraversal`]: `CFG` → `CFGFrame`, `Block` → `BlockFrame`,
 ///    `DiGraph` → `DiGraphFrame`, `UnGraph` → the dialect/compiler hook
-///    ([`FrameBuild::from_ungraph_entry`]). Everything else in this list is
-///    fixed: a custom policy chooses walkers, never the lifecycle;
+///    (the default traversal rejects it). Everything else in this list is fixed:
+///    a custom traversal chooses walkers, never the lifecycle;
 /// 5. suspend while the callee frame runs;
 /// 6. validate the callee's completion kind ([`Returned`](Completion::Returned)
 ///    or a graph's natural [`Finished`](Completion::Finished) are returns; a
@@ -30,19 +32,29 @@ use super::{BodyFrameEntry, CallBodyFramePolicy, Completion, DefaultBodyFrames, 
 /// 8. deliver the returned values — into the caller's result slots for a
 ///    nested call, or as the run's completion for a root call
 ///    ([`ConcreteInterpreter::call`](crate::ConcreteInterpreter::call) pushes
-///    a [`CallFrame::root`], so root and nested calls share this one
+///    a [`CallRequest::root`], so root and nested calls share this one
 ///    boundary implementation).
-pub struct CallFrame<V, P = DefaultBodyFrames> {
+pub struct CallFrame<V, T = DefaultCallBodyTraversal> {
     state: CallState<V>,
-    /// Which walkers enter the callee body. Selected by the total frame type
-    /// via [`FrameBuild::BodyFrames`]; the lifecycle above is unaffected.
-    _policy: std::marker::PhantomData<fn() -> P>,
+    /// Which walkers enter the callee body. Selected explicitly by the
+    /// composition root; the lifecycle above is unaffected.
+    _traversal: std::marker::PhantomData<fn() -> T>,
+}
+
+/// Request to enter a function-call boundary, independent of stack representation.
+///
+/// Traversal frames and root-entry APIs construct this value without knowing
+/// the private heterogeneous stack-item enum or the call-body traversal selected by the
+/// concrete engine configuration. Composition converts it into the configured
+/// [`CallFrame`].
+pub struct CallRequest<V> {
+    state: CallState<V>,
 }
 
 enum CallState<V> {
     /// Not yet dispatched: resolve the callee and enter its body.
     Pending {
-        resolve_stage: CompileStage,
+        lookup_stage: CompileStage,
         callee: Callee,
         args: Product<V>,
         dest: CallDest,
@@ -67,16 +79,13 @@ enum CallDest {
     Root,
 }
 
-impl<V, P> CallFrame<V, P>
-where
-    V: Clone,
-{
+impl<V> CallRequest<V> {
     /// A call issued by a statement ([`SparseForwardEffect::Call`](crate::SparseForwardEffect::Call)):
     /// returned values land in `call.results` of the caller's activation.
     pub fn pending(scope_stage: CompileStage, caller_env: EnvIndex, call: CallEffect<V>) -> Self {
-        CallFrame {
+        Self {
             state: CallState::Pending {
-                resolve_stage: call.stage.unwrap_or(scope_stage),
+                lookup_stage: call.stage.unwrap_or(scope_stage),
                 callee: call.callee,
                 args: call.args,
                 dest: CallDest::Caller {
@@ -84,87 +93,104 @@ where
                     results: call.results,
                 },
             },
-            _policy: std::marker::PhantomData,
         }
     }
 
     /// A root call (no calling activation): the returned values complete the
     /// frame stack.
     pub fn root(stage: CompileStage, callee: Callee, args: Product<V>) -> Self {
-        CallFrame {
+        Self {
             state: CallState::Pending {
-                resolve_stage: stage,
+                lookup_stage: stage,
                 callee,
                 args,
                 dest: CallDest::Root,
             },
-            _policy: std::marker::PhantomData,
         }
     }
 }
 
-impl<I, F, V, E, P> Frame<I, F> for CallFrame<V, P>
+impl<V, T> From<CallRequest<V>> for CallFrame<V, T> {
+    fn from(request: CallRequest<V>) -> Self {
+        Self {
+            state: request.state,
+            _traversal: std::marker::PhantomData,
+        }
+    }
+}
+
+/// The call boundary consumes two independent capabilities and names both:
+/// [`CallServices`] to create the callee activation, resolve its body, and free
+/// it again, and an SSA-anchored [`Env`] to bind the completion's results back
+/// into the *caller's* activation ([`SSABinding::bind_values`], which is
+/// blanket-implemented, so `Env<Anchor = SSAValue>` is the whole storage
+/// requirement).
+///
+/// Notably absent: [`StatementDispatch`](crate::StatementDispatch) and any
+/// statement-effect algebra. A call boundary resolves, allocates, enters,
+/// suspends, frees, and binds — it never interprets a statement, so it must not
+/// be made to require the forward engine surface.
+impl<I, F, V, E, T> Frame<I, F> for CallFrame<V, T>
 where
-    I: CallServices<Value = V, Error = E>,
-    F: FrameBuild<V, E, BodyFrames = P>,
-    P: CallBodyFramePolicy<V, E, F>,
+    I: CallServices<Value = V, Error = E> + Env<Anchor = SSAValue>,
+    T: CallBodyTraversal<V, E, F>,
     V: Clone,
     E: From<InterpreterError>,
 {
     type Completion = Completion<V>;
 
-    fn step_into(self, interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    fn step_into(self, interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         match self.state {
             CallState::Pending {
-                resolve_stage,
+                lookup_stage,
                 callee,
                 args,
                 dest,
             } => {
-                let target = interp.resolve_call(resolve_stage, &callee)?;
+                let target = interp.resolve_callee(lookup_stage, &callee)?;
+                let body = interp.discover_body(&target)?;
                 let index = interp.alloc_env();
-                let entry = interp.enter_function(target.stage, target.body, args, index)?;
                 // The closed `Body` enum is the framework's supported body
                 // vocabulary, so this match is intentionally exhaustive;
-                // only the `UnGraph` arm delegates to a language policy.
+                // only the `UnGraph` arm delegates to a language traversal.
                 // `Body` is a closed vocabulary, so this match stays
                 // exhaustive; only *which frame* each arm builds is
-                // configurable, via the `P` policy. Activation ownership and
-                // completion handling deliberately stay out of the policy.
-                let child = match entry.body {
-                    Body::CFG(cfg) => P::from_cfg(BodyFrameEntry {
+                // configurable, via the `T` traversal. Activation ownership and
+                // completion handling deliberately stay out of the traversal.
+                let child = match body {
+                    Body::CFG(cfg) => T::from_cfg(BodyFrameEntry {
                         stage: target.stage,
                         index,
                         body: cfg,
-                        args: entry.args,
+                        args,
                     })?,
-                    Body::Block(block) => P::from_block(BodyFrameEntry {
+                    Body::Block(block) => T::from_block(BodyFrameEntry {
                         stage: target.stage,
                         index,
                         body: block,
-                        args: entry.args,
+                        args,
                     })?,
-                    Body::DiGraph(graph) => P::from_digraph(BodyFrameEntry {
+                    Body::DiGraph(graph) => T::from_digraph(BodyFrameEntry {
                         stage: target.stage,
                         index,
                         body: graph,
-                        args: entry.args,
+                        args,
                     })?,
-                    Body::UnGraph(graph) => P::from_ungraph(BodyFrameEntry {
+                    Body::UnGraph(graph) => T::from_ungraph(BodyFrameEntry {
                         stage: target.stage,
                         index,
                         body: graph,
-                        args: entry.args,
+                        args,
                     })?,
                 };
                 Ok(FrameEffect::Push {
-                    parent: F::from_call(CallFrame {
+                    parent: CallFrame {
                         state: CallState::Awaiting {
                             callee_env: index,
                             dest,
                         },
-                        _policy: std::marker::PhantomData,
-                    }),
+                        _traversal: std::marker::PhantomData,
+                    },
                     child,
                 })
             }
@@ -174,7 +200,7 @@ where
         }
     }
 
-    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<F, Completion<V>>, E> {
+    fn resume_done_into(self, _interp: &mut I) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         Err(E::from(InterpreterError::Custom(
             "call frame resumed without a return",
         )))
@@ -186,7 +212,7 @@ where
         self,
         completion: Completion<V>,
         interp: &mut I,
-    ) -> Result<FrameEffect<F, Completion<V>>, E> {
+    ) -> Result<FrameEffect<Self, Completion<V>, F>, E> {
         let CallState::Awaiting { callee_env, dest } = self.state else {
             return Err(E::from(InterpreterError::Custom(
                 "call frame resumed before dispatch",

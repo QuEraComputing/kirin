@@ -86,8 +86,8 @@ pub struct SpecializeError<L: Dialect> {
     pub signature: Signature<L::Type>,
     /// Existing non-invalidated specializations with matching signatures.
     pub conflicting: Vec<SpecializedFunction>,
-    /// Preserved body statement for the new specialization.
-    pub body: Statement,
+    /// Preserved definition statement for the new specialization.
+    pub definition: Statement,
     /// Preserved backedges for the new specialization.
     pub backedges: Option<Vec<SpecializedFunction>>,
 }

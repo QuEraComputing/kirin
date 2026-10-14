@@ -25,6 +25,7 @@ pub enum GraphFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     Function {
+        #[kirin(callable_body)]
         body: CFG,
         sig: Signature<ArithType>,
     },
@@ -34,6 +35,7 @@ pub enum GraphFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     GraphFunction {
+        #[kirin(callable_body)]
         body: DiGraph,
         sig: Signature<ArithType>,
     },
@@ -43,18 +45,20 @@ pub enum GraphFunctionLanguage {
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     LinearFunction {
+        #[kirin(callable_body)]
         body: Block,
         sig: Signature<ArithType>,
     },
     /// UnGraph-bodied callable. The framework has no default walker for an
     /// undirected graph body: calling one requires the compiler to supply a
-    /// traversal policy (`FrameBuild::from_ungraph_entry`), otherwise the
-    /// engine reports `NoDefaultWalker`.
+    /// custom `CallBodyTraversal`, otherwise the engine reports
+    /// `NoDefaultWalker`.
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
         chumsky(format = "fn {:name}{sig} {body}")
     )]
     UnGraphFunction {
+        #[kirin(callable_body)]
         body: UnGraph,
         sig: Signature<ArithType>,
     },
@@ -88,17 +92,17 @@ mod interpreter {
     use kirin_arith::{ArithValue, CheckedDiv, CheckedRem, interpreter::DivisionByZero};
     use kirin_interpreter::BranchCondition;
     use kirin_interpreter::{
-        CallableBody, DiGraphFrame, ForwardEval, FrameBuild, FunctionEntry, Interp, Interpretable,
-        InterpreterError, SparseForwardEffect, SparseForwardInterp,
+        ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, DiGraphFrame,
+        ForwardEval, Interpretable, SparseForwardEffect, SparseForwardInterp, StrongDemand,
     };
-    use kirin_ir::{Product, SSAValue};
+    use kirin_ir::{HasBottom, Product, SSAValue};
 
     use super::GraphFunctionLanguage;
 
     impl<I> Interpretable<I, ForwardEval> for GraphFunctionLanguage
     where
         I: SparseForwardInterp,
-        I::Frame: FrameBuild<I::Value, I::Error>,
+        I::Frame: From<DiGraphFrame<I::Value, I::Error>>,
         I::Value: std::ops::Add<Output = I::Value>
             + std::ops::Sub<Output = I::Value>
             + std::ops::Mul<Output = I::Value>
@@ -129,7 +133,7 @@ mod interpreter {
                     // directly into the current activation.
                     let frame = DiGraphFrame::new(interp.stage(), interp.index(), *graph, args);
                     Ok(SparseForwardEffect::Push {
-                        frame: I::Frame::from_digraph(frame),
+                        frame: frame.into(),
                         results: [SSAValue::from(*result)].into_iter().collect(),
                     })
                 }
@@ -142,28 +146,43 @@ mod interpreter {
         }
     }
 
-    impl<I: Interp> FunctionEntry<I> for GraphFunctionLanguage {
-        fn function_entry(
-            &self,
-            args: Product<I::Value>,
-            interp: &mut I,
-        ) -> Result<CallableBody<I::Value>, I::Error> {
+    impl<I> Interpretable<I, StrongDemand> for GraphFunctionLanguage
+    where
+        I: DemandInterp,
+        I::Value: HasBottom + PartialEq,
+    {
+        fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
             match self {
-                GraphFunctionLanguage::Function { body, .. } => {
-                    Ok(CallableBody::new(*body).args(args))
-                }
-                GraphFunctionLanguage::GraphFunction { body, .. } => {
-                    Ok(CallableBody::new(*body).args(args))
-                }
-                GraphFunctionLanguage::LinearFunction { body, .. } => {
-                    Ok(CallableBody::new(*body).args(args))
-                }
-                GraphFunctionLanguage::UnGraphFunction { body, .. } => {
-                    Ok(CallableBody::new(*body).args(args))
-                }
-                _ => Err(I::Error::from(InterpreterError::NotCallable(
-                    interp.statement(),
-                ))),
+                GraphFunctionLanguage::Function { .. }
+                | GraphFunctionLanguage::GraphFunction { .. }
+                | GraphFunctionLanguage::LinearFunction { .. }
+                | GraphFunctionLanguage::UnGraphFunction { .. } => Ok(interp.effect()),
+                GraphFunctionLanguage::GraphEval { .. } => interp.demand_uses_if_observable(self),
+                GraphFunctionLanguage::Arith(op) => op.interpret(interp),
+                GraphFunctionLanguage::Cf(op) => op.interpret(interp),
+                GraphFunctionLanguage::Constant(op) => op.interpret(interp),
+                GraphFunctionLanguage::Call(op) => op.interpret(interp),
+                GraphFunctionLanguage::Return(op) => op.interpret(interp),
+            }
+        }
+    }
+
+    impl<I> Interpretable<I, ClassicLiveness> for GraphFunctionLanguage
+    where
+        I: ClassicLivenessInterp,
+    {
+        fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+            match self {
+                GraphFunctionLanguage::Function { .. }
+                | GraphFunctionLanguage::GraphFunction { .. }
+                | GraphFunctionLanguage::LinearFunction { .. }
+                | GraphFunctionLanguage::UnGraphFunction { .. } => Ok(DenseBackwardEffect::Next),
+                GraphFunctionLanguage::GraphEval { .. } => interp.gen_uses_kill_defs(self),
+                GraphFunctionLanguage::Arith(op) => op.interpret(interp),
+                GraphFunctionLanguage::Cf(op) => op.interpret(interp),
+                GraphFunctionLanguage::Constant(op) => op.interpret(interp),
+                GraphFunctionLanguage::Call(op) => op.interpret(interp),
+                GraphFunctionLanguage::Return(op) => op.interpret(interp),
             }
         }
     }
