@@ -34,9 +34,8 @@
 //! [`BlockInfo::predecessors`](crate::BlockInfo), the block-body summary
 //! (`BlockInfo::statements`/`terminator`), and the CFG chain summary
 //! (`CFGInfo::blocks`) — so they stay valid without a rebuild. Deferred to
-//! later slices: terminator erasure/replacement, graph-body surgery,
-//! result-defining insertion, and full cross-block dominance/visibility
-//! preflight.
+//! later slices: graph-body surgery, result-defining insertion, and full
+//! cross-block dominance/visibility preflight.
 //!
 //! # Known gap: graph-body operand edits
 //!
@@ -93,7 +92,7 @@ pub enum MutationEvent {
     ReplacedUses { old: SSAValue, new: SSAValue },
     /// A new statement was spliced into a block's statement list.
     InsertedStatement { stmt: Statement },
-    /// A statement was tombstoned and unlinked from its block.
+    /// A statement was tombstoned and removed from its block.
     ///
     /// Covers everything nested in it: the statement-owned blocks and `CFG`s
     /// it held were tombstoned with it, and no separate
@@ -125,9 +124,6 @@ pub enum RewriteError {
     /// `DiGraph`/`UnGraph`-owned statements needs graph surgery, deferred to a
     /// later slice.
     NotInBlockBody(Statement),
-    /// Erasing a block's terminator would leave the block ill-formed; this slice
-    /// does not perform the required control-flow repair.
-    CannotEraseTerminator(Statement),
     /// The statement defines results that are still used elsewhere, so erasing it
     /// would leave dangling uses. Replace those uses first.
     StatementResultsInUse(Statement),
@@ -219,9 +215,6 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::NotInBlockBody(stmt) => {
                 write!(f, "statement {stmt:?} is not owned by a block body")
-            }
-            RewriteError::CannotEraseTerminator(stmt) => {
-                write!(f, "cannot erase block terminator {stmt:?}")
             }
             RewriteError::StatementResultsInUse(stmt) => {
                 write!(
@@ -580,17 +573,21 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         moved.iter().map(Vec::len).sum()
     }
 
-    /// Erase `stmt`: tombstone it, unlink it from its block's statement list,
-    /// drop its operand uses from the def-use index, and tombstone its result
-    /// values. Statement-owned blocks and `CFG`s nested inside `stmt` are
-    /// tombstoned with it, recursively. `DiGraph`/`UnGraph` bodies are not
-    /// tombstoned yet.
+    /// Erase `stmt`: tombstone it, remove it from its block, drop its operand
+    /// uses from the def-use index, and tombstone its result values. Erasing a
+    /// block's terminator clears the block's terminator,
+    /// removes its outgoing edges from the predecessor mirror, and leaves the
+    /// block unterminated (see [`Rewriter::insert_terminator`]).
+    /// Statement-owned blocks and `CFG`s nested inside `stmt` are tombstoned
+    /// with it, recursively. `DiGraph`/`UnGraph` bodies are not tombstoned
+    /// yet.
     ///
     /// Rejects — leaving the stage untouched — if `stmt` is unknown, is not
-    /// owned by a block body, is the block terminator, or still has results that
-    /// are used elsewhere. Records [`MutationEvent::ErasedStatement`].
+    /// owned by a block body, or still has results that are used elsewhere.
+    /// Records [`MutationEvent::ErasedStatement`], followed by
+    /// [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator.
     pub fn erase_statement(&mut self, stmt: Statement) -> Result<(), RewriteError> {
-        let (block, prev, next, operands, results, is_terminator) = {
+        let (block, prev, next, operands, results, successors, is_terminator) = {
             let item = stmt
                 .get_info(self.stage)
                 .filter(|item| !item.deleted())
@@ -611,13 +608,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     .results()
                     .map(|r| SSAValue::from(*r))
                     .collect::<Vec<SSAValue>>(),
+                item.definition
+                    .successors()
+                    .map(|successor| successor.target())
+                    .collect::<HashSet<Block>>(),
                 item.definition.is_terminator(),
             )
         };
 
-        if is_terminator {
-            return Err(RewriteError::CannotEraseTerminator(stmt));
-        }
         for &result in &results {
             let used = result
                 .get_info(self.stage)
@@ -628,36 +626,48 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             }
         }
 
-        // Unlink from the block's statement linked list (fix neighbours, or the
-        // block head/tail when the statement is at an end).
-        match prev {
-            Some(p) => {
-                if let Some(info) = p.get_info_mut(self.stage) {
-                    info.node.next = next;
+        if is_terminator {
+            // The terminator is not in the chain; clear the block's pointer.
+            if let Some(block_info) = block.get_info_mut(self.stage) {
+                block_info.terminator = None;
+            }
+            // Only terminators carry successors, so the block's outgoing edges
+            // are exactly this statement's; each target loses its entry.
+            for target in successors {
+                remove_predecessor(self.stage, target, block);
+            }
+        } else {
+            // Unlink from the block's statement linked list (fix neighbours, or
+            // the block head/tail when the statement is at an end).
+            match prev {
+                Some(p) => {
+                    if let Some(info) = p.get_info_mut(self.stage) {
+                        info.node.next = next;
+                    }
+                }
+                None => {
+                    if let Some(block_info) = block.get_info_mut(self.stage) {
+                        block_info.statements.head = next;
+                    }
                 }
             }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.head = next;
+            match next {
+                Some(n) => {
+                    if let Some(info) = n.get_info_mut(self.stage) {
+                        info.node.prev = prev;
+                    }
+                }
+                None => {
+                    if let Some(block_info) = block.get_info_mut(self.stage) {
+                        block_info.statements.tail = prev;
+                    }
                 }
             }
-        }
-        match next {
-            Some(n) => {
-                if let Some(info) = n.get_info_mut(self.stage) {
-                    info.node.prev = prev;
-                }
+            if let Some(block_info) = block.get_info_mut(self.stage)
+                && block_info.statements.len > 0
+            {
+                block_info.statements.len -= 1;
             }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.tail = prev;
-                }
-            }
-        }
-        if let Some(block_info) = block.get_info_mut(self.stage)
-            && block_info.statements.len > 0
-        {
-            block_info.statements.len -= 1;
         }
 
         // Drop the def-use edges this statement contributed, erase the bodies
@@ -666,7 +676,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for (index, operand) in operands.into_iter().enumerate() {
             remove_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
-        // Predecessor mirror does not need to be updated since we rejected terminators earlier.
         self.tombstone_nested_bodies(stmt);
         for result in results {
             let _ = self.stage.ssas.delete(result);
@@ -674,6 +683,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let _ = self.stage.statement_arena_mut().delete(stmt);
 
         self.events.push(MutationEvent::ErasedStatement { stmt });
+        if is_terminator {
+            self.events.push(MutationEvent::ChangedTerminator { block });
+        }
         Ok(())
     }
 
@@ -697,10 +709,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let mut current = info.statements.head;
         while let Some(stmt) = current {
             current = stmt.get_info(self.stage).and_then(|item| item.node.next);
-            self.tombstone_statement(stmt, Some(block));
+            self.tombstone_statement(stmt, block);
         }
         if let Some(stmt) = terminator {
-            self.tombstone_statement(stmt, Some(block));
+            self.tombstone_statement(stmt, block);
         }
 
         for arg in args {
@@ -710,13 +722,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// The per-statement step of [`Rewriter::tombstone_block`]: drop `stmt`'s
-    /// uses, erase its nested bodies, then tombstone its results and itself.
-    ///
-    /// With `edges_from: Some(block)` its outgoing edges are also removed from
-    /// the predecessor mirror, which is exact only when all of `block` goes
-    /// away (the mirror keeps one entry per `(source, target)` pair). With
-    /// `None` the caller maintains the mirror itself.
-    pub(super) fn tombstone_statement(&mut self, stmt: Statement, edges_from: Option<Block>) {
+    /// uses and its outgoing edges from `block`, erase its nested bodies, then
+    /// tombstone its results and itself.
+    fn tombstone_statement(&mut self, stmt: Statement, block: Block) {
         let (operands, results, successors) = {
             let definition = &stmt.expect_info(self.stage).definition;
             (
@@ -737,10 +745,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for (index, operand) in operands.into_iter().enumerate() {
             remove_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
-        if let Some(block) = edges_from {
-            for target in successors {
-                remove_predecessor(self.stage, target, block);
-            }
+        for target in successors {
+            remove_predecessor(self.stage, target, block);
         }
         self.tombstone_nested_bodies(stmt);
         for result in results {
@@ -930,7 +936,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         block: Block,
         definition: L,
     ) -> Result<Statement, RewriteError> {
-        let chain_head = {
+        {
             let info = block
                 .get_info(self.stage)
                 .filter(|item| !item.deleted())
@@ -938,8 +944,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             if info.terminator.is_some() {
                 return Err(RewriteError::BlockHasTerminator(block));
             }
-            info.statements.head
-        };
+        }
         if !definition.is_terminator() {
             return Err(RewriteError::ExpectedTerminator);
         }
@@ -959,16 +964,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             }
         }
 
-        // Edges the block already has (from non-terminator statements, if any)
-        // keep their single predecessor entry.
-        let mut existing: HashSet<Block> = HashSet::new();
-        let mut current = chain_head;
-        while let Some(stmt) = current {
-            let item = stmt.expect_info(self.stage);
-            existing.extend(item.definition.successors().map(|s| s.target()));
-            current = item.node.next;
-        }
-
         let new_stmt = self
             .stage
             .statement_arena_mut()
@@ -984,7 +979,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             };
             add_use(self.stage, operand, site);
         }
-        for &target in targets.difference(&existing) {
+        // Only terminators carry successors and the block had none, so every
+        // target gains exactly one entry for `block`.
+        for target in targets {
             add_predecessor(self.stage, target, block);
         }
         if let Some(info) = block.get_info_mut(self.stage) {
@@ -1015,7 +1012,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// owned by a block body (i.e. in a graph), changes result arity or
     /// terminator-ness, or names an operand or successor target that is not live.
     ///
-    /// Records [`MutationEvent::ReplacedStatement`].
+    /// Records [`MutationEvent::ReplacedStatement`], followed by
+    /// [`MutationEvent::ChangedTerminator`] when `stmt` is a terminator.
     pub fn replace_statement(
         &mut self,
         stmt: Statement,
@@ -1084,6 +1082,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             old_results,
             old_successors,
             parent_block,
+            is_terminator: old_is_terminator,
         })
     }
 
@@ -1101,6 +1100,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             old_results,
             old_successors,
             parent_block,
+            is_terminator,
         } = prepared;
         let new_operands: Vec<SSAValue> = definition.arguments().copied().collect();
         let new_successors: HashSet<Block> = definition
@@ -1140,6 +1140,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
 
         self.events.push(MutationEvent::ReplacedStatement { stmt });
+        if is_terminator {
+            self.events.push(MutationEvent::ChangedTerminator {
+                block: parent_block,
+            });
+        }
     }
 }
 
@@ -1149,6 +1154,7 @@ pub(super) struct PreparedReplacement {
     old_results: Vec<crate::ResultValue>,
     old_successors: HashSet<Block>,
     parent_block: Block,
+    is_terminator: bool,
 }
 
 /// Remove one occurrence of `site` from `value`'s use list, if present.

@@ -806,19 +806,16 @@ fn insert_after_the_terminator_leaves_the_block_body_intact() {
 }
 
 #[test]
-fn erasing_the_terminator_leaves_the_block_body_intact() {
+fn erasing_the_terminator_keeps_the_chain_and_clears_the_terminator() {
     let mut f = body_stage();
-    let before = f.body();
+    let (head, tail, len, _) = f.body();
 
-    {
-        let mut rewriter = Rewriter::new(&mut f.stage);
-        assert_eq!(
-            rewriter.erase_statement(f.terminator),
-            Err(RewriteError::CannotEraseTerminator(f.terminator))
-        );
-    }
+    Rewriter::new(&mut f.stage)
+        .erase_statement(f.terminator)
+        .unwrap();
 
-    assert_eq!(f.body(), before);
+    // The chain summary is untouched; only the terminator pointer clears.
+    assert_eq!(f.body(), (head, tail, len, None));
     assert_eq!(verify_derived(&f.stage), Ok(()));
 }
 
