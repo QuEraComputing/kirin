@@ -73,6 +73,8 @@ class Map(ir.Statement):
 
 @statement(dialect=dialect)
 class Foldr(ir.Statement):
+    """Fold right to left, passing each element before the accumulator."""
+
     traits = frozenset({ir.MaybePure(), lowering.FromPythonCall()})
     purity: bool = info.attribute(default=False)
     fn: ir.SSAValue = info.argument(types.MethodType[[ElemT, OutElemT], OutElemT])
