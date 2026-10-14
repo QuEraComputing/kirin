@@ -177,6 +177,9 @@ pub enum RewriteError {
     BlockArgumentIndexOutOfRange { block: Block, index: usize },
     /// Dropping the block argument would leave dangling uses. Replace them first.
     BlockArgumentInUse { block: Block, index: usize },
+    /// A `merge_blocks` replacement is one of the merged block's own
+    /// arguments, which the merge deletes.
+    ReplacementIsMergedArgument { block: Block, value: SSAValue },
     /// `stmt` branches to a block through successor position `successor`, but
     /// its [`BranchOp`](crate::BranchOp) gives no editable operand list for
     /// that edge.
@@ -299,6 +302,12 @@ impl fmt::Display for RewriteError {
                 write!(
                     f,
                     "operand index {index} is out of range for successor {successor} of {stmt:?}"
+                )
+            }
+            RewriteError::ReplacementIsMergedArgument { block, value } => {
+                write!(
+                    f,
+                    "replacement {value} is an argument of {block:?}, which the merge deletes"
                 )
             }
             RewriteError::BlockArgumentInUse { block, index } => {

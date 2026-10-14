@@ -754,6 +754,64 @@ fn merge_blocks_with_empty_succ_chain_keeps_pred_chain() {
 }
 
 #[test]
+fn merge_blocks_rejects_replacements_deleted_with_succ() {
+    let mut stage = new_stage();
+
+    // entry(a) { br succ } ; succ(x, y) { use x; return }
+    let x = stage.block_argument().index(0);
+    let use_x = stage.statement().definition(BuilderDialect::Use(x)).new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let succ = stage
+        .block()
+        .argument(TestType::I32)
+        .argument(TestType::I32)
+        .stmt(use_x)
+        .terminator(ret)
+        .new();
+    let entry_br = stage.statement().definition(br(succ)).new();
+    let entry = stage
+        .block()
+        .argument(TestType::I32)
+        .terminator(entry_br)
+        .new();
+    let _cfg = stage.cfg().add_block(entry).add_block(succ).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let a = arg(&stage, entry, 0);
+    let (real_x, real_y) = (arg(&stage, succ, 0), arg(&stage, succ, 1));
+
+    let mut rw = Rewriter::new(&mut stage);
+    // x replaced by itself: the redirect is a no-op, then x would be deleted.
+    assert_eq!(
+        rw.merge_blocks(entry, succ, &[real_x, real_y]),
+        Err(RewriteError::ReplacementIsMergedArgument {
+            block: succ,
+            value: real_x,
+        })
+    );
+    // x replaced by succ's other argument, which the merge also deletes.
+    assert_eq!(
+        rw.merge_blocks(entry, succ, &[real_y, real_y]),
+        Err(RewriteError::ReplacementIsMergedArgument {
+            block: succ,
+            value: real_y,
+        })
+    );
+
+    // Nothing was touched.
+    assert!(rw.events().is_empty());
+    assert!(!succ.get_info(rw.stage()).unwrap().deleted());
+    assert_eq!(entry.terminator(rw.stage()), Some(entry_br));
+    assert_eq!(use_x.definition(rw.stage()), &BuilderDialect::Use(real_x));
+    verify_derived(rw.stage()).unwrap();
+
+    // Values that survive the merge are accepted.
+    rw.merge_blocks(entry, succ, &[a, a]).unwrap();
+    assert_eq!(use_x.definition(rw.stage()), &BuilderDialect::Use(a));
+    verify_derived(rw.stage()).unwrap();
+}
+
+#[test]
 fn merge_blocks_rejects_illegal_merges() {
     let mut stage = new_stage();
 

@@ -16,7 +16,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Rejects, leaving the stage untouched, if either block is unknown or
     /// not in a CFG, they are in different CFGs or the same block, the
     /// replacement count differs from `succ`'s argument count, or a
-    /// replacement is not live.
+    /// replacement is not live or is one of `succ`'s own arguments (which the
+    /// merge deletes).
     ///
     /// Records [`MutationEvent::ErasedStatement`] for `pred`'s terminator (if
     /// any), the [`Rewriter::replace_all_uses`] events for the argument
@@ -54,6 +55,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for &value in arg_replacements {
             if value.get_info(self.stage).is_none() {
                 return Err(RewriteError::UnknownValue(value));
+            }
+            // succ's arguments are tombstoned with succ, so their uses must
+            // be redirected to values that survive the merge.
+            if succ_args.contains(&value) {
+                return Err(RewriteError::ReplacementIsMergedArgument { block: succ, value });
             }
         }
 
