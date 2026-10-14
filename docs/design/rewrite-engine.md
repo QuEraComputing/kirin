@@ -10,10 +10,6 @@ Whole-stage verifier implementation is a separate future subsystem. Sections
 below that discuss verifier integration describe the eventual pipeline
 boundary, not a current rewrite-engine deliverable.
 
-Companion design note: [Dialect and DSL Integration Contract](rewrite-engine-dialect-integration.md).
-That note defines the proposed dialect-facing contract. Downstream compiler
-integration details are outside its scope.
-
 This document proposes a Kirin 2.0 rewrite framework. The core design is:
 
 > Rewrites are separate from the interpreter framework. The interpreter
@@ -1073,8 +1069,7 @@ that is merely opportunistic belongs to DCE. Once mutation starts, any action
 error quarantines the owned stage, and the driver never falls through to another
 rule against partially edited IR.
 
-Task breakdown for implementing this is Step 2 of
-[the in-place rewrite plan](../plans/2026-07-29-in-place-rewrite-plans.md).
+The reference-only plan is tracked under [M1: Mutation Layer](#m1-mutation-layer).
 
 ---
 
@@ -1606,9 +1601,7 @@ match -> proposed RewritePlan + obligations -> prove/accept -> apply via Rewrite
 ```
 
 An unproved obligation is a non-match or proof failure, not a partially applied
-plan that needs rollback. See the focused
-[in-place rewrite plan](../plans/2026-07-29-in-place-rewrite-plans.md#mutation-primitives-policy-helpers-and-semantic-acceptance)
-for the rule, helper, analysis, and solver roles.
+plan that needs rollback.
 
 ### In-place pass boundary
 
@@ -2315,9 +2308,6 @@ rule sets; v1 has no dynamic global rule discovery.
 `RuleSet` is not the same as Kirin-python's executable `Chain` combinator. The
 driver may index a rule set by root operation and apply its buckets under a
 walk, worklist, or fixpoint scheduling policy.
-
-The detailed dialect-facing contract and illustrative APIs are in
-[Dialect and DSL Integration Contract](rewrite-engine-dialect-integration.md).
 
 ### `WildcardMatcher`
 
