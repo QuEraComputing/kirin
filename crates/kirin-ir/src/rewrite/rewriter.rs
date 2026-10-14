@@ -25,7 +25,8 @@
 //! Scope is operand/yield rewriting (including bulk result redirection through
 //! [`Rewriter::replace_results`]), block-body statement surgery
 //! ([`Rewriter::erase_statement`], [`Rewriter::insert_before`],
-//! [`Rewriter::insert_after`], [`Rewriter::replace_statement`]), and `CFG`
+//! [`Rewriter::insert_after`], [`Rewriter::replace_statement`],
+//! [`Rewriter::insert_terminator`]), and `CFG`
 //! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
 //! merge blocks, [`Rewriter::retarget_successor`], and block-argument insertion
 //! and erasure). The rewriter **maintains** all four derived mirrors
@@ -33,8 +34,9 @@
 //! [`BlockInfo::predecessors`](crate::BlockInfo), the block-body summary
 //! (`BlockInfo::statements`/`terminator`), and the CFG chain summary
 //! (`CFGInfo::blocks`) — so they stay valid without a rebuild. Deferred to
-//! later slices: terminator and graph-body surgery, result-defining insertion,
-//! and full cross-block dominance/visibility preflight.
+//! later slices: terminator erasure/replacement, graph-body surgery,
+//! result-defining insertion, and full cross-block dominance/visibility
+//! preflight.
 //!
 //! # Known gap: graph-body operand edits
 //!
@@ -104,6 +106,8 @@ pub enum MutationEvent {
     ChangedBlockList { cfg: CFG },
     /// Control-flow edges or block arguments of blocks in `cfg` changed.
     ChangedCfg { cfg: CFG },
+    /// `block`'s terminator was set (and with it the block's outgoing edges).
+    ChangedTerminator { block: Block },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -131,8 +135,11 @@ pub enum RewriteError {
     /// on one. (`insert_before` can: it appends to the end of the chain.)
     AnchorIsTerminator(Statement),
     /// The inserted definition is a terminator; terminators are not spliced into
-    /// the middle of a block's statement list.
+    /// the middle of a block's statement list. Use
+    /// [`Rewriter::insert_terminator`] on a block that has none.
     CannotInsertTerminator,
+    /// `insert_terminator` was given a block that already has a terminator.
+    BlockHasTerminator(Block),
     /// The inserted definition declares results; allocating fresh result SSA
     /// values (with types) is deferred to a later slice.
     CannotInsertWithResults,
@@ -157,8 +164,7 @@ pub enum RewriteError {
     CfgMismatch { block: Block, expected: CFG },
     /// `merge_blocks` was asked to merge a block into itself.
     CannotMergeBlockIntoItself(Block),
-    /// The definition must be a terminator (e.g. the branch closing the first
-    /// half of a split block).
+    /// The definition passed to `insert_terminator` is not a terminator.
     ExpectedTerminator,
     /// A list of values did not line up one-for-one with a block's arguments.
     BlockArgumentArityMismatch {
@@ -225,6 +231,9 @@ impl fmt::Display for RewriteError {
                     f,
                     "cannot splice a terminator into a block's statement list"
                 )
+            }
+            RewriteError::BlockHasTerminator(block) => {
+                write!(f, "block {block:?} already has a terminator")
             }
             RewriteError::CannotInsertWithResults => {
                 write!(f, "cannot insert a statement that defines results yet")
@@ -882,6 +891,91 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // Predecessor mirror does not need to be updated since we rejected terminators earlier.
         self.events
             .push(MutationEvent::InsertedStatement { stmt: new_stmt });
+        Ok(new_stmt)
+    }
+
+    /// Insert `definition` as the terminator of `block`, which must have none
+    /// (for example the first half left by [`Rewriter::split_block`]).
+    ///
+    /// The block may be in a `CFG` or a statement-owned body. Operand uses and
+    /// the predecessor mirror are updated for the new statement's operands and
+    /// successors, and the block's terminator pointer is set.
+    ///
+    /// Rejects, leaving the stage untouched, if `block` is unknown or already
+    /// has a terminator, or if `definition` is not a terminator, declares
+    /// results, or names a dead operand or successor.
+    ///
+    /// Records [`MutationEvent::InsertedStatement`] then
+    /// [`MutationEvent::ChangedTerminator`].
+    pub fn insert_terminator(
+        &mut self,
+        block: Block,
+        definition: L,
+    ) -> Result<Statement, RewriteError> {
+        let chain_head = {
+            let info = block
+                .get_info(self.stage)
+                .filter(|item| !item.deleted())
+                .ok_or(RewriteError::UnknownBlock(block))?;
+            if info.terminator.is_some() {
+                return Err(RewriteError::BlockHasTerminator(block));
+            }
+            info.statements.head
+        };
+        if !definition.is_terminator() {
+            return Err(RewriteError::ExpectedTerminator);
+        }
+        if definition.results().next().is_some() {
+            return Err(RewriteError::CannotInsertWithResults);
+        }
+        let operands: Vec<SSAValue> = definition.arguments().copied().collect();
+        for &operand in &operands {
+            if operand.get_info(self.stage).is_none() {
+                return Err(RewriteError::UnknownValue(operand));
+            }
+        }
+        let targets: HashSet<Block> = definition.successors().map(|s| s.target()).collect();
+        for &target in &targets {
+            if !block_is_live(self.stage, target) {
+                return Err(RewriteError::UnknownBlock(target));
+            }
+        }
+
+        // Edges the block already has (from non-terminator statements, if any)
+        // keep their single predecessor entry.
+        let mut existing: HashSet<Block> = HashSet::new();
+        let mut current = chain_head;
+        while let Some(stmt) = current {
+            let item = stmt.expect_info(self.stage);
+            existing.extend(item.definition.successors().map(|s| s.target()));
+            current = item.node.next;
+        }
+
+        let new_stmt = self
+            .stage
+            .statement_arena_mut()
+            .alloc_with_id(|id| StatementInfo {
+                node: LinkedListNode::new(id),
+                parent: Some(StatementParent::Block(block)),
+                definition,
+            });
+        for (index, operand) in operands.into_iter().enumerate() {
+            let site = Use::StatementOperand {
+                stmt: new_stmt,
+                index,
+            };
+            add_use(self.stage, operand, site);
+        }
+        for &target in targets.difference(&existing) {
+            add_predecessor(self.stage, target, block);
+        }
+        if let Some(info) = block.get_info_mut(self.stage) {
+            info.terminator = Some(new_stmt);
+        }
+
+        self.events
+            .push(MutationEvent::InsertedStatement { stmt: new_stmt });
+        self.events.push(MutationEvent::ChangedTerminator { block });
         Ok(new_stmt)
     }
 

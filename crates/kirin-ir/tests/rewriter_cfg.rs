@@ -371,7 +371,7 @@ fn erase_block_tombstones_nested_bodies() {
 }
 
 #[test]
-fn split_block_moves_suffix_and_maintains_mirrors() {
+fn split_block_moves_suffix_and_leaves_original_unterminated() {
     let mut stage = new_stage();
 
     let exit_ret = stage.statement().definition(BuilderDialect::Return).new();
@@ -396,23 +396,21 @@ fn split_block_moves_suffix_and_maintains_mirrors() {
 
     let (tail, events) = {
         let mut rw = Rewriter::new(&mut stage);
-        let tail = rw.split_block(s1, br).unwrap();
+        let tail = rw.split_block(s1).unwrap();
         (tail, rw.drain_events())
     };
-    let new_br = entry.terminator(&stage).unwrap();
     assert_eq!(
         events,
         vec![
             MutationEvent::ChangedBlockList { cfg },
-            MutationEvent::InsertedStatement { stmt: new_br },
             MutationEvent::ChangedCfg { cfg },
         ]
     );
 
-    // entry keeps the prefix and now branches to the new block, which holds
-    // the suffix and the original terminator.
+    // entry keeps the prefix and has no terminator; the new block holds the
+    // suffix and the original terminator.
     assert_eq!(entry.statements(&stage).collect::<Vec<_>>(), vec![s0]);
-    assert_eq!(new_br.definition(&stage), &br(tail));
+    assert_eq!(entry.terminator(&stage), None);
     assert_eq!(tail.statements(&stage).collect::<Vec<_>>(), vec![s1, s2]);
     assert_eq!(tail.terminator(&stage), Some(entry_br));
     for stmt in [s1, s2, entry_br] {
@@ -424,14 +422,20 @@ fn split_block_moves_suffix_and_maintains_mirrors() {
         vec![entry, tail, exit]
     );
 
-    // Edges: entry -> tail -> exit. Uses are untouched by the move.
-    assert_eq!(preds(&stage, tail), HashSet::from([entry]));
+    // The moved edge leaves from the new block; nothing reaches it yet.
+    assert!(preds(&stage, tail).is_empty());
     assert_eq!(preds(&stage, exit), HashSet::from([tail]));
     assert_eq!(
         uses_set(&stage, real_x),
         HashSet::from([so(s0, 0), so(s2, 0)])
     );
+    verify_derived(&stage).unwrap();
 
+    // Closing the first half with a branch, as a caller would, wires the edge.
+    Rewriter::new(&mut stage)
+        .insert_terminator(entry, br(tail))
+        .unwrap();
+    assert_eq!(preds(&stage, tail), HashSet::from([entry]));
     verify_derived(&stage).unwrap();
 }
 
@@ -447,9 +451,10 @@ fn split_block_at_terminator_moves_only_the_terminator() {
     let _cfg = stage.cfg().add_block(entry).add_block(exit).new();
 
     let mut stage = stage.finalize().unwrap();
-    let tail = Rewriter::new(&mut stage).split_block(entry_br, br).unwrap();
+    let tail = Rewriter::new(&mut stage).split_block(entry_br).unwrap();
 
     assert_eq!(entry.statements(&stage).collect::<Vec<_>>(), vec![s0]);
+    assert_eq!(entry.terminator(&stage), None);
     assert_eq!(tail.statements(&stage).count(), 0);
     assert_eq!(tail.terminator(&stage), Some(entry_br));
     assert_eq!(preds(&stage, exit), HashSet::from([tail]));
@@ -470,14 +475,11 @@ fn split_block_at_first_statement_empties_original_chain() {
     let _cfg = stage.cfg().add_block(entry).add_block(exit).new();
 
     let mut stage = stage.finalize().unwrap();
-    let tail = Rewriter::new(&mut stage).split_block(s0, br).unwrap();
+    let tail = Rewriter::new(&mut stage).split_block(s0).unwrap();
 
-    // entry keeps only the new branch; the whole chain moved.
+    // The whole chain and the terminator moved; entry is empty.
     assert_eq!(entry.statements(&stage).count(), 0);
-    assert_eq!(
-        entry.terminator(&stage).map(|t| t.definition(&stage)),
-        Some(&br(tail))
-    );
+    assert_eq!(entry.terminator(&stage), None);
     assert_eq!(tail.statements(&stage).collect::<Vec<_>>(), vec![s0, s1]);
     assert_eq!(tail.terminator(&stage), Some(entry_br));
     assert_eq!(s0.prev(&stage), &None, "the moved head has no predecessor");
@@ -486,7 +488,7 @@ fn split_block_at_first_statement_empties_original_chain() {
 }
 
 #[test]
-fn split_block_rejects_bad_branch_without_mutating() {
+fn split_block_rejects_unknown_and_non_cfg_statements() {
     let mut stage = new_stage();
 
     let s0 = stage.statement().definition(BuilderDialect::Nop).new();
@@ -497,21 +499,17 @@ fn split_block_rejects_bad_branch_without_mutating() {
     let lone = stage.block().stmt(lone_nop).new();
 
     let mut stage = stage.finalize().unwrap();
-    let dead_block = Block::from(Id::from(TestSSAValue(9_999)));
+    let dead_stmt = Statement::from(Id::from(TestSSAValue(9_999)));
     let blocks_before = stage.block_arena().len();
 
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
-        rw.split_block(s0, |_| BuilderDialect::Nop),
-        Err(RewriteError::ExpectedTerminator)
-    );
-    assert_eq!(
-        rw.split_block(s0, |_| br(dead_block)),
-        Err(RewriteError::UnknownBlock(dead_block))
-    );
-    assert_eq!(
-        rw.split_block(lone_nop, br),
+        rw.split_block(lone_nop),
         Err(RewriteError::NotInCfgBody(lone))
+    );
+    assert_eq!(
+        rw.split_block(dead_stmt),
+        Err(RewriteError::UnknownStatement(dead_stmt))
     );
     assert!(rw.events().is_empty());
 
@@ -519,6 +517,116 @@ fn split_block_rejects_bad_branch_without_mutating() {
     assert_eq!(rw.stage().block_arena().len(), blocks_before);
     assert_eq!(cfg.blocks(rw.stage()).collect::<Vec<_>>(), vec![entry]);
     assert_eq!(entry.terminator(rw.stage()), Some(ret));
+}
+
+#[test]
+fn insert_terminator_wires_operands_and_edges() {
+    let mut stage = new_stage();
+
+    // entry(a) has no terminator; target(t) returns.
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let target = stage.block().argument(TestType::I32).terminator(ret).new();
+    let entry = stage.block().argument(TestType::I32).new();
+    let _cfg = stage.cfg().add_block(entry).add_block(target).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let a = arg(&stage, entry, 0);
+
+    let (jump, events) = {
+        let mut rw = Rewriter::new(&mut stage);
+        let jump = rw
+            .insert_terminator(
+                entry,
+                BuilderDialect::Jump(Successor::from_block(target), vec![a]),
+            )
+            .unwrap();
+        (jump, rw.drain_events())
+    };
+    assert_eq!(
+        events,
+        vec![
+            MutationEvent::InsertedStatement { stmt: jump },
+            MutationEvent::ChangedTerminator { block: entry },
+        ]
+    );
+
+    assert_eq!(entry.terminator(&stage), Some(jump));
+    assert_eq!(jump.parent(&stage), &Some(StatementParent::Block(entry)));
+    assert_eq!(entry.statements(&stage).count(), 0, "not part of the chain");
+    assert_eq!(uses_set(&stage, a), HashSet::from([so(jump, 0)]));
+    assert_eq!(preds(&stage, target), HashSet::from([entry]));
+
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn insert_terminator_works_in_statement_owned_body() {
+    let mut stage = new_stage();
+
+    // `owner` owns two single-block bodies, neither terminated.
+    let body = stage.block().new();
+    let other = stage.block().new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnBlocks(body, other))
+        .new();
+    let host_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let host = stage.block().stmt(owner).terminator(host_ret).new();
+    let _cfg = stage.cfg().add_block(host).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let ret = Rewriter::new(&mut stage)
+        .insert_terminator(body, BuilderDialect::Return)
+        .unwrap();
+
+    assert_eq!(body.terminator(&stage), Some(ret));
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn insert_terminator_rejects_without_mutating() {
+    let mut stage = new_stage();
+
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let terminated = stage.block().terminator(ret).new();
+    let open = stage.block().new();
+    let _cfg = stage.cfg().add_block(terminated).add_block(open).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let dead_block = Block::from(Id::from(TestSSAValue(9_999)));
+    let dead_value = SSAValue::from(TestSSAValue(9_999));
+    let stmts_before = stage.statement_arena().len();
+
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(
+        rw.insert_terminator(terminated, BuilderDialect::Return),
+        Err(RewriteError::BlockHasTerminator(terminated))
+    );
+    assert_eq!(
+        rw.insert_terminator(open, BuilderDialect::Nop),
+        Err(RewriteError::ExpectedTerminator)
+    );
+    assert_eq!(
+        rw.insert_terminator(open, br(dead_block)),
+        Err(RewriteError::UnknownBlock(dead_block))
+    );
+    assert_eq!(
+        rw.insert_terminator(
+            open,
+            BuilderDialect::Jump(Successor::from_block(terminated), vec![dead_value]),
+        ),
+        Err(RewriteError::UnknownValue(dead_value))
+    );
+    assert_eq!(
+        rw.insert_terminator(dead_block, BuilderDialect::Return),
+        Err(RewriteError::UnknownBlock(dead_block))
+    );
+
+    assert!(rw.events().is_empty());
+    assert_eq!(rw.stage().statement_arena().len(), stmts_before);
+    assert_eq!(open.terminator(rw.stage()), None);
+    assert!(preds(rw.stage(), terminated).is_empty());
+    verify_derived(rw.stage()).unwrap();
 }
 
 #[test]
