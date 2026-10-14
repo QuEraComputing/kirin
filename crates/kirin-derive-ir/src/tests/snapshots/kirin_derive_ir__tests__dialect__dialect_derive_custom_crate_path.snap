@@ -342,3 +342,21 @@ impl kirin_ir::HasCallableBody for Nop {
         ::core::option::Option::None
     }
 }
+#[automatically_derived]
+impl kirin_ir::BranchOp for Nop {
+    fn successor_operands(&self, index: usize) -> ::core::option::Option<&[kirin_ir::SSAValue]> {
+        {
+            let _ = index;
+            ::core::option::Option::None
+        }
+    }
+    fn successor_operands_mut(
+        &mut self,
+        index: usize,
+    ) -> ::core::option::Option<&mut ::std::vec::Vec<kirin_ir::SSAValue>> {
+        {
+            let _ = index;
+            ::core::option::Option::None
+        }
+    }
+}

@@ -21,6 +21,8 @@ pub struct KirinStructOptions {
     pub terminator: bool,
     #[darling(default)]
     pub edge: bool,
+    #[darling(default)]
+    pub branch_op: bool,
 }
 
 /// Raw darling-parsed options for enum inputs.
@@ -43,6 +45,8 @@ pub struct KirinEnumOptions {
     pub terminator: bool,
     #[darling(default)]
     pub edge: bool,
+    #[darling(default)]
+    pub branch_op: bool,
 }
 
 /// Per-variant/statement options from `#[kirin(...)]`.
@@ -160,6 +164,9 @@ pub struct GlobalOptions {
     pub terminator: bool,
     /// Whether the operation is an edge.
     pub edge: bool,
+    /// Whether the type implements `BranchOp` by hand (`#[kirin(branch_op)]`),
+    /// so `#[derive(Dialect)]` must not generate it.
+    pub branch_op: bool,
 }
 
 impl FromDeriveInput for GlobalOptions {
@@ -198,6 +205,7 @@ impl From<KirinStructOptions> for GlobalOptions {
             speculatable: opts.speculatable,
             terminator: opts.terminator,
             edge: opts.edge,
+            branch_op: opts.branch_op,
         }
     }
 }
@@ -227,6 +235,7 @@ impl From<KirinEnumOptions> for GlobalOptions {
             speculatable: value.speculatable,
             terminator: value.terminator,
             edge: value.edge,
+            branch_op: value.branch_op,
         }
     }
 }

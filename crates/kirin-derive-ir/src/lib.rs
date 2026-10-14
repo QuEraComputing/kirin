@@ -3,6 +3,7 @@ extern crate proc_macro;
 use proc_macro::TokenStream;
 use syn::parse_macro_input;
 
+mod branch_op;
 mod generate;
 mod has_callable_body;
 mod has_signature;

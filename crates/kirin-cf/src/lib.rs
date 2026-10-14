@@ -26,7 +26,7 @@ use kirin::prelude::*;
 
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[non_exhaustive]
-#[kirin(terminator, builders, type = T)]
+#[kirin(terminator, builders, branch_op, type = T)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ControlFlow<T: CompileTimeValue> {
     #[chumsky(format = "$br {target}({args})")]
@@ -46,6 +46,29 @@ pub enum ControlFlow<T: CompileTimeValue> {
     },
     #[doc(hidden)]
     __Phantom(std::marker::PhantomData<T>),
+}
+
+/// `br` forwards `args` to its only successor; `cond_br` forwards
+/// `true_args` to successor 0 and `false_args` to successor 1. The condition
+/// is not forwarded anywhere.
+impl<T: CompileTimeValue> BranchOp for ControlFlow<T> {
+    fn successor_operands(&self, index: usize) -> Option<&[SSAValue]> {
+        match (self, index) {
+            (ControlFlow::Branch { args, .. }, 0) => Some(args),
+            (ControlFlow::ConditionalBranch { true_args, .. }, 0) => Some(true_args),
+            (ControlFlow::ConditionalBranch { false_args, .. }, 1) => Some(false_args),
+            _ => None,
+        }
+    }
+
+    fn successor_operands_mut(&mut self, index: usize) -> Option<&mut Vec<SSAValue>> {
+        match (self, index) {
+            (ControlFlow::Branch { args, .. }, 0) => Some(args),
+            (ControlFlow::ConditionalBranch { true_args, .. }, 0) => Some(true_args),
+            (ControlFlow::ConditionalBranch { false_args, .. }, 1) => Some(false_args),
+            _ => None,
+        }
+    }
 }
 
 pub mod interpreter;

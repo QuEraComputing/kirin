@@ -492,3 +492,31 @@ where
         }
     }
 }
+#[automatically_derived]
+impl ::kirin::ir::BranchOp for MixedOps {
+    fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
+        match self {
+            Self::Add(field_0) => {
+                <AddOp as ::kirin::ir::BranchOp>::successor_operands(field_0, index)
+            }
+            Self::Literal { value } => {
+                let _ = index;
+                ::core::option::Option::None
+            }
+        }
+    }
+    fn successor_operands_mut(
+        &mut self,
+        index: usize,
+    ) -> ::core::option::Option<&mut ::std::vec::Vec<::kirin::ir::SSAValue>> {
+        match self {
+            Self::Add(field_0) => {
+                <AddOp as ::kirin::ir::BranchOp>::successor_operands_mut(field_0, index)
+            }
+            Self::Literal { value } => {
+                let _ = index;
+                ::core::option::Option::None
+            }
+        }
+    }
+}

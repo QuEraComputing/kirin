@@ -76,3 +76,25 @@ mod interpreter {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use kirin_ir::{Block, BranchOp, Id, SSAValue, Successor, TestSSAValue};
+
+    /// The derive-generated `BranchOp` forwards a `#[wraps]` variant to the
+    /// wrapped dialect's hand-written implementation.
+    #[test]
+    fn branch_op_forwards_through_wrapped_control_flow() {
+        let args: Vec<SSAValue> = vec![TestSSAValue(1).into(), TestSSAValue(2).into()];
+        let mut op = ArithFunctionLanguage::ControlFlow(ControlFlow::Branch {
+            target: Successor::from_block(Block::from(Id::from(TestSSAValue(10)))),
+            args: args.clone(),
+        });
+        assert_eq!(op.successor_operands(0), Some(args.as_slice()));
+        assert_eq!(op.successor_operands(1), None);
+
+        op.successor_operands_mut(0).unwrap().pop();
+        assert_eq!(op.successor_operands(0), Some(&args[..1]));
+    }
+}

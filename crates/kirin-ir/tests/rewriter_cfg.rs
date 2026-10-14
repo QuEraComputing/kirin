@@ -828,17 +828,17 @@ fn insert_block_arg_shifts_arguments_and_rewrites_edges() {
     let (real_a, real_b) = (arg(&stage, entry, 0), arg(&stage, entry, 1));
     let real_x = arg(&stage, target, 0);
 
-    // Prepend an i64 argument; the edge must now forward (b, a).
+    // Prepend an i64 argument fed by b; the edge must now forward (b, a).
     let (fresh, events) = {
         let mut rw = Rewriter::new(&mut stage);
+        let mut asked = Vec::new();
         let fresh = rw
-            .insert_block_arg(target, 0, TestType::I64, |_, definition| match definition {
-                BuilderDialect::Jump(succ, args) => {
-                    BuilderDialect::Jump(*succ, [vec![real_b], args.clone()].concat())
-                }
-                other => other.clone(),
+            .insert_block_arg(target, 0, TestType::I64, |stmt, successor| {
+                asked.push((stmt, successor));
+                real_b
             })
             .unwrap();
+        assert_eq!(asked, vec![(jump, 0)], "one value per incoming edge");
         (SSAValue::from(fresh), rw.drain_events())
     };
     assert_eq!(
@@ -880,7 +880,7 @@ fn insert_block_arg_rejects_without_mutating() {
 
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
-        rw.insert_block_arg(target, 2, TestType::I32, |_, d| d.clone()),
+        rw.insert_block_arg(target, 2, TestType::I32, |_, _| dead_value),
         Err(RewriteError::BlockArgumentIndexOutOfRange {
             block: target,
             index: 2,
@@ -888,9 +888,7 @@ fn insert_block_arg_rejects_without_mutating() {
     );
     // A rewritten edge is checked like replace_statement before any edit.
     assert_eq!(
-        rw.insert_block_arg(target, 1, TestType::I32, |_, _| {
-            BuilderDialect::Jump(Successor::from_block(target), vec![dead_value])
-        }),
+        rw.insert_block_arg(target, 1, TestType::I32, |_, _| dead_value),
         Err(RewriteError::UnknownValue(dead_value))
     );
 
@@ -916,11 +914,7 @@ fn erase_block_arg_shifts_arguments_and_rewrites_edges() {
     // Drop the unused x; the edge must stop forwarding a.
     {
         let mut rw = Rewriter::new(&mut stage);
-        rw.erase_block_arg(target, 0, |_, definition| match definition {
-            BuilderDialect::Jump(succ, args) => BuilderDialect::Jump(*succ, args[1..].to_vec()),
-            other => other.clone(),
-        })
-        .unwrap();
+        rw.erase_block_arg(target, 0).unwrap();
     }
 
     assert_eq!(
@@ -948,14 +942,14 @@ fn erase_block_arg_rejects_used_and_out_of_range_arguments() {
 
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
-        rw.erase_block_arg(target, 0, |_, d| d.clone()),
+        rw.erase_block_arg(target, 0),
         Err(RewriteError::BlockArgumentInUse {
             block: target,
             index: 0,
         })
     );
     assert_eq!(
-        rw.erase_block_arg(target, 1, |_, d| d.clone()),
+        rw.erase_block_arg(target, 1),
         Err(RewriteError::BlockArgumentIndexOutOfRange {
             block: target,
             index: 1,
@@ -964,4 +958,36 @@ fn erase_block_arg_rejects_used_and_out_of_range_arguments() {
 
     assert!(rw.events().is_empty());
     assert_eq!(target.expect_info(rw.stage()).arguments, args_before);
+}
+
+#[test]
+fn block_arg_edits_reject_edges_without_successor_operands() {
+    let mut stage = new_stage();
+
+    // entry -branch-> target(x): `Branch` forwards no operand list, so its
+    // edge cannot gain or lose an operand.
+    let target = stage.block().argument(TestType::I32).new();
+    let branch = stage.statement().definition(br(target)).new();
+    let entry = stage.block().terminator(branch).new();
+    let _cfg = stage.cfg().add_block(entry).add_block(target).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let args_before = target.expect_info(&stage).arguments.clone();
+    let x = arg(&stage, target, 0);
+
+    let mut rw = Rewriter::new(&mut stage);
+    let expected = Err(RewriteError::NoSuccessorOperands {
+        stmt: branch,
+        successor: 0,
+    });
+    assert_eq!(rw.erase_block_arg(target, 0), expected);
+    assert_eq!(
+        rw.insert_block_arg(target, 0, TestType::I32, |_, _| x)
+            .map(|_| ()),
+        expected
+    );
+
+    assert!(rw.events().is_empty());
+    assert_eq!(target.expect_info(rw.stage()).arguments, args_before);
+    verify_derived(rw.stage()).unwrap();
 }

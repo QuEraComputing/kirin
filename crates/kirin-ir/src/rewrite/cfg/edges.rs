@@ -1,3 +1,5 @@
+use smallvec::SmallVec;
+
 use crate::arena::GetInfo;
 use crate::{
     Block, BlockArgument, Dialect, SSAKind, SSAValue, Statement, StatementParent, Successor,
@@ -61,14 +63,21 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// Insert a fresh argument of type `ty` at position `index` of `block`
-    /// (`index == len` appends), and rewrite every incoming edge to match.
+    /// (`index == len` appends), and insert the matching operand into every
+    /// incoming edge.
     ///
-    /// Which operands an edge forwards to which successor is dialect-specific,
-    /// so `fix_edge` is called once per statement (in a predecessor block)
-    /// that has `block` as a successor, with that statement and its current
-    /// definition, and returns the rewritten definition. Every rewritten
-    /// definition is checked as by [`Rewriter::replace_statement`] before any
-    /// edit is made. Returns the new argument.
+    /// Edges are found through [`BranchOp`](crate::BranchOp): for each
+    /// statement (in a predecessor block) that has `block` as a successor,
+    /// `forwarded(stmt, successor)` gives the value that edge passes for the
+    /// new argument, where `successor` is the edge's position in
+    /// `successors()`. Every rewritten edge is checked as by
+    /// [`Rewriter::replace_statement`] before any edit is made. Returns the new
+    /// argument.
+    ///
+    /// Rejects, leaving the stage untouched, if `index` is past the end of the
+    /// argument list, an incoming edge has no editable operand list
+    /// ([`RewriteError::NoSuccessorOperands`]), an edge's operand list is
+    /// shorter than `index`, or a forwarded value is not live.
     ///
     /// Records one [`MutationEvent::ReplacedStatement`] per rewritten edge
     /// statement, then [`MutationEvent::ChangedCfg`].
@@ -77,13 +86,23 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         block: Block,
         index: usize,
         ty: L::Type,
-        fix_edge: impl FnMut(Statement, &L) -> L,
+        mut forwarded: impl FnMut(Statement, usize) -> SSAValue,
     ) -> Result<BlockArgument, RewriteError> {
         let cfg = self.owning_cfg(block)?;
         if index > self.live_block(block)?.arguments.len() {
             return Err(RewriteError::BlockArgumentIndexOutOfRange { block, index });
         }
-        let edges = self.prepare_incoming_edges(block, fix_edge)?;
+        let edges = self.prepare_incoming_edges(block, |stmt, successor, operands| {
+            if index > operands.len() {
+                return Err(RewriteError::SuccessorOperandIndexOutOfRange {
+                    stmt,
+                    successor,
+                    index,
+                });
+            }
+            operands.insert(index, forwarded(stmt, successor));
+            Ok(())
+        })?;
 
         let arg = self.alloc_block_argument(block, index, ty);
         if let Some(info) = block.get_info_mut(self.stage) {
@@ -96,19 +115,17 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(arg)
     }
 
-    /// Remove argument `index` of `block`, tombstoning it, and rewrite every
-    /// incoming edge to match. The argument must have no uses.
+    /// Remove argument `index` of `block`, tombstoning it, and remove the
+    /// matching operand from every incoming edge (found through
+    /// [`BranchOp`](crate::BranchOp)). The argument must have no uses.
     ///
-    /// `fix_edge` works as for [`Rewriter::insert_block_arg`].
+    /// Rejects, leaving the stage untouched, if `index` is out of range, the
+    /// argument is still used, an incoming edge has no editable operand list,
+    /// or an edge's operand list has no operand at `index`.
     ///
     /// Records one [`MutationEvent::ReplacedStatement`] per rewritten edge
     /// statement, then [`MutationEvent::ChangedCfg`].
-    pub fn erase_block_arg(
-        &mut self,
-        block: Block,
-        index: usize,
-        fix_edge: impl FnMut(Statement, &L) -> L,
-    ) -> Result<(), RewriteError> {
+    pub fn erase_block_arg(&mut self, block: Block, index: usize) -> Result<(), RewriteError> {
         let cfg = self.owning_cfg(block)?;
         let arg: SSAValue = self
             .live_block(block)?
@@ -123,7 +140,17 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         {
             return Err(RewriteError::BlockArgumentInUse { block, index });
         }
-        let edges = self.prepare_incoming_edges(block, fix_edge)?;
+        let edges = self.prepare_incoming_edges(block, |stmt, successor, operands| {
+            if index >= operands.len() {
+                return Err(RewriteError::SuccessorOperandIndexOutOfRange {
+                    stmt,
+                    successor,
+                    index,
+                });
+            }
+            operands.remove(index);
+            Ok(())
+        })?;
 
         if let Some(info) = block.get_info_mut(self.stage) {
             info.arguments.remove(index);
@@ -136,22 +163,37 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(())
     }
 
-    /// Rewrite every statement that branches to `block` with `fix_edge` and
-    /// check each result, without mutating.
+    /// For every statement that branches to `block`, apply `edit` to the
+    /// operand list it forwards on each such edge (a statement may target
+    /// `block` more than once), then check the edited definition, without
+    /// mutating the stage.
     fn prepare_incoming_edges(
         &self,
         block: Block,
-        mut fix_edge: impl FnMut(Statement, &L) -> L,
+        mut edit: impl FnMut(Statement, usize, &mut Vec<SSAValue>) -> Result<(), RewriteError>,
     ) -> Result<Vec<(Statement, PreparedReplacement, L)>, RewriteError> {
         let mut edges = Vec::new();
         for &pred in &self.live_block(block)?.predecessors {
             for stmt in self.block_statements(pred) {
                 let definition = &stmt.expect_info(self.stage).definition;
-                if definition.successors().any(|s| s.target() == block) {
-                    let definition = fix_edge(stmt, definition);
-                    let prepared = self.prepare_replacement(stmt, &definition)?;
-                    edges.push((stmt, prepared, definition));
+                let positions: SmallVec<[usize; 2]> = definition
+                    .successors()
+                    .enumerate()
+                    .filter(|(_, successor)| successor.target() == block)
+                    .map(|(position, _)| position)
+                    .collect();
+                if positions.is_empty() {
+                    continue;
                 }
+                let mut definition = definition.clone();
+                for successor in positions {
+                    let operands = definition
+                        .successor_operands_mut(successor)
+                        .ok_or(RewriteError::NoSuccessorOperands { stmt, successor })?;
+                    edit(stmt, successor, operands)?;
+                }
+                let prepared = self.prepare_replacement(stmt, &definition)?;
+                edges.push((stmt, prepared, definition));
             }
         }
         Ok(edges)

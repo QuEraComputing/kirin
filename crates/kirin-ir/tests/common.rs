@@ -257,6 +257,23 @@ impl IsEdge for BuilderDialect {
     }
 }
 
+/// Only `Jump` forwards operands; `Branch`/`CondBranch` carry none.
+impl BranchOp for BuilderDialect {
+    fn successor_operands(&self, index: usize) -> Option<&[SSAValue]> {
+        match (self, index) {
+            (BuilderDialect::Jump(_, args), 0) => Some(args),
+            _ => None,
+        }
+    }
+
+    fn successor_operands_mut(&mut self, index: usize) -> Option<&mut Vec<SSAValue>> {
+        match (self, index) {
+            (BuilderDialect::Jump(_, args), 0) => Some(args),
+            _ => None,
+        }
+    }
+}
+
 impl Dialect for BuilderDialect {
     type Type = TestType;
 }

@@ -527,3 +527,29 @@ where
         }
     }
 }
+#[automatically_derived]
+impl ::kirin::ir::BranchOp for MixedWraps {
+    fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
+        match self {
+            Self::Simple(field_0) => {
+                <SimpleOp as ::kirin::ir::BranchOp>::successor_operands(field_0, index)
+            }
+            Self::Wrapped { inner, tag } => {
+                <InnerOp as ::kirin::ir::BranchOp>::successor_operands(inner, index)
+            }
+        }
+    }
+    fn successor_operands_mut(
+        &mut self,
+        index: usize,
+    ) -> ::core::option::Option<&mut ::std::vec::Vec<::kirin::ir::SSAValue>> {
+        match self {
+            Self::Simple(field_0) => {
+                <SimpleOp as ::kirin::ir::BranchOp>::successor_operands_mut(field_0, index)
+            }
+            Self::Wrapped { inner, tag } => {
+                <InnerOp as ::kirin::ir::BranchOp>::successor_operands_mut(inner, index)
+            }
+        }
+    }
+}

@@ -1761,15 +1761,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         block: Block,
         index: usize,
         ty: L::Type,
-        fix_edge: impl FnMut(Statement, &L) -> L,
+        forwarded: impl FnMut(Statement, usize) -> SSAValue,
     ) -> Result<BlockArgument, RewriteError>;
 
-    pub fn erase_block_arg(
-        &mut self,
-        block: Block,
-        index: usize,
-        fix_edge: impl FnMut(Statement, &L) -> L,
-    ) -> Result<(), RewriteError>;
+    pub fn erase_block_arg(&mut self, block: Block, index: usize) -> Result<(), RewriteError>;
 
     // --- Immediate change/event log (current prototype API) ---
     pub fn events(&self) -> &[MutationEvent];
@@ -1797,7 +1792,7 @@ stage remains valid.
 | `split_block` | Move `at`, its successors in the chain, and the terminator into a new block placed after the original; close the original with the terminator `make_branch(new_block)` returns. | `ChangedBlockList`, `InsertedStatement`, `ChangedCfg` | new block has no arguments; branch must be a result-less terminator with live operands/targets |
 | `merge_blocks` | Erase `pred`'s terminator, redirect `succ`'s arguments to `arg_replacements`, splice `succ`'s statements and terminator onto `pred`, tombstone `succ`. | `ErasedStatement`, the `replace_all_uses` events, `ChangedBlockList`, `ChangedCfg` | same `Cfg`, distinct blocks, exact argument arity; no CFG-shape check (other edges into `succ` dangle) |
 | `retarget_successor` | Point every successor slot of `stmt` naming `old` at `new`. | `ChangedCfg` (none if nothing changed) | returns the count rewritten; `old` may be dead (repairs a dangling edge), `new` must be live |
-| `insert_block_arg` / `erase_block_arg` | Insert or erase one block argument, renumbering later ones, and rewrite each incoming edge through `fix_edge`. | one `ReplacedStatement` per edge, then `ChangedCfg` | every rewritten edge is checked before any edit; an erased argument must be unused; `fix_edge` stands in for `HasCfgEdges` until that lands |
+| `insert_block_arg` / `erase_block_arg` | Insert or erase one block argument, renumbering later ones, and insert or remove the matching operand on each incoming edge through `BranchOp`. `insert_block_arg` asks `forwarded(stmt, successor)` for each edge's new operand. | one `ReplacedStatement` per edge, then `ChangedCfg` | every rewritten edge is checked before any edit; an erased argument must be unused; every incoming edge needs an editable operand list (`NoSuccessorOperands` otherwise) |
 
 Deferred to later slices (each is rejected, not silently mishandled):
 terminator and `DiGraph`/`UnGraph`-body surgery;
@@ -1971,6 +1966,8 @@ axis — hence the column.
 | `BlockArgumentArityMismatch { block, expected, found }` | guard | values do not line up one-for-one with the block's arguments | `merge_blocks` |
 | `BlockArgumentIndexOutOfRange { block, index }` | liveness | argument index past the block's argument list (for insertion, past its end) | `insert_block_arg`, `erase_block_arg` |
 | `BlockArgumentInUse { block, index }` | guard | the argument still has uses (or, for `erase_block`, uses outside the block); replace them first | `erase_block_arg`, `erase_block` |
+| `NoSuccessorOperands { stmt, successor }` | guard | an incoming edge's `BranchOp` gives no editable operand list for that successor | `insert_block_arg`, `erase_block_arg` |
+| `SuccessorOperandIndexOutOfRange { stmt, successor, index }` | guard | an incoming edge forwards too few operands for `index` (its arity disagrees with the block's) | `insert_block_arg`, `erase_block_arg` |
 | `OperandIndexOutOfRange { stmt, index }` | liveness | operand index past the statement's operand list | `replace_operand` |
 | `NotInBlockBody(stmt)` | deferred | statement is owned by a `DiGraph`/`UnGraph` (or nothing), not a block — graph surgery deferred | `erase_statement`, `insert_*`, `replace_statement` |
 | `CannotEraseTerminator(stmt)` | deferred | erasing a block terminator would need control-flow repair, deferred | `erase_statement` |
@@ -2690,17 +2687,20 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   edit maintains the topology mirror atomically; there is no dirty interval.
 - [ ] Terminator surgery: erase/replace a terminator, maintaining
   `BlockInfo::terminator` and successor edges. Emits `ChangedTerminator`.
-- [ ] Add the grouped operation-owned `HasCfgEdges` view that preserves each
-  successor together with its forwarded arguments and separates non-edge
-  operands.
+- [x] Add the grouped operation-owned `HasCfgEdges` view that preserves each
+  successor together with its forwarded arguments. Landed as the `BranchOp`
+  trait (after MLIR's `BranchOpInterface`): a `Dialect` supertrait whose
+  `successor_operands(index)` / `successor_operands_mut(index)` give the
+  operands forwarded to each successor. `#[derive(Dialect)]` generates it
+  (forwarding through `#[wraps]`, `None` otherwise); branch dialects opt out
+  with `#[kirin(branch_op)]` and implement it by hand, as `kirin-cf` does.
 - [x] **`Cfg` block-list surgery**: append/insert/erase/split/merge blocks,
   retarget successors, insert/erase block arguments across incoming edges.
   Emits `ChangedBlockList` / `ChangedCfg`. This is the capability
   [Level 5](#level-5-cfg-fragment) assumes and the one no earlier milestone
-  named. Edge operands are rewritten through a caller-supplied `fix_edge`
-  closure until `HasCfgEdges` lands; `split_block` likewise takes the branch
-  from a `make_branch` closure, since `kirin-ir` cannot construct a dialect's
-  branch.
+  named. Edge operands are edited through `BranchOp`; `split_block` takes the
+  branch from a `make_branch` closure, since `kirin-ir` cannot construct a
+  dialect's branch.
 - [ ] `DiGraph` body surgery: insert/erase nodes with petgraph topology and
   `yields` maintenance. Emits `ChangedDiGraphTopology`.
 - [ ] `UnGraph` body surgery: insert/erase nodes and edge statements, maintaining

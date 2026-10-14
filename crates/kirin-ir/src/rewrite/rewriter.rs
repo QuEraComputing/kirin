@@ -171,6 +171,17 @@ pub enum RewriteError {
     BlockArgumentIndexOutOfRange { block: Block, index: usize },
     /// Dropping the block argument would leave dangling uses. Replace them first.
     BlockArgumentInUse { block: Block, index: usize },
+    /// `stmt` branches to a block through successor position `successor`, but
+    /// its [`BranchOp`](crate::BranchOp) gives no editable operand list for
+    /// that edge.
+    NoSuccessorOperands { stmt: Statement, successor: usize },
+    /// The operand list `stmt` forwards on successor `successor` has no slot at
+    /// `index` (for insertion, `index` is past its end).
+    SuccessorOperandIndexOutOfRange {
+        stmt: Statement,
+        successor: usize,
+        index: usize,
+    },
 }
 
 impl fmt::Display for RewriteError {
@@ -263,6 +274,22 @@ impl fmt::Display for RewriteError {
                 write!(
                     f,
                     "argument index {index} is out of range for block {block:?}"
+                )
+            }
+            RewriteError::NoSuccessorOperands { stmt, successor } => {
+                write!(
+                    f,
+                    "{stmt:?} forwards no editable operands on successor {successor}"
+                )
+            }
+            RewriteError::SuccessorOperandIndexOutOfRange {
+                stmt,
+                successor,
+                index,
+            } => {
+                write!(
+                    f,
+                    "operand index {index} is out of range for successor {successor} of {stmt:?}"
                 )
             }
             RewriteError::BlockArgumentInUse { block, index } => {
