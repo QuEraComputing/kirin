@@ -254,10 +254,10 @@ impl<L: Dialect> From<SSAInfo<L>> for BuilderSSAInfo<L> {
 /// `UnGraph` has no analogue: its `Extra` is a list of edge *statements*, whose
 /// operands are already ordinary statement-operand uses.
 ///
-/// Populated by
-/// [`StageInfo::rebuild_use_index`](crate::StageInfo::rebuild_use_index) at
-/// finalization; a mutation layer (the rewriter) must keep it in sync with
-/// every operand and yield change.
+/// Derived and installed at finalization, then maintained incrementally by
+/// [`Rewriter`](crate::Rewriter) on every operand and yield change.
+/// [`verify_derived`](crate::verify_derived) checks the installed index
+/// against a fresh derivation; it is never repaired in place.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Use {

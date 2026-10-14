@@ -25,6 +25,7 @@ use kirin_scf::{AbstractScfForFrame, AbstractScfIfFrame, ScfForFrame, ScfIfFrame
 #[derive(Frame)]
 pub(crate) enum ToyFrame<V, E> {
     Block(BlockFrame<V, E>),
+    #[allow(clippy::upper_case_acronyms)]
     CFG(CFGFrame<V, E>),
     Call(CallFrame<V>),
     DiGraph(DiGraphFrame<V, E>),

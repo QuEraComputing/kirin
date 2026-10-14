@@ -134,6 +134,12 @@ impl<L: Dialect> GraphInfo<L, petgraph::Directed, DiGraphExtra> {
     pub fn yields(&self) -> &[SSAValue] {
         &self.extra.yields
     }
+
+    /// Mutable access to the yield slots, for the rewriter to replace a
+    /// yielded value in place while maintaining the def-use index.
+    pub fn yields_mut(&mut self) -> &mut [SSAValue] {
+        &mut self.extra.yields
+    }
 }
 
 // --- Undirected graph convenience accessors ---

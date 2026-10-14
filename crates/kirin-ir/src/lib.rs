@@ -2,6 +2,7 @@ mod arena;
 mod body;
 mod builder;
 mod comptime;
+mod derived;
 mod detach;
 mod intern;
 mod language;
@@ -10,6 +11,7 @@ mod node;
 mod pipeline;
 mod product;
 mod project;
+mod rewrite;
 mod signature;
 mod stage;
 
@@ -24,6 +26,7 @@ pub use builder::error::{
 };
 pub use builder::{AsBuildStage, BuilderStageInfo, FinalizeError};
 pub use comptime::{CompileTimeValue, Placeholder, Typeof};
+pub use derived::{DeriveError, Finding, Mismatch, VerifyError, verify_derived};
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
@@ -44,6 +47,7 @@ pub use node::{
 pub use pipeline::Pipeline;
 pub use product::{HasProduct, Product};
 pub use project::{Project, ProjectError, TryProject, TryProjectTo};
+pub use rewrite::{MutationEvent, RewriteError, Rewriter};
 pub use signature::{
     ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
