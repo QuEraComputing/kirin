@@ -820,6 +820,28 @@ fn erasing_the_terminator_keeps_the_chain_and_clears_the_terminator() {
 }
 
 #[test]
+fn a_non_terminator_with_successors_fails_finalization() {
+    let mut stage = new_stage();
+    // `Fork` carries a successor without being a terminator: invalid IR.
+    let target = stage.block().new();
+    let fork = stage
+        .statement()
+        .definition(BuilderDialect::Fork(Successor::from_block(target)))
+        .new();
+    let source = stage.block().stmt(fork).new();
+    let _cfg = stage.cfg().add_block(source).add_block(target).new();
+
+    // Reported once, and its edge is not derived (no other finding, such as
+    // a predecessor mismatch, accompanies it).
+    assert_eq!(
+        stage.finalize().err(),
+        Some(FinalizeError::MalformedIR(vec![
+            Finding::NonTerminatorSuccessor { stmt: fork }
+        ]))
+    );
+}
+
+#[test]
 fn a_block_holding_only_a_terminator_has_an_empty_chain() {
     let mut stage = new_stage();
     let terminator = stage.statement().definition(BuilderDialect::Return).new();

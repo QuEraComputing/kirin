@@ -1470,9 +1470,12 @@ Pure derivation replaces the public mutating `rebuild_use_index` and
 out-of-range/tombstoned statement operands produce
 `DanglingOperand { stmt, index, value }`; directed-graph yields produce
 `DanglingYield { graph, index, value }`; successor references to a dead block
-produce `DanglingSuccessor { stmt, target }`. Body ownership follows the same
-rule: a membership pointer naming a dead container produces `DanglingParent`,
-and the chain walker's own defects arrive as `Chain(ChainFinding)`.
+produce `DanglingSuccessor { stmt, target }`. Only terminators may carry
+successors: a non-terminator that does produces
+`NonTerminatorSuccessor { stmt }` and contributes no edges. Body ownership
+follows the same rule: a membership pointer naming a dead container produces
+`DanglingParent`, and the chain walker's own defects arrive as
+`Chain(ChainFinding)`.
 Later derivations apply the same rule to graph membership and topology. Derivation
 collects independent findings rather than stopping at the first one — component
 derivations share one findings buffer instead of returning early, so a single
