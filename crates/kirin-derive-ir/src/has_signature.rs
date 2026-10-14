@@ -105,9 +105,25 @@ pub(crate) fn has_signature_template(crate_path: &syn::Path) -> TraitImplTemplat
     );
 
     let cp_for_return = crate_path.clone();
+    let cp_for_where = crate_path.clone();
 
     TraitImplTemplate::new(trait_path, default_crate)
         .trait_generics(|_ctx| quote! { <Self> })
+        // A wrapped bare type parameter has no derived `HasSignature` impl to
+        // delegate to, so the delegating impl has to require one.
+        .where_clause(move |ctx| {
+            let predicates: Vec<syn::WherePredicate> = ctx
+                .statements
+                .values()
+                .filter_map(|stmt_ctx| stmt_ctx.wrapper)
+                .filter(|wrapper| wrapper.wraps_bare_type_param(&ctx.meta.generics))
+                .map(|wrapper| {
+                    let ty = &wrapper.ty;
+                    syn::parse_quote! { #ty: #cp_for_where::HasSignature<#ty> }
+                })
+                .collect();
+            (!predicates.is_empty()).then(|| syn::parse_quote! { where #(#predicates),* })
+        })
         .method(MethodSpec {
             name: from_str("signature"),
             self_arg: quote! { &self },
