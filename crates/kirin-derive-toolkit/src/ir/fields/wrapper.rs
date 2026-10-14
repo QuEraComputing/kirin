@@ -82,4 +82,26 @@ impl Wrapper {
             lift_project_from: options.lift_project_from,
         }
     }
+
+    /// For enum Lang<L: Dialect> { Op(L), ... }, this function identifies
+    /// variants like `Op(L)` where the wrapped type is a bare type param.
+    ///
+    /// The derive treats such a variant specially, for two reasons:
+    /// - In the generated impls, `L` is only known to implement what its
+    ///   bounds say (`Dialect` and its supertraits), so delegating another
+    ///   trait to it, such as `HasSignature`, needs a `where` clause.
+    /// - `L` may be any type, including a sibling variant's wrapped type
+    ///   (`L = VariantTy<T>` makes `VariantTy<L::Type>` equal `L`), so `From<L>`
+    ///   would overlap with that sibling's `From`. For this case, we skip
+    ///   generating a `From` impl.
+    pub fn wraps_bare_type_param(&self, generics: &syn::Generics) -> bool {
+        let syn::Type::Path(type_path) = &self.ty else {
+            return false;
+        };
+        type_path.qself.is_none()
+            && type_path
+                .path
+                .get_ident()
+                .is_some_and(|ident| generics.type_params().any(|param| param.ident == *ident))
+    }
 }
