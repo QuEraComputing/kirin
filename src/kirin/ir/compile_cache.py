@@ -12,9 +12,11 @@ A kernel is looked up by a key over
 
 - its lowered IR, which holds the values of the globals, closure variables and
   attributes the lowering read,
-- the keys of the kernels its lowered IR refers to (a kernel that did not come
-  from a decorator, such as a closure returned by another kernel, is keyed by its
-  own IR and captured values),
+- the current IR and captured values of the kernels its lowered IR refers to,
+  directly or through other kernels, since a rewrite or pass may have changed
+  them in place after they were decorated, and their keys if they have one (a
+  kernel that did not come from a decorator, such as a closure returned by
+  another kernel, has none),
 - the dialect group, the source of its `run_pass` generator and the decorator's
   options,
 - the file the function is in, but not the line it starts at: a kernel that moved
@@ -54,7 +56,7 @@ if TYPE_CHECKING:
 ENV_VAR = "KIRIN_COMPILE_CACHE_DIR"
 """Override the source-local cache directory; `FALSE` disables caching (case-insensitive)."""
 
-FORMAT = "2"
+FORMAT = "3"
 """Part of every key; bump it when the key or the file layout changes."""
 
 _keys: dict[int, str] = {}
@@ -84,7 +86,7 @@ def directory(source_file: str) -> Path | None:
 class Fingerprint:
     key: str
     callees: tuple[Method, ...]
-    """Kernels the lowered IR refers to, directly or through kernels without a key."""
+    """Kernels the lowered IR refers to, directly or through other kernels."""
 
 
 def fingerprint(
@@ -106,21 +108,26 @@ def fingerprint(
         file = next(
             (stmt.source.file for stmt in code.walk() if stmt.source is not None), None
         )
-        text = "\n".join(
-            (
-                FORMAT,
-                _toolchain,
-                f"{names};{passes}",
-                _value_text((args, sorted(options.items())), state),
-                repr(file),
-                _ir_text(code, state),
-            )
-        )
+        parts = [
+            FORMAT,
+            _toolchain,
+            f"{names};{passes}",
+            _value_text((args, sorted(options.items())), state),
+            repr(file),
+            _ir_text(code, state),
+        ]
+        number = 0
+        while number < len(state.callees):
+            callee = state.callees[number]
+            parts.append(f"#{number}:{_keys.get(id(callee), '')}")
+            parts.append(_ir_text(callee.code, state))
+            parts.append(_value_text(callee.fields, state))
+            number += 1
+        text = "\n".join(parts)
     except Exception:
         # including from user code: compile as usual instead
         return None
-    callees = tuple({id(callee): callee for callee in state.callees}.values())
-    return Fingerprint(hashlib.sha256(text.encode()).hexdigest(), callees)
+    return Fingerprint(hashlib.sha256(text.encode()).hexdigest(), tuple(state.callees))
 
 
 def remember(mt: Method, key: str) -> None:
@@ -205,8 +212,9 @@ class _Keying:
     """State of one key computation."""
 
     callees: list[Method] = dataclasses.field(default_factory=list)
-    ir_keys: dict[int, str | None] = dataclasses.field(default_factory=dict)
-    """Keys of the methods without one, by `id`; `None` while being computed."""
+    """Kernels reached, in the order they were reached."""
+    numbers: dict[int, int] = dataclasses.field(default_factory=dict)
+    """Position of each kernel in `callees`, by `id`."""
 
 
 def _ir_text(code: Statement, state: _Keying) -> str:
@@ -275,21 +283,11 @@ def _value_text(value: Any, state: _Keying) -> str:
     if isinstance(value, type):
         return f"type:{value.__module__}.{value.__qualname__}"
     if isinstance(value, Method):
-        state.callees.append(value)
-        key = _keys.get(id(value))
-        if key is None:
-            # not from a decorator, e.g. a closure returned by a kernel: key it by
-            # its own IR and captured values
-            if id(value) in state.ir_keys:
-                key = state.ir_keys[id(value)]
-                if key is None:
-                    raise _Unkeyable  # refers to itself
-            else:
-                state.ir_keys[id(value)] = None
-                text = _ir_text(value.code, state) + _value_text(value.fields, state)
-                key = hashlib.sha256(text.encode()).hexdigest()
-                state.ir_keys[id(value)] = key
-        return f"Method:{key}"
+        number = state.numbers.get(id(value))
+        if number is None:
+            number = state.numbers[id(value)] = len(state.callees)
+            state.callees.append(value)
+        return f"Method:#{number}"
     if dataclasses.is_dataclass(value):
         names = [field.name for field in dataclasses.fields(value)]
         if set(getattr(value, "__dict__", ())) - set(names):
