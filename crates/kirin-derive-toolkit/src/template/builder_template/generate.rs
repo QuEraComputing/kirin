@@ -4,10 +4,12 @@ use crate::ir::{self, StandardLayout};
 use proc_macro2::TokenStream;
 use quote::quote;
 
-/// Generates constructor functions (`new()` / `op_*()`) and result types for IR statements.
+/// Generates constructor functions (`new()` / `op_*()` / `new_*()`) and result types for IR statements.
 ///
 /// Produces:
 /// - Per-statement builder functions that allocate SSA values
+/// - Per-statement `new_*()` constructors returning the statement as a value
+///   without allocating result SSA values.
 /// - A result module with typed return structs
 /// - `From` impls for wrapper variants
 ///
@@ -46,6 +48,7 @@ impl BuilderTemplate {
             name: stmt.name.clone(),
             fields,
             build_fn_name: fn_name,
+            constructor_name: helpers::constructor_name(stmt),
             is_wrapper: stmt.wraps.is_some(),
             wrapper_type: stmt.wraps.as_ref().map(|w| w.ty.clone()),
             wrapper_field: stmt.wraps.as_ref().map(|w| w.field.clone()),

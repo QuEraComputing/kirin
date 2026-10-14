@@ -1,0 +1,704 @@
+---
+source: crates/kirin-derive-ir/src/tests/dialect.rs
+expression: generate_dialect_code(input)
+---
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasArguments<'a> for Arith<T> {
+    type Iter = ArithArgumentsIter<'a>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithArgumentsIter::Add(std::iter::once(lhs).chain(std::iter::once(rhs))),
+            Self::CondBr { condition, target } => {
+                ArithArgumentsIter::CondBr(std::iter::once(condition))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithArgumentsIter<'a> {
+    Add(
+        std::iter::Chain<
+            std::iter::Once<&'a ::kirin::ir::SSAValue>,
+            std::iter::Once<&'a ::kirin::ir::SSAValue>,
+        >,
+    ),
+    CondBr(std::iter::Once<&'a ::kirin::ir::SSAValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithArgumentsIter<'a> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasArgumentsMut<'a> for Arith<T> {
+    type IterMut = ArithArgumentsMutIter<'a>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithArgumentsMutIter::Add(std::iter::once(lhs).chain(std::iter::once(rhs))),
+            Self::CondBr { condition, target } => {
+                ArithArgumentsMutIter::CondBr(std::iter::once(condition))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithArgumentsMutIter<'a> {
+    Add(
+        std::iter::Chain<
+            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+            std::iter::Once<&'a mut ::kirin::ir::SSAValue>,
+        >,
+    ),
+    CondBr(std::iter::Once<&'a mut ::kirin::ir::SSAValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithArgumentsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasResults<'a> for Arith<T> {
+    type Iter = ArithResultsIter<'a>;
+    fn results(&'a self) -> Self::Iter {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithResultsIter::Add(std::iter::once(result)),
+            Self::CondBr { condition, target } => {
+                ArithResultsIter::CondBr(std::iter::empty::<&'a ::kirin::ir::ResultValue>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithResultsIter<'a> {
+    Add(std::iter::Once<&'a ::kirin::ir::ResultValue>),
+    CondBr(std::iter::Empty<&'a ::kirin::ir::ResultValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithResultsIter<'a> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasResultsMut<'a> for Arith<T> {
+    type IterMut = ArithResultsMutIter<'a>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithResultsMutIter::Add(std::iter::once(result)),
+            Self::CondBr { condition, target } => {
+                ArithResultsMutIter::CondBr(std::iter::empty::<&'a mut ::kirin::ir::ResultValue>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithResultsMutIter<'a> {
+    Add(std::iter::Once<&'a mut ::kirin::ir::ResultValue>),
+    CondBr(std::iter::Empty<&'a mut ::kirin::ir::ResultValue>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithResultsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasBlocks<'a> for Arith<T> {
+    type Iter = ArithBlocksIter<'a>;
+    fn blocks(&'a self) -> Self::Iter {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithBlocksIter::Add(std::iter::empty::<&'a ::kirin::ir::Block>()),
+            Self::CondBr { condition, target } => {
+                ArithBlocksIter::CondBr(std::iter::empty::<&'a ::kirin::ir::Block>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithBlocksIter<'a> {
+    Add(std::iter::Empty<&'a ::kirin::ir::Block>),
+    CondBr(std::iter::Empty<&'a ::kirin::ir::Block>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithBlocksIter<'a> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasBlocksMut<'a> for Arith<T> {
+    type IterMut = ArithBlocksMutIter<'a>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithBlocksMutIter::Add(std::iter::empty::<&'a mut ::kirin::ir::Block>()),
+            Self::CondBr { condition, target } => {
+                ArithBlocksMutIter::CondBr(std::iter::empty::<&'a mut ::kirin::ir::Block>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithBlocksMutIter<'a> {
+    Add(std::iter::Empty<&'a mut ::kirin::ir::Block>),
+    CondBr(std::iter::Empty<&'a mut ::kirin::ir::Block>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithBlocksMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasSuccessors<'a> for Arith<T> {
+    type Iter = ArithSuccessorsIter<'a>;
+    fn successors(&'a self) -> Self::Iter {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithSuccessorsIter::Add(std::iter::empty::<&'a ::kirin::ir::Successor>()),
+            Self::CondBr { condition, target } => {
+                ArithSuccessorsIter::CondBr(std::iter::once(target))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithSuccessorsIter<'a> {
+    Add(std::iter::Empty<&'a ::kirin::ir::Successor>),
+    CondBr(std::iter::Once<&'a ::kirin::ir::Successor>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithSuccessorsIter<'a> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasSuccessorsMut<'a> for Arith<T> {
+    type IterMut = ArithSuccessorsMutIter<'a>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithSuccessorsMutIter::Add(std::iter::empty::<&'a mut ::kirin::ir::Successor>()),
+            Self::CondBr { condition, target } => {
+                ArithSuccessorsMutIter::CondBr(std::iter::once(target))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithSuccessorsMutIter<'a> {
+    Add(std::iter::Empty<&'a mut ::kirin::ir::Successor>),
+    CondBr(std::iter::Once<&'a mut ::kirin::ir::Successor>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithSuccessorsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasCFG<'a> for Arith<T> {
+    type Iter = ArithCFGIter<'a>;
+    fn cfgs(&'a self) -> Self::Iter {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithCFGIter::Add(std::iter::empty::<&'a ::kirin::ir::CFG>()),
+            Self::CondBr { condition, target } => {
+                ArithCFGIter::CondBr(std::iter::empty::<&'a ::kirin::ir::CFG>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithCFGIter<'a> {
+    Add(std::iter::Empty<&'a ::kirin::ir::CFG>),
+    CondBr(std::iter::Empty<&'a ::kirin::ir::CFG>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithCFGIter<'a> {
+    type Item = &'a ::kirin::ir::CFG;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasCFGMut<'a> for Arith<T> {
+    type IterMut = ArithCFGMutIter<'a>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithCFGMutIter::Add(std::iter::empty::<&'a mut ::kirin::ir::CFG>()),
+            Self::CondBr { condition, target } => {
+                ArithCFGMutIter::CondBr(std::iter::empty::<&'a mut ::kirin::ir::CFG>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithCFGMutIter<'a> {
+    Add(std::iter::Empty<&'a mut ::kirin::ir::CFG>),
+    CondBr(std::iter::Empty<&'a mut ::kirin::ir::CFG>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithCFGMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::CFG;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasDigraphs<'a> for Arith<T> {
+    type Iter = ArithDigraphsIter<'a>;
+    fn digraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithDigraphsIter::Add(std::iter::empty::<&'a ::kirin::ir::DiGraph>()),
+            Self::CondBr { condition, target } => {
+                ArithDigraphsIter::CondBr(std::iter::empty::<&'a ::kirin::ir::DiGraph>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithDigraphsIter<'a> {
+    Add(std::iter::Empty<&'a ::kirin::ir::DiGraph>),
+    CondBr(std::iter::Empty<&'a ::kirin::ir::DiGraph>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithDigraphsIter<'a> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasDigraphsMut<'a> for Arith<T> {
+    type IterMut = ArithDigraphsMutIter<'a>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithDigraphsMutIter::Add(std::iter::empty::<&'a mut ::kirin::ir::DiGraph>()),
+            Self::CondBr { condition, target } => {
+                ArithDigraphsMutIter::CondBr(std::iter::empty::<&'a mut ::kirin::ir::DiGraph>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithDigraphsMutIter<'a> {
+    Add(std::iter::Empty<&'a mut ::kirin::ir::DiGraph>),
+    CondBr(std::iter::Empty<&'a mut ::kirin::ir::DiGraph>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithDigraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasUngraphs<'a> for Arith<T> {
+    type Iter = ArithUngraphsIter<'a>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithUngraphsIter::Add(std::iter::empty::<&'a ::kirin::ir::UnGraph>()),
+            Self::CondBr { condition, target } => {
+                ArithUngraphsIter::CondBr(std::iter::empty::<&'a ::kirin::ir::UnGraph>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithUngraphsIter<'a> {
+    Add(std::iter::Empty<&'a ::kirin::ir::UnGraph>),
+    CondBr(std::iter::Empty<&'a ::kirin::ir::UnGraph>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithUngraphsIter<'a> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasUngraphsMut<'a> for Arith<T> {
+    type IterMut = ArithUngraphsMutIter<'a>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithUngraphsMutIter::Add(std::iter::empty::<&'a mut ::kirin::ir::UnGraph>()),
+            Self::CondBr { condition, target } => {
+                ArithUngraphsMutIter::CondBr(std::iter::empty::<&'a mut ::kirin::ir::UnGraph>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithUngraphsMutIter<'a> {
+    Add(std::iter::Empty<&'a mut ::kirin::ir::UnGraph>),
+    CondBr(std::iter::Empty<&'a mut ::kirin::ir::UnGraph>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithUngraphsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<T: CompileTimeValue> ::kirin::ir::IsTerminator for Arith<T> {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => false || false,
+            Self::CondBr { condition, target } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl<T: CompileTimeValue> ::kirin::ir::IsConstant for Arith<T> {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => false || false,
+            Self::CondBr { condition, target } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl<T: CompileTimeValue> ::kirin::ir::IsPure for Arith<T> {
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => false || false,
+            Self::CondBr { condition, target } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl<T: CompileTimeValue> ::kirin::ir::IsSpeculatable for Arith<T> {
+    fn is_speculatable(&self) -> bool {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => false || false,
+            Self::CondBr { condition, target } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl<T: CompileTimeValue> ::kirin::ir::IsEdge for Arith<T> {
+    fn is_edge(&self) -> bool {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => false || false,
+            Self::CondBr { condition, target } => false || false,
+        }
+    }
+}
+#[automatically_derived]
+impl<T: CompileTimeValue> Arith<T> {
+    #[allow(clippy::too_many_arguments)]
+    pub fn op_add<Lang>(
+        stage: &mut impl ::kirin::ir::AsBuildStage<Lang>,
+        lhs: impl Into<SSAValue>,
+        rhs: impl Into<SSAValue>,
+    ) -> arith_build_result::Add
+    where
+        Lang: ::kirin::ir::Dialect + ::core::convert::From<Arith<T>>,
+        Lang::Type: From<T>,
+        T: ::kirin::ir::Placeholder,
+    {
+        let stage = stage.as_build_stage();
+        {
+            let add_statement_id = stage.statement_arena().next_id();
+            let lhs: SSAValue = lhs.into();
+            let rhs: SSAValue = rhs.into();
+            let marker: std::marker::PhantomData<T> = ::core::default::Default::default();
+            let result: ResultValue = stage
+                .ssa()
+                .kind(::kirin::ir::BuilderSSAKind::Result(
+                    add_statement_id,
+                    0usize,
+                ))
+                .ty(Lang::Type::from(T::placeholder()))
+                .new()
+                .into();
+            stage
+                .statement()
+                .definition(<Lang as ::core::convert::From<Arith<T>>>::from(Self::Add {
+                    lhs: lhs,
+                    rhs: rhs,
+                    result: result,
+                    marker: marker,
+                }))
+                .new();
+            arith_build_result::Add {
+                id: add_statement_id,
+                result,
+            }
+        }
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_add(
+        lhs: impl Into<SSAValue>,
+        rhs: impl Into<SSAValue>,
+        result: ResultValue,
+    ) -> Self {
+        let lhs: SSAValue = lhs.into();
+        let rhs: SSAValue = rhs.into();
+        let marker: std::marker::PhantomData<T> = ::core::default::Default::default();
+        Self::Add {
+            lhs: lhs,
+            rhs: rhs,
+            result: result,
+            marker: marker,
+        }
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn op_cond_br<Lang>(
+        stage: &mut impl ::kirin::ir::AsBuildStage<Lang>,
+        condition: impl Into<SSAValue>,
+        target: impl Into<Successor>,
+    ) -> arith_build_result::CondBr
+    where
+        Lang: ::kirin::ir::Dialect + ::core::convert::From<Arith<T>>,
+        Lang::Type: From<T>,
+    {
+        let stage = stage.as_build_stage();
+        {
+            let condbr_statement_id = stage.statement_arena().next_id();
+            let condition: SSAValue = condition.into();
+            let target: Successor = target.into();
+            stage
+                .statement()
+                .definition(<Lang as ::core::convert::From<Arith<T>>>::from(
+                    Self::CondBr {
+                        condition: condition,
+                        target: target,
+                    },
+                ))
+                .new();
+            arith_build_result::CondBr {
+                id: condbr_statement_id,
+            }
+        }
+    }
+    #[allow(clippy::too_many_arguments)]
+    pub fn new_cond_br(condition: impl Into<SSAValue>, target: impl Into<Successor>) -> Self {
+        let condition: SSAValue = condition.into();
+        let target: Successor = target.into();
+        Self::CondBr {
+            condition: condition,
+            target: target,
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub mod arith_build_result {
+    use kirin::ir::{ResultValue, Statement};
+    #[automatically_derived]
+    #[doc(hidden)]
+    pub struct Add {
+        pub id: Statement,
+        pub result: ResultValue,
+    }
+    #[automatically_derived]
+    impl From<Add> for Statement {
+        fn from(value: Add) -> Self {
+            value.id
+        }
+    }
+    #[automatically_derived]
+    #[doc(hidden)]
+    pub struct CondBr {
+        pub id: Statement,
+    }
+    #[automatically_derived]
+    impl From<CondBr> for Statement {
+        fn from(value: CondBr) -> Self {
+            value.id
+        }
+    }
+}
+#[automatically_derived]
+impl<T: CompileTimeValue> ::kirin::ir::Dialect for Arith<T> {
+    type Type = T;
+}
+#[automatically_derived]
+impl<T: CompileTimeValue> ::kirin::ir::HasSignature<Self> for Arith<T> {
+    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => None,
+            Self::CondBr { condition, target } => None,
+        }
+    }
+}
+#[automatically_derived]
+impl<T: CompileTimeValue> ::kirin::ir::HasCallableBody for Arith<T> {
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ::core::option::Option::None,
+            Self::CondBr { condition, target } => ::core::option::Option::None,
+        }
+    }
+}
