@@ -40,7 +40,15 @@ pub(crate) fn generate_project(ir: &Input<StandardLayout>, crate_path: &syn::Pat
                     let inner_ty = &wrapper.ty;
                     let constructor = enum_variant_constructor(name, variant_name, wrapper);
                     let pattern = enum_variant_pattern(name, variant_name, wrapper);
-                    let direct = builder.direct(&constructor, &pattern, inner_ty, emit_direct_from);
+                    // `From<L>`/`TryProjectTo<L>` for a bare type parameter `L`
+                    // overlap with every sibling variant's impls, since `L` may
+                    // be instantiated to that sibling's wrapped type. Skip
+                    let direct =
+                        if data.variants.len() > 1 && wrapper.wraps_bare_type_param(&ir.generics) {
+                            TokenStream::new()
+                        } else {
+                            builder.direct(&constructor, &pattern, inner_ty, emit_direct_from)
+                        };
                     let bridge = wrapper
                         .lift_project_from
                         .iter()

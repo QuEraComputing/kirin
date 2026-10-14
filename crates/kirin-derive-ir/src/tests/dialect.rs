@@ -334,6 +334,23 @@ fn test_dialect_derive_wrapper_struct_generates_lift_project_bridge() {
     insta::assert_snapshot!(code);
 }
 
+/// A variant wrapping a bare type parameter gets no Into/Project (they would
+/// overlap with its siblings'), and `HasSignature` requires the parameter's.
+#[test]
+fn test_dialect_derive_enum_wraps_type_param() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = L::Type)]
+        enum PatternOps<L: Dialect> {
+            #[wraps]
+            Op(L),
+            #[wraps]
+            Hole(HoleOp<L::Type>),
+        }
+    };
+    let code = generate_dialect_code(input);
+    insta::assert_snapshot!(code);
+}
+
 /// Standalone `LiftProject` does not require `#[kirin(type = ...)]`.
 #[test]
 fn test_lift_project_derive_enum_pure_wrapper_without_dialect() {
