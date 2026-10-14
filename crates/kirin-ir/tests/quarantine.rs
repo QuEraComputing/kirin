@@ -8,7 +8,6 @@ use kirin_ir::*;
 
 struct Fixture {
     quarantine: Quarantined<StageInfo<BuilderDialect>>,
-    add: Statement,
     nop: Statement,
 }
 
@@ -43,29 +42,12 @@ fn fixture(cause: QuarantineCause) -> Fixture {
 
     Fixture {
         quarantine: Quarantined::from_stage_info(stage, cause, events),
-        add,
         nop,
     }
 }
 
 fn panicked() -> Quarantined<StageInfo<BuilderDialect>> {
     fixture(QuarantineCause::Panic("panic".to_string())).quarantine
-}
-
-/// The rows of one `report` section, excluding its title and column header.
-fn section(report: &str, title: &str) -> Vec<String> {
-    report
-        .lines()
-        .skip_while(|line| !line.starts_with(title))
-        .skip(2)
-        .take_while(|line| !line.is_empty())
-        .map(str::to_string)
-        .collect()
-}
-
-/// Whether a `report` row carries is a tombstone. Checks the `del` column for "x"
-fn is_deleted(row: &str) -> bool {
-    row.split_whitespace().nth(1) == Some("x")
 }
 
 #[test]
@@ -85,75 +67,43 @@ fn cause_and_events_are_retained() {
 }
 
 #[test]
-fn report_lists_every_id_including_tombstones() {
-    let f = fixture(QuarantineCause::Panic("panic".to_string()));
-    let report = f.quarantine.report();
-    let rows = section(report, "== statements");
+fn report_dumps_every_arena_and_the_event_log() {
+    // What the snapshot pins down:
+    //
+    // - statements: four ids although only three are live. The erased `nop`
+    //   keeps its id and is flagged `x`, and the statements after it are *not*
+    //   renumbered, so report ids line up with the ids the event log names.
+    // - blocks: the predecessor mirror plus the raw list summary, reported
+    //   without any link traversal.
+    // - ssa values: the use mirror still points at the surviving `add`, both
+    //   `SSAKind` shapes render without the `Id(..)` wrapper, and the builder
+    //   placeholders discarded at finalize show as tombstoned rows.
+    // - mutation events: the erase names the same id the statement table
+    //   flagged.
+    insta::assert_snapshot!(panicked().report(), @r"
+    == statements (4 ids) ==
+       id  del  parent        definition
+        0       Block(0)      Add(SSAValue(4), SSAValue(5))
+        1   x   Block(0)      Nop
+        2       Block(0)      Split(ResultValue(2), ResultValue(3))
+        3       Block(0)      Return
 
-    // Four ids even though only three statements are live: erased entries are
-    // listed, not skipped.
-    assert!(report.contains("== statements (4 ids) =="), "{report}");
-    assert_eq!(rows.len(), 4, "{rows:?}");
+    == blocks (1 ids) ==
+       id  del  parent      predecessors      stmts h/t/len                             terminator
+        0       -           []                Statement(0)/Statement(2)/2               Statement(3)
 
-    // The erased statement keeps its own id and is flagged, and the statements
-    // after it are *not* renumbered. This is what makes report ids line up
-    // with the ids the event log names.
-    assert!(rows[0].contains("Add("), "{rows:?}");
-    assert!(is_deleted(&rows[1]) && rows[1].contains("Nop"), "{rows:?}");
-    assert!(rows[2].contains("Split("), "{rows:?}");
-    assert!(rows[3].contains("Return"), "{rows:?}");
-    assert_eq!(rows.iter().filter(|row| is_deleted(row)).count(), 1);
-    for (id, row) in rows.iter().enumerate() {
-        assert_eq!(
-            row.split_whitespace().next(),
-            Some(id.to_string().as_str()),
-            "{rows:?}"
-        );
-    }
-}
+    == ssa values (6 ids) ==
+       id  del  kind                            uses
+        0   x   -                               -
+        1   x   -                               -
+        2       Result(Statement(2), 0)         []
+        3       Result(Statement(2), 1)         []
+        4       BlockArgument(Block(0), 0)      [StatementOperand { stmt: Statement(0), index: 0 }]
+        5       BlockArgument(Block(0), 1)      [StatementOperand { stmt: Statement(0), index: 1 }]
 
-#[test]
-fn report_shows_both_mirrors_and_the_event_log() {
-    let f = fixture(QuarantineCause::Panic("panic".to_string()));
-    let report = f.quarantine.report();
-
-    // Block section: the predecessor mirror plus the raw list summary,
-    // reported without any link traversal.
-    assert!(report.contains("== blocks (1 ids) =="), "{report}");
-    assert!(report.contains("predecessors"), "{report}");
-
-    // SSA section: the use mirror still points at the surviving `add`, and
-    // both `SSAKind` shapes render without the `Id(..)` wrapper.
-    let ssa_rows = section(report, "== ssa values");
-    let add = f.add;
-    assert!(
-        ssa_rows
-            .iter()
-            .any(|row| row.contains(&format!("StatementOperand {{ stmt: {add:?}, index: 0 }}"))),
-        "{ssa_rows:?}"
-    );
-    assert!(
-        ssa_rows
-            .iter()
-            .any(|row| row.contains("BlockArgument(Block(0), 0)")),
-        "{ssa_rows:?}"
-    );
-    assert!(
-        ssa_rows
-            .iter()
-            .any(|row| row.contains("Result(Statement(2), 1)")),
-        "{ssa_rows:?}"
-    );
-    // Builder placeholders discarded at finalize show as tombstoned rows.
-    assert_eq!(ssa_rows.iter().filter(|row| is_deleted(row)).count(), 2);
-
-    // The event log names the same id the statement table flagged.
-    assert!(report.contains("== mutation events (1) =="), "{report}");
-    let nop = f.nop;
-    assert!(
-        report.contains(&format!("ErasedStatement {{ stmt: {nop:?} }}")),
-        "{report}"
-    );
+    == mutation events (1) ==
+        0  ErasedStatement { stmt: Statement(1) }
+    ");
 }
 
 #[test]
@@ -195,15 +145,27 @@ fn report_renders_a_stage_whose_mirrors_are_desynced() {
 
     let quarantine =
         Quarantined::from_stage_info(stage, QuarantineCause::Panic("desync".into()), vec![]);
-    let report = quarantine.report();
 
-    assert!(
-        report.contains(&format!("StatementOperand {{ stmt: {ret:?}, index: 9 }}")),
-        "{report}"
-    );
-    // The block had no real predecessors, so the invented self-edge is the
-    // only entry in the mirror.
-    assert!(report.contains(&format!("[{block}]")), "{report}");
+    // The invented operand use (index 9 on the `return`) and the invented
+    // self-edge both appear; the block had no real predecessors, so the
+    // self-edge is the only entry in the mirror.
+    insta::assert_snapshot!(quarantine.report(), @r"
+    == statements (2 ids) ==
+       id  del  parent        definition
+        0       Block(0)      Use(SSAValue(1))
+        1       Block(0)      Return
+
+    == blocks (1 ids) ==
+       id  del  parent      predecessors      stmts h/t/len                             terminator
+        0       -           [^0]              Statement(0)/Statement(0)/1               Statement(1)
+
+    == ssa values (2 ids) ==
+       id  del  kind                            uses
+        0   x   -                               -
+        1       BlockArgument(Block(0), 0)      [StatementOperand { stmt: Statement(0), index: 0 }, StatementOperand { stmt: Statement(1), index: 9 }]
+
+    == mutation events (0) ==
+    ");
 }
 
 #[test]
@@ -223,32 +185,36 @@ fn report_tolerates_a_terminator_pointing_at_a_tombstone() {
 
     let quarantine =
         Quarantined::from_stage_info(stage, QuarantineCause::Panic("dangling".into()), vec![]);
-    let report = quarantine.report();
-    let blocks = section(report, "== blocks");
 
-    assert_eq!(blocks.len(), 1, "{blocks:?}");
-    assert!(blocks[0].contains(&format!("{nop:?}")), "{blocks:?}");
-    // The statement it names is listed, and marked deleted.
-    let statements = section(report, "== statements");
-    assert!(is_deleted(&statements[0]), "{statements:?}");
+    // The block's terminator names the erased statement, which is listed and
+    // marked deleted.
+    insta::assert_snapshot!(quarantine.report(), @r"
+    == statements (2 ids) ==
+       id  del  parent        definition
+        0   x   Block(0)      Nop
+        1       Block(0)      Return
+
+    == blocks (1 ids) ==
+       id  del  parent      predecessors      stmts h/t/len                             terminator
+        0       -           []                -/-/0                                     Statement(0)
+
+    == ssa values (0 ids) ==
+       id  del  kind                            uses
+
+    == mutation events (0) ==
+    ");
 }
 
 #[test]
 fn debug_is_a_summary_not_a_dump() {
     // Cause and event count only — a derived impl would inline the payload's
     // arenas and the whole rendered report here. `..` points at both.
-    assert_eq!(
-        format!("{:?}", panicked()),
-        "Quarantined { cause: Panic(\"panic\"), events: 1, .. }"
-    );
+    insta::assert_snapshot!(format!("{:?}", panicked()), @r#"Quarantined { cause: Panic("panic"), events: 1, .. }"#);
 }
 
 #[test]
 fn display_summarizes_the_failure() {
-    assert_eq!(
-        panicked().to_string(),
-        "stage quarantined after 1 mutation event(s): the pass panicked: panic"
-    );
+    insta::assert_snapshot!(panicked(), @"stage quarantined after 1 mutation event(s): the pass panicked: panic");
 }
 
 #[test]
@@ -274,14 +240,17 @@ fn empty_stage_reports_every_section() {
     let stage = new_stage().finalize().expect("an empty stage is valid");
     let quarantine =
         Quarantined::from_stage_info(stage, QuarantineCause::Panic("empty".to_string()), vec![]);
-    let report = quarantine.report();
 
-    for title in [
-        "== statements (0 ids) ==",
-        "== blocks (0 ids) ==",
-        "== ssa values (0 ids) ==",
-        "== mutation events (0) ==",
-    ] {
-        assert!(report.contains(title), "missing {title}:\n{report}");
-    }
+    insta::assert_snapshot!(quarantine.report(), @r"
+    == statements (0 ids) ==
+       id  del  parent        definition
+
+    == blocks (0 ids) ==
+       id  del  parent      predecessors      stmts h/t/len                             terminator
+
+    == ssa values (0 ids) ==
+       id  del  kind                            uses
+
+    == mutation events (0) ==
+    ");
 }
