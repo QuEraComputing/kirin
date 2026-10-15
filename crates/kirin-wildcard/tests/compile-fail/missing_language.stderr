@@ -1,0 +1,7 @@
+error: Missing field `language`
+ --> tests/compile-fail/missing_language.rs:9:1
+  |
+9 | #[rewrite_rule]
+  | ^^^^^^^^^^^^^^^
+  |
+  = note: this error originates in the attribute macro `rewrite_rule` (in Nightly builds, run with -Z macro-backtrace for more info)
