@@ -5,9 +5,15 @@ edition = "2024"
 
 [dependencies]
 kirin.workspace = true
+kirin-derive-wildcard = { workspace = true, optional = true }
+
+[features]
+default = ["derive"]
+derive = ["dep:kirin-derive-wildcard"]
 
 [dev-dependencies]
 kirin-arith = { workspace = true }
 kirin-constant = { workspace = true }
-kirin-test-languages = { workspace = true, features = ["graph-function-language"] }
+kirin-test-languages = { workspace = true, features = ["graph-function-language", "effect-language"] }
 kirin-test-types = { path = "../kirin-test-types" }
+trybuild = { workspace = true }

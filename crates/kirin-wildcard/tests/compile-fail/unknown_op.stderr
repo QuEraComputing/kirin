@@ -1,0 +1,20 @@
+error[E0599]: no variant, associated function, or constant named `new_ad` found for enum `kirin_arith::Arith<T>` in the current scope
+ --> tests/compile-fail/unknown_op.rs:8:24
+  |
+6 | #[rewrite_rule(language = L)]
+  | ----------------------------- in this attribute macro expansion
+7 | fn rule() {
+8 |     let r = op![Arith::ad(x, y)];
+  |                        ^^ variant, associated function, or constant not found in `kirin_arith::Arith<_>`
+  |
+note: if you're trying to build a new `kirin_arith::Arith<_>` consider using one of the following associated functions:
+      kirin_arith::Arith::<T>::new_add
+      kirin_arith::Arith::<T>::new_sub
+      kirin_arith::Arith::<T>::new_mul
+      kirin_arith::Arith::<T>::new_div
+      and $N others
+ --> $WORKSPACE/crates/kirin-arith/src/lib.rs
+  |
+  | #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+  |                                             ^^^^^^^
+  = note: this error originates in the attribute macro `rewrite_rule` which comes from the expansion of the derive macro `Dialect` (in Nightly builds, run with -Z macro-backtrace for more info)

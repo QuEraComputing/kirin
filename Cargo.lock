@@ -1059,8 +1059,10 @@ dependencies = [
  "kirin",
  "kirin-arith",
  "kirin-constant",
+ "kirin-derive-wildcard",
  "kirin-test-languages",
  "kirin-test-types",
+ "trybuild",
 ]
 
 [[package]]
