@@ -9,6 +9,7 @@ import statistics
 import subprocess
 import sys
 
+from provenance import inspect_python_source, verify_python_source
 from semantic_spec import SPEC_PATH, assert_semantically_valid, family_spec, load_suite
 from validation import validate_shape
 
@@ -36,6 +37,7 @@ def main():
     python = (args.python or baseline / ".venv/bin/python").absolute()
     assert run("git", "rev-parse", "HEAD", cwd=baseline) == BASELINE, "wrong Python revision"
     assert not run("git", "status", "--porcelain", cwd=baseline), "Python baseline must be clean"
+    python_provenance = inspect_python_source(python, baseline, cwd=ROOT)
     assert args.repeats > 0 and args.warmups >= 0
     suite = load_suite()
     for family in args.families:
@@ -58,6 +60,7 @@ def main():
                 export = [args.export_payloads.absolute()] if args.export_payloads else []
                 pair[implementation] = json.loads(run(*commands[implementation], family, size,
                                                      args.repeats, args.warmups, *export))
+            verify_python_source(baseline, pair["python"]["kirin_source"])
             assert_semantically_valid(pair["rust"], pair["python"], family, size)
             for data in pair.values():
                 validate_shape(data["shape"])  # local validity, not cross-version equality
@@ -84,7 +87,8 @@ def main():
                         "rustc": run("rustc", "--version", "--verbose"),
                         "rust_revision": run("git", "rev-parse", "HEAD"),
                         "rust_working_tree": run("git", "status", "--porcelain"),
-                        "python_revision": BASELINE},
+                        "python_revision": BASELINE,
+                        "python_provenance": python_provenance},
         "workload_spec_sha256": hashlib.sha256(SPEC_PATH.read_bytes()).hexdigest(),
         "validation_scope": "representative bounded inputs executed before and after JSON against closed-form oracle; not a universal proof",
         "timed_boundary": "complete IR -> JSON string -> complete usable IR; output destruction excluded",

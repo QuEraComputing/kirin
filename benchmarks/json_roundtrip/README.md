@@ -120,8 +120,11 @@ python3 benchmarks/json_roundtrip/compare.py \
 
 Exports are written outside timing: each case produces `.rust.kirin`,
 `.rust.json`, and `.python.json`. `--python` can select another interpreter
-with the pinned Python source installed. The driver builds Rust in release
-mode, runs both on the same host, alternates implementation order across cases,
+with the pinned Python source installed. Before building or timing, the driver
+checks that this interpreter actually imports `kirin` from the checked baseline,
+rejecting conflicting `PYTHONPATH` entries or editable installs. It records the
+resolved source path and checks it again in each measuring subprocess. The driver
+builds Rust in release mode, runs both on the same host, alternates implementation order across cases,
 and records revisions, dirty Rust files, compiler/Python/platform/hardware,
 all samples, medians, serialized sizes and Python/Rust median ratios. Smoke
 ratios validate the harness; they are not performance thresholds or QBI results.

@@ -6,6 +6,7 @@ import json
 from pathlib import Path
 import time
 
+import kirin
 from kirin import ir, types
 from kirin.dialects import cf, func
 from kirin.dialects.py.binop import Add, Sub
@@ -180,6 +181,7 @@ def main():
         samples.append(elapsed)
         del output  # output lifetime/reclamation is outside the timer
     print(json.dumps({"implementation": "python", "family": args.family,
+                      "kirin_source": str(Path(kirin.__file__).resolve()),
                       "size": args.size, "semantic_cases": semantic_cases, "operations": operations, "blocks": blocks,
                       "shape": normalized, "json_bytes": len(encoded.encode()), "warmups": args.warmups,
                       "samples_seconds": samples}))
