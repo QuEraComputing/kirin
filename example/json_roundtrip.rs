@@ -2,29 +2,27 @@
 use std::{hint::black_box, time::Instant};
 
 use kirin::prelude::*;
-use kirin_arith::{Arith, ArithType};
+use kirin_arith::Arith;
 use kirin_cf::ControlFlow;
 use kirin_function::Return;
 use kirin_prettyless::PipelinePrintExt;
-use kirin_scf::StructuredControlFlow;
+use kirin_test_languages::SimpleType;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint, Serialize, Deserialize)]
-#[kirin(builders, type = ArithType)]
+#[kirin(builders, type = SimpleType)]
 enum BenchmarkLanguage {
     #[chumsky(format = "fn {:name}{signature} {body}")]
     Function {
         body: CFG,
-        signature: Signature<ArithType>,
+        signature: Signature<SimpleType>,
     },
     #[wraps]
-    Arith(Arith<ArithType>),
+    Arith(Arith<SimpleType>),
     #[wraps]
-    Cf(ControlFlow<ArithType>),
+    Cf(ControlFlow<SimpleType>),
     #[wraps]
-    Scf(StructuredControlFlow<ArithType>),
-    #[wraps]
-    Return(Return<ArithType>),
+    Return(Return<SimpleType>),
 }
 
 #[path = "json_roundtrip/shape.rs"]
@@ -36,7 +34,7 @@ type IR = Pipeline<StageInfo<BenchmarkLanguage>>;
 
 fn main() {
     let mut args = std::env::args().skip(1);
-    let family = args.next().expect("family: chain, diamond or nested_if");
+    let family = args.next().expect("family: chain, diamond or nested_cfg");
     let size: usize = args.next().expect("number of adds").parse().unwrap();
     let repeats: usize = args.next().unwrap_or("30".into()).parse().unwrap();
     let warmups: usize = args.next().unwrap_or("5".into()).parse().unwrap();
@@ -44,6 +42,7 @@ fn main() {
     let text = workload::workload(&family, size);
     let mut ir = IR::new();
     ir.parse(&text).expect("generated workload parses");
+    shape::verify(&ir.stages()[0]);
     let printed = ir.sprint();
     let json = serde_json::to_string(&ir).expect("serialize complete IR");
     let restored: IR = serde_json::from_str(&json).expect("deserialize complete IR");
@@ -53,7 +52,7 @@ fn main() {
         serde_json::to_value(&restored).unwrap()
     );
     let stage = &restored.stages()[0];
-    kirin::ir::verify_derived(stage).expect("usable restored metadata");
+    shape::verify(stage);
     assert_eq!(
         restored.lookup_function_by_name("benchmark"),
         ir.lookup_function_by_name("benchmark")
@@ -65,8 +64,6 @@ fn main() {
             BenchmarkLanguage::Arith(Arith::Add { .. }) => "add",
             BenchmarkLanguage::Cf(ControlFlow::Branch { .. }) => "br",
             BenchmarkLanguage::Cf(ControlFlow::ConditionalBranch { .. }) => "cond_br",
-            BenchmarkLanguage::Scf(StructuredControlFlow::If(_)) => "if",
-            BenchmarkLanguage::Scf(StructuredControlFlow::Yield(_)) => "yield",
             BenchmarkLanguage::Return(_) => "ret",
             other => panic!("unexpected benchmark statement: {other:?}"),
         };
@@ -99,3 +96,7 @@ fn main() {
         })
     );
 }
+
+#[cfg(test)]
+#[path = "json_roundtrip/tests.rs"]
+mod tests;

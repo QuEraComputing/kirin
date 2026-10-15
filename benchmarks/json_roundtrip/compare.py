@@ -9,6 +9,8 @@ import statistics
 import subprocess
 import sys
 
+from validation import assert_equivalent
+
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 BASELINE = "eae74008d4aec630169b5e64cc085e6f2c0d5b12"
 
@@ -22,8 +24,8 @@ def main():
     parser.add_argument("--python-checkout", type=pathlib.Path, required=True)
     parser.add_argument("--python", type=pathlib.Path)
     parser.add_argument("--sizes", type=int, nargs="+", default=[1000, 10000, 100000])
-    parser.add_argument("--families", nargs="+", choices=["chain", "diamond", "nested_if"],
-                        default=["chain", "diamond", "nested_if"])
+    parser.add_argument("--families", nargs="+", choices=["chain", "diamond", "nested_cfg"],
+                        default=["chain", "diamond", "nested_cfg"])
     parser.add_argument("--repeats", type=int, default=30)
     parser.add_argument("--warmups", type=int, default=5)
     parser.add_argument("--output", type=pathlib.Path, required=True)
@@ -50,16 +52,15 @@ def main():
                 print(f"Checking and measuring {implementation}: {family}, {size} adds", file=sys.stderr)
                 pair[implementation] = json.loads(run(*commands[implementation], family, size,
                                                      args.repeats, args.warmups))
-            for field in ("family", "adds", "operations", "blocks", "shape"):
-                assert pair["rust"][field] == pair["python"][field], f"workloads differ: {field}"
-            # The normalized shape compares every operand/result identity, integer
-            # type, CFG successor, block argument, and nested-body relationship.
+            assert_equivalent(pair["rust"], pair["python"])
+            # Compare core CFG/SSA relationships after explicit Int/i64 mapping;
+            # this omits wrapper and implementation-specific attribute metadata.
             shape = pair["rust"]["shape"]
             digest = hashlib.sha256(json.dumps(shape, sort_keys=True, separators=(",", ":")).encode()).hexdigest()
             for data in pair.values():
                 del data["shape"]
                 data["median_seconds"] = statistics.median(data["samples_seconds"])
-            result = {"family": family, "adds": size, "equivalent_shape_sha256": digest,
+            result = {"family": family, "adds": size, "normalized_shape_sha256": digest,
                       "rust": pair["rust"], "python": pair["python"],
                       "python_over_rust_median_ratio": pair["python"]["median_seconds"] / pair["rust"]["median_seconds"]}
             results.append(result)
@@ -84,7 +85,7 @@ def main():
     }
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.write_text(json.dumps(report, indent=2) + "\n")
-    print(f"Verified equivalent typed SSA/control flow for {len(results)} workload pairs. Results: {args.output}")
+    print(f"Verified matching normalized CFG/SSA structure for {len(results)} workload pairs. Results: {args.output}")
 
 
 if __name__ == "__main__":

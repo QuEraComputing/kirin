@@ -31,6 +31,7 @@ printed IR and derived metadata; deserialization alone is not an IR verifier.
 ```sh
 cargo test --test roundtrip --test json_storage --features serde
 cargo test -p toy-qc --features serde
+cargo test --example json_roundtrip --features serde
 ```
 
 With serde enabled, the shared round-trip assertions additionally perform
@@ -79,23 +80,55 @@ previous result. No compiler/optimization pass runs during construction.
 | --- | --- | --- | --- |
 | `chain` | One chain containing N adds | 1 return | 1 |
 | `diamond` | Conditional branch to two N/2-add chains, then merge | 1 conditional branch, 2 branches, 1 return | 4 |
-| `nested_if` | Two levels of conditionals; four N/4-add leaf chains | 3 ifs, 6 yields, 1 return | 7 |
+| `nested_cfg` | Two levels of CFG diamonds; four N/4-add leaf chains, two intermediate merges and a final merge | 3 conditional branches, 6 branches, 1 return | 10 |
 
 Both have an unused first entry argument (Python Method's implicit self),
-followed by integer `x` and integer `condition` arguments. Python uses `Int`;
-Rust uses `i64`. The condition uses integer truthiness. The workloads have the
-same mathematical semantics for inputs whose results fit `i64`; this is not
-an arbitrary-precision arithmetic performance comparison.
+followed by integer `x` and Boolean `condition` arguments. Python uses `Int`;
+Rust uses `i64`. The comparison maps these to the category `int`;
+Python `Bool` and Rust `SimpleType::Bool` map to `bool`.
+These are not identical type systems: Python integers are unbounded, whereas
+Rust `i64` is bounded. Workload arithmetic is intended to agree for inputs
+whose intermediate and final results fit `i64`; serialization benchmarking
+does not prove general equivalence of the two interpreters.
 
-Before accepting a comparison, the driver requires equality of a normalized
-**actual IR** description: every block argument and result's integer type,
-every operation and operand/result SSA identity, CFG successor, and nested
-body reference. Both implementations also check this description after JSON
-decoding. Rust checks its final text against the text printed before JSON;
-Python checks `is_structurally_equal`. Schemas, metadata overhead and JSON
-sizes may differ. The report stores a SHA-256 of the matching description.
-Graph-specific correctness remains in the Rust corpus because Python has no
-matching undirected graph body representation for this benchmark.
+Before and after the JSON round trip, Python runs `code.verify()` and
+`code.verify_type()`. Both
+implementations additionally check their benchmark CFG subset: terminating
+blocks, branch argument arity/type compatibility, and resolved integer SSA
+references; Rust checks `verify_derived` metadata consistency. The comparison
+driver validates normalized SSA definition uniqueness, operand dominance and
+within-block definition order for both representations.
+
+The driver then requires equality of a normalized **actual IR** description:
+block argument/result IDs and mapped integer/Boolean types, operation kinds, ordered
+operand/result relationships, and ordered CFG targets. This compares the core
+operation/CFG shape after the explicit `Int`/`i64` mapping; it intentionally
+omits wrapper definitions, source locations and implementation-specific
+operation attributes/metadata. It is neither byte equality nor a proof of
+arbitrary program semantic equivalence. Both implementations require their
+own pre/post normalized descriptions to match. Rust additionally checks
+printed text and all serialized fields; Python checks
+`is_structurally_equal`. JSON schemas, metadata overhead and sizes may differ.
+The report stores a SHA-256 of the matching normalized description.
+
+The nested family uses CFG diamonds because Python `scf.IfElse` requires an
+implicit condition argument in each arm, while Rust's structured `If` enters
+arms without binding such a parameter. Decorative matching parameters would
+not be valid Rust execution IR. Similarly, Python's `scf.For` consumes an
+iterable, while Rust's counted loop uses start/end/step operands. Structured
+conditionals/loops remain in the Rust JSON correctness corpus, outside this
+cross-version timing comparison. Graph correctness also remains separate
+because Python has no matching undirected graph body for this benchmark.
+
+Run fixture validity and comparison-regression tests using the pinned Python:
+
+```sh
+/absolute/path/to/python-kirin/.venv/bin/python -m unittest discover \
+  -s benchmarks/json_roundtrip -p 'test_*.py'
+```
+
+The tests verify original/restored fixtures and check that changed operands,
+targets, types, branch arities and invalid dominance are rejected.
 
 ### Timed boundary
 
