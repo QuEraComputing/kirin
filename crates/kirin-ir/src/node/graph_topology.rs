@@ -9,10 +9,6 @@ use petgraph::visit::EdgeRef;
 use super::graph::GraphInfo;
 use crate::{Dialect, SSAValue, Statement};
 
-#[cfg_attr(
-    not(test),
-    expect(dead_code, reason = "wired up by the rewriter's graph surgery")
-)]
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     /// Add `stmt` as a new node. Returns `false`, changing nothing, if `stmt`
     /// is already a member.
@@ -58,6 +54,10 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     /// # Panics
     ///
     /// If either statement is not a member.
+    #[cfg_attr(
+        not(test),
+        expect(dead_code, reason = "wired up by operand edits on DiGraph members")
+    )]
     pub(crate) fn remove_edge(
         &mut self,
         producer: Statement,

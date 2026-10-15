@@ -125,7 +125,7 @@ fn pipeline_refuses_to_serialize_a_poisoned_stage() {
         .name("target")
         .new();
     let _ = ir.run_pass::<ArithFunctionLanguage, _, (), _>(source, |_| {
-        Err(RewriteError::CannotInsertTerminator)
+        Err(RewriteError::UnexpectedTerminator)
     });
 
     // Skipping `source` instead would silently turn `target` into stage 0.
