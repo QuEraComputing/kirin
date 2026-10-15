@@ -869,6 +869,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-derive-wildcard"
+version = "0.1.0"
+dependencies = [
+ "darling",
+ "kirin-derive-toolkit",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "kirin-function"
 version = "0.1.0"
 dependencies = [
