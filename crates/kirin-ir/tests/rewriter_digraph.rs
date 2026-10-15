@@ -476,3 +476,28 @@ fn replace_statement_on_member_updates_operand_edges() {
     assert_eq!(uses_set(&stage, rq), HashSet::from([so(n, 0)]));
     verify_derived(&stage).unwrap();
 }
+
+#[test]
+fn rewriter_maintains_edges_of_an_attached_digraph() {
+    let mut stage = new_stage();
+
+    // Built the way the parser builds graphs: empty, then members attached.
+    let (split, x, _) = make_split(&mut stage);
+    let _outer = stage.block().stmt(split).new();
+    let (p, rp) = make_compute(&mut stage, x);
+    let c = stage.statement().definition(BuilderDialect::Use(rp)).new();
+    let dg = stage.digraph().new();
+    stage.attach_nodes_to_digraph(dg, &[p, c], &[]);
+
+    let mut stage = stage.finalize().unwrap();
+    assert_members(&stage, dg, &[p, c]);
+    assert_eq!(edges(&stage, dg), HashMap::from([((p, c, rp), 1)]));
+
+    let mut rw = Rewriter::new(&mut stage);
+    rw.erase_statement(c).unwrap();
+    drop(rw);
+
+    assert_members(&stage, dg, &[p]);
+    assert!(edges(&stage, dg).is_empty());
+    verify_derived(&stage).unwrap();
+}
