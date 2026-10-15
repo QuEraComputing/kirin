@@ -9,6 +9,7 @@
 //! [`rewriter`] module docs for exactly what is and is not guaranteed.
 
 pub(crate) mod cfg;
+pub(crate) mod digraph;
 pub(crate) mod rewriter;
 
 pub use rewriter::{MutationEvent, RewriteError, Rewriter};
