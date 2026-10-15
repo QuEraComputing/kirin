@@ -373,6 +373,15 @@ impl<L: Dialect> BuilderStageInfo<L> {
         let dg_info = &self.digraphs[dg];
         let id = dg_info.id();
 
+        for &stmt_id in nodes {
+            let info = &self.statements[stmt_id];
+            assert!(
+                !info.definition.is_terminator(),
+                "Cannot add terminator statement {:?} as a digraph node",
+                info.definition
+            );
+        }
+
         let mut stmt_to_node: HashMap<Statement, petgraph::graph::NodeIndex> = HashMap::new();
         let mut graph = petgraph::Graph::<Statement, SSAValue, petgraph::Directed>::new();
         for &stmt_id in nodes {
@@ -397,7 +406,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             info.parent = Some(StatementParent::DiGraph(id));
         }
         let dg_info = &mut self.digraphs[dg];
-        dg_info.graph = graph;
+        dg_info.set_graph(graph);
         dg_info.extra.yields = yields.to_vec();
     }
 
@@ -544,7 +553,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
             self.statements[stmt_id].parent = Some(StatementParent::UnGraph(id));
         }
         let ug_info = &mut self.ungraphs[ug];
-        ug_info.graph = new_graph;
+        ug_info.set_graph(new_graph);
         ug_info.extra.edge_statements = bfs_edge_order;
     }
 

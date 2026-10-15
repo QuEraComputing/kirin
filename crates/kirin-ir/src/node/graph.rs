@@ -55,10 +55,12 @@ pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) name: Option<Symbol>,
     pub(crate) ports: Vec<Port>,
     pub(crate) edge_count: usize,
-    pub(crate) graph: petgraph::Graph<Statement, SSAValue, D>,
-    /// Member statement → its node in `graph`. Kept in lockstep with `graph`
-    /// by the rewriter; not checked by `derived/` verification.
-    pub(crate) stmt_to_node_idx: FxHashMap<Statement, NodeIndex>,
+    /// Written only through `set_graph` and the `graph_topology` edits, which
+    /// keep `stmt_to_node_idx` in lockstep with it (hence `pub(super)`).
+    pub(super) graph: petgraph::Graph<Statement, SSAValue, D>,
+    /// Member statement → its node in `graph`. Not checked by `derived/`
+    /// verification.
+    pub(super) stmt_to_node_idx: FxHashMap<Statement, NodeIndex>,
     pub(crate) extra: Extra,
     _marker: std::marker::PhantomData<L>,
 }
@@ -74,10 +76,7 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         graph: petgraph::Graph<Statement, SSAValue, D>,
         extra: Extra,
     ) -> Self {
-        let stmt_to_node_idx = graph
-            .node_indices()
-            .map(|node| (graph[node], node))
-            .collect();
+        let stmt_to_node_idx = Self::index_members(&graph);
         Self {
             id,
             parent,
@@ -89,6 +88,23 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
             extra,
             _marker: std::marker::PhantomData,
         }
+    }
+
+    /// Replace the petgraph with `graph`, re-indexing its members. The only way
+    /// to swap the whole graph, so `stmt_to_node_idx` cannot fall behind it.
+    pub(crate) fn set_graph(&mut self, graph: petgraph::Graph<Statement, SSAValue, D>) {
+        self.stmt_to_node_idx = Self::index_members(&graph);
+        self.graph = graph;
+    }
+
+    /// Member statement → its node in `graph`.
+    fn index_members(
+        graph: &petgraph::Graph<Statement, SSAValue, D>,
+    ) -> FxHashMap<Statement, NodeIndex> {
+        graph
+            .node_indices()
+            .map(|node| (graph[node], node))
+            .collect()
     }
 
     /// The parent statement that owns this graph, if any.

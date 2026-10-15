@@ -132,6 +132,15 @@ fn digraph_builder_rejects_terminator_node() {
 }
 
 #[test]
+#[should_panic(expected = "as a digraph node")]
+fn attach_nodes_to_digraph_rejects_terminator() {
+    let mut stage = new_stage();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let dg = stage.digraph().new();
+    stage.attach_nodes_to_digraph(dg, &[ret], &[]);
+}
+
+#[test]
 #[should_panic(expected = "already has a different parent")]
 fn statement_builder_rejects_digraph_with_existing_owner() {
     let mut stage = new_stage();
