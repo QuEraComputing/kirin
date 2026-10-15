@@ -124,6 +124,14 @@ fn statement_builder_assigns_parent_to_directly_owned_graphs() {
 }
 
 #[test]
+#[should_panic(expected = "as a digraph node")]
+fn digraph_builder_rejects_terminator_node() {
+    let mut stage = new_stage();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let _ = stage.digraph().node(ret);
+}
+
+#[test]
 #[should_panic(expected = "already has a different parent")]
 fn statement_builder_rejects_digraph_with_existing_owner() {
     let mut stage = new_stage();
