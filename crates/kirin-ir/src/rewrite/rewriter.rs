@@ -34,8 +34,9 @@
 //! [`BlockInfo::predecessors`](crate::BlockInfo), the block-body summary
 //! (`BlockInfo::statements`/`terminator`), and the CFG chain summary
 //! (`CFGInfo::blocks`) — so they stay valid without a rebuild. Deferred to
-//! later slices: graph-body surgery, result-defining insertion, and full
-//! cross-block dominance/visibility preflight.
+//! later slices: graph-body surgery and full cross-block dominance/visibility
+//! preflight. Inserted statements define results through values pre-allocated
+//! with [`Rewriter::new_result`].
 //!
 //! # Known gap: graph-body operand edits
 //!
@@ -67,6 +68,8 @@
 
 use std::collections::HashSet;
 use std::fmt;
+
+use rustc_hash::FxHashMap;
 
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedListNode;
@@ -144,9 +147,13 @@ pub enum RewriteError {
     NonTerminatorWithSuccessors,
     /// `insert_terminator` was given a block that already has a terminator.
     BlockHasTerminator(Block),
-    /// The inserted definition declares results; allocating fresh result SSA
-    /// values (with types) is deferred to a later slice.
-    CannotInsertWithResults,
+    /// The definition passed to `insert_terminator` declares results; a
+    /// terminator ends its block, so nothing could use them.
+    CannotInsertTerminatorWithResults,
+    /// A result slot of the inserted definition holds a value that is not a
+    /// fresh [`Rewriter::new_result`] of this `Rewriter`: it is an existing or
+    /// already bound value, or it fills two slots.
+    ResultNotFresh(SSAValue),
     /// A result list did not line up one-for-one with the statement's results:
     /// a `replace_statement` definition changed the result count (which would
     /// orphan or invent result SSA values), or a `replace_results` call did not
@@ -242,8 +249,14 @@ impl fmt::Display for RewriteError {
             RewriteError::BlockHasTerminator(block) => {
                 write!(f, "block {block:?} already has a terminator")
             }
-            RewriteError::CannotInsertWithResults => {
-                write!(f, "cannot insert a statement that defines results yet")
+            RewriteError::CannotInsertTerminatorWithResults => {
+                write!(f, "cannot insert a terminator that defines results")
+            }
+            RewriteError::ResultNotFresh(value) => {
+                write!(
+                    f,
+                    "result {value} is not a fresh, unbound value from new_result"
+                )
             }
             RewriteError::ResultArityMismatch {
                 stmt,
@@ -343,6 +356,9 @@ impl std::error::Error for RewriteError {}
 pub struct Rewriter<'a, L: Dialect> {
     pub(super) stage: &'a mut StageInfo<L>,
     pub(super) events: Vec<MutationEvent>,
+    /// Values from [`Rewriter::new_result`] not yet bound to a statement, with
+    /// their types. Their arena slots stay empty until bound.
+    pub(super) unbound_ssa_results: FxHashMap<SSAValue, L::Type>,
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -350,6 +366,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Self {
             stage,
             events: Vec::new(),
+            unbound_ssa_results: FxHashMap::default(),
         }
     }
 
@@ -821,10 +838,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Insert `definition` as a new statement immediately after `anchor`.
     ///
     /// `anchor` must be a live, non-terminator statement owned by a block body,
-    /// and `definition` must be a non-terminator declaring no results (fresh
-    /// result-value allocation is a later slice) and no successors. Every
-    /// operand must be live. On success the new statement is spliced into the
-    /// block, its operand uses are recorded, and
+    /// and `definition` must be a non-terminator with no successors. Every
+    /// operand must be live, and every result a fresh [`Rewriter::new_result`]
+    /// value, which becomes a result of the new statement. On success the new
+    /// statement is spliced into the block, its operand uses are recorded, and
     /// [`MutationEvent::InsertedStatement`] is emitted; the new id is returned.
     pub fn insert_after(
         &mut self,
@@ -872,9 +889,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if definition.successors().next().is_some() {
             return Err(RewriteError::NonTerminatorWithSuccessors);
         }
-        if definition.results().next().is_some() {
-            return Err(RewriteError::CannotInsertWithResults);
-        }
+        let results = self.fresh_results(&definition)?;
         let operands: Vec<SSAValue> = definition.arguments().copied().collect();
         for &operand in &operands {
             if operand.get_info(self.stage).is_none() {
@@ -894,6 +909,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 parent: Some(StatementParent::Block(block)),
                 definition,
             });
+        self.bind_results(new_stmt, results);
 
         // Wire neighbours (or the block head/tail when inserting at an end).
         match prev {
@@ -968,7 +984,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             return Err(RewriteError::ExpectedTerminator);
         }
         if definition.results().next().is_some() {
-            return Err(RewriteError::CannotInsertWithResults);
+            return Err(RewriteError::CannotInsertTerminatorWithResults);
         }
         let operands: Vec<SSAValue> = definition.arguments().copied().collect();
         for &operand in &operands {

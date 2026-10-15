@@ -42,9 +42,13 @@ impl Placeholder for TestType {
 /// - `Gate(a, b)`: two SSAValue operands (ungraph node)
 /// - `Wire(r)`: edge that produces a ResultValue (ungraph edge)
 /// - `Split(a, b)`: no operands, two ResultValues (multi-result rewrites)
+/// - `Compute(a, r)`: one operand, one result — a non-terminator that both
+///   reads and defines values
 /// - `Isolated`: no operands, no results (ungraph isolated node)
 /// - `Branch(target)`: one-successor control-flow terminator
 /// - `CondBranch(a, b)`: two-successor control-flow terminator
+/// - `Invoke(r)`: a terminator defining a result, which `insert_terminator`
+///   rejects
 /// - `Fork(target)`: a non-terminator carrying a successor, which is invalid
 ///   IR; exists to test that verification reports it
 /// - `Jump(target, args)`: one-successor terminator forwarding `args` to the
@@ -62,9 +66,11 @@ pub enum BuilderDialect {
     Gate(SSAValue, SSAValue),
     Wire(ResultValue),
     Split(ResultValue, ResultValue),
+    Compute(SSAValue, ResultValue),
     Isolated,
     Branch(Successor),
     CondBranch(Successor, Successor),
+    Invoke(ResultValue),
     Jump(Successor, Vec<SSAValue>),
     Fork(Successor),
     OwnBlocks(Block, Block),
@@ -77,7 +83,7 @@ impl<'a> HasArguments<'a> for BuilderDialect {
     fn arguments(&'a self) -> Self::Iter {
         match self {
             BuilderDialect::Add(a, b) | BuilderDialect::Gate(a, b) => vec![a, b].into_iter(),
-            BuilderDialect::Use(a) => vec![a].into_iter(),
+            BuilderDialect::Use(a) | BuilderDialect::Compute(a, _) => vec![a].into_iter(),
             BuilderDialect::Jump(_, args) => args.iter().collect::<Vec<_>>().into_iter(),
             _ => vec![].into_iter(),
         }
@@ -89,7 +95,7 @@ impl<'a> HasArgumentsMut<'a> for BuilderDialect {
     fn arguments_mut(&'a mut self) -> Self::IterMut {
         match self {
             BuilderDialect::Add(a, b) | BuilderDialect::Gate(a, b) => vec![a, b].into_iter(),
-            BuilderDialect::Use(a) => vec![a].into_iter(),
+            BuilderDialect::Use(a) | BuilderDialect::Compute(a, _) => vec![a].into_iter(),
             BuilderDialect::Jump(_, args) => args.iter_mut().collect::<Vec<_>>().into_iter(),
             _ => vec![].into_iter(),
         }
@@ -100,7 +106,9 @@ impl<'a> HasResults<'a> for BuilderDialect {
     type Iter = std::vec::IntoIter<&'a ResultValue>;
     fn results(&'a self) -> Self::Iter {
         match self {
-            BuilderDialect::Wire(r) => vec![r].into_iter(),
+            BuilderDialect::Wire(r) | BuilderDialect::Invoke(r) | BuilderDialect::Compute(_, r) => {
+                vec![r].into_iter()
+            }
             BuilderDialect::Split(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }
@@ -111,7 +119,9 @@ impl<'a> HasResultsMut<'a> for BuilderDialect {
     type IterMut = std::vec::IntoIter<&'a mut ResultValue>;
     fn results_mut(&'a mut self) -> Self::IterMut {
         match self {
-            BuilderDialect::Wire(r) => vec![r].into_iter(),
+            BuilderDialect::Wire(r) | BuilderDialect::Invoke(r) | BuilderDialect::Compute(_, r) => {
+                vec![r].into_iter()
+            }
             BuilderDialect::Split(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }
@@ -192,6 +202,7 @@ impl IsTerminator for BuilderDialect {
                 | BuilderDialect::Branch(_)
                 | BuilderDialect::CondBranch(_, _)
                 | BuilderDialect::Jump(_, _)
+                | BuilderDialect::Invoke(_)
         )
     }
 }

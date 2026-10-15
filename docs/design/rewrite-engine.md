@@ -1789,7 +1789,8 @@ stage remains valid.
 | `replace_operand` | Rewrite one operand slot; move its use record `old → new`. | `ChangedOperands` (none if slot unchanged) | operand-index and live-value checked |
 | `replace_all_uses` | Rewrite every operand **and `DiGraph` yield** reading `old` to `new`; transfer use records. | one `ChangedOperands` per affected statement, then one `ReplacedUses` | returns count of slots rewritten; self-replace is `Ok(0)` |
 | `erase_statement` | Tombstone the statement, unlink it from its block list, drop its operand uses, tombstone its (unused) result values. Statement-owned blocks and `Cfg`s nested in it are tombstoned with it. Erasing a terminator clears the block's terminator and removes its outgoing edges, leaving the block unterminated. | `ErasedStatement` (covers the nested bodies; no CFG events), then `ChangedTerminator` for a terminator | block-parented, no live result uses; nested `DiGraph`/`UnGraph` bodies are not yet tombstoned |
-| `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with **no results** and no successors; operands must be live |
+| `new_result` | Allocate a typed result value for a statement not inserted yet; its arena slot stays empty (not live) until an insert binds it. | none | a value its `Rewriter` never binds stays dead |
+| `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, bind its results, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with no successors; operands must be live; results must be distinct, unbound `new_result` values |
 | `insert_terminator` | Allocate `definition` as the terminator of a block that has none; add operand uses and predecessor entries. | `InsertedStatement`, `ChangedTerminator` | any block (`Cfg` member or statement-owned body); `definition` is a result-less terminator with live operands and successors |
 | `replace_statement` | Swap the definition in place, keeping id, block position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror. | `ReplacedStatement`, then `ChangedTerminator` for a terminator | same result arity and terminator-ness as the original; a non-terminator replacement carries no successors |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
@@ -1801,8 +1802,7 @@ stage remains valid.
 | `insert_block_arg` / `erase_block_arg` | Insert or erase one block argument, renumbering later ones, and insert or remove the matching operand on each incoming edge through `BranchOp`. `insert_block_arg` asks `forwarded(stmt, successor)` for each edge's new operand. | `ReplacedStatement` and `ChangedTerminator` per edge, then `ChangedCfg` | every rewritten edge is checked before any edit; an erased argument must be unused; every incoming edge needs an editable operand list (`NoSuccessorOperands` otherwise) |
 
 Deferred to later slices (each is rejected, not silently mishandled):
-`DiGraph`/`UnGraph`-body surgery;
-result-defining insertion (needs fresh result SSA values with types); single
+`DiGraph`/`UnGraph`-body surgery; single
 dead-result trimming (`remove_result`, below); the owning pass driver and
 quarantine boundary; and the pure derive/install/verify split described under
 [Pass Completion and Failure](#pass-completion-and-failure).
@@ -1983,7 +1983,8 @@ axis — hence the column.
 | `AnchorIsTerminator(stmt)` | guard | nothing can follow a terminator, so `insert_after` cannot anchor on one | `insert_after` |
 | `CannotInsertTerminator` | guard | the inserted definition is a terminator (not spliced mid-block; use `insert_terminator`) | `insert_*` |
 | `NonTerminatorWithSuccessors` | guard | the definition is a non-terminator carrying successors; only a terminator may transfer control | `insert_*`, `replace_statement` |
-| `CannotInsertWithResults` | deferred | the inserted definition declares results (fresh result allocation deferred) | `insert_*`, `insert_terminator` |
+| `CannotInsertTerminatorWithResults` | guard | the terminator declares results, which nothing could use | `insert_terminator` |
+| `ResultNotFresh(value)` | guard | a result slot of the inserted definition is not a distinct, unbound `new_result` value of this `Rewriter` | `insert_*` |
 | `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
 | `TerminatorKindMismatch(stmt)` | guard | replacement changes terminator-ness, desyncing the block's terminator cache | `replace_statement` |
 | `EdgeRoleMismatch(stmt)` | guard | replacement changes `IsEdge`, desyncing `GraphMember` classification | `replace_statement` |
@@ -2768,7 +2769,10 @@ policy.
 
 **Deferred out of M1:**
 
-- [ ] Result-defining insertion — replacement-arena result SSA records already
+- [x] Result-defining insertion — callers pre-allocate typed results with
+  `Rewriter::new_result` (an empty arena slot plus a type held by the
+  `Rewriter` until an insert binds it); inserts reject anything else with
+  `ResultNotFresh`. Replacement-arena result SSA records already
   carry the types to copy. `Rewriter` allocates fresh ids and checks mechanical
   arity but makes no generic type-compatibility judgment; that belongs to rule
   authoring or later verification. Generated field-wise remapping in M4 must

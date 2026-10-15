@@ -23,6 +23,7 @@ pub(crate) mod pass;
 #[cfg(test)]
 mod pass_tests;
 pub(crate) mod quarantine;
+mod results;
 pub(crate) mod rewriter;
 
 pub use quarantine::{QuarantineCause, Quarantined};
