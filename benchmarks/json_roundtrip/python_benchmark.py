@@ -6,6 +6,8 @@ import json
 from pathlib import Path
 import time
 
+from rich.console import Console
+
 import kirin
 from kirin import ir, types
 from kirin.dialects import cf, func
@@ -155,6 +157,11 @@ def main():
     if args.export:
         args.export.mkdir(parents=True, exist_ok=True)
         (args.export / f"{args.family}-{args.size}.python.json").write_text(encoded)
+        printed = program.code.print_str(
+            console=Console(color_system=None, force_terminal=False, width=160),
+            show_indent_mark=False,
+        )
+        (args.export / f"{args.family}-{args.size}.python.kirin").write_text(printed)
 
     def roundtrip():
         payload = basic.encode_json(program)

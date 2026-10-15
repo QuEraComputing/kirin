@@ -119,7 +119,9 @@ python3 benchmarks/json_roundtrip/compare.py \
 ```
 
 Exports are written outside timing: each case produces `.rust.kirin`,
-`.rust.json`, and `.python.json`. `--python` can select another interpreter
+`.python.kirin`, `.rust.json`, and `.python.json`. The Python text is a plain
+dump from its native IR printer for human comparison, without requiring a text
+parser. `--python` can select another interpreter
 with the pinned Python source installed. Before building or timing, the driver
 checks that this interpreter actually imports `kirin` from the checked baseline,
 rejecting conflicting `PYTHONPATH` entries or editable installs. It records the
