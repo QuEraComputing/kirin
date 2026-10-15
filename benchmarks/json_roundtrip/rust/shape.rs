@@ -60,6 +60,7 @@ pub fn describe(stage: &Stage) -> Value {
             let definition = stmt.expect_info(stage).definition();
             let kind = match definition {
                 BenchmarkLanguage::Arith(kirin_arith::Arith::Add { .. }) => "add",
+                BenchmarkLanguage::Arith(kirin_arith::Arith::Sub { .. }) => "sub",
                 BenchmarkLanguage::Cf(ControlFlow::Branch { .. }) => "br",
                 BenchmarkLanguage::Cf(ControlFlow::ConditionalBranch { .. }) => "cond_br",
                 BenchmarkLanguage::Return(_) => "ret",
@@ -99,7 +100,10 @@ pub fn verify(stage: &Stage) {
             );
         };
         match item.definition() {
-            BenchmarkLanguage::Arith(kirin_arith::Arith::Add { lhs, rhs, result }) => {
+            BenchmarkLanguage::Arith(
+                kirin_arith::Arith::Add { lhs, rhs, result }
+                | kirin_arith::Arith::Sub { lhs, rhs, result },
+            ) => {
                 require_int(*lhs);
                 require_int(*rhs);
                 require_int((*result).into());

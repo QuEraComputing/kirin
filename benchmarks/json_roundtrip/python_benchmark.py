@@ -3,19 +3,24 @@ import argparse
 import collections
 import gc
 import json
+from pathlib import Path
 import time
 
 from kirin import ir, types
 from kirin.dialects import cf, func
-from kirin.dialects.py.binop import Add
+from kirin.dialects.py.binop import Add, Sub
 from kirin.prelude import basic
 
 from validation import validate_shape
+from semantic_spec import family_spec, validate_runtime
 
 
-def chain(block, count, value, other):
+def chain(block, count, path, x, y):
+    values = {"x": x, "y": y}
+    value, delta = values[path["start"]], values[path["delta"]]
+    operation = {"add": Add, "sub": Sub}[path["operation"]]
     for _ in range(count):
-        stmt = Add(value, other)
+        stmt = operation(value, delta)
         stmt.result.type = types.Int
         block.stmts.append(stmt)
         value = stmt.result
@@ -23,33 +28,33 @@ def chain(block, count, value, other):
 
 
 def workload(family, size):
-    # The first block argument is Python Method's unused implicit self. Rust
-    # carries the same unused argument so argument counts/shapes match.
-    entry = ir.Block(argtypes=(types.Int, types.Int, types.Bool))
-    _, x, cond = entry.args
+    specification = family_spec(family, size)
+    paths = {path["name"]: path for path in specification["paths"]}
+    steps = size // specification["steps_divisor"]
+    # Python's Method wrapper needs self; Rust does not need this extra argument.
+    entry = ir.Block(argtypes=(types.MethodType, types.Int, types.Int, types.Bool, types.Bool))
+    _, x, y, outer, inner = entry.args
     blocks = [entry]
     if family == "chain":
-        entry.stmts.append(func.Return(chain(entry, size, x, x)))
+        entry.stmts.append(func.Return(chain(entry, steps, paths["all"], x, y)))
     elif family == "diamond":
-        left = ir.Block(argtypes=(types.Int,))
-        right = ir.Block(argtypes=(types.Int,))
+        left, right = [ir.Block(argtypes=(types.Int, types.Int)) for _ in range(2)]
         merge = ir.Block(argtypes=(types.Int,))
-        entry.stmts.append(cf.ConditionalBranch(cond, (x,), (x,), then_successor=left, else_successor=right))
-        l = chain(left, size // 2, left.args[0], left.args[0])
-        left.stmts.append(cf.Branch((l,), successor=merge))
-        r = chain(right, size // 2, right.args[0], right.args[0])
-        right.stmts.append(cf.Branch((r,), successor=merge))
+        entry.stmts.append(cf.ConditionalBranch(outer, (x, y), (x, y), then_successor=left, else_successor=right))
+        for block, name in [(left, "left"), (right, "right")]:
+            result = chain(block, steps, paths[name], *block.args)
+            block.stmts.append(cf.Branch((result,), successor=merge))
         merge.stmts.append(func.Return(merge.args[0]))
         blocks += [left, right, merge]
     elif family == "nested_cfg":
-        left, right = [ir.Block(argtypes=(types.Int,)) for _ in range(2)]
-        a, b, c, d = [ir.Block(argtypes=(types.Int,)) for _ in range(4)]
+        left, right = [ir.Block(argtypes=(types.Int, types.Int)) for _ in range(2)]
+        a, b, c, d = [ir.Block(argtypes=(types.Int, types.Int)) for _ in range(4)]
         left_merge, right_merge, merge = [ir.Block(argtypes=(types.Int,)) for _ in range(3)]
-        entry.stmts.append(cf.ConditionalBranch(cond, (x,), (x,), then_successor=left, else_successor=right))
-        left.stmts.append(cf.ConditionalBranch(cond, (left.args[0],), (left.args[0],), then_successor=a, else_successor=b))
-        right.stmts.append(cf.ConditionalBranch(cond, (right.args[0],), (right.args[0],), then_successor=c, else_successor=d))
-        for leaf, target in [(a, left_merge), (b, left_merge), (c, right_merge), (d, right_merge)]:
-            result = chain(leaf, size // 4, leaf.args[0], leaf.args[0])
+        entry.stmts.append(cf.ConditionalBranch(outer, (x, y), (x, y), then_successor=left, else_successor=right))
+        left.stmts.append(cf.ConditionalBranch(inner, tuple(left.args), tuple(left.args), then_successor=a, else_successor=b))
+        right.stmts.append(cf.ConditionalBranch(inner, tuple(right.args), tuple(right.args), then_successor=c, else_successor=d))
+        for leaf, name, target in [(a, "a", left_merge), (b, "b", left_merge), (c, "c", right_merge), (d, "d", right_merge)]:
+            result = chain(leaf, steps, paths[name], *leaf.args)
             leaf.stmts.append(cf.Branch((result,), successor=target))
         left_merge.stmts.append(cf.Branch((left_merge.args[0],), successor=merge))
         right_merge.stmts.append(cf.Branch((right_merge.args[0],), successor=merge))
@@ -59,11 +64,11 @@ def workload(family, size):
         raise ValueError(family)
     code = func.Function(
         sym_name="benchmark",
-        slots=("self", "x", "cond"),
-        signature=func.Signature((types.Int, types.Int, types.Bool), types.Int),
+        slots=("self", "x", "y", "outer", "inner"),
+        signature=func.Signature((types.MethodType, types.Int, types.Int, types.Bool, types.Bool), types.Int),
         body=ir.Region(blocks),
     )
-    return ir.Method(basic, code, arg_names=["self", "x", "cond"])
+    return ir.Method(basic, code, arg_names=["self", "x", "y", "outer", "inner"])
 
 
 def describe(code):
@@ -73,7 +78,7 @@ def describe(code):
     def walk(stmt):
         nonlocal blocks
         if stmt is not code:
-            names = {Add: "add", cf.Branch: "br", cf.ConditionalBranch: "cond_br",
+            names = {Add: "add", Sub: "sub", cf.Branch: "br", cf.ConditionalBranch: "cond_br",
                      func.Return: "ret"}
             counts[names[type(stmt)]] += 1
         for region in stmt.regions:
@@ -105,9 +110,9 @@ def shape(code):
             for value in stmt.results:
                 values[value] = len(values)
     def typed(value):
-        assert value.type in (types.Int, types.Bool), value.type
-        return {"id": values[value], "type": "bool" if value.type == types.Bool else "int"}
-    names = {Add: "add", cf.Branch: "br", cf.ConditionalBranch: "cond_br",
+        assert value.type in (types.Int, types.Bool, types.MethodType), value.type
+        return {"id": values[value], "type": "method" if value.type == types.MethodType else ("bool" if value.type == types.Bool else "int")}
+    names = {Add: "add", Sub: "sub", cf.Branch: "br", cf.ConditionalBranch: "cond_br",
              func.Return: "ret"}
     return [{"arguments": [typed(v) for v in block.args],
              "ops": [{"kind": names[type(stmt)], "inputs": [values[v] for v in stmt.args],
@@ -120,12 +125,13 @@ def shape(code):
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("family", choices=("chain", "diamond", "nested_cfg"))
-    parser.add_argument("adds", type=int)
+    parser.add_argument("size", type=int)
     parser.add_argument("repeats", type=int, nargs="?", default=30)
     parser.add_argument("warmups", type=int, nargs="?", default=5)
+    parser.add_argument("export", type=Path, nargs="?")
     args = parser.parse_args()
-    assert args.adds > 0 and args.adds % 4 == 0 and args.repeats > 0
-    program = workload(args.family, args.adds)
+    assert args.size > 0 and args.size % 4 == 0 and args.repeats > 0
+    program = workload(args.family, args.size)
     # These APIs include BOTH semantic IR encoding/decoding and actual JSON.
     program.code.verify()
     program.code.verify_type()
@@ -135,13 +141,19 @@ def main():
     restored.code.verify_type()
     assert restored.code.is_structurally_equal(program.code)
     operations, blocks = describe(program.code)
-    assert operations["add"] == args.adds
+    assert operations.get("add", 0) + operations.get("sub", 0) == args.size
     assert describe(restored.code) == (operations, blocks)
 
     normalized = shape(program.code)
     validate_shape(normalized)
     validate_shape(shape(restored.code))
     assert normalized == shape(restored.code)
+
+    semantic_cases = validate_runtime(program, restored, args.family, args.size)
+
+    if args.export:
+        args.export.mkdir(parents=True, exist_ok=True)
+        (args.export / f"{args.family}-{args.size}.python.json").write_text(encoded)
 
     def roundtrip():
         payload = basic.encode_json(program)
@@ -168,7 +180,7 @@ def main():
         samples.append(elapsed)
         del output  # output lifetime/reclamation is outside the timer
     print(json.dumps({"implementation": "python", "family": args.family,
-                      "adds": args.adds, "operations": operations, "blocks": blocks,
+                      "size": args.size, "semantic_cases": semantic_cases, "operations": operations, "blocks": blocks,
                       "shape": normalized, "json_bytes": len(encoded.encode()), "warmups": args.warmups,
                       "samples_seconds": samples}))
 

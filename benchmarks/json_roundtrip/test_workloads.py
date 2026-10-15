@@ -2,13 +2,15 @@
 import copy
 import unittest
 
+from kirin.dialects.py.binop import Add, Sub
 from kirin.prelude import basic
-from python_benchmark import describe, shape, workload
-from validation import assert_equivalent, validate_shape
+from python_benchmark import shape, workload
+from semantic_spec import assert_semantically_valid, expected_cases, validate_runtime
+from validation import validate_shape
 
 
 class WorkloadValidity(unittest.TestCase):
-    def test_all_families_valid_before_and_after_json(self):
+    def test_original_and_decoded_payloads_execute_against_oracle(self):
         for family in ("chain", "diamond", "nested_cfg"):
             with self.subTest(family=family):
                 original = workload(family, 4)
@@ -20,25 +22,37 @@ class WorkloadValidity(unittest.TestCase):
                 self.assertTrue(original.code.is_structurally_equal(decoded.code))
                 validate_shape(shape(original.code))
                 validate_shape(shape(decoded.code))
-                self.assertEqual(shape(original.code), shape(decoded.code))
+                cases = validate_runtime(original, decoded, family, 4)
+                self.assertEqual(len(cases), 7)
+                if family == "nested_cfg":
+                    self.assertEqual({case["path"] for case in cases}, {"a", "b", "c", "d"})
+                    self.assertEqual(len({case["expected"] for case in cases[:4]}), 4)
 
-    def test_shape_comparison_rejects_operand_target_and_type_changes(self):
+    def test_wrong_arithmetic_in_real_payload_is_rejected(self):
         original = workload("diamond", 4)
-        operations, blocks = describe(original.code)
-        reference = {"family": "diamond", "adds": 4, "operations": operations,
-                     "blocks": blocks, "shape": shape(original.code)}
-        for mutation in ("operand", "target", "type"):
-            changed = copy.deepcopy(reference)
-            if mutation == "operand":
-                changed["shape"][1]["ops"][0]["inputs"][1] = 2
-            elif mutation == "target":
-                changed["shape"][0]["ops"][-1]["targets"][0] = 2
-            else:
-                changed["shape"][0]["arguments"][1]["type"] = "float"
-            with self.subTest(mutation=mutation), self.assertRaises(AssertionError):
-                assert_equivalent(reference, changed)
+        add = next(stmt for block in original.code.body.blocks for stmt in block.stmts if isinstance(stmt, Add))
+        replacement = Sub(*add.args)
+        replacement.result.type = add.result.type
+        add.replace_by(replacement)
+        original.code.verify()
+        original.code.verify_type()
+        decoded = basic.decode_json(basic.encode_json(original))
+        with self.assertRaisesRegex(AssertionError, "oracle"):
+            validate_runtime(original, decoded, "diamond", 4)
 
-    def test_branch_arity_and_dominance_rejected(self):
+    def test_shape_differences_allowed_but_wrong_execution_rejected(self):
+        cases = [dict(case, original=case["expected"], decoded=case["expected"])
+                 for case in expected_cases("diamond", 4)]
+        rust = {"family": "diamond", "size": 4, "semantic_cases": cases,
+                "shape": "Rust representation", "operations": {"add": 2, "sub": 2}}
+        python = dict(rust, shape="different Python representation", operations={"other": 7})
+        assert_semantically_valid(rust, python, "diamond", 4)
+        broken = copy.deepcopy(python)
+        broken["semantic_cases"][0]["decoded"] += 1
+        with self.assertRaisesRegex(AssertionError, "decoded runtime result"):
+            assert_semantically_valid(rust, broken, "diamond", 4)
+
+    def test_branch_arity_and_dominance_rejected_locally(self):
         invalid = shape(workload("diamond", 4).code)
         invalid[0]["ops"][-1]["inputs"].pop()
         with self.assertRaisesRegex(AssertionError, "arity"):

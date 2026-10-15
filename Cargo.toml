@@ -147,5 +147,5 @@ serde = ["dep:serde", "kirin-ir/serde", "kirin-test-utils/serde", "kirin-test-la
 
 [[example]]
 name = "json_roundtrip"
-path = "example/json_roundtrip.rs"
+path = "benchmarks/json_roundtrip/rust/main.rs"
 required-features = ["serde", "parser", "pretty"]

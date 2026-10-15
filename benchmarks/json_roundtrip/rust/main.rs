@@ -1,33 +1,17 @@
-//! JSON-only round-trip benchmark; see docs/benchmarks/json-roundtrip.md.
+//! JSON-only round-trip benchmark; see benchmarks/json_roundtrip/README.md.
 use std::{hint::black_box, time::Instant};
 
 use kirin::prelude::*;
 use kirin_arith::Arith;
 use kirin_cf::ControlFlow;
-use kirin_function::Return;
 use kirin_prettyless::PipelinePrintExt;
-use kirin_test_languages::SimpleType;
-use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint, Serialize, Deserialize)]
-#[kirin(builders, type = SimpleType)]
-enum BenchmarkLanguage {
-    #[chumsky(format = "fn {:name}{signature} {body}")]
-    Function {
-        body: CFG,
-        signature: Signature<SimpleType>,
-    },
-    #[wraps]
-    Arith(Arith<SimpleType>),
-    #[wraps]
-    Cf(ControlFlow<SimpleType>),
-    #[wraps]
-    Return(Return<SimpleType>),
-}
+mod language;
+mod semantics;
+mod spec;
+use language::BenchmarkLanguage;
 
-#[path = "json_roundtrip/shape.rs"]
 mod shape;
-#[path = "json_roundtrip/workload.rs"]
 mod workload;
 
 type IR = Pipeline<StageInfo<BenchmarkLanguage>>;
@@ -35,10 +19,17 @@ type IR = Pipeline<StageInfo<BenchmarkLanguage>>;
 fn main() {
     let mut args = std::env::args().skip(1);
     let family = args.next().expect("family: chain, diamond or nested_cfg");
-    let size: usize = args.next().expect("number of adds").parse().unwrap();
+    let size: usize = args
+        .next()
+        .expect("semantic arithmetic size")
+        .parse()
+        .unwrap();
     let repeats: usize = args.next().unwrap_or("30".into()).parse().unwrap();
     let warmups: usize = args.next().unwrap_or("5".into()).parse().unwrap();
+    let export = args.next().map(std::path::PathBuf::from);
     assert!(size > 0 && repeats > 0 && size.is_multiple_of(4));
+    let suite = spec::Suite::load();
+    let specification = suite.family(&family, size);
     let text = workload::workload(&family, size);
     let mut ir = IR::new();
     ir.parse(&text).expect("generated workload parses");
@@ -62,6 +53,7 @@ fn main() {
         let name = match stmt.definition() {
             BenchmarkLanguage::Function { .. } => continue,
             BenchmarkLanguage::Arith(Arith::Add { .. }) => "add",
+            BenchmarkLanguage::Arith(Arith::Sub { .. }) => "sub",
             BenchmarkLanguage::Cf(ControlFlow::Branch { .. }) => "br",
             BenchmarkLanguage::Cf(ControlFlow::ConditionalBranch { .. }) => "cond_br",
             BenchmarkLanguage::Return(_) => "ret",
@@ -69,9 +61,18 @@ fn main() {
         };
         *counts.entry(name).or_default() += 1;
     }
-    assert_eq!(counts["add"], size);
+    assert_eq!(
+        counts.get("add").unwrap_or(&0) + counts.get("sub").unwrap_or(&0),
+        size
+    );
     let shape = shape::describe(stage);
     assert_eq!(shape, shape::describe(&ir.stages()[0]));
+    let semantic_cases = semantics::validate(&ir, &restored, &suite, specification, size);
+    if let Some(directory) = export {
+        std::fs::create_dir_all(&directory).unwrap();
+        std::fs::write(directory.join(format!("{family}-{size}.rust.kirin")), &text).unwrap();
+        std::fs::write(directory.join(format!("{family}-{size}.rust.json")), &json).unwrap();
+    }
     let roundtrip = || {
         let json = serde_json::to_string(black_box(&ir)).unwrap();
         let restored: IR = serde_json::from_str(black_box(&json)).unwrap();
@@ -90,7 +91,7 @@ fn main() {
     println!(
         "{}",
         serde_json::json!({
-            "implementation": "rust", "family": family, "adds": size,
+            "implementation": "rust", "family": family, "size": size, "semantic_cases": semantic_cases,
             "operations": counts, "blocks": stage.block_arena().iter().count(), "shape": shape,
             "json_bytes": json.len(), "warmups": warmups, "samples_seconds": samples,
         })
@@ -98,5 +99,4 @@ fn main() {
 }
 
 #[cfg(test)]
-#[path = "json_roundtrip/tests.rs"]
 mod tests;

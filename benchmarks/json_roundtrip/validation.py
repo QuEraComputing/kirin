@@ -8,13 +8,13 @@ def validate_shape(blocks):
     for block_id, block in enumerate(blocks):
         assert block["ops"], "empty unterminated block"
         for value in block["arguments"]:
-            assert value["type"] in ("int", "bool"), "invalid block argument type"
+            assert value["type"] in ("int", "bool", "method"), "invalid block argument type"
             assert value["id"] not in definitions, "duplicate SSA definition"
             definitions[value["id"]] = (block_id, -1, value["type"])
         for index, op in enumerate(block["ops"]):
             assert not op["bodies"], "benchmark uses CFGs, not structured regions"
-            assert op["kind"] in ("add", "ret", "br", "cond_br")
-            assert (op["kind"] == "add") == (index < len(block["ops"]) - 1), "invalid terminator placement"
+            assert op["kind"] in ("add", "sub", "ret", "br", "cond_br")
+            assert (op["kind"] in ("add", "sub")) == (index < len(block["ops"]) - 1), "invalid terminator placement"
             for value in op["outputs"]:
                 assert value["type"] == "int", "noninteger result"
                 assert value["id"] not in definitions, "duplicate SSA definition"
@@ -23,7 +23,7 @@ def validate_shape(blocks):
                 assert 0 <= target < len(blocks), "missing target block"
                 predecessors[target].add(block_id)
             target_arity = sum(len(blocks[target]["arguments"]) for target in op["targets"])
-            if op["kind"] == "add":
+            if op["kind"] in ("add", "sub"):
                 assert len(op["inputs"]) == 2 and len(op["outputs"]) == 1 and not op["targets"]
             else:
                 assert not op["outputs"]
@@ -61,11 +61,4 @@ def validate_shape(blocks):
             else:
                 carried_types = input_types
             assert all(tag == "int" for tag in carried_types), "noninteger arithmetic or carried value"
-
-
-def assert_equivalent(rust, python):
-    validate_shape(rust["shape"])
-    validate_shape(python["shape"])
-    for field in ("family", "adds", "operations", "blocks", "shape"):
-        assert rust[field] == python[field], f"normalized workloads differ: {field}"
 
