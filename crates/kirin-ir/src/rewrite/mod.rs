@@ -10,6 +10,7 @@
 
 pub(crate) mod cfg;
 pub(crate) mod digraph;
+mod results;
 pub(crate) mod rewriter;
 
 pub use rewriter::{MutationEvent, RewriteError, Rewriter};

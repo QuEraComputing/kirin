@@ -498,9 +498,10 @@ fn insert_before_and_after_splice_and_maintain_index() {
         rw.insert_after(ret, BuilderDialect::Nop),
         Err(RewriteError::AnchorIsTerminator(ret))
     );
+    let not_fresh = ResultValue::from(TestSSAValue(0));
     assert_eq!(
-        rw.insert_before(s0, BuilderDialect::Wire(ResultValue::from(TestSSAValue(0)))),
-        Err(RewriteError::CannotInsertWithResults)
+        rw.insert_before(s0, BuilderDialect::Wire(not_fresh)),
+        Err(RewriteError::ResultNotFresh(not_fresh.into()))
     );
     assert_eq!(
         rw.insert_before(s0, BuilderDialect::Return),
@@ -519,6 +520,105 @@ fn insert_before_and_after_splice_and_maintain_index() {
     assert!(rw.events().is_empty());
 
     // Maintained index equals a from-scratch rebuild.
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn insert_binds_fresh_results() {
+    let mut stage = new_stage();
+
+    let x = stage.block_argument().index(0);
+    let s0 = stage.statement().definition(BuilderDialect::Use(x)).new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let block = stage
+        .block()
+        .argument(TestType::I32)
+        .stmt(s0)
+        .terminator(ret)
+        .new();
+    let mut stage = stage.finalize().unwrap();
+    let real_x = SSAValue::from(block.expect_info(&stage).arguments[0]);
+
+    // A value allocated by a rewriter that never binds it stays dead, and no
+    // later rewriter can bind it.
+    let stale = Rewriter::new(&mut stage).new_result(TestType::I32);
+    assert!(stale.get_info(&stage).is_none());
+
+    let mut rw = Rewriter::new(&mut stage);
+    let a = rw.new_result(TestType::I32);
+    let b = rw.new_result(TestType::I64);
+
+    // Unbound values are not live yet, and not visible to verification.
+    assert_eq!(
+        rw.insert_before(s0, BuilderDialect::Use(a.into())),
+        Err(RewriteError::UnknownValue(a.into()))
+    );
+    verify_derived(rw.stage()).unwrap();
+
+    // Rejected: the same value twice, an existing value, a stale value.
+    assert_eq!(
+        rw.insert_before(s0, BuilderDialect::Split(a, a)),
+        Err(RewriteError::ResultNotFresh(a.into()))
+    );
+    assert_eq!(
+        rw.insert_before(s0, BuilderDialect::Wire(ResultValue::from(real_x))),
+        Err(RewriteError::ResultNotFresh(real_x))
+    );
+    assert_eq!(
+        rw.insert_before(s0, BuilderDialect::Wire(stale)),
+        Err(RewriteError::ResultNotFresh(stale.into()))
+    );
+    // A rejection after the freshness check leaves `a` unbound: the `Split`
+    // below still binds it.
+    let dead = SSAValue::from(TestSSAValue(9_999));
+    assert_eq!(
+        rw.insert_before(s0, BuilderDialect::Compute(dead, a)),
+        Err(RewriteError::UnknownValue(dead))
+    );
+    assert!(a.get_info(rw.stage()).is_none());
+    assert!(rw.events().is_empty());
+
+    // Binding makes them results of the new statement, in slot order.
+    let split = rw.insert_before(s0, BuilderDialect::Split(a, b)).unwrap();
+    let info = a.get_info(rw.stage()).unwrap();
+    assert_eq!(*info.kind(), SSAKind::Result(split, 0));
+    assert_eq!(*info.ty(), TestType::I32);
+    let info = b.get_info(rw.stage()).unwrap();
+    assert_eq!(*info.kind(), SSAKind::Result(split, 1));
+    assert_eq!(*info.ty(), TestType::I64);
+
+    // Bound values are usable, and cannot be bound again.
+    let user = rw
+        .insert_after(split, BuilderDialect::Use(a.into()))
+        .unwrap();
+    assert_eq!(
+        rw.insert_after(split, BuilderDialect::Wire(b)),
+        Err(RewriteError::ResultNotFresh(b.into()))
+    );
+
+    // `insert_after` binds results too.
+    let c = rw.new_result(TestType::I32);
+    let wire = rw.insert_after(split, BuilderDialect::Wire(c)).unwrap();
+    let info = c.get_info(rw.stage()).unwrap();
+    assert_eq!(*info.kind(), SSAKind::Result(wire, 0));
+    assert_eq!(*info.ty(), TestType::I32);
+
+    // One event per successful insert; the rejections recorded none.
+    assert_eq!(
+        rw.drain_events(),
+        vec![
+            MutationEvent::InsertedStatement { stmt: split },
+            MutationEvent::InsertedStatement { stmt: user },
+            MutationEvent::InsertedStatement { stmt: wire },
+        ]
+    );
+    drop(rw);
+
+    assert_eq!(uses_set(&stage, a), HashSet::from([so(user, 0)]));
+    assert_eq!(
+        block.statements(&stage).collect::<Vec<_>>(),
+        vec![split, wire, user, s0]
+    );
     verify_derived(&stage).unwrap();
 }
 
