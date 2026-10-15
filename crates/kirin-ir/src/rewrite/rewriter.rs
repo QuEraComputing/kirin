@@ -73,8 +73,8 @@ use crate::node::linked_list::LinkedListNode;
 use smallvec::SmallVec;
 
 use crate::{
-    Block, BlockInfo, CFG, Dialect, SSAValue, StageInfo, Statement, StatementInfo, StatementParent,
-    Use,
+    Block, BlockInfo, CFG, DiGraph, Dialect, SSAValue, StageInfo, Statement, StatementInfo,
+    StatementParent, Use,
 };
 
 /// A structured record of one mutation performed through a [`Rewriter`].
@@ -108,6 +108,9 @@ pub enum MutationEvent {
     ChangedCfg { cfg: CFG },
     /// `block`'s terminator was set (and with it the block's outgoing edges).
     ChangedTerminator { block: Block },
+    /// Nodes or edges of `graph`'s topology changed. Recorded at most once per
+    /// graph per [`Rewriter`] call.
+    ChangedDiGraphTopology { graph: DiGraph },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].

@@ -58,7 +58,7 @@ pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) graph: petgraph::Graph<Statement, SSAValue, D>,
     /// Member statement → its node in `graph`. Kept in lockstep with `graph`
     /// by the rewriter; not checked by `derived/` verification.
-    pub(crate) node_index: FxHashMap<Statement, NodeIndex>,
+    pub(crate) stmt_to_node_idx: FxHashMap<Statement, NodeIndex>,
     pub(crate) extra: Extra,
     _marker: std::marker::PhantomData<L>,
 }
@@ -74,7 +74,7 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         graph: petgraph::Graph<Statement, SSAValue, D>,
         extra: Extra,
     ) -> Self {
-        let node_index = graph
+        let stmt_to_node_idx = graph
             .node_indices()
             .map(|node| (graph[node], node))
             .collect();
@@ -85,7 +85,7 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
             ports,
             edge_count,
             graph,
-            node_index,
+            stmt_to_node_idx,
             extra,
             _marker: std::marker::PhantomData,
         }
@@ -127,8 +127,8 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     }
 
     /// The petgraph node of member statement `stmt`, if it is a member.
-    pub fn node_of(&self, stmt: Statement) -> Option<NodeIndex> {
-        self.node_index.get(&stmt).copied()
+    pub fn node_idx_of(&self, stmt: Statement) -> Option<NodeIndex> {
+        self.stmt_to_node_idx.get(&stmt).copied()
     }
 
     /// A reference to the direction-specific extra data.

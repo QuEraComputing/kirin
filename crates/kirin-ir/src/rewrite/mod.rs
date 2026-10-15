@@ -18,6 +18,7 @@
 //! guarantee, and [`pass`] for the boundary's failure routes.
 
 pub(crate) mod cfg;
+pub(crate) mod digraph;
 pub(crate) mod pass;
 #[cfg(test)]
 mod pass_tests;

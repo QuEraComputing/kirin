@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
-enum TestType {
+pub(crate) enum TestType {
     #[default]
     Any,
 }
@@ -175,7 +175,7 @@ macro_rules! impl_empty_dialect_traits {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct LangA;
+pub(crate) struct LangA;
 impl_empty_dialect_traits!(LangA);
 impl Dialect for LangA {
     type Type = TestType;
