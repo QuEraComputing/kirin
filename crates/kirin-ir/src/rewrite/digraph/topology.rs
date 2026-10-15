@@ -20,33 +20,51 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// Mirror a new operand slot of member `consumer` reading `value`.
+    /// Returns whether an edge was added.
     pub(in crate::rewrite) fn add_operand_edge(
         &mut self,
         graph: DiGraph,
         consumer: Statement,
         value: SSAValue,
-    ) {
-        if let Some(producer) = self.member_producer(graph, value) {
-            graph
-                .expect_info_mut(self.stage)
-                .add_edge(producer, consumer, value);
-        }
+    ) -> bool {
+        let Some(producer) = self.member_producer(graph, value) else {
+            return false;
+        };
+        graph
+            .expect_info_mut(self.stage)
+            .add_edge(producer, consumer, value);
+        true
     }
 
     /// Drop the mirror of one operand slot of member `consumer` reading
-    /// `value`.
-    #[expect(dead_code, reason = "wired up by operand edits on DiGraph members")]
+    /// `value`. Returns whether an edge was removed.
     pub(in crate::rewrite) fn remove_operand_edge(
         &mut self,
         graph: DiGraph,
         consumer: Statement,
         value: SSAValue,
-    ) {
-        if let Some(producer) = self.member_producer(graph, value) {
-            let removed = graph
-                .expect_info_mut(self.stage)
-                .remove_edge(producer, consumer, value);
-            debug_assert!(removed, "no {value} edge into {consumer:?} to remove");
-        }
+    ) -> bool {
+        let Some(producer) = self.member_producer(graph, value) else {
+            return false;
+        };
+        let removed = graph
+            .expect_info_mut(self.stage)
+            .remove_edge(producer, consumer, value);
+        debug_assert!(removed, "no {value} edge into {consumer:?} to remove");
+        removed
+    }
+
+    /// Mirror one operand slot of member `consumer` changing from `old` to
+    /// `new`. Returns whether the topology changed.
+    pub(in crate::rewrite) fn retarget_operand_edge(
+        &mut self,
+        graph: DiGraph,
+        consumer: Statement,
+        old: SSAValue,
+        new: SSAValue,
+    ) -> bool {
+        let removed = self.remove_operand_edge(graph, consumer, old);
+        let added = self.add_operand_edge(graph, consumer, new);
+        removed || added
     }
 }

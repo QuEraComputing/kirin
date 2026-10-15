@@ -320,3 +320,159 @@ fn erase_statement_tombstones_owned_digraph() {
     assert!(!iso.get_info(&stage).unwrap().deleted());
     verify_derived(&stage).unwrap();
 }
+
+#[test]
+fn replace_operand_on_member_retargets_its_edge() {
+    let mut stage = new_stage();
+
+    let (split, x, y) = make_split(&mut stage);
+    let _outer = stage.block().stmt(split).new();
+    let (p, rp) = make_compute(&mut stage, x);
+    let (q, rq) = make_compute(&mut stage, x);
+    let c = stage.statement().definition(BuilderDialect::Use(rp)).new();
+    let dg = stage.digraph().node(p).node(q).node(c).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let operands = MutationEvent::ChangedOperands { stmt: c };
+    let topology = MutationEvent::ChangedDiGraphTopology { graph: dg };
+    let mut rw = Rewriter::new(&mut stage);
+
+    // Member result → member result: the edge moves to the new producer.
+    assert_eq!(rw.replace_operand(c, 0, rq), Ok(rp));
+    assert_eq!(edges(rw.stage(), dg), HashMap::from([((q, c, rq), 1)]));
+    assert_eq!(rw.drain_events(), vec![operands, topology]);
+
+    // Member result → outside value: the edge goes.
+    rw.replace_operand(c, 0, x).unwrap();
+    assert!(edges(rw.stage(), dg).is_empty());
+    assert_eq!(rw.drain_events(), vec![operands, topology]);
+
+    // Outside → outside: no edge either way, so no topology event.
+    rw.replace_operand(c, 0, y).unwrap();
+    assert!(edges(rw.stage(), dg).is_empty());
+    assert_eq!(rw.drain_events(), vec![operands]);
+
+    // Outside → member result: an edge appears.
+    rw.replace_operand(c, 0, rp).unwrap();
+    assert_eq!(edges(rw.stage(), dg), HashMap::from([((p, c, rp), 1)]));
+    assert_eq!(rw.drain_events(), vec![operands, topology]);
+    drop(rw);
+
+    assert_eq!(uses_set(&stage, rp), HashSet::from([so(c, 0)]));
+    assert!(uses_set(&stage, rq).is_empty());
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_all_uses_retargets_every_member_edge() {
+    let mut stage = new_stage();
+
+    // `rp` is read by two members (one of them twice) and by the yield.
+    let (split, x, _) = make_split(&mut stage);
+    let _outer = stage.block().stmt(split).new();
+    let (p, rp) = make_compute(&mut stage, x);
+    let (q, rq) = make_compute(&mut stage, x);
+    let c1 = stage.statement().definition(BuilderDialect::Use(rp)).new();
+    let c2 = stage
+        .statement()
+        .definition(BuilderDialect::Add(rp, rp))
+        .new();
+    let dg = stage
+        .digraph()
+        .node(p)
+        .node(q)
+        .node(c1)
+        .node(c2)
+        .yield_value(rp)
+        .new();
+
+    let mut stage = stage.finalize().unwrap();
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(rw.replace_all_uses(rp, rq), Ok(4));
+    let events = rw.drain_events();
+
+    // One topology and one yields event for the graph, however many slots.
+    let expected = [
+        MutationEvent::ChangedOperands { stmt: c1 },
+        MutationEvent::ChangedOperands { stmt: c2 },
+        MutationEvent::ChangedDiGraphTopology { graph: dg },
+        MutationEvent::ChangedDiGraphYields { graph: dg },
+        MutationEvent::ReplacedUses { old: rp, new: rq },
+    ];
+    assert_eq!(events.len(), expected.len());
+    assert_eq!(
+        events.iter().copied().collect::<HashSet<_>>(),
+        HashSet::from(expected)
+    );
+
+    // Every edge out of `p` now leaves `q`, and `p` is free to go.
+    assert_eq!(
+        edges(rw.stage(), dg),
+        HashMap::from([((q, c1, rq), 1), ((q, c2, rq), 2)])
+    );
+    rw.erase_statement(p).unwrap();
+    drop(rw);
+
+    assert_members(&stage, dg, &[q, c1, c2]);
+    assert_eq!(
+        uses_set(&stage, rq),
+        HashSet::from([so(c1, 0), so(c2, 0), so(c2, 1), dgy(dg, 0)])
+    );
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_statement_on_member_updates_operand_edges() {
+    let mut stage = new_stage();
+
+    // p → n → d, with q a second producer.
+    let (split, x, _) = make_split(&mut stage);
+    let _outer = stage.block().stmt(split).new();
+    let (p, rp) = make_compute(&mut stage, x);
+    let (q, rq) = make_compute(&mut stage, x);
+    let (n, rn) = make_compute(&mut stage, rp);
+    let d = stage.statement().definition(BuilderDialect::Use(rn)).new();
+    let dg = stage.digraph().node(p).node(q).node(n).node(d).new();
+
+    let mut stage = stage.finalize().unwrap();
+    // The result slot is overwritten with `n`'s own result on replacement.
+    let placeholder = ResultValue::from(TestSSAValue(0));
+    let mut rw = Rewriter::new(&mut stage);
+
+    // A member cannot become a terminator.
+    assert_eq!(
+        rw.replace_statement(n, BuilderDialect::Invoke(placeholder)),
+        Err(RewriteError::TerminatorKindMismatch(n))
+    );
+    assert!(rw.events().is_empty());
+
+    // Reading `rq` instead of `rp` swaps the incoming edge; the result keeps
+    // its id, so the outgoing edge to `d` stands.
+    rw.replace_statement(n, BuilderDialect::Compute(rq, placeholder))
+        .unwrap();
+    assert_eq!(
+        rw.drain_events(),
+        vec![
+            MutationEvent::ReplacedStatement { stmt: n },
+            MutationEvent::ChangedDiGraphTopology { graph: dg },
+        ]
+    );
+    assert_eq!(
+        edges(rw.stage(), dg),
+        HashMap::from([((q, n, rq), 1), ((n, d, rn), 1)])
+    );
+
+    // Same operands again: the topology is unchanged, so no topology event.
+    rw.replace_statement(n, BuilderDialect::Compute(rq, placeholder))
+        .unwrap();
+    assert_eq!(
+        rw.drain_events(),
+        vec![MutationEvent::ReplacedStatement { stmt: n }]
+    );
+    drop(rw);
+
+    assert_eq!(*rn.get_info(&stage).unwrap().kind(), SSAKind::Result(n, 0));
+    assert!(uses_set(&stage, rp).is_empty());
+    assert_eq!(uses_set(&stage, rq), HashSet::from([so(n, 0)]));
+    verify_derived(&stage).unwrap();
+}

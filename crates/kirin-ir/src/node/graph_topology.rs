@@ -54,10 +54,6 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     /// # Panics
     ///
     /// If either statement is not a member.
-    #[cfg_attr(
-        not(test),
-        expect(dead_code, reason = "wired up by operand edits on DiGraph members")
-    )]
     pub(crate) fn remove_edge(
         &mut self,
         producer: Statement,
