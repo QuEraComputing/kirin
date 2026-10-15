@@ -85,7 +85,7 @@ impl PrettyPrint for Successor {
     {
         let block = self.target();
         let block_info = block.expect_info(doc.stage());
-        doc.text(doc.resolve_caret_name(block_info.name, block))
+        doc.text(doc.resolve_caret_name(block_info.name(), block))
     }
 }
 

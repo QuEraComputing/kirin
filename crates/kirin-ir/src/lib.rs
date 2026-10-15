@@ -3,7 +3,6 @@ mod body;
 mod builder;
 mod comptime;
 mod derived;
-mod detach;
 mod intern;
 mod language;
 mod lattice;
@@ -14,6 +13,8 @@ mod project;
 mod rewrite;
 mod signature;
 mod stage;
+#[cfg(test)]
+mod testing;
 
 /// Queries from the IRContext.
 pub mod query;
@@ -30,7 +31,6 @@ pub use derived::{
     BlockBody, ChainDefect, ChainFinding, DanglingParent, DeriveError, Finding, Mismatch,
     VerifyError, verify_derived,
 };
-pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
     Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut,

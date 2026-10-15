@@ -62,7 +62,7 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedListNode;
 use crate::{Block, Dialect, SSAValue, StageInfo, Statement, StatementInfo, StatementParent, Use};
 

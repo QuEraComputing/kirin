@@ -51,8 +51,8 @@ fn replace_all_uses_rewrites_operands_and_records_events() {
     let (real_x, real_y) = {
         let info = block.expect_info(&stage);
         (
-            SSAValue::from(info.arguments[0]),
-            SSAValue::from(info.arguments[1]),
+            SSAValue::from(info.arguments()[0]),
+            SSAValue::from(info.arguments()[1]),
         )
     };
 
@@ -109,8 +109,8 @@ fn replace_operand_updates_single_slot_and_rejects_illegal_edits() {
     let (real_x, real_y) = {
         let info = block.expect_info(&stage);
         (
-            SSAValue::from(info.arguments[0]),
-            SSAValue::from(info.arguments[1]),
+            SSAValue::from(info.arguments()[0]),
+            SSAValue::from(info.arguments()[1]),
         )
     };
 
@@ -174,8 +174,8 @@ fn replace_operand_maintains_def_use_index() {
     let (real_x, real_y) = {
         let info = block.expect_info(&stage);
         (
-            SSAValue::from(info.arguments[0]),
-            SSAValue::from(info.arguments[1]),
+            SSAValue::from(info.arguments()[0]),
+            SSAValue::from(info.arguments()[1]),
         )
     };
 
@@ -229,7 +229,7 @@ fn replace_all_uses_maintains_def_use_index_including_yields() {
     let block = stage.block().argument(TestType::I32).new();
 
     let mut stage = stage.finalize().unwrap();
-    let real_b = SSAValue::from(block.expect_info(&stage).arguments[0]);
+    let real_b = SSAValue::from(block.expect_info(&stage).arguments()[0]);
 
     // Before: a is used by the operand and the yield; b is unused.
     assert_eq!(
@@ -293,7 +293,7 @@ fn erase_statement_unlinks_and_maintains_index() {
         .new();
 
     let mut stage = stage.finalize().unwrap();
-    let real_x = SSAValue::from(block.expect_info(&stage).arguments[0]);
+    let real_x = SSAValue::from(block.expect_info(&stage).arguments()[0]);
 
     assert_eq!(
         uses_set(&stage, real_x),
@@ -379,8 +379,8 @@ fn insert_before_and_after_splice_and_maintain_index() {
         .new();
 
     let mut stage = stage.finalize().unwrap();
-    let real_x = SSAValue::from(block.expect_info(&stage).arguments[0]);
-    let real_y = SSAValue::from(block.expect_info(&stage).arguments[1]);
+    let real_x = SSAValue::from(block.expect_info(&stage).arguments()[0]);
+    let real_y = SSAValue::from(block.expect_info(&stage).arguments()[1]);
 
     let (n0, n1, events) = {
         let mut rw = Rewriter::new(&mut stage);
@@ -477,8 +477,8 @@ fn replace_statement_swaps_def_and_updates_uses() {
         .new();
 
     let mut stage = stage.finalize().unwrap();
-    let real_x = SSAValue::from(block.expect_info(&stage).arguments[0]);
-    let real_y = SSAValue::from(block.expect_info(&stage).arguments[1]);
+    let real_x = SSAValue::from(block.expect_info(&stage).arguments()[0]);
+    let real_y = SSAValue::from(block.expect_info(&stage).arguments()[1]);
 
     assert_eq!(
         uses_set(&stage, real_x),
@@ -592,7 +592,7 @@ fn replace_statement_rejects_illegal_edits() {
     let _cfg = stage.cfg().add_block(source).add_block(target).new();
 
     let mut stage = stage.finalize().unwrap();
-    let real_x = SSAValue::from(source.expect_info(&stage).arguments[0]);
+    let real_x = SSAValue::from(source.expect_info(&stage).arguments()[0]);
     // Ids past the end of their arenas.
     let dead_value = SSAValue::from(Id::from(TestSSAValue(9_999)));
     let dead_block = Block::from(Id::from(TestSSAValue(9_999)));
@@ -639,10 +639,7 @@ fn replace_statement_rejects_illegal_edits() {
 
     // None of the rejections above mutated the stage
     assert_eq!(uses_set(rw.stage(), real_x), HashSet::from([so(plain, 0)]));
-    assert_eq!(
-        target.expect_info(rw.stage()).predecessors.as_slice(),
-        [source]
-    );
+    assert_eq!(target.expect_info(rw.stage()).predecessors(), [source]);
     match branch.definition(rw.stage()) {
         BuilderDialect::Branch(successor) => assert_eq!(successor.target(), target),
         other => panic!("expected Branch, got {other:?}"),
@@ -668,10 +665,7 @@ fn replace_statement_maintains_predecessors_when_retargeting() {
         .new();
 
     let mut stage = stage.finalize().unwrap();
-    assert_eq!(
-        old_target.expect_info(&stage).predecessors.as_slice(),
-        [source]
-    );
+    assert_eq!(old_target.expect_info(&stage).predecessors(), [source]);
 
     let events = {
         let mut rw = Rewriter::new(&mut stage);
@@ -684,11 +678,8 @@ fn replace_statement_maintains_predecessors_when_retargeting() {
     };
 
     // The reverse control-flow index followed the edge.
-    assert!(old_target.expect_info(&stage).predecessors.is_empty());
-    assert_eq!(
-        new_target.expect_info(&stage).predecessors.as_slice(),
-        [source]
-    );
+    assert!(old_target.expect_info(&stage).predecessors().is_empty());
+    assert_eq!(new_target.expect_info(&stage).predecessors(), [source]);
     assert_eq!(
         events,
         vec![MutationEvent::ReplacedStatement { stmt: branch }]

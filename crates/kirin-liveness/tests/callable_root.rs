@@ -76,6 +76,26 @@ fn function_callee(pipeline: &Pipeline<TestStage>, name: &str) -> (CompileStage,
     (stage, Callee::Function(function))
 }
 
+/// Replace `specialization` with one whose definition is `definition`, via the
+/// builder; it does not check the statement, so it may be non-callable or
+/// unallocated.
+fn redefine(
+    pipeline: &mut Pipeline<TestStage>,
+    stage: CompileStage,
+    specialization: SpecializedFunction,
+    definition: Statement,
+) -> SpecializedFunction {
+    pipeline.stage_mut(stage).unwrap().with_builder(|b| {
+        let conflict = b
+            .specialize()
+            .staged_func(specialization.id().0)
+            .definition(definition)
+            .new()
+            .expect_err("the existing specialization holds this signature");
+        b.redefine_specialization(conflict)
+    })
+}
+
 fn all_callee_variants(pipeline: &Pipeline<TestStage>) -> (CompileStage, [Callee; 4]) {
     let stage = pipeline.stage_by_name("test").expect("stage exists");
     let info = pipeline.stage(stage).expect("stage info exists");
@@ -231,11 +251,7 @@ fn a_resolved_non_callable_definition_is_reported_by_shared_body_discovery() {
         .next()
         .expect("body contains an arithmetic statement");
     // The specialization record is the sole source of its definition.
-    *target
-        .specialization
-        .get_info_mut(pipeline.stage_mut(stage).unwrap())
-        .unwrap()
-        .definition_mut() = non_callable;
+    redefine(&mut pipeline, stage, target.specialization, non_callable);
 
     let demand_error = Demand::<TestStage>::new(&pipeline)
         .analyze(stage, callee)
@@ -319,11 +335,15 @@ fn malformed_custom_targets_return_errors_without_panicking() {
     }
 
     let missing_definition = pipeline.stage(lowered).unwrap().statement_arena().next_id();
-    *target
-        .specialization
-        .get_info_mut(pipeline.stage_mut(lowered).unwrap())
-        .unwrap()
-        .definition_mut() = missing_definition;
+    let target = LinkTarget {
+        specialization: redefine(
+            &mut pipeline,
+            lowered,
+            target.specialization,
+            missing_definition,
+        ),
+        ..target
+    };
     let expected = InterpreterError::MissingStatement(missing_definition);
     assert_eq!(
         Demand::<TestStage>::new(&pipeline)
