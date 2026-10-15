@@ -124,3 +124,37 @@ wildcard.pattern @add_zero block ^bb {
     assert_eq!(rendered.trim(), expected.trim());
     roundtrip::assert_statement_roundtrip::<PatternLanguage>(rendered.trim(), &[]);
 }
+
+/// A rule built into the generic `PatternLanguage<L>` prints like a pattern
+/// written in a concrete language.
+#[kirin_wildcard::rewrite_rule(language = kirin_test_languages::GraphFunctionLanguage)]
+fn double_neg() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        replace!(r, x);
+        erase!(r);
+    })
+}
+
+#[test]
+fn test_generic_pattern_language_prints() {
+    type Generic = kirin_wildcard::PatternLanguage<kirin_test_languages::GraphFunctionLanguage>;
+    let mut stage = BuilderStageInfo::<Generic>::default();
+    let pattern = double_neg(&mut stage);
+    let stage = stage.finalize().expect("pattern should finalize");
+    let expected = r#"
+wildcard.pattern @double_neg block ^double_neg_pat {
+  %x = wildcard.hole -> i64;
+  %a = neg %x -> i64;
+  %r = neg %a -> i64;
+  wildcard.rewrite 2 block ^double_neg_rw {
+    wildcard.replace %r with %x;
+    wildcard.erase 2;
+  };
+}"#;
+    assert_eq!(
+        roundtrip::render_statement(&stage, pattern).trim(),
+        expected.trim()
+    );
+}
