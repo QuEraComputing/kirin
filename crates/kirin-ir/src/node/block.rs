@@ -155,7 +155,8 @@ impl<L: Dialect> GetInfo<L> for Successor {
 impl Block {
     /// Iterates this block's non-terminator statements in order.
     ///
-    /// The terminator is never yielded; use [`Block::terminator`] for it.
+    /// The terminator is never yielded; use [`Block::terminator`] for it, or
+    /// [`Block::next_statement`] to step through the whole body.
     pub fn statements<'a, L: Dialect>(
         &self,
         stage: &'a crate::StageInfo<L>,
@@ -198,6 +199,36 @@ impl Block {
     pub fn last_statement<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<Statement> {
         let info = self.expect_info(stage);
         info.terminator.or_else(|| info.statements.tail().copied())
+    }
+
+    /// Returns the statement after `after` in this block's body order,
+    /// stepping from the last non-terminator onto the terminator. `None` if
+    /// `after` is the last (terminator inclusive) statement in the block.
+    pub fn next_statement<L: Dialect>(
+        &self,
+        stage: &crate::StageInfo<L>,
+        after: Statement,
+    ) -> Option<Statement> {
+        let info = self.expect_info(stage);
+        if info.terminator == Some(after) {
+            return None;
+        }
+        after.next(stage).or(info.terminator)
+    }
+
+    /// Returns the statement before `before` in this block's body order,
+    /// stepping from the terminator back onto the last non-terminator. `None`
+    /// when `before` is the first statement in the body.
+    pub fn previous_statement<L: Dialect>(
+        &self,
+        stage: &crate::StageInfo<L>,
+        before: Statement,
+    ) -> Option<Statement> {
+        let info = self.expect_info(stage);
+        if info.terminator == Some(before) {
+            return info.statements.tail().copied();
+        }
+        *before.prev(stage)
     }
 }
 

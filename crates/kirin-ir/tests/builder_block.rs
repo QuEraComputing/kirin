@@ -228,6 +228,57 @@ fn block_with_statements_and_terminator() {
 }
 
 #[test]
+fn block_next_previous_statement_cross_the_terminator() {
+    let mut stage = new_stage();
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let block = stage.block().stmt(s0).stmt(s1).terminator(ret).new();
+
+    let stage = stage.finalize().unwrap();
+    // The raw links stop at the chain's ends; the terminator is not in it.
+    assert_eq!(*s1.next(&stage), None);
+    assert_eq!(*ret.prev(&stage), None);
+
+    let forward: Vec<_> = std::iter::successors(block.first_statement(&stage), |&s| {
+        block.next_statement(&stage, s)
+    })
+    .collect();
+    assert_eq!(forward, vec![s0, s1, ret]);
+
+    let backward: Vec<_> = std::iter::successors(block.last_statement(&stage), |&s| {
+        block.previous_statement(&stage, s)
+    })
+    .collect();
+    assert_eq!(backward, vec![ret, s1, s0]);
+}
+
+#[test]
+fn block_next_previous_statement_without_terminator() {
+    let mut stage = new_stage();
+    let s0 = stage.statement().definition(BuilderDialect::Nop).new();
+    let s1 = stage.statement().definition(BuilderDialect::Nop).new();
+    let block = stage.block().stmt(s0).stmt(s1).new();
+
+    let stage = stage.finalize().unwrap();
+    assert_eq!(block.next_statement(&stage, s0), Some(s1));
+    assert_eq!(block.next_statement(&stage, s1), None);
+    assert_eq!(block.previous_statement(&stage, s1), Some(s0));
+    assert_eq!(block.previous_statement(&stage, s0), None);
+}
+
+#[test]
+fn block_next_previous_statement_with_terminator_only() {
+    let mut stage = new_stage();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let block = stage.block().terminator(ret).new();
+
+    let stage = stage.finalize().unwrap();
+    assert_eq!(block.next_statement(&stage, ret), None);
+    assert_eq!(block.previous_statement(&stage, ret), None);
+}
+
+#[test]
 fn empty_block_iteration() {
     let mut stage = new_stage();
     let block = stage.block().new();
