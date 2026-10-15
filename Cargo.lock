@@ -880,7 +880,9 @@ name = "kirin-derive-wildcard"
 version = "0.1.0"
 dependencies = [
  "darling",
+ "insta",
  "kirin-derive-toolkit",
+ "kirin-test-utils",
  "proc-macro2",
  "quote",
  "syn",
