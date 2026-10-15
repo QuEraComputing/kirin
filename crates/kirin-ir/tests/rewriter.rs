@@ -259,12 +259,13 @@ fn replace_all_uses_maintains_def_use_index_including_yields() {
     }
     assert_eq!(dg.expect_info(&stage).yields()[0], real_b);
 
-    // Statement operand gets a granular event; the yield is covered by the
+    // Statement operands and graph yields each get a granular event, then the
     // summary ReplacedUses.
     assert_eq!(
         events,
         vec![
             MutationEvent::ChangedOperands { stmt: consumer },
+            MutationEvent::ChangedDiGraphYields { graph: dg },
             MutationEvent::ReplacedUses {
                 old: a,
                 new: real_b
@@ -505,7 +506,7 @@ fn insert_before_and_after_splice_and_maintain_index() {
     );
     assert_eq!(
         rw.insert_before(s0, BuilderDialect::Return),
-        Err(RewriteError::CannotInsertTerminator)
+        Err(RewriteError::UnexpectedTerminator)
     );
     // Only a terminator may carry successors.
     assert_eq!(

@@ -335,6 +335,25 @@ pub fn make_split(stage: &mut BuilderStageInfo<BuilderDialect>) -> (Statement, S
     (stmt, a, b)
 }
 
+/// Create a `Compute` statement reading `operand`, with one freshly allocated
+/// `I32` result.
+#[allow(dead_code)]
+pub fn make_compute(
+    stage: &mut BuilderStageInfo<BuilderDialect>,
+    operand: SSAValue,
+) -> (Statement, SSAValue) {
+    let result = stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Unresolved(ResolutionInfo::Result(0)))
+        .new();
+    let stmt = stage
+        .statement()
+        .definition(BuilderDialect::Compute(operand, result.into()))
+        .new();
+    (stmt, result)
+}
+
 /// Create a new BuilderStageInfo with the unified BuilderDialect.
 #[allow(dead_code)]
 pub fn new_stage() -> BuilderStageInfo<BuilderDialect> {

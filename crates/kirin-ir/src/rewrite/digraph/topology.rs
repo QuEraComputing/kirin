@@ -4,7 +4,6 @@ use crate::{DiGraph, Dialect, SSAKind, SSAValue, Statement};
 use crate::rewrite::rewriter::Rewriter;
 
 /// Operand-edge bookkeeping shared by the `DiGraph` surgery methods.
-#[expect(dead_code, reason = "wired up by DiGraph node and operand surgery")]
 impl<'a, L: Dialect> Rewriter<'a, L> {
     /// The member of `graph` that defines `value`, if `value` is a result of
     /// one. Only such values have an edge in `graph`'s petgraph.
@@ -36,6 +35,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
     /// Drop the mirror of one operand slot of member `consumer` reading
     /// `value`.
+    #[expect(dead_code, reason = "wired up by operand edits on DiGraph members")]
     pub(in crate::rewrite) fn remove_operand_edge(
         &mut self,
         graph: DiGraph,
