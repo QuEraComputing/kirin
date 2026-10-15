@@ -172,3 +172,22 @@ floats use exact IEEE bits, including signed zero/nonfinite values/NaN payloads;
 encoding (a plain serde-derived nonfinite `f64` does not survive serde_json).
 This is native storage with compatible dialect definitions/schema, not a
 versioned Rust/Python interchange format; deserialization alone is no verifier.
+
+## Recorded local run and plot
+
+The 15 October 2026 run is stored in `results/2026-10-15/roundtrip.json`,
+including all 30 samples per implementation/case, five warmups, semantic
+checks, environment, and measured revisions. `roundtrip.png` plots the
+medians with interquartile ranges, using common logarithmic axes. Native
+JSON formats differ, so the speedups describe these complete serializers
+on representative payloads on one host. The measured Rust revision is
+`dc3d2362021927633098cceb0d617f434d1dbfc5`; subsequent provenance checks
+and print exports do not change the timed serialization code.
+
+To regenerate the static plot in an environment with `matplotlib==3.10.0`:
+
+```sh
+python benchmarks/json_roundtrip/plot_results.py \
+  benchmarks/json_roundtrip/results/2026-10-15/roundtrip.json \
+  benchmarks/json_roundtrip/results/2026-10-15/roundtrip.png
+```
