@@ -258,13 +258,17 @@ fn replace_all_uses_maintains_def_use_index_including_yields() {
         other => panic!("expected Use, got {other:?}"),
     }
     assert_eq!(dg.expect_info(&stage).yields()[0], real_b);
+    // `real_b` is not a member result, so the slot carries no edge any more.
+    assert_eq!(dg.expect_info(&stage).graph().edge_count(), 0);
 
-    // Statement operands and graph yields each get a granular event, then the
+    // Statement operands, the graph edge `s_src → consumer` the operand slot
+    // no longer carries, and graph yields each get a granular event, then the
     // summary ReplacedUses.
     assert_eq!(
         events,
         vec![
             MutationEvent::ChangedOperands { stmt: consumer },
+            MutationEvent::ChangedDiGraphTopology { graph: dg },
             MutationEvent::ChangedDiGraphYields { graph: dg },
             MutationEvent::ReplacedUses {
                 old: a,
@@ -760,9 +764,9 @@ fn replace_statement_preserves_result_identity() {
 fn replace_statement_rejects_illegal_edits() {
     let mut stage = new_stage();
 
-    // A digraph-owned statement, for the body-kind guard.
-    let graph_stmt = stage.statement().definition(BuilderDialect::Nop).new();
-    let _digraph = stage.digraph().node(graph_stmt).new();
+    // An ungraph-owned statement, for the body-kind guard.
+    let graph_stmt = stage.statement().definition(BuilderDialect::Isolated).new();
+    let _ungraph = stage.ungraph().node(graph_stmt).new();
 
     // A block holding a plain statement, a two-result statement, and a branch.
     let x = stage.block_argument().index(0);
@@ -790,9 +794,9 @@ fn replace_statement_rejects_illegal_edits() {
 
     let mut rw = Rewriter::new(&mut stage);
 
-    // Graph bodies need topology surgery, which is a later slice.
+    // UnGraph bodies need topology surgery, which is a later slice.
     assert_eq!(
-        rw.replace_statement(graph_stmt, BuilderDialect::Nop),
+        rw.replace_statement(graph_stmt, BuilderDialect::Isolated),
         Err(RewriteError::NotInBlockBody(graph_stmt))
     );
     // Result arity is fixed: dropping results would orphan their SSA values.
