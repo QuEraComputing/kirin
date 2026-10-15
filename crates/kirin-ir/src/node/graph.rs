@@ -1,4 +1,6 @@
 use petgraph::EdgeType;
+use petgraph::graph::NodeIndex;
+use rustc_hash::FxHashMap;
 
 use crate::node::port::Port;
 use crate::{Dialect, SSAValue, Statement, Symbol};
@@ -12,7 +14,7 @@ pub struct DiGraphExtra {
 
 impl DiGraphExtra {
     /// Create a new directed graph extra with the given yield values.
-    pub fn new(yields: Vec<SSAValue>) -> Self {
+    pub(crate) fn new(yields: Vec<SSAValue>) -> Self {
         Self { yields }
     }
 }
@@ -26,7 +28,7 @@ pub struct UnGraphExtra {
 
 impl UnGraphExtra {
     /// Create a new undirected graph extra with the given edge statements.
-    pub fn new(edge_statements: Vec<Statement>) -> Self {
+    pub(crate) fn new(edge_statements: Vec<Statement>) -> Self {
         Self { edge_statements }
     }
 }
@@ -54,13 +56,16 @@ pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) ports: Vec<Port>,
     pub(crate) edge_count: usize,
     pub(crate) graph: petgraph::Graph<Statement, SSAValue, D>,
+    /// Member statement → its node in `graph`. Kept in lockstep with `graph`
+    /// by the rewriter; not checked by `derived/` verification.
+    pub(crate) node_index: FxHashMap<Statement, NodeIndex>,
     pub(crate) extra: Extra,
     _marker: std::marker::PhantomData<L>,
 }
 
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     /// Create a new graph info.
-    pub fn new(
+    pub(crate) fn new(
         id: crate::arena::Id,
         parent: Option<Statement>,
         name: Option<Symbol>,
@@ -69,6 +74,10 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         graph: petgraph::Graph<Statement, SSAValue, D>,
         extra: Extra,
     ) -> Self {
+        let node_index = graph
+            .node_indices()
+            .map(|node| (graph[node], node))
+            .collect();
         Self {
             id,
             parent,
@@ -76,6 +85,7 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
             ports,
             edge_count,
             graph,
+            node_index,
             extra,
             _marker: std::marker::PhantomData,
         }
@@ -116,19 +126,14 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         &self.graph
     }
 
-    /// A mutable reference to the underlying petgraph.
-    pub fn graph_mut(&mut self) -> &mut petgraph::Graph<Statement, SSAValue, D> {
-        &mut self.graph
+    /// The petgraph node of member statement `stmt`, if it is a member.
+    pub fn node_of(&self, stmt: Statement) -> Option<NodeIndex> {
+        self.node_index.get(&stmt).copied()
     }
 
     /// A reference to the direction-specific extra data.
     pub fn extra(&self) -> &Extra {
         &self.extra
-    }
-
-    /// A mutable reference to the direction-specific extra data.
-    pub fn extra_mut(&mut self) -> &mut Extra {
-        &mut self.extra
     }
 }
 
@@ -147,7 +152,7 @@ impl<L: Dialect> GraphInfo<L, petgraph::Directed, DiGraphExtra> {
 
     /// Mutable access to the yield slots, for the rewriter to replace a
     /// yielded value in place while maintaining the def-use index.
-    pub fn yields_mut(&mut self) -> &mut [SSAValue] {
+    pub(crate) fn yields_mut(&mut self) -> &mut [SSAValue] {
         &mut self.extra.yields
     }
 }
