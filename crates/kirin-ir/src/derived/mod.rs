@@ -6,11 +6,20 @@
 //! authoritative IR is stored in the [`StageInfo::nodes`](crate::StageInfo::nodes)
 //! arenas.
 //!
-//! Currently, there are two mirrors:
+//! Currently, there are four mirrors:
 //!  1. [`SSAInfo::uses`](crate::SSAInfo) collects each SSA-value's uses. These
 //!     mirror an SSA-value's uses in the IR's statement operand slots and `DiGraph` yield slots;
 //!  2. [`BlockInfo::predecessors`](crate::BlockInfo) collects a block's predecessors.
-//!     These mirror the successor references carried by terminators in the IR.
+//!     These mirror the successor references carried by terminators in the IR;
+//!  3. [`BlockInfo::statements`](crate::BlockInfo) and
+//!     [`BlockInfo::terminator`](crate::BlockInfo) summarize a block's body. These
+//!     mirror the `prev`/`next` links on the block's member statements, partitioned
+//!     into the non-terminator chain and the terminator that sits outside it;
+//!  4. [`CFGInfo::blocks`](crate::node::CFGInfo) summarizes a CFG's block list. This mirrors the
+//!     `prev`/`next` links on the blocks parented to that CFG.
+//!
+//! The last two are reconstructed by the shared chain walker [`derive_chains`](self::chain::derive_chains)
+//!  in [`chain`](self::chain), which never reads the summary it is deriving.
 //!
 //! The authoritative slots in the IR are the ground truth; a mirror is a
 //! cache over them that exists to answer the reverse question cheaply.
@@ -32,19 +41,25 @@
 //! - [`VerifyError::Mismatch`] — the authoritative IR is fine, but installed
 //!   metadata disagrees with it, so the **mutation layer** is at fault.
 
+mod chain;
 mod compare;
 mod error;
 mod mirrors;
 
-pub use error::{DeriveError, Finding, Mismatch, VerifyError};
+pub use chain::{ChainDefect, ChainFinding};
+pub use error::{DanglingParent, DeriveError, Finding, Mismatch, VerifyError};
+pub use mirrors::block_body::BlockBody;
 
 use std::marker::PhantomData;
 
 use crate::arena::{Arena, Id, Identifier};
+use crate::derived::mirrors::block_body::{self, BlockBodyMap};
+use crate::derived::mirrors::cfg_blocks::{self, CFGBlocksMap};
 use crate::{Dialect, StageInfo};
 
 use self::mirrors::predecessors::{self, PredecessorMap};
 use self::mirrors::uses::{self, UseMap};
+
 /// A map from an arena id to a value.
 ///
 /// Used to collect the mirrors [`SSAInfo::uses`](crate::SSAInfo) and
@@ -57,13 +72,18 @@ struct SlotMap<I: Identifier, T> {
 }
 
 impl<I: Identifier, T: Clone + Default> SlotMap<I, T> {
+    /// An empty map with `len` entries, indexed by raw arena slot.
+    fn with_len(len: usize) -> Self {
+        Self {
+            slots: vec![T::default(); len],
+            marker: PhantomData,
+        }
+    }
+
     /// An empty map with one entry per slot of `source`, tombstones included,
     /// so an id indexes both the source Arena and this SlotMap identically.
     fn sized_like<U>(source: &Arena<I, U>) -> Self {
-        Self {
-            slots: vec![T::default(); source.len()],
-            marker: PhantomData,
-        }
+        Self::with_len(source.len())
     }
 }
 
@@ -82,6 +102,17 @@ impl<I: Identifier, T> SlotMap<I, T> {
         self.slots.into_iter()
     }
 
+    /// Iterate `(id, &value)` over every slot, tombstones included.
+    ///
+    /// [`SlotMap::into_iter`] drops the id, but a caller that walks containers
+    /// needs to know which one each entry belongs to.
+    fn iter(&self) -> impl Iterator<Item = (I, &T)> {
+        self.slots
+            .iter()
+            .enumerate()
+            .map(|(raw, value)| (I::from(Id(raw)), value))
+    }
+
     fn len(&self) -> usize {
         self.slots.len()
     }
@@ -93,6 +124,8 @@ impl<I: Identifier, T> SlotMap<I, T> {
 pub(crate) struct Mirrors {
     uses: UseMap,
     predecessors: PredecessorMap,
+    block_bodies: BlockBodyMap,
+    cfg_blocks: CFGBlocksMap,
 }
 
 fn derive_partial<L: Dialect>(stage: &StageInfo<L>) -> (Mirrors, Vec<Finding>) {
@@ -100,8 +133,18 @@ fn derive_partial<L: Dialect>(stage: &StageInfo<L>) -> (Mirrors, Vec<Finding>) {
 
     let uses = uses::derive(stage, &mut findings);
     let predecessors = predecessors::derive(stage, &mut findings);
+    let block_bodies = block_body::derive(stage, &mut findings);
+    let cfg_blocks = cfg_blocks::derive(stage, &mut findings);
 
-    (Mirrors { uses, predecessors }, findings)
+    (
+        Mirrors {
+            uses,
+            predecessors,
+            block_bodies,
+            cfg_blocks,
+        },
+        findings,
+    )
 }
 
 /// Compute what every mirror of `stage` should be. Pure: `stage` is not written.
@@ -121,9 +164,16 @@ pub(crate) fn derive_mirrors<L: Dialect>(stage: &StageInfo<L>) -> Result<Mirrors
 
 /// Write derived mirrors into a stage.
 pub(crate) fn install_mirrors<L: Dialect>(stage: &mut StageInfo<L>, mirrors: Mirrors) {
-    let Mirrors { uses, predecessors } = mirrors;
+    let Mirrors {
+        uses,
+        predecessors,
+        block_bodies,
+        cfg_blocks,
+    } = mirrors;
     uses.install(stage);
     predecessors.install(stage);
+    block_bodies.install(stage);
+    cfg_blocks.install(stage);
 }
 
 /// Best-effort: for use by `finalize_unchecked`.
@@ -149,6 +199,8 @@ pub fn verify_derived<L: Dialect>(stage: &StageInfo<L>) -> Result<(), VerifyErro
     let mut mismatches: Vec<Mismatch> = Vec::new();
     mirrors.uses.verify(stage, &mut mismatches);
     mirrors.predecessors.verify(stage, &mut mismatches);
+    mirrors.block_bodies.verify(stage, &mut mismatches);
+    mirrors.cfg_blocks.verify(stage, &mut mismatches);
 
     if mismatches.is_empty() {
         Ok(())

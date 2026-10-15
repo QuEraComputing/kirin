@@ -96,13 +96,7 @@ where
         _stage: CompileStage,
         info: &StageInfo<L>,
     ) -> Result<Self::Output, Self::Error> {
-        match *self.after.next(info) {
-            Some(next) => Ok(Some(next)),
-            None if self.block.last_statement(info) != Some(self.after) => {
-                Ok(self.block.last_statement(info))
-            }
-            None => Ok(None),
-        }
+        Ok(self.block.next_statement(info, self.after))
     }
 }
 
@@ -130,8 +124,8 @@ where
     }
 }
 
-/// Statement before `before` within `block`, starting after the cached
-/// terminator and then walking the statement list backwards.
+/// Statement before `before` within `block`, stepping from the terminator
+/// back onto the statement list.
 pub struct PreviousStatement {
     pub block: Block,
     pub before: Statement,
@@ -153,11 +147,7 @@ where
         self.block
             .get_info(info)
             .ok_or(InterpreterError::MissingBlock(self.block))?;
-        if self.block.terminator(info) == Some(self.before) {
-            Ok(self.block.statements(info).next_back())
-        } else {
-            Ok(*self.before.prev(info))
-        }
+        Ok(self.block.previous_statement(info, self.before))
     }
 }
 

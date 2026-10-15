@@ -52,9 +52,13 @@ Specialized    ::= concrete specialization with definition Statement
 
 Statement      ::= dialect definition + operands + results + nested blocks/cfgs/successors
 CFG            ::= Block*
-Block          ::= BlockArgument* ; Statement* ; optional terminator cache
+Block          ::= BlockArgument* ; Statement* ; Statement?
 SSAValue       ::= ResultValue | BlockArgument | Port
 ```
+
+In `Block`, `Statement*` are the non-terminators, linked in order
+(`BlockInfo::statements`); the optional final `Statement` is the terminator,
+held in `BlockInfo::terminator` and not linked into that chain.
 
 `Statement.definition` is the dialect value dispatchable through
 `InterpDispatch -> Interpretable`.

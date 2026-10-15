@@ -88,10 +88,20 @@ impl Statement {
         &self.expect_info(stage).parent
     }
 
+    /// The next link in the parent block's non-terminator chain.
+    ///
+    /// `None` after the last non-terminator, even when a terminator follows.
+    /// For similar behavior including the terminator, use
+    /// [`Block::next_statement`](crate::Block::next_statement).
     pub fn next<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> &'a Option<Statement> {
         &self.expect_info(stage).node.next
     }
 
+    /// The previous link in the parent block's non-terminator chain.
+    ///
+    /// Always `None` on the terminator. For similar behavior including the
+    /// terminator, use
+    /// [`Block::previous_statement`](crate::Block::previous_statement).
     pub fn prev<'a, L: Dialect>(&self, stage: &'a crate::StageInfo<L>) -> &'a Option<Statement> {
         &self.expect_info(stage).node.prev
     }
