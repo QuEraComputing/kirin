@@ -63,7 +63,9 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
         self
     }
 
-    /// Add a statement to the block.
+    /// Append a non-terminator statement to the block's statement chain.
+    ///
+    /// Panics if `stmt` is a terminator; set that with [`terminator`](Self::terminator).
     pub fn stmt(mut self, stmt: impl Into<Statement>) -> Self {
         let stmt = stmt.into();
         let info = &self.stage.statements[stmt];
@@ -78,6 +80,9 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
     }
 
     /// Set the terminator statement of the block.
+    ///
+    /// The terminator is stored separately and is not linked into the chain of
+    /// statements added with [`stmt`](Self::stmt).
     pub fn terminator(mut self, term: impl Into<Statement>) -> Self {
         let term = term.into();
         let info = &self.stage.statements[term];

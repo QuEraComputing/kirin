@@ -60,6 +60,14 @@ pub enum BlockParent {
     Statement(Statement),
 }
 
+/// The arena record for a [`Block`].
+///
+/// A block's body is its non-terminator statements followed by at most one
+/// terminator. Every one of them has this block as its `parent`, but only the
+/// non-terminators are linked through `prev`/`next`: `statements` summarizes
+/// that chain (`tail` is the last non-terminator, `len` excludes the
+/// terminator), and `terminator` points at the terminator, whose own
+/// `prev`/`next` are always `None`.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct BlockInfo<L: Dialect> {
@@ -75,7 +83,10 @@ pub struct BlockInfo<L: Dialect> {
     /// with a couple of `break`s stays under four. Wider joins spill to the
     /// heap rather than making every block pay for the worst case.
     pub predecessors: SmallVec<[Block; 4]>,
+    /// Head/tail/length summary of the non-terminator chain. Never includes
+    /// `terminator`.
     pub statements: LinkedList<Statement>,
+    /// The block's terminator, if any. Not linked into `statements`.
     pub terminator: Option<Statement>,
     _marker: std::marker::PhantomData<L>,
 }
@@ -94,9 +105,9 @@ impl<L: Dialect> BlockInfo<L> {
         arguments: Vec<BlockArgument>,
         /// The predecessor blocks in the reverse control-flow index.
         predecessors: SmallVec<[Block; 4]>,
-        /// The statements contained in this block.
+        /// The summary of this block's non-terminator statement chain.
         statements: Option<LinkedList<Statement>>,
-        /// The terminator statement of this block, if any.
+        /// The terminator statement of this block, if any; not part of `statements`.
         terminator: Option<Statement>,
     ) -> Self {
         Self {
@@ -142,6 +153,9 @@ impl<L: Dialect> GetInfo<L> for Successor {
 }
 
 impl Block {
+    /// Iterates this block's non-terminator statements in order.
+    ///
+    /// The terminator is never yielded; use [`Block::terminator`] for it.
     pub fn statements<'a, L: Dialect>(
         &self,
         stage: &'a crate::StageInfo<L>,
@@ -155,6 +169,9 @@ impl Block {
         }
     }
 
+    /// Returns this block's terminator, if any.
+    ///
+    /// The terminator is not part of [`Block::statements`].
     pub fn terminator<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<Statement> {
         let info = self.expect_info(stage);
         info.terminator
@@ -176,17 +193,15 @@ impl Block {
 
     /// Returns the last statement in this block.
     ///
-    /// The terminator *is* the last statement — the `terminator` field in
-    /// [`BlockInfo`] is a cached pointer to it, not a separate statement.
-    /// [`Block::statements`] iterates only the non-terminator prefix of
-    /// the linked list. This method returns the terminator if present,
-    /// otherwise the tail of the statements linked list.
+    /// This is the terminator if the block has one, otherwise the last
+    /// non-terminator statement (the tail of [`Block::statements`]).
     pub fn last_statement<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<Statement> {
         let info = self.expect_info(stage);
         info.terminator.or_else(|| info.statements.tail().copied())
     }
 }
 
+/// Iterator over a block's non-terminator statements; see [`Block::statements`].
 pub struct StatementIter<'a, L: Dialect> {
     head: Option<Statement>,
     tail: Option<Statement>,
