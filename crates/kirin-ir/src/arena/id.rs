@@ -50,9 +50,16 @@ pub trait GetInfo<L: Dialect>: std::fmt::Debug {
 macro_rules! identifier {
     ($(#[$attr:meta])* struct $name:ident) => {
         $(#[$attr])*
-        #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+        #[derive(Clone, Copy, Hash, PartialEq, Eq)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
         pub struct $name(pub(crate) Id);
+
+        // Name(id) instead of the default Name(Id(id))
+        impl std::fmt::Debug for $name {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                std::write!(f, "{}({})", std::stringify!($name), self.0.raw())
+            }
+        }
 
         impl From<Id> for $name {
             fn from(value: Id) -> Self {

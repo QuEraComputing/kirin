@@ -16,3 +16,6 @@ serde = { workspace = true, optional = true }
 default = ["derive"]
 derive = ["dep:kirin-derive-ir"]
 serde = ["dep:serde"]
+
+[dev-dependencies]
+insta.workspace = true
