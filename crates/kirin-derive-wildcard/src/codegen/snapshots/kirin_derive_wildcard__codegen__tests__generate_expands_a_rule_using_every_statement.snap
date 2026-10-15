@@ -1,0 +1,169 @@
+---
+source: crates/kirin-derive-wildcard/src/codegen/tests.rs
+expression: "kirin_test_utils::rustfmt(code.to_string())"
+---
+#[doc = r" Rewrites `-x + _` into `-log2(x)` when `x` is a power of two."]
+pub fn rule(
+    stage: &mut impl ::kirin_wildcard::__private::ir::AsBuildStage<::kirin_wildcard::PatternLanguage<L>>,
+) -> ::kirin_wildcard::__private::ir::Statement {
+    type __Type = <L as ::kirin_wildcard::__private::ir::Dialect>::Type;
+    let stage = ::kirin_wildcard::__private::ir::AsBuildStage::as_build_stage(stage);
+    {
+        let statement_0 = stage.statement_arena().next_id();
+        let value_x: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("x")
+            .ty(<__Type as ::kirin_wildcard::__private::ir::Placeholder>::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_0,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::Hole::<__Type>::new_hole(value_x))
+            .new();
+        let statement_1 = stage.statement_arena().next_id();
+        let value_a: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("a")
+            .ty(<__Type as ::kirin_wildcard::__private::ir::Placeholder>::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_1,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::PatternLanguage::<L>::Op(
+                ::core::convert::From::from(Arith::new_neg(
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_x),
+                    value_a,
+                )),
+            ))
+            .new();
+        let statement_2 = stage.statement_arena().next_id();
+        let value_2: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .ty(<__Type as ::kirin_wildcard::__private::ir::Placeholder>::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_2,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::Hole::<__Type>::new_hole(value_2))
+            .new();
+        let statement_3 = stage.statement_arena().next_id();
+        let value_r: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("r")
+            .ty(<__Type as ::kirin_wildcard::__private::ir::Placeholder>::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_3,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::PatternLanguage::<L>::Op(
+                ::core::convert::From::from(Arith::new_add(
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_a),
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_2),
+                    value_r,
+                )),
+            ))
+            .new();
+        let _ = is_power_of_two;
+        let statement_4 = stage.statement_arena().next_id();
+        let value_4: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .ty(<__Type as ::kirin_wildcard::__private::ir::Placeholder>::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_4,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::NativeCall::<__Type>::new_native_call(
+                ::std::string::String::from("is_power_of_two"),
+                ::std::vec![<::kirin_wildcard::__private::ir::SSAValue>::from(value_x)],
+                ::std::vec![value_4],
+            ))
+            .new();
+        let statement_5 = ::kirin_wildcard::Constraint::<__Type>::new(stage, value_4).id;
+        let _ = math::log2;
+        let statement_6 = stage.statement_arena().next_id();
+        let value_k: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("k")
+            .ty(<__Type as ::kirin_wildcard::__private::ir::Placeholder>::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_6,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::NativeCall::<__Type>::new_native_call(
+                ::std::string::String::from("math::log2"),
+                ::std::vec![<::kirin_wildcard::__private::ir::SSAValue>::from(value_x)],
+                ::std::vec![value_k],
+            ))
+            .new();
+        let statement_7 = stage.statement_arena().next_id();
+        let value_n: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("n")
+            .ty(<__Type as ::kirin_wildcard::__private::ir::Placeholder>::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_7,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::PatternLanguage::<L>::Op(
+                ::core::convert::From::from(Arith::new_neg(
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_k),
+                    value_n,
+                )),
+            ))
+            .new();
+        let statement_8 = ::kirin_wildcard::Replace::<__Type>::new(stage, value_r, value_n).id;
+        let statement_9 = ::kirin_wildcard::Erase::<__Type>::new(stage, 3).id;
+        let rewrite_body = stage
+            .block()
+            .name("rule_rw")
+            .stmt(statement_6)
+            .stmt(statement_7)
+            .stmt(statement_8)
+            .stmt(statement_9)
+            .new();
+        let statement_10 = ::kirin_wildcard::Rewrite::<__Type>::new(stage, 3, rewrite_body).id;
+        let pattern_body = stage
+            .block()
+            .name("rule_pat")
+            .stmt(statement_0)
+            .stmt(statement_1)
+            .stmt(statement_2)
+            .stmt(statement_3)
+            .stmt(statement_4)
+            .stmt(statement_5)
+            .terminator(statement_10)
+            .new();
+        let pattern_name = stage
+            .symbol_table_mut()
+            .intern(::std::string::String::from("rule"));
+        ::kirin_wildcard::Pattern::<__Type>::new(stage, pattern_name, pattern_body).id
+    }
+}
