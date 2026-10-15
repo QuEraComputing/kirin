@@ -1,0 +1,15 @@
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+ --> tests/compile-fail/wrong_operand_count.rs:9:24
+  |
+7 | #[rewrite_rule(language = L)]
+  | ----------------------------- in this attribute macro expansion
+8 | fn rule() {
+9 |     let r = op![Arith::neg(x, y)];
+  |                        ^^^    - unexpected argument #2 of type `kirin_wildcard::__private::kirin_ir::node::ssa::SSAValue`
+  |
+note: associated function defined here
+ --> $WORKSPACE/crates/kirin-arith/src/lib.rs
+  |
+  |     Neg {
+  |     ^^^
+  = note: this error originates in the attribute macro `rewrite_rule` (in Nightly builds, run with -Z macro-backtrace for more info)

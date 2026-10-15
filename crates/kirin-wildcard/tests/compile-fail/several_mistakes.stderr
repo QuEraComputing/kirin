@@ -1,0 +1,17 @@
+error: this `op![..]` does not feed the root of the rewrite, so it is never matched
+  --> tests/compile-fail/several_mistakes.rs:20:5
+   |
+20 |     let unused = op![Arith::neg(z)];
+   |     ^^^
+
+error: the hole `a` is not an argument of any `op![..]`, so matching will never bind it
+  --> tests/compile-fail/several_mistakes.rs:18:21
+   |
+18 |     is_power_of_two(a);
+   |                     ^
+
+error: the hole `b` is not an argument of any `op![..]`, so matching will never bind it
+  --> tests/compile-fail/several_mistakes.rs:19:21
+   |
+19 |     is_power_of_two(b);
+   |                     ^
