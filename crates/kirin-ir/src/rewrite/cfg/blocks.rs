@@ -55,11 +55,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// everything it holds (arguments, statements, results, nested bodies).
     ///
     /// The uses those statements made are dropped and their outgoing edges
-    /// are removed from the predecessor mirror. Edges *into* `block` are left
-    /// in place and become dangling; see the module docs.
+    /// are removed from the predecessor mirror.
     ///
     /// Rejects, leaving the stage untouched, if `block` is unknown or not in a
-    /// CFG, or if a value it defines is used outside it
+    /// CFG, if another block still branches to it
+    /// ([`RewriteError::BlockHasPredecessors`]; retarget those edges first,
+    /// a self-loop is fine), or if a value it defines is used outside it
     /// ([`RewriteError::BlockArgumentInUse`] /
     /// [`RewriteError::StatementResultsInUse`]); replace those uses first.
     ///
@@ -67,6 +68,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// [`MutationEvent::ChangedCfg`].
     pub fn erase_block(&mut self, block: Block) -> Result<(), RewriteError> {
         let cfg = self.owning_cfg(block)?;
+        self.check_no_outside_predecessors(block, &[block])?;
         self.check_no_outside_uses(block)?;
 
         self.unlink_block(cfg, block);

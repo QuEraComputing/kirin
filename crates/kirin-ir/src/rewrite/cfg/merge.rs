@@ -9,13 +9,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// of `succ`'s `i`-th argument to `arg_replacements[i]`, move `succ`'s
     /// statements and terminator to the end of `pred`, and tombstone `succ`.
     ///
-    /// No CFG-shape check is made: any edge `pred`'s terminator carried
-    /// elsewhere is dropped, and edges from other blocks into `succ` become
-    /// dangling.
+    /// `pred` need not branch to `succ`: any edge `pred`'s terminator carried
+    /// elsewhere is dropped.
     ///
     /// Rejects, leaving the stage untouched, if either block is unknown or
-    /// not in a CFG, they are in different CFGs or the same block, the
-    /// replacement count differs from `succ`'s argument count, or a
+    /// not in a CFG, they are in different CFGs or the same block, a block
+    /// other than `pred` or `succ` still branches to `succ`
+    /// ([`RewriteError::BlockHasPredecessors`]; retarget those edges first),
+    /// the replacement count differs from `succ`'s argument count, or a
     /// replacement is not live or is one of `succ`'s own arguments (which the
     /// merge deletes).
     ///
@@ -39,6 +40,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if pred == succ {
             return Err(RewriteError::CannotMergeBlockIntoItself(pred));
         }
+        self.check_no_outside_predecessors(succ, &[pred, succ])?;
         let succ_args: Vec<SSAValue> = self
             .live_block(succ)?
             .arguments

@@ -177,6 +177,9 @@ pub enum RewriteError {
     BlockArgumentIndexOutOfRange { block: Block, index: usize },
     /// Dropping the block argument would leave dangling uses. Replace them first.
     BlockArgumentInUse { block: Block, index: usize },
+    /// Removing `block` would leave `pred`'s edges into it dangling. Retarget
+    /// them first.
+    BlockHasPredecessors { block: Block, pred: Block },
     /// A `merge_blocks` replacement is one of the merged block's own
     /// arguments, which the merge deletes.
     ReplacementIsMergedArgument { block: Block, value: SSAValue },
@@ -314,6 +317,12 @@ impl fmt::Display for RewriteError {
                 write!(
                     f,
                     "argument {index} of block {block:?} is still used; replace it first"
+                )
+            }
+            RewriteError::BlockHasPredecessors { block, pred } => {
+                write!(
+                    f,
+                    "block {pred:?} still branches to block {block:?}; retarget its edges first"
                 )
             }
         }

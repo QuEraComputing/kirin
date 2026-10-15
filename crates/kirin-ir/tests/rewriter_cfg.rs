@@ -186,7 +186,7 @@ fn erase_block_tombstones_contents_and_maintains_mirrors() {
 }
 
 #[test]
-fn erase_block_leaves_incoming_edges_dangling() {
+fn erase_block_rejects_incoming_edges_until_retargeted() {
     let mut stage = new_stage();
 
     // entry -> middle -> exit
@@ -205,29 +205,47 @@ fn erase_block_leaves_incoming_edges_dangling() {
 
     let mut stage = stage.finalize().unwrap();
 
-    // Erasure is permissive about control flow: no predecessor guard.
-    Rewriter::new(&mut stage).erase_block(middle).unwrap();
-
-    // The mirrors are still exact, so verification reports broken
-    // authoritative IR (not a mismatch), naming the dangling edge.
-    let Err(VerifyError::Derive(error)) = verify_derived(&stage) else {
-        panic!("expected a dangling-successor finding");
-    };
+    let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
-        error.findings(),
-        [Finding::DanglingSuccessor {
-            stmt: entry_br,
-            target: middle,
-        }]
+        rw.erase_block(middle),
+        Err(RewriteError::BlockHasPredecessors {
+            block: middle,
+            pred: entry,
+        })
     );
-    assert!(preds(&stage, exit).is_empty());
+    assert!(rw.events().is_empty());
+    assert!(!middle.get_info(rw.stage()).unwrap().deleted());
+    assert_eq!(preds(rw.stage(), exit), HashSet::from([middle]));
+    verify_derived(rw.stage()).unwrap();
 
-    // The finding stops verification before the mirrors are compared, so
-    // repair the edge and check that the erase left every mirror exact.
+    // Once the edge is retargeted the erase goes through.
+    rw.retarget_successor(entry_br, middle, exit).unwrap();
+    rw.erase_block(middle).unwrap();
+    assert_eq!(
+        cfg.blocks(rw.stage()).collect::<Vec<_>>(),
+        vec![entry, exit]
+    );
+    assert_eq!(preds(rw.stage(), exit), HashSet::from([entry]));
+    verify_derived(rw.stage()).unwrap();
+}
+
+#[test]
+fn erase_block_allows_self_loop() {
+    let mut stage = new_stage();
+
+    let entry = stage.block().new();
+    let lp = stage.block().new();
+    let cfg = stage.cfg().add_block(entry).add_block(lp).new();
+
+    let mut stage = stage.finalize().unwrap();
+    // The builder cannot name `lp` before creating it, so close the loop here.
     Rewriter::new(&mut stage)
-        .retarget_successor(entry_br, middle, exit)
+        .insert_terminator(lp, br(lp))
         .unwrap();
-    assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![entry, exit]);
+    assert_eq!(preds(&stage, lp), HashSet::from([lp]));
+
+    Rewriter::new(&mut stage).erase_block(lp).unwrap();
+    assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![entry]);
     verify_derived(&stage).unwrap();
 }
 
@@ -854,6 +872,50 @@ fn merge_blocks_rejects_illegal_merges() {
 }
 
 #[test]
+fn merge_blocks_rejects_other_incoming_edges_until_retargeted() {
+    let mut stage = new_stage();
+
+    // entry -> succ, side -> succ
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let succ = stage.block().terminator(ret).new();
+    let side_br = stage.statement().definition(br(succ)).new();
+    let side = stage.block().terminator(side_br).new();
+    let entry_br = stage.statement().definition(br(succ)).new();
+    let entry = stage.block().terminator(entry_br).new();
+    let cfg = stage
+        .cfg()
+        .add_block(entry)
+        .add_block(side)
+        .add_block(succ)
+        .new();
+
+    let mut stage = stage.finalize().unwrap();
+
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(
+        rw.merge_blocks(entry, succ, &[]),
+        Err(RewriteError::BlockHasPredecessors {
+            block: succ,
+            pred: side,
+        })
+    );
+    assert!(rw.events().is_empty());
+    assert!(!succ.get_info(rw.stage()).unwrap().deleted());
+    assert_eq!(entry.terminator(rw.stage()), Some(entry_br));
+    verify_derived(rw.stage()).unwrap();
+
+    // Once side branches elsewhere the merge goes through.
+    rw.retarget_successor(side_br, succ, entry).unwrap();
+    rw.merge_blocks(entry, succ, &[]).unwrap();
+    assert_eq!(
+        cfg.blocks(rw.stage()).collect::<Vec<_>>(),
+        vec![entry, side]
+    );
+    assert_eq!(entry.terminator(rw.stage()), Some(ret));
+    verify_derived(rw.stage()).unwrap();
+}
+
+#[test]
 fn retarget_successor_rewrites_every_matching_slot() {
     let mut stage = new_stage();
 
@@ -890,38 +952,23 @@ fn retarget_successor_rewrites_every_matching_slot() {
 }
 
 #[test]
-fn retarget_successor_repairs_edge_into_erased_block() {
+fn retarget_successor_rejects_dead_new_target() {
     let mut stage = new_stage();
 
     let exit = stage.block().new();
-    let mid_br = stage.statement().definition(br(exit)).new();
-    let mid = stage.block().terminator(mid_br).new();
-    let entry_br = stage.statement().definition(br(mid)).new();
+    let entry_br = stage.statement().definition(br(exit)).new();
     let entry = stage.block().terminator(entry_br).new();
-    let _cfg = stage
-        .cfg()
-        .add_block(entry)
-        .add_block(mid)
-        .add_block(exit)
-        .new();
+    let _cfg = stage.cfg().add_block(entry).add_block(exit).new();
 
     let mut stage = stage.finalize().unwrap();
     let dead_block = Block::from(Id::from(TestSSAValue(9_999)));
 
     let mut rw = Rewriter::new(&mut stage);
-    rw.erase_block(mid).unwrap();
-    assert!(matches!(
-        verify_derived(rw.stage()),
-        Err(VerifyError::Derive(_))
-    ));
-
-    // The new target must be live; the old one need not be.
     assert_eq!(
-        rw.retarget_successor(entry_br, mid, dead_block),
+        rw.retarget_successor(entry_br, exit, dead_block),
         Err(RewriteError::UnknownBlock(dead_block))
     );
-    assert_eq!(rw.retarget_successor(entry_br, mid, exit).unwrap(), 1);
-
+    assert!(rw.events().is_empty());
     assert_eq!(preds(rw.stage(), exit), HashSet::from([entry]));
     verify_derived(rw.stage()).unwrap();
 }

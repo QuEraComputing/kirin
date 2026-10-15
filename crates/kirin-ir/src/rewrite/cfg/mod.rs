@@ -10,13 +10,13 @@
 //! ([`CFGInfo::blocks`](crate::node::CFGInfo)) — and check executable
 //! preconditions before writing.
 //!
-//! They do **not** keep the CFG well-formed. Erasing a block that still has
-//! predecessors, or merging a block that other blocks still branch to, is
-//! accepted; the remaining edges then name a tombstoned block and
-//! [`verify_derived`](crate::verify_derived) reports them as
-//! [`Finding::DanglingSuccessor`](crate::Finding). Values, by contrast, are
-//! never left dangling: erasing a block whose values are used outside it is
-//! rejected.
+//! They never leave a dangling reference. Removing a block (erasing it, or
+//! merging it into another) is rejected while some other block still
+//! branches to it ([`RewriteError::BlockHasPredecessors`](super::RewriteError::BlockHasPredecessors))
+//! or a value it defines is used outside it; retarget those edges and replace
+//! those uses first. Other CFG well-formedness (terminators present, edge
+//! arguments matching block arguments) may be broken between calls and is
+//! left to verification.
 //!
 //! Erasure tombstones eagerly: a block's arguments, statements, results, and
 //! nested statement-owned blocks and `CFG`s are marked deleted in one walk.

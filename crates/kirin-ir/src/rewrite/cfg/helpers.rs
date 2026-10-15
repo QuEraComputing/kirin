@@ -91,6 +91,25 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
     }
 
+    /// Reject removing `block` if a predecessor outside `allowed` still
+    /// branches to it, so a rejected removal leaves the stage untouched and an
+    /// accepted one leaves no edge naming a tombstoned block.
+    pub(super) fn check_no_outside_predecessors(
+        &self,
+        block: Block,
+        allowed: &[Block],
+    ) -> Result<(), RewriteError> {
+        match self
+            .live_block(block)?
+            .predecessors
+            .iter()
+            .find(|pred| !allowed.contains(pred))
+        {
+            Some(&pred) => Err(RewriteError::BlockHasPredecessors { block, pred }),
+            None => Ok(()),
+        }
+    }
+
     /// Reject erasing `block` if a value it defines (an argument, or a result
     /// of one of its top-level statements) is used outside it, so a rejected
     /// erase leaves the stage untouched.

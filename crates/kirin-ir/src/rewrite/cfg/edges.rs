@@ -13,9 +13,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Point every successor slot of `stmt` that targets `old` at `new`,
     /// returning the number of slots rewritten.
     ///
-    /// `old` need not be live, so this can also repair an edge left dangling
-    /// by [`Rewriter::erase_block`]. Forwarded block arguments are not
-    /// touched. Rewriting nothing (including `old == new`) records no event.
+    /// `old` need not be live. Forwarded block arguments are not touched.
+    /// Rewriting nothing (including `old == new`) records no event.
     ///
     /// Rejects, leaving the stage untouched, if `stmt` is unknown or not in a
     /// CFG block, or `new` is not a live block.
