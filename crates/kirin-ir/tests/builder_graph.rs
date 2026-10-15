@@ -29,6 +29,8 @@ fn digraph_builder_two_node_dag() {
     let info = dg.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 2); // two operands both ref s0
+    assert_eq!(info.graph()[info.node_of(s0).unwrap()], s0);
+    assert_eq!(info.graph()[info.node_of(s1).unwrap()], s1);
 
     assert_eq!(*s0.parent(&stage), Some(StatementParent::DiGraph(dg)));
     assert_eq!(*s1.parent(&stage), Some(StatementParent::DiGraph(dg)));
@@ -213,6 +215,10 @@ fn ungraph_two_nodes_one_edge() {
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 1);
     assert_eq!(info.edge_statements().len(), 1);
+    assert_eq!(info.graph()[info.node_of(n0).unwrap()], n0);
+    assert_eq!(info.graph()[info.node_of(n1).unwrap()], n1);
+    // Edge statements are petgraph edges, not nodes.
+    assert_eq!(info.node_of(wire_stmt), None);
 
     assert_eq!(*n0.parent(&stage), Some(StatementParent::UnGraph(ug)));
     assert_eq!(*n1.parent(&stage), Some(StatementParent::UnGraph(ug)));

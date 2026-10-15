@@ -26,7 +26,7 @@ impl<L: Dialect> DiGraphInfo<L> {
     ///
     /// This constructor preserves the original API. Internally it delegates
     /// to [`GraphInfo::new`].
-    pub fn from_parts(
+    pub(crate) fn from_parts(
         id: DiGraph,
         parent: Option<crate::Statement>,
         name: Option<crate::Symbol>,
