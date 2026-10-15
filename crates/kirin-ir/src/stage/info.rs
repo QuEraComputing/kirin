@@ -67,6 +67,14 @@ use super::arenas::Arenas;
 /// // stage is back to StageInfo with the new function added
 /// ```
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "L: serde::Serialize, L::Type: serde::Serialize",
+        deserialize = "L: serde::Deserialize<'de>, L::Type: serde::Deserialize<'de>"
+    ))
+)]
 pub struct StageInfo<L: Dialect> {
     pub(crate) nodes: Arenas<L>,
     pub(crate) ssas: Arena<SSAValue, Option<SSAInfo<L>>>,

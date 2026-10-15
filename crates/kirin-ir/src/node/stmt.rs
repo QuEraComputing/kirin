@@ -21,6 +21,13 @@ pub enum StatementParent {
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "L: serde::Serialize, L::Type: serde::Serialize",
+        deserialize = "L: serde::Deserialize<'de>, L::Type: serde::Deserialize<'de>"
+    ))
+)]
 pub struct StatementInfo<L: Dialect> {
     pub(crate) node: LinkedListNode<Statement>,
     pub(crate) parent: Option<StatementParent>,

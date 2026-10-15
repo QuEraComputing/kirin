@@ -73,6 +73,7 @@ mod tests;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[wraps]
 #[kirin(pure, builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Tuple<T: CompileTimeValue> {
     NewTuple(NewTuple<T>),
     Unpack(Unpack<T>),
@@ -86,6 +87,7 @@ pub enum Tuple<T: CompileTimeValue> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$new_tuple({args}) -> {result:type}")]
 #[kirin(pure, builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct NewTuple<T: CompileTimeValue> {
     args: Vec<SSAValue>,
     result: ResultValue,
@@ -104,6 +106,7 @@ pub struct NewTuple<T: CompileTimeValue> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$unpack {source} -> {results:type}")]
 #[kirin(pure, builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Unpack<T: CompileTimeValue> {
     source: SSAValue,
     results: Vec<ResultValue>,
@@ -124,6 +127,7 @@ pub struct Unpack<T: CompileTimeValue> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$get {source}, {index} -> {result:type}")]
 #[kirin(pure, builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Get<T: CompileTimeValue> {
     source: SSAValue,
     index: SSAValue,
@@ -139,6 +143,7 @@ pub struct Get<T: CompileTimeValue> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$len {source} -> {result:type}")]
 #[kirin(pure, builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Len<T: CompileTimeValue> {
     source: SSAValue,
     result: ResultValue,

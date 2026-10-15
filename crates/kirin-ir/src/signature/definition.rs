@@ -4,6 +4,7 @@
 /// - `ret`: the return type.
 /// - `constraints`: optional constraint context (e.g., type-variable bindings). Defaults to `()`.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Signature<T, C = ()> {
     params: Vec<T>,
     ret: T,

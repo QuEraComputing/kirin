@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+serde = { workspace = true, optional = true }
 kirin = { workspace = true }
 kirin-interpreter = { workspace = true, features = ["derive"] }
 smallvec = { workspace = true }
@@ -13,3 +14,6 @@ kirin-arith = { workspace = true }
 kirin-cf = { workspace = true }
 kirin-constant = { workspace = true }
 kirin-test-types = { path = "../kirin-test-types" }
+
+[features]
+serde = ["dep:serde", "kirin/serde"]

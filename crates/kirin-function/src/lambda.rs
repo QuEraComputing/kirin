@@ -33,6 +33,7 @@ use kirin::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = T)]
 #[chumsky(format = "$lambda {name} captures({captures}) {body} -> {res:type}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Lambda<T: CompileTimeValue> {
     name: Symbol,
     captures: Vec<SSAValue>,

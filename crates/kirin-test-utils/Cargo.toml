@@ -4,6 +4,8 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+serde = { workspace = true, optional = true }
+serde_json = { version = "1.0", optional = true }
 kirin-ir = { version = "0.1.0", path = "../kirin-ir", default-features = false }
 kirin-test-types = { workspace = true }
 kirin-chumsky = { workspace = true, optional = true }
@@ -15,3 +17,4 @@ default = []
 parser = ["kirin-chumsky", "kirin-lexer"]
 pretty = ["kirin-prettyless"]
 roundtrip = ["parser", "pretty"]
+serde = ["dep:serde", "dep:serde_json", "kirin-ir/serde"]

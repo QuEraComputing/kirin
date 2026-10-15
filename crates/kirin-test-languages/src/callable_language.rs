@@ -10,6 +10,7 @@ use kirin_ir::{CFG, Dialect, Signature};
 #[kirin(builders, type = ArithType, crate = kirin_ir)]
 #[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
 #[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum CallableLanguage {
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),

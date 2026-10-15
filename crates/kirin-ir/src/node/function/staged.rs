@@ -13,6 +13,7 @@ identifier! {
 
 /// Policy controlling whether multiple staged signatures can share the same function name.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StagedNamePolicy {
     /// Require a single semantic interface per function name.
     ///
@@ -52,6 +53,14 @@ impl std::error::Error for UniqueLiveSpecializationError {}
 /// when the source function is redefined; it is then retained for backedge
 /// bookkeeping but excluded from new dispatch or compilation.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "L::Type: serde::Serialize",
+        deserialize = "L::Type: serde::Deserialize<'de>"
+    ))
+)]
 pub struct StagedFunctionInfo<L: Dialect> {
     pub(crate) id: StagedFunction,
     pub(crate) name: Option<GlobalSymbol>,

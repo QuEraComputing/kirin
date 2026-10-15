@@ -7,6 +7,7 @@ use kirin_test_utils::roundtrip;
 #[kirin(edge, builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 #[chumsky(format = "$wire")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct Wire {
     #[kirin(type = SimpleType::Any)]
     res: ResultValue,
@@ -17,6 +18,7 @@ struct Wire {
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 #[chumsky(format = "$node_a({param}, {port})")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 struct NodeA {
     param: SSAValue,
     port: SSAValue,
@@ -27,6 +29,7 @@ struct NodeA {
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
 #[wraps]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum UngraphTestLanguage {
     Wire(Wire),
     NodeA(NodeA),

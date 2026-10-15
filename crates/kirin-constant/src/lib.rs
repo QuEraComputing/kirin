@@ -9,6 +9,7 @@ mod tests;
 #[chumsky(format = "$constant {value} -> {result:type}")]
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(constant, pure, builders = new, type = Ty)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Constant<T: CompileTimeValue + Typeof<Ty> + PrettyPrint, Ty: CompileTimeValue> {
     #[kirin(into)]
     pub value: T,

@@ -83,6 +83,7 @@ pub use types::{ArithConversionError, ArithType, ArithValue};
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[non_exhaustive]
 #[kirin(pure, builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Arith<T: CompileTimeValue> {
     #[kirin(speculatable)]
     #[chumsky(format = "$add {lhs}, {rhs} -> {result:type}")]

@@ -27,6 +27,7 @@ use kirin::prelude::*;
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[non_exhaustive]
 #[kirin(terminator, builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ControlFlow<T: CompileTimeValue> {
     #[chumsky(format = "$br {target}({args})")]
     Branch {

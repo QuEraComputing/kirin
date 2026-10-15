@@ -17,6 +17,7 @@ identifier! {
 
 /// Information about a function across different compilation stages.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FunctionInfo {
     id: Function,
     name: Option<GlobalSymbol>,

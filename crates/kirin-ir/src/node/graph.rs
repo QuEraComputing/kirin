@@ -5,6 +5,7 @@ use crate::{Dialect, SSAValue, Statement, Symbol};
 
 /// Extra data specific to directed graphs.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct DiGraphExtra {
     pub(crate) yields: Vec<SSAValue>,
 }
@@ -18,6 +19,7 @@ impl DiGraphExtra {
 
 /// Extra data specific to undirected graphs.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UnGraphExtra {
     pub(crate) edge_statements: Vec<Statement>,
 }
@@ -37,6 +39,14 @@ impl UnGraphExtra {
 /// Use the type aliases [`DiGraphInfo`](super::DiGraphInfo) and
 /// [`UnGraphInfo`](super::UnGraphInfo) rather than naming this type directly.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "Extra: serde::Serialize",
+        deserialize = "Extra: serde::Deserialize<'de>"
+    ))
+)]
 pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) id: crate::arena::Id,
     pub(crate) parent: Option<Statement>,

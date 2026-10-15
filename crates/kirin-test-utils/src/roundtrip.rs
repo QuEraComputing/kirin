@@ -47,12 +47,18 @@ where
 /// Assert that a statement roundtrips: parse → render → reparse → render → compare.
 pub fn assert_statement_roundtrip<L>(input: &str, operands: &[(&str, L::Type)])
 where
-    L: Dialect + PrettyPrint,
+    L: Dialect + PrettyPrint + RoundtripSerde,
     StageInfo<L>: ParseStatementTextExt<L>,
-    L::Type: Clone + Display,
+    L::Type: Clone + Display + RoundtripSerde,
 {
     let (stage, statement) = emit_statement::<L>(input, operands);
     let rendered = render_statement::<L>(&stage, statement);
+    #[cfg(feature = "serde")]
+    {
+        let restored = json_roundtrip(&stage);
+        assert_eq!(rendered, render_statement::<L>(&restored, statement));
+        kirin_ir::verify_derived(&restored).expect("restored metadata is valid");
+    }
 
     let (reparsed_stage, reparsed_statement) = emit_statement::<L>(rendered.trim(), operands);
     let rendered_again = render_statement::<L>(&reparsed_stage, reparsed_statement);
@@ -65,7 +71,8 @@ pub fn assert_pipeline_roundtrip<L>(input: &str)
 where
     Pipeline<StageInfo<L>>: ParsePipelineText,
     StageInfo<L>: RenderDispatch,
-    L: Dialect,
+    L: Dialect + RoundtripSerde,
+    L::Type: RoundtripSerde,
 {
     let mut parsed_pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
     let parsed_functions = parsed_pipeline
@@ -76,6 +83,19 @@ where
         "expected at least one parsed function"
     );
     let rendered = parsed_pipeline.sprint();
+    #[cfg(feature = "serde")]
+    {
+        let restored = json_roundtrip(&parsed_pipeline);
+        assert_eq!(rendered, restored.sprint());
+        for stage in restored.stages() {
+            kirin_ir::verify_derived(stage).expect("restored metadata is valid");
+        }
+        for function in restored.function_arena().iter() {
+            if let Some(name) = function.name() {
+                assert_eq!(restored.function_by_name(name), Some(function.id()));
+            }
+        }
+    }
 
     let mut reparsed_pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
     let reparsed_functions = reparsed_pipeline
@@ -88,4 +108,27 @@ where
     );
     let rendered_again = reparsed_pipeline.sprint();
     assert_eq!(rendered.trim_end(), rendered_again.trim_end());
+}
+
+/// Serde bound enabled only for JSON qualification builds.
+#[cfg(feature = "serde")]
+pub trait RoundtripSerde: serde::Serialize + serde::de::DeserializeOwned {}
+#[cfg(feature = "serde")]
+impl<T: serde::Serialize + serde::de::DeserializeOwned> RoundtripSerde for T {}
+#[cfg(not(feature = "serde"))]
+pub trait RoundtripSerde {}
+#[cfg(not(feature = "serde"))]
+impl<T> RoundtripSerde for T {}
+
+/// Preserve all serialized IR fields, including IDs, types, attributes and links.
+#[cfg(feature = "serde")]
+pub fn json_roundtrip<T: RoundtripSerde>(value: &T) -> T {
+    let json = serde_json::to_string(value).expect("IR serializes to JSON");
+    let restored = serde_json::from_str(&json).expect("JSON restores IR");
+    assert_eq!(
+        serde_json::to_value(value).unwrap(),
+        serde_json::to_value(&restored).unwrap(),
+        "JSON round trip must preserve every encoded field"
+    );
+    restored
 }

@@ -198,3 +198,6 @@ mod tests {
         assert_eq!(ArithValue::I8(-1).to_i64_lossy(), -1);
     }
 }
+
+#[cfg(feature = "serde")]
+mod serde;

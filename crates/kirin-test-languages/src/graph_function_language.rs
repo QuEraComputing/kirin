@@ -18,6 +18,7 @@ use kirin_ir::{
 #[kirin(builders, type = ArithType, crate = kirin_ir)]
 #[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
 #[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum GraphFunctionLanguage {
     /// Standard CFG-bodied function.
     #[cfg_attr(

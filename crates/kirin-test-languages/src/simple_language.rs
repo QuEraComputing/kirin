@@ -7,6 +7,7 @@ use kirin_ir::{CFG, Dialect, ResultValue, SSAValue};
 #[kirin(builders, type = SimpleType, crate = kirin_ir)]
 #[cfg_attr(feature = "parser", chumsky(crate = kirin_chumsky))]
 #[cfg_attr(feature = "pretty", pretty(crate = kirin_prettyless))]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SimpleLanguage {
     #[cfg_attr(
         any(feature = "parser", feature = "pretty"),
