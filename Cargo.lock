@@ -720,6 +720,7 @@ dependencies = [
  "kirin-test-languages",
  "kirin-test-utils",
  "kirin-tuple",
+ "kirin-wildcard",
  "serde",
  "serde_json",
  "trybuild",
@@ -1042,7 +1043,11 @@ dependencies = [
 name = "kirin-wildcard"
 version = "0.1.0"
 dependencies = [
- "kirin-ir",
+ "kirin",
+ "kirin-arith",
+ "kirin-constant",
+ "kirin-test-languages",
+ "kirin-test-types",
 ]
 
 [[package]]
