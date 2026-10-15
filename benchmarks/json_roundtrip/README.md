@@ -191,3 +191,15 @@ python benchmarks/json_roundtrip/plot_results.py \
   benchmarks/json_roundtrip/results/2026-10-15/roundtrip.json \
   benchmarks/json_roundtrip/results/2026-10-15/roundtrip.png
 ```
+
+To plot uncompressed UTF-8 JSON size from the same recorded payloads:
+
+```sh
+python benchmarks/json_roundtrip/plot_results.py \
+  benchmarks/json_roundtrip/results/2026-10-15/roundtrip.json \
+  benchmarks/json_roundtrip/results/2026-10-15/roundtrip-size.png --metric json-size
+```
+
+Size uses the emitted compact JSON byte count, not resident memory. MiB means
+1,048,576 bytes. The two native formats may preserve different metadata; the
+comparison does not require identical schemas or JSON bytes.
