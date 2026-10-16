@@ -1,6 +1,6 @@
 use smallvec::SmallVec;
 
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::port::PortParent;
 use crate::{Dialect, SSAKind, SSAValue, Statement, StatementParent, UnGraph, Use};
 
@@ -18,13 +18,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             return false;
         };
         match *info.kind() {
-            SSAKind::Result(stmt, _) => stmt
-                .get_info(self.stage)
-                .filter(|item| !item.deleted())
-                .is_some_and(|item| {
-                    item.parent == Some(StatementParent::UnGraph(graph))
-                        && item.definition.is_edge()
-                }),
+            SSAKind::Result(stmt, _) => stmt.get_info(self.stage).is_some_and(|item| {
+                item.parent == Some(StatementParent::UnGraph(graph)) && item.definition.is_edge()
+            }),
             SSAKind::Port(PortParent::UnGraph(owner), index) => {
                 owner == graph
                     && graph
@@ -66,7 +62,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if same_endpoints(before, after) {
             return false;
         }
-        let info = graph.expect_info_mut(self.stage);
+        let info = graph
+            .get_info_mut(self.stage)
+            .expect("graph is live in this stage");
         let mut changed = false;
         if let &[a, b] = before {
             changed |= info.remove_edge(a, b, value);

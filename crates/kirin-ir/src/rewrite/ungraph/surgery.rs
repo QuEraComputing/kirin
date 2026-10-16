@@ -1,4 +1,4 @@
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::{Dialect, SSAValue, Statement, StatementParent, UnGraph, UnGraphInfo};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter};
@@ -81,7 +81,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             results,
             &operands,
         );
-        graph.expect_info_mut(self.stage).add_node(stmt);
+        graph
+            .get_info_mut(self.stage)
+            .expect("graph is live in this stage")
+            .add_node(stmt);
         for wire in wires {
             let after = self.incidences(graph, wire.value);
             self.resync_edge(graph, wire.value, &wire.orig_incidences, &after);
@@ -134,7 +137,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             &operands,
         );
         graph
-            .expect_info_mut(self.stage)
+            .get_info_mut(self.stage)
+            .expect("graph is live in this stage")
             .extra
             .edge_statements
             .push(stmt);
@@ -145,14 +149,70 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(stmt)
     }
 
-    /// The live `UnGraph` `graph`, or [`RewriteError::UnknownUnGraph`].
+    /// The `UnGraph` arm of [`Rewriter::erase_statement`]: `stmt` is a live
+    /// node or edge statement of `graph`.
+    pub(in crate::rewrite) fn erase_ungraph_member(
+        &mut self,
+        stmt: Statement,
+        graph: UnGraph,
+    ) -> Result<(), RewriteError> {
+        // For an edge statement, this means no node reads its wires.
+        self.ensure_results_unused(stmt)?;
+
+        let info = graph
+            .get_info_mut(self.stage)
+            .expect("graph is live in this stage");
+        if info.remove_node(stmt) {
+            // A node takes its edges with it; each wire it read is left with
+            // one incidence fewer.
+        } else {
+            // An edge statement: no node reads its wires (checked above), so
+            // they have no edges; just drop it from the list.
+            let edges = &mut info.extra.edge_statements;
+            if let Some(pos) = edges.iter().position(|&edge| edge == stmt) {
+                edges.swap_remove(pos);
+            }
+        }
+        self.tombstone_statement(stmt, None);
+
+        self.events.push(MutationEvent::ErasedStatement { stmt });
+        self.events
+            .push(MutationEvent::ChangedUnGraphTopology { graph });
+        Ok(())
+    }
+
+    /// Tombstone `graph` with everything in it: its nodes and edge statements
+    /// (recursing into their nested bodies) with their uses and results, and
+    /// its ports. The graph's own topology is left as is.
+    pub(in crate::rewrite) fn tombstone_ungraph(&mut self, graph: UnGraph) {
+        let Ok(info) = self.live_ungraph(graph) else {
+            return;
+        };
+        let members: Vec<Statement> = info
+            .graph()
+            .node_weights()
+            .chain(info.edge_statements())
+            .copied()
+            .collect();
+        let ports: Vec<SSAValue> = info.ports().iter().map(|&port| port.into()).collect();
+
+        for member in members {
+            self.tombstone_statement(member, None);
+        }
+        for port in ports {
+            let _ = self.stage.ssas.delete(port);
+        }
+        let _ = self.stage.nodes.ungraphs.delete(graph);
+    }
+
+    /// The live `UnGraph` `graph`, or [`RewriteError::UnknownUnGraph`] for a
+    /// deleted or unknown id.
     pub(in crate::rewrite) fn live_ungraph(
         &self,
         graph: UnGraph,
     ) -> Result<&UnGraphInfo<L>, RewriteError> {
         graph
             .get_info(self.stage)
-            .filter(|item| !item.deleted())
             .map(|item| &**item)
             .ok_or(RewriteError::UnknownUnGraph(graph))
     }

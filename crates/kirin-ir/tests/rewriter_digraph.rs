@@ -319,9 +319,9 @@ fn erase_statement_tombstones_owned_digraph() {
     assert!(port.get_info(&stage).is_none());
     assert!(uses_set(&stage, x).is_empty());
     assert_eq!(outer.statements(&stage).collect::<Vec<_>>(), vec![split]);
-    // UnGraph bodies are out of scope and still survive their owner.
-    assert!(ug.get_info(&stage).is_some());
-    assert!(iso.get_info(&stage).is_some());
+    // The owner's UnGraph goes with it too.
+    assert!(ug.get_info(&stage).is_none());
+    assert!(iso.get_info(&stage).is_none());
     verify_derived(&stage).unwrap();
 }
 

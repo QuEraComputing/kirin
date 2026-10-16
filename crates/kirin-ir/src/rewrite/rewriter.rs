@@ -44,9 +44,8 @@
 //!
 //! # Known gap: `UnGraph` operand edits
 //!
-//! [`Rewriter::replace_statement`], [`Rewriter::erase_statement`], and the
-//! block `insert_*` methods reject `UnGraph` members with
-//! [`RewriteError::NotInBlockBody`]. [`Rewriter::replace_operand`],
+//! [`Rewriter::replace_statement`] and the block `insert_*` methods reject
+//! `UnGraph` members with [`RewriteError::NotInBlockBody`]. [`Rewriter::replace_operand`],
 //! [`Rewriter::replace_all_uses`], and [`Rewriter::replace_results`] do **not**
 //! check body kind: on an `UnGraph` member they rewrite the operand and leave
 //! the petgraph edge weights that mirror it stale. Until `UnGraph` surgery
@@ -66,9 +65,9 @@
 //!
 //! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
-//! removed. Erasure is eager: the statement-owned blocks, `CFG`s, and
-//! `DiGraph`s nested in an erased statement or block are tombstoned with it.
-//! `UnGraph` bodies are not tombstoned yet and survive their owner.
+//! removed. Erasure is eager: the statement-owned blocks, `CFG`s, `DiGraph`s,
+//! and `UnGraph`s nested in an erased statement or block are tombstoned with
+//! it.
 
 use std::collections::HashSet;
 use std::fmt;
@@ -100,12 +99,13 @@ pub enum MutationEvent {
     /// A new statement was spliced into a block's statement list or added as a
     /// `DiGraph` node.
     InsertedStatement { stmt: Statement },
-    /// A statement was tombstoned and removed from its block or `DiGraph`.
+    /// A statement was tombstoned and removed from its block or graph.
     ///
-    /// Covers everything nested in it: the statement-owned blocks, `CFG`s, and
-    /// `DiGraph`s it held were tombstoned with it, and no separate
-    /// [`MutationEvent::ChangedBlockList`], [`MutationEvent::ChangedCfg`], or
-    /// [`MutationEvent::ChangedDiGraphTopology`] is recorded for them.
+    /// Covers everything nested in it: the statement-owned blocks, `CFG`s,
+    /// `DiGraph`s, and `UnGraph`s it held were tombstoned with it, and no
+    /// separate [`MutationEvent::ChangedBlockList`],
+    /// [`MutationEvent::ChangedCfg`], [`MutationEvent::ChangedDiGraphTopology`],
+    /// or [`MutationEvent::ChangedUnGraphTopology`] is recorded for them.
     ErasedStatement { stmt: Statement },
     /// A statement's definition was swapped in place (same id and results).
     ReplacedStatement { stmt: Statement },
@@ -721,24 +721,33 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// block's terminator clears the block's terminator,
     /// removes its outgoing edges from the predecessor mirror, and leaves the
     /// block unterminated (see [`Rewriter::insert_terminator`]).
-    /// Statement-owned blocks, `CFG`s, and `DiGraph`s nested inside `stmt` are
-    /// tombstoned with it, recursively. `UnGraph` bodies are not tombstoned
-    /// yet.
+    /// Statement-owned blocks, `CFG`s, `DiGraph`s, and `UnGraph`s nested inside
+    /// `stmt` are tombstoned with it, recursively.
     ///
-    /// A `DiGraph` member is erased the same way, except that instead of
-    /// leaving a block chain it loses its graph node (and the edges into it).
+    /// A graph member is erased the same way, except that instead of leaving a
+    /// block chain it leaves its graph: a `DiGraph` member or `UnGraph` node
+    /// loses its node and the edges touching it, and an `UnGraph` edge
+    /// statement leaves the graph's edge-statement list.
     ///
     /// Rejects — leaving the stage untouched — if `stmt` is unknown, is owned
-    /// by an `UnGraph` (or nothing), or still has results that are used
-    /// elsewhere (a `DiGraph` yield counts as a use). Records
-    /// [`MutationEvent::ErasedStatement`], followed by
-    /// [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator or
-    /// [`MutationEvent::ChangedDiGraphTopology`] when it was a graph member.
+    /// by nothing, or still has results that are used elsewhere (a `DiGraph`
+    /// yield counts as a use, and so does a node reading an `UnGraph` edge
+    /// statement's wire). Records [`MutationEvent::ErasedStatement`], followed
+    /// by [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator,
+    /// [`MutationEvent::ChangedDiGraphTopology`] when it was a `DiGraph`
+    /// member, or [`MutationEvent::ChangedUnGraphTopology`] when it was an
+    /// `UnGraph` member.
     pub fn erase_statement(&mut self, stmt: Statement) -> Result<(), RewriteError> {
-        if let Some(item) = stmt.get_info(self.stage)
-            && let Some(StatementParent::DiGraph(graph)) = item.parent
-        {
-            return self.erase_digraph_member(stmt, graph);
+        if let Some(item) = stmt.get_info(self.stage) {
+            match item.parent {
+                Some(StatementParent::DiGraph(graph)) => {
+                    return self.erase_digraph_member(stmt, graph);
+                }
+                Some(StatementParent::UnGraph(graph)) => {
+                    return self.erase_ungraph_member(stmt, graph);
+                }
+                _ => {}
+            }
         }
         let (block, prev, next, operands, results, successors, is_terminator) = {
             let item = self.live_statement(stmt)?;
@@ -766,15 +775,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             )
         };
 
-        for &result in &results {
-            let used = result
-                .get_info(self.stage)
-                .map(|info| !info.uses().is_empty())
-                .unwrap_or(false);
-            if used {
-                return Err(RewriteError::StatementResultsInUse(stmt));
-            }
-        }
+        self.ensure_results_unused(stmt)?;
 
         if is_terminator {
             // The terminator is not in the chain; clear the block's pointer.
@@ -837,6 +838,25 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             self.events.push(MutationEvent::ChangedTerminator { block });
         }
         Ok(())
+    }
+
+    /// [`RewriteError::StatementResultsInUse`] if a result of the live `stmt`
+    /// is still used.
+    pub(super) fn ensure_results_unused(&self, stmt: Statement) -> Result<(), RewriteError> {
+        let used = stmt
+            .expect_info(self.stage)
+            .definition
+            .results()
+            .any(|&result| {
+                SSAValue::from(result)
+                    .get_info(self.stage)
+                    .is_some_and(|info| !info.uses().is_empty())
+            });
+        if used {
+            Err(RewriteError::StatementResultsInUse(stmt))
+        } else {
+            Ok(())
+        }
     }
 
     /// Tombstone `block`, its arguments, and every statement it holds, the
@@ -908,13 +928,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let _ = self.stage.statement_arena_mut().delete(stmt);
     }
 
-    /// Tombstone the statement-owned blocks, `CFG`s, and `DiGraph`s nested in
-    /// `stmt`.
-    ///
-    /// TODO: `UnGraph` bodies are not tombstoned yet; their members survive
-    /// their owner until `UnGraph` surgery lands.
+    /// Tombstone the statement-owned blocks, `CFG`s, `DiGraph`s, and `UnGraph`s
+    /// nested in `stmt`.
     fn tombstone_nested_bodies(&mut self, stmt: Statement) {
-        let (blocks, cfgs, digraphs) = {
+        let (blocks, cfgs, digraphs, ungraphs) = {
             let definition = &stmt.expect_info(self.stage).definition;
             (
                 definition
@@ -926,10 +943,17 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     .digraphs()
                     .copied()
                     .collect::<SmallVec<[DiGraph; 1]>>(),
+                definition
+                    .ungraphs()
+                    .copied()
+                    .collect::<SmallVec<[UnGraph; 1]>>(),
             )
         };
         for graph in digraphs {
             self.tombstone_digraph(graph);
+        }
+        for graph in ungraphs {
+            self.tombstone_ungraph(graph);
         }
         for block in blocks {
             self.tombstone_block(block);
