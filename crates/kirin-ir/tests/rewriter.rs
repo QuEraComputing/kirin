@@ -363,7 +363,61 @@ fn erase_statement_tombstones_nested_bodies() {
 }
 
 #[test]
-fn erase_statement_rejects_terminator_results_and_unknown() {
+fn erase_statement_erases_a_terminator_and_its_edges() {
+    let mut stage = new_stage();
+
+    // entry(a) { nop; jump target(a) } ; target(t) { return }
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let target = stage.block().argument(TestType::I32).terminator(ret).new();
+    let nop = stage.statement().definition(BuilderDialect::Nop).new();
+    let a = stage.block_argument().index(0);
+    let jump = stage
+        .statement()
+        .definition(BuilderDialect::Jump(Successor::from_block(target), vec![a]))
+        .new();
+    let entry = stage
+        .block()
+        .argument(TestType::I32)
+        .stmt(nop)
+        .terminator(jump)
+        .new();
+    let _cfg = stage.cfg().add_block(entry).add_block(target).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let real_a = SSAValue::from(entry.expect_info(&stage).arguments[0]);
+    assert_eq!(uses_set(&stage, real_a), HashSet::from([so(jump, 0)]));
+    assert_eq!(target.expect_info(&stage).predecessors.as_slice(), [entry]);
+
+    let events = {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.erase_statement(jump).unwrap();
+        rw.drain_events()
+    };
+    assert_eq!(
+        events,
+        vec![
+            MutationEvent::ErasedStatement { stmt: jump },
+            MutationEvent::ChangedTerminator { block: entry },
+        ]
+    );
+
+    // The block is unterminated, its chain intact; the edge and use are gone.
+    assert!(jump.get_info(&stage).unwrap().deleted());
+    assert_eq!(entry.terminator(&stage), None);
+    assert_eq!(entry.statements(&stage).collect::<Vec<_>>(), vec![nop]);
+    assert!(target.expect_info(&stage).predecessors.is_empty());
+    assert!(uses_set(&stage, real_a).is_empty());
+    verify_derived(&stage).unwrap();
+
+    // The block can be closed again.
+    Rewriter::new(&mut stage)
+        .insert_terminator(entry, BuilderDialect::Return)
+        .unwrap();
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn erase_statement_rejects_used_results_and_unknown() {
     let mut stage = new_stage();
 
     let (wire, wire_ssa) = make_wire(&mut stage);
@@ -372,14 +426,7 @@ fn erase_statement_rejects_terminator_results_and_unknown() {
         .definition(BuilderDialect::Use(wire_ssa))
         .new();
     let s0 = stage.statement().definition(BuilderDialect::Nop).new();
-    let ret = stage.statement().definition(BuilderDialect::Return).new();
-    let _block = stage
-        .block()
-        .stmt(wire)
-        .stmt(consumer)
-        .stmt(s0)
-        .terminator(ret)
-        .new();
+    let _block = stage.block().stmt(wire).stmt(consumer).stmt(s0).new();
 
     let mut stage = stage.finalize().unwrap();
     let mut rw = Rewriter::new(&mut stage);
@@ -388,11 +435,6 @@ fn erase_statement_rejects_terminator_results_and_unknown() {
     assert_eq!(
         rw.erase_statement(wire),
         Err(RewriteError::StatementResultsInUse(wire))
-    );
-    // The block terminator cannot be erased in this slice.
-    assert_eq!(
-        rw.erase_statement(ret),
-        Err(RewriteError::CannotEraseTerminator(ret))
     );
     // A clean erase succeeds; erasing the same id again reports it unknown.
     rw.erase_statement(s0).unwrap();
@@ -463,6 +505,11 @@ fn insert_before_and_after_splice_and_maintain_index() {
     assert_eq!(
         rw.insert_before(s0, BuilderDialect::Return),
         Err(RewriteError::CannotInsertTerminator)
+    );
+    // Only a terminator may carry successors.
+    assert_eq!(
+        rw.insert_after(s0, BuilderDialect::Fork(Successor::from_block(block))),
+        Err(RewriteError::NonTerminatorWithSuccessors)
     );
     let bogus = SSAValue::from(TestSSAValue(9999));
     assert_eq!(
@@ -666,6 +713,12 @@ fn replace_statement_rejects_illegal_edits() {
         rw.replace_statement(branch, BuilderDialect::Nop),
         Err(RewriteError::TerminatorKindMismatch(branch))
     );
+    // A non-terminator cannot gain successors: only the terminator's edges
+    // are in the predecessor mirror.
+    assert_eq!(
+        rw.replace_statement(plain, BuilderDialect::Fork(Successor::from_block(target))),
+        Err(RewriteError::NonTerminatorWithSuccessors)
+    );
     // Operands must be live...
     assert_eq!(
         rw.replace_statement(plain, BuilderDialect::Use(dead_value)),
@@ -734,7 +787,10 @@ fn replace_statement_maintains_predecessors_when_retargeting() {
     );
     assert_eq!(
         events,
-        vec![MutationEvent::ReplacedStatement { stmt: branch }]
+        vec![
+            MutationEvent::ReplacedStatement { stmt: branch },
+            MutationEvent::ChangedTerminator { block: source },
+        ]
     );
 
     // The maintained index equals a from-scratch rebuild.

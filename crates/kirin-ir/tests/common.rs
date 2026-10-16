@@ -45,6 +45,8 @@ impl Placeholder for TestType {
 /// - `Isolated`: no operands, no results (ungraph isolated node)
 /// - `Branch(target)`: one-successor control-flow terminator
 /// - `CondBranch(a, b)`: two-successor control-flow terminator
+/// - `Fork(target)`: a non-terminator carrying a successor, which is invalid
+///   IR; exists to test that verification reports it
 /// - `Jump(target, args)`: one-successor terminator forwarding `args` to the
 ///   target's block arguments
 /// - `OwnBlocks(a, b)`: structurally owns two blocks
@@ -64,6 +66,7 @@ pub enum BuilderDialect {
     Branch(Successor),
     CondBranch(Successor, Successor),
     Jump(Successor, Vec<SSAValue>),
+    Fork(Successor),
     OwnBlocks(Block, Block),
     OwnCFG(CFG),
     OwnGraphs(DiGraph, UnGraph),
@@ -139,9 +142,9 @@ impl<'a> HasSuccessors<'a> for BuilderDialect {
     type Iter = std::vec::IntoIter<&'a Successor>;
     fn successors(&'a self) -> Self::Iter {
         match self {
-            BuilderDialect::Branch(target) | BuilderDialect::Jump(target, _) => {
-                vec![target].into_iter()
-            }
+            BuilderDialect::Branch(target)
+            | BuilderDialect::Jump(target, _)
+            | BuilderDialect::Fork(target) => vec![target].into_iter(),
             BuilderDialect::CondBranch(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }
@@ -152,9 +155,9 @@ impl<'a> HasSuccessorsMut<'a> for BuilderDialect {
     type IterMut = std::vec::IntoIter<&'a mut Successor>;
     fn successors_mut(&'a mut self) -> Self::IterMut {
         match self {
-            BuilderDialect::Branch(target) | BuilderDialect::Jump(target, _) => {
-                vec![target].into_iter()
-            }
+            BuilderDialect::Branch(target)
+            | BuilderDialect::Jump(target, _)
+            | BuilderDialect::Fork(target) => vec![target].into_iter(),
             BuilderDialect::CondBranch(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }

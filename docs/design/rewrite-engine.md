@@ -1470,9 +1470,12 @@ Pure derivation replaces the public mutating `rebuild_use_index` and
 out-of-range/tombstoned statement operands produce
 `DanglingOperand { stmt, index, value }`; directed-graph yields produce
 `DanglingYield { graph, index, value }`; successor references to a dead block
-produce `DanglingSuccessor { stmt, target }`. Body ownership follows the same
-rule: a membership pointer naming a dead container produces `DanglingParent`,
-and the chain walker's own defects arrive as `Chain(ChainFinding)`.
+produce `DanglingSuccessor { stmt, target }`. Only terminators may carry
+successors: a non-terminator that does produces
+`NonTerminatorSuccessor { stmt }` and contributes no edges. Body ownership
+follows the same rule: a membership pointer naming a dead container produces
+`DanglingParent`, and the chain walker's own defects arrive as
+`Chain(ChainFinding)`.
 Later derivations apply the same rule to graph membership and topology. Derivation
 collects independent findings rather than stopping at the first one — component
 derivations share one findings buffer instead of returning early, so a single
@@ -1785,20 +1788,20 @@ stage remains valid.
 |---|---|---|---|
 | `replace_operand` | Rewrite one operand slot; move its use record `old → new`. | `ChangedOperands` (none if slot unchanged) | operand-index and live-value checked |
 | `replace_all_uses` | Rewrite every operand **and `DiGraph` yield** reading `old` to `new`; transfer use records. | one `ChangedOperands` per affected statement, then one `ReplacedUses` | returns count of slots rewritten; self-replace is `Ok(0)` |
-| `erase_statement` | Tombstone the statement, unlink it from its block list, drop its operand uses, tombstone its (unused) result values. Statement-owned blocks and `Cfg`s nested in it are tombstoned with it. | `ErasedStatement` (covers the nested bodies; no CFG events) | block-parented, non-terminator, no live result uses; nested `DiGraph`/`UnGraph` bodies are not yet tombstoned |
-| `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with **no results**; operands must be live |
+| `erase_statement` | Tombstone the statement, unlink it from its block list, drop its operand uses, tombstone its (unused) result values. Statement-owned blocks and `Cfg`s nested in it are tombstoned with it. Erasing a terminator clears the block's terminator and removes its outgoing edges, leaving the block unterminated. | `ErasedStatement` (covers the nested bodies; no CFG events), then `ChangedTerminator` for a terminator | block-parented, no live result uses; nested `DiGraph`/`UnGraph` bodies are not yet tombstoned |
+| `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with **no results** and no successors; operands must be live |
 | `insert_terminator` | Allocate `definition` as the terminator of a block that has none; add operand uses and predecessor entries. | `InsertedStatement`, `ChangedTerminator` | any block (`Cfg` member or statement-owned body); `definition` is a result-less terminator with live operands and successors |
-| `replace_statement` | Swap the definition in place, keeping id, block position, and result SSA identity; fix operand uses. | `ReplacedStatement` | same result arity and terminator-ness as the original |
+| `replace_statement` | Swap the definition in place, keeping id, block position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror. | `ReplacedStatement`, then `ChangedTerminator` for a terminator | same result arity and terminator-ness as the original; a non-terminator replacement carries no successors |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
 | `append_block` / `insert_block_before` / `insert_block_after` | Allocate an empty block (no terminator) with fresh typed arguments and link it into the `Cfg` block list. | `ChangedBlockList` | anchor must be a live block of a `Cfg` list (not a statement-owned body) |
 | `erase_block` | Unlink the block and tombstone it with its arguments, statements, results, and nested blocks/`Cfg`s; drop their uses and outgoing edges. | `ChangedBlockList`, `ChangedCfg` | rejects if another block still branches to it (a self-loop is fine) or an argument or top-level result is used outside the block; retarget those edges and replace those uses first |
 | `split_block` | Move `at`, its successors in the chain, and the terminator into a new block placed after the original; the original is left without a terminator, for the caller to close with `insert_terminator`. | `ChangedBlockList`, `ChangedCfg` | new block has no arguments |
-| `merge_blocks` | Erase `pred`'s terminator, redirect `succ`'s arguments to `arg_replacements`, splice `succ`'s statements and terminator onto `pred`, tombstone `succ`. | `ErasedStatement`, the `replace_all_uses` events, `ChangedBlockList`, `ChangedCfg` | same `Cfg`, distinct blocks, exact argument arity; replacements must be live and not `succ`'s own arguments; rejects if a block other than `pred` still branches to `succ`; `pred` need not branch to `succ` |
+| `merge_blocks` | Erase `pred`'s terminator, redirect `succ`'s arguments to `arg_replacements`, splice `succ`'s statements and terminator onto `pred`, tombstone `succ`. | the `erase_statement` events, the `replace_all_uses` events, `ChangedBlockList`, `ChangedCfg` | same `Cfg`, distinct blocks, exact argument arity; replacements must be live and not `succ`'s own arguments; rejects if a block other than `pred` still branches to `succ`; `pred` need not branch to `succ` |
 | `retarget_successor` | Point every successor slot of `stmt` naming `old` at `new`. | `ChangedCfg` (none if nothing changed) | returns the count rewritten; `old` need not be live, `new` must be live |
-| `insert_block_arg` / `erase_block_arg` | Insert or erase one block argument, renumbering later ones, and insert or remove the matching operand on each incoming edge through `BranchOp`. `insert_block_arg` asks `forwarded(stmt, successor)` for each edge's new operand. | one `ReplacedStatement` per edge, then `ChangedCfg` | every rewritten edge is checked before any edit; an erased argument must be unused; every incoming edge needs an editable operand list (`NoSuccessorOperands` otherwise) |
+| `insert_block_arg` / `erase_block_arg` | Insert or erase one block argument, renumbering later ones, and insert or remove the matching operand on each incoming edge through `BranchOp`. `insert_block_arg` asks `forwarded(stmt, successor)` for each edge's new operand. | `ReplacedStatement` and `ChangedTerminator` per edge, then `ChangedCfg` | every rewritten edge is checked before any edit; an erased argument must be unused; every incoming edge needs an editable operand list (`NoSuccessorOperands` otherwise) |
 
 Deferred to later slices (each is rejected, not silently mishandled):
-terminator and `DiGraph`/`UnGraph`-body surgery;
+`DiGraph`/`UnGraph`-body surgery;
 result-defining insertion (needs fresh result SSA values with types); single
 dead-result trimming (`remove_result`, below); the owning pass driver and
 quarantine boundary; and the pure derive/install/verify split described under
@@ -1976,10 +1979,10 @@ axis — hence the column.
 | `SuccessorOperandIndexOutOfRange { stmt, successor, index }` | guard | an incoming edge forwards too few operands for `index` (its arity disagrees with the block's) | `insert_block_arg`, `erase_block_arg` |
 | `OperandIndexOutOfRange { stmt, index }` | liveness | operand index past the statement's operand list | `replace_operand` |
 | `NotInBlockBody(stmt)` | deferred | statement is owned by a `DiGraph`/`UnGraph` (or nothing), not a block — graph surgery deferred | `erase_statement`, `insert_*`, `replace_statement` |
-| `CannotEraseTerminator(stmt)` | deferred | erasing a block terminator would need control-flow repair, deferred | `erase_statement` |
 | `StatementResultsInUse(stmt)` | guard | a result of the statement is still used elsewhere (for `erase_block`, outside the block); replace those uses first | `erase_statement`, `erase_block` |
 | `AnchorIsTerminator(stmt)` | guard | nothing can follow a terminator, so `insert_after` cannot anchor on one | `insert_after` |
 | `CannotInsertTerminator` | guard | the inserted definition is a terminator (not spliced mid-block; use `insert_terminator`) | `insert_*` |
+| `NonTerminatorWithSuccessors` | guard | the definition is a non-terminator carrying successors; only a terminator may transfer control | `insert_*`, `replace_statement` |
 | `CannotInsertWithResults` | deferred | the inserted definition declares results (fresh result allocation deferred) | `insert_*`, `insert_terminator` |
 | `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
 | `TerminatorKindMismatch(stmt)` | guard | replacement changes terminator-ness, desyncing the block's terminator cache | `replace_statement` |
@@ -2691,10 +2694,11 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
 - [ ] Until topology maintenance lands, guard graph-owned statements in
   operand and definition replacement. Once it lands, every successful graph
   edit maintains the topology mirror atomically; there is no dirty interval.
-- [ ] Terminator surgery: erase/replace a terminator, maintaining
+- [x] Terminator surgery: erase/replace a terminator, maintaining
   `BlockInfo::terminator` and successor edges. Emits `ChangedTerminator`.
-  Inserting a terminator into a block that has none (`insert_terminator`) has
-  landed; erasing and replacing one remain.
+  `erase_statement` erases a terminator (leaving the block unterminated),
+  `replace_statement` replaces one, and `insert_terminator` closes a block
+  that has none.
 - [x] Add the grouped operation-owned `HasCfgEdges` view that preserves each
   successor together with its forwarded arguments. Landed as the `BranchOp`
   trait (after MLIR's `BranchOpInterface`): a `Dialect` supertrait whose
@@ -2945,7 +2949,7 @@ The documented `MutationEvent` enum lists the full target vocabulary; the
 implementation currently emits **eight** — `ChangedOperands`, `ReplacedUses`,
 `InsertedStatement`, `ErasedStatement`, `ReplacedStatement`, `ChangedBlockList`,
 `ChangedCfg`, `ChangedTerminator` — covering operand and yield rewriting,
-block-body statement surgery (erase/insert/replace, terminator insertion), and
+block-body statement and terminator surgery (erase/insert/replace), and
 `Cfg` block-list surgery. The remaining documented variants (graph-topology and
 result-type events) are not emitted because that surgery is not yet
 implemented, so an analysis-invalidation policy written against them would

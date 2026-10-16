@@ -21,8 +21,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// replacement is not live or is one of `succ`'s own arguments (which the
     /// merge deletes).
     ///
-    /// Records [`MutationEvent::ErasedStatement`] for `pred`'s terminator (if
-    /// any), the [`Rewriter::replace_all_uses`] events for the argument
+    /// Records the [`Rewriter::erase_statement`] events for `pred`'s terminator
+    /// (if any), the [`Rewriter::replace_all_uses`] events for the argument
     /// redirection, then [`MutationEvent::ChangedBlockList`] and
     /// [`MutationEvent::ChangedCfg`].
     pub fn merge_blocks(
@@ -68,18 +68,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             }
         }
 
+        // Erasing pred's terminator also drops its edges from the predecessor
+        // mirror.
+        if let Some(terminator) = pred.expect_info(self.stage).terminator {
+            self.erase_statement(terminator)?;
+        }
         let pred_successors_before = self.block_successors(pred);
         let succ_successors = self.block_successors(succ);
-
-        if let Some(terminator) = pred.expect_info(self.stage).terminator {
-            // The predecessor mirror is reconciled below from successor sets.
-            self.tombstone_statement(terminator, None);
-            if let Some(info) = pred.get_info_mut(self.stage) {
-                info.terminator = None;
-            }
-            self.events
-                .push(MutationEvent::ErasedStatement { stmt: terminator });
-        }
 
         let pairs: Vec<(SSAValue, SSAValue)> = succ_args
             .iter()

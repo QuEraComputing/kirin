@@ -50,6 +50,9 @@ pub enum Finding {
     },
     /// A successor reference on `stmt` targets a block that is not live.
     DanglingSuccessor { stmt: Statement, target: Block },
+    /// `stmt` carries successors but is not a terminator. Only a block's
+    /// terminator may transfer control, so its edges are not derived.
+    NonTerminatorSuccessor { stmt: Statement },
     /// The chain comprising a `Block` or `CFG` has a defect.
     Chain(ChainFinding),
     /// A block has multiple terminator statements
@@ -80,6 +83,9 @@ impl fmt::Display for Finding {
                 f,
                 "successor of {stmt:?} targets {target}, which is not live"
             ),
+            Finding::NonTerminatorSuccessor { stmt } => {
+                write!(f, "{stmt:?} carries successors but is not a terminator")
+            }
             Finding::Chain(finding) => write!(f, "{finding}"),
             Finding::MultipleTerminators { block, terminators } => write!(
                 f,

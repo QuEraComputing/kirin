@@ -694,6 +694,7 @@ fn merge_blocks_splices_successor_and_redirects_arguments() {
         events,
         vec![
             MutationEvent::ErasedStatement { stmt: jump },
+            MutationEvent::ChangedTerminator { block: entry },
             MutationEvent::ChangedOperands { stmt: use_x },
             MutationEvent::ReplacedUses {
                 old: real_x,
@@ -1092,6 +1093,7 @@ fn insert_block_arg_shifts_arguments_and_rewrites_edges() {
         events,
         vec![
             MutationEvent::ReplacedStatement { stmt: jump },
+            MutationEvent::ChangedTerminator { block: entry },
             MutationEvent::ChangedCfg { cfg },
         ]
     );

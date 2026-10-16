@@ -16,9 +16,9 @@ pub(in crate::derived) type PredecessorMap = SlotMap<Block, SmallVec<[Block; 4]>
 /// Compute the reverse control-flow index from authoritative successor
 /// references.
 ///
-/// Successor references carried by statements are the authoritative forward
-/// edges. A statement contributes an edge only when its structural parent is a
-/// block, because the predecessor relation is between blocks.
+/// Successor references carried by terminators are the authoritative forward
+/// edges. A non-terminator carrying successors is reported as
+/// [`Finding::NonTerminatorSuccessor`] and contributes no edges.
 pub(in crate::derived) fn derive<L: Dialect>(
     stage: &StageInfo<L>,
     findings: &mut Vec<Finding>,
@@ -34,6 +34,15 @@ pub(in crate::derived) fn derive<L: Dialect>(
             continue;
         };
         let stmt = Statement::from(Id(raw));
+
+        // Only a terminator transfers control; successors anywhere else are
+        // reported and contribute no edges.
+        if !item.definition.is_terminator() {
+            if item.definition.successors().next().is_some() {
+                findings.push(Finding::NonTerminatorSuccessor { stmt });
+            }
+            continue;
+        }
 
         for successor in item.definition.successors() {
             let target = successor.target();
