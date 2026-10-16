@@ -58,6 +58,7 @@ impl Placeholder for TestType {
 /// - `OwnBlocks(a, b)`: structurally owns two blocks
 /// - `OwnCFG(cfg)`: structurally owns one CFG
 /// - `OwnGraphs(dg, ug)`: structurally owns one directed and one undirected graph
+/// - `OwnDiGraph(dg)` / `OwnUnGraph(ug)`: structurally owns one graph of a kind
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BuilderDialect {
@@ -79,6 +80,8 @@ pub enum BuilderDialect {
     OwnBlocks(Block, Block),
     OwnCFG(CFG),
     OwnGraphs(DiGraph, UnGraph),
+    OwnDiGraph(DiGraph),
+    OwnUnGraph(UnGraph),
 }
 
 impl<'a> HasArguments<'a> for BuilderDialect {
@@ -238,7 +241,9 @@ impl<'a> HasDigraphs<'a> for BuilderDialect {
     type Iter = std::vec::IntoIter<&'a DiGraph>;
     fn digraphs(&'a self) -> Self::Iter {
         match self {
-            BuilderDialect::OwnGraphs(graph, _) => vec![graph].into_iter(),
+            BuilderDialect::OwnGraphs(graph, _) | BuilderDialect::OwnDiGraph(graph) => {
+                vec![graph].into_iter()
+            }
             _ => vec![].into_iter(),
         }
     }
@@ -248,7 +253,9 @@ impl<'a> HasDigraphsMut<'a> for BuilderDialect {
     type IterMut = std::vec::IntoIter<&'a mut DiGraph>;
     fn digraphs_mut(&'a mut self) -> Self::IterMut {
         match self {
-            BuilderDialect::OwnGraphs(graph, _) => vec![graph].into_iter(),
+            BuilderDialect::OwnGraphs(graph, _) | BuilderDialect::OwnDiGraph(graph) => {
+                vec![graph].into_iter()
+            }
             _ => vec![].into_iter(),
         }
     }
@@ -258,7 +265,9 @@ impl<'a> HasUngraphs<'a> for BuilderDialect {
     type Iter = std::vec::IntoIter<&'a UnGraph>;
     fn ungraphs(&'a self) -> Self::Iter {
         match self {
-            BuilderDialect::OwnGraphs(_, graph) => vec![graph].into_iter(),
+            BuilderDialect::OwnGraphs(_, graph) | BuilderDialect::OwnUnGraph(graph) => {
+                vec![graph].into_iter()
+            }
             _ => vec![].into_iter(),
         }
     }
@@ -268,7 +277,9 @@ impl<'a> HasUngraphsMut<'a> for BuilderDialect {
     type IterMut = std::vec::IntoIter<&'a mut UnGraph>;
     fn ungraphs_mut(&'a mut self) -> Self::IterMut {
         match self {
-            BuilderDialect::OwnGraphs(_, graph) => vec![graph].into_iter(),
+            BuilderDialect::OwnGraphs(_, graph) | BuilderDialect::OwnUnGraph(graph) => {
+                vec![graph].into_iter()
+            }
             _ => vec![].into_iter(),
         }
     }

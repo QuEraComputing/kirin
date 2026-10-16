@@ -290,11 +290,9 @@ fn erase_statement_tombstones_owned_digraph() {
         .node(p)
         .yield_value(rp)
         .new();
-    let iso = stage.statement().definition(BuilderDialect::Isolated).new();
-    let ug = stage.ungraph().node(iso).new();
     let owner = stage
         .statement()
-        .definition(BuilderDialect::OwnGraphs(dg, ug))
+        .definition(BuilderDialect::OwnDiGraph(dg))
         .new();
     let outer = stage.block().stmt(split).stmt(owner).new();
 
@@ -319,9 +317,6 @@ fn erase_statement_tombstones_owned_digraph() {
     assert!(port.get_info(&stage).is_none());
     assert!(uses_set(&stage, x).is_empty());
     assert_eq!(outer.statements(&stage).collect::<Vec<_>>(), vec![split]);
-    // The owner's UnGraph goes with it too.
-    assert!(ug.get_info(&stage).is_none());
-    assert!(iso.get_info(&stage).is_none());
     verify_derived(&stage).unwrap();
 }
 

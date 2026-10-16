@@ -435,10 +435,9 @@ fn erase_statement_tombstones_owned_ungraph() {
         .node(n0)
         .node(n1)
         .new();
-    let dg = stage.digraph().new();
     let owner = stage
         .statement()
-        .definition(BuilderDialect::OwnGraphs(dg, ug))
+        .definition(BuilderDialect::OwnUnGraph(ug))
         .new();
     let outer = stage.block().stmt(split).stmt(owner).new();
 
