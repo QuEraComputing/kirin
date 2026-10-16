@@ -6,4 +6,5 @@
 //! two such incidences. The rewriter keeps the petgraph (and the statement →
 //! node map beside it) correct incrementally; there is no public edge API.
 
+mod surgery;
 mod topology;

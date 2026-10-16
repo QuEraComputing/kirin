@@ -92,7 +92,6 @@ impl<L: Dialect> UnGraphInfo<L> {
     /// # Panics
     ///
     /// If either statement is not a node.
-    #[expect(dead_code, reason = "wired up by UnGraph node and operand surgery")]
     pub(crate) fn add_edge(&mut self, a: Statement, b: Statement, wire: SSAValue) {
         self.insert_edge(a, b, wire);
     }
@@ -103,7 +102,6 @@ impl<L: Dialect> UnGraphInfo<L> {
     /// # Panics
     ///
     /// If either statement is not a node.
-    #[expect(dead_code, reason = "wired up by UnGraph node and operand surgery")]
     pub(crate) fn remove_edge(&mut self, a: Statement, b: Statement, wire: SSAValue) -> bool {
         self.delete_edge(a, b, wire)
     }

@@ -10,7 +10,6 @@ use crate::rewrite::rewriter::Rewriter;
 pub(in crate::rewrite) type Incidences = SmallVec<[Statement; 2]>;
 
 /// Incidence bookkeeping shared by the `UnGraph` surgery methods.
-#[expect(dead_code, reason = "wired up by UnGraph node and operand surgery")]
 impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Whether `value` is an edge value of `graph`: a result of one of its
     /// edge statements, or one of its boundary ports.

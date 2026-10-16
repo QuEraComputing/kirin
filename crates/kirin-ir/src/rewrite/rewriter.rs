@@ -185,6 +185,17 @@ pub enum RewriteError {
     UnknownDiGraph(DiGraph),
     /// The yield index is out of range for the `DiGraph`'s yield list.
     YieldIndexOutOfRange { graph: DiGraph, index: usize },
+    /// The `UnGraph` ID does not resolve to a live `UnGraph` in this stage.
+    UnknownUnGraph(UnGraph),
+    /// `insert_ungraph_node` was given an edge statement; add those with
+    /// [`Rewriter::insert_ungraph_edge`].
+    UnexpectedEdgeStatement,
+    /// `insert_ungraph_edge` was given a statement that is not an edge
+    /// statement; add nodes with [`Rewriter::insert_ungraph_node`].
+    ExpectedEdgeStatement,
+    /// An inserted edge statement has operands. A wire only connects the nodes
+    /// that read it; it consumes no values.
+    EdgeStatementWithOperands,
     /// The edit would leave the wire `value` of `graph` read by `incidences`
     /// node operand slots; an undirected edge joins at most two.
     UnGraphDegreeExceeded {
@@ -303,6 +314,24 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::UnknownDiGraph(graph) => {
                 write!(f, "DiGraph {graph} is not a live DiGraph in this stage")
+            }
+            RewriteError::UnknownUnGraph(graph) => {
+                write!(f, "UnGraph {graph} is not a live UnGraph in this stage")
+            }
+            RewriteError::UnexpectedEdgeStatement => {
+                write!(
+                    f,
+                    "expected a node: edge statements are inserted with insert_ungraph_edge"
+                )
+            }
+            RewriteError::ExpectedEdgeStatement => {
+                write!(
+                    f,
+                    "expected an edge statement: nodes are inserted with insert_ungraph_node"
+                )
+            }
+            RewriteError::EdgeStatementWithOperands => {
+                write!(f, "an edge statement cannot have operands")
             }
             RewriteError::UnGraphDegreeExceeded {
                 graph,

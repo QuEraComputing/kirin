@@ -1795,6 +1795,8 @@ stage remains valid.
 | `insert_terminator` | Allocate `definition` as the terminator of a block that has none; add operand uses and predecessor entries. | `InsertedStatement`, `ChangedTerminator` | any block (`Cfg` member or statement-owned body); `definition` is a result-less terminator with live operands and successors |
 | `insert_node` | Allocate `definition` as a new `DiGraph` member and node; bind its results, add operand uses and an edge from each member producer of an operand. | `InsertedStatement`, `ChangedDiGraphTopology` | live graph; non-terminator with no successors; live operands (outside ones get no edge); results must be `new_result` values |
 | `replace_yield` | Rewrite one `DiGraph` yield slot; move its yield use `old → new`. Topology is unchanged. | `ChangedDiGraphYields` (none if slot unchanged) | live graph and value, index in range |
+| `insert_ungraph_node` | Allocate `definition` as a new `UnGraph` node; bind its results, add operand uses; each operand that is a wire of the graph becomes an incidence, and a wire with two incidences is an edge. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; non-terminator with no successors, not an edge statement; live operands; `new_result` results; no wire above two incidences |
+| `insert_ungraph_edge` | Allocate `definition` as a new `UnGraph` edge statement and append it to the edge-statement list; its results are new wires with no incidences. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; an edge statement with no operands, not a terminator, no successors; `new_result` results |
 | `replace_statement` | Swap the definition in place, keeping id, position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror or, for a `DiGraph` member, its incoming edges. | `ReplacedStatement`, then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` for a member whose edges changed | block- or `DiGraph`-parented; same result arity and terminator-ness as the original; a non-terminator replacement carries no successors |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
 | `append_block` / `insert_block_before` / `insert_block_after` | Allocate an empty block (no terminator) with fresh typed arguments and link it into the `Cfg` block list. | `ChangedBlockList` | anchor must be a live block of a `Cfg` list (not a statement-owned body) |
@@ -1968,6 +1970,11 @@ axis — hence the column.
 | `UnknownCfg(cfg)` | liveness | the `Cfg` id does not resolve to a live `Cfg` | `append_block` |
 | `UnknownDiGraph(graph)` | liveness | the `DiGraph` id does not resolve to a live `DiGraph` | `insert_node`, `replace_yield` |
 | `YieldIndexOutOfRange { graph, index }` | liveness | yield index past the graph's yield list | `replace_yield` |
+| `UnknownUnGraph(graph)` | liveness | the `UnGraph` id does not resolve to a live `UnGraph` | `insert_ungraph_node`, `insert_ungraph_edge` |
+| `UnGraphDegreeExceeded { graph, value, incidences }` | guard | the edit would leave a wire read by more than two node slots | `insert_ungraph_node` |
+| `UnexpectedEdgeStatement` | guard | `insert_ungraph_node` was given an edge statement | `insert_ungraph_node` |
+| `ExpectedEdgeStatement` | guard | `insert_ungraph_edge` was given a node | `insert_ungraph_edge` |
+| `EdgeStatementWithOperands` | guard | an edge statement has operands; a wire consumes no values | `insert_ungraph_edge` |
 | `NotInCfgBody(block)` | guard | the block is a statement-owned single-block body (or detached), not a member of a `Cfg` list | CFG block-list methods |
 | `CfgMismatch { block, expected }` | guard | the block belongs to a different `Cfg` than required | `merge_blocks` |
 | `CannotMergeBlockIntoItself(block)` | guard | `merge_blocks` was given the same block twice | `merge_blocks` |
