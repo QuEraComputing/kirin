@@ -1,23 +1,55 @@
 use std::collections::HashMap;
+use std::fmt;
 use std::hash::Hash;
+
+use kirin_ir::{Arena, Id, Identifier};
 
 use crate::{FactStore, InterpreterError, LatticeAnchor};
 
 /// A handle to one allocated environment. The owning engine controls its
 /// lifetime; the handle stays invalid once freed, because indices are never
 /// reused.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub struct EnvIndex(usize);
+///
+/// Handles come from [`EnvStore`]'s arena; this crate never builds one from a
+/// number.
+#[derive(Clone, Copy, PartialEq, Eq, Hash)]
+pub struct EnvIndex(Id);
 
 impl EnvIndex {
-    pub(crate) fn new(index: usize) -> Self {
-        Self(index)
+    /// A fixed handle for engines that keep no environments but must still
+    /// answer [`Interp::index`](crate::Interp::index) (the backward engines).
+    ///
+    /// It is the handle an [`EnvStore`]'s first allocation returns, so it must
+    /// never be used to address a store.
+    pub(crate) fn placeholder() -> Self {
+        Arena::<Self, ()>::default().next_id()
     }
 
     pub fn raw(self) -> usize {
-        self.0
+        self.0.raw()
     }
 }
+
+/// Prints `EnvIndex(n)`, the same as before the index wrapped an arena [`Id`].
+impl fmt::Debug for EnvIndex {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "EnvIndex({})", self.raw())
+    }
+}
+
+impl From<Id> for EnvIndex {
+    fn from(id: Id) -> Self {
+        Self(id)
+    }
+}
+
+impl From<EnvIndex> for Id {
+    fn from(index: EnvIndex) -> Self {
+        index.0
+    }
+}
+
+impl Identifier for EnvIndex {}
 
 /// One allocated environment: its facts, plus the context key it is registered
 /// under, if any. Keeping the key next to the facts is what lets
@@ -56,7 +88,10 @@ where
     A: LatticeAnchor,
 {
     context_indices: HashMap<K, EnvIndex>,
-    environments: Vec<Option<Environment<K, A, V>>>,
+    /// `free` empties the `Option` before deleting the slot: `Arena::delete`
+    /// keeps a slot's data until `gc`, and a freed environment's facts must
+    /// not stay in memory.
+    environments: Arena<EnvIndex, Option<Environment<K, A, V>>>,
 }
 
 impl<K, A, V> Default for EnvStore<K, A, V>
@@ -75,7 +110,7 @@ where
     pub fn new() -> Self {
         Self {
             context_indices: HashMap::new(),
-            environments: Vec::new(),
+            environments: Arena::default(),
         }
     }
 
@@ -89,8 +124,8 @@ where
     /// Inspect the facts of a live environment.
     pub fn environment(&self, index: EnvIndex) -> Result<&FactStore<A, V>, InterpreterError> {
         self.environments
-            .get(index.raw())
-            .and_then(Option::as_ref)
+            .get(index)
+            .and_then(|slot| (**slot).as_ref())
             .map(|environment| &environment.facts)
             .ok_or(InterpreterError::InvalidEnvIndex(index))
     }
@@ -114,12 +149,10 @@ where
     }
 
     fn alloc_with(&mut self, key: Option<K>) -> EnvIndex {
-        let index = EnvIndex::new(self.environments.len());
-        self.environments.push(Some(Environment {
+        self.environments.alloc(Some(Environment {
             key,
             facts: FactStore::new(),
-        }));
-        index
+        }))
     }
 
     fn environment_mut(
@@ -127,8 +160,8 @@ where
         index: EnvIndex,
     ) -> Result<&mut FactStore<A, V>, InterpreterError> {
         self.environments
-            .get_mut(index.raw())
-            .and_then(Option::as_mut)
+            .get_mut(index)
+            .and_then(|slot| (**slot).as_mut())
             .map(|environment| &mut environment.facts)
             .ok_or(InterpreterError::InvalidEnvIndex(index))
     }
@@ -169,9 +202,10 @@ where
     pub fn free(&mut self, index: EnvIndex) -> Result<(), InterpreterError> {
         let environment = self
             .environments
-            .get_mut(index.raw())
-            .and_then(Option::take)
+            .get_mut(index)
+            .and_then(|slot| (**slot).take())
             .ok_or(InterpreterError::InvalidEnvIndex(index))?;
+        let _ = self.environments.delete(index);
         if let Some(key) = environment.key {
             self.context_indices.remove(&key);
         }
