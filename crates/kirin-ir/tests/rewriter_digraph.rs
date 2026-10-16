@@ -122,7 +122,7 @@ fn insert_node_rejects_without_mutating() {
     let mut stage = new_stage();
 
     let (split, x, _) = make_split(&mut stage);
-    let _outer = stage.block().stmt(split).new();
+    let outer = stage.block().stmt(split).new();
     let (p, rp) = make_compute(&mut stage, x);
     let dg = stage.digraph().node(p).new();
 
@@ -139,6 +139,10 @@ fn insert_node_rejects_without_mutating() {
     assert_eq!(
         rw.insert_node(dg, BuilderDialect::Return),
         Err(RewriteError::UnexpectedTerminator)
+    );
+    assert_eq!(
+        rw.insert_node(dg, BuilderDialect::Fork(Successor::from_block(outer))),
+        Err(RewriteError::NonTerminatorWithSuccessors)
     );
     assert_eq!(
         rw.insert_node(dg, BuilderDialect::Compute(x, ResultValue::from(rp))),

@@ -9,7 +9,8 @@ use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, add_use, r
 impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Add `definition` to `graph` as a new member statement and node.
     ///
-    /// `definition` must be a non-terminator (a `DiGraph` has none). Every
+    /// `definition` must be a non-terminator (a `DiGraph` has none) with no
+    /// successors (only a terminator may transfer control). Every
     /// operand must be live, and every result a fresh
     /// [`Rewriter::new_result`] value, which becomes a result of the new
     /// statement. Each operand slot reading a result of another member gets an
@@ -27,6 +28,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         self.live_digraph(graph)?;
         if definition.is_terminator() {
             return Err(RewriteError::UnexpectedTerminator);
+        }
+        if definition.successors().next().is_some() {
+            return Err(RewriteError::NonTerminatorWithSuccessors);
         }
         let (results, operands) = self.prepare_insert(&definition)?;
 
