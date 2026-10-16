@@ -175,3 +175,23 @@ def test_body_with_no_yield():
     )
     for_body_stmts = list(for_stmt.body.stmts())
     assert isinstance(for_body_stmts[-1], scf.Yield)
+
+
+def test_a_variable_that_the_body_reads_is_carried_once():
+    @structural_no_opt
+    def read_only(x: int, n: int):
+        for _ in range(n):
+            y = x + 1  # noqa: F841
+        return x
+
+    @structural_no_opt
+    def read_and_write(x: int, n: int):
+        for _ in range(n):
+            x = x + 1
+        return x
+
+    for main, expected in ((read_only, 3), (read_and_write, 7)):
+        (loop,) = [s for s in main.callable_region.walk() if isinstance(s, scf.For)]
+        assert len(loop.initializers) == 1
+        assert len(loop.body.blocks[0].args) == 2
+        assert main(3, 4) == expected
