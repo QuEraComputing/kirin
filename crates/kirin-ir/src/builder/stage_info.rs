@@ -380,6 +380,11 @@ impl<L: Dialect> BuilderStageInfo<L> {
                 "Cannot add terminator statement {:?} as a digraph node",
                 info.definition
             );
+            assert!(
+                info.definition.successors().next().is_none(),
+                "Cannot add statement {:?} with successors as a digraph node",
+                info.definition
+            );
         }
 
         let mut stmt_to_node: HashMap<Statement, petgraph::graph::NodeIndex> = HashMap::new();

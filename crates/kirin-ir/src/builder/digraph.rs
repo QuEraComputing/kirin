@@ -71,13 +71,18 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
         self
     }
 
-    /// Add a member statement. A `DiGraph` has no terminator, so `stmt` must
-    /// not be one.
+    /// Add a member statement. `stmt` must be neither a terminator nor carry
+    /// block successors.
     pub fn node(mut self, stmt: Statement) -> Self {
         let info = &self.stage.statements[stmt];
         assert!(
             !info.definition.is_terminator(),
             "Cannot add terminator statement {:?} as a digraph node",
+            info.definition
+        );
+        assert!(
+            info.definition.successors().next().is_none(),
+            "Cannot add statement {:?} with successors as a digraph node",
             info.definition
         );
         self.nodes.push(stmt);
