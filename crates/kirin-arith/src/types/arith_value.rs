@@ -33,19 +33,20 @@ use super::ArithType;
 /// If your language needs different literal defaults or value semantics, define
 /// your own value enum and pair it with your own type lattice.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ArithValue {
     I8(i8),
     I16(i16),
     I32(i32),
     I64(i64),
-    I128(i128),
+    I128(#[cfg_attr(feature = "serde", serde(with = "super::serde::i128_decimal"))] i128),
     U8(u8),
     U16(u16),
     U32(u32),
     U64(u64),
-    U128(u128),
-    F32(f32),
-    F64(f64),
+    U128(#[cfg_attr(feature = "serde", serde(with = "super::serde::u128_decimal"))] u128),
+    F32(#[cfg_attr(feature = "serde", serde(with = "super::serde::f32_bits"))] f32),
+    F64(#[cfg_attr(feature = "serde", serde(with = "super::serde::f64_bits"))] f64),
 }
 
 impl PartialEq for ArithValue {

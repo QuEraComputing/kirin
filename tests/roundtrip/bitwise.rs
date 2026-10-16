@@ -10,6 +10,7 @@ use kirin_test_utils::roundtrip;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[wraps]
 #[kirin(builders, type = ArithType)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum NumericLanguage {
     Bitwise(Bitwise<ArithType>),
     Constant(Constant<ArithValue, ArithType>),

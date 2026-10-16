@@ -70,6 +70,13 @@ pub enum BlockParent {
 /// `prev`/`next` are always `None`.
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "L::Type: serde::Serialize",
+        deserialize = "L::Type: serde::Deserialize<'de>"
+    ))
+)]
 pub struct BlockInfo<L: Dialect> {
     pub parent: Option<BlockParent>,
     pub name: Option<Symbol>,

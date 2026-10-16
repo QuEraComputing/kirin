@@ -55,6 +55,7 @@ mod tests;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[non_exhaustive]
 #[kirin(pure, builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Bitwise<T: CompileTimeValue> {
     #[kirin(speculatable)]
     #[chumsky(format = "$and {lhs}, {rhs} -> {result:type}")]

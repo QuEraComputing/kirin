@@ -8,6 +8,7 @@ name = "toy-qc"
 path = "src/main.rs"
 
 [dependencies]
+serde = { workspace = true, optional = true }
 kirin = { workspace = true }
 kirin-ir = { workspace = true, features = ["derive"] }
 kirin-chumsky = { workspace = true }
@@ -16,5 +17,9 @@ clap = { workspace = true }
 anyhow = { workspace = true }
 
 [dev-dependencies]
+kirin-test-utils = { workspace = true, features = ["roundtrip"] }
 assert_cmd = { workspace = true }
 predicates = { workspace = true }
+
+[features]
+serde = ["dep:serde", "kirin/serde", "kirin-test-utils/serde"]

@@ -1,0 +1,2489 @@
+{
+  "environment": {
+    "platform": "macOS-26.7.1-arm64-arm-64bit",
+    "machine": "arm64",
+    "hardware": {
+      "logical_cpus": 14,
+      "processor": "arm",
+      "machdep.cpu.brand_string": "unavailable",
+      "hw.model": "unavailable",
+      "hw.memsize": "unavailable"
+    },
+    "python": "Python 3.13.5 (main, Jul  1 2025, 18:16:22) [Clang 20.1.4 ]",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: aarch64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2",
+    "rust_revision": "dc3d2362021927633098cceb0d617f434d1dbfc5",
+    "rust_working_tree": "",
+    "python_revision": "eae74008d4aec630169b5e64cc085e6f2c0d5b12"
+  },
+  "workload_spec_sha256": "2199029ac437c5386343ef47727ed7dcaee1c59aef1ac1b5efa1078ce8273860",
+  "validation_scope": "representative bounded inputs executed before and after JSON against closed-form oracle; not a universal proof",
+  "timed_boundary": "complete IR -> JSON string -> complete usable IR; output destruction excluded",
+  "results": [
+    {
+      "family": "chain",
+      "size": 1000,
+      "semantic_case_count": 7,
+      "rust": {
+        "blocks": 1,
+        "family": "chain",
+        "implementation": "rust",
+        "json_bytes": 342007,
+        "operations": {
+          "add": 1000,
+          "ret": 1
+        },
+        "samples_seconds": [
+          0.001338583,
+          0.0013045,
+          0.001224292,
+          0.001286125,
+          0.001299791,
+          0.001261708,
+          0.001261708,
+          0.001133833,
+          0.001179375,
+          0.001157208,
+          0.001255834,
+          0.001164792,
+          0.001099,
+          0.001183667,
+          0.001101875,
+          0.001108916,
+          0.001124083,
+          0.001141417,
+          0.001051916,
+          0.001037875,
+          0.001095416,
+          0.001023041,
+          0.001028542,
+          0.001030875,
+          0.001011667,
+          0.00108175,
+          0.001036416,
+          0.001004667,
+          0.001080708,
+          0.001044875
+        ],
+        "semantic_cases": [
+          {
+            "decoded": 3002,
+            "expected": 3002,
+            "input": {
+              "inner": true,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 3002,
+            "path": "all"
+          },
+          {
+            "decoded": 3002,
+            "expected": 3002,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 3002,
+            "path": "all"
+          },
+          {
+            "decoded": 3002,
+            "expected": 3002,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": 3002,
+            "path": "all"
+          },
+          {
+            "decoded": 3002,
+            "expected": 3002,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": 3002,
+            "path": "all"
+          },
+          {
+            "decoded": 2998,
+            "expected": 2998,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": -2,
+              "y": 3
+            },
+            "original": 2998,
+            "path": "all"
+          },
+          {
+            "decoded": -1997,
+            "expected": -1997,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 3,
+              "y": -2
+            },
+            "original": -1997,
+            "path": "all"
+          },
+          {
+            "decoded": 0,
+            "expected": 0,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 0,
+              "y": 0
+            },
+            "original": 0,
+            "path": "all"
+          }
+        ],
+        "size": 1000,
+        "warmups": 5,
+        "shape_sha256": "4cce137bef679ed2208cfeed8165c33c85f521cddadb52a42eb8c760ffcabd74",
+        "median_seconds": 0.0011164995
+      },
+      "python": {
+        "implementation": "python",
+        "family": "chain",
+        "size": 1000,
+        "semantic_cases": [
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": true
+            },
+            "path": "all",
+            "expected": 3002,
+            "original": 3002,
+            "decoded": 3002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 3002,
+            "original": 3002,
+            "decoded": 3002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": true
+            },
+            "path": "all",
+            "expected": 3002,
+            "original": 3002,
+            "decoded": 3002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 3002,
+            "original": 3002,
+            "decoded": 3002
+          },
+          {
+            "input": {
+              "x": -2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 2998,
+            "original": 2998,
+            "decoded": 2998
+          },
+          {
+            "input": {
+              "x": 3,
+              "y": -2,
+              "outer": false,
+              "inner": true
+            },
+            "path": "all",
+            "expected": -1997,
+            "original": -1997,
+            "decoded": -1997
+          },
+          {
+            "input": {
+              "x": 0,
+              "y": 0,
+              "outer": false,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 0,
+            "original": 0,
+            "decoded": 0
+          }
+        ],
+        "operations": {
+          "add": 1000,
+          "ret": 1
+        },
+        "blocks": 1,
+        "json_bytes": 786166,
+        "warmups": 5,
+        "samples_seconds": [
+          0.04398720800236333,
+          0.04373504199611489,
+          0.04560716700507328,
+          0.044508250008220784,
+          0.045415917003992945,
+          0.04574162499920931,
+          0.045024082995951176,
+          0.04414058299153112,
+          0.0440589999925578,
+          0.04435879099764861,
+          0.04352062501129694,
+          0.04420779200154357,
+          0.045403332987916656,
+          0.04463879099057522,
+          0.0452865420083981,
+          0.04435312499117572,
+          0.043819083002745174,
+          0.043087500002002344,
+          0.042399250000016764,
+          0.042444249993423,
+          0.043449709002743475,
+          0.04315891700389329,
+          0.04383587499614805,
+          0.04398987500462681,
+          0.04408508399501443,
+          0.04432887499569915,
+          0.043619208998279646,
+          0.04293045899248682,
+          0.043414290994405746,
+          0.04360824999457691
+        ],
+        "shape_sha256": "4f5a7779e50d61a5525a3be0fd42d9abc2c498e04351e6d9589e158a7ccbec18",
+        "median_seconds": 0.044024437498592306
+      },
+      "python_over_rust_median_ratio": 39.43077224718176
+    },
+    {
+      "family": "diamond",
+      "size": 1000,
+      "semantic_case_count": 7,
+      "rust": {
+        "blocks": 4,
+        "family": "diamond",
+        "implementation": "rust",
+        "json_bytes": 349069,
+        "operations": {
+          "add": 500,
+          "br": 2,
+          "cond_br": 1,
+          "ret": 1,
+          "sub": 500
+        },
+        "samples_seconds": [
+          0.00092125,
+          0.000958958,
+          0.000936625,
+          0.000944541,
+          0.000888208,
+          0.0008935,
+          0.000885459,
+          0.000911458,
+          0.000918875,
+          0.000955791,
+          0.000902333,
+          0.000909792,
+          0.000848292,
+          0.000834875,
+          0.000931375,
+          0.000937209,
+          0.000914083,
+          0.0009055,
+          0.000880375,
+          0.000938458,
+          0.000909084,
+          0.000953125,
+          0.000908791,
+          0.000921292,
+          0.000905333,
+          0.000906875,
+          0.000905583,
+          0.000911,
+          0.00091375,
+          0.000936916
+        ],
+        "semantic_cases": [
+          {
+            "decoded": 1502,
+            "expected": 1502,
+            "input": {
+              "inner": true,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 1502,
+            "path": "left"
+          },
+          {
+            "decoded": 1502,
+            "expected": 1502,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 1502,
+            "path": "left"
+          },
+          {
+            "decoded": -1498,
+            "expected": -1498,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": -1498,
+            "path": "right"
+          },
+          {
+            "decoded": -1498,
+            "expected": -1498,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": -1498,
+            "path": "right"
+          },
+          {
+            "decoded": 1498,
+            "expected": 1498,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": -2,
+              "y": 3
+            },
+            "original": 1498,
+            "path": "left"
+          },
+          {
+            "decoded": 1003,
+            "expected": 1003,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 3,
+              "y": -2
+            },
+            "original": 1003,
+            "path": "right"
+          },
+          {
+            "decoded": 0,
+            "expected": 0,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 0,
+              "y": 0
+            },
+            "original": 0,
+            "path": "right"
+          }
+        ],
+        "size": 1000,
+        "warmups": 5,
+        "shape_sha256": "ae0639304a8988d1cdb517e81d48087206b860b3dadcfcd6d68ff67d98096788",
+        "median_seconds": 0.0009112289999999999
+      },
+      "python": {
+        "implementation": "python",
+        "family": "diamond",
+        "size": 1000,
+        "semantic_cases": [
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": true
+            },
+            "path": "left",
+            "expected": 1502,
+            "original": 1502,
+            "decoded": 1502
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "left",
+            "expected": 1502,
+            "original": 1502,
+            "decoded": 1502
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": true
+            },
+            "path": "right",
+            "expected": -1498,
+            "original": -1498,
+            "decoded": -1498
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": false
+            },
+            "path": "right",
+            "expected": -1498,
+            "original": -1498,
+            "decoded": -1498
+          },
+          {
+            "input": {
+              "x": -2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "left",
+            "expected": 1498,
+            "original": 1498,
+            "decoded": 1498
+          },
+          {
+            "input": {
+              "x": 3,
+              "y": -2,
+              "outer": false,
+              "inner": true
+            },
+            "path": "right",
+            "expected": 1003,
+            "original": 1003,
+            "decoded": 1003
+          },
+          {
+            "input": {
+              "x": 0,
+              "y": 0,
+              "outer": false,
+              "inner": false
+            },
+            "path": "right",
+            "expected": 0,
+            "original": 0,
+            "decoded": 0
+          }
+        ],
+        "operations": {
+          "add": 500,
+          "br": 2,
+          "cond_br": 1,
+          "ret": 1,
+          "sub": 500
+        },
+        "blocks": 4,
+        "json_bytes": 790066,
+        "warmups": 5,
+        "samples_seconds": [
+          0.045525249995989725,
+          0.045604124999954365,
+          0.04538541700458154,
+          0.04577058399445377,
+          0.04469545799656771,
+          0.044483000005129725,
+          0.043757917010225356,
+          0.043790124997030944,
+          0.04486525000538677,
+          0.045681000003241934,
+          0.045965041004819795,
+          0.046195874994737096,
+          0.04538374999538064,
+          0.04446020899922587,
+          0.04540200000337791,
+          0.04455895800492726,
+          0.044866958996863104,
+          0.04772070900071412,
+          0.04566720899310894,
+          0.0472778749972349,
+          0.04704029099957552,
+          0.04603512500762008,
+          0.044891249999636784,
+          0.04436458300915547,
+          0.044221832999028265,
+          0.044537417008541524,
+          0.04481974999362137,
+          0.046481707991915755,
+          0.0463844159967266,
+          0.046295916006783955
+        ],
+        "shape_sha256": "7c2252e82ae8a90a958df7ded6afd765b58a760d07b97980a57bc65e766c1215",
+        "median_seconds": 0.045393708503979724
+      },
+      "python_over_rust_median_ratio": 49.8159172984834
+    },
+    {
+      "family": "nested_cfg",
+      "size": 1000,
+      "semantic_case_count": 7,
+      "rust": {
+        "blocks": 10,
+        "family": "nested_cfg",
+        "implementation": "rust",
+        "json_bytes": 351155,
+        "operations": {
+          "add": 500,
+          "br": 6,
+          "cond_br": 3,
+          "ret": 1,
+          "sub": 500
+        },
+        "samples_seconds": [
+          0.000989125,
+          0.000919,
+          0.000949709,
+          0.000945833,
+          0.001046542,
+          0.0009675,
+          0.000915583,
+          0.000892416,
+          0.00093175,
+          0.000899292,
+          0.000914792,
+          0.000937166,
+          0.000921208,
+          0.000909709,
+          0.000917917,
+          0.000943667,
+          0.000880917,
+          0.0010205,
+          0.000866042,
+          0.000917125,
+          0.000958333,
+          0.000978959,
+          0.000918208,
+          0.000917417,
+          0.000896167,
+          0.000947792,
+          0.000923,
+          0.000980166,
+          0.000891958,
+          0.000910625
+        ],
+        "semantic_cases": [
+          {
+            "decoded": 752,
+            "expected": 752,
+            "input": {
+              "inner": true,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 752,
+            "path": "a"
+          },
+          {
+            "decoded": -748,
+            "expected": -748,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": -748,
+            "path": "b"
+          },
+          {
+            "decoded": 753,
+            "expected": 753,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": 753,
+            "path": "c"
+          },
+          {
+            "decoded": -497,
+            "expected": -497,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": -497,
+            "path": "d"
+          },
+          {
+            "decoded": -752,
+            "expected": -752,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": -2,
+              "y": 3
+            },
+            "original": -752,
+            "path": "b"
+          },
+          {
+            "decoded": -502,
+            "expected": -502,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 3,
+              "y": -2
+            },
+            "original": -502,
+            "path": "c"
+          },
+          {
+            "decoded": 0,
+            "expected": 0,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 0,
+              "y": 0
+            },
+            "original": 0,
+            "path": "d"
+          }
+        ],
+        "size": 1000,
+        "warmups": 5,
+        "shape_sha256": "7db82161db5f6c5c82076c4c535fabd7354327d3563255e1e693ba13f94e93f6",
+        "median_seconds": 0.0009201039999999999
+      },
+      "python": {
+        "implementation": "python",
+        "family": "nested_cfg",
+        "size": 1000,
+        "semantic_cases": [
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": true
+            },
+            "path": "a",
+            "expected": 752,
+            "original": 752,
+            "decoded": 752
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "b",
+            "expected": -748,
+            "original": -748,
+            "decoded": -748
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": true
+            },
+            "path": "c",
+            "expected": 753,
+            "original": 753,
+            "decoded": 753
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": false
+            },
+            "path": "d",
+            "expected": -497,
+            "original": -497,
+            "decoded": -497
+          },
+          {
+            "input": {
+              "x": -2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "b",
+            "expected": -752,
+            "original": -752,
+            "decoded": -752
+          },
+          {
+            "input": {
+              "x": 3,
+              "y": -2,
+              "outer": false,
+              "inner": true
+            },
+            "path": "c",
+            "expected": -502,
+            "original": -502,
+            "decoded": -502
+          },
+          {
+            "input": {
+              "x": 0,
+              "y": 0,
+              "outer": false,
+              "inner": false
+            },
+            "path": "d",
+            "expected": 0,
+            "original": 0,
+            "decoded": 0
+          }
+        ],
+        "operations": {
+          "add": 500,
+          "br": 6,
+          "cond_br": 3,
+          "ret": 1,
+          "sub": 500
+        },
+        "blocks": 10,
+        "json_bytes": 796826,
+        "warmups": 5,
+        "samples_seconds": [
+          0.04542491699976381,
+          0.04634833399904892,
+          0.04660308400343638,
+          0.046771291992627084,
+          0.04587108301348053,
+          0.04514275000838097,
+          0.044554999985848553,
+          0.04479045899643097,
+          0.045534208009485155,
+          0.04433770899777301,
+          0.04538870800752193,
+          0.04515408299630508,
+          0.04708837499492802,
+          0.04542799999762792,
+          0.046150167006999254,
+          0.046097165992250666,
+          0.04526683400035836,
+          0.04504954100411851,
+          0.0448066669923719,
+          0.04665000000386499,
+          0.046098958991933614,
+          0.04673833301058039,
+          0.04665566699986812,
+          0.04658966600254644,
+          0.04580562500632368,
+          0.045618917007232085,
+          0.045022791004157625,
+          0.0454962079966208,
+          0.044612124998820946,
+          0.04551016600453295
+        ],
+        "shape_sha256": "001958546c48d5220f73e7440443b9804aad0262753f3eec937abd73a9974760",
+        "median_seconds": 0.04552218700700905
+      },
+      "python_over_rust_median_ratio": 49.47504521989803
+    },
+    {
+      "family": "chain",
+      "size": 10000,
+      "semantic_case_count": 7,
+      "rust": {
+        "blocks": 1,
+        "family": "chain",
+        "implementation": "rust",
+        "json_bytes": 3510034,
+        "operations": {
+          "add": 10000,
+          "ret": 1
+        },
+        "samples_seconds": [
+          0.009250167,
+          0.00933475,
+          0.009370584,
+          0.009044958,
+          0.009127417,
+          0.009284209,
+          0.008860084,
+          0.009048583,
+          0.009355292,
+          0.009111125,
+          0.009127125,
+          0.009336625,
+          0.00897225,
+          0.009060375,
+          0.009145875,
+          0.009208,
+          0.009058458,
+          0.009074625,
+          0.009159542,
+          0.009237875,
+          0.008977292,
+          0.009036375,
+          0.009105541,
+          0.009181417,
+          0.009500625,
+          0.0094765,
+          0.0093375,
+          0.009348416,
+          0.00928525,
+          0.009192667
+        ],
+        "semantic_cases": [
+          {
+            "decoded": 30002,
+            "expected": 30002,
+            "input": {
+              "inner": true,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 30002,
+            "path": "all"
+          },
+          {
+            "decoded": 30002,
+            "expected": 30002,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 30002,
+            "path": "all"
+          },
+          {
+            "decoded": 30002,
+            "expected": 30002,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": 30002,
+            "path": "all"
+          },
+          {
+            "decoded": 30002,
+            "expected": 30002,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": 30002,
+            "path": "all"
+          },
+          {
+            "decoded": 29998,
+            "expected": 29998,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": -2,
+              "y": 3
+            },
+            "original": 29998,
+            "path": "all"
+          },
+          {
+            "decoded": -19997,
+            "expected": -19997,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 3,
+              "y": -2
+            },
+            "original": -19997,
+            "path": "all"
+          },
+          {
+            "decoded": 0,
+            "expected": 0,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 0,
+              "y": 0
+            },
+            "original": 0,
+            "path": "all"
+          }
+        ],
+        "size": 10000,
+        "warmups": 5,
+        "shape_sha256": "587b4399c657e458ceac9212bb5dbd929a6686a64ba0484ccf6b8d3816722095",
+        "median_seconds": 0.0091704795
+      },
+      "python": {
+        "implementation": "python",
+        "family": "chain",
+        "size": 10000,
+        "semantic_cases": [
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": true
+            },
+            "path": "all",
+            "expected": 30002,
+            "original": 30002,
+            "decoded": 30002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 30002,
+            "original": 30002,
+            "decoded": 30002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": true
+            },
+            "path": "all",
+            "expected": 30002,
+            "original": 30002,
+            "decoded": 30002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 30002,
+            "original": 30002,
+            "decoded": 30002
+          },
+          {
+            "input": {
+              "x": -2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 29998,
+            "original": 29998,
+            "decoded": 29998
+          },
+          {
+            "input": {
+              "x": 3,
+              "y": -2,
+              "outer": false,
+              "inner": true
+            },
+            "path": "all",
+            "expected": -19997,
+            "original": -19997,
+            "decoded": -19997
+          },
+          {
+            "input": {
+              "x": 0,
+              "y": 0,
+              "outer": false,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 0,
+            "original": 0,
+            "decoded": 0
+          }
+        ],
+        "operations": {
+          "add": 10000,
+          "ret": 1
+        },
+        "blocks": 1,
+        "json_bytes": 7851178,
+        "warmups": 5,
+        "samples_seconds": [
+          0.4576593329984462,
+          0.45809570800338406,
+          0.4537197499885224,
+          0.45161583299341146,
+          0.45253591700748075,
+          0.4555936249962542,
+          0.45504612500371877,
+          0.45495329100231174,
+          0.4572115000046324,
+          0.4574564999929862,
+          0.45552620899979956,
+          0.4573158339917427,
+          0.45532891699986067,
+          0.45933287500520237,
+          0.459457916993415,
+          0.4620385419984814,
+          0.45876925000629853,
+          0.4651432079990627,
+          0.45750529199722223,
+          0.45791408300283365,
+          0.46048125000379514,
+          0.45658537501003593,
+          0.4566699580027489,
+          0.46982104099879507,
+          0.4709978330065496,
+          0.4659547500050394,
+          0.45800670799508225,
+          0.46861125000577886,
+          0.4581043330108514,
+          0.45975495800666977
+        ],
+        "shape_sha256": "3ea6eb6a6e7b7ca7a1ba97dd944e1afb59ebeee5e780cfd516b0d5d45c2f5a4c",
+        "median_seconds": 0.4577867080006399
+      },
+      "python_over_rust_median_ratio": 49.91960431301764
+    },
+    {
+      "family": "diamond",
+      "size": 10000,
+      "semantic_case_count": 7,
+      "rust": {
+        "blocks": 4,
+        "family": "diamond",
+        "implementation": "rust",
+        "json_bytes": 3561639,
+        "operations": {
+          "add": 5000,
+          "br": 2,
+          "cond_br": 1,
+          "ret": 1,
+          "sub": 5000
+        },
+        "samples_seconds": [
+          0.009034875,
+          0.009266625,
+          0.009267875,
+          0.009151542,
+          0.008932208,
+          0.009181667,
+          0.009303083,
+          0.009134875,
+          0.009381417,
+          0.009149041,
+          0.009161458,
+          0.009208375,
+          0.009615167,
+          0.009036542,
+          0.0095585,
+          0.0092695,
+          0.008820958,
+          0.009295708,
+          0.009703667,
+          0.008775833,
+          0.008942041,
+          0.009222459,
+          0.009529708,
+          0.009434417,
+          0.009527417,
+          0.009560209,
+          0.009552541,
+          0.009421916,
+          0.009243792,
+          0.009418209
+        ],
+        "semantic_cases": [
+          {
+            "decoded": 15002,
+            "expected": 15002,
+            "input": {
+              "inner": true,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 15002,
+            "path": "left"
+          },
+          {
+            "decoded": 15002,
+            "expected": 15002,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 15002,
+            "path": "left"
+          },
+          {
+            "decoded": -14998,
+            "expected": -14998,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": -14998,
+            "path": "right"
+          },
+          {
+            "decoded": -14998,
+            "expected": -14998,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": -14998,
+            "path": "right"
+          },
+          {
+            "decoded": 14998,
+            "expected": 14998,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": -2,
+              "y": 3
+            },
+            "original": 14998,
+            "path": "left"
+          },
+          {
+            "decoded": 10003,
+            "expected": 10003,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 3,
+              "y": -2
+            },
+            "original": 10003,
+            "path": "right"
+          },
+          {
+            "decoded": 0,
+            "expected": 0,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 0,
+              "y": 0
+            },
+            "original": 0,
+            "path": "right"
+          }
+        ],
+        "size": 10000,
+        "warmups": 5,
+        "shape_sha256": "f02bf1870d1e71a6d29150702d454b957f719ab8333ebc40448b58597b4c857e",
+        "median_seconds": 0.009267250000000001
+      },
+      "python": {
+        "implementation": "python",
+        "family": "diamond",
+        "size": 10000,
+        "semantic_cases": [
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": true
+            },
+            "path": "left",
+            "expected": 15002,
+            "original": 15002,
+            "decoded": 15002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "left",
+            "expected": 15002,
+            "original": 15002,
+            "decoded": 15002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": true
+            },
+            "path": "right",
+            "expected": -14998,
+            "original": -14998,
+            "decoded": -14998
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": false
+            },
+            "path": "right",
+            "expected": -14998,
+            "original": -14998,
+            "decoded": -14998
+          },
+          {
+            "input": {
+              "x": -2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "left",
+            "expected": 14998,
+            "original": 14998,
+            "decoded": 14998
+          },
+          {
+            "input": {
+              "x": 3,
+              "y": -2,
+              "outer": false,
+              "inner": true
+            },
+            "path": "right",
+            "expected": 10003,
+            "original": 10003,
+            "decoded": 10003
+          },
+          {
+            "input": {
+              "x": 0,
+              "y": 0,
+              "outer": false,
+              "inner": false
+            },
+            "path": "right",
+            "expected": 0,
+            "original": 0,
+            "decoded": 0
+          }
+        ],
+        "operations": {
+          "add": 5000,
+          "br": 2,
+          "cond_br": 1,
+          "ret": 1,
+          "sub": 5000
+        },
+        "blocks": 4,
+        "json_bytes": 7867087,
+        "warmups": 5,
+        "samples_seconds": [
+          0.465891041996656,
+          0.4708376249909634,
+          0.46522445799200796,
+          0.46414020798692945,
+          0.4609236249962123,
+          0.4600617090036394,
+          0.4606836250022752,
+          0.4609909579885425,
+          0.4606490829901304,
+          0.4625193749961909,
+          0.46613595899543725,
+          0.46615712498896755,
+          0.461611750011798,
+          0.4646005829999922,
+          0.46310516601079144,
+          0.4636724579904694,
+          0.46227179100969806,
+          0.4641655000013998,
+          0.46749454201199114,
+          0.46215791600116063,
+          0.45907954199356027,
+          0.4679805839987239,
+          0.46273316600127146,
+          0.459801332995994,
+          0.46751504100393504,
+          0.46974045800743625,
+          0.466487915997277,
+          0.4619773749873275,
+          0.4722830420068931,
+          0.468145959006506
+        ],
+        "shape_sha256": "5d228f2fab78cdf47339f1b04eb211523f8cddf3c58025b097443fb9811a9408",
+        "median_seconds": 0.46390633298869943
+      },
+      "python_over_rust_median_ratio": 50.05868331907517
+    },
+    {
+      "family": "nested_cfg",
+      "size": 10000,
+      "semantic_case_count": 7,
+      "rust": {
+        "blocks": 10,
+        "family": "nested_cfg",
+        "implementation": "rust",
+        "json_bytes": 3537311,
+        "operations": {
+          "add": 5000,
+          "br": 6,
+          "cond_br": 3,
+          "ret": 1,
+          "sub": 5000
+        },
+        "samples_seconds": [
+          0.009275125,
+          0.009224583,
+          0.009260959,
+          0.009396334,
+          0.009374333,
+          0.009180375,
+          0.009153833,
+          0.009392292,
+          0.009400667,
+          0.009266917,
+          0.008918125,
+          0.009469417,
+          0.009180792,
+          0.009471292,
+          0.009348167,
+          0.009141375,
+          0.009143042,
+          0.009134458,
+          0.0093085,
+          0.009289167,
+          0.009168334,
+          0.00934675,
+          0.009263,
+          0.009131083,
+          0.009153875,
+          0.009294916,
+          0.009124125,
+          0.009157125,
+          0.009273084,
+          0.009483875
+        ],
+        "semantic_cases": [
+          {
+            "decoded": 7502,
+            "expected": 7502,
+            "input": {
+              "inner": true,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 7502,
+            "path": "a"
+          },
+          {
+            "decoded": -7498,
+            "expected": -7498,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": -7498,
+            "path": "b"
+          },
+          {
+            "decoded": 7503,
+            "expected": 7503,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": 7503,
+            "path": "c"
+          },
+          {
+            "decoded": -4997,
+            "expected": -4997,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": -4997,
+            "path": "d"
+          },
+          {
+            "decoded": -7502,
+            "expected": -7502,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": -2,
+              "y": 3
+            },
+            "original": -7502,
+            "path": "b"
+          },
+          {
+            "decoded": -5002,
+            "expected": -5002,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 3,
+              "y": -2
+            },
+            "original": -5002,
+            "path": "c"
+          },
+          {
+            "decoded": 0,
+            "expected": 0,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 0,
+              "y": 0
+            },
+            "original": 0,
+            "path": "d"
+          }
+        ],
+        "size": 10000,
+        "warmups": 5,
+        "shape_sha256": "b411dccc53e602d4c284b634c245ceede77a80e07586404e32d2cb7b7bd1d530",
+        "median_seconds": 0.0092649585
+      },
+      "python": {
+        "implementation": "python",
+        "family": "nested_cfg",
+        "size": 10000,
+        "semantic_cases": [
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": true
+            },
+            "path": "a",
+            "expected": 7502,
+            "original": 7502,
+            "decoded": 7502
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "b",
+            "expected": -7498,
+            "original": -7498,
+            "decoded": -7498
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": true
+            },
+            "path": "c",
+            "expected": 7503,
+            "original": 7503,
+            "decoded": 7503
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": false
+            },
+            "path": "d",
+            "expected": -4997,
+            "original": -4997,
+            "decoded": -4997
+          },
+          {
+            "input": {
+              "x": -2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "b",
+            "expected": -7502,
+            "original": -7502,
+            "decoded": -7502
+          },
+          {
+            "input": {
+              "x": 3,
+              "y": -2,
+              "outer": false,
+              "inner": true
+            },
+            "path": "c",
+            "expected": -5002,
+            "original": -5002,
+            "decoded": -5002
+          },
+          {
+            "input": {
+              "x": 0,
+              "y": 0,
+              "outer": false,
+              "inner": false
+            },
+            "path": "d",
+            "expected": 0,
+            "original": 0,
+            "decoded": 0
+          }
+        ],
+        "operations": {
+          "add": 5000,
+          "br": 6,
+          "cond_br": 3,
+          "ret": 1,
+          "sub": 5000
+        },
+        "blocks": 10,
+        "json_bytes": 7880867,
+        "warmups": 5,
+        "samples_seconds": [
+          0.46413591600139625,
+          0.45903283399820793,
+          0.4595869170007063,
+          0.4615885410021292,
+          0.463696249993518,
+          0.4661641669954406,
+          0.4598752909951145,
+          0.4623703329998534,
+          0.4625897090008948,
+          0.464230542012956,
+          0.4692028330027824,
+          0.46616233300301246,
+          0.46657016599783674,
+          0.4620482919999631,
+          0.46060954200220294,
+          0.464316208002856,
+          0.46176462499715853,
+          0.46102120899013244,
+          0.4598560419981368,
+          0.4637769999972079,
+          0.46509091700136196,
+          0.4657995419984218,
+          0.46184466700651683,
+          0.4637301250040764,
+          0.46744020900223404,
+          0.46748620898870286,
+          0.4636600410012761,
+          0.4652279999863822,
+          0.4647060419956688,
+          0.46544362499844283
+        ],
+        "shape_sha256": "bff1d7afc80a9c12352ed51b65a1077ed66ba6625a2a92f18f2bed4f4a5df9d8",
+        "median_seconds": 0.46375356250064215
+      },
+      "python_over_rust_median_ratio": 50.05457525801569
+    },
+    {
+      "family": "chain",
+      "size": 100000,
+      "semantic_case_count": 7,
+      "rust": {
+        "blocks": 1,
+        "family": "chain",
+        "implementation": "rust",
+        "json_bytes": 36180061,
+        "operations": {
+          "add": 100000,
+          "ret": 1
+        },
+        "samples_seconds": [
+          0.104555958,
+          0.105430459,
+          0.103683666,
+          0.104777666,
+          0.104816541,
+          0.106793834,
+          0.105477417,
+          0.104376875,
+          0.105301917,
+          0.103538375,
+          0.1025315,
+          0.111046625,
+          0.109442708,
+          0.104756875,
+          0.107088333,
+          0.101895875,
+          0.100561916,
+          0.105304667,
+          0.103087667,
+          0.101857667,
+          0.102194,
+          0.102240667,
+          0.104076916,
+          0.102951875,
+          0.100161208,
+          0.102401,
+          0.1023365,
+          0.103975083,
+          0.101395875,
+          0.100323
+        ],
+        "semantic_cases": [
+          {
+            "decoded": 300002,
+            "expected": 300002,
+            "input": {
+              "inner": true,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 300002,
+            "path": "all"
+          },
+          {
+            "decoded": 300002,
+            "expected": 300002,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 300002,
+            "path": "all"
+          },
+          {
+            "decoded": 300002,
+            "expected": 300002,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": 300002,
+            "path": "all"
+          },
+          {
+            "decoded": 300002,
+            "expected": 300002,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": 300002,
+            "path": "all"
+          },
+          {
+            "decoded": 299998,
+            "expected": 299998,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": -2,
+              "y": 3
+            },
+            "original": 299998,
+            "path": "all"
+          },
+          {
+            "decoded": -199997,
+            "expected": -199997,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 3,
+              "y": -2
+            },
+            "original": -199997,
+            "path": "all"
+          },
+          {
+            "decoded": 0,
+            "expected": 0,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 0,
+              "y": 0
+            },
+            "original": 0,
+            "path": "all"
+          }
+        ],
+        "size": 100000,
+        "warmups": 5,
+        "shape_sha256": "fe23956fc340767d40ac32870e4394d34b1b99b9dca5e3ed93d6de141cdedb1e",
+        "median_seconds": 0.10382937449999999
+      },
+      "python": {
+        "implementation": "python",
+        "family": "chain",
+        "size": 100000,
+        "semantic_cases": [
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": true
+            },
+            "path": "all",
+            "expected": 300002,
+            "original": 300002,
+            "decoded": 300002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 300002,
+            "original": 300002,
+            "decoded": 300002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": true
+            },
+            "path": "all",
+            "expected": 300002,
+            "original": 300002,
+            "decoded": 300002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 300002,
+            "original": 300002,
+            "decoded": 300002
+          },
+          {
+            "input": {
+              "x": -2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 299998,
+            "original": 299998,
+            "decoded": 299998
+          },
+          {
+            "input": {
+              "x": 3,
+              "y": -2,
+              "outer": false,
+              "inner": true
+            },
+            "path": "all",
+            "expected": -199997,
+            "original": -199997,
+            "decoded": -199997
+          },
+          {
+            "input": {
+              "x": 0,
+              "y": 0,
+              "outer": false,
+              "inner": false
+            },
+            "path": "all",
+            "expected": 0,
+            "original": 0,
+            "decoded": 0
+          }
+        ],
+        "operations": {
+          "add": 100000,
+          "ret": 1
+        },
+        "blocks": 1,
+        "json_bytes": 78861190,
+        "warmups": 5,
+        "samples_seconds": [
+          4.750528000004124,
+          4.690253749999101,
+          4.734985292001511,
+          4.707314917002805,
+          4.760407209003461,
+          4.724599083012436,
+          4.707370333009749,
+          4.711491375011974,
+          4.8015965000086,
+          4.73254979099147,
+          4.703144792001694,
+          4.697874833000242,
+          4.698503042003722,
+          4.716203292002319,
+          4.697236292005982,
+          4.717495833989233,
+          4.699995749993832,
+          4.709310165999341,
+          4.730628584002261,
+          4.689555250006379,
+          4.693365958009963,
+          4.692036332999123,
+          4.737131917005172,
+          4.742867458000546,
+          4.7041511249990435,
+          4.705852083003265,
+          4.686467584004276,
+          4.716461749994778,
+          4.714145958001609,
+          4.704035041999305
+        ],
+        "shape_sha256": "43f5b9fddb648706d199629ad321196ff3f69cf782ab7b1c1edb4a5984a4f855",
+        "median_seconds": 4.708340249504545
+      },
+      "python_over_rust_median_ratio": 45.34689987470304
+    },
+    {
+      "family": "diamond",
+      "size": 100000,
+      "semantic_case_count": 7,
+      "rust": {
+        "blocks": 4,
+        "family": "diamond",
+        "implementation": "rust",
+        "json_bytes": 36721709,
+        "operations": {
+          "add": 50000,
+          "br": 2,
+          "cond_br": 1,
+          "ret": 1,
+          "sub": 50000
+        },
+        "samples_seconds": [
+          0.103177041,
+          0.103603958,
+          0.101219875,
+          0.10032625,
+          0.102451625,
+          0.103464083,
+          0.102613208,
+          0.099959834,
+          0.100370917,
+          0.103066375,
+          0.103454333,
+          0.103982542,
+          0.102669333,
+          0.102954417,
+          0.105210625,
+          0.104084709,
+          0.103001833,
+          0.102966333,
+          0.103763333,
+          0.105674125,
+          0.103260792,
+          0.100984375,
+          0.100606625,
+          0.104090125,
+          0.102924625,
+          0.101057333,
+          0.102041625,
+          0.100829709,
+          0.10454725,
+          0.102419
+        ],
+        "semantic_cases": [
+          {
+            "decoded": 150002,
+            "expected": 150002,
+            "input": {
+              "inner": true,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 150002,
+            "path": "left"
+          },
+          {
+            "decoded": 150002,
+            "expected": 150002,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 150002,
+            "path": "left"
+          },
+          {
+            "decoded": -149998,
+            "expected": -149998,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": -149998,
+            "path": "right"
+          },
+          {
+            "decoded": -149998,
+            "expected": -149998,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": -149998,
+            "path": "right"
+          },
+          {
+            "decoded": 149998,
+            "expected": 149998,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": -2,
+              "y": 3
+            },
+            "original": 149998,
+            "path": "left"
+          },
+          {
+            "decoded": 100003,
+            "expected": 100003,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 3,
+              "y": -2
+            },
+            "original": 100003,
+            "path": "right"
+          },
+          {
+            "decoded": 0,
+            "expected": 0,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 0,
+              "y": 0
+            },
+            "original": 0,
+            "path": "right"
+          }
+        ],
+        "size": 100000,
+        "warmups": 5,
+        "shape_sha256": "13217796202a1fe9ae17dd1369c0605b711416e3bd19617adf0f2d14899b490b",
+        "median_seconds": 0.10296037499999999
+      },
+      "python": {
+        "implementation": "python",
+        "family": "diamond",
+        "size": 100000,
+        "semantic_cases": [
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": true
+            },
+            "path": "left",
+            "expected": 150002,
+            "original": 150002,
+            "decoded": 150002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "left",
+            "expected": 150002,
+            "original": 150002,
+            "decoded": 150002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": true
+            },
+            "path": "right",
+            "expected": -149998,
+            "original": -149998,
+            "decoded": -149998
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": false
+            },
+            "path": "right",
+            "expected": -149998,
+            "original": -149998,
+            "decoded": -149998
+          },
+          {
+            "input": {
+              "x": -2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "left",
+            "expected": 149998,
+            "original": 149998,
+            "decoded": 149998
+          },
+          {
+            "input": {
+              "x": 3,
+              "y": -2,
+              "outer": false,
+              "inner": true
+            },
+            "path": "right",
+            "expected": 100003,
+            "original": 100003,
+            "decoded": 100003
+          },
+          {
+            "input": {
+              "x": 0,
+              "y": 0,
+              "outer": false,
+              "inner": false
+            },
+            "path": "right",
+            "expected": 0,
+            "original": 0,
+            "decoded": 0
+          }
+        ],
+        "operations": {
+          "add": 50000,
+          "br": 2,
+          "cond_br": 1,
+          "ret": 1,
+          "sub": 50000
+        },
+        "blocks": 4,
+        "json_bytes": 79042108,
+        "warmups": 5,
+        "samples_seconds": [
+          4.7459292499988806,
+          4.735061540995957,
+          4.744551791998674,
+          4.74714262499765,
+          4.734273875001236,
+          4.747354250008357,
+          4.727892832990619,
+          4.750128375002532,
+          4.75400908300071,
+          4.753883165991283,
+          4.781449874993996,
+          4.7625428330065915,
+          4.7509344999998575,
+          4.74349454100593,
+          4.74819304200355,
+          4.764570707993698,
+          4.741399457998341,
+          4.762311166006839,
+          4.747940041997936,
+          4.752957249991596,
+          4.779990958006238,
+          4.768488415997126,
+          4.758060374995694,
+          4.760611707999487,
+          4.761760292007239,
+          4.760898458000156,
+          4.75602324999636,
+          4.757230250004795,
+          4.747975624995888,
+          4.749859874995309
+        ],
+        "shape_sha256": "84a3f36f9bf808807b98f74b729f1e191171a3c819529a3ed77770aa2d1cc502",
+        "median_seconds": 4.751945874995727
+      },
+      "python_over_rust_median_ratio": 46.153152365613735
+    },
+    {
+      "family": "nested_cfg",
+      "size": 100000,
+      "semantic_case_count": 7,
+      "rust": {
+        "blocks": 10,
+        "family": "nested_cfg",
+        "implementation": "rust",
+        "json_bytes": 36454967,
+        "operations": {
+          "add": 50000,
+          "br": 6,
+          "cond_br": 3,
+          "ret": 1,
+          "sub": 50000
+        },
+        "samples_seconds": [
+          0.104880834,
+          0.105884875,
+          0.112655083,
+          0.106632083,
+          0.105078916,
+          0.104868167,
+          0.103190208,
+          0.101810875,
+          0.100674417,
+          0.101958333,
+          0.101941541,
+          0.101758875,
+          0.100026042,
+          0.10047475,
+          0.102458625,
+          0.102404958,
+          0.102731125,
+          0.1007005,
+          0.101498291,
+          0.10409675,
+          0.102865625,
+          0.100383917,
+          0.100955875,
+          0.101213541,
+          0.102826667,
+          0.10217975,
+          0.100391583,
+          0.101139041,
+          0.101108292,
+          0.103149834
+        ],
+        "semantic_cases": [
+          {
+            "decoded": 75002,
+            "expected": 75002,
+            "input": {
+              "inner": true,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": 75002,
+            "path": "a"
+          },
+          {
+            "decoded": -74998,
+            "expected": -74998,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": 2,
+              "y": 3
+            },
+            "original": -74998,
+            "path": "b"
+          },
+          {
+            "decoded": 75003,
+            "expected": 75003,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": 75003,
+            "path": "c"
+          },
+          {
+            "decoded": -49997,
+            "expected": -49997,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 2,
+              "y": 3
+            },
+            "original": -49997,
+            "path": "d"
+          },
+          {
+            "decoded": -75002,
+            "expected": -75002,
+            "input": {
+              "inner": false,
+              "outer": true,
+              "x": -2,
+              "y": 3
+            },
+            "original": -75002,
+            "path": "b"
+          },
+          {
+            "decoded": -50002,
+            "expected": -50002,
+            "input": {
+              "inner": true,
+              "outer": false,
+              "x": 3,
+              "y": -2
+            },
+            "original": -50002,
+            "path": "c"
+          },
+          {
+            "decoded": 0,
+            "expected": 0,
+            "input": {
+              "inner": false,
+              "outer": false,
+              "x": 0,
+              "y": 0
+            },
+            "original": 0,
+            "path": "d"
+          }
+        ],
+        "size": 100000,
+        "warmups": 5,
+        "shape_sha256": "968a85b8e43e19b9630d61e4f83063b5bc1f4491dd08ee7587380073f6c0d06a",
+        "median_seconds": 0.1020690415
+      },
+      "python": {
+        "implementation": "python",
+        "family": "nested_cfg",
+        "size": 100000,
+        "semantic_cases": [
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": true
+            },
+            "path": "a",
+            "expected": 75002,
+            "original": 75002,
+            "decoded": 75002
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "b",
+            "expected": -74998,
+            "original": -74998,
+            "decoded": -74998
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": true
+            },
+            "path": "c",
+            "expected": 75003,
+            "original": 75003,
+            "decoded": 75003
+          },
+          {
+            "input": {
+              "x": 2,
+              "y": 3,
+              "outer": false,
+              "inner": false
+            },
+            "path": "d",
+            "expected": -49997,
+            "original": -49997,
+            "decoded": -49997
+          },
+          {
+            "input": {
+              "x": -2,
+              "y": 3,
+              "outer": true,
+              "inner": false
+            },
+            "path": "b",
+            "expected": -75002,
+            "original": -75002,
+            "decoded": -75002
+          },
+          {
+            "input": {
+              "x": 3,
+              "y": -2,
+              "outer": false,
+              "inner": true
+            },
+            "path": "c",
+            "expected": -50002,
+            "original": -50002,
+            "decoded": -50002
+          },
+          {
+            "input": {
+              "x": 0,
+              "y": 0,
+              "outer": false,
+              "inner": false
+            },
+            "path": "d",
+            "expected": 0,
+            "original": 0,
+            "decoded": 0
+          }
+        ],
+        "operations": {
+          "add": 50000,
+          "br": 6,
+          "cond_br": 3,
+          "ret": 1,
+          "sub": 50000
+        },
+        "blocks": 10,
+        "json_bytes": 79148408,
+        "warmups": 5,
+        "samples_seconds": [
+          4.723154917010106,
+          4.698741083004279,
+          4.714490541999112,
+          4.715715291997185,
+          4.804588040991803,
+          4.764408083006856,
+          4.7672862079925835,
+          4.763420083996607,
+          4.796471249996102,
+          4.825968958000885,
+          4.776923750003334,
+          4.825898583003436,
+          4.791442332993029,
+          4.782496625004569,
+          4.790988042004756,
+          4.788661416998366,
+          4.788804541996797,
+          4.802253000001656,
+          4.819284958997741,
+          4.795077375005349,
+          4.842979709006613,
+          4.817755334006506,
+          4.819198416007566,
+          4.800139917002525,
+          4.805244749994017,
+          4.802048540994292,
+          4.845015749990125,
+          4.812473833997501,
+          4.784359833007329,
+          4.782678874995327
+        ],
+        "shape_sha256": "959ca21d5a987fcc9954a341978f819635f66087707cc1fb389d2734ec4a00eb",
+        "median_seconds": 4.793259853999189
+      },
+      "python_over_rust_median_ratio": 46.96095685388785
+    }
+  ]
+}

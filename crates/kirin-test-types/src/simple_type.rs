@@ -1,6 +1,7 @@
 use kirin_ir::{HasBottom, HasTop, Lattice, TypeLattice, Typeof};
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum SimpleType {
     Any,
     I32,

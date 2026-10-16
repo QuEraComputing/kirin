@@ -2,6 +2,7 @@ use kirin_ir::{HasBottom, HasTop, Lattice, TypeLattice};
 
 /// A minimal type lattice with a single value.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug, Default)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UnitType;
 
 impl std::fmt::Display for UnitType {

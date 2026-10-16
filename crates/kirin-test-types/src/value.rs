@@ -2,6 +2,7 @@ use crate::SimpleType;
 use kirin_ir::Typeof;
 
 #[derive(Clone, Debug, PartialEq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Value {
     I64(i64),
     F64(f64),

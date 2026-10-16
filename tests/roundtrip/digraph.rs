@@ -19,6 +19,7 @@ fn make_test_pipeline<L: Dialect>() -> Pipeline<StageInfo<L>> {
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum DiGraphLanguage {
     #[chumsky(format = "$add {0}, {1}")]
     Add(
@@ -42,6 +43,7 @@ enum DiGraphLanguage {
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum ProjectedDigraphLanguage {
     #[chumsky(format = "$add {0}, {1}")]
     Add(
@@ -117,6 +119,7 @@ fn test_projected_digraph_empty_body_roundtrip() {
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum ProjectedFuncLang {
     #[chumsky(format = "$add {0}, {1}")]
     Add(
@@ -184,6 +187,7 @@ specialize @test fn @foo(f64) -> f64 (%p0: f64) captures () { %r = add %p0, %p0;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum BlockProjectedLang {
     #[chumsky(format = "$add {0}, {1}")]
     Add(
@@ -234,6 +238,7 @@ specialize @test fn @foo(f64) -> f64 (%x: f64) { %r = add %x, %x; ret %r; }
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum CFGProjectedLang {
     #[chumsky(format = "$add {0}, {1}")]
     Add(
@@ -284,6 +289,7 @@ specialize @test fn @foo(f64) -> f64 { ^entry(%x: f64) { %r = add %x, %x; ret %r
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum DialectControlledLang {
     #[chumsky(format = "$add {0}, {1}")]
     Add(

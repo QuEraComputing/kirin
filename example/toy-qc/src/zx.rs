@@ -7,6 +7,7 @@ use kirin::prelude::*;
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "fn {:name}{sig} {body}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ZXFunction {
     pub body: UnGraph,
     pub sig: Signature<QubitType>,
@@ -16,6 +17,7 @@ pub struct ZXFunction {
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(edge, builders, type = QubitType)]
 #[chumsky(format = "$wire -> {res:type}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Wire {
     pub res: ResultValue,
 }
@@ -24,6 +26,7 @@ pub struct Wire {
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "$z_spider({angle}) {legs}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct ZSpider {
     pub angle: f64,
     pub legs: Vec<SSAValue>,
@@ -33,6 +36,7 @@ pub struct ZSpider {
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "$x_spider({angle}) {legs}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct XSpider {
     pub angle: f64,
     pub legs: Vec<SSAValue>,
@@ -42,6 +46,7 @@ pub struct XSpider {
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "$h_box {src}, {dst}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct HBox {
     pub src: SSAValue,
     pub dst: SSAValue,
@@ -50,6 +55,7 @@ pub struct HBox {
 /// ZX calculus dialect language enum.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ZX {
     #[wraps]
     Wire(Wire),

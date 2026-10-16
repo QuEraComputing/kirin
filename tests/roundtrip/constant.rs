@@ -8,6 +8,7 @@ use kirin_test_utils::roundtrip;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum ConstantLanguage {
     #[chumsky(format = "fn {:name}{sig} {body}")]
     Function {

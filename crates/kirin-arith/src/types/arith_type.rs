@@ -20,6 +20,7 @@ use kirin::parsers::PrettyPrint;
 /// If this built-in lattice is not sufficient, define your own type enum and
 /// use `Arith<YourType>` to preserve your language semantics.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, HasParser, PrettyPrint)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum ArithType {
     #[chumsky(format = "i8")]
     I8,

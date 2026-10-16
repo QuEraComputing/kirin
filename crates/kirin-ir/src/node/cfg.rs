@@ -11,6 +11,8 @@ identifier! {
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(bound(serialize = "", deserialize = "")))]
 pub struct CFGInfo<L: Dialect> {
     pub(crate) id: CFG,
     pub(crate) parent: Option<Statement>,

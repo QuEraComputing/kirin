@@ -37,6 +37,7 @@ mod tests;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[wraps]
 #[kirin(builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Lexical<T: CompileTimeValue> {
     Function(Function<T>),
     Call(Call<T>),
@@ -47,6 +48,7 @@ pub enum Lexical<T: CompileTimeValue> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[wraps]
 #[kirin(builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Lifted<T: CompileTimeValue> {
     Function(Function<T>),
     Call(Call<T>),

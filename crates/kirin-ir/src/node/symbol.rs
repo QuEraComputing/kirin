@@ -6,6 +6,7 @@ use crate::intern::InternKey;
 /// local to a single compilation stage's [`StageInfo`](crate::StageInfo).
 /// Interned via `Context.symbols`.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Symbol(usize);
 
 impl From<usize> for Symbol {
@@ -30,6 +31,7 @@ impl InternKey for Symbol {}
 /// Distinct from [`Symbol`] at the type level to prevent accidental mixing
 /// of global and stage-local symbols.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct GlobalSymbol(usize);
 
 impl From<usize> for GlobalSymbol {

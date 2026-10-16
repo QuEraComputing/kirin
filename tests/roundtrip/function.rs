@@ -11,6 +11,7 @@ use kirin_test_utils::roundtrip;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum SplitSigLanguage {
     #[chumsky(format = "fn {:name}({sig:inputs}) -> {sig:return} {body}")]
     Function {
@@ -128,6 +129,7 @@ specialize @A fn @main(i32) -> i32 cfg {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum LambdaLanguage {
     #[wraps]
     Lambda(Lambda<SimpleType>),

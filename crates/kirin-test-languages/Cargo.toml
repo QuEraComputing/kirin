@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+serde = { workspace = true, optional = true }
 kirin-ir = { version = "0.1.0", path = "../kirin-ir", default-features = false }
 kirin-test-types = { workspace = true, features = ["parser", "pretty"] }
 kirin-chumsky = { workspace = true, optional = true }
@@ -29,3 +30,4 @@ ungraph-language = ["kirin-ir/derive"]
 parser = ["kirin-chumsky/derive", "kirin-lexer"]
 pretty = ["kirin-prettyless", "kirin-derive-chumsky"]
 interpreter = ["kirin-interpreter"]
+serde = ["dep:serde", "kirin-ir/serde", "kirin-test-types/serde", "kirin-arith?/serde", "kirin-bitwise?/serde", "kirin-cf?/serde", "kirin-constant?/serde", "kirin-function?/serde"]

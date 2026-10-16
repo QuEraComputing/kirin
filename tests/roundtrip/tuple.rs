@@ -8,6 +8,7 @@ use kirin_tuple::Tuple;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = ArithType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 enum TupleLanguage {
     #[chumsky(format = "fn {:name}{sig} {body}")]
     Function {
