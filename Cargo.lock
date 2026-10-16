@@ -894,6 +894,7 @@ dependencies = [
  "kirin-derive-interpreter",
  "kirin-ir",
  "petgraph",
+ "rustc-hash",
  "smallvec",
  "thiserror 2.0.18",
 ]

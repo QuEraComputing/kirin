@@ -7,9 +7,8 @@
 //! scope where needed. Engines decide what absence means and when facts must
 //! join.
 
-use std::collections::HashMap;
-
 use kirin_ir::SSAValue;
+use rustc_hash::FxHashMap;
 
 use super::anchor::{Change, LatticeAnchor, Scoped};
 
@@ -18,12 +17,15 @@ use super::anchor::{Change, LatticeAnchor, Scoped};
 /// Missing anchors return `None`. Concrete engines report unbound values;
 /// abstract engines can interpret absence as bottom. Assignment never joins
 /// implicitly; [`join_with`](Self::join_with) takes an explicit bottom and merge.
+///
+/// Anchors are small integer ids or tuples of them, so the map uses Fx hashing
+/// instead of the std default (SipHash).
 #[derive(Clone, Debug)]
 pub struct FactStore<A, F>
 where
     A: LatticeAnchor,
 {
-    facts: HashMap<A, F>,
+    facts: FxHashMap<A, F>,
 }
 
 impl<A: LatticeAnchor, F> Default for FactStore<A, F> {
@@ -35,7 +37,7 @@ impl<A: LatticeAnchor, F> Default for FactStore<A, F> {
 impl<A: LatticeAnchor, F> FactStore<A, F> {
     pub fn new() -> Self {
         Self {
-            facts: HashMap::new(),
+            facts: FxHashMap::default(),
         }
     }
 
