@@ -17,4 +17,4 @@ pub use info::StageInfo;
 pub use meta::{HasStageInfo, StageMeta};
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

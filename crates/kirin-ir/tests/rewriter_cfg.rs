@@ -624,6 +624,12 @@ fn insert_terminator_rejects_without_mutating() {
         rw.insert_terminator(open, BuilderDialect::Nop),
         Err(RewriteError::ExpectedTerminator)
     );
+    // Even a fresh result is rejected: nothing can follow a terminator to use it.
+    let result = rw.new_result(TestType::I32);
+    assert_eq!(
+        rw.insert_terminator(open, BuilderDialect::Invoke(result)),
+        Err(RewriteError::CannotInsertTerminatorWithResults)
+    );
     assert_eq!(
         rw.insert_terminator(open, br(dead_block)),
         Err(RewriteError::UnknownBlock(dead_block))

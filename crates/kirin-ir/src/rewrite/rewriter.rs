@@ -26,26 +26,31 @@
 //! [`Rewriter::replace_results`]), block-body statement surgery
 //! ([`Rewriter::erase_statement`], [`Rewriter::insert_before`],
 //! [`Rewriter::insert_after`], [`Rewriter::replace_statement`],
-//! [`Rewriter::insert_terminator`]), and `CFG`
+//! [`Rewriter::insert_terminator`]), `CFG`
 //! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
 //! merge blocks, [`Rewriter::retarget_successor`], and block-argument insertion
-//! and erasure). The rewriter **maintains** all four derived mirrors
+//! and erasure), and `DiGraph` node surgery in the sibling `digraph` module
+//! ([`Rewriter::insert_node`], [`Rewriter::replace_yield`], and erasing members
+//! through [`Rewriter::erase_statement`]). The rewriter **maintains** all four derived mirrors
 //! incrementally on every edit — [`SSAInfo::uses`](crate::SSAInfo),
 //! [`BlockInfo::predecessors`](crate::BlockInfo), the block-body summary
 //! (`BlockInfo::statements`/`terminator`), and the CFG chain summary
-//! (`CFGInfo::blocks`) — so they stay valid without a rebuild. Deferred to
-//! later slices: graph-body surgery, result-defining insertion, and full
-//! cross-block dominance/visibility preflight.
+//! (`CFGInfo::blocks`) — so they stay valid without a rebuild — and keeps each
+//! `DiGraph`'s petgraph topology in step with node insertion and erasure and
+//! with operand edits on its members. Deferred to later slices: `UnGraph`
+//! surgery and full cross-block dominance/visibility preflight. Inserted
+//! statements define results through values pre-allocated with
+//! [`Rewriter::new_result`].
 //!
-//! # Known gap: graph-body operand edits
+//! # Known gap: `UnGraph` operand edits
 //!
-//! [`Rewriter::erase_statement`], [`Rewriter::replace_statement`], and the
-//! `insert_*` methods reject `DiGraph`/`UnGraph`-owned statements with
+//! [`Rewriter::replace_statement`], [`Rewriter::erase_statement`], and the
+//! block `insert_*` methods reject `UnGraph` members with
 //! [`RewriteError::NotInBlockBody`]. [`Rewriter::replace_operand`],
 //! [`Rewriter::replace_all_uses`], and [`Rewriter::replace_results`] do **not**
-//! check body kind: on a graph-owned statement they rewrite the operand and
-//! leave the petgraph edge weights that mirror it stale. Until graph surgery
-//! lands, prefer not to point them at graph bodies.
+//! check body kind: on an `UnGraph` member they rewrite the operand and leave
+//! the petgraph edge weights that mirror it stale. Until `UnGraph` surgery
+//! lands, prefer not to point them at `UnGraph` bodies.
 //!
 //! Because value rewrites are index-driven (they consult and update
 //! `SSAInfo::uses` rather than scanning), correctness depends on the use index
@@ -61,20 +66,19 @@
 //!
 //! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
-//! removed. Erasure is eager: the statement-owned blocks and `CFG`s nested in
-//! an erased statement or block are tombstoned with it. `DiGraph`/`UnGraph`
-//! bodies are not tombstoned yet and survive their owner.
+//! removed. Erasure is eager: the statement-owned blocks, `CFG`s, and
+//! `DiGraph`s nested in an erased statement or block are tombstoned with it.
+//! `UnGraph` bodies are not tombstoned yet and survive their owner.
 
 use std::collections::HashSet;
 use std::fmt;
 
+use rustc_hash::FxHashMap;
+
 use crate::arena::GetInfo;
-use crate::node::linked_list::LinkedListNode;
 use smallvec::SmallVec;
 
-use crate::{
-    Block, CFG, Dialect, SSAValue, StageInfo, Statement, StatementInfo, StatementParent, Use,
-};
+use crate::{Block, CFG, DiGraph, Dialect, SSAValue, StageInfo, Statement, StatementParent, Use};
 
 /// A structured record of one mutation performed through a [`Rewriter`].
 ///
@@ -90,14 +94,15 @@ pub enum MutationEvent {
     /// Emitted once per [`Rewriter::replace_all_uses`] call, after the
     /// per-statement [`MutationEvent::ChangedOperands`] events it implies.
     ReplacedUses { old: SSAValue, new: SSAValue },
-    /// A new statement was spliced into a block's statement list.
+    /// A new statement was spliced into a block's statement list or added as a
+    /// `DiGraph` node.
     InsertedStatement { stmt: Statement },
-    /// A statement was tombstoned and removed from its block.
+    /// A statement was tombstoned and removed from its block or `DiGraph`.
     ///
-    /// Covers everything nested in it: the statement-owned blocks and `CFG`s
-    /// it held were tombstoned with it, and no separate
-    /// [`MutationEvent::ChangedBlockList`] or [`MutationEvent::ChangedCfg`] is
-    /// recorded for them.
+    /// Covers everything nested in it: the statement-owned blocks, `CFG`s, and
+    /// `DiGraph`s it held were tombstoned with it, and no separate
+    /// [`MutationEvent::ChangedBlockList`], [`MutationEvent::ChangedCfg`], or
+    /// [`MutationEvent::ChangedDiGraphTopology`] is recorded for them.
     ErasedStatement { stmt: Statement },
     /// A statement's definition was swapped in place (same id and results).
     ReplacedStatement { stmt: Statement },
@@ -107,6 +112,12 @@ pub enum MutationEvent {
     ChangedCfg { cfg: CFG },
     /// `block`'s terminator was set (and with it the block's outgoing edges).
     ChangedTerminator { block: Block },
+    /// Nodes or edges of `graph`'s topology changed. Recorded at most once per
+    /// graph per [`Rewriter`] call.
+    ChangedDiGraphTopology { graph: DiGraph },
+    /// One or more yield slots of `graph` were rewritten in place. Recorded at
+    /// most once per graph per [`Rewriter`] call.
+    ChangedDiGraphYields { graph: DiGraph },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -130,19 +141,25 @@ pub enum RewriteError {
     /// Nothing can follow a block's terminator, so `insert_after` cannot anchor
     /// on one. (`insert_before` can: it appends to the end of the chain.)
     AnchorIsTerminator(Statement),
-    /// The inserted definition is a terminator; terminators are not spliced into
-    /// the middle of a block's statement list. Use
-    /// [`Rewriter::insert_terminator`] on a block that has none.
-    CannotInsertTerminator,
+    /// The inserted definition is a terminator where a non-terminator is
+    /// required: `insert_before`/`insert_after` do not splice terminators into
+    /// a block's statement list (use [`Rewriter::insert_terminator`] on a block
+    /// that has none), and a `DiGraph` has no terminators for `insert_node` to
+    /// add. The counterpart of [`RewriteError::ExpectedTerminator`].
+    UnexpectedTerminator,
     /// The inserted or replacement definition is a non-terminator that carries
     /// successors. Only a block's terminator may transfer control, so such a
     /// statement would add edges the predecessor mirror does not count.
     NonTerminatorWithSuccessors,
     /// `insert_terminator` was given a block that already has a terminator.
     BlockHasTerminator(Block),
-    /// The inserted definition declares results; allocating fresh result SSA
-    /// values (with types) is deferred to a later slice.
-    CannotInsertWithResults,
+    /// The definition passed to `insert_terminator` declares results; a
+    /// terminator ends its block, so nothing could use them.
+    CannotInsertTerminatorWithResults,
+    /// A result slot of the inserted definition holds a value that is not a
+    /// fresh [`Rewriter::new_result`] of this `Rewriter`: it is an existing or
+    /// already bound value, or it fills two slots.
+    ResultNotFresh(SSAValue),
     /// A result list did not line up one-for-one with the statement's results:
     /// a `replace_statement` definition changed the result count (which would
     /// orphan or invent result SSA values), or a `replace_results` call did not
@@ -157,6 +174,10 @@ pub enum RewriteError {
     TerminatorKindMismatch(Statement),
     /// The CFG ID does not resolve to a live CFG in this stage.
     UnknownCfg(CFG),
+    /// The `DiGraph` ID does not resolve to a live `DiGraph` in this stage.
+    UnknownDiGraph(DiGraph),
+    /// The yield index is out of range for the `DiGraph`'s yield list.
+    YieldIndexOutOfRange { graph: DiGraph, index: usize },
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -229,17 +250,23 @@ impl fmt::Display for RewriteError {
             RewriteError::AnchorIsTerminator(stmt) => {
                 write!(f, "cannot insert after terminator {stmt:?}")
             }
-            RewriteError::CannotInsertTerminator => {
+            RewriteError::UnexpectedTerminator => {
                 write!(
                     f,
-                    "cannot splice a terminator into a block's statement list"
+                    "expected a non-terminator: terminators are only inserted with insert_terminator"
                 )
             }
             RewriteError::BlockHasTerminator(block) => {
                 write!(f, "block {block:?} already has a terminator")
             }
-            RewriteError::CannotInsertWithResults => {
-                write!(f, "cannot insert a statement that defines results yet")
+            RewriteError::CannotInsertTerminatorWithResults => {
+                write!(f, "cannot insert a terminator that defines results")
+            }
+            RewriteError::ResultNotFresh(value) => {
+                write!(
+                    f,
+                    "result {value} is not a fresh, unbound value from new_result"
+                )
             }
             RewriteError::ResultArityMismatch {
                 stmt,
@@ -259,6 +286,12 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::UnknownCfg(cfg) => {
                 write!(f, "CFG {cfg:?} is not a live CFG in this stage")
+            }
+            RewriteError::UnknownDiGraph(graph) => {
+                write!(f, "DiGraph {graph} is not a live DiGraph in this stage")
+            }
+            RewriteError::YieldIndexOutOfRange { graph, index } => {
+                write!(f, "yield index {index} is out of range for DiGraph {graph}")
             }
             RewriteError::NotInCfgBody(block) => {
                 write!(f, "block {block:?} is not part of a CFG block list")
@@ -339,6 +372,9 @@ impl std::error::Error for RewriteError {}
 pub struct Rewriter<'a, L: Dialect> {
     pub(super) stage: &'a mut StageInfo<L>,
     pub(super) events: Vec<MutationEvent>,
+    /// Values from [`Rewriter::new_result`] not yet bound to a statement, with
+    /// their types. Their arena slots stay empty until bound.
+    pub(super) unbound_ssa_results: FxHashMap<SSAValue, L::Type>,
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -346,6 +382,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Self {
             stage,
             events: Vec::new(),
+            unbound_ssa_results: FxHashMap::default(),
         }
     }
 
@@ -384,6 +421,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .get_info_mut(self.stage)
             .filter(|item| !item.deleted())
             .ok_or(RewriteError::UnknownStatement(stmt))?;
+        let parent = item.parent;
         let slot = item
             .definition
             .arguments_mut()
@@ -401,6 +439,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         remove_use(self.stage, old, site);
         add_use(self.stage, value, site);
         self.events.push(MutationEvent::ChangedOperands { stmt });
+        if let Some(StatementParent::DiGraph(graph)) = parent
+            && self.retarget_operand_edge(graph, stmt, old, value)
+        {
+            self.events
+                .push(MutationEvent::ChangedDiGraphTopology { graph });
+        }
         Ok(old)
     }
 
@@ -520,29 +564,47 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // Rewrite the slots, keeping the sites that actually applied — a stale
         // site names a statement or graph that has since been tombstoned.
         let mut changed_stmts: Vec<Statement> = Vec::new();
+        let mut changed_graphs: Vec<DiGraph> = Vec::new();
+        let mut changed_topologies: Vec<DiGraph> = Vec::new();
         let mut moved: Vec<Vec<Use>> = Vec::with_capacity(pairs.len());
-        for (&(_, new), sites) in pairs.iter().zip(&sites) {
+        for (&(old, new), sites) in pairs.iter().zip(&sites) {
             let mut applied: Vec<Use> = Vec::with_capacity(sites.len());
             for &site in sites {
                 let ok = match site {
                     Use::StatementOperand { stmt, index } => {
-                        let ok = stmt
+                        let Some(item) =
+                            stmt.get_info_mut(self.stage).filter(|item| !item.deleted())
+                        else {
+                            continue;
+                        };
+                        let parent = item.parent;
+                        let Some(slot) = item.definition.arguments_mut().nth(index) else {
+                            continue;
+                        };
+                        *slot = new;
+                        if !changed_stmts.contains(&stmt) {
+                            changed_stmts.push(stmt);
+                        }
+                        if let Some(StatementParent::DiGraph(graph)) = parent
+                            && self.retarget_operand_edge(graph, stmt, old, new)
+                            && !changed_topologies.contains(&graph)
+                        {
+                            changed_topologies.push(graph);
+                        }
+                        true
+                    }
+                    Use::DiGraphYield { graph, index } => {
+                        let ok = graph
                             .get_info_mut(self.stage)
                             .filter(|item| !item.deleted())
-                            .and_then(|item| item.definition.arguments_mut().nth(index))
+                            .and_then(|item| item.yields_mut().get_mut(index))
                             .map(|slot| *slot = new)
                             .is_some();
-                        if ok && !changed_stmts.contains(&stmt) {
-                            changed_stmts.push(stmt);
+                        if ok && !changed_graphs.contains(&graph) {
+                            changed_graphs.push(graph);
                         }
                         ok
                     }
-                    Use::DiGraphYield { graph, index } => graph
-                        .get_info_mut(self.stage)
-                        .filter(|item| !item.deleted())
-                        .and_then(|item| item.yields_mut().get_mut(index))
-                        .map(|slot| *slot = new)
-                        .is_some(),
                 };
                 if ok {
                     applied.push(site);
@@ -572,6 +634,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for stmt in changed_stmts {
             self.events.push(MutationEvent::ChangedOperands { stmt });
         }
+        for graph in changed_topologies {
+            self.events
+                .push(MutationEvent::ChangedDiGraphTopology { graph });
+        }
+        for graph in changed_graphs {
+            self.events
+                .push(MutationEvent::ChangedDiGraphYields { graph });
+        }
         for (&(old, new), moved) in pairs.iter().zip(&moved) {
             if !moved.is_empty() {
                 self.events.push(MutationEvent::ReplacedUses { old, new });
@@ -585,15 +655,25 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// block's terminator clears the block's terminator,
     /// removes its outgoing edges from the predecessor mirror, and leaves the
     /// block unterminated (see [`Rewriter::insert_terminator`]).
-    /// Statement-owned blocks and `CFG`s nested inside `stmt` are tombstoned
-    /// with it, recursively. `DiGraph`/`UnGraph` bodies are not tombstoned
+    /// Statement-owned blocks, `CFG`s, and `DiGraph`s nested inside `stmt` are
+    /// tombstoned with it, recursively. `UnGraph` bodies are not tombstoned
     /// yet.
     ///
-    /// Rejects — leaving the stage untouched — if `stmt` is unknown, is not
-    /// owned by a block body, or still has results that are used elsewhere.
-    /// Records [`MutationEvent::ErasedStatement`], followed by
-    /// [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator.
+    /// A `DiGraph` member is erased the same way, except that instead of
+    /// leaving a block chain it loses its graph node (and the edges into it).
+    ///
+    /// Rejects — leaving the stage untouched — if `stmt` is unknown, is owned
+    /// by an `UnGraph` (or nothing), or still has results that are used
+    /// elsewhere (a `DiGraph` yield counts as a use). Records
+    /// [`MutationEvent::ErasedStatement`], followed by
+    /// [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator or
+    /// [`MutationEvent::ChangedDiGraphTopology`] when it was a graph member.
     pub fn erase_statement(&mut self, stmt: Statement) -> Result<(), RewriteError> {
+        if let Some(item) = stmt.get_info(self.stage).filter(|item| !item.deleted())
+            && let Some(StatementParent::DiGraph(graph)) = item.parent
+        {
+            return self.erase_digraph_member(stmt, graph);
+        }
         let (block, prev, next, operands, results, successors, is_terminator) = {
             let item = stmt
                 .get_info(self.stage)
@@ -716,10 +796,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let mut current = info.statements.head;
         while let Some(stmt) = current {
             current = stmt.get_info(self.stage).and_then(|item| item.node.next);
-            self.tombstone_statement(stmt, block);
+            self.tombstone_statement(stmt, Some(block));
         }
         if let Some(stmt) = terminator {
-            self.tombstone_statement(stmt, block);
+            self.tombstone_statement(stmt, Some(block));
         }
 
         for arg in args {
@@ -728,10 +808,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let _ = self.stage.nodes.blocks.delete(block);
     }
 
-    /// The per-statement step of [`Rewriter::tombstone_block`]: drop `stmt`'s
-    /// uses and its outgoing edges from `block`, erase its nested bodies, then
-    /// tombstone its results and itself.
-    fn tombstone_statement(&mut self, stmt: Statement, block: Block) {
+    /// The per-statement step of [`Rewriter::tombstone_block`] and graph
+    /// tombstoning: drop `stmt`'s uses and, for a block member, its outgoing
+    /// edges from `block`; erase its nested bodies; then tombstone its results
+    /// and itself.
+    pub(super) fn tombstone_statement(&mut self, stmt: Statement, block: Option<Block>) {
         let (operands, results, successors) = {
             let definition = &stmt.expect_info(self.stage).definition;
             (
@@ -752,8 +833,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for (index, operand) in operands.into_iter().enumerate() {
             remove_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
-        for target in successors {
-            remove_predecessor(self.stage, target, block);
+        if let Some(block) = block {
+            for target in successors {
+                remove_predecessor(self.stage, target, block);
+            }
         }
         self.tombstone_nested_bodies(stmt);
         for result in results {
@@ -762,12 +845,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let _ = self.stage.statement_arena_mut().delete(stmt);
     }
 
-    /// Tombstone the statement-owned blocks and `CFG`s nested in `stmt`.
+    /// Tombstone the statement-owned blocks, `CFG`s, and `DiGraph`s nested in
+    /// `stmt`.
     ///
-    /// TODO: `DiGraph`/`UnGraph` bodies are not tombstoned yet; their members
-    /// survive their owner until graph surgery lands.
+    /// TODO: `UnGraph` bodies are not tombstoned yet; their members survive
+    /// their owner until `UnGraph` surgery lands.
     fn tombstone_nested_bodies(&mut self, stmt: Statement) {
-        let (blocks, cfgs) = {
+        let (blocks, cfgs, digraphs) = {
             let definition = &stmt.expect_info(self.stage).definition;
             (
                 definition
@@ -775,8 +859,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     .copied()
                     .collect::<SmallVec<[Block; 2]>>(),
                 definition.cfgs().copied().collect::<SmallVec<[CFG; 1]>>(),
+                definition
+                    .digraphs()
+                    .copied()
+                    .collect::<SmallVec<[DiGraph; 1]>>(),
             )
         };
+        for graph in digraphs {
+            self.tombstone_digraph(graph);
+        }
         for block in blocks {
             self.tombstone_block(block);
         }
@@ -806,10 +897,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Insert `definition` as a new statement immediately after `anchor`.
     ///
     /// `anchor` must be a live, non-terminator statement owned by a block body,
-    /// and `definition` must be a non-terminator declaring no results (fresh
-    /// result-value allocation is a later slice) and no successors. Every
-    /// operand must be live. On success the new statement is spliced into the
-    /// block, its operand uses are recorded, and
+    /// and `definition` must be a non-terminator with no successors. Every
+    /// operand must be live, and every result a fresh [`Rewriter::new_result`]
+    /// value, which becomes a result of the new statement. On success the new
+    /// statement is spliced into the block, its operand uses are recorded, and
     /// [`MutationEvent::InsertedStatement`] is emitted; the new id is returned.
     pub fn insert_after(
         &mut self,
@@ -855,33 +946,20 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         };
 
         if definition.is_terminator() {
-            return Err(RewriteError::CannotInsertTerminator);
+            return Err(RewriteError::UnexpectedTerminator);
         }
         if definition.successors().next().is_some() {
             return Err(RewriteError::NonTerminatorWithSuccessors);
         }
-        if definition.results().next().is_some() {
-            return Err(RewriteError::CannotInsertWithResults);
-        }
-        let operands: Vec<SSAValue> = definition.arguments().copied().collect();
-        for &operand in &operands {
-            if operand.get_info(self.stage).is_none() {
-                return Err(RewriteError::UnknownValue(operand));
-            }
-        }
-
-        let new_stmt = self
-            .stage
-            .statement_arena_mut()
-            .alloc_with_id(|id| StatementInfo {
-                node: LinkedListNode {
-                    ptr: id,
-                    next,
-                    prev,
-                },
-                parent: Some(StatementParent::Block(block)),
-                definition,
-            });
+        let (results, operands) = self.prepare_insert(&definition)?;
+        let new_stmt = self.alloc_statement(
+            definition,
+            StatementParent::Block(block),
+            prev,
+            next,
+            results,
+            &operands,
+        );
 
         // Wire neighbours (or the block head/tail when inserting at an end).
         match prev {
@@ -912,16 +990,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             block_info.statements.len += 1;
         }
 
-        for (index, operand) in operands.into_iter().enumerate() {
-            add_use(
-                self.stage,
-                operand,
-                Use::StatementOperand {
-                    stmt: new_stmt,
-                    index,
-                },
-            );
-        }
         // Predecessor mirror does not need to be updated since we rejected terminators earlier.
         self.events
             .push(MutationEvent::InsertedStatement { stmt: new_stmt });
@@ -959,14 +1027,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             return Err(RewriteError::ExpectedTerminator);
         }
         if definition.results().next().is_some() {
-            return Err(RewriteError::CannotInsertWithResults);
+            return Err(RewriteError::CannotInsertTerminatorWithResults);
         }
-        let operands: Vec<SSAValue> = definition.arguments().copied().collect();
-        for &operand in &operands {
-            if operand.get_info(self.stage).is_none() {
-                return Err(RewriteError::UnknownValue(operand));
-            }
-        }
+        let (results, operands) = self.prepare_insert(&definition)?;
         let targets: HashSet<Block> = definition.successors().map(|s| s.target()).collect();
         for &target in &targets {
             if !block_is_live(self.stage, target) {
@@ -974,21 +1037,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             }
         }
 
-        let new_stmt = self
-            .stage
-            .statement_arena_mut()
-            .alloc_with_id(|id| StatementInfo {
-                node: LinkedListNode::new(id),
-                parent: Some(StatementParent::Block(block)),
-                definition,
-            });
-        for (index, operand) in operands.into_iter().enumerate() {
-            let site = Use::StatementOperand {
-                stmt: new_stmt,
-                index,
-            };
-            add_use(self.stage, operand, site);
-        }
+        let new_stmt = self.alloc_statement(
+            definition,
+            StatementParent::Block(block),
+            None,
+            None,
+            results,
+            &operands,
+        );
         // Only terminators carry successors and the block had none, so every
         // target gains exactly one entry for `block`.
         for target in targets {
@@ -1005,7 +1061,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// Swap `stmt`'s definition for `definition` in place, keeping the same
-    /// statement id, block position, and result values.
+    /// statement id, position (block slot or `DiGraph` node), and result
+    /// values.
     ///
     /// The replacement must declare the same number of results and the same
     /// terminator-ness as the original, so result SSA values and the block's
@@ -1016,15 +1073,18 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// the new operands, and `BlockInfo::predecessors` is updated for any
     /// control-flow edge the replacement adds or drops. The block-body and CFG
     /// chain mirrors need no update: the statement keeps its id, chain links,
-    /// and terminator-ness, and no block moves.
+    /// and terminator-ness, and no block moves. For a `DiGraph` member, the
+    /// edges into it follow the operand values it gains or loses.
     ///
-    /// Rejects (leaving the stage untouched) if `stmt` is unknown, is not
-    /// owned by a block body (i.e. in a graph), changes result arity or
-    /// terminator-ness, gives a non-terminator successors, or names an operand
-    /// or successor target that is not live.
+    /// Rejects (leaving the stage untouched) if `stmt` is unknown, is owned by
+    /// an `UnGraph` (or nothing), changes result arity or terminator-ness,
+    /// gives a non-terminator successors, or names an operand or successor
+    /// target that is not live.
     ///
     /// Records [`MutationEvent::ReplacedStatement`], followed by
-    /// [`MutationEvent::ChangedTerminator`] when `stmt` is a terminator.
+    /// [`MutationEvent::ChangedTerminator`] when `stmt` is a terminator, or by
+    /// [`MutationEvent::ChangedDiGraphTopology`] when it is a `DiGraph` member
+    /// whose edges changed.
     pub fn replace_statement(
         &mut self,
         stmt: Statement,
@@ -1042,13 +1102,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         stmt: Statement,
         definition: &L,
     ) -> Result<PreparedReplacement, RewriteError> {
-        let (old_operands, old_results, old_successors, parent_block, old_is_terminator) = {
+        let (old_operands, old_results, old_successors, parent, old_is_terminator) = {
             let item = stmt
                 .get_info(self.stage)
                 .filter(|item| !item.deleted())
                 .ok_or(RewriteError::UnknownStatement(stmt))?;
-            let Some(StatementParent::Block(parent_block)) = item.parent else {
-                return Err(RewriteError::NotInBlockBody(stmt));
+            let parent = match item.parent {
+                Some(parent @ (StatementParent::Block(_) | StatementParent::DiGraph(_))) => parent,
+                _ => return Err(RewriteError::NotInBlockBody(stmt)),
             };
             (
                 item.definition
@@ -1060,7 +1121,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     .successors()
                     .map(|successor| successor.target())
                     .collect::<HashSet<Block>>(),
-                parent_block,
+                parent,
                 item.definition.is_terminator(),
             )
         };
@@ -1095,7 +1156,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             old_operands,
             old_results,
             old_successors,
-            parent_block,
+            parent,
             is_terminator: old_is_terminator,
         })
     }
@@ -1113,7 +1174,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             old_operands,
             old_results,
             old_successors,
-            parent_block,
+            parent,
             is_terminator,
         } = prepared;
         let new_operands: Vec<SSAValue> = definition.arguments().copied().collect();
@@ -1130,15 +1191,49 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
 
         // Update the def-use index: drop the old operand edges, install the new.
-        for (index, operand) in old_operands.into_iter().enumerate() {
+        for (index, &operand) in old_operands.iter().enumerate() {
             remove_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
         if let Some(item) = stmt.get_info_mut(self.stage) {
             item.definition = definition;
         }
-        for (index, operand) in new_operands.into_iter().enumerate() {
+        for (index, &operand) in new_operands.iter().enumerate() {
             add_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
+
+        let parent_block = match parent {
+            StatementParent::Block(block) => block,
+            StatementParent::DiGraph(graph) => {
+                // A member has no block edges; its operand edges follow its
+                // operands. Results keep their ids, so outgoing edges stand.
+                // Edges depend only on the multiset of operand values, so
+                // only the values gained or lost are touched.
+                let mut dropped = old_operands;
+                let mut gained = Vec::new();
+                for operand in new_operands {
+                    match dropped.iter().position(|&old| old == operand) {
+                        Some(pos) => {
+                            dropped.swap_remove(pos);
+                        }
+                        None => gained.push(operand),
+                    }
+                }
+                let mut changed = false;
+                for operand in dropped {
+                    changed |= self.remove_operand_edge(graph, stmt, operand);
+                }
+                for operand in gained {
+                    changed |= self.add_operand_edge(graph, stmt, operand);
+                }
+                self.events.push(MutationEvent::ReplacedStatement { stmt });
+                if changed {
+                    self.events
+                        .push(MutationEvent::ChangedDiGraphTopology { graph });
+                }
+                return;
+            }
+            StatementParent::UnGraph(_) => unreachable!("rejected by prepare_replacement"),
+        };
 
         // Update the predecessor mirror. Only terminators are expected to have successors.
         // Remove the parent_block from the predecessor list of any successor that is
@@ -1169,7 +1264,7 @@ pub(super) struct PreparedReplacement {
     old_operands: Vec<SSAValue>,
     old_results: Vec<crate::ResultValue>,
     old_successors: HashSet<Block>,
-    parent_block: Block,
+    parent: StatementParent,
     is_terminator: bool,
 }
 
