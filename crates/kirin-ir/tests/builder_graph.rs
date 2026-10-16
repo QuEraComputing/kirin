@@ -141,6 +141,31 @@ fn attach_nodes_to_digraph_rejects_terminator() {
 }
 
 #[test]
+#[should_panic(expected = "with successors as a digraph node")]
+fn digraph_builder_rejects_node_with_successors() {
+    let mut stage = new_stage();
+    let target = stage.block().new();
+    let fork = stage
+        .statement()
+        .definition(BuilderDialect::Fork(Successor::from_block(target)))
+        .new();
+    let _ = stage.digraph().node(fork);
+}
+
+#[test]
+#[should_panic(expected = "with successors as a digraph node")]
+fn attach_nodes_to_digraph_rejects_node_with_successors() {
+    let mut stage = new_stage();
+    let target = stage.block().new();
+    let fork = stage
+        .statement()
+        .definition(BuilderDialect::Fork(Successor::from_block(target)))
+        .new();
+    let dg = stage.digraph().new();
+    stage.attach_nodes_to_digraph(dg, &[fork], &[]);
+}
+
+#[test]
 #[should_panic(expected = "already has a different parent")]
 fn statement_builder_rejects_digraph_with_existing_owner() {
     let mut stage = new_stage();
