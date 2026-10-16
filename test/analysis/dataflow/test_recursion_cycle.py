@@ -1,5 +1,5 @@
-from kirin import types
-from kirin.prelude import basic_no_opt
+from kirin import interp, types
+from kirin.prelude import basic, basic_no_opt
 from kirin.analysis import TypeInference, const
 from kirin.dialects import func
 
@@ -117,3 +117,44 @@ def test_a_recursion_inside_a_loop_settles():
     _, result = propagate.run(inside_a_loop, const.Unknown())
     assert isinstance(result, const.Unknown)
     assert propagate.deepest < 10
+
+
+@basic
+def fill(n: int, values: list):
+    values[n] = n
+    if n > 0:
+        fill(n - 1, values)
+    return 0
+
+
+def test_a_recursive_call_with_side_effects_and_an_unused_result_stays():
+    values = [-1, -1, -1, -1]
+    fill(3, values)
+    assert values == [0, 1, 2, 3]
+
+
+@basic
+def total(n: int) -> int:
+    if n > 0:
+        return total(n - 1) + n
+    return 0
+
+
+@basic
+def drop_total(n: int) -> int:
+    total(n)
+    return 1
+
+
+def test_a_pure_recursive_call_with_an_unused_result_goes():
+    assert not any(
+        isinstance(stmt, (func.Call, func.Invoke))
+        for stmt in drop_total.callable_region.walk()
+    )
+    assert drop_total(3) == 1
+
+
+def test_only_abstract_interpreters_lower_the_depth_limit():
+    assert interp.Interpreter(basic_no_opt).max_depth == 800
+    assert TypeInference(basic_no_opt).max_depth == 128
+    assert const.Propagate(basic_no_opt)._interp.max_depth == 800
