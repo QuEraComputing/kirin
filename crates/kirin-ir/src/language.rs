@@ -105,6 +105,23 @@ pub trait IsEdge {
     fn is_edge(&self) -> bool;
 }
 
+/// The operands a branch-like statement forwards to each successor's block
+/// arguments, after MLIR's `BranchOpInterface`.
+///
+/// `index` is a successor position in [`HasSuccessors::successors`] order.
+/// Both methods return `None` when the statement forwards nothing to that
+/// successor in an editable list: it is not a branch, `index` is out of
+/// range, or the edge carries no operand list.
+///
+/// `#[derive(Dialect)]` generates an implementation that forwards through
+/// `#[wraps]` variants and returns `None` otherwise. A dialect whose
+/// operations forward operands marks itself `#[kirin(branch_op)]` and
+/// implements this trait by hand.
+pub trait BranchOp {
+    fn successor_operands(&self, index: usize) -> Option<&[crate::SSAValue]>;
+    fn successor_operands_mut(&mut self, index: usize) -> Option<&mut Vec<crate::SSAValue>>;
+}
+
 /// The base trait that all dialects must implement.
 ///
 /// Every dialect carries the full set of IR accessor and property traits as
@@ -137,6 +154,7 @@ pub trait Dialect:
     + IsPure
     + IsSpeculatable
     + IsEdge
+    + BranchOp
     + Clone
     + PartialEq
     + std::fmt::Debug

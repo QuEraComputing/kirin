@@ -1715,6 +1715,59 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         definition: L,
     ) -> Result<(), RewriteError>;
 
+    pub fn insert_terminator(
+        &mut self,
+        block: Block,
+        definition: L,
+    ) -> Result<Statement, RewriteError>;
+
+    // --- `Cfg` block-list surgery (rewrite/cfg) ---
+    pub fn append_block(
+        &mut self,
+        cfg: CFG,
+        arg_types: impl IntoIterator<Item = L::Type>,
+    ) -> Result<Block, RewriteError>;
+
+    pub fn insert_block_before(
+        &mut self,
+        anchor: Block,
+        arg_types: impl IntoIterator<Item = L::Type>,
+    ) -> Result<Block, RewriteError>;
+
+    pub fn insert_block_after(
+        &mut self,
+        anchor: Block,
+        arg_types: impl IntoIterator<Item = L::Type>,
+    ) -> Result<Block, RewriteError>;
+
+    pub fn erase_block(&mut self, block: Block) -> Result<(), RewriteError>;
+
+    pub fn split_block(&mut self, at: Statement) -> Result<Block, RewriteError>;
+
+    pub fn merge_blocks(
+        &mut self,
+        pred: Block,
+        succ: Block,
+        arg_replacements: &[SSAValue],
+    ) -> Result<(), RewriteError>;
+
+    pub fn retarget_successor(
+        &mut self,
+        stmt: Statement,
+        old: Block,
+        new: Block,
+    ) -> Result<usize, RewriteError>;
+
+    pub fn insert_block_arg(
+        &mut self,
+        block: Block,
+        index: usize,
+        ty: L::Type,
+        forwarded: impl FnMut(Statement, usize) -> SSAValue,
+    ) -> Result<BlockArgument, RewriteError>;
+
+    pub fn erase_block_arg(&mut self, block: Block, index: usize) -> Result<(), RewriteError>;
+
     // --- Immediate change/event log (current prototype API) ---
     pub fn events(&self) -> &[MutationEvent];
     pub fn drain_events(&mut self) -> Vec<MutationEvent>;
@@ -1732,13 +1785,20 @@ stage remains valid.
 |---|---|---|---|
 | `replace_operand` | Rewrite one operand slot; move its use record `old → new`. | `ChangedOperands` (none if slot unchanged) | operand-index and live-value checked |
 | `replace_all_uses` | Rewrite every operand **and `DiGraph` yield** reading `old` to `new`; transfer use records. | one `ChangedOperands` per affected statement, then one `ReplacedUses` | returns count of slots rewritten; self-replace is `Ok(0)` |
-| `erase_statement` | Tombstone the statement, unlink it from its block list, drop its operand uses, tombstone its (unused) result values. | `ErasedStatement` | block-parented, non-terminator, no live result uses |
+| `erase_statement` | Tombstone the statement, unlink it from its block list, drop its operand uses, tombstone its (unused) result values. Statement-owned blocks and `Cfg`s nested in it are tombstoned with it. | `ErasedStatement` (covers the nested bodies; no CFG events) | block-parented, non-terminator, no live result uses; nested `DiGraph`/`UnGraph` bodies are not yet tombstoned |
 | `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with **no results**; operands must be live |
+| `insert_terminator` | Allocate `definition` as the terminator of a block that has none; add operand uses and predecessor entries. | `InsertedStatement`, `ChangedTerminator` | any block (`Cfg` member or statement-owned body); `definition` is a result-less terminator with live operands and successors |
 | `replace_statement` | Swap the definition in place, keeping id, block position, and result SSA identity; fix operand uses. | `ReplacedStatement` | same result arity and terminator-ness as the original |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
+| `append_block` / `insert_block_before` / `insert_block_after` | Allocate an empty block (no terminator) with fresh typed arguments and link it into the `Cfg` block list. | `ChangedBlockList` | anchor must be a live block of a `Cfg` list (not a statement-owned body) |
+| `erase_block` | Unlink the block and tombstone it with its arguments, statements, results, and nested blocks/`Cfg`s; drop their uses and outgoing edges. | `ChangedBlockList`, `ChangedCfg` | rejects if another block still branches to it (a self-loop is fine) or an argument or top-level result is used outside the block; retarget those edges and replace those uses first |
+| `split_block` | Move `at`, its successors in the chain, and the terminator into a new block placed after the original; the original is left without a terminator, for the caller to close with `insert_terminator`. | `ChangedBlockList`, `ChangedCfg` | new block has no arguments |
+| `merge_blocks` | Erase `pred`'s terminator, redirect `succ`'s arguments to `arg_replacements`, splice `succ`'s statements and terminator onto `pred`, tombstone `succ`. | `ErasedStatement`, the `replace_all_uses` events, `ChangedBlockList`, `ChangedCfg` | same `Cfg`, distinct blocks, exact argument arity; replacements must be live and not `succ`'s own arguments; rejects if a block other than `pred` still branches to `succ`; `pred` need not branch to `succ` |
+| `retarget_successor` | Point every successor slot of `stmt` naming `old` at `new`. | `ChangedCfg` (none if nothing changed) | returns the count rewritten; `old` need not be live, `new` must be live |
+| `insert_block_arg` / `erase_block_arg` | Insert or erase one block argument, renumbering later ones, and insert or remove the matching operand on each incoming edge through `BranchOp`. `insert_block_arg` asks `forwarded(stmt, successor)` for each edge's new operand. | one `ReplacedStatement` per edge, then `ChangedCfg` | every rewritten edge is checked before any edit; an erased argument must be unused; every incoming edge needs an editable operand list (`NoSuccessorOperands` otherwise) |
 
 Deferred to later slices (each is rejected, not silently mishandled):
-terminator, `Cfg` block-list, and `DiGraph`/`UnGraph`-body surgery;
+terminator and `DiGraph`/`UnGraph`-body surgery;
 result-defining insertion (needs fresh result SSA values with types); single
 dead-result trimming (`remove_result`, below); the owning pass driver and
 quarantine boundary; and the pure derive/install/verify split described under
@@ -1900,22 +1960,38 @@ axis — hence the column.
 |---|---|---|---|
 | `UnknownStatement(stmt)` | liveness | id does not resolve to a live (non-tombstoned) statement | all statement methods |
 | `UnknownValue(value)` | liveness | SSA id does not resolve to a live value | `replace_operand`, `replace_all_uses`, `insert_*`, `replace_statement` |
-| `UnknownBlock(block)` | liveness | a successor target does not resolve to a live block; the new edge would dangle | `replace_statement` |
+| `UnknownBlock(block)` | liveness | a block id (anchor, operand block, or successor target) does not resolve to a live block | `replace_statement`, CFG block-list methods |
+| `UnknownCfg(cfg)` | liveness | the `Cfg` id does not resolve to a live `Cfg` | `append_block` |
+| `NotInCfgBody(block)` | guard | the block is a statement-owned single-block body (or detached), not a member of a `Cfg` list | CFG block-list methods |
+| `CfgMismatch { block, expected }` | guard | the block belongs to a different `Cfg` than required | `merge_blocks` |
+| `CannotMergeBlockIntoItself(block)` | guard | `merge_blocks` was given the same block twice | `merge_blocks` |
+| `ExpectedTerminator` | guard | the definition is not a terminator | `insert_terminator` |
+| `BlockHasTerminator(block)` | guard | the block already has a terminator | `insert_terminator` |
+| `BlockArgumentArityMismatch { block, expected, found }` | guard | values do not line up one-for-one with the block's arguments | `merge_blocks` |
+| `BlockArgumentIndexOutOfRange { block, index }` | liveness | argument index past the block's argument list (for insertion, past its end) | `insert_block_arg`, `erase_block_arg` |
+| `ReplacementIsMergedArgument { block, value }` | guard | a replacement is one of the merged block's own arguments, which the merge deletes | `merge_blocks` |
+| `BlockHasPredecessors { block, pred }` | guard | `pred` still branches to the block being removed; retarget its edges first | `erase_block`, `merge_blocks` |
+| `BlockArgumentInUse { block, index }` | guard | the argument still has uses (or, for `erase_block`, uses outside the block); replace them first | `erase_block_arg`, `erase_block` |
+| `NoSuccessorOperands { stmt, successor }` | guard | an incoming edge's `BranchOp` gives no editable operand list for that successor | `insert_block_arg`, `erase_block_arg` |
+| `SuccessorOperandIndexOutOfRange { stmt, successor, index }` | guard | an incoming edge forwards too few operands for `index` (its arity disagrees with the block's) | `insert_block_arg`, `erase_block_arg` |
 | `OperandIndexOutOfRange { stmt, index }` | liveness | operand index past the statement's operand list | `replace_operand` |
 | `NotInBlockBody(stmt)` | deferred | statement is owned by a `DiGraph`/`UnGraph` (or nothing), not a block — graph surgery deferred | `erase_statement`, `insert_*`, `replace_statement` |
 | `CannotEraseTerminator(stmt)` | deferred | erasing a block terminator would need control-flow repair, deferred | `erase_statement` |
-| `StatementResultsInUse(stmt)` | guard | a result of the statement is still used elsewhere; replace those uses first | `erase_statement` |
+| `StatementResultsInUse(stmt)` | guard | a result of the statement is still used elsewhere (for `erase_block`, outside the block); replace those uses first | `erase_statement`, `erase_block` |
 | `AnchorIsTerminator(stmt)` | guard | nothing can follow a terminator, so `insert_after` cannot anchor on one | `insert_after` |
-| `CannotInsertTerminator` | guard | the inserted definition is a terminator (not spliced mid-block) | `insert_*` |
-| `CannotInsertWithResults` | deferred | the inserted definition declares results (fresh result allocation deferred) | `insert_*` |
+| `CannotInsertTerminator` | guard | the inserted definition is a terminator (not spliced mid-block; use `insert_terminator`) | `insert_*` |
+| `CannotInsertWithResults` | deferred | the inserted definition declares results (fresh result allocation deferred) | `insert_*`, `insert_terminator` |
 | `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
 | `TerminatorKindMismatch(stmt)` | guard | replacement changes terminator-ness, desyncing the block's terminator cache | `replace_statement` |
 | `EdgeRoleMismatch(stmt)` | guard | replacement changes `IsEdge`, desyncing `GraphMember` classification | `replace_statement` |
 
 The immediate `MutationEvent` vocabulary recorded by these methods is
-`ChangedOperands`, `ReplacedUses`, `InsertedStatement`, `ErasedStatement`, and
-`ReplacedStatement`; the remaining documented event kinds (CFG/graph and
-result-type events) grow in as the corresponding mutation capability lands (see
+`ChangedOperands`, `ReplacedUses`, `InsertedStatement`, `ErasedStatement`,
+`ReplacedStatement`, `ChangedBlockList { cfg }`, `ChangedCfg { cfg }`, and
+`ChangedTerminator { block }`. `ErasedStatement` also covers everything nested
+in the erased statement; no separate CFG events are recorded for those bodies.
+The remaining documented event kinds (graph and result-type events) grow in as
+the corresponding mutation capability lands (see
 [Gap 3](#gap-3--mutationevent-vocabulary-vs-implementation)).
 
 The design requirement is that all rewrite mutation flows through this object so
@@ -2617,14 +2693,22 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   edit maintains the topology mirror atomically; there is no dirty interval.
 - [ ] Terminator surgery: erase/replace a terminator, maintaining
   `BlockInfo::terminator` and successor edges. Emits `ChangedTerminator`.
-- [ ] Add the grouped operation-owned `HasCfgEdges` view that preserves each
-  successor together with its forwarded arguments and separates non-edge
-  operands.
-- [ ] **`Cfg` block-list surgery**: append/insert/erase/split blocks, retarget
-  successors, remap block arguments across incoming edges. Emits
-  `ChangedBlockList` / `ChangedCfg`. This is the capability
+  Inserting a terminator into a block that has none (`insert_terminator`) has
+  landed; erasing and replacing one remain.
+- [x] Add the grouped operation-owned `HasCfgEdges` view that preserves each
+  successor together with its forwarded arguments. Landed as the `BranchOp`
+  trait (after MLIR's `BranchOpInterface`): a `Dialect` supertrait whose
+  `successor_operands(index)` / `successor_operands_mut(index)` give the
+  operands forwarded to each successor. `#[derive(Dialect)]` generates it
+  (forwarding through `#[wraps]`, `None` otherwise); branch dialects opt out
+  with `#[kirin(branch_op)]` and implement it by hand, as `kirin-cf` does.
+- [x] **`Cfg` block-list surgery**: append/insert/erase/split/merge blocks,
+  retarget successors, insert/erase block arguments across incoming edges.
+  Emits `ChangedBlockList` / `ChangedCfg`. This is the capability
   [Level 5](#level-5-cfg-fragment) assumes and the one no earlier milestone
-  named.
+  named. Edge operands are edited through `BranchOp`. `split_block` leaves the
+  original block unterminated, and the caller closes it with
+  `insert_terminator`.
 - [ ] `DiGraph` body surgery: insert/erase nodes with petgraph topology and
   `yields` maintenance. Emits `ChangedDiGraphTopology`.
 - [ ] `UnGraph` body surgery: insert/erase nodes and edge statements, maintaining
@@ -2858,10 +2942,11 @@ implement the derive and its matching/remapping bodies.
 ### Gap 3 — MutationEvent vocabulary vs implementation — RESOLVED DELIVERY RULE
 
 The documented `MutationEvent` enum lists the full target vocabulary; the
-implementation currently emits **five** — `ChangedOperands`, `ReplacedUses`,
-`InsertedStatement`, `ErasedStatement`, `ReplacedStatement` — covering operand
-and yield rewriting plus block-body statement surgery (erase/insert/replace).
-The remaining documented variants (CFG, terminator, graph-topology, and
+implementation currently emits **eight** — `ChangedOperands`, `ReplacedUses`,
+`InsertedStatement`, `ErasedStatement`, `ReplacedStatement`, `ChangedBlockList`,
+`ChangedCfg`, `ChangedTerminator` — covering operand and yield rewriting,
+block-body statement surgery (erase/insert/replace, terminator insertion), and
+`Cfg` block-list surgery. The remaining documented variants (graph-topology and
 result-type events) are not emitted because that surgery is not yet
 implemented, so an analysis-invalidation policy written against them would
 subscribe to events that never fire. Resolution: keep growing the enum in

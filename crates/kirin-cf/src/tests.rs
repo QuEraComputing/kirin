@@ -1,6 +1,6 @@
 use kirin::ir::{
-    Block, HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant, IsPure,
-    IsSpeculatable, IsTerminator, Successor, TestSSAValue,
+    Block, BranchOp, HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant,
+    IsPure, IsSpeculatable, IsTerminator, Successor, TestSSAValue,
 };
 use kirin_test_types::UnitType;
 
@@ -177,4 +177,41 @@ fn successor_roundtrip() {
     let block = Block::from(kirin::ir::Id::from(TestSSAValue(42)));
     let succ = Successor::from_block(block);
     assert_eq!(succ.target(), block);
+}
+
+#[test]
+fn branch_forwards_its_args_to_its_only_successor() {
+    let mut br = make_branch();
+    let expected: Vec<kirin::ir::SSAValue> = vec![TestSSAValue(0).into(), TestSSAValue(1).into()];
+    assert_eq!(br.successor_operands(0), Some(expected.as_slice()));
+    assert_eq!(br.successor_operands(1), None);
+
+    // Edits through the mutable view land in `args`.
+    br.successor_operands_mut(0).unwrap().remove(0);
+    assert_eq!(br.successor_operands(0), Some(&expected[1..]));
+}
+
+#[test]
+fn cond_branch_forwards_each_side_and_never_the_condition() {
+    let cond = make_cond_branch();
+    let true_args: Vec<kirin::ir::SSAValue> = vec![TestSSAValue(1).into()];
+    let false_args: Vec<kirin::ir::SSAValue> = vec![TestSSAValue(2).into(), TestSSAValue(3).into()];
+    // Successor positions follow `successors()` order: then, else.
+    assert_eq!(cond.successor_operands(0), Some(true_args.as_slice()));
+    assert_eq!(cond.successor_operands(1), Some(false_args.as_slice()));
+    assert_eq!(cond.successor_operands(2), None);
+    let condition: kirin::ir::SSAValue = TestSSAValue(0).into();
+    for index in 0..2 {
+        assert!(!cond.successor_operands(index).unwrap().contains(&condition));
+    }
+}
+
+#[test]
+fn branch_without_args_still_has_an_editable_operand_list() {
+    let mut br = make_branch_no_args();
+    assert_eq!(br.successor_operands(0), Some(&[][..]));
+    br.successor_operands_mut(0)
+        .unwrap()
+        .push(TestSSAValue(5).into());
+    assert_eq!(br.successor_operands(0).map(<[_]>::len), Some(1));
 }

@@ -23,13 +23,18 @@
 //! derived mirrors, and traversable block lists — nothing above that.
 //!
 //! Scope is operand/yield rewriting (including bulk result redirection through
-//! [`Rewriter::replace_results`]) plus block-body statement surgery:
-//! [`Rewriter::erase_statement`], [`Rewriter::insert_before`],
-//! [`Rewriter::insert_after`], and [`Rewriter::replace_statement`]. The rewriter
-//! **maintains** both derived mirrors incrementally on every edit —
-//! [`SSAInfo::uses`](crate::SSAInfo) and
-//! [`BlockInfo::predecessors`](crate::BlockInfo) — so they stay valid without a
-//! rebuild. Deferred to later slices: terminator/graph-body surgery,
+//! [`Rewriter::replace_results`]), block-body statement surgery
+//! ([`Rewriter::erase_statement`], [`Rewriter::insert_before`],
+//! [`Rewriter::insert_after`], [`Rewriter::replace_statement`],
+//! [`Rewriter::insert_terminator`]), and `CFG`
+//! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
+//! merge blocks, [`Rewriter::retarget_successor`], and block-argument insertion
+//! and erasure). The rewriter **maintains** all four derived mirrors
+//! incrementally on every edit — [`SSAInfo::uses`](crate::SSAInfo),
+//! [`BlockInfo::predecessors`](crate::BlockInfo), the block-body summary
+//! (`BlockInfo::statements`/`terminator`), and the CFG chain summary
+//! (`CFGInfo::blocks`) — so they stay valid without a rebuild. Deferred to
+//! later slices: terminator erasure/replacement, graph-body surgery,
 //! result-defining insertion, and full cross-block dominance/visibility
 //! preflight.
 //!
@@ -51,20 +56,26 @@
 //! chain's `tail`.
 //! `BlockInfo::predecessors` is maintained differently: it is recomputed from
 //! the statement's own `successors()`, so it does not depend on its own prior
-//! accuracy. Direct arena writes that bypass the `Rewriter` desync both, and
+//! accuracy. Direct arena writes that bypass the `Rewriter` desync the mirrors, and
 //! `StageInfo::statement_arena_mut` is still public, so that bypass is
 //! currently reachable.
 //!
-//! Statement surgery uses arena tombstones: an erased statement is marked
+//! Surgery uses arena tombstones: an erased statement or block is marked
 //! deleted (its id stays stable and resolves to `None`), never physically
-//! removed.
+//! removed. Erasure is eager: the statement-owned blocks and `CFG`s nested in
+//! an erased statement or block are tombstoned with it. `DiGraph`/`UnGraph`
+//! bodies are not tombstoned yet and survive their owner.
 
 use std::collections::HashSet;
 use std::fmt;
 
 use crate::arena::GetInfo;
 use crate::node::linked_list::LinkedListNode;
-use crate::{Block, Dialect, SSAValue, StageInfo, Statement, StatementInfo, StatementParent, Use};
+use smallvec::SmallVec;
+
+use crate::{
+    Block, CFG, Dialect, SSAValue, StageInfo, Statement, StatementInfo, StatementParent, Use,
+};
 
 /// A structured record of one mutation performed through a [`Rewriter`].
 ///
@@ -83,9 +94,20 @@ pub enum MutationEvent {
     /// A new statement was spliced into a block's statement list.
     InsertedStatement { stmt: Statement },
     /// A statement was tombstoned and unlinked from its block.
+    ///
+    /// Covers everything nested in it: the statement-owned blocks and `CFG`s
+    /// it held were tombstoned with it, and no separate
+    /// [`MutationEvent::ChangedBlockList`] or [`MutationEvent::ChangedCfg`] is
+    /// recorded for them.
     ErasedStatement { stmt: Statement },
     /// A statement's definition was swapped in place (same id and results).
     ReplacedStatement { stmt: Statement },
+    /// Blocks were added to, removed from, or moved within `cfg`'s block list.
+    ChangedBlockList { cfg: CFG },
+    /// Control-flow edges or block arguments of blocks in `cfg` changed.
+    ChangedCfg { cfg: CFG },
+    /// `block`'s terminator was set (and with it the block's outgoing edges).
+    ChangedTerminator { block: Block },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -113,8 +135,11 @@ pub enum RewriteError {
     /// on one. (`insert_before` can: it appends to the end of the chain.)
     AnchorIsTerminator(Statement),
     /// The inserted definition is a terminator; terminators are not spliced into
-    /// the middle of a block's statement list.
+    /// the middle of a block's statement list. Use
+    /// [`Rewriter::insert_terminator`] on a block that has none.
     CannotInsertTerminator,
+    /// `insert_terminator` was given a block that already has a terminator.
+    BlockHasTerminator(Block),
     /// The inserted definition declares results; allocating fresh result SSA
     /// values (with types) is deferred to a later slice.
     CannotInsertWithResults,
@@ -130,6 +155,45 @@ pub enum RewriteError {
     /// A `replace_statement` changed terminator-ness, which would desync the
     /// block's terminator cache. The replacement must match the original.
     TerminatorKindMismatch(Statement),
+    /// The CFG ID does not resolve to a live CFG in this stage.
+    UnknownCfg(CFG),
+    /// The block is not part of a CFG's block list (it is a statement-owned
+    /// single-block body, or detached), so block-list surgery cannot apply.
+    NotInCfgBody(Block),
+    /// The block belongs to a different CFG than the operation's CFG.
+    CfgMismatch { block: Block, expected: CFG },
+    /// `merge_blocks` was asked to merge a block into itself.
+    CannotMergeBlockIntoItself(Block),
+    /// The definition passed to `insert_terminator` is not a terminator.
+    ExpectedTerminator,
+    /// A list of values did not line up one-for-one with a block's arguments.
+    BlockArgumentArityMismatch {
+        block: Block,
+        expected: usize,
+        found: usize,
+    },
+    /// A block-argument index is out of range for the block's argument list
+    /// (for insertion, past its end).
+    BlockArgumentIndexOutOfRange { block: Block, index: usize },
+    /// Dropping the block argument would leave dangling uses. Replace them first.
+    BlockArgumentInUse { block: Block, index: usize },
+    /// Removing `block` would leave `pred`'s edges into it dangling. Retarget
+    /// them first.
+    BlockHasPredecessors { block: Block, pred: Block },
+    /// A `merge_blocks` replacement is one of the merged block's own
+    /// arguments, which the merge deletes.
+    ReplacementIsMergedArgument { block: Block, value: SSAValue },
+    /// `stmt` branches to a block through successor position `successor`, but
+    /// its [`BranchOp`](crate::BranchOp) gives no editable operand list for
+    /// that edge.
+    NoSuccessorOperands { stmt: Statement, successor: usize },
+    /// The operand list `stmt` forwards on successor `successor` has no slot at
+    /// `index` (for insertion, `index` is past its end).
+    SuccessorOperandIndexOutOfRange {
+        stmt: Statement,
+        successor: usize,
+        index: usize,
+    },
 }
 
 impl fmt::Display for RewriteError {
@@ -174,6 +238,9 @@ impl fmt::Display for RewriteError {
                     "cannot splice a terminator into a block's statement list"
                 )
             }
+            RewriteError::BlockHasTerminator(block) => {
+                write!(f, "block {block:?} already has a terminator")
+            }
             RewriteError::CannotInsertWithResults => {
                 write!(f, "cannot insert a statement that defines results yet")
             }
@@ -193,6 +260,71 @@ impl fmt::Display for RewriteError {
                     "replacement for {stmt:?} changes terminator-ness of the statement"
                 )
             }
+            RewriteError::UnknownCfg(cfg) => {
+                write!(f, "CFG {cfg:?} is not a live CFG in this stage")
+            }
+            RewriteError::NotInCfgBody(block) => {
+                write!(f, "block {block:?} is not part of a CFG block list")
+            }
+            RewriteError::CfgMismatch { block, expected } => {
+                write!(f, "block {block:?} does not belong to CFG {expected:?}")
+            }
+            RewriteError::CannotMergeBlockIntoItself(block) => {
+                write!(f, "cannot merge block {block:?} into itself")
+            }
+            RewriteError::ExpectedTerminator => {
+                write!(f, "the definition must be a terminator")
+            }
+            RewriteError::BlockArgumentArityMismatch {
+                block,
+                expected,
+                found,
+            } => {
+                write!(
+                    f,
+                    "block {block:?} has {expected} arguments, but {found} values were given"
+                )
+            }
+            RewriteError::BlockArgumentIndexOutOfRange { block, index } => {
+                write!(
+                    f,
+                    "argument index {index} is out of range for block {block:?}"
+                )
+            }
+            RewriteError::NoSuccessorOperands { stmt, successor } => {
+                write!(
+                    f,
+                    "{stmt:?} forwards no editable operands on successor {successor}"
+                )
+            }
+            RewriteError::SuccessorOperandIndexOutOfRange {
+                stmt,
+                successor,
+                index,
+            } => {
+                write!(
+                    f,
+                    "operand index {index} is out of range for successor {successor} of {stmt:?}"
+                )
+            }
+            RewriteError::ReplacementIsMergedArgument { block, value } => {
+                write!(
+                    f,
+                    "replacement {value} is an argument of {block:?}, which the merge deletes"
+                )
+            }
+            RewriteError::BlockArgumentInUse { block, index } => {
+                write!(
+                    f,
+                    "argument {index} of block {block:?} is still used; replace it first"
+                )
+            }
+            RewriteError::BlockHasPredecessors { block, pred } => {
+                write!(
+                    f,
+                    "block {pred:?} still branches to block {block:?}; retarget its edges first"
+                )
+            }
         }
     }
 }
@@ -205,8 +337,8 @@ impl std::error::Error for RewriteError {}
 /// (use information, list links, caches) is maintained in one place and every
 /// edit is recorded as a [`MutationEvent`].
 pub struct Rewriter<'a, L: Dialect> {
-    stage: &'a mut StageInfo<L>,
-    events: Vec<MutationEvent>,
+    pub(super) stage: &'a mut StageInfo<L>,
+    pub(super) events: Vec<MutationEvent>,
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -373,7 +505,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// replaced and a replacement ends up with exactly the sites redirected
     /// *to* it. A sequential loop would instead let a later pair carry away the
     /// sites an earlier one just moved.
-    fn redirect_uses(&mut self, pairs: &[(SSAValue, SSAValue)]) -> usize {
+    pub(super) fn redirect_uses(&mut self, pairs: &[(SSAValue, SSAValue)]) -> usize {
         // Snapshot the use sites so we can mutate the arenas while walking them
         // (the borrows of the `old` infos end here).
         let sites: Vec<Vec<Use>> = pairs
@@ -450,7 +582,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
     /// Erase `stmt`: tombstone it, unlink it from its block's statement list,
     /// drop its operand uses from the def-use index, and tombstone its result
-    /// values.
+    /// values. Statement-owned blocks and `CFG`s nested inside `stmt` are
+    /// tombstoned with it, recursively. `DiGraph`/`UnGraph` bodies are not
+    /// tombstoned yet.
     ///
     /// Rejects — leaving the stage untouched — if `stmt` is unknown, is not
     /// owned by a block body, is the block terminator, or still has results that
@@ -526,12 +660,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             block_info.statements.len -= 1;
         }
 
-        // Drop the def-use edges this statement contributed, then tombstone its
-        // (now unused) result values and the statement itself.
+        // Drop the def-use edges this statement contributed, erase the bodies
+        // nested in it, then tombstone its (now unused) result values and the
+        // statement itself.
         for (index, operand) in operands.into_iter().enumerate() {
             remove_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
         // Predecessor mirror does not need to be updated since we rejected terminators earlier.
+        self.tombstone_nested_bodies(stmt);
         for result in results {
             let _ = self.stage.ssas.delete(result);
         }
@@ -539,6 +675,106 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
         self.events.push(MutationEvent::ErasedStatement { stmt });
         Ok(())
+    }
+
+    /// Tombstone `block`, its arguments, and every statement it holds, the
+    /// terminator included, recursing into nested bodies.
+    ///
+    /// Mirrors [`Rewriter::erase_statement`] per statement, minus its checks
+    /// and chain relinking: the caller guarantees no value defined in `block`
+    /// is used outside it, and the whole chain dies at once. Each statement's
+    /// uses and outgoing edges are dropped, so the use and predecessor mirrors
+    /// stay exact. Block-list links are left to the caller.
+    pub(super) fn tombstone_block(&mut self, block: Block) {
+        let Some(info) = block.get_info(self.stage).filter(|item| !item.deleted()) else {
+            return;
+        };
+        let args: SmallVec<[SSAValue; 4]> = info.arguments.iter().map(|&a| a.into()).collect();
+        let terminator = info.terminator;
+
+        // A tombstoned statement keeps its links, so the chain can be walked
+        // while it is being deleted.
+        let mut current = info.statements.head;
+        while let Some(stmt) = current {
+            current = stmt.get_info(self.stage).and_then(|item| item.node.next);
+            self.tombstone_statement(stmt, Some(block));
+        }
+        if let Some(stmt) = terminator {
+            self.tombstone_statement(stmt, Some(block));
+        }
+
+        for arg in args {
+            let _ = self.stage.ssas.delete(arg);
+        }
+        let _ = self.stage.nodes.blocks.delete(block);
+    }
+
+    /// The per-statement step of [`Rewriter::tombstone_block`]: drop `stmt`'s
+    /// uses, erase its nested bodies, then tombstone its results and itself.
+    ///
+    /// With `edges_from: Some(block)` its outgoing edges are also removed from
+    /// the predecessor mirror, which is exact only when all of `block` goes
+    /// away (the mirror keeps one entry per `(source, target)` pair). With
+    /// `None` the caller maintains the mirror itself.
+    pub(super) fn tombstone_statement(&mut self, stmt: Statement, edges_from: Option<Block>) {
+        let (operands, results, successors) = {
+            let definition = &stmt.expect_info(self.stage).definition;
+            (
+                definition
+                    .arguments()
+                    .copied()
+                    .collect::<SmallVec<[SSAValue; 4]>>(),
+                definition
+                    .results()
+                    .map(|r| SSAValue::from(*r))
+                    .collect::<SmallVec<[SSAValue; 2]>>(),
+                definition
+                    .successors()
+                    .map(|s| s.target())
+                    .collect::<SmallVec<[Block; 2]>>(),
+            )
+        };
+        for (index, operand) in operands.into_iter().enumerate() {
+            remove_use(self.stage, operand, Use::StatementOperand { stmt, index });
+        }
+        if let Some(block) = edges_from {
+            for target in successors {
+                remove_predecessor(self.stage, target, block);
+            }
+        }
+        self.tombstone_nested_bodies(stmt);
+        for result in results {
+            let _ = self.stage.ssas.delete(result);
+        }
+        let _ = self.stage.statement_arena_mut().delete(stmt);
+    }
+
+    /// Tombstone the statement-owned blocks and `CFG`s nested in `stmt`.
+    ///
+    /// TODO: `DiGraph`/`UnGraph` bodies are not tombstoned yet; their members
+    /// survive their owner until graph surgery lands.
+    fn tombstone_nested_bodies(&mut self, stmt: Statement) {
+        let (blocks, cfgs) = {
+            let definition = &stmt.expect_info(self.stage).definition;
+            (
+                definition
+                    .blocks()
+                    .copied()
+                    .collect::<SmallVec<[Block; 2]>>(),
+                definition.cfgs().copied().collect::<SmallVec<[CFG; 1]>>(),
+            )
+        };
+        for block in blocks {
+            self.tombstone_block(block);
+        }
+        for cfg in cfgs {
+            let mut current = cfg.get_info(self.stage).and_then(|item| item.blocks.head);
+            while let Some(block) = current {
+                current = block.get_info(self.stage).and_then(|item| item.node.next);
+                self.tombstone_block(block);
+            }
+            let _ = self.stage.nodes.cfgs.delete(cfg);
+        }
     }
 
     /// Insert `definition` as a new statement immediately before `anchor`.
@@ -676,6 +912,91 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(new_stmt)
     }
 
+    /// Insert `definition` as the terminator of `block`, which must have none
+    /// (for example the first half left by [`Rewriter::split_block`]).
+    ///
+    /// The block may be in a `CFG` or a statement-owned body. Operand uses and
+    /// the predecessor mirror are updated for the new statement's operands and
+    /// successors, and the block's terminator pointer is set.
+    ///
+    /// Rejects, leaving the stage untouched, if `block` is unknown or already
+    /// has a terminator, or if `definition` is not a terminator, declares
+    /// results, or names a dead operand or successor.
+    ///
+    /// Records [`MutationEvent::InsertedStatement`] then
+    /// [`MutationEvent::ChangedTerminator`].
+    pub fn insert_terminator(
+        &mut self,
+        block: Block,
+        definition: L,
+    ) -> Result<Statement, RewriteError> {
+        let chain_head = {
+            let info = block
+                .get_info(self.stage)
+                .filter(|item| !item.deleted())
+                .ok_or(RewriteError::UnknownBlock(block))?;
+            if info.terminator.is_some() {
+                return Err(RewriteError::BlockHasTerminator(block));
+            }
+            info.statements.head
+        };
+        if !definition.is_terminator() {
+            return Err(RewriteError::ExpectedTerminator);
+        }
+        if definition.results().next().is_some() {
+            return Err(RewriteError::CannotInsertWithResults);
+        }
+        let operands: Vec<SSAValue> = definition.arguments().copied().collect();
+        for &operand in &operands {
+            if operand.get_info(self.stage).is_none() {
+                return Err(RewriteError::UnknownValue(operand));
+            }
+        }
+        let targets: HashSet<Block> = definition.successors().map(|s| s.target()).collect();
+        for &target in &targets {
+            if !block_is_live(self.stage, target) {
+                return Err(RewriteError::UnknownBlock(target));
+            }
+        }
+
+        // Edges the block already has (from non-terminator statements, if any)
+        // keep their single predecessor entry.
+        let mut existing: HashSet<Block> = HashSet::new();
+        let mut current = chain_head;
+        while let Some(stmt) = current {
+            let item = stmt.expect_info(self.stage);
+            existing.extend(item.definition.successors().map(|s| s.target()));
+            current = item.node.next;
+        }
+
+        let new_stmt = self
+            .stage
+            .statement_arena_mut()
+            .alloc_with_id(|id| StatementInfo {
+                node: LinkedListNode::new(id),
+                parent: Some(StatementParent::Block(block)),
+                definition,
+            });
+        for (index, operand) in operands.into_iter().enumerate() {
+            let site = Use::StatementOperand {
+                stmt: new_stmt,
+                index,
+            };
+            add_use(self.stage, operand, site);
+        }
+        for &target in targets.difference(&existing) {
+            add_predecessor(self.stage, target, block);
+        }
+        if let Some(info) = block.get_info_mut(self.stage) {
+            info.terminator = Some(new_stmt);
+        }
+
+        self.events
+            .push(MutationEvent::InsertedStatement { stmt: new_stmt });
+        self.events.push(MutationEvent::ChangedTerminator { block });
+        Ok(new_stmt)
+    }
+
     /// Swap `stmt`'s definition for `definition` in place, keeping the same
     /// statement id, block position, and result values.
     ///
@@ -684,9 +1005,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// terminator cache stay valid; the original result ids are preserved
     /// regardless of what `definition` carries in its result slots.
     ///
-    /// Both mirrors are maintained: operand uses are updated to match the new
-    /// operands, and `BlockInfo::predecessors` is updated for any control-flow
-    /// edge the replacement adds or drops.
+    /// Every derived mirror stays current. Operand uses are updated to match
+    /// the new operands, and `BlockInfo::predecessors` is updated for any
+    /// control-flow edge the replacement adds or drops. The block-body and CFG
+    /// chain mirrors need no update: the statement keeps its id, chain links,
+    /// and terminator-ness, and no block moves.
     ///
     /// Rejects (leaving the stage untouched) if `stmt` is unknown, is not
     /// owned by a block body (i.e. in a graph), changes result arity or
@@ -698,6 +1021,18 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         stmt: Statement,
         definition: L,
     ) -> Result<(), RewriteError> {
+        let prepared = self.prepare_replacement(stmt, &definition)?;
+        self.commit_replacement(stmt, prepared, definition);
+        Ok(())
+    }
+
+    /// Check [`Rewriter::replace_statement`]'s preconditions without mutating,
+    /// capturing the old state the commit step needs.
+    pub(super) fn prepare_replacement(
+        &self,
+        stmt: Statement,
+        definition: &L,
+    ) -> Result<PreparedReplacement, RewriteError> {
         let (old_operands, old_results, old_successors, parent_block, old_is_terminator) = {
             let item = stmt
                 .get_info(self.stage)
@@ -732,21 +1067,46 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if definition.is_terminator() != old_is_terminator {
             return Err(RewriteError::TerminatorKindMismatch(stmt));
         }
-        let new_operands: Vec<SSAValue> = definition.arguments().copied().collect();
-        for &operand in &new_operands {
+        for &operand in definition.arguments() {
             if operand.get_info(self.stage).is_none() {
                 return Err(RewriteError::UnknownValue(operand));
             }
         }
-        let new_successors: HashSet<Block> = definition
-            .successors()
-            .map(|successor| successor.target())
-            .collect();
-        for &target in &new_successors {
+        for successor in definition.successors() {
+            let target = successor.target();
             if !block_is_live(self.stage, target) {
                 return Err(RewriteError::UnknownBlock(target));
             }
         }
+
+        Ok(PreparedReplacement {
+            old_operands,
+            old_results,
+            old_successors,
+            parent_block,
+        })
+    }
+
+    /// Install a definition already checked by
+    /// [`Rewriter::prepare_replacement`], keeping every derived mirror current
+    /// (see [`Rewriter::replace_statement`]).
+    pub(super) fn commit_replacement(
+        &mut self,
+        stmt: Statement,
+        prepared: PreparedReplacement,
+        definition: L,
+    ) {
+        let PreparedReplacement {
+            old_operands,
+            old_results,
+            old_successors,
+            parent_block,
+        } = prepared;
+        let new_operands: Vec<SSAValue> = definition.arguments().copied().collect();
+        let new_successors: HashSet<Block> = definition
+            .successors()
+            .map(|successor| successor.target())
+            .collect();
 
         // Preserve the original result ids in the incoming definition so its
         // results keep their SSA identity and types.
@@ -780,12 +1140,19 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
 
         self.events.push(MutationEvent::ReplacedStatement { stmt });
-        Ok(())
     }
 }
 
+/// Old-state snapshot taken by [`Rewriter::prepare_replacement`].
+pub(super) struct PreparedReplacement {
+    old_operands: Vec<SSAValue>,
+    old_results: Vec<crate::ResultValue>,
+    old_successors: HashSet<Block>,
+    parent_block: Block,
+}
+
 /// Remove one occurrence of `site` from `value`'s use list, if present.
-fn remove_use<L: Dialect>(stage: &mut StageInfo<L>, value: SSAValue, site: Use) {
+pub(super) fn remove_use<L: Dialect>(stage: &mut StageInfo<L>, value: SSAValue, site: Use) {
     if let Some(info) = value.get_info_mut(stage) {
         let uses = info.uses_mut();
         if let Some(pos) = uses.iter().position(|u| *u == site) {
@@ -795,7 +1162,7 @@ fn remove_use<L: Dialect>(stage: &mut StageInfo<L>, value: SSAValue, site: Use) 
 }
 
 /// Record `site` on `value`'s use list.
-fn add_use<L: Dialect>(stage: &mut StageInfo<L>, value: SSAValue, site: Use) {
+pub(super) fn add_use<L: Dialect>(stage: &mut StageInfo<L>, value: SSAValue, site: Use) {
     if let Some(info) = value.get_info_mut(stage) {
         info.uses_mut().push(site);
     }
@@ -805,7 +1172,7 @@ fn add_use<L: Dialect>(stage: &mut StageInfo<L>, value: SSAValue, site: Use) {
 ///
 /// One entry per `(source, target)` pair, so callers must only reach this for
 /// a target that does not have any other edges from `block`
-fn remove_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Block, pred: Block) {
+pub(super) fn remove_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Block, pred: Block) {
     let Some(block_info) = block.get_info_mut(stage).filter(|item| !item.deleted()) else {
         return;
     };
@@ -818,13 +1185,13 @@ fn remove_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Block, pred: 
 ///
 /// One entry per `(source, target)` pair, so callers must only reach this for
 /// a target that did not already have an edge from `pred`.
-fn add_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Block, pred: Block) {
+pub(super) fn add_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Block, pred: Block) {
     if let Some(info) = block.get_info_mut(stage).filter(|item| !item.deleted()) {
         info.predecessors.push(pred);
     }
 }
 
 /// Whether `block` resolves to a live block in `stage`.
-fn block_is_live<L: Dialect>(stage: &StageInfo<L>, block: Block) -> bool {
+pub(super) fn block_is_live<L: Dialect>(stage: &StageInfo<L>, block: Block) -> bool {
     block.get_info(stage).is_some_and(|item| !item.deleted())
 }

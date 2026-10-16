@@ -320,6 +320,49 @@ fn erase_statement_unlinks_and_maintains_index() {
 }
 
 #[test]
+fn erase_statement_tombstones_nested_bodies() {
+    let mut stage = new_stage();
+
+    // `owner` holds an inner CFG whose statement reads x, a result defined in
+    // the outer block.
+    let (split, x, _unused) = make_split(&mut stage);
+    let inner_use = stage.statement().definition(BuilderDialect::Use(x)).new();
+    let inner_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let inner_block = stage.block().stmt(inner_use).terminator(inner_ret).new();
+    let inner = stage.cfg().add_block(inner_block).new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnCFG(inner))
+        .new();
+    let outer = stage.block().stmt(split).stmt(owner).new();
+
+    let mut stage = stage.finalize().unwrap();
+    assert_eq!(uses_set(&stage, x), HashSet::from([so(inner_use, 0)]));
+
+    {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.erase_statement(owner).unwrap();
+        assert_eq!(
+            rw.drain_events(),
+            vec![MutationEvent::ErasedStatement { stmt: owner }]
+        );
+    }
+
+    // Nothing survives under the deleted owner, including the terminator.
+    assert!(owner.get_info(&stage).unwrap().deleted());
+    assert!(inner.get_info(&stage).unwrap().deleted());
+    assert!(inner_block.get_info(&stage).unwrap().deleted());
+    assert!(inner_use.get_info(&stage).unwrap().deleted());
+    assert!(inner_ret.get_info(&stage).unwrap().deleted());
+    // The nested statement's use of x went with it; x itself is untouched.
+    assert!(uses_set(&stage, x).is_empty());
+    assert!(!split.get_info(&stage).unwrap().deleted());
+    assert_eq!(outer.statements(&stage).collect::<Vec<_>>(), vec![split]);
+
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
 fn erase_statement_rejects_terminator_results_and_unknown() {
     let mut stage = new_stage();
 
