@@ -55,23 +55,28 @@ impl<I: Identifier, T> Arena<I, T> {
         id
     }
 
+    /// Get a live item. Returns `None` for a deleted tombstone as well as for
+    /// an id this arena never allocated.
     pub fn get(&self, id: impl Into<I>) -> Option<&Item<T>> {
-        self.items.get(id.into().into().raw())
+        self.items
+            .get(id.into().into().raw())
+            .filter(|arena_item| !arena_item.deleted)
     }
 
+    /// Mutable counterpart of [`get`](Self::get): live items only.
     pub fn get_mut(&mut self, id: impl Into<I>) -> Option<&mut Item<T>> {
-        self.items.get_mut(id.into().into().raw())
+        self.items
+            .get_mut(id.into().into().raw())
+            .filter(|arena_item| !arena_item.deleted)
     }
 
     #[must_use]
     pub fn delete(&mut self, id: impl Into<I>) -> bool {
-        if let Some(arena_item) = self.get_mut(id)
-            && !arena_item.deleted
-        {
-            arena_item.deleted = true;
-            return true;
-        }
-        false
+        let Some(arena_item) = self.get_mut(id) else {
+            return false;
+        };
+        arena_item.deleted = true;
+        true
     }
 
     pub fn iter(&self) -> impl Iterator<Item = &Item<T>> {
@@ -187,17 +192,23 @@ impl<I: Identifier, T> Arena<I, T> {
     }
 }
 
+/// `arena[id]` is [`get`](Arena::get) that panics where `get` returns `None`:
+/// for a deleted tombstone and for an id this arena never allocated.
 impl<T, I: Identifier> std::ops::Index<I> for Arena<I, T> {
     type Output = Item<T>;
 
     fn index(&self, index: I) -> &Self::Output {
-        &self.items[index.into().raw()]
+        self.get(index)
+            .unwrap_or_else(|| panic!("{index:?} is deleted or not in this arena"))
     }
 }
 
+/// Mutable counterpart of the [`Index`](std::ops::Index) impl: live items
+/// only, panicking where [`get_mut`](Arena::get_mut) returns `None`.
 impl<T, I: Identifier> std::ops::IndexMut<I> for Arena<I, T> {
     fn index_mut(&mut self, index: I) -> &mut Self::Output {
-        &mut self.items[index.into().raw()]
+        self.get_mut(index)
+            .unwrap_or_else(|| panic!("{index:?} is deleted or not in this arena"))
     }
 }
 
@@ -245,9 +256,49 @@ mod tests {
         let live: Vec<&str> = arena.iter().map(|item| **item).collect();
         assert_eq!(live, vec!["b", "c"]);
 
-        // get() still returns deleted items (with deleted flag)
-        assert!(arena.get(a).unwrap().deleted());
-        assert!(!arena.get(c).unwrap().deleted());
+        // get() skips deleted items too
+        assert!(arena.get(a).is_none());
+        assert!(arena.get(c).is_some());
+    }
+
+    #[test]
+    fn arena_get_mut_skips_tombstones() {
+        let mut arena: Arena<TestId, i32> = Arena::default();
+        let a = arena.alloc(1);
+        let b = arena.alloc(2);
+        assert!(arena.delete(a));
+
+        assert!(arena.get_mut(a).is_none());
+        assert_eq!(**arena.get_mut(b).unwrap(), 2);
+    }
+
+    #[test]
+    fn arena_delete_keeps_data_in_slot() {
+        let mut arena: Arena<TestId, i32> = Arena::default();
+        let id = arena.alloc(7);
+        assert!(arena.delete(id));
+
+        // The data stays in place until gc(); only the arena itself sees it.
+        let slot = &arena.items[Id::from(id).raw()];
+        assert!(slot.deleted());
+        assert_eq!(**slot, 7);
+    }
+
+    #[test]
+    fn arena_gc_drops_tombstones_and_remaps() {
+        let mut arena: Arena<TestId, &str> = Arena::default();
+        let a = arena.alloc("a");
+        let b = arena.alloc("b");
+        let c = arena.alloc("c");
+        assert!(arena.delete(b));
+
+        let map = arena.gc();
+        assert_eq!(arena.len(), 2);
+        assert_eq!(map.get(a), Some(TestId(Id(0))));
+        assert_eq!(map.get(b), None);
+        let new_c = map.get(c).unwrap();
+        assert_eq!(new_c, TestId(Id(1)));
+        assert_eq!(**arena.get(new_c).unwrap(), "c");
     }
 
     #[test]

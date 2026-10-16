@@ -168,8 +168,7 @@ fn digraph_builder_resolves_builder_port_placeholders() {
         .new();
 
     // Check placeholder deletion via builder arena before converting
-    let placeholder_item = stage.ssa_arena().get(placeholder).unwrap();
-    assert!(placeholder_item.deleted());
+    assert!(stage.ssa_arena().get(placeholder).is_none());
 
     let stage = stage.finalize().unwrap();
     let info = dg.expect_info(&stage);

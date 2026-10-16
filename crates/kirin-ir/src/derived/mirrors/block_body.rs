@@ -44,7 +44,7 @@ pub(in crate::derived) fn derive<L: Dialect>(
         // Checked once, before the terminator split: both branches record
         // membership, so both would otherwise file the statement under a block
         // that no longer exists.
-        if !is_live_block(stage, parent) {
+        if stage.nodes.blocks.get(parent).is_none() {
             findings.push(Finding::DanglingParent(DanglingParent::StatementInBlock {
                 stmt,
                 parent,
@@ -150,13 +150,4 @@ impl BlockBodyMap {
             }
         }
     }
-}
-
-/// Whether `block` resolves to a live block of `stage`.
-fn is_live_block<L: Dialect>(stage: &StageInfo<L>, block: Block) -> bool {
-    stage
-        .nodes
-        .blocks
-        .get(block)
-        .is_some_and(|item| !item.deleted())
 }

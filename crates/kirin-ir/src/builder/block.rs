@@ -145,11 +145,12 @@ impl<'a, L: Dialect> BlockBuilder<'a, L> {
                 if replacements.contains_key(arg) {
                     continue;
                 }
-                let ssa_info = self
-                    .stage
-                    .ssas
-                    .get(*arg)
-                    .expect("SSAValue not found in stage");
+                let ssa_info = self.stage.ssas.get(*arg).unwrap_or_else(|| {
+                    panic!(
+                        "SSAValue {arg} not found in stage (a placeholder already \
+                         resolved by another block is deleted and cannot be reused)"
+                    )
+                });
                 if let BuilderSSAKind::Unresolved(ResolutionInfo::BlockArgument(key)) =
                     ssa_info.kind
                 {

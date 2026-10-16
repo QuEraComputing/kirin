@@ -310,7 +310,7 @@ fn erase_statement_unlinks_and_maintains_index() {
     }
 
     // s1 is tombstoned; the block now reads [s0, s2]; x lost the {s1,0} use.
-    assert!(s1.get_info(&stage).unwrap().deleted());
+    assert!(s1.get_info(&stage).is_none());
     let order: Vec<Statement> = block.statements(&stage).collect();
     assert_eq!(order, vec![s0, s2]);
     assert_eq!(uses_set(&stage, real_x), HashSet::from([so(s0, 0)]));
@@ -349,14 +349,14 @@ fn erase_statement_tombstones_nested_bodies() {
     }
 
     // Nothing survives under the deleted owner, including the terminator.
-    assert!(owner.get_info(&stage).unwrap().deleted());
-    assert!(inner.get_info(&stage).unwrap().deleted());
-    assert!(inner_block.get_info(&stage).unwrap().deleted());
-    assert!(inner_use.get_info(&stage).unwrap().deleted());
-    assert!(inner_ret.get_info(&stage).unwrap().deleted());
+    assert!(owner.get_info(&stage).is_none());
+    assert!(inner.get_info(&stage).is_none());
+    assert!(inner_block.get_info(&stage).is_none());
+    assert!(inner_use.get_info(&stage).is_none());
+    assert!(inner_ret.get_info(&stage).is_none());
     // The nested statement's use of x went with it; x itself is untouched.
     assert!(uses_set(&stage, x).is_empty());
-    assert!(!split.get_info(&stage).unwrap().deleted());
+    assert!(split.get_info(&stage).is_some());
     assert_eq!(outer.statements(&stage).collect::<Vec<_>>(), vec![split]);
 
     verify_derived(&stage).unwrap();
@@ -402,7 +402,7 @@ fn erase_statement_erases_a_terminator_and_its_edges() {
     );
 
     // The block is unterminated, its chain intact; the edge and use are gone.
-    assert!(jump.get_info(&stage).unwrap().deleted());
+    assert!(jump.get_info(&stage).is_none());
     assert_eq!(entry.terminator(&stage), None);
     assert_eq!(entry.statements(&stage).collect::<Vec<_>>(), vec![nop]);
     assert!(target.expect_info(&stage).predecessors.is_empty());
@@ -444,8 +444,8 @@ fn erase_statement_rejects_used_results_and_unknown() {
     );
 
     // The rejected edits left wire and consumer intact.
-    assert!(!wire.get_info(rw.stage()).unwrap().deleted());
-    assert!(!consumer.get_info(rw.stage()).unwrap().deleted());
+    assert!(wire.get_info(rw.stage()).is_some());
+    assert!(consumer.get_info(rw.stage()).is_some());
 }
 
 #[test]
@@ -874,7 +874,7 @@ fn replace_results_redirects_every_result_and_unblocks_erase() {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(dup).unwrap();
     }
-    assert!(dup.get_info(&stage).unwrap().deleted());
+    assert!(dup.get_info(&stage).is_none());
 
     verify_derived(&stage).unwrap();
 }
