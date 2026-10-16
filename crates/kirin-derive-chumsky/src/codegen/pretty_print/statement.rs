@@ -80,6 +80,21 @@ impl GeneratePrettyPrint {
         let prettyless_path = &self.prettyless_path;
         let ir_path = Self::ir_path(ir_input);
 
+        // A variant wrapping a bare type parameter `L` only has the impls its
+        // bounds promise, so printing it requires `L: PrettyPrint`.
+        let mut where_clause = where_clause.cloned();
+        if let kirin_derive_toolkit::ir::Data::Enum(e) = &ir_input.data {
+            for wrapper in e.variants.iter().filter_map(|v| v.wraps.as_ref()) {
+                if wrapper.wraps_bare_type_param(&ir_input.generics) {
+                    let ty = &wrapper.ty;
+                    where_clause
+                        .get_or_insert_with(|| syn::parse_quote!(where))
+                        .predicates
+                        .push(syn::parse_quote! { #ty: #prettyless_path::PrettyPrint });
+                }
+            }
+        }
+
         let print_body = match &ir_input.data {
             kirin_derive_toolkit::ir::Data::Struct(s) => {
                 self.generate_struct_print(ir_input, &s.0, dialect_name, None)
