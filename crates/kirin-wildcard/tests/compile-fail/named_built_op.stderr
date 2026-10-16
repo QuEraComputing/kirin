@@ -1,0 +1,5 @@
+error: `@` cannot name an statement built in the body of `rewrite!`
+  --> tests/compile-fail/named_built_op.rs:15:15
+   |
+15 |         let n @ y = op![Arith::neg(x)];
+   |               ^

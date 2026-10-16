@@ -1,0 +1,5 @@
+error: `erase!` can only act on an `op![..]` before the rewrite, or one of its results
+  --> tests/compile-fail/invalid_rule.rs:14:12
+   |
+14 |     erase!(x)
+   |            ^
