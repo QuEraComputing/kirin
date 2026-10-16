@@ -80,7 +80,7 @@ use smallvec::SmallVec;
 
 use crate::{
     Block, BlockInfo, CFG, DiGraph, Dialect, SSAValue, StageInfo, Statement, StatementInfo,
-    StatementParent, Use,
+    StatementParent, UnGraph, Use,
 };
 
 /// A structured record of one mutation performed through a [`Rewriter`].
@@ -121,6 +121,10 @@ pub enum MutationEvent {
     /// One or more yield slots of `graph` were rewritten in place. Recorded at
     /// most once per graph per [`Rewriter`] call.
     ChangedDiGraphYields { graph: DiGraph },
+    /// Members or edges of `graph`'s topology changed: a node or edge
+    /// statement was added or removed, or a wire's endpoints changed. Recorded
+    /// at most once per graph per [`Rewriter`] call.
+    ChangedUnGraphTopology { graph: UnGraph },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -181,6 +185,13 @@ pub enum RewriteError {
     UnknownDiGraph(DiGraph),
     /// The yield index is out of range for the `DiGraph`'s yield list.
     YieldIndexOutOfRange { graph: DiGraph, index: usize },
+    /// The edit would leave the wire `value` of `graph` read by `incidences`
+    /// node operand slots; an undirected edge joins at most two.
+    UnGraphDegreeExceeded {
+        graph: UnGraph,
+        value: SSAValue,
+        incidences: usize,
+    },
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -292,6 +303,16 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::UnknownDiGraph(graph) => {
                 write!(f, "DiGraph {graph} is not a live DiGraph in this stage")
+            }
+            RewriteError::UnGraphDegreeExceeded {
+                graph,
+                value,
+                incidences,
+            } => {
+                write!(
+                    f,
+                    "wire {value} of UnGraph {graph} would have {incidences} node incidences; at most 2 are allowed"
+                )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
                 write!(f, "yield index {index} is out of range for DiGraph {graph}")

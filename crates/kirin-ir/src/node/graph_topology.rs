@@ -7,7 +7,7 @@ use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 
 use super::graph::GraphInfo;
-use crate::{Dialect, SSAValue, Statement};
+use crate::{DiGraphInfo, Dialect, SSAValue, Statement, UnGraphInfo};
 
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     /// Add `stmt` as a new node. Returns `false`, changing nothing, if `stmt`
@@ -35,17 +35,39 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         true
     }
 
+    /// Add an edge between members `a` and `b` (from `a` to `b` if directed).
+    fn insert_edge(&mut self, a: Statement, b: Statement, value: SSAValue) {
+        let (a, b) = (self.expect_node_idx_of(a), self.expect_node_idx_of(b));
+        self.graph.add_edge(a, b, value);
+    }
+
+    /// Remove an edge carrying `value` between members `a` and `b` (from `a`
+    /// to `b` if directed), returning whether there was one. Of several such
+    /// parallel edges, only one is removed.
+    fn delete_edge(&mut self, a: Statement, b: Statement, value: SSAValue) -> bool {
+        let (a, b) = (self.expect_node_idx_of(a), self.expect_node_idx_of(b));
+        let edge = self
+            .graph
+            .edges_connecting(a, b)
+            .find(|edge| *edge.weight() == value)
+            .map(|edge| edge.id());
+        edge.is_some_and(|edge| self.graph.remove_edge(edge).is_some())
+    }
+
+    fn expect_node_idx_of(&self, stmt: Statement) -> NodeIndex {
+        self.node_idx_of(stmt)
+            .unwrap_or_else(|| panic!("{stmt:?} is not a graph member"))
+    }
+}
+
+impl<L: Dialect> DiGraphInfo<L> {
     /// Add an edge `producer → consumer` carrying `value`.
     ///
     /// # Panics
     ///
     /// If either statement is not a member.
     pub(crate) fn add_edge(&mut self, producer: Statement, consumer: Statement, value: SSAValue) {
-        let (from, to) = (
-            self.expect_node_idx_of(producer),
-            self.expect_node_idx_of(consumer),
-        );
-        self.graph.add_edge(from, to, value);
+        self.insert_edge(producer, consumer, value);
     }
 
     /// Remove one edge `producer → consumer` carrying `value` (parallel edges
@@ -60,21 +82,30 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         consumer: Statement,
         value: SSAValue,
     ) -> bool {
-        let (from, to) = (
-            self.expect_node_idx_of(producer),
-            self.expect_node_idx_of(consumer),
-        );
-        let edge = self
-            .graph
-            .edges_connecting(from, to)
-            .find(|edge| *edge.weight() == value)
-            .map(|edge| edge.id());
-        edge.is_some_and(|edge| self.graph.remove_edge(edge).is_some())
+        self.delete_edge(producer, consumer, value)
+    }
+}
+
+impl<L: Dialect> UnGraphInfo<L> {
+    /// Add the edge for `wire` between nodes `a` and `b`.
+    ///
+    /// # Panics
+    ///
+    /// If either statement is not a node.
+    #[expect(dead_code, reason = "wired up by UnGraph node and operand surgery")]
+    pub(crate) fn add_edge(&mut self, a: Statement, b: Statement, wire: SSAValue) {
+        self.insert_edge(a, b, wire);
     }
 
-    fn expect_node_idx_of(&self, stmt: Statement) -> NodeIndex {
-        self.node_idx_of(stmt)
-            .unwrap_or_else(|| panic!("{stmt:?} is not a graph member"))
+    /// Remove the edge for `wire` between nodes `a` and `b`, in either order.
+    /// Returns `false` if there is none.
+    ///
+    /// # Panics
+    ///
+    /// If either statement is not a node.
+    #[expect(dead_code, reason = "wired up by UnGraph node and operand surgery")]
+    pub(crate) fn remove_edge(&mut self, a: Statement, b: Statement, wire: SSAValue) -> bool {
+        self.delete_edge(a, b, wire)
     }
 }
 
