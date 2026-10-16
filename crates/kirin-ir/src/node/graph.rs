@@ -44,10 +44,13 @@ impl UnGraphExtra {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "serde",
-    serde(bound(
-        serialize = "Extra: serde::Serialize",
-        deserialize = "Extra: serde::Deserialize<'de>"
-    ))
+    serde(
+        bound(
+            serialize = "Extra: serde::Serialize",
+            deserialize = "Extra: serde::Deserialize<'de>"
+        ),
+        from = "GraphInfoData<D, Extra>"
+    )
 )]
 pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) id: crate::arena::Id,
@@ -59,10 +62,42 @@ pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     /// keep `stmt_to_node_idx` in lockstep with it (hence `pub(super)`).
     pub(super) graph: petgraph::Graph<Statement, SSAValue, D>,
     /// Member statement → its node in `graph`. Not checked by `derived/`
-    /// verification.
+    /// verification. Not serialized: deserialization rebuilds it from `graph`.
+    #[cfg_attr(feature = "serde", serde(skip))]
     pub(super) stmt_to_node_idx: FxHashMap<Statement, NodeIndex>,
     pub(crate) extra: Extra,
     _marker: std::marker::PhantomData<L>,
+}
+
+/// The serialized fields of a [`GraphInfo`]. Deserializing goes through
+/// [`GraphInfo::new`], so `stmt_to_node_idx` is rebuilt from the graph rather
+/// than trusted from the input.
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+#[serde(bound(deserialize = "Extra: serde::Deserialize<'de>"))]
+struct GraphInfoData<D: EdgeType, Extra> {
+    id: crate::arena::Id,
+    parent: Option<Statement>,
+    name: Option<Symbol>,
+    ports: Vec<Port>,
+    edge_count: usize,
+    graph: petgraph::Graph<Statement, SSAValue, D>,
+    extra: Extra,
+}
+
+#[cfg(feature = "serde")]
+impl<L: Dialect, D: EdgeType, Extra> From<GraphInfoData<D, Extra>> for GraphInfo<L, D, Extra> {
+    fn from(data: GraphInfoData<D, Extra>) -> Self {
+        GraphInfo::new(
+            data.id,
+            data.parent,
+            data.name,
+            data.ports,
+            data.edge_count,
+            data.graph,
+            data.extra,
+        )
+    }
 }
 
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
