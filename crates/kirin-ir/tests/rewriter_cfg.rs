@@ -872,6 +872,40 @@ fn merge_blocks_rejects_illegal_merges() {
 }
 
 #[test]
+fn merge_blocks_rejects_self_looping_succ() {
+    let mut stage = new_stage();
+
+    // entry -> succ, succ -> succ
+    let succ = stage.block().new();
+    let entry_br = stage.statement().definition(br(succ)).new();
+    let entry = stage.block().terminator(entry_br).new();
+    let _cfg = stage.cfg().add_block(entry).add_block(succ).new();
+
+    let mut stage = stage.finalize().unwrap();
+    // The builder cannot name `succ` before creating it, so close the loop here.
+    Rewriter::new(&mut stage)
+        .insert_terminator(succ, br(succ))
+        .unwrap();
+    let succ_br = succ.terminator(&stage).unwrap();
+
+    // Merging would move `br succ` into entry, leaving it targeting the
+    // tombstoned succ.
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(
+        rw.merge_blocks(entry, succ, &[]),
+        Err(RewriteError::BlockHasPredecessors {
+            block: succ,
+            pred: succ,
+        })
+    );
+    assert!(rw.events().is_empty());
+    assert!(!succ.get_info(rw.stage()).unwrap().deleted());
+    assert_eq!(entry.terminator(rw.stage()), Some(entry_br));
+    assert_eq!(succ.terminator(rw.stage()), Some(succ_br));
+    verify_derived(rw.stage()).unwrap();
+}
+
+#[test]
 fn merge_blocks_rejects_other_incoming_edges_until_retargeted() {
     let mut stage = new_stage();
 

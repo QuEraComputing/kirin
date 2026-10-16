@@ -14,8 +14,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Rejects, leaving the stage untouched, if either block is unknown or
     /// not in a CFG, they are in different CFGs or the same block, a block
-    /// other than `pred` or `succ` still branches to `succ`
-    /// ([`RewriteError::BlockHasPredecessors`]; retarget those edges first),
+    /// other than `pred` (including `succ` itself, via a self-loop) still
+    /// branches to `succ` ([`RewriteError::BlockHasPredecessors`]; retarget
+    /// those edges first),
     /// the replacement count differs from `succ`'s argument count, or a
     /// replacement is not live or is one of `succ`'s own arguments (which the
     /// merge deletes).
@@ -40,7 +41,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if pred == succ {
             return Err(RewriteError::CannotMergeBlockIntoItself(pred));
         }
-        self.check_no_outside_predecessors(succ, &[pred, succ])?;
+        // A self-loop on succ is rejected too: its terminator moves into pred
+        // and would still target succ, which the merge tombstones.
+        self.check_no_outside_predecessors(succ, &[pred])?;
         let succ_args: Vec<SSAValue> = self
             .live_block(succ)?
             .arguments
