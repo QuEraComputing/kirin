@@ -506,6 +506,11 @@ fn insert_before_and_after_splice_and_maintain_index() {
         rw.insert_before(s0, BuilderDialect::Return),
         Err(RewriteError::CannotInsertTerminator)
     );
+    // Only a terminator may carry successors.
+    assert_eq!(
+        rw.insert_after(s0, BuilderDialect::Fork(Successor::from_block(block))),
+        Err(RewriteError::NonTerminatorWithSuccessors)
+    );
     let bogus = SSAValue::from(TestSSAValue(9999));
     assert_eq!(
         rw.insert_before(s0, BuilderDialect::Use(bogus)),
@@ -707,6 +712,12 @@ fn replace_statement_rejects_illegal_edits() {
     assert_eq!(
         rw.replace_statement(branch, BuilderDialect::Nop),
         Err(RewriteError::TerminatorKindMismatch(branch))
+    );
+    // A non-terminator cannot gain successors: only the terminator's edges
+    // are in the predecessor mirror.
+    assert_eq!(
+        rw.replace_statement(plain, BuilderDialect::Fork(Successor::from_block(target))),
+        Err(RewriteError::NonTerminatorWithSuccessors)
     );
     // Operands must be live...
     assert_eq!(

@@ -134,6 +134,10 @@ pub enum RewriteError {
     /// the middle of a block's statement list. Use
     /// [`Rewriter::insert_terminator`] on a block that has none.
     CannotInsertTerminator,
+    /// The inserted or replacement definition is a non-terminator that carries
+    /// successors. Only a block's terminator may transfer control, so such a
+    /// statement would add edges the predecessor mirror does not count.
+    NonTerminatorWithSuccessors,
     /// `insert_terminator` was given a block that already has a terminator.
     BlockHasTerminator(Block),
     /// The inserted definition declares results; allocating fresh result SSA
@@ -267,6 +271,9 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::ExpectedTerminator => {
                 write!(f, "the definition must be a terminator")
+            }
+            RewriteError::NonTerminatorWithSuccessors => {
+                write!(f, "only a terminator may carry successors")
             }
             RewriteError::BlockArgumentArityMismatch {
                 block,
@@ -800,10 +807,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// `anchor` must be a live, non-terminator statement owned by a block body,
     /// and `definition` must be a non-terminator declaring no results (fresh
-    /// result-value allocation is a later slice). Every operand must be live. On
-    /// success the new statement is spliced into the block, its operand uses are
-    /// recorded, and [`MutationEvent::InsertedStatement`] is emitted; the new id
-    /// is returned.
+    /// result-value allocation is a later slice) and no successors. Every
+    /// operand must be live. On success the new statement is spliced into the
+    /// block, its operand uses are recorded, and
+    /// [`MutationEvent::InsertedStatement`] is emitted; the new id is returned.
     pub fn insert_after(
         &mut self,
         anchor: Statement,
@@ -849,6 +856,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
         if definition.is_terminator() {
             return Err(RewriteError::CannotInsertTerminator);
+        }
+        if definition.successors().next().is_some() {
+            return Err(RewriteError::NonTerminatorWithSuccessors);
         }
         if definition.results().next().is_some() {
             return Err(RewriteError::CannotInsertWithResults);
@@ -1010,7 +1020,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Rejects (leaving the stage untouched) if `stmt` is unknown, is not
     /// owned by a block body (i.e. in a graph), changes result arity or
-    /// terminator-ness, or names an operand or successor target that is not live.
+    /// terminator-ness, gives a non-terminator successors, or names an operand
+    /// or successor target that is not live.
     ///
     /// Records [`MutationEvent::ReplacedStatement`], followed by
     /// [`MutationEvent::ChangedTerminator`] when `stmt` is a terminator.
@@ -1064,6 +1075,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         if definition.is_terminator() != old_is_terminator {
             return Err(RewriteError::TerminatorKindMismatch(stmt));
+        }
+        if !old_is_terminator && definition.successors().next().is_some() {
+            return Err(RewriteError::NonTerminatorWithSuccessors);
         }
         for &operand in definition.arguments() {
             if operand.get_info(self.stage).is_none() {
@@ -1126,17 +1140,19 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             add_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
 
-        // Update the predecessor mirror
+        // Update the predecessor mirror. Only terminators are expected to have successors.
         // Remove the parent_block from the predecessor list of any successor that is
         // also not a successor of the new definition. Similarly, only add parent_block
         // to the predecessor list of any successor that does not already have it.
         // For example, when making the replacement cond_branch(t, t) -> cond_branch(t, u)
         // there is still an edge from parent_block to t, so we don't update t's predecessors
-        for &target in old_successors.difference(&new_successors) {
-            remove_predecessor(self.stage, target, parent_block);
-        }
-        for &target in new_successors.difference(&old_successors) {
-            add_predecessor(self.stage, target, parent_block);
+        if is_terminator {
+            for &target in old_successors.difference(&new_successors) {
+                remove_predecessor(self.stage, target, parent_block);
+            }
+            for &target in new_successors.difference(&old_successors) {
+                add_predecessor(self.stage, target, parent_block);
+            }
         }
 
         self.events.push(MutationEvent::ReplacedStatement { stmt });
