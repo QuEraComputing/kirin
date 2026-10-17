@@ -723,8 +723,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let args: SmallVec<[SSAValue; 4]> = info.arguments.iter().map(|&a| a.into()).collect();
         let terminator = info.terminator;
 
-        // A tombstoned statement keeps its links, so the chain can be walked
-        // while it is being deleted.
+        // Read `next` before tombstoning: a tombstoned statement's `get_info`
+        // returns `None`, so its links can't be followed afterwards.
         let mut current = info.statements.head;
         while let Some(stmt) = current {
             current = stmt.get_info(self.stage).and_then(|item| item.node.next);

@@ -10,8 +10,9 @@ use crate::{FactStore, InterpreterError, LatticeAnchor};
 /// lifetime; the handle stays invalid once freed, because indices are never
 /// reused.
 ///
-/// Handles come from [`EnvStore`]'s arena; this crate never builds one from a
-/// number.
+/// Valid handles come only from [`EnvStore`]'s arena. The public
+/// `From<Id>` conversion exists because [`Arena`] requires it; converting any
+/// other id yields a handle that names no particular environment.
 #[derive(Clone, Copy, PartialEq, Eq, Hash)]
 pub struct EnvIndex(Id);
 
@@ -19,8 +20,12 @@ impl EnvIndex {
     /// A fixed handle for engines that keep no environments but must still
     /// answer [`Interp::index`](crate::Interp::index) (the backward engines).
     ///
-    /// It is the handle an [`EnvStore`]'s first allocation returns, so it must
-    /// never be used to address a store.
+    /// It equals the handle an [`EnvStore`]'s first allocation returns, so it
+    /// must never be used to address a store. What prevents that is the type
+    /// system: environments are reached only through [`Env`](crate::Env) and
+    /// the [`SparseForwardInterp`](crate::SparseForwardInterp) helpers built on
+    /// it, and the backward engines implement neither. Remove this once the
+    /// backward engines keep their facts in environments.
     pub(crate) fn placeholder() -> Self {
         Arena::<Self, ()>::default().next_id()
     }
@@ -37,6 +42,8 @@ impl fmt::Debug for EnvIndex {
     }
 }
 
+/// Required by [`Identifier`] so [`EnvStore`] can keep environments in an
+/// [`Arena`]. Only ids that arena allocated are meaningful handles.
 impl From<Id> for EnvIndex {
     fn from(id: Id) -> Self {
         Self(id)
