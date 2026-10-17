@@ -140,6 +140,10 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
             return self
         elif self.is_subseteq(other):
             return other
+        # A tuple of a different length has no element-wise join. The `zip`
+        # below would drop the extra elements of the longer tuple.
+        elif not self._same_length(other):
+            return Unknown()
         elif isinstance(other, PartialTuple):
             return PartialTuple(tuple(x.join(y) for x, y in zip(self.data, other.data)))
         elif isinstance(other, Value) and isinstance(other.data, tuple):
@@ -153,6 +157,8 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
             return self
         elif other.is_subseteq(self):
             return other
+        elif not self._same_length(other):
+            return self.bottom()
         elif isinstance(other, PartialTuple):
             return PartialTuple(tuple(x.meet(y) for x, y in zip(self.data, other.data)))
         elif isinstance(other, Value) and isinstance(other.data, tuple):
@@ -161,11 +167,21 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
             )
         return self.bottom()
 
+    def _same_length(self, other: ir.Attribute) -> bool:
+        """Return True if `other` is a tuple with as many elements as `self`."""
+        if isinstance(other, PartialTuple):
+            return len(other.data) == len(self.data)
+        if isinstance(other, Value) and isinstance(other.data, tuple):
+            return len(other.data) == len(self.data)
+        return False
+
     def is_subseteq_PartialTuple(self, other: "PartialTuple") -> bool:
+        if not self._same_length(other):
+            return False
         return all(x.is_subseteq(y) for x, y in zip(self.data, other.data))
 
     def is_subseteq_Value(self, other: Value) -> bool:
-        if isinstance(other.data, tuple):
+        if self._same_length(other):
             return all(x.is_subseteq(Value(y)) for x, y in zip(self.data, other.data))
         return False
 
@@ -178,6 +194,8 @@ class PartialTuple(PartialConst, metaclass=PartialTupleMeta):
     def is_structurally_equal(
         self, other: ir.Attribute, context: dict | None = None
     ) -> bool:
+        if not self._same_length(other):
+            return False
         if isinstance(other, PartialTuple):
             return all(
                 x.is_structurally_equal(y, context=context)
