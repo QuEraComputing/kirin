@@ -235,3 +235,16 @@ def test_nested_loops_over_unknown_ranges_keep_body_constants():
         if s.name == "constant" and s.value.unwrap() == 4  # type: ignore
     )
     assert frame.entries[step.results[0]] == const.Value(4)
+
+
+def test_a_loop_that_changes_the_tuple_length_keeps_len_unknown():
+    @structural
+    def main(n: int):
+        t = (n, 0)
+        for _ in range(n):
+            t = (t[0], 0, 7)
+        return len(t)
+
+    assert main(0) == 2
+    assert main(1) == 3
+    assert main(3) == 3

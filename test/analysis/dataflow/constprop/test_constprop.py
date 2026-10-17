@@ -118,6 +118,19 @@ class TestLattice:
             == const.Unknown()
         )
 
+    def test_partial_tuples_of_different_lengths_stay_apart(self):
+        short = const.PartialTuple((const.Unknown(), const.Value(0)))
+        long = const.PartialTuple((const.Unknown(), const.Value(0), const.Value(7)))
+        assert not short.is_subseteq(long)
+        assert not long.is_subseteq(short)
+        assert not short.is_subseteq(const.Value((1, 0, 7)))
+        assert not short.is_structurally_equal(long)
+        assert short.join(long) == const.Unknown()
+        assert long.join(short) == const.Unknown()
+        assert short.join(const.Value((1, 0, 7))) == const.Unknown()
+        assert short.meet(long) == const.Bottom()
+        assert short.meet(const.Value((1, 0, 7))) == const.Bottom()
+
     def test_is_structurally_equal(self):
         assert const.Unknown().is_structurally_equal(const.Unknown())
         assert not const.Unknown().is_structurally_equal(const.Bottom())
