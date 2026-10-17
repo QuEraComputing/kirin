@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from abc import ABC
-from typing import TypeVar, TypeAlias, overload
+from typing import Generic, TypeVar, TypeAlias, overload
 from dataclasses import field, dataclass
 
 from kirin import ir
@@ -63,6 +63,24 @@ AbstractFrameType = TypeVar("AbstractFrameType", bound=AbstractFrame)
 
 
 @dataclass
+class _RunningCall(Generic[AbstractFrameType, ResultType]):
+    """A call on the stack of an abstract interpreter."""
+
+    node: ir.Statement
+    args: tuple[ResultType, ...]
+    assumed: ResultType
+    """The result that a recursive call of `node` with `args` returns."""
+    frame: AbstractFrameType | None = None
+    """Hold the frame that the latest finished round of this call produced.
+
+    A recursive call of `node` with `args` takes its frame facts, such as
+    purity, from this frame. The field holds None during the first round.
+    """
+    reached: bool = False
+    """True if a recursive call of `node` with `args` returned `assumed`."""
+
+
+@dataclass
 class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
     """Abstract interpreter for the IR.
 
@@ -90,6 +108,20 @@ class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
     lattice: type[BoundedLattice[ResultType]] = field(init=False)
     """lattice type for the abstract interpreter.
     """
+    max_depth: int = field(default=128, kw_only=True)
+    """Limit the depth of the interpreter stack.
+
+    An abstract interpreter calls a rule implementation and several Python
+    helpers for each call it enters. With Python 3.10 on macOS, about 500
+    levels overflow the C stack and kill the process. The default of 128 stays
+    well below 500 levels.
+    """
+    recursion_rounds: int = field(default=8, kw_only=True)
+    """The rounds a call that reaches itself may take to settle before it is top."""
+    _running: list[_RunningCall[AbstractFrameType, ResultType]] = field(
+        default_factory=list, init=False, repr=False
+    )
+    """The calls on the stack, innermost last."""
 
     def __init_subclass__(cls) -> None:
         if ABC in cls.__bases__:
@@ -105,6 +137,88 @@ class AbstractInterpreter(InterpreterABC[AbstractFrameType, ResultType], ABC):
 
     def recursion_limit_reached(self) -> ResultType:
         return self.lattice.bottom()
+
+    def initialize(self):
+        self._running = []
+        return super().initialize()
+
+    def call(
+        self, node: ir.Statement | ir.Method, *args: ResultType, **kwargs: ResultType
+    ) -> tuple[AbstractFrameType, ResultType]:
+        """Call `node`, and solve a call that reaches itself as a fixpoint.
+
+        A call of a callable node with the arguments of a call that is still on
+        the stack returns the result assumed for that call, at first bottom. The
+        outer call then runs again with its own result joined in, until the
+        result stays within the assumption, which is then the result. A result
+        that keeps growing, such as a tuple that nests deeper at every round,
+        is assumed to be top after `recursion_rounds` rounds. This bounds the
+        stack by the number of distinct calls.
+
+        The recursive call also takes its frame facts, such as purity, from
+        the previous round of the outer call. The outer call runs again until
+        `recursive_frame_settled` accepts these facts.
+        """
+        if isinstance(node, ir.Method):
+            return super().call(node, *args, **kwargs)
+        trait = node.get_trait(ir.CallableStmtInterface)
+        if trait is None:
+            return super().call(node, *args, **kwargs)
+        aligned = trait.align_input_args(node, *args, **kwargs)
+        for running in self._running:
+            if running.node is node and running.args == aligned:
+                running.reached = True
+                return self.recursive_call_frame(node, running.frame), running.assumed
+        running: _RunningCall[AbstractFrameType, ResultType] = _RunningCall(
+            node, aligned, self.lattice.bottom()
+        )
+        self._running.append(running)
+        try:
+            for round in range(self.recursion_rounds + 1):
+                frame, result = super().call(node, *args, **kwargs)
+                if not running.reached:
+                    return frame, result
+                settled = self.recursive_frame_settled(running.frame, frame)
+                running.frame = frame
+                if result.is_subseteq(running.assumed):
+                    if settled:
+                        return frame, running.assumed
+                elif round < self.recursion_rounds:
+                    running.assumed = running.assumed.join(result)
+                else:
+                    running.assumed = self.lattice.top()
+                running.reached = False
+            frame, _ = super().call(node, *args, **kwargs)
+            return frame, running.assumed
+        finally:
+            self._running.pop()
+
+    def recursive_call_frame(
+        self, node: ir.Statement, assumed: AbstractFrameType | None
+    ) -> AbstractFrameType:
+        """Return the frame of a call that reaches a call still on the stack.
+
+        The interpreter skips the body of such a call, so the frame holds no
+        facts about the body. The `assumed` frame comes from the previous round
+        of the outer call, and it is None in the first round. If an analysis
+        records facts in its frame, such as purity, it must override this
+        method and copy each fact from `assumed`.
+        """
+        with self.new_frame(node) as frame:
+            return frame
+
+    def recursive_frame_settled(
+        self, assumed: AbstractFrameType | None, frame: AbstractFrameType
+    ) -> bool:
+        """Check that a round of a recursive call confirms its assumed frame facts.
+
+        The recursive call inside the round took its facts from `assumed`. The
+        outer call of the round produced `frame`. If the facts in `frame` differ
+        from the facts in `assumed`, the outer call runs another round. If an
+        analysis overrides `recursive_call_frame`, it must override this method
+        as well.
+        """
+        return True
 
     # helper methods
     @overload
