@@ -1,4 +1,4 @@
-from kirin import interp, types
+from kirin import types, interp
 from kirin.prelude import basic, basic_no_opt
 from kirin.analysis import TypeInference, const
 from kirin.dialects import func
