@@ -36,7 +36,7 @@ pub fn describe(stage: &Stage) -> Value {
     let block_ids: HashMap<_, _> = blocks.iter().enumerate().map(|(i, b)| (*b, i)).collect();
     let mut values = HashMap::<SSAValue, usize>::new();
     for block in &blocks {
-        for arg in &block.expect_info(stage).arguments {
+        for arg in block.expect_info(stage).arguments() {
             let next = values.len();
             values.insert((*arg).into(), next);
         }
@@ -53,7 +53,7 @@ pub fn describe(stage: &Stage) -> Value {
         other => panic!("unexpected benchmark type: {other:?}"),
     };
     Value::Array(blocks.iter().map(|block| {
-        let args: Vec<_> = block.expect_info(stage).arguments.iter().map(|v| {
+        let args: Vec<_> = block.expect_info(stage).arguments().iter().map(|v| {
             let v: SSAValue = (*v).into(); json!({"id": values[&v], "type": ty(v)})
         }).collect();
         let ops: Vec<_> = statements(stage, *block).into_iter().map(|stmt| {
@@ -82,7 +82,7 @@ pub fn describe(stage: &Stage) -> Value {
 pub fn verify(stage: &Stage) {
     kirin::ir::verify_derived(stage).expect("consistent SSA/CFG metadata");
     let check_target = |target: Successor, args: &[SSAValue]| {
-        let parameters = &target.expect_info(stage).arguments;
+        let parameters = target.expect_info(stage).arguments();
         assert_eq!(parameters.len(), args.len(), "branch argument arity");
         for (parameter, argument) in parameters.iter().zip(args) {
             let parameter: SSAValue = (*parameter).into();
@@ -118,12 +118,12 @@ pub fn verify(stage: &Stage) {
         if let BenchmarkLanguage::Function { body, signature } = item.definition() {
             let entry = body.blocks(stage).next().expect("function entry block");
             assert_eq!(
-                entry.expect_info(stage).arguments.len(),
+                entry.expect_info(stage).arguments().len(),
                 signature.params().len()
             );
             for (argument, ty) in entry
                 .expect_info(stage)
-                .arguments
+                .arguments()
                 .iter()
                 .zip(signature.params())
             {
@@ -139,8 +139,11 @@ pub fn verify(stage: &Stage) {
         }
     }
     for item in stage.block_arena().iter() {
-        assert!(item.terminator.is_some(), "benchmark block must terminate");
-        let definition = item.terminator.unwrap().expect_info(stage).definition();
+        assert!(
+            item.terminator().is_some(),
+            "benchmark block must terminate"
+        );
+        let definition = item.terminator().unwrap().expect_info(stage).definition();
         match definition {
             BenchmarkLanguage::Cf(ControlFlow::Branch { target, args }) => {
                 check_target(*target, args)

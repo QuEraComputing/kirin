@@ -6,5 +6,6 @@ mod item;
 
 pub use data::Arena;
 pub use hint::{DenseHint, SparseHint};
+pub(crate) use id::GetInfoMut;
 pub use id::{GetInfo, Id, Identifier};
 pub use item::Item;
