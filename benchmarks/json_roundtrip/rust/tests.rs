@@ -6,12 +6,12 @@ fn original_and_decoded_payloads_execute_against_oracle() {
     for family in ["chain", "diamond", "nested_cfg"] {
         let mut ir = IR::new();
         ir.parse(&workload::workload(family, 4)).unwrap();
-        shape::verify(&ir.stages()[0]);
+        shape::verify(ir.stages().next().unwrap());
         let restored: IR = serde_json::from_str(&serde_json::to_string(&ir).unwrap()).unwrap();
-        shape::verify(&restored.stages()[0]);
+        shape::verify(restored.stages().next().unwrap());
         assert_eq!(
-            shape::describe(&ir.stages()[0]),
-            shape::describe(&restored.stages()[0])
+            shape::describe(ir.stages().next().unwrap()),
+            shape::describe(restored.stages().next().unwrap())
         );
         assert_eq!(ir.sprint(), restored.sprint());
         let cases = semantics::validate(&ir, &restored, &suite, suite.family(family, 4), 4);
@@ -28,7 +28,7 @@ fn malformed_branch_argument_arity_is_rejected() {
     if ir.parse(&text).is_ok() {
         assert!(
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                shape::verify(&ir.stages()[0]);
+                shape::verify(ir.stages().next().unwrap());
             }))
             .is_err()
         );
@@ -44,7 +44,7 @@ fn arithmetic_with_boolean_operand_is_rejected() {
     if ir.parse(&text).is_ok() {
         assert!(
             std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                shape::verify(&ir.stages()[0]);
+                shape::verify(ir.stages().next().unwrap());
             }))
             .is_err()
         );
@@ -58,7 +58,7 @@ fn structurally_valid_wrong_arithmetic_fails_real_runtime_oracle() {
     assert_ne!(text, original);
     let mut ir = IR::new();
     ir.parse(&text).unwrap();
-    shape::verify(&ir.stages()[0]);
+    shape::verify(ir.stages().next().unwrap());
     let restored: IR = serde_json::from_str(&serde_json::to_string(&ir).unwrap()).unwrap();
     let suite = spec::Suite::load();
     assert!(
