@@ -2740,9 +2740,17 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   edge maintenance in `replace_operand`, `replace_all_uses`/`replace_results`,
   and `replace_statement` on members. Narrowed scope: no `StableGraph` migration and no topology mirror in `derived/` — the
   petgraph is the store, kept correct incrementally.
-- [ ] `UnGraph` body surgery: insert/erase nodes and edge statements, maintaining
+- [x] `UnGraph` body surgery: insert/erase nodes and edge statements, maintaining
   undirected topology, member order, and degree constraints. Emits
-  `ChangedUnGraphTopology`.
+  `ChangedUnGraphTopology`. Landed as `insert_ungraph_node`,
+  `insert_ungraph_edge`, member erasure through `erase_statement`, tombstoning
+  owned `UnGraph`s with their owner, wire resyncing in `replace_operand`,
+  `replace_all_uses`/`replace_results`, and `replace_statement`, and builder
+  member checks. Narrowed scope, as for `DiGraph`: no `StableGraph` migration
+  and no topology mirror in `derived/`; member order is append on insert and
+  swap-remove on erase (printing order may change). The degree limit is not a
+  per-edit guard: a wire may exceed two readers mid-pass (it then has no edge),
+  and `verify_derived` reports `Finding::UnGraphDegreeExceeded`.
 
 **Graph-body prerequisites found by code audit:**
 
