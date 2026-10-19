@@ -1,3 +1,5 @@
+use indexmap::IndexMap;
+use rustc_hash::FxBuildHasher;
 use smallvec::SmallVec;
 
 use crate::arena::{GetInfo, GetInfoMut};
@@ -8,6 +10,9 @@ use crate::rewrite::rewriter::Rewriter;
 
 /// The node members reading one edge value, one entry per operand slot.
 pub(in crate::rewrite) type Incidences = SmallVec<[Statement; 2]>;
+
+/// Wire → its incidences before an edit, for [`Rewriter::resync_wires`].
+pub(in crate::rewrite) type WireSnapshot = IndexMap<SSAValue, Incidences, FxBuildHasher>;
 
 /// Incidence bookkeeping shared by the `UnGraph` surgery methods.
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -49,10 +54,40 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .collect()
     }
 
+    /// Snapshot the wires of `graph` among `values` (each once; values that
+    /// are not wires of `graph` are skipped) before an edit that may change
+    /// their incidences.
+    pub(in crate::rewrite) fn snapshot_wires(
+        &self,
+        graph: UnGraph,
+        values: impl IntoIterator<Item = SSAValue>,
+    ) -> WireSnapshot {
+        let mut wires = WireSnapshot::default();
+        for value in values {
+            if !wires.contains_key(&value) && self.is_edge_value(graph, value) {
+                wires.insert(value, self.incidences(graph, value));
+            }
+        }
+        wires
+    }
+
+    /// After the edit, bring the edge of each snapshotted wire in line with
+    /// its incidences now. Returns whether the petgraph changed.
+    pub(in crate::rewrite) fn resync_wires(&mut self, graph: UnGraph, wires: WireSnapshot) -> bool {
+        let mut changed = false;
+        for (value, orig_incidences) in wires {
+            let after = self.incidences(graph, value);
+            changed |= self.resync_edge(graph, value, &orig_incidences, &after);
+        }
+        changed
+    }
+
     /// Bring `graph`'s petgraph edge for `value` in line after its incidences
     /// changed from `before` to `after`: an edge exists exactly when there are
-    /// two. Returns whether the petgraph changed.
-    pub(in crate::rewrite) fn resync_edge(
+    /// two (a wire with more has none; that is invalid IR, which
+    /// [`verify_derived`](crate::verify_derived) reports). Returns whether the
+    /// petgraph changed.
+    fn resync_edge(
         &mut self,
         graph: UnGraph,
         value: SSAValue,

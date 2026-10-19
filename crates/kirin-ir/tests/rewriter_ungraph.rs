@@ -70,6 +70,15 @@ fn assert_topology(stage: &StageInfo<BuilderDialect>, graph: UnGraph) {
     assert_eq!(edges(stage, graph), expected_edges(stage, graph));
 }
 
+/// The wires `verify_derived` reports as read by more than two node slots.
+fn degree_findings(stage: &StageInfo<BuilderDialect>) -> Vec<Finding> {
+    match verify_derived(stage) {
+        Ok(()) => Vec::new(),
+        Err(VerifyError::Derive(error)) => error.findings().to_vec(),
+        Err(other) => panic!("unexpected verification error: {other}"),
+    }
+}
+
 fn dead_value() -> SSAValue {
     SSAValue::from(TestSSAValue(9_999))
 }
@@ -134,15 +143,21 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
         .insert_ungraph_node(ug, BuilderDialect::Gate(w, boundary))
         .unwrap();
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(w, pair(a, b))]));
-    // A third reader would make `w` a hyperedge.
+    // A third reader makes `w` a hyperedge: accepted, but `w` loses its edge
+    // and verification reports it.
+    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    assert!(edges(rw.stage(), ug).is_empty());
     assert_eq!(
-        rw.insert_ungraph_node(ug, BuilderDialect::Use(w)),
-        Err(RewriteError::UnGraphDegreeExceeded {
+        degree_findings(rw.stage()),
+        [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: w,
             incidences: 3
-        })
+        }]
     );
+    // Back to two readers, the edge returns.
+    rw.erase_statement(c).unwrap();
+    assert_eq!(edges(rw.stage(), ug), HashMap::from([(w, pair(a, b))]));
     // A boundary port is a wire too; a capture is an ordinary use.
     let d = rw
         .insert_ungraph_node(ug, BuilderDialect::Gate(boundary, capture))
@@ -157,6 +172,10 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
             MutationEvent::InsertedStatement { stmt: a },
             topology,
             MutationEvent::InsertedStatement { stmt: b },
+            topology,
+            MutationEvent::InsertedStatement { stmt: c },
+            topology,
+            MutationEvent::ErasedStatement { stmt: c },
             topology,
             MutationEvent::InsertedStatement { stmt: d },
             topology,
@@ -186,19 +205,20 @@ fn insert_ungraph_node_reading_a_wire_twice_is_a_self_loop() {
         .insert_ungraph_node(ug, BuilderDialect::Gate(v, v))
         .unwrap();
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(s, s))]));
-    // Both of `v`'s incidences are taken.
+    // Both of `v`'s incidences are taken: a third reader leaves no edge.
+    rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    drop(rw);
+
+    assert!(edges(&stage, ug).is_empty());
+    assert_topology(&stage, ug);
     assert_eq!(
-        rw.insert_ungraph_node(ug, BuilderDialect::Use(v)),
-        Err(RewriteError::UnGraphDegreeExceeded {
+        degree_findings(&stage),
+        [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: v,
             incidences: 3
-        })
+        }]
     );
-    drop(rw);
-
-    assert_topology(&stage, ug);
-    verify_derived(&stage).unwrap();
 }
 
 #[test]
@@ -464,5 +484,205 @@ fn erase_statement_tombstones_owned_ungraph() {
     assert!(port.get_info(&stage).is_none());
     assert!(x.get_info(&stage).unwrap().uses().is_empty());
     assert_eq!(outer.statements(&stage).collect::<Vec<_>>(), vec![split]);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_operand_swaps_endpoints_through_an_over_full_wire() {
+    let Fixture {
+        mut stage,
+        ug,
+        w,
+        v,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    // w joins a — b, v joins c — d; both wires are full.
+    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    let d = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    rw.drain_events();
+    let topology = MutationEvent::ChangedUnGraphTopology { graph: ug };
+
+    // Moving b onto v first leaves v with three readers: no edge, and invalid
+    // until the swap completes.
+    assert_eq!(rw.replace_operand(b, 0, v), Ok(w));
+    assert!(edges(rw.stage(), ug).is_empty());
+    assert_topology(rw.stage(), ug);
+    assert_eq!(
+        degree_findings(rw.stage()),
+        [Finding::UnGraphDegreeExceeded {
+            graph: ug,
+            value: v,
+            incidences: 3
+        }]
+    );
+    assert_eq!(
+        rw.drain_events(),
+        vec![MutationEvent::ChangedOperands { stmt: b }, topology]
+    );
+
+    // Moving d onto w completes it: w joins a — d, v joins c — b.
+    rw.replace_operand(d, 0, w).unwrap();
+    assert_eq!(
+        rw.drain_events(),
+        vec![MutationEvent::ChangedOperands { stmt: d }, topology]
+    );
+    drop(rw);
+
+    assert_eq!(
+        edges(&stage, ug),
+        HashMap::from([(w, pair(a, d)), (v, pair(b, c))])
+    );
+    assert_topology(&stage, ug);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_operand_off_a_wire_drops_its_edge() {
+    let Fixture {
+        mut stage,
+        ug,
+        w,
+        capture,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    let _a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    rw.drain_events();
+
+    // A capture is not a wire: b leaves w, so w's edge goes.
+    rw.replace_operand(b, 0, capture).unwrap();
+    assert!(edges(rw.stage(), ug).is_empty());
+    assert_eq!(
+        rw.drain_events(),
+        vec![
+            MutationEvent::ChangedOperands { stmt: b },
+            MutationEvent::ChangedUnGraphTopology { graph: ug },
+        ]
+    );
+
+    // Neither the capture nor a node's result is a wire: moving between them
+    // changes no topology, so only the operand event is recorded.
+    let r = rw.new_result(TestType::I32);
+    rw.insert_ungraph_node(ug, BuilderDialect::Compute(capture, r))
+        .unwrap();
+    rw.drain_events();
+    rw.replace_operand(b, 0, r).unwrap();
+    assert_eq!(
+        rw.drain_events(),
+        vec![MutationEvent::ChangedOperands { stmt: b }]
+    );
+    drop(rw);
+
+    assert_topology(&stage, ug);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_all_uses_moves_every_reader_to_the_new_wire() {
+    let Fixture {
+        mut stage,
+        ug,
+        w,
+        v,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    rw.drain_events();
+
+    // One reader each: merging w into v gives v exactly two.
+    assert_eq!(rw.replace_all_uses(w, v), Ok(1));
+    assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(a, c))]));
+    assert_eq!(
+        rw.drain_events(),
+        vec![
+            MutationEvent::ChangedOperands { stmt: a },
+            MutationEvent::ChangedUnGraphTopology { graph: ug },
+            MutationEvent::ReplacedUses { old: w, new: v },
+        ]
+    );
+
+    // A third reader merged in leaves v over full, with no edge.
+    let e = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    rw.replace_all_uses(w, v).unwrap();
+    drop(rw);
+
+    assert!(edges(&stage, ug).is_empty());
+    assert_topology(&stage, ug);
+    assert_eq!(*e.definition(&stage), BuilderDialect::Use(v));
+    assert_eq!(
+        degree_findings(&stage),
+        [Finding::UnGraphDegreeExceeded {
+            graph: ug,
+            value: v,
+            incidences: 3
+        }]
+    );
+}
+
+#[test]
+fn replace_results_redirects_an_edge_statements_readers() {
+    let Fixture {
+        mut stage,
+        ug,
+        w_stmt,
+        w,
+        v,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    rw.drain_events();
+
+    // w's readers move to v, so the edge now carries v, and w_stmt is free
+    // to go.
+    rw.replace_results(w_stmt, &[v]).unwrap();
+    assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(a, b))]));
+    rw.erase_statement(w_stmt).unwrap();
+    drop(rw);
+
+    assert_topology(&stage, ug);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_all_uses_across_two_ungraphs() {
+    let mut stage = new_stage();
+
+    // `x` from the outer block is read by a node in each of two ungraphs;
+    // `w1` is a wire of the first, already read by `a`.
+    let (split, x, _) = make_split(&mut stage);
+    let _outer = stage.block().stmt(split).new();
+    let (w1_stmt, w1) = make_wire(&mut stage);
+    let a = stage.statement().definition(BuilderDialect::Use(w1)).new();
+    let b = stage.statement().definition(BuilderDialect::Use(x)).new();
+    let ug1 = stage.ungraph().edge(w1_stmt).node(a).node(b).new();
+    let c = stage.statement().definition(BuilderDialect::Use(x)).new();
+    let ug2 = stage.ungraph().node(c).new();
+
+    let mut stage = stage.finalize().unwrap();
+    let mut rw = Rewriter::new(&mut stage);
+    assert_eq!(rw.replace_all_uses(x, w1), Ok(2));
+    let events = rw.drain_events();
+    drop(rw);
+
+    // In ug1, `b` joins `w1`; in ug2, `w1` is not a wire, so nothing changes.
+    assert_eq!(edges(&stage, ug1), HashMap::from([(w1, pair(a, b))]));
+    assert!(edges(&stage, ug2).is_empty());
+    assert_eq!(
+        events
+            .iter()
+            .filter(|event| matches!(event, MutationEvent::ChangedUnGraphTopology { .. }))
+            .collect::<Vec<_>>(),
+        [&MutationEvent::ChangedUnGraphTopology { graph: ug1 }]
+    );
+    assert_topology(&stage, ug1);
+    assert_topology(&stage, ug2);
     verify_derived(&stage).unwrap();
 }

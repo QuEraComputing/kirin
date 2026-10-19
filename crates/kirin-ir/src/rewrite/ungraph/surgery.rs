@@ -2,7 +2,6 @@ use crate::arena::{GetInfo, GetInfoMut};
 use crate::{Dialect, SSAValue, Statement, StatementParent, UnGraph, UnGraphInfo};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter};
-use crate::rewrite::ungraph::topology::Incidences;
 
 /// Adding `UnGraph` members.
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -10,16 +9,18 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// `definition` must not be an edge statement (see
     /// [`Rewriter::insert_ungraph_edge`]), and must be a non-terminator with no
-    /// successors. Every operand
-    /// must be live, and every result a fresh [`Rewriter::new_result`] value.
-    /// Each operand that is a wire of `graph` (an edge statement's result or
-    /// a boundary port) becomes an incidence of that wire; a wire read by two
-    /// node slots is an edge between those nodes. Other operands are ordinary
-    /// uses.
+    /// successors. Every operand must be live, and every result a fresh
+    /// [`Rewriter::new_result`] value. Each operand that is a wire of `graph`
+    /// (an edge statement's result or a boundary port) becomes an incidence of
+    /// that wire; a wire read by two node slots is an edge between those
+    /// nodes. Other operands are ordinary uses.
     ///
-    /// Rejects, leaving the stage untouched, if `graph` is unknown, a check
-    /// above fails, or a wire would end up with more than two incidences
-    /// ([`RewriteError::UnGraphDegreeExceeded`]). Records
+    /// A wire may end up with more than two incidences. That is invalid IR,
+    /// left for [`verify_derived`](crate::verify_derived) to report; such a
+    /// wire has no edge.
+    ///
+    /// Rejects, leaving the stage untouched, if `graph` is unknown or a check
+    /// above fails. Records
     /// [`MutationEvent::InsertedStatement`] then
     /// [`MutationEvent::ChangedUnGraphTopology`].
     pub fn insert_ungraph_node(
@@ -39,39 +40,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         let (results, operands) = self.prepare_insert(&definition)?;
 
-        /// A wire the new node reads.
-        struct WireRead {
-            value: SSAValue,
-            /// How many of the node's operand slots read it.
-            reads: usize,
-            /// Its incidences before the insert.
-            orig_incidences: Incidences,
-        }
-        let mut wires: Vec<WireRead> = Vec::new();
-        for &operand in &operands {
-            if let Some(wire) = wires.iter_mut().find(|wire| wire.value == operand) {
-                // Wire already seen: the node reads it in another slot.
-                wire.reads += 1;
-            } else if self.is_edge_value(graph, operand) {
-                // A wire read for the first time. Operands that are not wires
-                // of this graph are ordinary uses and skipped.
-                wires.push(WireRead {
-                    value: operand,
-                    reads: 1,
-                    orig_incidences: self.incidences(graph, operand),
-                });
-            }
-        }
-        for wire in &wires {
-            let incidences = wire.orig_incidences.len() + wire.reads;
-            if incidences > 2 {
-                return Err(RewriteError::UnGraphDegreeExceeded {
-                    graph,
-                    value: wire.value,
-                    incidences,
-                });
-            }
-        }
+        let wires = self.snapshot_wires(graph, operands.iter().copied());
 
         let stmt = self.alloc_statement(
             definition,
@@ -85,10 +54,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .get_info_mut(self.stage)
             .expect("graph is live in this stage")
             .add_node(stmt);
-        for wire in wires {
-            let after = self.incidences(graph, wire.value);
-            self.resync_edge(graph, wire.value, &wire.orig_incidences, &after);
-        }
+        self.resync_wires(graph, wires);
 
         self.events.push(MutationEvent::InsertedStatement { stmt });
         self.events
@@ -159,21 +125,39 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // For an edge statement, this means no node reads its wires.
         self.ensure_results_unused(stmt)?;
 
-        let info = graph
-            .get_info_mut(self.stage)
-            .expect("graph is live in this stage");
-        if info.remove_node(stmt) {
-            // A node takes its edges with it; each wire it read is left with
-            // one incidence fewer.
+        let is_node = graph.expect_info(self.stage).node_idx_of(stmt).is_some();
+        if is_node {
+            // A node: each wire it read loses its incidences. The edge changes
+            // only when the count crosses 2: 2 → 1 (or 2 → 0 for a self-loop)
+            // removes it, 3 → 2 restores it; other counts change nothing.
+            // Drop its operand uses, resync those wires while its node still
+            // exists, then remove it.
+            let operands: Vec<SSAValue> = stmt
+                .expect_info(self.stage)
+                .definition
+                .arguments()
+                .copied()
+                .collect();
+            let wires = self.snapshot_wires(graph, operands);
+            self.tombstone_statement(stmt, None);
+            self.resync_wires(graph, wires);
+            graph
+                .get_info_mut(self.stage)
+                .expect("graph is live in this stage")
+                .remove_node(stmt);
         } else {
             // An edge statement: no node reads its wires (checked above), so
             // they have no edges; just drop it from the list.
-            let edges = &mut info.extra.edge_statements;
+            let edges = &mut graph
+                .get_info_mut(self.stage)
+                .expect("graph is live in this stage")
+                .extra
+                .edge_statements;
             if let Some(pos) = edges.iter().position(|&edge| edge == stmt) {
                 edges.swap_remove(pos);
             }
+            self.tombstone_statement(stmt, None);
         }
-        self.tombstone_statement(stmt, None);
 
         self.events.push(MutationEvent::ErasedStatement { stmt });
         self.events

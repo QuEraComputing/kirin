@@ -42,14 +42,16 @@
 //! statements define results through values pre-allocated with
 //! [`Rewriter::new_result`].
 //!
-//! # Known gap: `UnGraph` operand edits
+//! # Graph bodies
 //!
-//! [`Rewriter::replace_statement`] and the block `insert_*` methods reject
-//! `UnGraph` members with [`RewriteError::NotInBlockBody`]. [`Rewriter::replace_operand`],
-//! [`Rewriter::replace_all_uses`], and [`Rewriter::replace_results`] do **not**
-//! check body kind: on an `UnGraph` member they rewrite the operand and leave
-//! the petgraph edge weights that mirror it stale. Until `UnGraph` surgery
-//! lands, prefer not to point them at `UnGraph` bodies.
+//! Operand edits keep each graph's petgraph in step: on a `DiGraph` member
+//! they move the slot's edge, and on an `UnGraph` node they resync the wires
+//! the slot leaves and joins. An `UnGraph` wire may be read by more than two
+//! node slots mid-pass; such a wire has no edge, and
+//! [`verify_derived`](crate::verify_derived) reports it as
+//! [`Finding::UnGraphDegreeExceeded`](crate::Finding). The block `insert_*`
+//! methods reject graph members, and [`Rewriter::replace_statement`] rejects
+//! `UnGraph` members, with [`RewriteError::NotInBlockBody`].
 //!
 //! Because value rewrites are index-driven (they consult and update
 //! `SSAInfo::uses` rather than scanning), correctness depends on the use index
@@ -72,7 +74,8 @@
 use std::collections::HashSet;
 use std::fmt;
 
-use rustc_hash::FxHashMap;
+use indexmap::{IndexMap, IndexSet};
+use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::arena::{GetInfo, GetInfoMut};
 use smallvec::SmallVec;
@@ -196,13 +199,6 @@ pub enum RewriteError {
     /// An inserted edge statement has operands. A wire only connects the nodes
     /// that read it; it consumes no values.
     EdgeStatementWithOperands,
-    /// The edit would leave the wire `value` of `graph` read by `incidences`
-    /// node operand slots; an undirected edge joins at most two.
-    UnGraphDegreeExceeded {
-        graph: UnGraph,
-        value: SSAValue,
-        incidences: usize,
-    },
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -332,16 +328,6 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::EdgeStatementWithOperands => {
                 write!(f, "an edge statement cannot have operands")
-            }
-            RewriteError::UnGraphDegreeExceeded {
-                graph,
-                value,
-                incidences,
-            } => {
-                write!(
-                    f,
-                    "wire {value} of UnGraph {graph} would have {incidences} node incidences; at most 2 are allowed"
-                )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
                 write!(f, "yield index {index} is out of range for DiGraph {graph}")
@@ -490,32 +476,48 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if value.get_info(self.stage).is_none() {
             return Err(RewriteError::UnknownValue(value));
         }
-        let item = stmt
-            .get_info_mut(self.stage)
-            .ok_or(RewriteError::UnknownStatement(stmt))?;
-        let parent = item.parent;
-        let slot = item
-            .definition
-            .arguments_mut()
-            .nth(index)
-            .ok_or(RewriteError::OperandIndexOutOfRange { stmt, index })?;
-        let old = *slot;
+        let (parent, old) = {
+            let item = self.live_statement(stmt)?;
+            let old = *item
+                .definition
+                .arguments()
+                .nth(index)
+                .ok_or(RewriteError::OperandIndexOutOfRange { stmt, index })?;
+            (item.parent, old)
+        };
         if old == value {
             return Ok(old);
         }
-        *slot = value;
+        // An UnGraph node's slot may leave one wire and join another.
+        let wires = match parent {
+            Some(StatementParent::UnGraph(graph)) => self.snapshot_wires(graph, [old, value]),
+            _ => Default::default(),
+        };
 
+        if let Some(slot) = stmt
+            .get_info_mut(self.stage)
+            .and_then(|item| item.definition.arguments_mut().nth(index))
+        {
+            *slot = value;
+        }
         // Maintain the def-use index: this operand slot no longer reads `old`,
         // it now reads `value`.
         let site = Use::StatementOperand { stmt, index };
         remove_use(self.stage, old, site);
         add_use(self.stage, value, site);
         self.events.push(MutationEvent::ChangedOperands { stmt });
-        if let Some(StatementParent::DiGraph(graph)) = parent
-            && self.retarget_operand_edge(graph, stmt, old, value)
-        {
-            self.events
-                .push(MutationEvent::ChangedDiGraphTopology { graph });
+        match parent {
+            Some(StatementParent::DiGraph(graph))
+                if self.retarget_operand_edge(graph, stmt, old, value) =>
+            {
+                self.events
+                    .push(MutationEvent::ChangedDiGraphTopology { graph });
+            }
+            Some(StatementParent::UnGraph(graph)) if self.resync_wires(graph, wires) => {
+                self.events
+                    .push(MutationEvent::ChangedUnGraphTopology { graph });
+            }
+            _ => {}
         }
         Ok(old)
     }
@@ -630,6 +632,31 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             })
             .collect();
 
+        // Snapshot the wires of each UnGraph whose node slots move, so their
+        // edges can be resynced once the use records have moved too. The sites
+        // of one value may lie in several UnGraphs; insertion order keeps the
+        // events deterministic, and the sets drop repeated values.
+        let mut ungraph_values: IndexMap<
+            UnGraph,
+            IndexSet<SSAValue, FxBuildHasher>,
+            FxBuildHasher,
+        > = IndexMap::default();
+        for (&(old, new), sites) in pairs.iter().zip(&sites) {
+            for &site in sites {
+                let Use::StatementOperand { stmt, .. } = site else {
+                    continue;
+                };
+                let parent = stmt.get_info(self.stage).and_then(|item| item.parent);
+                if let Some(StatementParent::UnGraph(graph)) = parent {
+                    ungraph_values.entry(graph).or_default().extend([old, new]);
+                }
+            }
+        }
+        let wire_snapshots: Vec<_> = ungraph_values
+            .into_iter()
+            .map(|(graph, values)| (graph, self.snapshot_wires(graph, values)))
+            .collect();
+
         // Rewrite the slots, keeping the sites that actually applied — a stale
         // site names a statement or graph that has since been tombstoned.
         let mut changed_stmts: Vec<Statement> = Vec::new();
@@ -696,6 +723,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 info.uses_mut().extend(moved.iter().copied());
             }
         }
+        let mut changed_ungraphs: Vec<UnGraph> = Vec::new();
+        for (graph, wires) in wire_snapshots {
+            if self.resync_wires(graph, wires) {
+                changed_ungraphs.push(graph);
+            }
+        }
 
         for stmt in changed_stmts {
             self.events.push(MutationEvent::ChangedOperands { stmt });
@@ -703,6 +736,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for graph in changed_topologies {
             self.events
                 .push(MutationEvent::ChangedDiGraphTopology { graph });
+        }
+        for graph in changed_ungraphs {
+            self.events
+                .push(MutationEvent::ChangedUnGraphTopology { graph });
         }
         for graph in changed_graphs {
             self.events
