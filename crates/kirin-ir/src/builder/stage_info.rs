@@ -3,6 +3,7 @@ use std::fmt;
 use std::ops::{Deref, DerefMut};
 
 use crate::arena::Arena;
+use crate::builder::ungraph::UnGraphRole;
 use crate::derived::{derive_mirrors, install_and_derive_mirrors_unchecked, install_mirrors};
 use crate::node::ssa::{BuilderSSAInfo, BuilderSSAKind, SSAValue};
 use crate::node::stmt::StatementParent;
@@ -417,6 +418,37 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
     }
 
+    /// Assert `stmt` may be an `UnGraph` member in `role`: an edge statement
+    /// with no operands, or a node; never a terminator or a statement with
+    /// successors.
+    pub(crate) fn assert_ungraph_member(&self, stmt: Statement, role: UnGraphRole) {
+        let definition = &self.statements[stmt].definition;
+        match role {
+            UnGraphRole::Edge => assert!(
+                definition.is_edge(),
+                "Cannot add non-edge statement {definition:?} as an ungraph edge"
+            ),
+            UnGraphRole::Node => assert!(
+                !definition.is_edge(),
+                "Cannot add edge statement {definition:?} as an ungraph node"
+            ),
+        }
+        assert!(
+            !definition.is_terminator(),
+            "Cannot add terminator statement {definition:?} to an ungraph"
+        );
+        assert!(
+            definition.successors().next().is_none(),
+            "Cannot add statement {definition:?} with successors to an ungraph"
+        );
+        if role == UnGraphRole::Edge {
+            assert!(
+                definition.arguments().next().is_none(),
+                "Cannot add edge statement {definition:?} with operands to an ungraph"
+            );
+        }
+    }
+
     /// Attach edge and node statements to an existing ungraph.
     pub fn attach_nodes_to_ungraph(
         &mut self,
@@ -424,6 +456,13 @@ impl<L: Dialect> BuilderStageInfo<L> {
         edge_stmts: &[Statement],
         node_stmts: &[Statement],
     ) {
+        for &stmt in edge_stmts {
+            self.assert_ungraph_member(stmt, UnGraphRole::Edge);
+        }
+        for &stmt in node_stmts {
+            self.assert_ungraph_member(stmt, UnGraphRole::Node);
+        }
+
         let ug_info = &self.ungraphs[ug];
         let id = ug_info.id();
         let edge_count = ug_info.edge_count();

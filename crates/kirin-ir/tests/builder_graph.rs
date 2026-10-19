@@ -166,6 +166,78 @@ fn attach_nodes_to_digraph_rejects_node_with_successors() {
 }
 
 #[test]
+#[should_panic(expected = "as an ungraph edge")]
+fn ungraph_builder_rejects_non_edge_as_edge() {
+    let mut stage = new_stage();
+    let nop = stage.statement().definition(BuilderDialect::Nop).new();
+    let _ = stage.ungraph().edge(nop);
+}
+
+#[test]
+#[should_panic(expected = "as an ungraph node")]
+fn ungraph_builder_rejects_edge_as_node() {
+    let mut stage = new_stage();
+    let (wire_stmt, _) = make_wire(&mut stage);
+    let _ = stage.ungraph().node(wire_stmt);
+}
+
+#[test]
+#[should_panic(expected = "Cannot add terminator statement")]
+fn ungraph_builder_rejects_terminator() {
+    let mut stage = new_stage();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let _ = stage.ungraph().node(ret);
+}
+
+#[test]
+#[should_panic(expected = "with successors to an ungraph")]
+fn ungraph_builder_rejects_successors() {
+    let mut stage = new_stage();
+    let target = stage.block().new();
+    let fork = stage
+        .statement()
+        .definition(BuilderDialect::Fork(Successor::from_block(target)))
+        .new();
+    let _ = stage.ungraph().node(fork);
+}
+
+#[test]
+#[should_panic(expected = "with operands to an ungraph")]
+fn ungraph_builder_rejects_edge_with_operands() {
+    let mut stage = new_stage();
+    let (_, wire) = make_wire(&mut stage);
+    let result: ResultValue = stage.ssa_arena().next_id().into();
+    let param_wire = stage
+        .statement()
+        .definition(BuilderDialect::ParamWire(wire, result))
+        .new();
+    let _ = stage.ungraph().edge(param_wire);
+}
+
+#[test]
+#[should_panic(expected = "as an ungraph node")]
+fn attach_nodes_to_ungraph_rejects_edge_as_node() {
+    let mut stage = new_stage();
+    let (wire_stmt, _) = make_wire(&mut stage);
+    let ug = stage.ungraph().new();
+    stage.attach_nodes_to_ungraph(ug, &[], &[wire_stmt]);
+}
+
+#[test]
+#[should_panic(expected = "with operands to an ungraph")]
+fn attach_nodes_to_ungraph_rejects_edge_with_operands() {
+    let mut stage = new_stage();
+    let (_, wire) = make_wire(&mut stage);
+    let result: ResultValue = stage.ssa_arena().next_id().into();
+    let param_wire = stage
+        .statement()
+        .definition(BuilderDialect::ParamWire(wire, result))
+        .new();
+    let ug = stage.ungraph().new();
+    stage.attach_nodes_to_ungraph(ug, &[param_wire], &[]);
+}
+
+#[test]
 #[should_panic(expected = "already has a different parent")]
 fn statement_builder_rejects_digraph_with_existing_owner() {
     let mut stage = new_stage();

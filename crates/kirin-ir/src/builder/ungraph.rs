@@ -6,6 +6,14 @@ use crate::node::stmt::{Statement, StatementParent};
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{BuilderStageInfo, Dialect};
 
+/// What an `UnGraph` member is stored as: a petgraph node, or an edge
+/// statement whose results are wires.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) enum UnGraphRole {
+    Node,
+    Edge,
+}
+
 pub struct UnGraphBuilder<'a, L: Dialect> {
     stage: &'a mut BuilderStageInfo<L>,
     parent: Option<Statement>,
@@ -65,11 +73,18 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
         }
         self
     }
+    /// Add an edge statement. `stmt` must be an edge statement with no
+    /// operands, neither a terminator nor carrying successors.
     pub fn edge(mut self, stmt: Statement) -> Self {
+        self.stage.assert_ungraph_member(stmt, UnGraphRole::Edge);
         self.edge_stmts.push(stmt);
         self
     }
+
+    /// Add a node. `stmt` must not be an edge statement, a terminator, or
+    /// carry successors.
     pub fn node(mut self, stmt: Statement) -> Self {
+        self.stage.assert_ungraph_member(stmt, UnGraphRole::Node);
         self.nodes.push(stmt);
         self
     }
