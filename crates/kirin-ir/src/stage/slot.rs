@@ -167,3 +167,22 @@ impl<S> StageSlot<S> {
         }
     }
 }
+
+/// Serializes as the stage it holds, so a pipeline's stages stay a plain list
+/// on the wire and its name travels with the stage.
+///
+/// A position without a stage is an error rather than skipped: every serialized
+/// [`CompileStage`](crate::CompileStage) is a raw index into that list, so
+/// dropping one would point every later id at the wrong stage.
+#[cfg(feature = "serde")]
+impl<S: serde::Serialize> serde::Serialize for StageSlot<S> {
+    fn serialize<Ser: serde::Serializer>(&self, serializer: Ser) -> Result<Ser::Ok, Ser::Error> {
+        match self.stage() {
+            Some(stage) => stage.serialize(serializer),
+            None => Err(serde::ser::Error::custom(format_args!(
+                "cannot serialize a pipeline position whose stage is unavailable: {:?}",
+                self.status()
+            ))),
+        }
+    }
+}

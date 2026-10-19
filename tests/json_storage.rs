@@ -84,6 +84,56 @@ fn pipeline_rebuilds_function_lookup_for_all_stages() {
 }
 
 #[test]
+fn pipeline_positions_keep_their_stage_names() {
+    use kirin::prelude::*;
+    use kirin_test_languages::ArithFunctionLanguage;
+    use kirin_test_utils::roundtrip::json_roundtrip;
+
+    let mut ir: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
+    let source = ir
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("source")
+        .new();
+    let target = ir
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("target")
+        .new();
+
+    // A position answers to its stage's own name, so the name must travel with
+    // the stage.
+    let restored = json_roundtrip(&ir);
+    assert_eq!(restored.stage_by_name("source"), Some(source));
+    assert_eq!(restored.stage_by_name("target"), Some(target));
+}
+
+#[test]
+fn pipeline_refuses_to_serialize_a_poisoned_stage() {
+    use kirin::ir::RewriteError;
+    use kirin::prelude::*;
+    use kirin_test_languages::ArithFunctionLanguage;
+
+    let mut ir: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
+    let source = ir
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("source")
+        .new();
+    ir.add_stage()
+        .stage(StageInfo::default())
+        .name("target")
+        .new();
+    let _ = ir.run_pass::<ArithFunctionLanguage, _, (), _>(source, |_| {
+        Err(RewriteError::CannotInsertTerminator)
+    });
+
+    // Skipping `source` instead would silently turn `target` into stage 0.
+    let error = serde_json::to_string(&ir).expect_err("a poisoned stage has nothing to serialize");
+    assert!(error.to_string().contains("Poisoned"), "{error}");
+}
+
+#[test]
 fn finalized_multistage_specializations_preserve_invalidation() {
     use kirin::prelude::*;
     use kirin_test_languages::ArithFunctionLanguage;

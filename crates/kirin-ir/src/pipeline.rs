@@ -829,7 +829,8 @@ impl<'de, S: serde::Deserialize<'de>> serde::Deserialize<'de> for Pipeline<S> {
             }
         }
         Ok(Self {
-            stages: data.stages,
+            // Only present stages serialize, so every restored position is one.
+            stages: data.stages.into_iter().map(StageSlot::present).collect(),
             functions: data.functions,
             global_symbols: data.global_symbols,
             name_index,
