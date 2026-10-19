@@ -50,8 +50,9 @@
 //! node slots mid-pass; such a wire has no edge, and
 //! [`verify_derived`](crate::verify_derived) reports it as
 //! [`Finding::UnGraphDegreeExceeded`](crate::Finding). The block `insert_*`
-//! methods reject graph members, and [`Rewriter::replace_statement`] rejects
-//! `UnGraph` members, with [`RewriteError::NotInBlockBody`].
+//! methods reject graph members with [`RewriteError::NotInBlockBody`]; graph
+//! members are added with [`Rewriter::insert_node`],
+//! [`Rewriter::insert_ungraph_node`], and [`Rewriter::insert_ungraph_edge`].
 //!
 //! Because value rewrites are index-driven (they consult and update
 //! `SSAInfo::uses` rather than scanning), correctness depends on the use index
@@ -199,6 +200,10 @@ pub enum RewriteError {
     /// An inserted edge statement has operands. A wire only connects the nodes
     /// that read it; it consumes no values.
     EdgeStatementWithOperands,
+    /// A `replace_statement` on an `UnGraph` member changed whether it is an
+    /// edge statement. Nodes and edge statements are stored differently, so
+    /// the replacement must keep the original's role.
+    EdgeRoleMismatch(Statement),
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -328,6 +333,12 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::EdgeStatementWithOperands => {
                 write!(f, "an edge statement cannot have operands")
+            }
+            RewriteError::EdgeRoleMismatch(stmt) => {
+                write!(
+                    f,
+                    "replacement for {stmt:?} changes whether it is an UnGraph edge statement"
+                )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
                 write!(f, "yield index {index} is out of range for DiGraph {graph}")
@@ -1177,8 +1188,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 
     /// Swap `stmt`'s definition for `definition` in place, keeping the same
-    /// statement id, position (block slot or `DiGraph` node), and result
-    /// values.
+    /// statement id, position (block slot, graph node, or `UnGraph` edge
+    /// statement), and result values.
     ///
     /// The replacement must declare the same number of results and the same
     /// terminator-ness as the original, so result SSA values and the block's
@@ -1190,17 +1201,23 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// control-flow edge the replacement adds or drops. The block-body and CFG
     /// chain mirrors need no update: the statement keeps its id, chain links,
     /// and terminator-ness, and no block moves. For a `DiGraph` member, the
-    /// edges into it follow the operand values it gains or loses.
+    /// edges into it follow the operand values it gains or loses; for an
+    /// `UnGraph` node, the wires it leaves and joins are resynced. An `UnGraph`
+    /// edge statement keeps its result ids, so its wires and their edges are
+    /// unchanged.
     ///
-    /// Rejects (leaving the stage untouched) if `stmt` is unknown, is owned by
-    /// an `UnGraph` (or nothing), changes result arity or terminator-ness,
-    /// gives a non-terminator successors, or names an operand or successor
-    /// target that is not live.
+    /// Rejects (leaving the stage untouched) if `stmt` is unknown or owned by
+    /// nothing, changes result arity or terminator-ness, gives a
+    /// non-terminator successors, names an operand or successor target that
+    /// is not live, or — for an `UnGraph` member — changes whether it is an
+    /// edge statement ([`RewriteError::EdgeRoleMismatch`]) or gives an edge
+    /// statement operands.
     ///
     /// Records [`MutationEvent::ReplacedStatement`], followed by
     /// [`MutationEvent::ChangedTerminator`] when `stmt` is a terminator, or by
-    /// [`MutationEvent::ChangedDiGraphTopology`] when it is a `DiGraph` member
-    /// whose edges changed.
+    /// [`MutationEvent::ChangedDiGraphTopology`] /
+    /// [`MutationEvent::ChangedUnGraphTopology`] when it is a graph member whose
+    /// edges changed.
     pub fn replace_statement(
         &mut self,
         stmt: Statement,
@@ -1218,11 +1235,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         stmt: Statement,
         definition: &L,
     ) -> Result<PreparedReplacement, RewriteError> {
-        let (old_operands, old_results, old_successors, parent, old_is_terminator) = {
+        let (old_operands, old_results, old_successors, parent, old_is_terminator, old_is_edge) = {
             let item = self.live_statement(stmt)?;
-            let parent = match item.parent {
-                Some(parent @ (StatementParent::Block(_) | StatementParent::DiGraph(_))) => parent,
-                _ => return Err(RewriteError::NotInBlockBody(stmt)),
+            let Some(parent) = item.parent else {
+                return Err(RewriteError::NotInBlockBody(stmt));
             };
             (
                 item.definition
@@ -1236,6 +1252,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     .collect::<HashSet<Block>>(),
                 parent,
                 item.definition.is_terminator(),
+                item.definition.is_edge(),
             )
         };
 
@@ -1249,6 +1266,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         if definition.is_terminator() != old_is_terminator {
             return Err(RewriteError::TerminatorKindMismatch(stmt));
+        }
+        // An UnGraph member keeps its role; an edge statement stays operand-free.
+        if let StatementParent::UnGraph(_) = parent {
+            if definition.is_edge() != old_is_edge {
+                return Err(RewriteError::EdgeRoleMismatch(stmt));
+            }
+            if old_is_edge && definition.arguments().next().is_some() {
+                return Err(RewriteError::EdgeStatementWithOperands);
+            }
         }
         if !old_is_terminator && definition.successors().next().is_some() {
             return Err(RewriteError::NonTerminatorWithSuccessors);
@@ -1301,6 +1327,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             *slot = old;
         }
 
+        // An UnGraph node's slots may leave some wires and join others.
+        let wires = match parent {
+            StatementParent::UnGraph(graph) => {
+                self.snapshot_wires(graph, old_operands.iter().chain(&new_operands).copied())
+            }
+            _ => Default::default(),
+        };
+
         // Update the def-use index: drop the old operand edges, install the new.
         for (index, &operand) in old_operands.iter().enumerate() {
             remove_use(self.stage, operand, Use::StatementOperand { stmt, index });
@@ -1343,7 +1377,18 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 }
                 return;
             }
-            StatementParent::UnGraph(_) => unreachable!("rejected by prepare_replacement"),
+            StatementParent::UnGraph(graph) => {
+                // Results keep their ids, so the wires an edge statement
+                // defines and their readers are unchanged; a node's wires are
+                // resynced. An edge statement has no operands, so its snapshot
+                // is empty.
+                self.events.push(MutationEvent::ReplacedStatement { stmt });
+                if self.resync_wires(graph, wires) {
+                    self.events
+                        .push(MutationEvent::ChangedUnGraphTopology { graph });
+                }
+                return;
+            }
         };
 
         // Update the predecessor mirror. Only terminators are expected to have successors.

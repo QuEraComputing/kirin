@@ -686,3 +686,125 @@ fn replace_all_uses_across_two_ungraphs() {
     assert_topology(&stage, ug2);
     verify_derived(&stage).unwrap();
 }
+
+#[test]
+fn replace_statement_on_ungraph_node_moves_its_wires() {
+    let Fixture {
+        mut stage,
+        ug,
+        w,
+        v,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    rw.drain_events();
+
+    // b now reads v instead of w: w loses its edge, v gains one.
+    rw.replace_statement(b, BuilderDialect::Use(v)).unwrap();
+    assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(b, c))]));
+    assert_eq!(
+        rw.drain_events(),
+        vec![
+            MutationEvent::ReplacedStatement { stmt: b },
+            MutationEvent::ChangedUnGraphTopology { graph: ug },
+        ]
+    );
+
+    // The same operands again change no topology.
+    rw.replace_statement(b, BuilderDialect::Use(v)).unwrap();
+    assert_eq!(
+        rw.drain_events(),
+        vec![MutationEvent::ReplacedStatement { stmt: b }]
+    );
+    drop(rw);
+
+    assert_eq!(*a.definition(&stage), BuilderDialect::Use(w));
+    assert_topology(&stage, ug);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_statement_on_edge_statement_keeps_its_wire() {
+    let Fixture {
+        mut stage,
+        ug,
+        w_stmt,
+        w,
+        v_stmt,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    rw.drain_events();
+
+    // The result slot is overwritten with the statement's own result, so `w`
+    // stays the wire and keeps its readers.
+    let placeholder = ResultValue::from(TestSSAValue(0));
+    rw.replace_statement(w_stmt, BuilderDialect::Wire(placeholder))
+        .unwrap();
+    assert_eq!(
+        rw.drain_events(),
+        vec![MutationEvent::ReplacedStatement { stmt: w_stmt }]
+    );
+    drop(rw);
+
+    assert_eq!(
+        *w.get_info(&stage).unwrap().kind(),
+        SSAKind::Result(w_stmt, 0)
+    );
+    assert_eq!(ug.expect_info(&stage).edge_statements(), [w_stmt, v_stmt]);
+    assert_eq!(edges(&stage, ug), HashMap::from([(w, pair(a, b))]));
+    assert_topology(&stage, ug);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_statement_on_ungraph_member_rejects_role_changes() {
+    let Fixture {
+        mut stage,
+        ug,
+        w_stmt,
+        capture,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    let r = rw.new_result(TestType::I32);
+    let node = rw
+        .insert_ungraph_node(ug, BuilderDialect::Compute(capture, r))
+        .unwrap();
+    rw.drain_events();
+    let placeholder = ResultValue::from(TestSSAValue(0));
+
+    // A node cannot become an edge statement, nor the reverse.
+    assert_eq!(
+        rw.replace_statement(node, BuilderDialect::Wire(placeholder)),
+        Err(RewriteError::EdgeRoleMismatch(node))
+    );
+    assert_eq!(
+        rw.replace_statement(w_stmt, BuilderDialect::Compute(capture, placeholder)),
+        Err(RewriteError::EdgeRoleMismatch(w_stmt))
+    );
+    // An edge statement stays operand-free.
+    assert_eq!(
+        rw.replace_statement(w_stmt, BuilderDialect::ParamWire(capture, placeholder)),
+        Err(RewriteError::EdgeStatementWithOperands)
+    );
+    // A node cannot become a terminator.
+    assert_eq!(
+        rw.replace_statement(node, BuilderDialect::Invoke(placeholder)),
+        Err(RewriteError::TerminatorKindMismatch(node))
+    );
+    assert!(rw.events().is_empty());
+    drop(rw);
+
+    assert_eq!(
+        *node.definition(&stage),
+        BuilderDialect::Compute(capture, r)
+    );
+    assert_topology(&stage, ug);
+    verify_derived(&stage).unwrap();
+}

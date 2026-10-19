@@ -770,9 +770,8 @@ fn replace_statement_preserves_result_identity() {
 fn replace_statement_rejects_illegal_edits() {
     let mut stage = new_stage();
 
-    // An ungraph-owned statement, for the body-kind guard.
-    let graph_stmt = stage.statement().definition(BuilderDialect::Isolated).new();
-    let _ungraph = stage.ungraph().node(graph_stmt).new();
+    // A statement in no body at all, for the body-kind guard.
+    let detached = stage.statement().definition(BuilderDialect::Nop).new();
 
     // A block holding a plain statement, a two-result statement, and a branch.
     let x = stage.block_argument().index(0);
@@ -800,10 +799,10 @@ fn replace_statement_rejects_illegal_edits() {
 
     let mut rw = Rewriter::new(&mut stage);
 
-    // UnGraph bodies need topology surgery, which is a later slice.
+    // A statement must belong to a block or graph to be replaced.
     assert_eq!(
-        rw.replace_statement(graph_stmt, BuilderDialect::Isolated),
-        Err(RewriteError::NotInBlockBody(graph_stmt))
+        rw.replace_statement(detached, BuilderDialect::Nop),
+        Err(RewriteError::NotInBlockBody(detached))
     );
     // Result arity is fixed: dropping results would orphan their SSA values.
     assert_eq!(
