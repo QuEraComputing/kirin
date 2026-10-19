@@ -15,11 +15,21 @@ impl std::fmt::Display for Port {
     }
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum PortParent {
     DiGraph(DiGraph),
     UnGraph(UnGraph),
+}
+
+/// Produces DiGraph(id) instead of DiGraph(DiGraph(id))
+impl std::fmt::Debug for PortParent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            PortParent::DiGraph(digraph) => write!(f, "{digraph:?}"),
+            PortParent::UnGraph(ungraph) => write!(f, "{ungraph:?}"),
+        }
+    }
 }
 
 #[cfg(test)]

@@ -1,7 +1,8 @@
 use std::convert::Infallible;
 
 use kirin_ir::{
-    Block, CompileStage, Function, SSAValue, SpecializedFunction, StagedFunction, Statement, Symbol,
+    Block, CompileStage, Function, SSAValue, SpecializedFunction, StageStatus, StagedFunction,
+    Statement, Symbol,
 };
 use thiserror::Error;
 
@@ -17,6 +18,8 @@ pub enum InterpreterError {
     EmptyFrameStack,
     #[error("missing stage {0:?}")]
     MissingStage(CompileStage),
+    #[error("stage {0:?} is unavailable ({1:?}); a rewrite pass holds or poisoned it")]
+    UnavailableStage(CompileStage, StageStatus),
     #[error("missing stage info for stage {0:?}")]
     MissingStageInfo(CompileStage),
     #[error("missing block info for block {0:?}")]
