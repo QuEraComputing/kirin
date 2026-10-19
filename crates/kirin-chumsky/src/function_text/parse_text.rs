@@ -899,7 +899,10 @@ where
 }
 
 /// Lookup a stage by symbolic name (`@A`) or numeric symbol (`@1`).
-fn find_stage_symbol<S>(pipeline: &Pipeline<S>, stage_symbol: &str) -> Option<CompileStage> {
+fn find_stage_symbol<S>(pipeline: &Pipeline<S>, stage_symbol: &str) -> Option<CompileStage>
+where
+    S: StageMeta,
+{
     if let Some(stage_id) = pipeline.stage_by_name(stage_symbol) {
         return Some(stage_id);
     }
@@ -911,7 +914,10 @@ fn find_stage_symbol<S>(pipeline: &Pipeline<S>, stage_symbol: &str) -> Option<Co
         .find(|stage_id| Id::from(*stage_id).raw() == raw_id)
 }
 
-fn stage_candidates<S>(pipeline: &Pipeline<S>) -> Vec<String> {
+fn stage_candidates<S>(pipeline: &Pipeline<S>) -> Vec<String>
+where
+    S: StageMeta,
+{
     let mut names = Vec::new();
     for (stage_id, name) in pipeline.stage_names() {
         match name.and_then(|symbol| pipeline.resolve(symbol).map(str::to_string)) {

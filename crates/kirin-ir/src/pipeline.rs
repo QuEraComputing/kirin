@@ -39,10 +39,14 @@ impl<S> Pipeline<S> {
     ///
     /// Resolves the name against the slot rather than the stage, so a position
     /// stays addressable even once its stage has been lent to a pass or
-    /// poisoned by a failed one.
+    /// poisoned by a failed one. While the stage is present, the slot answers
+    /// to the stage's own name, so this agrees with what the printer shows.
     ///
     /// Returns `None` if no stage has the given name.
-    pub fn stage_by_name(&self, name: &str) -> Option<CompileStage> {
+    pub fn stage_by_name(&self, name: &str) -> Option<CompileStage>
+    where
+        S: StageMeta,
+    {
         // Names are interned, so symbol equality is name equality — no need to
         // resolve every slot back to a string.
         let symbol = self.global_symbols.lookup(name)?;
@@ -60,7 +64,10 @@ impl<S> Pipeline<S> {
     ///
     /// Unlike [`Pipeline::stages`], this yields *every* position, so the
     /// [`CompileStage`] it hands back is always the real one.
-    pub fn stage_names(&self) -> impl Iterator<Item = (CompileStage, Option<GlobalSymbol>)> + '_ {
+    pub fn stage_names(&self) -> impl Iterator<Item = (CompileStage, Option<GlobalSymbol>)> + '_
+    where
+        S: StageMeta,
+    {
         self.stages
             .iter()
             .enumerate()
@@ -82,7 +89,7 @@ impl<S> Pipeline<S> {
     /// in the `#[bon::bon]` block) when you want to set a stage name.
     pub fn add_stage_raw(&mut self, stage: S) -> CompileStage {
         let id = CompileStage::new(Id(self.stages.len()));
-        self.stages.push(StageSlot::present(stage, None));
+        self.stages.push(StageSlot::present(stage));
         id
     }
 
@@ -325,13 +332,11 @@ impl<S> Pipeline<S> {
     {
         let id = CompileStage::new(Id(self.stages.len()));
         stage.set_stage_id(Some(id));
-        // The slot's copy is what `stage_by_name` matches on; the stage's own
-        // copy is what the printer and parser read.
-        let symbol = name.map(|n| self.global_symbols.intern(n));
-        if let Some(sym) = symbol {
+        if let Some(n) = name {
+            let sym = self.global_symbols.intern(n);
             stage.set_stage_name(Some(sym));
         }
-        self.stages.push(StageSlot::present(stage, symbol));
+        self.stages.push(StageSlot::present(stage));
         id
     }
 

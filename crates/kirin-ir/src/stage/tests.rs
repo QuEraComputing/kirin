@@ -752,6 +752,56 @@ fn a_poisoned_position_keeps_its_name_and_id() {
     assert_eq!(pipeline.stage_by_name("source"), Some(id));
 }
 
+/// A `lang_a_pipeline` whose stage was renamed from `source` to `lowered`.
+fn renamed_lang_a_pipeline() -> (Pipeline<TestStage>, CompileStage) {
+    let (mut pipeline, id) = lang_a_pipeline();
+    let renamed = pipeline.intern("lowered");
+    pipeline
+        .stage_mut(id)
+        .expect("the stage is present")
+        .set_stage_name(Some(renamed));
+    (pipeline, id)
+}
+
+#[test]
+fn renaming_a_present_stage_renames_its_position() {
+    let (pipeline, id) = renamed_lang_a_pipeline();
+
+    // The printer reads the stage's own name, so lookup must follow it rather
+    // than a copy taken when the stage was added.
+    assert_eq!(pipeline.stage_by_name("lowered"), Some(id));
+    assert_eq!(pipeline.stage_by_name("source"), None);
+    assert_eq!(
+        pipeline.stage_names().collect::<Vec<_>>(),
+        vec![(id, pipeline.lookup_symbol("lowered"))]
+    );
+}
+
+#[test]
+fn a_transferred_position_answers_to_the_name_its_stage_left_with() {
+    let (mut pipeline, id) = renamed_lang_a_pipeline();
+
+    // Only an unwind outside `run_pass`'s catch strands a slot like this.
+    let _lost = pipeline
+        .slot_mut(id)
+        .and_then(StageSlot::take)
+        .expect("the stage is present");
+
+    assert_eq!(pipeline.stage_status(id), Some(StageStatus::Transferred));
+    assert_eq!(pipeline.stage_by_name("lowered"), Some(id));
+    assert_eq!(pipeline.stage_by_name("source"), None);
+}
+
+#[test]
+fn a_poisoned_position_answers_to_the_name_its_stage_left_with() {
+    let (mut pipeline, id) = renamed_lang_a_pipeline();
+    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::CannotInsertTerminator));
+
+    assert_eq!(pipeline.stage_status(id), Some(StageStatus::Poisoned));
+    assert_eq!(pipeline.stage_by_name("lowered"), Some(id));
+    assert_eq!(pipeline.stage_by_name("source"), None);
+}
+
 #[test]
 fn run_pass_restores_the_stage_when_the_dialect_does_not_match() {
     let (mut pipeline, id) = lang_a_pipeline();

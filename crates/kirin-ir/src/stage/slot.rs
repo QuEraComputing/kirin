@@ -1,5 +1,5 @@
-use crate::Quarantined;
 use crate::node::symbol::GlobalSymbol;
+use crate::{Quarantined, StageMeta};
 
 /// One stage position in a [`Pipeline`](crate::Pipeline).
 ///
@@ -8,14 +8,18 @@ use crate::node::symbol::GlobalSymbol;
 /// [`StageInfo`](crate::StageInfo) is valid, well-formed, empty IR, so a failed
 /// pass would silently become "this stage compiled to nothing".
 ///
-/// The name lives on the slot rather than only on the stage because a position
-/// must stay identifiable in every state, and two of the three have no readable
-/// stage: a transferred slot holds nothing, and a poisoned one holds its stage
-/// inside a [`Quarantined`], which lends out no IR.
-pub(crate) struct StageSlot<S> {
-    name: Option<GlobalSymbol>,
-    state: SlotState<S>,
-}
+/// A position must stay identifiable by name in every state, but two of the
+/// three have no readable stage: a transferred slot holds nothing, and a
+/// poisoned one holds its stage inside a [`Quarantined`], which lends out no
+/// IR. So the stage's own name is the only copy while it is present, and the
+/// slot records it at the moment the stage is transferred. Nothing can rename
+/// a stage that is out of reach, so the recorded copy cannot drift from it.
+///
+/// [`StageSlot`] is a separate type so the state enum [`SlotState`] remains
+/// private to this module. This way, it changes only through the transitions
+/// below, which refuse to overwrite a present stage, revive a poisoned one, or
+/// record a name the stage did not carry.
+pub(crate) struct StageSlot<S>(SlotState<S>);
 
 /// What a [`StageSlot`] currently holds.
 enum SlotState<S> {
@@ -27,11 +31,14 @@ enum SlotState<S> {
     /// the stage out and putting it back, outside the `catch_unwind` that
     /// [`Pipeline::run_pass`](crate::rewrite::pass::drive_pass) installs
     /// Hence, it marks a stage lost to a panic, rather than one never written back.
-    Transferred,
+    Transferred { name: Option<GlobalSymbol> },
     /// A pass failed here. The slot keeps its position so every previously
     /// issued [`CompileStage`](crate::CompileStage), which is a raw index,
     /// stays valid.
-    Poisoned(Quarantined<S>),
+    Poisoned {
+        name: Option<GlobalSymbol>,
+        quarantined: Quarantined<S>,
+    },
 }
 
 /// Which of three states a stage position in a [`Pipeline`](crate::Pipeline)
@@ -52,26 +59,28 @@ pub enum StageStatus {
 }
 
 impl<S> StageSlot<S> {
-    /// A slot holding `stage`, optionally under `name`.
-    pub(crate) fn present(stage: S, name: Option<GlobalSymbol>) -> Self {
-        Self {
-            name,
-            state: SlotState::Present(stage),
-        }
+    /// A slot holding `stage`, answering to whatever name the stage carries.
+    pub(crate) fn present(stage: S) -> Self {
+        Self(SlotState::Present(stage))
     }
 
     /// Lend the stage out, leaving this position marked as transferred.
     ///
     /// Returns `None` when the slot holds no stage, leaving it exactly as it was.
     #[allow(dead_code)]
-    pub(crate) fn take(&mut self) -> Option<S> {
+    pub(crate) fn take(&mut self) -> Option<S>
+    where
+        S: StageMeta,
+    {
+        // Read the name while the stage is still here: once it leaves, the
+        // marker is the only thing left to answer to it.
+        let name = self.stage()?.stage_name();
         // Swapping in the marker and reading the old state is one step, so the
         // slot is never left holding neither.
-        match std::mem::replace(&mut self.state, SlotState::Transferred) {
+        match std::mem::replace(&mut self.0, SlotState::Transferred { name }) {
             SlotState::Present(stage) => Some(stage),
-            unchanged => {
-                self.state = unchanged;
-                None
+            SlotState::Transferred { .. } | SlotState::Poisoned { .. } => {
+                unreachable!("`stage()` just found this slot present")
             }
         }
     }
@@ -82,9 +91,9 @@ impl<S> StageSlot<S> {
     /// overwriting a `Present` or `Poisoned` slot
     #[allow(dead_code)]
     pub(crate) fn restore(&mut self, stage: S) {
-        match &self.state {
-            SlotState::Transferred => {
-                self.state = SlotState::Present(stage);
+        match &self.0 {
+            SlotState::Transferred { .. } => {
+                self.0 = SlotState::Present(stage);
             }
             _ => panic!("Can only restore a Transferred StageSlot"),
         }
@@ -96,9 +105,9 @@ impl<S> StageSlot<S> {
     /// overwriting a `Present` or `Poisoned` slot
     #[allow(dead_code)]
     pub(crate) fn poison(&mut self, quarantined: Quarantined<S>) {
-        match &self.state {
-            SlotState::Transferred => {
-                self.state = SlotState::Poisoned(quarantined);
+        match self.0 {
+            SlotState::Transferred { name } => {
+                self.0 = SlotState::Poisoned { name, quarantined };
             }
             _ => panic!("Can only poison a Transferred StageSlot"),
         }
@@ -111,8 +120,8 @@ impl<S> StageSlot<S> {
     /// deliberately lends out no IR, so nothing else survives a failed pass.
     #[allow(dead_code)]
     pub(crate) fn quarantined(&self) -> Option<&Quarantined<S>> {
-        match &self.state {
-            SlotState::Poisoned(q) => Some(q),
+        match &self.0 {
+            SlotState::Poisoned { quarantined, .. } => Some(quarantined),
             _ => None,
         }
     }
@@ -121,31 +130,40 @@ impl<S> StageSlot<S> {
     /// [`Quarantined`] it may hold.
     #[allow(dead_code)]
     pub(crate) fn status(&self) -> StageStatus {
-        match &self.state {
+        match &self.0 {
             SlotState::Present(_) => StageStatus::Present,
-            SlotState::Transferred => StageStatus::Transferred,
-            SlotState::Poisoned(_) => StageStatus::Poisoned,
+            SlotState::Transferred { .. } => StageStatus::Transferred,
+            SlotState::Poisoned { .. } => StageStatus::Poisoned,
         }
     }
 
     /// The interned name this position answers to, in every state.
-    pub(crate) fn name(&self) -> Option<GlobalSymbol> {
-        self.name
+    ///
+    /// The stage's own name while it is present, so renaming the stage renames
+    /// the position; the name it left with otherwise.
+    pub(crate) fn name(&self) -> Option<GlobalSymbol>
+    where
+        S: StageMeta,
+    {
+        match &self.0 {
+            SlotState::Present(stage) => stage.stage_name(),
+            SlotState::Transferred { name } | SlotState::Poisoned { name, .. } => *name,
+        }
     }
 
     /// The stage, if this slot still holds one.
     pub(crate) fn stage(&self) -> Option<&S> {
-        match &self.state {
+        match &self.0 {
             SlotState::Present(stage) => Some(stage),
-            SlotState::Transferred | SlotState::Poisoned(_) => None,
+            SlotState::Transferred { .. } | SlotState::Poisoned { .. } => None,
         }
     }
 
     /// The stage, mutably, if this slot still holds one.
     pub(crate) fn stage_mut(&mut self) -> Option<&mut S> {
-        match &mut self.state {
+        match &mut self.0 {
             SlotState::Present(stage) => Some(stage),
-            SlotState::Transferred | SlotState::Poisoned(_) => None,
+            SlotState::Transferred { .. } | SlotState::Poisoned { .. } => None,
         }
     }
 }
