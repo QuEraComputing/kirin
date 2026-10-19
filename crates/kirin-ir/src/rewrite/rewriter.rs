@@ -29,16 +29,18 @@
 //! [`Rewriter::insert_terminator`]), `CFG`
 //! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
 //! merge blocks, [`Rewriter::retarget_successor`], and block-argument insertion
-//! and erasure), and `DiGraph` node surgery in the sibling `digraph` module
-//! ([`Rewriter::insert_node`], [`Rewriter::replace_yield`], and erasing members
-//! through [`Rewriter::erase_statement`]). The rewriter **maintains** all four derived mirrors
+//! and erasure), `DiGraph` node surgery in the sibling `digraph` module
+//! ([`Rewriter::insert_node`], [`Rewriter::replace_yield`]), and `UnGraph`
+//! surgery in the sibling `ungraph` module ([`Rewriter::insert_ungraph_node`],
+//! [`Rewriter::insert_ungraph_edge`]); graph members are erased through
+//! [`Rewriter::erase_statement`]. The rewriter **maintains** all four derived mirrors
 //! incrementally on every edit — [`SSAInfo::uses`](crate::SSAInfo),
 //! [`BlockInfo::predecessors`](crate::BlockInfo), the block-body summary
 //! (`BlockInfo::statements`/`terminator`), and the CFG chain summary
 //! (`CFGInfo::blocks`) — so they stay valid without a rebuild — and keeps each
-//! `DiGraph`'s petgraph topology in step with node insertion and erasure and
-//! with operand edits on its members. Deferred to later slices: `UnGraph`
-//! surgery and full cross-block dominance/visibility preflight. Inserted
+//! graph's petgraph topology in step with member insertion and erasure and
+//! with operand edits on its members. Deferred to later slices: full
+//! cross-block dominance/visibility preflight. Inserted
 //! statements define results through values pre-allocated with
 //! [`Rewriter::new_result`].
 //!
@@ -100,8 +102,9 @@ pub enum MutationEvent {
     /// Emitted once per [`Rewriter::replace_all_uses`] call, after the
     /// per-statement [`MutationEvent::ChangedOperands`] events it implies.
     ReplacedUses { old: SSAValue, new: SSAValue },
-    /// A new statement was spliced into a block's statement list or added as a
-    /// `DiGraph` node.
+    /// A new statement was spliced into a block's statement list or added to a
+    /// graph: a `DiGraph` node, an `UnGraph` node, or an `UnGraph` edge
+    /// statement.
     InsertedStatement { stmt: Statement },
     /// A statement was tombstoned and removed from its block or graph.
     ///
