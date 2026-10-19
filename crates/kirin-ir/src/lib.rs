@@ -33,7 +33,7 @@ pub use derived::{
 pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
-    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut,
+    BranchOp, Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut,
     HasDigraphs, HasDigraphsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
     HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator,
 };
@@ -63,7 +63,7 @@ pub use stage::{
 /// Re-exports of the most commonly used types for dialect authors.
 pub mod prelude {
     pub use crate::{
-        Block, Body, BuilderStageInfo, CFG, CompileStage, Dialect, Function, GetInfo,
+        Block, Body, BranchOp, BuilderStageInfo, CFG, CompileStage, Dialect, Function, GetInfo,
         HasCallableBody, HasSignature, HasStageInfo, Pipeline, ResultValue, SSAValue, Signature,
         SignatureSemantics, StageInfo, StageMeta, Statement,
     };

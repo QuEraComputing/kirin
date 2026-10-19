@@ -806,20 +806,39 @@ fn insert_after_the_terminator_leaves_the_block_body_intact() {
 }
 
 #[test]
-fn erasing_the_terminator_leaves_the_block_body_intact() {
+fn erasing_the_terminator_keeps_the_chain_and_clears_the_terminator() {
     let mut f = body_stage();
-    let before = f.body();
+    let (head, tail, len, _) = f.body();
 
-    {
-        let mut rewriter = Rewriter::new(&mut f.stage);
-        assert_eq!(
-            rewriter.erase_statement(f.terminator),
-            Err(RewriteError::CannotEraseTerminator(f.terminator))
-        );
-    }
+    Rewriter::new(&mut f.stage)
+        .erase_statement(f.terminator)
+        .unwrap();
 
-    assert_eq!(f.body(), before);
+    // The chain summary is untouched; only the terminator pointer clears.
+    assert_eq!(f.body(), (head, tail, len, None));
     assert_eq!(verify_derived(&f.stage), Ok(()));
+}
+
+#[test]
+fn a_non_terminator_with_successors_fails_finalization() {
+    let mut stage = new_stage();
+    // `Fork` carries a successor without being a terminator: invalid IR.
+    let target = stage.block().new();
+    let fork = stage
+        .statement()
+        .definition(BuilderDialect::Fork(Successor::from_block(target)))
+        .new();
+    let source = stage.block().stmt(fork).new();
+    let _cfg = stage.cfg().add_block(source).add_block(target).new();
+
+    // Reported once, and its edge is not derived (no other finding, such as
+    // a predecessor mismatch, accompanies it).
+    assert_eq!(
+        stage.finalize().err(),
+        Some(FinalizeError::MalformedIR(vec![
+            Finding::NonTerminatorSuccessor { stmt: fork }
+        ]))
+    );
 }
 
 #[test]

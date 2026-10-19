@@ -32,6 +32,7 @@ impl From<LinkedListNode<Block>> for Block {
 }
 
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct LinkedList<Ptr: Copy + PartialEq> {
     pub(crate) head: Option<Ptr>,
     pub(crate) tail: Option<Ptr>,

@@ -17,6 +17,14 @@ use crate::{Dialect, InternTable, node::*};
 ///
 /// Re-exported at the crate root as [`StageArenas`](crate::StageArenas).
 #[derive(Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "L: serde::Serialize, L::Type: serde::Serialize",
+        deserialize = "L: serde::Deserialize<'de>, L::Type: serde::Deserialize<'de>"
+    ))
+)]
 pub struct Arenas<L: Dialect> {
     pub(crate) name: Option<GlobalSymbol>,
     pub(crate) stage_id: Option<CompileStage>,

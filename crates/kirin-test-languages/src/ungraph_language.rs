@@ -15,6 +15,7 @@ use kirin_test_types::SimpleType;
 /// Corresponds to `edge %w0 = wire -> EdgeType;` in the text format.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(edge, builders, type = SimpleType, crate = kirin_ir)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UngraphEdge {
     pub res: ResultValue,
 }
@@ -24,6 +25,7 @@ pub struct UngraphEdge {
 /// Models operations like ZX spiders: `node_a(%param, %e0, %e1, ...);`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(builders, type = SimpleType, crate = kirin_ir)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UngraphNodeA {
     pub param: SSAValue,
     pub ports: Vec<SSAValue>,
@@ -34,6 +36,7 @@ pub struct UngraphNodeA {
 /// Models operations with two parameters: `node_b(%p0, %p1, %e0, ...);`
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(builders, type = SimpleType, crate = kirin_ir)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UngraphNodeB {
     pub param0: SSAValue,
     pub param1: SSAValue,
@@ -54,6 +57,7 @@ pub struct UngraphNodeB {
 /// ```
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(builders, type = SimpleType, crate = kirin_ir)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct UngraphCompound {
     pub args: Vec<SSAValue>,
     pub body: UnGraph,
@@ -64,6 +68,7 @@ pub struct UngraphCompound {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
 #[kirin(builders, type = SimpleType, crate = kirin_ir)]
 #[wraps]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum UngraphLanguage {
     Edge(UngraphEdge),
     NodeA(UngraphNodeA),

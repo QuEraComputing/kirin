@@ -2,11 +2,11 @@ use std::convert::Infallible;
 
 use super::*;
 use crate::{
-    Block, CFG, CompileStage, DiGraph, Dialect, GlobalSymbol, HasArguments, HasArgumentsMut,
-    HasBlocks, HasBlocksMut, HasCFG, HasCFGMut, HasDigraphs, HasDigraphsMut, HasResults,
-    HasResultsMut, HasStageInfo, HasSuccessors, HasSuccessorsMut, HasUngraphs, HasUngraphsMut, Id,
-    IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, Pipeline, ResultValue, SSAValue,
-    StageInfo, StageMeta, StagedNamePolicy, Successor, UnGraph,
+    Block, BranchOp, CFG, CompileStage, DiGraph, Dialect, GlobalSymbol, HasArguments,
+    HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut, HasDigraphs, HasDigraphsMut,
+    HasResults, HasResultsMut, HasStageInfo, HasSuccessors, HasSuccessorsMut, HasUngraphs,
+    HasUngraphsMut, Id, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, Pipeline,
+    ResultValue, SSAValue, StageInfo, StageMeta, StagedNamePolicy, Successor, UnGraph,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -160,6 +160,15 @@ macro_rules! impl_empty_dialect_traits {
         impl IsEdge for $dialect {
             fn is_edge(&self) -> bool {
                 false
+            }
+        }
+
+        impl BranchOp for $dialect {
+            fn successor_operands(&self, _index: usize) -> Option<&[SSAValue]> {
+                None
+            }
+            fn successor_operands_mut(&mut self, _index: usize) -> Option<&mut Vec<SSAValue>> {
+                None
             }
         }
     };

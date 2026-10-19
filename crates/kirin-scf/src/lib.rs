@@ -46,6 +46,7 @@ mod tests;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint, Interpretable)]
 #[wraps]
 #[kirin(builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StructuredControlFlow<T: CompileTimeValue> {
     If(If<T>),
     For(For<T>),
@@ -61,6 +62,7 @@ pub enum StructuredControlFlow<T: CompileTimeValue> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$if {condition} then {then_body} else {else_body}[ -> {results:type}]")]
 #[kirin(builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct If<T: CompileTimeValue> {
     condition: SSAValue,
     then_body: Block,
@@ -103,6 +105,7 @@ impl<T: CompileTimeValue> If<T> {
     format = "$for {induction_var} in {start}..{end} step {step} iter_args({init_args}) do {body}[ -> {results:type}]"
 )]
 #[kirin(builders, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct For<T: CompileTimeValue> {
     induction_var: SSAValue,
     start: SSAValue,
@@ -162,6 +165,7 @@ impl<T: CompileTimeValue> For<T> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[chumsky(format = "$yield[ {values}]")]
 #[kirin(terminator, type = T)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Yield<T: CompileTimeValue> {
     values: Vec<SSAValue>,
     #[kirin(default)]

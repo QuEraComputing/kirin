@@ -112,3 +112,34 @@ mod tests {
         assert_ne!(k1, k2);
     }
 }
+
+// Serialize only the canonical ordered items, never the derived lookup map.
+#[cfg(feature = "serde")]
+impl<T, K> serde::Serialize for InternTable<T, K>
+where
+    T: Clone + Eq + std::hash::Hash + serde::Serialize,
+    K: InternKey,
+{
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        self.items.serialize(serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, T, K> serde::Deserialize<'de> for InternTable<T, K>
+where
+    T: Clone + Eq + std::hash::Hash + serde::Deserialize<'de>,
+    K: InternKey,
+{
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let items = Vec::<T>::deserialize(deserializer)?;
+        let mut table = Self::default();
+        for item in items {
+            if table.item_map.contains_key(&item) {
+                return Err(serde::de::Error::custom("duplicate interned item"));
+            }
+            table.intern(item);
+        }
+        Ok(table)
+    }
+}

@@ -4,6 +4,7 @@ use kirin_interpreter::Interpretable;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(type = T)]
 #[chumsky(format = "$named {target}({args})[ -> {results:type}]")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CallNamed<T: CompileTimeValue> {
     target: Symbol,
     args: Vec<SSAValue>,
@@ -17,6 +18,7 @@ pub struct CallNamed<T: CompileTimeValue> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(type = T)]
 #[chumsky(format = "$function {target}({args})[ -> {results:type}]")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CallFunction<T: CompileTimeValue> {
     target: Function,
     args: Vec<SSAValue>,
@@ -30,6 +32,7 @@ pub struct CallFunction<T: CompileTimeValue> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(type = T)]
 #[chumsky(format = "$staged {target}({args})[ -> {results:type}]")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CallStaged<T: CompileTimeValue> {
     target: StagedFunction,
     args: Vec<SSAValue>,
@@ -43,6 +46,7 @@ pub struct CallStaged<T: CompileTimeValue> {
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(type = T)]
 #[chumsky(format = "$specialized {target}({args})[ -> {results:type}]")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CallSpecialized<T: CompileTimeValue> {
     target: SpecializedFunction,
     args: Vec<SSAValue>,
@@ -57,6 +61,7 @@ pub struct CallSpecialized<T: CompileTimeValue> {
 #[wraps]
 #[kirin(type = T)]
 #[chumsky(format = "call")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Call<T: CompileTimeValue> {
     Named(CallNamed<T>),
     Function(CallFunction<T>),

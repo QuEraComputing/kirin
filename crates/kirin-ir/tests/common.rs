@@ -45,6 +45,10 @@ impl Placeholder for TestType {
 /// - `Isolated`: no operands, no results (ungraph isolated node)
 /// - `Branch(target)`: one-successor control-flow terminator
 /// - `CondBranch(a, b)`: two-successor control-flow terminator
+/// - `Fork(target)`: a non-terminator carrying a successor, which is invalid
+///   IR; exists to test that verification reports it
+/// - `Jump(target, args)`: one-successor terminator forwarding `args` to the
+///   target's block arguments
 /// - `OwnBlocks(a, b)`: structurally owns two blocks
 /// - `OwnCFG(cfg)`: structurally owns one CFG
 /// - `OwnGraphs(dg, ug)`: structurally owns one directed and one undirected graph
@@ -61,6 +65,8 @@ pub enum BuilderDialect {
     Isolated,
     Branch(Successor),
     CondBranch(Successor, Successor),
+    Jump(Successor, Vec<SSAValue>),
+    Fork(Successor),
     OwnBlocks(Block, Block),
     OwnCFG(CFG),
     OwnGraphs(DiGraph, UnGraph),
@@ -72,6 +78,7 @@ impl<'a> HasArguments<'a> for BuilderDialect {
         match self {
             BuilderDialect::Add(a, b) | BuilderDialect::Gate(a, b) => vec![a, b].into_iter(),
             BuilderDialect::Use(a) => vec![a].into_iter(),
+            BuilderDialect::Jump(_, args) => args.iter().collect::<Vec<_>>().into_iter(),
             _ => vec![].into_iter(),
         }
     }
@@ -83,6 +90,7 @@ impl<'a> HasArgumentsMut<'a> for BuilderDialect {
         match self {
             BuilderDialect::Add(a, b) | BuilderDialect::Gate(a, b) => vec![a, b].into_iter(),
             BuilderDialect::Use(a) => vec![a].into_iter(),
+            BuilderDialect::Jump(_, args) => args.iter_mut().collect::<Vec<_>>().into_iter(),
             _ => vec![].into_iter(),
         }
     }
@@ -134,7 +142,9 @@ impl<'a> HasSuccessors<'a> for BuilderDialect {
     type Iter = std::vec::IntoIter<&'a Successor>;
     fn successors(&'a self) -> Self::Iter {
         match self {
-            BuilderDialect::Branch(target) => vec![target].into_iter(),
+            BuilderDialect::Branch(target)
+            | BuilderDialect::Jump(target, _)
+            | BuilderDialect::Fork(target) => vec![target].into_iter(),
             BuilderDialect::CondBranch(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }
@@ -145,7 +155,9 @@ impl<'a> HasSuccessorsMut<'a> for BuilderDialect {
     type IterMut = std::vec::IntoIter<&'a mut Successor>;
     fn successors_mut(&'a mut self) -> Self::IterMut {
         match self {
-            BuilderDialect::Branch(target) => vec![target].into_iter(),
+            BuilderDialect::Branch(target)
+            | BuilderDialect::Jump(target, _)
+            | BuilderDialect::Fork(target) => vec![target].into_iter(),
             BuilderDialect::CondBranch(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }
@@ -176,7 +188,10 @@ impl IsTerminator for BuilderDialect {
     fn is_terminator(&self) -> bool {
         matches!(
             self,
-            BuilderDialect::Return | BuilderDialect::Branch(_) | BuilderDialect::CondBranch(_, _)
+            BuilderDialect::Return
+                | BuilderDialect::Branch(_)
+                | BuilderDialect::CondBranch(_, _)
+                | BuilderDialect::Jump(_, _)
         )
     }
 }
@@ -242,6 +257,23 @@ impl<'a> HasUngraphsMut<'a> for BuilderDialect {
 impl IsEdge for BuilderDialect {
     fn is_edge(&self) -> bool {
         matches!(self, BuilderDialect::Wire(_))
+    }
+}
+
+/// Only `Jump` forwards operands; `Branch`/`CondBranch` carry none.
+impl BranchOp for BuilderDialect {
+    fn successor_operands(&self, index: usize) -> Option<&[SSAValue]> {
+        match (self, index) {
+            (BuilderDialect::Jump(_, args), 0) => Some(args),
+            _ => None,
+        }
+    }
+
+    fn successor_operands_mut(&mut self, index: usize) -> Option<&mut Vec<SSAValue>> {
+        match (self, index) {
+            (BuilderDialect::Jump(_, args), 0) => Some(args),
+            _ => None,
+        }
     }
 }
 

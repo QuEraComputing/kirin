@@ -1,0 +1,207 @@
+{
+  "description": "Common semantic specification. Builders use start/delta/operation. The independent closed-form oracle uses expected coefficient fields.",
+  "max_size": 100000,
+  "max_abs_input": 8,
+  "samples": [
+    {
+      "x": 2,
+      "y": 3,
+      "outer": true,
+      "inner": true
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "outer": true,
+      "inner": false
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "outer": false,
+      "inner": true
+    },
+    {
+      "x": 2,
+      "y": 3,
+      "outer": false,
+      "inner": false
+    },
+    {
+      "x": -2,
+      "y": 3,
+      "outer": true,
+      "inner": false
+    },
+    {
+      "x": 3,
+      "y": -2,
+      "outer": false,
+      "inner": true
+    },
+    {
+      "x": 0,
+      "y": 0,
+      "outer": false,
+      "inner": false
+    }
+  ],
+  "families": [
+    {
+      "name": "chain",
+      "description": "Return x plus size additions of y.",
+      "steps_divisor": 1,
+      "paths": [
+        {
+          "name": "all",
+          "when": {},
+          "start": "x",
+          "delta": "y",
+          "operation": "add",
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "diamond",
+      "description": "Outer Boolean chooses adding or subtracting y size/2 times from x.",
+      "steps_divisor": 2,
+      "paths": [
+        {
+          "name": "left",
+          "when": {
+            "outer": true
+          },
+          "start": "x",
+          "delta": "y",
+          "operation": "add",
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": 1
+            }
+          }
+        },
+        {
+          "name": "right",
+          "when": {
+            "outer": false
+          },
+          "start": "x",
+          "delta": "y",
+          "operation": "sub",
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": -1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "nested_cfg",
+      "description": "Independent outer/inner Booleans select four distinct linear arithmetic paths.",
+      "steps_divisor": 4,
+      "paths": [
+        {
+          "name": "a",
+          "when": {
+            "outer": true,
+            "inner": true
+          },
+          "start": "x",
+          "delta": "y",
+          "operation": "add",
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": 1
+            }
+          }
+        },
+        {
+          "name": "b",
+          "when": {
+            "outer": true,
+            "inner": false
+          },
+          "start": "x",
+          "delta": "y",
+          "operation": "sub",
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": -1
+            }
+          }
+        },
+        {
+          "name": "c",
+          "when": {
+            "outer": false,
+            "inner": true
+          },
+          "start": "y",
+          "delta": "y",
+          "operation": "add",
+          "expected": {
+            "x_multiplier": {
+              "constant": 0,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 1,
+              "per_step": 1
+            }
+          }
+        },
+        {
+          "name": "d",
+          "when": {
+            "outer": false,
+            "inner": false
+          },
+          "start": "y",
+          "delta": "x",
+          "operation": "sub",
+          "expected": {
+            "x_multiplier": {
+              "constant": 0,
+              "per_step": -1
+            },
+            "y_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            }
+          }
+        }
+      ]
+    }
+  ]
+}

@@ -213,6 +213,11 @@ pub(crate) fn generate_dialect(ast: &syn::DeriveInput) -> darling::Result<TokenS
             crate_path,
         ));
 
+    // `#[kirin(branch_op)]` dialects implement `BranchOp` by hand.
+    if !ir.attrs.branch_op {
+        builder = builder.add(crate::branch_op::branch_op_template(crate_path));
+    }
+
     let mut output = builder.build()?;
     output.extend(crate::project::generate_project(&ir, crate_path));
     Ok(output)

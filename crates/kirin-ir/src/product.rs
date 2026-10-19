@@ -6,6 +6,7 @@ use smallvec::SmallVec;
 /// Uses SmallVec for compact inline storage: products with <=2 elements
 /// avoid heap allocation.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Product<T>(pub SmallVec<[T; 2]>);
 
 impl<T> Product<T> {

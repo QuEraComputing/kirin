@@ -356,3 +356,21 @@ impl ::kirin::ir::HasCallableBody for ZxWire {
         ::core::option::Option::None
     }
 }
+#[automatically_derived]
+impl ::kirin::ir::BranchOp for ZxWire {
+    fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
+        {
+            let _ = index;
+            ::core::option::Option::None
+        }
+    }
+    fn successor_operands_mut(
+        &mut self,
+        index: usize,
+    ) -> ::core::option::Option<&mut ::std::vec::Vec<::kirin::ir::SSAValue>> {
+        {
+            let _ = index;
+            ::core::option::Option::None
+        }
+    }
+}

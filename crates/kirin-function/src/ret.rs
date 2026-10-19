@@ -3,6 +3,7 @@ use kirin::prelude::*;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
 #[kirin(terminator, builders, type = T)]
 #[chumsky(format = "$ret[ {values}]")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Return<T: CompileTimeValue> {
     pub(crate) values: Vec<SSAValue>,
     #[kirin(default)]

@@ -61,6 +61,13 @@ pub struct TestSSAValue(pub usize);
 /// every SSA value is guaranteed to have a type and a resolved kind.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "L::Type: serde::Serialize",
+        deserialize = "L::Type: serde::Deserialize<'de>"
+    ))
+)]
 pub struct SSAInfo<L: Dialect> {
     pub(crate) id: SSAValue,
     pub(crate) name: Option<Symbol>,
@@ -129,6 +136,13 @@ impl<L: Dialect> SSAInfo<L> {
 /// Used during IR construction by parsers and builders.
 #[derive(Clone, Debug, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "L::Type: serde::Serialize",
+        deserialize = "L::Type: serde::Deserialize<'de>"
+    ))
+)]
 pub struct BuilderSSAInfo<L: Dialect> {
     pub(crate) id: SSAValue,
     pub(crate) name: Option<Symbol>,

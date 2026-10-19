@@ -38,3 +38,6 @@ fn main() -> anyhow::Result<()> {
         }
     }
 }
+
+#[cfg(all(test, feature = "serde"))]
+mod json_tests;

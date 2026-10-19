@@ -8,6 +8,7 @@ use kirin::prelude::*;
 #[derive(Clone, Hash, PartialEq, Eq, Debug, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = T)]
 #[chumsky(format = "fn {:name}{sig} {body}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Function<T: CompileTimeValue> {
     #[kirin(callable_body)]
     pub(crate) body: CFG,

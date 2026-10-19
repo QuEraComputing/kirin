@@ -1,6 +1,7 @@
 /// an arena item, provides generic interface
 /// to the item Id and whether it has been marked as deleted.
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Item<T> {
     pub(crate) deleted: bool,
     pub(crate) data: T,

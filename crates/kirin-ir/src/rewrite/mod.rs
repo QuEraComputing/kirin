@@ -17,6 +17,7 @@
 //! See the [`rewriter`] module docs for what a single edit does and does not
 //! guarantee, and [`pass`] for the boundary's failure routes.
 
+pub(crate) mod cfg;
 pub(crate) mod pass;
 pub(crate) mod quarantine;
 pub(crate) mod rewriter;

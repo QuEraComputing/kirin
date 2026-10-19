@@ -7,6 +7,7 @@ use kirin::prelude::*;
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "fn {:name}{sig} {body}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct CircuitFunction {
     pub body: DiGraph,
     pub sig: Signature<QubitType>,
@@ -16,6 +17,7 @@ pub struct CircuitFunction {
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "$h {qubit} -> {result:type}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct H {
     pub qubit: SSAValue,
     pub result: ResultValue,
@@ -25,6 +27,7 @@ pub struct H {
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "$cnot {ctrl}, {tgt} -> {ctrl_out:type}, {tgt_out:type}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Cnot {
     pub ctrl: SSAValue,
     pub tgt: SSAValue,
@@ -36,6 +39,7 @@ pub struct Cnot {
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "$rz({angle}) {qubit} -> {result:type}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Rz {
     pub angle: f64,
     pub qubit: SSAValue,
@@ -46,6 +50,7 @@ pub struct Rz {
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
 #[chumsky(format = "$measure {qubit} -> {result:type}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Measure {
     pub qubit: SSAValue,
     pub result: ResultValue,
@@ -54,6 +59,7 @@ pub struct Measure {
 /// Circuit dialect language enum.
 #[derive(Clone, Debug, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = QubitType)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum Circuit {
     #[wraps]
     H(H),

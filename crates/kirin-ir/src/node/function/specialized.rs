@@ -7,6 +7,7 @@ use super::staged::StagedFunction;
 
 /// A specialized version of a function, identified by its function ID and specialization ID.
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct SpecializedFunction(pub(crate) StagedFunction, pub(crate) usize);
 
 impl SpecializedFunction {
@@ -23,6 +24,14 @@ impl SpecializedFunction {
 /// Like staged functions, specializations can be invalidated and are then
 /// excluded from dispatch while remaining available for backedge tracking.
 #[derive(Clone, Debug)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "L::Type: serde::Serialize",
+        deserialize = "L::Type: serde::Deserialize<'de>"
+    ))
+)]
 pub struct SpecializedFunctionInfo<L: Dialect> {
     id: SpecializedFunction,
     signature: Signature<L::Type>,

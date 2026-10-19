@@ -19,10 +19,12 @@ use crate::stage::{HasStageInfo, StageDispatchMiss, StageInfo, StageMeta, StageS
 /// The global symbol table (`global_symbols`) provides cross-stage interning
 /// for identifiers like function names. Stage-local symbols (SSA names, blocks)
 /// remain in each stage's [`StageInfo`].
+#[cfg_attr(feature = "serde", derive(serde::Serialize))]
 pub struct Pipeline<S> {
     stages: Vec<StageSlot<S>>,
     functions: Arena<Function, FunctionInfo>,
     global_symbols: InternTable<String, GlobalSymbol>,
+    #[cfg_attr(feature = "serde", serde(skip))]
     name_index: FxHashMap<GlobalSymbol, Function>,
 }
 
@@ -797,5 +799,35 @@ mod tests {
         for f in &funcs {
             assert_eq!(pipeline.function_info(*f).unwrap().name(), None);
         }
+    }
+}
+
+#[cfg(feature = "serde")]
+impl<'de, S: serde::Deserialize<'de>> serde::Deserialize<'de> for Pipeline<S> {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        #[derive(serde::Deserialize)]
+        struct Data<S> {
+            stages: Vec<S>,
+            functions: Arena<Function, FunctionInfo>,
+            global_symbols: InternTable<String, GlobalSymbol>,
+        }
+        let data = Data::deserialize(deserializer)?;
+        let mut name_index = FxHashMap::default();
+        for function in data.functions.iter() {
+            if let Some(name) = function.name() {
+                if data.global_symbols.resolve(name).is_none() {
+                    return Err(serde::de::Error::custom("unknown global function symbol"));
+                }
+                if name_index.insert(name, function.id()).is_some() {
+                    return Err(serde::de::Error::custom("duplicate function name"));
+                }
+            }
+        }
+        Ok(Self {
+            stages: data.stages,
+            functions: data.functions,
+            global_symbols: data.global_symbols,
+            name_index,
+        })
     }
 }

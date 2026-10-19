@@ -2,6 +2,14 @@ use super::id::{Id, Identifier};
 use super::item::Item;
 
 #[derive(Debug, Clone)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(
+    feature = "serde",
+    serde(bound(
+        serialize = "T: serde::Serialize",
+        deserialize = "T: serde::Deserialize<'de>"
+    ))
+)]
 pub struct Arena<I: Identifier, T> {
     pub(crate) items: Vec<Item<T>>,
     marker: std::marker::PhantomData<I>,

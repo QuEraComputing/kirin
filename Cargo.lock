@@ -721,6 +721,7 @@ dependencies = [
  "kirin-test-utils",
  "kirin-tuple",
  "serde",
+ "serde_json",
  "trybuild",
 ]
 
@@ -730,6 +731,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "serde",
  "thiserror 2.0.18",
 ]
 
@@ -740,6 +742,7 @@ dependencies = [
  "kirin",
  "kirin-interpreter",
  "kirin-test-types",
+ "serde",
  "thiserror 2.0.18",
 ]
 
@@ -750,6 +753,7 @@ dependencies = [
  "kirin",
  "kirin-interpreter",
  "kirin-test-types",
+ "serde",
  "smallvec",
 ]
 
@@ -778,6 +782,7 @@ dependencies = [
  "kirin",
  "kirin-interpreter",
  "kirin-test-types",
+ "serde",
 ]
 
 [[package]]
@@ -786,6 +791,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-interpreter",
+ "serde",
 ]
 
 [[package]]
@@ -877,6 +883,7 @@ dependencies = [
  "kirin-constant",
  "kirin-interpreter",
  "kirin-test-types",
+ "serde",
  "smallvec",
 ]
 
@@ -970,6 +977,7 @@ dependencies = [
  "kirin-function",
  "kirin-interpreter",
  "kirin-test-types",
+ "serde",
  "smallvec",
 ]
 
@@ -989,6 +997,7 @@ dependencies = [
  "kirin-lexer",
  "kirin-prettyless",
  "kirin-test-types",
+ "serde",
 ]
 
 [[package]]
@@ -999,6 +1008,7 @@ dependencies = [
  "kirin-ir",
  "kirin-lexer",
  "kirin-prettyless",
+ "serde",
 ]
 
 [[package]]
@@ -1010,6 +1020,8 @@ dependencies = [
  "kirin-lexer",
  "kirin-prettyless",
  "kirin-test-types",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]
@@ -1019,6 +1031,7 @@ dependencies = [
  "kirin",
  "kirin-interpreter",
  "kirin-test-types",
+ "serde",
  "smallvec",
  "thiserror 2.0.18",
 ]
@@ -1267,6 +1280,8 @@ checksum = "3672b37090dbd86368a4145bc067582552b29c27377cad4e0a306c97f9bd7772"
 dependencies = [
  "fixedbitset",
  "indexmap",
+ "serde",
+ "serde_derive",
 ]
 
 [[package]]
@@ -1655,6 +1670,9 @@ name = "smallvec"
 version = "1.15.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+dependencies = [
+ "serde",
+]
 
 [[package]]
 name = "stacker"
@@ -1949,7 +1967,9 @@ dependencies = [
  "kirin-chumsky",
  "kirin-ir",
  "kirin-prettyless",
+ "kirin-test-utils",
  "predicates",
+ "serde",
 ]
 
 [[package]]
