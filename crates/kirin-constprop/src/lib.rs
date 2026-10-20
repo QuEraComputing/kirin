@@ -34,9 +34,9 @@ pub use value::{ConstPropValue, PartialStruct, PartialTuple};
 /// `factorial(Const(5)) → Const(120)`) while remaining sound and terminating on
 /// unknown/over-budget arguments.
 ///
-/// The constant type `C` supplies the scalar semantics: constants are folded
-/// with `C`'s own operations, so any value type a concrete interpreter can run
-/// works here too.
+/// The constant type `C` supplies the scalar semantics. Addition, subtraction,
+/// multiplication, and negation require `num_traits` checked-operation traits;
+/// overflow yields `Top` rather than panicking.
 pub type ConstProp<'ir, S, C, E, Lk = kirin_interpreter::SameStageLinker> =
     kirin_interpreter::SparseForwardInterpreter<
         'ir,

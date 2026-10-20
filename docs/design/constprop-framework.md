@@ -64,12 +64,15 @@ identifies the struct shape and `F` identifies fields. A join between two
 partial structs is field-wise only when the shape and ordered field keys match.
 Different shapes join to `Top` and meet to `Bottom`.
 
-The scalar parameter `C` is the constant type, and its scalar semantics are
-lifted from `C` itself: `Const(a) op Const(b)` evaluates `a op b` with the same
-trait impls a concrete interpreter over `C` uses (arithmetic, bitwise,
-comparison, branch truthiness, `scf.for` induction values). `ArithValue`
+The scalar parameter `C` is the constant type. Scalar operations delegate to
+`C`'s capabilities (arithmetic, bitwise, comparison, branch truthiness, and
+`scf.for` induction values), using checked arithmetic as described below. `ArithValue`
 literals convert through `C: TryFrom<ArithValue>`; a literal `C` cannot
 represent becomes `Top`.
+
+Addition, subtraction, multiplication, and negation require `C` to implement
+the corresponding `num_traits` checked-operation traits. Overflow becomes
+`Top`, so integer overflow does not panic during constant folding.
 
 ## Lattice Semantics
 

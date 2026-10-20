@@ -107,6 +107,19 @@ fn scalar_ops_preserve_constants_and_lift_unknowns() {
 }
 
 #[test]
+fn scalar_arithmetic_overflow_becomes_unknown() {
+    assert_eq!(Value::Const(i64::MAX) + Value::Const(1), Value::Top);
+    assert_eq!(Value::Const(i64::MIN) - Value::Const(1), Value::Top);
+    assert_eq!(Value::Const(i64::MAX) * Value::Const(2), Value::Top);
+    assert_eq!(-Value::Const(i64::MIN), Value::Top);
+
+    assert_eq!(Value::Const(7) - Value::Const(2), Value::Const(5));
+    assert_eq!(-Value::Const(7), Value::Const(-7));
+    assert_eq!(-Value::Bottom, Value::Bottom);
+    assert_eq!(-Value::Top, Value::Top);
+}
+
+#[test]
 fn scalar_comparison_and_control_flow_traits_match_toy_constprop() {
     assert_eq!(Value::Const(2).cmp_lt(&Value::Const(3)), Value::Const(1));
     assert_eq!(Value::Const(0).is_truthy(), Some(false));

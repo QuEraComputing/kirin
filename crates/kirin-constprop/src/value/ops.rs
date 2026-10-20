@@ -1,15 +1,14 @@
 //! Scalar transfer functions, lifted from the constant type `C`.
 //!
-//! `Const(a) op Const(b)` evaluates `a op b` with `C`'s own concrete
-//! semantics (the same trait impls a concrete interpreter over `C` uses), so
-//! constant propagation is available for every constant type that can be
-//! executed.
+//! Known constants use `C`'s operations. Addition, subtraction, multiplication,
+//! and negation use checked operations and return `Top` on overflow.
 
 use std::ops::{Add, BitAnd, BitOr, BitXor, Mul, Neg, Not, Sub};
 
 use kirin_arith::{CheckedDiv, CheckedRem};
 use kirin_bitwise::{CheckedShl, CheckedShr};
 use kirin_cmp::CompareValue;
+use num_traits::{CheckedAdd, CheckedMul, CheckedNeg, CheckedSub};
 
 use super::ConstPropValue;
 
@@ -79,35 +78,41 @@ impl<C: CompareValue, S, F> CompareValue for ConstPropValue<C, S, F> {
     }
 }
 
-impl<C: Add<Output = C>, S, F> Add for ConstPropValue<C, S, F> {
+impl<C: CheckedAdd, S, F> Add for ConstPropValue<C, S, F> {
     type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
-        self.binary_const(rhs, C::add)
+        self.checked_const(rhs, |lhs, rhs| lhs.checked_add(&rhs))
+            .unwrap_or(Self::Top)
     }
 }
 
-impl<C: Sub<Output = C>, S, F> Sub for ConstPropValue<C, S, F> {
+impl<C: CheckedSub, S, F> Sub for ConstPropValue<C, S, F> {
     type Output = Self;
 
     fn sub(self, rhs: Self) -> Self::Output {
-        self.binary_const(rhs, C::sub)
+        self.checked_const(rhs, |lhs, rhs| lhs.checked_sub(&rhs))
+            .unwrap_or(Self::Top)
     }
 }
 
-impl<C: Mul<Output = C>, S, F> Mul for ConstPropValue<C, S, F> {
+impl<C: CheckedMul, S, F> Mul for ConstPropValue<C, S, F> {
     type Output = Self;
 
     fn mul(self, rhs: Self) -> Self::Output {
-        self.binary_const(rhs, C::mul)
+        self.checked_const(rhs, |lhs, rhs| lhs.checked_mul(&rhs))
+            .unwrap_or(Self::Top)
     }
 }
 
-impl<C: Neg<Output = C>, S, F> Neg for ConstPropValue<C, S, F> {
+impl<C: CheckedNeg, S, F> Neg for ConstPropValue<C, S, F> {
     type Output = Self;
 
     fn neg(self) -> Self::Output {
-        self.unary_const(C::neg)
+        match self {
+            Self::Const(value) => value.checked_neg().map_or(Self::Top, Self::Const),
+            value => value,
+        }
     }
 }
 
