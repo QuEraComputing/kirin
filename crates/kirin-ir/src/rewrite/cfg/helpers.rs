@@ -2,7 +2,7 @@ use std::collections::HashSet;
 
 use smallvec::SmallVec;
 
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedListNode;
 use crate::{
     Block, BlockArgument, BlockInfo, BlockParent, CFG, Dialect, SSAInfo, SSAKind, SSAValue,

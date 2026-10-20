@@ -3,7 +3,6 @@ mod body;
 mod builder;
 mod comptime;
 mod derived;
-mod detach;
 mod intern;
 mod language;
 mod lattice;
@@ -14,6 +13,8 @@ mod project;
 mod rewrite;
 mod signature;
 mod stage;
+#[cfg(test)]
+mod testing;
 
 /// Queries from the IRContext.
 pub mod query;
@@ -30,7 +31,6 @@ pub use derived::{
     BlockBody, ChainDefect, ChainFinding, DanglingParent, DeriveError, Finding, Mismatch,
     VerifyError, verify_derived,
 };
-pub use detach::Detach;
 pub use intern::InternTable;
 pub use language::{
     BranchOp, Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut,
@@ -50,14 +50,14 @@ pub use node::{
 pub use pipeline::Pipeline;
 pub use product::{HasProduct, Product};
 pub use project::{Project, ProjectError, TryProject, TryProjectTo};
-pub use rewrite::{MutationEvent, RewriteError, Rewriter};
+pub use rewrite::{MutationEvent, QuarantineCause, Quarantined, RewriteError, Rewriter};
 pub use signature::{
     ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };
 pub use stage::{
     HasStageInfo, StageAction, StageActionMut, StageArenas, StageDispatch, StageDispatchMiss,
-    StageDispatchMut, StageDispatchRequiredError, StageInfo, StageMeta, SupportsStageDispatch,
-    SupportsStageDispatchMut,
+    StageDispatchMut, StageDispatchRequiredError, StageInfo, StageMeta, StagePassError,
+    StageStatus, SupportsStageDispatch, SupportsStageDispatchMut,
 };
 
 /// Re-exports of the most commonly used types for dialect authors.

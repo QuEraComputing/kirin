@@ -1,4 +1,4 @@
-use crate::arena::{GetInfo, Id, Item};
+use crate::arena::{GetInfo, GetInfoMut, Id, Item};
 use crate::identifier;
 use crate::{Dialect, node::linked_list::LinkedListNode};
 
@@ -11,12 +11,23 @@ identifier! {
     struct Statement
 }
 
-#[derive(Clone, Copy, Debug, Hash, PartialEq, Eq)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum StatementParent {
     Block(Block),
     DiGraph(DiGraph),
     UnGraph(UnGraph),
+}
+
+/// Produces Block(id) instead of Block(Block(id))
+impl std::fmt::Debug for StatementParent {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StatementParent::Block(block) => write!(f, "{block:?}"),
+            StatementParent::DiGraph(digraph) => write!(f, "{digraph:?}"),
+            StatementParent::UnGraph(ungraph) => write!(f, "{ungraph:?}"),
+        }
+    }
 }
 
 #[derive(Clone, Debug, Hash, PartialEq, Eq)]
@@ -124,7 +135,9 @@ impl<L: Dialect> GetInfo<L> for Statement {
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.statements.get(*self)
     }
+}
 
+impl<L: Dialect> GetInfoMut<L> for Statement {
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         stage.statements.get_mut(*self)
     }

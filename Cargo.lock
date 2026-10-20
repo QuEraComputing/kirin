@@ -917,6 +917,7 @@ version = "0.1.0"
 dependencies = [
  "bon",
  "indexmap",
+ "insta",
  "kirin-derive-ir",
  "petgraph",
  "rustc-hash",

@@ -33,7 +33,7 @@ fn main() {
     let text = workload::workload(&family, size);
     let mut ir = IR::new();
     ir.parse(&text).expect("generated workload parses");
-    shape::verify(&ir.stages()[0]);
+    shape::verify(ir.stages().next().unwrap());
     let printed = ir.sprint();
     let json = serde_json::to_string(&ir).expect("serialize complete IR");
     let restored: IR = serde_json::from_str(&json).expect("deserialize complete IR");
@@ -42,7 +42,7 @@ fn main() {
         serde_json::to_value(&ir).unwrap(),
         serde_json::to_value(&restored).unwrap()
     );
-    let stage = &restored.stages()[0];
+    let stage = restored.stages().next().unwrap();
     shape::verify(stage);
     assert_eq!(
         restored.lookup_function_by_name("benchmark"),
@@ -66,7 +66,7 @@ fn main() {
         size
     );
     let shape = shape::describe(stage);
-    assert_eq!(shape, shape::describe(&ir.stages()[0]));
+    assert_eq!(shape, shape::describe(ir.stages().next().unwrap()));
     let semantic_cases = semantics::validate(&ir, &restored, &suite, specification, size);
     if let Some(directory) = export {
         std::fs::create_dir_all(&directory).unwrap();

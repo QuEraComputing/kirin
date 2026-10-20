@@ -1,5 +1,5 @@
 use crate::Dialect;
-use crate::arena::{GetInfo, Id};
+use crate::arena::{GetInfo, GetInfoMut, Id};
 use crate::identifier;
 
 use super::graph::{GraphInfo, UnGraphExtra};
@@ -53,7 +53,9 @@ impl<L: Dialect> GetInfo<L> for UnGraph {
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         stage.ungraphs.get(*self)
     }
+}
 
+impl<L: Dialect> GetInfoMut<L> for UnGraph {
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         stage.ungraphs.get_mut(*self)
     }

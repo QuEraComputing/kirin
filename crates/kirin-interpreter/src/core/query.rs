@@ -48,7 +48,7 @@ where
             .get_info(info)
             .ok_or(InterpreterError::MissingBlock(self.0))?;
         Ok(block
-            .arguments
+            .arguments()
             .iter()
             .copied()
             .map(SSAValue::from)
@@ -386,10 +386,10 @@ where
             .get_info(info)
             .ok_or(InterpreterError::MissingBlock(self.0))?;
 
-        match block.parent {
+        match block.parent() {
             Some(BlockParent::Statement(owner)) => Ok(smallvec![owner]),
             Some(BlockParent::CFG(_)) => block
-                .predecessors
+                .predecessors()
                 .iter()
                 .map(|predecessor| {
                     predecessor.terminator(info).ok_or(InterpreterError::Custom(
@@ -625,7 +625,10 @@ where
 {
     let info = pipeline
         .stage(stage)
-        .ok_or(InterpreterError::MissingStage(stage))?;
+        .ok_or_else(|| match pipeline.stage_status(stage) {
+            Some(status) => InterpreterError::UnavailableStage(stage, status),
+            None => InterpreterError::MissingStage(stage),
+        })?;
     S::dispatch_stage_action(info, stage, &mut action)?
         .ok_or(InterpreterError::MissingStageInfo(stage))
 }

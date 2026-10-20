@@ -84,6 +84,56 @@ fn pipeline_rebuilds_function_lookup_for_all_stages() {
 }
 
 #[test]
+fn pipeline_positions_keep_their_stage_names() {
+    use kirin::prelude::*;
+    use kirin_test_languages::ArithFunctionLanguage;
+    use kirin_test_utils::roundtrip::json_roundtrip;
+
+    let mut ir: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
+    let source = ir
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("source")
+        .new();
+    let target = ir
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("target")
+        .new();
+
+    // A position answers to its stage's own name, so the name must travel with
+    // the stage.
+    let restored = json_roundtrip(&ir);
+    assert_eq!(restored.stage_by_name("source"), Some(source));
+    assert_eq!(restored.stage_by_name("target"), Some(target));
+}
+
+#[test]
+fn pipeline_refuses_to_serialize_a_poisoned_stage() {
+    use kirin::ir::RewriteError;
+    use kirin::prelude::*;
+    use kirin_test_languages::ArithFunctionLanguage;
+
+    let mut ir: Pipeline<StageInfo<ArithFunctionLanguage>> = Pipeline::new();
+    let source = ir
+        .add_stage()
+        .stage(StageInfo::default())
+        .name("source")
+        .new();
+    ir.add_stage()
+        .stage(StageInfo::default())
+        .name("target")
+        .new();
+    let _ = ir.run_pass::<ArithFunctionLanguage, _, (), _>(source, |_| {
+        Err(RewriteError::CannotInsertTerminator)
+    });
+
+    // Skipping `source` instead would silently turn `target` into stage 0.
+    let error = serde_json::to_string(&ir).expect_err("a poisoned stage has nothing to serialize");
+    assert!(error.to_string().contains("Poisoned"), "{error}");
+}
+
+#[test]
 fn finalized_multistage_specializations_preserve_invalidation() {
     use kirin::prelude::*;
     use kirin_test_languages::ArithFunctionLanguage;
@@ -101,9 +151,28 @@ specialize @target fn @f(i64) -> i64 cfg { ^entry(%x: i64) { ret %x; } }
     let source_fn = ir.resolve_staged_function("f", source).unwrap();
     let target_fn = ir.resolve_staged_function("f", target).unwrap();
     let stage = ir.stage_mut(source).unwrap();
-    let specialization = source_fn.expect_info(stage).specializations()[0].id();
-    specialization.expect_info_mut(stage).invalidate();
-    source_fn.expect_info_mut(stage).invalidate();
+    let source_info = source_fn.expect_info(stage);
+    let specialization = source_info.specializations()[0].id();
+    let (name, signature) = (source_info.name(), source_info.signature().clone());
+    let definition = *specialization.expect_info(stage).definition();
+    // Redefinition is the public route to invalidation: each conflicting
+    // redefinition invalidates the entry it replaces.
+    stage.with_builder(|b| {
+        let conflict = b
+            .specialize()
+            .staged_func(source_fn)
+            .definition(definition)
+            .new()
+            .expect_err("the existing specialization holds this signature");
+        b.redefine_specialization(conflict);
+        let conflict = b
+            .staged_function()
+            .maybe_name(name)
+            .signature(signature)
+            .new()
+            .expect_err("the existing staged function holds this signature");
+        b.redefine_staged_function(conflict);
+    });
     let restored = json_roundtrip(&ir);
     assert!(
         source_fn
