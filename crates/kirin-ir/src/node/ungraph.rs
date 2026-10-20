@@ -22,7 +22,8 @@ impl std::fmt::Display for UnGraph {
 pub type UnGraphInfo<L> = GraphInfo<L, petgraph::Undirected, UnGraphExtra>;
 
 impl<L: Dialect> UnGraphInfo<L> {
-    /// Construct a new `UnGraphInfo` with all fields.
+    /// Construct a new `UnGraphInfo` with no members yet; the builder adds
+    /// them with `add_ungraph_members`.
     ///
     /// This constructor preserves the original API. Internally it delegates
     /// to [`GraphInfo::new`].
@@ -32,8 +33,6 @@ impl<L: Dialect> UnGraphInfo<L> {
         name: Option<crate::Symbol>,
         ports: Vec<super::port::Port>,
         edge_count: usize,
-        graph: petgraph::Graph<crate::Statement, crate::SSAValue, petgraph::Undirected>,
-        edge_statements: Vec<crate::Statement>,
     ) -> Self {
         GraphInfo::new(
             id.into(),
@@ -41,8 +40,8 @@ impl<L: Dialect> UnGraphInfo<L> {
             name,
             ports,
             edge_count,
-            graph,
-            UnGraphExtra::new(edge_statements),
+            petgraph::Graph::new_undirected(),
+            UnGraphExtra::new(Vec::new()),
         )
     }
 }
