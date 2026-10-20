@@ -29,5 +29,5 @@ namespaced-language = ["kirin-ir/derive", "kirin-arith", "kirin-cf", "kirin-func
 ungraph-language = ["kirin-ir/derive"]
 parser = ["kirin-chumsky/derive", "kirin-lexer"]
 pretty = ["kirin-prettyless", "kirin-derive-chumsky"]
-interpreter = ["kirin-interpreter"]
+interpreter = ["kirin-interpreter/derive"]
 serde = ["dep:serde", "kirin-ir/serde", "kirin-test-types/serde", "kirin-arith?/serde", "kirin-bitwise?/serde", "kirin-cf?/serde", "kirin-constant?/serde", "kirin-function?/serde"]
