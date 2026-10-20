@@ -101,9 +101,6 @@ fn live_entry<'t, L: Dialect>(
     table: &'t mut PredecessorMap,
     block: Block,
 ) -> Option<&'t mut SmallVec<[Block; 4]>> {
-    let item = stage.nodes.blocks.get(block)?;
-    if item.deleted() {
-        return None;
-    }
+    stage.nodes.blocks.get(block)?;
     table.get_mut(block)
 }

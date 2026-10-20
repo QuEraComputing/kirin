@@ -104,7 +104,12 @@ pub(crate) fn resolve_and_replace<L: Dialect>(
             if replacements.contains_key(arg) {
                 continue;
             }
-            let ssa_info = stage.ssas.get(*arg).expect("SSAValue not found in stage");
+            let ssa_info = stage.ssas.get(*arg).unwrap_or_else(|| {
+                panic!(
+                    "SSAValue {arg} not found in stage (a placeholder already \
+                     resolved by another graph is deleted and cannot be reused)"
+                )
+            });
             match ssa_info.kind {
                 BuilderSSAKind::Unresolved(ResolutionInfo::Port(key)) => {
                     let index = super::resolve_builder_key(

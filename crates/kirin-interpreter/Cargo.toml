@@ -6,6 +6,7 @@ edition = "2024"
 [dependencies]
 kirin-ir = { workspace = true }
 petgraph = { workspace = true }
+rustc-hash = "2.1.1"
 kirin-derive-interpreter = { workspace = true, optional = true }
 smallvec = { workspace = true }
 thiserror = { workspace = true }

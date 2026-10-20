@@ -15,7 +15,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ) -> Result<Block, RewriteError> {
         let tail = cfg
             .get_info(self.stage)
-            .filter(|item| !item.deleted())
             .ok_or(RewriteError::UnknownCfg(cfg))?
             .blocks
             .tail;

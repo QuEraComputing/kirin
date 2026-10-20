@@ -195,7 +195,7 @@ where
             pipeline,
             location: None,
             state: V::bottom(),
-            activation: EnvIndex::new(0),
+            activation: EnvIndex::placeholder(),
             _marker: PhantomData,
         }
     }

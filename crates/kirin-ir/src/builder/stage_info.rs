@@ -384,7 +384,12 @@ impl<L: Dialect> BuilderStageInfo<L> {
             let info = &self.statements[stmt_id];
             let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
             for operand in operands {
-                let ssa_info = self.ssas.get(operand).expect("SSAValue not found in stage");
+                let ssa_info = self.ssas.get(operand).unwrap_or_else(|| {
+                    panic!(
+                        "SSAValue {operand} not found in stage (a placeholder already \
+                         resolved by another graph is deleted and cannot be reused)"
+                    )
+                });
                 if let BuilderSSAKind::Result(producer_stmt, _) = ssa_info.kind
                     && let Some(&producer_ni) = stmt_to_node.get(&producer_stmt)
                 {

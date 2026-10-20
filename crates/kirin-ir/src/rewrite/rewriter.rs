@@ -73,7 +73,8 @@ use crate::node::linked_list::LinkedListNode;
 use smallvec::SmallVec;
 
 use crate::{
-    Block, CFG, Dialect, SSAValue, StageInfo, Statement, StatementInfo, StatementParent, Use,
+    Block, BlockInfo, CFG, Dialect, SSAValue, StageInfo, Statement, StatementInfo, StatementParent,
+    Use,
 };
 
 /// A structured record of one mutation performed through a [`Rewriter`].
@@ -364,6 +365,26 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         std::mem::take(&mut self.events)
     }
 
+    /// The live statement `stmt`, or [`RewriteError::UnknownStatement`] for a
+    /// deleted or unknown id.
+    pub(super) fn live_statement(
+        &self,
+        stmt: Statement,
+    ) -> Result<&StatementInfo<L>, RewriteError> {
+        stmt.get_info(self.stage)
+            .map(|item| &**item)
+            .ok_or(RewriteError::UnknownStatement(stmt))
+    }
+
+    /// The live block `block`, or [`RewriteError::UnknownBlock`] for a
+    /// deleted or unknown id.
+    pub(super) fn live_block(&self, block: Block) -> Result<&BlockInfo<L>, RewriteError> {
+        block
+            .get_info(self.stage)
+            .map(|item| &**item)
+            .ok_or(RewriteError::UnknownBlock(block))
+    }
+
     /// Rewrite the `index`-th operand of `stmt` to `value`, returning the
     /// previous operand.
     ///
@@ -382,7 +403,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         let item = stmt
             .get_info_mut(self.stage)
-            .filter(|item| !item.deleted())
             .ok_or(RewriteError::UnknownStatement(stmt))?;
         let slot = item
             .definition
@@ -464,10 +484,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         replacements: &[SSAValue],
     ) -> Result<(), RewriteError> {
         let results: Vec<SSAValue> = {
-            let item = stmt
-                .get_info(self.stage)
-                .filter(|item| !item.deleted())
-                .ok_or(RewriteError::UnknownStatement(stmt))?;
+            let item = self.live_statement(stmt)?;
             item.definition
                 .results()
                 .map(|r| SSAValue::from(*r))
@@ -528,7 +545,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     Use::StatementOperand { stmt, index } => {
                         let ok = stmt
                             .get_info_mut(self.stage)
-                            .filter(|item| !item.deleted())
                             .and_then(|item| item.definition.arguments_mut().nth(index))
                             .map(|slot| *slot = new)
                             .is_some();
@@ -539,7 +555,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     }
                     Use::DiGraphYield { graph, index } => graph
                         .get_info_mut(self.stage)
-                        .filter(|item| !item.deleted())
                         .and_then(|item| item.yields_mut().get_mut(index))
                         .map(|slot| *slot = new)
                         .is_some(),
@@ -595,10 +610,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// [`MutationEvent::ChangedTerminator`] when `stmt` was a terminator.
     pub fn erase_statement(&mut self, stmt: Statement) -> Result<(), RewriteError> {
         let (block, prev, next, operands, results, successors, is_terminator) = {
-            let item = stmt
-                .get_info(self.stage)
-                .filter(|item| !item.deleted())
-                .ok_or(RewriteError::UnknownStatement(stmt))?;
+            let item = self.live_statement(stmt)?;
             let block = match item.parent {
                 Some(StatementParent::Block(block)) => block,
                 _ => return Err(RewriteError::NotInBlockBody(stmt)),
@@ -705,14 +717,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// uses and outgoing edges are dropped, so the use and predecessor mirrors
     /// stay exact. Block-list links are left to the caller.
     pub(super) fn tombstone_block(&mut self, block: Block) {
-        let Some(info) = block.get_info(self.stage).filter(|item| !item.deleted()) else {
+        let Some(info) = block.get_info(self.stage) else {
             return;
         };
         let args: SmallVec<[SSAValue; 4]> = info.arguments.iter().map(|&a| a.into()).collect();
         let terminator = info.terminator;
 
-        // A tombstoned statement keeps its links, so the chain can be walked
-        // while it is being deleted.
+        // Read `next` before tombstoning: a tombstoned statement's `get_info`
+        // returns `None`, so its links can't be followed afterwards.
         let mut current = info.statements.head;
         while let Some(stmt) = current {
             current = stmt.get_info(self.stage).and_then(|item| item.node.next);
@@ -826,10 +838,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         after: bool,
     ) -> Result<Statement, RewriteError> {
         let (block, prev, next) = {
-            let item = anchor
-                .get_info(self.stage)
-                .filter(|item| !item.deleted())
-                .ok_or(RewriteError::UnknownStatement(anchor))?;
+            let item = self.live_statement(anchor)?;
             let block = match item.parent {
                 Some(StatementParent::Block(block)) => block,
                 _ => return Err(RewriteError::NotInBlockBody(anchor)),
@@ -947,10 +956,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         definition: L,
     ) -> Result<Statement, RewriteError> {
         {
-            let info = block
-                .get_info(self.stage)
-                .filter(|item| !item.deleted())
-                .ok_or(RewriteError::UnknownBlock(block))?;
+            let info = self.live_block(block)?;
             if info.terminator.is_some() {
                 return Err(RewriteError::BlockHasTerminator(block));
             }
@@ -969,9 +975,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         let targets: HashSet<Block> = definition.successors().map(|s| s.target()).collect();
         for &target in &targets {
-            if !block_is_live(self.stage, target) {
-                return Err(RewriteError::UnknownBlock(target));
-            }
+            self.live_block(target)?;
         }
 
         let new_stmt = self
@@ -1043,10 +1047,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         definition: &L,
     ) -> Result<PreparedReplacement, RewriteError> {
         let (old_operands, old_results, old_successors, parent_block, old_is_terminator) = {
-            let item = stmt
-                .get_info(self.stage)
-                .filter(|item| !item.deleted())
-                .ok_or(RewriteError::UnknownStatement(stmt))?;
+            let item = self.live_statement(stmt)?;
             let Some(StatementParent::Block(parent_block)) = item.parent else {
                 return Err(RewriteError::NotInBlockBody(stmt));
             };
@@ -1086,9 +1087,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         for successor in definition.successors() {
             let target = successor.target();
-            if !block_is_live(self.stage, target) {
-                return Err(RewriteError::UnknownBlock(target));
-            }
+            self.live_block(target)?;
         }
 
         Ok(PreparedReplacement {
@@ -1195,7 +1194,7 @@ pub(super) fn add_use<L: Dialect>(stage: &mut StageInfo<L>, value: SSAValue, sit
 /// One entry per `(source, target)` pair, so callers must only reach this for
 /// a target that does not have any other edges from `block`
 pub(super) fn remove_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Block, pred: Block) {
-    let Some(block_info) = block.get_info_mut(stage).filter(|item| !item.deleted()) else {
+    let Some(block_info) = block.get_info_mut(stage) else {
         return;
     };
     if let Some(pos) = block_info.predecessors.iter().position(|p| *p == pred) {
@@ -1208,12 +1207,7 @@ pub(super) fn remove_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Bl
 /// One entry per `(source, target)` pair, so callers must only reach this for
 /// a target that did not already have an edge from `pred`.
 pub(super) fn add_predecessor<L: Dialect>(stage: &mut StageInfo<L>, block: Block, pred: Block) {
-    if let Some(info) = block.get_info_mut(stage).filter(|item| !item.deleted()) {
+    if let Some(info) = block.get_info_mut(stage) {
         info.predecessors.push(pred);
     }
-}
-
-/// Whether `block` resolves to a live block in `stage`.
-pub(super) fn block_is_live<L: Dialect>(stage: &StageInfo<L>, block: Block) -> bool {
-    block.get_info(stage).is_some_and(|item| !item.deleted())
 }

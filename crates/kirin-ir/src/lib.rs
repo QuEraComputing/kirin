@@ -19,7 +19,7 @@ mod testing;
 /// Queries from the IRContext.
 pub mod query;
 
-pub use arena::{Arena, DenseHint, GetInfo, Id, Identifier, Item, SparseHint};
+pub use arena::{Arena, GetInfo, Id, Identifier, Item};
 pub use body::{Body, HasCallableBody};
 pub use builder::error::{
     PipelineError, PipelineStagedError, SpecializeError, StagedFunctionConflictKind,

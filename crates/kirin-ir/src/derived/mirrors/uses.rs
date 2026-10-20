@@ -115,9 +115,6 @@ fn live_entry<'t, L: Dialect>(
     table: &'t mut UseMap,
     value: SSAValue,
 ) -> Option<&'t mut SmallVec<[Use; 2]>> {
-    let item = stage.ssas.get(value)?;
-    if item.deleted() || item.data.is_none() {
-        return None;
-    }
+    stage.ssas.get(value)?.data.as_ref()?;
     table.get_mut(value)
 }

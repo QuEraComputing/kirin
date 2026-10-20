@@ -41,7 +41,7 @@ fn preds(stage: &StageInfo<BuilderDialect>, block: Block) -> HashSet<Block> {
 }
 
 fn ssa_deleted(stage: &StageInfo<BuilderDialect>, value: impl Into<SSAValue>) -> bool {
-    stage.ssa_arena().get(value.into()).unwrap().deleted()
+    stage.ssa_arena().get(value.into()).is_none()
 }
 
 #[test]
@@ -172,9 +172,9 @@ fn erase_block_tombstones_contents_and_maintains_mirrors() {
     );
 
     // The block, its statements, and its argument are tombstoned.
-    assert!(dead.get_info(&stage).unwrap().deleted());
-    assert!(use_x.get_info(&stage).unwrap().deleted());
-    assert!(dead_br.get_info(&stage).unwrap().deleted());
+    assert!(dead.get_info(&stage).is_none());
+    assert!(use_x.get_info(&stage).is_none());
+    assert!(dead_br.get_info(&stage).is_none());
     assert!(ssa_deleted(&stage, real_x));
 
     // The block list and the reverse control-flow index forgot it.
@@ -214,7 +214,7 @@ fn erase_block_rejects_incoming_edges_until_retargeted() {
         })
     );
     assert!(rw.events().is_empty());
-    assert!(!middle.get_info(rw.stage()).unwrap().deleted());
+    assert!(middle.get_info(rw.stage()).is_some());
     assert_eq!(preds(rw.stage(), exit), HashSet::from([middle]));
     verify_derived(rw.stage()).unwrap();
 
@@ -318,8 +318,8 @@ fn erase_block_rejects_values_used_outside_without_mutating() {
 
     // Nothing was touched.
     assert!(rw.events().is_empty());
-    assert!(!middle.get_info(rw.stage()).unwrap().deleted());
-    assert!(!split.get_info(rw.stage()).unwrap().deleted());
+    assert!(middle.get_info(rw.stage()).is_some());
+    assert!(split.get_info(rw.stage()).is_some());
     assert_eq!(preds(rw.stage(), exit), HashSet::from([middle]));
     assert_eq!(uses_set(rw.stage(), y), HashSet::from([so(use_r0, 0)]));
     verify_derived(rw.stage()).unwrap();
@@ -346,8 +346,8 @@ fn erase_block_allows_uses_nested_inside_it() {
     let mut stage = stage.finalize().unwrap();
     Rewriter::new(&mut stage).erase_block(host).unwrap();
 
-    assert!(inner_use.get_info(&stage).unwrap().deleted());
-    assert!(split.get_info(&stage).unwrap().deleted());
+    assert!(inner_use.get_info(&stage).is_none());
+    assert!(split.get_info(&stage).is_none());
     assert!(ssa_deleted(&stage, r0));
     assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![entry]);
 
@@ -378,12 +378,12 @@ fn erase_block_tombstones_nested_bodies() {
 
     // Everything reachable from the erased block is tombstoned, not just
     // its direct statements.
-    assert!(owner.get_info(&stage).unwrap().deleted());
-    assert!(inner.get_info(&stage).unwrap().deleted());
-    assert!(inner_block.get_info(&stage).unwrap().deleted());
-    assert!(inner_nop.get_info(&stage).unwrap().deleted());
-    assert!(inner_ret.get_info(&stage).unwrap().deleted());
-    assert!(!entry.get_info(&stage).unwrap().deleted());
+    assert!(owner.get_info(&stage).is_none());
+    assert!(inner.get_info(&stage).is_none());
+    assert!(inner_block.get_info(&stage).is_none());
+    assert!(inner_nop.get_info(&stage).is_none());
+    assert!(inner_ret.get_info(&stage).is_none());
+    assert!(entry.get_info(&stage).is_some());
 
     verify_derived(&stage).unwrap();
 }
@@ -715,8 +715,8 @@ fn merge_blocks_splices_successor_and_redirects_arguments() {
     assert_eq!(use_x.definition(&stage), &BuilderDialect::Use(real_a));
 
     // succ, its argument, and entry's old terminator are gone.
-    assert!(succ.get_info(&stage).unwrap().deleted());
-    assert!(jump.get_info(&stage).unwrap().deleted());
+    assert!(succ.get_info(&stage).is_none());
+    assert!(jump.get_info(&stage).is_none());
     assert!(ssa_deleted(&stage, real_x));
     assert_eq!(cfg.blocks(&stage).collect::<Vec<_>>(), vec![entry, exit]);
 
@@ -819,7 +819,7 @@ fn merge_blocks_rejects_replacements_deleted_with_succ() {
 
     // Nothing was touched.
     assert!(rw.events().is_empty());
-    assert!(!succ.get_info(rw.stage()).unwrap().deleted());
+    assert!(succ.get_info(rw.stage()).is_some());
     assert_eq!(entry.terminator(rw.stage()), Some(entry_br));
     assert_eq!(use_x.definition(rw.stage()), &BuilderDialect::Use(real_x));
     verify_derived(rw.stage()).unwrap();
@@ -869,7 +869,7 @@ fn merge_blocks_rejects_illegal_merges() {
         Err(RewriteError::NotInCfgBody(lone))
     );
     assert!(rw.events().is_empty());
-    assert!(!succ.get_info(rw.stage()).unwrap().deleted());
+    assert!(succ.get_info(rw.stage()).is_some());
 }
 
 #[test]
@@ -900,7 +900,7 @@ fn merge_blocks_rejects_self_looping_succ() {
         })
     );
     assert!(rw.events().is_empty());
-    assert!(!succ.get_info(rw.stage()).unwrap().deleted());
+    assert!(succ.get_info(rw.stage()).is_some());
     assert_eq!(entry.terminator(rw.stage()), Some(entry_br));
     assert_eq!(succ.terminator(rw.stage()), Some(succ_br));
     verify_derived(rw.stage()).unwrap();
@@ -935,7 +935,7 @@ fn merge_blocks_rejects_other_incoming_edges_until_retargeted() {
         })
     );
     assert!(rw.events().is_empty());
-    assert!(!succ.get_info(rw.stage()).unwrap().deleted());
+    assert!(succ.get_info(rw.stage()).is_some());
     assert_eq!(entry.terminator(rw.stage()), Some(entry_br));
     verify_derived(rw.stage()).unwrap();
 

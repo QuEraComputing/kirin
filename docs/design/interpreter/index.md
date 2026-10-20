@@ -918,7 +918,7 @@ of environment identity:
 
 ```rust
 context_indices: HashMap<K, EnvIndex>,          // which context an environment belongs to
-environments:    Vec<Option<Environment<K, A, V>>>,  // its facts (one FactStore each)
+environments:    Arena<EnvIndex, Option<Environment<K, A, V>>>,  // its facts (one FactStore each)
 ```
 
 Fact maps stay separate per environment, so equal anchors under different

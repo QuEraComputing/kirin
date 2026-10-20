@@ -133,7 +133,7 @@ where
     A: Eq + Hash,
 {
     context_indices: HashMap<K, EnvIndex>,
-    environments: Vec<Option<Environment<K, A, V>>>,
+    environments: Arena<EnvIndex, Option<Environment<K, A, V>>>,
 ```
 
 An `EnvStore` contains a directory of environments, and the environments

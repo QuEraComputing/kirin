@@ -206,7 +206,7 @@ impl<'ir, S: StageMeta, V, E, Sem> SparseBackwardTransfer<'ir, S, V, E, Sem> {
             pipeline,
             location: None,
             demands: Vec::new(),
-            activation: EnvIndex::new(0),
+            activation: EnvIndex::placeholder(),
             _marker: PhantomData,
         }
     }

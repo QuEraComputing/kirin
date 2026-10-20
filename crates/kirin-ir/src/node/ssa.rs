@@ -422,8 +422,10 @@ impl_from_test!(Port);
 /// GetInfo impl for SSAValue — returns `SSAInfo<L>` from finalized
 /// `StageInfo` (clean types with `L::Type` and `SSAKind`).
 ///
-/// Deleted or tombstoned SSA slots (`None` in the arena) return `None`
-/// from `get_info`, so stale IDs never produce invalid data.
+/// Returns `None` when the arena lookup misses (a deleted ID, or one this
+/// stage never allocated), or when a live slot holds `None`. Live `None`
+/// slots come from `finalize_unchecked`, which stores type-less SSAs (such
+/// as unresolved placeholders) that way.
 impl<L: Dialect, T> GetInfo<L> for T
 where
     T: Into<SSAValue> + Identifier,
@@ -432,9 +434,6 @@ where
 
     fn get_info<'a>(&self, stage: &'a crate::StageInfo<L>) -> Option<&'a Self::Info> {
         let item = stage.ssas.get(*self)?;
-        if item.deleted() {
-            return None;
-        }
         // Deref through Item to Option<SSAInfo<L>>, then unwrap the Option ref
         (**item).as_ref()
     }
@@ -446,9 +445,6 @@ where
 {
     fn get_info_mut<'a>(&self, stage: &'a mut crate::StageInfo<L>) -> Option<&'a mut Self::Info> {
         let item = stage.ssas.get_mut(*self)?;
-        if item.deleted() {
-            return None;
-        }
         // DerefMut through Item to Option<SSAInfo<L>>, then unwrap the Option ref
         (**item).as_mut()
     }

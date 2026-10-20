@@ -37,7 +37,8 @@ fn test_block() {
         .terminator(ret)
         .new();
 
-    let ret = SimpleLanguage::op_return(&mut stage, block_arg_x);
+    let block_b_arg = stage.block_argument().index(0);
+    let ret = SimpleLanguage::op_return(&mut stage, block_b_arg);
     let block_b = stage
         .block()
         .argument(SimpleType::F64)

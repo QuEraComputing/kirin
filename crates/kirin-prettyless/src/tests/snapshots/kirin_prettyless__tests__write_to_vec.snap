@@ -2,7 +2,7 @@
 source: crates/kirin-prettyless/src/tests/write.rs
 expression: output
 ---
-specialize @0 %8 = cfg {
+specialize @0 %9 = cfg {
   ^0(%5: i64, %y: f64) {
     %0 = constant 1.2;
     %1 = constant 3.4;
@@ -10,7 +10,7 @@ specialize @0 %8 = cfg {
     %4 = add %2, %5;
     return %4;
   }
-  ^1(%7: f64) {
-    return %7;
+  ^1(%8: f64) {
+    return %8;
   }
 }

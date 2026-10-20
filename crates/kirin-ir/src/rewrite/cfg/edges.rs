@@ -5,9 +5,7 @@ use crate::{
     Block, BlockArgument, Dialect, SSAKind, SSAValue, Statement, StatementParent, Successor,
 };
 
-use crate::rewrite::rewriter::{
-    MutationEvent, PreparedReplacement, RewriteError, Rewriter, block_is_live,
-};
+use crate::rewrite::rewriter::{MutationEvent, PreparedReplacement, RewriteError, Rewriter};
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Point every successor slot of `stmt` that targets `old` at `new`,
@@ -39,9 +37,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             (block, count)
         };
         let cfg = self.owning_cfg(block)?;
-        if !block_is_live(self.stage, new) {
-            return Err(RewriteError::UnknownBlock(new));
-        }
+        self.live_block(new)?;
         if old == new || count == 0 {
             return Ok(0);
         }

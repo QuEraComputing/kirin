@@ -757,5 +757,5 @@ fn remap_block_identity_remaps_parents_and_ssa_kinds() {
     let arg_info = arg.expect_info(&stage);
     assert!(matches!(*arg_info.kind(), SSAKind::BlockArgument(owner, 0) if owner == stub));
 
-    assert!(stage.block_arena().get(real).unwrap().deleted());
+    assert!(stage.block_arena().get(real).is_none());
 }

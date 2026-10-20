@@ -41,7 +41,7 @@ fn arena_tombstones_keep_slot_identity_and_next_allocation() {
     let next = arena.next_id();
     let mut restored: Arena<kirin::ir::Statement, String> =
         serde_json::from_str(&serde_json::to_string(&arena).unwrap()).unwrap();
-    assert!(restored.get(deleted).unwrap().deleted());
+    assert!(restored.get(deleted).is_none());
     assert_eq!(&**restored.get(live).unwrap(), "live");
     assert_eq!(restored.iter().count(), 1);
     assert_eq!(restored.alloc("new".into()), next);

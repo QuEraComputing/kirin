@@ -27,7 +27,7 @@
 //! read dependencies through the single [`apply_update`](ForwardDriver::apply_update)
 //! path, which merges via the analysis policy and reschedules owners / value
 //! readers. Direct dominated cross-block SSA uses are tracked by context-qualified
-//! [`ValueFactKey`] value-reader deps, so a reader block reruns when a value it
+//! [`Scoped`](crate::Scoped) value-reader deps, so a reader block reruns when a value it
 //! read directly rises.
 
 use std::cell::RefCell;
@@ -46,12 +46,12 @@ use crate::{
     BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
     EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval, Frame, Interp,
     InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, OwnerAnalysis,
-    SSABinding, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
+    SSABinding, SameStageLinker, Scoped, SparseForwardEffect, SparseForwardSemantic, StageQuery,
     StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, Summary,
     SummaryDependency, SummaryDependencyIndex, SummaryEffect,
 };
 
-use super::deps::{ForwardDeps, ValueFactKey};
+use super::deps::ForwardDeps;
 
 // ===========================================================================
 // Pluggable analysis seams (policy `P`)
@@ -1071,10 +1071,9 @@ where
                     }
                 }
                 for value in risen {
-                    let readers = self.dependency_index().readers_of(&ValueFactKey {
-                        function: function.clone(),
-                        value,
-                    });
+                    let readers = self
+                        .dependency_index()
+                        .readers_of(&Scoped::new(function.clone(), value));
                     for reader in readers {
                         self.schedule(reader);
                     }
@@ -1302,13 +1301,9 @@ where
         let written: HashSet<SSAValue> = writes.iter().copied().collect();
         for value in reads {
             if !written.contains(&value) {
-                interp.dependency_index_mut().register_reader(
-                    ValueFactKey {
-                        function: function.clone(),
-                        value,
-                    },
-                    owner.clone(),
-                );
+                interp
+                    .dependency_index_mut()
+                    .register_reader(Scoped::new(function.clone(), value), owner.clone());
             }
         }
 

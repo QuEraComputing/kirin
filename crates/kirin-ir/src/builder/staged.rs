@@ -73,6 +73,10 @@ impl<L: Dialect> BuilderStageInfo<L> {
     }
 
     /// Create a placeholder for a block argument, resolved when the block is built.
+    ///
+    /// A placeholder is single-use: building the block that uses it deletes it,
+    /// so using the same placeholder in a second block panics. Create a fresh
+    /// one per block.
     pub fn block_argument(&mut self) -> PlaceholderBuilder<'_, L> {
         PlaceholderBuilder {
             stage: self,
@@ -81,6 +85,9 @@ impl<L: Dialect> BuilderStageInfo<L> {
     }
 
     /// Create a placeholder for a graph edge port, resolved when the graph is built.
+    ///
+    /// Single-use, like [`block_argument`](Self::block_argument): create a fresh
+    /// one per graph.
     pub fn graph_port(&mut self) -> PlaceholderBuilder<'_, L> {
         PlaceholderBuilder {
             stage: self,
@@ -89,6 +96,9 @@ impl<L: Dialect> BuilderStageInfo<L> {
     }
 
     /// Create a placeholder for a graph capture, resolved when the graph is built.
+    ///
+    /// Single-use, like [`block_argument`](Self::block_argument): create a fresh
+    /// one per graph.
     pub fn graph_capture(&mut self) -> PlaceholderBuilder<'_, L> {
         PlaceholderBuilder {
             stage: self,

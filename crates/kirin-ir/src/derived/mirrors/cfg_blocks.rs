@@ -30,7 +30,7 @@ pub(in crate::derived) fn derive<L: Dialect>(
 
         // A block whose CFG is gone would otherwise be filed under a container
         // that no longer exists.
-        if !is_live_cfg(stage, parent) {
+        if stage.nodes.cfgs.get(parent).is_none() {
             findings.push(Finding::DanglingParent(DanglingParent::BlockInCFG {
                 block,
                 parent,
@@ -102,13 +102,4 @@ impl CFGBlocksMap {
             }
         }
     }
-}
-
-/// Whether `cfg` resolves to a live CFG of `stage`.
-fn is_live_cfg<L: Dialect>(stage: &StageInfo<L>, cfg: CFG) -> bool {
-    stage
-        .nodes
-        .cfgs
-        .get(cfg)
-        .is_some_and(|item| !item.deleted())
 }

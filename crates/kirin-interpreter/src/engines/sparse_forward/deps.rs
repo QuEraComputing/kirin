@@ -20,23 +20,20 @@ use std::hash::Hash;
 
 use kirin_ir::SSAValue;
 
-use crate::{ForwardSummaryDeps, SummaryDependencies, SummaryDependency, SummaryDependencyIndex};
+use crate::{
+    ForwardSummaryDeps, Scoped, SummaryDependencies, SummaryDependency, SummaryDependencyIndex,
+};
 
 use super::interp::Owner;
 
-/// Context-qualified key for value-reader dependencies: the same [`SSAValue`]
-/// under two different function contexts is two distinct facts, so readers never
-/// cross-contaminate.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct ValueFactKey<K> {
-    pub function: K,
-    pub value: SSAValue,
-}
-
 /// Both forward dependency kinds for one analysis.
+///
+/// Value readers are keyed by [`Scoped`] SSA values: the same [`SSAValue`] under
+/// two function contexts is two distinct facts, so readers never
+/// cross-contaminate.
 pub struct ForwardDeps<K> {
     summaries: ForwardSummaryDeps<Owner<K>>,
-    value_readers: HashMap<ValueFactKey<K>, HashSet<Owner<K>>>,
+    value_readers: HashMap<Scoped<K, SSAValue>, HashSet<Owner<K>>>,
 }
 
 impl<K> Default for ForwardDeps<K> {
@@ -57,12 +54,12 @@ impl<K> ForwardDeps<K> {
 impl<K: Clone + Eq + Hash> ForwardDeps<K> {
     /// Record that `reader` read a value it does not define, so it must rerun
     /// when that value's fact rises.
-    pub fn register_reader(&mut self, key: ValueFactKey<K>, reader: Owner<K>) {
+    pub fn register_reader(&mut self, key: Scoped<K, SSAValue>, reader: Owner<K>) {
         self.value_readers.entry(key).or_default().insert(reader);
     }
 
     /// The owners to reschedule now that a context-qualified value has risen.
-    pub fn readers_of(&self, key: &ValueFactKey<K>) -> Vec<Owner<K>> {
+    pub fn readers_of(&self, key: &Scoped<K, SSAValue>) -> Vec<Owner<K>> {
         self.value_readers
             .get(key)
             .map(|readers| readers.iter().cloned().collect())

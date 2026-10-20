@@ -6,7 +6,7 @@ use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedListNode;
 use crate::{
     Block, BlockArgument, BlockInfo, BlockParent, CFG, Dialect, SSAInfo, SSAKind, SSAValue,
-    Statement, StatementInfo, StatementParent, Use,
+    Statement, StatementParent, Use,
 };
 
 use crate::rewrite::rewriter::{
@@ -15,26 +15,6 @@ use crate::rewrite::rewriter::{
 
 /// Shared lookups and block-list plumbing for the CFG surgery methods.
 impl<'a, L: Dialect> Rewriter<'a, L> {
-    /// The live statement `stmt`, or [`RewriteError::UnknownStatement`].
-    pub(super) fn live_statement(
-        &self,
-        stmt: Statement,
-    ) -> Result<&StatementInfo<L>, RewriteError> {
-        stmt.get_info(self.stage)
-            .filter(|item| !item.deleted())
-            .map(|item| &**item)
-            .ok_or(RewriteError::UnknownStatement(stmt))
-    }
-
-    /// The live block `block`, or [`RewriteError::UnknownBlock`].
-    pub(super) fn live_block(&self, block: Block) -> Result<&BlockInfo<L>, RewriteError> {
-        block
-            .get_info(self.stage)
-            .filter(|item| !item.deleted())
-            .map(|item| &**item)
-            .ok_or(RewriteError::UnknownBlock(block))
-    }
-
     /// The CFG whose block list holds the live block `block`, or
     /// [`RewriteError::UnknownBlock`] / [`RewriteError::NotInCfgBody`].
     pub(super) fn owning_cfg(&self, block: Block) -> Result<CFG, RewriteError> {

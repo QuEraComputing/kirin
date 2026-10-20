@@ -70,8 +70,8 @@ API-level correspondence:
 Concrete and forward abstract storage use `EnvStore<K, A, V>`:
 
 - `context_indices: HashMap<K, EnvIndex>` — which analysis context an environment belongs to
-- `environments: Vec<Option<Environment<K, A, V>>>` — each holding one `FactStore<A, V>`
-- `EnvIndex` is a capability (index into `environments`), never reused after `free`
+- `environments: Arena<EnvIndex, Option<Environment<K, A, V>>>` — each holding one `FactStore<A, V>`
+- `EnvIndex` is a capability (an arena id into `environments`), never reused after `free`
 - `alloc` adds a new live record with no context association
 - `get_or_allocate(k)` returns `k`'s live record, adding one on first use
 - `free` retires a record and drops its context association
