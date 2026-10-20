@@ -467,3 +467,26 @@ fn test_digraph_empty_body_roundtrip() {
     let rendered2 = roundtrip::render_statement::<DiGraphLanguage>(&stage2, stmt2);
     assert_eq!(rendered.trim(), rendered2.trim());
 }
+
+#[test]
+fn test_digraph_body_with_a_terminator_is_a_parse_error() {
+    // A DiGraph has no terminator; parsing one must report an error, not
+    // panic in the builder.
+    let input = r#"
+stage @test fn @g(i64, i64) -> i64;
+specialize @test fn @g(i64, i64) -> i64 digraph ^g0(%x: i64, %y: i64) {
+  %s = mul %x, %y -> i64;
+  ret %s;
+  yield %s;
+}
+"#;
+    let mut pipeline: Pipeline<StageInfo<kirin_test_languages::GraphFunctionLanguage>> =
+        Pipeline::new();
+    let error = pipeline
+        .parse(input)
+        .expect_err("a terminator is not a digraph node");
+    assert!(
+        format!("{error:?}").contains("cannot contain a terminator"),
+        "unexpected error: {error:?}"
+    );
+}

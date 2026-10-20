@@ -49,3 +49,25 @@ fn test_ungraph_node_roundtrip() {
         &[("p", SimpleType::F64), ("e0", SimpleType::Any)],
     );
 }
+
+#[test]
+fn test_ungraph_body_with_a_terminator_is_a_parse_error() {
+    // An UnGraph has no terminator; parsing one must report an error, not
+    // panic in the builder.
+    let input = r#"
+stage @test fn @g(i64, i64) -> i64;
+specialize @test fn @g(i64, i64) -> i64 ungraph ^u0(%x: i64, %y: i64) {
+  %s = add %x, %y -> i64;
+  ret %s;
+}
+"#;
+    let mut pipeline: Pipeline<StageInfo<kirin_test_languages::GraphFunctionLanguage>> =
+        Pipeline::new();
+    let error = pipeline
+        .parse(input)
+        .expect_err("a terminator is not an ungraph member");
+    assert!(
+        format!("{error:?}").contains("cannot contain a terminator"),
+        "unexpected error: {error:?}"
+    );
+}

@@ -120,6 +120,44 @@ where
     Ok((names, types))
 }
 
+/// Reject a parsed graph-body statement the graph builders assert against, so
+/// bad input is a parse error rather than a panic: a terminator, a statement
+/// with successors, and — for an ungraph, where `is_edge` says whether it was
+/// written with `edge` — a role that disagrees with the definition or an edge
+/// statement with operands.
+fn check_graph_member<IR: Dialect>(
+    ctx: &EmitContext<'_, IR>,
+    stmt: kirin_ir::Statement,
+    graph: &str,
+    is_edge: Option<bool>,
+) -> Result<(), EmitError> {
+    let definition = ctx
+        .stage
+        .statement_arena()
+        .get(stmt)
+        .expect("statement should exist")
+        .definition();
+    let error = |what: &str| {
+        Err(EmitError::Custom(format!(
+            "{graph} body cannot contain {what}: {definition:?}"
+        )))
+    };
+    if definition.is_terminator() {
+        return error("a terminator");
+    }
+    if definition.successors().next().is_some() {
+        return error("a statement with successors");
+    }
+    match is_edge {
+        Some(true) if !definition.is_edge() => error("`edge` on a non-edge statement"),
+        Some(false) if definition.is_edge() => error("an edge statement without `edge`"),
+        Some(true) if definition.arguments().next().is_some() => {
+            error("an edge statement with operands")
+        }
+        _ => Ok(()),
+    }
+}
+
 // --- EmitIR implementations ---
 
 impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
@@ -195,6 +233,7 @@ impl<'src, TypeOutput, StmtOutput> DiGraph<'src, TypeOutput, StmtOutput> {
             let mut stmts = Vec::new();
             for stmt_ast in &self.statements {
                 let stmt = emit_statement(&stmt_ast.value, &mut rd_guard)?;
+                check_graph_member(&rd_guard, stmt, "digraph", None)?;
                 stmts.push(stmt);
             }
             stmts
@@ -305,6 +344,7 @@ impl<'src, TypeOutput, StmtOutput> UnGraph<'src, TypeOutput, StmtOutput> {
             let mut nodes = Vec::new();
             for ug_stmt in &self.statements {
                 let stmt = emit_statement(&ug_stmt.stmt.value, &mut rd_guard)?;
+                check_graph_member(&rd_guard, stmt, "ungraph", Some(ug_stmt.is_edge))?;
                 if ug_stmt.is_edge {
                     edges.push(stmt);
                 } else {
