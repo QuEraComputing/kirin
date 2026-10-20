@@ -1790,7 +1790,7 @@ stage remains valid.
 | `replace_operand` | Rewrite one operand slot; move its use record `old → new`; for a `DiGraph` member, move the slot's edge. | `ChangedOperands` (none if slot unchanged), then `ChangedDiGraphTopology` if an edge changed | operand-index and live-value checked |
 | `replace_all_uses` | Rewrite every operand and `DiGraph` yield slot reading `old` to `new`; transfer use records and move the edges of rewritten member slots. | one `ChangedOperands` per affected statement, one `ChangedDiGraphTopology` per graph whose edges changed, one `ChangedDiGraphYields` per affected graph, then one `ReplacedUses` | returns count of slots rewritten; self-replace is `Ok(0)` |
 | `erase_statement` | Tombstone the statement, unlink it from its block list (or, for a `DiGraph` member, remove its node and incoming edges), drop its operand uses, tombstone its (unused) result values. Statement-owned blocks, `Cfg`s, and `DiGraph`s nested in it are tombstoned with it. Erasing a terminator clears the block's terminator and removes its outgoing edges, leaving the block unterminated. | `ErasedStatement` (covers the nested bodies; no CFG or graph events), then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` for a `DiGraph` member | block- or `DiGraph`-parented, no live result uses (a yield is a use); nested `UnGraph` bodies are not yet tombstoned |
-| `new_result` | Allocate a typed result value for a statement not inserted yet; its arena slot stays empty (not live) until an insert binds it. | none | a value its `Rewriter` never binds stays dead |
+| `new_result` | Allocate a typed result value for a statement not inserted yet; its arena slot stays empty (not live) until an insert binds it. | none | a value its `Rewriter` never binds is tombstoned when the `Rewriter` is dropped (`run_pass` drops it before verifying) |
 | `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, bind its results, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with no successors; operands must be live; results must be distinct, unbound `new_result` values |
 | `insert_terminator` | Allocate `definition` as the terminator of a block that has none; add operand uses and predecessor entries. | `InsertedStatement`, `ChangedTerminator` | any block (`Cfg` member or statement-owned body); `definition` is a result-less terminator with live operands and successors |
 | `insert_node` | Allocate `definition` as a new `DiGraph` member and node; bind its results, add operand uses and an edge from each member producer of an operand. | `InsertedStatement`, `ChangedDiGraphTopology` | live graph; non-terminator with no successors; live operands (outside ones get no edge); results must be `new_result` values |
@@ -2782,7 +2782,8 @@ policy.
 - [x] Result-defining insertion — callers pre-allocate typed results with
   `Rewriter::new_result` (an empty arena slot plus a type held by the
   `Rewriter` until an insert binds it); inserts reject anything else with
-  `ResultNotFresh`. Replacement-arena result SSA records already
+  `ResultNotFresh`. Dropping the `Rewriter` tombstones every value it never
+  bound, so afterwards each result slot is either bound or a real tombstone. Replacement-arena result SSA records already
   carry the types to copy. `Rewriter` allocates fresh ids and checks mechanical
   arity but makes no generic type-compatibility judgment; that belongs to rule
   authoring or later verification. Generated field-wise remapping in M4 must

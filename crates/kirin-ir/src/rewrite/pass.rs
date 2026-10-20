@@ -51,6 +51,10 @@ where
         Err(error) => return (events, Err(QuarantineCause::Pass(Box::new(error)))),
     };
 
+    // Tombstone the results the pass never bound, ending the borrow of
+    // `stage` before it is verified.
+    drop(rewriter);
+
     // Verify the generated IR
     if let Err(error) = verify_derived(stage) {
         return (events, Err(QuarantineCause::Verify(error)));

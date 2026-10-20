@@ -5,6 +5,8 @@
 //! exist until it is inserted. [`Rewriter::new_result`] bridges the gap: it
 //! allocates an id whose arena slot stays empty (so the value reads as not
 //! live and cannot be used yet) and keeps its type until an insert binds it.
+//! Dropping the `Rewriter` tombstones every value it never bound, so once it
+//! is gone each result slot is either bound or a real tombstone.
 
 use crate::{Dialect, ResultValue, SSAInfo, SSAKind, SSAValue, Statement};
 
@@ -16,8 +18,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Put it in a result slot of the definition passed to an insert; the
     /// insert makes it a result of the new statement. Until then the value is
     /// not live: using it as an operand is rejected with
-    /// [`RewriteError::UnknownValue`]. A value this `Rewriter` never binds
-    /// stays dead.
+    /// [`RewriteError::UnknownValue`]. A value this `Rewriter` never binds is
+    /// tombstoned when the `Rewriter` is dropped.
     pub fn new_result(&mut self, ty: L::Type) -> ResultValue {
         let value = self.stage.ssas.alloc(None);
         self.unbound_ssa_results.insert(value, ty);
@@ -53,6 +55,16 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 .get_mut(value)
                 .expect("unbound result has an arena slot");
             slot.data = Some(SSAInfo::new(value, None, ty, SSAKind::Result(stmt, index)));
+        }
+    }
+}
+
+impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
+    /// Tombstone every [`new_result`](Rewriter::new_result) value no insert
+    /// bound, so no empty, live-looking slot outlives the `Rewriter`.
+    fn drop(&mut self) {
+        for (value, _) in self.unbound_ssa_results.drain() {
+            let _ = self.stage.ssas.delete(value);
         }
     }
 }

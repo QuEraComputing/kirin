@@ -75,6 +75,7 @@ fn replace_all_uses_rewrites_operands_and_records_events() {
     // A second replacement finds nothing left to rewrite and records nothing.
     assert_eq!(rewriter.replace_all_uses(real_x, real_y).unwrap(), 0);
     assert!(rewriter.events().is_empty());
+    drop(rewriter);
 
     match add.definition(&stage) {
         BuilderDialect::Add(a, b) => {
@@ -144,6 +145,7 @@ fn replace_operand_updates_single_slot_and_rejects_illegal_edits() {
         vec![MutationEvent::ChangedOperands { stmt: add }],
         "only the one real edit is recorded"
     );
+    drop(rewriter);
 
     match add.definition(&stage) {
         BuilderDialect::Add(a, b) => {
@@ -523,6 +525,7 @@ fn insert_before_and_after_splice_and_maintain_index() {
         Err(RewriteError::UnknownValue(bogus))
     );
     assert!(rw.events().is_empty());
+    drop(rw);
 
     // Maintained index equals a from-scratch rebuild.
     verify_derived(&stage).unwrap();
@@ -544,10 +547,12 @@ fn insert_binds_fresh_results() {
     let mut stage = stage.finalize().unwrap();
     let real_x = SSAValue::from(block.expect_info(&stage).arguments()[0]);
 
-    // A value allocated by a rewriter that never binds it stays dead, and no
-    // later rewriter can bind it.
+    // A value allocated by a rewriter that never binds it is tombstoned when
+    // that rewriter is dropped, and no later rewriter can bind it.
     let stale = Rewriter::new(&mut stage).new_result(TestType::I32);
     assert!(stale.get_info(&stage).is_none());
+    // Every live SSA slot holds a value: no empty slot outlives the rewriter.
+    assert!(stage.ssa_arena().iter().all(|item| item.is_some()));
 
     let mut rw = Rewriter::new(&mut stage);
     let a = rw.new_result(TestType::I32);
@@ -723,6 +728,7 @@ fn replace_statement_swaps_def_and_updates_uses() {
         rw.replace_statement(s0, BuilderDialect::Return),
         Err(RewriteError::TerminatorKindMismatch(s0))
     );
+    drop(rw);
 
     verify_derived(&stage).unwrap();
 }
