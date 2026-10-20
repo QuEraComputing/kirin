@@ -370,9 +370,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
         nodes: &[Statement],
         yields: &[SSAValue],
     ) {
-        let dg_info = &self.digraphs[dg];
-        let id = dg_info.id();
-
         for &stmt_id in nodes {
             let info = &self.statements[stmt_id];
             assert!(
@@ -387,37 +384,37 @@ impl<L: Dialect> BuilderStageInfo<L> {
             );
         }
 
-        let mut stmt_to_node: HashMap<Statement, petgraph::graph::NodeIndex> = HashMap::new();
-        let mut graph = petgraph::Graph::<Statement, SSAValue, petgraph::Directed>::new();
-        for &stmt_id in nodes {
-            let ni = graph.add_node(stmt_id);
-            stmt_to_node.insert(stmt_id, ni);
+        let dg_info = &mut self.digraphs[dg];
+        dg_info.set_graph(petgraph::Graph::new());
+        dg_info.extra.yields = yields.to_vec();
+        self.add_digraph_nodes(dg, nodes);
+    }
+
+    /// Make `nodes` members and nodes of `dg`, with one edge per operand slot
+    /// reading another member's result. The graph's own statement → node map
+    /// is the only index built.
+    pub(crate) fn add_digraph_nodes(&mut self, dg: DiGraph, nodes: &[Statement]) {
+        let parent = Some(StatementParent::DiGraph(dg));
+        let graph = &mut self.nodes.digraphs[dg];
+        for &stmt in nodes {
+            self.nodes.statements[stmt].parent = parent;
+            graph.add_node(stmt);
         }
-        for &stmt_id in nodes {
-            let consumer_ni = stmt_to_node[&stmt_id];
-            let info = &self.statements[stmt_id];
-            let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
-            for operand in operands {
+        for &consumer in nodes {
+            for &operand in self.nodes.statements[consumer].definition.arguments() {
                 let ssa_info = self.ssas.get(operand).unwrap_or_else(|| {
                     panic!(
                         "SSAValue {operand} not found in stage (a placeholder already \
                          resolved by another graph is deleted and cannot be reused)"
                     )
                 });
-                if let BuilderSSAKind::Result(producer_stmt, _) = ssa_info.kind
-                    && let Some(&producer_ni) = stmt_to_node.get(&producer_stmt)
+                if let BuilderSSAKind::Result(producer, _) = ssa_info.kind
+                    && graph.node_idx_of(producer).is_some()
                 {
-                    graph.add_edge(producer_ni, consumer_ni, operand);
+                    graph.add_edge(producer, consumer, operand);
                 }
             }
         }
-        for &stmt_id in nodes {
-            let info = &mut self.statements[stmt_id];
-            info.parent = Some(StatementParent::DiGraph(id));
-        }
-        let dg_info = &mut self.digraphs[dg];
-        dg_info.set_graph(graph);
-        dg_info.extra.yields = yields.to_vec();
     }
 
     /// Attach edge and node statements to an existing ungraph.
