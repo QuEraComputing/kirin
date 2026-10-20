@@ -42,7 +42,6 @@ fn expected_edges(
     let info = graph.expect_info(stage);
     let mut wires: Vec<SSAValue> = info
         .edge_statements()
-        .iter()
         .flat_map(|stmt| stmt.results(stage).map(|&r| SSAValue::from(r)))
         .collect();
     wires.extend(info.edge_ports().iter().map(|&port| SSAValue::from(port)));
@@ -252,7 +251,7 @@ fn insert_ungraph_edge_adds_a_wire_nodes_can_read() {
         ]
     );
     let info = ug.expect_info(&stage);
-    assert!(info.edge_statements().contains(&e));
+    assert!(info.edge_statements().any(|edge| edge == e));
     assert_eq!(info.node_idx_of(e), None);
     assert_eq!(*r.get_info(&stage).unwrap().kind(), SSAKind::Result(e, 0));
     assert_eq!(
@@ -321,7 +320,7 @@ fn ungraph_inserts_reject_without_mutating() {
     assert_eq!(stage.statement_arena().len(), stmts_before);
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 0);
-    assert_eq!(info.edge_statements().len(), 2);
+    assert_eq!(info.edge_statements().count(), 2);
     verify_derived(&stage).unwrap();
 }
 
@@ -425,7 +424,10 @@ fn erase_edge_statement_once_no_node_reads_its_wire() {
     );
     drop(rw);
 
-    assert_eq!(ug.expect_info(&stage).edge_statements(), [v_stmt]);
+    assert_eq!(
+        ug.expect_info(&stage).edge_statements().collect::<Vec<_>>(),
+        [v_stmt]
+    );
     assert!(w_stmt.get_info(&stage).is_none());
     assert!(w.get_info(&stage).is_none());
     assert_topology(&stage, ug);
@@ -756,7 +758,10 @@ fn replace_statement_on_edge_statement_keeps_its_wire() {
         *w.get_info(&stage).unwrap().kind(),
         SSAKind::Result(w_stmt, 0)
     );
-    assert_eq!(ug.expect_info(&stage).edge_statements(), [w_stmt, v_stmt]);
+    assert_eq!(
+        ug.expect_info(&stage).edge_statements().collect::<Vec<_>>(),
+        [w_stmt, v_stmt]
+    );
     assert_eq!(edges(&stage, ug), HashMap::from([(w, pair(a, b))]));
     assert_topology(&stage, ug);
     verify_derived(&stage).unwrap();

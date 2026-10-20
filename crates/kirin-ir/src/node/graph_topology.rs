@@ -1,36 +1,44 @@
-//! Node and edge edits on a [`GraphInfo`] that keep the petgraph and its
-//! statement → node map in lockstep. Crate-private: the rewriter decides which
-//! edits to make, these only keep the two stores consistent.
+//! Member and edge edits on a [`GraphInfo`] that keep the petgraph and its
+//! member map in lockstep. Crate-private: the rewriter and the builders decide
+//! which edits to make, these only keep the two stores consistent.
 
 use petgraph::EdgeType;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 
-use super::graph::GraphInfo;
+use super::graph::{GraphInfo, GraphMember};
 use crate::{DiGraphInfo, Dialect, SSAValue, Statement, UnGraphInfo};
 
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
-    /// Add `stmt` as a new node. Returns `false`, changing nothing, if `stmt`
-    /// is already a member.
+    /// Drop every member and edge.
+    pub(crate) fn clear_members(&mut self) {
+        self.graph.clear();
+        self.members.clear();
+    }
+
+    /// Append `stmt` as a new node. Returns `false`, changing nothing, if
+    /// `stmt` is already a member.
     pub(crate) fn add_node(&mut self, stmt: Statement) -> bool {
-        if self.stmt_to_node_idx.contains_key(&stmt) {
+        if self.members.contains_key(&stmt) {
             return false;
         }
         let node = self.graph.add_node(stmt);
-        self.stmt_to_node_idx.insert(stmt, node);
+        self.members.insert(stmt, GraphMember::Node(node));
         true
     }
 
-    /// Remove `stmt`'s node together with its incident edges. Returns `false`
-    /// if `stmt` is not a member.
+    /// Remove node `stmt` together with its incident edges, in O(1) plus its
+    /// degree. The last member takes `stmt`'s place in the member map, so
+    /// member order is not kept. Returns `false` if `stmt` is not a node.
     pub(crate) fn remove_node(&mut self, stmt: Statement) -> bool {
-        let Some(node) = self.stmt_to_node_idx.remove(&stmt) else {
+        let Some(GraphMember::Node(node)) = self.member(stmt) else {
             return false;
         };
+        self.members.swap_remove(&stmt);
         self.graph.remove_node(node);
         // `Graph::remove_node` swap-removes: the last node now sits at `node`.
         if let Some(&moved) = self.graph.node_weight(node) {
-            self.stmt_to_node_idx.insert(moved, node);
+            self.members.insert(moved, GraphMember::Node(node));
         }
         true
     }
@@ -87,6 +95,27 @@ impl<L: Dialect> DiGraphInfo<L> {
 }
 
 impl<L: Dialect> UnGraphInfo<L> {
+    /// Append `stmt` as a new edge statement. Returns `false`, changing
+    /// nothing, if `stmt` is already a member.
+    pub(crate) fn add_edge_member(&mut self, stmt: Statement) -> bool {
+        if self.members.contains_key(&stmt) {
+            return false;
+        }
+        self.members.insert(stmt, GraphMember::Edge);
+        true
+    }
+
+    /// Remove edge statement `stmt` in O(1). The last member takes its place
+    /// in the member map, so member order is not kept. Returns `false` if
+    /// `stmt` is not an edge statement.
+    pub(crate) fn remove_edge_member(&mut self, stmt: Statement) -> bool {
+        if self.member(stmt) != Some(GraphMember::Edge) {
+            return false;
+        }
+        self.members.swap_remove(&stmt);
+        true
+    }
+
     /// Add the edge for `wire` between nodes `a` and `b`.
     ///
     /// # Panics
@@ -111,7 +140,10 @@ impl<L: Dialect> UnGraphInfo<L> {
 mod tests {
     use crate::arena::Id;
     use crate::stage::tests::LangA;
-    use crate::{DiGraphExtra, DiGraphInfo, GraphInfo, SSAValue, Statement};
+    use crate::{
+        DiGraphExtra, DiGraphInfo, GraphInfo, GraphMember, SSAValue, Statement, UnGraphExtra,
+        UnGraphInfo,
+    };
 
     fn stmt(raw: usize) -> Statement {
         Statement(Id(raw))
@@ -128,14 +160,13 @@ mod tests {
             None,
             Vec::new(),
             0,
-            petgraph::Graph::new(),
             DiGraphExtra::new(Vec::new()),
         )
     }
 
     /// Every map entry points at its own node, and every node has an entry.
     fn assert_map_in_sync(info: &DiGraphInfo<LangA>) {
-        assert_eq!(info.stmt_to_node_idx.len(), info.graph().node_count());
+        assert_eq!(info.members.len(), info.graph().node_count());
         for node in info.graph().node_indices() {
             assert_eq!(info.node_idx_of(info.graph()[node]), Some(node));
         }
@@ -206,5 +237,36 @@ mod tests {
         assert!(!info.remove_edge(stmt(0), stmt(1), value(10)));
         assert!(!info.remove_edge(stmt(1), stmt(0), value(11)));
         assert_eq!(info.graph().edge_count(), 1);
+    }
+
+    fn empty_ungraph() -> UnGraphInfo<LangA> {
+        GraphInfo::new(Id(0), None, None, Vec::new(), 0, UnGraphExtra::default())
+    }
+
+    #[test]
+    fn edge_members_have_no_node_and_removal_swaps_in_the_last_member() {
+        let mut info = empty_ungraph();
+        info.add_node(stmt(0));
+        assert!(info.add_edge_member(stmt(1)));
+        assert!(!info.add_edge_member(stmt(1)));
+        assert!(!info.add_edge_member(stmt(0)), "already a node");
+        info.add_node(stmt(2));
+
+        assert_eq!(info.member(stmt(1)), Some(GraphMember::Edge));
+        assert_eq!(info.node_idx_of(stmt(1)), None);
+        assert_eq!(info.graph().node_count(), 2);
+        assert_eq!(info.edge_statements().collect::<Vec<_>>(), [stmt(1)]);
+        assert_eq!(info.nodes().collect::<Vec<_>>(), [stmt(0), stmt(2)]);
+
+        // A node is not an edge member and vice versa. Removing a member is
+        // O(1): the last member takes its place in the map.
+        assert!(!info.remove_edge_member(stmt(0)));
+        assert!(!info.remove_node(stmt(1)));
+        assert!(info.remove_node(stmt(0)));
+        let members: Vec<_> = info.members().map(|(stmt, _)| stmt).collect();
+        assert_eq!(members, [stmt(2), stmt(1)]);
+        assert_eq!(info.graph()[info.node_idx_of(stmt(2)).unwrap()], stmt(2));
+        assert!(info.remove_edge_member(stmt(1)));
+        assert_eq!(info.members().count(), 1);
     }
 }

@@ -18,7 +18,7 @@ impl std::fmt::Display for UnGraph {
 /// Information about an undirected graph body.
 ///
 /// This is a type alias for the generic [`GraphInfo`] with undirected edges
-/// and [`UnGraphExtra`] (edge statements).
+/// and [`UnGraphExtra`] (empty: edge statements live in the member map).
 pub type UnGraphInfo<L> = GraphInfo<L, petgraph::Undirected, UnGraphExtra>;
 
 impl<L: Dialect> UnGraphInfo<L> {
@@ -40,8 +40,7 @@ impl<L: Dialect> UnGraphInfo<L> {
             name,
             ports,
             edge_count,
-            petgraph::Graph::new_undirected(),
-            UnGraphExtra::new(Vec::new()),
+            UnGraphExtra::default(),
         )
     }
 }

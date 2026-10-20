@@ -162,7 +162,7 @@ mod tests {
         let info = ug.expect_info(&stage);
         assert_eq!(info.edge_ports().len(), 1);
         assert_eq!(info.capture_ports().len(), 1);
-        assert_eq!(info.edge_statements().len(), 1);
+        assert_eq!(info.edge_statements().count(), 1);
         assert_eq!(info.graph().node_count(), 2);
     }
 

@@ -388,7 +388,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
 
         let dg_info = &mut self.digraphs[dg];
-        dg_info.set_graph(petgraph::Graph::new());
+        dg_info.clear_members();
         dg_info.extra.yields = yields.to_vec();
         self.add_digraph_nodes(dg, nodes);
     }
@@ -425,9 +425,9 @@ impl<L: Dialect> BuilderStageInfo<L> {
     /// slots. The graph's own statement → node map is the only index built,
     /// and doubles as the BFS visited set.
     ///
-    /// Nodes are stored in BFS order from the boundary: nodes reading a
-    /// boundary port first, then whatever their edge statements' wires reach,
-    /// then the rest in the order given.
+    /// Members are stored in BFS order from the boundary: nodes reading a
+    /// boundary port first, then the edge statements and nodes their wires
+    /// reach, then the remaining nodes and edge statements in the order given.
     ///
     /// # Panics
     ///
@@ -444,7 +444,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
         let statements = &self.nodes.statements;
         let graph = &mut self.nodes.ungraphs[ug];
-        graph.set_graph(petgraph::Graph::new_undirected());
+        graph.clear_members();
 
         let boundary_ssa_set: HashSet<SSAValue> =
             graph.edge_ports().iter().map(|&port| port.into()).collect();
@@ -477,10 +477,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
 
         // BFS from the nodes reading a boundary port, across edge-statement
-        // wires. `add_node` is false for a node already added, so the graph's
-        // own map is the visited set.
-        let mut visited_edges: HashSet<Statement> = HashSet::new();
-        let mut bfs_edge_order: Vec<Statement> = Vec::with_capacity(edge_stmts.len());
+        // wires. `add_node` and `add_edge_member` are false for a member
+        // already added, so the graph's own map is the visited set.
         let mut queue: VecDeque<Statement> = VecDeque::new();
         for &node_stmt in node_stmts {
             let uses_boundary = statements[node_stmt]
@@ -496,10 +494,9 @@ impl<L: Dialect> BuilderStageInfo<L> {
                 let Some(&edge_stmt) = ssa_to_edge_stmt.get(&operand) else {
                     continue;
                 };
-                if !visited_edges.insert(edge_stmt) {
+                if !graph.add_edge_member(edge_stmt) {
                     continue;
                 }
-                bfs_edge_order.push(edge_stmt);
                 for &other_stmt in &edge_ssa_to_nodes[&operand] {
                     if graph.add_node(other_stmt) {
                         queue.push_back(other_stmt);
@@ -511,18 +508,15 @@ impl<L: Dialect> BuilderStageInfo<L> {
         for &node_stmt in node_stmts {
             graph.add_node(node_stmt);
         }
-        bfs_edge_order.extend(
-            edge_stmts
-                .iter()
-                .filter(|&&edge_stmt| visited_edges.insert(edge_stmt)),
-        );
+        for &edge_stmt in edge_stmts {
+            graph.add_edge_member(edge_stmt);
+        }
 
         for (&ssa, nodes) in &edge_ssa_to_nodes {
             if let &[n0, n1] = nodes.as_slice() {
                 graph.add_edge(n0, n1, ssa);
             }
         }
-        graph.extra.edge_statements = bfs_edge_order;
     }
 
     /// Assert `stmt` may be an `UnGraph` member in `role`: an edge statement

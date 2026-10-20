@@ -70,8 +70,9 @@ fn parse_graph_pipeline(text: &str) -> GraphPipeline {
     pipeline
 }
 
-/// The single UnGraph of `pipeline`'s `@test` stage, and that stage.
-fn only_ungraph(
+/// `pipeline`'s `@test` stage and the one UnGraph in it (asserting there is
+/// exactly one).
+fn test_stage_and_ungraph(
     pipeline: &GraphPipeline,
 ) -> (
     &StageInfo<kirin_test_languages::GraphFunctionLanguage>,
@@ -88,7 +89,7 @@ fn only_ungraph(
 /// The graph has one edge, carried by its first boundary port, and every
 /// node resolves to its own petgraph node.
 fn assert_port_edge(pipeline: &GraphPipeline) {
-    let (stage, ug) = only_ungraph(pipeline);
+    let (stage, ug) = test_stage_and_ungraph(pipeline);
     let info = ug.expect_info(stage);
     let port = SSAValue::from(info.edge_ports()[0]);
     let weights: Vec<SSAValue> = info.graph().raw_edges().iter().map(|e| e.weight).collect();
@@ -101,17 +102,23 @@ fn assert_port_edge(pipeline: &GraphPipeline) {
 
 #[cfg(feature = "serde")]
 #[test]
-fn test_ungraph_json_rebuilds_member_index() {
+fn test_ungraph_json_restores_members() {
     let pipeline = parse_graph_pipeline(UNGRAPH_FN);
 
-    // The statement → node index is derived from the graph, so it is not
-    // stored; loading rebuilds it.
+    // The member map is serialized with the graph and restored as is.
     let json = serde_json::to_string(&pipeline).unwrap();
-    assert!(!json.contains("stmt_to_node_idx"), "json: {json}");
     let restored: GraphPipeline = serde_json::from_str(&json).unwrap();
 
-    let (stage, ug) = only_ungraph(&restored);
+    let (stage, ug) = test_stage_and_ungraph(&restored);
     let info = ug.expect_info(stage);
+    let (original_stage, original_ug) = test_stage_and_ungraph(&pipeline);
+    assert_eq!(
+        info.members().collect::<Vec<_>>(),
+        original_ug
+            .expect_info(original_stage)
+            .members()
+            .collect::<Vec<_>>()
+    );
     let graph = info.graph();
     assert_eq!(graph.node_count(), 2);
     for node in graph.node_indices() {
@@ -123,7 +130,7 @@ fn test_ungraph_json_rebuilds_member_index() {
 fn test_ungraph_text_roundtrip_after_rewrite() {
     let mut pipeline = parse_graph_pipeline(UNGRAPH_FN);
     let stage_id = pipeline.stage_by_name("test").unwrap();
-    let (stage, ug) = only_ungraph(&pipeline);
+    let (stage, ug) = test_stage_and_ungraph(&pipeline);
     let info = ug.expect_info(stage);
     let x = SSAValue::from(info.edge_ports()[0]);
     // `%t` is the node that does not read `%x`.

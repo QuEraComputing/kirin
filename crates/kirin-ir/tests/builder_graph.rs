@@ -328,7 +328,7 @@ fn ungraph_two_nodes_one_edge() {
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 1);
-    assert_eq!(info.edge_statements().len(), 1);
+    assert_eq!(info.edge_statements().count(), 1);
     assert_eq!(info.graph()[info.node_idx_of(n0).unwrap()], n0);
     assert_eq!(info.graph()[info.node_idx_of(n1).unwrap()], n1);
     // Edge statements are petgraph edges, not nodes.
@@ -460,7 +460,7 @@ fn ungraph_interleaved_edge_node_order() {
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 3);
     assert_eq!(info.graph().edge_count(), 2);
-    assert_eq!(info.edge_statements().len(), 2);
+    assert_eq!(info.edge_statements().count(), 2);
 
     assert_eq!(*n0.parent(&stage), Some(StatementParent::UnGraph(ug)));
     assert_eq!(*n1.parent(&stage), Some(StatementParent::UnGraph(ug)));

@@ -778,7 +778,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// A graph member is erased the same way, except that instead of leaving a
     /// block chain it leaves its graph: a `DiGraph` member or `UnGraph` node
     /// loses its node and the edges touching it, and an `UnGraph` edge
-    /// statement leaves the graph's edge-statement list.
+    /// statement leaves the graph's member map.
     ///
     /// Rejects — leaving the stage untouched — if `stmt` is unknown, is owned
     /// by nothing, or still has results that are used elsewhere (a `DiGraph`

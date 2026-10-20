@@ -1,6 +1,7 @@
+use indexmap::IndexMap;
 use petgraph::EdgeType;
 use petgraph::graph::NodeIndex;
-use rustc_hash::FxHashMap;
+use rustc_hash::FxBuildHasher;
 
 use crate::node::port::Port;
 use crate::{Dialect, SSAValue, Statement, Symbol};
@@ -19,24 +20,35 @@ impl DiGraphExtra {
     }
 }
 
-/// Extra data specific to undirected graphs.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+/// Extra data specific to undirected graphs. Empty: an `UnGraph`'s edge
+/// statements are [`GraphMember::Edge`] entries of its member map.
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct UnGraphExtra {
-    pub(crate) edge_statements: Vec<Statement>,
+pub struct UnGraphExtra {}
+
+/// How a graph member is stored.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum GraphMember {
+    /// A petgraph node, at this index.
+    Node(NodeIndex),
+    /// An `UnGraph` edge statement, whose results are wires. It has no
+    /// petgraph node; a `DiGraph` never has one.
+    Edge,
 }
 
-impl UnGraphExtra {
-    /// Create a new undirected graph extra with the given edge statements.
-    pub(crate) fn new(edge_statements: Vec<Statement>) -> Self {
-        Self { edge_statements }
-    }
-}
+/// Member statement → how it is stored. Insertion order until a removal,
+/// which swaps the last member into the hole.
+pub(crate) type MemberMap = IndexMap<Statement, GraphMember, FxBuildHasher>;
 
 /// Unified graph information, parameterized by edge direction and extra data.
 ///
 /// `D` is the petgraph edge type ([`petgraph::Directed`] or [`petgraph::Undirected`]).
-/// `Extra` carries direction-specific data (yields for digraphs, edge statements for ungraphs).
+/// `Extra` carries direction-specific data (yields for digraphs, nothing for ungraphs).
+///
+/// `members` holds every member, nodes and `UnGraph` edge statements, with
+/// O(1) lookup, insert, and removal; `graph` holds the connectivity between the
+/// nodes. The `graph_topology` edits keep the two in lockstep.
 ///
 /// Use the type aliases [`DiGraphInfo`](super::DiGraphInfo) and
 /// [`UnGraphInfo`](super::UnGraphInfo) rather than naming this type directly.
@@ -44,13 +56,10 @@ impl UnGraphExtra {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "serde",
-    serde(
-        bound(
-            serialize = "Extra: serde::Serialize",
-            deserialize = "Extra: serde::Deserialize<'de>"
-        ),
-        from = "GraphInfoData<D, Extra>"
-    )
+    serde(bound(
+        serialize = "Extra: serde::Serialize",
+        deserialize = "Extra: serde::Deserialize<'de>"
+    ))
 )]
 pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) id: crate::arena::Id,
@@ -58,88 +67,37 @@ pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) name: Option<Symbol>,
     pub(crate) ports: Vec<Port>,
     pub(crate) edge_count: usize,
-    /// Written only through `set_graph` and the `graph_topology` edits, which
-    /// keep `stmt_to_node_idx` in lockstep with it (hence `pub(super)`).
+    /// Written only through the `graph_topology` edits, which keep it in
+    /// lockstep with `members` (hence `pub(super)`).
     pub(super) graph: petgraph::Graph<Statement, SSAValue, D>,
-    /// Member statement → its node in `graph`. Not checked by `derived/`
-    /// verification. Not serialized: deserialization rebuilds it from `graph`.
-    #[cfg_attr(feature = "serde", serde(skip))]
-    pub(super) stmt_to_node_idx: FxHashMap<Statement, NodeIndex>,
+    /// Every member and how it is stored. Written only through the
+    /// `graph_topology` edits, alongside `graph`. Serialized with it.
+    pub(super) members: MemberMap,
     pub(crate) extra: Extra,
     _marker: std::marker::PhantomData<L>,
 }
 
-/// The serialized fields of a [`GraphInfo`]. Deserializing goes through
-/// [`GraphInfo::new`], so `stmt_to_node_idx` is rebuilt from the graph rather
-/// than trusted from the input.
-#[cfg(feature = "serde")]
-#[derive(serde::Deserialize)]
-#[serde(bound(deserialize = "Extra: serde::Deserialize<'de>"))]
-struct GraphInfoData<D: EdgeType, Extra> {
-    id: crate::arena::Id,
-    parent: Option<Statement>,
-    name: Option<Symbol>,
-    ports: Vec<Port>,
-    edge_count: usize,
-    graph: petgraph::Graph<Statement, SSAValue, D>,
-    extra: Extra,
-}
-
-#[cfg(feature = "serde")]
-impl<L: Dialect, D: EdgeType, Extra> From<GraphInfoData<D, Extra>> for GraphInfo<L, D, Extra> {
-    fn from(data: GraphInfoData<D, Extra>) -> Self {
-        GraphInfo::new(
-            data.id,
-            data.parent,
-            data.name,
-            data.ports,
-            data.edge_count,
-            data.graph,
-            data.extra,
-        )
-    }
-}
-
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
-    /// Create a new graph info.
+    /// Create a new graph info with no members.
     pub(crate) fn new(
         id: crate::arena::Id,
         parent: Option<Statement>,
         name: Option<Symbol>,
         ports: Vec<Port>,
         edge_count: usize,
-        graph: petgraph::Graph<Statement, SSAValue, D>,
         extra: Extra,
     ) -> Self {
-        let stmt_to_node_idx = Self::index_members(&graph);
         Self {
             id,
             parent,
             name,
             ports,
             edge_count,
-            graph,
-            stmt_to_node_idx,
+            graph: petgraph::Graph::default(),
+            members: MemberMap::default(),
             extra,
             _marker: std::marker::PhantomData,
         }
-    }
-
-    /// Replace the petgraph with `graph`, re-indexing its members. The only way
-    /// to swap the whole graph, so `stmt_to_node_idx` cannot fall behind it.
-    pub(crate) fn set_graph(&mut self, graph: petgraph::Graph<Statement, SSAValue, D>) {
-        self.stmt_to_node_idx = Self::index_members(&graph);
-        self.graph = graph;
-    }
-
-    /// Member statement → its node in `graph`.
-    fn index_members(
-        graph: &petgraph::Graph<Statement, SSAValue, D>,
-    ) -> FxHashMap<Statement, NodeIndex> {
-        graph
-            .node_indices()
-            .map(|node| (graph[node], node))
-            .collect()
     }
 
     /// The parent statement that owns this graph, if any.
@@ -177,9 +135,32 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         &self.graph
     }
 
-    /// The petgraph node of member statement `stmt`, if it is a member.
+    /// Every member with how it is stored, in member order: insertion order,
+    /// except that a removal moves the last member into the removed one's
+    /// place. Sort by statement id where a stable order matters.
+    pub fn members(&self) -> impl Iterator<Item = (Statement, GraphMember)> + '_ {
+        self.members.iter().map(|(&stmt, &member)| (stmt, member))
+    }
+
+    /// How `stmt` is stored, if it is a member.
+    pub fn member(&self, stmt: Statement) -> Option<GraphMember> {
+        self.members.get(&stmt).copied()
+    }
+
+    /// The node members, in member order.
+    pub fn nodes(&self) -> impl Iterator<Item = Statement> + '_ {
+        self.members().filter_map(|(stmt, member)| match member {
+            GraphMember::Node(_) => Some(stmt),
+            GraphMember::Edge => None,
+        })
+    }
+
+    /// The petgraph node of member statement `stmt`, if it is a node.
     pub fn node_idx_of(&self, stmt: Statement) -> Option<NodeIndex> {
-        self.stmt_to_node_idx.get(&stmt).copied()
+        match self.member(stmt)? {
+            GraphMember::Node(node) => Some(node),
+            GraphMember::Edge => None,
+        }
     }
 
     /// A reference to the direction-specific extra data.
@@ -216,8 +197,11 @@ impl<L: Dialect> GraphInfo<L, petgraph::Undirected, UnGraphExtra> {
         super::ungraph::UnGraph(self.id)
     }
 
-    /// The edge statements in BFS-canonical order.
-    pub fn edge_statements(&self) -> &[Statement] {
-        &self.extra.edge_statements
+    /// The edge statements, in member order.
+    pub fn edge_statements(&self) -> impl Iterator<Item = Statement> + '_ {
+        self.members().filter_map(|(stmt, member)| match member {
+            GraphMember::Edge => Some(stmt),
+            GraphMember::Node(_) => None,
+        })
     }
 }

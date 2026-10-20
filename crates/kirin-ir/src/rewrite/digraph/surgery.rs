@@ -83,7 +83,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let Ok(info) = self.live_digraph(graph) else {
             return;
         };
-        let members: Vec<Statement> = info.graph().node_weights().copied().collect();
+        let members: Vec<Statement> = info.members().map(|(stmt, _)| stmt).collect();
         let yields: Vec<SSAValue> = info.yields().to_vec();
         let ports: Vec<SSAValue> = info.ports().iter().map(|&port| port.into()).collect();
 

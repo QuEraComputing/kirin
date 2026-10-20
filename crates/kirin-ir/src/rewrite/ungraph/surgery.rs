@@ -105,9 +105,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         graph
             .get_info_mut(self.stage)
             .expect("graph is live in this stage")
-            .extra
-            .edge_statements
-            .push(stmt);
+            .add_edge_member(stmt);
 
         self.events.push(MutationEvent::InsertedStatement { stmt });
         self.events
@@ -147,15 +145,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 .remove_node(stmt);
         } else {
             // An edge statement: no node reads its wires (checked above), so
-            // they have no edges; just drop it from the list.
-            let edges = &mut graph
+            // they have no edges; just drop it from the members.
+            graph
                 .get_info_mut(self.stage)
                 .expect("graph is live in this stage")
-                .extra
-                .edge_statements;
-            if let Some(pos) = edges.iter().position(|&edge| edge == stmt) {
-                edges.swap_remove(pos);
-            }
+                .remove_edge_member(stmt);
             self.tombstone_statement(stmt, None);
         }
 
@@ -172,12 +166,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let Ok(info) = self.live_ungraph(graph) else {
             return;
         };
-        let members: Vec<Statement> = info
-            .graph()
-            .node_weights()
-            .chain(info.edge_statements())
-            .copied()
-            .collect();
+        let members: Vec<Statement> = info.members().map(|(stmt, _)| stmt).collect();
         let ports: Vec<SSAValue> = info.ports().iter().map(|&port| port.into()).collect();
 
         for member in members {
