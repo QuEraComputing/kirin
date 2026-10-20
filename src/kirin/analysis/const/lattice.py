@@ -1,7 +1,9 @@
 """Lattice for constant analysis."""
 
+import math
 from typing import Any, final
 from dataclasses import dataclass
+from collections.abc import Sequence
 
 from kirin import ir
 from kirin.lattice import (
@@ -80,6 +82,83 @@ class Bottom(Result, metaclass=SingletonLatticeAttributeMeta):
         return isinstance(other, Bottom)
 
 
+def _same_constant(lhs: Any, rhs: Any) -> bool:
+    """Return True if one constant can replace the other in any program.
+
+    Python `==` is too weak for this. It says that `1 == 1.0`, `True == 1`
+    and `0.0 == -0.0`, and a container compares its elements with `==`.
+    A fold that uses the wrong one of two such constants changes the result
+    of the program.
+
+    Each pair of values must have the same type and satisfy `==`, so the
+    check returns True only where `==` also does. The check then adds
+    stricter checks for floats, complex numbers, and the container kinds
+    that a pure statement can build. For any other type, the type's own
+    `==` decides.
+
+    The check returns False for two NaN objects. That answer only makes the
+    analysis give Unknown, which is always safe.
+
+    The check walks the two values with a list of pending pairs. A Python
+    recursion would fail on a tuple that nests a few hundred levels deep.
+    The check visits each pair of objects once, so it ends on any value.
+    """
+    pending = [(lhs, rhs)]
+    # The dict values keep each visited object alive. Python can reuse the
+    # id of a dead object, such as the float from `lhs.real`, for a new one.
+    visited: dict[tuple[int, int], tuple[Any, Any]] = {}
+    while pending:
+        lhs, rhs = pending.pop()
+        if lhs is rhs or (id(lhs), id(rhs)) in visited:
+            continue
+        visited[id(lhs), id(rhs)] = (lhs, rhs)
+        if type(lhs) is not type(rhs) or not (lhs == rhs):
+            return False
+        if isinstance(lhs, ir.Data):
+            # The structural check of an `IList` also compares its element type.
+            if not lhs.is_structurally_equal(rhs):
+                return False
+            if not isinstance(lhs, Sequence):
+                # `unwrap` can return the object itself. The checks above
+                # then decide, and the walk stops here.
+                pending.append((lhs.unwrap(), rhs.unwrap()))
+                continue
+        if isinstance(lhs, float):
+            # `0.0 == -0.0`, but `math.copysign(1.0, -0.0)` gives `-1.0`.
+            if math.copysign(1.0, lhs) != math.copysign(1.0, rhs):
+                return False
+        elif isinstance(lhs, complex):
+            pending.append((lhs.real, rhs.real))
+            pending.append((lhs.imag, rhs.imag))
+        elif isinstance(lhs, Sequence) and not isinstance(lhs, (str, bytes, range)):
+            # A `range` holds only ints, so its own `==` is exact. A check of
+            # each element would take one step per element of a huge range.
+            if len(lhs) != len(rhs):
+                return False
+            pending.extend(zip(lhs, rhs))
+        elif isinstance(lhs, (set, frozenset, dict)):
+            # `lhs == rhs` holds, so each element or key of `lhs` has exactly
+            # one `==` match in `rhs`. A dict from each element or key of
+            # `rhs` to itself finds that match in one step.
+            matches = {item: item for item in rhs}
+            for item in lhs:
+                match = matches.get(item, _NO_MATCH)
+                if match is _NO_MATCH:
+                    return False
+                pending.append((item, match))
+                if isinstance(lhs, dict):
+                    pending.append((lhs[item], rhs[match]))
+        elif isinstance(lhs, slice):
+            pending.append((lhs.start, rhs.start))
+            pending.append((lhs.stop, rhs.stop))
+            pending.append((lhs.step, rhs.step))
+    return True
+
+
+_NO_MATCH = object()
+"""Mark an element or key of `lhs` that has no `==` match in `rhs`."""
+
+
 @final
 @dataclass
 class Value(Result):
@@ -88,10 +167,10 @@ class Value(Result):
     data: Any
 
     def is_subseteq_Value(self, other: "Value") -> bool:
-        return self.data == other.data
+        return _same_constant(self.data, other.data)
 
     def __eq__(self, value: object) -> bool:
-        return isinstance(value, Value) and self.data == value.data
+        return isinstance(value, Value) and _same_constant(self.data, value.data)
 
     def __hash__(self) -> int:
         # NOTE: we use id here because the data
@@ -104,7 +183,7 @@ class Value(Result):
     ) -> bool:
         if not isinstance(other, Value):
             return False
-        return self.data == other.data
+        return _same_constant(self.data, other.data)
 
 
 @dataclass

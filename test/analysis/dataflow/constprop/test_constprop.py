@@ -1,3 +1,9 @@
+import itertools
+from dataclasses import dataclass
+from collections.abc import Sequence
+
+import pytest
+
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.prelude import basic_no_opt, structural_no_opt
@@ -49,6 +55,265 @@ class NestedConstProp(interp.MethodTable):
             results = interp_.frame_call_region(body_frame, stmt, stmt.body)
         frame.entries.update(body_frame.entries)
         return results
+
+
+# Each pair is equal under Python `==`, but a fold that swaps the two
+# constants changes the result of a program.
+DIFFERENT_CONSTANTS = [
+    (1, 1.0),
+    (True, 1),
+    (0.0, -0.0),
+    (0j, complex(0.0, -0.0)),
+    ((1,), (1.0,)),
+    ([1], [1.0]),
+    (((1, 2), 3), ((1, 2.0), 3)),
+    (ilist.IList([1]), ilist.IList([1.0])),
+    (ilist.IList([], elem=types.Int), ilist.IList([], elem=types.Float)),
+    ({1}, {1.0}),
+    (frozenset({1}), frozenset({1.0})),
+    ({"a": 1}, {"a": 1.0}),
+    ({1: "a"}, {1.0: "a"}),
+    (slice(1), slice(1.0)),
+    (ir.PyAttr(1, types.Any), ir.PyAttr(1.0, types.Any)),
+    ({1, 2.0}, {1.0, 2}),
+    ({1: 2.0}, {1.0: 2}),
+]
+
+# Each pair holds two separate objects that can replace each other.
+SAME_CONSTANTS = [
+    (1, 1),
+    (2.5, 2.5),
+    ("ab", "ab"),
+    (None, None),
+    ((1, (2.0, "x")), (1, (2.0, "x"))),
+    (ilist.IList([1, 2], elem=types.Int), ilist.IList([1, 2], elem=types.Int)),
+    ({1, 2}, {2, 1}),
+    ({"a": (1, 2.0)}, {"a": (1, 2.0)}),
+    (slice(1, 5, 2), slice(1, 5, 2)),
+    (range(10**12), range(10**12)),
+]
+
+
+@pytest.mark.parametrize("lhs, rhs", DIFFERENT_CONSTANTS)
+def test_constants_that_python_calls_equal_stay_apart(lhs, rhs):
+    assert lhs == rhs
+    assert const.Value(lhs) != const.Value(rhs)
+    assert not const.Value(lhs).is_subseteq(const.Value(rhs))
+    assert not const.Value(lhs).is_structurally_equal(const.Value(rhs))
+    assert const.Value(lhs).join(const.Value(rhs)) == const.Unknown()
+    assert const.Value(lhs).meet(const.Value(rhs)) == const.Bottom()
+
+
+@pytest.mark.parametrize("lhs, rhs", SAME_CONSTANTS)
+def test_equal_constants_of_the_same_type_stay_equal(lhs, rhs):
+    assert const.Value(lhs) == const.Value(rhs)
+    assert const.Value(lhs).is_subseteq(const.Value(rhs))
+    assert const.Value(lhs).join(const.Value(rhs)) == const.Value(lhs)
+
+
+def test_a_nan_constant_equals_only_itself():
+    nan = float("nan")
+    assert const.Value(nan) == const.Value(nan)
+    assert const.Value(nan) != const.Value(float("nan"))
+
+
+@dataclass(eq=False)
+class Point(ir.Data["Point"]):
+    """Hold a point whose `unwrap` returns the point itself."""
+
+    x: float
+
+    def __post_init__(self):
+        self.type = types.PyClass(Point)
+
+    def unwrap(self):
+        return self
+
+    def __eq__(self, other):
+        return isinstance(other, Point) and self.x == other.x
+
+    def __hash__(self):
+        return hash(self.x)
+
+    def is_structurally_equal(self, other, context=None):
+        return self == other
+
+    def print_impl(self, printer):
+        printer.plain_print(repr(self))
+
+
+@dataclass(eq=False)
+class Untyped(ir.Data[int]):
+    """Hold an int, and never set the `type` field that `ir.Data` declares."""
+
+    value: int
+
+    def unwrap(self):
+        return self.value
+
+    def __eq__(self, other):
+        return isinstance(other, Untyped) and self.value == other.value
+
+    def __hash__(self):
+        return hash(self.value)
+
+    def print_impl(self, printer):
+        printer.plain_print(repr(self))
+
+
+class Tagged(Sequence):
+    """Hold a sequence whose `==` also compares a tag outside the items."""
+
+    def __init__(self, items, tag):
+        self.items = list(items)
+        self.tag = tag
+
+    def __getitem__(self, index):
+        return self.items[index]
+
+    def __len__(self):
+        return len(self.items)
+
+    def __eq__(self, other):
+        return (
+            isinstance(other, Tagged)
+            and self.items == other.items
+            and self.tag == other.tag
+        )
+
+    __hash__ = None  # type: ignore
+
+
+def test_data_whose_unwrap_returns_itself_compares_with_its_own_eq():
+    assert const.Value(Point(1.0)) == const.Value(Point(1.0))
+    assert const.Value(Point(1.0)) != const.Value(Point(2.0))
+
+
+def test_data_without_a_type_field_compares_its_unwrapped_value():
+    assert const.Value(Untyped(1)) == const.Value(Untyped(1))
+    assert const.Value(Untyped(1)) != const.Value(Untyped(2))
+
+
+def test_a_sequence_with_extra_state_keeps_its_own_eq():
+    assert const.Value(Tagged([1], "a")) == const.Value(Tagged([1], "a"))
+    assert const.Value(Tagged([1], "a")) != const.Value(Tagged([1], "b"))
+
+
+@dataclass(eq=False)
+class Linked(ir.Data["Linked | None"]):
+    """Hold a value whose `unwrap` returns its partner, so `unwrap` cycles."""
+
+    tag: int
+    partner: "Linked | None" = None
+
+    def __post_init__(self):
+        self.type = types.PyClass(Linked)
+
+    def unwrap(self):
+        return self.partner
+
+    def __eq__(self, other):
+        return isinstance(other, Linked) and self.tag == other.tag
+
+    def __hash__(self):
+        return hash(self.tag)
+
+    def print_impl(self, printer):
+        printer.plain_print(repr(self.tag))
+
+
+def test_data_whose_unwrap_cycles_compares_without_end():
+    lhs, rhs = Linked(1), Linked(1)
+    lhs.partner, rhs.partner = Linked(2, lhs), Linked(2, rhs)
+    assert const.Value(lhs) == const.Value(rhs)
+
+
+def nested_tuple(depth: int, leaf):
+    value = leaf
+    for _ in range(depth):
+        value = (value,)
+    return value
+
+
+def test_a_deeply_nested_tuple_compares_without_recursion_error():
+    assert const.Value(nested_tuple(900, 1)) == const.Value(nested_tuple(900, 1))
+    assert const.Value(nested_tuple(900, 1)) != const.Value(nested_tuple(900, 1.0))
+
+
+class Counted:
+    """Hold an int, and count every call of `==` on any `Counted` value."""
+
+    calls = 0
+
+    def __init__(self, value: int):
+        self.value = value
+
+    def __hash__(self):
+        return hash(self.value)
+
+    def __eq__(self, other):
+        type(self).calls += 1
+        return isinstance(other, Counted) and self.value == other.value
+
+
+def test_large_sets_and_dicts_compare_each_element_a_few_times():
+    """Check that set and dict comparisons take time linear in the size.
+
+    A search over all pairs of elements would call `==` about 4 million
+    times for 2000 elements. A lookup by hash calls it a few times for each
+    element.
+    """
+    size = 2000
+    for build in (set, dict.fromkeys):
+        lhs = build(Counted(i) for i in range(size))
+        rhs = build(Counted(i) for i in range(size))
+        Counted.calls = 0
+        assert const.Value(lhs) == const.Value(rhs)
+        assert Counted.calls <= 5 * size
+    assert const.Value({*range(size), 0.5}) != const.Value({*range(size), 0.5 + 0j})
+
+
+def test_temporary_values_never_share_an_id_during_a_comparison():
+    """Check a pair that the comparison reaches after many temporaries die.
+
+    The comparison reads `.real` and `.imag`, and each read builds a new
+    float. If the comparison forgot those floats, Python could give a new
+    float the same id, and the comparison would skip the differing pair.
+    """
+    lhs = (complex(0.0, 0.0), *(complex(i, 0.0) for i in range(2000)))
+    rhs = (complex(0.0, -0.0), *(complex(i, 0.0) for i in range(2000)))
+    assert const.Value(lhs) != const.Value(rhs)
+
+
+# The pool holds equal constants as separate objects, so that the `is`
+# shortcut in the lattice does not decide those pairs.
+CONSTANT_POOL = [
+    *(lhs for pair in DIFFERENT_CONSTANTS + SAME_CONSTANTS for lhs in pair),
+    float("nan"),
+    Point(1.0),
+    Point(1.0),
+    Point(2.0),
+    Untyped(1),
+    Untyped(1),
+    Tagged([1], "a"),
+    Tagged([1], "a"),
+    Tagged([1], "b"),
+    Tagged([1.0], "a"),
+]
+
+
+def test_equal_constants_are_also_equal_under_python_eq():
+    """Check that the lattice never merges two constants that `==` keeps apart.
+
+    A merge of two such constants would fold one of them into the place of
+    the other. The test checks every ordered pair of the pool. A pair of one
+    object with itself skips the `==` check, because `nan == nan` is False.
+    """
+    for lhs, rhs in itertools.product(CONSTANT_POOL, repeat=2):
+        same = const.Value(lhs) == const.Value(rhs)
+        assert same == (const.Value(rhs) == const.Value(lhs)), (lhs, rhs)
+        if same and lhs is not rhs:
+            assert type(lhs) is type(rhs) and lhs == rhs, (lhs, rhs)
 
 
 class TestLattice:

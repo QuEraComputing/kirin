@@ -1,3 +1,5 @@
+import math
+
 from pytest import mark
 
 from kirin import ir, types, lowering
@@ -248,3 +250,27 @@ def test_a_loop_that_changes_the_tuple_length_keeps_len_unknown():
     assert main(0) == 2
     assert main(1) == 3
     assert main(3) == 3
+
+
+def test_a_loop_that_changes_the_value_type_keeps_the_result_unknown():
+    @structural
+    def main(n: int):
+        x = 1
+        for i in range(n):
+            x = 1.0
+        return x * 2
+
+    assert type(main(0)) is int
+    assert type(main(3)) is float
+
+
+def test_a_loop_that_changes_the_sign_of_a_zero_keeps_the_result_unknown():
+    @structural
+    def main(n: int):
+        x = 0.0
+        for i in range(n):
+            x = -0.0
+        return x * 1.0
+
+    assert math.copysign(1.0, main(0)) == 1.0
+    assert math.copysign(1.0, main(3)) == -1.0
