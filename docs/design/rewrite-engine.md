@@ -2769,7 +2769,7 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   `BuilderStageInfo` and becomes `DeriveError::UnGraphDegreeExceeded` at the
   BuilderStageInfo-to-StageInfo boundary, with every `(Statement, operand_index)`
   occurrence.
-- [ ] Keep topology value-derived. A DiGraph edge is an operand whose result
+- [x] Keep topology value-derived. A DiGraph edge is an operand whose result
   producer is another member. An UnGraph incidence is a use of an edge-member
   result or edge port. Captures are distinguished at the graph boundary by
   `edge_count`, never by consumer-field annotations; no per-field topology
