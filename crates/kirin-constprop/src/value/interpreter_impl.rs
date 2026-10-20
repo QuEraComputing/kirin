@@ -19,25 +19,18 @@ where
     }
 }
 
-impl<S, F> BranchCondition for ConstPropValue<i64, S, F>
-where
-    S: Clone,
-    F: Clone,
-{
+impl<C: BranchCondition, S, F> BranchCondition for ConstPropValue<C, S, F> {
     fn is_truthy(&self) -> Option<bool> {
         match self {
-            Self::Const(0) => Some(false),
-            Self::Const(_) => Some(true),
+            Self::Const(value) => value.is_truthy(),
             Self::Bottom | Self::PartialTuple(_) | Self::PartialStruct(_) | Self::Top => None,
         }
     }
 }
 
-impl<S, F> From<ArithValue> for ConstPropValue<i64, S, F> {
+/// A literal the constant type `C` cannot represent is unknown (`Top`).
+impl<C: TryFrom<ArithValue>, S, F> From<ArithValue> for ConstPropValue<C, S, F> {
     fn from(value: ArithValue) -> Self {
-        match value {
-            ArithValue::I64(value) => Self::Const(value),
-            _ => Self::Top,
-        }
+        C::try_from(value).map_or(Self::Top, Self::Const)
     }
 }

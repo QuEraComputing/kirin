@@ -1355,9 +1355,9 @@ where
 /// behavior are owned by the policy `P`.
 ///
 /// ```ignore
-/// let mut analysis = SparseForwardInterpreter::<Stage, ConstPropValue, MyError>::new(&pipeline)
+/// let mut analysis = SparseForwardInterpreter::<Stage, ConstPropValue<MyConst>, MyError>::new(&pipeline)
 ///     .with_linker(CrossStageLinker);
-/// let result = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(7)])?;
+/// let result = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
 /// ```
 pub struct SparseForwardInterpreter<
     'ir,

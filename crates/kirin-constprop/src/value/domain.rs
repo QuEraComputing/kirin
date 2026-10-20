@@ -1,7 +1,7 @@
 use super::{PartialStruct, PartialTuple};
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum ConstPropValue<C = i64, S = String, F = String> {
+pub enum ConstPropValue<C, S = String, F = String> {
     Bottom,
     Const(C),
     PartialTuple(Box<PartialTuple<Self>>),
@@ -37,11 +37,5 @@ impl<C, S, F> ConstPropValue<C, S, F> {
             Self::PartialStruct(value) => Some(value),
             _ => None,
         }
-    }
-}
-
-impl<S, F> From<i64> for ConstPropValue<i64, S, F> {
-    fn from(value: i64) -> Self {
-        Self::Const(value)
     }
 }

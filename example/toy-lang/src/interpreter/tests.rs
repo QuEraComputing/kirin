@@ -6,7 +6,8 @@ use crate::interpreter::{analyze_constprop, run_i64, run_source_i64};
 use crate::language::LowLevel;
 use crate::stage::Stage;
 
-type ConstProp = kirin_constprop::ConstPropValue;
+/// The toy programs compute on `i64`, so the tests run constant propagation over it.
+type ConstProp = kirin_constprop::ConstPropValue<i64>;
 
 const ADD_LOWERED: &str = r#"
 stage @lowered fn @add(i64, i64) -> i64;
@@ -557,10 +558,10 @@ fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
 
 /// Analysis-author surface for a custom abstract policy budget.
 mod advanced {
-    use kirin_constprop::{ConstPropContext, ConstPropValue};
+    use kirin_constprop::ConstPropContext;
     use kirin_interpreter::{SameStageLinker, engine::expect_single};
 
-    use super::build_pipeline;
+    use super::{ConstProp, build_pipeline};
 
     use crate::interpreter::ToyError;
 
@@ -576,13 +577,13 @@ mod advanced {
         let mut analysis = crate::interpreter::ToyConstProp::new(&pipeline)
             .with_policy(ConstPropContext::with_budget(2))
             .with_linker(SameStageLinker);
-        let result = expect_single::<ConstPropValue, ToyError>(
+        let result = expect_single::<ConstProp, ToyError>(
             analysis
-                .analyze_by_name("source", "factorial", [ConstPropValue::Const(5)])
+                .analyze_by_name("source", "factorial", [ConstProp::Const(5)])
                 .unwrap(),
         )
         .unwrap();
-        assert_eq!(result, ConstPropValue::Top);
+        assert_eq!(result, ConstProp::Top);
     }
 }
 

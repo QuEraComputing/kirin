@@ -20,6 +20,7 @@
 //! [`ContextInsensitive`].
 
 use std::collections::{HashMap, HashSet};
+use std::hash::Hash;
 
 use kirin_interpreter::{
     CallContext, ContextInsensitive, InterpreterError, LinkTarget, WideningStrategy,
@@ -30,9 +31,9 @@ use crate::ConstPropValue;
 
 /// The call-context component of a context-sensitive summary key.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum CallCtx {
+pub enum CallCtx<C> {
     /// Every argument was a known constant — a precise, distinct context.
-    Args(Vec<i64>),
+    Args(Vec<C>),
     /// Arguments were non-constant, or the per-function budget was exhausted:
     /// one shared, conservative context.
     Unknown,
@@ -40,17 +41,17 @@ pub enum CallCtx {
 
 /// Bounded arg-tuple context sensitivity for constant propagation.
 #[derive(Clone, Debug)]
-pub struct ConstPropContext {
+pub struct ConstPropContext<C> {
     control: ContextInsensitive,
     max_contexts: usize,
     /// Per-target admitted constant tuples. Keyed by the resolved
     /// [`LinkTarget`] — the same identity [`ContextInsensitive`] uses as its
     /// whole key, so the budget is spent per function-in-a-stage exactly as
     /// before.
-    admitted: HashMap<LinkTarget, HashSet<Vec<i64>>>,
+    admitted: HashMap<LinkTarget, HashSet<Vec<C>>>,
 }
 
-impl ConstPropContext {
+impl<C> ConstPropContext<C> {
     /// Construct with an explicit per-function distinct-context budget.
     pub fn with_budget(max_contexts: usize) -> Self {
         Self {
@@ -60,7 +61,7 @@ impl ConstPropContext {
     }
 }
 
-impl Default for ConstPropContext {
+impl<C> Default for ConstPropContext<C> {
     fn default() -> Self {
         Self {
             control: ContextInsensitive::default(),
@@ -73,10 +74,10 @@ impl Default for ConstPropContext {
 /// The context-insensitive key ([`LinkTarget`]) plus the call context that
 /// refines it. Context sensitivity *adds* to the resolved target's identity
 /// rather than re-spelling it.
-impl CallContext<ConstPropValue> for ConstPropContext {
-    type Key = (LinkTarget, CallCtx);
+impl<C: Clone + Eq + Hash> CallContext<ConstPropValue<C>> for ConstPropContext<C> {
+    type Key = (LinkTarget, CallCtx<C>);
 
-    fn key(&mut self, target: &LinkTarget, args: &Product<ConstPropValue>) -> Self::Key {
+    fn key(&mut self, target: &LinkTarget, args: &Product<ConstPropValue<C>>) -> Self::Key {
         let ctx = match all_const(args) {
             Some(consts) => {
                 let admitted = self.admitted.entry(*target).or_default();
@@ -96,18 +97,18 @@ impl CallContext<ConstPropValue> for ConstPropContext {
     }
 }
 
-impl WideningStrategy<ConstPropValue> for ConstPropContext {
+impl<C: Clone + PartialEq> WideningStrategy<ConstPropValue<C>> for ConstPropContext<C> {
     fn merge(
         &self,
-        current: &Product<ConstPropValue>,
-        incoming: &Product<ConstPropValue>,
+        current: &Product<ConstPropValue<C>>,
+        incoming: &Product<ConstPropValue<C>>,
         visits: usize,
-    ) -> Result<Product<ConstPropValue>, InterpreterError> {
+    ) -> Result<Product<ConstPropValue<C>>, InterpreterError> {
         self.control.merge(current, incoming, visits)
     }
 }
 
 /// `Some(consts)` iff every argument is a known constant.
-fn all_const(args: &Product<ConstPropValue>) -> Option<Vec<i64>> {
-    args.iter().map(|value| value.as_const().copied()).collect()
+fn all_const<C: Clone>(args: &Product<ConstPropValue<C>>) -> Option<Vec<C>> {
+    args.iter().map(|value| value.as_const().cloned()).collect()
 }
