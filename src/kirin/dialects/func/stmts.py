@@ -304,5 +304,6 @@ class Invoke(ir.Statement):
     def check(self) -> None:
         if self.callee.nargs - 1 != len(self.args):
             raise ValueError(
-                f"expected {self.callee.nargs - 1} arguments, got {len(self.args)}"
+                f"expected {self.callee.nargs - 1} arguments, got {len(self.args)} when calling "
+                f"method {self.callee.sym_name!r}"
             )
