@@ -38,6 +38,20 @@ class CfLowering(lowering.FromPythonAST):
             next_value = body_frame.entr_block.args.append_from(types.Any, "next_value")
             py.unpack.unpacking(state, node.target, next_value)
             body_frame.exhaust()
+            # Variables assigned in the body but never read there do not
+            # trigger the capture callback, yet they are still loop-carried
+            # if they resolve to a local in an enclosing frame. Add them
+            # here; body_frame.defs[name] keeps the body's final value,
+            # which is what the back-edge and exit branches below yield.
+            for name in body_frame.defs:
+                if name in yields:
+                    continue
+                outer = frame.get_local(name)
+                if outer is None:
+                    continue
+                yields.append(name)
+                frame.defs[name] = outer
+                body_frame.entr_block.args.append_from(outer.type, name)
             self.branch_next_if_not_terminated(body_frame)
             yield_args = tuple(body_frame[name] for name in yields)
             next_stmt = py.iterable.Next(iter_stmt.iter)
