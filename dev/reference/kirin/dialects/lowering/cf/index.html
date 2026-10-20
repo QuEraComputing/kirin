@@ -36,17 +36,17 @@
                 }
               });
             </script> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.lowering.cf.CfLowering.branch_next_if_not_terminated class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">branch_next_if_not_terminated</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>branch_next_if_not_terminated</span><span class=p>(</span><span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>)</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Branch to the next block if the current block is not terminated.</p> <p>This must be used after exhausting the current frame and before popping the frame.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/lowering/cf.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>159</span>
-<span class=normal>160</span>
-<span class=normal>161</span>
-<span class=normal>162</span>
-<span class=normal>163</span>
-<span class=normal>164</span>
-<span class=normal>165</span>
-<span class=normal>166</span>
-<span class=normal>167</span>
-<span class=normal>168</span>
-<span class=normal>169</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>branch_next_if_not_terminated</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Frame</span><span class=p>):</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Branch to the next block if the current block is not terminated.</p> <p>This must be used after exhausting the current frame and before popping the frame.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/lowering/cf.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>173</span>
+<span class=normal>174</span>
+<span class=normal>175</span>
+<span class=normal>176</span>
+<span class=normal>177</span>
+<span class=normal>178</span>
+<span class=normal>179</span>
+<span class=normal>180</span>
+<span class=normal>181</span>
+<span class=normal>182</span>
+<span class=normal>183</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>branch_next_if_not_terminated</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Frame</span><span class=p>):</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Branch to the next block if the current block is not terminated.</span>
 
 <span class=sd>    This must be used after exhausting the current frame and before popping the frame.</span>
