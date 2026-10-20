@@ -67,8 +67,9 @@ Different shapes join to `Top` and meet to `Bottom`.
 The scalar parameter `C` is the constant type. Scalar operations delegate to
 `C`'s capabilities (arithmetic, bitwise, comparison, branch truthiness, and
 `scf.for` induction values), using checked arithmetic as described below. `ArithValue`
-literals convert through `C: TryFrom<ArithValue>`; a literal `C` cannot
-represent becomes `Top`.
+literals convert through `C: TryFrom<ArithValue> + Into<ArithValue>`: a literal
+becomes `Const` only if converting the constant back gives the same literal, so
+`1.0` never folds as the integer `1`. Any other literal becomes `Top`.
 
 Addition, subtraction, multiplication, and negation require `C` to implement
 the corresponding `num_traits` checked-operation traits. Overflow becomes

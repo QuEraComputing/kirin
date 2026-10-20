@@ -28,9 +28,16 @@ impl<C: BranchCondition, S, F> BranchCondition for ConstPropValue<C, S, F> {
     }
 }
 
-/// A literal the constant type `C` cannot represent is unknown (`Top`).
-impl<C: TryFrom<ArithValue>, S, F> From<ArithValue> for ConstPropValue<C, S, F> {
+/// A literal is a constant only if converting it back gives the same literal,
+/// so `1.0` never folds as the integer `1`.
+impl<C, S, F> From<ArithValue> for ConstPropValue<C, S, F>
+where
+    C: TryFrom<ArithValue> + Into<ArithValue> + Clone,
+{
     fn from(value: ArithValue) -> Self {
-        C::try_from(value).map_or(Self::Top, Self::Const)
+        match C::try_from(value.clone()) {
+            Ok(constant) if constant.clone().into() == value => Self::Const(constant),
+            _ => Self::Top,
+        }
     }
 }

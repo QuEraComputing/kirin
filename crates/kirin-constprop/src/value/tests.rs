@@ -1,4 +1,4 @@
-use kirin_arith::{CheckedDiv, CheckedRem};
+use kirin_arith::{ArithValue, CheckedDiv, CheckedRem};
 use kirin_bitwise::{CheckedShl, CheckedShr};
 use kirin_cmp::CompareValue;
 use kirin_interpreter::{BranchCondition, HasProductValue};
@@ -117,6 +117,12 @@ fn scalar_arithmetic_overflow_becomes_unknown() {
     assert_eq!(-Value::Const(7), Value::Const(-7));
     assert_eq!(-Value::Bottom, Value::Bottom);
     assert_eq!(-Value::Top, Value::Top);
+}
+
+#[test]
+fn non_i64_integer_literals_are_unknown() {
+    assert_eq!(Value::from(ArithValue::I32(5)), Value::Top);
+    assert_eq!(Value::from(ArithValue::U64(5)), Value::Top);
 }
 
 #[test]

@@ -176,6 +176,12 @@ impl std::fmt::Display for ArithConversionError {
 
 impl std::error::Error for ArithConversionError {}
 
+impl From<i64> for ArithValue {
+    fn from(value: i64) -> Self {
+        ArithValue::I64(value)
+    }
+}
+
 impl TryFrom<ArithValue> for i64 {
     type Error = ArithConversionError;
 

@@ -161,6 +161,19 @@ specialize @source fn @if_diff(i64) -> i64 cfg {
 }
 "#;
 
+const SOURCE_FLOAT_DIV: &str = r#"
+stage @source fn @half() -> f64;
+
+specialize @source fn @half() -> f64 cfg {
+  ^entry() {
+    %one = constant 1.0 -> f64;
+    %two = constant 2.0 -> f64;
+    %half = div %one, %two -> f64;
+    ret %half;
+  }
+}
+"#;
+
 const CROSS_STAGE_CALLS: &str = r#"
 stage @source fn @source_to_lowered_to_source(i64) -> i64;
 stage @source fn @low_then_high(i64) -> i64;
@@ -448,6 +461,14 @@ fn constprop_unknown_if_different_constants_join_to_top() {
     // if %unknown { yield 1 } else { yield 2 } -> join(Const(1), Const(2)) = Top
     let pipeline = build_pipeline(SOURCE_IF_DIFF_CONST);
     let result = analyze_constprop(&pipeline, "source", "if_diff", &[ConstProp::Top]).unwrap();
+    assert_eq!(result, ConstProp::Top);
+}
+
+#[test]
+fn constprop_float_division_is_top() {
+    // Folding the f64 literals as integers would give Const(0).
+    let pipeline = build_pipeline(SOURCE_FLOAT_DIV);
+    let result: ConstProp = analyze_constprop(&pipeline, "source", "half", &[]).unwrap();
     assert_eq!(result, ConstProp::Top);
 }
 
