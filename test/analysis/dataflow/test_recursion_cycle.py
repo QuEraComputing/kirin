@@ -158,3 +158,19 @@ def test_only_abstract_interpreters_lower_the_depth_limit():
     assert interp.Interpreter(basic_no_opt).max_depth == 800
     assert TypeInference(basic_no_opt).max_depth == 128
     assert const.Propagate(basic_no_opt)._interp.max_depth == 800
+
+
+@basic
+def nest_pairs(n: int):
+    if n > 0:
+        return (1, nest_pairs(n - 1))
+    return (1, 2)
+
+
+@basic
+def second_of_nest_pairs(n: int):
+    return nest_pairs(n)[1]
+
+
+def test_a_cached_recursive_call_still_reaches_the_fixpoint():
+    assert second_of_nest_pairs(3) == (1, (1, (1, 2)))

@@ -162,6 +162,9 @@ class Propagate(ForwardExtra[Frame, Result]):
         keeps a recursive call whose result is unused but whose body has side
         effects.
         """
+        # Like the recursion limit, a cycle hit depends on the call stack,
+        # so calls that reach it must not be cached.
+        self._cutoffs += 1
         frame = super().recursive_call_frame(node, assumed)
         frame.frame_is_not_pure = assumed is not None and assumed.frame_is_not_pure
         return frame
