@@ -13,13 +13,6 @@ use num_traits::{CheckedAdd, CheckedMul, CheckedNeg, CheckedSub};
 use super::ConstPropValue;
 
 impl<C, S, F> ConstPropValue<C, S, F> {
-    fn unary_const(self, op: impl FnOnce(C) -> C) -> Self {
-        match self {
-            Self::Const(value) => Self::Const(op(value)),
-            value => value,
-        }
-    }
-
     fn binary_const(self, rhs: Self, op: impl FnOnce(C, C) -> C) -> Self {
         match (self, rhs) {
             (Self::Const(lhs), Self::Const(rhs)) => Self::Const(op(lhs, rhs)),
@@ -120,7 +113,10 @@ impl<C: Not<Output = C>, S, F> Not for ConstPropValue<C, S, F> {
     type Output = Self;
 
     fn not(self) -> Self::Output {
-        self.unary_const(C::not)
+        match self {
+            Self::Const(value) => Self::Const(!value),
+            value => value,
+        }
     }
 }
 
