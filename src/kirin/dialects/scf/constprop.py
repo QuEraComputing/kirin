@@ -1,6 +1,6 @@
 from collections.abc import Iterable
 
-from kirin import interp
+from kirin import ir, interp
 from kirin.analysis import const
 from kirin.dialects import func
 
@@ -90,8 +90,30 @@ class DialectConstProp(interp.MethodTable):
         iterable = frame.get(stmt.iterable)
         if isinstance(iterable, const.Value):
             return self._prop_const_iterable_forloop(interp_, frame, stmt, iterable)
-        else:  # TODO: support other iteration
-            return tuple(interp_.lattice.top() for _ in stmt.results)
+        # The body runs with an unknown loop index until the carried results
+        # stop changing, so that a value that the body computes from constants
+        # alone keeps its constant. A carried result only moves up the lattice,
+        # so one run per carried value settles it, and one more run with every
+        # carried result unknown settles any other case.
+        carried = frame.get_values(stmt.initializers)
+        for step in range(len(carried) + 2):
+            if step > len(carried):
+                carried = tuple(interp_.lattice.top() for _ in carried)
+            with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
+                ret = interp_.frame_call_region(
+                    body_frame, stmt, stmt.body, interp_.lattice.top(), *carried
+                )
+            frame.entries.update(body_frame.entries)
+            if isinstance(ret, interp.ReturnValue):
+                return ret
+            yielded = ret if isinstance(ret, tuple) else ()
+            if len(yielded) != len(carried):
+                break
+            joined = tuple(old.join(new) for old, new in zip(carried, yielded))
+            if joined == carried:
+                return carried
+            carried = joined
+        return tuple(interp_.lattice.top() for _ in stmt.results)
 
     def _prop_const_iterable_forloop(
         self,
@@ -114,11 +136,17 @@ class DialectConstProp(interp.MethodTable):
         can_early_terminate = not iter_var.uses
 
         prev_loop_vars = None
+        # The body values join over the iterations, so that a value that is the
+        # same constant in every iteration keeps that constant.
+        entries: dict[ir.SSAValue, const.Result] = {}
         for value in iterable.data:
             with interp_.new_frame(stmt, has_parent_access=True) as body_frame:
                 loop_vars = interp_.frame_call_region(
                     body_frame, stmt, stmt.body, const.Value(value), *loop_vars
                 )
+            for key, result in body_frame.entries.items():
+                entries[key] = entries[key].join(result) if key in entries else result
+            frame.entries.update(entries)
 
             if body_frame.frame_is_not_pure:
                 frame_is_not_pure = True
