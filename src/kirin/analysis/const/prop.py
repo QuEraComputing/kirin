@@ -96,7 +96,6 @@ class Propagate(ForwardExtra[Frame, Result]):
         self._interp = interp.Interpreter(
             self.dialects,
             debug=self.debug,
-            max_depth=self.max_depth,
             max_python_recursion_depth=self.max_python_recursion_depth,
         )
 
@@ -153,6 +152,26 @@ class Propagate(ForwardExtra[Frame, Result]):
             # A frame without a caller starts a new run.
             self._call_summaries.clear()
         return Frame(node, has_parent_access=has_parent_access)
+
+    def recursive_call_frame(self, node: ir.Statement, assumed: Frame | None) -> Frame:
+        """Return the frame of a recursive call with the purity of `assumed`.
+
+        The first round assumes that the recursive call is pure. If the outer
+        call turns out impure, `recursive_frame_settled` starts another round,
+        and the recursive call becomes impure too. Dead code elimination then
+        keeps a recursive call whose result is unused but whose body has side
+        effects.
+        """
+        # Like the recursion limit, a cycle hit depends on the call stack,
+        # so calls that reach it must not be cached.
+        self._cutoffs += 1
+        frame = super().recursive_call_frame(node, assumed)
+        frame.frame_is_not_pure = assumed is not None and assumed.frame_is_not_pure
+        return frame
+
+    def recursive_frame_settled(self, assumed: Frame | None, frame: Frame) -> bool:
+        assumed_not_pure = assumed is not None and assumed.frame_is_not_pure
+        return assumed_not_pure == frame.frame_is_not_pure
 
     def method_self(self, method: ir.Method) -> Result:
         return Value(method)
