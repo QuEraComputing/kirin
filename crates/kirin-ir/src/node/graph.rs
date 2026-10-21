@@ -1,6 +1,7 @@
 use indexmap::IndexMap;
 use petgraph::EdgeType;
 use petgraph::graph::NodeIndex;
+use petgraph::stable_graph::StableGraph;
 use rustc_hash::FxBuildHasher;
 
 use crate::node::port::Port;
@@ -37,6 +38,23 @@ pub enum GraphMember {
     Edge,
 }
 
+impl GraphMember {
+    /// The member's role, without its node index.
+    pub fn role(self) -> MemberRole {
+        match self {
+            GraphMember::Node(_) => MemberRole::Node,
+            GraphMember::Edge => MemberRole::Edge,
+        }
+    }
+}
+
+/// Whether a graph member is a node or an `UnGraph` edge statement.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum MemberRole {
+    Node,
+    Edge,
+}
+
 /// Member statement → how it is stored. Insertion order until a removal,
 /// which swaps the last member into the hole.
 pub(crate) type MemberMap = IndexMap<Statement, GraphMember, FxBuildHasher>;
@@ -69,7 +87,7 @@ pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) edge_count: usize,
     /// Written only through the `graph_topology` edits, which keep it in
     /// lockstep with `members` (hence `pub(super)`).
-    pub(super) graph: petgraph::Graph<Statement, SSAValue, D>,
+    pub(super) graph: StableGraph<Statement, SSAValue, D>,
     /// Every member and how it is stored. Written only through the
     /// `graph_topology` edits, alongside `graph`. Serialized with it.
     pub(super) members: MemberMap,
@@ -93,7 +111,7 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
             name,
             ports,
             edge_count,
-            graph: petgraph::Graph::default(),
+            graph: StableGraph::default(),
             members: MemberMap::default(),
             extra,
             _marker: std::marker::PhantomData,
@@ -130,9 +148,18 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         &self.ports[self.edge_count..]
     }
 
-    /// A reference to the underlying petgraph.
-    pub fn graph(&self) -> &petgraph::Graph<Statement, SSAValue, D> {
+    /// A reference to the underlying petgraph. A `StableGraph`: removing a
+    /// node leaves the other nodes' indices unchanged.
+    pub fn graph(&self) -> &StableGraph<Statement, SSAValue, D> {
         &self.graph
+    }
+
+    /// Raw access to the petgraph half, so tests can forge a member map and
+    /// petgraph that disagree. No edit outside tests may bypass the
+    /// `graph_topology` lockstep.
+    #[cfg(test)]
+    pub(crate) fn graph_mut(&mut self) -> &mut StableGraph<Statement, SSAValue, D> {
+        &mut self.graph
     }
 
     /// Every member with how it is stored, in member order: insertion order,
@@ -140,6 +167,15 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     /// place. Sort by statement id where a stable order matters.
     pub fn members(&self) -> impl Iterator<Item = (Statement, GraphMember)> + '_ {
         self.members.iter().map(|(&stmt, &member)| (stmt, member))
+    }
+
+    /// Every member with how it is stored, in statement id order: the order
+    /// the members were allocated, which a removal does not disturb. For
+    /// presentation; O(n log n).
+    pub fn members_by_id(&self) -> Vec<(Statement, GraphMember)> {
+        let mut members: Vec<_> = self.members().collect();
+        members.sort_unstable_by_key(|&(stmt, _)| crate::arena::Id::from(stmt).raw());
+        members
     }
 
     /// How `stmt` is stored, if it is a member.
