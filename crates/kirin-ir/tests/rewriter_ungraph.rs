@@ -8,6 +8,7 @@ use std::collections::HashMap;
 
 use common::{BuilderDialect, TestType, make_split, make_wire, new_stage};
 use kirin_ir::*;
+use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
 /// An unordered endpoint pair, in a canonical order.
 fn pair(a: Statement, b: Statement) -> [Statement; 2] {
@@ -22,12 +23,12 @@ fn pair(a: Statement, b: Statement) -> [Statement; 2] {
 fn edges(stage: &StageInfo<BuilderDialect>, graph: UnGraph) -> HashMap<SSAValue, [Statement; 2]> {
     let petgraph = graph.expect_info(stage).graph();
     let mut out = HashMap::new();
-    for edge in petgraph.raw_edges() {
+    for edge in petgraph.edge_references() {
         let ends = pair(petgraph[edge.source()], petgraph[edge.target()]);
         assert!(
-            out.insert(edge.weight, ends).is_none(),
+            out.insert(*edge.weight(), ends).is_none(),
             "wire {} has two edges",
-            edge.weight
+            edge.weight()
         );
     }
     out
@@ -151,7 +152,7 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
         [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: w,
-            endpoints: 3
+            occurrences: vec![(a, 0), (b, 0), (c, 0)]
         }]
     );
     // Back to two readers, the edge returns.
@@ -205,7 +206,7 @@ fn insert_ungraph_node_reading_a_wire_twice_is_a_self_loop() {
         .unwrap();
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(s, s))]));
     // Both of `v`'s endpoints are taken: a third reader leaves no edge.
-    rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    let t = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
     drop(rw);
 
     assert!(edges(&stage, ug).is_empty());
@@ -215,7 +216,7 @@ fn insert_ungraph_node_reading_a_wire_twice_is_a_self_loop() {
         [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: v,
-            endpoints: 3
+            occurrences: vec![(s, 0), (s, 1), (t, 0)]
         }]
     );
 }
@@ -517,7 +518,7 @@ fn replace_operand_swaps_endpoints_through_an_over_full_wire() {
         [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: v,
-            endpoints: 3
+            occurrences: vec![(b, 0), (c, 0), (d, 0)]
         }]
     );
     assert_eq!(
@@ -622,7 +623,7 @@ fn replace_all_uses_moves_every_reader_to_the_new_wire() {
         [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: v,
-            endpoints: 3
+            occurrences: vec![(a, 0), (c, 0), (e, 0)]
         }]
     );
 }

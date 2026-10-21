@@ -1,8 +1,5 @@
-use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt;
 use std::ops::{Deref, DerefMut};
-
-use indexmap::IndexMap;
 
 use crate::arena::Arena;
 use crate::builder::ungraph::UnGraphRole;
@@ -366,8 +363,7 @@ impl<L: Dialect> BuilderStageInfo<L> {
         let _ = self.blocks.delete(real);
     }
 
-    /// Attach node statements and yield values to an existing digraph, which
-    /// must have no members yet.
+    /// Attach node statements and yield values to an existing digraph.
     pub fn attach_nodes_to_digraph(
         &mut self,
         dg: DiGraph,
@@ -388,147 +384,22 @@ impl<L: Dialect> BuilderStageInfo<L> {
             );
         }
 
-        let dg_info = &mut self.digraphs[dg];
-        assert!(
-            dg_info.members().next().is_none(),
-            "Cannot attach nodes to digraph {dg:?}, which already has members"
-        );
-        dg_info.extra.yields = yields.to_vec();
-        self.add_digraph_nodes(dg, nodes);
+        self.digraphs[dg].extra.yields = yields.to_vec();
+        self.add_graph_members(StatementParent::DiGraph(dg), nodes);
     }
 
-    /// Make `nodes` members and nodes of `dg`, with one edge per operand slot
-    /// reading another member's result. The graph's own statement → node map
-    /// is the only index built.
-    pub(crate) fn add_digraph_nodes(&mut self, dg: DiGraph, nodes: &[Statement]) {
-        let parent = Some(StatementParent::DiGraph(dg));
-        let graph = &mut self.nodes.digraphs[dg];
-        for &stmt in nodes {
-            let info = &mut self.nodes.statements[stmt];
-            assert!(
-                info.parent.is_none() || info.parent == parent,
-                "Statement `{stmt:?}` already has a different parent"
-            );
-            info.parent = parent;
-            graph.add_node(stmt);
-        }
-        for &consumer in nodes {
-            for &operand in self.nodes.statements[consumer].definition.arguments() {
-                let ssa_info = self.ssas.get(operand).unwrap_or_else(|| {
-                    panic!(
-                        "SSAValue {operand} not found in stage (a placeholder already \
-                         resolved by another graph is deleted and cannot be reused)"
-                    )
-                });
-                if let BuilderSSAKind::Result(producer, _) = ssa_info.kind
-                    && graph.node_idx_of(producer).is_some()
-                {
-                    graph.add_edge(producer, consumer, operand);
-                }
-            }
-        }
-    }
-
-    /// Make `edge_stmts` and `node_stmts` members of `ug`, with one edge per
-    /// wire (an edge statement's result or a boundary port) read by two node
-    /// slots. The graph's own statement → node map is the only index built,
-    /// and doubles as the BFS visited set.
-    ///
-    /// Members are stored in BFS order from the boundary: nodes reading a
-    /// boundary port first, then the edge statements and nodes their wires
-    /// reach, then the remaining nodes and edge statements in the order given.
-    ///
-    /// # Panics
-    ///
-    /// If a wire is read by more than two node operand slots.
-    pub(crate) fn add_ungraph_members(
-        &mut self,
-        ug: UnGraph,
-        edge_stmts: &[Statement],
-        node_stmts: &[Statement],
-    ) {
-        let parent = Some(StatementParent::UnGraph(ug));
-        for &stmt_id in node_stmts.iter().chain(edge_stmts) {
+    /// Make `stmts` members of the graph `parent` names. Membership only: the
+    /// member map and petgraph are derived from parents and operands when the
+    /// stage is finalized, which also reports a wire read by more than two
+    /// node slots.
+    pub(crate) fn add_graph_members(&mut self, parent: StatementParent, stmts: &[Statement]) {
+        for &stmt_id in stmts {
             let info = &mut self.nodes.statements[stmt_id];
             assert!(
-                info.parent.is_none() || info.parent == parent,
+                info.parent.is_none() || info.parent == Some(parent),
                 "Statement `{stmt_id:?}` already has a different parent"
             );
-            info.parent = parent;
-        }
-        let statements = &self.nodes.statements;
-        let graph = &mut self.nodes.ungraphs[ug];
-
-        let boundary_ssa_set: HashSet<SSAValue> =
-            graph.edge_ports().iter().map(|&port| port.into()).collect();
-        let mut ssa_to_edge_stmt: HashMap<SSAValue, Statement> = HashMap::new();
-        for &edge_stmt in edge_stmts {
-            for &result in statements[edge_stmt].definition.results() {
-                ssa_to_edge_stmt.insert(result.into(), edge_stmt);
-            }
-        }
-
-        // Edge SSA → the node statements reading it, one entry per operand slot.
-        let mut edge_ssa_to_nodes: IndexMap<SSAValue, Vec<Statement>> = IndexMap::new();
-        for &node_stmt in node_stmts {
-            for &operand in statements[node_stmt].definition.arguments() {
-                if ssa_to_edge_stmt.contains_key(&operand) || boundary_ssa_set.contains(&operand) {
-                    edge_ssa_to_nodes
-                        .entry(operand)
-                        .or_default()
-                        .push(node_stmt);
-                }
-            }
-        }
-        for (ssa, nodes) in &edge_ssa_to_nodes {
-            if nodes.len() > 2 {
-                panic!(
-                    "UnGraph constraint violated: edge SSAValue {ssa} is used by {} node statements (max 2 allowed for undirected graph edges)",
-                    nodes.len()
-                );
-            }
-        }
-
-        // BFS from the nodes reading a boundary port, across edge-statement
-        // wires. `add_node` and `add_edge_member` are false for a member
-        // already added, so the graph's own map is the visited set.
-        let mut queue: VecDeque<Statement> = VecDeque::new();
-        for &node_stmt in node_stmts {
-            let uses_boundary = statements[node_stmt]
-                .definition
-                .arguments()
-                .any(|operand| boundary_ssa_set.contains(operand));
-            if uses_boundary && graph.add_node(node_stmt) {
-                queue.push_back(node_stmt);
-            }
-        }
-        while let Some(node_stmt) = queue.pop_front() {
-            for &operand in statements[node_stmt].definition.arguments() {
-                let Some(&edge_stmt) = ssa_to_edge_stmt.get(&operand) else {
-                    continue;
-                };
-                if !graph.add_edge_member(edge_stmt) {
-                    continue;
-                }
-                for &other_stmt in &edge_ssa_to_nodes[&operand] {
-                    if graph.add_node(other_stmt) {
-                        queue.push_back(other_stmt);
-                    }
-                }
-            }
-        }
-        // The rest, in the order given.
-        for &node_stmt in node_stmts {
-            graph.add_node(node_stmt);
-        }
-        for &edge_stmt in edge_stmts {
-            graph.add_edge_member(edge_stmt);
-        }
-
-        for (&ssa, nodes) in &edge_ssa_to_nodes {
-            if let &[n0, n1] = nodes.as_slice() {
-                graph.add_edge(n0, n1, ssa);
-            }
+            info.parent = Some(parent);
         }
     }
 
@@ -563,18 +434,13 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
     }
 
-    /// Attach edge and node statements to an existing ungraph, which must
-    /// have no members yet.
+    /// Attach edge and node statements to an existing ungraph.
     pub fn attach_nodes_to_ungraph(
         &mut self,
         ug: UnGraph,
         edge_stmts: &[Statement],
         node_stmts: &[Statement],
     ) {
-        assert!(
-            self.ungraphs[ug].members().next().is_none(),
-            "Cannot attach statements to ungraph {ug:?}, which already has members"
-        );
         for &stmt in edge_stmts {
             self.assert_ungraph_member(stmt, UnGraphRole::Edge);
         }
@@ -582,7 +448,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
             self.assert_ungraph_member(stmt, UnGraphRole::Node);
         }
 
-        self.add_ungraph_members(ug, edge_stmts, node_stmts);
+        self.add_graph_members(StatementParent::UnGraph(ug), edge_stmts);
+        self.add_graph_members(StatementParent::UnGraph(ug), node_stmts);
     }
 
     pub fn link_statements(&mut self, ptrs: &[Statement]) -> LinkedList<Statement> {

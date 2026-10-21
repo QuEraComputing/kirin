@@ -1,5 +1,5 @@
 use crate::node::port::PortParent;
-use crate::node::stmt::Statement;
+use crate::node::stmt::{Statement, StatementParent};
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{BuilderStageInfo, Dialect};
 
@@ -117,7 +117,9 @@ impl<'a, L: Dialect> UnGraphBuilder<'a, L> {
         );
         let _ = self.stage.ungraphs.alloc(info);
         self.stage
-            .add_ungraph_members(id, &self.edge_stmts, &self.nodes);
+            .add_graph_members(StatementParent::UnGraph(id), &self.edge_stmts);
+        self.stage
+            .add_graph_members(StatementParent::UnGraph(id), &self.nodes);
         id
     }
 }

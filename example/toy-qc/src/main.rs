@@ -43,3 +43,5 @@ fn main() -> anyhow::Result<()> {
 mod json_tests;
 #[cfg(test)]
 mod parse_tests;
+#[cfg(test)]
+mod zx_tests;
