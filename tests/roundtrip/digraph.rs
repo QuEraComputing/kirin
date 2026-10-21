@@ -112,26 +112,27 @@ fn test_projected_digraph_empty_body_roundtrip() {
 
 #[cfg(feature = "serde")]
 #[test]
-fn test_digraph_json_restores_members() {
+fn test_digraph_json_restores_graph_mirror() {
     let input = "%out = projected_func (%p0: f64) captures () { %c = constant 1; %r = add %p0, %c; yield %r; }";
     let (stage, _) = roundtrip::emit_statement::<ProjectedDigraphLanguage>(input, &[]);
 
-    // The member map is serialized with the graph and restored as is.
+    // The graph mirror is serialized like the other mirrors and trusted on
+    // load; verification confirms it still agrees with the IR.
     let json = serde_json::to_string(&stage).unwrap();
     let restored: StageInfo<ProjectedDigraphLanguage> = serde_json::from_str(&json).unwrap();
 
-    let original = stage.digraph_arena().iter().next().unwrap();
     let graphs: Vec<_> = restored.digraph_arena().iter().collect();
     assert_eq!(graphs.len(), 1);
-    assert_eq!(
-        graphs[0].members().collect::<Vec<_>>(),
-        original.members().collect::<Vec<_>>()
-    );
-    let graph = graphs[0].graph();
-    assert_eq!(graph.node_count(), 2);
-    for node in graph.node_indices() {
-        assert_eq!(graphs[0].node_idx_of(graph[node]), Some(node));
-    }
+    let original: Vec<_> = stage
+        .digraph_arena()
+        .iter()
+        .next()
+        .unwrap()
+        .members()
+        .collect();
+    assert_eq!(graphs[0].members().collect::<Vec<_>>(), original);
+    assert_eq!(graphs[0].graph().node_count(), 2);
+    kirin::ir::verify_derived(&restored).unwrap();
 }
 
 // --- Pipeline-level projected format e2e test ---

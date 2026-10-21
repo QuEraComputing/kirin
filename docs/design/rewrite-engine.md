@@ -1413,8 +1413,8 @@ incrementally.
 The index is derived metadata over authoritative statement/yield slots, not a
 substitute for them. The pass-boundary checker must derive it independently
 because raw legacy mutation paths can still bypass `Rewriter`. Derived
-comparison has landed for the four mirrors that exist today (see below); the
-graph-topology mirrors have not. Type, visibility, dominance, and dialect
+comparison has landed for all five mirrors that exist today (see below),
+including the `DiGraph`/`UnGraph` graph mirror. Type, visibility, dominance, and dialect
 validity remain responsibilities of the separate future whole-stage verifier.
 
 The pass boundary derives expected uses from authoritative slots and compares
@@ -1477,9 +1477,10 @@ successors: a non-terminator that does produces
 follows the same rule: a membership pointer naming a dead container produces
 `DanglingParent`, and the chain walker's own defects arrive as
 `Chain(ChainFinding)`. An `UnGraph` wire read by more than two node slots
-produces `UnGraphDegreeExceeded { graph, value, endpoints }`; the rewriter
-allows such a wire mid-pass and keeps no edge for it.
-Later derivations apply the same rule to graph membership and topology. Derivation
+produces `UnGraphDegreeExceeded { graph, value, occurrences }`, listing every
+`(Statement, operand_index)` that reads it; the rewriter allows such a wire
+mid-pass and keeps no edge for it. A statement parented to a `DiGraph` or
+`UnGraph` that is not live produces `DanglingParent::StatementInGraph`. Derivation
 collects independent findings rather than stopping at the first one — component
 derivations share one findings buffer instead of returning early, so a single
 scan reports every independent defect.
@@ -1506,13 +1507,14 @@ in the source arena.
 
 For graph bodies, `StatementInfo::parent` is authoritative membership.
 `StableGraph` plus `IndexMap<Statement, GraphMember>` is one derived mirror:
-the map supplies stable insertion-order presentation and direct node lookup;
-petgraph supplies connectivity. Verification compares member keys as sets and
-edges as normalized multisets over statement weights. It excludes `NodeIndex`
-and order, retains parallel-edge multiplicity, and normalizes undirected
-endpoints. A dangling statement owner is a `DanglingParent` finding; the variant
-pairing a statement with its graph does not exist yet, because graph membership
-derivation has not landed.
+the map supplies direct lookup of every member and its role; petgraph supplies
+connectivity. Derivation installs members in statement id order. Verification
+compares member keys and roles as sets (`Mismatch::GraphMembers`), each node
+member's `NodeIndex` against the petgraph node holding it
+(`Mismatch::GraphNodeIndex`), and edges as normalized multisets over statement
+weights (`Mismatch::GraphEdges`). It excludes `NodeIndex` values and order,
+retains parallel-edge multiplicity, and normalizes undirected endpoints. A
+dangling statement owner is `DanglingParent::StatementInGraph`.
 
 For blocks, membership also comes from `StatementInfo::parent`, but order is
 authoritative in child `prev`/`next` links. The member set partitions into
@@ -2739,23 +2741,21 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   `insert_node`, member erasure through `erase_statement`, `replace_yield`
   (`ChangedDiGraphYields`), tombstoning owned `DiGraph`s with their owner, and
   edge maintenance in `replace_operand`, `replace_all_uses`/`replace_results`,
-  and `replace_statement` on members. Narrowed scope: no `StableGraph` migration and no topology mirror in `derived/` — the
-  petgraph is the store, kept correct incrementally.
+  and `replace_statement` on members. The `StableGraph` swap and the derived
+  graph mirror landed afterwards (see the graph-body prerequisites).
 - [x] `UnGraph` body surgery: insert/erase nodes and edge statements, maintaining
   undirected topology, member order, and degree constraints. Emits
   `ChangedUnGraphTopology`. Landed as `insert_ungraph_node`,
   `insert_ungraph_edge`, member erasure through `erase_statement`, tombstoning
   owned `UnGraph`s with their owner, wire resyncing in `replace_operand`,
   `replace_all_uses`/`replace_results`, and `replace_statement`, and builder
-  member checks. Narrowed scope, as for `DiGraph`: no `StableGraph` migration
-  and no topology mirror in `derived/`; member order is append on insert and
-  swap-remove on erase (printing order may change). The degree limit is not a
+  member checks. The degree limit is not a
   per-edit guard: a wire may exceed two readers mid-pass (it then has no edge),
   and `verify_derived` reports `Finding::UnGraphDegreeExceeded`.
 
 **Graph-body prerequisites found by code audit:**
 
-- [ ] Replace `petgraph::Graph` with `StableGraph` and store one
+- [x] Replace `petgraph::Graph` with `StableGraph` and store one
   `IndexMap<Statement, GraphMember>` beside it. `GraphMember::Node(NodeIndex)`
   and `GraphMember::Edge` give every member, node or edge statement, O(1)
   lookup, insert, and removal (`swap_remove`; see the ordering paragraph
@@ -2763,16 +2763,22 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   remains authoritative in `StatementInfo::parent`. `UnGraphExtra` becomes
   empty once its separate edge-statement list moves into this map; generic
   `GraphInfo<L, D, Extra>` remains unified and DiGraph never constructs the
-  `Edge` variant. The member map has landed (serialized with the graph,
-  replacing the rebuild-on-load index) on top of `petgraph::Graph`; the
-  `StableGraph` swap is still to do.
-- [ ] Move petgraph construction out of graph builders. Builders record
-  parents, operands, ports, and yields; their allocation sequence initializes
-  the mixed member order, which is presentation state rather than authority.
+  `Edge` variant. Both halves are serialized, like the other mirrors, and
+  trusted on load.
+- [x] Move petgraph construction out of graph builders. Builders record
+  parents, operands, ports, and yields; their allocation sequence (statement
+  id order) initializes the mixed member order, which is presentation state
+  rather than authority.
   Finalize derives and installs the mirror once. An oversubscribed UnGraph is representable in
-  `BuilderStageInfo` and becomes `DeriveError::UnGraphDegreeExceeded` at the
+  `BuilderStageInfo` and becomes `Finding::UnGraphDegreeExceeded` (in the
+  `DeriveError`, so `FinalizeError::MalformedIR`) at the
   BuilderStageInfo-to-StageInfo boundary, with every `(Statement, operand_index)`
-  occurrence.
+  occurrence. The order of builder `.node()`/`.edge()` calls does not matter,
+  and the old BFS reordering is gone.
+- [x] Compare the graph mirror at the pass boundary. `verify_derived` derives
+  every live graph's members and edges and compares them with the installed
+  mirror (`Mismatch::GraphMembers`, `GraphNodeIndex`, `GraphEdges`), which
+  closes I3g.
 - [x] Keep topology value-derived. A DiGraph edge is an operand whose result
   producer is another member. An UnGraph endpoint is a use of an edge-member
   result or edge port. Captures are distinguished at the graph boundary by
@@ -2792,8 +2798,10 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
 Graph bodies print in statement id order, not a canonical graph order. The
 member map does not keep that order itself: removal uses
 `IndexMap::swap_remove`, which moves the last member into the hole in O(1).
-Since id order is derivable, the printer sorts members by statement id, so an
-erase changes only the erased line of the output. Derived verification
+Since id order is derivable, the printer sorts members by statement id
+(`GraphInfo::members_by_id`), so an erase changes only the erased line of the
+output. An `UnGraph` edge statement may print after a node that reads it; the
+parser's relaxed dominance accepts that. Derived verification
 compares member keys as sets and topology edges as normalized multisets over
 statement weights: never compare `NodeIndex`, preserve parallel-edge
 multiplicity, and normalize endpoint order for UnGraph. Independently built

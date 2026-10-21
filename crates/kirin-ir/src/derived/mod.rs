@@ -6,7 +6,7 @@
 //! authoritative IR is stored in the [`StageInfo::nodes`](crate::StageInfo::nodes)
 //! arenas.
 //!
-//! Currently, there are four mirrors:
+//! Currently, there are five mirrors:
 //!  1. [`SSAInfo::uses`](crate::SSAInfo) collects each SSA-value's uses. These
 //!     mirror an SSA-value's uses in the IR's statement operand slots and `DiGraph` yield slots;
 //!  2. [`BlockInfo::predecessors`](crate::BlockInfo) collects a block's predecessors.
@@ -16,9 +16,13 @@
 //!     mirror the `prev`/`next` links on the block's member statements, partitioned
 //!     into the non-terminator chain and the terminator that sits outside it;
 //!  4. [`CFGInfo::blocks`](crate::node::CFGInfo) summarizes a CFG's block list. This mirrors the
-//!     `prev`/`next` links on the blocks parented to that CFG.
+//!     `prev`/`next` links on the blocks parented to that CFG;
+//!  5. The member map and petgraph of every [`DiGraphInfo`](crate::DiGraphInfo) and
+//!     [`UnGraphInfo`](crate::UnGraphInfo). These mirror the statements parented to the
+//!     graph and the value-derived connectivity between them (see
+//!     [`graph_topology`](self::mirrors::graph_topology)).
 //!
-//! The last two are reconstructed by the shared chain walker [`derive_chains`](self::chain::derive_chains)
+//! Mirrors 3 and 4 are reconstructed by the shared chain walker [`derive_chains`](self::chain::derive_chains)
 //!  in [`chain`](self::chain), which never reads the summary it is deriving.
 //!
 //! The authoritative slots in the IR are the ground truth; a mirror is a
@@ -44,10 +48,11 @@
 mod chain;
 mod compare;
 mod error;
+#[cfg(test)]
+mod graph_tests;
 mod mirrors;
 #[cfg(test)]
 mod tests;
-mod ungraph_degree;
 
 pub use chain::{ChainDefect, ChainFinding};
 pub use error::{DanglingParent, DeriveError, Finding, Mismatch, VerifyError};
@@ -60,6 +65,7 @@ use crate::derived::mirrors::block_body::{self, BlockBodyMap};
 use crate::derived::mirrors::cfg_blocks::{self, CFGBlocksMap};
 use crate::{Dialect, StageInfo};
 
+use self::mirrors::graph_topology::{self, DiGraphTopologyMap, UnGraphTopologyMap};
 use self::mirrors::predecessors::{self, PredecessorMap};
 use self::mirrors::uses::{self, UseMap};
 
@@ -129,6 +135,8 @@ pub(crate) struct Mirrors {
     predecessors: PredecessorMap,
     block_bodies: BlockBodyMap,
     cfg_blocks: CFGBlocksMap,
+    digraph_topology: DiGraphTopologyMap,
+    ungraph_topology: UnGraphTopologyMap,
 }
 
 fn derive_partial<L: Dialect>(stage: &StageInfo<L>) -> (Mirrors, Vec<Finding>) {
@@ -138,7 +146,8 @@ fn derive_partial<L: Dialect>(stage: &StageInfo<L>) -> (Mirrors, Vec<Finding>) {
     let predecessors = predecessors::derive(stage, &mut findings);
     let block_bodies = block_body::derive(stage, &mut findings);
     let cfg_blocks = cfg_blocks::derive(stage, &mut findings);
-    ungraph_degree::check(stage, &mut findings);
+    let digraph_topology = graph_topology::derive_digraphs(stage, &mut findings);
+    let ungraph_topology = graph_topology::derive_ungraphs(stage, &mut findings);
 
     (
         Mirrors {
@@ -146,6 +155,8 @@ fn derive_partial<L: Dialect>(stage: &StageInfo<L>) -> (Mirrors, Vec<Finding>) {
             predecessors,
             block_bodies,
             cfg_blocks,
+            digraph_topology,
+            ungraph_topology,
         },
         findings,
     )
@@ -173,11 +184,15 @@ pub(crate) fn install_mirrors<L: Dialect>(stage: &mut StageInfo<L>, mirrors: Mir
         predecessors,
         block_bodies,
         cfg_blocks,
+        digraph_topology,
+        ungraph_topology,
     } = mirrors;
     uses.install(stage);
     predecessors.install(stage);
     block_bodies.install(stage);
     cfg_blocks.install(stage);
+    digraph_topology.install(stage);
+    ungraph_topology.install(stage);
 }
 
 /// Best-effort: for use by `finalize_unchecked`.
@@ -205,6 +220,8 @@ pub fn verify_derived<L: Dialect>(stage: &StageInfo<L>) -> Result<(), VerifyErro
     mirrors.predecessors.verify(stage, &mut mismatches);
     mirrors.block_bodies.verify(stage, &mut mismatches);
     mirrors.cfg_blocks.verify(stage, &mut mismatches);
+    mirrors.digraph_topology.verify(stage, &mut mismatches);
+    mirrors.ungraph_topology.verify(stage, &mut mismatches);
 
     if mismatches.is_empty() {
         Ok(())

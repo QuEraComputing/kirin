@@ -2,9 +2,10 @@
 //!
 //! Deliberately smaller than `tests/common.rs`'s `BuilderDialect`: it carries
 //! only what the in-crate tests need — operands, so values have uses, and a
-//! terminator, so blocks have a body to summarize. Successors, bodies, results,
-//! and graph edges are covered by the integration tests, which reach the same
-//! code through the public API.
+//! terminator, so blocks have a body to summarize, and a result-producing op
+//! and an edge op, so graph mirrors have edges to forge. Successors and bodies
+//! are covered by the integration tests, which reach the same code through the
+//! public API.
 
 use crate::{
     Block, BranchOp, BuilderStageInfo, CFG, DiGraph, Dialect, HasArguments, HasArgumentsMut,
@@ -39,12 +40,16 @@ impl Placeholder for TestType {
 /// - `Nop`: no operands, no results
 /// - `Add(a, b)` / `Use(a)`: operand slots, so a value can have several uses
 /// - `Return`: a terminator
+/// - `Def(r)`: one result, so a `DiGraph` member can feed another
+/// - `Wire(r)`: an edge statement, whose result is an `UnGraph` wire
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum TestLang {
     Nop,
     Add(SSAValue, SSAValue),
     Use(SSAValue),
     Return,
+    Def(ResultValue),
+    Wire(ResultValue),
 }
 
 impl<'a> HasArguments<'a> for TestLang {
@@ -75,21 +80,35 @@ impl IsTerminator for TestLang {
     }
 }
 
+impl IsEdge for TestLang {
+    fn is_edge(&self) -> bool {
+        matches!(self, TestLang::Wire(_))
+    }
+}
+
+impl<'a> HasResults<'a> for TestLang {
+    type Iter = std::option::IntoIter<&'a ResultValue>;
+    fn results(&'a self) -> Self::Iter {
+        match self {
+            TestLang::Def(r) | TestLang::Wire(r) => Some(r).into_iter(),
+            _ => None.into_iter(),
+        }
+    }
+}
+
+impl<'a> HasResultsMut<'a> for TestLang {
+    type IterMut = std::option::IntoIter<&'a mut ResultValue>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            TestLang::Def(r) | TestLang::Wire(r) => Some(r).into_iter(),
+            _ => None.into_iter(),
+        }
+    }
+}
+
 /// The remaining `Dialect` supertraits, none of which this dialect exercises.
 macro_rules! empty_impls {
     ($ty:ty) => {
-        impl<'a> HasResults<'a> for $ty {
-            type Iter = std::iter::Empty<&'a ResultValue>;
-            fn results(&'a self) -> Self::Iter {
-                std::iter::empty()
-            }
-        }
-        impl<'a> HasResultsMut<'a> for $ty {
-            type IterMut = std::iter::Empty<&'a mut ResultValue>;
-            fn results_mut(&'a mut self) -> Self::IterMut {
-                std::iter::empty()
-            }
-        }
         impl<'a> HasBlocks<'a> for $ty {
             type Iter = std::iter::Empty<&'a Block>;
             fn blocks(&'a self) -> Self::Iter {
@@ -163,11 +182,6 @@ macro_rules! empty_impls {
         impl IsSpeculatable for $ty {
             fn is_speculatable(&self) -> bool {
                 true
-            }
-        }
-        impl IsEdge for $ty {
-            fn is_edge(&self) -> bool {
-                false
             }
         }
         impl BranchOp for $ty {

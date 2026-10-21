@@ -238,28 +238,6 @@ fn attach_nodes_to_ungraph_rejects_edge_with_operands() {
 }
 
 #[test]
-#[should_panic(expected = "which already has members")]
-fn attach_nodes_to_digraph_rejects_a_graph_with_members() {
-    let mut stage = new_stage();
-    let first = stage.statement().definition(BuilderDialect::Nop).new();
-    let second = stage.statement().definition(BuilderDialect::Nop).new();
-    let dg = stage.digraph().new();
-    stage.attach_nodes_to_digraph(dg, &[first], &[]);
-    stage.attach_nodes_to_digraph(dg, &[second], &[]);
-}
-
-#[test]
-#[should_panic(expected = "which already has members")]
-fn attach_nodes_to_ungraph_rejects_a_graph_with_members() {
-    let mut stage = new_stage();
-    let (first, _) = make_wire(&mut stage);
-    let (second, _) = make_wire(&mut stage);
-    let ug = stage.ungraph().new();
-    stage.attach_nodes_to_ungraph(ug, &[first], &[]);
-    stage.attach_nodes_to_ungraph(ug, &[second], &[]);
-}
-
-#[test]
 #[should_panic(expected = "already has a different parent")]
 fn statement_builder_rejects_digraph_with_existing_owner() {
     let mut stage = new_stage();
@@ -365,87 +343,85 @@ fn ungraph_two_nodes_one_edge() {
 }
 
 #[test]
-fn ungraph_boundary_port_bfs_ordering() {
+fn ungraph_members_follow_allocation_order_not_builder_calls() {
     let mut stage = new_stage();
 
-    let port_placeholder = stage.graph_port().index(0);
-
     let (wire0_stmt, wire0_ssa) = make_wire(&mut stage);
-    let (wire1_stmt, wire1_ssa) = make_wire(&mut stage);
-
-    // n_far uses wire0 only (not connected to boundary)
-    // n_mid uses wire0 and wire1 (bridge)
-    // n_near uses wire1 and boundary port (connected to boundary)
     let n_far = stage
         .statement()
         .definition(BuilderDialect::Use(wire0_ssa))
         .new();
+    let (wire1_stmt, wire1_ssa) = make_wire(&mut stage);
     let n_mid = stage
         .statement()
         .definition(BuilderDialect::Gate(wire0_ssa, wire1_ssa))
         .new();
-    let n_near = stage
-        .statement()
-        .definition(BuilderDialect::Gate(wire1_ssa, port_placeholder))
-        .new();
 
-    // Insert nodes in reverse BFS order: far first, near last
+    // Added in a different order than allocated.
     let ug = stage
         .ungraph()
-        .port(TestType::Qubit)
-        .port_name("p0")
-        .edge(wire0_stmt)
+        .node(n_mid)
         .edge(wire1_stmt)
         .node(n_far)
-        .node(n_mid)
-        .node(n_near)
+        .edge(wire0_stmt)
         .new();
 
     let stage = stage.finalize().unwrap();
     let info = ug.expect_info(&stage);
-    assert_eq!(info.graph().node_count(), 3);
-
-    let node_order: Vec<Statement> = info
-        .graph()
-        .node_indices()
-        .map(|ni| info.graph()[ni])
+    let members: Vec<(Statement, MemberRole)> = info
+        .members()
+        .map(|(stmt, member)| (stmt, member.role()))
         .collect();
     assert_eq!(
-        node_order[0], n_near,
-        "boundary-connected node should be first"
+        members,
+        [
+            (wire0_stmt, MemberRole::Edge),
+            (n_far, MemberRole::Node),
+            (wire1_stmt, MemberRole::Edge),
+            (n_mid, MemberRole::Node),
+        ]
     );
-    assert_eq!(node_order[1], n_mid, "bridge node should be second");
-    assert_eq!(node_order[2], n_far, "far node should be third");
+    assert_eq!(info.nodes().collect::<Vec<_>>(), [n_far, n_mid]);
+    assert_eq!(
+        info.edge_statements().collect::<Vec<_>>(),
+        [wire0_stmt, wire1_stmt]
+    );
+    // wire0 joins n_far and n_mid; wire1 has one reader and no edge.
+    assert_eq!(info.graph().edge_count(), 1);
 }
 
 #[test]
-#[should_panic(expected = "UnGraph constraint violated")]
-fn ungraph_edge_max_two_uses_validation() {
+fn ungraph_wire_with_three_readers_fails_finalize() {
     let mut stage = new_stage();
 
     let (wire_stmt, wire_ssa) = make_wire(&mut stage);
+    let readers: Vec<Statement> = (0..3)
+        .map(|_| {
+            stage
+                .statement()
+                .definition(BuilderDialect::Use(wire_ssa))
+                .new()
+        })
+        .collect();
 
-    let n0 = stage
-        .statement()
-        .definition(BuilderDialect::Use(wire_ssa))
-        .new();
-    let n1 = stage
-        .statement()
-        .definition(BuilderDialect::Use(wire_ssa))
-        .new();
-    let n2 = stage
-        .statement()
-        .definition(BuilderDialect::Use(wire_ssa))
-        .new();
+    // Building an over-full wire is representable; finalize rejects it.
+    let mut builder = stage.ungraph().edge(wire_stmt);
+    for &node in &readers {
+        builder = builder.node(node);
+    }
+    let ug = builder.new();
 
-    // This should panic: 3 nodes using the same wire violates 2-use constraint
-    stage
-        .ungraph()
-        .edge(wire_stmt)
-        .node(n0)
-        .node(n1)
-        .node(n2)
-        .new();
+    let Err(FinalizeError::MalformedIR(findings)) = stage.finalize() else {
+        panic!("finalize should reject a wire with three readers");
+    };
+    assert_eq!(
+        findings,
+        [Finding::UnGraphDegreeExceeded {
+            graph: ug,
+            value: wire_ssa,
+            occurrences: readers.iter().map(|&node| (node, 0)).collect(),
+        }]
+    );
 }
 
 #[test]

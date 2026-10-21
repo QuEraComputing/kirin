@@ -1,7 +1,7 @@
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::port::PortParent;
 use crate::node::ssa::SSAValue;
-use crate::node::stmt::Statement;
+use crate::node::stmt::{Statement, StatementParent};
 use crate::{BuilderStageInfo, Dialect};
 
 pub struct DiGraphBuilder<'a, L: Dialect> {
@@ -115,7 +115,8 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             self.yields,
         );
         let _ = self.stage.digraphs.alloc(info);
-        self.stage.add_digraph_nodes(id, &self.nodes);
+        self.stage
+            .add_graph_members(StatementParent::DiGraph(id), &self.nodes);
         id
     }
 }

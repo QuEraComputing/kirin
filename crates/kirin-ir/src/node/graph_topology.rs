@@ -6,10 +6,36 @@ use petgraph::EdgeType;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 
-use super::graph::{GraphInfo, GraphMember};
+use super::graph::{GraphInfo, GraphMember, MemberRole};
 use crate::{DiGraphInfo, Dialect, SSAValue, Statement, UnGraphInfo};
 
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
+    /// Replace the whole mirror: `members` in the given order (each `Node`
+    /// gets a petgraph node), then one petgraph edge per `(a, b, value)`
+    /// (from `a` to `b` if directed). Finalization only.
+    ///
+    /// # Panics
+    ///
+    /// If an edge endpoint is not a node member.
+    pub(crate) fn install_mirror(
+        &mut self,
+        members: &[(Statement, MemberRole)],
+        edges: &[(Statement, Statement, SSAValue)],
+    ) {
+        self.graph.clear();
+        self.members.clear();
+        for &(stmt, role) in members {
+            let member = match role {
+                MemberRole::Node => GraphMember::Node(self.graph.add_node(stmt)),
+                MemberRole::Edge => GraphMember::Edge,
+            };
+            self.members.insert(stmt, member);
+        }
+        for &(a, b, value) in edges {
+            self.insert_edge(a, b, value);
+        }
+    }
+
     /// Append `stmt` as a new node. Returns `false`, changing nothing, if
     /// `stmt` is already a member.
     pub(crate) fn add_node(&mut self, stmt: Statement) -> bool {
@@ -29,11 +55,8 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
             return false;
         };
         self.members.swap_remove(&stmt);
+        // A `StableGraph` leaves the other nodes where they are.
         self.graph.remove_node(node);
-        // `Graph::remove_node` swap-removes: the last node now sits at `node`.
-        if let Some(&moved) = self.graph.node_weight(node) {
-            self.members.insert(moved, GraphMember::Node(node));
-        }
         true
     }
 
@@ -132,6 +155,8 @@ impl<L: Dialect> UnGraphInfo<L> {
 
 #[cfg(test)]
 mod tests {
+    use petgraph::visit::IntoEdgeReferences;
+
     use crate::arena::Id;
     use crate::stage::tests::LangA;
     use crate::{
@@ -176,19 +201,17 @@ mod tests {
     }
 
     #[test]
-    fn remove_node_repoints_the_swapped_in_node() {
+    fn remove_node_leaves_other_node_indices_unchanged() {
         let mut info = empty_digraph();
         for raw in 0..3 {
             info.add_node(stmt(raw));
         }
+        let last = info.node_idx_of(stmt(2));
 
-        // Removing the first node moves the last one into its slot.
         assert!(info.remove_node(stmt(0)));
         assert_eq!(info.node_idx_of(stmt(0)), None);
-        assert_map_in_sync(&info);
-
-        // Removing the last node moves nothing.
-        assert!(info.remove_node(stmt(1)));
+        // A StableGraph does not move the last node into the hole.
+        assert_eq!(info.node_idx_of(stmt(2)), last);
         assert_map_in_sync(&info);
 
         assert!(!info.remove_node(stmt(0)));

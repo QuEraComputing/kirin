@@ -8,6 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use common::{BuilderDialect, TestType, make_compute, make_split, new_stage};
 use kirin_ir::*;
+use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
 /// The def-use set of `value` (order-agnostic; `SSAInfo::uses` is a bag).
 fn uses_set(stage: &StageInfo<BuilderDialect>, value: impl Into<SSAValue>) -> HashSet<Use> {
@@ -32,11 +33,11 @@ type Edge = (Statement, Statement, SSAValue);
 fn edges(stage: &StageInfo<BuilderDialect>, graph: DiGraph) -> HashMap<Edge, usize> {
     let petgraph = graph.expect_info(stage).graph();
     let mut out = HashMap::new();
-    for edge in petgraph.raw_edges() {
+    for edge in petgraph.edge_references() {
         let key = (
             petgraph[edge.source()],
             petgraph[edge.target()],
-            edge.weight,
+            *edge.weight(),
         );
         *out.entry(key).or_insert(0) += 1;
     }
