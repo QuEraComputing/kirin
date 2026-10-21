@@ -11,6 +11,39 @@ dialect = ir.Dialect("lowering.cf")
 @dialect.register
 class CfLowering(lowering.FromPythonAST):
 
+    def lower_IfExp(self, state: lowering.State, node: ast.IfExp) -> lowering.Result:
+        cond = state.lower(node.test).expect_one()
+        frame = state.current_frame
+        merge = ir.Block()
+        branches: list[ir.Block] = []
+        values: list[ir.SSAValue] = []
+        for expression in (node.body, node.orelse):
+            with state.frame(
+                [], region=frame.curr_region, finalize_next=False
+            ) as branch_frame:
+                value = state.lower(expression).expect_one()
+                if branch_frame.defs:
+                    raise lowering.BuildError(
+                        "Assignment expressions in conditional branches are not supported"
+                    )
+                branch_frame.push(cf.Branch(arguments=(value,), successor=merge))
+                branches.append(branch_frame.entr_block)
+                values.append(value)
+
+        frame.push(
+            cf.ConditionalBranch(
+                cond,
+                then_arguments=(),
+                else_arguments=(),
+                then_successor=branches[0],
+                else_successor=branches[1],
+            )
+        )
+        result = merge.args.append_from(values[0].type.join(values[1].type))
+        # Continue the enclosing expression without consuming the statement stream.
+        frame.push(merge)
+        return result
+
     def lower_Pass(self, state: lowering.State, node: ast.Pass):
         state.current_frame.push(
             cf.Branch(arguments=(), successor=state.current_frame.next_block)
