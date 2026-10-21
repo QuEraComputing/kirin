@@ -19,24 +19,24 @@ where
     }
 }
 
-impl<S, F> BranchCondition for ConstPropValue<i64, S, F>
-where
-    S: Clone,
-    F: Clone,
-{
+impl<C: BranchCondition, S, F> BranchCondition for ConstPropValue<C, S, F> {
     fn is_truthy(&self) -> Option<bool> {
         match self {
-            Self::Const(0) => Some(false),
-            Self::Const(_) => Some(true),
+            Self::Const(value) => value.is_truthy(),
             Self::Bottom | Self::PartialTuple(_) | Self::PartialStruct(_) | Self::Top => None,
         }
     }
 }
 
-impl<S, F> From<ArithValue> for ConstPropValue<i64, S, F> {
+/// A literal is a constant only if converting it back gives the same literal,
+/// so `1.0` never folds as the integer `1`.
+impl<C, S, F> From<ArithValue> for ConstPropValue<C, S, F>
+where
+    C: TryFrom<ArithValue> + Into<ArithValue> + Clone,
+{
     fn from(value: ArithValue) -> Self {
-        match value {
-            ArithValue::I64(value) => Self::Const(value),
+        match C::try_from(value.clone()) {
+            Ok(constant) if constant.clone().into() == value => Self::Const(constant),
             _ => Self::Top,
         }
     }

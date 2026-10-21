@@ -588,7 +588,7 @@ fn ungraph_without_traversal_reports_no_default_walker() {
 //   left implicit.
 
 /// Summary key of the constant-propagation context policy.
-type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
+type CpKey = <ConstPropContext<i64> as CallContext<TestValue>>::Key;
 
 /// Total abstract frame for the graph language: the standard abstract
 /// traversal (blocks, calls, graph bodies), plus a variant recording the
@@ -683,20 +683,24 @@ where
 type AbstractEngine<'ir> = SparseForwardInterpreter<
     'ir,
     L,
-    ConstPropValue,
+    TestValue,
     TestError,
     SameStageLinker,
-    ConstPropContext,
-    GraphAbstractFrame<ConstPropValue, TestError, CpKey>,
+    ConstPropContext<i64>,
+    GraphAbstractFrame<TestValue, TestError, CpKey>,
 >;
+
+/// The value these tests run constant propagation over: the graph language
+/// computes on `i64`.
+type TestValue = ConstPropValue<i64>;
 
 /// Run constant propagation from `function` and return its inferred return
 /// value at the fixpoint.
 fn analyze(
     pipeline: &Pipeline<L>,
     function: &str,
-    args: &[ConstPropValue],
-) -> Result<ConstPropValue, TestError> {
+    args: &[TestValue],
+) -> Result<TestValue, TestError> {
     let mut analysis: AbstractEngine<'_> =
         SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
     expect_single(analysis.analyze_by_name("test", function, args.iter().cloned())?)
@@ -704,16 +708,16 @@ fn analyze(
 
 /// Summary key of the *context-insensitive* policy: one key per function, so
 /// every call site shares one owner and their arguments join.
-type CiKey = <ContextInsensitive as CallContext<ConstPropValue>>::Key;
+type CiKey = <ContextInsensitive as CallContext<TestValue>>::Key;
 
 type InsensitiveEngine<'ir> = SparseForwardInterpreter<
     'ir,
     L,
-    ConstPropValue,
+    TestValue,
     TestError,
     SameStageLinker,
     ContextInsensitive,
-    GraphAbstractFrame<ConstPropValue, TestError, CiKey>,
+    GraphAbstractFrame<TestValue, TestError, CiKey>,
 >;
 
 /// The same analysis under [`ContextInsensitive`] keying: distinct call sites
@@ -722,8 +726,8 @@ type InsensitiveEngine<'ir> = SparseForwardInterpreter<
 fn analyze_insensitive(
     pipeline: &Pipeline<L>,
     function: &str,
-    args: &[ConstPropValue],
-) -> Result<ConstPropValue, TestError> {
+    args: &[TestValue],
+) -> Result<TestValue, TestError> {
     let mut analysis: InsensitiveEngine<'_> =
         SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
     expect_single(analysis.analyze_by_name("test", function, args.iter().cloned())?)
@@ -763,19 +767,19 @@ fn sparse_forward_symbol_entry_matches_name_and_direct_callee() {
     let args = || [ConstPropValue::Const(2), ConstPropValue::Const(3)];
 
     let mut by_name: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
-    let by_name = expect_single::<ConstPropValue, TestError>(
+    let by_name = expect_single::<TestValue, TestError>(
         by_name.analyze_by_name("test", "gadd", args()).unwrap(),
     )
     .unwrap();
 
     let mut by_symbol: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
-    let by_symbol = expect_single::<ConstPropValue, TestError>(
+    let by_symbol = expect_single::<TestValue, TestError>(
         by_symbol.analyze_by_symbol(stage, symbol, args()).unwrap(),
     )
     .unwrap();
 
     let mut by_callee: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
-    let by_callee = expect_single::<ConstPropValue, TestError>(
+    let by_callee = expect_single::<TestValue, TestError>(
         by_callee
             .analyze(stage, Callee::Named(symbol), args())
             .unwrap(),

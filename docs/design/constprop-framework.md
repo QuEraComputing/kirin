@@ -43,7 +43,7 @@ files, following the repository module convention.
 The initial value domain is:
 
 ```rust
-pub enum ConstPropValue<C = i64, S = String, F = String> {
+pub enum ConstPropValue<C, S = String, F = String> {
     Bottom,
     Const(C),
     PartialTuple(Box<PartialTuple<Self>>),
@@ -64,10 +64,16 @@ identifies the struct shape and `F` identifies fields. A join between two
 partial structs is field-wise only when the shape and ordered field keys match.
 Different shapes join to `Top` and meet to `Bottom`.
 
-The scalar parameter `C` keeps the framework open to non-`i64` constants. The
-first implementation provides the existing toy semantics for `i64`, including
-arithmetic, bitwise, comparison, branch truthiness, `scf.for` induction values,
-and conversion from `ArithValue`.
+The scalar parameter `C` is the constant type. Scalar operations delegate to
+`C`'s capabilities (arithmetic, bitwise, comparison, branch truthiness, and
+`scf.for` induction values), using checked arithmetic as described below. `ArithValue`
+literals convert through `C: TryFrom<ArithValue> + Into<ArithValue>`: a literal
+becomes `Const` only if converting the constant back gives the same literal, so
+`1.0` never folds as the integer `1`. Any other literal becomes `Top`.
+
+Addition, subtraction, multiplication, and negation require `C` to implement
+the corresponding `num_traits` checked-operation traits. Overflow becomes
+`Top`, so integer overflow does not panic during constant folding.
 
 ## Lattice Semantics
 
@@ -95,11 +101,10 @@ The value domain implements the capabilities that existing dialect
 `interpreter_new` modules already expect:
 
 - `HasProductValue` wraps interpreter products as `PartialTuple`;
-- `BranchCondition` for `i64` constants uses zero/non-zero truthiness;
-- arithmetic and bitwise traits compute constants when all inputs are constants,
-  propagate `Bottom`, and otherwise return `Top`;
-- `CompareValue` returns `Const(1)` or `Const(0)` when comparison inputs are
-  known;
+- `BranchCondition` delegates to `C`'s truthiness for constants;
+- arithmetic and bitwise traits compute constants with `C`'s operation when all
+  inputs are constants, propagate `Bottom`, and otherwise return `Top`;
+- `CompareValue` returns `Const(C::Bool)` when comparison inputs are known;
 - dialect crates can add analysis-specific capabilities, such as SCF loop
   induction semantics, without making `kirin-constprop` depend on those
   dialects.
@@ -173,7 +178,7 @@ dialects a reusable summary slot for IR locations that need local convergence.
 SCF-specific support lives in `kirin-scf` behind the `constprop` feature, where
 that crate implements:
 
-- `ForLoopValue` for `ConstPropValue<i64, _, _>`;
+- `ForLoopValue` for `ConstPropValue<C, _, _>`;
 - `ScfForConstPropSummary<V>` as the location payload for `scf.for`;
 - `ScfForFixpointSummary<..., ConstPropOwner>` for
   `ConstPropSummary<V, ScfForConstPropSummary<V>>`.

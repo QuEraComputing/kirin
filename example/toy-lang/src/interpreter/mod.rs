@@ -16,19 +16,22 @@ pub use frame::ToyAbstractFrame;
 pub(crate) use frame::ToyDenseBackwardFrame;
 use frame::ToyFrame;
 
+use std::hash::Hash;
+
 use kirin::prelude::{CFG, CompileStage, Pipeline};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_interpreter::engine::{
     CallContext, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
     SparseForwardInterpreter, expect_single,
 };
-use kirin_interpreter::{Body, Callee, InterpreterError};
+use kirin_interpreter::{Body, Callee, InterpDispatch, InterpreterError, SparseForwardTransfer};
 use kirin_liveness::{DemandResult, DenseLiveness, DenseLivenessResult, LiveSet};
+use kirin_scf::ForLoopValue;
 
 use crate::stage::Stage;
 
 /// Summary key of the constant-propagation analysis policy.
-type CpKey = <ConstPropContext as CallContext<ConstPropValue>>::Key;
+type CpKey<C> = <ConstPropContext<C> as CallContext<ConstPropValue<C>>>::Key;
 
 type ToyEngine<'ir, Lk> =
     ConcreteInterpreterCore<'ir, Stage, i64, ToyError, Lk, ToyFrame<i64, ToyError>>;
@@ -72,14 +75,14 @@ where
 
 /// Cross-language constant propagation, with a frame type embedding the SCF
 /// loop frame.
-pub type ToyConstProp<'ir, Lk = CrossStageLinker> = SparseForwardInterpreter<
+pub type ToyConstProp<'ir, C, Lk = CrossStageLinker> = SparseForwardInterpreter<
     'ir,
     Stage,
-    ConstPropValue,
+    ConstPropValue<C>,
     ToyError,
     Lk,
-    ConstPropContext,
-    ToyAbstractFrame<ConstPropValue, ToyError, CpKey>,
+    ConstPropContext<C>,
+    ToyAbstractFrame<ConstPropValue<C>, ToyError, CpKey<C>>,
 >;
 
 /// Classic per-point liveness over toy's private dense stack item: the reverse
@@ -137,13 +140,28 @@ fn run_same_stage_i64(
 /// Run constant propagation from `function_name` at `stage_name`, following
 /// calls across language boundaries. Returns the function's inferred return
 /// value at the fixpoint.
-pub fn analyze_constprop(
-    pipeline: &Pipeline<Stage>,
+pub fn analyze_constprop<'ir, C>(
+    pipeline: &'ir Pipeline<Stage>,
     stage_name: &str,
     function_name: &str,
-    args: &[ConstPropValue],
-) -> Result<ConstPropValue, ToyError> {
-    let mut analysis: ToyConstProp<'_> = ToyConstProp::new(pipeline).with_linker(CrossStageLinker);
+    args: &[ConstPropValue<C>],
+) -> Result<ConstPropValue<C>, ToyError>
+where
+    C: Clone + Eq + Hash + ForLoopValue,
+    Stage: InterpDispatch<
+        SparseForwardTransfer<
+            'ir,
+            Stage,
+            ConstPropValue<C>,
+            ToyError,
+            CrossStageLinker,
+            ConstPropContext<C>,
+            ToyAbstractFrame<ConstPropValue<C>, ToyError, CpKey<C>>,
+        >,
+    >,
+{
+    let mut analysis: ToyConstProp<'_, C> =
+        ToyConstProp::new(pipeline).with_linker(CrossStageLinker);
     expect_single(analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?)
 }
 

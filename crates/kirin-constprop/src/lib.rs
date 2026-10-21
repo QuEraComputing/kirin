@@ -12,12 +12,12 @@
 //! [`ConstPropValue`] unchanged.
 //!
 //! ```ignore
-//! use kirin_constprop::ConstProp;
+//! use kirin_constprop::{ConstProp, ConstPropValue};
 //! use kirin_interpreter::engine::CrossStageLinker;
 //!
-//! let mut analysis = ConstProp::<Stage, MyError>::new(&pipeline)
+//! let mut analysis = ConstProp::<Stage, MyConst, MyError>::new(&pipeline)
 //!     .with_linker(CrossStageLinker);
-//! let result = analysis.analyze_by_name("source", "abs", [7.into()])?;
+//! let result = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
 //! ```
 
 mod context;
@@ -33,5 +33,16 @@ pub use value::{ConstPropValue, PartialStruct, PartialTuple};
 /// ([`ConstPropContext`]) so recursion over distinct constants stays precise (e.g.
 /// `factorial(Const(5)) → Const(120)`) while remaining sound and terminating on
 /// unknown/over-budget arguments.
-pub type ConstProp<'ir, S, E, Lk = kirin_interpreter::SameStageLinker> =
-    kirin_interpreter::SparseForwardInterpreter<'ir, S, ConstPropValue, E, Lk, ConstPropContext>;
+///
+/// The constant type `C` supplies the scalar semantics. Addition, subtraction,
+/// multiplication, and negation require `num_traits` checked-operation traits;
+/// overflow yields `Top` rather than panicking.
+pub type ConstProp<'ir, S, C, E, Lk = kirin_interpreter::SameStageLinker> =
+    kirin_interpreter::SparseForwardInterpreter<
+        'ir,
+        S,
+        ConstPropValue<C>,
+        E,
+        Lk,
+        ConstPropContext<C>,
+    >;

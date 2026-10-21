@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
+num-traits.workspace = true
 kirin-arith = { workspace = true }
 kirin-scf = { workspace = true }
 kirin-bitwise = { workspace = true }
