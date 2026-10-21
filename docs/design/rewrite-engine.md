@@ -1432,8 +1432,8 @@ left to the separate whole-stage verifier.
 
 ### Derive, install, verify — never repair
 
-**Landed** for the use, predecessor, block-body, and CFG-block-list mirrors, in
-`kirin-ir`'s `derived` module. All derived services follow one split:
+**Landed** for the use, predecessor, block-body, CFG-block-list, and
+`DiGraph`/`UnGraph` graph mirrors, in `kirin-ir`'s `derived` module. All derived services follow one split:
 
 ```rust,ignore
 pub(crate) fn derive_mirrors<L: Dialect>(
@@ -1451,7 +1451,7 @@ pub fn verify_derived<L: Dialect>(
 ```
 
 `Mirrors` is deliberately not parameterized by the dialect: every mirror holds
-arena ids (`Statement`, `SSAValue`, `Block`, `DiGraph`) and nothing
+arena ids (`Statement`, `SSAValue`, `Block`, `DiGraph`, `UnGraph`) and nothing
 dialect-specific, so an `L` would only be `PhantomData`.
 
 Finalize first assembles a `StageInfo`, derives from `&StageInfo`, and installs
@@ -1463,7 +1463,7 @@ disagrees and therefore a mutation path is broken. Component derivation helpers
 and installers remain crate-private; no mutating recovery entry point is public.
 The only public names are `verify_derived`, `DeriveError`, `Finding`,
 `Mismatch`, `VerifyError`, and the payloads those carry: `ChainDefect`,
-`ChainFinding`, `DanglingParent`, and `BlockBody`.
+`ChainFinding`, `DanglingParent`, `BlockBody`, and `MemberRole`.
 
 
 Pure derivation replaces the public mutating `rebuild_use_index` and
@@ -3000,14 +3000,14 @@ implement the derive and its matching/remapping bodies.
 ### Gap 3 — MutationEvent vocabulary vs implementation — RESOLVED DELIVERY RULE
 
 The documented `MutationEvent` enum lists the full target vocabulary; the
-implementation currently emits **ten** — `ChangedOperands`, `ReplacedUses`,
+implementation currently emits **eleven** — `ChangedOperands`, `ReplacedUses`,
 `InsertedStatement`, `ErasedStatement`, `ReplacedStatement`, `ChangedBlockList`,
 `ChangedCfg`, `ChangedTerminator`, `ChangedDiGraphTopology`,
-`ChangedDiGraphYields` — covering operand and yield rewriting,
-block-body statement and terminator surgery (erase/insert/replace),
-`Cfg` block-list surgery, and `DiGraph` node surgery. The remaining documented
-variants (`UnGraph`-topology and result-type events) are not emitted because that surgery is not yet
-implemented, so an analysis-invalidation policy written against them would
+`ChangedDiGraphYields`, `ChangedUnGraphTopology` — covering operand and yield
+rewriting, block-body statement and terminator surgery (erase/insert/replace),
+`Cfg` block-list surgery, and `DiGraph` and `UnGraph` member surgery. The
+remaining documented variants (result-type events) are not emitted because that
+surgery is not yet implemented, so an analysis-invalidation policy written against them would
 subscribe to events that never fire. Resolution: keep growing the enum in
 lockstep with mutation capability (CFG/graph events as that surgery lands in
 M1; M6/M7 are matching-only), keep drop-all-on-mutation invalidation until
