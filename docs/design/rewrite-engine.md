@@ -2784,12 +2784,6 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   result or edge port. Captures are distinguished at the graph boundary by
   `edge_count`, never by consumer-field annotations; no per-field topology
   derive is added.
-- [ ] Add an atomic multi-operand edit. It validates the net UnGraph endpoint
-  delta before changing definitions, reverse uses, or mirrors. Single-slot
-  replacement delegates to it, and `replace_all_uses` applies its entire use set
-  atomically. Not needed for UnGraph endpoint swaps any more: the degree limit
-  is checked at verification (`Finding::UnGraphDegreeExceeded`), so single
-  edits may pass through an over-full wire.
 - [x] Make `replace_statement` require equal `is_edge()` and return
   `EdgeRoleMismatch`, paralleling its existing terminator classification
   guard. Narrowed to `UnGraph` members: `is_edge()` means nothing in blocks or
