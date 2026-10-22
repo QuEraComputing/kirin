@@ -11,7 +11,7 @@ pub struct RewriteSummary {
     pub sweeps: usize,
     /// Rule applications that edited the IR.
     pub applied: usize,
-    /// Statements erased by the dead-code pass after each sweep.
+    /// Statements erased by the dead-code cleanup after each sweep.
     pub erased: usize,
 }
 
@@ -42,7 +42,7 @@ impl std::ops::AddAssign for RewriteSummary {
 ///
 /// Rules never erase the statement being visited, which
 /// [`RuleSet::add`](crate::RuleSet::add) checks, so dead statements are left
-/// to the dead-code pass. Native actions are not checked; one breaking the
+/// to the dead-code cleanup. Native actions are not checked; one breaking the
 /// walk's contract (see [`kirin_ir::walk`]) fails the run.
 ///
 /// The driver edits through the [`Rewriter`] a pass is given, so it runs

@@ -2868,11 +2868,15 @@ driver runs `#[rewrite_rule]` patterns rather than native rules:
 - `RewriteDriver::run::<O>` / `run_at::<O>` take the pass's `Rewriter`, so
   they run inside `Pipeline::run_pass`. A sweep tries every rule in order at
   each statement the cursor visits (Kirin-python `Chain` semantics), then a
-  dead-code pass erases pure, unused, non-terminator statements in the
-  blocks under the root. The fixpoint ends at the first sweep (rules plus
-  dead-code pass) recording no `MutationEvent`.
+  dead-code cleanup erases pure, unused, non-terminator statements under the
+  root, mostly what the rules left behind. Blocks are cleaned from their
+  end; `DiGraph`s from their sinks, queuing a member's producers when it is
+  erased, so a dead chain goes in one pass. `UnGraph`s are not cleaned:
+  their nodes usually have no results and mean something through their
+  wires. The fixpoint ends at the first sweep (rules plus cleanup) recording
+  no `MutationEvent`.
 - Rules may not erase their root (`RuleErrorKind::ErasesRoot`, checked when
-  the rule is added); a root left dead is removed by the dead-code pass. A
+  the rule is added); a root left dead is removed by the dead-code cleanup. A
   rule's other erase targets are producers of the root, which are never
   nested in or around it, so declarative rules satisfy the walk contract by
   construction. Native actions are not checked.
