@@ -104,8 +104,9 @@ dialect type because the `Semantics` parameter distinguishes them (no coherence
 conflict):
 
 - `StrongDemand` (on `SparseBackwardShape`) — engine surface split in two:
-  the shape-generic `SparseBackwardInterp` (`fact`/`raise_fact`/`effect` plus
-  the block-topology queries) serves any sparse-backward key, and
+  the shape-generic `SparseBackwardInterp` (`fact`/`raise_fact`/`effect`, the
+  block-topology queries, and the callable-boundary mechanics
+  `declare_return`/`summarize_call`) serves any sparse-backward key, and
   `DemandInterp` (pinned to `StrongDemand` via its supertrait) adds the demand
   vocabulary. `raise_fact` takes the lattice element to merge, so the shape
   moves facts without inspecting them; ⊤ is `demand`'s business, and `HasTop`
@@ -113,6 +114,13 @@ conflict):
   raise demands (`demand`), and end with `interp.effect()`
   (= `SparseBackwardEffect`); ordinary dialects are the one-liner
   `interp.demand_uses_if_observable(self)` (purity-aware neededness via `IsPure`).
+  Rules stay context-blind: the engine qualifies every read and local
+  contribution with the callable context of the work dispatching the rule.
+  The function dialect owns the call-boundary semantics: `ret` declares
+  operand `i` as output `i` (`declare_return`), and a call with a demanded result
+  sends its result facts through `summarize_call` and maps the returned callee
+  parameter facts onto its arguments (see [Interprocedural
+  demand](#interprocedural-demand)).
 - `ClassicLiveness` (on `DenseBackwardShape`) — likewise split: the
   shape-generic `DenseBackwardInterp` (`insert_fact`/`remove_fact` point-state
   mechanics) serves any dense-backward key, and `ClassicLivenessInterp` adds
@@ -521,6 +529,88 @@ Analysis crates stay small: `kirin-constprop` is the `ConstPropValue` lattice, a
 `pub type ConstProp<..> = SparseForwardInterpreter<.., ConstPropValue, .., ConstPropContext>`
 — constant propagation is a forward dataflow / forward abstract-interpretation
 specialization.
+
+### `SparseBackwardInterpreter<'ir, S, V, E, Lk, P = ContextInsensitive, Sem = StrongDemand>`
+
+#### Interprocedural demand
+
+The sparse backward engine runs one worklist over **context-qualified fact
+locations** `Scoped<K, SSAValue>`: demand on a local SSA value in callable
+context `K`. `K` comes from the `DemandContext<V>` policy `P`, fed the
+resolved `LinkTarget` and `Product<V>` of result lattice values. Public entry
+points accept an iterator and collect it into this product internally.
+The generic engine defaults to `ContextInsensitive`, selecting the target itself.
+The shipped `DemandAnalysis` engine instead uses `OutputDemandContext`, with
+`Key = (LinkTarget, DemandCallCtx)`: result-demand products or a `Shared` fallback
+after 64 admitted requests per target. Changing demand selects a new context; existing
+parameter-to-caller dependencies remain registered. A policy must select stable keys from a bounded
+space; a key naming two targets is an error. Facts stay in `DemandSummary`
+behind `Summary::merge`. The engine's per-context metadata (target, body, and
+the return operands per output) lives in the driver's store slot and is never a
+second copy of facts. It holds only what the IR cannot answer: an entry exists
+once its context is discovered, and entry parameters are read from the IR. Work carries its context, so
+the frame dispatching a rule supplies the context that rule's reads and local
+contributions are qualified with — there is no global analysis scope.
+
+Each fact location is also runnable work:
+
+| Location | Work when its fact rises |
+|---|---|
+| result | the defining statement's rule |
+| block argument | the owning structured statement, or each CFG predecessor's terminator |
+| port | the graph's owning statement |
+
+A requested output is not a location: demand on output `i` merges directly
+into operand `i` of every return site of the context.
+
+The call protocol, for a call in context `C` with a demanded result:
+
+```text
+C.result[i] demanded ──summarize_call──▶ D.ret_operand[i] (every return site)
+      ▲                                                    │ ...
+      └──── C.argument[j] ◀──call rule── D.param[j] (dependency) ◀───┘
+```
+
+1. The call rule reads its result facts; with none demanded it returns
+   (ignored and zero-result calls never activate callees — demandedness only,
+   no effect preservation).
+2. `summarize_call` resolves through the linker at the call's lookup stage,
+   selects `D`, registers `D.param[j] → current work` for every parameter
+   (so bottom reads still wake the caller), returns the current parameter
+   facts, and queues the activation.
+3. After the work completes, activations are applied: `D` is discovered if
+   new, the call's result count is checked against `D`'s return arity, and
+   each non-bottom result fact `i` merges into operand `i` of every return
+   site of `D`.
+
+**Discovery** records the context first (so recursion never restarts it), then
+evaluates every rule of its body and structured children once, with nothing
+demanded, skipping nested callable definitions' bodies. Unconditional
+contributions become control roots; conditional rules read bottom and rerun
+through the table above. Return rules declare their operands here, which is
+why requests are routed only after discovery.
+The public backward `analyze` methods return `Product<V>` parameter facts in
+entry-parameter order, dual to forward analysis's returned output facts. `root()`
+exposes the most recent successful root context separately; `contexts()` and
+`fact()` retain detailed per-context inspection. `kirin-liveness::analyze_demand`
+collects these details into `DemandResult`, while `DemandAnalysis::analyze`
+returns boundary facts directly. The two-point fact type is `Demand::{Dead, Live}`.
+Exact products are checked against discovered return arity; all-bottom products
+still seed intrinsic roots. Reused context keys accumulate facts monotonically.
+
+Roots of an analysis are the supplied result lattice values, selected positionally,
+plus the control roots.
+A root's control roots are seeded even when every supplied fact is bottom, while a callee is discovered only when
+a call result is demanded. Discovery is deferred to the end of the work that
+activated the callee, so rule dispatch never re-enters itself and no nested
+fixpoint runs.
+
+Arity errors, resolution errors, and unsupported (graph) callee bodies are
+errors, never opaque fallbacks. There is no opaque-call policy. Indirect calls
+and closures are unsupported: like their forward rules, the `Lambda`/`Bind`
+demand rules return errors.
+Facts accumulate across `analyze` calls on one engine; `with_linker` and
+`with_policy` reset the analysis state.
 
 ### Engine internals: stage dispatch and IR queries
 
@@ -1021,13 +1111,15 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
   from the earlier sketch noted inline):
   - **Strong liveness / demand** (`StrongDemand`,
     `SparseBackwardInterpreter`): `Interp::Value` is the *per-SSA-value* demand
-    fact (`kirin_liveness::Live`), not a `LiveSet` — the sparse fact anchors to
+    fact (`kirin_liveness::Demand`), not a `LiveSet` — the sparse fact anchors to
     values, mirroring the forward per-value model. Helpers are
     `is_demanded`/`demand` (on `DemandInterp`)/`effect()` plus the purity-aware `demand_uses_if_observable`
     (rather than the sketched `live_after`/`use_def` names); the effect is
-    `SparseBackwardEffect::Demands`. Summary owners ARE scope-qualified SSA
-    values, so the fixpoint driver's default self-dependent index is the demand
-    worklist; scf converges loop-carried demand with **no frames**.
+    `SparseBackwardEffect::Demands`. Summary owners ARE context-qualified
+    fact locations (`Scoped<K, SSAValue>`), so the fixpoint driver's default
+    self-dependent index is the demand worklist; scf converges loop-carried
+    demand with **no frames**, and demand crosses calls on the same worklist
+    (see [Interprocedural demand](#interprocedural-demand)).
   - **Classic per-point liveness** (`ClassicLiveness`,
     `DenseBackwardInterpreter`): here `Interp::Value` *is* the point state
     (`LiveSet`), realizing the sketch's `Value = LiveSet` — with the textbook

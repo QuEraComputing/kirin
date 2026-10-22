@@ -460,7 +460,8 @@ where
 }
 
 /// One step of a body-containment walk: the statements directly in this body
-/// part and the child body parts reached from it.
+/// part and the child body parts reached from it. Bodies of nested callable
+/// definitions are not children: they belong to their own callable.
 pub struct BodyContents {
     pub statements: Vec<Statement>,
     pub children: Vec<Body>,
@@ -471,7 +472,7 @@ pub struct BodyContentsQuery(pub Body);
 impl<S, L> StageAction<S, L> for BodyContentsQuery
 where
     S: StageMeta + HasStageInfo<L>,
-    L: Dialect,
+    L: Dialect + HasCallableBody,
     for<'a> L: HasBlocks<'a> + HasCFG<'a> + HasDigraphs<'a> + HasUngraphs<'a>,
 {
     type Output = BodyContents;
@@ -519,6 +520,11 @@ where
 
         for &statement in &statements {
             let definition = statement.definition(info);
+            // A nested callable definition is its own analysis context: its
+            // bodies are reached by calling it, never by containment.
+            if definition.callable_body().is_some() {
+                continue;
+            }
             children.extend(definition.blocks().copied().map(Body::Block));
             children.extend(definition.cfgs().copied().map(Body::CFG));
             children.extend(definition.digraphs().copied().map(Body::DiGraph));

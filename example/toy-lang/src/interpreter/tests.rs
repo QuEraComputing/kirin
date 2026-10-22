@@ -785,7 +785,13 @@ specialize @source fn @if_body(i64) -> i64 cfg {
     fn scf_if_body_demand_follows_result_demand() {
         let pipeline = parse(IF_BODY_DEMAND);
         let (caller_stage, callee) = source_root(&pipeline, "if_body");
-        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let result = analyze_demand(
+            &pipeline,
+            caller_stage,
+            callee,
+            [kirin_liveness::Demand::Live],
+        )
+        .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());
 
         let cond = entry_params(&pipeline, cfg)[0];
@@ -835,7 +841,13 @@ specialize @source fn @if_dead(i64) -> i64 cfg {
     fn scf_if_dead_result_keeps_only_condition() {
         let pipeline = parse(IF_DEAD_RESULT);
         let (caller_stage, callee) = source_root(&pipeline, "if_dead");
-        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let result = analyze_demand(
+            &pipeline,
+            caller_stage,
+            callee,
+            [kirin_liveness::Demand::Live],
+        )
+        .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());
 
         let cond = entry_params(&pipeline, cfg)[0];
@@ -876,7 +888,13 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
     fn scf_for_loop_carried_demand_converges() {
         let pipeline = parse(FOR_CARRIED_DEMAND);
         let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
-        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let result = analyze_demand(
+            &pipeline,
+            caller_stage,
+            callee,
+            [kirin_liveness::Demand::Live],
+        )
+        .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());
 
         let params = entry_params(&pipeline, cfg);
@@ -945,7 +963,13 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
     fn scf_for_dead_result_keeps_only_bounds() {
         let pipeline = parse(FOR_DEAD_RESULT);
         let (caller_stage, callee) = source_root(&pipeline, "loop_dead");
-        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let result = analyze_demand(
+            &pipeline,
+            caller_stage,
+            callee,
+            [kirin_liveness::Demand::Live],
+        )
+        .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());
 
         let params = entry_params(&pipeline, cfg);
@@ -989,14 +1013,21 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
 }
 "#;
 
-    /// Calls are unmarked (impure), so their arguments are unconditional
-    /// demand roots even when the call result is unused; a pure `add` beside
-    /// it with a dead result demands nothing.
+    /// A call activates only through a demanded result: this one's result is
+    /// unused, so its callee is never discovered and its argument stays dead
+    /// even though calls are unmarked (impure) — demand tracks neededness,
+    /// not effects. A pure `add` beside it with a dead result demands nothing.
     #[test]
-    fn call_arguments_are_demand_roots() {
+    fn ignored_call_does_not_demand_arguments() {
         let pipeline = parse(CALL_PURITY);
         let (caller_stage, callee) = source_root(&pipeline, "main");
-        let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+        let result = analyze_demand(
+            &pipeline,
+            caller_stage,
+            callee,
+            [kirin_liveness::Demand::Live],
+        )
+        .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());
 
         let params = entry_params(&pipeline, cfg);
@@ -1012,7 +1043,7 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
             _ => None,
         });
 
-        assert!(result.is_demanded(x), "call args are roots (impure)");
+        assert!(!result.is_demanded(x), "an ignored call demands nothing");
         assert!(result.is_demanded(constant_result(&pipeline, cfg, 0)));
         assert!(!result.is_demanded(unused), "the call result is unused");
         assert!(!result.is_demanded(y), "pure add with dead result");

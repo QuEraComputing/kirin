@@ -5,7 +5,7 @@ use kirin::prelude::*;
 use kirin_interpreter::{
     Body, Callee, CrossStageLinker, InterpreterError, LinkTarget, Linker, SameStageLinker,
 };
-use kirin_liveness::{Demand, DenseLiveness};
+use kirin_liveness::{Demand, DemandAnalysis, DenseLiveness};
 use kirin_test_languages::GraphFunctionLanguage;
 
 type TestStage = StageInfo<GraphFunctionLanguage>;
@@ -128,8 +128,12 @@ fn every_callee_variant_uses_the_same_backward_root_protocol() {
     let (stage, callees) = all_callee_variants(&pipeline);
 
     for callee in callees {
-        let mut demand = Demand::<TestStage>::new(&pipeline);
-        let demand_scope = demand.analyze(stage, callee).expect("demand succeeds");
+        let mut demand = DemandAnalysis::<TestStage>::new(&pipeline);
+        demand
+            .analyze(stage, callee, [Demand::Live])
+            .expect("demand succeeds");
+        let root = demand.root().unwrap();
+        let demand_scope = demand.scope(root).expect("root context is selected");
         assert!(matches!(demand_scope, (_, Body::Block(_))));
 
         let mut dense = DenseLiveness::<TestStage>::new(&pipeline);
@@ -158,9 +162,9 @@ fn no_callee_variant_bypasses_the_configured_linker() {
     let (stage, callees) = all_callee_variants(&pipeline);
 
     for callee in callees {
-        let demand_error = Demand::<TestStage>::new(&pipeline)
+        let demand_error = DemandAnalysis::<TestStage>::new(&pipeline)
             .with_linker(RejectingLinker)
-            .analyze(stage, callee)
+            .analyze(stage, callee, [Demand::Live])
             .expect_err("demand must use the linker");
         assert_eq!(
             demand_error,
@@ -189,7 +193,7 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
     let callee = Callee::Function(function);
 
     assert!(matches!(
-        Demand::<TestStage>::new(&pipeline).analyze(source, callee),
+        DemandAnalysis::<TestStage>::new(&pipeline).analyze(source, callee, [Demand::Live]),
         Err(InterpreterError::MissingSpecialization(_))
     ));
     assert!(matches!(
@@ -197,10 +201,16 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
         Err(InterpreterError::MissingSpecialization(_))
     ));
 
-    let demand_scope = Demand::<TestStage>::new(&pipeline)
-        .with_linker(CrossStageLinker)
-        .analyze(source, callee)
+    let mut demand = DemandAnalysis::<TestStage>::new(&pipeline).with_linker(CrossStageLinker);
+    demand
+        .analyze(source, callee, [Demand::Live])
         .expect("cross-stage demand succeeds");
+    let root = demand.root().unwrap();
+    assert_eq!(
+        root.0.stage, lowered,
+        "the root context is the resolved target"
+    );
+    let demand_scope = demand.scope(root).expect("root context is selected");
     let mut dense = DenseLiveness::<TestStage>::new(&pipeline).with_linker(CrossStageLinker);
     let dense_scope = dense
         .analyze(source, callee)
@@ -253,8 +263,8 @@ fn a_resolved_non_callable_definition_is_reported_by_shared_body_discovery() {
     // The specialization record is the sole source of its definition.
     redefine(&mut pipeline, stage, target.specialization, non_callable);
 
-    let demand_error = Demand::<TestStage>::new(&pipeline)
-        .analyze(stage, callee)
+    let demand_error = DemandAnalysis::<TestStage>::new(&pipeline)
+        .analyze(stage, callee, [Demand::Live])
         .expect_err("non-callable definition must fail");
     assert_eq!(demand_error, InterpreterError::NotCallable(non_callable));
 
@@ -282,16 +292,15 @@ fn specialized_handles_are_validated_before_accepting_a_candidate_stage() {
             .unwrap(),
         target
     );
-    let demand = Demand::<TestStage>::new(&pipeline)
-        .with_linker(CrossStageLinker)
-        .analyze(source, callee)
-        .unwrap();
+    let mut demand = DemandAnalysis::<TestStage>::new(&pipeline).with_linker(CrossStageLinker);
+    demand.analyze(source, callee, [Demand::Live]).unwrap();
     let dense = DenseLiveness::<TestStage>::new(&pipeline)
         .with_linker(CrossStageLinker)
         .analyze(source, callee)
         .unwrap();
-    assert_eq!(demand.0, lowered);
-    assert_eq!(dense, demand);
+    let root = demand.root().unwrap();
+    assert_eq!(root.0, target);
+    assert_eq!(Some(dense), demand.scope(root));
 }
 
 #[test]
@@ -319,9 +328,9 @@ fn malformed_custom_targets_return_errors_without_panicking() {
     ] {
         let linker = FixedTargetLinker(LinkTarget { stage, ..target });
         assert_eq!(
-            Demand::<TestStage>::new(&pipeline)
+            DemandAnalysis::<TestStage>::new(&pipeline)
                 .with_linker(linker)
-                .analyze(source, callee)
+                .analyze(source, callee, [Demand::Live])
                 .unwrap_err(),
             expected
         );
@@ -346,9 +355,9 @@ fn malformed_custom_targets_return_errors_without_panicking() {
     };
     let expected = InterpreterError::MissingStatement(missing_definition);
     assert_eq!(
-        Demand::<TestStage>::new(&pipeline)
+        DemandAnalysis::<TestStage>::new(&pipeline)
             .with_linker(FixedTargetLinker(target))
-            .analyze(source, callee)
+            .analyze(source, callee, [Demand::Live])
             .unwrap_err(),
         expected
     );
@@ -367,8 +376,8 @@ fn unsupported_graph_roots_fail_instead_of_producing_empty_facts() {
 
     for name in ["directed", "undirected"] {
         let (stage, callee) = function_callee(&pipeline, name);
-        let demand_error = Demand::<TestStage>::new(&pipeline)
-            .analyze(stage, callee)
+        let demand_error = DemandAnalysis::<TestStage>::new(&pipeline)
+            .analyze(stage, callee, [Demand::Live])
             .expect_err("graph demand is not implemented");
         assert!(matches!(
             demand_error,
@@ -392,7 +401,7 @@ fn linker_resolution_errors_propagate_from_both_backward_engines() {
     let missing = Callee::Named(Symbol::from(usize::MAX));
 
     assert!(matches!(
-        Demand::<TestStage>::new(&pipeline).analyze(stage, missing),
+        DemandAnalysis::<TestStage>::new(&pipeline).analyze(stage, missing, [Demand::Live]),
         Err(InterpreterError::MissingCallSymbol(_))
     ));
     assert!(matches!(
@@ -403,7 +412,11 @@ fn linker_resolution_errors_propagate_from_both_backward_engines() {
     let ambiguous_pipeline = parse(AMBIGUOUS_PROGRAM);
     let (ambiguous_stage, ambiguous) = function_callee(&ambiguous_pipeline, "ambiguous");
     assert!(matches!(
-        Demand::<TestStage>::new(&ambiguous_pipeline).analyze(ambiguous_stage, ambiguous),
+        DemandAnalysis::<TestStage>::new(&ambiguous_pipeline).analyze(
+            ambiguous_stage,
+            ambiguous,
+            [Demand::Live]
+        ),
         Err(InterpreterError::AmbiguousSpecialization { count: 2, .. })
     ));
     assert!(matches!(

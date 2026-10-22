@@ -203,5 +203,10 @@ pub fn analyze_demand(
     let function = pipeline
         .lookup_function_by_name(function_name)
         .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    kirin_liveness::analyze_demand(pipeline, stage, Callee::Function(function))
+    kirin_liveness::analyze_demand(
+        pipeline,
+        stage,
+        Callee::Function(function),
+        [kirin_liveness::Demand::Live],
+    )
 }

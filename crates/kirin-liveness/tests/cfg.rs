@@ -121,7 +121,13 @@ fn find_arith<R>(
 fn strong_liveness_over_branching_function() {
     let pipeline = parse(PROGRAM);
     let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let result = analyze_demand(
+        &pipeline,
+        caller_stage,
+        callee,
+        [kirin_liveness::Demand::Live],
+    )
+    .expect("analysis succeeds");
     let (_, Body::CFG(cfg)) = result.root_scope() else {
         panic!("@main resolves to a CFG body")
     };
@@ -164,7 +170,13 @@ fn strong_liveness_over_branching_function() {
 fn unused_successor_block_argument_does_not_keep_edge_arg_live() {
     let pipeline = parse(DEAD_EDGE_ARG_PROGRAM);
     let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let result = analyze_demand(
+        &pipeline,
+        caller_stage,
+        callee,
+        [kirin_liveness::Demand::Live],
+    )
+    .expect("analysis succeeds");
     let (_, Body::CFG(cfg)) = result.root_scope() else {
         panic!("@main resolves to a CFG body")
     };
@@ -227,7 +239,13 @@ specialize @test fn @main(i64, i64) -> i64 cfg {
 fn terminator_operands_become_demanded() {
     let pipeline = parse(RET_PARAM_PROGRAM);
     let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let result = analyze_demand(
+        &pipeline,
+        caller_stage,
+        callee,
+        [kirin_liveness::Demand::Live],
+    )
+    .expect("analysis succeeds");
     let (_, Body::CFG(cfg)) = result.root_scope() else {
         panic!("@main resolves to a CFG body")
     };
@@ -240,7 +258,13 @@ fn terminator_operands_become_demanded() {
 fn demanded_result_marks_operands_demanded() {
     let pipeline = parse(DEMANDED_RESULT_PROGRAM);
     let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let result = analyze_demand(
+        &pipeline,
+        caller_stage,
+        callee,
+        [kirin_liveness::Demand::Live],
+    )
+    .expect("analysis succeeds");
     let (_, Body::CFG(cfg)) = result.root_scope() else {
         panic!("@main resolves to a CFG body")
     };
@@ -259,7 +283,13 @@ fn demanded_result_marks_operands_demanded() {
 fn dead_result_leaves_operands_dead() {
     let pipeline = parse(DEAD_RESULT_PROGRAM);
     let (caller_stage, callee) = function_root(&pipeline, "main");
-    let result = analyze_demand(&pipeline, caller_stage, callee).expect("analysis succeeds");
+    let result = analyze_demand(
+        &pipeline,
+        caller_stage,
+        callee,
+        [kirin_liveness::Demand::Live],
+    )
+    .expect("analysis succeeds");
     let (_, Body::CFG(cfg)) = result.root_scope() else {
         panic!("@main resolves to a CFG body")
     };
@@ -462,7 +492,13 @@ fn strong_per_point_sets_are_classic_intersect_demanded() {
     let pipeline = parse(DEAD_RESULT_PROGRAM);
     let (caller_stage, callee) = function_root(&pipeline, "main");
     let dense = analyze_dense(&pipeline, caller_stage, callee).expect("dense analysis succeeds");
-    let demand = analyze_demand(&pipeline, caller_stage, callee).expect("demand analysis succeeds");
+    let demand = analyze_demand(
+        &pipeline,
+        caller_stage,
+        callee,
+        [kirin_liveness::Demand::Live],
+    )
+    .expect("demand analysis succeeds");
     let scope = dense.root_scope();
     assert_eq!(scope, demand.root_scope());
     let (_, Body::CFG(cfg)) = scope else {

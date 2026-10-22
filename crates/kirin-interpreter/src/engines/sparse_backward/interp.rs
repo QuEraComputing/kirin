@@ -5,10 +5,11 @@
 //! A **sparse backward** fact is one lattice element per SSA value: *how
 //! strongly is this value needed?* For strong (true) liveness the lattice is
 //! two-point (demanded or not): a value is demanded iff it transitively feeds
-//! a *root* — a return/terminator operand or an impure statement. Dead code
-//! demands nothing. The fact does not vary by program point, so it anchors to
-//! [`SSAValue`]s; per-point live sets are the dense analysis's product
-//! (`ClassicLiveness`), not this one's.
+//! a *root* — a requested output, a control root (a branch condition, loop
+//! bounds), or an impure ordinary statement. Dead code demands nothing. The
+//! fact does not vary by program point, so it anchors to [`SSAValue`]s;
+//! per-point live sets are the dense analysis's product (`ClassicLiveness`),
+//! not this one's.
 //!
 //! # Layering (owner-summary fixpoint)
 //!
@@ -16,68 +17,101 @@
 //! wrapper over a [`StandardFixpointInterpreter`] driving a summary-free
 //! [`SparseBackwardTransfer`]:
 //!
-//! - **[`SparseBackwardTransfer`]** is the [`Interp`] delegate: pipeline access,
-//!   the real dispatch location, and the per-rule demand buffer.
+//! - **[`SparseBackwardTransfer`]** is the [`Interp`] delegate: pipeline
+//!   access, the calling convention and context policy, the real dispatch
+//!   location and callable context, and the per-rule buffers.
 //! - the **[`StandardFixpointInterpreter`]** driver owns the demand facts
-//!   (summaries keyed by [`Scoped`] SSA values — never bare values), the value
-//!   worklist, and the analysis scope.
+//!   (summaries keyed by context-qualified SSA values), the worklist, and
+//!   the discovered callable contexts.
 //!
-//! # Owners are values; scheduling is demand propagation
+//! # Owners are fact locations; scheduling is demand propagation
 //!
-//! `SummaryKey = Scoped<BodyScope, SSAValue>`: the fact anchor is
-//! the owner. The driver's *default* self-dependent index
-//! ([`OwnerSummaryDeps`]) is exactly demand propagation — a value whose fact
-//! rises is rescheduled, and analyzing a value means dispatching the rules
-//! that can translate its demand:
+//! `SummaryKey = Scoped<K, SSAValue>`, where `K` is the callable context a
+//! [`DemandContext`] policy selects (default: the resolved [`LinkTarget`](crate::LinkTarget)).
+//! The fact location is the owner. The driver's *default* self-dependent
+//! index ([`OwnerSummaryDeps`]) is exactly demand propagation — a location
+//! whose fact rises is rescheduled, and analyzing it means dispatching, in its
+//! context, the rules that translate its demand:
 //!
 //! - a statement **result** → the defining statement's backward rule;
 //! - a **block argument** → its directly owning structured statement, or each
 //!   indexed CFG predecessor block's terminator;
 //! - a graph **port** → the statement owning the graph boundary.
 //!
-//! Rules read converged facts ([`DemandInterp::is_demanded`]) and raise new
-//! demands ([`DemandInterp::demand`], strong liveness's spelling of the
-//! shape-generic [`SparseBackwardInterp::raise_fact`]); each rule returns the
-//! facts it raised as its [`SparseBackwardEffect`]. All fact mutation flows
-//! through the driver's single merge path. Facts only rise in a finite-height
-//! lattice, so the fixpoint terminates with O(predecessors) rule runs per rise —
-//! no block re-walks, no widening, and no frames for structured control:
-//! loop-carried demand (e.g. `scf.for`) converges through the value worklist.
+//! Requested outputs merge directly into the operands of the context's return
+//! sites (declared through [`declare_return`](SparseBackwardInterp::declare_return)).
+//!
+//! Call rules cross into another context through
+//! [`summarize_call`](SparseBackwardInterp::summarize_call), which registers the one
+//! non-topological dependency: callee parameter facts → the caller's call
+//! work. All fact mutation flows through the driver's single merge path.
+//! Facts only rise in a finite-height lattice and the default context space
+//! is bounded, so one shared worklist converges — recursion included — with no
+//! nested fixpoints, no widening, and no frames for structured control.
 
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, HashSet, VecDeque};
+use std::hash::Hash;
 use std::marker::PhantomData;
 use std::mem;
 
 use kirin_ir::{
     Block, CompileStage, HasArguments, HasBottom, HasResults, HasTop, IsPure, Lattice, Pipeline,
-    SSAKind, SSAValue, StageMeta, Statement, Symbol,
+    Product, SSAKind, SSAValue, StageMeta, Statement, Symbol,
 };
 
+use super::DemandFrame;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, Body, Callee, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, Linker, OwnerAnalysis, OwnerSummaryDeps,
-    SameStageLinker, Scoped, SparseBackwardSemantic, SparseStore, StageQuery,
-    StandardFixpointInterpreter, StrongDemand, Summary, SummaryEffect, TerminatorArgs,
+    AbstractInterpreter, Body, Callee, ContextInsensitive, EnvIndex, FixpointProfile, Interp,
+    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, OwnerAnalysis,
+    OwnerSummaryDeps, SameStageLinker, Scoped, SparseBackwardSemantic, SparseStore, StageQuery,
+    StandardFixpointInterpreter, StrongDemand, Summary, SummaryDependency, SummaryDependencyIndex,
+    SummaryEffect, TerminatorArgs,
 };
 
-/// The scope a body-level backward analysis qualifies its facts with.
+/// A resolved `(stage, body)` pair: the structure one callable context
+/// analyzes (and the scope dense liveness qualifies its facts with).
 ///
-/// Arena ids are per-stage, so the stage is part of the scope; analyzing two
-/// bodies in one engine keeps their facts distinct.
+/// Arena ids are per-stage, so the stage is part of the scope.
 pub type BodyScope = (CompileStage, Body);
+
+// ===========================================================================
+// Pluggable analysis seams (policy `P`)
+// ===========================================================================
+
+/// Context-selection policy for demand: which callable context tracks the
+/// demand of a resolved call target.
+///
+/// A policy must select stable instances from a bounded space. Equal keys
+/// must name the same target. Requests carry boundary facts, not a call-site
+/// identity.
+pub trait DemandContext<V> {
+    type Key: Clone + Eq + Hash;
+
+    fn key(&mut self, target: &LinkTarget, outputs: &Product<V>) -> Self::Key;
+}
+
+/// One context per resolved callable, regardless of output request.
+impl<V> DemandContext<V> for ContextInsensitive {
+    type Key = LinkTarget;
+
+    fn key(&mut self, target: &LinkTarget, _outputs: &Product<V>) -> LinkTarget {
+        *target
+    }
+}
 
 // ===========================================================================
 // Effect + dialect-facing trait
 // ===========================================================================
 
-/// What a backward rule produced: the demand facts it raised.
+/// What a backward rule produced: the local demand facts it raised.
 ///
 /// Rules raise facts imperatively through
 /// [`raise_fact`](SparseBackwardInterp::raise_fact) (or its [`DemandInterp`]
 /// spelling [`demand`](DemandInterp::demand)) and finish with
 /// [`effect()`](SparseBackwardInterp::effect), which drains the buffer into
-/// this value; the driver applies it through its single merge path.
+/// this value; the driver qualifies the values with the rule's callable
+/// context and applies them through its single merge path.
 pub enum SparseBackwardEffect<V> {
     /// Demand facts to merge (possibly empty).
     Demands(Vec<(SSAValue, V)>),
@@ -87,10 +121,11 @@ pub enum SparseBackwardEffect<V> {
 /// *shape-generic* fact mechanics plus [`SparseBackwardEffect`]. Any
 /// sparse-backward semantics ([`StrongDemand`] today, downstream keys
 /// tomorrow) shares this surface: read a converged per-value fact, raise a
-/// fact, drain the raised facts into the rule's effect, and query the block
-/// boundary facts terminator/structured rules map across. Rules are
-/// scope-blind: they name bare SSA values, and the engine qualifies them with
-/// the current analysis scope.
+/// fact, drain the raised facts into the rule's effect, query the block
+/// boundary facts terminator/structured rules map across, and cross callable
+/// boundaries. Rules are context-blind: they name bare SSA values and output
+/// positions, and the engine qualifies them with the callable context the
+/// dispatching work carries.
 ///
 /// Semantics-specific vocabulary lives in helper traits on top — strong
 /// liveness's is [`DemandInterp`].
@@ -120,6 +155,27 @@ pub trait SparseBackwardInterp:
 
     /// The operands of `block`'s terminator — a structured body's yield slots.
     fn terminator_args(&self, block: Block) -> Result<TerminatorArgs, Self::Error>;
+
+    /// Declare the dispatched statement a return site whose operand `i`
+    /// carries this callable context's output `i`. Demand requested on an
+    /// output merges directly into those operands. Every return site of one
+    /// callable must declare the same arity.
+    fn declare_return(&mut self, operands: &[SSAValue]) -> Result<(), Self::Error>;
+
+    /// Cross a call boundary backward.
+    ///
+    /// Resolves `callee` (looked up in `stage`, defaulting to the current
+    /// stage) through the engine's linker, selects the callee's context,
+    /// merges `outputs[i]` into its output position `i` (activating it on
+    /// first use), and returns the facts currently on the callee's
+    /// parameters. The dispatching work reruns whenever those parameter facts
+    /// rise — including facts that are still bottom now.
+    fn summarize_call(
+        &mut self,
+        callee: Callee,
+        stage: Option<CompileStage>,
+        outputs: Product<Self::Value>,
+    ) -> Result<Product<Self::Value>, Self::Error>;
 }
 
 /// [`StrongDemand`]'s helper vocabulary on top of the shape-generic
@@ -184,78 +240,88 @@ where
 }
 
 // ===========================================================================
-// SparseBackwardTransfer — the summary-free Interp delegate
+// Owners + summaries
 // ===========================================================================
 
-/// The summary-free transfer of the sparse backward engine: pipeline access,
-/// the real dispatch location, and the per-rule demand buffer.
-pub struct SparseBackwardTransfer<'ir, S: StageMeta, V, E, Sem = StrongDemand> {
-    pipeline: &'ir Pipeline<S>,
-    location: Option<InterpLocation>,
-    /// Facts the currently dispatched rule has raised.
-    demands: Vec<(SSAValue, V)>,
-    /// The analysis's single activation: sparse backward facts live in one
-    /// scope-qualified store, not per-call activation records.
-    activation: EnvIndex,
-    _marker: PhantomData<fn() -> (E, Sem)>,
+/// One discovered callable context: the body it analyzes and what demand
+/// learned by running its rules once. Parameters are read from the IR.
+pub struct CallableContext {
+    pub(super) target: LinkTarget,
+    pub(super) body: Body,
+    /// `outputs[i]` holds operand `i` of every return site; `None` if the
+    /// body declares no return site.
+    pub(super) outputs: Option<Vec<Vec<SSAValue>>>,
 }
 
-impl<'ir, S: StageMeta, V, E, Sem> SparseBackwardTransfer<'ir, S, V, E, Sem> {
-    fn new(pipeline: &'ir Pipeline<S>) -> Self {
+impl CallableContext {
+    pub(super) fn new(target: LinkTarget, body: Body) -> Self {
         Self {
-            pipeline,
-            location: None,
-            demands: Vec::new(),
-            activation: EnvIndex::placeholder(),
-            _marker: PhantomData,
+            target,
+            body,
+            outputs: None,
         }
     }
 
-    pub fn pipeline(&self) -> &'ir Pipeline<S> {
-        self.pipeline
+    /// Record a return site: its operand `i` carries output `i`.
+    pub(super) fn add_return(&mut self, operands: &[SSAValue]) -> Result<(), InterpreterError> {
+        let Some(outputs) = &mut self.outputs else {
+            self.outputs = Some(operands.iter().map(|operand| vec![*operand]).collect());
+            return Ok(());
+        };
+        if outputs.len() != operands.len() {
+            return Err(InterpreterError::ProductArityMismatch {
+                expected: outputs.len(),
+                actual: operands.len(),
+            });
+        }
+        for (output, operand) in outputs.iter_mut().zip(operands) {
+            output.push(*operand);
+        }
+        Ok(())
+    }
+
+    /// The updates merging a request for `outputs` into the operands of every
+    /// return site, after checking its arity. A callable without return sites
+    /// accepts any request: no return operand exists that the demand could
+    /// reach.
+    pub(super) fn route_outputs<K: Clone, V: Clone + PartialEq + HasBottom>(
+        &self,
+        key: &K,
+        outputs: Product<V>,
+    ) -> Result<Vec<DemandUpdate<K, V>>, InterpreterError> {
+        let Some(operands) = &self.outputs else {
+            return Ok(Vec::new());
+        };
+        if operands.len() != outputs.len() {
+            return Err(InterpreterError::ProductArityMismatch {
+                expected: operands.len(),
+                actual: outputs.len(),
+            });
+        }
+        let mut updates = Vec::new();
+        for (operands, fact) in operands.iter().zip(outputs) {
+            if fact != V::bottom() {
+                for operand in operands {
+                    updates.push((
+                        Scoped::new(key.clone(), *operand),
+                        DemandSummary(fact.clone()),
+                    ));
+                }
+            }
+        }
+        Ok(updates)
     }
 }
 
-impl<'ir, S, V, E, Sem> Interp for SparseBackwardTransfer<'ir, S, V, E, Sem>
-where
-    S: StageMeta,
-    V: Clone,
-    E: From<InterpreterError>,
-    Sem: SparseBackwardSemantic,
-{
-    type Value = V;
-    type Error = E;
-    type Effect = SparseBackwardEffect<V>;
-    type Semantics = Sem;
+/// The driver's `store` slot: the discovered callable contexts. A context is
+/// discovered once its entry exists.
+pub type DemandContexts<K> = HashMap<K, CallableContext>;
 
-    fn stage(&self) -> CompileStage {
-        self.location.expect("interp location not set").stage
-    }
+const UNDISCOVERED: InterpreterError =
+    InterpreterError::Custom("demand context was never discovered");
 
-    fn statement(&self) -> Statement {
-        self.location.expect("interp location not set").statement
-    }
-
-    fn index(&self) -> EnvIndex {
-        self.activation
-    }
-}
-
-impl<'ir, S, V, E, Sem> AbstractInterpreter for SparseBackwardTransfer<'ir, S, V, E, Sem>
-where
-    S: StageMeta,
-    V: Clone,
-    E: From<InterpreterError>,
-    Sem: SparseBackwardSemantic,
-{
-}
-
-// ===========================================================================
-// Summary + profile + analysis state
-// ===========================================================================
-
-/// The per-value summary: one demand fact. Its merge is a real lattice join —
-/// `Some(())` iff the fact rose — which is what drives rescheduling.
+/// The per-location summary: one demand fact. Its merge is a real lattice
+/// join — `Some(())` iff the fact rose — which is what drives rescheduling.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DemandSummary<V>(pub V);
 
@@ -282,159 +348,202 @@ where
     }
 }
 
-/// The owner-summary type family for the sparse backward engine.
-pub struct SparseBackwardProfile<V, E> {
-    _marker: PhantomData<fn() -> (V, E)>,
+/// The owner-summary type family for the sparse backward engine, over
+/// callable-context keys `K`.
+pub struct SparseBackwardProfile<V, E, K> {
+    #[allow(clippy::type_complexity)]
+    _marker: PhantomData<fn() -> (V, E, K)>,
 }
 
-impl<'ir, S, V, E, Sem> FixpointProfile<SparseBackwardTransfer<'ir, S, V, E, Sem>>
-    for SparseBackwardProfile<V, E>
+impl<'ir, S, V, E, Lk, P, Sem> FixpointProfile<SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>>
+    for SparseBackwardProfile<V, E, P::Key>
 where
     S: StageMeta,
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
+    P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
-    type SummaryKey = Scoped<BodyScope, SSAValue>;
+    type SummaryKey = Scoped<P::Key, SSAValue>;
     type Summary = DemandSummary<V>;
-    type Frame = DemandFrame<V>;
+    type Frame = DemandFrame<P::Key, V>;
     type Completion = Vec<(SSAValue, V)>;
 }
 
-/// Analysis-local state carried in the driver's `store` slot: the scope facts
-/// are qualified with.
-#[derive(Default)]
-pub struct BackwardAnalysisState {
-    scope: Option<BodyScope>,
-}
+/// One summary update: a context-qualified location and the fact to merge.
+pub(super) type DemandUpdate<K, V> = (Scoped<K, SSAValue>, DemandSummary<V>);
 
 /// The sparse backward driver: a [`StandardFixpointInterpreter`] over
-/// [`SparseBackwardTransfer`] with scope-qualified value owners and the
+/// [`SparseBackwardTransfer`] with context-qualified fact owners and the
 /// default self-dependent index (demand propagation).
-pub type SparseBackwardDriver<'ir, S, V, E, Sem = StrongDemand> = StandardFixpointInterpreter<
-    SparseBackwardTransfer<'ir, S, V, E, Sem>,
-    SparseBackwardProfile<V, E>,
-    BackwardAnalysisState,
-    OwnerSummaryDeps<Scoped<BodyScope, SSAValue>>,
+pub type SparseBackwardDriver<
+    'ir,
+    S,
+    V,
+    E,
+    Lk = SameStageLinker,
+    P = ContextInsensitive,
+    Sem = StrongDemand,
+> = StandardFixpointInterpreter<
+    SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>,
+    SparseBackwardProfile<V, E, <P as DemandContext<V>>::Key>,
+    DemandContexts<<P as DemandContext<V>>::Key>,
+    OwnerSummaryDeps<Scoped<<P as DemandContext<V>>::Key, SSAValue>>,
 >;
 
 // ===========================================================================
-// The demand frame: one owner analysis = dispatch the translating rules
+// SparseBackwardTransfer — the summary-free Interp delegate
 // ===========================================================================
 
-/// One value-owner analysis: dispatch each statement whose rule can translate
-/// the owner's demand, accumulating the demands the rules raise.
-pub struct DemandFrame<V> {
-    stage: CompileStage,
-    work: Vec<Statement>,
-    collected: Vec<(SSAValue, V)>,
+/// The summary-free transfer of the sparse backward engine: pipeline access,
+/// the calling convention and context policy, the real dispatch location and
+/// callable context, and the per-rule buffers.
+pub struct SparseBackwardTransfer<
+    'ir,
+    S: StageMeta,
+    V,
+    E,
+    Lk = SameStageLinker,
+    P = ContextInsensitive,
+    Sem = StrongDemand,
+> where
+    P: DemandContext<V>,
+{
+    pipeline: &'ir Pipeline<S>,
+    pub(super) linker: Lk,
+    pub(super) policy: P,
+    location: Option<InterpLocation>,
+    /// The callable context of the rule being dispatched, carried by the work
+    /// that dispatched it.
+    pub(super) context: Option<P::Key>,
+    /// Local facts the currently dispatched rule has raised.
+    demands: Vec<(SSAValue, V)>,
+    /// Callee contexts the current work's call rules crossed into, each with
+    /// the facts on the call's results. Applied after the work completes, so
+    /// discovery never re-enters rule dispatch.
+    pub(super) activations: Vec<(P::Key, LinkTarget, Product<V>)>,
+    /// Sparse backward facts live in summaries, not per-call activation
+    /// records; this index only satisfies [`Interp::index`].
+    activation: EnvIndex,
+    _marker: PhantomData<fn() -> (E, Sem)>,
 }
 
-impl<V> DemandFrame<V> {
-    fn new(stage: CompileStage, work: Vec<Statement>) -> Self {
+impl<'ir, S: StageMeta, V, E, P, Sem> SparseBackwardTransfer<'ir, S, V, E, SameStageLinker, P, Sem>
+where
+    P: DemandContext<V> + Default,
+{
+    pub(super) fn new(pipeline: &'ir Pipeline<S>) -> Self {
+        Self::with_parts(pipeline, SameStageLinker, P::default())
+    }
+}
+
+impl<'ir, S: StageMeta, V, E, Lk, P, Sem> SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>
+where
+    P: DemandContext<V>,
+{
+    pub(super) fn with_parts(pipeline: &'ir Pipeline<S>, linker: Lk, policy: P) -> Self {
         Self {
-            stage,
-            work,
-            collected: Vec::new(),
-        }
-    }
-}
-
-// This engine has one leaf continuation and never pushes a child, so its frame
-// is also its complete stack-item composition.
-impl<'ir, S, V, E, Sem> Frame<SparseBackwardDriver<'ir, S, V, E, Sem>> for DemandFrame<V>
-where
-    S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Sem>>,
-    V: Clone + PartialEq + Lattice + HasBottom,
-    E: From<InterpreterError>,
-    Sem: SparseBackwardSemantic,
-{
-    type Completion = Vec<(SSAValue, V)>;
-
-    fn step_into(
-        mut self,
-        interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-    ) -> Result<FrameEffect<Self, Self::Completion>, E> {
-        match self.work.pop() {
-            Some(statement) => {
-                let SparseBackwardEffect::Demands(demands) =
-                    interp.run_statement(self.stage, statement)?;
-                self.collected.extend(demands);
-                Ok(FrameEffect::Continue(self))
-            }
-            None => Ok(FrameEffect::Complete(self.collected)),
+            pipeline,
+            linker,
+            policy,
+            location: None,
+            context: None,
+            demands: Vec::new(),
+            activations: Vec::new(),
+            activation: EnvIndex::placeholder(),
+            _marker: PhantomData,
         }
     }
 
-    fn resume_done_into(
-        self,
-        _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-    ) -> Result<FrameEffect<Self, Self::Completion>, E> {
-        Err(E::from(InterpreterError::Custom(
-            "demand frames never push children",
-        )))
+    pub(super) fn into_parts(self) -> (&'ir Pipeline<S>, Lk, P) {
+        (self.pipeline, self.linker, self.policy)
     }
 
-    fn resume_into(
-        self,
-        _completion: Self::Completion,
-        _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-    ) -> Result<FrameEffect<Self, Self::Completion>, E> {
-        Err(E::from(InterpreterError::Custom(
-            "demand frames never push children",
-        )))
+    pub fn pipeline(&self) -> &'ir Pipeline<S> {
+        self.pipeline
     }
-}
 
-// ===========================================================================
-// Driver capabilities: dispatch + the dialect-facing trait
-// ===========================================================================
-
-impl<'ir, S, V, E, Sem> SparseBackwardDriver<'ir, S, V, E, Sem>
-where
-    S: StageMeta + StageQuery + InterpDispatch<Self>,
-    V: Clone + PartialEq + Lattice,
-    E: From<InterpreterError>,
-    Sem: SparseBackwardSemantic,
-{
-    /// Dispatch one statement's backward rule with the location set.
-    fn run_statement(
+    /// Enter `location` under `context`, returning what to restore.
+    pub(super) fn enter(
         &mut self,
-        stage: CompileStage,
-        statement: Statement,
-    ) -> Result<SparseBackwardEffect<V>, E> {
-        let pipeline = self.inner().pipeline();
-        let info = pipeline
-            .stage(stage)
-            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
-        let activation = self.inner().activation;
-        let previous = self.inner_mut().location.replace(InterpLocation {
-            stage,
-            statement,
-            index: activation,
-        });
-        let result = info.dispatch_statement(statement, self);
-        self.inner_mut().location = previous;
-        result
+        location: InterpLocation,
+        context: P::Key,
+    ) -> (Option<InterpLocation>, Option<P::Key>) {
+        (
+            self.location.replace(location),
+            self.context.replace(context),
+        )
+    }
+
+    pub(super) fn restore(&mut self, saved: (Option<InterpLocation>, Option<P::Key>)) {
+        (self.location, self.context) = saved;
+    }
+
+    pub(super) fn current_context(&self) -> Result<&P::Key, InterpreterError> {
+        self.context.as_ref().ok_or(InterpreterError::Custom(
+            "no demand context is being dispatched",
+        ))
+    }
+
+    pub(super) fn activation(&self) -> EnvIndex {
+        self.activation
     }
 }
 
-impl<'ir, S, V, E, Sem> SparseBackwardInterp for SparseBackwardDriver<'ir, S, V, E, Sem>
+impl<'ir, S, V, E, Lk, P, Sem> Interp for SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>
+where
+    S: StageMeta,
+    V: Clone,
+    E: From<InterpreterError>,
+    P: DemandContext<V>,
+    Sem: SparseBackwardSemantic,
+{
+    type Value = V;
+    type Error = E;
+    type Effect = SparseBackwardEffect<V>;
+    type Semantics = Sem;
+
+    fn stage(&self) -> CompileStage {
+        self.location.expect("interp location not set").stage
+    }
+
+    fn statement(&self) -> Statement {
+        self.location.expect("interp location not set").statement
+    }
+
+    fn index(&self) -> EnvIndex {
+        self.activation
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, Sem> AbstractInterpreter
+    for SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>
+where
+    S: StageMeta,
+    V: Clone,
+    E: From<InterpreterError>,
+    P: DemandContext<V>,
+    Sem: SparseBackwardSemantic,
+{
+}
+
+// ===========================================================================
+// Driver capabilities: the dialect-facing trait
+// ===========================================================================
+
+impl<'ir, S, V, E, Lk, P, Sem> SparseBackwardInterp
+    for SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>
 where
     S: StageMeta + StageQuery,
     V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
     fn fact(&self, value: impl Into<SSAValue>) -> Result<V, E> {
-        let scope = self
-            .store()
-            .scope
-            .ok_or_else(|| E::from(InterpreterError::Custom("no active backward analysis")))?;
-        Ok(self
-            .summary(&Scoped::new(scope, value.into()))
-            .map(|summary| summary.0.clone())
-            .unwrap_or_else(V::bottom))
+        let context = self.inner().current_context()?.clone();
+        Ok(self.fact_at(Scoped::new(context, value.into())))
     }
 
     fn raise_fact(&mut self, value: impl Into<SSAValue>, fact: V) -> Result<(), E> {
@@ -454,73 +563,263 @@ where
     fn terminator_args(&self, block: Block) -> Result<TerminatorArgs, E> {
         query::terminator_arguments(self.inner().pipeline(), self.stage(), block).map_err(E::from)
     }
+
+    fn declare_return(&mut self, operands: &[SSAValue]) -> Result<(), E> {
+        let context = self.inner().current_context()?.clone();
+        self.store_mut()
+            .get_mut(&context)
+            .ok_or(UNDISCOVERED)?
+            .add_return(operands)?;
+        Ok(())
+    }
+
+    fn summarize_call(
+        &mut self,
+        callee: Callee,
+        stage: Option<CompileStage>,
+        outputs: Product<V>,
+    ) -> Result<Product<V>, E> {
+        let lookup_stage = stage.unwrap_or(self.stage());
+        let pipeline = self.inner().pipeline();
+        let target = self
+            .inner()
+            .linker
+            .resolve(pipeline, lookup_stage, &callee)?;
+        let key = self.inner_mut().policy.key(&target, &outputs);
+        let work = self.current_owner().cloned().ok_or_else(|| {
+            E::from(InterpreterError::Custom(
+                "a call boundary was crossed outside propagation work",
+            ))
+        })?;
+
+        let params = self.entry_params(target)?;
+        let mut facts = Product::new();
+        for param in params {
+            let location = Scoped::new(key.clone(), param);
+            self.dependency_index_mut()
+                .register(&location, SummaryDependency::Reanalyze(work.clone()))
+                .map_err(|error| E::from(InterpreterError::from(error)))?;
+            facts.0.push(self.fact_at(location));
+        }
+        self.inner_mut().activations.push((key, target, outputs));
+        Ok(facts)
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, Sem> SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>
+where
+    S: StageMeta + StageQuery,
+    V: Clone + PartialEq + Lattice + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: DemandContext<V>,
+    Sem: SparseBackwardSemantic,
+{
+    /// The current fact at a context-qualified location (bottom if absent).
+    pub(super) fn fact_at(&self, location: Scoped<P::Key, SSAValue>) -> V {
+        self.summary(&location)
+            .map(|summary| summary.0.clone())
+            .unwrap_or_else(V::bottom)
+    }
+
+    /// `target`'s callable body and entry block. Unsupported bodies fail here
+    /// rather than producing empty facts.
+    fn callable_entry(&self, target: LinkTarget) -> Result<(Body, Block), E> {
+        let pipeline = self.inner().pipeline();
+        let body = target.body(pipeline)?;
+        let entry = match body {
+            Body::CFG(cfg) => {
+                query::cfg_entry(pipeline, target.stage, cfg)?.ok_or(InterpreterError::EmptyCFG)?
+            }
+            Body::Block(block) => block,
+            Body::DiGraph(_) | Body::UnGraph(_) => {
+                return Err(E::from(InterpreterError::NoDefaultWalker(body)));
+            }
+        };
+        Ok((body, entry))
+    }
+
+    /// `target`'s entry parameters — what callers map onto arguments.
+    pub(super) fn entry_params(&self, target: LinkTarget) -> Result<Vec<SSAValue>, E> {
+        let (_, entry) = self.callable_entry(target)?;
+        Ok(query::block_params(
+            self.inner().pipeline(),
+            target.stage,
+            entry,
+        )?)
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, Sem> SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>
+where
+    S: StageMeta + StageQuery + InterpDispatch<Self>,
+    V: Clone + PartialEq + Lattice + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: DemandContext<V>,
+    Sem: SparseBackwardSemantic,
+{
+    /// Dispatch one statement's backward rule at `stage` under `context`.
+    pub(super) fn run_statement(
+        &mut self,
+        context: &P::Key,
+        stage: CompileStage,
+        statement: Statement,
+    ) -> Result<SparseBackwardEffect<V>, E> {
+        let pipeline = self.inner().pipeline();
+        let info = pipeline
+            .stage(stage)
+            .ok_or_else(|| E::from(InterpreterError::MissingStage(stage)))?;
+        let index = self.inner().activation();
+        let saved = self.inner_mut().enter(
+            InterpLocation {
+                stage,
+                statement,
+                index,
+            },
+            context.clone(),
+        );
+        let result = info.dispatch_statement(statement, self);
+        self.inner_mut().restore(saved);
+        result
+    }
+
+    /// Discover a context once: record it, then evaluate every rule of
+    /// its body and structured children — but not nested callable
+    /// definitions — with nothing demanded yet, collecting the unconditional
+    /// contributions (control roots) before any of them is merged. Rules
+    /// whose contributions are conditional read bottom here and rerun when
+    /// the facts they consulted rise.
+    pub(super) fn discover(
+        &mut self,
+        key: &P::Key,
+        target: LinkTarget,
+    ) -> Result<Vec<DemandUpdate<P::Key, V>>, E> {
+        if let Some(context) = self.store().get(key) {
+            if context.target != target {
+                return Err(E::from(InterpreterError::Custom(
+                    "demand context key selected for two call targets",
+                )));
+            }
+            return Ok(Vec::new());
+        }
+        let (body, _) = self.callable_entry(target)?;
+        self.store_mut()
+            .insert(key.clone(), CallableContext::new(target, body));
+        let stage = target.stage;
+
+        let mut bodies = VecDeque::from([body]);
+        let mut visited = HashSet::new();
+        let mut seeds = Vec::new();
+        while let Some(body) = bodies.pop_front() {
+            if !visited.insert(body) {
+                continue;
+            }
+            let contents = query::body_contents(self.inner().pipeline(), stage, body)?;
+            bodies.extend(contents.children);
+            for statement in contents.statements {
+                let SparseBackwardEffect::Demands(demands) =
+                    self.run_statement(key, stage, statement)?;
+                seeds.extend(
+                    demands.into_iter().map(|(value, fact)| {
+                        (Scoped::new(key.clone(), value), DemandSummary(fact))
+                    }),
+                );
+            }
+        }
+        Ok(seeds)
+    }
+
+    /// Apply the call boundaries crossed by the work that just completed:
+    /// discover each callee context if needed, then route the call's result
+    /// facts into its return operands. Every update still merges through the
+    /// driver.
+    pub(super) fn apply_activations(&mut self) -> Result<Vec<DemandUpdate<P::Key, V>>, E> {
+        let mut updates = Vec::new();
+        loop {
+            let activations = mem::take(&mut self.inner_mut().activations);
+            if activations.is_empty() {
+                return Ok(updates);
+            }
+            for (key, target, outputs) in activations {
+                updates.extend(self.discover(&key, target)?);
+                updates.extend(
+                    self.store()
+                        .get(&key)
+                        .ok_or(UNDISCOVERED)?
+                        .route_outputs(&key, outputs)?,
+                );
+            }
+        }
+    }
 }
 
 // ===========================================================================
-// Owner analysis: analyzing one value = running its translating rules
+// Owner semantics: analyzing one location = running its translating rules
 // ===========================================================================
 
-struct SparseBackwardOwnerAnalysis;
+pub(super) struct SparseBackwardOwnerAnalysis;
 
-impl<'ir, S, V, E, Sem>
+impl<'ir, S, V, E, Lk, P, Sem>
     OwnerAnalysis<
-        SparseBackwardDriver<'ir, S, V, E, Sem>,
-        Scoped<BodyScope, SSAValue>,
+        SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
+        Scoped<P::Key, SSAValue>,
         DemandSummary<V>,
-        DemandFrame<V>,
+        DemandFrame<P::Key, V>,
         Vec<(SSAValue, V)>,
         E,
     > for SparseBackwardOwnerAnalysis
 where
-    S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Sem>>,
+    S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
     fn bottom_summary(
         &mut self,
-        _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-        _owner: &Scoped<BodyScope, SSAValue>,
+        _interp: &mut SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
+        _owner: &Scoped<P::Key, SSAValue>,
     ) -> Result<DemandSummary<V>, E> {
         Ok(DemandSummary(V::bottom()))
     }
 
     fn entry_frame(
         &mut self,
-        interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-        owner: &Scoped<BodyScope, SSAValue>,
+        interp: &mut SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
+        owner: &Scoped<P::Key, SSAValue>,
         _summary: &DemandSummary<V>,
-    ) -> Result<DemandFrame<V>, E> {
-        let (stage, _cfg) = owner.scope;
-        let kind = query::value_kind(interp.inner().pipeline(), stage, owner.item)?;
-        let work = match kind {
+    ) -> Result<DemandFrame<P::Key, V>, E> {
+        let context = interp.store().get(&owner.scope).ok_or(UNDISCOVERED)?;
+        let stage = context.target.stage;
+        let pipeline = interp.inner().pipeline();
+        let work = match query::value_kind(pipeline, stage, owner.item)? {
             SSAKind::Result(statement, _) => vec![statement],
             SSAKind::BlockArgument(block, _) => {
-                query::block_argument_predecessors(interp.inner().pipeline(), stage, block)?
-                    .into_vec()
+                query::block_argument_predecessors(pipeline, stage, block)?.into_vec()
             }
-            SSAKind::Port(parent, _) => vec![query::graph_port_owner(
-                interp.inner().pipeline(),
-                stage,
-                parent,
-            )?],
+            SSAKind::Port(parent, _) => {
+                vec![query::graph_port_owner(pipeline, stage, parent)?]
+            }
         };
-        Ok(DemandFrame::new(stage, work))
+        Ok(DemandFrame::new(owner.scope.clone(), stage, work))
     }
 
     fn complete_owner(
         &mut self,
-        _interp: &mut SparseBackwardDriver<'ir, S, V, E, Sem>,
-        owner: Scoped<BodyScope, SSAValue>,
+        interp: &mut SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
+        owner: Scoped<P::Key, SSAValue>,
         completion: Vec<(SSAValue, V)>,
-    ) -> Result<SummaryEffect<Scoped<BodyScope, SSAValue>, DemandSummary<V>>, E> {
-        // Scope-qualify the bare values the rules demanded.
-        Ok(SummaryEffect::Many(
-            completion
-                .into_iter()
-                .map(|(value, fact)| (Scoped::new(owner.scope, value), DemandSummary(fact)))
-                .collect(),
-        ))
+    ) -> Result<SummaryEffect<Scoped<P::Key, SSAValue>, DemandSummary<V>>, E> {
+        // Qualify the rules' local demands with the work's context, then
+        // apply the call boundaries the work crossed.
+        let mut updates: Vec<DemandUpdate<P::Key, V>> = completion
+            .into_iter()
+            .map(|(value, fact)| (Scoped::new(owner.scope.clone(), value), DemandSummary(fact)))
+            .collect();
+        updates.extend(interp.apply_activations()?);
+        Ok(SummaryEffect::Many(updates))
     }
 }
 
@@ -530,10 +829,18 @@ where
 
 /// Sparse backward demand engine (strong liveness / neededness).
 ///
+/// Demand crosses supported calls: a demanded call result demands the
+/// matching output of the callee's context, and demanded callee parameters
+/// demand the matching call arguments. Facts are qualified by the callable
+/// context the [`DemandContext`] policy `P` selects (default: one context per
+/// resolved [`LinkTarget`](crate::LinkTarget)). One engine accumulates facts across `analyze`
+/// calls, each adding its root request; use a fresh engine for an isolated
+/// request.
+///
 /// ```ignore
-/// let mut analysis = SparseBackwardInterpreter::<Stage, Live>::new(&pipeline);
-/// let scope = analysis.analyze(stage, callee)?;
-/// let demanded = analysis.is_demanded(scope.0, scope.1, value);
+/// let mut analysis = SparseBackwardInterpreter::<Stage, Demand>::new(&pipeline);
+/// let params = analysis.analyze(stage, callee, [Demand::Live])?;
+/// let demanded = analysis.is_demanded(analysis.root().unwrap(), value);
 /// ```
 pub struct SparseBackwardInterpreter<
     'ir,
@@ -541,194 +848,235 @@ pub struct SparseBackwardInterpreter<
     V,
     E = InterpreterError,
     Lk = SameStageLinker,
+    P = ContextInsensitive,
     Sem = StrongDemand,
 > where
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
+    P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
-    driver: SparseBackwardDriver<'ir, S, V, E, Sem>,
-    linker: Lk,
+    pub(super) driver: SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
+    pub(super) root: Option<P::Key>,
 }
 
-impl<'ir, S, V, E, Sem> SparseBackwardInterpreter<'ir, S, V, E, SameStageLinker, Sem>
+impl<'ir, S, V, E, P, Sem> SparseBackwardInterpreter<'ir, S, V, E, SameStageLinker, P, Sem>
 where
     S: StageMeta,
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
+    P: DemandContext<V> + Default,
     Sem: SparseBackwardSemantic,
 {
     pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
-        Self {
-            driver: StandardFixpointInterpreter::with_dependency_index(
-                SparseBackwardTransfer::new(pipeline),
-                BackwardAnalysisState::default(),
-                (),
-                OwnerSummaryDeps::new(),
-            ),
-            linker: SameStageLinker,
-        }
+        Self::from_transfer(SparseBackwardTransfer::new(pipeline))
     }
 }
 
-impl<'ir, S, V, E, Lk, Sem> SparseBackwardInterpreter<'ir, S, V, E, Lk, Sem>
+impl<'ir, S, V, E, Lk, P, Sem> SparseBackwardInterpreter<'ir, S, V, E, Lk, P, Sem>
 where
     S: StageMeta,
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
+    P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
-    /// Replace the calling convention used by the canonical callable root.
+    fn from_transfer(transfer: SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>) -> Self {
+        Self {
+            root: None,
+            driver: StandardFixpointInterpreter::with_dependency_index(
+                transfer,
+                Default::default(),
+                (),
+                OwnerSummaryDeps::new(),
+            ),
+        }
+    }
+
+    /// Replace the calling convention used for roots and calls. Resets the
+    /// analysis state.
     pub fn with_linker<Lk2>(
         self,
         linker: Lk2,
-    ) -> SparseBackwardInterpreter<'ir, S, V, E, Lk2, Sem> {
-        SparseBackwardInterpreter {
-            driver: self.driver,
-            linker,
-        }
+    ) -> SparseBackwardInterpreter<'ir, S, V, E, Lk2, P, Sem> {
+        let (pipeline, _, policy) = self.driver.into_inner().into_parts();
+        SparseBackwardInterpreter::from_transfer(SparseBackwardTransfer::with_parts(
+            pipeline, linker, policy,
+        ))
+    }
+
+    /// Replace the context-selection policy (and so the context key type).
+    /// Resets the analysis state.
+    pub fn with_policy<P2: DemandContext<V>>(
+        self,
+        policy: P2,
+    ) -> SparseBackwardInterpreter<'ir, S, V, E, Lk, P2, Sem> {
+        let (pipeline, linker, _) = self.driver.into_inner().into_parts();
+        SparseBackwardInterpreter::from_transfer(SparseBackwardTransfer::with_parts(
+            pipeline, linker, policy,
+        ))
     }
 
     pub fn pipeline(&self) -> &'ir Pipeline<S> {
         self.driver.inner().pipeline()
     }
 
-    /// The converged demand fact for `value` under the `(stage, body)` scope.
-    pub fn fact(
-        &self,
-        stage: CompileStage,
-        body: impl Into<Body>,
-        value: impl Into<SSAValue>,
-    ) -> Option<&V> {
+    /// The root of the most recent successful analysis. Cleared when a new
+    /// analysis starts; detailed facts remain available through context queries.
+    pub fn root(&self) -> Option<&P::Key> {
+        self.root.as_ref()
+    }
+
+    /// The discovered callable contexts, in no particular order.
+    pub fn contexts(&self) -> impl Iterator<Item = &P::Key> {
+        self.driver.store().keys()
+    }
+
+    /// The `(target stage, callable body)` a discovered context analyzes.
+    pub fn scope(&self, context: &P::Key) -> Option<BodyScope> {
         self.driver
-            .summary(&Scoped::new((stage, body.into()), value.into()))
+            .store()
+            .get(context)
+            .map(|context| (context.target.stage, context.body))
+    }
+
+    /// The converged demand fact for `value` in `context`.
+    pub fn fact(&self, context: &P::Key, value: impl Into<SSAValue>) -> Option<&V> {
+        self.driver
+            .summary(&Scoped::new(context.clone(), value.into()))
             .map(|summary| &summary.0)
     }
 
-    /// All converged `(value, fact)` pairs under the `(stage, body)` scope.
-    pub fn facts(
-        &self,
-        stage: CompileStage,
-        body: impl Into<Body>,
-    ) -> impl Iterator<Item = (SSAValue, &V)> {
-        let scope = (stage, body.into());
+    /// The joined demand on operand `index` of every return site of `context`.
+    pub fn result_value(&self, context: &P::Key, index: usize) -> Option<V> {
+        let store = self.driver.store();
+        let operands = store.get(context)?.outputs.as_ref()?.get(index)?;
+        operands
+            .iter()
+            .filter_map(|operand| self.fact(context, *operand))
+            .cloned()
+            .reduce(|joined, fact| joined.join(&fact))
+    }
+
+    /// All converged `(value, fact)` pairs in `context`.
+    pub fn facts<'a>(&'a self, context: &'a P::Key) -> impl Iterator<Item = (SSAValue, &'a V)> {
         self.driver
             .summaries()
             .iter()
-            .filter(move |(owner, _)| owner.scope == scope)
+            .filter(move |(owner, _)| owner.scope == *context)
             .map(|(owner, summary)| (owner.item, &summary.0))
     }
 
-    /// The converged facts under the `(stage, body)` scope as a
-    /// [`SparseStore`] (the sparse per-SSA-value fact view; absent = bottom).
-    pub fn fact_store(&self, stage: CompileStage, body: impl Into<Body>) -> SparseStore<V> {
+    /// The converged value facts in `context` as a [`SparseStore`] (the
+    /// sparse per-SSA-value fact view; absent = bottom).
+    pub fn fact_store(&self, context: &P::Key) -> SparseStore<V> {
         let mut store = SparseStore::new();
-        for (value, fact) in self.facts(stage, body) {
+        for (value, fact) in self.facts(context) {
             store.set(value, fact.clone());
         }
         store
     }
+
+    /// `true` iff `value` carries a non-bottom demand fact in `context`.
+    pub fn is_demanded(&self, context: &P::Key, value: impl Into<SSAValue>) -> bool
+    where
+        V: HasBottom,
+    {
+        self.fact(context, value)
+            .is_some_and(|fact| *fact != V::bottom())
+    }
 }
 
-impl<'ir, S, V, E, Lk, Sem> SparseBackwardInterpreter<'ir, S, V, E, Lk, Sem>
+impl<'ir, S, V, E, Lk, P, Sem> SparseBackwardInterpreter<'ir, S, V, E, Lk, P, Sem>
 where
-    S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Sem>>,
+    S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
+    P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
-    /// Resolve a stage and function by name, then run the demand fixpoint.
+    /// Resolve a stage and function by name and infer parameter facts from
+    /// the supplied output facts. See [`Self::analyze`].
     pub fn analyze_by_name(
         &mut self,
         stage_name: &str,
         function_name: &str,
-    ) -> Result<BodyScope, E> {
+        result_values: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        self.root = None;
         let stage = self
-            .driver
-            .inner()
             .pipeline()
             .stage_by_name(stage_name)
             .ok_or_else(|| E::from(InterpreterError::MissingStageName(stage_name.into())))?;
         let function = self
-            .driver
-            .inner()
             .pipeline()
             .lookup_function_by_name(function_name)
             .ok_or_else(|| E::from(InterpreterError::MissingFunctionName(function_name.into())))?;
-        self.analyze(stage, Callee::Function(function))
+        self.analyze(stage, Callee::Function(function), result_values)
     }
 
-    /// Run the demand fixpoint from a stage-local symbol.
+    /// Resolve a stage-local symbol and infer parameter facts from the
+    /// supplied output facts. See [`Self::analyze`].
     pub fn analyze_by_symbol(
         &mut self,
         stage: CompileStage,
         symbol: Symbol,
-    ) -> Result<BodyScope, E> {
-        self.analyze(stage, symbol.into())
+        result_values: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        self.analyze(stage, symbol.into(), result_values)
     }
 
-    /// Resolve `callee` and run the demand fixpoint over its callable body.
+    /// Infer one fact per entry parameter, in parameter order, from output
+    /// lattice values. Supply exactly one lattice value per result.
     ///
-    /// **Prepass**: walk the body's containment hierarchy, running every
-    /// statement's rule once with nothing demanded — impure statements and
-    /// terminators contribute the demand roots.
-    /// **Propagation**: drain the value worklist; each risen value dispatches
-    /// the rules that translate its demand.
-    pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
-        let pipeline = self.driver.inner().pipeline();
-        let target = self.linker.resolve(pipeline, stage, &callee)?;
-        let body = target.body(pipeline)?;
-        if matches!(body, Body::DiGraph(_) | Body::UnGraph(_)) {
-            return Err(E::from(InterpreterError::NoDefaultWalker(body)));
-        }
-        let scope = (target.stage, body);
-        *self.driver.store_mut() = BackwardAnalysisState { scope: Some(scope) };
-
+    /// Discover return sites and intrinsic roots once per context, merge the
+    /// supplied output facts into the return operands, then drain the shared
+    /// fixpoint worklist. Bottom output facts still allow intrinsic roots to
+    /// contribute parameter facts.
+    /// Facts join with prior requests if the context policy reuses a key.
+    /// Detailed context facts remain accessible through [`Self::root`],
+    /// [`Self::contexts`], and [`Self::fact`].
+    pub fn analyze(
+        &mut self,
+        stage: CompileStage,
+        callee: Callee,
+        result_values: impl IntoIterator<Item = V>,
+    ) -> Result<Product<V>, E> {
+        self.root = None;
+        let outputs: Product<V> = result_values.into_iter().collect();
+        let target = self
+            .driver
+            .inner()
+            .linker
+            .resolve(self.pipeline(), stage, &callee)?;
+        let root = self.driver.inner_mut().policy.key(&target, &outputs);
+        let updates = self.driver.discover(&root, target)?;
+        // Preserve intrinsic seeds even if boundary arity validation fails:
+        // discovery is cached, so a later valid request must still see them.
         let mut owner_analysis = SparseBackwardOwnerAnalysis;
-
-        // Prepass: visit each contained body part once and collect all demand
-        // roots before merging any of them, so every rule observes bottom.
-        let mut bodies = VecDeque::from([body]);
-        let mut visited = HashSet::new();
-        let mut seeds: Vec<(SSAValue, V)> = Vec::new();
-        while let Some(body) = bodies.pop_front() {
-            if !visited.insert(body) {
-                continue;
-            }
-            let contents =
-                query::body_contents(self.driver.inner().pipeline(), target.stage, body)?;
-            bodies.extend(contents.children);
-            for statement in contents.statements {
-                let SparseBackwardEffect::Demands(demands) =
-                    self.driver.run_statement(target.stage, statement)?;
-                seeds.extend(demands);
-            }
+        for (location, fact) in updates {
+            self.driver
+                .merge_summary(&mut owner_analysis, location, fact)?;
         }
-
-        // Propagate to the fixpoint.
-        for (value, fact) in seeds {
-            self.driver.merge_summary(
-                &mut owner_analysis,
-                Scoped::new(scope, value),
-                DemandSummary(fact),
-            )?;
+        let updates = self
+            .driver
+            .store()
+            .get(&root)
+            .ok_or(UNDISCOVERED)?
+            .route_outputs(&root, outputs)?;
+        for (location, fact) in updates {
+            self.driver
+                .merge_summary(&mut owner_analysis, location, fact)?;
         }
         self.driver.drain_worklist(&mut owner_analysis)?;
-        Ok(scope)
-    }
-
-    /// `true` iff `value` carries a non-bottom demand fact under the scope.
-    pub fn is_demanded(
-        &self,
-        stage: CompileStage,
-        body: impl Into<Body>,
-        value: impl Into<SSAValue>,
-    ) -> bool
-    where
-        V: HasBottom,
-    {
-        self.fact(stage, body, value)
-            .is_some_and(|fact| *fact != V::bottom())
+        let params = self
+            .driver
+            .entry_params(target)?
+            .into_iter()
+            .map(|param| self.driver.fact_at(Scoped::new(root.clone(), param)))
+            .collect();
+        self.root = Some(root);
+        Ok(params)
     }
 }
