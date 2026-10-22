@@ -2872,10 +2872,10 @@ driver runs `#[rewrite_rule]` patterns rather than native rules:
   dead-code cleanup erases pure, unused, non-terminator statements under the
   root, mostly what the rules left behind. Blocks are cleaned from their
   end; `DiGraph`s from their sinks, queuing a member's producers when it is
-  erased, so a dead chain goes in one pass. `UnGraph`s are not cleaned:
-  their nodes usually have no results and mean something through their
-  wires. The fixpoint ends at the first sweep (rules plus cleanup) recording
-  no `MutationEvent`.
+  erased, so a dead chain goes in one pass. `UnGraph`s are not cleaned, by
+  design: their nodes consume wires but are not consumed, so there is no
+  "unused" to test. The fixpoint ends at the first sweep (rules plus
+  cleanup) recording no `MutationEvent`.
 - Rules may not erase their root (`RuleErrorKind::ErasesRoot`, checked when
   the rule is added); a root left dead is removed by the dead-code cleanup. A
   rule's other erase targets are producers of the root, which are never

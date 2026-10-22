@@ -24,9 +24,8 @@ impl<L: Dialect> RewriteDriver<'_, L> {
     ///   results is used (by another member or a yield), and a member's
     ///   producers are queued when it is erased.
     ///
-    /// `UnGraph` bodies are left alone: their nodes usually have no results
-    /// and mean something through their wires, so "no result is used" does
-    /// not make them dead.
+    /// `UnGraph` bodies are not cleaned, by design: their nodes consume wires
+    /// but are not consumed, so there is no "unused" to test.
     pub(super) fn clean_up_dead_code(
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
