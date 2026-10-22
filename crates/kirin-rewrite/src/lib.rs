@@ -1,10 +1,21 @@
 //! Matching and scheduling for Kirin rewrite rules.
 //!
-//! This crate will own wildcard matching, root-operation indexing, worklists,
-//! fixpoints, constraint evaluation, and analysis integration. Concrete IR
-//! mutation remains in `kirin-ir`; inspectable `RewriteRule` data remains in
-//! `kirin-wildcard`.
+//! A rule is a `wildcard.pattern` from `kirin-wildcard`, usually written with
+//! `#[rewrite_rule]`. A [`RuleSet`] checks the patterns once and holds the
+//! [`NativeRegistry`] of Rust functions they call by name. A
+//! [`RewriteDriver`] walks the IR in a [`WalkOrder`](kirin_ir::walk::WalkOrder),
+//! matches every rule at every statement, runs the rewrite of each match
+//! through the pass's [`Rewriter`](kirin_ir::Rewriter), and repeats until a
+//! walk changes nothing.
 //!
-//! The public engine API is intentionally not defined until the def-use and
-//! replacement-legality contracts in the rewrite-engine design are settled.
+//! Concrete IR mutation stays in `kirin-ir`, and the rule data in
+//! `kirin-wildcard`.
 #![forbid(unsafe_code)]
+
+mod driver;
+mod native;
+mod rule;
+
+pub use driver::{DriverError, RewriteDriver, RewriteSummary};
+pub use native::{ActionFn, CheckFn, NativeRegistry, NativeValue};
+pub use rule::{RewriteRule, RuleError, RuleErrorKind, RuleSet};
