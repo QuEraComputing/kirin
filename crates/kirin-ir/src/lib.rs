@@ -19,6 +19,9 @@ mod testing;
 /// Queries from the IRContext.
 pub mod query;
 
+/// Traversal orders for rewrite drivers.
+pub use rewrite::walk;
+
 pub use arena::{Arena, GetInfo, Id, Identifier, Item};
 pub use body::{Body, HasCallableBody};
 pub use builder::error::{
