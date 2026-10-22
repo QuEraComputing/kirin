@@ -38,7 +38,7 @@ pub enum DriverError {
     /// An edit broke the walk's contract, such as a native action erasing the
     /// statement being visited.
     Walk(WalkError),
-    /// The dead-code pass could not erase `stmt`.
+    /// The dead-code cleanup could not erase `stmt`.
     DeadCode {
         stmt: Statement,
         error: RewriteError,

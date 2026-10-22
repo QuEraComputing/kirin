@@ -13,7 +13,7 @@ use kirin_wildcard::rewrite_rule;
 
 /// `-(-x)` is `x`: integer negation wraps and float negation flips the sign
 /// bit, so negating twice is exact. The two `neg`s are left dead for the
-/// driver's dead-code pass.
+/// driver's dead-code cleanup.
 #[rewrite_rule(language = L)]
 fn double_neg() {
     let a = op![Arith::neg(x)];
@@ -186,7 +186,7 @@ fn a_chain_of_negations_reduces_by_parity() {
 
 #[test]
 fn the_fixpoint_ends_with_a_sweep_that_changes_nothing() {
-    // Sweep 1: `double_neg` folds `%b` into `%x`; the dead-code pass then
+    // Sweep 1: `double_neg` folds `%b` into `%x`; the dead-code cleanup then
     // erases `%b` and, with it unused, `%a`. Sweep 2 changes nothing.
     let input = program(
         "    %a = neg %x -> i64;\n    %b = neg %a -> i64;\n    %c = neg %b -> i64;",

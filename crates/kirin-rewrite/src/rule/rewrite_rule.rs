@@ -50,7 +50,7 @@ impl RewriteRule {
     ///
     /// A rule must not erase its root: the driver is visiting it, and a walk
     /// forbids erasing the statement being visited (see
-    /// [`kirin_ir::walk`]). Dead roots are left to the dead-code pass. The
+    /// [`kirin_ir::walk`]). Dead roots are left to the dead-code cleanup. The
     /// producers a rule may erase are never nested in or around the root,
     /// so no other erase can break the walk.
     pub(crate) fn new<L: Dialect>(
