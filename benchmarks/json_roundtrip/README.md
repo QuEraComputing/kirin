@@ -82,7 +82,9 @@ local pre/post shape preservation remains useful for serialization correctness.
 Reports retain each sample input, path, expected/original/decoded output,
 workload specification SHA-256, and separate representation diagnostics.
 
-The small corpus currently omits loops. A future Python iterable-based loop
+`workloads.json` also defines `loop`, `calls`, `calls_same` and `recursion`
+for the [constprop benchmark](../constprop/README.md). This benchmark runs only
+the three families above, so its corpus still omits loops. A future Python iterable-based loop
 and Rust start/end/step loop may be compared when both satisfy the same finite
 semantic specification; identical loop representation is not required.
 Structured conditionals/loops and graph bodies remain covered by the separate

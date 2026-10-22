@@ -1,7 +1,33 @@
 """Check the source actually imported by the selected Python interpreter."""
 import json
+import os
 from pathlib import Path
+import platform
 import subprocess
+
+ROOT = Path(__file__).resolve().parents[2]
+
+
+def run(*args, cwd=ROOT):
+    return subprocess.check_output([str(arg) for arg in args], cwd=cwd, text=True).strip()
+
+
+def environment(python):
+    """Host, toolchains and Rust revision recorded with every report."""
+    hardware = {"logical_cpus": os.cpu_count(), "processor": platform.processor()}
+    if platform.system() == "Darwin":
+        for key in ("machdep.cpu.brand_string", "hw.model", "hw.memsize"):
+            probe = subprocess.run(["sysctl", "-n", key], capture_output=True, text=True)
+            hardware[key] = probe.stdout.strip() if probe.returncode == 0 else "unavailable"
+    elif platform.system() == "Linux":
+        cpuinfo = Path("/proc/cpuinfo").read_text()
+        hardware["cpu_model"] = next((line.split(":", 1)[1].strip() for line in cpuinfo.splitlines()
+                                      if line.startswith("model name")), platform.processor())
+    return {"platform": platform.platform(), "machine": platform.machine(),
+            "hardware": hardware, "python": run(python, "-VV"),
+            "rustc": run("rustc", "--version", "--verbose"),
+            "rust_revision": run("git", "rev-parse", "HEAD"),
+            "rust_working_tree": run("git", "status", "--porcelain")}
 
 
 def verify_python_source(checkout, source):

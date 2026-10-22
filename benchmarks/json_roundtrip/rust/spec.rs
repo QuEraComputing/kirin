@@ -28,6 +28,8 @@ pub struct Path {
     pub start: String,
     pub delta: String,
     pub operation: String,
+    #[serde(default)]
+    pub trips: usize,
     pub expected: Expected,
 }
 #[derive(Deserialize)]

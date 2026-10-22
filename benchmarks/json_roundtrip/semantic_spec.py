@@ -15,6 +15,16 @@ def family_spec(name, size, suite=None):
     return next(family for family in suite["families"] if family["name"] == name)
 
 
+def coefficients(path, steps):
+    return {var: multiplier["constant"] + steps * multiplier["per_step"]
+            for var in ("x", "y") for multiplier in [path["expected"][f"{var}_multiplier"]]}
+
+
+def path_value(path, steps, inputs):
+    """Evaluate a closed form, not the builder's repeated arithmetic chain. Unread inputs may be None."""
+    return sum(coefficient * inputs[var] for var, coefficient in coefficients(path, steps).items() if coefficient)
+
+
 def expected_cases(name, size, suite=None):
     suite = suite or load_suite()
     family = family_spec(name, size, suite)
@@ -27,9 +37,7 @@ def expected_cases(name, size, suite=None):
         assert len(paths) == 1
         path = paths[0]
         covered.add(path["name"])
-        # Evaluate a closed form, not the builder's repeated arithmetic chain.
-        expected = sum(sample[var] * (path["expected"][f"{var}_multiplier"]["constant"] +
-                       steps * path["expected"][f"{var}_multiplier"]["per_step"]) for var in ("x", "y"))
+        expected = path_value(path, steps, sample)
         assert -(2 ** 63) <= expected < 2 ** 63
         cases.append({"input": sample, "path": path["name"], "expected": expected})
     assert covered == {path["name"] for path in family["paths"]}

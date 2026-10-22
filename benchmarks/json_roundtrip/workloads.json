@@ -202,6 +202,146 @@
           }
         }
       ]
+    },
+    {
+      "name": "loop",
+      "description": "CFG loop: outer chooses 4 or 0 iterations; each iteration adds y size times.",
+      "steps_divisor": 1,
+      "paths": [
+        {
+          "name": "run",
+          "when": {
+            "outer": true
+          },
+          "start": "x",
+          "delta": "y",
+          "operation": "add",
+          "trips": 4,
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": 4
+            }
+          }
+        },
+        {
+          "name": "skip",
+          "when": {
+            "outer": false
+          },
+          "start": "x",
+          "delta": "y",
+          "operation": "add",
+          "trips": 0,
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": 0
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "calls",
+      "description": "size chained calls acc = step(acc, y), where step adds its arguments.",
+      "steps_divisor": 1,
+      "paths": [
+        {
+          "name": "all",
+          "when": {},
+          "start": "x",
+          "delta": "y",
+          "operation": "add",
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "calls_same",
+      "description": "size calls step(x, y) with the same arguments, each result added to x.",
+      "steps_divisor": 1,
+      "paths": [
+        {
+          "name": "all",
+          "when": {},
+          "start": "x",
+          "delta": "y",
+          "operation": "add",
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 1
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": 1
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "recursion",
+      "description": "Self-recursion adding y at each level; outer chooses depth size or 0.",
+      "steps_divisor": 1,
+      "paths": [
+        {
+          "name": "run",
+          "when": {
+            "outer": true
+          },
+          "start": "x",
+          "delta": "y",
+          "operation": "add",
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": 1
+            }
+          }
+        },
+        {
+          "name": "skip",
+          "when": {
+            "outer": false
+          },
+          "start": "x",
+          "delta": "y",
+          "operation": "add",
+          "expected": {
+            "x_multiplier": {
+              "constant": 1,
+              "per_step": 0
+            },
+            "y_multiplier": {
+              "constant": 0,
+              "per_step": 0
+            }
+          }
+        }
+      ]
     }
   ]
 }
