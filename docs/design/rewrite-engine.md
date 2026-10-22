@@ -101,7 +101,7 @@ flowchart TB
   end
 
   subgraph L3["kirin-rewrite — matching &amp; scheduling"]
-    RD["RewriteDriver<br/>Walk · Chain · Fixpoint"]:::planned
+    RD["RewriteDriver<br/>Walk · Chain · Fixpoint"]:::partial
     WM["WildcardMatcher"]:::planned
     RI["RuleIndex<br/>root-op indexing"]:::planned
     AM["AnalysisManager<br/>drop cache on mutation"]:::planned
@@ -2825,9 +2825,9 @@ policy.
 
 ### M2: Native Rule Driver
 
-- [ ] Implement `RewriteResult` / `RewriteChange`.
-- [ ] Implement `Walk`, `Chain`, `Fixpoint` equivalents over arena ids.
-- [ ] Have one driver/pass invocation mutate one `StageInfo` in place.
+- [x] Implement `RewriteResult` / `RewriteChange` (`RewriteSummary`).
+- [x] Implement `Walk`, `Chain`, `Fixpoint` equivalents over arena ids.
+- [x] Have one driver/pass invocation mutate one `StageInfo` in place.
 - [ ] Support native Rust rules as a permanent restricted-mutation extension
   point for stateful, algorithmic, analysis-backed, and larger-scope work.
 - [ ] Store immutable native configuration/factories in `RuleSet` and create
@@ -2838,9 +2838,51 @@ policy.
 - [ ] Exercise the state lifecycle with a test-only rule; do not add a
   disposable production rule that will be deleted when declarative matching
   lands.
-- [ ] Ensure dead ids in worklists are skipped.
-- [ ] Treat fixpoint-budget exhaustion as a pass error rather than silent
-  incomplete success.
+- [x] Ensure dead ids in worklists are skipped.
+- [x] Treat fixpoint-budget exhaustion as a pass error rather than silent
+  incomplete success. The limit defaults to 10,000 sweeps, far above what a
+  terminating rule set needs, so it only catches rules that never reach a
+  fixpoint. A single sweep has no limit.
+
+**Landed ahead of the native path: a declarative-rule driver.** The first
+driver runs `#[rewrite_rule]` patterns rather than native rules:
+
+- `kirin_ir::walk` defines the traversal orders over the statement nesting
+  tree — `PreOrder`, `PostOrder`, `BFS`, `ReverseBFS` (BFS backwards: each
+  level right to left), `KeepOrderReverseBFS` (deepest level first, each in
+  program order) — as `WalkOrder` marker
+  types, each starting a `WalkCursor` that is stepped one statement at a time
+  so the IR can be edited in between. `PreOrder`/`PostOrder` follow the IR's
+  own parent/sibling links in O(1) extra space; `BFS` follows them too,
+  keeping only the body-owning statements of two adjacent levels; all three
+  see edits made ahead of the cursor. The two reverse orders build their
+  order at the start in O(n). Contract, for every order: edits while visiting a
+  statement must not erase it or any of its ancestors; they may add or
+  erase its siblings and the statements nested in it. An erased visited
+  statement is reported as `WalkError` on the next step.
+- `kirin_rewrite::RuleSet` checks each `wildcard.pattern` once into a
+  `RewriteRule` (matched producer closure, checks, actions) and owns the
+  `NativeRegistry` resolving `native_call` names: check functions in pattern
+  bodies, action functions in rewrite bodies, exchanging `NativeValue`s.
+  Unregistered names are rejected when the rule is added.
+- `RewriteDriver::run::<O>` / `run_at::<O>` take the pass's `Rewriter`, so
+  they run inside `Pipeline::run_pass`. A sweep tries every rule in order at
+  each statement the cursor visits (Kirin-python `Chain` semantics), then a
+  dead-code pass erases pure, unused, non-terminator statements in the
+  blocks under the root. The fixpoint ends at the first sweep (rules plus
+  dead-code pass) recording no `MutationEvent`.
+- Rules may not erase their root (`RuleErrorKind::ErasesRoot`, checked when
+  the rule is added); a root left dead is removed by the dead-code pass. A
+  rule's other erase targets are producers of the root, which are never
+  nested in or around it, so declarative rules satisfy the walk contract by
+  construction. Native actions are not checked.
+- Until the `RewriteDialect` derive (M4) exists, op matching clones the
+  pattern op, overwrites its operands and results with the candidate's, and
+  compares with `==`. Ops with bodies or successors are rejected; types are
+  not compared (macro-built patterns use placeholder types); every rule is
+  tried at every statement (no root-op index yet).
+- Rewrite bodies support `replace`, `erase`, and native actions; building new
+  ops in a rewrite body is not yet supported.
 
 Ordinary CSE is a permanent body-scoped native client. Start block-local with a
 fresh expression table per block; require strong `IsPure`, redirect exact-arity

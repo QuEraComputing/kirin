@@ -978,7 +978,10 @@ dependencies = [
 name = "kirin-rewrite"
 version = "0.1.0"
 dependencies = [
+ "kirin",
+ "kirin-arith",
  "kirin-ir",
+ "kirin-test-languages",
  "kirin-wildcard",
 ]
 
