@@ -1,5 +1,5 @@
 use kirin::prelude::*;
-use kirin_liveness::{Demand, DemandAnalysis};
+use kirin_demand::{Demand, DemandAnalysis};
 use kirin_test_languages::GraphFunctionLanguage;
 
 #[test]

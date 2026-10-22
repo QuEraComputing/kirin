@@ -15,6 +15,7 @@ kirin-cf = { workspace = true }
 kirin-cmp = { workspace = true }
 kirin-constant = { workspace = true }
 kirin-constprop = { workspace = true }
+kirin-demand = { workspace = true }
 kirin-function = { workspace = true }
 kirin-scf = { workspace = true }
 kirin-interpreter = { workspace = true, features = ["derive"] }

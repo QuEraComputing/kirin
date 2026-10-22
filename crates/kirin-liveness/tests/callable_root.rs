@@ -2,10 +2,11 @@
 //! backward engines.
 
 use kirin::prelude::*;
+use kirin_demand::{Demand, DemandAnalysis};
 use kirin_interpreter::{
     Body, Callee, CrossStageLinker, InterpreterError, LinkTarget, Linker, SameStageLinker,
 };
-use kirin_liveness::{Demand, DemandAnalysis, DenseLiveness};
+use kirin_liveness::DenseLiveness;
 use kirin_test_languages::GraphFunctionLanguage;
 
 type TestStage = StageInfo<GraphFunctionLanguage>;

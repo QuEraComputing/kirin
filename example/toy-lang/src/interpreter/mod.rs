@@ -20,12 +20,13 @@ use std::hash::Hash;
 
 use kirin::prelude::{CFG, CompileStage, Pipeline};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
+use kirin_demand::DemandResult;
 use kirin_interpreter::engine::{
     CallContext, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
     SparseForwardInterpreter, expect_single,
 };
 use kirin_interpreter::{Body, Callee, InterpDispatch, InterpreterError, SparseForwardTransfer};
-use kirin_liveness::{DemandResult, DenseLiveness, DenseLivenessResult, LiveSet};
+use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
 use kirin_scf::ForLoopValue;
 
 use crate::stage::Stage;
@@ -168,7 +169,7 @@ where
 /// Run classic per-point liveness (dense backward — regalloc-grade
 /// block-boundary and per-statement sets) over `function_name`'s body at
 /// `stage_name`. Consumes the finalized IR directly; strong demand
-/// ([`kirin_liveness::analyze_demand`]) is an independent analysis and is
+/// ([`kirin_demand::analyze_demand`]) is an independent analysis and is
 /// not involved.
 ///
 /// Stage-pinned: a `function_name` with no live specialization at `stage_name`
@@ -203,10 +204,10 @@ pub fn analyze_demand(
     let function = pipeline
         .lookup_function_by_name(function_name)
         .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    kirin_liveness::analyze_demand(
+    kirin_demand::analyze_demand(
         pipeline,
         stage,
         Callee::Function(function),
-        [kirin_liveness::Demand::Live],
+        [kirin_demand::Demand::Live],
     )
 }

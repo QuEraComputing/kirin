@@ -623,9 +623,9 @@ mod demand {
         ParsePipelineText, Pipeline, SSAValue, Statement,
     };
     use kirin_arith::{Arith, ArithValue};
+    use kirin_demand::analyze_demand;
     use kirin_function::Lexical;
     use kirin_interpreter::{Body, BodyScope, Callee};
-    use kirin_liveness::analyze_demand;
 
     use crate::language::HighLevel;
     use crate::stage::Stage;
@@ -789,7 +789,7 @@ specialize @source fn @if_body(i64) -> i64 cfg {
             &pipeline,
             caller_stage,
             callee,
-            [kirin_liveness::Demand::Live],
+            [kirin_demand::Demand::Live],
         )
         .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());
@@ -845,7 +845,7 @@ specialize @source fn @if_dead(i64) -> i64 cfg {
             &pipeline,
             caller_stage,
             callee,
-            [kirin_liveness::Demand::Live],
+            [kirin_demand::Demand::Live],
         )
         .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());
@@ -892,7 +892,7 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
             &pipeline,
             caller_stage,
             callee,
-            [kirin_liveness::Demand::Live],
+            [kirin_demand::Demand::Live],
         )
         .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());
@@ -967,7 +967,7 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
             &pipeline,
             caller_stage,
             callee,
-            [kirin_liveness::Demand::Live],
+            [kirin_demand::Demand::Live],
         )
         .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());
@@ -1025,7 +1025,7 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
             &pipeline,
             caller_stage,
             callee,
-            [kirin_liveness::Demand::Live],
+            [kirin_demand::Demand::Live],
         )
         .expect("analysis succeeds");
         let (_, cfg) = cfg_scope(result.root_scope());

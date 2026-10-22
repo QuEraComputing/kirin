@@ -592,7 +592,7 @@ why requests are routed only after discovery.
 The public backward `analyze` methods return `Product<V>` parameter facts in
 entry-parameter order, dual to forward analysis's returned output facts. `root()`
 exposes the most recent successful root context separately; `contexts()` and
-`fact()` retain detailed per-context inspection. `kirin-liveness::analyze_demand`
+`fact()` retain detailed per-context inspection. `kirin_demand::analyze_demand`
 collects these details into `DemandResult`, while `DemandAnalysis::analyze`
 returns boundary facts directly. The two-point fact type is `Demand::{Dead, Live}`.
 Exact products are checked against discovered return arity; all-bottom products
@@ -1111,7 +1111,7 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
   from the earlier sketch noted inline):
   - **Strong liveness / demand** (`StrongDemand`,
     `SparseBackwardInterpreter`): `Interp::Value` is the *per-SSA-value* demand
-    fact (`kirin_liveness::Demand`), not a `LiveSet` — the sparse fact anchors to
+    fact (`kirin_demand::Demand`), not a `LiveSet` — the sparse fact anchors to
     values, mirroring the forward per-value model. Helpers are
     `is_demanded`/`demand` (on `DemandInterp`)/`effect()` plus the purity-aware `demand_uses_if_observable`
     (rather than the sketched `live_after`/`use_def` names); the effect is
@@ -1128,8 +1128,11 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
     per point on demand (never persisted by the fixpoint); scf owns dense
     frames (arm-join, loop fixpoint). Classic liveness consumes finalized IR
     directly and does not require a sparse-demand pre-pass.
-  Strong per-point sets are the composition `dense ∩ demanded`, not a third
-  analysis. Because the `Semantics` parameter distinguishes impls, one dialect
+  The two analyses live in separate crates (`kirin-demand`, `kirin-liveness`)
+  that do not depend on each other. Filtering a dense set by demand drops
+  values no root needs, but only over-approximates per-point strong liveness:
+  a value can be live at a point through a faint use while its demand comes
+  from another use. Because the `Semantics` parameter distinguishes impls, one dialect
   carries all three rules at once, as every shipped dialect demonstrates.
 - Function-summary context sensitivity is a pluggable `CallContext` strategy.
   `ContextInsensitive` is the context-insensitive baseline; `ConstPropContext` provides bounded

@@ -1,8 +1,8 @@
 //! Backward boundary packets and context-specific inspection.
 use kirin::prelude::*;
+use kirin_demand::OutputDemandContext;
+use kirin_demand::{Demand, DemandAnalysis, DemandResult};
 use kirin_interpreter::InterpreterError;
-use kirin_liveness::OutputDemandContext;
-use kirin_liveness::{Demand, DemandAnalysis, DemandResult};
 use kirin_test_languages::GraphFunctionLanguage;
 
 type TestStage = StageInfo<GraphFunctionLanguage>;
