@@ -41,7 +41,7 @@ pub enum RuleErrorKind {
     /// matched op.
     EraseNotMatched { position: usize },
     /// An `erase` names the root, which the driver is visiting when the rule
-    /// runs. The dead-code pass removes a root left unused instead.
+    /// runs. The dead-code cleanup removes a root left unused instead.
     ErasesRoot,
     /// A rewrite-body statement the driver cannot run yet, such as building
     /// a new op.
