@@ -14,6 +14,8 @@
 //!   poisons the slot with a [`Quarantined`] stage instead, holding the mutated
 //!   IR for diagnosis but not for further use.
 //!
+//! [`walk`] holds the traversal orders a rewrite driver visits statements in.
+//!
 //! See the [`rewriter`] module docs for what a single edit does and does not
 //! guarantee, and [`pass`] for the boundary's failure routes.
 
@@ -28,6 +30,7 @@ pub(crate) mod quarantine;
 mod results;
 pub(crate) mod rewriter;
 pub(crate) mod ungraph;
+pub mod walk;
 
 pub use quarantine::{QuarantineCause, Quarantined};
 pub use rewriter::{MutationEvent, RewriteError, Rewriter};
