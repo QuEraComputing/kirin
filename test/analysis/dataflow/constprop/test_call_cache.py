@@ -32,9 +32,7 @@ def test_equal_constants_in_different_objects_share_one_analysis(monkeypatch):
     a, b = const.Value(float("2.5")), const.Value(float("2.5"))
     assert a.data is not b.data
 
-    _, result = const.Propagate(basic_no_opt, cache_calls=True).run(
-        add_one_twice, a, b
-    )
+    _, result = const.Propagate(basic_no_opt, cache_calls=True).run(add_one_twice, a, b)
 
     assert analyses["add_one"] == 1
     assert result == const.Value(7.0)
