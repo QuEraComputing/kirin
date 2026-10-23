@@ -41,7 +41,6 @@ impl<L: Dialect> DiGraphInfo<L> {
             name,
             ports,
             edge_count,
-            petgraph::Graph::new(),
             DiGraphExtra::new(yields),
         )
     }
