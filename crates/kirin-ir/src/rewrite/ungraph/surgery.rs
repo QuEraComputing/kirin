@@ -1,4 +1,5 @@
 use crate::arena::{GetInfo, GetInfoMut};
+use crate::builder::ungraph::UnGraphRole;
 use crate::{Dialect, SSAValue, Statement, StatementParent, UnGraph, UnGraphInfo};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter};
@@ -29,15 +30,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         definition: L,
     ) -> Result<Statement, RewriteError> {
         self.live_ungraph(graph)?;
-        if definition.is_edge() {
-            return Err(RewriteError::UnexpectedEdgeStatement);
-        }
-        if definition.is_terminator() {
-            return Err(RewriteError::UnexpectedTerminator);
-        }
-        if definition.successors().next().is_some() {
-            return Err(RewriteError::NonTerminatorWithSuccessors);
-        }
+        Self::check_ungraph_member(&definition, UnGraphRole::Node)?;
         let (results, operands) = self.prepare_insert(&definition)?;
 
         let wires = self.snapshot_wires(graph, operands.iter().copied());
@@ -80,15 +73,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         definition: L,
     ) -> Result<Statement, RewriteError> {
         self.live_ungraph(graph)?;
-        if !definition.is_edge() {
-            return Err(RewriteError::ExpectedEdgeStatement);
-        }
-        if definition.is_terminator() {
-            return Err(RewriteError::UnexpectedTerminator);
-        }
-        if definition.successors().next().is_some() {
-            return Err(RewriteError::NonTerminatorWithSuccessors);
-        }
+        Self::check_ungraph_member(&definition, UnGraphRole::Edge)?;
         if definition.arguments().next().is_some() {
             return Err(RewriteError::EdgeStatementWithOperands);
         }
@@ -188,5 +173,23 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .get_info(self.stage)
             .map(|item| &**item)
             .ok_or(RewriteError::UnknownUnGraph(graph))
+    }
+
+    /// Check that `definition` can be an `UnGraph` member in `role`: an edge
+    /// statement exactly when `role` is [`UnGraphRole::Edge`], and a
+    /// non-terminator with no successors.
+    fn check_ungraph_member(definition: &L, role: UnGraphRole) -> Result<(), RewriteError> {
+        match (role, definition.is_edge()) {
+            (UnGraphRole::Node, true) => return Err(RewriteError::UnexpectedEdgeStatement),
+            (UnGraphRole::Edge, false) => return Err(RewriteError::ExpectedEdgeStatement),
+            _ => {}
+        }
+        if definition.is_terminator() {
+            return Err(RewriteError::UnexpectedTerminator);
+        }
+        if definition.successors().next().is_some() {
+            return Err(RewriteError::NonTerminatorWithSuccessors);
+        }
+        Ok(())
     }
 }
