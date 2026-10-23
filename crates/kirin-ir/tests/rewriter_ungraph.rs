@@ -1,6 +1,6 @@
 //! Integration tests for the Rewriter's `UnGraph` surgery: inserting nodes
 //! and edge statements while keeping each wire's petgraph edge, and its limit
-//! of two incidences, in step with the nodes' operands.
+//! of two endpoints, in step with the nodes' operands.
 
 mod common;
 
@@ -134,7 +134,7 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
 
-    // One reader: an incidence, but no edge yet.
+    // One reader: an endpoint, but no edge yet.
     let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     assert!(edges(rw.stage(), ug).is_empty());
     // A second reader completes the edge; the boundary port gets one reader.
@@ -151,7 +151,7 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
         [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: w,
-            incidences: 3
+            endpoints: 3
         }]
     );
     // Back to two readers, the edge returns.
@@ -204,7 +204,7 @@ fn insert_ungraph_node_reading_a_wire_twice_is_a_self_loop() {
         .insert_ungraph_node(ug, BuilderDialect::Gate(v, v))
         .unwrap();
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(s, s))]));
-    // Both of `v`'s incidences are taken: a third reader leaves no edge.
+    // Both of `v`'s endpoints are taken: a third reader leaves no edge.
     rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
     drop(rw);
 
@@ -215,7 +215,7 @@ fn insert_ungraph_node_reading_a_wire_twice_is_a_self_loop() {
         [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: v,
-            incidences: 3
+            endpoints: 3
         }]
     );
 }
@@ -517,7 +517,7 @@ fn replace_operand_swaps_endpoints_through_an_over_full_wire() {
         [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: v,
-            incidences: 3
+            endpoints: 3
         }]
     );
     assert_eq!(
@@ -622,7 +622,7 @@ fn replace_all_uses_moves_every_reader_to_the_new_wire() {
         [Finding::UnGraphDegreeExceeded {
             graph: ug,
             value: v,
-            incidences: 3
+            endpoints: 3
         }]
     );
 }

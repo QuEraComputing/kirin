@@ -62,11 +62,11 @@ pub(in crate::derived) fn check<L: Dialect>(stage: &StageInfo<L>, findings: &mut
     let mut exceeded: Vec<((UnGraph, SSAValue), usize)> =
         reads.into_iter().filter(|&(_, count)| count > 2).collect();
     exceeded.sort_by_key(|&((graph, value), _)| (graph.0.raw(), value.0.raw()));
-    findings.extend(exceeded.into_iter().map(|((graph, value), incidences)| {
+    findings.extend(exceeded.into_iter().map(|((graph, value), endpoints)| {
         Finding::UnGraphDegreeExceeded {
             graph,
             value,
-            incidences,
+            endpoints,
         }
     }));
 }

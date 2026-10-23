@@ -62,12 +62,12 @@ pub enum Finding {
     },
     /// A membership pointer names a container that is not live.
     DanglingParent(DanglingParent),
-    /// The wire `value` of `graph` is read by `incidences` node operand
+    /// The wire `value` of `graph` is read by `endpoints` node operand
     /// slots; an undirected edge joins at most two.
     UnGraphDegreeExceeded {
         graph: UnGraph,
         value: SSAValue,
-        incidences: usize,
+        endpoints: usize,
     },
 }
 
@@ -103,10 +103,10 @@ impl fmt::Display for Finding {
             Finding::UnGraphDegreeExceeded {
                 graph,
                 value,
-                incidences,
+                endpoints,
             } => write!(
                 f,
-                "wire {value} of UnGraph {graph} is read by {incidences} node operand slots; at most 2 are allowed"
+                "wire {value} of UnGraph {graph} is read by {endpoints} node operand slots; at most 2 are allowed"
             ),
         }
     }

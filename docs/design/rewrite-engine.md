@@ -1056,7 +1056,7 @@ No separate erased template or foreign-id convention is introduced.
 
 Coordinated operand edits are one atomic action. This is required for UnGraph
 endpoint swaps: no sequence of single-slot edits can preserve the binary
-incidence limit when both edges begin full. `replace_operand` is the one-edit
+endpoint limit when both edges begin full. `replace_operand` is the one-edit
 case and `replace_all_uses` preflights and applies its complete edit set as one
 operation.
 
@@ -1477,7 +1477,7 @@ successors: a non-terminator that does produces
 follows the same rule: a membership pointer naming a dead container produces
 `DanglingParent`, and the chain walker's own defects arrive as
 `Chain(ChainFinding)`. An `UnGraph` wire read by more than two node slots
-produces `UnGraphDegreeExceeded { graph, value, incidences }`; the rewriter
+produces `UnGraphDegreeExceeded { graph, value, endpoints }`; the rewriter
 allows such a wire mid-pass and keeps no edge for it.
 Later derivations apply the same rule to graph membership and topology. Derivation
 collects independent findings rather than stopping at the first one — component
@@ -1796,8 +1796,8 @@ stage remains valid.
 | `insert_terminator` | Allocate `definition` as the terminator of a block that has none; add operand uses and predecessor entries. | `InsertedStatement`, `ChangedTerminator` | any block (`Cfg` member or statement-owned body); `definition` is a result-less terminator with live operands and successors |
 | `insert_node` | Allocate `definition` as a new `DiGraph` member and node; bind its results, add operand uses and an edge from each member producer of an operand. | `InsertedStatement`, `ChangedDiGraphTopology` | live graph; non-terminator with no successors; live operands (outside ones get no edge); results must be `new_result` values |
 | `replace_yield` | Rewrite one `DiGraph` yield slot; move its yield use `old → new`. Topology is unchanged. | `ChangedDiGraphYields` (none if slot unchanged) | live graph and value, index in range |
-| `insert_ungraph_node` | Allocate `definition` as a new `UnGraph` node; bind its results, add operand uses; each operand that is a wire of the graph becomes an incidence, and a wire with two incidences is an edge. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; non-terminator with no successors, not an edge statement; live operands; `new_result` results; a wire may exceed two incidences (reported by `verify_derived`; it then has no edge) |
-| `insert_ungraph_edge` | Allocate `definition` as a new `UnGraph` edge statement and append it to the member map; its results are new wires with no incidences. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; an edge statement with no operands, not a terminator, no successors; `new_result` results |
+| `insert_ungraph_node` | Allocate `definition` as a new `UnGraph` node; bind its results, add operand uses; each operand that is a wire of the graph becomes an endpoint, and a wire with two endpoints is an edge. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; non-terminator with no successors, not an edge statement; live operands; `new_result` results; a wire may exceed two endpoints (reported by `verify_derived`; it then has no edge) |
+| `insert_ungraph_edge` | Allocate `definition` as a new `UnGraph` edge statement and append it to the member map; its results are new wires with no endpoints. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; an edge statement with no operands, not a terminator, no successors; `new_result` results |
 | `replace_statement` | Swap the definition in place, keeping id, position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror, for a `DiGraph` member its incoming edges, or for an `UnGraph` node the wires it leaves and joins. | `ReplacedStatement`, then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` / `ChangedUnGraphTopology` for a member whose edges changed | parented by a block or graph; same result arity and terminator-ness as the original; a non-terminator replacement carries no successors; an `UnGraph` member keeps its edge role, and an edge statement has no operands |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
 | `append_block` / `insert_block_before` / `insert_block_after` | Allocate an empty block (no terminator) with fresh typed arguments and link it into the `Cfg` block list. | `ChangedBlockList` | anchor must be a live block of a `Cfg` list (not a statement-owned body) |
@@ -2774,11 +2774,11 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   BuilderStageInfo-to-StageInfo boundary, with every `(Statement, operand_index)`
   occurrence.
 - [x] Keep topology value-derived. A DiGraph edge is an operand whose result
-  producer is another member. An UnGraph incidence is a use of an edge-member
+  producer is another member. An UnGraph endpoint is a use of an edge-member
   result or edge port. Captures are distinguished at the graph boundary by
   `edge_count`, never by consumer-field annotations; no per-field topology
   derive is added.
-- [ ] Add an atomic multi-operand edit. It validates the net UnGraph incidence
+- [ ] Add an atomic multi-operand edit. It validates the net UnGraph endpoint
   delta before changing definitions, reverse uses, or mirrors. Single-slot
   replacement delegates to it, and `replace_all_uses` applies its entire use set
   atomically. Not needed for UnGraph endpoint swaps any more: the degree limit

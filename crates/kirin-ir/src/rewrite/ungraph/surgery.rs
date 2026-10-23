@@ -11,11 +11,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// [`Rewriter::insert_ungraph_edge`]), and must be a non-terminator with no
     /// successors. Every operand must be live, and every result a fresh
     /// [`Rewriter::new_result`] value. Each operand that is a wire of `graph`
-    /// (an edge statement's result or a boundary port) becomes an incidence of
+    /// (an edge statement's result or a boundary port) becomes an endpoint of
     /// that wire; a wire read by two node slots is an edge between those
     /// nodes. Other operands are ordinary uses.
     ///
-    /// A wire may end up with more than two incidences. That is invalid IR,
+    /// A wire may end up with more than two endpoints. That is invalid IR,
     /// left for [`verify_derived`](crate::verify_derived) to report; such a
     /// wire has no edge.
     ///
@@ -68,7 +68,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// `definition` must be an edge statement, not a terminator, with no
     /// successors and no operands (a wire only connects the nodes that read
     /// it); every result must be a fresh [`Rewriter::new_result`]
-    /// value. The new wires have no incidences yet, so the petgraph gains no
+    /// value. The new wires have no endpoints yet, so the petgraph gains no
     /// edge until nodes read them.
     ///
     /// Rejects, leaving the stage untouched, if `graph` is unknown or a check
@@ -125,7 +125,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
         let is_node = graph.expect_info(self.stage).node_idx_of(stmt).is_some();
         if is_node {
-            // A node: each wire it read loses its incidences. The edge changes
+            // A node: each wire it read loses its endpoints. The edge changes
             // only when the count crosses 2: 2 → 1 (or 2 → 0 for a self-loop)
             // removes it, 3 → 2 restores it; other counts change nothing.
             // Drop its operand uses, resync those wires while its node still
