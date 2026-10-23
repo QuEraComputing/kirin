@@ -17,11 +17,14 @@
 //! See the [`rewriter`] module docs for what a single edit does and does not
 //! guarantee, and [`pass`] for the boundary's failure routes.
 
+mod alloc;
 pub(crate) mod cfg;
+pub(crate) mod digraph;
 pub(crate) mod pass;
 #[cfg(test)]
 mod pass_tests;
 pub(crate) mod quarantine;
+mod results;
 pub(crate) mod rewriter;
 
 pub use quarantine::{QuarantineCause, Quarantined};

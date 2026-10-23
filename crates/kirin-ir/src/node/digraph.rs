@@ -22,17 +22,17 @@ impl std::fmt::Display for DiGraph {
 pub type DiGraphInfo<L> = GraphInfo<L, petgraph::Directed, DiGraphExtra>;
 
 impl<L: Dialect> DiGraphInfo<L> {
-    /// Construct a new `DiGraphInfo` with all fields.
+    /// Construct a new `DiGraphInfo` with no members yet; the builder adds
+    /// them with [`add_node`](GraphInfo::add_node) and its edge edits.
     ///
     /// This constructor preserves the original API. Internally it delegates
     /// to [`GraphInfo::new`].
-    pub fn from_parts(
+    pub(crate) fn from_parts(
         id: DiGraph,
         parent: Option<crate::Statement>,
         name: Option<crate::Symbol>,
         ports: Vec<super::port::Port>,
         edge_count: usize,
-        graph: petgraph::Graph<crate::Statement, crate::SSAValue, petgraph::Directed>,
         yields: Vec<crate::SSAValue>,
     ) -> Self {
         GraphInfo::new(
@@ -41,7 +41,7 @@ impl<L: Dialect> DiGraphInfo<L> {
             name,
             ports,
             edge_count,
-            graph,
+            petgraph::Graph::new(),
             DiGraphExtra::new(yields),
         )
     }

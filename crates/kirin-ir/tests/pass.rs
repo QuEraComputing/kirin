@@ -166,6 +166,20 @@ fn a_stage_returned_by_one_pass_can_be_handed_to_the_next() {
     assert_eq!(verify_derived(f.stage()), Ok(()));
 }
 
+#[test]
+fn results_a_pass_never_binds_are_tombstoned_before_verification() {
+    let mut f = fixture();
+
+    let unbound = f
+        .run_pass(|rewriter| Ok::<_, RewriteError>(rewriter.new_result(TestType::I32)))
+        .expect("allocating a result without binding it is not an error");
+
+    // The boundary dropped the rewriter before verifying, so the value is a
+    // tombstone rather than an empty live slot.
+    assert!(SSAValue::from(unbound).get_info(f.stage()).is_none());
+    assert!(f.stage().ssa_arena().iter().all(|item| item.is_some()));
+}
+
 // ---------------------------------------------------------------------------
 // The pass returns an error
 // ---------------------------------------------------------------------------

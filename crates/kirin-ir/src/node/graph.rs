@@ -1,4 +1,6 @@
 use petgraph::EdgeType;
+use petgraph::graph::NodeIndex;
+use rustc_hash::FxHashMap;
 
 use crate::node::port::Port;
 use crate::{Dialect, SSAValue, Statement, Symbol};
@@ -12,7 +14,7 @@ pub struct DiGraphExtra {
 
 impl DiGraphExtra {
     /// Create a new directed graph extra with the given yield values.
-    pub fn new(yields: Vec<SSAValue>) -> Self {
+    pub(crate) fn new(yields: Vec<SSAValue>) -> Self {
         Self { yields }
     }
 }
@@ -26,7 +28,7 @@ pub struct UnGraphExtra {
 
 impl UnGraphExtra {
     /// Create a new undirected graph extra with the given edge statements.
-    pub fn new(edge_statements: Vec<Statement>) -> Self {
+    pub(crate) fn new(edge_statements: Vec<Statement>) -> Self {
         Self { edge_statements }
     }
 }
@@ -42,10 +44,13 @@ impl UnGraphExtra {
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(
     feature = "serde",
-    serde(bound(
-        serialize = "Extra: serde::Serialize",
-        deserialize = "Extra: serde::Deserialize<'de>"
-    ))
+    serde(
+        bound(
+            serialize = "Extra: serde::Serialize",
+            deserialize = "Extra: serde::Deserialize<'de>"
+        ),
+        from = "GraphInfoData<D, Extra>"
+    )
 )]
 pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) id: crate::arena::Id,
@@ -53,14 +58,51 @@ pub struct GraphInfo<L: Dialect, D: EdgeType, Extra> {
     pub(crate) name: Option<Symbol>,
     pub(crate) ports: Vec<Port>,
     pub(crate) edge_count: usize,
-    pub(crate) graph: petgraph::Graph<Statement, SSAValue, D>,
+    /// Written only through `set_graph` and the `graph_topology` edits, which
+    /// keep `stmt_to_node_idx` in lockstep with it (hence `pub(super)`).
+    pub(super) graph: petgraph::Graph<Statement, SSAValue, D>,
+    /// Member statement → its node in `graph`. Not checked by `derived/`
+    /// verification. Not serialized: deserialization rebuilds it from `graph`.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    pub(super) stmt_to_node_idx: FxHashMap<Statement, NodeIndex>,
     pub(crate) extra: Extra,
     _marker: std::marker::PhantomData<L>,
 }
 
+/// The serialized fields of a [`GraphInfo`]. Deserializing goes through
+/// [`GraphInfo::new`], so `stmt_to_node_idx` is rebuilt from the graph rather
+/// than trusted from the input.
+#[cfg(feature = "serde")]
+#[derive(serde::Deserialize)]
+#[serde(bound(deserialize = "Extra: serde::Deserialize<'de>"))]
+struct GraphInfoData<D: EdgeType, Extra> {
+    id: crate::arena::Id,
+    parent: Option<Statement>,
+    name: Option<Symbol>,
+    ports: Vec<Port>,
+    edge_count: usize,
+    graph: petgraph::Graph<Statement, SSAValue, D>,
+    extra: Extra,
+}
+
+#[cfg(feature = "serde")]
+impl<L: Dialect, D: EdgeType, Extra> From<GraphInfoData<D, Extra>> for GraphInfo<L, D, Extra> {
+    fn from(data: GraphInfoData<D, Extra>) -> Self {
+        GraphInfo::new(
+            data.id,
+            data.parent,
+            data.name,
+            data.ports,
+            data.edge_count,
+            data.graph,
+            data.extra,
+        )
+    }
+}
+
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     /// Create a new graph info.
-    pub fn new(
+    pub(crate) fn new(
         id: crate::arena::Id,
         parent: Option<Statement>,
         name: Option<Symbol>,
@@ -69,6 +111,7 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         graph: petgraph::Graph<Statement, SSAValue, D>,
         extra: Extra,
     ) -> Self {
+        let stmt_to_node_idx = Self::index_members(&graph);
         Self {
             id,
             parent,
@@ -76,9 +119,27 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
             ports,
             edge_count,
             graph,
+            stmt_to_node_idx,
             extra,
             _marker: std::marker::PhantomData,
         }
+    }
+
+    /// Replace the petgraph with `graph`, re-indexing its members. The only way
+    /// to swap the whole graph, so `stmt_to_node_idx` cannot fall behind it.
+    pub(crate) fn set_graph(&mut self, graph: petgraph::Graph<Statement, SSAValue, D>) {
+        self.stmt_to_node_idx = Self::index_members(&graph);
+        self.graph = graph;
+    }
+
+    /// Member statement → its node in `graph`.
+    fn index_members(
+        graph: &petgraph::Graph<Statement, SSAValue, D>,
+    ) -> FxHashMap<Statement, NodeIndex> {
+        graph
+            .node_indices()
+            .map(|node| (graph[node], node))
+            .collect()
     }
 
     /// The parent statement that owns this graph, if any.
@@ -114,6 +175,11 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     /// A reference to the underlying petgraph.
     pub fn graph(&self) -> &petgraph::Graph<Statement, SSAValue, D> {
         &self.graph
+    }
+
+    /// The petgraph node of member statement `stmt`, if it is a member.
+    pub fn node_idx_of(&self, stmt: Statement) -> Option<NodeIndex> {
+        self.stmt_to_node_idx.get(&stmt).copied()
     }
 
     /// A reference to the direction-specific extra data.

@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::port::PortParent;
-use crate::node::ssa::{BuilderSSAKind, SSAValue};
-use crate::node::stmt::{Statement, StatementParent};
+use crate::node::ssa::SSAValue;
+use crate::node::stmt::Statement;
 use crate::{BuilderStageInfo, Dialect};
 
 pub struct DiGraphBuilder<'a, L: Dialect> {
@@ -71,7 +69,20 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
         self
     }
 
+    /// Add a member statement. `stmt` must be neither a terminator nor carry
+    /// block successors.
     pub fn node(mut self, stmt: Statement) -> Self {
+        let info = &self.stage.statements[stmt];
+        assert!(
+            !info.definition.is_terminator(),
+            "Cannot add terminator statement {:?} as a digraph node",
+            info.definition
+        );
+        assert!(
+            info.definition.successors().next().is_none(),
+            "Cannot add statement {:?} with successors as a digraph node",
+            info.definition
+        );
         self.nodes.push(stmt);
         self
     }
@@ -94,39 +105,6 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
         );
         super::graph_common::resolve_and_replace(self.stage, &self.nodes, &allocated, "digraph");
 
-        // Build the directed petgraph
-        let mut stmt_to_node: HashMap<Statement, petgraph::graph::NodeIndex> = HashMap::new();
-        let mut graph = petgraph::Graph::<Statement, SSAValue, petgraph::Directed>::new();
-
-        for &stmt_id in &self.nodes {
-            let ni = graph.add_node(stmt_id);
-            stmt_to_node.insert(stmt_id, ni);
-        }
-
-        for &stmt_id in &self.nodes {
-            let consumer_ni = stmt_to_node[&stmt_id];
-            let info = &self.stage.statements[stmt_id];
-            let operands: Vec<SSAValue> = info.definition.arguments().copied().collect();
-            for operand in operands {
-                let ssa_info = self
-                    .stage
-                    .ssas
-                    .get(operand)
-                    .expect("SSAValue not found in stage");
-                if let BuilderSSAKind::Result(producer_stmt, _) = ssa_info.kind
-                    && let Some(&producer_ni) = stmt_to_node.get(&producer_stmt)
-                {
-                    graph.add_edge(producer_ni, consumer_ni, operand);
-                }
-            }
-        }
-
-        let nodes = self.nodes;
-        for &stmt_id in &nodes {
-            let info = &mut self.stage.statements[stmt_id];
-            info.parent = Some(StatementParent::DiGraph(id));
-        }
-
         let name_symbol = self.name.map(|n| self.stage.symbols.intern(n));
         let info = DiGraphInfo::from_parts(
             id,
@@ -134,10 +112,10 @@ impl<'a, L: Dialect> DiGraphBuilder<'a, L> {
             name_symbol,
             allocated.all_ports,
             allocated.edge_count,
-            graph,
             self.yields,
         );
         let _ = self.stage.digraphs.alloc(info);
+        self.stage.add_digraph_nodes(id, &self.nodes);
         id
     }
 }

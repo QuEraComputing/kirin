@@ -3,6 +3,7 @@ pub mod cfg;
 pub(crate) mod digraph;
 pub mod function;
 pub(crate) mod graph;
+mod graph_topology;
 pub mod linked_list;
 pub(crate) mod port;
 pub mod ssa;

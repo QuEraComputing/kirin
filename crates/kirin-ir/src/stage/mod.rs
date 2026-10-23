@@ -20,4 +20,4 @@ pub(crate) use slot::StageSlot;
 pub use slot::StageStatus;
 
 #[cfg(test)]
-mod tests;
+pub(crate) mod tests;

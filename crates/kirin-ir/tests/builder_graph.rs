@@ -29,6 +29,8 @@ fn digraph_builder_two_node_dag() {
     let info = dg.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 2); // two operands both ref s0
+    assert_eq!(info.graph()[info.node_idx_of(s0).unwrap()], s0);
+    assert_eq!(info.graph()[info.node_idx_of(s1).unwrap()], s1);
 
     assert_eq!(*s0.parent(&stage), Some(StatementParent::DiGraph(dg)));
     assert_eq!(*s1.parent(&stage), Some(StatementParent::DiGraph(dg)));
@@ -119,6 +121,48 @@ fn statement_builder_assigns_parent_to_directly_owned_graphs() {
     let stage = stage.finalize().unwrap();
     assert_eq!(digraph.expect_info(&stage).parent(), Some(owner));
     assert_eq!(ungraph.expect_info(&stage).parent(), Some(owner));
+}
+
+#[test]
+#[should_panic(expected = "as a digraph node")]
+fn digraph_builder_rejects_terminator_node() {
+    let mut stage = new_stage();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let _ = stage.digraph().node(ret);
+}
+
+#[test]
+#[should_panic(expected = "as a digraph node")]
+fn attach_nodes_to_digraph_rejects_terminator() {
+    let mut stage = new_stage();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let dg = stage.digraph().new();
+    stage.attach_nodes_to_digraph(dg, &[ret], &[]);
+}
+
+#[test]
+#[should_panic(expected = "with successors as a digraph node")]
+fn digraph_builder_rejects_node_with_successors() {
+    let mut stage = new_stage();
+    let target = stage.block().new();
+    let fork = stage
+        .statement()
+        .definition(BuilderDialect::Fork(Successor::from_block(target)))
+        .new();
+    let _ = stage.digraph().node(fork);
+}
+
+#[test]
+#[should_panic(expected = "with successors as a digraph node")]
+fn attach_nodes_to_digraph_rejects_node_with_successors() {
+    let mut stage = new_stage();
+    let target = stage.block().new();
+    let fork = stage
+        .statement()
+        .definition(BuilderDialect::Fork(Successor::from_block(target)))
+        .new();
+    let dg = stage.digraph().new();
+    stage.attach_nodes_to_digraph(dg, &[fork], &[]);
 }
 
 #[test]
@@ -213,6 +257,10 @@ fn ungraph_two_nodes_one_edge() {
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 1);
     assert_eq!(info.edge_statements().len(), 1);
+    assert_eq!(info.graph()[info.node_idx_of(n0).unwrap()], n0);
+    assert_eq!(info.graph()[info.node_idx_of(n1).unwrap()], n1);
+    // Edge statements are petgraph edges, not nodes.
+    assert_eq!(info.node_idx_of(wire_stmt), None);
 
     assert_eq!(*n0.parent(&stage), Some(StatementParent::UnGraph(ug)));
     assert_eq!(*n1.parent(&stage), Some(StatementParent::UnGraph(ug)));

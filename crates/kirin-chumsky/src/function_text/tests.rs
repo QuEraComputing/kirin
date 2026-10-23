@@ -588,7 +588,7 @@ fn test_parse_does_not_duplicate_a_poisoned_stage() {
         .new();
 
     let _ = pipeline.run_pass::<FunctionDefinition, _, (), _>(stage_a, |_| {
-        Err(RewriteError::CannotInsertTerminator)
+        Err(RewriteError::UnexpectedTerminator)
     });
     assert_eq!(
         pipeline.stage_status(stage_a),

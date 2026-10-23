@@ -110,6 +110,27 @@ fn test_projected_digraph_empty_body_roundtrip() {
     assert_eq!(rendered.trim(), rendered2.trim());
 }
 
+#[cfg(feature = "serde")]
+#[test]
+fn test_digraph_json_rebuilds_member_index() {
+    let input = "%out = projected_func (%p0: f64) captures () { %c = constant 1; %r = add %p0, %c; yield %r; }";
+    let (stage, _) = roundtrip::emit_statement::<ProjectedDigraphLanguage>(input, &[]);
+
+    // The statement → node index is derived from the graph, so it is not
+    // stored; loading rebuilds it.
+    let json = serde_json::to_string(&stage).unwrap();
+    assert!(!json.contains("stmt_to_node_idx"), "json: {json}");
+    let restored: StageInfo<ProjectedDigraphLanguage> = serde_json::from_str(&json).unwrap();
+
+    let graphs: Vec<_> = restored.digraph_arena().iter().collect();
+    assert_eq!(graphs.len(), 1);
+    let graph = graphs[0].graph();
+    assert_eq!(graph.node_count(), 2);
+    for node in graph.node_indices() {
+        assert_eq!(graphs[0].node_idx_of(graph[node]), Some(node));
+    }
+}
+
 // --- Pipeline-level projected format e2e test ---
 
 /// A dialect where the function definition uses projected DiGraph format.
@@ -445,4 +466,27 @@ fn test_digraph_empty_body_roundtrip() {
     let (stage2, stmt2) = roundtrip::emit_statement::<DiGraphLanguage>(rendered.trim(), &[]);
     let rendered2 = roundtrip::render_statement::<DiGraphLanguage>(&stage2, stmt2);
     assert_eq!(rendered.trim(), rendered2.trim());
+}
+
+#[test]
+fn test_digraph_body_with_a_terminator_is_a_parse_error() {
+    // A DiGraph has no terminator; parsing one must report an error, not
+    // panic in the builder.
+    let input = r#"
+stage @test fn @g(i64, i64) -> i64;
+specialize @test fn @g(i64, i64) -> i64 digraph ^g0(%x: i64, %y: i64) {
+  %s = mul %x, %y -> i64;
+  ret %s;
+  yield %s;
+}
+"#;
+    let mut pipeline: Pipeline<StageInfo<kirin_test_languages::GraphFunctionLanguage>> =
+        Pipeline::new();
+    let error = pipeline
+        .parse(input)
+        .expect_err("a terminator is not a digraph node");
+    assert!(
+        format!("{error:?}").contains("cannot contain a terminator"),
+        "unexpected error: {error:?}"
+    );
 }

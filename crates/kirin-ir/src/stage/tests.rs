@@ -10,7 +10,7 @@ use crate::{
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
-enum TestType {
+pub(crate) enum TestType {
     #[default]
     Any,
 }
@@ -175,7 +175,7 @@ macro_rules! impl_empty_dialect_traits {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
-struct LangA;
+pub(crate) struct LangA;
 impl_empty_dialect_traits!(LangA);
 impl Dialect for LangA {
     type Type = TestType;
@@ -729,7 +729,7 @@ fn run_pass_poisons_the_position_when_the_pass_fails() {
     let (mut pipeline, id) = lang_a_pipeline();
 
     let error = pipeline
-        .run_pass::<LangA, _, (), _>(id, |_rewriter| Err(RewriteError::CannotInsertTerminator))
+        .run_pass::<LangA, _, (), _>(id, |_rewriter| Err(RewriteError::UnexpectedTerminator))
         .expect_err("a failing pass must not hand back a usable stage");
 
     assert_eq!(error, StagePassError::PassFailed);
@@ -746,7 +746,7 @@ fn run_pass_poisons_the_position_when_the_pass_fails() {
 #[test]
 fn a_poisoned_position_keeps_its_name_and_id() {
     let (mut pipeline, id) = lang_a_pipeline();
-    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::CannotInsertTerminator));
+    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
 
     // `CompileStage` is a raw index, so poisoning must not renumber anything.
     assert_eq!(pipeline.stage_by_name("source"), Some(id));
@@ -795,7 +795,7 @@ fn a_transferred_position_answers_to_the_name_its_stage_left_with() {
 #[test]
 fn a_poisoned_position_answers_to_the_name_its_stage_left_with() {
     let (mut pipeline, id) = renamed_lang_a_pipeline();
-    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::CannotInsertTerminator));
+    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
 
     assert_eq!(pipeline.stage_status(id), Some(StageStatus::Poisoned));
     assert_eq!(pipeline.stage_by_name("lowered"), Some(id));
@@ -834,7 +834,7 @@ fn run_pass_refuses_an_unknown_position() {
 #[test]
 fn run_pass_refuses_a_position_an_earlier_pass_poisoned() {
     let (mut pipeline, id) = lang_a_pipeline();
-    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::CannotInsertTerminator));
+    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
 
     let error = pipeline
         .run_pass::<LangA, _, (), RewriteError>(id, |_| Ok(()))
@@ -858,7 +858,7 @@ fn poisoning_one_position_leaves_the_others_usable() {
         .new();
 
     let _ =
-        pipeline.run_pass::<LangA, _, (), _>(first, |_| Err(RewriteError::CannotInsertTerminator));
+        pipeline.run_pass::<LangA, _, (), _>(first, |_| Err(RewriteError::UnexpectedTerminator));
 
     assert!(pipeline.stage(first).is_none(), "only `first` is dead");
     assert!(pipeline.stage(second).is_some());
@@ -873,7 +873,7 @@ fn stage_status_names_all_three_states() {
     let (mut pipeline, id) = lang_a_pipeline();
     assert_eq!(pipeline.stage_status(id), Some(StageStatus::Present));
 
-    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::CannotInsertTerminator));
+    let _ = pipeline.run_pass::<LangA, _, (), _>(id, |_| Err(RewriteError::UnexpectedTerminator));
     assert_eq!(pipeline.stage_status(id), Some(StageStatus::Poisoned));
 
     let missing = CompileStage::new(Id(999));
@@ -889,7 +889,7 @@ fn dispatch_distinguishes_a_poisoned_position_from_a_missing_one() {
         .name("a")
         .new();
 
-    let _ = pipeline.run_pass::<LangA, _, (), _>(a, |_| Err(RewriteError::CannotInsertTerminator));
+    let _ = pipeline.run_pass::<LangA, _, (), _>(a, |_| Err(RewriteError::UnexpectedTerminator));
 
     // The position is real and still named; only its stage is gone. Reporting
     // `MissingStage` would send someone looking for a bad stage id instead of
@@ -928,7 +928,7 @@ fn stage_names_lists_every_position_including_poisoned_ones() {
         .new();
 
     let _ =
-        pipeline.run_pass::<LangA, _, (), _>(first, |_| Err(RewriteError::CannotInsertTerminator));
+        pipeline.run_pass::<LangA, _, (), _>(first, |_| Err(RewriteError::UnexpectedTerminator));
 
     // `stages()` skips the poisoned position; `stage_names()` must not, or
     // every id derived from its iteration order is off by one.

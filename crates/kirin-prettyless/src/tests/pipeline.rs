@@ -181,7 +181,7 @@ fn test_pipeline_marks_a_poisoned_stage_instead_of_dropping_it() {
     let _stage_b = add_stage(&mut pipeline, "B", 7);
 
     let _ = pipeline.run_pass::<SimpleLanguage, _, (), _>(stage_a, |_| {
-        Err(RewriteError::CannotInsertTerminator)
+        Err(RewriteError::UnexpectedTerminator)
     });
 
     let output = PrintExt::sprint(&func, &pipeline);
