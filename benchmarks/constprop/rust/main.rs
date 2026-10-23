@@ -95,3 +95,6 @@ fn main() {
         .collect();
     println!("{}", json!({"check": check, "time": time}));
 }
+
+#[cfg(test)]
+mod tests;

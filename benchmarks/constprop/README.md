@@ -27,6 +27,10 @@ warmups.
 | `--python` | select another interpreter |
 | `--python-cache-calls` | run Python with `cache_calls=True` |
 
+Call caching is opt-in. With this flag, Python reuses matching callee/argument
+results within each analysis; every repetition still constructs a fresh analyzer
+and starts with an empty cache. Report cached and uncached runs separately.
+
 As in the JSON benchmark, the driver checks that the interpreter imports
 `kirin` from the checkout.
 
@@ -97,9 +101,21 @@ Verdicts are recorded and counted, not enforced.
 - Rust: `ConstProp::new(&ir)`, then `analyze_by_name`.
 - Python: `const.Propagate(dialects)`, then `.run(method, *args)`.
 
-Building IR, checking, and dropping the analyzer and its result are outside the
-timer. Python collects garbage between samples and disables it during each
-sample.
+Building IR, preparing abstract arguments, checking, and dropping the analyzer
+and its result (including Python's call cache) are outside the timer. Python
+collects garbage between samples and disables it during each sample.
+
+## Regression tests
+
+```sh
+cargo test --example constprop --example json_roundtrip --features serde
+/absolute/path/to/python-kirin/.venv/bin/python -m unittest discover \
+  -s benchmarks/constprop -p 'test_*.py'
+```
+
+The constprop tests require a Python checkout supporting `cache_calls`. They
+check the Python analyzer/cache lifetime, verdicts, and the new workload
+builders against the independent oracle using both concrete interpreters.
 
 ## Report
 
