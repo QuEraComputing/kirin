@@ -238,6 +238,28 @@ fn attach_nodes_to_ungraph_rejects_edge_with_operands() {
 }
 
 #[test]
+#[should_panic(expected = "which already has members")]
+fn attach_nodes_to_digraph_rejects_a_graph_with_members() {
+    let mut stage = new_stage();
+    let first = stage.statement().definition(BuilderDialect::Nop).new();
+    let second = stage.statement().definition(BuilderDialect::Nop).new();
+    let dg = stage.digraph().new();
+    stage.attach_nodes_to_digraph(dg, &[first], &[]);
+    stage.attach_nodes_to_digraph(dg, &[second], &[]);
+}
+
+#[test]
+#[should_panic(expected = "which already has members")]
+fn attach_nodes_to_ungraph_rejects_a_graph_with_members() {
+    let mut stage = new_stage();
+    let (first, _) = make_wire(&mut stage);
+    let (second, _) = make_wire(&mut stage);
+    let ug = stage.ungraph().new();
+    stage.attach_nodes_to_ungraph(ug, &[first], &[]);
+    stage.attach_nodes_to_ungraph(ug, &[second], &[]);
+}
+
+#[test]
 #[should_panic(expected = "already has a different parent")]
 fn statement_builder_rejects_digraph_with_existing_owner() {
     let mut stage = new_stage();

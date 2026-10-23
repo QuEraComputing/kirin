@@ -366,7 +366,8 @@ impl<L: Dialect> BuilderStageInfo<L> {
         let _ = self.blocks.delete(real);
     }
 
-    /// Attach node statements and yield values to an existing digraph.
+    /// Attach node statements and yield values to an existing digraph, which
+    /// must have no members yet.
     pub fn attach_nodes_to_digraph(
         &mut self,
         dg: DiGraph,
@@ -388,7 +389,10 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
 
         let dg_info = &mut self.digraphs[dg];
-        dg_info.clear_members();
+        assert!(
+            dg_info.members().next().is_none(),
+            "Cannot attach nodes to digraph {dg:?}, which already has members"
+        );
         dg_info.extra.yields = yields.to_vec();
         self.add_digraph_nodes(dg, nodes);
     }
@@ -444,7 +448,6 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
         let statements = &self.nodes.statements;
         let graph = &mut self.nodes.ungraphs[ug];
-        graph.clear_members();
 
         let boundary_ssa_set: HashSet<SSAValue> =
             graph.edge_ports().iter().map(|&port| port.into()).collect();
@@ -550,13 +553,18 @@ impl<L: Dialect> BuilderStageInfo<L> {
         }
     }
 
-    /// Attach edge and node statements to an existing ungraph.
+    /// Attach edge and node statements to an existing ungraph, which must
+    /// have no members yet.
     pub fn attach_nodes_to_ungraph(
         &mut self,
         ug: UnGraph,
         edge_stmts: &[Statement],
         node_stmts: &[Statement],
     ) {
+        assert!(
+            self.ungraphs[ug].members().next().is_none(),
+            "Cannot attach statements to ungraph {ug:?}, which already has members"
+        );
         for &stmt in edge_stmts {
             self.assert_ungraph_member(stmt, UnGraphRole::Edge);
         }

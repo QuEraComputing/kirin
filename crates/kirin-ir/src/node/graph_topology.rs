@@ -10,12 +10,6 @@ use super::graph::{GraphInfo, GraphMember};
 use crate::{DiGraphInfo, Dialect, SSAValue, Statement, UnGraphInfo};
 
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
-    /// Drop every member and edge.
-    pub(crate) fn clear_members(&mut self) {
-        self.graph.clear();
-        self.members.clear();
-    }
-
     /// Append `stmt` as a new node. Returns `false`, changing nothing, if
     /// `stmt` is already a member.
     pub(crate) fn add_node(&mut self, stmt: Statement) -> bool {
