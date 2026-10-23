@@ -701,9 +701,10 @@ fn analyze(
     function: &str,
     args: &[TestValue],
 ) -> Result<TestValue, TestError> {
-    let mut analysis: AbstractEngine<'_> =
+    let analysis: AbstractEngine<'_> =
         SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
-    expect_single(analysis.analyze_by_name("test", function, args.iter().cloned())?)
+    let (ret, _) = analysis.analyze_by_name("test", function, args.iter().cloned())?;
+    expect_single(ret)
 }
 
 /// Summary key of the *context-insensitive* policy: one key per function, so
@@ -728,9 +729,10 @@ fn analyze_insensitive(
     function: &str,
     args: &[TestValue],
 ) -> Result<TestValue, TestError> {
-    let mut analysis: InsensitiveEngine<'_> =
+    let analysis: InsensitiveEngine<'_> =
         SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
-    expect_single(analysis.analyze_by_name("test", function, args.iter().cloned())?)
+    let (ret, _) = analysis.analyze_by_name("test", function, args.iter().cloned())?;
+    expect_single(ret)
 }
 
 #[test]
@@ -766,23 +768,27 @@ fn sparse_forward_symbol_entry_matches_name_and_direct_callee() {
     let (stage, symbol) = local_function_symbol(&pipeline, "test", "gadd");
     let args = || [ConstPropValue::Const(2), ConstPropValue::Const(3)];
 
-    let mut by_name: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
+    let by_name: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
     let by_name = expect_single::<TestValue, TestError>(
-        by_name.analyze_by_name("test", "gadd", args()).unwrap(),
+        by_name.analyze_by_name("test", "gadd", args()).unwrap().0,
     )
     .unwrap();
 
-    let mut by_symbol: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
+    let by_symbol: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
     let by_symbol = expect_single::<TestValue, TestError>(
-        by_symbol.analyze_by_symbol(stage, symbol, args()).unwrap(),
+        by_symbol
+            .analyze_by_symbol(stage, symbol, args())
+            .unwrap()
+            .0,
     )
     .unwrap();
 
-    let mut by_callee: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
+    let by_callee: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
     let by_callee = expect_single::<TestValue, TestError>(
         by_callee
             .analyze(stage, Callee::Named(symbol), args())
-            .unwrap(),
+            .unwrap()
+            .0,
     )
     .unwrap();
 

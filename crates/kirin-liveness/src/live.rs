@@ -1,59 +1,9 @@
-//! The liveness fact lattice and the live-set fact store.
+//! The live-set point state of classic liveness.
 
 use std::collections::HashSet;
 
 use kirin_interpreter::PointFacts;
-use kirin_ir::{HasBottom, HasTop, Lattice, SSAValue};
-
-/// The two-point liveness lattice: `Dead` (bottom) ⊑ `Live` (top).
-///
-/// `join` is logical OR: a value is live if it is live on *any* path.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Default)]
-pub enum Live {
-    /// The value is not demanded.
-    #[default]
-    Dead,
-    /// The value is demanded (live).
-    Live,
-}
-
-impl Live {
-    pub fn is_live(self) -> bool {
-        matches!(self, Live::Live)
-    }
-}
-
-impl Lattice for Live {
-    fn join(&self, other: &Self) -> Self {
-        match (self, other) {
-            (Live::Live, _) | (_, Live::Live) => Live::Live,
-            _ => Live::Dead,
-        }
-    }
-
-    fn meet(&self, other: &Self) -> Self {
-        match (self, other) {
-            (Live::Dead, _) | (_, Live::Dead) => Live::Dead,
-            _ => Live::Live,
-        }
-    }
-
-    fn is_subseteq(&self, other: &Self) -> bool {
-        matches!((self, other), (Live::Dead, _) | (Live::Live, Live::Live))
-    }
-}
-
-impl HasBottom for Live {
-    fn bottom() -> Self {
-        Live::Dead
-    }
-}
-
-impl HasTop for Live {
-    fn top() -> Self {
-        Live::Live
-    }
-}
+use kirin_ir::{HasBottom, Lattice, SSAValue};
 
 /// A set of live SSA values.
 ///
@@ -180,22 +130,6 @@ mod tests {
 
     fn ssa(n: usize) -> SSAValue {
         SSAValue::from(TestSSAValue(n))
-    }
-
-    #[test]
-    fn live_join_is_logical_or() {
-        assert_eq!(Live::Dead.join(&Live::Dead), Live::Dead);
-        assert_eq!(Live::Dead.join(&Live::Live), Live::Live);
-        assert_eq!(Live::Live.join(&Live::Dead), Live::Live);
-        assert_eq!(Live::Live.join(&Live::Live), Live::Live);
-    }
-
-    #[test]
-    fn live_lattice_bottom_top_order() {
-        assert_eq!(<Live as HasBottom>::bottom(), Live::Dead);
-        assert_eq!(<Live as HasTop>::top(), Live::Live);
-        assert!(Live::Dead.is_subseteq(&Live::Live));
-        assert!(!Live::Live.is_subseteq(&Live::Dead));
     }
 
     #[test]
