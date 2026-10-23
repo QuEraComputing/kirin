@@ -404,7 +404,12 @@ impl<L: Dialect> BuilderStageInfo<L> {
         let parent = Some(StatementParent::DiGraph(dg));
         let graph = &mut self.nodes.digraphs[dg];
         for &stmt in nodes {
-            self.nodes.statements[stmt].parent = parent;
+            let info = &mut self.nodes.statements[stmt];
+            assert!(
+                info.parent.is_none() || info.parent == parent,
+                "Statement `{stmt:?}` already has a different parent"
+            );
+            info.parent = parent;
             graph.add_node(stmt);
         }
         for &consumer in nodes {
@@ -444,7 +449,12 @@ impl<L: Dialect> BuilderStageInfo<L> {
     ) {
         let parent = Some(StatementParent::UnGraph(ug));
         for &stmt_id in node_stmts.iter().chain(edge_stmts) {
-            self.nodes.statements[stmt_id].parent = parent;
+            let info = &mut self.nodes.statements[stmt_id];
+            assert!(
+                info.parent.is_none() || info.parent == parent,
+                "Statement `{stmt_id:?}` already has a different parent"
+            );
+            info.parent = parent;
         }
         let statements = &self.nodes.statements;
         let graph = &mut self.nodes.ungraphs[ug];

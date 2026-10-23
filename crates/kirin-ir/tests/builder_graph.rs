@@ -606,3 +606,30 @@ fn ungraph_isolated_node_appended_after_bfs() {
         Some(StatementParent::UnGraph(ug))
     );
 }
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn digraph_builder_rejects_a_node_of_another_graph() {
+    let mut stage = new_stage();
+    let nop = stage.statement().definition(BuilderDialect::Nop).new();
+    let _ = stage.digraph().node(nop).new();
+    let _ = stage.digraph().node(nop).new();
+}
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn ungraph_builder_rejects_a_member_of_another_graph() {
+    let mut stage = new_stage();
+    let (wire_stmt, _) = make_wire(&mut stage);
+    let _ = stage.ungraph().edge(wire_stmt).new();
+    let _ = stage.ungraph().edge(wire_stmt).new();
+}
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn digraph_builder_rejects_a_statement_in_a_block() {
+    let mut stage = new_stage();
+    let nop = stage.statement().definition(BuilderDialect::Nop).new();
+    let _ = stage.block().stmt(nop).new();
+    let _ = stage.digraph().node(nop).new();
+}
