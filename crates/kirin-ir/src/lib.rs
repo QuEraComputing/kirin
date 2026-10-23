@@ -41,7 +41,7 @@ pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice, Widen}
 pub use node::{
     Block, BlockArgument, BlockInfo, BlockParent, BuilderKey, BuilderSSAInfo, BuilderSSAKind, CFG,
     CompileStage, DeletedSSAValue, DiGraph, DiGraphExtra, DiGraphInfo, Function, FunctionInfo,
-    GlobalSymbol, GraphInfo, GraphMember, LinkedList, LinkedListNode, Port, PortParent,
+    GlobalSymbol, GraphInfo, GraphMember, LinkedList, LinkedListNode, MemberRole, Port, PortParent,
     ResolutionInfo, ResultValue, SSAInfo, SSAKind, SSAValue, SpecializedFunction,
     SpecializedFunctionInfo, StagedFunction, StagedFunctionInfo, StagedNamePolicy, Statement,
     StatementInfo, StatementParent, Successor, Symbol, TestSSAValue, UnGraph, UnGraphExtra,

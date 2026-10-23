@@ -3,7 +3,9 @@ use std::fmt;
 use crate::derived::chain::ChainFinding;
 use crate::derived::mirrors::block_body::BlockBody;
 use crate::node::ssa::Use;
-use crate::{Block, CFG, DiGraph, LinkedList, SSAValue, Statement, UnGraph};
+use crate::{
+    Block, CFG, DiGraph, LinkedList, MemberRole, SSAValue, Statement, StatementParent, UnGraph,
+};
 
 /// A membership pointer naming a container that is not live.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -12,6 +14,11 @@ pub enum DanglingParent {
     StatementInBlock { stmt: Statement, parent: Block },
     /// `block` claims membership of a CFG that is not live.
     BlockInCFG { block: Block, parent: CFG },
+    /// `stmt` claims membership of a `DiGraph` or `UnGraph` that is not live.
+    StatementInGraph {
+        stmt: Statement,
+        parent: StatementParent,
+    },
 }
 
 impl fmt::Display for DanglingParent {
@@ -24,6 +31,10 @@ impl fmt::Display for DanglingParent {
             DanglingParent::BlockInCFG { block, parent } => write!(
                 f,
                 "{block} claims membership of {parent:?}, which is not live"
+            ),
+            DanglingParent::StatementInGraph { stmt, parent } => write!(
+                f,
+                "{stmt:?} claims membership of {parent:?}, which is not live"
             ),
         }
     }
@@ -62,12 +73,13 @@ pub enum Finding {
     },
     /// A membership pointer names a container that is not live.
     DanglingParent(DanglingParent),
-    /// The wire `value` of `graph` is read by `endpoints` node operand
-    /// slots; an undirected edge joins at most two.
+    /// The wire `value` of `graph` is read by more than two node operand
+    /// slots, each listed as `(node, operand_index)`; an undirected edge
+    /// joins at most two.
     UnGraphDegreeExceeded {
         graph: UnGraph,
         value: SSAValue,
-        endpoints: usize,
+        occurrences: Vec<(Statement, usize)>,
     },
 }
 
@@ -103,10 +115,11 @@ impl fmt::Display for Finding {
             Finding::UnGraphDegreeExceeded {
                 graph,
                 value,
-                endpoints,
+                occurrences,
             } => write!(
                 f,
-                "wire {value} of UnGraph {graph} is read by {endpoints} node operand slots; at most 2 are allowed"
+                "wire {value} of UnGraph {graph} is read by {} node operand slots {occurrences:?}; at most 2 are allowed",
+                occurrences.len()
             ),
         }
     }
@@ -177,6 +190,30 @@ pub enum Mismatch {
         installed: LinkedList<Block>,
         derived: LinkedList<Block>,
     },
+    /// The installed members of `graph` differ from the derived ones: one or
+    /// more members are missing, extra, or stored with the wrong role. `graph`
+    /// is a `StatementParent::DiGraph` or `StatementParent::UnGraph`, and both
+    /// lists are sorted by statement.
+    GraphMembers {
+        graph: StatementParent,
+        installed: Vec<(Statement, MemberRole)>,
+        derived: Vec<(Statement, MemberRole)>,
+    },
+    /// The member map and the petgraph of `graph` disagree about the node of
+    /// each statement in `statements`: either the map points it at a petgraph
+    /// node holding a different statement, or the petgraph has a node for it
+    /// that the map does not point at.
+    GraphNodeIndex {
+        graph: StatementParent,
+        statements: Vec<Statement>,
+    },
+    /// The installed edges of `graph` differ from the derived ones, compared as
+    /// multisets of `(a, b, value)` with undirected endpoints in id order.
+    GraphEdges {
+        graph: StatementParent,
+        installed: Vec<(Statement, Statement, SSAValue)>,
+        derived: Vec<(Statement, Statement, SSAValue)>,
+    },
 }
 
 impl fmt::Display for Mismatch {
@@ -213,6 +250,26 @@ impl fmt::Display for Mismatch {
             } => write!(
                 f,
                 "blocks of {cfg:?}: installed {installed:?}, derived {derived:?}"
+            ),
+            Mismatch::GraphMembers {
+                graph,
+                installed,
+                derived,
+            } => write!(
+                f,
+                "members of {graph:?}: installed {installed:?}, derived {derived:?}"
+            ),
+            Mismatch::GraphNodeIndex { graph, statements } => write!(
+                f,
+                "member map and petgraph of {graph:?} disagree about the nodes of {statements:?}"
+            ),
+            Mismatch::GraphEdges {
+                graph,
+                installed,
+                derived,
+            } => write!(
+                f,
+                "edges of {graph:?}: installed {installed:?}, derived {derived:?}"
             ),
         }
     }

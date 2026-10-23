@@ -92,7 +92,7 @@ fn assert_port_edge(pipeline: &GraphPipeline) {
     let (stage, ug) = test_stage_and_ungraph(pipeline);
     let info = ug.expect_info(stage);
     let port = SSAValue::from(info.edge_ports()[0]);
-    let weights: Vec<SSAValue> = info.graph().raw_edges().iter().map(|e| e.weight).collect();
+    let weights: Vec<SSAValue> = info.graph().edge_weights().copied().collect();
     assert_eq!(weights, [port]);
     for node in info.graph().node_indices() {
         assert_eq!(info.node_idx_of(info.graph()[node]), Some(node));
@@ -102,28 +102,23 @@ fn assert_port_edge(pipeline: &GraphPipeline) {
 
 #[cfg(feature = "serde")]
 #[test]
-fn test_ungraph_json_restores_members() {
+fn test_ungraph_json_restores_graph_mirror() {
     let pipeline = parse_graph_pipeline(UNGRAPH_FN);
 
-    // The member map is serialized with the graph and restored as is.
+    // The graph mirror is serialized like the other mirrors and trusted on
+    // load; verification confirms it still agrees with the IR.
     let json = serde_json::to_string(&pipeline).unwrap();
     let restored: GraphPipeline = serde_json::from_str(&json).unwrap();
 
-    let (stage, ug) = test_stage_and_ungraph(&restored);
-    let info = ug.expect_info(stage);
-    let (original_stage, original_ug) = test_stage_and_ungraph(&pipeline);
+    let (stage, ug) = test_stage_and_ungraph(&pipeline);
+    let (restored_stage, restored_ug) = test_stage_and_ungraph(&restored);
+    let restored_info = restored_ug.expect_info(restored_stage);
     assert_eq!(
-        info.members().collect::<Vec<_>>(),
-        original_ug
-            .expect_info(original_stage)
-            .members()
-            .collect::<Vec<_>>()
+        restored_info.members().collect::<Vec<_>>(),
+        ug.expect_info(stage).members().collect::<Vec<_>>()
     );
-    let graph = info.graph();
-    assert_eq!(graph.node_count(), 2);
-    for node in graph.node_indices() {
-        assert_eq!(info.node_idx_of(graph[node]), Some(node));
-    }
+    assert_eq!(restored_info.graph().node_count(), 2);
+    kirin::ir::verify_derived(restored_stage).unwrap();
 }
 
 #[test]
@@ -135,9 +130,7 @@ fn test_ungraph_text_roundtrip_after_rewrite() {
     let x = SSAValue::from(info.edge_ports()[0]);
     // `%t` is the node that does not read `%x`.
     let t = info
-        .graph()
-        .node_weights()
-        .copied()
+        .nodes()
         .find(|node| !node.arguments(stage).any(|&arg| arg == x))
         .unwrap();
 
