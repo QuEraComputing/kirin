@@ -83,8 +83,9 @@ use rustc_hash::{FxBuildHasher, FxHashMap};
 use crate::arena::{GetInfo, GetInfoMut};
 use smallvec::SmallVec;
 
+use super::bodies::bodies_of;
 use crate::{
-    Block, BlockInfo, CFG, DiGraph, Dialect, SSAValue, StageInfo, Statement, StatementInfo,
+    Block, BlockInfo, Body, CFG, DiGraph, Dialect, SSAValue, StageInfo, Statement, StatementInfo,
     StatementParent, UnGraph, Use,
 };
 
@@ -132,6 +133,10 @@ pub enum MutationEvent {
     /// statement was added or removed, or a wire's endpoints changed. Recorded
     /// at most once per graph per [`Rewriter`] call.
     ChangedUnGraphTopology { graph: UnGraph },
+    /// `owner`'s definition was replaced with one naming different bodies:
+    /// the bodies it dropped were tombstoned with everything nested in them,
+    /// and the bodies it gained now have `owner` as their parent.
+    ChangedBodyNesting { owner: Statement },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -207,6 +212,18 @@ pub enum RewriteError {
     /// edge statement. Nodes and edge statements are stored differently, so
     /// the replacement must keep the original's role.
     EdgeRoleMismatch(Statement),
+    /// A `replace_statement` definition names a body that does not resolve to
+    /// a live body in this stage.
+    UnknownBody(Body),
+    /// A `replace_statement` definition names a body that belongs to another
+    /// statement or, for a block, to a CFG. A body has one owner; detach it
+    /// from the other one first.
+    BodyOwnedElsewhere(Body),
+    /// A `replace_statement` definition names the same body in two fields.
+    BodyListedTwice(Body),
+    /// A `replace_statement` definition names a body the statement itself is
+    /// nested in, which would make the statement its own ancestor.
+    BodyEnclosesOwner(Body),
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -341,6 +358,21 @@ impl fmt::Display for RewriteError {
                 write!(
                     f,
                     "replacement for {stmt:?} changes whether it is an UnGraph edge statement"
+                )
+            }
+            RewriteError::UnknownBody(body) => {
+                write!(f, "body {body:?} is not a live body in this stage")
+            }
+            RewriteError::BodyOwnedElsewhere(body) => {
+                write!(f, "body {body:?} already belongs to something else")
+            }
+            RewriteError::BodyListedTwice(body) => {
+                write!(f, "the replacement names body {body:?} twice")
+            }
+            RewriteError::BodyEnclosesOwner(body) => {
+                write!(
+                    f,
+                    "the replacement names body {body:?}, which encloses the statement"
                 )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
@@ -982,40 +1014,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Tombstone the statement-owned blocks, `CFG`s, `DiGraph`s, and `UnGraph`s
     /// nested in `stmt`.
     fn tombstone_nested_bodies(&mut self, stmt: Statement) {
-        let (blocks, cfgs, digraphs, ungraphs) = {
-            let definition = &stmt.expect_info(self.stage).definition;
-            (
-                definition
-                    .blocks()
-                    .copied()
-                    .collect::<SmallVec<[Block; 2]>>(),
-                definition.cfgs().copied().collect::<SmallVec<[CFG; 1]>>(),
-                definition
-                    .digraphs()
-                    .copied()
-                    .collect::<SmallVec<[DiGraph; 1]>>(),
-                definition
-                    .ungraphs()
-                    .copied()
-                    .collect::<SmallVec<[UnGraph; 1]>>(),
-            )
-        };
-        for graph in digraphs {
-            self.tombstone_digraph(graph);
-        }
-        for graph in ungraphs {
-            self.tombstone_ungraph(graph);
-        }
-        for block in blocks {
-            self.tombstone_block(block);
-        }
-        for cfg in cfgs {
-            let mut current = cfg.get_info(self.stage).and_then(|item| item.blocks.head);
-            while let Some(block) = current {
-                current = block.get_info(self.stage).and_then(|item| item.node.next);
-                self.tombstone_block(block);
-            }
-            let _ = self.stage.nodes.cfgs.delete(cfg);
+        for body in bodies_of(&stmt.expect_info(self.stage).definition) {
+            self.tombstone_body(body);
         }
     }
 
@@ -1203,7 +1203,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// the new operands, and `BlockInfo::predecessors` is updated for any
     /// control-flow edge the replacement adds or drops. The block-body and CFG
     /// chain mirrors need no update: the statement keeps its id, chain links,
-    /// and terminator-ness, and no block moves. For a `DiGraph` member, the
+    /// and terminator-ness.
+    ///
+    /// The bodies (blocks, `CFG`s, `DiGraph`s, `UnGraph`s) the definition
+    /// names may change. Bodies named by both definitions are untouched, so
+    /// reordering them (swapping an `if`'s arms) just works. A body only the
+    /// old definition named is tombstoned with everything nested in it, as
+    /// erasing the statement would do. A body only the new one names gets
+    /// `stmt` as its parent; it must be live, owned by nothing else, and not
+    /// enclose `stmt`. For a `DiGraph` member, the
     /// edges into it follow the operand values it gains or loses; for an
     /// `UnGraph` node, the wires it leaves and joins are resynced. An `UnGraph`
     /// edge statement keeps its result ids, so its wires and their edges are
@@ -1214,9 +1222,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// non-terminator successors, names an operand or successor target that
     /// is not live, or — for an `UnGraph` member — changes whether it is an
     /// edge statement ([`RewriteError::EdgeRoleMismatch`]) or gives an edge
-    /// statement operands.
+    /// statement operands, or names a body that is not live
+    /// ([`RewriteError::UnknownBody`]), belongs to something else
+    /// ([`RewriteError::BodyOwnedElsewhere`]), is named twice
+    /// ([`RewriteError::BodyListedTwice`]), or encloses `stmt`
+    /// ([`RewriteError::BodyEnclosesOwner`]).
     ///
-    /// Records [`MutationEvent::ReplacedStatement`], followed by
+    /// Records [`MutationEvent::ReplacedStatement`], then
+    /// [`MutationEvent::ChangedBodyNesting`] if the bodies changed, followed by
     /// [`MutationEvent::ChangedTerminator`] when `stmt` is a terminator, or by
     /// [`MutationEvent::ChangedDiGraphTopology`] /
     /// [`MutationEvent::ChangedUnGraphTopology`] when it is a graph member whose
@@ -1238,7 +1251,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         stmt: Statement,
         definition: &L,
     ) -> Result<PreparedReplacement, RewriteError> {
-        let (old_operands, old_results, old_successors, parent, old_is_terminator, old_is_edge) = {
+        let (
+            old_operands,
+            old_results,
+            old_successors,
+            parent,
+            old_is_terminator,
+            old_is_edge,
+            old_bodies,
+        ) = {
             let item = self.live_statement(stmt)?;
             let Some(parent) = item.parent else {
                 return Err(RewriteError::NotInBlockBody(stmt));
@@ -1256,6 +1277,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 parent,
                 item.definition.is_terminator(),
                 item.definition.is_edge(),
+                bodies_of(&item.definition),
             )
         };
 
@@ -1291,6 +1313,26 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             let target = successor.target();
             self.live_block(target)?;
         }
+        // Bodies kept from the old definition stay as they are; a body the
+        // new one gains must be free for `stmt` to own.
+        let new_bodies = bodies_of(definition);
+        for (index, &body) in new_bodies.iter().enumerate() {
+            if new_bodies[..index].contains(&body) {
+                return Err(RewriteError::BodyListedTwice(body));
+            }
+            if !old_bodies.contains(&body) {
+                self.check_can_adopt(body, stmt)?;
+            }
+        }
+        let dropped_bodies = old_bodies
+            .iter()
+            .copied()
+            .filter(|body| !new_bodies.contains(body))
+            .collect();
+        let gained_bodies = new_bodies
+            .into_iter()
+            .filter(|body| !old_bodies.contains(body))
+            .collect();
 
         Ok(PreparedReplacement {
             old_operands,
@@ -1298,6 +1340,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             old_successors,
             parent,
             is_terminator: old_is_terminator,
+            dropped_bodies,
+            gained_bodies,
         })
     }
 
@@ -1316,6 +1360,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             old_successors,
             parent,
             is_terminator,
+            dropped_bodies,
+            gained_bodies,
         } = prepared;
         let new_operands: Vec<SSAValue> = definition.arguments().copied().collect();
         let new_successors: HashSet<Block> = definition
@@ -1349,6 +1395,16 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             add_use(self.stage, operand, Use::StatementOperand { stmt, index });
         }
 
+        // Keep the bodies' parents in step with the definition that names
+        // them: drop what it no longer names, adopt what it newly does.
+        let bodies_changed = !dropped_bodies.is_empty() || !gained_bodies.is_empty();
+        for body in dropped_bodies {
+            self.tombstone_body(body);
+        }
+        for body in gained_bodies {
+            self.adopt_body(body, stmt);
+        }
+
         let parent_block = match parent {
             StatementParent::Block(block) => block,
             StatementParent::DiGraph(graph) => {
@@ -1373,7 +1429,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 for operand in gained {
                     changed |= self.add_operand_edge(graph, stmt, operand);
                 }
-                self.events.push(MutationEvent::ReplacedStatement { stmt });
+                self.push_replaced(stmt, bodies_changed);
                 if changed {
                     self.events
                         .push(MutationEvent::ChangedDiGraphTopology { graph });
@@ -1385,7 +1441,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 // defines and their readers are unchanged; a node's wires are
                 // resynced. An edge statement has no operands, so its snapshot
                 // is empty.
-                self.events.push(MutationEvent::ReplacedStatement { stmt });
+                self.push_replaced(stmt, bodies_changed);
                 if self.resync_wires(graph, wires) {
                     self.events
                         .push(MutationEvent::ChangedUnGraphTopology { graph });
@@ -1409,7 +1465,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             }
         }
 
-        self.events.push(MutationEvent::ReplacedStatement { stmt });
+        self.push_replaced(stmt, bodies_changed);
         if is_terminator {
             self.events.push(MutationEvent::ChangedTerminator {
                 block: parent_block,
@@ -1418,10 +1474,25 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     }
 }
 
+impl<L: Dialect> Rewriter<'_, L> {
+    /// Record `stmt`'s replacement, and the change to its bodies if any.
+    fn push_replaced(&mut self, stmt: Statement, bodies_changed: bool) {
+        self.events.push(MutationEvent::ReplacedStatement { stmt });
+        if bodies_changed {
+            self.events
+                .push(MutationEvent::ChangedBodyNesting { owner: stmt });
+        }
+    }
+}
+
 /// Old-state snapshot taken by [`Rewriter::prepare_replacement`].
 pub(super) struct PreparedReplacement {
     old_operands: Vec<SSAValue>,
     old_results: Vec<crate::ResultValue>,
+    /// Bodies the old definition named and the new one does not.
+    dropped_bodies: SmallVec<[Body; 2]>,
+    /// Bodies the new definition names and the old one did not.
+    gained_bodies: SmallVec<[Body; 2]>,
     old_successors: HashSet<Block>,
     parent: StatementParent,
     is_terminator: bool,
