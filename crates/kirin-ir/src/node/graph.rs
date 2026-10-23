@@ -178,6 +178,17 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         members
     }
 
+    /// The first member in member order.
+    pub(crate) fn first_member(&self) -> Option<Statement> {
+        self.members.get_index(0).map(|(&stmt, _)| stmt)
+    }
+
+    /// The member after `stmt` in member order, in O(1).
+    pub(crate) fn member_after(&self, stmt: Statement) -> Option<Statement> {
+        let index = self.members.get_index_of(&stmt)?;
+        self.members.get_index(index + 1).map(|(&next, _)| next)
+    }
+
     /// How `stmt` is stored, if it is a member.
     pub fn member(&self, stmt: Statement) -> Option<GraphMember> {
         self.members.get(&stmt).copied()

@@ -1,0 +1,5 @@
+error: `r` is a result of an op erased by `erase!` above and cannot be used afterwards
+  --> tests/compile-fail/use_after_erase.rs:16:18
+   |
+16 |         replace!(r, x);
+   |                  ^

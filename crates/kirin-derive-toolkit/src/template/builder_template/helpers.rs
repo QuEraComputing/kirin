@@ -11,9 +11,17 @@ pub(super) struct StatementInfo {
     pub(super) name: syn::Ident,
     pub(super) fields: Vec<FieldInfo<StandardLayout>>,
     pub(super) build_fn_name: syn::Ident,
+    pub(super) constructor_name: syn::Ident,
     pub(super) is_wrapper: bool,
     pub(super) wrapper_type: Option<syn::Type>,
     pub(super) wrapper_field: Option<FieldIndex>,
+}
+
+/// The op's name in generated function names: the statement's Rust name in
+/// snake case. So `Add` gives builder name `op_add` and constructor name
+/// `new_add`.
+fn op_name(statement: &ir::Statement<StandardLayout>) -> String {
+    to_snake_case(statement.name.to_string())
 }
 
 pub(super) fn build_fn_name(
@@ -21,11 +29,7 @@ pub(super) fn build_fn_name(
     statement: &ir::Statement<StandardLayout>,
 ) -> syn::Ident {
     let default_name = if is_enum {
-        format_ident!(
-            "op_{}",
-            to_snake_case(statement.name.to_string()),
-            span = statement.name.span()
-        )
+        format_ident!("op_{}", op_name(statement), span = statement.name.span())
     } else {
         format_ident!("new", span = statement.name.span())
     };
@@ -36,6 +40,12 @@ pub(super) fn build_fn_name(
         }
         _ => default_name,
     }
+}
+
+/// The name of the constructor returning the statement as a value:
+/// `new_{op}` for enum variants and structs alike.
+pub(super) fn constructor_name(statement: &ir::Statement<StandardLayout>) -> syn::Ident {
+    format_ident!("new_{}", op_name(statement), span = statement.name.span())
 }
 
 fn build_result_module_name(input: &InputMeta) -> syn::Ident {
@@ -77,44 +87,68 @@ fn build_fn_inputs(info: &StatementInfo, ir_type: &syn::Path) -> Vec<proc_macro2
         }
     }
 
-    for field in info.fields.iter() {
-        match field.category() {
-            FieldCategory::Result => continue,
-            FieldCategory::Value => {
-                if field.has_default() {
-                    continue;
-                }
-                let ty = field.value_type().expect("Value field must have type");
-                let name = field.name_ident(ty.span());
-                let sig = if field.has_into() {
-                    quote! { #name: impl Into<#ty> }
-                } else {
-                    quote! { #name: #ty }
-                };
-                inputs.push(sig);
-            }
-            FieldCategory::Signature => {
-                let ty = field_type_for_signature(&field.collection, ir_type);
-                let name = field.name_ident(proc_macro2::Span::call_site());
-                inputs.push(quote! { #name: impl Into<#ty> });
-            }
-            FieldCategory::Argument
-            | FieldCategory::Block
-            | FieldCategory::Successor
-            | FieldCategory::CFG
-            | FieldCategory::DiGraph
-            | FieldCategory::UnGraph
-            | FieldCategory::Symbol => {
-                let ty = field_type_for_category(&field.collection, field.category());
-                let name = field.name_ident(ty.span());
-                inputs.push(quote! { #name: impl Into<#ty> });
-            }
-        }
-    }
+    // The builder creates the results itself.
+    inputs.extend(
+        info.fields
+            .iter()
+            .filter(|field| field.category() != FieldCategory::Result)
+            .filter_map(|field| field_param(field, ir_type)),
+    );
     inputs
 }
 
-fn build_fn_let_inputs(info: &StatementInfo, ir_type: &syn::Path) -> Vec<proc_macro2::TokenStream> {
+/// The parameter a builder or constructor takes for a Statement's `field`, or
+/// `None` for a value field with a `#[kirin(default)]`.
+///
+/// A result takes exactly `ResultValue` while an argument takes any
+/// `impl Into<SSAValue>`. Passing a constructor its arguments and results
+/// in the wrong order fails to compile.
+pub(super) fn field_param(
+    field: &FieldInfo<StandardLayout>,
+    ir_type: &syn::Path,
+) -> Option<proc_macro2::TokenStream> {
+    let param = match field.category() {
+        FieldCategory::Result => {
+            let ty = field_type_for_category(&field.collection, field.category());
+            let name = field.name_ident(ty.span());
+            quote! { #name: #ty }
+        }
+        FieldCategory::Value => {
+            if field.has_default() {
+                return None;
+            }
+            let ty = field.value_type().expect("Value field must have type");
+            let name = field.name_ident(ty.span());
+            if field.has_into() {
+                quote! { #name: impl Into<#ty> }
+            } else {
+                quote! { #name: #ty }
+            }
+        }
+        FieldCategory::Signature => {
+            let ty = field_type_for_signature(&field.collection, ir_type);
+            let name = field.name_ident(proc_macro2::Span::call_site());
+            quote! { #name: impl Into<#ty> }
+        }
+        FieldCategory::Argument
+        | FieldCategory::Block
+        | FieldCategory::Successor
+        | FieldCategory::CFG
+        | FieldCategory::DiGraph
+        | FieldCategory::UnGraph
+        | FieldCategory::Symbol => {
+            let ty = field_type_for_category(&field.collection, field.category());
+            let name = field.name_ident(ty.span());
+            quote! { #name: impl Into<#ty> }
+        }
+    };
+    Some(param)
+}
+
+pub(super) fn build_fn_let_inputs(
+    info: &StatementInfo,
+    ir_type: &syn::Path,
+) -> Vec<proc_macro2::TokenStream> {
     let mut assigns = Vec::new();
     for field in info.fields.iter() {
         match field.category() {
@@ -415,6 +449,7 @@ pub(super) fn build_fn_for_statement(
         quote! {}
     };
 
+    let constructor_fn = super::constructor::constructor_fn(info, input);
     let fn_tokens = quote! {
         #[allow(clippy::too_many_arguments)]
         pub fn #build_fn_name<Lang>(stage: &mut impl #crate_path::AsBuildStage<Lang>, #(#inputs),*) -> #build_result_path
@@ -426,6 +461,8 @@ pub(super) fn build_fn_for_statement(
             let stage = stage.as_build_stage();
             #body
         }
+
+        #constructor_fn
     };
 
     Ok(if is_enum {
@@ -726,6 +763,7 @@ mod tests {
             name: format_ident!("{}", name),
             fields,
             build_fn_name: format_ident!("op_{}", name.to_lowercase()),
+            constructor_name: format_ident!("new_{}", name.to_lowercase()),
             is_wrapper: false,
             wrapper_type: None,
             wrapper_field: None,

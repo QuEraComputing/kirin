@@ -258,6 +258,47 @@ fn test_dialect_derive_enum_wraps_with_extra_fields_from_impl() {
     insta::assert_snapshot!(code);
 }
 
+/// `#[kirin(builders)]` emits a `new_{op}` constructor next to each `op_{op}`
+/// builder, taking the results and skipping `#[kirin(default)]` fields.
+#[test]
+fn test_dialect_derive_enum_builders_emit_constructors() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = T, builders)]
+        enum Arith<T: CompileTimeValue> {
+            Add {
+                lhs: SSAValue,
+                rhs: SSAValue,
+                result: ResultValue,
+                #[kirin(default)]
+                marker: std::marker::PhantomData<T>,
+            },
+            CondBr {
+                condition: SSAValue,
+                target: Successor,
+            },
+        }
+    };
+    insta::assert_snapshot!(generate_dialect_code(input));
+}
+
+/// A struct's constructor is named after the struct, since its builder
+/// already takes `new`.
+#[test]
+fn test_dialect_derive_struct_builders_emit_constructor() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = Ty, builders)]
+        struct Constant<T: CompileTimeValue, Ty: CompileTimeValue> {
+            #[kirin(into)]
+            value: T,
+            #[kirin(type = value.type_of())]
+            result: ResultValue,
+            #[kirin(default)]
+            marker: std::marker::PhantomData<Ty>,
+        }
+    };
+    insta::assert_snapshot!(generate_dialect_code(input));
+}
+
 /// Into/Project are generated for pure wrapper enums (all variants #[wraps], no side fields).
 #[test]
 fn test_dialect_derive_enum_pure_wrapper_generates_lift_project() {
@@ -329,6 +370,23 @@ fn test_dialect_derive_wrapper_struct_generates_lift_project_bridge() {
         #[kirin(type = SimpleType)]
         #[wraps(lift_project_from(LeafOp, OtherLeafOp))]
         struct WrapperOp(InnerOp);
+    };
+    let code = generate_dialect_code(input);
+    insta::assert_snapshot!(code);
+}
+
+/// A variant wrapping a bare type parameter gets no Into/Project (they would
+/// overlap with its siblings'), and `HasSignature` requires the parameter's.
+#[test]
+fn test_dialect_derive_enum_wraps_type_param() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = L::Type)]
+        enum PatternOps<L: Dialect> {
+            #[wraps]
+            Op(L),
+            #[wraps]
+            Hole(HoleOp<L::Type>),
+        }
     };
     let code = generate_dialect_code(input);
     insta::assert_snapshot!(code);

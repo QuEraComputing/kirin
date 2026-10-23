@@ -720,6 +720,7 @@ dependencies = [
  "kirin-test-languages",
  "kirin-test-utils",
  "kirin-tuple",
+ "kirin-wildcard",
  "serde",
  "serde_json",
  "trybuild",
@@ -875,6 +876,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-derive-wildcard"
+version = "0.1.0"
+dependencies = [
+ "darling",
+ "insta",
+ "kirin-derive-toolkit",
+ "kirin-test-utils",
+ "proc-macro2",
+ "quote",
+ "syn",
+]
+
+[[package]]
 name = "kirin-function"
 version = "0.1.0"
 dependencies = [
@@ -964,7 +978,10 @@ dependencies = [
 name = "kirin-rewrite"
 version = "0.1.0"
 dependencies = [
+ "kirin",
+ "kirin-arith",
  "kirin-ir",
+ "kirin-test-languages",
  "kirin-wildcard",
 ]
 
@@ -1042,7 +1059,13 @@ dependencies = [
 name = "kirin-wildcard"
 version = "0.1.0"
 dependencies = [
- "kirin-ir",
+ "kirin",
+ "kirin-arith",
+ "kirin-constant",
+ "kirin-derive-wildcard",
+ "kirin-test-languages",
+ "kirin-test-types",
+ "trybuild",
 ]
 
 [[package]]
