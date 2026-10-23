@@ -334,10 +334,17 @@ let mut interp = ConcreteInterpreter::<Stage, i64, ToyError>::new(&pipeline)
     .with_linker(CrossStageLinker);
 let result = expect_single(interp.call_by_name("source", "main", [3, 5])?)?;
 
-let mut analysis = ConstProp::<Stage, ToyError>::new(&pipeline)
+let analysis = ConstProp::<Stage, ToyError>::new(&pipeline)
     .with_linker(CrossStageLinker);
-let value = expect_single(analysis.analyze_by_name("source", "abs", [Const(7)])?)?;
+let (ret, analysis) = analysis.analyze_by_name("source", "abs", [Const(7)])?;
+let value = expect_single(ret)?;
 ```
+
+The analysis engines (sparse forward, sparse backward, dense backward) take
+`self` in `analyze`/`analyze_by_name`/`analyze_by_symbol` and return the engine
+beside the result on success. An error drops the engine, so a failed
+analysis's partial state can never be resumed or queried: callers build a new
+engine. The concrete interpreter keeps `&mut self` entry points.
 
 ### Linkers: calling conventions as components
 
@@ -609,8 +616,14 @@ Arity errors, resolution errors, and unsupported (graph) callee bodies are
 errors, never opaque fallbacks. There is no opaque-call policy. Indirect calls
 and closures are unsupported: like their forward rules, the `Lambda`/`Bind`
 demand rules return errors.
-Facts accumulate across `analyze` calls on one engine; `with_linker` and
-`with_policy` reset the analysis state.
+Facts accumulate across successful `analyze` calls on one engine, so shared
+callees are discovered and solved once; `with_linker` and `with_policy` reset
+the analysis state. Because facts only rise, a request whose policy key
+matches an earlier context returns the join with the earlier requests: never
+less demanded than a fresh engine, possibly more, and dependent on query
+order. That happens for every repeated callee under `ContextInsensitive`, and
+under `OutputDemandContext` once a callable's budget falls back to `Shared`.
+An error consumes the engine, so a failed discovery is never reused.
 
 ### Engine internals: stage dispatch and IR queries
 

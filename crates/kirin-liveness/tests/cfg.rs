@@ -196,9 +196,9 @@ fn reusing_dense_engine_replaces_the_previous_scoped_result() {
     let pipeline = parse(ENGINE_REUSE_PROGRAM);
     let (stage, first) = function_root(&pipeline, "first");
     let (_, second) = function_root(&pipeline, "second");
-    let mut engine = DenseLiveness::<_, InterpreterError>::new(&pipeline);
+    let engine = DenseLiveness::<_, InterpreterError>::new(&pipeline);
 
-    let first_scope = engine
+    let (first_scope, engine) = engine
         .analyze(stage, first)
         .expect("first callable analysis succeeds");
     let (_, Body::CFG(first_cfg)) = first_scope else {
@@ -214,7 +214,7 @@ fn reusing_dense_engine_replaces_the_previous_scoped_result() {
             .is_some()
     );
 
-    let second_scope = engine
+    let (second_scope, engine) = engine
         .analyze(stage, second)
         .expect("second callable analysis succeeds");
     let (_, Body::CFG(second_cfg)) = second_scope else {

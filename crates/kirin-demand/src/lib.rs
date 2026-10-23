@@ -66,7 +66,6 @@ where
             >,
         >,
 {
-    let mut engine = DemandAnalysis::<S>::new(pipeline);
-    engine.analyze(stage, callee, result_values)?;
+    let (_, engine) = DemandAnalysis::<S>::new(pipeline).analyze(stage, callee, result_values)?;
     DemandResult::from_engine(&engine)
 }

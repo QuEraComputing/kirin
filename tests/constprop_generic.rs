@@ -20,8 +20,8 @@ specialize @test fn @add(i32, i32) -> i32 cfg {
     )
     .unwrap();
 
-    let mut analysis = ConstProp::<_, i32, InterpreterError>::new(&pipeline);
-    let result = analysis
+    let analysis = ConstProp::<_, i32, InterpreterError>::new(&pipeline);
+    let (result, _) = analysis
         .analyze_by_name(
             "test",
             "add",

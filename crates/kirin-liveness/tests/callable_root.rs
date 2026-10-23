@@ -129,16 +129,16 @@ fn every_callee_variant_uses_the_same_backward_root_protocol() {
     let (stage, callees) = all_callee_variants(&pipeline);
 
     for callee in callees {
-        let mut demand = DemandAnalysis::<TestStage>::new(&pipeline);
-        demand
+        let (_, demand) = DemandAnalysis::<TestStage>::new(&pipeline)
             .analyze(stage, callee, [Demand::Live])
             .expect("demand succeeds");
         let root = demand.root().unwrap();
         let demand_scope = demand.scope(root).expect("root context is selected");
         assert!(matches!(demand_scope, (_, Body::Block(_))));
 
-        let mut dense = DenseLiveness::<TestStage>::new(&pipeline);
-        let dense_scope = dense.analyze(stage, callee).expect("dense succeeds");
+        let (dense_scope, _) = DenseLiveness::<TestStage>::new(&pipeline)
+            .analyze(stage, callee)
+            .expect("dense succeeds");
         assert_eq!(dense_scope, demand_scope);
     }
 }
@@ -166,7 +166,8 @@ fn no_callee_variant_bypasses_the_configured_linker() {
         let demand_error = DemandAnalysis::<TestStage>::new(&pipeline)
             .with_linker(RejectingLinker)
             .analyze(stage, callee, [Demand::Live])
-            .expect_err("demand must use the linker");
+            .err()
+            .expect("demand must use the linker");
         assert_eq!(
             demand_error,
             InterpreterError::Custom("rejecting linker reached")
@@ -175,7 +176,8 @@ fn no_callee_variant_bypasses_the_configured_linker() {
         let dense_error = DenseLiveness::<TestStage>::new(&pipeline)
             .with_linker(RejectingLinker)
             .analyze(stage, callee)
-            .expect_err("dense must use the linker");
+            .err()
+            .expect("dense must use the linker");
         assert_eq!(
             dense_error,
             InterpreterError::Custom("rejecting linker reached")
@@ -202,8 +204,8 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
         Err(InterpreterError::MissingSpecialization(_))
     ));
 
-    let mut demand = DemandAnalysis::<TestStage>::new(&pipeline).with_linker(CrossStageLinker);
-    demand
+    let (_, demand) = DemandAnalysis::<TestStage>::new(&pipeline)
+        .with_linker(CrossStageLinker)
         .analyze(source, callee, [Demand::Live])
         .expect("cross-stage demand succeeds");
     let root = demand.root().unwrap();
@@ -212,8 +214,8 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
         "the root context is the resolved target"
     );
     let demand_scope = demand.scope(root).expect("root context is selected");
-    let mut dense = DenseLiveness::<TestStage>::new(&pipeline).with_linker(CrossStageLinker);
-    let dense_scope = dense
+    let (dense_scope, dense) = DenseLiveness::<TestStage>::new(&pipeline)
+        .with_linker(CrossStageLinker)
         .analyze(source, callee)
         .expect("cross-stage dense succeeds");
     assert_eq!(demand_scope.0, lowered);
@@ -222,12 +224,10 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
 
     // Dense analysis rebuilds solver state between roots; configuration state
     // must survive that reset.
-    assert_eq!(
-        dense
-            .analyze(source, callee)
-            .expect("custom linker survives dense reset"),
-        dense_scope
-    );
+    let (again, _) = dense
+        .analyze(source, callee)
+        .expect("custom linker survives dense reset");
+    assert_eq!(again, dense_scope);
 }
 
 #[derive(Clone, Copy)]
@@ -266,12 +266,14 @@ fn a_resolved_non_callable_definition_is_reported_by_shared_body_discovery() {
 
     let demand_error = DemandAnalysis::<TestStage>::new(&pipeline)
         .analyze(stage, callee, [Demand::Live])
-        .expect_err("non-callable definition must fail");
+        .err()
+        .expect("non-callable definition must fail");
     assert_eq!(demand_error, InterpreterError::NotCallable(non_callable));
 
     let dense_error = DenseLiveness::<TestStage>::new(&pipeline)
         .analyze(stage, callee)
-        .expect_err("non-callable definition must fail");
+        .err()
+        .expect("non-callable definition must fail");
     assert_eq!(dense_error, InterpreterError::NotCallable(non_callable));
 }
 
@@ -293,9 +295,11 @@ fn specialized_handles_are_validated_before_accepting_a_candidate_stage() {
             .unwrap(),
         target
     );
-    let mut demand = DemandAnalysis::<TestStage>::new(&pipeline).with_linker(CrossStageLinker);
-    demand.analyze(source, callee, [Demand::Live]).unwrap();
-    let dense = DenseLiveness::<TestStage>::new(&pipeline)
+    let (_, demand) = DemandAnalysis::<TestStage>::new(&pipeline)
+        .with_linker(CrossStageLinker)
+        .analyze(source, callee, [Demand::Live])
+        .unwrap();
+    let (dense, _) = DenseLiveness::<TestStage>::new(&pipeline)
         .with_linker(CrossStageLinker)
         .analyze(source, callee)
         .unwrap();
@@ -332,14 +336,16 @@ fn malformed_custom_targets_return_errors_without_panicking() {
             DemandAnalysis::<TestStage>::new(&pipeline)
                 .with_linker(linker)
                 .analyze(source, callee, [Demand::Live])
-                .unwrap_err(),
+                .err()
+                .unwrap(),
             expected
         );
         assert_eq!(
             DenseLiveness::<TestStage>::new(&pipeline)
                 .with_linker(linker)
                 .analyze(source, callee)
-                .unwrap_err(),
+                .err()
+                .unwrap(),
             expected
         );
     }
@@ -359,14 +365,16 @@ fn malformed_custom_targets_return_errors_without_panicking() {
         DemandAnalysis::<TestStage>::new(&pipeline)
             .with_linker(FixedTargetLinker(target))
             .analyze(source, callee, [Demand::Live])
-            .unwrap_err(),
+            .err()
+            .unwrap(),
         expected
     );
     assert_eq!(
         DenseLiveness::<TestStage>::new(&pipeline)
             .with_linker(FixedTargetLinker(target))
             .analyze(source, callee)
-            .unwrap_err(),
+            .err()
+            .unwrap(),
         expected
     );
 }
@@ -379,7 +387,8 @@ fn unsupported_graph_roots_fail_instead_of_producing_empty_facts() {
         let (stage, callee) = function_callee(&pipeline, name);
         let demand_error = DemandAnalysis::<TestStage>::new(&pipeline)
             .analyze(stage, callee, [Demand::Live])
-            .expect_err("graph demand is not implemented");
+            .err()
+            .expect("graph demand is not implemented");
         assert!(matches!(
             demand_error,
             InterpreterError::NoDefaultWalker(Body::DiGraph(_) | Body::UnGraph(_))
@@ -387,7 +396,8 @@ fn unsupported_graph_roots_fail_instead_of_producing_empty_facts() {
 
         let dense_error = DenseLiveness::<TestStage>::new(&pipeline)
             .analyze(stage, callee)
-            .expect_err("graph liveness is not implemented");
+            .err()
+            .expect("graph liveness is not implemented");
         assert!(matches!(
             dense_error,
             InterpreterError::NoDefaultWalker(Body::DiGraph(_) | Body::UnGraph(_))

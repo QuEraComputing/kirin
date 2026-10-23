@@ -31,12 +31,11 @@ specialize @test fn @second(i64, i64, i64) -> i64 cfg {{
         );
         let mut pipeline: Pipeline<StageInfo<GraphFunctionLanguage>> = Pipeline::new();
         ParsePipelineText::parse(&mut pipeline, &source).unwrap();
-        let mut analysis = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&pipeline);
+        let (inputs, analysis) = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&pipeline)
+            .analyze_by_name("test", "second", [Demand::Live])
+            .unwrap();
         assert_eq!(
-            analysis
-                .analyze_by_name("test", "second", [Demand::Live])
-                .unwrap()
-                .as_slice(),
+            inputs.as_slice(),
             &[Demand::Live, Demand::Dead, Demand::Live]
         );
         assert_eq!(analysis.contexts().count(), 2);

@@ -161,9 +161,9 @@ where
         >,
     >,
 {
-    let mut analysis: ToyConstProp<'_, C> =
-        ToyConstProp::new(pipeline).with_linker(CrossStageLinker);
-    expect_single(analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?)
+    let analysis: ToyConstProp<'_, C> = ToyConstProp::new(pipeline).with_linker(CrossStageLinker);
+    let (ret, _) = analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?;
+    expect_single(ret)
 }
 
 /// Run classic per-point liveness (dense backward — regalloc-grade
@@ -179,8 +179,8 @@ pub fn analyze_classic_liveness(
     stage_name: &str,
     function_name: &str,
 ) -> Result<(CompileStage, CFG, DenseLivenessResult), InterpreterError> {
-    let mut analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-    let scope = analysis.analyze_by_name(stage_name, function_name)?;
+    let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
+    let (scope, analysis) = analysis.analyze_by_name(stage_name, function_name)?;
     let result = DenseLivenessResult::from_engine(&analysis, scope);
     let (stage, Body::CFG(cfg)) = scope else {
         return Err(InterpreterError::Custom(

@@ -57,11 +57,11 @@ fn pipeline() -> Pipeline<TestStage> {
 #[test]
 fn output_product_returns_parameter_facts_and_preserves_context_queries() {
     let pipeline = pipeline();
-    let mut analysis = DemandAnalysis::<TestStage>::new(&pipeline);
+    let analysis = DemandAnalysis::<TestStage>::new(&pipeline);
     let outputs: Product<_> = [Demand::Live, Demand::Dead, Demand::Live]
         .into_iter()
         .collect();
-    let inputs = analysis.analyze_by_name("test", "main", outputs).unwrap();
+    let (inputs, analysis) = analysis.analyze_by_name("test", "main", outputs).unwrap();
     assert_eq!(
         inputs.as_slice(),
         &[Demand::Dead, Demand::Live, Demand::Live]
@@ -77,7 +77,7 @@ fn output_product_returns_parameter_facts_and_preserves_context_queries() {
     let outputs: Product<_> = [Demand::Dead, Demand::Live, Demand::Dead]
         .into_iter()
         .collect();
-    let inputs = analysis.analyze_by_name("test", "main", outputs).unwrap();
+    let (inputs, analysis) = analysis.analyze_by_name("test", "main", outputs).unwrap();
     assert_eq!(
         inputs.as_slice(),
         &[Demand::Live, Demand::Dead, Demand::Dead]
@@ -89,34 +89,28 @@ fn output_product_returns_parameter_facts_and_preserves_context_queries() {
 #[test]
 fn result_values_preserve_control_roots() {
     let pipeline = pipeline();
-    let mut analysis = DemandAnalysis::<TestStage>::new(&pipeline);
-    let inputs = analysis
+    let (inputs, _) = DemandAnalysis::<TestStage>::new(&pipeline)
         .analyze_by_name("test", "branch", [Demand::Dead])
         .unwrap();
     assert_eq!(inputs.as_slice(), &[Demand::Dead, Demand::Live]);
 }
 
 #[test]
-fn arity_errors_clear_root_and_do_not_lose_discovered_control_roots() {
+fn root_arity_errors_are_reported() {
     let pipeline = pipeline();
-    let mut analysis = DemandAnalysis::<TestStage>::new(&pipeline)
-        .with_policy(OutputDemandContext::with_budget(0));
-    analysis
+    let (_, analysis) = DemandAnalysis::<TestStage>::new(&pipeline)
+        .with_policy(OutputDemandContext::with_budget(0))
         .analyze_by_name("test", "main", [Demand::Live, Demand::Live, Demand::Live])
         .unwrap();
     assert!(analysis.root().is_some());
     let wrong: Product<Demand> = Product::new();
     assert_eq!(
-        analysis.analyze_by_name("test", "branch", wrong),
-        Err(InterpreterError::ProductArityMismatch {
+        analysis.analyze_by_name("test", "branch", wrong).err(),
+        Some(InterpreterError::ProductArityMismatch {
             expected: 1,
             actual: 0
         }),
     );
-    assert!(analysis.root().is_none());
-    let outputs: Product<_> = [Demand::Dead].into_iter().collect();
-    let inputs = analysis.analyze_by_name("test", "branch", outputs).unwrap();
-    assert_eq!(inputs.as_slice(), &[Demand::Dead, Demand::Live]);
 }
 
 #[test]
@@ -128,7 +122,8 @@ fn call_sites_map_one_callee_parameter_to_different_arguments() {
         ([Demand::Live, Demand::Dead], [Demand::Dead, Demand::Live]),
         ([Demand::Dead, Demand::Live], [Demand::Live, Demand::Dead]),
     ] {
-        let actual = analysis.analyze_by_name("test", "swap", outputs).unwrap();
+        let (actual, next) = analysis.analyze_by_name("test", "swap", outputs).unwrap();
+        analysis = next;
         assert_eq!(actual.as_slice(), &inputs, "outputs {outputs:?}");
     }
 }

@@ -833,13 +833,21 @@ where
 /// matching output of the callee's context, and demanded callee parameters
 /// demand the matching call arguments. Facts are qualified by the callable
 /// context the [`DemandContext`] policy `P` selects (default: one context per
-/// resolved [`LinkTarget`](crate::LinkTarget)). One engine accumulates facts across `analyze`
-/// calls, each adding its root request; use a fresh engine for an isolated
-/// request.
+/// resolved [`LinkTarget`](crate::LinkTarget)).
+///
+/// `analyze` consumes the engine and hands it back only on success, so a
+/// failed analysis can never be resumed: build a new engine instead.
+/// Successful analyses accumulate: discovered contexts and their facts are
+/// reused, so shared callees are analyzed once. Facts only rise, so a request
+/// whose policy key matches an earlier context returns the join with the
+/// earlier requests — never less demanded than a fresh engine, possibly more,
+/// and dependent on query order. That happens for every repeated callee under
+/// [`ContextInsensitive`], and under a bounded policy once its fallback
+/// context is shared. Use a fresh engine for an isolated answer.
 ///
 /// ```ignore
-/// let mut analysis = SparseBackwardInterpreter::<Stage, Demand>::new(&pipeline);
-/// let params = analysis.analyze(stage, callee, [Demand::Live])?;
+/// let analysis = SparseBackwardInterpreter::<Stage, Demand>::new(&pipeline);
+/// let (params, analysis) = analysis.analyze(stage, callee, [Demand::Live])?;
 /// let demanded = analysis.is_demanded(analysis.root().unwrap(), value);
 /// ```
 pub struct SparseBackwardInterpreter<
@@ -921,8 +929,8 @@ where
         self.driver.inner().pipeline()
     }
 
-    /// The root of the most recent successful analysis. Cleared when a new
-    /// analysis starts; detailed facts remain available through context queries.
+    /// The root of the most recent analysis; detailed facts remain available
+    /// through context queries.
     pub fn root(&self) -> Option<&P::Key> {
         self.root.as_ref()
     }
@@ -999,12 +1007,11 @@ where
     /// Resolve a stage and function by name and infer parameter facts from
     /// the supplied output facts. See [`Self::analyze`].
     pub fn analyze_by_name(
-        &mut self,
+        self,
         stage_name: &str,
         function_name: &str,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Product<V>, E> {
-        self.root = None;
+    ) -> Result<(Product<V>, Self), E> {
         let stage = self
             .pipeline()
             .stage_by_name(stage_name)
@@ -1019,11 +1026,11 @@ where
     /// Resolve a stage-local symbol and infer parameter facts from the
     /// supplied output facts. See [`Self::analyze`].
     pub fn analyze_by_symbol(
-        &mut self,
+        self,
         stage: CompileStage,
         symbol: Symbol,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Product<V>, E> {
+    ) -> Result<(Product<V>, Self), E> {
         self.analyze(stage, symbol.into(), result_values)
     }
 
@@ -1035,15 +1042,15 @@ where
     /// fixpoint worklist. Bottom output facts still allow intrinsic roots to
     /// contribute parameter facts.
     /// Facts join with prior requests if the context policy reuses a key.
-    /// Detailed context facts remain accessible through [`Self::root`],
-    /// [`Self::contexts`], and [`Self::fact`].
+    /// Returns the engine on success, so detailed context facts remain
+    /// accessible through [`Self::root`], [`Self::contexts`], and
+    /// [`Self::fact`]; an error drops it.
     pub fn analyze(
-        &mut self,
+        mut self,
         stage: CompileStage,
         callee: Callee,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<Product<V>, E> {
-        self.root = None;
+    ) -> Result<(Product<V>, Self), E> {
         let outputs: Product<V> = result_values.into_iter().collect();
         let target = self
             .driver
@@ -1052,8 +1059,6 @@ where
             .resolve(self.pipeline(), stage, &callee)?;
         let root = self.driver.inner_mut().policy.key(&target, &outputs);
         let updates = self.driver.discover(&root, target)?;
-        // Preserve intrinsic seeds even if boundary arity validation fails:
-        // discovery is cached, so a later valid request must still see them.
         let mut owner_analysis = SparseBackwardOwnerAnalysis;
         for (location, fact) in updates {
             self.driver
@@ -1077,6 +1082,6 @@ where
             .map(|param| self.driver.fact_at(Scoped::new(root.clone(), param)))
             .collect();
         self.root = Some(root);
-        Ok(params)
+        Ok((params, self))
     }
 }

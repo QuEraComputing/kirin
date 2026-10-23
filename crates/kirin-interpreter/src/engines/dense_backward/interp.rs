@@ -597,8 +597,8 @@ where
 /// Dense backward liveness engine (classic per-program-point liveness).
 ///
 /// ```ignore
-/// let mut analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
-/// let scope = analysis.analyze(stage, callee)?;
+/// let analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
+/// let (scope, analysis) = analysis.analyze(stage, callee)?;
 /// let point = Scoped::new(scope, ProgramPoint::BlockEntry(block));
 /// let live_in = analysis.point_facts(point);
 /// ```
@@ -729,10 +729,10 @@ where
 
     /// Resolve a stage and function by name, then seed and solve its blocks.
     pub fn analyze_by_name(
-        &mut self,
+        self,
         stage_name: &str,
         function_name: &str,
-    ) -> Result<BodyScope, E> {
+    ) -> Result<(BodyScope, Self), E> {
         let stage = self
             .driver
             .inner()
@@ -750,17 +750,20 @@ where
 
     /// Seed and solve a callable body named by a stage-local symbol.
     pub fn analyze_by_symbol(
-        &mut self,
+        self,
         stage: CompileStage,
         symbol: Symbol,
-    ) -> Result<BodyScope, E> {
+    ) -> Result<(BodyScope, Self), E> {
         self.analyze(stage, symbol.into())
     }
 
     /// Resolve `callee`, seed every block selected by its CFG or Block body,
     /// and drain the block-boundary worklist. Dependencies are discovered from
     /// terminator edges; unsupported graph roots fail before solving.
-    pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
+    ///
+    /// Each call solves from fresh state. It consumes the engine and returns
+    /// it on success, like the other analysis engines; an error drops it.
+    pub fn analyze(mut self, stage: CompileStage, callee: Callee) -> Result<(BodyScope, Self), E> {
         let pipeline = self.driver.inner().pipeline();
         let target = self.linker.resolve(pipeline, stage, &callee)?;
         let body = target.body(pipeline)?;
@@ -781,6 +784,6 @@ where
 
         let mut owner_analysis = DenseBackwardOwnerAnalysis;
         self.driver.solve_many(&mut owner_analysis, owners)?;
-        Ok(scope)
+        Ok((scope, self))
     }
 }

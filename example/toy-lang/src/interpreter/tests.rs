@@ -595,15 +595,13 @@ mod advanced {
         // (capping degrades precision, not soundness) — and it terminates,
         // which exercises the same-key self-dependency convergence.
         let pipeline = build_pipeline(include_str!("../../programs/factorial.kirin"));
-        let mut analysis = crate::interpreter::ToyConstProp::new(&pipeline)
+        let analysis = crate::interpreter::ToyConstProp::new(&pipeline)
             .with_policy(ConstPropContext::with_budget(2))
             .with_linker(SameStageLinker);
-        let result = expect_single::<ConstProp, ToyError>(
-            analysis
-                .analyze_by_name("source", "factorial", [ConstProp::Const(5)])
-                .unwrap(),
-        )
-        .unwrap();
+        let (ret, _) = analysis
+            .analyze_by_name("source", "factorial", [ConstProp::Const(5)])
+            .unwrap();
+        let result = expect_single::<ConstProp, ToyError>(ret).unwrap();
         assert_eq!(result, ConstProp::Top);
     }
 }
@@ -1079,8 +1077,8 @@ mod dense {
         caller_stage: CompileStage,
         callee: Callee,
     ) -> DenseLivenessResult {
-        let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-        let scope = engine
+        let engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
+        let (scope, engine) = engine
             .analyze(caller_stage, callee)
             .expect("analysis succeeds");
         DenseLivenessResult::from_engine(&engine, scope)
