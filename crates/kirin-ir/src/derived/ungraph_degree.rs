@@ -16,14 +16,20 @@ pub(in crate::derived) fn check<L: Dialect>(stage: &StageInfo<L>, findings: &mut
     let mut reads: FxHashMap<(UnGraph, SSAValue), usize> = FxHashMap::default();
 
     // Wires from boundary ports: the first `edge_count` ports of each graph.
+    let mut any_live = false;
     for (raw, item) in stage.nodes.ungraphs.items.iter().enumerate() {
         if item.deleted() {
             continue;
         }
+        any_live = true;
         let graph = UnGraph::from(Id(raw));
         for &port in item.edge_ports() {
             reads.insert((graph, port.into()), 0);
         }
+    }
+    // No live graph, so no wires: skip the statement walk.
+    if !any_live {
+        return;
     }
     // Live statements parented to an UnGraph, walked twice below (`clone`
     // copies the iterator, not the statements).
