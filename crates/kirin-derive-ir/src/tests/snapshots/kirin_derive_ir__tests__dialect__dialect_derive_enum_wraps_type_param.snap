@@ -1,0 +1,522 @@
+---
+source: crates/kirin-derive-ir/src/tests/dialect.rs
+expression: code
+---
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasArguments<'a> for PatternOps<L> {
+    type Iter = PatternOpsArgumentsIter<'a, L>;
+    fn arguments(&'a self) -> Self::Iter {
+        match self {
+            Self::Op(field_0) => {
+                PatternOpsArgumentsIter::Op(<L as ::kirin::ir::HasArguments>::arguments(field_0))
+            }
+            Self::Hole(field_0) => PatternOpsArgumentsIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasArguments>::arguments(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsArgumentsIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasArguments<'a>>::Iter),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasArguments<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsArgumentsIter<'a, L> {
+    type Item = &'a ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasArgumentsMut<'a> for PatternOps<L> {
+    type IterMut = PatternOpsArgumentsMutIter<'a, L>;
+    fn arguments_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Op(field_0) => PatternOpsArgumentsMutIter::Op(
+                <L as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+            Self::Hole(field_0) => PatternOpsArgumentsMutIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasArgumentsMut>::arguments_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsArgumentsMutIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasArgumentsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsArgumentsMutIter<'a, L> {
+    type Item = &'a mut ::kirin::ir::SSAValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasResults<'a> for PatternOps<L> {
+    type Iter = PatternOpsResultsIter<'a, L>;
+    fn results(&'a self) -> Self::Iter {
+        match self {
+            Self::Op(field_0) => {
+                PatternOpsResultsIter::Op(<L as ::kirin::ir::HasResults>::results(field_0))
+            }
+            Self::Hole(field_0) => PatternOpsResultsIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasResults>::results(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsResultsIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasResults<'a>>::Iter),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasResults<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsResultsIter<'a, L> {
+    type Item = &'a ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasResultsMut<'a> for PatternOps<L> {
+    type IterMut = PatternOpsResultsMutIter<'a, L>;
+    fn results_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Op(field_0) => PatternOpsResultsMutIter::Op(
+                <L as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+            Self::Hole(field_0) => PatternOpsResultsMutIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasResultsMut>::results_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsResultsMutIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasResultsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsResultsMutIter<'a, L> {
+    type Item = &'a mut ::kirin::ir::ResultValue;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasBlocks<'a> for PatternOps<L> {
+    type Iter = PatternOpsBlocksIter<'a, L>;
+    fn blocks(&'a self) -> Self::Iter {
+        match self {
+            Self::Op(field_0) => {
+                PatternOpsBlocksIter::Op(<L as ::kirin::ir::HasBlocks>::blocks(field_0))
+            }
+            Self::Hole(field_0) => PatternOpsBlocksIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasBlocks>::blocks(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsBlocksIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasBlocks<'a>>::Iter),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasBlocks<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsBlocksIter<'a, L> {
+    type Item = &'a ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasBlocksMut<'a> for PatternOps<L> {
+    type IterMut = PatternOpsBlocksMutIter<'a, L>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Op(field_0) => {
+                PatternOpsBlocksMutIter::Op(<L as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0))
+            }
+            Self::Hole(field_0) => PatternOpsBlocksMutIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasBlocksMut>::blocks_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsBlocksMutIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasBlocksMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsBlocksMutIter<'a, L> {
+    type Item = &'a mut ::kirin::ir::Block;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasSuccessors<'a> for PatternOps<L> {
+    type Iter = PatternOpsSuccessorsIter<'a, L>;
+    fn successors(&'a self) -> Self::Iter {
+        match self {
+            Self::Op(field_0) => {
+                PatternOpsSuccessorsIter::Op(<L as ::kirin::ir::HasSuccessors>::successors(field_0))
+            }
+            Self::Hole(field_0) => PatternOpsSuccessorsIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasSuccessors>::successors(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsSuccessorsIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasSuccessors<'a>>::Iter),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasSuccessors<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsSuccessorsIter<'a, L> {
+    type Item = &'a ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasSuccessorsMut<'a> for PatternOps<L> {
+    type IterMut = PatternOpsSuccessorsMutIter<'a, L>;
+    fn successors_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Op(field_0) => PatternOpsSuccessorsMutIter::Op(
+                <L as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+            Self::Hole(field_0) => PatternOpsSuccessorsMutIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasSuccessorsMut>::successors_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsSuccessorsMutIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasSuccessorsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsSuccessorsMutIter<'a, L> {
+    type Item = &'a mut ::kirin::ir::Successor;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasCFG<'a> for PatternOps<L> {
+    type Iter = PatternOpsCFGIter<'a, L>;
+    fn cfgs(&'a self) -> Self::Iter {
+        match self {
+            Self::Op(field_0) => PatternOpsCFGIter::Op(<L as ::kirin::ir::HasCFG>::cfgs(field_0)),
+            Self::Hole(field_0) => {
+                PatternOpsCFGIter::Hole(<HoleOp<L::Type> as ::kirin::ir::HasCFG>::cfgs(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsCFGIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasCFG<'a>>::Iter),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasCFG<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsCFGIter<'a, L> {
+    type Item = &'a ::kirin::ir::CFG;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasCFGMut<'a> for PatternOps<L> {
+    type IterMut = PatternOpsCFGMutIter<'a, L>;
+    fn cfgs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Op(field_0) => {
+                PatternOpsCFGMutIter::Op(<L as ::kirin::ir::HasCFGMut>::cfgs_mut(field_0))
+            }
+            Self::Hole(field_0) => PatternOpsCFGMutIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasCFGMut>::cfgs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsCFGMutIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasCFGMut<'a>>::IterMut),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasCFGMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsCFGMutIter<'a, L> {
+    type Item = &'a mut ::kirin::ir::CFG;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasDigraphs<'a> for PatternOps<L> {
+    type Iter = PatternOpsDigraphsIter<'a, L>;
+    fn digraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Op(field_0) => {
+                PatternOpsDigraphsIter::Op(<L as ::kirin::ir::HasDigraphs>::digraphs(field_0))
+            }
+            Self::Hole(field_0) => PatternOpsDigraphsIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasDigraphs>::digraphs(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsDigraphsIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasDigraphs<'a>>::Iter),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasDigraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsDigraphsIter<'a, L> {
+    type Item = &'a ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasDigraphsMut<'a> for PatternOps<L> {
+    type IterMut = PatternOpsDigraphsMutIter<'a, L>;
+    fn digraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Op(field_0) => PatternOpsDigraphsMutIter::Op(
+                <L as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+            Self::Hole(field_0) => PatternOpsDigraphsMutIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasDigraphsMut>::digraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsDigraphsMutIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasDigraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsDigraphsMutIter<'a, L> {
+    type Item = &'a mut ::kirin::ir::DiGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasUngraphs<'a> for PatternOps<L> {
+    type Iter = PatternOpsUngraphsIter<'a, L>;
+    fn ungraphs(&'a self) -> Self::Iter {
+        match self {
+            Self::Op(field_0) => {
+                PatternOpsUngraphsIter::Op(<L as ::kirin::ir::HasUngraphs>::ungraphs(field_0))
+            }
+            Self::Hole(field_0) => PatternOpsUngraphsIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasUngraphs>::ungraphs(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsUngraphsIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasUngraphs<'a>>::Iter),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasUngraphs<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsUngraphsIter<'a, L> {
+    type Item = &'a ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasUngraphsMut<'a> for PatternOps<L> {
+    type IterMut = PatternOpsUngraphsMutIter<'a, L>;
+    fn ungraphs_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Op(field_0) => PatternOpsUngraphsMutIter::Op(
+                <L as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+            Self::Hole(field_0) => PatternOpsUngraphsMutIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasUngraphsMut>::ungraphs_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsUngraphsMutIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasUngraphsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsUngraphsMutIter<'a, L> {
+    type Item = &'a mut ::kirin::ir::UnGraph;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect> ::kirin::ir::IsTerminator for PatternOps<L> {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::Op(field_0) => <L as ::kirin::ir::IsTerminator>::is_terminator(field_0),
+            Self::Hole(field_0) => {
+                <HoleOp<L::Type> as ::kirin::ir::IsTerminator>::is_terminator(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect> ::kirin::ir::IsConstant for PatternOps<L> {
+    fn is_constant(&self) -> bool {
+        match self {
+            Self::Op(field_0) => <L as ::kirin::ir::IsConstant>::is_constant(field_0),
+            Self::Hole(field_0) => {
+                <HoleOp<L::Type> as ::kirin::ir::IsConstant>::is_constant(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect> ::kirin::ir::IsPure for PatternOps<L> {
+    fn is_pure(&self) -> bool {
+        match self {
+            Self::Op(field_0) => <L as ::kirin::ir::IsPure>::is_pure(field_0),
+            Self::Hole(field_0) => <HoleOp<L::Type> as ::kirin::ir::IsPure>::is_pure(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect> ::kirin::ir::IsSpeculatable for PatternOps<L> {
+    fn is_speculatable(&self) -> bool {
+        match self {
+            Self::Op(field_0) => <L as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0),
+            Self::Hole(field_0) => {
+                <HoleOp<L::Type> as ::kirin::ir::IsSpeculatable>::is_speculatable(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect> ::kirin::ir::IsEdge for PatternOps<L> {
+    fn is_edge(&self) -> bool {
+        match self {
+            Self::Op(field_0) => <L as ::kirin::ir::IsEdge>::is_edge(field_0),
+            Self::Hole(field_0) => <HoleOp<L::Type> as ::kirin::ir::IsEdge>::is_edge(field_0),
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect> ::kirin::ir::Dialect for PatternOps<L> {
+    type Type = L::Type;
+}
+#[automatically_derived]
+impl<L: Dialect> ::kirin::ir::HasSignature<Self> for PatternOps<L>
+where
+    L: ::kirin::ir::HasSignature<L>,
+{
+    fn signature(&self) -> Option<::kirin::ir::Signature<<Self as ::kirin::ir::Dialect>::Type>> {
+        match self {
+            Self::Op(field_0) => <L as ::kirin::ir::HasSignature<L>>::signature(field_0),
+            Self::Hole(field_0) => {
+                <HoleOp<L::Type> as ::kirin::ir::HasSignature<HoleOp<L::Type>>>::signature(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect> ::kirin::ir::HasCallableBody for PatternOps<L>
+where
+    L: ::kirin::ir::HasCallableBody,
+    HoleOp<L::Type>: ::kirin::ir::HasCallableBody,
+{
+    fn callable_body(&self) -> ::core::option::Option<::kirin::ir::Body> {
+        match self {
+            Self::Op(field_0) => <L as ::kirin::ir::HasCallableBody>::callable_body(field_0),
+            Self::Hole(field_0) => {
+                <HoleOp<L::Type> as ::kirin::ir::HasCallableBody>::callable_body(field_0)
+            }
+        }
+    }
+}
+#[automatically_derived]
+impl<L: Dialect> ::core::convert::From<HoleOp<L::Type>> for PatternOps<L> {
+    fn from(from: HoleOp<L::Type>) -> Self {
+        PatternOps::Hole(from)
+    }
+}
+#[automatically_derived]
+impl<L: Dialect> ::kirin::ir::TryProjectTo<HoleOp<L::Type>> for PatternOps<L> {
+    type Error = ::kirin::ir::ProjectError;
+    fn try_project_to(self) -> ::core::result::Result<HoleOp<L::Type>, Self::Error> {
+        match self {
+            PatternOps::Hole(inner) => Ok(inner),
+            _ => Err(::kirin::ir::ProjectError::InvalidVariant),
+        }
+    }
+}
