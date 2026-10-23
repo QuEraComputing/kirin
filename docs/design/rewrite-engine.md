@@ -1800,7 +1800,7 @@ stage remains valid.
 | `replace_yield` | Rewrite one `DiGraph` yield slot; move its yield use `old → new`. Topology is unchanged. | `ChangedDiGraphYields` (none if slot unchanged) | live graph and value, index in range |
 | `insert_ungraph_node` | Allocate `definition` as a new `UnGraph` node; bind its results, add operand uses; each operand that is a wire of the graph becomes an endpoint, and a wire with two endpoints is an edge. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; non-terminator with no successors, not an edge statement; live operands; `new_result` results; a wire may exceed two endpoints (reported by `verify_derived`; it then has no edge) |
 | `insert_ungraph_edge` | Allocate `definition` as a new `UnGraph` edge statement and append it to the member map; its results are new wires with no endpoints. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; an edge statement with no operands, not a terminator, no successors; `new_result` results |
-| `replace_statement` | Swap the definition in place, keeping id, position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror, for a `DiGraph` member its incoming edges, or for an `UnGraph` node the wires it leaves and joins. | `ReplacedStatement`, then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` / `ChangedUnGraphTopology` for a member whose edges changed | parented by a block or graph; same result arity and terminator-ness as the original; a non-terminator replacement carries no successors; an `UnGraph` member keeps its edge role, and an edge statement has no operands |
+| `replace_statement` | Swap the definition in place, keeping id, position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror, for a `DiGraph` member its incoming edges, or for an `UnGraph` node the wires it leaves and joins. Keeps body parents in step with the bodies the new definition names: bodies it drops are tombstoned with their contents, bodies it gains get the statement as parent. | `ReplacedStatement`, then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` / `ChangedUnGraphTopology` for a member whose edges changed; `ChangedBodyNesting` after `ReplacedStatement` when the bodies changed | parented by a block or graph; same result arity and terminator-ness as the original; a non-terminator replacement carries no successors; an `UnGraph` member keeps its edge role, and an edge statement has no operands; every gained body is live, owned by nothing else, named once, and does not enclose the statement |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
 | `append_block` / `insert_block_before` / `insert_block_after` | Allocate an empty block (no terminator) with fresh typed arguments and link it into the `Cfg` block list. | `ChangedBlockList` | anchor must be a live block of a `Cfg` list (not a statement-owned body) |
 | `erase_block` | Unlink the block and tombstone it with its arguments, statements, results, and nested blocks/`Cfg`s; drop their uses and outgoing edges. | `ChangedBlockList`, `ChangedCfg` | rejects if another block still branches to it (a self-loop is fine) or an argument or top-level result is used outside the block; retarget those edges and replace those uses first |
@@ -2000,12 +2000,16 @@ axis — hence the column.
 | `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
 | `TerminatorKindMismatch(stmt)` | guard | replacement changes terminator-ness, desyncing the block's terminator cache | `replace_statement` |
 | `EdgeRoleMismatch(stmt)` | guard | the replacement of an `UnGraph` member changes `is_edge()`; nodes and edge statements are stored differently | `replace_statement` |
+| `UnknownBody(body)` | liveness | a body the replacement gains does not resolve to a live body | `replace_statement` |
+| `BodyOwnedElsewhere(body)` | guard | a body the replacement gains already belongs to another statement or, for a block, to a CFG | `replace_statement` |
+| `BodyListedTwice(body)` | guard | the replacement names the same body in two fields | `replace_statement` |
+| `BodyEnclosesOwner(body)` | guard | the replacement names a body the statement is nested in, which would make it its own ancestor | `replace_statement` |
 
 The immediate `MutationEvent` vocabulary recorded by these methods is
 `ChangedOperands`, `ReplacedUses`, `InsertedStatement`, `ErasedStatement`,
 `ReplacedStatement`, `ChangedBlockList { cfg }`, `ChangedCfg { cfg }`,
-`ChangedTerminator { block }`, `ChangedDiGraphTopology { graph }`, and
-`ChangedDiGraphYields { graph }`. `ErasedStatement` also covers everything nested
+`ChangedTerminator { block }`, `ChangedDiGraphTopology { graph }`,
+`ChangedDiGraphYields { graph }`, and `ChangedBodyNesting { owner }`. `ErasedStatement` also covers everything nested
 in the erased statement; no separate CFG or graph events are recorded for those
 bodies. The remaining documented event kinds (`UnGraph` and result-type events)
 grow in as
@@ -2994,12 +2998,13 @@ implement the derive and its matching/remapping bodies.
 ### Gap 3 — MutationEvent vocabulary vs implementation — RESOLVED DELIVERY RULE
 
 The documented `MutationEvent` enum lists the full target vocabulary; the
-implementation currently emits **eleven** — `ChangedOperands`, `ReplacedUses`,
+implementation currently emits **twelve** — `ChangedOperands`, `ReplacedUses`,
 `InsertedStatement`, `ErasedStatement`, `ReplacedStatement`, `ChangedBlockList`,
 `ChangedCfg`, `ChangedTerminator`, `ChangedDiGraphTopology`,
-`ChangedDiGraphYields`, `ChangedUnGraphTopology` — covering operand and yield
-rewriting, block-body statement and terminator surgery (erase/insert/replace),
-`Cfg` block-list surgery, and `DiGraph` and `UnGraph` member surgery. The
+`ChangedDiGraphYields`, `ChangedUnGraphTopology`, `ChangedBodyNesting` —
+covering operand and yield rewriting, block-body statement and terminator
+surgery (erase/insert/replace), `Cfg` block-list surgery, `DiGraph` and
+`UnGraph` member surgery, and body changes through `replace_statement`. The
 remaining documented variants (result-type events) are not emitted because that
 surgery is not yet implemented, so an analysis-invalidation policy written against them would
 subscribe to events that never fire. Resolution: keep growing the enum in
