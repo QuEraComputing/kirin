@@ -6,7 +6,9 @@ import tempfile
 import unittest
 from unittest.mock import patch
 
-from provenance import inspect_python_source, verify_python_source
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+
+from common.provenance import inspect_python_source, verify_python_source
 
 
 class PythonProvenance(unittest.TestCase):

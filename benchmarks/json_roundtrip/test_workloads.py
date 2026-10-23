@@ -1,11 +1,17 @@
 """Run with the pinned baseline Python: -m unittest discover -s this_directory."""
 import copy
 import unittest
+from pathlib import Path
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from kirin.dialects.py.binop import Add, Sub
 from kirin.prelude import basic
-from python_benchmark import shape, workload
-from semantic_spec import assert_semantically_valid, expected_cases, validate_runtime
+from python_benchmark import shape
+from common.python_workload import workload
+from common.semantic_spec import expected_cases
+from semantics import assert_semantically_valid, validate_runtime
 from validation import validate_shape
 
 

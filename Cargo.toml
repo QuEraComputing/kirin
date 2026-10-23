@@ -149,3 +149,8 @@ serde = ["dep:serde", "kirin-ir/serde", "kirin-test-utils/serde", "kirin-test-la
 name = "json_roundtrip"
 path = "benchmarks/json_roundtrip/rust/main.rs"
 required-features = ["serde", "parser", "pretty"]
+
+[[example]]
+name = "constprop"
+path = "benchmarks/constprop/rust/main.rs"
+required-features = ["serde", "parser", "pretty"]

@@ -1,0 +1,109 @@
+    Finished `release` profile [optimized] target(s) in 0.05s
+Checking and measuring rust: chain, size 1000
+Checking and measuring python: chain, size 1000
+  all_known: rust 0.206 ms, python 4.098 ms (20x)
+  unknown_conditions: rust 0.176 ms, python 4.016 ms (23x)
+  all_unknown: rust 0.171 ms, python 2.448 ms (14x)
+Checking and measuring python: diamond, size 1000
+Checking and measuring rust: diamond, size 1000
+  all_known: rust 0.105 ms, python 2.078 ms (20x)
+  unknown_conditions: rust 0.177 ms, python 4.174 ms (24x)
+  all_unknown: rust 0.180 ms, python 2.478 ms (14x)
+Checking and measuring rust: nested_cfg, size 1000
+Checking and measuring python: nested_cfg, size 1000
+  all_known: rust 0.067 ms, python 1.069 ms (16x)
+  unknown_conditions: rust 0.199 ms, python 4.231 ms (21x)
+  all_unknown: rust 0.198 ms, python 2.527 ms (13x)
+Checking and measuring python: loop, size 1000
+Checking and measuring rust: loop, size 1000
+  all_known: rust 0.827 ms, python 6.583 ms (8x)
+  unknown_conditions: rust 0.605 ms, python 6.630 ms (11x)
+  all_unknown: rust 0.404 ms, python 4.552 ms (11x)
+Checking and measuring rust: calls, size 1000
+Checking and measuring python: calls, size 1000
+  all_known: rust 26.764 ms, python 18.828 ms (1x)
+  unknown_conditions: rust 25.019 ms, python 18.632 ms (1x)
+  all_unknown: rust 0.787 ms, python 3.391 ms (4x)
+Checking and measuring python: calls_same, size 1000
+Checking and measuring rust: calls_same, size 1000
+  all_known: rust 1.521 ms, python 7.784 ms (5x)
+  unknown_conditions: rust 1.376 ms, python 7.799 ms (6x)
+  all_unknown: rust 1.138 ms, python 6.034 ms (5x)
+Checking and measuring rust: recursion, size 1000
+Checking and measuring python: recursion, size 1000
+  all_known: rust 0.583 ms, python 30.406 ms (52x)
+  unknown_conditions: rust 0.016 ms, python 60.215 ms (3833x)
+  all_unknown: rust 0.009 ms, python 55.024 ms (5989x)
+Checking and measuring python: chain, size 10000
+Checking and measuring rust: chain, size 10000
+  all_known: rust 2.041 ms, python 42.041 ms (21x)
+  unknown_conditions: rust 1.745 ms, python 40.622 ms (23x)
+  all_unknown: rust 1.727 ms, python 23.364 ms (14x)
+Checking and measuring rust: diamond, size 10000
+Checking and measuring python: diamond, size 10000
+  all_known: rust 1.021 ms, python 20.722 ms (20x)
+  unknown_conditions: rust 1.740 ms, python 42.232 ms (24x)
+  all_unknown: rust 1.708 ms, python 24.804 ms (15x)
+Checking and measuring python: nested_cfg, size 10000
+Checking and measuring rust: nested_cfg, size 10000
+  all_known: rust 0.554 ms, python 10.472 ms (19x)
+  unknown_conditions: rust 1.866 ms, python 42.232 ms (23x)
+  all_unknown: rust 1.840 ms, python 25.877 ms (14x)
+Checking and measuring rust: loop, size 10000
+Checking and measuring python: loop, size 10000
+  all_known: rust 7.950 ms, python 66.848 ms (8x)
+  unknown_conditions: rust 5.934 ms, python 66.736 ms (11x)
+  all_unknown: rust 3.883 ms, python 45.793 ms (12x)
+Checking and measuring python: calls, size 10000
+Checking and measuring rust: calls, size 10000
+  all_known: rust 266.871 ms, python 189.617 ms (1x)
+  unknown_conditions: rust 250.149 ms, python 189.336 ms (1x)
+  all_unknown: rust 7.810 ms, python 35.179 ms (5x)
+Checking and measuring rust: calls_same, size 10000
+Checking and measuring python: calls_same, size 10000
+  all_known: rust 15.105 ms, python 83.490 ms (6x)
+  unknown_conditions: rust 13.507 ms, python 83.416 ms (6x)
+  all_unknown: rust 11.294 ms, python 65.838 ms (6x)
+Checking and measuring python: recursion, size 10000
+Checking and measuring rust: recursion, size 10000
+  all_known: rust 0.586 ms, python 31.253 ms (53x)
+  unknown_conditions: rust 0.016 ms, python 61.979 ms (3967x)
+  all_unknown: rust 0.009 ms, python 56.786 ms (6195x)
+Checking and measuring rust: chain, size 100000
+Checking and measuring python: chain, size 100000
+  all_known: rust 20.655 ms, python 420.543 ms (20x)
+  unknown_conditions: rust 17.473 ms, python 418.889 ms (24x)
+  all_unknown: rust 17.326 ms, python 258.462 ms (15x)
+Checking and measuring python: diamond, size 100000
+Checking and measuring rust: diamond, size 100000
+  all_known: rust 10.554 ms, python 217.521 ms (21x)
+  unknown_conditions: rust 17.113 ms, python 439.086 ms (26x)
+  all_unknown: rust 16.910 ms, python 272.304 ms (16x)
+Checking and measuring rust: nested_cfg, size 100000
+Checking and measuring python: nested_cfg, size 100000
+  all_known: rust 5.387 ms, python 106.196 ms (20x)
+  unknown_conditions: rust 18.022 ms, python 429.336 ms (24x)
+  all_unknown: rust 17.736 ms, python 264.432 ms (15x)
+Checking and measuring python: loop, size 100000
+Checking and measuring rust: loop, size 100000
+  all_known: rust 81.031 ms, python 669.365 ms (8x)
+  unknown_conditions: rust 61.127 ms, python 670.487 ms (11x)
+  all_unknown: rust 39.937 ms, python 456.374 ms (11x)
+Checking and measuring rust: calls, size 100000
+Checking and measuring python: calls, size 100000
+  all_known: rust 2852.281 ms, python 2008.654 ms (1x)
+  unknown_conditions: rust 2609.626 ms, python 1938.739 ms (1x)
+  all_unknown: rust 80.104 ms, python 373.785 ms (5x)
+Checking and measuring python: calls_same, size 100000
+Checking and measuring rust: calls_same, size 100000
+  all_known: rust 158.468 ms, python 926.560 ms (6x)
+  unknown_conditions: rust 142.301 ms, python 939.064 ms (7x)
+  all_unknown: rust 119.606 ms, python 712.989 ms (6x)
+Checking and measuring rust: recursion, size 100000
+Checking and measuring python: recursion, size 100000
+Traceback (most recent call last):
+  File "/Users/dliew/quera/kirin-workspace/kirin/benchmarks/constprop/compare.py", line 152, in <module>
+  File "/Users/dliew/quera/kirin-workspace/kirin/benchmarks/constprop/compare.py", line 113, in main
+  File "/Users/dliew/.local/share/uv/python/cpython-3.12.13-macos-aarch64-none/lib/python3.12/subprocess.py", line 571, in run
+    raise CalledProcessError(retcode, process.args,
+subprocess.CalledProcessError: Command '['/private/tmp/kirin-py-bench/.venv/bin/python', '/Users/dliew/quera/kirin-workspace/kirin/benchmarks/constprop/bench.py']' returned non-zero exit status 2.

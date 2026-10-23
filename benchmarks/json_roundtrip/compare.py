@@ -2,23 +2,19 @@
 import argparse
 import hashlib
 import json
-import os
 import pathlib
-import platform
 import statistics
 import subprocess
 import sys
 
-from provenance import inspect_python_source, verify_python_source
-from semantic_spec import SPEC_PATH, assert_semantically_valid, family_spec, load_suite
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from common.provenance import ROOT, environment, inspect_python_source, run, verify_python_source
+from common.semantic_spec import SPEC_PATH, family_spec, load_suite
+from semantics import assert_semantically_valid
 from validation import validate_shape
 
-ROOT = pathlib.Path(__file__).resolve().parents[2]
 BASELINE = "eae74008d4aec630169b5e64cc085e6f2c0d5b12"
-
-
-def run(*args, cwd=ROOT):
-    return subprocess.check_output([str(arg) for arg in args], cwd=cwd, text=True).strip()
 
 
 def main():
@@ -72,22 +68,8 @@ def main():
                       "rust": pair["rust"], "python": pair["python"],
                       "python_over_rust_median_ratio": pair["python"]["median_seconds"] / pair["rust"]["median_seconds"]}
             results.append(result)
-    hardware = {"logical_cpus": os.cpu_count(), "processor": platform.processor()}
-    if platform.system() == "Darwin":
-        for key in ("machdep.cpu.brand_string", "hw.model", "hw.memsize"):
-            probe = subprocess.run(["sysctl", "-n", key], capture_output=True, text=True)
-            hardware[key] = probe.stdout.strip() if probe.returncode == 0 else "unavailable"
-    elif platform.system() == "Linux":
-        cpuinfo = pathlib.Path("/proc/cpuinfo").read_text()
-        hardware["cpu_model"] = next((line.split(":", 1)[1].strip() for line in cpuinfo.splitlines()
-                                      if line.startswith("model name")), platform.processor())
     report = {
-        "environment": {"platform": platform.platform(), "machine": platform.machine(),
-                        "hardware": hardware, "python": run(python, "-VV"),
-                        "rustc": run("rustc", "--version", "--verbose"),
-                        "rust_revision": run("git", "rev-parse", "HEAD"),
-                        "rust_working_tree": run("git", "status", "--porcelain"),
-                        "python_revision": BASELINE,
+        "environment": {**environment(python), "python_revision": BASELINE,
                         "python_provenance": python_provenance},
         "workload_spec_sha256": hashlib.sha256(SPEC_PATH.read_bytes()).hexdigest(),
         "validation_scope": "representative bounded inputs executed before and after JSON against closed-form oracle; not a universal proof",
