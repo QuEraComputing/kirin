@@ -23,11 +23,37 @@ class Frame(ForwardFrame[Result]):
     """If we hit any non-pure statement."""
 
 
-def _data_key(data: Any) -> Hashable:
-    """A hash key that two constants share whenever `_same_constant` says so.
+# The call cache looks up an earlier call in two steps. `_fact_key` maps each
+# argument fact to a hash key, and calls whose callee and argument keys match
+# share a bucket in `Propagate._call_summaries`. Within the bucket,
+# `_same_facts` decides whether a stored call's arguments can stand in for the
+# current ones; only then is the stored result reused.
+#
+# The keys only have to satisfy one rule: facts that `_same_facts` considers
+# the same must get the same key, so they share a bucket. Different facts may
+# share a key too; `_same_facts` tells them apart. A coarser key therefore only
+# means more comparisons per lookup, and a key finer than `_same_facts` would
+# only lose hits; neither changes a result. Keys are exact where equality is
+# exact and hashable (scalars, floats by their bits, tuples of these), and
+# fall back to the type alone where it isn't (for example a type with an
+# approximate `__eq__`).
 
-    Exact for scalars and tuples of them; other types share one key per type,
-    and `_same_facts` tells their values apart.
+
+def _data_key(data: Any) -> Hashable:
+    """The bucket key of a constant, for the first step of a cache lookup.
+
+    Constants that `_same_constant` treats as the same always get the same key.
+    The key holds the type, since `1`, `1.0` and `True` are different
+    constants even though Python compares them equal. Beyond that:
+
+    - `int`, `bool`, `str`, `bytes` and `None` are keyed by their value, and
+      floats by `float.hex()`, which keeps `0.0` and `-0.0` apart as
+      `_same_constant` does. These keys are exact.
+    - Complex numbers and tuples are keyed part by part, in the same way.
+    - Any other type is keyed by the type alone, because its `==` may be
+      approximate or its values unhashable, so no finer key is safe. All
+      constants of that type share a bucket, and `_same_facts` compares them
+      in the second step.
     """
     kind = type(data)
     if kind in (int, bool, str, bytes, type(None)):
@@ -42,22 +68,34 @@ def _data_key(data: Any) -> Hashable:
 
 
 def _fact_key(fact: Result) -> Hashable:
-    """A hash key that two facts share whenever `_same_facts` says so."""
-    kind = type(fact)
-    if kind is Value:
-        return (kind, _data_key(fact.data))
-    if kind is PartialLambda:
+    """The bucket key of an argument fact, for the first step of a cache lookup.
+
+    Facts that `_same_facts` treats as the same always get the same key, so
+    that they land in the same bucket:
+
+    - a constant (`Value`) is keyed by `_data_key` of its data;
+    - a closure (`PartialLambda`) by the identity of its code, its argument
+      names, and the keys of its captured facts, so closures built separately
+      from the same code with equal captures share a key;
+    - a partial tuple by the keys of its elements;
+    - `Unknown` and `Bottom` by their type;
+    - any other fact by its identity, since `_same_facts` compares those by
+      identity too.
+    """
+    if isinstance(fact, Value):
+        return (Value, _data_key(fact.data))
+    if isinstance(fact, PartialLambda):
         return (
-            kind,
+            PartialLambda,
             id(fact.code),
             tuple(fact.argnames),
             tuple(_fact_key(item) for item in fact.captured),
         )
-    if kind is PartialTuple:
-        return (kind, tuple(_fact_key(item) for item in fact.data))
-    if kind in (Unknown, Bottom):
-        return (kind,)
-    return (kind, id(fact))
+    if isinstance(fact, PartialTuple):
+        return (PartialTuple, tuple(_fact_key(item) for item in fact.data))
+    if isinstance(fact, (Unknown, Bottom)):
+        return (type(fact),)
+    return (type(fact), id(fact))
 
 
 def _same_facts(lhs: Result, rhs: Result) -> bool:
@@ -68,23 +106,22 @@ def _same_facts(lhs: Result, rhs: Result) -> bool:
     """
     if lhs is rhs:
         return True
-    kind = type(lhs)
-    if kind is not type(rhs):
+    if type(lhs) is not type(rhs):
         return False
-    if kind is Value:
+    if isinstance(lhs, Value) and isinstance(rhs, Value):
         return _same_constant(lhs.data, rhs.data)
-    if kind is PartialLambda:
+    if isinstance(lhs, PartialLambda) and isinstance(rhs, PartialLambda):
         return (
             lhs.code is rhs.code
             and lhs.argnames == rhs.argnames
             and len(lhs.captured) == len(rhs.captured)
             and all(map(_same_facts, lhs.captured, rhs.captured))
         )
-    if kind is PartialTuple:
+    if isinstance(lhs, PartialTuple) and isinstance(rhs, PartialTuple):
         return len(lhs.data) == len(rhs.data) and all(
             map(_same_facts, lhs.data, rhs.data)
         )
-    return kind in (Unknown, Bottom)
+    return isinstance(lhs, (Unknown, Bottom))
 
 
 @dataclass(frozen=True)
