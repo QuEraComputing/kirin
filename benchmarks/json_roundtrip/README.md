@@ -1,7 +1,8 @@
 # JSON round-trip benchmark suite
 
-This folder contains the common semantic specifications, separate Rust/Python
-payload builders, real-runtime validation, timing driver, and regression tests.
+This folder contains serialization-specific validation, timing drivers, and
+regression tests. Shared specifications and native Rust/Python payload builders
+live in [`../common`](../common), alongside the shared provenance helpers.
 The benchmark measures **complete IR → JSON string → usable IR**. It does not
 time execution of the arithmetic programs.
 
@@ -9,12 +10,14 @@ time execution of the arithmetic programs.
 
 | File | Purpose |
 | --- | --- |
-| `workloads.json` | Common workload paths, seven sample inputs, bounded domain, and independent closed-form oracle coefficients |
-| `rust/workload.rs` | Rust-specific native text builder |
-| `rust/language.rs` | Native arithmetic/CFG language and dispatch to Kirin's standard interpreter rules |
+| `../common/workloads.json` | Common workload paths, seven sample inputs, bounded domain, and independent closed-form oracle coefficients |
+| `../common/rust/workload.rs` | Rust-specific native text builder |
+| `../common/rust/language.rs` | Native arithmetic/CFG language and dispatch to Kirin's standard interpreter rules |
 | `rust/semantics.rs` | Executes original and decoded Rust payloads in `ConcreteInterpreter` against the oracle |
-| `python_benchmark.py` | Builds Python `Method`/block/SSA objects directly and measures Python JSON round trips |
-| `semantic_spec.py` | Reads the common specification, evaluates the closed-form oracle, and executes Python's real `Interpreter` |
+| `../common/python_workload.py` | Builds Python `Method`/block/SSA objects directly |
+| `python_benchmark.py` | Measures Python JSON round trips |
+| `../common/semantic_spec.py` | Reads the common specification and evaluates the closed-form oracle |
+| `semantics.py` | Executes Python's real `Interpreter` and validates original/decoded results |
 | `rust/shape.rs`, `validation.py` | Local IR validity checks; shapes are diagnostics, not a cross-version equality requirement |
 | `compare.py` | Builds Rust release binary, runs both implementations, accepts sampled semantic agreement, and reports timings/environment/spec hash |
 | `rust/tests.rs`, `test_workloads.py` | Original/decoded execution and validity regressions, including deliberately incorrect arithmetic |
@@ -82,7 +85,7 @@ local pre/post shape preservation remains useful for serialization correctness.
 Reports retain each sample input, path, expected/original/decoded output,
 workload specification SHA-256, and separate representation diagnostics.
 
-`workloads.json` also defines `loop`, `calls`, `calls_same` and `recursion`
+`../common/workloads.json` also defines `loop`, `calls`, `calls_same` and `recursion`
 for the [constprop benchmark](../constprop/README.md). This benchmark runs only
 the three families above, so its corpus still omits loops. A future Python iterable-based loop
 and Rust start/end/step loop may be compared when both satisfy the same finite
@@ -154,6 +157,8 @@ and thirty measured repetitions are the defaults.
 cargo test --example json_roundtrip --features serde
 /absolute/path/to/python-kirin/.venv/bin/python -m unittest discover \
   -s benchmarks/json_roundtrip -p 'test_*.py'
+/absolute/path/to/python-kirin/.venv/bin/python -m unittest discover \
+  -s benchmarks/common -p 'test_*.py'
 cargo test --test roundtrip --test json_storage --features serde
 cargo test -p toy-qc --features serde
 ```

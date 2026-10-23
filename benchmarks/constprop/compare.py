@@ -9,10 +9,10 @@ import statistics
 import subprocess
 import sys
 
-sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1] / "json_roundtrip"))
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
 
-from provenance import ROOT, environment, inspect_python_source, run, verify_python_source
-from semantic_spec import SPEC_PATH, coefficients, family_spec, load_suite, path_value
+from common.provenance import ROOT, environment, inspect_python_source, run, verify_python_source
+from common.semantic_spec import SPEC_PATH, coefficients, family_spec, load_suite, path_value
 
 KEYS = ("x", "y", "outer", "inner")
 FAMILIES = ["chain", "diamond", "nested_cfg", "loop", "calls", "calls_same", "recursion"]

@@ -7,15 +7,12 @@ use kirin_interpreter::{InterpreterError, expect_single};
 use serde::Deserialize;
 use serde_json::{Value, json};
 
-#[path = "../../json_roundtrip/rust/language.rs"]
-mod language;
 #[allow(dead_code)]
-#[path = "../../json_roundtrip/rust/spec.rs"]
-mod spec;
-#[path = "../../json_roundtrip/rust/workload.rs"]
-mod workload;
+#[path = "../../common/rust/mod.rs"]
+mod common;
+use common::{BenchmarkLanguage, workload};
 
-type IR = Pipeline<StageInfo<language::BenchmarkLanguage>>;
+type IR = Pipeline<StageInfo<BenchmarkLanguage>>;
 type V = ConstPropValue<i64>;
 
 /// An abstract argument tuple; `null` is an unknown (top) argument.

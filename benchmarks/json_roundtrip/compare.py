@@ -7,8 +7,11 @@ import statistics
 import subprocess
 import sys
 
-from provenance import ROOT, environment, inspect_python_source, run, verify_python_source
-from semantic_spec import SPEC_PATH, assert_semantically_valid, family_spec, load_suite
+sys.path.insert(0, str(pathlib.Path(__file__).resolve().parents[1]))
+
+from common.provenance import ROOT, environment, inspect_python_source, run, verify_python_source
+from common.semantic_spec import SPEC_PATH, family_spec, load_suite
+from semantics import assert_semantically_valid
 from validation import validate_shape
 
 BASELINE = "eae74008d4aec630169b5e64cc085e6f2c0d5b12"

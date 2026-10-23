@@ -1,9 +1,10 @@
 # Constant-propagation benchmark
 
 Runs Kirin-Rust's `ConstProp` and Kirin-Python's `const.Propagate` on the
-shared workloads in [`workloads.json`](../json_roundtrip/workloads.json), built
-by the JSON round-trip benchmark's builders. It checks every result and times
-both.
+shared workloads in [`workloads.json`](../common/workloads.json), built
+by the shared native builders in [`../common`](../common). The JSON round-trip
+benchmark uses the same builders; each suite keeps its own checks and timer.
+This benchmark checks every result and times both implementations.
 
 ## Run
 

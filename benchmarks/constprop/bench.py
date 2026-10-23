@@ -5,11 +5,11 @@ from pathlib import Path
 import sys
 import time
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "json_roundtrip"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 import kirin
 from kirin.analysis import const
-from python_benchmark import workload
+from common.python_workload import workload
 
 
 def analyze(program, input, options):
