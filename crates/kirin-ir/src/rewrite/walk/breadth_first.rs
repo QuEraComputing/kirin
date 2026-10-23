@@ -17,15 +17,15 @@ use crate::{Dialect, GetInfo, StageInfo, Statement};
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BFS;
 
-/// [`BFS`] backwards: the deepest level first, up to the root, and each level
-/// from its last statement to its first. Within a block uses come before
-/// their definitions, so removing a dead use exposes its producer before the
-/// walk reaches it.
+/// [`BFS`]'s levels from the deepest up to the root, each level right to
+/// left (last statement first), so within a block uses come before their
+/// definitions.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct ReverseBFS;
 
-/// [`BFS`]'s levels from the deepest up to the root, each kept in program
-/// order, so within a block definitions come before their uses.
+/// [`BFS`]'s levels from the deepest up to the root, each level left to
+/// right (first statement first), so within a block definitions come before
+/// their uses.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KeepOrderReverseBFS;
 
