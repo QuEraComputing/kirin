@@ -18,6 +18,7 @@
 //! guarantee, and [`pass`] for the boundary's failure routes.
 
 mod alloc;
+mod bodies;
 pub(crate) mod cfg;
 pub(crate) mod digraph;
 pub(crate) mod pass;
