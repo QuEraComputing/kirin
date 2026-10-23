@@ -1,10 +1,18 @@
-from typing import Iterable, final
+from typing import Any, Hashable, final
 from dataclasses import field, dataclass
 
 from kirin import ir, types, interp
 from kirin.analysis.forward import ForwardExtra, ForwardFrame
 
-from .lattice import Value, Result, Unknown, PartialTuple, PartialLambda
+from .lattice import (
+    Value,
+    Bottom,
+    Result,
+    Unknown,
+    PartialTuple,
+    PartialLambda,
+    _same_constant,
+)
 
 
 @dataclass
@@ -15,18 +23,68 @@ class Frame(ForwardFrame[Result]):
     """If we hit any non-pure statement."""
 
 
-def _fact_id(fact: Result) -> int:
-    """Get the ID of a fact for use in a cache key."""
-    return id(fact.data) if type(fact) is Value else id(fact)
+def _data_key(data: Any) -> Hashable:
+    """A hash key that two constants share whenever `_same_constant` says so.
+
+    Exact for scalars and tuples of them; other types share one key per type,
+    and `_same_facts` tells their values apart.
+    """
+    kind = type(data)
+    if kind in (int, bool, str, bytes, type(None)):
+        return (kind, data)
+    if kind is float:
+        return (kind, data.hex())
+    if kind is complex:
+        return (kind, data.real.hex(), data.imag.hex())
+    if kind is tuple:
+        return (kind, tuple(_data_key(item) for item in data))
+    return (kind,)
 
 
-def _holds_closure(facts: Iterable[Result]) -> bool:
-    """Whether `facts` contain a closure fact, possibly inside a partial tuple."""
-    return any(
-        type(fact) is PartialLambda
-        or (type(fact) is PartialTuple and _holds_closure(fact.data))
-        for fact in facts
-    )
+def _fact_key(fact: Result) -> Hashable:
+    """A hash key that two facts share whenever `_same_facts` says so."""
+    kind = type(fact)
+    if kind is Value:
+        return (kind, _data_key(fact.data))
+    if kind is PartialLambda:
+        return (
+            kind,
+            id(fact.code),
+            tuple(fact.argnames),
+            tuple(_fact_key(item) for item in fact.captured),
+        )
+    if kind is PartialTuple:
+        return (kind, tuple(_fact_key(item) for item in fact.data))
+    if kind in (Unknown, Bottom):
+        return (kind,)
+    return (kind, id(fact))
+
+
+def _same_facts(lhs: Result, rhs: Result) -> bool:
+    """Whether one argument fact can stand in for the other in a call.
+
+    Constants are compared as the lattice compares them (`_same_constant`),
+    closures and partial tuples element by element, other facts by identity.
+    """
+    if lhs is rhs:
+        return True
+    kind = type(lhs)
+    if kind is not type(rhs):
+        return False
+    if kind is Value:
+        return _same_constant(lhs.data, rhs.data)
+    if kind is PartialLambda:
+        return (
+            lhs.code is rhs.code
+            and lhs.argnames == rhs.argnames
+            and len(lhs.captured) == len(rhs.captured)
+            and all(map(_same_facts, lhs.captured, rhs.captured))
+        )
+    if kind is PartialTuple:
+        return len(lhs.data) == len(rhs.data) and all(
+            map(_same_facts, lhs.data, rhs.data)
+        )
+    return kind in (Unknown, Bottom)
 
 
 @dataclass(frozen=True)
@@ -34,7 +92,8 @@ class _CallSummary:
     """What an analyzed call returned and left in its frame."""
 
     arguments: tuple[Result, ...]
-    """Kept alive so that the ids in the call's key cannot be reused."""
+    """The call's argument facts, compared with `_same_facts` on lookup. Kept
+    alive so that the ids in the call's key cannot be reused."""
     result: Result
     entries: tuple[tuple[ir.SSAValue, Result], ...]
     should_be_pure: frozenset[ir.Statement]
@@ -69,10 +128,12 @@ class Propagate(ForwardExtra[Frame, Result]):
 
     With `cache_calls` set, within one run, a call with the same callee and the
     same argument facts as a call already analyzed reuses that call's result
-    and frame instead of analyzing the callee again. A run starts whenever a
-    frame is created without a caller; the IR may change between runs, so
-    nothing is reused across them. Calls cut off at the depth limit, and calls
-    whose frame holds a closure, are analyzed every time.
+    and frame instead of analyzing the callee again. Argument facts are the
+    same when the lattice can't tell them apart: constants by
+    `_same_constant`, closures by code and captured facts, partial tuples
+    element by element. A run starts whenever a frame is created without a
+    caller; the IR may change between runs, so nothing is reused across them.
+    Calls cut off at the depth limit are analyzed every time.
     """
 
     keys = ("constprop",)
@@ -84,7 +145,7 @@ class Propagate(ForwardExtra[Frame, Result]):
     hands out the same facts where the callee would have produced fresh ones."""
 
     _interp: interp.Interpreter = field(init=False)
-    _call_summaries: dict[tuple, _CallSummary] = field(
+    _call_summaries: dict[Hashable, list[_CallSummary]] = field(
         default_factory=dict, init=False, repr=False
     )
     _cutoffs: int = field(default=0, init=False, repr=False)
@@ -115,28 +176,30 @@ class Propagate(ForwardExtra[Frame, Result]):
             # call without a caller is a whole run, whose frame its caller reads.
             return ForwardExtra.call(self, node, *args, **kwargs)
 
+        facts = (*args, *kwargs.values())
         key = (
             node,
-            tuple(map(_fact_id, args)),
-            tuple((name, _fact_id(value)) for name, value in kwargs.items()),
+            tuple(kwargs),
+            tuple(map(_fact_key, facts)),
         )
-        if (summary := self._call_summaries.get(key)) is not None:
-            return summary.frame(node), summary.result
+        summaries = self._call_summaries.setdefault(key, [])
+        for summary in summaries:
+            if all(map(_same_facts, facts, summary.arguments)):
+                return summary.frame(node), summary.result
 
         cutoffs = self._cutoffs
         frame, result = ForwardExtra.call(self, node, *args, **kwargs)
-        # Skip caching if the call hit the recursion limit (its result depends on
-        # the call stack) or yields a closure (closures are told apart by
-        # identity, so each call site needs its own).
-        if self._cutoffs == cutoffs and not _holds_closure(
-            (result, *frame.entries.values())
-        ):
-            self._call_summaries[key] = _CallSummary(
-                (*args, *kwargs.values()),
-                result,
-                tuple(frame.entries.items()),
-                frozenset(frame.should_be_pure),
-                frame.frame_is_not_pure,
+        # Skip caching if the call hit the recursion limit: its result depends
+        # on the call stack.
+        if self._cutoffs == cutoffs:
+            summaries.append(
+                _CallSummary(
+                    facts,
+                    result,
+                    tuple(frame.entries.items()),
+                    frozenset(frame.should_be_pure),
+                    frame.frame_is_not_pure,
+                )
             )
         return frame, result
 
