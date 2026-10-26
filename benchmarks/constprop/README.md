@@ -129,6 +129,5 @@ builders against the independent oracle using both concrete interpreters.
 
 ## Recorded measurements
 
-See the [23 October 2026 results](results/2026-10-23/README.md) for cached
-timings, a corrected uncached control, precision verdicts, and the interruption
-and recovery limits of the full run.
+See the [26 October 2026 results](results/2026-10-26/README.md) for the full
+cached matrix, an uncached control, precision verdicts, and complete raw samples.
