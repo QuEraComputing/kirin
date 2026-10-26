@@ -54,7 +54,7 @@ jobs:
               repo: context.repo.repo,
               title: `Backport: failed to find PR for commit ${commitSha.slice(0, 7)}`,
               body: `The backport workflow could not find a PR associated with commit ${commitSha} after ${maxAttempts} attempts.\n\nThis is likely a GitHub API race condition. Please check if this commit should be backported and create the backport PR manually if needed.\n\nWorkflow run: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-              labels: ['category: bug']
+              labels: ['category: bug', 'area: Kirin']
             });
             core.setOutput('pr_num', '');
         env:
@@ -79,8 +79,6 @@ jobs:
             });
             const labels = pr.data.labels.map(l => l.name);
             core.info(`PR #${prNum} labels: ${labels.join(', ')}`);
-            // The `v` is optional: kirin's labels are `backport 0.22`, while
-            // bloqade-core's are `backport v0.6`. Accept both.
             const versionPattern = /^backport v?(\d+\.\d+)$/;
             const versions = labels
               .map(l => {
@@ -105,6 +103,10 @@ jobs:
             const versions = process.env.VERSIONS.split('\n').filter(Boolean);
             const commit = process.env.GITHUB_SHA;
             const prNum = process.env.PR_NUM;
+            // Must match the label release_tag.yml gates on, which reads the
+            // same repository variable. Hardcoding it here would advertise a
+            // label that does nothing the moment anyone sets RELEASE_LABEL.
+            const releaseLabel = process.env.RELEASE_LABEL;
 
             execSync('git config user.name "github-actions[bot]"');
             execSync('git config user.email "github-actions[bot]@users.noreply.github.com"');
@@ -124,8 +126,12 @@ jobs:
               const backportBranch = `${branch}-backport-pr${prNum}`;
               try {
                 core.info(`Backporting PR #${prNum} (${commit}) to ${branch}`);
+                // Fetch the release branch into a local ref. We check out the local
+                // ${branch} (not origin/${branch}): an explicit refspec fetch does not
+                // reliably update the remote-tracking ref, and actions/checkout only
+                // fetched main, so origin/${branch} may not exist.
                 execSync(`git fetch origin ${branch}:${branch}`);
-                execSync(`git checkout -B ${backportBranch} origin/${branch}`);
+                execSync(`git checkout -B ${backportBranch} ${branch}`);
 
                 // Attempt cherry-pick with --no-commit to detect conflicts/empty
                 try {
@@ -163,16 +169,34 @@ jobs:
                 // Commit, push, and create PR
                 execSync(`git commit -m "Backport PR #${prNum} (${commit}) to ${branch}"`);
                 execSync(`git push --force-with-lease origin ${backportBranch}`);
-                const pr = await github.rest.pulls.create({
+
+                // pulls.create is not idempotent: on a re-run an open backport PR for
+                // this head/base may already exist and the API would return 422. Reuse
+                // the existing PR instead of failing the whole job.
+                const existing = await github.rest.pulls.list({
                   owner: context.repo.owner,
                   repo: context.repo.repo,
-                  title: `Backport PR #${prNum} to ${branch}`,
-                  head: backportBranch,
+                  head: `${context.repo.owner}:${backportBranch}`,
                   base: branch,
-                  body: `Automated backport of PR #${prNum} (${commit}) to \`${branch}\`.`
+                  state: 'open'
                 });
-                core.info(`Created backport PR #${pr.data.number} for ${branch}`);
-                successes.push({ version, branch, backportPrNum: pr.data.number });
+                let backportPrNum;
+                if (existing.data.length) {
+                  backportPrNum = existing.data[0].number;
+                  core.info(`Reusing existing backport PR #${backportPrNum} for ${branch}`);
+                } else {
+                  const pr = await github.rest.pulls.create({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    title: `Backport PR #${prNum} to ${branch}`,
+                    head: backportBranch,
+                    base: branch,
+                    body: `Automated backport of PR #${prNum} (${commit}) to \`${branch}\`.\n\nAdd the \`${releaseLabel}\` label before merging to cut a patch release from this branch. Without it this merges without releasing, and ships with whichever later backport is labelled.`
+                  });
+                  backportPrNum = pr.data.number;
+                  core.info(`Created backport PR #${backportPrNum} for ${branch}`);
+                }
+                successes.push({ version, branch, backportPrNum });
 
               } catch (e) {
                 execSync('git cherry-pick --abort 2>/dev/null || true');
@@ -228,7 +252,7 @@ jobs:
                 repo: context.repo.repo,
                 title: `Backport failed: PR #${prNum} → ${failedBranches}`,
                 body: `Automated backport of PR #${prNum} failed for the following branches:\n\n${errors.map(e => `- \`${e.branch}\`: ${e.reason}`).join('\n')}\n\nTo resolve manually:\n\`\`\`bash\ngit fetch origin <release-branch>\ngit checkout -b backport-pr${prNum} origin/<release-branch>\ngit cherry-pick ${commit}\n# resolve conflicts, then push and open a PR\n\`\`\`\n\nWorkflow run: ${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`,
-                labels: ['category: bug']
+                labels: ['category: bug', 'area: Kirin']
               });
               throw new Error(`Backport failed for: ${failedBranches}. See PR #${prNum} for details.`);
             }
@@ -236,3 +260,4 @@ jobs:
           VERSIONS: ${{ steps.versions.outputs.versions }}
           GITHUB_SHA: ${{ github.sha }}
           PR_NUM: ${{ steps.prnum.outputs.pr_num }}
+          RELEASE_LABEL: ${{ vars.RELEASE_LABEL || 'release-patch' }}

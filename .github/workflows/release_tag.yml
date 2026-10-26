@@ -1,0 +1,241 @@
+name: Tag a patch release
+
+# Cuts a patch release when a PR labelled "release-patch" merges into a release
+# branch: bumps pyproject.toml and uv.lock, commits, and pushes a v* tag. That
+# tag is what hands off to release.yml for the PyPI publish and the GitHub
+# Release.
+#
+# Merging WITHOUT the label is the ordinary case and does nothing -- backports
+# accumulate on the release branch until one of them is labelled, and that
+# release contains all of them.
+#
+# This file and .github/scripts/next_version.py must also be on each release
+# branch: a pull_request run reads the workflow from the PR's merge commit, and
+# the job runs the script from the release branch tip.
+
+on:
+  pull_request:
+    types: [closed]
+  # Manual recovery, for when a merge fails to produce a run at all. A
+  # dispatched run skips the label and base-ref checks: a human pressing the
+  # button has expressed the intent, and next_version.py refusing is the
+  # backstop for dispatching on a branch this cannot version.
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: "Log the decision without pushing anything"
+        type: boolean
+        default: false
+
+# Serialises releases per branch. Two labelled PRs merged seconds apart must not
+# both compute the same version -- each run recomputes from the branch tip at the
+# time it runs, which only works if they do not overlap.
+#
+# Keyed on the BASE branch: for a pull_request event github.ref is
+# refs/pull/N/merge, which would put every PR in its own group and serialise
+# nothing.
+concurrency:
+  group: release-tag-${{ github.event.pull_request.base.ref || github.ref_name }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read # the app token does all writing
+  issues: write # the failure reporter opens an issue
+  # Commenting on a PR goes through the issues endpoint but is gated on
+  # pull-requests, not issues. Without this the reporter's PR comment 403s --
+  # inside an if: failure() step, so it would hide the failure it exists to
+  # report. backport.yml declares the same pair for the same two operations.
+  pull-requests: write
+
+jobs:
+  tag:
+    runs-on: ubuntu-latest
+    # The label name comes from a repository variable so renaming it -- or
+    # pointing another repo's copy of this workflow at a different label -- is a
+    # settings change, not a code change. A variable and not a workflow `env:`
+    # because `env` is not among the contexts GitHub allows in a job-level `if:`;
+    # `vars` is. An unset variable is the empty string, which is falsy, so `||`
+    # supplies the default.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.pull_request.merged == true &&
+       contains(github.event.pull_request.labels.*.name,
+                vars.RELEASE_LABEL || 'release-patch'))
+    env:
+      TARGET_BRANCH: ${{ github.event.pull_request.base.ref || github.ref_name }}
+      DRY_RUN: ${{ inputs.dry_run || 'false' }}
+    steps:
+      # Defence in depth behind the `if` above: rejects a labelled PR into main,
+      # or into a stray branch like release-0-28-remove-heater-tone-hw-test.
+      - name: Check the target is a release branch
+        if: github.event_name == 'pull_request'
+        run: |
+          set -euo pipefail
+          if ! printf '%s' "$TARGET_BRANCH" | grep -qE '^release-[0-9]+-[0-9]+$'; then
+            echo "::notice::$TARGET_BRANCH is not a release branch; nothing to do"
+            echo "skip=true" >> "$GITHUB_ENV"
+          fi
+
+      # NOT the default GITHUB_TOKEN. GitHub does not start workflow runs from
+      # events it creates, so a tag pushed with it would never trigger
+      # release.yml -- no publish, no GitHub Release, and no failed job to
+      # notice. App installation tokens are exempt. See app-token-check.yml.
+      - name: Mint an app installation token
+        if: env.skip != 'true'
+        id: app-token
+        uses: actions/create-github-app-token@v3
+        with:
+          app-id: ${{ secrets.TOKEN_APP_ID }}
+          private-key: ${{ secrets.TOKEN_APP_PEM }}
+
+      - name: Check out the release branch
+        if: env.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          # The branch tip, NOT the PR merge ref: the tip already contains this
+          # merge plus anything else that landed, and recomputing from it is
+          # what makes concurrent releases correct.
+          ref: ${{ env.TARGET_BRANCH }}
+          # Required, not defensive. At the default depth of 1 there are no
+          # tags, so "highest tagged patch on this line" evaluates to nothing
+          # and the version rule degrades to a bare pyproject.toml increment.
+          fetch-depth: 0
+          # Keep checkout credentials available for the git push steps.
+          token: ${{ steps.app-token.outputs.token }}
+
+      # GitHub updates the base ref before firing the closed webhook, so the tip
+      # should already contain the merge. Assert it anyway: tagging a tree that
+      # silently lacks the backport is the exact class of failure this pipeline
+      # exists to remove, and the check costs one command.
+      - name: Verify the merge is on the branch
+        if: env.skip != 'true' && github.event_name == 'pull_request'
+        env:
+          MERGE_SHA: ${{ github.event.pull_request.merge_commit_sha }}
+        run: |
+          set -euo pipefail
+          git merge-base --is-ancestor "$MERGE_SHA" HEAD \
+            || { echo "::error::$MERGE_SHA is not on $TARGET_BRANCH"; exit 1; }
+
+      # Computes AND writes in one call, so the version that goes into
+      # pyproject.toml is by construction the same one that gets tagged below.
+      # Splitting them would leave two independent computations that a later
+      # edit -- a retry, a reorder, an added `git fetch --tags` between the
+      # steps -- could silently desynchronise.
+      #
+      # The assignment is wrapped in `if` so it can survive a non-zero exit long
+      # enough to read the code. The runner invokes this step as `bash -e {0}`,
+      # so errexit is already on before the script body runs and `set -uo
+      # pipefail` does not clear it -- a bare `version=$(...)` would abort the
+      # shell and `status=$?` would never be reached, losing the exit-2
+      # annotation below. A command used as an `if` condition is exempt from
+      # errexit, which is what makes reading the code possible at all.
+      - name: Bump the patch version
+        if: env.skip != 'true'
+        id: version
+        run: |
+          set -uo pipefail
+          if version=$(python3 .github/scripts/next_version.py --branch "$TARGET_BRANCH" --write); then
+            status=0
+          else
+            status=$?
+          fi
+          if [ "$status" -eq 2 ]; then
+            echo "::error::refused to compute a version for $TARGET_BRANCH"
+            exit 1
+          fi
+          [ "$status" -eq 0 ] || exit "$status"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "Next version on $TARGET_BRANCH: $version"
+
+      # uv.lock records this package's own version, and lint.yml runs
+      # `uv run --locked pre-commit` on every PR, so a bump that skips the lock
+      # breaks lint on the next backport PR into this branch.
+      #
+      # Pinned to a modern uv, NOT lint.yml's 0.6.14: 0.6.14 rewrites the whole
+      # lock down to format revision 1, while a current uv changes only the one
+      # version line -- and 0.6.14 still accepts that lock under --locked.
+      - name: Install uv
+        if: env.skip != 'true'
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: "0.11.18"
+
+      - name: Re-lock uv.lock
+        if: env.skip != 'true'
+        run: uv lock
+
+      - name: Commit and tag
+        if: env.skip != 'true'
+        env:
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+
+          if [ "$DRY_RUN" = "true" ]; then
+            echo "::notice::dry run -- would tag v$VERSION on $TARGET_BRANCH"
+            git --no-pager diff
+            exit 0
+          fi
+
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git commit -am "chore: bump version to $VERSION"
+          # Lightweight, matching every tag on this repo.
+          git tag "v$VERSION"
+          git push origin "$TARGET_BRANCH"
+          git push origin "v$VERSION"
+          echo "::notice::released v$VERSION on $TARGET_BRANCH"
+
+      # One reporter for every failure above, including the token step dying.
+      # Uses the default GITHUB_TOKEN precisely because the app token may be
+      # what failed.
+      #
+      # Skipped on a dry run: that is a smoke test someone is watching live, and
+      # filing a `category: bug` issue for a deliberate experiment is noise.
+      - name: Report failure
+        if: failure() && env.DRY_RUN != 'true'
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const branch = process.env.TARGET_BRANCH;
+            const title = `Release failed on ${branch}`;
+            const runUrl = `${process.env.GITHUB_SERVER_URL}/${process.env.GITHUB_REPOSITORY}/actions/runs/${process.env.GITHUB_RUN_ID}`;
+            const body = `The release workflow failed for \`${branch}\`.\n\nWorkflow run: ${runUrl}`;
+
+            // Dedup by title: a branch left in a state next_version.py refuses
+            // would otherwise open a fresh issue on every labelled merge.
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'category: bug',
+              per_page: 100,
+            });
+            const match = existing.data.find(i => i.title === title);
+            if (match) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: match.number,
+                body,
+              });
+            } else {
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title,
+                body,
+                labels: ['category: bug'],
+              });
+            }
+
+            // No PR on a workflow_dispatch run, and Recovery sends people down
+            // that path, so this is a live case rather than a corner.
+            if (context.payload.pull_request) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.payload.pull_request.number,
+                body,
+              });
+            }
