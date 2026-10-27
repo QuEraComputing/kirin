@@ -1,7 +1,7 @@
 use kirin::prelude::*;
 
 /// A hole: matches any SSA value and binds it to its result.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, PrettyPrint)]
 #[chumsky(format = "$hole -> {result:type}")]
 #[kirin(builders, type = T)]
 pub struct Hole<T: CompileTimeValue> {

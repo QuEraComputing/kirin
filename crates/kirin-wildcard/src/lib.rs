@@ -5,30 +5,33 @@
 //! statements in the pattern describe the statements to match; the
 //! `wildcard.*` statements mark holes and describe the replacement.
 //!
+//! Patterns are built in Rust, usually by the code `#[rewrite_rule]`
+//! generates, and have no text parser.
+//!
 //! # Statements
 //!
 //! | Statement | Description |
 //! |-----------|-------------|
-//! | `wildcard.pattern @name block ^bb() {..}` | Holds one pattern: the match statements followed by a `rewrite` |
+//! | `wildcard.pattern @name block ^bb {..}` | Holds one pattern: the match statements followed by a `rewrite` |
 //! | `%x = wildcard.hole -> T` | Hole: matches any SSA value and binds it to `%x` |
 //! | `%k = wildcard.native_call "log2"(%c) -> T` | Calls a registered native function: computes values for a `constraint` in a pattern body, or computes results in a replacement body |
 //! | `wildcard.constraint %ok` | Fails the match unless `%ok`, computed by a `native_call`, is true |
 //! | `wildcard.replace %r with %x` | Redirects every use of the matched `%r` to `%x` |
-//! | `wildcard.erase 2` | Erases the matched statement at position 2 of the pattern body |
-//! | `wildcard.rewrite 2 block ^rw() {..}` | Terminates a pattern body; the statement at position 2 is the root, the body holds the replacement |
+//! | `wildcard.erase %r` | Erases the matched op defining `%r` |
+//! | `wildcard.rewrite %r block ^rw {..}` | Terminates a pattern body; the op defining `%r` is the root, the body holds the replacement |
 //!
 //! # Example
 //!
 //! ```text
-//! wildcard.pattern @add_zero block ^bb() {
-//!   %x    = wildcard.hole -> i64;
+//! wildcard.pattern @add_zero block ^bb {
+//!   %x = wildcard.hole -> i64;
 //!   %zero = constant 0 -> i64;
-//!   %r    = add %x, %zero -> i64;
-//!   wildcard.rewrite 2 block ^rw() {
+//!   %r = add %x, %zero -> i64;
+//!   wildcard.rewrite %r block ^rw {
 //!     wildcard.replace %r with %x;
-//!     wildcard.erase 2;
+//!     wildcard.erase %r;
 //!   };
-//! };
+//! }
 //! ```
 //!
 //! The matched statements are the producers of the `rewrite` root, followed
@@ -38,11 +41,11 @@
 //! that they are unused. Erasing a statement whose results are still used
 //! fails the rewrite, and the pass quarantines the stage.
 //!
-//! `rewrite` and `erase` name their statement by its 0-based position in the
-//! pattern body rather than by one of its results because kirin-ir statements
-//! take only SSA values as arguments. So a statement without results could not
-//! be referenced otherwise.
-//! Patterns are never rewritten, so the positions stay valid.
+//! `rewrite` and `erase` hold an [`OpRef`], the `Statement` id of the op
+//! they act on, so they can name an op without results. It prints as the
+//! op's first result, or as the op's position in the pattern body (`#2`) for
+//! an op without results. Patterns are never rewritten, so the ids stay
+//! valid.
 //!
 //! This crate only defines the pattern data. It does not match patterns or
 //! mutate concrete IR; those responsibilities belong to `kirin-rewrite` and
@@ -56,6 +59,7 @@ mod erase;
 mod hole;
 mod language;
 mod native_call;
+mod op_ref;
 mod pattern;
 mod replace;
 mod rewrite;
@@ -65,6 +69,7 @@ pub use erase::Erase;
 pub use hole::Hole;
 pub use language::PatternLanguage;
 pub use native_call::NativeCall;
+pub use op_ref::OpRef;
 pub use pattern::Pattern;
 pub use replace::Replace;
 pub use rewrite::Rewrite;
@@ -85,7 +90,7 @@ use kirin::prelude::*;
 mod tests;
 
 /// Wrapper enum that composes all wildcard statements.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, PrettyPrint)]
 #[wraps]
 #[kirin(builders, type = T)]
 #[chumsky(format = "wildcard")]

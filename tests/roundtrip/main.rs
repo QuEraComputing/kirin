@@ -12,4 +12,3 @@ mod namespace;
 mod scf;
 mod tuple;
 mod ungraph;
-mod wildcard;

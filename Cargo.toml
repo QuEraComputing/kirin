@@ -139,7 +139,6 @@ kirin-test-languages = { workspace = true, features = [
 ] }
 kirin-test-utils = { workspace = true, features = ["roundtrip"] }
 kirin-tuple = { workspace = true }
-kirin-wildcard = { workspace = true }
 trybuild = { workspace = true }
 
 [features]

@@ -4,6 +4,7 @@
 use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType};
 use kirin_test_languages::{EffectLanguage, GraphFunctionLanguage as L};
+use kirin_test_utils::roundtrip;
 use kirin_wildcard::{PatternLanguage, PatternStatement, Rewrite, rewrite_rule};
 
 type Stage = StageInfo<PatternLanguage<L>>;
@@ -159,10 +160,10 @@ fn rewrite_rule_builds_the_match_and_the_rewrite() {
         ]
     );
 
-    // The root is `r`, named by its position in the body, and the rewrite
-    // redirects its uses to `x`, then erases it.
-    assert_eq!(rewrite.root(), 2);
-    let root = statements[rewrite.root()];
+    // The root is `r`, and the rewrite redirects its uses to `x`, then
+    // erases it.
+    let root = rewrite.root();
+    assert_eq!(root, statements[2]);
     assert_eq!(describe(&stage, root), "r = neg");
     let actions: Vec<Statement> = rewrite.body().statements(&stage).collect();
     let PatternLanguage::Wildcard(PatternStatement::Replace(replace)) =
@@ -199,7 +200,7 @@ fn rewrite_rule_erases_without_replacing() {
     );
 
     // The rewrite only erases the root.
-    assert_eq!(rewrite.root(), 1);
+    assert_eq!(rewrite.root(), statements[1]);
     let actions: Vec<Statement> = rewrite.body().statements(&stage).collect();
     let [action] = actions[..] else {
         panic!("expected one action");
@@ -220,7 +221,8 @@ fn rewrite_rule_roots_and_erases_an_op_without_results() {
 
     // Match: the hole `x`, the `neg`, and the `effect` consuming it.
     assert_eq!(statements.len(), 3);
-    let root = statements[rewrite.root()];
+    let root = rewrite.root();
+    assert_eq!(root, statements[2]);
     let PatternLanguage::Op(EffectLanguage::Effect { value }) =
         root.expect_info(&stage).definition()
     else {
@@ -244,6 +246,50 @@ fn rewrite_rule_roots_and_erases_an_op_without_results() {
         panic!("expected an erase");
     };
     assert_eq!(erase.target(), rewrite.root());
+}
+
+/// The printed rule shows the root, in `rewrite` and `erase`, by its result.
+#[test]
+fn rewrite_rule_prints_the_root_by_its_result() {
+    let (stage, pattern) = build(double_neg);
+    let expected = r#"
+wildcard.pattern @double_neg block ^double_neg_pat {
+  %x = wildcard.hole -> i64;
+  %a = neg %x -> i64;
+  %r = neg %a -> i64;
+  %3 = wildcard.native_call "is_power_of_two" (%x) -> i64;
+  wildcard.constraint %3;
+  wildcard.rewrite %r block ^double_neg_rw {
+    wildcard.replace %r with %x;
+    wildcard.erase %r;
+  };
+}
+"#;
+    assert_eq!(
+        roundtrip::render_statement(&stage, pattern).trim(),
+        expected.trim()
+    );
+}
+
+/// The printed rule shows a root without results by its position in the
+/// pattern body.
+#[test]
+fn rewrite_rule_prints_a_root_without_results_by_its_position() {
+    let (stage, pattern) = build(drop_effect_of_neg);
+    let expected = r#"
+wildcard.pattern @drop_effect_of_neg block ^drop_effect_of_neg_pat {
+  %x = wildcard.hole -> i64;
+  %n = neg %x -> i64;
+  effect %n;
+  wildcard.rewrite #2 block ^drop_effect_of_neg_rw {
+    wildcard.erase #2;
+  };
+}
+"#;
+    assert_eq!(
+        roundtrip::render_statement(&stage, pattern).trim(),
+        expected.trim()
+    );
 }
 
 #[test]
@@ -297,8 +343,7 @@ fn rewrite_rule_keeps_visibility_and_takes_a_crate_path() {
 }
 
 /// Several rules build into one stage, finalized once, and a finalized stage
-/// can take more. Each pattern keeps its own name and body, and positions are
-/// relative to that body.
+/// can take more. Each pattern keeps its own name, body and root.
 #[test]
 fn rewrite_rules_share_one_stage() {
     let mut stage = BuilderStageInfo::<PatternLanguage<L>>::default();
@@ -310,8 +355,8 @@ fn rewrite_rules_share_one_stage() {
     let roots: Vec<(String, Statement)> = [first, second, third]
         .into_iter()
         .map(|pattern| {
-            let (name, statements, rewrite) = pattern_parts(&stage, pattern);
-            (name, statements[rewrite.root()])
+            let (name, _, rewrite) = pattern_parts(&stage, pattern);
+            (name, rewrite.root())
         })
         .collect();
     let names: Vec<&str> = roots.iter().map(|(name, _)| name.as_str()).collect();

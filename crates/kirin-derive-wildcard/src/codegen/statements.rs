@@ -1,4 +1,4 @@
-use proc_macro2::{Literal, Span, TokenStream};
+use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
 use syn::{ext::IdentExt, spanned::Spanned};
 
@@ -205,13 +205,13 @@ impl RuleCodegen {
 
     /// `rewrite!(root, { .. })`: the `wildcard.rewrite` terminator for the
     /// pattern block. Establishes `root` for the rewrite rule driver. `root`
-    /// is identified by its position in the pattern body.
+    /// is identified by the `Statement` built for it in the pattern body.
     pub(super) fn rewrite(&self, stmt: StmtId, root: StmtId, body: &[StmtId]) -> TokenStream {
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
         let ty = self.type_alias();
 
-        let root_position = Literal::usize_unsuffixed(self.model.position(root));
+        let root_id = self.statement_ident(root);
         let stmt_id = self.statement_ident(stmt);
 
         let span = Span::mixed_site().located_at(self.model.statement(stmt).span);
@@ -229,7 +229,7 @@ impl RuleCodegen {
                 #(.stmt(#body_ids))*
                 .new();
             let #stmt_id =
-                #krate::Rewrite::<#ty>::new(#stage, #root_position, #body_id).id;
+                #krate::Rewrite::<#ty>::new(#stage, #root_id, #body_id).id;
         }
     }
 
@@ -255,17 +255,17 @@ impl RuleCodegen {
     }
 
     /// `erase!(matched);`: a `wildcard.erase` of the matched op `op` which is
-    /// identified by its position in the pattern body.
+    /// identified by the `Statement` built for it in the pattern body.
     pub(super) fn erase(&self, stmt: StmtId, op: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
         let ty = self.type_alias();
 
-        let op_position = Literal::usize_unsuffixed(self.model.position(op));
+        let op_id = self.statement_ident(op);
         let stmt_id = self.statement_ident(stmt);
 
         quote! {
-            let #stmt_id = #krate::Erase::<#ty>::new(#stage, #op_position).id;
+            let #stmt_id = #krate::Erase::<#ty>::new(#stage, #op_id).id;
         }
     }
 }

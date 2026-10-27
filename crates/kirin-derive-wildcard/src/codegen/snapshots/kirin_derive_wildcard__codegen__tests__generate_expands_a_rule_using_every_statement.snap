@@ -140,7 +140,7 @@ pub fn rule(
             ))
             .new();
         let statement_8 = ::kirin_wildcard::Replace::<__Type>::new(stage, value_r, value_n).id;
-        let statement_9 = ::kirin_wildcard::Erase::<__Type>::new(stage, 3).id;
+        let statement_9 = ::kirin_wildcard::Erase::<__Type>::new(stage, statement_3).id;
         let rewrite_body = stage
             .block()
             .name("rule_rw")
@@ -149,7 +149,8 @@ pub fn rule(
             .stmt(statement_8)
             .stmt(statement_9)
             .new();
-        let statement_10 = ::kirin_wildcard::Rewrite::<__Type>::new(stage, 3, rewrite_body).id;
+        let statement_10 =
+            ::kirin_wildcard::Rewrite::<__Type>::new(stage, statement_3, rewrite_body).id;
         let pattern_body = stage
             .block()
             .name("rule_pat")

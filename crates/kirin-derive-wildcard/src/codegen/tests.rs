@@ -370,15 +370,13 @@ fn constraint_replace_and_erase_use_their_builders() {
         expected.to_string()
     );
 
-    // The erased op is named by its position in the pattern body: after the
-    // holes `x` and `y`.
+    // The erased op is named by the `Statement` built for it.
     let StmtKind::Erase { stmt: op } = model.statement(erase).kind else {
         panic!("expected an erase");
     };
-    assert_eq!(model.position(op), 2);
-    let erase_id = codegen.statement_ident(erase);
+    let (erase_id, op_id) = (codegen.statement_ident(erase), codegen.statement_ident(op));
     let expected = quote! {
-        let #erase_id = ::kirin_wildcard::Erase::<__Type>::new(stage, 2).id;
+        let #erase_id = ::kirin_wildcard::Erase::<__Type>::new(stage, #op_id).id;
     };
     assert_eq!(codegen.erase(erase, op).to_string(), expected.to_string());
 }
@@ -401,15 +399,17 @@ fn rewrite_builds_its_body_block_then_the_rewrite() {
     let StmtKind::Rewrite { root, body } = &model.statement(rewrite).kind else {
         panic!("expected a rewrite");
     };
-    let rewrite_id = codegen.statement_ident(rewrite);
+    let (rewrite_id, root_id) = (
+        codegen.statement_ident(rewrite),
+        codegen.statement_ident(*root),
+    );
     let actions = body.iter().map(|&s| codegen.statement(s));
     let action_ids = body.iter().map(|&s| codegen.statement_ident(s));
-    // The root is named by its position in the pattern body, after the
-    // holes `x` and `y`.
+    // The root is named by the `Statement` built for it.
     let expected = quote! {
         #(#actions)*
         let rewrite_body = stage.block().name("add_zero_rw")#(.stmt(#action_ids))*.new();
-        let #rewrite_id = ::kirin_wildcard::Rewrite::<__Type>::new(stage, 2, rewrite_body).id;
+        let #rewrite_id = ::kirin_wildcard::Rewrite::<__Type>::new(stage, #root_id, rewrite_body).id;
     };
     assert_eq!(
         codegen.rewrite(rewrite, *root, body).to_string(),
