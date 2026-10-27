@@ -55,8 +55,9 @@ pub enum MemberRole {
     Edge,
 }
 
-/// Member statement → how it is stored. Insertion order until a removal,
-/// which swaps the last member into the hole.
+/// Member statement → how it is stored, in statement id order: the mirror is
+/// installed in id order, inserts append newly allocated statements, and a
+/// removal keeps the others in order.
 pub(crate) type MemberMap = IndexMap<Statement, GraphMember, FxBuildHasher>;
 
 /// Unified graph information, parameterized by edge direction and extra data.
@@ -162,20 +163,11 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         &mut self.graph
     }
 
-    /// Every member with how it is stored, in member order: insertion order,
-    /// except that a removal moves the last member into the removed one's
-    /// place. Sort by statement id where a stable order matters.
+    /// Every member with how it is stored, in member order: statement id
+    /// order, which carries no meaning but is deterministic and unchanged by
+    /// removals.
     pub fn members(&self) -> impl Iterator<Item = (Statement, GraphMember)> + '_ {
         self.members.iter().map(|(&stmt, &member)| (stmt, member))
-    }
-
-    /// Every member with how it is stored, in statement id order: the order
-    /// the members were allocated, which a removal does not disturb. For
-    /// presentation; O(n log n).
-    pub fn members_by_id(&self) -> Vec<(Statement, GraphMember)> {
-        let mut members: Vec<_> = self.members().collect();
-        members.sort_unstable_by_key(|&(stmt, _)| crate::arena::Id::from(stmt).raw());
-        members
     }
 
     /// How `stmt` is stored, if it is a member.
