@@ -71,8 +71,8 @@ fn rewrite_is_terminator() {
 
 #[test]
 fn only_rewrite_variant_is_terminator() {
-    // Enum-level `#[wraps]` does not delegate terminator-ness, so this checks
-    // the explicit `#[kirin(terminator)]` on the `Rewrite` variant.
+    // `#[wraps]` delegates terminator-ness to each wrapped statement, so this
+    // checks that `Rewrite` is the only terminator among them.
     for stmt in all_statements() {
         let expected = matches!(stmt, PatternStatement::Rewrite(_));
         assert_eq!(stmt.is_terminator(), expected, "{stmt:?}");

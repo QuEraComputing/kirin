@@ -13,9 +13,7 @@ use kirin_test_utils::roundtrip;
 enum NumericLanguage {
     Arith(Arith<ArithType>),
     Constant(Constant<ArithValue, ArithType>),
-    #[kirin(terminator)]
     ControlFlow(ControlFlow<ArithType>),
-    #[kirin(terminator)]
     Return(Return<ArithType>),
 }
 

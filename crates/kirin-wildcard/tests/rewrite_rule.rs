@@ -55,6 +55,18 @@ fn drop_effect_of_neg() {
     erase!(k)
 }
 
+/// A terminator of the language as the root: an `exit` of a double negation
+/// exits with the value itself.
+#[rewrite_rule(language = EffectLanguage)]
+fn exit_double_neg() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let k @ () = op![EffectLanguage::exit(r)];
+    rewrite!(k, {
+        replace!(r, x);
+    })
+}
+
 mod rules {
     use super::{Arith, L, native};
     use kirin_wildcard::{self as wildcard, rewrite_rule};
@@ -248,6 +260,25 @@ fn rewrite_rule_roots_and_erases_an_op_without_results() {
     assert_eq!(erase.target(), rewrite.root());
 }
 
+/// A terminator of the language is an ordinary statement of the pattern body,
+/// which the `rewrite` still ends.
+#[test]
+fn rewrite_rule_roots_at_a_terminator_of_the_language() {
+    let (stage, pattern) = build(exit_double_neg);
+    let (_, statements, rewrite) = pattern_parts(&stage, pattern);
+
+    // Match: the hole `x`, both `neg`s, and the `exit` consuming the second.
+    assert_eq!(statements.len(), 4);
+    let root = rewrite.root();
+    assert_eq!(root, statements[3]);
+    let definition = root.expect_info(&stage).definition();
+    let PatternLanguage::Op(exit @ EffectLanguage::Exit { .. }) = definition else {
+        panic!("expected the exit as the root");
+    };
+    assert!(exit.is_terminator());
+    assert!(!definition.is_terminator());
+}
+
 /// The printed rule shows the root, in `rewrite` and `erase`, by its result.
 #[test]
 fn rewrite_rule_prints_the_root_by_its_result() {
@@ -283,6 +314,28 @@ wildcard.pattern @drop_effect_of_neg block ^drop_effect_of_neg_pat {
   effect %n;
   wildcard.rewrite #2 block ^drop_effect_of_neg_rw {
     wildcard.erase #2;
+  };
+}
+"#;
+    assert_eq!(
+        roundtrip::render_statement(&stage, pattern).trim(),
+        expected.trim()
+    );
+}
+
+/// The printed rule shows a terminator of the language in the pattern body,
+/// before the `rewrite` ending it.
+#[test]
+fn rewrite_rule_prints_a_terminator_of_the_language_in_the_body() {
+    let (stage, pattern) = build(exit_double_neg);
+    let expected = r#"
+wildcard.pattern @exit_double_neg block ^exit_double_neg_pat {
+  %x = wildcard.hole -> i64;
+  %a = neg %x -> i64;
+  %r = neg %a -> i64;
+  exit %r;
+  wildcard.rewrite #3 block ^exit_double_neg_rw {
+    wildcard.replace %r with %x;
   };
 }
 "#;

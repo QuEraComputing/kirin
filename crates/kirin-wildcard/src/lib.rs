@@ -101,6 +101,5 @@ pub enum PatternStatement<T: CompileTimeValue> {
     Constraint(Constraint<T>),
     Replace(Replace<T>),
     Erase(Erase<T>),
-    #[kirin(terminator)]
     Rewrite(Rewrite<T>),
 }

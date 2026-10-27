@@ -4,7 +4,39 @@ use crate::{Constraint, Erase, Hole, NativeCall, Pattern, PatternStatement, Repl
 
 /// The language a pattern is written in: the ops of `L`, reused as-is, plus
 /// the [`PatternStatement`]s.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, PrettyPrint)]
+///
+/// Derives every property in Dialect except [`IsTerminator`]: a pattern body
+/// is ended by its [`Rewrite`], so a matched terminator of `L` is an ordinary
+/// statement of it. That is why the `Dialect` traits are derived one by one
+/// instead of with `#[derive(Dialect)]`, which would delegate `is_terminator`
+/// too.
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Hash,
+    PrettyPrint,
+    HasArguments,
+    HasArgumentsMut,
+    HasResults,
+    HasResultsMut,
+    HasBlocks,
+    HasBlocksMut,
+    HasSuccessors,
+    HasSuccessorsMut,
+    HasCFG,
+    HasCFGMut,
+    HasDigraphs,
+    HasDigraphsMut,
+    HasUngraphs,
+    HasUngraphsMut,
+    IsConstant,
+    IsPure,
+    IsSpeculatable,
+    IsEdge,
+    LiftProject,
+)]
 #[wraps]
 #[kirin(type = L::Type)]
 pub enum PatternLanguage<L: Dialect> {
@@ -22,4 +54,17 @@ pub enum PatternLanguage<L: Dialect> {
         Rewrite<L::Type>
     ))]
     Wildcard(PatternStatement<L::Type>),
+}
+
+impl<L: Dialect> Dialect for PatternLanguage<L> {
+    type Type = L::Type;
+}
+
+impl<L: Dialect> IsTerminator for PatternLanguage<L> {
+    fn is_terminator(&self) -> bool {
+        match self {
+            Self::Op(_) => false,
+            Self::Wildcard(statement) => statement.is_terminator(),
+        }
+    }
 }
