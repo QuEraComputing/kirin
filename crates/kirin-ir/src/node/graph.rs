@@ -66,7 +66,8 @@ pub(crate) type MemberMap = IndexMap<Statement, GraphMember, FxBuildHasher>;
 /// `Extra` carries direction-specific data (yields for digraphs, nothing for ungraphs).
 ///
 /// `members` holds every member, nodes and `UnGraph` edge statements, with
-/// O(1) lookup, insert, and removal; `graph` holds the connectivity between the
+/// O(1) lookup and insert and order-preserving O(members) removal; `graph`
+/// holds the connectivity between the
 /// nodes. The `graph_topology` edits keep the two in lockstep.
 ///
 /// Use the type aliases [`DiGraphInfo`](super::DiGraphInfo) and
