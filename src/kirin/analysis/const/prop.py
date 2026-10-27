@@ -1,18 +1,11 @@
-from typing import Any, Hashable, final
+import struct
+from typing import Hashable, final
 from dataclasses import field, dataclass
 
 from kirin import ir, types, interp
 from kirin.analysis.forward import ForwardExtra, ForwardFrame
 
-from .lattice import (
-    Value,
-    Bottom,
-    Result,
-    Unknown,
-    PartialTuple,
-    PartialLambda,
-    _same_constant,
-)
+from .lattice import Value, Bottom, Result, Unknown, PartialTuple, PartialLambda
 
 
 @dataclass
@@ -23,67 +16,32 @@ class Frame(ForwardFrame[Result]):
     """If we hit any non-pure statement."""
 
 
-# The call cache looks up an earlier call in two steps. `_fact_key` maps each
-# argument fact to a hash key, and calls whose callee and argument keys match
-# share a bucket in `Propagate._call_summaries`. Within the bucket,
-# `_same_facts` decides whether a stored call's arguments can stand in for the
-# current ones; only then is the stored result reused.
-#
-# The keys only have to satisfy one rule: facts that `_same_facts` considers
-# the same must get the same key, so they share a bucket. Different facts may
-# share a key too; `_same_facts` tells them apart. A coarser key therefore only
-# means more comparisons per lookup, and a key finer than `_same_facts` would
-# only lose hits; neither changes a result. Keys are exact where equality is
-# exact and hashable (scalars, floats by their bits, tuples of these), and
-# fall back to the type alone where it isn't (for example a type with an
-# approximate `__eq__`).
-
-
-def _data_key(data: Any) -> Hashable:
-    """The bucket key of a constant, for the first step of a cache lookup.
-
-    Constants that `_same_constant` treats as the same always get the same key.
-    The key holds the type, since `1`, `1.0` and `True` are different
-    constants even though Python compares them equal. Beyond that:
-
-    - `int`, `bool`, `str`, `bytes` and `None` are keyed by their value, and
-      floats by `float.hex()`, which keeps `0.0` and `-0.0` apart as
-      `_same_constant` does. These keys are exact.
-    - Complex numbers and tuples are keyed part by part, in the same way.
-    - Any other type is keyed by the type alone, because its `==` may be
-      approximate or its values unhashable, so no finer key is safe. All
-      constants of that type share a bucket, and `_same_facts` compares them
-      in the second step.
-    """
-    kind = type(data)
-    if kind in (int, bool, str, bytes, type(None)):
-        return (kind, data)
-    if kind is float:
-        return (kind, data.hex())
-    if kind is complex:
-        return (kind, data.real.hex(), data.imag.hex())
-    if kind is tuple:
-        return (kind, tuple(_data_key(item) for item in data))
-    return (kind,)
-
-
 def _fact_key(fact: Result) -> Hashable:
-    """The bucket key of an argument fact, for the first step of a cache lookup.
+    """The cache key of an argument fact.
 
-    Facts that `_same_facts` treats as the same always get the same key, so
-    that they land in the same bucket:
-
-    - a constant (`Value`) is keyed by `_data_key` of its data;
+    - a constant (`Value`) of type `int`, `bool`, `str`, `bytes`, `None`,
+      `float` or `complex` by its type and value, floats by their bits. The
+      type keeps `1`, `1.0` and `True` apart, and the bits keep `0.0` and
+      `-0.0`, and NaNs of different sign, apart;
+    - any other constant by the identity of its data. Its `==` may call
+      different values equal (a closure's `==` compares its captures with
+      `==`, so captures `1` and `1.0` match), so only the same object is safe;
     - a closure (`PartialLambda`) by the identity of its code, its argument
       names, and the keys of its captured facts, so closures built separately
       from the same code with equal captures share a key;
     - a partial tuple by the keys of its elements;
     - `Unknown` and `Bottom` by their type;
-    - any other fact by its identity, since `_same_facts` compares those by
-      identity too.
+    - any other fact by its identity.
     """
     if isinstance(fact, Value):
-        return (Value, _data_key(fact.data))
+        data, kind = fact.data, type(fact.data)
+        if kind in (int, bool, str, bytes, type(None)):
+            return (Value, kind, data)
+        if kind is float:
+            return (Value, kind, struct.pack("<d", data))
+        if kind is complex:
+            return (Value, kind, struct.pack("<dd", data.real, data.imag))
+        return (Value, id(data))
     if isinstance(fact, PartialLambda):
         return (
             PartialLambda,
@@ -98,39 +56,12 @@ def _fact_key(fact: Result) -> Hashable:
     return (type(fact), id(fact))
 
 
-def _same_facts(lhs: Result, rhs: Result) -> bool:
-    """Whether one argument fact can stand in for the other in a call.
-
-    Constants are compared as the lattice compares them (`_same_constant`),
-    closures and partial tuples element by element, other facts by identity.
-    """
-    if lhs is rhs:
-        return True
-    if type(lhs) is not type(rhs):
-        return False
-    if isinstance(lhs, Value) and isinstance(rhs, Value):
-        return _same_constant(lhs.data, rhs.data)
-    if isinstance(lhs, PartialLambda) and isinstance(rhs, PartialLambda):
-        return (
-            lhs.code is rhs.code
-            and lhs.argnames == rhs.argnames
-            and len(lhs.captured) == len(rhs.captured)
-            and all(map(_same_facts, lhs.captured, rhs.captured))
-        )
-    if isinstance(lhs, PartialTuple) and isinstance(rhs, PartialTuple):
-        return len(lhs.data) == len(rhs.data) and all(
-            map(_same_facts, lhs.data, rhs.data)
-        )
-    return isinstance(lhs, (Unknown, Bottom))
-
-
 @dataclass(frozen=True)
 class _CallSummary:
     """What an analyzed call returned and left in its frame."""
 
     arguments: tuple[Result, ...]
-    """The call's argument facts, compared with `_same_facts` on lookup. Kept
-    alive so that the ids in the call's key cannot be reused."""
+    """Kept alive so that the ids in the call's key cannot be reused."""
     result: Result
     entries: tuple[tuple[ir.SSAValue, Result], ...]
     should_be_pure: frozenset[ir.Statement]
@@ -165,12 +96,13 @@ class Propagate(ForwardExtra[Frame, Result]):
 
     With `cache_calls` set, within one run, a call with the same callee and the
     same argument facts as a call already analyzed reuses that call's result
-    and frame instead of analyzing the callee again. Argument facts are the
-    same when the lattice can't tell them apart: constants by
-    `_same_constant`, closures by code and captured facts, partial tuples
-    element by element. A run starts whenever a frame is created without a
-    caller; the IR may change between runs, so nothing is reused across them.
-    Calls cut off at the depth limit are analyzed every time.
+    and frame instead of analyzing the callee again. Scalar constants are the
+    same when their type and value (for floats, their bits) are, other
+    constants when they are the same object, closures when their code and
+    captured facts are, partial tuples when their elements are. A run starts
+    whenever a frame is created without a caller; the IR may change between
+    runs, so nothing is reused across them. Calls cut off at the depth limit
+    are analyzed every time.
     """
 
     keys = ("constprop",)
@@ -182,7 +114,7 @@ class Propagate(ForwardExtra[Frame, Result]):
     hands out the same facts where the callee would have produced fresh ones."""
 
     _interp: interp.Interpreter = field(init=False)
-    _call_summaries: dict[Hashable, list[_CallSummary]] = field(
+    _call_summaries: dict[Hashable, _CallSummary] = field(
         default_factory=dict, init=False, repr=False
     )
     _cutoffs: int = field(default=0, init=False, repr=False)
@@ -219,24 +151,20 @@ class Propagate(ForwardExtra[Frame, Result]):
             tuple(kwargs),
             tuple(map(_fact_key, facts)),
         )
-        summaries = self._call_summaries.setdefault(key, [])
-        for summary in summaries:
-            if all(map(_same_facts, facts, summary.arguments)):
-                return summary.frame(node), summary.result
+        if (summary := self._call_summaries.get(key)) is not None:
+            return summary.frame(node), summary.result
 
         cutoffs = self._cutoffs
         frame, result = ForwardExtra.call(self, node, *args, **kwargs)
         # Skip caching if the call hit the recursion limit: its result depends
         # on the call stack.
         if self._cutoffs == cutoffs:
-            summaries.append(
-                _CallSummary(
-                    facts,
-                    result,
-                    tuple(frame.entries.items()),
-                    frozenset(frame.should_be_pure),
-                    frame.frame_is_not_pure,
-                )
+            self._call_summaries[key] = _CallSummary(
+                facts,
+                result,
+                tuple(frame.entries.items()),
+                frozenset(frame.should_be_pure),
+                frame.frame_is_not_pure,
             )
         return frame, result
 
