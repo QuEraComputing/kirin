@@ -30,6 +30,22 @@
 //!   O(n). Statements inserted later are not visited; statements erased
 //!   later are skipped.
 //!
+//! # Steering a walk
+//!
+//! [`WalkOrder::walk`] and [`WalkOrder::walk_mut`] call a visit function at
+//! each statement and act on the [`WalkResult`] it returns:
+//!
+//! - [`WalkResult::Advance`] goes on to the next statement.
+//! - [`WalkResult::Skip`] goes on without walking the statements nested in
+//!   this one, through [`WalkCursor::skip`]. [`PreOrder`] steps past them and
+//!   [`BFS`] never queues them. The other orders have already visited them,
+//!   so there it is the same as `Advance`.
+//! - [`WalkResult::Interrupt`] ends the walk, which reports
+//!   [`WalkStatus::Interrupted`]. Edits already made stay.
+//!
+//! A cursor driven by hand gets the same control: calling
+//! [`WalkCursor::skip`] skips, and no longer calling `next` interrupts.
+//!
 //! # Contract
 //!
 //! While a walk is visiting a statement, edits must not erase it or any of
@@ -47,4 +63,4 @@ mod tree;
 
 pub use breadth_first::{BFS, BFSCursor, BuiltOrderCursor, KeepOrderReverseBFS, ReverseBFS};
 pub use depth_first::{PostOrder, PostOrderCursor, PreOrder, PreOrderCursor};
-pub use order::{WalkCursor, WalkError, WalkOrder};
+pub use order::{WalkCursor, WalkError, WalkOrder, WalkResult, WalkStatus};

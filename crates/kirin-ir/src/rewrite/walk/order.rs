@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Dialect, StageInfo, Statement};
+use crate::{Dialect, Rewriter, StageInfo, Statement};
 
 /// A traversal order over the statements nested under a root statement.
 ///
@@ -27,6 +27,76 @@ pub trait WalkOrder {
         }
         ordered_nodes
     }
+
+    /// Walk the tree under `root`, calling `visit` at each statement and
+    /// steering the walk by what it returns. `visit` cannot edit, so the
+    /// walk cannot fail; for one that edits, use [`walk_mut`](Self::walk_mut).
+    fn walk<L: Dialect>(
+        stage: &StageInfo<L>,
+        root: Statement,
+        mut visit: impl FnMut(&StageInfo<L>, Statement) -> WalkResult,
+    ) -> WalkStatus {
+        let mut cursor = Self::start(stage, root);
+        while let Ok(Some(stmt)) = cursor.next(stage) {
+            if let Some(status) = visit(stage, stmt).steer(&mut cursor) {
+                return status;
+            }
+        }
+        WalkStatus::Completed
+    }
+
+    /// [`walk`](Self::walk) with a `visit` that may edit through `rewriter`,
+    /// within the walk's contract (see the [module docs](super)). Fails if
+    /// `visit` erases the statement it is visiting.
+    fn walk_mut<'r, L: Dialect>(
+        rewriter: &mut Rewriter<'r, L>,
+        root: Statement,
+        mut visit: impl FnMut(&mut Rewriter<'r, L>, Statement) -> WalkResult,
+    ) -> Result<WalkStatus, WalkError> {
+        let mut cursor = Self::start(rewriter.stage(), root);
+        while let Some(stmt) = cursor.next(rewriter.stage())? {
+            if let Some(status) = visit(rewriter, stmt).steer(&mut cursor) {
+                return Ok(status);
+            }
+        }
+        Ok(WalkStatus::Completed)
+    }
+}
+
+/// What a walk does after visiting a statement.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq, Hash)]
+pub enum WalkResult {
+    /// Go on to the next statement.
+    #[default]
+    Advance,
+    /// Go on, without walking the statements nested in this one. See
+    /// [`WalkCursor::skip`] for the orders where this has an effect.
+    Skip,
+    /// End the walk.
+    Interrupt,
+}
+
+impl WalkResult {
+    /// Apply `self` to `cursor`: `Some` to end the walk with that status.
+    fn steer(self, cursor: &mut impl WalkCursor) -> Option<WalkStatus> {
+        match self {
+            WalkResult::Advance => None,
+            WalkResult::Skip => {
+                cursor.skip();
+                None
+            }
+            WalkResult::Interrupt => Some(WalkStatus::Interrupted),
+        }
+    }
+}
+
+/// How a walk ended.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum WalkStatus {
+    /// Every statement of the walk was visited.
+    Completed,
+    /// A visit returned [`WalkResult::Interrupt`].
+    Interrupted,
 }
 
 /// A position in a walk. It holds only statement ids, so the IR can be
@@ -38,6 +108,14 @@ pub trait WalkCursor {
     /// the [module docs](super)). Fails if the statement returned by the
     /// previous call has since been erased.
     fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError>;
+
+    /// Do not walk the statements nested in the statement the previous
+    /// [`next`](Self::next) returned, including any added while visiting it.
+    /// Has no effect before the first step, after the last, or in an order
+    /// that visits a statement after the statements nested in it
+    /// ([`PostOrder`](super::PostOrder), [`ReverseBFS`](super::ReverseBFS),
+    /// [`KeepOrderReverseBFS`](super::KeepOrderReverseBFS)).
+    fn skip(&mut self);
 }
 
 /// A walk whose contract was broken by an edit made during it.

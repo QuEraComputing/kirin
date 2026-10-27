@@ -5,6 +5,7 @@ mod common;
 use common::{BuilderDialect, new_stage};
 use kirin_ir::walk::{
     BFS, KeepOrderReverseBFS, PostOrder, PreOrder, ReverseBFS, WalkCursor, WalkError, WalkOrder,
+    WalkResult, WalkStatus,
 };
 use kirin_ir::*;
 
@@ -401,4 +402,170 @@ fn pre_order_skips_children_and_siblings_erased_while_visiting() {
         }
     }
     assert_eq!(visited, [root, a, b, y]);
+}
+
+/// Walk `O` under `root`, returning `result` when visiting `at` and
+/// `Advance` elsewhere; the statements visited and how the walk ended.
+fn steered<O: WalkOrder>(
+    stage: &StageInfo<BuilderDialect>,
+    root: Statement,
+    at: Statement,
+    result: WalkResult,
+) -> (Vec<Statement>, WalkStatus) {
+    let mut visited = Vec::new();
+    let status = O::walk(stage, root, |_, stmt| {
+        visited.push(stmt);
+        if stmt == at {
+            result
+        } else {
+            WalkResult::Advance
+        }
+    });
+    (visited, status)
+}
+
+/// `steered` for `O`, with `Skip`, checked to complete.
+fn skipping<O: WalkOrder>(t: &Tree, at: Statement) -> Vec<Statement> {
+    let (visited, status) = steered::<O>(&t.stage, t.root, at, WalkResult::Skip);
+    assert_eq!(status, WalkStatus::Completed);
+    visited
+}
+
+#[test]
+fn advancing_everywhere_walks_the_whole_schedule() {
+    let t = tree();
+    let (visited, status) = steered::<PreOrder>(&t.stage, t.root, t.owner, WalkResult::Advance);
+    assert_eq!(visited, PreOrder::schedule(&t.stage, t.root));
+    assert_eq!(status, WalkStatus::Completed);
+}
+
+#[test]
+fn skip_leaves_out_the_subtree_in_pre_order_and_bfs() {
+    let t = tree();
+    assert_eq!(
+        skipping::<PreOrder>(&t, t.owner),
+        [t.root, t.a, t.owner, t.ret]
+    );
+    assert_eq!(skipping::<BFS>(&t, t.owner), [t.root, t.a, t.owner, t.ret]);
+}
+
+#[test]
+fn skip_has_no_effect_in_orders_visiting_children_first() {
+    let t = tree();
+    assert_eq!(
+        skipping::<PostOrder>(&t, t.owner),
+        PostOrder::schedule(&t.stage, t.root)
+    );
+    assert_eq!(
+        skipping::<ReverseBFS>(&t, t.owner),
+        ReverseBFS::schedule(&t.stage, t.root)
+    );
+    assert_eq!(
+        skipping::<KeepOrderReverseBFS>(&t, t.owner),
+        KeepOrderReverseBFS::schedule(&t.stage, t.root)
+    );
+}
+
+#[test]
+fn skipping_a_statement_without_bodies_changes_nothing() {
+    let t = tree();
+    assert_eq!(
+        skipping::<PreOrder>(&t, t.a),
+        PreOrder::schedule(&t.stage, t.root)
+    );
+    assert_eq!(skipping::<BFS>(&t, t.a), BFS::schedule(&t.stage, t.root));
+}
+
+#[test]
+fn skipping_the_root_visits_only_the_root_in_pre_order_and_bfs() {
+    let t = tree();
+    assert_eq!(skipping::<PreOrder>(&t, t.root), [t.root]);
+    assert_eq!(skipping::<BFS>(&t, t.root), [t.root]);
+}
+
+#[test]
+fn skip_in_bfs_leaves_out_only_the_skipped_subtree() {
+    let (stage, [root, a, b, c, _x, y]) = two_owners();
+    let (visited, _) = steered::<BFS>(&stage, root, a, WalkResult::Skip);
+    assert_eq!(visited, [root, a, b, c, y]);
+}
+
+/// `steered` for `O`, interrupting at `t.owner`: the walk ends right after
+/// it, having visited what the full schedule visits up to it.
+fn check_interrupts<O: WalkOrder>(t: &Tree) {
+    let (visited, status) = steered::<O>(&t.stage, t.root, t.owner, WalkResult::Interrupt);
+    assert_eq!(status, WalkStatus::Interrupted);
+    let schedule = O::schedule(&t.stage, t.root);
+    let end = schedule.iter().position(|&stmt| stmt == t.owner).unwrap() + 1;
+    assert_eq!(visited, schedule[..end]);
+}
+
+#[test]
+fn interrupt_ends_the_walk_after_the_visited_statement() {
+    let t = tree();
+    check_interrupts::<PreOrder>(&t);
+    check_interrupts::<PostOrder>(&t);
+    check_interrupts::<BFS>(&t);
+    check_interrupts::<ReverseBFS>(&t);
+    check_interrupts::<KeepOrderReverseBFS>(&t);
+}
+
+/// Walk `O` with `walk_mut`, inserting a statement into `t.owner`'s first
+/// body while visiting it and skipping it; the statements visited.
+fn skip_after_inserting<O: WalkOrder>() -> (Tree, Statement, Vec<Statement>) {
+    let mut t = tree();
+    let (root, owner, then_ret) = (t.root, t.owner, t.then_ret);
+    let mut visited = Vec::new();
+    let mut inserted = None;
+    let status = O::walk_mut(&mut Rewriter::new(&mut t.stage), root, |rewriter, stmt| {
+        visited.push(stmt);
+        if stmt != owner {
+            return WalkResult::Advance;
+        }
+        inserted = Some(
+            rewriter
+                .insert_before(then_ret, BuilderDialect::Nop)
+                .unwrap(),
+        );
+        WalkResult::Skip
+    })
+    .unwrap();
+    assert_eq!(status, WalkStatus::Completed);
+    (t, inserted.unwrap(), visited)
+}
+
+#[test]
+fn skip_leaves_out_children_inserted_while_visiting() {
+    let (t, inserted, visited) = skip_after_inserting::<PreOrder>();
+    assert_eq!(visited, [t.root, t.a, t.owner, t.ret]);
+    assert!(!visited.contains(&inserted));
+    let (t, inserted, visited) = skip_after_inserting::<BFS>();
+    assert_eq!(visited, [t.root, t.a, t.owner, t.ret]);
+    assert!(!visited.contains(&inserted));
+}
+
+#[test]
+fn walk_mut_fails_when_the_visited_statement_is_erased() {
+    let mut t = tree();
+    let (root, a) = (t.root, t.a);
+    let mut rewriter = Rewriter::new(&mut t.stage);
+    let result = PreOrder::walk_mut(&mut rewriter, root, |rewriter, stmt| {
+        if stmt == a {
+            rewriter.erase_statement(a).unwrap();
+        }
+        WalkResult::Advance
+    });
+    assert_eq!(result, Err(WalkError::VisitedErased(a)));
+}
+
+#[test]
+fn skip_before_the_first_step_has_no_effect() {
+    let t = tree();
+    let mut cursor = PreOrder::start(&t.stage, t.root);
+    cursor.skip();
+    let mut visited = Vec::new();
+    while let Some(stmt) = cursor.next(&t.stage).unwrap() {
+        visited.push(stmt);
+    }
+    assert_eq!(visited, PreOrder::schedule(&t.stage, t.root));
 }
