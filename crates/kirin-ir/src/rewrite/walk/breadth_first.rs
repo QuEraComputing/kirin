@@ -49,6 +49,8 @@ pub struct BFSCursor {
     /// The current level's statements that own bodies, collected as they are
     /// visited: the next level's parents.
     next_parents: Vec<Statement>,
+    /// Whether to leave the visited statement out of `next_parents`.
+    skip: bool,
 }
 
 /// A [`ReverseBFS`] or [`KeepOrderReverseBFS`] walk in progress: the order
@@ -75,6 +77,7 @@ impl WalkOrder for BFS {
             parents: Vec::new(),
             parent_index: 0,
             next_parents: Vec::new(),
+            skip: false,
         }
     }
 }
@@ -86,8 +89,9 @@ impl WalkCursor for BFSCursor {
             Position::At(visited) => {
                 check_live(stage, visited)?;
                 // Keep it as a parent for the next level, whose statements
-                // are its children. Statements without bodies have none.
-                if owns_bodies(stage, visited) {
+                // are its children. Statements without bodies have none,
+                // and a skipped statement's are not walked.
+                if !self.skip && owns_bodies(stage, visited) {
                     self.next_parents.push(visited);
                 }
                 // The root is the only statement of its level; every other
@@ -109,7 +113,12 @@ impl WalkCursor for BFSCursor {
             Position::Done => None,
         };
         self.position = next.map_or(Position::Done, Position::At);
+        self.skip = false;
         Ok(next)
+    }
+
+    fn skip(&mut self) {
+        self.skip = matches!(self.position, Position::At(_));
     }
 }
 
@@ -205,6 +214,10 @@ impl WalkCursor for BuiltOrderCursor {
         }
         Ok(None)
     }
+
+    /// Nothing to skip: the order visits a statement after the statements
+    /// nested in it.
+    fn skip(&mut self) {}
 }
 
 /// The statements under `root` in breadth-first order, for [`ReverseBFS`]
