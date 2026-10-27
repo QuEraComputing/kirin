@@ -2762,8 +2762,8 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
 - [x] Replace `petgraph::Graph` with `StableGraph` and store one
   `IndexMap<Statement, GraphMember>` beside it. `GraphMember::Node(NodeIndex)`
   and `GraphMember::Edge` give every member, node or edge statement, O(1)
-  lookup, insert, and removal (`swap_remove`; see the ordering paragraph
-  below). The map and petgraph are two halves of one derived mirror; membership
+  lookup and insert, and order-preserving removal (`shift_remove`; see the
+  ordering paragraph below). The map and petgraph are two halves of one derived mirror; membership
   remains authoritative in `StatementInfo::parent`. `UnGraphExtra` becomes
   empty once its separate edge-statement list moves into this map; generic
   `GraphInfo<L, D, Extra>` remains unified and DiGraph never constructs the
@@ -2794,11 +2794,12 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   `DiGraph`s. Declarative rule construction checks this once from op kinds.
 
 Graph bodies print in statement id order, not a canonical graph order. The
-member map does not keep that order itself: removal uses
-`IndexMap::swap_remove`, which moves the last member into the hole in O(1).
-Since id order is derivable, the printer sorts members by statement id
-(`GraphInfo::members_by_id`), so an erase changes only the erased line of the
-output. An `UnGraph` edge statement may print after a node that reads it; the
+member map keeps that order itself: finalize installs it in id order, inserts
+append newly allocated (highest-id) statements, and removal uses
+`IndexMap::shift_remove`, which keeps the other members in order at O(members)
+per removal. Member order therefore carries no meaning but is deterministic,
+is the same order walks and printing use, and an erase changes only the erased
+line of the output. An `UnGraph` edge statement may print after a node that reads it; the
 parser's relaxed dominance accepts that. Derived verification
 compares member keys as sets and topology edges as normalized multisets over
 statement weights: never compare `NodeIndex`, preserve parallel-edge
