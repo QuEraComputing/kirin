@@ -13,3 +13,20 @@ def test_push_one_element():
     assert push_one(ilist.IList([1, 2, 3], elem=types.Int)) == ilist.IList(
         [1, 2, 3, 4], elem=types.Int
     )
+
+
+def test_push_onto_list_of_any():
+    @basic(typeinfer=True)
+    def push_one(xs: ilist.IList[types.Any, types.Any]):
+        return ilist.Push(xs, 4)
+
+    push_one.verify_type()
+    assert push_one.return_type == ilist.IListType[types.Any, types.Any]
+
+
+def test_push_wrong_element_type():
+    @basic(typeinfer=True)
+    def push_one(xs: ilist.IList[int, types.Any]):
+        return ilist.Push(xs, 4.0)
+
+    assert push_one.return_type == types.Bottom
