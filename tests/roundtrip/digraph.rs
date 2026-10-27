@@ -81,6 +81,23 @@ fn test_projected_digraph_parse_and_render() {
     assert!(rendered.contains("yield %r"), "rendered: {}", rendered);
 }
 
+/// Abbreviating keeps the projected ports and captures, and collapses only
+/// the `{0:body}` projection.
+#[test]
+fn test_projected_digraph_abbreviated() {
+    let input = "%out = projected_func (%p0: f64) captures () { %c = constant 1; %r = add %p0, %c; yield %r; }";
+    let (stage, stmt) = roundtrip::emit_statement::<ProjectedDigraphLanguage>(input, &[]);
+    let doc = Document::new(Default::default(), &stage);
+    let mut rendered = String::new();
+    doc.print_statement_abbreviated(&stmt)
+        .render_fmt(80, &mut rendered)
+        .unwrap();
+    assert_eq!(
+        rendered,
+        "%out = projected_func (%p0: f64) captures (){ ... }"
+    );
+}
+
 #[test]
 fn test_projected_digraph_roundtrip_stability() {
     let input = "%out = projected_func (%p0: f64) captures () { %r = add %p0, %p0; yield %r; }";

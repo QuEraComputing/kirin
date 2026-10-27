@@ -302,18 +302,18 @@ wildcard.pattern @double_neg block ^double_neg_pat {
     );
 }
 
-/// The printed rule shows a root without results by its position in the
-/// pattern body.
+/// The printed rule shows a root without results quoted, followed by its
+/// position in the pattern body.
 #[test]
-fn rewrite_rule_prints_a_root_without_results_by_its_position() {
+fn rewrite_rule_prints_a_root_without_results_quoted_with_its_position() {
     let (stage, pattern) = build(drop_effect_of_neg);
     let expected = r#"
 wildcard.pattern @drop_effect_of_neg block ^drop_effect_of_neg_pat {
   %x = wildcard.hole -> i64;
   %n = neg %x -> i64;
   effect %n;
-  wildcard.rewrite #2 block ^drop_effect_of_neg_rw {
-    wildcard.erase #2;
+  wildcard.rewrite 'effect %n' (#2) block ^drop_effect_of_neg_rw {
+    wildcard.erase 'effect %n' (#2);
   };
 }
 "#;
@@ -334,7 +334,7 @@ wildcard.pattern @exit_double_neg block ^exit_double_neg_pat {
   %a = neg %x -> i64;
   %r = neg %a -> i64;
   exit %r;
-  wildcard.rewrite #3 block ^exit_double_neg_rw {
+  wildcard.rewrite 'exit %r' (#3) block ^exit_double_neg_rw {
     wildcard.replace %r with %x;
   };
 }

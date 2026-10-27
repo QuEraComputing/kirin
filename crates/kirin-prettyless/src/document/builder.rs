@@ -30,6 +30,9 @@ pub struct Document<'a, L: Dialect> {
     /// need to set the function name context before delegating to the dialect's
     /// `PrettyPrint` impl.
     pub(super) function_name: Cell<Option<GlobalSymbol>>,
+    /// Whether body printers collapse each nested body to a placeholder,
+    /// set while [`Document::print_statement_abbreviated`] runs.
+    pub(super) abbreviate_bodies: Cell<bool>,
 }
 
 impl<'a, L: Dialect> Document<'a, L> {
@@ -46,6 +49,7 @@ impl<'a, L: Dialect> Document<'a, L> {
             stage,
             global_symbols: None,
             function_name: Cell::new(None),
+            abbreviate_bodies: Cell::new(false),
         }
     }
 
@@ -65,6 +69,7 @@ impl<'a, L: Dialect> Document<'a, L> {
             stage,
             global_symbols: Some(global_symbols),
             function_name: Cell::new(None),
+            abbreviate_bodies: Cell::new(false),
         }
     }
 

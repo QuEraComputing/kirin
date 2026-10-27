@@ -43,9 +43,24 @@
 //!
 //! `rewrite` and `erase` hold an [`OpRef`], the `Statement` id of the op
 //! they act on, so they can name an op without results. It prints as the
-//! op's first result, or as the op's position in the pattern body (`#2`) for
-//! an op without results. Patterns are never rewritten, so the ids stay
-//! valid.
+//! op's first result, or for an op without results as the quoted op, with
+//! nested bodies collapsed to `{...}`, followed by its position in the
+//! pattern body (`'effect %n' (#2)`). Patterns are never rewritten, so the
+//! ids stay valid.
+//!
+//! For example, this pattern is rooted at an `effect` op, which has no
+//! results, and erases it:
+//!
+//! ```text
+//! wildcard.pattern @drop_effect_of_neg block ^bb {
+//!   %x = wildcard.hole -> i64;
+//!   %n = neg %x -> i64;
+//!   effect %n;
+//!   wildcard.rewrite 'effect %n' (#2) block ^rw {
+//!     wildcard.erase 'effect %n' (#2);
+//!   };
+//! }
+//! ```
 //!
 //! This crate only defines the pattern data. It does not match patterns or
 //! mutate concrete IR; those responsibilities belong to `kirin-rewrite` and

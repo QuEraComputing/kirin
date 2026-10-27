@@ -13,9 +13,11 @@ impl From<Statement> for OpRef {
     }
 }
 
-/// The printer shows the op's first result, as in `wildcard.erase %r`, or for
-/// an op without results its 0-based position in the pattern body, as in
-/// `wildcard.erase #2`.
+/// The printer shows the op's first result, as in `wildcard.erase %r`. An op
+/// without results prints quoted, followed by its 0-based position in the
+/// pattern body to tell identical ops apart, as in
+/// `wildcard.erase 'effect %n' (#2)`. The quote collapses the op's nested
+/// bodies to `{...}` (see [`Document::print_statement_abbreviated`]).
 impl PrettyPrint for OpRef {
     fn namespaced_pretty_print<'a, L: Dialect + PrettyPrint>(
         &self,
@@ -31,7 +33,9 @@ impl PrettyPrint for OpRef {
             None => {
                 let position =
                     std::iter::successors(*self.0.prev(stage), |stmt| *stmt.prev(stage)).count();
-                doc.text(format!("#{position}"))
+                doc.text("'")
+                    + doc.print_statement_abbreviated(&self.0)
+                    + doc.text(format!("' (#{position})"))
             }
         }
     }
