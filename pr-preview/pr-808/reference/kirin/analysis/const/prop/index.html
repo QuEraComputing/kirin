@@ -155,7 +155,7 @@
                   return '';
                 }
               });
-            </script> <p>Forward dataflow analysis for constant propagation.</p> <p>This analysis is a forward dataflow analysis that propagates constant values through the program. It uses the <code>Result</code> lattice to track the constant values and purity of the values.</p> <p>The analysis is implemented as a forward dataflow analysis, where the <code>eval_stmt</code> method is overridden to handle the different types of statements in the IR. The analysis uses the <code>interp.Interpreter</code> to evaluate the statements and propagate the constant values.</p> <p>When a statement is registered under the "constprop" key in the method table, the analysis will call the method to evaluate the statement instead of using the interpreter. This allows for custom handling of statements.</p> <p>With <code>cache_calls</code> set, within one run, a call with the same callee and the same argument facts as a call already analyzed reuses that call's result and frame instead of analyzing the callee again. Argument facts are the same when the lattice can't tell them apart: constants by <code>_same_constant</code>, closures by code and captured facts, partial tuples element by element. A run starts whenever a frame is created without a caller; the IR may change between runs, so nothing is reused across them. Calls cut off at the depth limit are analyzed every time.</p> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h3 id=kirin.analysis.const.prop.Propagate.cache_calls class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">cache_calls</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>cache_calls</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=n>field</span><span class=p>(</span><span class=n>default</span><span class=o>=</span><span class=kc>False</span><span class=p>,</span> <span class=n>kw_only</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
+            </script> <p>Forward dataflow analysis for constant propagation.</p> <p>This analysis is a forward dataflow analysis that propagates constant values through the program. It uses the <code>Result</code> lattice to track the constant values and purity of the values.</p> <p>The analysis is implemented as a forward dataflow analysis, where the <code>eval_stmt</code> method is overridden to handle the different types of statements in the IR. The analysis uses the <code>interp.Interpreter</code> to evaluate the statements and propagate the constant values.</p> <p>When a statement is registered under the "constprop" key in the method table, the analysis will call the method to evaluate the statement instead of using the interpreter. This allows for custom handling of statements.</p> <p>With <code>cache_calls</code> set, within one run, a call with the same callee and the same argument facts as a call already analyzed reuses that call's result and frame instead of analyzing the callee again. Scalar constants are the same when their type and value (for floats, their bits) are, other constants when they are the same object, closures when their code and captured facts are, partial tuples when their elements are. A run starts whenever a frame is created without a caller; the IR may change between runs, so nothing is reused across them. Calls cut off at the depth limit are analyzed every time.</p> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h3 id=kirin.analysis.const.prop.Propagate.cache_calls class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">cache_calls</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>cache_calls</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=n>field</span><span class=p>(</span><span class=n>default</span><span class=o>=</span><span class=kc>False</span><span class=p>,</span> <span class=n>kw_only</span><span class=o>=</span><span class=kc>True</span><span class=p>)</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Whether identical calls within a run reuse one analysis. Off unless asked for: a reused call skips the method tables that would have run for it, and hands out the same facts where the callee would have produced fresh ones.</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.analysis.const.prop.Propagate.keys class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">keys</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>keys</span> <span class=o>=</span> <span class=p>(</span><span class=s1>&#39;constprop&#39;</span><span class=p>,)</span>
 </code></pre></div> <div class="doc doc-contents "> <p>The name of the interpreter to select from dialects by order. First matching key will be used.</p> </div> </div> <div class="doc doc-object doc-attribute"> <h3 id=kirin.analysis.const.prop.Propagate.lattice class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">lattice</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>lattice</span> <span class=o>=</span> <span class=n>Result</span>
 </code></pre></div> <div class="doc doc-contents "> <p>lattice type for the abstract interpreter.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.prop.Propagate.call class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">call</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>call</span><span class=p>(</span>
@@ -163,9 +163,85 @@
     <span class=o>*</span><span class=n>args</span><span class=p>:</span> <span class=n>Result</span><span class=p>,</span>
     <span class=o>**</span><span class=n>kwargs</span><span class=p>:</span> <span class=n>Result</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Frame</span><span class=p>,</span> <span class=n>Result</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Call <code>node</code>, and solve a call that reaches itself as a fixpoint.</p> <p>A call of a callable node with the arguments of a call that is still on the stack returns the result assumed for that call, at first bottom. The outer call then runs again with its own result joined in, until the result stays within the assumption, which is then the result. A result that keeps growing, such as a tuple that nests deeper at every round, is assumed to be top after <code>recursion_rounds</code> rounds. This bounds the stack by the number of distinct calls.</p> <p>The recursive call also takes its frame facts, such as purity, from the previous round of the outer call. The outer call runs again until <code>recursive_frame_settled</code> accepts these facts.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>205</span>
-<span class=normal>206</span>
-<span class=normal>207</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Call <code>node</code>, and solve a call that reaches itself as a fixpoint.</p> <p>A call of a callable node with the arguments of a call that is still on the stack returns the result assumed for that call, at first bottom. The outer call then runs again with its own result joined in, until the result stays within the assumption, which is then the result. A result that keeps growing, such as a tuple that nests deeper at every round, is assumed to be top after <code>recursion_rounds</code> rounds. This bounds the stack by the number of distinct calls.</p> <p>The recursive call also takes its frame facts, such as purity, from the previous round of the outer call. The outer call runs again until <code>recursive_frame_settled</code> accepts these facts.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>137</span>
+<span class=normal>138</span>
+<span class=normal>139</span>
+<span class=normal>140</span>
+<span class=normal>141</span>
+<span class=normal>142</span>
+<span class=normal>143</span>
+<span class=normal>144</span>
+<span class=normal>145</span>
+<span class=normal>146</span>
+<span class=normal>147</span>
+<span class=normal>148</span>
+<span class=normal>149</span>
+<span class=normal>150</span>
+<span class=normal>151</span>
+<span class=normal>152</span>
+<span class=normal>153</span>
+<span class=normal>154</span>
+<span class=normal>155</span>
+<span class=normal>156</span>
+<span class=normal>157</span>
+<span class=normal>158</span>
+<span class=normal>159</span>
+<span class=normal>160</span>
+<span class=normal>161</span>
+<span class=normal>162</span>
+<span class=normal>163</span>
+<span class=normal>164</span>
+<span class=normal>165</span>
+<span class=normal>166</span>
+<span class=normal>167</span>
+<span class=normal>168</span>
+<span class=normal>169</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>call</span><span class=p>(</span>
+    <span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span> <span class=o>|</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>:</span> <span class=n>Result</span><span class=p>,</span> <span class=o>**</span><span class=n>kwargs</span><span class=p>:</span> <span class=n>Result</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Frame</span><span class=p>,</span> <span class=n>Result</span><span class=p>]:</span>
+    <span class=c1># `ForwardExtra.call(self, ...)` rather than `super().call(...)`: CPython</span>
+    <span class=c1># gives a starred call to a bound method its own C frame, which would</span>
+    <span class=c1># lower the recursion depth that analyses survive.</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=bp>self</span><span class=o>.</span><span class=n>cache_calls</span> <span class=ow>or</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>)</span> <span class=ow>or</span> <span class=ow>not</span> <span class=bp>self</span><span class=o>.</span><span class=n>state</span><span class=o>.</span><span class=n>depth</span><span class=p>:</span>
+        <span class=c1># A `Method` comes back as its code once its run is set up, and a</span>
+        <span class=c1># call without a caller is a whole run, whose frame its caller reads.</span>
+        <span class=k>return</span> <span class=n>ForwardExtra</span><span class=o>.</span><span class=n>call</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>**</span><span class=n>kwargs</span><span class=p>)</span>
+
+    <span class=n>facts</span> <span class=o>=</span> <span class=p>(</span><span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>*</span><span class=n>kwargs</span><span class=o>.</span><span class=n>values</span><span class=p>())</span>
+    <span class=n>key</span> <span class=o>=</span> <span class=p>(</span>
+        <span class=n>node</span><span class=p>,</span>
+        <span class=nb>tuple</span><span class=p>(</span><span class=n>kwargs</span><span class=p>),</span>
+        <span class=nb>tuple</span><span class=p>(</span><span class=nb>map</span><span class=p>(</span><span class=n>_fact_key</span><span class=p>,</span> <span class=n>facts</span><span class=p>)),</span>
+    <span class=p>)</span>
+    <span class=k>if</span> <span class=p>(</span><span class=n>summary</span> <span class=o>:=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_call_summaries</span><span class=o>.</span><span class=n>get</span><span class=p>(</span><span class=n>key</span><span class=p>))</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
+        <span class=k>return</span> <span class=n>summary</span><span class=o>.</span><span class=n>frame</span><span class=p>(</span><span class=n>node</span><span class=p>),</span> <span class=n>summary</span><span class=o>.</span><span class=n>result</span>
+
+    <span class=n>cutoffs</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_cutoffs</span>
+    <span class=n>frame</span><span class=p>,</span> <span class=n>result</span> <span class=o>=</span> <span class=n>ForwardExtra</span><span class=o>.</span><span class=n>call</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>**</span><span class=n>kwargs</span><span class=p>)</span>
+    <span class=c1># Skip caching if the call hit the recursion limit: its result depends</span>
+    <span class=c1># on the call stack.</span>
+    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_cutoffs</span> <span class=o>==</span> <span class=n>cutoffs</span><span class=p>:</span>
+        <span class=bp>self</span><span class=o>.</span><span class=n>_call_summaries</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=n>_CallSummary</span><span class=p>(</span>
+            <span class=n>facts</span><span class=p>,</span>
+            <span class=n>result</span><span class=p>,</span>
+            <span class=nb>tuple</span><span class=p>(</span><span class=n>frame</span><span class=o>.</span><span class=n>entries</span><span class=o>.</span><span class=n>items</span><span class=p>()),</span>
+            <span class=nb>frozenset</span><span class=p>(</span><span class=n>frame</span><span class=o>.</span><span class=n>should_be_pure</span><span class=p>),</span>
+            <span class=n>frame</span><span class=o>.</span><span class=n>frame_is_not_pure</span><span class=p>,</span>
+        <span class=p>)</span>
+    <span class=k>return</span> <span class=n>frame</span><span class=p>,</span> <span class=n>result</span>
+</code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.prop.Propagate.frame_eval class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">frame_eval</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>frame_eval</span><span class=p>(</span>
+    <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>Statement</span>
+<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>Result</span><span class=p>]</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Run a statement within the current frame. This is the entry point of running a statement. It will look up the statement implementation in the dialect registry, or optionally call a fallback implementation.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title=kirin.interp.abc.FrameType>FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>node</code> </td> <td> <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Statement</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span> (<code>kirin.ir.Statement</code>)' href=../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement>Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>StatementResult</code></td> <td> <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">StatementResult</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
+  </span> (<code>kirin.interp.value.StatementResult</code>)' href=../../../interp/value/#kirin.interp.value.StatementResult>StatementResult</a>[<span title=kirin.interp.abc.ValueType>ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of running the statement</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>207</span>
 <span class=normal>208</span>
 <span class=normal>209</span>
 <span class=normal>210</span>
@@ -191,91 +267,7 @@
 <span class=normal>230</span>
 <span class=normal>231</span>
 <span class=normal>232</span>
-<span class=normal>233</span>
-<span class=normal>234</span>
-<span class=normal>235</span>
-<span class=normal>236</span>
-<span class=normal>237</span>
-<span class=normal>238</span>
-<span class=normal>239</span>
-<span class=normal>240</span>
-<span class=normal>241</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>call</span><span class=p>(</span>
-    <span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span> <span class=o>|</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>:</span> <span class=n>Result</span><span class=p>,</span> <span class=o>**</span><span class=n>kwargs</span><span class=p>:</span> <span class=n>Result</span>
-<span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Frame</span><span class=p>,</span> <span class=n>Result</span><span class=p>]:</span>
-    <span class=c1># `ForwardExtra.call(self, ...)` rather than `super().call(...)`: CPython</span>
-    <span class=c1># gives a starred call to a bound method its own C frame, which would</span>
-    <span class=c1># lower the recursion depth that analyses survive.</span>
-    <span class=k>if</span> <span class=ow>not</span> <span class=bp>self</span><span class=o>.</span><span class=n>cache_calls</span> <span class=ow>or</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>)</span> <span class=ow>or</span> <span class=ow>not</span> <span class=bp>self</span><span class=o>.</span><span class=n>state</span><span class=o>.</span><span class=n>depth</span><span class=p>:</span>
-        <span class=c1># A `Method` comes back as its code once its run is set up, and a</span>
-        <span class=c1># call without a caller is a whole run, whose frame its caller reads.</span>
-        <span class=k>return</span> <span class=n>ForwardExtra</span><span class=o>.</span><span class=n>call</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>**</span><span class=n>kwargs</span><span class=p>)</span>
-
-    <span class=n>facts</span> <span class=o>=</span> <span class=p>(</span><span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>*</span><span class=n>kwargs</span><span class=o>.</span><span class=n>values</span><span class=p>())</span>
-    <span class=n>key</span> <span class=o>=</span> <span class=p>(</span>
-        <span class=n>node</span><span class=p>,</span>
-        <span class=nb>tuple</span><span class=p>(</span><span class=n>kwargs</span><span class=p>),</span>
-        <span class=nb>tuple</span><span class=p>(</span><span class=nb>map</span><span class=p>(</span><span class=n>_fact_key</span><span class=p>,</span> <span class=n>facts</span><span class=p>)),</span>
-    <span class=p>)</span>
-    <span class=n>summaries</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_call_summaries</span><span class=o>.</span><span class=n>setdefault</span><span class=p>(</span><span class=n>key</span><span class=p>,</span> <span class=p>[])</span>
-    <span class=k>for</span> <span class=n>summary</span> <span class=ow>in</span> <span class=n>summaries</span><span class=p>:</span>
-        <span class=k>if</span> <span class=nb>all</span><span class=p>(</span><span class=nb>map</span><span class=p>(</span><span class=n>_same_facts</span><span class=p>,</span> <span class=n>facts</span><span class=p>,</span> <span class=n>summary</span><span class=o>.</span><span class=n>arguments</span><span class=p>)):</span>
-            <span class=k>return</span> <span class=n>summary</span><span class=o>.</span><span class=n>frame</span><span class=p>(</span><span class=n>node</span><span class=p>),</span> <span class=n>summary</span><span class=o>.</span><span class=n>result</span>
-
-    <span class=n>cutoffs</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>_cutoffs</span>
-    <span class=n>frame</span><span class=p>,</span> <span class=n>result</span> <span class=o>=</span> <span class=n>ForwardExtra</span><span class=o>.</span><span class=n>call</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>,</span> <span class=o>*</span><span class=n>args</span><span class=p>,</span> <span class=o>**</span><span class=n>kwargs</span><span class=p>)</span>
-    <span class=c1># Skip caching if the call hit the recursion limit: its result depends</span>
-    <span class=c1># on the call stack.</span>
-    <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>_cutoffs</span> <span class=o>==</span> <span class=n>cutoffs</span><span class=p>:</span>
-        <span class=n>summaries</span><span class=o>.</span><span class=n>append</span><span class=p>(</span>
-            <span class=n>_CallSummary</span><span class=p>(</span>
-                <span class=n>facts</span><span class=p>,</span>
-                <span class=n>result</span><span class=p>,</span>
-                <span class=nb>tuple</span><span class=p>(</span><span class=n>frame</span><span class=o>.</span><span class=n>entries</span><span class=o>.</span><span class=n>items</span><span class=p>()),</span>
-                <span class=nb>frozenset</span><span class=p>(</span><span class=n>frame</span><span class=o>.</span><span class=n>should_be_pure</span><span class=p>),</span>
-                <span class=n>frame</span><span class=o>.</span><span class=n>frame_is_not_pure</span><span class=p>,</span>
-            <span class=p>)</span>
-        <span class=p>)</span>
-    <span class=k>return</span> <span class=n>frame</span><span class=p>,</span> <span class=n>result</span>
-</code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.prop.Propagate.frame_eval class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">frame_eval</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>frame_eval</span><span class=p>(</span>
-    <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>Statement</span>
-<span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>Result</span><span class=p>]</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Run a statement within the current frame. This is the entry point of running a statement. It will look up the statement implementation in the dialect registry, or optionally call a fallback implementation.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>frame</code> </td> <td> <code><span title=kirin.interp.abc.FrameType>FrameType</span></code> </td> <td> <div class=doc-md-description> <p>the current frame</p> </div> </td> <td> <em>required</em> </td> </tr> <tr class=doc-section-item> <td> <code>node</code> </td> <td> <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Statement</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span> (<code>kirin.ir.Statement</code>)' href=../../../ir/nodes/stmt/#kirin.ir.nodes.stmt.Statement>Statement</a></code> </td> <td> <div class=doc-md-description> <p>the statement to run</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td><code>StatementResult</code></td> <td> <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code>            <span class="doc doc-object-name doc-attribute-name">StatementResult</span>
-
-
-  <span class="doc doc-labels">
-      <small class="doc doc-label doc-label-module-attribute"><code>module-attribute</code></small>
-  </span> (<code>kirin.interp.value.StatementResult</code>)' href=../../../interp/value/#kirin.interp.value.StatementResult>StatementResult</a>[<span title=kirin.interp.abc.ValueType>ValueType</span>]</code> </td> <td> <div class=doc-md-description> <p>the result of running the statement</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>279</span>
-<span class=normal>280</span>
-<span class=normal>281</span>
-<span class=normal>282</span>
-<span class=normal>283</span>
-<span class=normal>284</span>
-<span class=normal>285</span>
-<span class=normal>286</span>
-<span class=normal>287</span>
-<span class=normal>288</span>
-<span class=normal>289</span>
-<span class=normal>290</span>
-<span class=normal>291</span>
-<span class=normal>292</span>
-<span class=normal>293</span>
-<span class=normal>294</span>
-<span class=normal>295</span>
-<span class=normal>296</span>
-<span class=normal>297</span>
-<span class=normal>298</span>
-<span class=normal>299</span>
-<span class=normal>300</span>
-<span class=normal>301</span>
-<span class=normal>302</span>
-<span class=normal>303</span>
-<span class=normal>304</span>
-<span class=normal>305</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>frame_eval</span><span class=p>(</span>
+<span class=normal>233</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>frame_eval</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>interp</span><span class=o>.</span><span class=n>StatementResult</span><span class=p>[</span><span class=n>Result</span><span class=p>]:</span>
     <span class=n>method</span> <span class=o>=</span> <span class=bp>self</span><span class=o>.</span><span class=n>lookup_registry</span><span class=p>(</span><span class=n>frame</span><span class=p>,</span> <span class=n>node</span><span class=p>)</span>
@@ -305,14 +297,14 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.prop.Propagate.initialize_frame class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">initialize_frame</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>initialize_frame</span><span class=p>(</span>
     <span class=n>node</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span> <span class=o>*</span><span class=p>,</span> <span class=n>has_parent_access</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Frame</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Initialize a new call frame for the given callable node.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>247</span>
-<span class=normal>248</span>
-<span class=normal>249</span>
-<span class=normal>250</span>
-<span class=normal>251</span>
-<span class=normal>252</span>
-<span class=normal>253</span>
-<span class=normal>254</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>initialize_frame</span><span class=p>(</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Initialize a new call frame for the given callable node.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>175</span>
+<span class=normal>176</span>
+<span class=normal>177</span>
+<span class=normal>178</span>
+<span class=normal>179</span>
+<span class=normal>180</span>
+<span class=normal>181</span>
+<span class=normal>182</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>initialize_frame</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span> <span class=o>*</span><span class=p>,</span> <span class=n>has_parent_access</span><span class=p>:</span> <span class=nb>bool</span> <span class=o>=</span> <span class=kc>False</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Frame</span><span class=p>:</span>
     <span class=n>state</span> <span class=o>=</span> <span class=nb>getattr</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=s2>&quot;state&quot;</span><span class=p>,</span> <span class=kc>None</span><span class=p>)</span>  <span class=c1># unset before `initialize`</span>
@@ -321,33 +313,33 @@
         <span class=bp>self</span><span class=o>.</span><span class=n>_call_summaries</span><span class=o>.</span><span class=n>clear</span><span class=p>()</span>
     <span class=k>return</span> <span class=n>Frame</span><span class=p>(</span><span class=n>node</span><span class=p>,</span> <span class=n>has_parent_access</span><span class=o>=</span><span class=n>has_parent_access</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.prop.Propagate.method_self class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">method_self</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>method_self</span><span class=p>(</span><span class=n>method</span><span class=p>:</span> <span class=n>Method</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Return the self value for the given method.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>276</span>
-<span class=normal>277</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>method_self</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>method</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Return the self value for the given method.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>204</span>
+<span class=normal>205</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>method_self</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>method</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
     <span class=k>return</span> <span class=n>Value</span><span class=p>(</span><span class=n>method</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.prop.Propagate.recursion_limit_reached class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">recursion_limit_reached</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>recursion_limit_reached</span><span class=p>()</span> <span class=o>-&gt;</span> <span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Handle the recursion limit reached.</p> <p>This method is called when the maximum depth of the interpreter stack when calling a callable node is reached. By default a <code>StackOverflowError</code> is raised. Overload this method to provide a custom behavior, e.g. in the case of abstract interpreter, the recursion limit returns a bottom value.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>243</span>
-<span class=normal>244</span>
-<span class=normal>245</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>recursion_limit_reached</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Handle the recursion limit reached.</p> <p>This method is called when the maximum depth of the interpreter stack when calling a callable node is reached. By default a <code>StackOverflowError</code> is raised. Overload this method to provide a custom behavior, e.g. in the case of abstract interpreter, the recursion limit returns a bottom value.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>171</span>
+<span class=normal>172</span>
+<span class=normal>173</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>recursion_limit_reached</span><span class=p>(</span><span class=bp>self</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Result</span><span class=p>:</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>_cutoffs</span> <span class=o>+=</span> <span class=mi>1</span>
     <span class=k>return</span> <span class=nb>super</span><span class=p>()</span><span class=o>.</span><span class=n>recursion_limit_reached</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.prop.Propagate.recursive_call_frame class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">recursive_call_frame</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>recursive_call_frame</span><span class=p>(</span>
     <span class=n>node</span><span class=p>:</span> <span class=n>Statement</span><span class=p>,</span> <span class=n>assumed</span><span class=p>:</span> <span class=n>Frame</span> <span class=o>|</span> <span class=kc>None</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Frame</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Return the frame of a recursive call with the purity of <code>assumed</code>.</p> <p>The first round assumes that the recursive call is pure. If the outer call turns out impure, <code>recursive_frame_settled</code> starts another round, and the recursive call becomes impure too. Dead code elimination then keeps a recursive call whose result is unused but whose body has side effects.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>256</span>
-<span class=normal>257</span>
-<span class=normal>258</span>
-<span class=normal>259</span>
-<span class=normal>260</span>
-<span class=normal>261</span>
-<span class=normal>262</span>
-<span class=normal>263</span>
-<span class=normal>264</span>
-<span class=normal>265</span>
-<span class=normal>266</span>
-<span class=normal>267</span>
-<span class=normal>268</span>
-<span class=normal>269</span>
-<span class=normal>270</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>recursive_call_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span> <span class=n>assumed</span><span class=p>:</span> <span class=n>Frame</span> <span class=o>|</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Frame</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Return the frame of a recursive call with the purity of <code>assumed</code>.</p> <p>The first round assumes that the recursive call is pure. If the outer call turns out impure, <code>recursive_frame_settled</code> starts another round, and the recursive call becomes impure too. Dead code elimination then keeps a recursive call whose result is unused but whose body has side effects.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>184</span>
+<span class=normal>185</span>
+<span class=normal>186</span>
+<span class=normal>187</span>
+<span class=normal>188</span>
+<span class=normal>189</span>
+<span class=normal>190</span>
+<span class=normal>191</span>
+<span class=normal>192</span>
+<span class=normal>193</span>
+<span class=normal>194</span>
+<span class=normal>195</span>
+<span class=normal>196</span>
+<span class=normal>197</span>
+<span class=normal>198</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>recursive_call_frame</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Statement</span><span class=p>,</span> <span class=n>assumed</span><span class=p>:</span> <span class=n>Frame</span> <span class=o>|</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Frame</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Return the frame of a recursive call with the purity of `assumed`.</span>
 
 <span class=sd>    The first round assumes that the recursive call is pure. If the outer</span>
@@ -365,9 +357,9 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.analysis.const.prop.Propagate.recursive_frame_settled class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">recursive_frame_settled</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>recursive_frame_settled</span><span class=p>(</span>
     <span class=n>assumed</span><span class=p>:</span> <span class=n>Frame</span> <span class=o>|</span> <span class=kc>None</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Check that a round of a recursive call confirms its assumed frame facts.</p> <p>The recursive call inside the round took its facts from <code>assumed</code>. The outer call of the round produced <code>frame</code>. If the facts in <code>frame</code> differ from the facts in <code>assumed</code>, the outer call runs another round. If an analysis overrides <code>recursive_call_frame</code>, it must override this method as well.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>272</span>
-<span class=normal>273</span>
-<span class=normal>274</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>recursive_frame_settled</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>assumed</span><span class=p>:</span> <span class=n>Frame</span> <span class=o>|</span> <span class=kc>None</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Check that a round of a recursive call confirms its assumed frame facts.</p> <p>The recursive call inside the round took its facts from <code>assumed</code>. The outer call of the round produced <code>frame</code>. If the facts in <code>frame</code> differ from the facts in <code>assumed</code>, the outer call runs another round. If an analysis overrides <code>recursive_call_frame</code>, it must override this method as well.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/analysis/const/prop.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>200</span>
+<span class=normal>201</span>
+<span class=normal>202</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>recursive_frame_settled</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>assumed</span><span class=p>:</span> <span class=n>Frame</span> <span class=o>|</span> <span class=kc>None</span><span class=p>,</span> <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
     <span class=n>assumed_not_pure</span> <span class=o>=</span> <span class=n>assumed</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span> <span class=ow>and</span> <span class=n>assumed</span><span class=o>.</span><span class=n>frame_is_not_pure</span>
     <span class=k>return</span> <span class=n>assumed_not_pure</span> <span class=o>==</span> <span class=n>frame</span><span class=o>.</span><span class=n>frame_is_not_pure</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> </div> </div> </div> </article> </div> <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script> </div> <button type=button class="md-top md-icon" data-md-component=top hidden> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg> Back to top </button> </main> <footer class=md-footer> <nav class="md-footer__inner md-grid" aria-label=Footer> <a href=../lattice/ class="md-footer__link md-footer__link--prev" aria-label="Previous: Lattice"> <div class="md-footer__button md-icon"> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg> </div> <div class=md-footer__title> <span class=md-footer__direction> Previous </span> <div class=md-ellipsis> Lattice </div> </div> </a> <a href=../../../rewrite/ class="md-footer__link md-footer__link--next" aria-label="Next: Index"> <div class=md-footer__title> <span class=md-footer__direction> Next </span> <div class=md-ellipsis> Index </div> </div> <div class="md-footer__button md-icon"> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg> </div> </a> </nav> <div class="md-footer-meta md-typeset"> <div class="md-footer-meta__inner md-grid"> <div class=md-copyright> <div class=md-copyright__highlight> Copyright &copy; 2024 Kirin contributors </div> Made with <a href=https://squidfunk.github.io/mkdocs-material/ target=_blank rel=noopener> Material for MkDocs </a> </div> <div class=md-social> <a href=https://x.com/QueraComputing target=_blank rel=noopener title=x.com class=md-social__link> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z"/></svg> </a> <a href=https://www.linkedin.com/company/quera-computing-inc/ target=_blank rel=noopener title=www.linkedin.com class=md-social__link> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 448 512"><!-- Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3M135.4 416H69V202.2h66.5V416zM102.2 96a38.5 38.5 0 1 1 0 77 38.5 38.5 0 1 1 0-77m282.1 320h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9z"/></svg> </a> </div> </div> </div> </footer> </div> <div class=md-dialog data-md-component=dialog> <div class="md-dialog__inner md-typeset"></div> </div> <script id=__config type=application/json>{"annotate": null, "base": "../../../../..", "features": ["announce.dismiss", "content.action.view", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tooltips", "navigation.indexes", "navigation.sections", "navigation.tabs", "navigation.top", "navigation.tracking", "navigation.footer", "search.highlight", "search.suggest", "toc.follow"], "search": "../../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script> <script src=../../../../../assets/javascripts/bundle.d7400e89.min.js></script> <script src=../../../../../scripts/katex.js></script> <script src=https://unpkg.com/katex@0/dist/katex.min.js></script> <script src=https://unpkg.com/katex@0/dist/contrib/auto-render.min.js></script> </body> </html>
