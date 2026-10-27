@@ -5,6 +5,12 @@
 //! its `DiGraph`s and `UnGraph`s (members in member order). Within a block,
 //! the terminator comes last.
 //!
+//! Siblings follow the IR's own lists: a block's statement list, a `CFG`'s
+//! block layout list, and a `DiGraph`'s or `UnGraph`'s member list.
+//! Terminator successors and graph connectivity are not read, so across
+//! blocks and graph members the order is deterministic but not program
+//! order.
+//!
 //! Each step reads the current links, so it sees every edit made before it.
 
 use crate::{BlockParent, Body, Dialect, GetInfo, StageInfo, Statement, StatementParent};
