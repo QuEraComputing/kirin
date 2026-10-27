@@ -23,7 +23,7 @@ impl RuleCodegen {
     }
 
     /// Reserve the id of `stmt` and create its results in order.
-    /// The `stmt` is needs to be reserve ahead of the results since these
+    /// The `stmt` needs to be reserved ahead of the results since these
     /// must point at the statement defining it before that statement exists.
     ///
     /// Returns the code generating the `stmt` id and the `ResultValue`s,

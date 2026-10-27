@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 
 use proc_macro2::Span;
+use syn::ext::IdentExt;
 
 use super::RuleParser;
 use crate::model::{Binding, StmtId, StmtKind, ValueId};
@@ -21,7 +22,7 @@ impl RuleParser {
     /// hole statement. If it is the first use of the name as a hole, it is
     /// created, added to the body and shared by every later use.
     pub(super) fn resolve_value(&mut self, name: &syn::Ident) -> syn::Result<ValueId> {
-        match self.names.get(&name.to_string()).copied() {
+        match self.names.get(&name.unraw().to_string()).copied() {
             Some(Name::Value(id)) => Ok(id),
             Some(Name::Op(_)) => Err(syn::Error::new_spanned(
                 name,
@@ -29,7 +30,7 @@ impl RuleParser {
             )),
             None => {
                 let id = self.add_hole(Some(name.clone()), name.span());
-                self.names.insert(name.to_string(), Name::Value(id));
+                self.names.insert(name.unraw().to_string(), Name::Value(id));
                 Ok(id)
             }
         }
@@ -53,7 +54,7 @@ impl RuleParser {
             return Err(misuse());
         };
 
-        let op = match self.names.get(&name.to_string()) {
+        let op = match self.names.get(&name.unraw().to_string()) {
             Some(&Name::Op(op)) => op,
             Some(&Name::Value(id)) => self.model.value(id).stmt,
             None => return Err(misuse()),
@@ -100,7 +101,7 @@ impl RuleParser {
             .chain(values.iter().flat_map(|(name, _)| name));
         let mut in_pattern = HashSet::new();
         for name in names {
-            let key = name.to_string();
+            let key = name.unraw().to_string();
 
             // A hole was created at an earlier use of the name, so it cannot
             // be bound now.
@@ -125,11 +126,11 @@ impl RuleParser {
 
         let stmt = self.model.add_statement(span, kind, values);
         if let Some(name) = op_name {
-            self.names.insert(name.to_string(), Name::Op(stmt));
+            self.names.insert(name.unraw().to_string(), Name::Op(stmt));
         }
         for &id in &self.model.statement(stmt).results {
             if let Some(name) = &self.model.value(id).name {
-                self.names.insert(name.to_string(), Name::Value(id));
+                self.names.insert(name.unraw().to_string(), Name::Value(id));
             }
         }
         Ok(stmt)
