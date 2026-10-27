@@ -47,14 +47,14 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         true
     }
 
-    /// Remove node `stmt` together with its incident edges, in O(1) plus its
-    /// degree. The last member takes `stmt`'s place in the member map, so
-    /// member order is not kept. Returns `false` if `stmt` is not a node.
+    /// Remove node `stmt` together with its incident edges, in O(members)
+    /// plus its degree. The other members keep their order. Returns `false`
+    /// if `stmt` is not a node.
     pub(crate) fn remove_node(&mut self, stmt: Statement) -> bool {
         let Some(GraphMember::Node(node)) = self.member(stmt) else {
             return false;
         };
-        self.members.swap_remove(&stmt);
+        self.members.shift_remove(&stmt);
         // A `StableGraph` leaves the other nodes where they are.
         self.graph.remove_node(node);
         true
@@ -122,14 +122,13 @@ impl<L: Dialect> UnGraphInfo<L> {
         true
     }
 
-    /// Remove edge statement `stmt` in O(1). The last member takes its place
-    /// in the member map, so member order is not kept. Returns `false` if
-    /// `stmt` is not an edge statement.
+    /// Remove edge statement `stmt` in O(members). The other members keep
+    /// their order. Returns `false` if `stmt` is not an edge statement.
     pub(crate) fn remove_edge_member(&mut self, stmt: Statement) -> bool {
         if self.member(stmt) != Some(GraphMember::Edge) {
             return false;
         }
-        self.members.swap_remove(&stmt);
+        self.members.shift_remove(&stmt);
         true
     }
 
@@ -261,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn edge_members_have_no_node_and_removal_swaps_in_the_last_member() {
+    fn edge_members_have_no_node_and_removal_keeps_member_order() {
         let mut info = empty_ungraph();
         info.add_node(stmt(0));
         assert!(info.add_edge_member(stmt(1)));
@@ -275,13 +274,13 @@ mod tests {
         assert_eq!(info.edge_statements().collect::<Vec<_>>(), [stmt(1)]);
         assert_eq!(info.nodes().collect::<Vec<_>>(), [stmt(0), stmt(2)]);
 
-        // A node is not an edge member and vice versa. Removing a member is
-        // O(1): the last member takes its place in the map.
+        // A node is not an edge member and vice versa. Removing a member
+        // keeps the others in order.
         assert!(!info.remove_edge_member(stmt(0)));
         assert!(!info.remove_node(stmt(1)));
         assert!(info.remove_node(stmt(0)));
         let members: Vec<_> = info.members().map(|(stmt, _)| stmt).collect();
-        assert_eq!(members, [stmt(2), stmt(1)]);
+        assert_eq!(members, [stmt(1), stmt(2)]);
         assert_eq!(info.graph()[info.node_idx_of(stmt(2)).unwrap()], stmt(2));
         assert!(info.remove_edge_member(stmt(1)));
         assert_eq!(info.members().count(), 1);

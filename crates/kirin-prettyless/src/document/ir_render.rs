@@ -426,7 +426,7 @@ where
 
         let mut inner = self.nil();
         let mut first = true;
-        for (stmt, _) in info.members_by_id() {
+        for (stmt, _) in info.members() {
             if !first {
                 inner += self.line_();
             }
@@ -452,7 +452,7 @@ where
 
         let mut inner = self.nil();
         let mut first = true;
-        for (stmt, member) in info.members_by_id() {
+        for (stmt, member) in info.members() {
             if !first {
                 inner += self.line_();
             }
