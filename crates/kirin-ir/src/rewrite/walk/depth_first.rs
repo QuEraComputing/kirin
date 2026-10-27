@@ -18,6 +18,8 @@ pub struct PostOrder;
 pub struct PreOrderCursor {
     root: Statement,
     position: Position,
+    /// Whether to step past the visited statement's children.
+    skip: bool,
 }
 
 /// A [`PostOrder`] walk in progress.
@@ -34,6 +36,7 @@ impl WalkOrder for PreOrder {
         PreOrderCursor {
             root,
             position: Position::Start,
+            skip: false,
         }
     }
 }
@@ -56,13 +59,23 @@ impl WalkCursor for PreOrderCursor {
             Position::At(visited) => {
                 check_live(stage, visited)?;
                 // The children are read now, so edits made while visiting
-                // `visited` are walked.
-                first_child(stage, visited).or_else(|| after_subtree(stage, self.root, visited))
+                // `visited` are walked, unless they are skipped.
+                let child = if self.skip {
+                    None
+                } else {
+                    first_child(stage, visited)
+                };
+                child.or_else(|| after_subtree(stage, self.root, visited))
             }
             Position::Done => None,
         };
         self.position = next.map_or(Position::Done, Position::At);
+        self.skip = false;
         Ok(next)
+    }
+
+    fn skip(&mut self) {
+        self.skip = matches!(self.position, Position::At(_));
     }
 }
 
@@ -85,6 +98,9 @@ impl WalkCursor for PostOrderCursor {
         self.position = next.map_or(Position::Done, Position::At);
         Ok(next)
     }
+
+    /// Nothing to skip: the children were visited before the statement.
+    fn skip(&mut self) {}
 }
 
 /// `stmt` if it is live.
