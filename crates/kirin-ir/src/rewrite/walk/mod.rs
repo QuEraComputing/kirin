@@ -8,10 +8,9 @@
 //! Only a block's statement order is program order. A `CFG`'s layout order
 //! and a `DiGraph`'s or `UnGraph`'s member order carry no meaning (control
 //! flow is in the terminators, connectivity in the graph's edges), so the
-//! walks use them only as a deterministic order. Member order is insertion
-//! order, and erasing a member can reorder the others. Rewrites whose
-//! result depends on visit order therefore depend on these orders across
-//! blocks and graph members.
+//! walks use them only as a deterministic order. Member order is statement
+//! id order. Rewrites whose result depends on visit order therefore depend
+//! on these orders across blocks and graph members.
 //!
 //! A walk is a [`WalkCursor`] stepped one statement at a time, so the IR can
 //! be edited at each statement before the walk moves on:
