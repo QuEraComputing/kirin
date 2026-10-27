@@ -1,6 +1,7 @@
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
+from kirin.ir.exception import ValidationError
 from kirin.ir.nodes.stmt import Statement
 
 from .abc import StmtTrait
@@ -74,7 +75,26 @@ class NoTerminator(StmtTrait):
 
 @dataclass(frozen=True)
 class IsolatedFromAbove(StmtTrait):
-    pass
+    """Require that the regions of a statement use only values that the
+    regions define themselves.
+
+    A value belongs to the regions if a block inside them owns it as an
+    argument, or if a statement inside them returns it as a result. Nested
+    regions count as inside. A statement with this trait must pass every
+    outside value into its regions through its own operands or attributes.
+    """
+
+    def verify(self, node: Statement):
+        for stmt in node.walk(include_self=False):
+            for arg in stmt.args:
+                # The result of `node` itself lives outside of its regions.
+                if arg.owner is node or not node.is_ancestor(arg.owner):
+                    raise ValidationError(
+                        stmt,
+                        f"Statement {stmt.name} uses a value that the "
+                        f"regions of {node.name} do not define, but "
+                        f"{node.name} has the IsolatedFromAbove trait",
+                    )
 
 
 @dataclass(frozen=True)
