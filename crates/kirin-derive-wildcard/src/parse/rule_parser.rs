@@ -63,15 +63,9 @@ impl RuleParser {
         &self.model
     }
 
+    /// Generic parameters and a where clause are kept on the generated
+    /// function, so a rule can be built for any language its bounds admit.
     pub(super) fn check_signature(sig: &syn::Signature) -> syn::Result<()> {
-        // TODO: decide what type parameters mean.
-        // They are ignored for now but could be used for matching type holes.
-        if !sig.generics.params.is_empty() {
-            return Err(syn::Error::new_spanned(
-                &sig.generics,
-                "`#[rewrite_rule]` functions cannot have generic parameters",
-            ));
-        }
         if sig.asyncness.is_some() {
             return Err(syn::Error::new_spanned(
                 sig.asyncness,
@@ -107,12 +101,6 @@ impl RuleParser {
             return Err(syn::Error::new_spanned(
                 &sig.output,
                 "`#[rewrite_rule]` functions cannot have a return type",
-            ));
-        }
-        if let Some(where_clause) = &sig.generics.where_clause {
-            return Err(syn::Error::new_spanned(
-                where_clause,
-                "`#[rewrite_rule]` functions cannot have a where clause",
             ));
         }
         Ok(())

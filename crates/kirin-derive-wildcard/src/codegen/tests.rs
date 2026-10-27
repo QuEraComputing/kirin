@@ -66,6 +66,57 @@ fn signature_takes_the_stage_and_returns_the_pattern() {
     assert_eq!(codegen.signature().to_string(), expected.to_string());
 }
 
+/// A generic rule keeps its parameters and where clause, which gains the
+/// bounds the body needs of any language.
+#[test]
+fn signature_keeps_generics_and_bounds_the_language() {
+    let item: syn::ItemFn = parse_quote!(
+        fn add_zero<L>()
+        where
+            L: From<Arith<L::Type>>,
+        {
+            let r = op![Arith::add(x, y)];
+            replace!(r, x)
+        }
+    );
+    let codegen = RuleCodegen::new(RuleParser::parse(&item).unwrap(), item, args());
+    let expected = quote! {
+        fn add_zero<L>(
+            stage: &mut impl ::kirin_wildcard::__private::ir::AsBuildStage<::kirin_wildcard::PatternLanguage<L>>,
+        ) -> ::kirin_wildcard::__private::ir::Statement
+        where
+            // Spaced as `syn` prints the original bound.
+            L: From<Arith<L::Type> >,
+            L: ::kirin_wildcard::__private::ir::Dialect,
+            <L as ::kirin_wildcard::__private::ir::Dialect>::Type: ::kirin_wildcard::__private::ir::Placeholder
+    };
+    assert_eq!(codegen.signature().to_string(), expected.to_string());
+}
+
+/// A rule generic over something else than its language still gets the
+/// language's bounds, which then hold trivially.
+#[test]
+fn signature_adds_the_bounds_without_a_where_clause() {
+    let item: syn::ItemFn = parse_quote!(
+        fn add_zero<V: Clone>() {
+            let r = op![Arith::add(x, y)];
+            replace!(r, x)
+        }
+    );
+    let codegen = RuleCodegen::new(RuleParser::parse(&item).unwrap(), item, args());
+    let signature = codegen.signature().to_string();
+    let bounds = quote! {
+        where
+            L: ::kirin_wildcard::__private::ir::Dialect,
+            <L as ::kirin_wildcard::__private::ir::Dialect>::Type: ::kirin_wildcard::__private::ir::Placeholder
+    };
+    assert!(
+        signature.contains(&quote!(fn add_zero<V: Clone>).to_string()),
+        "{signature}"
+    );
+    assert!(signature.ends_with(&bounds.to_string()), "{signature}");
+}
+
 // --- value_ident ---
 
 #[test]
@@ -163,13 +214,13 @@ fn hole_builds_an_operand_in_the_stage() {
         let value_x: ::kirin_wildcard::__private::ir::ResultValue = stage
             .ssa()
             .name("x")
-            .ty(<__Type as ::kirin_wildcard::__private::ir::Placeholder>::placeholder())
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
             .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(#statement, 0usize))
             .new()
             .into();
         stage
             .statement()
-            .definition(::kirin_wildcard::Hole::<__Type>::new_hole(value_x))
+            .definition(::kirin_wildcard::Hole::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new_hole(value_x))
             .new();
     };
     assert_eq!(codegen.hole(hole).to_string(), expected.to_string());
@@ -292,7 +343,7 @@ fn native_compute_builds_a_named_native_call() {
         #results
         stage
             .statement()
-            .definition(::kirin_wildcard::NativeCall::<__Type>::new_native_call(
+            .definition(::kirin_wildcard::NativeCall::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new_native_call(
                 ::std::string::String::from("math::divmod"),
                 ::std::vec![
                     <::kirin_wildcard::__private::ir::SSAValue>::from(value_x),
@@ -338,7 +389,7 @@ fn constraint_replace_and_erase_use_their_builders() {
         codegen.value_ident(success),
     );
     let expected = quote! {
-        let #constraint_id = ::kirin_wildcard::Constraint::<__Type>::new(stage, #success_id).id;
+        let #constraint_id = ::kirin_wildcard::Constraint::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(stage, #success_id).id;
     };
     assert_eq!(
         codegen.constraint(constraint, success).to_string(),
@@ -361,7 +412,7 @@ fn constraint_replace_and_erase_use_their_builders() {
     };
     let replace_id = codegen.statement_ident(replace);
     let expected = quote! {
-        let #replace_id = ::kirin_wildcard::Replace::<__Type>::new(stage, value_r, value_x).id;
+        let #replace_id = ::kirin_wildcard::Replace::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(stage, value_r, value_x).id;
     };
     assert_eq!(
         codegen
@@ -376,7 +427,7 @@ fn constraint_replace_and_erase_use_their_builders() {
     };
     let (erase_id, op_id) = (codegen.statement_ident(erase), codegen.statement_ident(op));
     let expected = quote! {
-        let #erase_id = ::kirin_wildcard::Erase::<__Type>::new(stage, #op_id).id;
+        let #erase_id = ::kirin_wildcard::Erase::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(stage, #op_id).id;
     };
     assert_eq!(codegen.erase(erase, op).to_string(), expected.to_string());
 }
@@ -409,7 +460,7 @@ fn rewrite_builds_its_body_block_then_the_rewrite() {
     let expected = quote! {
         #(#actions)*
         let rewrite_body = stage.block().name("add_zero_rw")#(.stmt(#action_ids))*.new();
-        let #rewrite_id = ::kirin_wildcard::Rewrite::<__Type>::new(stage, #root_id, rewrite_body).id;
+        let #rewrite_id = ::kirin_wildcard::Rewrite::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(stage, #root_id, rewrite_body).id;
     };
     assert_eq!(
         codegen.rewrite(rewrite, *root, body).to_string(),
@@ -449,7 +500,7 @@ fn pattern_builds_its_body_with_the_rewrite_as_terminator() {
         let pattern_name = stage
             .symbol_table_mut()
             .intern(::std::string::String::from("add_zero"));
-        ::kirin_wildcard::Pattern::<__Type>::new(stage, pattern_name, pattern_body).id
+        ::kirin_wildcard::Pattern::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(stage, pattern_name, pattern_body).id
     }};
     assert_eq!(codegen.pattern().to_string(), expected.to_string());
 }
@@ -473,6 +524,32 @@ fn generate_expands_a_rule_using_every_statement() {
                 let n = op![Arith::neg(k)];
                 replace!(r, n);
                 erase!(s);
+            })
+        }
+    );
+    let code = RuleCodegen::generate(RuleParser::parse(&item).unwrap(), item, args());
+    insta::assert_snapshot!(kirin_test_utils::rustfmt(code.to_string()));
+}
+
+/// The whole expansion of a rule generic over its language, bounded by a
+/// `From` for each dialect it uses. The generated function keeps the
+/// parameter and the bounds, adds the ones its body needs of any language,
+/// and converts the ops it matches and builds through those `From`s.
+#[test]
+fn generate_expands_a_rule_generic_over_its_language() {
+    let item: syn::ItemFn = parse_quote!(
+        /// Rewrites `-a == -b` into `a == b` in any language containing
+        /// `Arith` and `Cmp`.
+        pub fn eq_of_negs<L>()
+        where
+            L: From<Arith<L::Type>> + From<Cmp<L::Type>>,
+        {
+            let na = op![Arith::neg(a)];
+            let nb = op![Arith::neg(b)];
+            let r = op![Cmp::eq(na, nb)];
+            rewrite!(r, {
+                let eq = op![Cmp::eq(a, b)];
+                replace!(r, eq);
             })
         }
     );

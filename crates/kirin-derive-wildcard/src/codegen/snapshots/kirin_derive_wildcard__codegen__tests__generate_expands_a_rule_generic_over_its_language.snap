@@ -1,0 +1,168 @@
+---
+source: crates/kirin-derive-wildcard/src/codegen/tests.rs
+expression: "kirin_test_utils::rustfmt(code.to_string())"
+---
+#[doc = r" Rewrites `-a == -b` into `a == b` in any language containing"]
+#[doc = r" `Arith` and `Cmp`."]
+pub fn eq_of_negs<L>(
+    stage: &mut impl ::kirin_wildcard::__private::ir::AsBuildStage<::kirin_wildcard::PatternLanguage<L>>,
+) -> ::kirin_wildcard::__private::ir::Statement
+where
+    L: From<Arith<L::Type>> + From<Cmp<L::Type>>,
+    L: ::kirin_wildcard::__private::ir::Dialect,
+    <L as ::kirin_wildcard::__private::ir::Dialect>::Type:
+        ::kirin_wildcard::__private::ir::Placeholder,
+{
+    let stage = ::kirin_wildcard::__private::ir::AsBuildStage::as_build_stage(stage);
+    {
+        let statement_0 = stage.statement_arena().next_id();
+        let value_a: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("a")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_0,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::Hole::<
+                <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+            >::new_hole(value_a))
+            .new();
+        let statement_1 = stage.statement_arena().next_id();
+        let value_na: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("na")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_1,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::PatternLanguage::<L>::Op(
+                ::core::convert::From::from(Arith::new_neg(
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_a),
+                    value_na,
+                )),
+            ))
+            .new();
+        let statement_2 = stage.statement_arena().next_id();
+        let value_b: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("b")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_2,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::Hole::<
+                <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+            >::new_hole(value_b))
+            .new();
+        let statement_3 = stage.statement_arena().next_id();
+        let value_nb: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("nb")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_3,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::PatternLanguage::<L>::Op(
+                ::core::convert::From::from(Arith::new_neg(
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_b),
+                    value_nb,
+                )),
+            ))
+            .new();
+        let statement_4 = stage.statement_arena().next_id();
+        let value_r: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("r")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_4,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::PatternLanguage::<L>::Op(
+                ::core::convert::From::from(Cmp::new_eq(
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_na),
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_nb),
+                    value_r,
+                )),
+            ))
+            .new();
+        let statement_5 = stage.statement_arena().next_id();
+        let value_eq: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("eq")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_5,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::PatternLanguage::<L>::Op(
+                ::core::convert::From::from(Cmp::new_eq(
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_a),
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_b),
+                    value_eq,
+                )),
+            ))
+            .new();
+        let statement_6 = ::kirin_wildcard::Replace::<
+            <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+        >::new(stage, value_r, value_eq)
+        .id;
+        let rewrite_body = stage
+            .block()
+            .name("eq_of_negs_rw")
+            .stmt(statement_5)
+            .stmt(statement_6)
+            .new();
+        let statement_7 = ::kirin_wildcard::Rewrite::<
+            <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+        >::new(stage, statement_4, rewrite_body)
+        .id;
+        let pattern_body = stage
+            .block()
+            .name("eq_of_negs_pat")
+            .stmt(statement_0)
+            .stmt(statement_1)
+            .stmt(statement_2)
+            .stmt(statement_3)
+            .stmt(statement_4)
+            .terminator(statement_7)
+            .new();
+        let pattern_name = stage
+            .symbol_table_mut()
+            .intern(::std::string::String::from("eq_of_negs"));
+        ::kirin_wildcard::Pattern::<<L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(
+            stage,
+            pattern_name,
+            pattern_body,
+        )
+        .id
+    }
+}

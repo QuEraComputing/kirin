@@ -15,15 +15,22 @@ fn check_signature_accepts_a_plain_function() {
     assert!(RuleParser::check_signature(&item.sig).is_ok());
 }
 
+/// A rule can be generic over the language it is built for.
+#[test]
+fn check_signature_accepts_generics_and_a_where_clause() {
+    let item: syn::ItemFn = parse_quote!(
+        fn rule<L, V: Clone>()
+        where
+            L: From<Arith<V>>,
+        {
+        }
+    );
+    assert!(RuleParser::check_signature(&item.sig).is_ok());
+}
+
 #[test]
 fn check_signature_rejects_qualified_functions() {
-    let cases: [(syn::ItemFn, &str); 7] = [
-        (
-            parse_quote!(
-                fn rule<T>() {}
-            ),
-            "`#[rewrite_rule]` functions cannot have generic parameters",
-        ),
+    let cases: [(syn::ItemFn, &str); 5] = [
         (
             parse_quote!(
                 async fn rule() {}
@@ -53,16 +60,6 @@ fn check_signature_rejects_qualified_functions() {
                 fn rule() -> u32 {}
             ),
             "`#[rewrite_rule]` functions cannot have a return type",
-        ),
-        (
-            parse_quote!(
-                fn rule()
-                where
-                    i32: Copy,
-                {
-                }
-            ),
-            "`#[rewrite_rule]` functions cannot have a where clause",
         ),
     ];
     for (item, message) in cases {
