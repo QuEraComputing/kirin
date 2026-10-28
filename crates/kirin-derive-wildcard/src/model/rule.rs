@@ -4,7 +4,7 @@
 use proc_macro2::Span;
 use syn::ext::IdentExt;
 
-use super::statement::{Binding, RuleStmt, StmtId, StmtKind, Value, ValueId};
+use super::statement::{Binding, RuleStmt, StmtId, StmtKind, Value, ValueId, WalkResult};
 
 /// A lowered `#[rewrite_rule]` function.
 ///
@@ -66,10 +66,19 @@ impl RuleModel {
     /// The root of the match and the body of the final `rewrite!`.
     pub fn rewrite(&self) -> (StmtId, &[StmtId]) {
         let (_, rewrite) = self.split_rewrite();
-        let StmtKind::Rewrite { root, body } = &self.statement(rewrite).kind else {
+        let StmtKind::Rewrite { root, body, .. } = &self.statement(rewrite).kind else {
             unreachable!("the parser ends every rule with a `rewrite!`")
         };
         (*root, body)
+    }
+
+    /// The [`StmtKind::WalkResult`] the final `rewrite!` body ends in, if any.
+    pub fn walk_result(&self) -> Option<StmtId> {
+        let (_, rewrite) = self.split_rewrite();
+        let StmtKind::Rewrite { walk_result, .. } = &self.statement(rewrite).kind else {
+            unreachable!("the parser ends every rule with a `rewrite!`")
+        };
+        *walk_result
     }
 
     /// Add a hole statement for a name used without a `let` binding it, or
@@ -165,6 +174,24 @@ impl RuleModel {
         self.body.iter().any(|&id| {
             matches!(self.statement(id).kind, StmtKind::Constraint { success } if success == result)
         })
+    }
+
+    /// Whether the native call `stmt` computes the walk result the final
+    /// `rewrite!` body ends in, so its function must return a `WalkResult`.
+    pub fn is_walk_result_call(&self, stmt: StmtId) -> bool {
+        let Some(walk) = self.walk_result() else {
+            return false;
+        };
+        let StmtKind::WalkResult(WalkResult::Value(value)) = &self.statement(walk).kind else {
+            return false;
+        };
+        self.statement(stmt).results.contains(&value.value)
+    }
+
+    /// Whether `id` is the result of a native function called in the
+    /// `rewrite!` body, which runs only once the rule applies.
+    pub fn is_rewrite_native_result(&self, id: ValueId) -> bool {
+        !self.in_match(id) && matches!(self.defining(id), StmtKind::NativeCompute { .. })
     }
 
     /// Whether `id` is defined by one of the body's statements.

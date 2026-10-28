@@ -4,7 +4,10 @@ use kirin::ir::{
 };
 use kirin_test_types::UnitType;
 
-use crate::{Constraint, Erase, Hole, NativeCall, Pattern, PatternStatement, Replace, Rewrite};
+use crate::{
+    Advance, Constraint, Erase, Hole, Interrupt, NativeCall, Pattern, PatternStatement, Replace,
+    Rewrite, Skip, WalkResultOf,
+};
 
 fn ssa(id: usize) -> SSAValue {
     TestSSAValue(id).into()
@@ -50,6 +53,10 @@ fn make_rewrite() -> Rewrite<UnitType> {
     Rewrite::new_rewrite(statement(3), block(20))
 }
 
+fn make_walk_result_of() -> WalkResultOf<UnitType> {
+    WalkResultOf::new_walk_result_of(ssa(8))
+}
+
 fn all_statements() -> Vec<PatternStatement<UnitType>> {
     vec![
         PatternStatement::Pattern(make_pattern()),
@@ -59,10 +66,15 @@ fn all_statements() -> Vec<PatternStatement<UnitType>> {
         PatternStatement::Replace(make_replace()),
         PatternStatement::Erase(make_erase()),
         PatternStatement::Rewrite(make_rewrite()),
+        PatternStatement::Advance(Advance::new_advance()),
+        PatternStatement::Skip(Skip::new_skip()),
+        PatternStatement::Interrupt(Interrupt::new_interrupt()),
+        PatternStatement::WalkResultOf(make_walk_result_of()),
     ]
 }
 
-// --- Terminators: only `rewrite` ends a block ---
+// --- Terminators: `rewrite` ends a pattern body, the walk results a
+// replacement body ---
 
 #[test]
 fn rewrite_is_terminator() {
@@ -70,11 +82,18 @@ fn rewrite_is_terminator() {
 }
 
 #[test]
-fn only_rewrite_variant_is_terminator() {
+fn only_rewrite_and_walk_result_variants_are_terminators() {
     // `#[wraps]` delegates terminator-ness to each wrapped statement, so this
-    // checks that `Rewrite` is the only terminator among them.
+    // checks that `Rewrite` and the walk results are the only terminators.
     for stmt in all_statements() {
-        let expected = matches!(stmt, PatternStatement::Rewrite(_));
+        let expected = matches!(
+            stmt,
+            PatternStatement::Rewrite(_)
+                | PatternStatement::Advance(_)
+                | PatternStatement::Skip(_)
+                | PatternStatement::Interrupt(_)
+                | PatternStatement::WalkResultOf(_)
+        );
         assert_eq!(stmt.is_terminator(), expected, "{stmt:?}");
     }
 }
@@ -183,6 +202,19 @@ fn rewrite_has_root_op_and_body() {
     assert_eq!(rewrite.results().count(), 0);
 }
 
+// --- Walk results ---
+
+#[test]
+fn walk_result_of_reads_one_value() {
+    let walk = make_walk_result_of();
+    assert_eq!(walk.value(), ssa(8));
+    assert_eq!(
+        walk.arguments().copied().collect::<Vec<_>>(),
+        [walk.value()]
+    );
+    assert_eq!(walk.results().count(), 0);
+}
+
 // --- PatternStatement wraps delegation ---
 
 #[test]
@@ -197,7 +229,8 @@ fn pattern_statement_delegates_arguments_results_and_blocks() {
             )
         })
         .collect();
-    // pattern, hole, native_call, constraint, replace, erase, rewrite
+    // pattern, hole, native_call, constraint, replace, erase, rewrite,
+    // advance, skip, interrupt, walk_result
     assert_eq!(
         counts,
         [
@@ -207,7 +240,11 @@ fn pattern_statement_delegates_arguments_results_and_blocks() {
             (1, 0, 0),
             (2, 0, 0),
             (0, 0, 0),
-            (0, 0, 1)
+            (0, 0, 1),
+            (0, 0, 0),
+            (0, 0, 0),
+            (0, 0, 0),
+            (1, 0, 0)
         ]
     );
 }
