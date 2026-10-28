@@ -1049,10 +1049,10 @@ mod dense {
         callee: Callee,
     ) -> DenseLivenessResult {
         let mut engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-        let scope = engine
+        let root = engine
             .analyze(caller_stage, callee)
             .expect("analysis succeeds");
-        DenseLivenessResult::from_engine(&engine, scope)
+        DenseLivenessResult::from_engine(&engine, root)
     }
 
     fn live_set(values: &[SSAValue]) -> LiveSet {

@@ -179,9 +179,9 @@ pub fn analyze_classic_liveness(
     function_name: &str,
 ) -> Result<(CompileStage, CFG, DenseLivenessResult), InterpreterError> {
     let mut analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-    let scope = analysis.analyze_by_name(stage_name, function_name)?;
-    let result = DenseLivenessResult::from_engine(&analysis, scope);
-    let (stage, Body::CFG(cfg)) = scope else {
+    let root = analysis.analyze_by_name(stage_name, function_name)?;
+    let result = DenseLivenessResult::from_engine(&analysis, root);
+    let (stage, Body::CFG(cfg)) = root.scope() else {
         return Err(InterpreterError::Custom(
             "classic liveness target is not a CFG function",
         ));
