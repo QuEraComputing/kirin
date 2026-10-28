@@ -1,3 +1,4 @@
+import types
 import typing
 from abc import abstractmethod
 from typing import TYPE_CHECKING
@@ -982,7 +983,9 @@ def hint2type(hint) -> TypeAttribute:
         else:
             params.append(hint2type(arg))
 
-    if origin.__name__ == "Method":
+    if origin is typing.Union or origin is types.UnionType:
+        return Union(*params)
+    elif origin.__name__ == "Method":
         assert (
             len(params) == 2
         ), "method type hint should be ir.Method[[params], return_type]"
