@@ -157,10 +157,10 @@
               });
             </script> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.attrs.types.BottomType.name class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">name</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>name</span> <span class=o>=</span> <span class=s1>&#39;Bottom&#39;</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Name of the attribute in printing and other text format.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.attrs.types.BottomType.is_subseteq class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">is_subseteq</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Subseteq operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>136</span>
-<span class=normal>137</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Subseteq operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>137</span>
 <span class=normal>138</span>
-<span class=normal>139</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
+<span class=normal>139</span>
+<span class=normal>140</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>bool</span><span class=p>:</span>
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>other</span><span class=p>,</span> <span class=n>TypeVar</span><span class=p>):</span>
         <span class=k>return</span> <span class=bp>self</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=o>.</span><span class=n>bound</span><span class=p>)</span>
     <span class=k>return</span> <span class=kc>True</span>
@@ -245,13 +245,13 @@
                   return '';
                 }
               });
-            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>809</span>
-<span class=normal>810</span>
+            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>810</span>
 <span class=normal>811</span>
 <span class=normal>812</span>
 <span class=normal>813</span>
 <span class=normal>814</span>
-<span class=normal>815</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>815</span>
+<span class=normal>816</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>params_type</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>TypeAttribute</span><span class=p>,</span> <span class=o>...</span><span class=p>],</span>
     <span class=n>return_type</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>,</span>
@@ -340,8 +340,7 @@
                   return '';
                 }
               });
-            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>583</span>
-<span class=normal>584</span>
+            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>584</span>
 <span class=normal>585</span>
 <span class=normal>586</span>
 <span class=normal>587</span>
@@ -349,7 +348,8 @@
 <span class=normal>589</span>
 <span class=normal>590</span>
 <span class=normal>591</span>
-<span class=normal>592</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>592</span>
+<span class=normal>593</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>body</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>PyClassType</span><span class=p>]</span> <span class=o>|</span> <span class=n>PyClass</span><span class=p>[</span><span class=n>PyClassType</span><span class=p>],</span>
     <span class=o>*</span><span class=nb>vars</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>|</span> <span class=nb>list</span> <span class=o>|</span> <span class=n>Vararg</span><span class=p>,</span>
@@ -440,9 +440,9 @@
                   return '';
                 }
               });
-            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>322</span>
-<span class=normal>323</span>
-<span class=normal>324</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>data</span><span class=p>:</span> <span class=n>LiteralType</span><span class=p>,</span> <span class=n>datatype</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>):</span>
+            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>323</span>
+<span class=normal>324</span>
+<span class=normal>325</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>data</span><span class=p>:</span> <span class=n>LiteralType</span><span class=p>,</span> <span class=n>datatype</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>):</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>data</span> <span class=o>=</span> <span class=n>data</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>type</span> <span class=o>=</span> <span class=n>datatype</span> <span class=ow>or</span> <span class=n>PyClass</span><span class=p>(</span><span class=nb>type</span><span class=p>(</span><span class=n>data</span><span class=p>))</span>
 </code></pre></div></td></tr></table></div> </details> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.attrs.types.Literal.name class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">name</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>name</span> <span class=o>=</span> <span class=s1>&#39;Literal&#39;</span>
@@ -530,8 +530,7 @@
                   return '';
                 }
               });
-            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>211</span>
-<span class=normal>212</span>
+            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>212</span>
 <span class=normal>213</span>
 <span class=normal>214</span>
 <span class=normal>215</span>
@@ -539,7 +538,8 @@
 <span class=normal>217</span>
 <span class=normal>218</span>
 <span class=normal>219</span>
-<span class=normal>220</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>220</span>
+<span class=normal>221</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>typ</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=n>PyClassType</span><span class=p>],</span>
     <span class=o>*</span><span class=p>,</span>
@@ -660,14 +660,14 @@
                 }
               });
             </script> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.attrs.types.TypeAttribute.join class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">join</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>join</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>TypeAttribute</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>73</span>
-<span class=normal>74</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>74</span>
 <span class=normal>75</span>
 <span class=normal>76</span>
 <span class=normal>77</span>
 <span class=normal>78</span>
 <span class=normal>79</span>
-<span class=normal>80</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=s2>&quot;TypeAttribute&quot;</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;TypeAttribute&quot;</span><span class=p>:</span>
+<span class=normal>80</span>
+<span class=normal>81</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=s2>&quot;TypeAttribute&quot;</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=s2>&quot;TypeAttribute&quot;</span><span class=p>:</span>
     <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=p>):</span>
         <span class=k>return</span> <span class=n>other</span>
     <span class=k>elif</span> <span class=n>other</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
@@ -782,9 +782,9 @@
                   return '';
                 }
               });
-            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>480</span>
-<span class=normal>481</span>
-<span class=normal>482</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>bound</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>):</span>
+            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>481</span>
+<span class=normal>482</span>
+<span class=normal>483</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>name</span><span class=p>:</span> <span class=nb>str</span><span class=p>,</span> <span class=n>bound</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>|</span> <span class=kc>None</span> <span class=o>=</span> <span class=kc>None</span><span class=p>):</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>varname</span> <span class=o>=</span> <span class=n>name</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>bound</span> <span class=o>=</span> <span class=n>bound</span> <span class=ow>or</span> <span class=n>AnyType</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.attrs.types.TypeVar.name class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">name</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>name</span> <span class=o>=</span> <span class=s1>&#39;TypeVar&#39;</span>
@@ -948,8 +948,7 @@
                   return '';
                 }
               });
-            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>401</span>
-<span class=normal>402</span>
+            </script> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>402</span>
 <span class=normal>403</span>
 <span class=normal>404</span>
 <span class=normal>405</span>
@@ -965,7 +964,8 @@
 <span class=normal>415</span>
 <span class=normal>416</span>
 <span class=normal>417</span>
-<span class=normal>418</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
+<span class=normal>418</span>
+<span class=normal>419</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=fm>__init__</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span>
     <span class=n>typ_or_set</span><span class=p>:</span> <span class=n>TypeAttribute</span> <span class=o>|</span> <span class=n>typing</span><span class=o>.</span><span class=n>Iterable</span><span class=p>[</span><span class=n>TypeAttribute</span><span class=p>],</span>
     <span class=o>*</span><span class=n>typs</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>,</span>
@@ -985,8 +985,7 @@
     <span class=bp>self</span><span class=o>.</span><span class=n>types</span> <span class=o>=</span> <span class=n>types</span>
 </code></pre></div></td></tr></table></div> </details> <div class="doc doc-children"> <div class="doc doc-object doc-attribute"> <h3 id=kirin.ir.attrs.types.Union.name class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-attribute"></code> <span class="doc doc-object-name doc-attribute-name">name</span> <span class="doc doc-labels"> <small class="doc doc-label doc-label-class-attribute"><code>class-attribute</code></small> <small class="doc doc-label doc-label-instance-attribute"><code>instance-attribute</code></small> </span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=n>name</span> <span class=o>=</span> <span class=s1>&#39;Union&#39;</span>
 </code></pre></div> <div class="doc doc-contents "> <p>Name of the attribute in printing and other text format.</p> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.attrs.types.Union.join class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">join</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>join</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>TypeAttribute</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>423</span>
-<span class=normal>424</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Join operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>424</span>
 <span class=normal>425</span>
 <span class=normal>426</span>
 <span class=normal>427</span>
@@ -994,7 +993,8 @@
 <span class=normal>429</span>
 <span class=normal>430</span>
 <span class=normal>431</span>
-<span class=normal>432</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>TypeAttribute</span><span class=p>:</span>
+<span class=normal>432</span>
+<span class=normal>433</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>join</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>TypeAttribute</span><span class=p>:</span>
     <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=p>):</span>
         <span class=k>return</span> <span class=n>other</span>
     <span class=k>elif</span> <span class=n>other</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
@@ -1005,8 +1005,7 @@
         <span class=k>return</span> <span class=n>Union</span><span class=p>(</span><span class=bp>self</span><span class=o>.</span><span class=n>types</span> <span class=o>|</span> <span class=p>{</span><span class=n>other</span><span class=p>})</span>
     <span class=k>return</span> <span class=n>BottomType</span><span class=p>()</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.ir.attrs.types.Union.meet class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">meet</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>meet</span><span class=p>(</span><span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>TypeAttribute</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Meet operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>434</span>
-<span class=normal>435</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Meet operation.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/ir/attrs/types.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>435</span>
 <span class=normal>436</span>
 <span class=normal>437</span>
 <span class=normal>438</span>
@@ -1014,7 +1013,8 @@
 <span class=normal>440</span>
 <span class=normal>441</span>
 <span class=normal>442</span>
-<span class=normal>443</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>meet</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>TypeAttribute</span><span class=p>:</span>
+<span class=normal>443</span>
+<span class=normal>444</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>meet</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>other</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>TypeAttribute</span><span class=p>:</span>
     <span class=k>if</span> <span class=bp>self</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>other</span><span class=p>):</span>
         <span class=k>return</span> <span class=bp>self</span>
     <span class=k>elif</span> <span class=n>other</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=bp>self</span><span class=p>):</span>
