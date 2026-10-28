@@ -24,6 +24,9 @@ pub struct RewriteRule {
     checks: Vec<Statement>,
     /// The rewrite body, in order.
     actions: Vec<Statement>,
+    /// The rewrite body's terminator, saying how the driver goes on walking.
+    /// `None` advances.
+    walk_result: Option<Statement>,
 }
 
 impl RewriteRule {
@@ -47,6 +50,10 @@ impl RewriteRule {
 
     pub(crate) fn actions(&self) -> &[Statement] {
         &self.actions
+    }
+
+    pub(crate) fn walk_result(&self) -> Option<Statement> {
+        self.walk_result
     }
 
     /// Check `pattern` and record its parts.
@@ -187,7 +194,8 @@ impl RewriteRule {
 
         // The body ends in a walk result, if any; a `walk_result` reads what a
         // native call of the body computed.
-        if let Some(terminator) = rewrite.body().terminator(stage) {
+        let walk_result = rewrite.body().terminator(stage);
+        if let Some(terminator) = walk_result {
             match terminator.expect_info(stage).definition() {
                 PatternLanguage::Wildcard(
                     PatternStatement::Advance(_)
@@ -216,6 +224,7 @@ impl RewriteRule {
             root,
             checks,
             actions,
+            walk_result,
         })
     }
 }

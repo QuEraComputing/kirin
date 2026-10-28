@@ -1,16 +1,20 @@
 use std::collections::HashMap;
 
+use kirin_ir::walk::WalkResult;
 use kirin_ir::{Dialect, RewriteError, Rewriter, SSAValue, StageInfo};
 
 /// A value passed to or returned by a native function.
 ///
 /// Pattern values bound by a match reach native functions as
 /// [`NativeValue::Value`]. A function checking a condition returns a
-/// [`NativeValue::Bool`] for a `wildcard.constraint` to test.
+/// [`NativeValue::Bool`] for a `wildcard.constraint` to test. An action
+/// deciding how the driver goes on walking returns a [`NativeValue::WalkResult`]
+/// for a `wildcard.walk_result` to read.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum NativeValue {
     Bool(bool),
     Value(SSAValue),
+    WalkResult(WalkResult),
 }
 
 /// A native function called while matching. It reads the IR and returns the
