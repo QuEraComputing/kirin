@@ -34,9 +34,16 @@ on:
 # Keyed on the BASE branch: for a pull_request event github.ref is
 # refs/pull/N/merge, which would put every PR in its own group and serialise
 # nothing.
+#
+# queue: max because by default a group holds only one pending run, and a newer
+# run cancels it. Every closed PR and every dispatch joins this group before
+# the label check runs, so an unlabelled merge or a dry run arriving while a
+# release is in progress would silently cancel a labelled release waiting
+# behind it.
 concurrency:
   group: release-tag-${{ github.event.pull_request.base.ref || github.ref_name }}
   cancel-in-progress: false
+  queue: max
 
 permissions:
   contents: read # the app token does all writing
