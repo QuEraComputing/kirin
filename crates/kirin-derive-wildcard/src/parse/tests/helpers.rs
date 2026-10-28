@@ -96,5 +96,6 @@ pub(super) fn kind_name(model: &RuleModel, id: StmtId) -> &'static str {
         StmtKind::Rewrite { .. } => "rewrite",
         StmtKind::Replace { .. } => "replace",
         StmtKind::Erase { .. } => "erase",
+        StmtKind::WalkResult(_) => "walk_result",
     }
 }

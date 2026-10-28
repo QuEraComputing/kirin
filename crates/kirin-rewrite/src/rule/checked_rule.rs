@@ -209,6 +209,30 @@ impl<L: Dialect> CheckedRule<L> {
             }
         }
 
+        // The body ends in a walk result, if any; a `walk_result` reads what a
+        // native call of the body computed.
+        if let Some(terminator) = rewrite.body().terminator(stage) {
+            match terminator.expect_info(stage).definition() {
+                PatternLanguage::Wildcard(
+                    PatternStatement::Advance(_)
+                    | PatternStatement::Skip(_)
+                    | PatternStatement::Interrupt(_),
+                ) => {}
+                PatternLanguage::Wildcard(PatternStatement::WalkResultOf(walk)) => {
+                    // Only a `native_call` becomes a `Step::Native`.
+                    let computed = producer(stage, walk.value()).is_some_and(|p| {
+                        actions
+                            .iter()
+                            .any(|step| matches!(step, Step::Native { stmt, .. } if *stmt == p))
+                    });
+                    if !computed {
+                        return Err(error(RuleErrorKind::WalkResultWithoutNativeCall));
+                    }
+                }
+                _ => return Err(error(RuleErrorKind::UnexpectedTerminator)),
+            }
+        }
+
         Ok(Self {
             name,
             root,
