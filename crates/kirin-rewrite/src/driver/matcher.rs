@@ -227,7 +227,7 @@ impl Match {
                     match self.value(rule, constraint.success())? {
                         NativeValue::Bool(true) => {}
                         NativeValue::Bool(false) => return Ok(None),
-                        NativeValue::Value(_) => {
+                        NativeValue::Value(_) | NativeValue::WalkResult(_) => {
                             return Err(DriverError::ConstraintNotBool {
                                 rule: rule.name().to_string(),
                             });

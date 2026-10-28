@@ -32,6 +32,9 @@ pub enum DriverError {
     ConstraintNotBool { rule: String },
     /// A `replace` redirected to or from a value that is not an SSA value.
     NotAnSsaValue { rule: String },
+    /// A `walk_result` read a value that is not a
+    /// [`NativeValue::WalkResult`](crate::NativeValue::WalkResult).
+    NotAWalkResult { rule: String },
     /// The tree under `root` was still changing after `sweeps` sweeps, the
     /// driver's limit: the rules most likely keep undoing each other.
     BudgetExhausted { root: Statement, sweeps: usize },
@@ -82,6 +85,12 @@ impl fmt::Display for DriverError {
                 write!(
                     f,
                     "rule `{rule}`: a replace names a value that is not an SSA value"
+                )
+            }
+            DriverError::NotAWalkResult { rule } => {
+                write!(
+                    f,
+                    "rule `{rule}`: a walk result reads a value that is not a walk result"
                 )
             }
             DriverError::BudgetExhausted { root, sweeps } => write!(

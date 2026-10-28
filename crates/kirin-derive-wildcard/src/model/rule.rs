@@ -73,6 +73,7 @@ impl RuleModel {
     }
 
     /// The [`StmtKind::WalkResult`] the final `rewrite!` body ends in, if any.
+    #[cfg(test)]
     pub fn walk_result(&self) -> Option<StmtId> {
         let (_, rewrite) = self.split_rewrite();
         let StmtKind::Rewrite { walk_result, .. } = &self.statement(rewrite).kind else {

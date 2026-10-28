@@ -1,4 +1,4 @@
-use kirin_ir::walk::{WalkCursor, WalkOrder};
+use kirin_ir::walk::{WalkCursor, WalkOrder, WalkResult};
 use kirin_ir::{Dialect, Rewriter, Statement};
 
 use super::{DriverError, Match};
@@ -36,6 +36,15 @@ impl std::ops::AddAssign for RewriteSummary {
 /// Symbol attributes, the ones [`HasSymbols`](kirin_ir::HasSymbols) lists,
 /// match by name through the pattern and program symbol tables, never by
 /// their stage-local ids.
+///
+/// A rule's rewrite body may end in a walk result steering the sweep (see
+/// [`kirin_wildcard`]): `skip` leaves the statements nested in the
+/// statement being visited unwalked, and `interrupt` ends the sweep there.
+/// An interrupted sweep counts like any other: if nothing changed, the run
+/// ends, without visiting the statements after the interrupt again. Since a
+/// rule's root never owns bodies yet (see
+/// [`RuleErrorKind::OpWithBodies`](crate::RuleErrorKind::OpWithBodies)),
+/// `skip` has no effect so far.
 ///
 /// Rules that keep undoing each other never reach a fixpoint. As a safety
 /// net, a run still changing after [`max_sweeps`](Self::max_sweeps) sweeps
@@ -125,6 +134,11 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
 
     /// Walk the tree under `root` once, applying every rule that matches.
     /// Returns how many applications edited the IR.
+    ///
+    /// Each applied rule's walk result steers the walk: after a `skip`, the
+    /// remaining rules still run at the statement, then its nested
+    /// statements are skipped; an `interrupt` stops trying rules and ends
+    /// the sweep.
     fn sweep<O: WalkOrder>(
         &self,
         rewriter: &mut Rewriter<'_, L>,
@@ -133,15 +147,24 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         let mut applied = 0;
         let mut cursor = O::start(rewriter.stage(), root);
         while let Some(stmt) = cursor.next(rewriter.stage())? {
+            let mut skip = false;
             for rule in self.rules.rules() {
                 let Some(found) = Match::find(self.rules, rule, rewriter.stage(), stmt)? else {
                     continue;
                 };
                 let before = rewriter.events().len();
-                found.apply(self.rules, rule, rewriter, stmt)?;
+                let walk_result = found.apply(self.rules, rule, rewriter, stmt)?;
                 if rewriter.events().len() > before {
                     applied += 1;
                 }
+                match walk_result {
+                    WalkResult::Advance => {}
+                    WalkResult::Skip => skip = true,
+                    WalkResult::Interrupt => return Ok(applied),
+                }
+            }
+            if skip {
+                cursor.skip();
             }
         }
         Ok(applied)

@@ -190,6 +190,7 @@ See [dialect-rewrite-rules.md](design/dialect-rewrite-rules.md).
 | erasing an op whose results are still used | not checked statically: kirin-ir's [`Rewriter::erase_statement`](../crates/kirin-ir/src/rewrite/rewriter.rs#L451-L458) rejects it ([`StatementResultsInUse`](../crates/kirin-ir/src/rewrite/rewriter.rs#L109-L111)) and the pass quarantines the stage |
 | $\textsf{rooted}$, $\textsf{acts}$ | macro ($\textsf{rooted}$ in its verification pass) |
 | a walk result is last, at most once, and $\textsf{walk}\ x$ reads a native result of the rewrite body | macro; for patterns built without it, [`RuleSet::add`](../crates/kirin-rewrite/src/rule/rule_set.rs) |
+| $\textsf{walk}\ x$: the native returns a walk result ([`NativeValue::WalkResult`](../crates/kirin-rewrite/src/native.rs)) | not checked statically: the driver fails the run with [`DriverError::NotAWalkResult`](../crates/kirin-rewrite/src/driver/error.rs) |
 | $O : m \to n$ (argument and result counts), $O$ in the language | rustc, through the generated constructor call `new_<op_name>`; for a generic rule, through the bounds its author writes |
 | native call arity and result sorts $\tau_i$ | not yet checked |
 
