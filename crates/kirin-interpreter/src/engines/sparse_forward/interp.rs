@@ -870,16 +870,7 @@ where
             results,
         } = call;
         let lookup_stage = call_stage.unwrap_or(stage);
-        let target = self.inner().resolve_callee(lookup_stage, &callee)?;
-        let body = target.body(self.inner().pipeline()).map_err(E::from)?;
-        let key = self.inner_mut().key(&target, &args);
-
-        self.apply_update(ForwardUpdate::FunctionEntry {
-            key: key.clone(),
-            stage: target.stage,
-            body,
-            args,
-        })?;
+        let key = self.contribute_call_entry(lookup_stage, &callee, args)?;
 
         let owner = Owner::Function(key);
         if let Some(caller) = self.current_owner().cloned() {
@@ -919,6 +910,24 @@ where
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
 {
+    fn contribute_call_entry(
+        &mut self,
+        lookup_stage: CompileStage,
+        callee: &Callee,
+        args: Product<V>,
+    ) -> Result<<P as CallContext<V>>::Key, E> {
+        let target = self.inner().resolve_callee(lookup_stage, callee)?;
+        let body = target.body(self.inner().pipeline()).map_err(E::from)?;
+        let key = self.inner_mut().key(&target, &args);
+        self.apply_update(ForwardUpdate::FunctionEntry {
+            key: key.clone(),
+            stage: target.stage,
+            body,
+            args,
+        })?;
+        Ok(key)
+    }
+
     fn apply_update(
         &mut self,
         update: ForwardUpdate<<P as CallContext<V>>::Key, V>,
@@ -1559,19 +1568,8 @@ where
         callee: Callee,
         args: impl IntoIterator<Item = V>,
     ) -> Result<Product<V>, E> {
-        let target = self.driver.inner().resolve_callee(stage, &callee)?;
-        let body = target
-            .body(self.driver.inner().pipeline())
-            .map_err(E::from)?;
         let args: Product<V> = args.into_iter().collect();
-        let key = self.driver.inner_mut().key(&target, &args);
-
-        self.driver.apply_update(ForwardUpdate::FunctionEntry {
-            key: key.clone(),
-            stage: target.stage,
-            body,
-            args,
-        })?;
+        let key = self.driver.contribute_call_entry(stage, &callee, args)?;
 
         let mut owner_analysis = SparseForwardOwnerAnalysis::new();
         self.driver.drain_worklist(&mut owner_analysis)?;
