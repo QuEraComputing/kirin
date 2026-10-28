@@ -580,12 +580,8 @@ where
         outputs: Product<V>,
     ) -> Result<Product<V>, E> {
         let lookup_stage = stage.unwrap_or(self.stage());
-        let pipeline = self.inner().pipeline();
-        let target = self
-            .inner()
-            .linker
-            .resolve(pipeline, lookup_stage, &callee)?;
-        let key = self.inner_mut().policy.key(&target, &outputs);
+        let (target, key) =
+            self.resolve_call_context(lookup_stage, &callee, &outputs)?;
         let work = self.current_owner().cloned().ok_or_else(|| {
             E::from(InterpreterError::Custom(
                 "a call boundary was crossed outside propagation work",
@@ -615,6 +611,22 @@ where
     P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
+    /// Resolve a callable and select its demand context.
+    fn resolve_call_context(
+        &mut self,
+        lookup_stage: CompileStage,
+        callee: &Callee,
+        outputs: &Product<V>,
+    ) -> Result<(LinkTarget, P::Key), E> {
+        let target = self.inner().linker.resolve(
+            self.inner().pipeline(),
+            lookup_stage,
+            callee,
+        )?;
+        let key = self.inner_mut().policy.key(&target, outputs);
+        Ok((target, key))
+    }
+
     /// The current fact at a context-qualified location (bottom if absent).
     pub(super) fn fact_at(&self, location: Scoped<P::Key, SSAValue>) -> V {
         self.summary(&location)
@@ -1052,24 +1064,14 @@ where
         result_values: impl IntoIterator<Item = V>,
     ) -> Result<(Product<V>, Self), E> {
         let outputs: Product<V> = result_values.into_iter().collect();
-        let target = self
-            .driver
-            .inner()
-            .linker
-            .resolve(self.pipeline(), stage, &callee)?;
-        let root = self.driver.inner_mut().policy.key(&target, &outputs);
-        let updates = self.driver.discover(&root, target)?;
+        let (target, root) =
+            self.driver.resolve_call_context(stage, &callee, &outputs)?;
+        self.driver
+            .inner_mut()
+            .activations
+            .push((root.clone(), target, outputs));
+        let updates = self.driver.apply_activations()?;
         let mut owner_analysis = SparseBackwardOwnerAnalysis;
-        for (location, fact) in updates {
-            self.driver
-                .merge_summary(&mut owner_analysis, location, fact)?;
-        }
-        let updates = self
-            .driver
-            .store()
-            .get(&root)
-            .ok_or(UNDISCOVERED)?
-            .route_outputs(&root, outputs)?;
         for (location, fact) in updates {
             self.driver
                 .merge_summary(&mut owner_analysis, location, fact)?;
