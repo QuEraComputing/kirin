@@ -390,7 +390,8 @@ fn reusing_dense_engine_replaces_the_previous_scoped_result() {
 
     let first_scope = engine
         .analyze(stage, first)
-        .expect("first callable analysis succeeds");
+        .expect("first callable analysis succeeds")
+        .scope();
     let (_, Body::CFG(first_cfg)) = first_scope else {
         panic!("@first resolves to a CFG body")
     };
@@ -406,7 +407,8 @@ fn reusing_dense_engine_replaces_the_previous_scoped_result() {
 
     let second_scope = engine
         .analyze(stage, second)
-        .expect("second callable analysis succeeds");
+        .expect("second callable analysis succeeds")
+        .scope();
     let (_, Body::CFG(second_cfg)) = second_scope else {
         panic!("@second resolves to a CFG body")
     };

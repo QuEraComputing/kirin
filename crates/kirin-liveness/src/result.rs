@@ -1,6 +1,7 @@
 //! Liveness results: the sparse demand set (strong liveness) and the dense
 //! per-point sets (classic liveness), plus their composition.
 
+use kirin_interpreter::AnalysisRoot;
 use kirin_interpreter::{
     BodyScope, DenseBackwardInterpreter, FactStore, InterpreterError, ProgramPoint, Scoped,
     SparseBackwardInterpreter,
@@ -13,31 +14,36 @@ use crate::live::{Live, LiveSet};
 /// values.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DemandResult {
-    root_scope: BodyScope,
+    root: AnalysisRoot,
     demanded: LiveSet,
 }
 
 impl DemandResult {
     pub(crate) fn from_engine<S: StageMeta, Lk>(
         engine: &SparseBackwardInterpreter<'_, S, Live, InterpreterError, Lk>,
-        root_scope: BodyScope,
+        root: AnalysisRoot,
     ) -> Self {
         // The engine's sparse fact view; the demand set is its live support.
-        let facts = engine.fact_store(root_scope.0, root_scope.1);
+        let facts = engine.fact_store(root.target.stage, root.body);
         let demanded = facts
             .iter()
             .filter(|(_, fact)| fact.is_live())
             .map(|(value, _)| value)
             .collect();
         Self {
-            root_scope,
+            root,
             demanded,
         }
     }
 
+    /// The callable and body selected for this analysis.
+    pub fn root(&self) -> AnalysisRoot {
+        self.root
+    }
+
     /// The resolved `(target stage, callable body)` analyzed by this result.
     pub fn root_scope(&self) -> BodyScope {
-        self.root_scope
+        self.root.scope()
     }
 
     /// The demanded SSA values (the strong-liveness fact).
@@ -60,7 +66,7 @@ impl DemandResult {
 /// intersected with the demand set.
 #[derive(Clone, Debug)]
 pub struct DenseLivenessResult {
-    root_scope: BodyScope,
+    root: AnalysisRoot,
     facts: FactStore<Scoped<BodyScope, ProgramPoint>, LiveSet>,
 }
 
@@ -68,20 +74,25 @@ impl DenseLivenessResult {
     /// Copy the facts recorded by a converged dense engine.
     pub fn from_engine<'ir, S, F, Lk>(
         engine: &DenseBackwardInterpreter<'ir, S, LiveSet, InterpreterError, F, Lk>,
-        root_scope: BodyScope,
+        root: AnalysisRoot,
     ) -> Self
     where
         S: StageMeta,
     {
         Self {
-            root_scope,
+            root,
             facts: engine.facts(),
         }
     }
 
+    /// The callable and body selected for this analysis.
+    pub fn root(&self) -> AnalysisRoot {
+        self.root
+    }
+
     /// The resolved `(target stage, callable body)` analyzed by this result.
     pub fn root_scope(&self) -> BodyScope {
-        self.root_scope
+        self.root.scope()
     }
 
     /// The liveness fact recorded at `point`.

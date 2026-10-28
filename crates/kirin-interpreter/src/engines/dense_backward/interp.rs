@@ -55,7 +55,7 @@ use kirin_ir::{
 use super::frames::DenseBlockFrame;
 use crate::Body;
 use crate::core::query;
-use crate::engines::sparse_backward::BodyScope;
+use crate::engines::sparse_backward::{AnalysisRoot, BodyScope};
 use crate::{
     AbstractInterpreter, BackwardSummaryDeps, Callee, ClassicLiveness, DenseBackwardSemantic,
     EnvIndex, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
@@ -598,7 +598,7 @@ where
 ///
 /// ```ignore
 /// let mut analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
-/// let scope = analysis.analyze(stage, callee)?;
+/// let scope = analysis.analyze(stage, callee)?.scope();
 /// let point = Scoped::new(scope, ProgramPoint::BlockEntry(block));
 /// let live_in = analysis.point_facts(point);
 /// ```
@@ -732,7 +732,7 @@ where
         &mut self,
         stage_name: &str,
         function_name: &str,
-    ) -> Result<BodyScope, E> {
+    ) -> Result<AnalysisRoot, E> {
         let stage = self
             .driver
             .inner()
@@ -753,14 +753,18 @@ where
         &mut self,
         stage: CompileStage,
         symbol: Symbol,
-    ) -> Result<BodyScope, E> {
+    ) -> Result<AnalysisRoot, E> {
         self.analyze(stage, symbol.into())
     }
 
     /// Resolve `callee`, seed every block selected by its CFG or Block body,
     /// and drain the block-boundary worklist. Dependencies are discovered from
     /// terminator edges; unsupported graph roots fail before solving.
-    pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
+    pub fn analyze(
+        &mut self,
+        stage: CompileStage,
+        callee: Callee,
+    ) -> Result<AnalysisRoot, E> {
         let pipeline = self.driver.inner().pipeline();
         let target = self.linker.resolve(pipeline, stage, &callee)?;
         let body = target.body(pipeline)?;
@@ -781,6 +785,6 @@ where
 
         let mut owner_analysis = DenseBackwardOwnerAnalysis;
         self.driver.solve_many(&mut owner_analysis, owners)?;
-        Ok(scope)
+        Ok(AnalysisRoot { target, body })
     }
 }

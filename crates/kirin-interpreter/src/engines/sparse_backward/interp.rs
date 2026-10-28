@@ -53,6 +53,7 @@ use kirin_ir::{
     SSAKind, SSAValue, StageMeta, Statement, Symbol,
 };
 
+use crate::LinkTarget;
 use crate::core::query;
 use crate::{
     AbstractInterpreter, Body, Callee, EnvIndex, FixpointProfile, Frame, FrameEffect, Interp,
@@ -66,6 +67,19 @@ use crate::{
 /// Arena ids are per-stage, so the stage is part of the scope; analyzing two
 /// bodies in one engine keeps their facts distinct.
 pub type BodyScope = (CompileStage, Body);
+
+/// The callable selected for analysis and its analyzed body.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct AnalysisRoot {
+    pub target: LinkTarget,
+    pub body: Body,
+}
+
+impl AnalysisRoot {
+    pub fn scope(&self) -> BodyScope {
+        (self.target.stage, self.body)
+    }
+}
 
 // ===========================================================================
 // Effect + dialect-facing trait
@@ -532,7 +546,7 @@ where
 ///
 /// ```ignore
 /// let mut analysis = SparseBackwardInterpreter::<Stage, Live>::new(&pipeline);
-/// let scope = analysis.analyze(stage, callee)?;
+/// let scope = analysis.analyze(stage, callee)?.scope();
 /// let demanded = analysis.is_demanded(scope.0, scope.1, value);
 /// ```
 pub struct SparseBackwardInterpreter<
@@ -643,7 +657,7 @@ where
         &mut self,
         stage_name: &str,
         function_name: &str,
-    ) -> Result<BodyScope, E> {
+    ) -> Result<AnalysisRoot, E> {
         let stage = self
             .driver
             .inner()
@@ -664,7 +678,7 @@ where
         &mut self,
         stage: CompileStage,
         symbol: Symbol,
-    ) -> Result<BodyScope, E> {
+    ) -> Result<AnalysisRoot, E> {
         self.analyze(stage, symbol.into())
     }
 
@@ -675,7 +689,11 @@ where
     /// terminators contribute the demand roots.
     /// **Propagation**: drain the value worklist; each risen value dispatches
     /// the rules that translate its demand.
-    pub fn analyze(&mut self, stage: CompileStage, callee: Callee) -> Result<BodyScope, E> {
+    pub fn analyze(
+        &mut self,
+        stage: CompileStage,
+        callee: Callee,
+    ) -> Result<AnalysisRoot, E> {
         let pipeline = self.driver.inner().pipeline();
         let target = self.linker.resolve(pipeline, stage, &callee)?;
         let body = target.body(pipeline)?;
@@ -715,7 +733,7 @@ where
             )?;
         }
         self.driver.drain_worklist(&mut owner_analysis)?;
-        Ok(scope)
+        Ok(AnalysisRoot { target, body })
     }
 
     /// `true` iff `value` carries a non-bottom demand fact under the scope.

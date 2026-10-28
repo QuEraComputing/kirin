@@ -61,8 +61,8 @@ where
         + InterpDispatch<SparseBackwardDriver<'ir, S, Live, InterpreterError>>,
 {
     let mut engine = Demand::<S>::new(pipeline);
-    let scope = engine.analyze(stage, callee)?;
-    Ok(DemandResult::from_engine(&engine, scope))
+    let root = engine.analyze(stage, callee)?;
+    Ok(DemandResult::from_engine(&engine, root))
 }
 
 /// Resolve `callee` and run classic per-point liveness over its body,
@@ -113,6 +113,6 @@ where
         > + From<DenseBlockFrame<LiveSet, InterpreterError>>,
 {
     let mut engine = DenseLiveness::<S, InterpreterError, F>::new(pipeline);
-    let scope = engine.analyze(stage, callee)?;
-    Ok(DenseLivenessResult::from_engine(&engine, scope))
+    let root = engine.analyze(stage, callee)?;
+    Ok(DenseLivenessResult::from_engine(&engine, root))
 }

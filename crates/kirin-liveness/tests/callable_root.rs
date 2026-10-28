@@ -129,12 +129,14 @@ fn every_callee_variant_uses_the_same_backward_root_protocol() {
 
     for callee in callees {
         let mut demand = Demand::<TestStage>::new(&pipeline);
-        let demand_scope = demand.analyze(stage, callee).expect("demand succeeds");
-        assert!(matches!(demand_scope, (_, Body::Block(_))));
+        let demand_root = demand.analyze(stage, callee).expect("demand succeeds");
+        assert!(matches!(demand_root.body, Body::Block(_)));
 
         let mut dense = DenseLiveness::<TestStage>::new(&pipeline);
-        let dense_scope = dense.analyze(stage, callee).expect("dense succeeds");
-        assert_eq!(dense_scope, demand_scope);
+        let dense_root = dense.analyze(stage, callee).expect("dense succeeds");
+        assert_eq!(dense_root, demand_root);
+        let expected = SameStageLinker.resolve(&pipeline, stage, &callee).unwrap();
+        assert_eq!(demand_root.target, expected);
     }
 }
 
@@ -197,17 +199,17 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
         Err(InterpreterError::MissingSpecialization(_))
     ));
 
-    let demand_scope = Demand::<TestStage>::new(&pipeline)
+    let demand_root = Demand::<TestStage>::new(&pipeline)
         .with_linker(CrossStageLinker)
         .analyze(source, callee)
         .expect("cross-stage demand succeeds");
     let mut dense = DenseLiveness::<TestStage>::new(&pipeline).with_linker(CrossStageLinker);
-    let dense_scope = dense
+    let dense_root = dense
         .analyze(source, callee)
         .expect("cross-stage dense succeeds");
-    assert_eq!(demand_scope.0, lowered);
-    assert!(matches!(demand_scope.1, Body::Block(_)));
-    assert_eq!(dense_scope, demand_scope);
+    assert_eq!(demand_root.target.stage, lowered);
+    assert!(matches!(demand_root.body, Body::Block(_)));
+    assert_eq!(dense_root, demand_root);
 
     // Dense analysis rebuilds solver state between roots; configuration state
     // must survive that reset.
@@ -215,7 +217,7 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
         dense
             .analyze(source, callee)
             .expect("custom linker survives dense reset"),
-        dense_scope
+        dense_root
     );
 }
 
@@ -290,7 +292,8 @@ fn specialized_handles_are_validated_before_accepting_a_candidate_stage() {
         .with_linker(CrossStageLinker)
         .analyze(source, callee)
         .unwrap();
-    assert_eq!(demand.0, lowered);
+    assert_eq!(demand.target, target);
+    assert_eq!(demand.target.stage, lowered);
     assert_eq!(dense, demand);
 }
 
@@ -410,4 +413,75 @@ fn linker_resolution_errors_propagate_from_both_backward_engines() {
         DenseLiveness::<TestStage>::new(&ambiguous_pipeline).analyze(ambiguous_stage, ambiguous),
         Err(InterpreterError::AmbiguousSpecialization { count: 2, .. })
     ));
+}
+
+#[test]
+fn liveness_reports_distinct_callables_that_share_a_body() {
+    let mut pipeline = parse(&format!(
+        "{BLOCK_PROGRAM}\nstage @test fn @alias(i64) -> i64;"
+    ));
+    let (stage, original) = function_callee(&pipeline, "linear");
+    let original_target = SameStageLinker
+        .resolve(&pipeline, stage, &original)
+        .unwrap();
+
+    // Give @alias its own specialization pointing to @linear's definition.
+    let definition = *original_target
+        .specialization
+        .get_info(pipeline.stage(stage).unwrap())
+        .unwrap()
+        .definition();
+    let alias_staged = pipeline
+        .resolve_staged_function("alias", stage)
+        .unwrap();
+    pipeline.stage_mut(stage).unwrap().with_builder(|builder| {
+        builder
+            .specialize()
+            .staged_func(alias_staged)
+            .definition(definition)
+            .new()
+            .unwrap();
+    });
+
+    let (_, alias) = function_callee(&pipeline, "alias");
+    let alias_target = SameStageLinker
+        .resolve(&pipeline, stage, &alias)
+        .unwrap();
+
+    // Establish the case: different callable identities, identical bodies.
+    assert_ne!(original_target, alias_target);
+    let body = original_target.body(&pipeline).unwrap();
+    assert_eq!(alias_target.body(&pipeline).unwrap(), body);
+
+    let demand_original =
+        kirin_liveness::analyze_demand(&pipeline, stage, original).unwrap();
+    let demand_alias =
+        kirin_liveness::analyze_demand(&pipeline, stage, alias).unwrap();
+
+    let dense_original =
+        kirin_liveness::analyze_dense(&pipeline, stage, original).unwrap();
+    let dense_alias =
+        kirin_liveness::analyze_dense(&pipeline, stage, alias).unwrap();
+
+    // Both public result types must preserve the selected specialization.
+    for (original_root, alias_root) in [
+        (demand_original.root(), demand_alias.root()),
+        (dense_original.root(), dense_alias.root()),
+    ] {
+        assert_eq!(original_root.target, original_target);
+        assert_eq!(alias_root.target, alias_target);
+        assert_ne!(original_root, alias_root);
+        assert_eq!(original_root.body, body);
+        assert_eq!(alias_root.body, body);
+    }
+
+    // Sharing a body still means sharing the same fact scope.
+    for scope in [
+        demand_original.root_scope(),
+        demand_alias.root_scope(),
+        dense_original.root_scope(),
+        dense_alias.root_scope(),
+    ] {
+        assert_eq!(scope, (stage, body));
+    }
 }
