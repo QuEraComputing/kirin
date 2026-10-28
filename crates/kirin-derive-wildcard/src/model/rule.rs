@@ -66,10 +66,19 @@ impl RuleModel {
     /// The root of the match and the body of the final `rewrite!`.
     pub fn rewrite(&self) -> (StmtId, &[StmtId]) {
         let (_, rewrite) = self.split_rewrite();
-        let StmtKind::Rewrite { root, body } = &self.statement(rewrite).kind else {
+        let StmtKind::Rewrite { root, body, .. } = &self.statement(rewrite).kind else {
             unreachable!("the parser ends every rule with a `rewrite!`")
         };
         (*root, body)
+    }
+
+    /// The [`StmtKind::WalkResult`] the final `rewrite!` body ends in, if any.
+    pub fn walk_result(&self) -> Option<StmtId> {
+        let (_, rewrite) = self.split_rewrite();
+        let StmtKind::Rewrite { walk_result, .. } = &self.statement(rewrite).kind else {
+            unreachable!("the parser ends every rule with a `rewrite!`")
+        };
+        *walk_result
     }
 
     /// Add a hole statement for a name used without a `let` binding it, or
@@ -136,6 +145,12 @@ impl RuleModel {
     /// the rule does apply.
     pub fn is_matched_native_result(&self, id: ValueId) -> bool {
         self.in_match(id) && matches!(self.defining(id), StmtKind::NativeCompute { .. })
+    }
+
+    /// Whether `id` is the result of a native function called in the
+    /// `rewrite!` body, which runs only once the rule applies.
+    pub fn is_rewrite_native_result(&self, id: ValueId) -> bool {
+        !self.in_match(id) && matches!(self.defining(id), StmtKind::NativeCompute { .. })
     }
 
     /// Whether `id` is defined by one of the body's statements.

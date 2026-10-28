@@ -19,6 +19,8 @@
 //! | `wildcard.replace %r with %x` | Redirects every use of the matched `%r` to `%x` |
 //! | `wildcard.erase %r` | Erases the matched op defining `%r` |
 //! | `wildcard.rewrite %r block ^rw {..}` | Terminates a pattern body; the op defining `%r` is the root, the body holds the replacement |
+//! | `wildcard.advance`, `wildcard.skip`, `wildcard.interrupt` | Terminates a replacement body: the driver goes on walking, goes on without walking the root's nested statements, or ends the current walk |
+//! | `wildcard.walk_result %w` | Terminates a replacement body: the driver goes on as `%w`, computed by a `native_call` in that body, says |
 //!
 //! # Example
 //!
@@ -62,6 +64,10 @@
 //! }
 //! ```
 //!
+//! A replacement body may end in one walk terminator (`advance`, `skip`,
+//! `interrupt` or `walk_result`), saying how the driver goes on walking once
+//! the rewrite has run. A body without one advances.
+//!
 //! This crate only defines the pattern data. It does not match patterns or
 //! mutate concrete IR; those responsibilities belong to `kirin-rewrite` and
 //! `kirin-ir`, respectively.
@@ -78,6 +84,7 @@ mod op_ref;
 mod pattern;
 mod replace;
 mod rewrite;
+mod walk;
 
 pub use constraint::Constraint;
 pub use erase::Erase;
@@ -88,6 +95,7 @@ pub use op_ref::OpRef;
 pub use pattern::Pattern;
 pub use replace::Replace;
 pub use rewrite::Rewrite;
+pub use walk::{Advance, Interrupt, Skip, WalkResultOf};
 
 #[cfg(feature = "derive")]
 pub use kirin_derive_wildcard::rewrite_rule;
@@ -117,4 +125,8 @@ pub enum PatternStatement<T: CompileTimeValue> {
     Replace(Replace<T>),
     Erase(Erase<T>),
     Rewrite(Rewrite<T>),
+    Advance(Advance<T>),
+    Skip(Skip<T>),
+    Interrupt(Interrupt<T>),
+    WalkResultOf(WalkResultOf<T>),
 }

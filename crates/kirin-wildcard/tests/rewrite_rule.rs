@@ -47,6 +47,33 @@ fn dead_neg() {
     erase!(r)
 }
 
+/// `double_neg`, leaving the root's nested statements unwalked.
+#[rewrite_rule(language = L)]
+fn double_neg_then_skip() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        replace!(r, x);
+        skip!()
+    })
+}
+
+/// Decides how the walk goes on; only named by the rule.
+fn decide(_x: i64) -> i64 {
+    unimplemented!("only named by the rule")
+}
+
+/// `double_neg`, going on as `decide` says.
+#[rewrite_rule(language = L)]
+fn double_neg_then_decide() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        replace!(r, x);
+        decide(x)
+    })
+}
+
 /// An op without results, named with `@ ()`, as the root and erased.
 #[rewrite_rule(language = EffectLanguage)]
 fn drop_effect_of_neg() {
@@ -106,6 +133,8 @@ fn describe(stage: &Stage, stmt: Statement) -> String {
         PatternLanguage::Wildcard(PatternStatement::Constraint(_)) => "constraint".to_string(),
         PatternLanguage::Wildcard(PatternStatement::Replace(_)) => "replace".to_string(),
         PatternLanguage::Wildcard(PatternStatement::Erase(_)) => "erase".to_string(),
+        PatternLanguage::Wildcard(PatternStatement::Skip(_)) => "skip".to_string(),
+        PatternLanguage::Wildcard(PatternStatement::WalkResultOf(_)) => "walk_result".to_string(),
         other => panic!("unexpected statement {other:?}"),
     };
     if results.is_empty() {
@@ -420,4 +449,59 @@ fn rewrite_rules_share_one_stage() {
         .collect();
     assert_eq!(described, ["r = neg", "r = neg", "r = add"]);
     assert_ne!(roots[0].1, roots[1].1);
+}
+
+/// The rewrite body of `rule`'s pattern: its actions and its terminator.
+fn rewrite_body(
+    rule: impl FnOnce(&mut BuilderStageInfo<PatternLanguage<L>>) -> Statement,
+) -> (Stage, Vec<Statement>, Option<Statement>) {
+    let (stage, pattern) = build(rule);
+    let (_, _, rewrite) = pattern_parts(&stage, pattern);
+    let body = rewrite.body();
+    let actions = body.statements(&stage).collect();
+    let terminator = body.terminator(&stage);
+    (stage, actions, terminator)
+}
+
+/// `stmts`, described.
+fn describe_all(stage: &Stage, stmts: &[Statement]) -> Vec<String> {
+    stmts.iter().map(|&s| describe(stage, s)).collect()
+}
+
+#[test]
+fn rewrite_rule_without_a_walk_result_has_no_terminator() {
+    let (stage, actions, terminator) = rewrite_body(double_neg);
+    assert_eq!(describe_all(&stage, &actions), ["replace", "erase"]);
+    assert_eq!(terminator, None);
+}
+
+#[test]
+fn rewrite_rule_ends_the_body_in_a_fixed_walk_result() {
+    let (stage, actions, terminator) = rewrite_body(double_neg_then_skip);
+    assert_eq!(describe_all(&stage, &actions), ["replace"]);
+    assert_eq!(describe(&stage, terminator.unwrap()), "skip");
+}
+
+/// The native call runs as the last action; the terminator reads its one
+/// anonymous result.
+#[test]
+fn rewrite_rule_ends_the_body_in_a_native_walk_result() {
+    let (stage, actions, terminator) = rewrite_body(double_neg_then_decide);
+    assert_eq!(
+        describe_all(&stage, &actions),
+        ["replace", "_ = call decide"]
+    );
+    let PatternLanguage::Wildcard(PatternStatement::WalkResultOf(walk)) =
+        terminator.unwrap().expect_info(&stage).definition()
+    else {
+        panic!("expected a `wildcard.walk_result`");
+    };
+    let call_result = actions[1]
+        .expect_info(&stage)
+        .definition()
+        .results()
+        .next()
+        .copied()
+        .map(SSAValue::from);
+    assert_eq!(Some(walk.value()), call_result);
 }
