@@ -240,7 +240,7 @@ impl GenerateHasDialectParser {
             .filter(|f| field_occurrences.contains_key(&f.index) || !f.has_default())
             .collect();
 
-        let has_named = ast_fields.first().and_then(|f| f.ident.as_ref()).is_some();
+        let has_named = collected.iter().any(|f| f.ident.is_some());
 
         let phantom_data = if type_params.is_empty() {
             quote! { ::core::marker::PhantomData::<fn() -> (&'t (), __TypeOutput, __LanguageOutput)> }
@@ -327,7 +327,7 @@ impl GenerateHasDialectParser {
             })
             .collect();
 
-        let has_named = ast_fields.first().and_then(|f| f.ident.as_ref()).is_some();
+        let has_named = collected.iter().any(|f| f.ident.is_some());
 
         let phantom_data = if type_params.is_empty() {
             quote! { ::core::marker::PhantomData::<fn() -> (&'t (), __TypeOutput, __LanguageOutput)> }
