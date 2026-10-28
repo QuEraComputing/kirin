@@ -27,19 +27,20 @@ class CallGraph(Printable):
         self.defs = {}
         self.edges = {}
         self.backedges = {}
-        self.__build(mt)
+        self.__build(mt, set())
+        for callee, callers in self.edges.items():
+            for caller in callers:
+                self.backedges.setdefault(caller, set()).add(callee)
 
-    def __build(self, mt: ir.Method):
+    def __build(self, mt: ir.Method, visited: set[ir.Method]):
+        if mt in visited:
+            return
+        visited.add(mt)
         for stmt in mt.callable_region.walk():
             if isinstance(stmt, func.Invoke):
                 edges = self.edges.setdefault(stmt.callee, set())
                 edges.add(mt)
-                self.__build(stmt.callee)
-
-        for caller in self.edges:
-            for callee in self.edges[caller]:
-                backedges = self.backedges.setdefault(callee, set())
-                backedges.add(caller)
+                self.__build(stmt.callee, visited)
 
     def get_neighbors(self, node: ir.Method) -> Iterable[ir.Method]:
         """Get the neighbors of a node in the call graph."""
