@@ -82,6 +82,49 @@ wildcard.pattern @add_zero block ^bb() {
 }
 
 #[test]
+fn test_walk_terminators_roundtrip() {
+    for input in ["wildcard.advance", "wildcard.skip", "wildcard.interrupt"] {
+        roundtrip::assert_statement_roundtrip::<PatternLanguage>(input, &[]);
+    }
+}
+
+#[test]
+fn test_walk_result_roundtrip() {
+    roundtrip::assert_statement_roundtrip::<PatternLanguage>(
+        "wildcard.walk_result %w",
+        &[("w", ArithType::I64)],
+    );
+}
+
+#[test]
+fn test_pattern_with_walk_terminators_roundtrip() {
+    let input = r#"
+wildcard.pattern @double_neg block ^bb() {
+  %x = wildcard.hole -> i64;
+  %a = neg %x -> i64;
+  %r = neg %a -> i64;
+  wildcard.rewrite 2 block ^rw() {
+    wildcard.replace %r with %x;
+    wildcard.skip;
+  };
+}"#;
+    roundtrip::assert_statement_roundtrip::<PatternLanguage>(input.trim(), &[]);
+
+    let input = r#"
+wildcard.pattern @double_neg block ^bb() {
+  %x = wildcard.hole -> i64;
+  %a = neg %x -> i64;
+  %r = neg %a -> i64;
+  wildcard.rewrite 2 block ^rw() {
+    wildcard.replace %r with %x;
+    %w = wildcard.native_call "decide"(%x) -> i64;
+    wildcard.walk_result %w;
+  };
+}"#;
+    roundtrip::assert_statement_roundtrip::<PatternLanguage>(input.trim(), &[]);
+}
+
+#[test]
 fn test_add_zero_pattern_built_with_builder() {
     let mut stage: BuilderStageInfo<PatternLanguage> = BuilderStageInfo::default();
 

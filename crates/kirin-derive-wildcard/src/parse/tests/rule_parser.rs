@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::model::StmtKind;
+use crate::model::{StmtKind, WalkResult};
 use crate::parse::RuleParser;
 
 use super::helpers::{error, kind_name};
@@ -124,7 +124,7 @@ fn parse_lowers_a_whole_rule() {
     );
     // The replacement ops are in the rewrite, not the match, and the root is
     // the `mul`.
-    let StmtKind::Rewrite { root, body } = &model.statement(model.body()[7]).kind else {
+    let StmtKind::Rewrite { root, body, .. } = &model.statement(model.body()[7]).kind else {
         panic!("expected a rewrite");
     };
     assert_eq!(*root, model.body()[3]);
@@ -219,7 +219,7 @@ fn parse_accepts_a_rule_ending_in_a_lone_action() {
             "rewrite"
         ]
     );
-    let StmtKind::Rewrite { root, body } = &model.statement(model.body()[6]).kind else {
+    let StmtKind::Rewrite { root, body, .. } = &model.statement(model.body()[6]).kind else {
         panic!("expected a rewrite");
     };
     assert_eq!(*root, model.body()[3]);
@@ -644,5 +644,257 @@ fn parse_reports_an_unreachable_op_but_not_the_holes_only_it_reads() {
             "this `op![..]` does not feed the root of the rewrite, so it is never matched",
             "the hole `a` is not an argument of any `op![..]`, so matching will never bind it",
         ]
+    );
+}
+
+// --- the walk result: the tail expression of the `rewrite!` body ---
+
+/// The kind of the walk result the rule's `rewrite!` body ends in.
+fn walk_result_of(item: syn::ItemFn) -> (crate::model::RuleModel, Option<&'static str>) {
+    let model = RuleParser::parse(&item).unwrap();
+    let walk_result =
+        model
+            .walk_result()
+            .map(|walk_result| match &model.statement(walk_result).kind {
+                StmtKind::WalkResult(WalkResult::Advance) => "advance",
+                StmtKind::WalkResult(WalkResult::Skip) => "skip",
+                StmtKind::WalkResult(WalkResult::Interrupt) => "interrupt",
+                StmtKind::WalkResult(WalkResult::Value(_)) => "value",
+                _ => panic!("expected a walk result"),
+            });
+    (model, walk_result)
+}
+
+#[test]
+fn parse_accepts_a_fixed_walk_result() {
+    for (item, expected) in [
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, {
+                        replace!(r, x);
+                        advance!()
+                    })
+                }
+            ),
+            "advance",
+        ),
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, {
+                        replace!(r, x);
+                        skip!()
+                    })
+                }
+            ),
+            "skip",
+        ),
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, {
+                        replace!(r, x);
+                        interrupt!()
+                    })
+                }
+            ),
+            "interrupt",
+        ),
+    ] {
+        let (model, walk_result) = walk_result_of(item);
+        assert_eq!(walk_result, Some(expected));
+        let (_, body) = model.rewrite();
+        let kinds: Vec<_> = body.iter().map(|&id| kind_name(&model, id)).collect();
+        assert_eq!(kinds, ["replace"], "the walk result is not an action");
+    }
+}
+
+#[test]
+fn parse_accepts_a_body_without_a_walk_result() {
+    let (_, walk_result) = walk_result_of(parse_quote!(
+        fn rule() {
+            let r = op![Arith::neg(x)];
+            rewrite!(r, {
+                replace!(r, x);
+            })
+        }
+    ));
+    assert_eq!(walk_result, None);
+}
+
+/// A native call as the tail runs as the body's last action, and the walk
+/// reads its one result.
+#[test]
+fn parse_accepts_a_native_call_as_the_walk_result() {
+    let (model, walk_result) = walk_result_of(parse_quote!(
+        fn rule() {
+            let r = op![Arith::neg(x)];
+            rewrite!(r, {
+                replace!(r, x);
+                decide(x)
+            })
+        }
+    ));
+    assert_eq!(walk_result, Some("value"));
+    let (_, body) = model.rewrite();
+    let kinds: Vec<_> = body.iter().map(|&id| kind_name(&model, id)).collect();
+    assert_eq!(kinds, ["replace", "compute"]);
+    let StmtKind::WalkResult(WalkResult::Value(value)) =
+        &model.statement(model.walk_result().unwrap()).kind
+    else {
+        panic!("expected a walk result value");
+    };
+    assert_eq!(model.value(value.value).stmt, body[1]);
+}
+
+#[test]
+fn parse_accepts_a_native_result_bound_in_the_body_as_the_walk_result() {
+    let (model, walk_result) = walk_result_of(parse_quote!(
+        fn rule() {
+            let r = op![Arith::neg(x)];
+            rewrite!(r, {
+                let w = decide(x);
+                replace!(r, x);
+                w
+            })
+        }
+    ));
+    assert_eq!(walk_result, Some("value"));
+    let StmtKind::WalkResult(WalkResult::Value(value)) =
+        &model.statement(model.walk_result().unwrap()).kind
+    else {
+        panic!("expected a walk result value");
+    };
+    let (_, body) = model.rewrite();
+    assert_eq!(model.value(value.value).stmt, body[0]);
+}
+
+#[test]
+fn parse_rejects_misplaced_or_malformed_walk_results() {
+    let misplaced =
+        "`skip!()` can only be the last expression of the body of `rewrite!`, without a semicolon";
+    let not_native = "the walk result must be computed by a native function in the `rewrite!` body";
+    let no_action =
+        "the body of `rewrite!` must contain an `erase!`, a `replace!` or a native call";
+    let cases: [(syn::ItemFn, &str); 8] = [
+        // With a semicolon, or before another statement.
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, {
+                        replace!(r, x);
+                        skip!();
+                    })
+                }
+            ),
+            misplaced,
+        ),
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, {
+                        skip!();
+                        replace!(r, x);
+                    })
+                }
+            ),
+            misplaced,
+        ),
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, {
+                        replace!(r, x);
+                        skip!(r)
+                    })
+                }
+            ),
+            "`skip!` takes no arguments",
+        ),
+        // A value no native function in the body computed: a native result
+        // from the match, or a matched op's result.
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    let w = decide(x);
+                    rewrite!(r, {
+                        replace!(r, x);
+                        w
+                    })
+                }
+            ),
+            not_native,
+        ),
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, {
+                        erase!(r);
+                        x
+                    })
+                }
+            ),
+            not_native,
+        ),
+        // Any other expression.
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, {
+                        replace!(r, x);
+                        true
+                    })
+                }
+            ),
+            "the last expression of the body of `rewrite!` must be `advance!()`, `skip!()`, `interrupt!()`, a native call or the name of a native call's result",
+        ),
+        // A walk result alone changes nothing, even from a native call.
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, { skip!() })
+                }
+            ),
+            no_action,
+        ),
+        (
+            parse_quote!(
+                fn rule() {
+                    let r = op![Arith::neg(x)];
+                    rewrite!(r, { decide(r) })
+                }
+            ),
+            no_action,
+        ),
+    ];
+    for (item, message) in cases {
+        assert_eq!(error(RuleParser::parse(&item)), message);
+    }
+}
+
+#[test]
+fn parse_rejects_a_walk_result_reading_an_erased_value() {
+    assert_eq!(
+        error(RuleParser::parse(&parse_quote!(
+            fn rule() {
+                let r = op![Arith::neg(x)];
+                rewrite!(r, {
+                    replace!(r, x);
+                    decide(r)
+                })
+            }
+        ))),
+        "`r` was redirected by `replace!` above and cannot be used afterwards"
     );
 }

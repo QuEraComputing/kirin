@@ -2,7 +2,7 @@ use quote::quote;
 use syn::parse_quote;
 
 use super::RuleCodegen;
-use crate::model::{RuleModel, StmtId, StmtKind, ValueId};
+use crate::model::{RuleModel, StmtId, StmtKind, ValueId, WalkResult};
 use crate::parse::RuleParser;
 use crate::rewrite_rule::RuleArgs;
 
@@ -398,7 +398,7 @@ fn rewrite_builds_its_body_block_then_the_rewrite() {
     let model = &codegen.model;
 
     let rewrite = *model.body().last().unwrap();
-    let StmtKind::Rewrite { root, body } = &model.statement(rewrite).kind else {
+    let StmtKind::Rewrite { root, body, .. } = &model.statement(rewrite).kind else {
         panic!("expected a rewrite");
     };
     let rewrite_id = codegen.statement_ident(rewrite);
@@ -412,7 +412,81 @@ fn rewrite_builds_its_body_block_then_the_rewrite() {
         let #rewrite_id = ::kirin_wildcard::Rewrite::<__Type>::new(stage, 2, rewrite_body).id;
     };
     assert_eq!(
-        codegen.rewrite(rewrite, *root, body).to_string(),
+        codegen.rewrite(rewrite, *root, body, None).to_string(),
+        expected.to_string()
+    );
+}
+
+#[test]
+fn rewrite_ends_its_body_block_in_the_walk_result() {
+    let item: syn::ItemFn = parse_quote!(
+        fn neg_skip() {
+            let r = op![Arith::neg(x)];
+            rewrite!(r, {
+                replace!(r, x);
+                skip!()
+            })
+        }
+    );
+    let codegen = RuleCodegen::new(RuleParser::parse(&item).unwrap(), item, args());
+    let model = &codegen.model;
+
+    let rewrite = *model.body().last().unwrap();
+    let StmtKind::Rewrite {
+        root,
+        body,
+        walk_result,
+    } = &model.statement(rewrite).kind
+    else {
+        panic!("expected a rewrite");
+    };
+    let walk_result = walk_result.expect("the body ends in `skip!()`");
+    let rewrite_id = codegen.statement_ident(rewrite);
+    let walk_result_id = codegen.statement_ident(walk_result);
+    let [replace] = body.as_slice() else {
+        panic!("expected one action");
+    };
+    let replace_code = codegen.statement(*replace);
+    let replace_id = codegen.statement_ident(*replace);
+    let expected = quote! {
+        #replace_code
+        let #walk_result_id = ::kirin_wildcard::Skip::<__Type>::new(stage).id;
+        let rewrite_body = stage.block().name("neg_skip_rw").stmt(#replace_id).terminator(#walk_result_id).new();
+        let #rewrite_id = ::kirin_wildcard::Rewrite::<__Type>::new(stage, 1, rewrite_body).id;
+    };
+    assert_eq!(
+        codegen
+            .rewrite(rewrite, *root, body, Some(walk_result))
+            .to_string(),
+        expected.to_string()
+    );
+}
+
+#[test]
+fn walk_result_builds_the_walk_result_terminator() {
+    let item: syn::ItemFn = parse_quote!(
+        fn neg_decide() {
+            let r = op![Arith::neg(x)];
+            rewrite!(r, {
+                replace!(r, x);
+                decide(x)
+            })
+        }
+    );
+    let codegen = RuleCodegen::new(RuleParser::parse(&item).unwrap(), item, args());
+    let model = &codegen.model;
+
+    let walk_result = model.walk_result().expect("the body ends in a native call");
+    let StmtKind::WalkResult(WalkResult::Value(value)) = &model.statement(walk_result).kind else {
+        panic!("expected a walk result value");
+    };
+    let walk_result_id = codegen.statement_ident(walk_result);
+    let value_id = codegen.value_ident(value.value);
+    let expected = quote! {
+        let #walk_result_id = ::kirin_wildcard::WalkResultOf::<__Type>::new(stage, #value_id).id;
+    };
+    assert_eq!(
+        codegen.statement(walk_result).to_string(),
         expected.to_string()
     );
 }

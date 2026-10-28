@@ -3,7 +3,7 @@ use quote::{format_ident, quote, quote_spanned};
 use syn::{ext::IdentExt, spanned::Spanned};
 
 use super::RuleCodegen;
-use crate::model::{StmtId, StmtKind, Use, ValueId};
+use crate::model::{StmtId, StmtKind, Use, ValueId, WalkResult};
 
 impl RuleCodegen {
     /// The code building statement `id`, by its kind.
@@ -13,12 +13,17 @@ impl RuleCodegen {
             StmtKind::Op { op, args } => self.op(id, op, args),
             StmtKind::NativeCompute { func, args } => self.native_compute(id, func, args),
             StmtKind::Constraint { success } => self.constraint(id, *success),
-            StmtKind::Rewrite { root, body } => self.rewrite(id, *root, body),
+            StmtKind::Rewrite {
+                root,
+                body,
+                walk_result,
+            } => self.rewrite(id, *root, body, *walk_result),
             StmtKind::Replace {
                 matched,
                 replacement,
             } => self.replace(id, matched.value, replacement.value),
             StmtKind::Erase { stmt: op } => self.erase(id, *op),
+            StmtKind::WalkResult(walk_result) => self.walk_result(id, walk_result),
         }
     }
 
@@ -205,8 +210,15 @@ impl RuleCodegen {
 
     /// `rewrite!(root, { .. })`: the `wildcard.rewrite` terminator for the
     /// pattern block. Establishes `root` for the rewrite rule driver. `root`
-    /// is identified by its position in the pattern body.
-    pub(super) fn rewrite(&self, stmt: StmtId, root: StmtId, body: &[StmtId]) -> TokenStream {
+    /// is identified by its position in the pattern body. The body block
+    /// ends in `walk_result`, if the body has one.
+    pub(super) fn rewrite(
+        &self,
+        stmt: StmtId,
+        root: StmtId,
+        body: &[StmtId],
+        walk_result: Option<StmtId>,
+    ) -> TokenStream {
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
         let ty = self.type_alias();
@@ -217,8 +229,12 @@ impl RuleCodegen {
         let span = Span::mixed_site().located_at(self.model.statement(stmt).span);
         let body_id = syn::Ident::new("rewrite_body", span);
 
-        let body_quotes = body.iter().map(|&s| self.statement(s));
+        let body_quotes = body.iter().chain(&walk_result).map(|&s| self.statement(s));
         let body_ids = body.iter().map(|&s| self.statement_ident(s));
+        let terminator = walk_result.map(|walk_result| {
+            let walk_result_id = self.statement_ident(walk_result);
+            quote! { .terminator(#walk_result_id) }
+        });
         let block_name = format!("{}_rw", self.model.name());
 
         quote! {
@@ -227,6 +243,7 @@ impl RuleCodegen {
                 .block()
                 .name(#block_name)
                 #(.stmt(#body_ids))*
+                #terminator
                 .new();
             let #stmt_id =
                 #krate::Rewrite::<#ty>::new(#stage, #root_position, #body_id).id;
@@ -266,6 +283,29 @@ impl RuleCodegen {
 
         quote! {
             let #stmt_id = #krate::Erase::<#ty>::new(#stage, #op_position).id;
+        }
+    }
+
+    /// The tail expression of a `rewrite!` body: a `wildcard.advance`,
+    /// `wildcard.skip` or `wildcard.interrupt`, or a `wildcard.walk_result`
+    /// of a native function's result.
+    pub(super) fn walk_result(&self, stmt: StmtId, walk_result: &WalkResult) -> TokenStream {
+        let krate = &self.args.crate_path;
+        let stage = self.stage_ident();
+        let ty = self.type_alias();
+        let stmt_id = self.statement_ident(stmt);
+
+        let build = match walk_result {
+            WalkResult::Advance => quote! { #krate::Advance::<#ty>::new(#stage) },
+            WalkResult::Skip => quote! { #krate::Skip::<#ty>::new(#stage) },
+            WalkResult::Interrupt => quote! { #krate::Interrupt::<#ty>::new(#stage) },
+            WalkResult::Value(value) => {
+                let value_id = self.value_ident(value.value);
+                quote! { #krate::WalkResultOf::<#ty>::new(#stage, #value_id) }
+            }
+        };
+        quote! {
+            let #stmt_id = #build.id;
         }
     }
 }

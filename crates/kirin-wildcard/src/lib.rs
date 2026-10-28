@@ -16,6 +16,8 @@
 //! | `wildcard.replace %r with %x` | Redirects every use of the matched `%r` to `%x` |
 //! | `wildcard.erase 2` | Erases the matched statement at position 2 of the pattern body |
 //! | `wildcard.rewrite 2 block ^rw() {..}` | Terminates a pattern body; the statement at position 2 is the root, the body holds the replacement |
+//! | `wildcard.advance`, `wildcard.skip`, `wildcard.interrupt` | Terminates a replacement body: the driver goes on walking, goes on without walking the root's nested statements, or ends the current walk |
+//! | `wildcard.walk_result %w` | Terminates a replacement body: the driver goes on as `%w`, computed by a `native_call` in that body, says |
 //!
 //! # Example
 //!
@@ -38,6 +40,10 @@
 //! that they are unused. Erasing a statement whose results are still used
 //! fails the rewrite, and the pass quarantines the stage.
 //!
+//! A replacement body may end in one walk terminator (`advance`, `skip`,
+//! `interrupt` or `walk_result`), saying how the driver goes on walking once
+//! the rewrite has run. A body without one advances.
+//!
 //! `rewrite` and `erase` name their statement by its 0-based position in the
 //! pattern body rather than by one of its results because kirin-ir statements
 //! take only SSA values as arguments. So a statement without results could not
@@ -59,6 +65,7 @@ mod native_call;
 mod pattern;
 mod replace;
 mod rewrite;
+mod walk;
 
 pub use constraint::Constraint;
 pub use erase::Erase;
@@ -68,6 +75,7 @@ pub use native_call::NativeCall;
 pub use pattern::Pattern;
 pub use replace::Replace;
 pub use rewrite::Rewrite;
+pub use walk::{Advance, Interrupt, Skip, WalkResultOf};
 
 #[cfg(feature = "derive")]
 pub use kirin_derive_wildcard::rewrite_rule;
@@ -98,4 +106,12 @@ pub enum PatternStatement<T: CompileTimeValue> {
     Erase(Erase<T>),
     #[kirin(terminator)]
     Rewrite(Rewrite<T>),
+    #[kirin(terminator)]
+    Advance(Advance<T>),
+    #[kirin(terminator)]
+    Skip(Skip<T>),
+    #[kirin(terminator)]
+    Interrupt(Interrupt<T>),
+    #[kirin(terminator)]
+    WalkResultOf(WalkResultOf<T>),
 }

@@ -21,7 +21,8 @@ e ::=\ & \textsf{let}\ x = \square;\ e && \text{hole} \\
 \mid\ & \textsf{let}\ (y_1, \ldots, y_n) = f(x_1, \ldots, x_m);\ e && \text{native computation} \\
 \mid\ & \textsf{constraint}\ x;\ e && \text{constraint} \\
 \mid\ & \textsf{rewrite}\ s\ \{\ r\ \} && \text{rewrite} \\
-r ::=\ & \epsilon \mid a;\ r && \text{rewrite body} \\
+r ::=\ & w \mid a;\ r && \text{rewrite body} \\
+w ::=\ & \epsilon \mid \textsf{advance} \mid \textsf{skip} \mid \textsf{interrupt} \mid \textsf{walk}\ x && \text{walk result} \\
 a ::=\ & \textsf{let}\ (y_1, \ldots, y_n) = O(x_1, \ldots, x_m) && \text{build} \\
 \mid\ & \textsf{let}\ (y_1, \ldots, y_n) = f(x_1, \ldots, x_m) && \text{native computation} \\
 \mid\ & \textsf{replace}\ y\ \textsf{with}\ x && \text{redirect uses} \\
@@ -36,6 +37,11 @@ The grammar is split into two sets of statements:
 2. $r, a$: the rewrite body and actions. These define the actions that modify the IR: 
    creating, replacing, and erasing ops. Note that native computations in a rewrite body may also
    perform these actions.
+3. $w$: the walk result ending the rewrite body, telling the rewrite driver how to go on walking
+   once the actions have run: go on ($\epsilon$ or $\textsf{advance}$), go on without walking the
+   statements nested in the root ($\textsf{skip}$), end the current walk ($\textsf{interrupt}$),
+   or as the value $x$ a native computation of the rewrite body returned says
+   ($\textsf{walk}\ x$).
 
 #### Clarifications
 Op matching binds both the op at $s$ and its results at $y_i$. We bind $s$ to have some kind
@@ -102,7 +108,8 @@ $$\frac{\Gamma(x) = \textsf{host} \qquad \Gamma;\ \Sigma \vdash_{\textsf{m}} e\ 
 
 ## 5. Rewrite rules
 
-$$\frac{}{\Gamma;\ \Sigma \vdash_{\textsf{rw}} \epsilon\ \textsf{ok}}\ \text{D\footnotesize ONE}$$
+$$\frac{w \in \{\epsilon, \textsf{advance}, \textsf{skip}, \textsf{interrupt}\}}{\Gamma;\ \Sigma \vdash_{\textsf{rw}} w\ \textsf{ok}}\ \text{D\footnotesize ONE}
+\qquad \frac{\Gamma(x) = \textsf{host}}{\Gamma;\ \Sigma \vdash_{\textsf{rw}} \textsf{walk}\ x\ \textsf{ok}}\ \text{W\footnotesize ALK}$$
 
 $$\frac{O : m \to n \qquad \Gamma(x_j) = \textsf{ir} \qquad \Gamma, y_1{:}\textsf{ir}, \ldots, y_n{:}\textsf{ir};\ \Sigma \vdash_{\textsf{rw}} r\ \textsf{ok}}{\Gamma;\ \Sigma \vdash_{\textsf{rw}} \textsf{let}\ (y_1, \ldots, y_n) = O(x_1, \ldots, x_m);\ r\ \textsf{ok}}\ \text{B\footnotesize UILD}$$
 
@@ -121,6 +128,9 @@ $$\frac{\Sigma(s) = (y_1, \ldots, y_n) \qquad \Gamma \setminus \{y_1, \ldots, y_
 - $\text{E\footnotesize RASE}$ After erasing an op $s$, it and its
   results are out of scope. Erasing $s$ while one of its results is still used is a mistake in the
   rule, reported when it runs (§7).
+- $\text{W\footnotesize ALK}$: $x$ must be computed by a native computation of the rewrite body,
+  not of the match. $\Gamma$ does not record where a $\textsf{host}$ value was computed, so the
+  rule does not show this; the macro checks it.
 
 ## 6. Patterns
 
@@ -131,8 +141,9 @@ Additionally, a pattern must also satisfy the following conditions.
   at the root and following each op's arguments back to the matched ops that produce them, must
   reach every matched op. Every hole must also be an argument of one of the ops reached. A pattern
   therefore cannot match an op or bind a hole that has no bearing on the root.
-- The rewrite body contains at least one `replace`, `erase` or native computation. Otherwise
-  the rule would only build values that nothing uses. A native computation counts because it
+- The rewrite body contains at least one `replace`, `erase` or native computation before its
+  walk result. Otherwise the rule would only build values that nothing uses, or only steer the walk
+  without changing the IR. A native computation counts because it
   may act on the IR itself; what it erases or replaces is invisible to the macro, so the checks
   on what the body uses after removing it (§5) do not cover a native's actions.
 
@@ -155,6 +166,9 @@ The table below describes the conversion from the the grammar syntax above to th
 | $\textsf{replace}\ y\ \textsf{with}\ x$ | final `replace!(y, x)`, $y \in \Sigma(s)$  |
 | $\textsf{rewrite}\ s\ \{\ \textsf{replace}\ y\ \textsf{with}\ x;\ \}$ | final `replace!(y, x)`, $y \in \Sigma(s)$ without having to write a `rewrite!()` block|
 | $\textsf{rewrite}\ s\ \{\ \textsf{erase}\ s;\ \}$ | final `erase!(s)` without having to write a `rewrite!` block|
+| $\textsf{advance}$, $\textsf{skip}$, $\textsf{interrupt}$ | `advance!()`, `skip!()`, `interrupt!()` as the last expression of a `rewrite!` body, without a semicolon |
+| $\textsf{let}\ y = f(\vec x);\ \textsf{walk}\ y$ | `f(x1, ..)` as the last expression of a `rewrite!` body, without a semicolon |
+| $\textsf{walk}\ y$ | `y`, bound by a native computation of the `rewrite!` body, as its last expression, without a semicolon |
 
 A `_` result cannot be replaced; an op with one can still be erased if the rule checks it is unused.
 
@@ -169,6 +183,7 @@ A `_` result cannot be replaced; an op with one can still be erased if the rule 
 | $\dagger$ and removal after `erase`: nothing used afterwards | macro
 | erasing an op whose results are still used | not checked statically: kirin-ir's [`Rewriter::erase_statement`](../crates/kirin-ir/src/rewrite/rewriter.rs#L451-L458) rejects it ([`StatementResultsInUse`](../crates/kirin-ir/src/rewrite/rewriter.rs#L109-L111)) and the pass quarantines the stage |
 | $\textsf{rooted}$, $\textsf{acts}$ | macro ($\textsf{rooted}$ in its verification pass) |
+| a walk result is last, at most once, and $\textsf{walk}\ x$ reads a native result of the rewrite body | macro; for patterns built without it, [`RuleSet::add`](../crates/kirin-rewrite/src/rule/rule_set.rs) |
 | $O : m \to n$ (argument and result counts), $O$ in the language | rustc, through the generated constructor call `new_<op_name>` |
 | native call arity and result sorts $\tau_i$ | not yet checked |
 

@@ -1,6 +1,9 @@
 use kirin::prelude::*;
 
-use crate::{Constraint, Erase, Hole, NativeCall, Pattern, PatternStatement, Replace, Rewrite};
+use crate::{
+    Advance, Constraint, Erase, Hole, Interrupt, NativeCall, Pattern, PatternStatement, Replace,
+    Rewrite, Skip, WalkResultOf,
+};
 
 /// The language a pattern is written in: the ops of `L`, reused as-is, plus
 /// the [`PatternStatement`]s.
@@ -19,7 +22,11 @@ pub enum PatternLanguage<L: Dialect> {
         Constraint<L::Type>,
         Replace<L::Type>,
         Erase<L::Type>,
-        Rewrite<L::Type>
+        Rewrite<L::Type>,
+        Advance<L::Type>,
+        Skip<L::Type>,
+        Interrupt<L::Type>,
+        WalkResultOf<L::Type>
     ))]
     Wildcard(PatternStatement<L::Type>),
 }

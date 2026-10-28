@@ -1,0 +1,5 @@
+error: the walk result must be computed by a native function in the `rewrite!` body
+  --> tests/compile-fail/walk_result_from_match.rs:18:9
+   |
+18 |         w
+   |         ^

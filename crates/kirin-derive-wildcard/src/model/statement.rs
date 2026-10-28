@@ -90,11 +90,33 @@ pub(crate) enum StmtKind {
     Constraint { success: ValueId },
     /// `rewrite!(r, { .. });`: the replacement for the match rooted at the
     /// statement `root`. In the source, `root` may be named directly via a
-    /// `let s @ (..)` binding, or by one of its results.
-    Rewrite { root: StmtId, body: Vec<StmtId> },
+    /// `let s @ (..)` binding, or by one of its results. `walk_result` is the
+    /// [`StmtKind::WalkResult`] the body ends in, if any.
+    Rewrite {
+        root: StmtId,
+        body: Vec<StmtId>,
+        walk_result: Option<StmtId>,
+    },
     /// `replace!(r, new_r);`: redirect every use of `matched` to `replacement`.
     Replace { matched: Use, replacement: Use },
     /// `erase!(r);`: erase the matched `stmt`, named directly in the source
     /// rule or by one of its results.
     Erase { stmt: StmtId },
+    /// The tail expression of a `rewrite!` body: how the driver goes on
+    /// walking once the rewrite has run.
+    WalkResult(WalkResult),
+}
+
+/// How a [`StmtKind::WalkResult`] tells the driver to go on.
+#[derive(Debug)]
+pub(crate) enum WalkResult {
+    /// `advance!()`
+    Advance,
+    /// `skip!()`
+    Skip,
+    /// `interrupt!()`
+    Interrupt,
+    /// A native call or a name: the value a native function in the
+    /// `rewrite!` body computed.
+    Value(Use),
 }
