@@ -3,7 +3,7 @@ use std::fmt;
 use crate::derived::chain::ChainFinding;
 use crate::derived::mirrors::block_body::BlockBody;
 use crate::node::ssa::Use;
-use crate::{Block, CFG, DiGraph, LinkedList, SSAValue, Statement};
+use crate::{Block, CFG, DiGraph, LinkedList, SSAValue, Statement, UnGraph};
 
 /// A membership pointer naming a container that is not live.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -62,6 +62,13 @@ pub enum Finding {
     },
     /// A membership pointer names a container that is not live.
     DanglingParent(DanglingParent),
+    /// The wire `value` of `graph` is read by `endpoints` node operand
+    /// slots; an undirected edge joins at most two.
+    UnGraphDegreeExceeded {
+        graph: UnGraph,
+        value: SSAValue,
+        endpoints: usize,
+    },
 }
 
 impl fmt::Display for Finding {
@@ -93,6 +100,14 @@ impl fmt::Display for Finding {
                 terminators.len()
             ),
             Finding::DanglingParent(finding) => write!(f, "{finding}"),
+            Finding::UnGraphDegreeExceeded {
+                graph,
+                value,
+                endpoints,
+            } => write!(
+                f,
+                "wire {value} of UnGraph {graph} is read by {endpoints} node operand slots; at most 2 are allowed"
+            ),
         }
     }
 }

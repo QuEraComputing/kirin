@@ -1056,7 +1056,7 @@ No separate erased template or foreign-id convention is introduced.
 
 Coordinated operand edits are one atomic action. This is required for UnGraph
 endpoint swaps: no sequence of single-slot edits can preserve the binary
-incidence limit when both edges begin full. `replace_operand` is the one-edit
+endpoint limit when both edges begin full. `replace_operand` is the one-edit
 case and `replace_all_uses` preflights and applies its complete edit set as one
 operation.
 
@@ -1476,7 +1476,9 @@ successors: a non-terminator that does produces
 `NonTerminatorSuccessor { stmt }` and contributes no edges. Body ownership
 follows the same rule: a membership pointer naming a dead container produces
 `DanglingParent`, and the chain walker's own defects arrive as
-`Chain(ChainFinding)`.
+`Chain(ChainFinding)`. An `UnGraph` wire read by more than two node slots
+produces `UnGraphDegreeExceeded { graph, value, endpoints }`; the rewriter
+allows such a wire mid-pass and keeps no edge for it.
 Later derivations apply the same rule to graph membership and topology. Derivation
 collects independent findings rather than stopping at the first one — component
 derivations share one findings buffer instead of returning early, so a single
@@ -1525,8 +1527,7 @@ orphans as `ChainDefect` variants. Blocks with multiple terminators are reported
 size information, never traversal control.
 
 `DeriveError` aggregates all independent findings found in one scan. In
-particular, `UnGraphDegreeExceeded { edge_value, incidences }` retains every
-offending `(Statement, operand_index)` occurrence. Finalize maps this aggregate
+particular, each over-full wire is its own `UnGraphDegreeExceeded`. Finalize maps this aggregate
 into `FinalizeError`; pass-boundary derivation retains it as the quarantine
 cause.
 
@@ -1787,15 +1788,17 @@ stage remains valid.
 
 | Method | Effect | Buffers | Notes / current limits |
 |---|---|---|---|
-| `replace_operand` | Rewrite one operand slot; move its use record `old → new`; for a `DiGraph` member, move the slot's edge. | `ChangedOperands` (none if slot unchanged), then `ChangedDiGraphTopology` if an edge changed | operand-index and live-value checked |
-| `replace_all_uses` | Rewrite every operand and `DiGraph` yield slot reading `old` to `new`; transfer use records and move the edges of rewritten member slots. | one `ChangedOperands` per affected statement, one `ChangedDiGraphTopology` per graph whose edges changed, one `ChangedDiGraphYields` per affected graph, then one `ReplacedUses` | returns count of slots rewritten; self-replace is `Ok(0)` |
-| `erase_statement` | Tombstone the statement, unlink it from its block list (or, for a `DiGraph` member, remove its node and incoming edges), drop its operand uses, tombstone its (unused) result values. Statement-owned blocks, `Cfg`s, and `DiGraph`s nested in it are tombstoned with it. Erasing a terminator clears the block's terminator and removes its outgoing edges, leaving the block unterminated. | `ErasedStatement` (covers the nested bodies; no CFG or graph events), then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` for a `DiGraph` member | block- or `DiGraph`-parented, no live result uses (a yield is a use); nested `UnGraph` bodies are not yet tombstoned |
+| `replace_operand` | Rewrite one operand slot; move its use record `old → new`; for a `DiGraph` member, move the slot's edge; for an `UnGraph` node, resync the wires it leaves and joins. | `ChangedOperands` (none if slot unchanged), then `ChangedDiGraphTopology` or `ChangedUnGraphTopology` if an edge changed | operand-index and live-value checked; an `UnGraph` wire may exceed two readers (reported by `verify_derived`) |
+| `replace_all_uses` | Rewrite every operand and `DiGraph` yield slot reading `old` to `new`; transfer use records and move the edges of rewritten member slots (resyncing affected `UnGraph` wires). | one `ChangedOperands` per affected statement, one `ChangedDiGraphTopology` / `ChangedUnGraphTopology` per graph whose edges changed, one `ChangedDiGraphYields` per affected graph, then one `ReplacedUses` | returns count of slots rewritten; self-replace is `Ok(0)` |
+| `erase_statement` | Tombstone the statement, unlink it from its block list (or remove its graph node and the edges touching it, or drop an `UnGraph` edge statement from the member map), drop its operand uses, tombstone its (unused) result values. Statement-owned blocks, `Cfg`s, `DiGraph`s, and `UnGraph`s nested in it are tombstoned with it. Erasing a terminator clears the block's terminator and removes its outgoing edges, leaving the block unterminated. | `ErasedStatement` (covers the nested bodies; no CFG or graph events), then `ChangedTerminator` for a terminator, `ChangedDiGraphTopology` for a `DiGraph` member, or `ChangedUnGraphTopology` for an `UnGraph` member | parented by a block or graph; no live result uses (a `DiGraph` yield is a use, and so is a node reading an edge statement's wire) |
 | `new_result` | Allocate a typed result value for a statement not inserted yet; its arena slot stays empty (not live) until an insert binds it. | none | a value its `Rewriter` never binds is tombstoned when the `Rewriter` is dropped (`run_pass` drops it before verifying) |
 | `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, bind its results, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with no successors; operands must be live; results must be distinct, unbound `new_result` values |
 | `insert_terminator` | Allocate `definition` as the terminator of a block that has none; add operand uses and predecessor entries. | `InsertedStatement`, `ChangedTerminator` | any block (`Cfg` member or statement-owned body); `definition` is a result-less terminator with live operands and successors |
 | `insert_node` | Allocate `definition` as a new `DiGraph` member and node; bind its results, add operand uses and an edge from each member producer of an operand. | `InsertedStatement`, `ChangedDiGraphTopology` | live graph; non-terminator with no successors; live operands (outside ones get no edge); results must be `new_result` values |
 | `replace_yield` | Rewrite one `DiGraph` yield slot; move its yield use `old → new`. Topology is unchanged. | `ChangedDiGraphYields` (none if slot unchanged) | live graph and value, index in range |
-| `replace_statement` | Swap the definition in place, keeping id, position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror or, for a `DiGraph` member, its incoming edges. | `ReplacedStatement`, then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` for a member whose edges changed | block- or `DiGraph`-parented; same result arity and terminator-ness as the original; a non-terminator replacement carries no successors |
+| `insert_ungraph_node` | Allocate `definition` as a new `UnGraph` node; bind its results, add operand uses; each operand that is a wire of the graph becomes an endpoint, and a wire with two endpoints is an edge. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; non-terminator with no successors, not an edge statement; live operands; `new_result` results; a wire may exceed two endpoints (reported by `verify_derived`; it then has no edge) |
+| `insert_ungraph_edge` | Allocate `definition` as a new `UnGraph` edge statement and append it to the member map; its results are new wires with no endpoints. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; an edge statement with no operands, not a terminator, no successors; `new_result` results |
+| `replace_statement` | Swap the definition in place, keeping id, position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror, for a `DiGraph` member its incoming edges, or for an `UnGraph` node the wires it leaves and joins. | `ReplacedStatement`, then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` / `ChangedUnGraphTopology` for a member whose edges changed | parented by a block or graph; same result arity and terminator-ness as the original; a non-terminator replacement carries no successors; an `UnGraph` member keeps its edge role, and an edge statement has no operands |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
 | `append_block` / `insert_block_before` / `insert_block_after` | Allocate an empty block (no terminator) with fresh typed arguments and link it into the `Cfg` block list. | `ChangedBlockList` | anchor must be a live block of a `Cfg` list (not a statement-owned body) |
 | `erase_block` | Unlink the block and tombstone it with its arguments, statements, results, and nested blocks/`Cfg`s; drop their uses and outgoing edges. | `ChangedBlockList`, `ChangedCfg` | rejects if another block still branches to it (a self-loop is fine) or an argument or top-level result is used outside the block; retarget those edges and replace those uses first |
@@ -1968,6 +1971,10 @@ axis — hence the column.
 | `UnknownCfg(cfg)` | liveness | the `Cfg` id does not resolve to a live `Cfg` | `append_block` |
 | `UnknownDiGraph(graph)` | liveness | the `DiGraph` id does not resolve to a live `DiGraph` | `insert_node`, `replace_yield` |
 | `YieldIndexOutOfRange { graph, index }` | liveness | yield index past the graph's yield list | `replace_yield` |
+| `UnknownUnGraph(graph)` | liveness | the `UnGraph` id does not resolve to a live `UnGraph` | `insert_ungraph_node`, `insert_ungraph_edge` |
+| `UnexpectedEdgeStatement` | guard | `insert_ungraph_node` was given an edge statement | `insert_ungraph_node` |
+| `ExpectedEdgeStatement` | guard | `insert_ungraph_edge` was given a node | `insert_ungraph_edge` |
+| `EdgeStatementWithOperands` | guard | an edge statement has operands; a wire consumes no values | `insert_ungraph_edge`, `replace_statement` |
 | `NotInCfgBody(block)` | guard | the block is a statement-owned single-block body (or detached), not a member of a `Cfg` list | CFG block-list methods |
 | `CfgMismatch { block, expected }` | guard | the block belongs to a different `Cfg` than required | `merge_blocks` |
 | `CannotMergeBlockIntoItself(block)` | guard | `merge_blocks` was given the same block twice | `merge_blocks` |
@@ -1981,7 +1988,7 @@ axis — hence the column.
 | `NoSuccessorOperands { stmt, successor }` | guard | an incoming edge's `BranchOp` gives no editable operand list for that successor | `insert_block_arg`, `erase_block_arg` |
 | `SuccessorOperandIndexOutOfRange { stmt, successor, index }` | guard | an incoming edge forwards too few operands for `index` (its arity disagrees with the block's) | `insert_block_arg`, `erase_block_arg` |
 | `OperandIndexOutOfRange { stmt, index }` | liveness | operand index past the statement's operand list | `replace_operand` |
-| `NotInBlockBody(stmt)` | deferred | statement is owned by a graph (or nothing), not a block; for `erase_statement` and `replace_statement`, by an `UnGraph` (or nothing) — `UnGraph` surgery deferred | `erase_statement`, `insert_*`, `replace_statement` |
+| `NotInBlockBody(stmt)` | guard | for `insert_*`, the anchor is owned by a graph (or nothing), not a block; for `erase_statement` and `replace_statement`, the statement is owned by nothing | `erase_statement`, `insert_*`, `replace_statement` |
 | `StatementResultsInUse(stmt)` | guard | a result of the statement is still used elsewhere (for `erase_block`, outside the block); replace those uses first | `erase_statement`, `erase_block` |
 | `AnchorIsTerminator(stmt)` | guard | nothing can follow a terminator, so `insert_after` cannot anchor on one | `insert_after` |
 | `UnexpectedTerminator` | guard | the inserted definition is a terminator where a non-terminator is required (not spliced mid-block, use `insert_terminator`; a `DiGraph` has none) | `insert_*`, `insert_node` |
@@ -1990,7 +1997,7 @@ axis — hence the column.
 | `ResultNotFresh(value)` | guard | a result slot of the inserted definition is not a distinct, unbound `new_result` value of this `Rewriter` | `insert_*` |
 | `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
 | `TerminatorKindMismatch(stmt)` | guard | replacement changes terminator-ness, desyncing the block's terminator cache | `replace_statement` |
-| `EdgeRoleMismatch(stmt)` | guard | replacement changes `IsEdge`, desyncing `GraphMember` classification | `replace_statement` |
+| `EdgeRoleMismatch(stmt)` | guard | the replacement of an `UnGraph` member changes `is_edge()`; nodes and edge statements are stored differently | `replace_statement` |
 
 The immediate `MutationEvent` vocabulary recorded by these methods is
 `ChangedOperands`, `ReplacedUses`, `InsertedStatement`, `ErasedStatement`,
@@ -2704,9 +2711,10 @@ remaining action methods from landing independently.
 covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
 `Block` — what is missing is block-level surgery and the two graph bodies:
 
-- [ ] Until topology maintenance lands, guard graph-owned statements in
-  operand and definition replacement. Once it lands, every successful graph
-  edit maintains the topology mirror atomically; there is no dirty interval.
+- [x] Every successful graph edit maintains the topology mirror atomically;
+  there is no dirty interval. `replace_operand`,
+  `replace_all_uses`/`replace_results`, and `replace_statement` keep `DiGraph`
+  edges and `UnGraph` wires in step (see the surgery items below).
 - [x] Terminator surgery: erase/replace a terminator, maintaining
   `BlockInfo::terminator` and successor edges. Emits `ChangedTerminator`.
   `erase_statement` erases a terminator (leaving the block unterminated),
@@ -2733,20 +2741,31 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   edge maintenance in `replace_operand`, `replace_all_uses`/`replace_results`,
   and `replace_statement` on members. Narrowed scope: no `StableGraph` migration and no topology mirror in `derived/` — the
   petgraph is the store, kept correct incrementally.
-- [ ] `UnGraph` body surgery: insert/erase nodes and edge statements, maintaining
+- [x] `UnGraph` body surgery: insert/erase nodes and edge statements, maintaining
   undirected topology, member order, and degree constraints. Emits
-  `ChangedUnGraphTopology`.
+  `ChangedUnGraphTopology`. Landed as `insert_ungraph_node`,
+  `insert_ungraph_edge`, member erasure through `erase_statement`, tombstoning
+  owned `UnGraph`s with their owner, wire resyncing in `replace_operand`,
+  `replace_all_uses`/`replace_results`, and `replace_statement`, and builder
+  member checks. Narrowed scope, as for `DiGraph`: no `StableGraph` migration
+  and no topology mirror in `derived/`; member order is append on insert and
+  swap-remove on erase (printing order may change). The degree limit is not a
+  per-edit guard: a wire may exceed two readers mid-pass (it then has no edge),
+  and `verify_derived` reports `Finding::UnGraphDegreeExceeded`.
 
 **Graph-body prerequisites found by code audit:**
 
 - [ ] Replace `petgraph::Graph` with `StableGraph` and store one
   `IndexMap<Statement, GraphMember>` beside it. `GraphMember::Node(NodeIndex)`
-  and `GraphMember::Edge` preserve mixed insertion order and provide direct
-  lookup. The map and petgraph are two halves of one derived mirror; membership
+  and `GraphMember::Edge` give every member, node or edge statement, O(1)
+  lookup, insert, and removal (`swap_remove`; see the ordering paragraph
+  below). The map and petgraph are two halves of one derived mirror; membership
   remains authoritative in `StatementInfo::parent`. `UnGraphExtra` becomes
   empty once its separate edge-statement list moves into this map; generic
   `GraphInfo<L, D, Extra>` remains unified and DiGraph never constructs the
-  `Edge` variant.
+  `Edge` variant. The member map has landed (serialized with the graph,
+  replacing the rebuild-on-load index) on top of `petgraph::Graph`; the
+  `StableGraph` swap is still to do.
 - [ ] Move petgraph construction out of graph builders. Builders record
   parents, operands, ports, and yields; their allocation sequence initializes
   the mixed member order, which is presentation state rather than authority.
@@ -2754,22 +2773,27 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   `BuilderStageInfo` and becomes `DeriveError::UnGraphDegreeExceeded` at the
   BuilderStageInfo-to-StageInfo boundary, with every `(Statement, operand_index)`
   occurrence.
-- [ ] Keep topology value-derived. A DiGraph edge is an operand whose result
-  producer is another member. An UnGraph incidence is a use of an edge-member
+- [x] Keep topology value-derived. A DiGraph edge is an operand whose result
+  producer is another member. An UnGraph endpoint is a use of an edge-member
   result or edge port. Captures are distinguished at the graph boundary by
   `edge_count`, never by consumer-field annotations; no per-field topology
   derive is added.
-- [ ] Add an atomic multi-operand edit. It validates the net UnGraph incidence
+- [ ] Add an atomic multi-operand edit. It validates the net UnGraph endpoint
   delta before changing definitions, reverse uses, or mirrors. Single-slot
   replacement delegates to it, and `replace_all_uses` applies its entire use set
-  atomically.
-- [ ] Make `replace_statement` unconditionally require equal `is_edge()` and
-  return `EdgeRoleMismatch`, paralleling its existing terminator classification
-  guard. Declarative rule construction checks this once from op kinds.
+  atomically. Not needed for UnGraph endpoint swaps any more: the degree limit
+  is checked at verification (`Finding::UnGraphDegreeExceeded`), so single
+  edits may pass through an over-full wire.
+- [x] Make `replace_statement` require equal `is_edge()` and return
+  `EdgeRoleMismatch`, paralleling its existing terminator classification
+  guard. Narrowed to `UnGraph` members: `is_edge()` means nothing in blocks or
+  `DiGraph`s. Declarative rule construction checks this once from op kinds.
 
-Graph bodies print in stored insertion order, not a canonical graph order.
-`IndexMap::shift_remove` deliberately avoids reshuffling the remaining output;
-that O(n) cost is presentation stability, not correctness. Derived verification
+Graph bodies print in statement id order, not a canonical graph order. The
+member map does not keep that order itself: removal uses
+`IndexMap::swap_remove`, which moves the last member into the hole in O(1).
+Since id order is derivable, the printer sorts members by statement id, so an
+erase changes only the erased line of the output. Derived verification
 compares member keys as sets and topology edges as normalized multisets over
 statement weights: never compare `NodeIndex`, preserve parallel-edge
 multiplicity, and normalize endpoint order for UnGraph. Independently built

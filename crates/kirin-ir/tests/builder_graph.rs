@@ -166,6 +166,100 @@ fn attach_nodes_to_digraph_rejects_node_with_successors() {
 }
 
 #[test]
+#[should_panic(expected = "as an ungraph edge")]
+fn ungraph_builder_rejects_non_edge_as_edge() {
+    let mut stage = new_stage();
+    let nop = stage.statement().definition(BuilderDialect::Nop).new();
+    let _ = stage.ungraph().edge(nop);
+}
+
+#[test]
+#[should_panic(expected = "as an ungraph node")]
+fn ungraph_builder_rejects_edge_as_node() {
+    let mut stage = new_stage();
+    let (wire_stmt, _) = make_wire(&mut stage);
+    let _ = stage.ungraph().node(wire_stmt);
+}
+
+#[test]
+#[should_panic(expected = "Cannot add terminator statement")]
+fn ungraph_builder_rejects_terminator() {
+    let mut stage = new_stage();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let _ = stage.ungraph().node(ret);
+}
+
+#[test]
+#[should_panic(expected = "with successors to an ungraph")]
+fn ungraph_builder_rejects_successors() {
+    let mut stage = new_stage();
+    let target = stage.block().new();
+    let fork = stage
+        .statement()
+        .definition(BuilderDialect::Fork(Successor::from_block(target)))
+        .new();
+    let _ = stage.ungraph().node(fork);
+}
+
+#[test]
+#[should_panic(expected = "with operands to an ungraph")]
+fn ungraph_builder_rejects_edge_with_operands() {
+    let mut stage = new_stage();
+    let (_, wire) = make_wire(&mut stage);
+    let result: ResultValue = stage.ssa_arena().next_id().into();
+    let param_wire = stage
+        .statement()
+        .definition(BuilderDialect::ParamWire(wire, result))
+        .new();
+    let _ = stage.ungraph().edge(param_wire);
+}
+
+#[test]
+#[should_panic(expected = "as an ungraph node")]
+fn attach_nodes_to_ungraph_rejects_edge_as_node() {
+    let mut stage = new_stage();
+    let (wire_stmt, _) = make_wire(&mut stage);
+    let ug = stage.ungraph().new();
+    stage.attach_nodes_to_ungraph(ug, &[], &[wire_stmt]);
+}
+
+#[test]
+#[should_panic(expected = "with operands to an ungraph")]
+fn attach_nodes_to_ungraph_rejects_edge_with_operands() {
+    let mut stage = new_stage();
+    let (_, wire) = make_wire(&mut stage);
+    let result: ResultValue = stage.ssa_arena().next_id().into();
+    let param_wire = stage
+        .statement()
+        .definition(BuilderDialect::ParamWire(wire, result))
+        .new();
+    let ug = stage.ungraph().new();
+    stage.attach_nodes_to_ungraph(ug, &[param_wire], &[]);
+}
+
+#[test]
+#[should_panic(expected = "which already has members")]
+fn attach_nodes_to_digraph_rejects_a_graph_with_members() {
+    let mut stage = new_stage();
+    let first = stage.statement().definition(BuilderDialect::Nop).new();
+    let second = stage.statement().definition(BuilderDialect::Nop).new();
+    let dg = stage.digraph().new();
+    stage.attach_nodes_to_digraph(dg, &[first], &[]);
+    stage.attach_nodes_to_digraph(dg, &[second], &[]);
+}
+
+#[test]
+#[should_panic(expected = "which already has members")]
+fn attach_nodes_to_ungraph_rejects_a_graph_with_members() {
+    let mut stage = new_stage();
+    let (first, _) = make_wire(&mut stage);
+    let (second, _) = make_wire(&mut stage);
+    let ug = stage.ungraph().new();
+    stage.attach_nodes_to_ungraph(ug, &[first], &[]);
+    stage.attach_nodes_to_ungraph(ug, &[second], &[]);
+}
+
+#[test]
 #[should_panic(expected = "already has a different parent")]
 fn statement_builder_rejects_digraph_with_existing_owner() {
     let mut stage = new_stage();
@@ -256,7 +350,7 @@ fn ungraph_two_nodes_one_edge() {
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 2);
     assert_eq!(info.graph().edge_count(), 1);
-    assert_eq!(info.edge_statements().len(), 1);
+    assert_eq!(info.edge_statements().count(), 1);
     assert_eq!(info.graph()[info.node_idx_of(n0).unwrap()], n0);
     assert_eq!(info.graph()[info.node_idx_of(n1).unwrap()], n1);
     // Edge statements are petgraph edges, not nodes.
@@ -388,7 +482,7 @@ fn ungraph_interleaved_edge_node_order() {
     let info = ug.expect_info(&stage);
     assert_eq!(info.graph().node_count(), 3);
     assert_eq!(info.graph().edge_count(), 2);
-    assert_eq!(info.edge_statements().len(), 2);
+    assert_eq!(info.edge_statements().count(), 2);
 
     assert_eq!(*n0.parent(&stage), Some(StatementParent::UnGraph(ug)));
     assert_eq!(*n1.parent(&stage), Some(StatementParent::UnGraph(ug)));
@@ -511,4 +605,31 @@ fn ungraph_isolated_node_appended_after_bfs() {
         *n_isolated.parent(&stage),
         Some(StatementParent::UnGraph(ug))
     );
+}
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn digraph_builder_rejects_a_node_of_another_graph() {
+    let mut stage = new_stage();
+    let nop = stage.statement().definition(BuilderDialect::Nop).new();
+    let _ = stage.digraph().node(nop).new();
+    let _ = stage.digraph().node(nop).new();
+}
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn ungraph_builder_rejects_a_member_of_another_graph() {
+    let mut stage = new_stage();
+    let (wire_stmt, _) = make_wire(&mut stage);
+    let _ = stage.ungraph().edge(wire_stmt).new();
+    let _ = stage.ungraph().edge(wire_stmt).new();
+}
+
+#[test]
+#[should_panic(expected = "already has a different parent")]
+fn digraph_builder_rejects_a_statement_in_a_block() {
+    let mut stage = new_stage();
+    let nop = stage.statement().definition(BuilderDialect::Nop).new();
+    let _ = stage.block().stmt(nop).new();
+    let _ = stage.digraph().node(nop).new();
 }

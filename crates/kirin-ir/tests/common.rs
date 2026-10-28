@@ -41,6 +41,8 @@ impl Placeholder for TestType {
 /// - `Use(a)`: one SSAValue operand (ungraph node)
 /// - `Gate(a, b)`: two SSAValue operands (ungraph node)
 /// - `Wire(r)`: edge that produces a ResultValue (ungraph edge)
+/// - `ParamWire(a, r)`: an edge statement with an operand, which UnGraphs
+///   reject
 /// - `Split(a, b)`: no operands, two ResultValues (multi-result rewrites)
 /// - `Compute(a, r)`: one operand, one result — a non-terminator that both
 ///   reads and defines values
@@ -56,6 +58,7 @@ impl Placeholder for TestType {
 /// - `OwnBlocks(a, b)`: structurally owns two blocks
 /// - `OwnCFG(cfg)`: structurally owns one CFG
 /// - `OwnGraphs(dg, ug)`: structurally owns one directed and one undirected graph
+/// - `OwnDiGraph(dg)` / `OwnUnGraph(ug)`: structurally owns one graph of a kind
 #[allow(dead_code)]
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum BuilderDialect {
@@ -65,6 +68,7 @@ pub enum BuilderDialect {
     Use(SSAValue),
     Gate(SSAValue, SSAValue),
     Wire(ResultValue),
+    ParamWire(SSAValue, ResultValue),
     Split(ResultValue, ResultValue),
     Compute(SSAValue, ResultValue),
     Isolated,
@@ -76,6 +80,8 @@ pub enum BuilderDialect {
     OwnBlocks(Block, Block),
     OwnCFG(CFG),
     OwnGraphs(DiGraph, UnGraph),
+    OwnDiGraph(DiGraph),
+    OwnUnGraph(UnGraph),
 }
 
 impl<'a> HasArguments<'a> for BuilderDialect {
@@ -83,7 +89,9 @@ impl<'a> HasArguments<'a> for BuilderDialect {
     fn arguments(&'a self) -> Self::Iter {
         match self {
             BuilderDialect::Add(a, b) | BuilderDialect::Gate(a, b) => vec![a, b].into_iter(),
-            BuilderDialect::Use(a) | BuilderDialect::Compute(a, _) => vec![a].into_iter(),
+            BuilderDialect::Use(a)
+            | BuilderDialect::Compute(a, _)
+            | BuilderDialect::ParamWire(a, _) => vec![a].into_iter(),
             BuilderDialect::Jump(_, args) => args.iter().collect::<Vec<_>>().into_iter(),
             _ => vec![].into_iter(),
         }
@@ -95,7 +103,9 @@ impl<'a> HasArgumentsMut<'a> for BuilderDialect {
     fn arguments_mut(&'a mut self) -> Self::IterMut {
         match self {
             BuilderDialect::Add(a, b) | BuilderDialect::Gate(a, b) => vec![a, b].into_iter(),
-            BuilderDialect::Use(a) | BuilderDialect::Compute(a, _) => vec![a].into_iter(),
+            BuilderDialect::Use(a)
+            | BuilderDialect::Compute(a, _)
+            | BuilderDialect::ParamWire(a, _) => vec![a].into_iter(),
             BuilderDialect::Jump(_, args) => args.iter_mut().collect::<Vec<_>>().into_iter(),
             _ => vec![].into_iter(),
         }
@@ -106,9 +116,10 @@ impl<'a> HasResults<'a> for BuilderDialect {
     type Iter = std::vec::IntoIter<&'a ResultValue>;
     fn results(&'a self) -> Self::Iter {
         match self {
-            BuilderDialect::Wire(r) | BuilderDialect::Invoke(r) | BuilderDialect::Compute(_, r) => {
-                vec![r].into_iter()
-            }
+            BuilderDialect::Wire(r)
+            | BuilderDialect::Invoke(r)
+            | BuilderDialect::Compute(_, r)
+            | BuilderDialect::ParamWire(_, r) => vec![r].into_iter(),
             BuilderDialect::Split(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }
@@ -119,9 +130,10 @@ impl<'a> HasResultsMut<'a> for BuilderDialect {
     type IterMut = std::vec::IntoIter<&'a mut ResultValue>;
     fn results_mut(&'a mut self) -> Self::IterMut {
         match self {
-            BuilderDialect::Wire(r) | BuilderDialect::Invoke(r) | BuilderDialect::Compute(_, r) => {
-                vec![r].into_iter()
-            }
+            BuilderDialect::Wire(r)
+            | BuilderDialect::Invoke(r)
+            | BuilderDialect::Compute(_, r)
+            | BuilderDialect::ParamWire(_, r) => vec![r].into_iter(),
             BuilderDialect::Split(a, b) => vec![a, b].into_iter(),
             _ => vec![].into_iter(),
         }
@@ -229,7 +241,9 @@ impl<'a> HasDigraphs<'a> for BuilderDialect {
     type Iter = std::vec::IntoIter<&'a DiGraph>;
     fn digraphs(&'a self) -> Self::Iter {
         match self {
-            BuilderDialect::OwnGraphs(graph, _) => vec![graph].into_iter(),
+            BuilderDialect::OwnGraphs(graph, _) | BuilderDialect::OwnDiGraph(graph) => {
+                vec![graph].into_iter()
+            }
             _ => vec![].into_iter(),
         }
     }
@@ -239,7 +253,9 @@ impl<'a> HasDigraphsMut<'a> for BuilderDialect {
     type IterMut = std::vec::IntoIter<&'a mut DiGraph>;
     fn digraphs_mut(&'a mut self) -> Self::IterMut {
         match self {
-            BuilderDialect::OwnGraphs(graph, _) => vec![graph].into_iter(),
+            BuilderDialect::OwnGraphs(graph, _) | BuilderDialect::OwnDiGraph(graph) => {
+                vec![graph].into_iter()
+            }
             _ => vec![].into_iter(),
         }
     }
@@ -249,7 +265,9 @@ impl<'a> HasUngraphs<'a> for BuilderDialect {
     type Iter = std::vec::IntoIter<&'a UnGraph>;
     fn ungraphs(&'a self) -> Self::Iter {
         match self {
-            BuilderDialect::OwnGraphs(_, graph) => vec![graph].into_iter(),
+            BuilderDialect::OwnGraphs(_, graph) | BuilderDialect::OwnUnGraph(graph) => {
+                vec![graph].into_iter()
+            }
             _ => vec![].into_iter(),
         }
     }
@@ -259,7 +277,9 @@ impl<'a> HasUngraphsMut<'a> for BuilderDialect {
     type IterMut = std::vec::IntoIter<&'a mut UnGraph>;
     fn ungraphs_mut(&'a mut self) -> Self::IterMut {
         match self {
-            BuilderDialect::OwnGraphs(_, graph) => vec![graph].into_iter(),
+            BuilderDialect::OwnGraphs(_, graph) | BuilderDialect::OwnUnGraph(graph) => {
+                vec![graph].into_iter()
+            }
             _ => vec![].into_iter(),
         }
     }
@@ -267,7 +287,10 @@ impl<'a> HasUngraphsMut<'a> for BuilderDialect {
 
 impl IsEdge for BuilderDialect {
     fn is_edge(&self) -> bool {
-        matches!(self, BuilderDialect::Wire(_))
+        matches!(
+            self,
+            BuilderDialect::Wire(_) | BuilderDialect::ParamWire(..)
+        )
     }
 }
 

@@ -26,6 +26,7 @@ mod pass_tests;
 pub(crate) mod quarantine;
 mod results;
 pub(crate) mod rewriter;
+pub(crate) mod ungraph;
 
 pub use quarantine::{QuarantineCause, Quarantined};
 pub use rewriter::{MutationEvent, RewriteError, Rewriter};

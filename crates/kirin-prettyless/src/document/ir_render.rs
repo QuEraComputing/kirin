@@ -450,7 +450,7 @@ where
     /// Print an UnGraph body only: interleaved edge/node statements, no header, no braces.
     pub fn print_ungraph_body_only(&'a self, ungraph: &UnGraph) -> ArenaDoc<'a> {
         let info = ungraph.expect_info(self.stage);
-        let edge_stmts = info.edge_statements();
+        let edge_stmts: Vec<Statement> = info.edge_statements().collect();
 
         let edge_result_to_stmt: std::collections::HashMap<SSAValue, Statement> = edge_stmts
             .iter()
@@ -485,7 +485,7 @@ where
             first = false;
         }
 
-        for &edge_stmt in edge_stmts {
+        for &edge_stmt in &edge_stmts {
             if printed_edges.insert(edge_stmt) {
                 if !first {
                     inner += self.line_();

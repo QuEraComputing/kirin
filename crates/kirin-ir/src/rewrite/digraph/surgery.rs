@@ -1,5 +1,3 @@
-use smallvec::SmallVec;
-
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::{DiGraph, DiGraphInfo, Dialect, SSAValue, Statement, StatementParent, Use};
 
@@ -63,20 +61,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         stmt: Statement,
         graph: DiGraph,
     ) -> Result<(), RewriteError> {
-        let results: SmallVec<[SSAValue; 2]> = stmt
-            .expect_info(self.stage)
-            .definition
-            .results()
-            .map(|&result| result.into())
-            .collect();
-        for result in results {
-            if result
-                .get_info(self.stage)
-                .is_some_and(|info| !info.uses().is_empty())
-            {
-                return Err(RewriteError::StatementResultsInUse(stmt));
-            }
-        }
+        self.ensure_results_unused(stmt)?;
 
         // Its results are unused, so it has no outgoing edges; removing the
         // node drops exactly the edges from its operands.
@@ -98,7 +83,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let Ok(info) = self.live_digraph(graph) else {
             return;
         };
-        let members: Vec<Statement> = info.graph().node_weights().copied().collect();
+        let members: Vec<Statement> = info.members().map(|(stmt, _)| stmt).collect();
         let yields: Vec<SSAValue> = info.yields().to_vec();
         let ports: Vec<SSAValue> = info.ports().iter().map(|&port| port.into()).collect();
 

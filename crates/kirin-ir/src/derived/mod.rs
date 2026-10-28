@@ -47,6 +47,7 @@ mod error;
 mod mirrors;
 #[cfg(test)]
 mod tests;
+mod ungraph_degree;
 
 pub use chain::{ChainDefect, ChainFinding};
 pub use error::{DanglingParent, DeriveError, Finding, Mismatch, VerifyError};
@@ -137,6 +138,7 @@ fn derive_partial<L: Dialect>(stage: &StageInfo<L>) -> (Mirrors, Vec<Finding>) {
     let predecessors = predecessors::derive(stage, &mut findings);
     let block_bodies = block_body::derive(stage, &mut findings);
     let cfg_blocks = cfg_blocks::derive(stage, &mut findings);
+    ungraph_degree::check(stage, &mut findings);
 
     (
         Mirrors {
