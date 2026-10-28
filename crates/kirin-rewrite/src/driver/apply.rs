@@ -1,3 +1,4 @@
+use kirin_ir::walk::WalkResult;
 use kirin_ir::{Dialect, GetInfo, RewriteError, Rewriter, SSAValue, Statement};
 use kirin_wildcard::{PatternLanguage, PatternStatement};
 
@@ -6,14 +7,15 @@ use crate::rule::{Step, native_call};
 use crate::{CheckedRule, RuleSet};
 
 impl Match {
-    /// Run `rule`'s rewrite body, in order, for this match rooted at `root`.
+    /// Run `rule`'s rewrite body, in order, for this match rooted at `root`,
+    /// and return how its walk result says the driver goes on walking.
     pub(crate) fn apply<L: Dialect>(
         mut self,
         rules: &RuleSet<L>,
         rule: &CheckedRule<L>,
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
-    ) -> Result<(), DriverError> {
+    ) -> Result<WalkResult, DriverError> {
         let patterns = rules.patterns();
         let failed = |error: RewriteError| DriverError::Rewrite {
             rule: rule.name().to_string(),
@@ -52,7 +54,22 @@ impl Match {
                 },
             }
         }
-        Ok(())
+        let Some(walk_result) = rule.walk_result() else {
+            return Ok(WalkResult::Advance);
+        };
+        match walk_result.expect_info(patterns).definition() {
+            PatternLanguage::Wildcard(PatternStatement::Advance(_)) => Ok(WalkResult::Advance),
+            PatternLanguage::Wildcard(PatternStatement::Skip(_)) => Ok(WalkResult::Skip),
+            PatternLanguage::Wildcard(PatternStatement::Interrupt(_)) => Ok(WalkResult::Interrupt),
+            PatternLanguage::Wildcard(PatternStatement::WalkResultOf(walk)) => self
+                .value(rule, walk.value())?
+                .get::<WalkResult>()
+                .copied()
+                .ok_or_else(|| DriverError::NotAWalkResult {
+                    rule: rule.name().to_string(),
+                }),
+            _ => unreachable!("RewriteRule::new rejects other rewrite-body terminators"),
+        }
     }
 
     /// The SSA value pattern value `value` is bound to.
