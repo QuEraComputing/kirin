@@ -1,0 +1,25 @@
+name: Rust minimum supported version
+
+on:
+  pull_request:
+    branches: [rust]
+  push:
+    branches: [rust]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  msrv:
+    name: Rust 1.98.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Rust 1.98.0
+        # Compile-fail snapshots include standard-library source excerpts.
+        run: rustup toolchain install 1.98.0 --profile minimal --component rustfmt --component rust-src
+      - name: Build workspace
+        run: cargo +1.98.0 build --workspace --locked
+      - name: Test workspace (including doctests)
+        run: cargo +1.98.0 test --workspace --locked
