@@ -2845,42 +2845,23 @@ policy.
   terminating rule set needs, so it only catches rules that never reach a
   fixpoint. A single sweep has no limit.
 
-**Landed ahead of the native path: a declarative-rule driver.** The first
-driver runs `#[rewrite_rule]` patterns rather than native rules:
+**Landed ahead of the native path: a declarative-rule driver.** The walk and
+fixpoint items above landed with a driver for `#[rewrite_rule]` patterns
+rather than native rules; the native items stay open. The traversal orders
+and their edit contract are documented in `kirin_ir::walk`, and the rule set
+and driver in `kirin_rewrite`. In short: walks may edit a visited
+statement's siblings and nested statements, but must not erase it or any of
+its ancestors. Each sweep tries every rule in order at each visited
+statement, then runs a dead-code cleanup, and the fixpoint ends at the first
+sweep recording no `MutationEvent`. Decisions to revisit in later
+milestones:
 
-- `kirin_ir::walk` defines the traversal orders over the statement nesting
-  tree — `PreOrder`, `PostOrder`, `BFS`, `ReverseBFS` (BFS backwards: each
-  level right to left), `KeepOrderReverseBFS` (deepest level first, each in
-  program order) — as `WalkOrder` marker
-  types, each starting a `WalkCursor` that is stepped one statement at a time
-  so the IR can be edited in between. `PreOrder`/`PostOrder` follow the IR's
-  own parent/sibling links in O(1) extra space; `BFS` follows them too,
-  keeping only the body-owning statements of two adjacent levels; all three
-  see edits made ahead of the cursor. The two reverse orders build their
-  order at the start in O(n). Contract, for every order: edits while visiting a
-  statement must not erase it or any of its ancestors; they may add or
-  erase its siblings and the statements nested in it. An erased visited
-  statement is reported as `WalkError` on the next step.
-- `kirin_rewrite::RuleSet` checks each `wildcard.pattern` once into a
-  `RewriteRule` (matched producer closure, checks, actions) and owns the
-  `NativeRegistry` resolving `native_call` names: check functions in pattern
-  bodies, action functions in rewrite bodies, exchanging `NativeValue`s.
-  Unregistered names are rejected when the rule is added.
-- `RewriteDriver::run::<O>` / `run_at::<O>` take the pass's `Rewriter`, so
-  they run inside `Pipeline::run_pass`. A sweep tries every rule in order at
-  each statement the cursor visits (Kirin-python `Chain` semantics), then a
-  dead-code cleanup erases pure, unused, non-terminator statements under the
-  root, mostly what the rules left behind. Blocks are cleaned from their
-  end; `DiGraph`s from their sinks, queuing a member's producers when it is
-  erased, so a dead chain goes in one pass. `UnGraph`s are not cleaned, by
-  design: their nodes consume wires but are not consumed, so there is no
-  "unused" to test. The fixpoint ends at the first sweep (rules plus
-  cleanup) recording no `MutationEvent`.
-- Rules may not erase their root (`RuleErrorKind::ErasesRoot`, checked when
-  the rule is added); a root left dead is removed by the dead-code cleanup. A
-  rule's other erase targets are producers of the root, which are never
-  nested in or around it, so declarative rules satisfy the walk contract by
-  construction. Native actions are not checked.
+- Rules may not erase their root (`RuleErrorKind::ErasesRoot`); a root left
+  dead goes to the dead-code cleanup. A rule's other erase targets are
+  producers of the root, never nested in or around it, so declarative rules
+  meet the walk contract by construction. Native actions are not checked.
+- `UnGraph`s are not cleaned, by design: their nodes consume wires but are not
+  consumed, so there is no "unused" to test.
 - Until the `RewriteDialect` derive (M4) exists, op matching clones the
   pattern op, overwrites its operands and results with the candidate's, and
   compares with `==`. Ops with bodies or successors are rejected; types are
