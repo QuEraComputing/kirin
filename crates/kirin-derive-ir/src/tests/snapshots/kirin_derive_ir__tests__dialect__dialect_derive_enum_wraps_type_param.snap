@@ -505,6 +505,30 @@ where
     }
 }
 #[automatically_derived]
+impl<L: Dialect> ::kirin::ir::BranchOp for PatternOps<L> {
+    fn successor_operands(&self, index: usize) -> ::core::option::Option<&[::kirin::ir::SSAValue]> {
+        match self {
+            Self::Op(field_0) => <L as ::kirin::ir::BranchOp>::successor_operands(field_0, index),
+            Self::Hole(field_0) => {
+                <HoleOp<L::Type> as ::kirin::ir::BranchOp>::successor_operands(field_0, index)
+            }
+        }
+    }
+    fn successor_operands_mut(
+        &mut self,
+        index: usize,
+    ) -> ::core::option::Option<&mut ::std::vec::Vec<::kirin::ir::SSAValue>> {
+        match self {
+            Self::Op(field_0) => {
+                <L as ::kirin::ir::BranchOp>::successor_operands_mut(field_0, index)
+            }
+            Self::Hole(field_0) => {
+                <HoleOp<L::Type> as ::kirin::ir::BranchOp>::successor_operands_mut(field_0, index)
+            }
+        }
+    }
+}
+#[automatically_derived]
 impl<L: Dialect> ::core::convert::From<HoleOp<L::Type>> for PatternOps<L> {
     fn from(from: HoleOp<L::Type>) -> Self {
         PatternOps::Hole(from)

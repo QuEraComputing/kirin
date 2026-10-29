@@ -9,7 +9,7 @@ use crate::{Constraint, Erase, Hole, NativeCall, Pattern, PatternStatement, Repl
 /// is ended by its [`Rewrite`], so a matched terminator of `L` is an ordinary
 /// statement of it. That is why the `Dialect` traits are derived one by one
 /// instead of with `#[derive(Dialect)]`, which would delegate `is_terminator`
-/// too.
+/// too. [`BranchOp`] has no standalone derive, so it is implemented by hand.
 #[derive(
     Debug,
     Clone,
@@ -65,6 +65,23 @@ impl<L: Dialect> IsTerminator for PatternLanguage<L> {
         match self {
             Self::Op(_) => false,
             Self::Wildcard(statement) => statement.is_terminator(),
+        }
+    }
+}
+
+/// Forwards to the wrapped statement, matching the derived `HasSuccessors`.
+impl<L: Dialect> BranchOp for PatternLanguage<L> {
+    fn successor_operands(&self, index: usize) -> Option<&[SSAValue]> {
+        match self {
+            Self::Op(op) => op.successor_operands(index),
+            Self::Wildcard(statement) => statement.successor_operands(index),
+        }
+    }
+
+    fn successor_operands_mut(&mut self, index: usize) -> Option<&mut Vec<SSAValue>> {
+        match self {
+            Self::Op(op) => op.successor_operands_mut(index),
+            Self::Wildcard(statement) => statement.successor_operands_mut(index),
         }
     }
 }
