@@ -60,14 +60,13 @@ fn verify_graph<L: Dialect, D: EdgeType, Extra>(
         .members()
         .map(|(stmt, member)| (stmt, member.role()))
         .collect();
-    let mut derived_members = derived.members.clone();
+    // The derived members are already in id order.
     installed_members.sort_by_key(|&(stmt, role)| (Id::from(stmt).raw(), role));
-    derived_members.sort_by_key(|&(stmt, role)| (Id::from(stmt).raw(), role));
-    if installed_members != derived_members {
+    if installed_members != derived.members {
         out.push(Mismatch::GraphMembers {
             graph,
             installed: installed_members,
-            derived: derived_members,
+            derived: derived.members.clone(),
         });
     }
 
