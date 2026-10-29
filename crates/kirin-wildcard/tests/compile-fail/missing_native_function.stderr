@@ -1,0 +1,5 @@
+error[E0425]: cannot find value `is_power_of_two` in this scope
+ --> tests/compile-fail/missing_native_function.rs:9:5
+  |
+9 |     is_power_of_two(x);
+  |     ^^^^^^^^^^^^^^^ not found in this scope

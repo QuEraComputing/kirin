@@ -1,0 +1,19 @@
+error[E0277]: the trait bound `OnlyConstants: From<Arith<_>>` is not satisfied
+  --> tests/compile-fail/op_not_in_language.rs:17:24
+   |
+15 | #[rewrite_rule(language = OnlyConstants)]
+   | ----------------------------------------- in this attribute macro expansion
+16 | fn rule() {
+17 |     let r = op![Arith::neg(x)];
+   |                 -----  ^^^ unsatisfied trait bound
+   |                 |
+   |                 required by a bound introduced by this call
+   |
+help: the trait `From<Arith<_>>` is not implemented for `OnlyConstants`
+      but trait `From<Constant<ArithValue, ArithType>>` is implemented for it
+  --> tests/compile-fail/op_not_in_language.rs:8:45
+   |
+ 8 | #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+   |                                             ^^^^^^^
+   = help: for that trait implementation, expected `Constant<ArithValue, ArithType>`, found `Arith<_>`
+   = note: this error originates in the attribute macro `rewrite_rule` which comes from the expansion of the derive macro `Dialect` (in Nightly builds, run with -Z macro-backtrace for more info)
