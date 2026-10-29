@@ -24,7 +24,18 @@ struct NodeA {
     port: SSAValue,
 }
 
-/// Ungraph test language composing edge and node.
+/// Function whose body is an UnGraph of `wire` edges and `node_a` nodes.
+#[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
+#[kirin(builders, type = SimpleType, crate = kirin::ir)]
+#[chumsky(crate = kirin::parsers)]
+#[chumsky(format = "fn {:name}{sig} {body}")]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+struct UngraphFunction {
+    body: UnGraph,
+    sig: Signature<SimpleType>,
+}
+
+/// Ungraph test language composing edge, node, and function.
 #[derive(Debug, Clone, PartialEq, Dialect, HasParser, PrettyPrint)]
 #[kirin(builders, type = SimpleType, crate = kirin::ir)]
 #[chumsky(crate = kirin::parsers)]
@@ -33,6 +44,7 @@ struct NodeA {
 enum UngraphTestLanguage {
     Wire(Wire),
     NodeA(NodeA),
+    UngraphFunction(UngraphFunction),
 }
 
 // --- Roundtrip tests ---
@@ -168,4 +180,58 @@ specialize @test fn @g(i64, i64) -> i64 ungraph ^u0(%x: i64, %y: i64) {
         format!("{error:?}").contains("cannot contain a terminator"),
         "unexpected error: {error:?}"
     );
+}
+
+/// Two nodes sharing `%w0`; `%w1` has one reader per node.
+const WIRED_FN: &str = r#"
+stage @test fn @wired() -> any;
+specialize @test fn @wired() -> any ungraph ^ug0 {
+  edge %w0 = wire;
+  edge %w1 = wire;
+  node_a(%w0, %w1);
+  node_a(%w0, %w1);
+}
+"#;
+
+type WirePipeline = Pipeline<StageInfo<UngraphTestLanguage>>;
+
+fn parse_wire_pipeline(text: &str) -> WirePipeline {
+    let mut pipeline = WirePipeline::new();
+    pipeline.parse(text).expect("pipeline parses");
+    pipeline
+}
+
+/// An edge statement inserted after the node that reads it prints in member
+/// order, after that node, and still reparses to the same graph.
+#[test]
+fn test_ungraph_wire_inserted_after_its_reader_roundtrips() {
+    let mut pipeline = parse_wire_pipeline(WIRED_FN);
+    let stage_id = pipeline.stage_by_name("test").unwrap();
+    let stage = pipeline.stage_mut(stage_id).unwrap();
+    let ug = stage.ungraph_arena().iter().next().unwrap().id();
+    let reader = ug.expect_info(stage).nodes().last().unwrap();
+
+    let mut rw = kirin::ir::Rewriter::new(stage);
+    let res = rw.new_result(SimpleType::Any);
+    let wire = rw
+        .insert_ungraph_edge(ug, UngraphTestLanguage::Wire(Wire { res }))
+        .unwrap();
+    rw.replace_operand(reader, 1, res).unwrap();
+    drop(rw);
+    kirin::ir::verify_derived(stage).unwrap();
+    // The new wire is the last member, after `reader`, which reads it.
+    let members: Vec<Statement> = ug.expect_info(stage).members().map(|(s, _)| s).collect();
+    assert_eq!(members.last(), Some(&wire));
+
+    let printed = pipeline.sprint();
+    let reparsed = parse_wire_pipeline(&printed);
+    assert_eq!(reparsed.sprint(), printed);
+    let stage = reparsed
+        .stage(reparsed.stage_by_name("test").unwrap())
+        .unwrap();
+    kirin::ir::verify_derived(stage).unwrap();
+    let info = stage.ungraph_arena().iter().next().unwrap();
+    assert_eq!(info.edge_statements().count(), 3);
+    // %w0 joins both nodes; %w1 and the new wire have one reader each.
+    assert_eq!(info.graph().edge_count(), 1);
 }
