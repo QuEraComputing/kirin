@@ -65,7 +65,7 @@ pub(in crate::derived) fn derive_ungraphs<L: Dialect>(
     // Members, and the wires their edge statements define. Collected before
     // counting endpoints, since a node may precede the edge statement whose
     // wire it reads.
-    let members: Vec<_> = members_of(stage, findings, as_ungraph, is_live_ungraph).collect();
+    let members = members_of(stage, findings, as_ungraph, is_live_ungraph);
     for &(stmt, item, graph) in &members {
         let role = if item.definition.is_edge() {
             MemberRole::Edge
@@ -127,32 +127,32 @@ type Wires = IndexMap<SSAValue, SmallVec<[(Statement, usize); 2]>, FxBuildHasher
 /// [`DanglingParent`] and skipped.
 fn members_of<'s, L: Dialect, G: Copy>(
     stage: &'s StageInfo<L>,
-    findings: &'s mut Vec<Finding>,
+    findings: &mut Vec<Finding>,
     graph_of: fn(StatementParent) -> Option<G>,
     is_live: fn(&StageInfo<L>, G) -> bool,
-) -> impl Iterator<Item = (Statement, &'s StatementInfo<L>, G)> + use<'s, L, G> {
-    stage
-        .nodes
-        .statements
-        .items
-        .iter()
-        .enumerate()
-        .filter_map(move |(raw, item)| {
-            if item.deleted() {
-                return None;
-            }
-            let parent = item.parent?;
-            let graph = graph_of(parent)?;
-            let stmt = Statement::from(Id(raw));
-            if !is_live(stage, graph) {
-                findings.push(Finding::DanglingParent(DanglingParent::StatementInGraph {
-                    stmt,
-                    parent,
-                }));
-                return None;
-            }
-            Some((stmt, &**item, graph))
-        })
+) -> Vec<(Statement, &'s StatementInfo<L>, G)> {
+    let mut members = Vec::new();
+    for (raw, item) in stage.nodes.statements.items.iter().enumerate() {
+        if item.deleted() {
+            continue;
+        }
+        let Some(parent) = item.parent else {
+            continue;
+        };
+        let Some(graph) = graph_of(parent) else {
+            continue;
+        };
+        let stmt = Statement::from(Id(raw));
+        if is_live(stage, graph) {
+            members.push((stmt, &**item, graph));
+        } else {
+            findings.push(Finding::DanglingParent(DanglingParent::StatementInGraph {
+                stmt,
+                parent,
+            }));
+        }
+    }
+    members
 }
 
 /// The live statement producing `value`, if it is a result of one parented
