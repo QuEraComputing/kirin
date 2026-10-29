@@ -14,6 +14,7 @@ use crate::{Dialect, GetInfo, StageInfo, Statement};
 /// Breadth-first by nesting depth: the root, then every statement nested
 /// directly in it, then every statement nested two levels down, and so on.
 /// Each level is in program order.
+/// See [`BFSCursor`] for how edits affect discovery during a walk.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BFS;
 
@@ -31,12 +32,18 @@ pub struct KeepOrderReverseBFS;
 
 /// A [`BFS`] walk in progress.
 ///
-/// A level is walked by reading, in turn, the bodies of the statements of the
-/// previous level that own any, through their links at the time the cursor
-/// gets there. So a statement inserted at the current level ahead of the
-/// cursor, or into the body of a statement at the current level, is visited
-/// in this walk; one inserted behind the cursor or at a finished level is
-/// not.
+/// When the cursor moves on from a visited statement, it queues that statement
+/// as a parent for the next level only if it owns bodies and was not skipped.
+/// At the next level, the cursor walks each queued parent's bodies in turn,
+/// reading their current links. Inserts ahead of the cursor in those bodies
+/// are visited.
+///
+/// The cursor does not revisit bodies it has passed or reconsider statements
+/// it did not queue as parents. For example, if a leaf gains a body after the
+/// cursor has moved on from it, that body and its descendants are not visited.
+/// Likewise, a subtree inserted behind the cursor is not discovered, even if
+/// its descendants lie at depths the walk has not reached. Such edits are
+/// allowed by the walk contract; visiting them requires another walk.
 #[derive(Clone, Debug)]
 pub struct BFSCursor {
     root: Statement,
