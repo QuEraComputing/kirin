@@ -23,8 +23,11 @@
 //!   children and never goes back into it, so children added while visiting
 //!   it are not walked until the next walk.
 //! - [`BFS`] follows the links too, keeping the statements of two adjacent
-//!   levels that own bodies. It sees statements inserted at the current
-//!   level ahead of the cursor, and at levels still to come.
+//!   levels that own bodies. It discovers children through queued parents
+//!   as their bodies are walked. Inserts ahead of the cursor in those
+//!   bodies are visited; edits to bodies already passed, or to statements
+//!   not queued as parents, may be missed together with their descendants,
+//!   even at depths the walk has not reached. See [`BFSCursor`] for details.
 //! - [`ReverseBFS`] (each level right to left) and [`KeepOrderReverseBFS`]
 //!   (each level left to right) build their order when the walk starts, in
 //!   O(n). Statements inserted later are not visited; statements erased
@@ -52,6 +55,10 @@
 //! its ancestors (erasing a statement erases everything nested in it). They
 //! may add or erase anything else, including its siblings and the statements
 //! nested in it.
+//!
+//! An allowed edit does not guarantee that newly nested statements will be
+//! visited in this walk. Discovery follows each order's rules above; nesting
+//! depth alone does not determine whether an insertion is ahead of the cursor.
 //!
 //! The cursor reports an erased visited statement as a [`WalkError`] on its
 //! next step.
