@@ -1,0 +1,4294 @@
+{
+  "environment": {
+    "platform": "macOS-26.6.2-arm64-arm-64bit",
+    "machine": "arm64",
+    "hardware": {
+      "logical_cpus": 18,
+      "processor": "arm",
+      "machdep.cpu.brand_string": "Apple M5 Pro",
+      "hw.model": "Mac17,8",
+      "hw.memsize": "51539607552"
+    },
+    "python": "Python 3.14.5 (main, May 10 2026, 19:20:57) [Clang 22.1.3 ]",
+    "rustc": "rustc 1.96.0 (ac68faa20 2026-05-25)\nbinary: rustc\ncommit-hash: ac68faa20c58cbccd01ee7208bf3b6e93a7d7f96\ncommit-date: 2026-05-25\nhost: aarch64-apple-darwin\nrelease: 1.96.0\nLLVM version: 22.1.2",
+    "rust_revision": "83d499be3dff7d8e30120570538e32d116118303",
+    "rust_working_tree": "",
+    "python_revision": "eae74008d4aec630169b5e64cc085e6f2c0d5b12",
+    "python_provenance": {
+      "kirin_source": "/private/tmp/kirin-py-bench/src/kirin/__init__.py",
+      "executable": "/private/tmp/kirin-py-bench/.venv/bin/python"
+    }
+  },
+  "workload_spec_sha256": "d7bee4c599d660bc7e177c3b438119a6829664c7b185c70cf8d5b59c6d15fddd",
+  "timed_boundary": "analyzer construction + analysis of the built IR; analyzer/result destruction excluded",
+  "python_cache_calls": false,
+  "verdicts": {
+    "rust": {
+      "imprecise": 22,
+      "pass": 182
+    },
+    "python": {
+      "pass": 188,
+      "unsound": 16
+    }
+  },
+  "results": [
+    {
+      "family": "calls",
+      "size": 1000,
+      "checks": [
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": true
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": null
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": true
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": true,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": true,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": true,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": false
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": false
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": false,
+            "inner": true
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": false,
+            "inner": null
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": false,
+            "inner": false
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": true,
+            "inner": false
+          },
+          "target": 2998,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 2998,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": true,
+            "inner": null
+          },
+          "target": 2998,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 2998,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": null,
+            "inner": false
+          },
+          "target": 2998,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 2998,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": 2998,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": 2998,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": false,
+            "inner": true
+          },
+          "target": -1997,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": -1997,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": false,
+            "inner": null
+          },
+          "target": -1997,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": -1997,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": null,
+            "inner": true
+          },
+          "target": -1997,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": -1997,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": null,
+            "inner": null
+          },
+          "target": -1997,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": -1997,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": false,
+            "inner": false
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": false,
+            "inner": null
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": null,
+            "inner": false
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": null,
+            "inner": null
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        }
+      ],
+      "timings": [
+        {
+          "config": "all_known",
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": true
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise",
+            "samples_seconds": [
+              0.026680667,
+              0.026809583,
+              0.026699917,
+              0.026383416,
+              0.026512417,
+              0.026362708,
+              0.026362708,
+              0.026490292,
+              0.026703083,
+              0.026492541,
+              0.026519625,
+              0.026752083,
+              0.026456625,
+              0.026550875,
+              0.026550667,
+              0.026708834,
+              0.026593042,
+              0.02766875,
+              0.027780792,
+              0.027901958,
+              0.0277725,
+              0.027146667,
+              0.026619417,
+              0.0267725,
+              0.026591417,
+              0.026576667,
+              0.027101167,
+              0.026758833,
+              0.026559084,
+              0.026403625
+            ],
+            "median_seconds": 0.026606229500000002
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass",
+            "samples_seconds": [
+              0.01714741694740951,
+              0.016974124824628234,
+              0.016962916823104024,
+              0.016966583905741572,
+              0.01676812511868775,
+              0.01681262510828674,
+              0.01691691600717604,
+              0.016829291824251413,
+              0.01677058287896216,
+              0.016908915946260095,
+              0.016876708017662168,
+              0.017027042107656598,
+              0.016966749913990498,
+              0.016946374904364347,
+              0.016828833846375346,
+              0.016767584020271897,
+              0.016911125043407083,
+              0.016917875036597252,
+              0.01692958315834403,
+              0.016911167185753584,
+              0.01686591701582074,
+              0.016813291935250163,
+              0.016928458120673895,
+              0.016773957991972566,
+              0.01695637498050928,
+              0.01697374996729195,
+              0.016747457906603813,
+              0.01682333298958838,
+              0.01705079199746251,
+              0.016852708999067545
+            ],
+            "median_seconds": 0.016911146114580333
+          },
+          "python_over_rust_median_ratio": 0.6356085184704707
+        },
+        {
+          "config": "unknown_conditions",
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise",
+            "samples_seconds": [
+              0.024618209,
+              0.025063167,
+              0.024744292,
+              0.024985167,
+              0.02461,
+              0.024807958,
+              0.024775166,
+              0.024723291,
+              0.024789,
+              0.024732291,
+              0.02514775,
+              0.025201042,
+              0.02468325,
+              0.024931459,
+              0.024770209,
+              0.0247985,
+              0.024562459,
+              0.024794542,
+              0.024808333,
+              0.024679792,
+              0.024757417,
+              0.024718542,
+              0.024724167,
+              0.024746917,
+              0.025004542,
+              0.024889417,
+              0.024904791,
+              0.024727375,
+              0.024867042,
+              0.024861625
+            ],
+            "median_seconds": 0.024782083
+          },
+          "python": {
+            "result": 3002,
+            "verdict": "pass",
+            "samples_seconds": [
+              0.017163333017379045,
+              0.017160709016025066,
+              0.01680774986743927,
+              0.017128416104242206,
+              0.016965667018666863,
+              0.016961208079010248,
+              0.01701433304697275,
+              0.017755750101059675,
+              0.016988624818623066,
+              0.0172794999089092,
+              0.017028833040967584,
+              0.01684825005941093,
+              0.017327083041891456,
+              0.01705224998295307,
+              0.016967958072200418,
+              0.017106541898101568,
+              0.016951957950368524,
+              0.016913084080442786,
+              0.016992707969620824,
+              0.017570874886587262,
+              0.017505916999652982,
+              0.017577667022123933,
+              0.017505292082205415,
+              0.017443083925172687,
+              0.017099000047892332,
+              0.017464250093325973,
+              0.01801987481303513,
+              0.018058415967971087,
+              0.018331750063225627,
+              0.017976040951907635
+            ],
+            "median_seconds": 0.017144562560133636
+          },
+          "python_over_rust_median_ratio": 0.6918128133189464
+        },
+        {
+          "config": "all_unknown",
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass",
+            "samples_seconds": [
+              0.0007935,
+              0.000757209,
+              0.0007815,
+              0.000767083,
+              0.000758416,
+              0.00075675,
+              0.000737083,
+              0.000792667,
+              0.000777958,
+              0.000803542,
+              0.000774542,
+              0.000792209,
+              0.000776958,
+              0.000785958,
+              0.000743917,
+              0.000759583,
+              0.00073525,
+              0.000790583,
+              0.000772625,
+              0.000786792,
+              0.000771875,
+              0.000800833,
+              0.000751292,
+              0.000781917,
+              0.000769917,
+              0.000777208,
+              0.000786875,
+              0.000774084,
+              0.000741917,
+              0.000761541
+            ],
+            "median_seconds": 0.000774313
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass",
+            "samples_seconds": [
+              0.014071499928832054,
+              0.013956542126834393,
+              0.01400016713887453,
+              0.013967833947390318,
+              0.014234875096008182,
+              0.013738208916038275,
+              0.013946583960205317,
+              0.01384958392009139,
+              0.013719083974137902,
+              0.013900167075917125,
+              0.013873792020604014,
+              0.014068040996789932,
+              0.013854290824383497,
+              0.013894708128646016,
+              0.013888124842196703,
+              0.014251207932829857,
+              0.01501829200424254,
+              0.01494804210960865,
+              0.013970790896564722,
+              0.014202540973201394,
+              0.014224292011931539,
+              0.014034833991900086,
+              0.014258708106353879,
+              0.01490958291105926,
+              0.014341667061671615,
+              0.014581291005015373,
+              0.014032792067155242,
+              0.013943333178758621,
+              0.014100124826654792,
+              0.014086083974689245
+            ],
+            "median_seconds": 0.014033813029527664
+          },
+          "python_over_rust_median_ratio": 18.124212081584144
+        }
+      ]
+    },
+    {
+      "family": "calls_same",
+      "size": 1000,
+      "checks": [
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": true
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": null
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": true
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": true,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": true,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": true,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": false
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": false
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": false,
+            "inner": true
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": false,
+            "inner": null
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": false,
+            "inner": false
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": true,
+            "inner": false
+          },
+          "target": 998,
+          "rust": {
+            "result": 998,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 998,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": true,
+            "inner": null
+          },
+          "target": 998,
+          "rust": {
+            "result": 998,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 998,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": null,
+            "inner": false
+          },
+          "target": 998,
+          "rust": {
+            "result": 998,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 998,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": 998,
+          "rust": {
+            "result": 998,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 998,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": false,
+            "inner": true
+          },
+          "target": 1003,
+          "rust": {
+            "result": 1003,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 1003,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": false,
+            "inner": null
+          },
+          "target": 1003,
+          "rust": {
+            "result": 1003,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 1003,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": null,
+            "inner": true
+          },
+          "target": 1003,
+          "rust": {
+            "result": 1003,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 1003,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": null,
+            "inner": null
+          },
+          "target": 1003,
+          "rust": {
+            "result": 1003,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 1003,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": false,
+            "inner": false
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": false,
+            "inner": null
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": null,
+            "inner": false
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": null,
+            "inner": null
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        }
+      ],
+      "timings": [
+        {
+          "config": "all_known",
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": true
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass",
+            "samples_seconds": [
+              0.001444625,
+              0.001453,
+              0.001443209,
+              0.001486583,
+              0.001512709,
+              0.001457625,
+              0.001514208,
+              0.001444666,
+              0.001483375,
+              0.001464458,
+              0.001475666,
+              0.001519667,
+              0.001513833,
+              0.001526,
+              0.001455958,
+              0.001534875,
+              0.001483125,
+              0.0015015,
+              0.001499375,
+              0.0015595,
+              0.001508667,
+              0.00154525,
+              0.001469625,
+              0.001508791,
+              0.001483125,
+              0.001568209,
+              0.001549958,
+              0.001505708,
+              0.001551125,
+              0.001528
+            ],
+            "median_seconds": 0.001503604
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass",
+            "samples_seconds": [
+              0.021461334079504013,
+              0.021341542014852166,
+              0.02130795898847282,
+              0.021276959218084812,
+              0.021449750056490302,
+              0.021977833937853575,
+              0.021599041996523738,
+              0.02135991700924933,
+              0.02134708291850984,
+              0.021241167094558477,
+              0.02145054191350937,
+              0.021615417208522558,
+              0.021589958108961582,
+              0.02113845804706216,
+              0.021377166034653783,
+              0.021261082962155342,
+              0.021304041147232056,
+              0.02109616599045694,
+              0.021382333943620324,
+              0.02140600001439452,
+              0.02130712498910725,
+              0.021313457982614636,
+              0.0213274999987334,
+              0.021277250023558736,
+              0.021236250177025795,
+              0.02118545793928206,
+              0.02138954191468656,
+              0.021191499894484878,
+              0.02176470891572535,
+              0.02141845808364451
+            ],
+            "median_seconds": 0.021344312466681004
+          },
+          "python_over_rust_median_ratio": 14.195434746569578
+        },
+        {
+          "config": "unknown_conditions",
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": 5002,
+          "rust": {
+            "result": 5002,
+            "verdict": "pass",
+            "samples_seconds": [
+              0.00133125,
+              0.001370083,
+              0.001376833,
+              0.001380792,
+              0.001370583,
+              0.001325583,
+              0.001345042,
+              0.001353208,
+              0.001435791,
+              0.001371584,
+              0.001385625,
+              0.001388375,
+              0.00136325,
+              0.001345,
+              0.001369084,
+              0.001374667,
+              0.001359125,
+              0.00133375,
+              0.001366916,
+              0.001334708,
+              0.001397833,
+              0.001344625,
+              0.001334458,
+              0.001351375,
+              0.001353958,
+              0.001424667,
+              0.0014585,
+              0.001430959,
+              0.001413834,
+              0.001399709
+            ],
+            "median_seconds": 0.0013695835
+          },
+          "python": {
+            "result": 5002,
+            "verdict": "pass",
+            "samples_seconds": [
+              0.021427624858915806,
+              0.02118333289399743,
+              0.02148899994790554,
+              0.021739209070801735,
+              0.021121040917932987,
+              0.02122320793569088,
+              0.02125879214145243,
+              0.021703833946958184,
+              0.02151474985294044,
+              0.021002292167395353,
+              0.020963708870112896,
+              0.021461000200361013,
+              0.021374834002926946,
+              0.02140058297663927,
+              0.021392500028014183,
+              0.021145540988072753,
+              0.021464791847392917,
+              0.021153500070795417,
+              0.021377291996032,
+              0.021216499852016568,
+              0.021502957912161946,
+              0.021157291950657964,
+              0.02142083295620978,
+              0.0214860828127712,
+              0.021256166975945234,
+              0.021196500165387988,
+              0.021111084148287773,
+              0.021455500042065978,
+              0.021177500020712614,
+              0.02136754197999835
+            ],
+            "median_seconds": 0.021371187991462648
+          },
+          "python_over_rust_median_ratio": 15.604151182795828
+        },
+        {
+          "config": "all_unknown",
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass",
+            "samples_seconds": [
+              0.001041542,
+              0.001115125,
+              0.001113459,
+              0.0011495,
+              0.001186333,
+              0.001152292,
+              0.001138875,
+              0.001114125,
+              0.001082292,
+              0.001113541,
+              0.001088041,
+              0.001121917,
+              0.00108525,
+              0.001134959,
+              0.001171125,
+              0.001126334,
+              0.0011225,
+              0.001087625,
+              0.001116666,
+              0.0011825,
+              0.001126208,
+              0.001094167,
+              0.001079083,
+              0.001096375,
+              0.001194,
+              0.00114825,
+              0.001206666,
+              0.001077709,
+              0.001105375,
+              0.001137333
+            ],
+            "median_seconds": 0.0011192915
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass",
+            "samples_seconds": [
+              0.016386166913434863,
+              0.016884749988093972,
+              0.016490583075210452,
+              0.01641062507405877,
+              0.01644629193469882,
+              0.01656758296303451,
+              0.016494540963321924,
+              0.01648008287884295,
+              0.016689500072970986,
+              0.01647016708739102,
+              0.01640683296136558,
+              0.016587625024840236,
+              0.01680450001731515,
+              0.016474457923322916,
+              0.016556832939386368,
+              0.016313415952026844,
+              0.016456583980470896,
+              0.01636341609992087,
+              0.016983832931146026,
+              0.01674212492071092,
+              0.016819249838590622,
+              0.016459082951769233,
+              0.0163629581220448,
+              0.016927541000768542,
+              0.016590790823101997,
+              0.01634962484240532,
+              0.016580249881371856,
+              0.016522624995559454,
+              0.01668695779517293,
+              0.016582374926656485
+            ],
+            "median_seconds": 0.01650858297944069
+          },
+          "python_over_rust_median_ratio": 14.749136377289284
+        }
+      ]
+    },
+    {
+      "family": "recursion",
+      "size": 1000,
+      "checks": [
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": true
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": null
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": true,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": true,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": true,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": false
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": false,
+            "inner": true
+          },
+          "target": 2,
+          "rust": {
+            "result": 2,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 2,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": false,
+            "inner": null
+          },
+          "target": 2,
+          "rust": {
+            "result": 2,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 2,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": false,
+            "inner": true
+          },
+          "target": 2,
+          "rust": {
+            "result": 2,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 2,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": 2,
+          "rust": {
+            "result": 2,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 2,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": false,
+            "inner": false
+          },
+          "target": 2,
+          "rust": {
+            "result": 2,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 2,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 2,
+            "y": null,
+            "outer": false,
+            "inner": false
+          },
+          "target": 2,
+          "rust": {
+            "result": 2,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 2,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 3,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": true,
+            "inner": false
+          },
+          "target": 2998,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": true,
+            "inner": null
+          },
+          "target": 2998,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": true,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": true,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": -2,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": false,
+            "inner": true
+          },
+          "target": 3,
+          "rust": {
+            "result": 3,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 3,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": false,
+            "inner": null
+          },
+          "target": 3,
+          "rust": {
+            "result": 3,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 3,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": -2,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": false,
+            "inner": true
+          },
+          "target": 3,
+          "rust": {
+            "result": 3,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 3,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": 3,
+          "rust": {
+            "result": 3,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 3,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 3,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": false,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": null,
+            "inner": true
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": -2,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": false,
+            "inner": false
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": false,
+            "inner": null
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": null,
+            "inner": false
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": 0,
+            "outer": null,
+            "inner": null
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": false,
+            "inner": false
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": false,
+            "inner": null
+          },
+          "target": 0,
+          "rust": {
+            "result": 0,
+            "verdict": "pass"
+          },
+          "python": {
+            "result": 0,
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": 0,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": false,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": false,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": null,
+            "inner": false
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        },
+        {
+          "input": {
+            "x": null,
+            "y": 0,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass"
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass"
+          }
+        }
+      ],
+      "timings": [
+        {
+          "config": "all_known",
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": true,
+            "inner": true
+          },
+          "target": 3002,
+          "rust": {
+            "result": "top",
+            "verdict": "imprecise",
+            "samples_seconds": [
+              0.000579584,
+              0.0006165,
+              0.000588,
+              0.000586167,
+              0.000577917,
+              0.000604916,
+              0.000575292,
+              0.000597458,
+              0.00057425,
+              0.000589958,
+              0.000578375,
+              0.000576917,
+              0.000581041,
+              0.000580417,
+              0.000584917,
+              0.000570792,
+              0.000582458,
+              0.000574917,
+              0.000610459,
+              0.000581791,
+              0.000581584,
+              0.000588125,
+              0.000579042,
+              0.000574166,
+              0.000574667,
+              0.000568667,
+              0.000559166,
+              0.000554916,
+              0.000554333,
+              0.000574541
+            ],
+            "median_seconds": 0.0005793129999999999
+          },
+          "python": {
+            "result": "bottom",
+            "verdict": "unsound",
+            "samples_seconds": [
+              0.0300093749538064,
+              0.030026624910533428,
+              0.029650165932253003,
+              0.02968620788305998,
+              0.029582958901301026,
+              0.029584333999082446,
+              0.029755708994343877,
+              0.029800750082358718,
+              0.029597749933600426,
+              0.029553750064224005,
+              0.02951379190199077,
+              0.029567208141088486,
+              0.029558666981756687,
+              0.029589666984975338,
+              0.029477958101779222,
+              0.02950862515717745,
+              0.029863334028050303,
+              0.029857374960556626,
+              0.02955170813947916,
+              0.02976791700348258,
+              0.02970337518490851,
+              0.029906374868005514,
+              0.029656416969373822,
+              0.02962950011715293,
+              0.029632958117872477,
+              0.02983054192736745,
+              0.029349915916100144,
+              0.02951408294029534,
+              0.029455832904204726,
+              0.029870458878576756
+            ],
+            "median_seconds": 0.029631229117512703
+          },
+          "python_over_rust_median_ratio": 51.148911067959304
+        },
+        {
+          "config": "unknown_conditions",
+          "input": {
+            "x": 2,
+            "y": 3,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass",
+            "samples_seconds": [
+              1.4958e-05,
+              1.4708e-05,
+              1.4791e-05,
+              1.4583e-05,
+              1.475e-05,
+              1.4666e-05,
+              1.5625e-05,
+              1.5709e-05,
+              1.5542e-05,
+              1.5541e-05,
+              1.5708e-05,
+              1.5333e-05,
+              1.475e-05,
+              1.4625e-05,
+              1.475e-05,
+              1.4709e-05,
+              1.4667e-05,
+              1.4541e-05,
+              1.4958e-05,
+              1.4708e-05,
+              1.475e-05,
+              1.45e-05,
+              1.5542e-05,
+              1.5584e-05,
+              1.5708e-05,
+              1.6792e-05,
+              1.6208e-05,
+              1.5583e-05,
+              1.4667e-05,
+              1.4708e-05
+            ],
+            "median_seconds": 1.47705e-05
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass",
+            "samples_seconds": [
+              0.05857891705818474,
+              0.058438749983906746,
+              0.05804458283819258,
+              0.058574624825268984,
+              0.058100458001717925,
+              0.05796662508510053,
+              0.058184875175356865,
+              0.058214041870087385,
+              0.0579491660464555,
+              0.05804979195818305,
+              0.05820333305746317,
+              0.05819183308631182,
+              0.05814758292399347,
+              0.058098499896004796,
+              0.05919158295728266,
+              0.05929945781826973,
+              0.058342291973531246,
+              0.058161916909739375,
+              0.0584653748665005,
+              0.0584884169511497,
+              0.058802791172638535,
+              0.05810562497936189,
+              0.05803679092787206,
+              0.058673459105193615,
+              0.058771499898284674,
+              0.05860049999319017,
+              0.058991166995838284,
+              0.05927933310158551,
+              0.05881958384998143,
+              0.058764749905094504
+            ],
+            "median_seconds": 0.058390520978718996
+          },
+          "python_over_rust_median_ratio": 3953.185131086896
+        },
+        {
+          "config": "all_unknown",
+          "input": {
+            "x": null,
+            "y": null,
+            "outer": null,
+            "inner": null
+          },
+          "target": "top",
+          "rust": {
+            "result": "top",
+            "verdict": "pass",
+            "samples_seconds": [
+              8.75e-06,
+              8.583e-06,
+              8.667e-06,
+              8.625e-06,
+              8.708e-06,
+              8.583e-06,
+              8.834e-06,
+              8.959e-06,
+              9.167e-06,
+              9.209e-06,
+              9.167e-06,
+              9.375e-06,
+              9.167e-06,
+              9.041e-06,
+              9.25e-06,
+              9.166e-06,
+              9.083e-06,
+              8.667e-06,
+              8.666e-06,
+              8.75e-06,
+              8.583e-06,
+              8.584e-06,
+              8.625e-06,
+              8.625e-06,
+              8.625e-06,
+              8.584e-06,
+              8.583e-06,
+              8.583e-06,
+              8.583e-06,
+              8.625e-06
+            ],
+            "median_seconds": 8.667e-06
+          },
+          "python": {
+            "result": "top",
+            "verdict": "pass",
+            "samples_seconds": [
+              0.05364974983967841,
+              0.05363395903259516,
+              0.053366417065262794,
+              0.05371237499639392,
+              0.053904457949101925,
+              0.05332399997860193,
+              0.053701415890827775,
+              0.05375716695562005,
+              0.053682208992540836,
+              0.05332399997860193,
+              0.05341883306391537,
+              0.053713833913207054,
+              0.0536295420024544,
+              0.05373154208064079,
+              0.0536202909424901,
+              0.053992042085155845,
+              0.05368479108437896,
+              0.05342279118485749,
+              0.053727874998003244,
+              0.05366412503644824,
+              0.05351641704328358,
+              0.05325129092670977,
+              0.05347550008445978,
+              0.05339612509123981,
+              0.0536173339933157,
+              0.053232874954119325,
+              0.05336462496779859,
+              0.05353604210540652,
+              0.05379470810294151,
+              0.05386250000447035
+            ],
+            "median_seconds": 0.05363175051752478
+          },
+          "python_over_rust_median_ratio": 6188.040904295001
+        }
+      ]
+    }
+  ]
+}

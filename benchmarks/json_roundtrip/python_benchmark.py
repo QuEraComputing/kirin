@@ -5,6 +5,9 @@ import gc
 import json
 from pathlib import Path
 import time
+import sys
+
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
 
 from rich.console import Console
 
@@ -15,63 +18,8 @@ from kirin.dialects.py.binop import Add, Sub
 from kirin.prelude import basic
 
 from validation import validate_shape
-from semantic_spec import family_spec, validate_runtime
-
-
-def chain(block, count, path, x, y):
-    values = {"x": x, "y": y}
-    value, delta = values[path["start"]], values[path["delta"]]
-    operation = {"add": Add, "sub": Sub}[path["operation"]]
-    for _ in range(count):
-        stmt = operation(value, delta)
-        stmt.result.type = types.Int
-        block.stmts.append(stmt)
-        value = stmt.result
-    return value
-
-
-def workload(family, size):
-    specification = family_spec(family, size)
-    paths = {path["name"]: path for path in specification["paths"]}
-    steps = size // specification["steps_divisor"]
-    # Python's Method wrapper needs self; Rust does not need this extra argument.
-    entry = ir.Block(argtypes=(types.MethodType, types.Int, types.Int, types.Bool, types.Bool))
-    _, x, y, outer, inner = entry.args
-    blocks = [entry]
-    if family == "chain":
-        entry.stmts.append(func.Return(chain(entry, steps, paths["all"], x, y)))
-    elif family == "diamond":
-        left, right = [ir.Block(argtypes=(types.Int, types.Int)) for _ in range(2)]
-        merge = ir.Block(argtypes=(types.Int,))
-        entry.stmts.append(cf.ConditionalBranch(outer, (x, y), (x, y), then_successor=left, else_successor=right))
-        for block, name in [(left, "left"), (right, "right")]:
-            result = chain(block, steps, paths[name], *block.args)
-            block.stmts.append(cf.Branch((result,), successor=merge))
-        merge.stmts.append(func.Return(merge.args[0]))
-        blocks += [left, right, merge]
-    elif family == "nested_cfg":
-        left, right = [ir.Block(argtypes=(types.Int, types.Int)) for _ in range(2)]
-        a, b, c, d = [ir.Block(argtypes=(types.Int, types.Int)) for _ in range(4)]
-        left_merge, right_merge, merge = [ir.Block(argtypes=(types.Int,)) for _ in range(3)]
-        entry.stmts.append(cf.ConditionalBranch(outer, (x, y), (x, y), then_successor=left, else_successor=right))
-        left.stmts.append(cf.ConditionalBranch(inner, tuple(left.args), tuple(left.args), then_successor=a, else_successor=b))
-        right.stmts.append(cf.ConditionalBranch(inner, tuple(right.args), tuple(right.args), then_successor=c, else_successor=d))
-        for leaf, name, target in [(a, "a", left_merge), (b, "b", left_merge), (c, "c", right_merge), (d, "d", right_merge)]:
-            result = chain(leaf, steps, paths[name], *leaf.args)
-            leaf.stmts.append(cf.Branch((result,), successor=target))
-        left_merge.stmts.append(cf.Branch((left_merge.args[0],), successor=merge))
-        right_merge.stmts.append(cf.Branch((right_merge.args[0],), successor=merge))
-        merge.stmts.append(func.Return(merge.args[0]))
-        blocks += [left, right, a, b, c, d, left_merge, right_merge, merge]
-    else:
-        raise ValueError(family)
-    code = func.Function(
-        sym_name="benchmark",
-        slots=("self", "x", "y", "outer", "inner"),
-        signature=func.Signature((types.MethodType, types.Int, types.Int, types.Bool, types.Bool), types.Int),
-        body=ir.Region(blocks),
-    )
-    return ir.Method(basic, code, arg_names=["self", "x", "y", "outer", "inner"])
+from common.python_workload import workload
+from semantics import validate_runtime
 
 
 def describe(code):

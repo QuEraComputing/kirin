@@ -6,13 +6,12 @@ use kirin_arith::Arith;
 use kirin_cf::ControlFlow;
 use kirin_prettyless::PipelinePrintExt;
 
-mod language;
+#[path = "../../common/rust/mod.rs"]
+mod common;
 mod semantics;
-mod spec;
-use language::BenchmarkLanguage;
+use common::{BenchmarkLanguage, spec, workload};
 
 mod shape;
-mod workload;
 
 type IR = Pipeline<StageInfo<BenchmarkLanguage>>;
 
