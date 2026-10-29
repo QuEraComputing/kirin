@@ -140,6 +140,20 @@ impl<'a> HasResultsMut<'a> for BuilderDialect {
     }
 }
 
+impl<'a> HasSymbols<'a> for BuilderDialect {
+    type Iter = std::iter::Empty<&'a Symbol>;
+    fn symbols(&'a self) -> Self::Iter {
+        std::iter::empty()
+    }
+}
+
+impl<'a> HasSymbolsMut<'a> for BuilderDialect {
+    type IterMut = std::iter::Empty<&'a mut Symbol>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        std::iter::empty()
+    }
+}
+
 impl<'a> HasBlocks<'a> for BuilderDialect {
     type Iter = std::vec::IntoIter<&'a Block>;
     fn blocks(&'a self) -> Self::Iter {

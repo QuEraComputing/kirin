@@ -353,6 +353,56 @@ impl<'a> Iterator for FuncOpUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for FuncOp {
+    type Iter = FuncOpSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpSymbolsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct FuncOpSymbolsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for FuncOpSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for FuncOp {
+    type IterMut = FuncOpSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            auxiliary,
+            implementation,
+        } = self;
+        FuncOpSymbolsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct FuncOpSymbolsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for FuncOpSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for FuncOp {
     fn is_terminator(&self) -> bool {
         false

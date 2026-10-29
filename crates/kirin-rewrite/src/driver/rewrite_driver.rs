@@ -33,6 +33,10 @@ impl std::ops::AddAssign for RewriteSummary {
 /// [`MutationEvent`](kirin_ir::MutationEvent); a rule that matches but edits
 /// nothing does not count as a change.
 ///
+/// Symbol attributes, the ones [`HasSymbols`](kirin_ir::HasSymbols) lists,
+/// match by name through the pattern and program symbol tables, never by
+/// their stage-local ids.
+///
 /// Rules that keep undoing each other never reach a fixpoint. As a safety
 /// net, a run still changing after [`max_sweeps`](Self::max_sweeps) sweeps
 /// ([`DEFAULT_MAX_SWEEPS`](Self::DEFAULT_MAX_SWEEPS) unless set) fails with

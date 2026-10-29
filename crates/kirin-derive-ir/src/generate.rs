@@ -132,7 +132,24 @@ pub(crate) const HAS_UNGRAPHS_MUT: FieldIterConfig = FieldIterConfig {
     trait_type_iter: "IterMut",
 };
 
-pub(crate) const FIELD_ITER_CONFIGS: [FieldIterConfig; 14] = [
+pub(crate) const HAS_SYMBOLS: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Symbols,
+    mutable: false,
+    trait_name: "HasSymbols",
+    matching_type: "Symbol",
+    trait_method: "symbols",
+    trait_type_iter: "Iter",
+};
+pub(crate) const HAS_SYMBOLS_MUT: FieldIterConfig = FieldIterConfig {
+    kind: FieldIterKind::Symbols,
+    mutable: true,
+    trait_name: "HasSymbolsMut",
+    matching_type: "Symbol",
+    trait_method: "symbols_mut",
+    trait_type_iter: "IterMut",
+};
+
+pub(crate) const FIELD_ITER_CONFIGS: [FieldIterConfig; 16] = [
     HAS_ARGUMENTS,
     HAS_ARGUMENTS_MUT,
     HAS_RESULTS,
@@ -147,6 +164,8 @@ pub(crate) const FIELD_ITER_CONFIGS: [FieldIterConfig; 14] = [
     HAS_DIGRAPHS_MUT,
     HAS_UNGRAPHS,
     HAS_UNGRAPHS_MUT,
+    HAS_SYMBOLS,
+    HAS_SYMBOLS_MUT,
 ];
 
 pub(crate) const IS_TERMINATOR: BoolPropertyConfig = BoolPropertyConfig {

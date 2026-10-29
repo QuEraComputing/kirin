@@ -297,6 +297,48 @@ impl<'a> Iterator for NopUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> kirin_ir::HasSymbols<'a> for Nop {
+    type Iter = NopSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        NopSymbolsIter {
+            inner: std::iter::empty::<&'a kirin_ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopSymbolsIter<'a> {
+    inner: std::iter::Empty<&'a kirin_ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopSymbolsIter<'a> {
+    type Item = &'a kirin_ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> kirin_ir::HasSymbolsMut<'a> for Nop {
+    type IterMut = NopSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        NopSymbolsMutIter {
+            inner: std::iter::empty::<&'a mut kirin_ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NopSymbolsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut kirin_ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for NopSymbolsMutIter<'a> {
+    type Item = &'a mut kirin_ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl kirin_ir::IsTerminator for Nop {
     fn is_terminator(&self) -> bool {
         false

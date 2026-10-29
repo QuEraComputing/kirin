@@ -22,6 +22,25 @@ pub trait HasResultsMut<'a> {
     fn results_mut(&'a mut self) -> Self::IterMut;
 }
 
+/// Stage-local symbol attributes, in a stable order, including wrapped operations.
+///
+/// `#[derive(Dialect)]` collects `Symbol`, `Option<Symbol>` and `Vec<Symbol>`
+/// fields and delegates through `#[wraps]`. A `Symbol` nested in any other
+/// field type, such as a tuple, `Box` or custom attribute struct, is not
+/// listed, so cross-stage comparisons see its raw id. Handwritten dialects
+/// must expose every symbol attribute here.
+pub trait HasSymbols<'a> {
+    type Iter: Iterator<Item = &'a crate::Symbol>;
+    fn symbols(&'a self) -> Self::Iter;
+}
+
+/// Mutable access to the same symbol attributes as [`HasSymbols`], in the
+/// same order. This allows cross-stage comparisons to normalize a clone's IDs.
+pub trait HasSymbolsMut<'a> {
+    type IterMut: Iterator<Item = &'a mut crate::Symbol>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut;
+}
+
 pub trait HasBlocks<'a> {
     type Iter: Iterator<Item = &'a crate::Block>;
     fn blocks(&'a self) -> Self::Iter;
@@ -139,6 +158,8 @@ pub trait Dialect:
     + for<'a> HasResults<'a>
     + for<'a> HasArgumentsMut<'a>
     + for<'a> HasResultsMut<'a>
+    + for<'a> HasSymbols<'a>
+    + for<'a> HasSymbolsMut<'a>
     + for<'a> HasBlocks<'a>
     + for<'a> HasBlocksMut<'a>
     + for<'a> HasSuccessors<'a>

@@ -311,6 +311,50 @@ impl<'a> Iterator for ZxWireUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for ZxWire {
+    type Iter = ZxWireSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        let Self { res } = self;
+        ZxWireSymbolsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxWireSymbolsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxWireSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for ZxWire {
+    type IterMut = ZxWireSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        let Self { res } = self;
+        ZxWireSymbolsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxWireSymbolsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxWireSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for ZxWire {
     fn is_terminator(&self) -> bool {
         false

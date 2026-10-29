@@ -38,7 +38,8 @@ pub use intern::InternTable;
 pub use language::{
     BranchOp, Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut,
     HasDigraphs, HasDigraphsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
-    HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator,
+    HasSymbols, HasSymbolsMut, HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure,
+    IsSpeculatable, IsTerminator,
 };
 pub use lattice::{FiniteLattice, HasBottom, HasTop, Lattice, TypeLattice, Widen};
 pub use node::{
@@ -80,6 +81,6 @@ pub mod prelude {
 pub use kirin_derive_ir::{
     Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut,
     HasDigraphs, HasDigraphsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
-    HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator,
-    LiftProject, ParseDispatch, StageMeta,
+    HasSymbols, HasSymbolsMut, HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure,
+    IsSpeculatable, IsTerminator, LiftProject, ParseDispatch, StageMeta,
 };
