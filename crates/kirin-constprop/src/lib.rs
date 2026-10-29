@@ -15,9 +15,9 @@
 //! use kirin_constprop::{ConstProp, ConstPropValue};
 //! use kirin_interpreter::engine::CrossStageLinker;
 //!
-//! let mut analysis = ConstProp::<Stage, MyConst, MyError>::new(&pipeline)
+//! let analysis = ConstProp::<Stage, MyConst, MyError>::new(&pipeline)
 //!     .with_linker(CrossStageLinker);
-//! let result = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
+//! let (result, analysis) = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
 //! ```
 
 mod context;

@@ -90,9 +90,9 @@ pub use engines::sparse_forward::{
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{
-    BackwardAnalysisState, BodyScope, DemandFrame, DemandInterp, DemandSummary,
-    SparseBackwardDriver, SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter,
-    SparseBackwardProfile, SparseBackwardTransfer,
+    BodyScope, DemandContext, DemandFrame, DemandInterp, DemandSummary, SparseBackwardDriver,
+    SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter, SparseBackwardProfile,
+    SparseBackwardTransfer,
 };
 // Dense backward engine (`Sem = ClassicLiveness`) + the dense standard frames.
 pub use engines::dense_backward::{
@@ -155,7 +155,7 @@ pub mod engine {
         AbstractInterpreter, BlockFrame, BlockQueries, BodyFrameEntry, CFGFrame, CFGQueries,
         CallBodyTraversal, CallContext, CallFrame, CallRequest, CallServices, Callee, Completion,
         ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive, CrossStageLinker,
-        DefaultCallBodyTraversal, DenseBackwardCompletion, DenseBackwardFrameEngine,
+        DefaultCallBodyTraversal, DemandContext, DenseBackwardCompletion, DenseBackwardFrameEngine,
         DenseBackwardInterp, DenseBackwardInterpreter, DenseBlockFrame, DiGraphFrame,
         DiGraphQueries, Env, ForwardDataflowFrameEngine, ForwardFrameEngine, Frame, FrameEffect,
         FrameEngine, Interp, InterpDispatch, InterpreterError, LinkTarget, Linker, SSABinding,

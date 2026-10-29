@@ -20,12 +20,13 @@ use std::hash::Hash;
 
 use kirin::prelude::{CFG, CompileStage, Pipeline};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
+use kirin_demand::DemandResult;
 use kirin_interpreter::engine::{
     CallContext, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
     SparseForwardInterpreter, expect_single,
 };
 use kirin_interpreter::{Body, Callee, InterpDispatch, InterpreterError, SparseForwardTransfer};
-use kirin_liveness::{DemandResult, DenseLiveness, DenseLivenessResult, LiveSet};
+use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
 use kirin_scf::ForLoopValue;
 
 use crate::stage::Stage;
@@ -160,15 +161,15 @@ where
         >,
     >,
 {
-    let mut analysis: ToyConstProp<'_, C> =
-        ToyConstProp::new(pipeline).with_linker(CrossStageLinker);
-    expect_single(analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?)
+    let analysis: ToyConstProp<'_, C> = ToyConstProp::new(pipeline).with_linker(CrossStageLinker);
+    let (ret, _) = analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?;
+    expect_single(ret)
 }
 
 /// Run classic per-point liveness (dense backward — regalloc-grade
 /// block-boundary and per-statement sets) over `function_name`'s body at
 /// `stage_name`. Consumes the finalized IR directly; strong demand
-/// ([`kirin_liveness::analyze_demand`]) is an independent analysis and is
+/// ([`kirin_demand::analyze_demand`]) is an independent analysis and is
 /// not involved.
 ///
 /// Stage-pinned: a `function_name` with no live specialization at `stage_name`
@@ -178,8 +179,8 @@ pub fn analyze_classic_liveness(
     stage_name: &str,
     function_name: &str,
 ) -> Result<(CompileStage, CFG, DenseLivenessResult), InterpreterError> {
-    let mut analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-    let scope = analysis.analyze_by_name(stage_name, function_name)?;
+    let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
+    let (scope, analysis) = analysis.analyze_by_name(stage_name, function_name)?;
     let result = DenseLivenessResult::from_engine(&analysis, scope);
     let (stage, Body::CFG(cfg)) = scope else {
         return Err(InterpreterError::Custom(
@@ -203,5 +204,10 @@ pub fn analyze_demand(
     let function = pipeline
         .lookup_function_by_name(function_name)
         .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    kirin_liveness::analyze_demand(pipeline, stage, Callee::Function(function))
+    kirin_demand::analyze_demand(
+        pipeline,
+        stage,
+        Callee::Function(function),
+        [kirin_demand::Demand::Live],
+    )
 }

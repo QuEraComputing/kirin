@@ -122,34 +122,27 @@ fn run_program(
 
     if demand {
         let result = interpreter::analyze_demand(&pipeline, stage_name, func_name)?;
-        println!("demanded: {:?}", result.demanded());
+        let demanded = result.demanded().iter().copied();
+        let demanded = match pipeline
+            .stage(result.root_scope().0)
+            .ok_or_else(|| anyhow::anyhow!("resolved stage is missing"))?
+        {
+            Stage::Source(info) => value_set(info, demanded),
+            Stage::Lowered(info) => value_set(info, demanded),
+        };
+        println!("demanded: {demanded}");
         return Ok(());
     }
 
     if liveness {
         let (stage, cfg, dense) =
             interpreter::analyze_classic_liveness(&pipeline, stage_name, func_name)?;
-        let blocks: Vec<_> = match pipeline
+        match pipeline
             .stage(stage)
             .ok_or_else(|| anyhow::anyhow!("resolved stage is missing"))?
         {
-            Stage::Source(info) => cfg.blocks(info).collect(),
-            Stage::Lowered(info) => cfg.blocks(info).collect(),
-        };
-        let scope = dense.root_scope();
-        let mut boundaries: Vec<_> = blocks
-            .into_iter()
-            .filter_map(|block| {
-                let live_in =
-                    dense.point_facts(Scoped::new(scope, ProgramPoint::BlockEntry(block)))?;
-                let live_out =
-                    dense.point_facts(Scoped::new(scope, ProgramPoint::BlockExit(block)))?;
-                Some(format!("{block:?}: in={live_in:?} out={live_out:?}"))
-            })
-            .collect();
-        boundaries.sort();
-        for line in boundaries {
-            println!("{line}");
+            Stage::Source(info) => print_block_liveness(info, cfg, &dense),
+            Stage::Lowered(info) => print_block_liveness(info, cfg, &dense),
         }
         return Ok(());
     }
@@ -177,4 +170,54 @@ fn run_program(
     };
     println!("{result}");
     Ok(())
+}
+
+/// Print each block's live-in and live-out sets, in block order, by source
+/// name.
+fn print_block_liveness<L: Dialect>(
+    info: &StageInfo<L>,
+    cfg: CFG,
+    dense: &kirin_liveness::DenseLivenessResult,
+) {
+    let scope = dense.root_scope();
+    for block in cfg.blocks(info) {
+        let point = |item| dense.point_facts(Scoped::new(scope, item));
+        let (Some(live_in), Some(live_out)) = (
+            point(ProgramPoint::BlockEntry(block)),
+            point(ProgramPoint::BlockExit(block)),
+        ) else {
+            continue;
+        };
+        let name = block
+            .expect_info(info)
+            .name()
+            .and_then(|name| info.symbol_table().resolve(name))
+            .map_or_else(|| format!("{block:?}"), |name| format!("^{name}"));
+        println!(
+            "{name}: in={} out={}",
+            value_set(info, live_in.iter()),
+            value_set(info, live_out.iter())
+        );
+    }
+}
+
+/// `{%a, %b}`: `values` ordered by raw SSA id, by source name (the raw id
+/// when a value is unnamed).
+fn value_set<L: Dialect>(
+    info: &StageInfo<L>,
+    values: impl IntoIterator<Item = SSAValue>,
+) -> String {
+    let mut values: Vec<_> = values.into_iter().collect();
+    values.sort_by_key(|value| Id::from(*value).raw());
+    let names: Vec<_> = values
+        .iter()
+        .map(|value| {
+            value
+                .expect_info(info)
+                .name()
+                .and_then(|name| info.symbol_table().resolve(name))
+                .map_or_else(|| format!("{value:?}"), |name| format!("%{name}"))
+        })
+        .collect();
+    format!("{{{}}}", names.join(", "))
 }

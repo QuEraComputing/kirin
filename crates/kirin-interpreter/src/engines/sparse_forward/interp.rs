@@ -1354,10 +1354,17 @@ where
 /// Traversal is owned by the total frame type `F`; summary keying and merge/widen
 /// behavior are owned by the policy `P`.
 ///
+/// `analyze` consumes the engine and hands it back only on success, so a
+/// failed analysis can never be resumed: build a new engine instead.
+/// Successful analyses accumulate summaries, so a request whose policy key
+/// matches an earlier summary returns the join with the earlier requests
+/// (for every repeated callee under [`ContextInsensitive`]) and can depend on
+/// query order. Use a fresh engine for an isolated answer.
+///
 /// ```ignore
-/// let mut analysis = SparseForwardInterpreter::<Stage, ConstPropValue<MyConst>, MyError>::new(&pipeline)
+/// let analysis = SparseForwardInterpreter::<Stage, ConstPropValue<MyConst>, MyError>::new(&pipeline)
 ///     .with_linker(CrossStageLinker);
-/// let result = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
+/// let (result, analysis) = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
 /// ```
 pub struct SparseForwardInterpreter<
     'ir,
@@ -1518,11 +1525,11 @@ where
     /// Resolve `stage`/`function` by name and analyze. Returns the function's
     /// inferred return product at the fixpoint (empty if it never returns).
     pub fn analyze_by_name(
-        &mut self,
+        self,
         stage_name: &str,
         function_name: &str,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Product<V>, E> {
+    ) -> Result<(Product<V>, Self), E> {
         let stage = self
             .driver
             .inner()
@@ -1543,22 +1550,23 @@ where
     /// [`analyze`](Self::analyze) with [`Callee::Named`], and returns its
     /// inferred return product at the fixpoint.
     pub fn analyze_by_symbol(
-        &mut self,
+        self,
         stage: CompileStage,
         symbol: Symbol,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Product<V>, E> {
+    ) -> Result<(Product<V>, Self), E> {
         self.analyze(stage, symbol.into(), args)
     }
 
     /// Run the fixpoint from a single entry. Seeds the entry function's entry block
-    /// owner and drains the owner worklist.
+    /// owner and drains the owner worklist. Returns the engine on success; an
+    /// error drops it.
     pub fn analyze(
-        &mut self,
+        mut self,
         stage: CompileStage,
         callee: Callee,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<Product<V>, E> {
+    ) -> Result<(Product<V>, Self), E> {
         let target = self.driver.inner().resolve_callee(stage, &callee)?;
         let body = target
             .body(self.driver.inner().pipeline())
@@ -1576,12 +1584,13 @@ where
         let mut owner_analysis = SparseForwardOwnerAnalysis::new();
         self.driver.drain_worklist(&mut owner_analysis)?;
 
-        Ok(self
+        let ret = self
             .driver
             .summary(&Owner::Function(key))
             .and_then(|info| info.as_function())
             .and_then(|function| function.ret.clone())
-            .unwrap_or_default())
+            .unwrap_or_default();
+        Ok((ret, self))
     }
 }
 

@@ -809,6 +809,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "kirin-demand"
+version = "0.1.0"
+dependencies = [
+ "kirin",
+ "kirin-arith",
+ "kirin-interpreter",
+ "kirin-ir",
+ "kirin-test-languages",
+]
+
+[[package]]
 name = "kirin-derive-chumsky"
 version = "0.1.0"
 dependencies = [
@@ -954,6 +965,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-arith",
+ "kirin-demand",
  "kirin-interpreter",
  "kirin-ir",
  "kirin-test-languages",
@@ -1968,6 +1980,7 @@ dependencies = [
  "kirin-cmp",
  "kirin-constant",
  "kirin-constprop",
+ "kirin-demand",
  "kirin-function",
  "kirin-interpreter",
  "kirin-liveness",
