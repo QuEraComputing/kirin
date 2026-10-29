@@ -11,4 +11,5 @@ kirin-wildcard = { workspace = true }
 [dev-dependencies]
 kirin = { workspace = true }
 kirin-arith = { workspace = true }
+kirin-function = { workspace = true }
 kirin-test-languages = { workspace = true, features = ["arith-function-language", "graph-function-language"] }

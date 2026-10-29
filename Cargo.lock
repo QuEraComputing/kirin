@@ -991,6 +991,7 @@ version = "0.1.0"
 dependencies = [
  "kirin",
  "kirin-arith",
+ "kirin-function",
  "kirin-ir",
  "kirin-test-languages",
  "kirin-wildcard",

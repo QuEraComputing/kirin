@@ -493,6 +493,76 @@ impl<'a> Iterator for CompositeOpsUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for CompositeOps {
+    type Iter = CompositeOpsSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsSymbolsIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasSymbols>::symbols(field_0),
+            ),
+            Self::Beta(field_0) => {
+                CompositeOpsSymbolsIter::Beta(<BetaOp as ::kirin::ir::HasSymbols>::symbols(field_0))
+            }
+            Self::Gamma(field_0) => CompositeOpsSymbolsIter::Gamma(
+                <GammaOp as ::kirin::ir::HasSymbols>::symbols(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsSymbolsIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+    Beta(<BetaOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+    Gamma(<GammaOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for CompositeOps {
+    type IterMut = CompositeOpsSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Alpha(field_0) => CompositeOpsSymbolsMutIter::Alpha(
+                <AlphaOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+            Self::Beta(field_0) => CompositeOpsSymbolsMutIter::Beta(
+                <BetaOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+            Self::Gamma(field_0) => CompositeOpsSymbolsMutIter::Gamma(
+                <GammaOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CompositeOpsSymbolsMutIter<'a> {
+    Alpha(<AlphaOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+    Beta(<BetaOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+    Gamma(<GammaOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CompositeOpsSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Alpha(inner) => inner.next(),
+            Self::Beta(inner) => inner.next(),
+            Self::Gamma(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for CompositeOps {
     fn is_terminator(&self) -> bool {
         match self {

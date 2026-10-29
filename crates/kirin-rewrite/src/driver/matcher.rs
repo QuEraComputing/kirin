@@ -86,12 +86,11 @@ impl Match {
     /// Match pattern op `pattern` against IR statement `stmt`, then its
     /// producers against `stmt`'s.
     ///
-    /// Two ops match when they are the same op with the same non-SSA fields.
-    /// Without a generated id-blind comparison, this copies the pattern op,
-    /// overwrites its operands and results with `stmt`'s, and compares the
-    /// copy with `stmt`'s definition. Fields holding other ids, such as
-    /// symbols interned in the pattern stage, would compare unequal; ops with
-    /// bodies or successors are rejected when the rule is built.
+    /// Two ops match when they have the same kind and attributes. Stage-local
+    /// symbols are compared by name through their respective tables. The
+    /// pattern clone's symbol, operand and result IDs are then normalized to
+    /// the candidate's before comparing the remaining fields with `==`.
+    /// Ops with bodies or successors are rejected when the rule is built.
     fn op<L: Dialect>(
         &mut self,
         patterns: &StageInfo<PatternLanguage<L>>,
@@ -112,10 +111,8 @@ impl Match {
             return false;
         };
 
-        // Step 1: compare everything but the SSA ids. The ids of the two
-        // stages never agree, so copy the pattern op, give the copy the IR
-        // statement's operands and results, and compare the copy: what is
-        // left to differ is the op itself and its other fields.
+        // Step 1: compare attributes across stages, normalizing local IDs
+        // on a clone before using structural equality.
         let pattern_operands: Vec<SSAValue> = op.arguments().copied().collect();
         let operands: Vec<SSAValue> = concrete.arguments().copied().collect();
         let pattern_results: Vec<ResultValue> = op.results().copied().collect();
@@ -124,6 +121,25 @@ impl Match {
             return false;
         }
         let mut probe = op.clone();
+        {
+            let mut pattern_symbols = probe.symbols_mut();
+            let mut concrete_symbols = concrete.symbols();
+            loop {
+                match (pattern_symbols.next(), concrete_symbols.next()) {
+                    (Some(pattern_symbol), Some(&concrete_symbol)) => {
+                        let Some(name) = patterns.symbol_table().resolve(*pattern_symbol) else {
+                            return false;
+                        };
+                        if stage.symbol_table().resolve(concrete_symbol) != Some(name) {
+                            return false;
+                        }
+                        *pattern_symbol = concrete_symbol;
+                    }
+                    (None, None) => break,
+                    _ => return false,
+                }
+            }
+        }
         for (slot, &operand) in probe.arguments_mut().zip(&operands) {
             *slot = operand;
         }

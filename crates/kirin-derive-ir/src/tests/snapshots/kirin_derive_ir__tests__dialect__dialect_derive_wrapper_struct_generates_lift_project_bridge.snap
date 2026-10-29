@@ -311,6 +311,50 @@ impl<'a> Iterator for WrapperOpUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for WrapperOp {
+    type Iter = WrapperOpSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        let Self(field_0) = self;
+        WrapperOpSymbolsIter {
+            inner: <InnerOp as ::kirin::ir::HasSymbols>::symbols(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpSymbolsIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasSymbols<'a>>::Iter,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for WrapperOp {
+    type IterMut = WrapperOpSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        let Self(field_0) = self;
+        WrapperOpSymbolsMutIter {
+            inner: <InnerOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct WrapperOpSymbolsMutIter<'a> {
+    inner: <InnerOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut,
+}
+#[automatically_derived]
+impl<'a> Iterator for WrapperOpSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for WrapperOp {
     fn is_terminator(&self) -> bool {
         let Self(field_0) = self;

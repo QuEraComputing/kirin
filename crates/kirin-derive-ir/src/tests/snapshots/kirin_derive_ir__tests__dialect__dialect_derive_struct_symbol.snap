@@ -309,6 +309,50 @@ impl<'a> Iterator for CallExternUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for CallExtern {
+    type Iter = CallExternSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        let Self { target, args } = self;
+        CallExternSymbolsIter {
+            inner: std::iter::once(target),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct CallExternSymbolsIter<'a> {
+    inner: std::iter::Once<&'a ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for CallExternSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for CallExtern {
+    type IterMut = CallExternSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        let Self { target, args } = self;
+        CallExternSymbolsMutIter {
+            inner: std::iter::once(target),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct CallExternSymbolsMutIter<'a> {
+    inner: std::iter::Once<&'a mut ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for CallExternSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for CallExtern {
     fn is_terminator(&self) -> bool {
         false

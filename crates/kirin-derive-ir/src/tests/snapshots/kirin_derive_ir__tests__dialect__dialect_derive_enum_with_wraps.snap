@@ -423,6 +423,66 @@ impl<'a> Iterator for ArithLanguageUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for ArithLanguage {
+    type Iter = ArithLanguageSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                ArithLanguageSymbolsIter::Add(<AddOp as ::kirin::ir::HasSymbols>::symbols(field_0))
+            }
+            Self::Sub(field_0) => {
+                ArithLanguageSymbolsIter::Sub(<SubOp as ::kirin::ir::HasSymbols>::symbols(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageSymbolsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+    Sub(<SubOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for ArithLanguage {
+    type IterMut = ArithLanguageSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => ArithLanguageSymbolsMutIter::Add(
+                <AddOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+            Self::Sub(field_0) => ArithLanguageSymbolsMutIter::Sub(
+                <SubOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithLanguageSymbolsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+    Sub(<SubOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithLanguageSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Sub(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for ArithLanguage {
     fn is_terminator(&self) -> bool {
         match self {

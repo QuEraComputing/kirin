@@ -10,9 +10,9 @@
 use crate::{
     Block, BranchOp, BuilderStageInfo, CFG, DiGraph, Dialect, HasArguments, HasArgumentsMut,
     HasBlocks, HasBlocksMut, HasCFG, HasCFGMut, HasDigraphs, HasDigraphsMut, HasResults,
-    HasResultsMut, HasSuccessors, HasSuccessorsMut, HasUngraphs, HasUngraphsMut, IsConstant,
-    IsEdge, IsPure, IsSpeculatable, IsTerminator, Placeholder, ResultValue, SSAValue, Successor,
-    UnGraph,
+    HasResultsMut, HasSuccessors, HasSuccessorsMut, HasSymbols, HasSymbolsMut, HasUngraphs,
+    HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, Placeholder,
+    ResultValue, SSAValue, Successor, Symbol, UnGraph,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -71,6 +71,20 @@ impl<'a> HasArgumentsMut<'a> for TestLang {
             TestLang::Use(a) => vec![a].into_iter(),
             _ => vec![].into_iter(),
         }
+    }
+}
+
+impl<'a> HasSymbols<'a> for TestLang {
+    type Iter = std::iter::Empty<&'a Symbol>;
+    fn symbols(&'a self) -> Self::Iter {
+        std::iter::empty()
+    }
+}
+
+impl<'a> HasSymbolsMut<'a> for TestLang {
+    type IterMut = std::iter::Empty<&'a mut Symbol>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        std::iter::empty()
     }
 }
 

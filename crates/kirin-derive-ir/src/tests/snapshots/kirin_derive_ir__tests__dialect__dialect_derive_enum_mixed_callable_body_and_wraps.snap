@@ -501,6 +501,78 @@ impl<'a> Iterator for CallableLanguageUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for CallableLanguage {
+    type Iter = CallableLanguageSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        match self {
+            Self::Function { body } => {
+                CallableLanguageSymbolsIter::Function(std::iter::empty::<&'a ::kirin::ir::Symbol>())
+            }
+            Self::Nop { value } => {
+                CallableLanguageSymbolsIter::Nop(std::iter::empty::<&'a ::kirin::ir::Symbol>())
+            }
+            Self::Lambda(field_0) => CallableLanguageSymbolsIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasSymbols>::symbols(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageSymbolsIter<'a> {
+    Function(std::iter::Empty<&'a ::kirin::ir::Symbol>),
+    Nop(std::iter::Empty<&'a ::kirin::ir::Symbol>),
+    Lambda(<LambdaOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for CallableLanguage {
+    type IterMut = CallableLanguageSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Function { body } => {
+                CallableLanguageSymbolsMutIter::Function(std::iter::empty::<
+                    &'a mut ::kirin::ir::Symbol,
+                >())
+            }
+            Self::Nop { value } => CallableLanguageSymbolsMutIter::Nop(std::iter::empty::<
+                &'a mut ::kirin::ir::Symbol,
+            >()),
+            Self::Lambda(field_0) => CallableLanguageSymbolsMutIter::Lambda(
+                <LambdaOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CallableLanguageSymbolsMutIter<'a> {
+    Function(std::iter::Empty<&'a mut ::kirin::ir::Symbol>),
+    Nop(std::iter::Empty<&'a mut ::kirin::ir::Symbol>),
+    Lambda(<LambdaOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CallableLanguageSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Function(inner) => inner.next(),
+            Self::Nop(inner) => inner.next(),
+            Self::Lambda(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for CallableLanguage {
     fn is_terminator(&self) -> bool {
         match self {
