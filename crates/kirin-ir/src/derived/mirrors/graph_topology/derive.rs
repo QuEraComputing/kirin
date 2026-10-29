@@ -18,6 +18,11 @@ pub(in crate::derived) fn derive_digraphs<L: Dialect>(
     findings: &mut Vec<Finding>,
 ) -> DiGraphTopologyMap {
     let mut table = DiGraphTopologyMap::sized_like(&stage.nodes.digraphs);
+    // Without any digraph slot, not even a deleted one, no statement can be
+    // a member or a dangling one, so skip the statement scan.
+    if stage.nodes.digraphs.is_empty() {
+        return table;
+    }
     for (stmt, item, graph) in members_of(stage, findings, as_digraph, is_live_digraph) {
         let topology = table.get_mut(graph).expect("sized like the digraph arena");
         topology.members.push((stmt, MemberRole::Node));
@@ -37,6 +42,11 @@ pub(in crate::derived) fn derive_ungraphs<L: Dialect>(
     findings: &mut Vec<Finding>,
 ) -> UnGraphTopologyMap {
     let mut table = UnGraphTopologyMap::sized_like(&stage.nodes.ungraphs);
+    // Without any ungraph slot, not even a deleted one, no statement can be
+    // a member or a dangling one, so skip the statement scan.
+    if stage.nodes.ungraphs.is_empty() {
+        return table;
+    }
     let mut wires: SlotMap<UnGraph, Wires> = SlotMap::sized_like(&stage.nodes.ungraphs);
 
     // Boundary wires: the first `edge_count` ports of each graph.
