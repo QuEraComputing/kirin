@@ -32,3 +32,29 @@ fn test_add_pretty_print() {
     arena_doc.render_fmt(80, &mut buf).unwrap();
     insta::assert_snapshot!(buf, @"%2 = add %0, %1");
 }
+
+/// Abbreviating collapses the function's CFG body, and full printing
+/// resumes once it returns.
+#[test]
+fn test_abbreviated_statement_collapses_nested_bodies() {
+    let mut stage: BuilderStageInfo<SimpleLanguage> = BuilderStageInfo::default();
+    let one = SimpleLanguage::op_constant(&mut stage, 1i64);
+    let ret = SimpleLanguage::op_return(&mut stage, one.result);
+    let block = stage.block().stmt(one).terminator(ret).new();
+    let body = stage.cfg().add_block(block).new();
+    let function = SimpleLanguage::op_function(&mut stage, body);
+    let stage = stage.finalize().unwrap();
+
+    let doc = Document::new(Default::default(), &stage);
+    let mut abbreviated = String::new();
+    doc.print_statement_abbreviated(&function.id)
+        .render_fmt(80, &mut abbreviated)
+        .unwrap();
+    insta::assert_snapshot!(abbreviated, @"%1 = {...}");
+
+    let mut full = String::new();
+    doc.print_statement(&function.id)
+        .render_fmt(80, &mut full)
+        .unwrap();
+    assert!(full.contains("return %0;"), "{full}");
+}

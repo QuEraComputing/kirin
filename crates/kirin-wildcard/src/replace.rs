@@ -1,7 +1,7 @@
 use kirin::prelude::*;
 
 /// Redirects every use of a matched value to a replacement value.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, PrettyPrint)]
 #[chumsky(format = "$replace {matched} with {replacement}")]
 #[kirin(builders, type = T)]
 pub struct Replace<T: CompileTimeValue> {

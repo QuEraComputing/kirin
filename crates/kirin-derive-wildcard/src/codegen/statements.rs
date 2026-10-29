@@ -1,4 +1,4 @@
-use proc_macro2::{Literal, Span, TokenStream};
+use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
 use syn::{ext::IdentExt, spanned::Spanned};
 
@@ -30,7 +30,6 @@ impl RuleCodegen {
     /// alongside the results' idents in order.
     pub(super) fn results(&self, stmt: StmtId) -> (TokenStream, Vec<syn::Ident>) {
         let ir = self.ir_path();
-        let ty = self.type_alias();
         let stage = self.stage_ident();
         let statement = self.statement_ident(stmt);
         let values = &self.model.statement(stmt).results;
@@ -50,7 +49,8 @@ impl RuleCodegen {
                     let #value: #ir::ResultValue = #stage
                         .ssa()
                         #name
-                        .ty(<#ty as #ir::Placeholder>::placeholder())
+                        // The type is inferred as the language's IR type.
+                        .ty(#ir::Placeholder::placeholder())
                         .kind(#ir::BuilderSSAKind::Result(#statement, #index))
                         .new()
                         .into();
@@ -80,7 +80,7 @@ impl RuleCodegen {
     /// is named after the rule's name for it unless it is `_`.
     pub(super) fn hole(&self, stmt: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
-        let ty = self.type_alias();
+        let ty = self.ir_type();
         let stage = self.stage_ident();
 
         let (declare_results, result_values) = self.results(stmt);
@@ -145,7 +145,7 @@ impl RuleCodegen {
         let name = Self::native_name(func);
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
-        let ty = self.type_alias();
+        let ty = self.ir_type();
 
         // `#func` keeps its own spans, so it resolves where the rule is
         // written and a missing function is reported at it.
@@ -193,7 +193,7 @@ impl RuleCodegen {
     pub(super) fn constraint(&self, stmt: StmtId, success: ValueId) -> TokenStream {
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
-        let ty = self.type_alias();
+        let ty = self.ir_type();
 
         let success_id = self.value_ident(success);
         let stmt_id = self.statement_ident(stmt);
@@ -205,13 +205,13 @@ impl RuleCodegen {
 
     /// `rewrite!(root, { .. })`: the `wildcard.rewrite` terminator for the
     /// pattern block. Establishes `root` for the rewrite rule driver. `root`
-    /// is identified by its position in the pattern body.
+    /// is identified by the `Statement` built for it in the pattern body.
     pub(super) fn rewrite(&self, stmt: StmtId, root: StmtId, body: &[StmtId]) -> TokenStream {
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
-        let ty = self.type_alias();
+        let ty = self.ir_type();
 
-        let root_position = Literal::usize_unsuffixed(self.model.position(root));
+        let root_id = self.statement_ident(root);
         let stmt_id = self.statement_ident(stmt);
 
         let span = Span::mixed_site().located_at(self.model.statement(stmt).span);
@@ -229,7 +229,7 @@ impl RuleCodegen {
                 #(.stmt(#body_ids))*
                 .new();
             let #stmt_id =
-                #krate::Rewrite::<#ty>::new(#stage, #root_position, #body_id).id;
+                #krate::Rewrite::<#ty>::new(#stage, #root_id, #body_id).id;
         }
     }
 
@@ -242,7 +242,7 @@ impl RuleCodegen {
     ) -> TokenStream {
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
-        let ty = self.type_alias();
+        let ty = self.ir_type();
 
         let matched_id = self.value_ident(matched);
         let replacement_id = self.value_ident(replacement);
@@ -255,17 +255,17 @@ impl RuleCodegen {
     }
 
     /// `erase!(matched);`: a `wildcard.erase` of the matched op `op` which is
-    /// identified by its position in the pattern body.
+    /// identified by the `Statement` built for it in the pattern body.
     pub(super) fn erase(&self, stmt: StmtId, op: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
-        let ty = self.type_alias();
+        let ty = self.ir_type();
 
-        let op_position = Literal::usize_unsuffixed(self.model.position(op));
+        let op_id = self.statement_ident(op);
         let stmt_id = self.statement_ident(stmt);
 
         quote! {
-            let #stmt_id = #krate::Erase::<#ty>::new(#stage, #op_position).id;
+            let #stmt_id = #krate::Erase::<#ty>::new(#stage, #op_id).id;
         }
     }
 }

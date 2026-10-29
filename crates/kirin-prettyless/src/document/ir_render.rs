@@ -120,6 +120,26 @@ where
         }
     }
 
+    /// Pretty print a statement as [`Document::print_statement`] does, but
+    /// with each nested body collapsed: a `Block`, `CFG`, `DiGraph` or
+    /// `UnGraph` field prints as `{...}`, and a `{field:body}` projection as
+    /// `...`. Ports, captures and block arguments still print.
+    ///
+    /// This names a statement in one line, such as `if %c then {...} else
+    /// {...}`. The output is for reading only and does not parse back.
+    pub fn print_statement_abbreviated(&'a self, stmt: &Statement) -> ArenaDoc<'a> {
+        let outer = self.abbreviate_bodies.replace(true);
+        let doc = self.print_statement(stmt);
+        self.abbreviate_bodies.set(outer);
+        doc
+    }
+
+    /// While [`Document::print_statement_abbreviated`] runs, `placeholder`
+    /// for a body printer to print instead of the body.
+    fn abbreviated_body(&'a self, placeholder: &'static str) -> Option<ArenaDoc<'a>> {
+        self.abbreviate_bodies.get().then(|| self.text(placeholder))
+    }
+
     /// Pretty print a standalone `Block` body, tagged with its `block` discriminator.
     ///
     /// Renders as:
@@ -134,6 +154,9 @@ where
     /// A CFG's member blocks are *not* printed through here — they stay
     /// untagged; the shared untagged block-rendering helper handles those.
     pub fn print_block(&'a self, block: &Block) -> ArenaDoc<'a> {
+        if let Some(elided) = self.abbreviated_body("{...}") {
+            return elided;
+        }
         self.text("block ") + self.print_untagged_block(block)
     }
 
@@ -194,6 +217,9 @@ where
     /// are rendered untagged — `cfg` names the body kind once for the whole
     /// container.
     pub fn print_cfg(&'a self, cfg: &CFG) -> ArenaDoc<'a> {
+        if let Some(elided) = self.abbreviated_body("{...}") {
+            return elided;
+        }
         let inner = self.print_cfg_body_only(cfg);
         self.text("cfg ") + self.block_indent(inner).enclose("{", "}")
     }
@@ -227,6 +253,9 @@ where
 
     /// Pretty print a directed graph body.
     pub fn print_digraph(&'a self, digraph: &DiGraph) -> ArenaDoc<'a> {
+        if let Some(elided) = self.abbreviated_body("{...}") {
+            return elided;
+        }
         let info = digraph.expect_info(self.stage);
 
         // Header: digraph ^name(ports) {
@@ -241,6 +270,9 @@ where
 
     /// Pretty print an undirected graph body.
     pub fn print_ungraph(&'a self, ungraph: &UnGraph) -> ArenaDoc<'a> {
+        if let Some(elided) = self.abbreviated_body("{...}") {
+            return elided;
+        }
         let info = ungraph.expect_info(self.stage);
 
         // Header: ungraph ^name(ports) {
@@ -424,6 +456,9 @@ where
 
     /// Print a DiGraph body only: statements + yield, no header, no braces.
     pub fn print_digraph_body_only(&'a self, digraph: &DiGraph) -> ArenaDoc<'a> {
+        if let Some(elided) = self.abbreviated_body("...") {
+            return elided;
+        }
         let info = digraph.expect_info(self.stage);
 
         let mut inner = self.nil();
@@ -449,6 +484,9 @@ where
 
     /// Print an UnGraph body only: interleaved edge/node statements, no header, no braces.
     pub fn print_ungraph_body_only(&'a self, ungraph: &UnGraph) -> ArenaDoc<'a> {
+        if let Some(elided) = self.abbreviated_body("...") {
+            return elided;
+        }
         let info = ungraph.expect_info(self.stage);
         let edge_stmts: Vec<Statement> = info.edge_statements().collect();
 
@@ -504,6 +542,9 @@ where
     /// Stays raw for `{field:body}` projections — no `cfg` keyword is injected,
     /// and the member blocks are untagged, matching `kirin_chumsky::cfg_body`.
     pub fn print_cfg_body_only(&'a self, cfg: &CFG) -> ArenaDoc<'a> {
+        if let Some(elided) = self.abbreviated_body("...") {
+            return elided;
+        }
         let mut inner = self.nil();
         for block in cfg.blocks(self.stage) {
             inner += self.print_untagged_block(&block);
@@ -515,6 +556,9 @@ where
     /// Print a Block body only: statements without the `block` keyword, the
     /// header, or the braces.
     pub fn print_block_body_only(&'a self, block: &Block) -> ArenaDoc<'a> {
+        if let Some(elided) = self.abbreviated_body("...") {
+            return elided;
+        }
         let mut inner = self.nil();
         for (i, stmt) in block.statements(self.stage).enumerate() {
             if i > 0 {

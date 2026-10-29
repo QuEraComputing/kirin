@@ -13,7 +13,8 @@ use crate::rewrite_rule::RuleArgs;
 /// which the caller finalizes at the end.
 pub(crate) struct RuleCodegen {
     pub(super) model: RuleModel,
-    /// The function the attribute is on, for its attributes and visibility.
+    /// The function the attribute macro is on, for its attributes, visibility and
+    /// generics.
     pub(super) item: syn::ItemFn,
     pub(super) args: RuleArgs,
 }
@@ -25,13 +26,10 @@ impl RuleCodegen {
         let codegen = Self::new(model, item, args);
         let signature = codegen.signature();
         let pattern = codegen.pattern();
-        let language = &codegen.args.language;
         let ir = codegen.ir_path();
-        let ty = codegen.type_alias();
         let stage = codegen.stage_ident();
         quote! {
             #signature {
-                type #ty = <#language as #ir::Dialect>::Type;
                 let #stage = #ir::AsBuildStage::as_build_stage(#stage);
                 #pattern
             }
@@ -43,8 +41,13 @@ impl RuleCodegen {
     }
 
     /// The generated function's signature, keeping the attributes,
-    /// visibility and name of the original. It takes the stage to build the
-    /// pattern in and returns the `wildcard.pattern` statement.
+    /// visibility, name, generic parameters and where clause of the
+    /// original. It takes the stage to build the pattern in and returns the
+    /// `wildcard.pattern` statement.
+    ///
+    /// A rule with generics also gets the where clauses its body needs,
+    /// allowing the author to define the rule on a generic language that
+    /// derives the dialects it should apply to with `L: From<..>`.
     pub(super) fn signature(&self) -> TokenStream {
         let syn::ItemFn {
             attrs, vis, sig, ..
@@ -54,11 +57,21 @@ impl RuleCodegen {
         let language = &self.args.language;
         let ir = self.ir_path();
         let stage = self.stage_ident();
+
+        let mut generics = sig.generics.clone();
+        if !generics.params.is_empty() {
+            let ty = self.ir_type();
+            let predicates = &mut generics.make_where_clause().predicates;
+            predicates.push(syn::parse_quote!(#language: #ir::Dialect));
+            predicates.push(syn::parse_quote!(#ty: #ir::Placeholder));
+        }
+        let where_clause = &generics.where_clause;
         quote! {
             #(#attrs)*
-            #vis fn #name(
+            #vis fn #name #generics(
                 #stage: &mut impl #ir::AsBuildStage<#krate::PatternLanguage<#language>>,
             ) -> #ir::Statement
+            #where_clause
         }
     }
 
@@ -69,10 +82,13 @@ impl RuleCodegen {
         quote!(#krate::__private::ir)
     }
 
-    /// The alias the generated function declares for the IR type of the
-    /// language, `<L as Dialect>::Type`, the `T` of the wildcard statements.
-    pub(super) fn type_alias(&self) -> syn::Ident {
-        syn::Ident::new("__Type", Span::mixed_site())
+    /// The IR type of the language, `<L as Dialect>::Type`, used as the `T`
+    /// of the wildcard statements. Written out at each use rather than
+    /// aliased, to allow the language to be generic.
+    pub(super) fn ir_type(&self) -> TokenStream {
+        let language = &self.args.language;
+        let ir = self.ir_path();
+        quote!(<#language as #ir::Dialect>::Type)
     }
 
     /// The generated function's parameter, and later a local variable holding
@@ -88,7 +104,7 @@ impl RuleCodegen {
     pub(super) fn pattern(&self) -> TokenStream {
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
-        let ty = self.type_alias();
+        let ty = self.ir_type();
         let rule_name = self.model.name().unraw().to_string();
 
         // Mixed-site, like the other locals, so they stay apart from the

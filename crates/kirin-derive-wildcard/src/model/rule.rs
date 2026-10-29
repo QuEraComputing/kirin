@@ -130,18 +130,6 @@ impl RuleModel {
         self.body.contains(&stmt) && matches!(self.statement(stmt).kind, StmtKind::Op { .. })
     }
 
-    /// The 0-based position of `stmt` in the body and correspondingly in the
-    /// generated pattern block.
-    ///
-    /// `wildcard.rewrite` and`wildcard.erase` name the statement they act on
-    /// by this position.
-    pub fn position(&self, stmt: StmtId) -> usize {
-        self.body
-            .iter()
-            .position(|&id| id == stmt)
-            .expect("only statements of the match have a position")
-    }
-
     /// Whether `id` is the result of a native function called in the match.
     /// A value computed from the match cannot build anything in the IR since
     /// the rule may still fail to apply and we only want to modify the IR if

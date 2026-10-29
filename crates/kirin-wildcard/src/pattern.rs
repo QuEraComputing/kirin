@@ -4,7 +4,7 @@ use crate::{PatternLanguage, PatternStatement, Rewrite};
 
 /// Holds one pattern in a single block: the statements to match, terminated
 /// by a [`Rewrite`].
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, PrettyPrint)]
 #[chumsky(format = "$pattern {name} {body}")]
 #[kirin(builders, type = T)]
 pub struct Pattern<T: CompileTimeValue> {
@@ -37,14 +37,13 @@ impl<T: CompileTimeValue> Pattern<T> {
         }
     }
 
-    /// The statement the match is rooted at: the one at [`Rewrite::root`]'s
-    /// position in the pattern body. `None` if the body does not end in a
-    /// [`Rewrite`] or the position is past the end of the body.
+    /// The statement the match is rooted at, [`Rewrite::root`], or `None` if
+    /// the body does not end in a [`Rewrite`]. Note that this latter case
+    /// would come from an invalid rewrite rule.
     pub fn root<L: Dialect<Type = T>>(
         &self,
         stage: &StageInfo<PatternLanguage<L>>,
     ) -> Option<Statement> {
-        let rewrite = self.rewrite(stage)?;
-        self.body.statements(stage).nth(rewrite.root())
+        self.rewrite(stage).map(Rewrite::root)
     }
 }

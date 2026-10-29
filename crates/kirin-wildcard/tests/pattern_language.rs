@@ -4,6 +4,7 @@ use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType, ArithValue};
 use kirin_constant::Constant;
 use kirin_test_languages::GraphFunctionLanguage as L;
+use kirin_test_utils::roundtrip;
 use kirin_wildcard::{Erase, Hole, Pattern, PatternLanguage, PatternStatement, Replace, Rewrite};
 
 type P = PatternLanguage<L>;
@@ -34,8 +35,17 @@ fn op(
     (statement, result)
 }
 
-#[test]
-fn add_zero_built_on_generic_pattern_language() {
+/// The add-zero pattern built by [`add_zero`]: the pattern statement, its root
+/// `add`, and the values `x` and `zero` the root adds.
+struct AddZero {
+    pattern: Statement,
+    root: Statement,
+    x: ResultValue,
+    zero: ResultValue,
+}
+
+/// Build the pattern rewriting `x + 0` to `x`, and finalize its stage.
+fn add_zero() -> (StageInfo<P>, AddZero) {
     let mut stage = BuilderStageInfo::<P>::default();
 
     // Match: a hole, the zero constant, and the root `add`.
@@ -56,12 +66,10 @@ fn add_zero_built_on_generic_pattern_language() {
     });
 
     // Replacement: redirect uses of the root to the hole, then erase the root.
-    // `rewrite` and `erase` name the root by its position in the body below.
-    let root_position = 2;
     let replace = Replace::<ArithType>::new(&mut stage, r, x.result);
-    let erase = Erase::<ArithType>::new(&mut stage, root_position);
+    let erase = Erase::<ArithType>::new(&mut stage, r_stmt);
     let rw = stage.block().name("rw").stmt(replace).stmt(erase).new();
-    let rewrite = Rewrite::<ArithType>::new(&mut stage, root_position, rw);
+    let rewrite = Rewrite::<ArithType>::new(&mut stage, r_stmt, rw);
 
     let bb = stage
         .block()
@@ -75,22 +83,52 @@ fn add_zero_built_on_generic_pattern_language() {
     let pattern = Pattern::<ArithType>::new(&mut stage, name, bb);
 
     let stage = stage.finalize().expect("pattern should finalize");
+    let add_zero = AddZero {
+        pattern: pattern.id,
+        root: r_stmt,
+        x: x.result,
+        zero,
+    };
+    (stage, add_zero)
+}
 
-    let PatternLanguage::Wildcard(PatternStatement::Pattern(root)) =
-        pattern.id.expect_info(&stage).definition()
+#[test]
+fn add_zero_built_on_generic_pattern_language() {
+    let (stage, add_zero) = add_zero();
+
+    let PatternLanguage::Wildcard(PatternStatement::Pattern(pattern)) =
+        add_zero.pattern.expect_info(&stage).definition()
     else {
         panic!("the top-level statement should be the pattern");
     };
-    assert_eq!(root.body(), bb);
-    assert_eq!(bb.statements(&stage).nth(root_position), Some(r_stmt));
+    assert_eq!(pattern.root(&stage), Some(add_zero.root));
 
     let PatternLanguage::Op(L::Arith(Arith::Add { lhs, rhs, .. })) =
-        r_stmt.expect_info(&stage).definition()
+        add_zero.root.expect_info(&stage).definition()
     else {
         panic!("the root should be `L`'s own `add`");
     };
-    assert_eq!(*lhs, SSAValue::from(x.result));
-    assert_eq!(*rhs, SSAValue::from(zero));
+    assert_eq!(*lhs, SSAValue::from(add_zero.x));
+    assert_eq!(*rhs, SSAValue::from(add_zero.zero));
+}
+
+/// `rewrite` and `erase` print the root op by its result.
+#[test]
+fn add_zero_prints_the_root_by_its_result() {
+    let (stage, add_zero) = add_zero();
+    let rendered = roundtrip::render_statement(&stage, add_zero.pattern);
+    // The hole has no name, so it prints by id.
+    let expected = r#"
+wildcard.pattern @add_zero block ^bb {
+  %0 = wildcard.hole -> i64;
+  %zero = constant 0 -> i64;
+  %r = add %0, %zero -> i64;
+  wildcard.rewrite %r block ^rw {
+    wildcard.replace %r with %0;
+    wildcard.erase %r;
+  };
+}"#;
+    assert_eq!(rendered.trim(), expected.trim());
 }
 
 /// `new_add` builds `L`'s statement without a stage, so it can go into

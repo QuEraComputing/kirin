@@ -14,7 +14,7 @@ use kirin::prelude::*;
 ///
 /// The name is a plain string, not a [`Symbol`]: nothing in the IR defines
 /// the function, so it must not read as an `@` reference to an IR entity.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, HasParser, PrettyPrint)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect, PrettyPrint)]
 #[chumsky(format = "$native_call {name}({args})[ -> {results:type}]")]
 #[kirin(builders, type = T)]
 pub struct NativeCall<T: CompileTimeValue> {

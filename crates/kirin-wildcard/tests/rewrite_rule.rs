@@ -4,6 +4,7 @@
 use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType};
 use kirin_test_languages::{EffectLanguage, GraphFunctionLanguage as L};
+use kirin_test_utils::roundtrip;
 use kirin_wildcard::{PatternLanguage, PatternStatement, Rewrite, rewrite_rule};
 
 type Stage = StageInfo<PatternLanguage<L>>;
@@ -52,6 +53,18 @@ fn drop_effect_of_neg() {
     let n = op![Arith::neg(x)];
     let k @ () = op![EffectLanguage::effect(n)];
     erase!(k)
+}
+
+/// A terminator of the language as the root: an `exit` of a double negation
+/// exits with the value itself.
+#[rewrite_rule(language = EffectLanguage)]
+fn exit_double_neg() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let k @ () = op![EffectLanguage::exit(r)];
+    rewrite!(k, {
+        replace!(r, x);
+    })
 }
 
 mod rules {
@@ -159,10 +172,10 @@ fn rewrite_rule_builds_the_match_and_the_rewrite() {
         ]
     );
 
-    // The root is `r`, named by its position in the body, and the rewrite
-    // redirects its uses to `x`, then erases it.
-    assert_eq!(rewrite.root(), 2);
-    let root = statements[rewrite.root()];
+    // The root is `r`, and the rewrite redirects its uses to `x`, then
+    // erases it.
+    let root = rewrite.root();
+    assert_eq!(root, statements[2]);
     assert_eq!(describe(&stage, root), "r = neg");
     let actions: Vec<Statement> = rewrite.body().statements(&stage).collect();
     let PatternLanguage::Wildcard(PatternStatement::Replace(replace)) =
@@ -199,7 +212,7 @@ fn rewrite_rule_erases_without_replacing() {
     );
 
     // The rewrite only erases the root.
-    assert_eq!(rewrite.root(), 1);
+    assert_eq!(rewrite.root(), statements[1]);
     let actions: Vec<Statement> = rewrite.body().statements(&stage).collect();
     let [action] = actions[..] else {
         panic!("expected one action");
@@ -220,7 +233,8 @@ fn rewrite_rule_roots_and_erases_an_op_without_results() {
 
     // Match: the hole `x`, the `neg`, and the `effect` consuming it.
     assert_eq!(statements.len(), 3);
-    let root = statements[rewrite.root()];
+    let root = rewrite.root();
+    assert_eq!(root, statements[2]);
     let PatternLanguage::Op(EffectLanguage::Effect { value }) =
         root.expect_info(&stage).definition()
     else {
@@ -244,6 +258,91 @@ fn rewrite_rule_roots_and_erases_an_op_without_results() {
         panic!("expected an erase");
     };
     assert_eq!(erase.target(), rewrite.root());
+}
+
+/// A terminator of the language is an ordinary statement of the pattern body,
+/// which the `rewrite` still ends.
+#[test]
+fn rewrite_rule_roots_at_a_terminator_of_the_language() {
+    let (stage, pattern) = build(exit_double_neg);
+    let (_, statements, rewrite) = pattern_parts(&stage, pattern);
+
+    // Match: the hole `x`, both `neg`s, and the `exit` consuming the second.
+    assert_eq!(statements.len(), 4);
+    let root = rewrite.root();
+    assert_eq!(root, statements[3]);
+    let definition = root.expect_info(&stage).definition();
+    let PatternLanguage::Op(exit @ EffectLanguage::Exit { .. }) = definition else {
+        panic!("expected the exit as the root");
+    };
+    assert!(exit.is_terminator());
+    assert!(!definition.is_terminator());
+}
+
+/// The printed rule shows the root, in `rewrite` and `erase`, by its result.
+#[test]
+fn rewrite_rule_prints_the_root_by_its_result() {
+    let (stage, pattern) = build(double_neg);
+    let expected = r#"
+wildcard.pattern @double_neg block ^double_neg_pat {
+  %x = wildcard.hole -> i64;
+  %a = neg %x -> i64;
+  %r = neg %a -> i64;
+  %3 = wildcard.native_call "is_power_of_two" (%x) -> i64;
+  wildcard.constraint %3;
+  wildcard.rewrite %r block ^double_neg_rw {
+    wildcard.replace %r with %x;
+    wildcard.erase %r;
+  };
+}
+"#;
+    assert_eq!(
+        roundtrip::render_statement(&stage, pattern).trim(),
+        expected.trim()
+    );
+}
+
+/// The printed rule shows a root without results quoted, followed by its
+/// position in the pattern body.
+#[test]
+fn rewrite_rule_prints_a_root_without_results_quoted_with_its_position() {
+    let (stage, pattern) = build(drop_effect_of_neg);
+    let expected = r#"
+wildcard.pattern @drop_effect_of_neg block ^drop_effect_of_neg_pat {
+  %x = wildcard.hole -> i64;
+  %n = neg %x -> i64;
+  effect %n;
+  wildcard.rewrite 'effect %n' (#2) block ^drop_effect_of_neg_rw {
+    wildcard.erase 'effect %n' (#2);
+  };
+}
+"#;
+    assert_eq!(
+        roundtrip::render_statement(&stage, pattern).trim(),
+        expected.trim()
+    );
+}
+
+/// The printed rule shows a terminator of the language in the pattern body,
+/// before the `rewrite` ending it.
+#[test]
+fn rewrite_rule_prints_a_terminator_of_the_language_in_the_body() {
+    let (stage, pattern) = build(exit_double_neg);
+    let expected = r#"
+wildcard.pattern @exit_double_neg block ^exit_double_neg_pat {
+  %x = wildcard.hole -> i64;
+  %a = neg %x -> i64;
+  %r = neg %a -> i64;
+  exit %r;
+  wildcard.rewrite 'exit %r' (#3) block ^exit_double_neg_rw {
+    wildcard.replace %r with %x;
+  };
+}
+"#;
+    assert_eq!(
+        roundtrip::render_statement(&stage, pattern).trim(),
+        expected.trim()
+    );
 }
 
 #[test]
@@ -297,8 +396,7 @@ fn rewrite_rule_keeps_visibility_and_takes_a_crate_path() {
 }
 
 /// Several rules build into one stage, finalized once, and a finalized stage
-/// can take more. Each pattern keeps its own name and body, and positions are
-/// relative to that body.
+/// can take more. Each pattern keeps its own name, body and root.
 #[test]
 fn rewrite_rules_share_one_stage() {
     let mut stage = BuilderStageInfo::<PatternLanguage<L>>::default();
@@ -310,8 +408,8 @@ fn rewrite_rules_share_one_stage() {
     let roots: Vec<(String, Statement)> = [first, second, third]
         .into_iter()
         .map(|pattern| {
-            let (name, statements, rewrite) = pattern_parts(&stage, pattern);
-            (name, statements[rewrite.root()])
+            let (name, _, rewrite) = pattern_parts(&stage, pattern);
+            (name, rewrite.root())
         })
         .collect();
     let names: Vec<&str> = roots.iter().map(|(name, _)| name.as_str()).collect();

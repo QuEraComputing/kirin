@@ -16,4 +16,5 @@ kirin-arith = { workspace = true }
 kirin-constant = { workspace = true }
 kirin-test-languages = { workspace = true, features = ["graph-function-language", "effect-language"] }
 kirin-test-types = { path = "../kirin-test-types" }
+kirin-test-utils = { workspace = true, features = ["roundtrip"] }
 trybuild = { workspace = true }

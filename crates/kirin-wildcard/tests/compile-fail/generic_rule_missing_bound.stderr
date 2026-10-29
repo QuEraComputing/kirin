@@ -1,0 +1,49 @@
+error[E0277]: the trait bound `L: From<Arith<_>>` is not satisfied
+ --> tests/compile-fail/generic_rule_missing_bound.rs:9:24
+  |
+7 | #[rewrite_rule(language = L)]
+  | ----------------------------- in this attribute macro expansion
+8 | fn double_neg<L>() {
+9 |     let a = op![Arith::neg(x)];
+  |                 -----  ^^^ the trait `From<Arith<_>>` is not implemented for `L`
+  |                 |
+  |                 required by a bound introduced by this call
+  |
+help: `T` implements trait `From<T>`
+ --> $RUST/core/src/convert/mod.rs
+  |
+  |   const impl<T> From<T> for T {
+  |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ `From<T>`
+  |
+ ::: $RUST/core/src/num/nonzero.rs
+  |
+  | / const impl<T> From<NonZero<T>> for T
+  | | where
+  | |     T: ZeroablePrimitive,
+  | |_________________________^ `From<NonZero<T>>`
+  = note: this error originates in the attribute macro `rewrite_rule` (in Nightly builds, run with -Z macro-backtrace for more info)
+
+error[E0277]: the trait bound `L: From<Arith<_>>` is not satisfied
+  --> tests/compile-fail/generic_rule_missing_bound.rs:10:24
+   |
+ 7 | #[rewrite_rule(language = L)]
+   | ----------------------------- in this attribute macro expansion
+...
+10 |     let r = op![Arith::neg(a)];
+   |                 -----  ^^^ the trait `From<Arith<_>>` is not implemented for `L`
+   |                 |
+   |                 required by a bound introduced by this call
+   |
+help: `T` implements trait `From<T>`
+  --> $RUST/core/src/convert/mod.rs
+   |
+   |   const impl<T> From<T> for T {
+   |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^ `From<T>`
+   |
+  ::: $RUST/core/src/num/nonzero.rs
+   |
+   | / const impl<T> From<NonZero<T>> for T
+   | | where
+   | |     T: ZeroablePrimitive,
+   | |_________________________^ `From<NonZero<T>>`
+   = note: this error originates in the attribute macro `rewrite_rule` (in Nightly builds, run with -Z macro-backtrace for more info)

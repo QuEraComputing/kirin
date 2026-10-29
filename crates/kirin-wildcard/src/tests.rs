@@ -1,6 +1,6 @@
 use kirin::ir::{
     Block, HasArguments, HasBlocks, HasResults, HasSuccessors, Id, IsConstant, IsPure,
-    IsSpeculatable, IsTerminator, SSAValue, Symbol, TestSSAValue,
+    IsSpeculatable, IsTerminator, SSAValue, Statement, Symbol, TestSSAValue,
 };
 use kirin_test_types::UnitType;
 
@@ -12,6 +12,10 @@ fn ssa(id: usize) -> SSAValue {
 
 fn block(id: usize) -> Block {
     Block::from(Id::from(TestSSAValue(id)))
+}
+
+fn statement(id: usize) -> Statement {
+    Statement::from(Id::from(TestSSAValue(id)))
 }
 
 fn make_pattern() -> Pattern<UnitType> {
@@ -39,11 +43,11 @@ fn make_replace() -> Replace<UnitType> {
 }
 
 fn make_erase() -> Erase<UnitType> {
-    Erase::new_erase(3)
+    Erase::new_erase(statement(3))
 }
 
 fn make_rewrite() -> Rewrite<UnitType> {
-    Rewrite::new_rewrite(3, block(20))
+    Rewrite::new_rewrite(statement(3), block(20))
 }
 
 fn all_statements() -> Vec<PatternStatement<UnitType>> {
@@ -67,8 +71,8 @@ fn rewrite_is_terminator() {
 
 #[test]
 fn only_rewrite_variant_is_terminator() {
-    // Enum-level `#[wraps]` does not delegate terminator-ness, so this checks
-    // the explicit `#[kirin(terminator)]` on the `Rewrite` variant.
+    // `#[wraps]` delegates terminator-ness to each wrapped statement, so this
+    // checks that `Rewrite` is the only terminator among them.
     for stmt in all_statements() {
         let expected = matches!(stmt, PatternStatement::Rewrite(_));
         assert_eq!(stmt.is_terminator(), expected, "{stmt:?}");
@@ -154,23 +158,23 @@ fn replace_arguments_are_matched_then_replacement() {
 
 // --- Erase ---
 
-/// The target is a position in the pattern body, not an operand, so erase
-/// uses no value.
+/// The target is the op's statement, not an operand, so erase uses no
+/// value.
 #[test]
-fn erase_names_its_target_by_position() {
+fn erase_names_its_target_op() {
     let erase = make_erase();
-    assert_eq!(erase.target(), 3);
+    assert_eq!(erase.target(), statement(3));
     assert_eq!(erase.arguments().count(), 0);
     assert_eq!(erase.results().count(), 0);
 }
 
 // --- Rewrite ---
 
-/// The root is a position in the pattern body, not an operand.
+/// The root is the op's statement, not an operand.
 #[test]
-fn rewrite_has_root_position_and_body() {
+fn rewrite_has_root_op_and_body() {
     let rewrite = make_rewrite();
-    assert_eq!(rewrite.root(), 3);
+    assert_eq!(rewrite.root(), statement(3));
     assert_eq!(rewrite.arguments().count(), 0);
     assert_eq!(
         rewrite.blocks().copied().collect::<Vec<_>>(),

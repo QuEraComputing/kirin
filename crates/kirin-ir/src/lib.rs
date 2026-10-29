@@ -75,6 +75,8 @@ pub mod prelude {
 
 #[cfg(feature = "derive")]
 pub use kirin_derive_ir::{
-    Dialect, HasArguments, HasCFG, HasDigraphs, HasResults, HasSuccessors, HasUngraphs, IsConstant,
-    IsEdge, IsPure, IsSpeculatable, IsTerminator, LiftProject, ParseDispatch, StageMeta,
+    Dialect, HasArguments, HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut,
+    HasDigraphs, HasDigraphsMut, HasResults, HasResultsMut, HasSuccessors, HasSuccessorsMut,
+    HasUngraphs, HasUngraphsMut, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator,
+    LiftProject, ParseDispatch, StageMeta,
 };

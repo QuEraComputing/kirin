@@ -1,0 +1,22 @@
+error[E0277]: the trait bound `OnlyConstants: From<Arith<ArithType>>` is not satisfied
+  --> tests/compile-fail/language_missing_dialect.rs:27:5
+   |
+27 |     double_neg(&mut stage);
+   |     ^^^^^^^^^^^^^^^^^^^^^^ unsatisfied trait bound
+   |
+help: the trait `From<Arith<ArithType>>` is not implemented for `OnlyConstants`
+      but trait `From<Constant<ArithValue, ArithType>>` is implemented for it
+  --> tests/compile-fail/language_missing_dialect.rs:8:45
+   |
+ 8 | #[derive(Debug, Clone, PartialEq, Eq, Hash, Dialect)]
+   |                                             ^^^^^^^
+   = help: for that trait implementation, expected `Constant<ArithValue, ArithType>`, found `Arith<ArithType>`
+note: required by a bound in `double_neg`
+  --> tests/compile-fail/language_missing_dialect.rs:18:8
+   |
+16 | fn double_neg<L>()
+   |    ---------- required by a bound in this function
+17 | where
+18 |     L: From<Arith<L::Type>>,
+   |        ^^^^^^^^^^^^^^^^^^^^ required by this bound in `double_neg`
+   = note: this error originates in the derive macro `Dialect` (in Nightly builds, run with -Z macro-backtrace for more info)

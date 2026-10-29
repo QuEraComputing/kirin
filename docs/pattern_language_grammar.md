@@ -158,6 +158,12 @@ The table below describes the conversion from the the grammar syntax above to th
 
 A `_` result cannot be replaced; an op with one can still be erased if the rule checks it is unused.
 
+The macro defines a `language` parameter describing the kirin Dialect that the rule aims to match.
+The function may be generic, with `language = L` naming one of its generic parameters.
+This allows the rule to apply to any language that implement the `where` bounds the rule 
+describes. Normally, these are the dialects the rule should apply to  e.g. `L: From<Arith<L::Type>>`.
+See [dialect-rewrite-rules.md](design/dialect-rewrite-rules.md).
+
 ## 8. Where each condition is enforced
 
 | Condition | Checked by |
@@ -169,7 +175,7 @@ A `_` result cannot be replaced; an op with one can still be erased if the rule 
 | $\dagger$ and removal after `erase`: nothing used afterwards | macro
 | erasing an op whose results are still used | not checked statically: kirin-ir's [`Rewriter::erase_statement`](../crates/kirin-ir/src/rewrite/rewriter.rs#L451-L458) rejects it ([`StatementResultsInUse`](../crates/kirin-ir/src/rewrite/rewriter.rs#L109-L111)) and the pass quarantines the stage |
 | $\textsf{rooted}$, $\textsf{acts}$ | macro ($\textsf{rooted}$ in its verification pass) |
-| $O : m \to n$ (argument and result counts), $O$ in the language | rustc, through the generated constructor call `new_<op_name>` |
+| $O : m \to n$ (argument and result counts), $O$ in the language | rustc, through the generated constructor call `new_<op_name>`; for a generic rule, through the bounds its author writes |
 | native call arity and result sorts $\tau_i$ | not yet checked |
 
 ## 9. Future Work
