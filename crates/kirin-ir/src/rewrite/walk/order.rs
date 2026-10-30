@@ -47,7 +47,8 @@ pub trait WalkOrder {
 
     /// [`walk`](Self::walk) with a `visit` that may edit through `rewriter`,
     /// within the walk's contract (see the [module docs](super)). Fails if
-    /// `visit` erases the statement it is visiting.
+    /// `visit` erases the statement it is visiting where the order does not
+    /// allow it.
     fn walk_mut<'r, L: Dialect>(
         rewriter: &mut Rewriter<'r, L>,
         root: Statement,
@@ -106,7 +107,8 @@ pub trait WalkCursor {
     ///
     /// The IR may be edited between calls within the walk's contract (see
     /// the [module docs](super)). Fails if the statement returned by the
-    /// previous call has since been erased.
+    /// previous call has since been erased where the order does not allow
+    /// it.
     fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError>;
 
     /// Do not walk the statements nested in the statement the previous
@@ -121,7 +123,8 @@ pub trait WalkCursor {
 /// A walk whose contract was broken by an edit made during it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WalkError {
-    /// The statement being visited was erased before the walk moved on.
+    /// The statement being visited was erased before the walk moved on, in a
+    /// way its order does not allow (see the [module docs](super)).
     VisitedErased(Statement),
 }
 

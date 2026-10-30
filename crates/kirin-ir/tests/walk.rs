@@ -375,16 +375,112 @@ fn erase_while_visiting<O: WalkOrder>() -> (Statement, Result<Vec<Statement>, Wa
 }
 
 #[test]
-fn erasing_the_visited_statement_breaks_the_walk() {
+fn erasing_the_visited_statement_alone_breaks_link_following_walks() {
     for (a, result) in [
         erase_while_visiting::<PreOrder>(),
         erase_while_visiting::<PostOrder>(),
         erase_while_visiting::<BFS>(),
-        erase_while_visiting::<ReverseBFS>(),
-        erase_while_visiting::<KeepOrderReverseBFS>(),
     ] {
         assert_eq!(result, Err(WalkError::VisitedErased(a)));
     }
+}
+
+#[test]
+fn reverse_bfs_orders_go_on_after_the_visited_statement_is_erased() {
+    let t = tree();
+    let (_, reverse) = erase_while_visiting::<ReverseBFS>();
+    assert_eq!(reverse.unwrap(), ReverseBFS::schedule(&t.stage, t.root));
+    let (_, keep_order) = erase_while_visiting::<KeepOrderReverseBFS>();
+    assert_eq!(
+        keep_order.unwrap(),
+        KeepOrderReverseBFS::schedule(&t.stage, t.root)
+    );
+}
+
+#[test]
+fn reverse_bfs_orders_skip_the_rest_of_an_ancestor_erased_while_visiting() {
+    let mut t = tree();
+    let (owner, then_nop, then_ret) = (t.owner, t.then_nop, t.then_ret);
+    let reverse = walk_editing::<ReverseBFS>(&mut t, |rewriter, stmt| {
+        if stmt == then_ret {
+            rewriter.erase_statement(owner).unwrap();
+        }
+    });
+    assert_eq!(
+        reverse.unwrap(),
+        [t.else_ret, t.else_nop, t.then_ret, t.ret, t.a, t.root]
+    );
+
+    let mut t = tree();
+    let keep_order = walk_editing::<KeepOrderReverseBFS>(&mut t, |rewriter, stmt| {
+        if stmt == then_nop {
+            rewriter.erase_statement(owner).unwrap();
+        }
+    });
+    assert_eq!(keep_order.unwrap(), [t.then_nop, t.a, t.ret, t.root]);
+}
+
+#[test]
+fn bfs_goes_on_with_the_next_parent_after_the_parent_is_erased() {
+    let (mut stage, [root, a, b, c, x, y]) = two_owners();
+    let mut rewriter = Rewriter::new(&mut stage);
+    let mut cursor = BFS::start(rewriter.stage(), root);
+    let mut visited = Vec::new();
+    while let Some(stmt) = cursor.next(rewriter.stage()).unwrap() {
+        visited.push(stmt);
+        if stmt == x {
+            rewriter.erase_statement(a).unwrap();
+        }
+    }
+    assert_eq!(visited, [root, a, b, c, x, y]);
+}
+
+/// ```text
+/// root = own_cfg {
+///   g = own_blocks { p = own_blocks { a } {} } {}
+///   h = own_blocks { q = own_blocks { d } {} } {}
+/// }
+/// ```
+/// and its statements `[root, g, h, p, q, a, d]`, in BFS order.
+fn bfs_three_levels() -> (StageInfo<BuilderDialect>, [Statement; 7]) {
+    let mut stage = new_stage();
+    let owner_of = |stage: &mut BuilderStageInfo<BuilderDialect>, child: Statement| {
+        let body = stage.block().stmt(child).new();
+        let empty = stage.block().new();
+        stage
+            .statement()
+            .definition(BuilderDialect::OwnBlocks(body, empty))
+            .new()
+    };
+    let a = stage.statement().definition(BuilderDialect::Nop).new();
+    let p = owner_of(&mut stage, a);
+    let g = owner_of(&mut stage, p);
+    let d = stage.statement().definition(BuilderDialect::Nop).new();
+    let q = owner_of(&mut stage, d);
+    let h = owner_of(&mut stage, q);
+    let entry = stage.block().stmt(g).stmt(h).new();
+    let cfg = stage.cfg().add_block(entry).new();
+    let root = stage
+        .statement()
+        .definition(BuilderDialect::OwnCFG(cfg))
+        .new();
+    (stage.finalize().unwrap(), [root, g, h, p, q, a, d])
+}
+
+#[test]
+fn bfs_goes_on_outside_a_grandparent_erased_while_visiting() {
+    let (mut stage, [root, g, h, p, q, a, d]) = bfs_three_levels();
+    let mut rewriter = Rewriter::new(&mut stage);
+    let mut cursor = BFS::start(rewriter.stage(), root);
+    let mut visited = Vec::new();
+    while let Some(stmt) = cursor.next(rewriter.stage()).unwrap() {
+        visited.push(stmt);
+        if stmt == a {
+            // Erases `p` and `a` with it; `p` is the front parent.
+            rewriter.erase_statement(g).unwrap();
+        }
+    }
+    assert_eq!(visited, [root, g, h, p, q, a, d]);
 }
 
 #[test]

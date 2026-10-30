@@ -7,7 +7,7 @@
 
 use std::collections::VecDeque;
 
-use super::depth_first::{check_live, live};
+use super::depth_first::live;
 use super::order::Position;
 use super::tree::{append_children, first_child, next_sibling, owns_bodies};
 use super::{WalkCursor, WalkError, WalkOrder};
@@ -46,6 +46,12 @@ pub struct KeepOrderReverseBFS;
 /// Likewise, a subtree inserted behind the cursor is not discovered, even if
 /// its descendants lie at depths the walk has not reached. Such edits are
 /// allowed by the walk contract; visiting them requires another walk.
+///
+/// A visit may erase an ancestor of the visited statement, and with it the
+/// visited statement and its siblings: the walk goes on with the next queued
+/// parent outside the erased subtree. Erasing the visited statement alone is
+/// an error, because its siblings are still live but can no longer be
+/// reached.
 #[derive(Clone, Debug)]
 pub struct BFSCursor {
     root: Statement,
@@ -61,14 +67,14 @@ pub struct BFSCursor {
 /// built at the start, and how far through it the walk is.
 ///
 /// Statements inserted after the start are not in the order, so they are
-/// not visited. Statements erased after the start are skipped.
+/// not visited. Statements erased after the start are skipped, including the
+/// visited statement and its ancestors: the cursor never reads the visited
+/// statement's links, so a visit may erase them.
 #[derive(Clone, Debug)]
 pub struct BuiltOrderCursor {
     ordered_nodes: Vec<Statement>,
     /// The index of the next statement to consider.
     next: usize,
-    /// The statement the previous call returned.
-    visited: Option<Statement>,
 }
 
 impl WalkOrder for BFS {
@@ -88,7 +94,9 @@ impl WalkCursor for BFSCursor {
         let next = match self.position {
             Position::Start => live(stage, self.root),
             Position::At(visited) | Position::Skipped(visited) => {
-                check_live(stage, visited)?;
+                if visited.get_info(stage).is_none() {
+                    return self.after_erased(stage, visited);
+                }
                 // Queue it as a parent for the next level, whose statements
                 // are its children. Statements without bodies have none,
                 // and a skipped statement's are not walked.
@@ -124,6 +132,30 @@ impl WalkCursor for BFSCursor {
 }
 
 impl BFSCursor {
+    /// The next statement after the visit erased `visited`. Allowed only if
+    /// it erased an ancestor too, killing the front parent: its remaining
+    /// children are then dead, and the walk goes on with the next live
+    /// parent's.
+    fn after_erased<L: Dialect>(
+        &mut self,
+        stage: &StageInfo<L>,
+        visited: Statement,
+    ) -> Result<Option<Statement>, WalkError> {
+        let parent_erased = visited != self.root
+            && self
+                .parents
+                .front()
+                .is_some_and(|&parent| parent.get_info(stage).is_none());
+        if !parent_erased {
+            return Err(WalkError::VisitedErased(visited));
+        }
+        // Dead parents, the front one included, have no children, so this
+        // drops them.
+        let next = self.first_child_of_next_parent(stage);
+        self.position = next.map_or(Position::Done, Position::At);
+        Ok(next)
+    }
+
     /// The first child of the front parent or a later one, dropping parents
     /// with no children. `None` once no queued parent has any.
     fn first_child_of_next_parent<L: Dialect>(
@@ -176,22 +208,17 @@ impl BuiltOrderCursor {
         Self {
             ordered_nodes,
             next: 0,
-            visited: None,
         }
     }
 }
 
 impl WalkCursor for BuiltOrderCursor {
     fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError> {
-        if let Some(visited) = self.visited.take() {
-            check_live(stage, visited)?;
-        }
         // Return the next statement still live, skipping any erased since the
         // order was built.
         while let Some(&stmt) = self.ordered_nodes.get(self.next) {
             self.next += 1;
             if stmt.get_info(stage).is_some() {
-                self.visited = Some(stmt);
                 return Ok(Some(stmt));
             }
         }
