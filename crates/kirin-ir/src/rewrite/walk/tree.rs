@@ -52,14 +52,14 @@ pub(super) fn next_sibling<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) ->
         }
         StatementParent::DiGraph(graph) => {
             let info = graph.get_info(stage)?;
-            if let Some(next) = info.member_after(stmt) {
+            if let Some(next) = info.next_member(stmt) {
                 return Some(next);
             }
             first_in_bodies_after(stage, info.parent()?, Some(Body::DiGraph(graph)))
         }
         StatementParent::UnGraph(graph) => {
             let info = graph.get_info(stage)?;
-            if let Some(next) = info.member_after(stmt) {
+            if let Some(next) = info.next_member(stmt) {
                 return Some(next);
             }
             first_in_bodies_after(stage, info.parent()?, Some(Body::UnGraph(graph)))

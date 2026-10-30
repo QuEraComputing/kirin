@@ -177,7 +177,7 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
     }
 
     /// The member after `stmt` in member order, in O(1).
-    pub(crate) fn member_after(&self, stmt: Statement) -> Option<Statement> {
+    pub(crate) fn next_member(&self, stmt: Statement) -> Option<Statement> {
         let index = self.members.get_index_of(&stmt)?;
         self.members.get_index(index + 1).map(|(&next, _)| next)
     }
