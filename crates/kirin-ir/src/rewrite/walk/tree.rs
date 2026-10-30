@@ -131,21 +131,9 @@ fn first_in_bodies_after<L: Dialect>(
             }
             continue;
         }
-        if let Some(first) = first_statement(stage, body) {
+        if let Some(first) = body.first_statement(stage) {
             return Some(first);
         }
     }
     None
-}
-
-/// The first statement of `body`, or `None` if it is empty.
-fn first_statement<L: Dialect>(stage: &StageInfo<L>, body: Body) -> Option<Statement> {
-    match body {
-        Body::Block(block) => block.first_statement(stage),
-        Body::CFG(cfg) => cfg
-            .blocks(stage)
-            .find_map(|block| block.first_statement(stage)),
-        Body::DiGraph(graph) => graph.get_info(stage)?.first_member(),
-        Body::UnGraph(graph) => graph.get_info(stage)?.first_member(),
-    }
 }
