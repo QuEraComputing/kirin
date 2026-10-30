@@ -145,5 +145,17 @@ impl std::error::Error for WalkError {}
 pub(super) enum Position {
     Start,
     At(Statement),
+    /// At a statement whose nested statements are not walked.
+    Skipped(Statement),
     Done,
+}
+
+impl Position {
+    /// Mark the statement the cursor is at as skipped; nothing to mark
+    /// before the first statement or past the last.
+    pub(super) fn skip(&mut self) {
+        if let Position::At(stmt) = *self {
+            *self = Position::Skipped(stmt);
+        }
+    }
 }

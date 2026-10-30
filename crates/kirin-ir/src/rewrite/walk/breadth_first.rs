@@ -56,8 +56,6 @@ pub struct BFSCursor {
     /// The current level's statements that own bodies, collected as they are
     /// visited: the next level's parents.
     next_parents: Vec<Statement>,
-    /// Whether to leave the visited statement out of `next_parents`.
-    skip: bool,
 }
 
 /// A [`ReverseBFS`] or [`KeepOrderReverseBFS`] walk in progress: the order
@@ -84,7 +82,6 @@ impl WalkOrder for BFS {
             parents: Vec::new(),
             parent_index: 0,
             next_parents: Vec::new(),
-            skip: false,
         }
     }
 }
@@ -93,12 +90,13 @@ impl WalkCursor for BFSCursor {
     fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError> {
         let next = match self.position {
             Position::Start => root_if_live(stage, self.root),
-            Position::At(visited) => {
+            Position::At(visited) | Position::Skipped(visited) => {
                 check_live(stage, visited)?;
                 // Keep it as a parent for the next level, whose statements
                 // are its children. Statements without bodies have none,
                 // and a skipped statement's are not walked.
-                if !self.skip && owns_bodies(stage, visited) {
+                let skipped = matches!(self.position, Position::Skipped(_));
+                if !skipped && owns_bodies(stage, visited) {
                     self.next_parents.push(visited);
                 }
                 // The root is the only statement of its level; every other
@@ -120,12 +118,11 @@ impl WalkCursor for BFSCursor {
             Position::Done => None,
         };
         self.position = next.map_or(Position::Done, Position::At);
-        self.skip = false;
         Ok(next)
     }
 
     fn skip(&mut self) {
-        self.skip = matches!(self.position, Position::At(_));
+        self.position.skip();
     }
 }
 
