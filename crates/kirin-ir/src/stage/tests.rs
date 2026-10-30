@@ -4,9 +4,10 @@ use super::*;
 use crate::{
     Block, BranchOp, CFG, CompileStage, DiGraph, Dialect, GlobalSymbol, HasArguments,
     HasArgumentsMut, HasBlocks, HasBlocksMut, HasCFG, HasCFGMut, HasDigraphs, HasDigraphsMut,
-    HasResults, HasResultsMut, HasStageInfo, HasSuccessors, HasSuccessorsMut, HasUngraphs,
-    HasUngraphsMut, Id, IsConstant, IsEdge, IsPure, IsSpeculatable, IsTerminator, Pipeline,
-    ResultValue, SSAValue, StageInfo, StageMeta, StagedNamePolicy, Successor, UnGraph,
+    HasResults, HasResultsMut, HasStageInfo, HasSuccessors, HasSuccessorsMut, HasSymbols,
+    HasSymbolsMut, HasUngraphs, HasUngraphsMut, Id, IsConstant, IsEdge, IsPure, IsSpeculatable,
+    IsTerminator, Pipeline, ResultValue, SSAValue, StageInfo, StageMeta, StagedNamePolicy,
+    Successor, Symbol, UnGraph,
 };
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
@@ -53,6 +54,22 @@ macro_rules! impl_empty_dialect_traits {
             type IterMut = std::iter::Empty<&'a mut ResultValue>;
 
             fn results_mut(&'a mut self) -> Self::IterMut {
+                std::iter::empty()
+            }
+        }
+
+        impl<'a> HasSymbols<'a> for $dialect {
+            type Iter = std::iter::Empty<&'a Symbol>;
+
+            fn symbols(&'a self) -> Self::Iter {
+                std::iter::empty()
+            }
+        }
+
+        impl<'a> HasSymbolsMut<'a> for $dialect {
+            type IterMut = std::iter::Empty<&'a mut Symbol>;
+
+            fn symbols_mut(&'a mut self) -> Self::IterMut {
                 std::iter::empty()
             }
         }

@@ -16,6 +16,8 @@ pub enum FieldIterKind {
     Arguments,
     /// Result fields.
     Results,
+    /// Stage-local symbol attributes.
+    Symbols,
     /// Block body fields.
     Blocks,
     /// Successor block references.
@@ -91,6 +93,11 @@ impl FieldCollection {
                 .results()
                 .map(FieldAccess::from_field_info)
                 .collect(),
+            FieldIterKind::Symbols => statement
+                .iter_all_fields()
+                .filter(|field| field.category() == ir::fields::FieldCategory::Symbol)
+                .map(FieldAccess::from_field_info)
+                .collect(),
             FieldIterKind::Blocks => statement
                 .blocks()
                 .map(FieldAccess::from_field_info)
@@ -155,6 +162,17 @@ impl FieldCollection {
         if stmt_ctx.is_wrapper {
             let wrapper_expr = self.wrapper_expr(ctx, stmt_ctx);
             let wrapper_type = self.wrapper_type(ctx, stmt_ctx);
+            if matches!(self.field_kind, FieldIterKind::Symbols) {
+                let fields = self.fields_for_kind(stmt_ctx.stmt);
+                if !fields.is_empty() {
+                    let iter_expr = self.iter_expr(&fields, &matching_item);
+                    let iter_type = self.iter_type(ctx, &fields, &matching_item);
+                    return (
+                        quote! { #wrapper_expr.chain(#iter_expr) },
+                        quote! { std::iter::Chain<#wrapper_type, #iter_type> },
+                    );
+                }
+            }
             (wrapper_expr, wrapper_type)
         } else {
             let fields = self.fields_for_kind(stmt_ctx.stmt);

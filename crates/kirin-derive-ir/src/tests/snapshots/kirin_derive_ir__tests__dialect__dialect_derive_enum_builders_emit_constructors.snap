@@ -475,6 +475,72 @@ impl<'a> Iterator for ArithUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasSymbols<'a> for Arith<T> {
+    type Iter = ArithSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithSymbolsIter::Add(std::iter::empty::<&'a ::kirin::ir::Symbol>()),
+            Self::CondBr { condition, target } => {
+                ArithSymbolsIter::CondBr(std::iter::empty::<&'a ::kirin::ir::Symbol>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithSymbolsIter<'a> {
+    Add(std::iter::Empty<&'a ::kirin::ir::Symbol>),
+    CondBr(std::iter::Empty<&'a ::kirin::ir::Symbol>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue> ::kirin::ir::HasSymbolsMut<'a> for Arith<T> {
+    type IterMut = ArithSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add {
+                lhs,
+                rhs,
+                result,
+                marker,
+            } => ArithSymbolsMutIter::Add(std::iter::empty::<&'a mut ::kirin::ir::Symbol>()),
+            Self::CondBr { condition, target } => {
+                ArithSymbolsMutIter::CondBr(std::iter::empty::<&'a mut ::kirin::ir::Symbol>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum ArithSymbolsMutIter<'a> {
+    Add(std::iter::Empty<&'a mut ::kirin::ir::Symbol>),
+    CondBr(std::iter::Empty<&'a mut ::kirin::ir::Symbol>),
+}
+#[automatically_derived]
+impl<'a> Iterator for ArithSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::CondBr(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl<T: CompileTimeValue> ::kirin::ir::IsTerminator for Arith<T> {
     fn is_terminator(&self) -> bool {
         match self {

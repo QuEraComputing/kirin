@@ -373,6 +373,58 @@ impl<'a> Iterator for ZxEvalUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for ZxEval {
+    type Iter = ZxEvalSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalSymbolsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalSymbolsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for ZxEval {
+    type IterMut = ZxEvalSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            boundary,
+            captures,
+            body,
+        } = self;
+        ZxEvalSymbolsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ZxEvalSymbolsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ZxEvalSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for ZxEval {
     fn is_terminator(&self) -> bool {
         false

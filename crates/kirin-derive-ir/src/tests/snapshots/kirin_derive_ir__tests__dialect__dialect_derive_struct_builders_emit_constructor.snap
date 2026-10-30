@@ -389,6 +389,62 @@ impl<'a> Iterator for ConstantUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a, T: CompileTimeValue, Ty: CompileTimeValue> ::kirin::ir::HasSymbols<'a>
+    for Constant<T, Ty>
+{
+    type Iter = ConstantSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        let Self {
+            value,
+            result,
+            marker,
+        } = self;
+        ConstantSymbolsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ConstantSymbolsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ConstantSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a, T: CompileTimeValue, Ty: CompileTimeValue> ::kirin::ir::HasSymbolsMut<'a>
+    for Constant<T, Ty>
+{
+    type IterMut = ConstantSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            value,
+            result,
+            marker,
+        } = self;
+        ConstantSymbolsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct ConstantSymbolsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for ConstantSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl<T: CompileTimeValue, Ty: CompileTimeValue> ::kirin::ir::IsTerminator for Constant<T, Ty> {
     fn is_terminator(&self) -> bool {
         false
