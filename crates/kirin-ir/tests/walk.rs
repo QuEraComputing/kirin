@@ -665,3 +665,117 @@ fn skip_before_the_first_step_has_no_effect() {
     }
     assert_eq!(visited, PreOrder::schedule(&t.stage, t.root));
 }
+
+/// The ids of [`merge_cfg`]'s blocks and statements.
+#[derive(Clone, Copy)]
+struct MergeCfg {
+    root: Statement,
+    b1: Block,
+    b2: Block,
+    z: Statement,
+    br: Statement,
+}
+
+/// ```text
+/// root = own_cfg {
+///   ^b2 { z; ret }
+///   ^b3 { y; ret }
+///   ^b1 { x; br ^b2 }
+/// }
+/// ```
+fn merge_cfg() -> (StageInfo<BuilderDialect>, MergeCfg) {
+    let mut stage = new_stage();
+    let z = stage.statement().definition(BuilderDialect::Nop).new();
+    let b2_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let b2 = stage.block().stmt(z).terminator(b2_ret).new();
+    let y = stage.statement().definition(BuilderDialect::Nop).new();
+    let b3_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let b3 = stage.block().stmt(y).terminator(b3_ret).new();
+    let x = stage.statement().definition(BuilderDialect::Nop).new();
+    let br = stage
+        .statement()
+        .definition(BuilderDialect::Branch(Successor::from_block(b2)))
+        .new();
+    let b1 = stage.block().stmt(x).terminator(br).new();
+    let cfg = stage.cfg().add_block(b2).add_block(b3).add_block(b1).new();
+    let root = stage
+        .statement()
+        .definition(BuilderDialect::OwnCFG(cfg))
+        .new();
+    let ids = MergeCfg {
+        root,
+        b1,
+        b2,
+        z,
+        br,
+    };
+    (stage.finalize().unwrap(), ids)
+}
+
+/// Walk `O` over [`merge_cfg`], running `edit` when visiting `z`; the walk's
+/// schedule before the edit, and the statements it visited.
+fn edit_at_z<O: WalkOrder>(
+    edit: impl Fn(&mut Rewriter<BuilderDialect>, MergeCfg),
+) -> (Vec<Statement>, Result<Vec<Statement>, WalkError>) {
+    let (mut stage, m) = merge_cfg();
+    let schedule = O::schedule(&stage, m.root);
+    let mut rewriter = Rewriter::new(&mut stage);
+    let mut cursor = O::start(rewriter.stage(), m.root);
+    let mut visited = Vec::new();
+    let result = loop {
+        match cursor.next(rewriter.stage()) {
+            Ok(Some(stmt)) => {
+                visited.push(stmt);
+                if stmt == m.z {
+                    edit(&mut rewriter, m);
+                }
+            }
+            Ok(None) => break Ok(visited),
+            Err(error) => break Err(error),
+        }
+    };
+    (schedule, result)
+}
+
+fn merge_b2_into_b1(rewriter: &mut Rewriter<BuilderDialect>, m: MergeCfg) {
+    rewriter.merge_blocks(m.b1, m.b2, &[]).unwrap();
+}
+
+#[test]
+fn merging_the_visited_statements_block_away_breaks_link_following_walks() {
+    let (_, m) = merge_cfg();
+    for (_, result) in [
+        edit_at_z::<PreOrder>(merge_b2_into_b1),
+        edit_at_z::<PostOrder>(merge_b2_into_b1),
+        edit_at_z::<BFS>(merge_b2_into_b1),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(m.z)));
+    }
+}
+
+#[test]
+fn reverse_bfs_orders_visit_statements_where_they_were_before_a_merge() {
+    let (_, m) = merge_cfg();
+    // `br` comes before `z` in `ReverseBFS`, so it is visited before the
+    // merge erases it; in `KeepOrderReverseBFS` it comes after and is skipped.
+    let (schedule, result) = edit_at_z::<ReverseBFS>(merge_b2_into_b1);
+    assert_eq!(result.unwrap(), schedule);
+
+    let (schedule, result) = edit_at_z::<KeepOrderReverseBFS>(merge_b2_into_b1);
+    let without_br: Vec<Statement> = schedule.into_iter().filter(|&s| s != m.br).collect();
+    assert_eq!(result.unwrap(), without_br);
+}
+
+#[test]
+fn splitting_the_visited_statements_block_keeps_the_walk() {
+    fn split_at_z(rewriter: &mut Rewriter<BuilderDialect>, m: MergeCfg) {
+        rewriter.split_block(m.z).unwrap();
+    }
+    for (schedule, result) in [
+        edit_at_z::<PreOrder>(split_at_z),
+        edit_at_z::<PostOrder>(split_at_z),
+        edit_at_z::<BFS>(split_at_z),
+    ] {
+        assert_eq!(result.unwrap(), schedule);
+    }
+}

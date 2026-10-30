@@ -65,12 +65,30 @@
 //! - [`ReverseBFS`] and [`KeepOrderReverseBFS`]: both allowed. Their order
 //!   is built at the start, and erased statements are skipped.
 //!
+//! A moved statement is treated as erased from its old place and inserted at
+//! its new one. Moving the visited statement itself is dangerous in
+//! [`PreOrder`], [`PostOrder`] and [`BFS`]: they find the next statement
+//! from the visited one, so the walk would carry on from its new place,
+//! skipping or repeating part of the walk. These orders do not allow:
+//!
+//! - merging its block into another block
+//!   ([`Rewriter::merge_blocks`](crate::Rewriter::merge_blocks) with its
+//!   block as `succ`), reported as [`WalkError::VisitedMoved`];
+//! - reordering the bodies of one of its ancestors
+//!   ([`Rewriter::replace_statement`](crate::Rewriter::replace_statement)),
+//!   which is not checked.
+//!
+//! Splitting its block with
+//! [`Rewriter::split_block`](crate::Rewriter::split_block) keeps the order
+//! and is allowed. [`ReverseBFS`] and [`KeepOrderReverseBFS`] allow every
+//! move: they visit each statement once, where it was at the start.
+//!
 //! An allowed edit does not guarantee that newly nested statements will be
 //! visited in this walk. Discovery follows each order's rules above; nesting
 //! depth alone does not determine whether an insertion is ahead of the cursor.
 //!
-//! The cursor reports an erased visited statement that its order does not
-//! allow as a [`WalkError`] on its next step.
+//! The cursor reports an erase or merge of the visited statement that its
+//! order does not allow as a [`WalkError`] on its next step.
 
 mod breadth_first;
 mod depth_first;
