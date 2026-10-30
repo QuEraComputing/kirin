@@ -51,17 +51,26 @@
 //!
 //! # Contract
 //!
-//! While a walk is visiting a statement, edits must not erase it or any of
-//! its ancestors (erasing a statement erases everything nested in it). They
-//! may add or erase anything else, including its siblings and the statements
-//! nested in it.
+//! While a walk is visiting a statement, edits may add or erase statements
+//! anywhere, including its siblings and the statements nested in it.
+//! Erasing a statement erases everything nested in it. The one limit is on
+//! erasing the visited statement or one of its ancestors, which depends on
+//! the order:
+//!
+//! - [`PreOrder`] and [`PostOrder`]: neither allowed. They find the next
+//!   statement through the visited one's links.
+//! - [`BFS`]: erasing an ancestor allowed, which erases the visited
+//!   statement and its siblings with it, but not the visited statement
+//!   alone. Its siblings would still be live but unreachable.
+//! - [`ReverseBFS`] and [`KeepOrderReverseBFS`]: both allowed. Their order
+//!   is built at the start, and erased statements are skipped.
 //!
 //! An allowed edit does not guarantee that newly nested statements will be
 //! visited in this walk. Discovery follows each order's rules above; nesting
 //! depth alone does not determine whether an insertion is ahead of the cursor.
 //!
-//! The cursor reports an erased visited statement as a [`WalkError`] on its
-//! next step.
+//! The cursor reports an erased visited statement that its order does not
+//! allow as a [`WalkError`] on its next step.
 
 mod breadth_first;
 mod depth_first;
