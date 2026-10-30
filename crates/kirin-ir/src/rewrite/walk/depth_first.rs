@@ -100,7 +100,7 @@ impl WalkCursor for PostOrderCursor {
 }
 
 /// `stmt` if it is live.
-fn live<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Option<Statement> {
+pub(super) fn live<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Option<Statement> {
     stmt.get_info(stage).map(|_| stmt)
 }
 

@@ -5,7 +5,7 @@
 //! [`KeepOrderReverseBFS`] need the deepest level first, so they build their
 //! order when the walk starts, in O(n) time and space.
 
-use super::depth_first::check_live;
+use super::depth_first::{check_live, live};
 use super::order::Position;
 use super::tree::{append_children, first_child, next_sibling, owns_bodies};
 use super::{WalkCursor, WalkError, WalkOrder};
@@ -89,7 +89,7 @@ impl WalkOrder for BFS {
 impl WalkCursor for BFSCursor {
     fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError> {
         let next = match self.position {
-            Position::Start => root_if_live(stage, self.root),
+            Position::Start => live(stage, self.root),
             Position::At(visited) | Position::Skipped(visited) => {
                 check_live(stage, visited)?;
                 // Keep it as a parent for the next level, whose statements
@@ -156,11 +156,6 @@ impl BFSCursor {
             self.parent_index = 0;
         }
     }
-}
-
-/// `root` if it is live.
-fn root_if_live<L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Option<Statement> {
-    root.get_info(stage).map(|_| root)
 }
 
 impl WalkOrder for ReverseBFS {
