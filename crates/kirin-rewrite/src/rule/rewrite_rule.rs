@@ -21,6 +21,9 @@ pub struct RewriteRule {
     checks: Vec<Statement>,
     /// The rewrite body, in order.
     actions: Vec<Statement>,
+    /// The rewrite body's terminator, saying how the driver goes on walking.
+    /// `None` advances.
+    walk_result: Option<Statement>,
 }
 
 impl RewriteRule {
@@ -40,6 +43,10 @@ impl RewriteRule {
 
     pub(crate) fn actions(&self) -> &[Statement] {
         &self.actions
+    }
+
+    pub(crate) fn walk_result(&self) -> Option<Statement> {
+        self.walk_result
     }
 
     /// Check `pattern` and record its parts.
@@ -177,11 +184,38 @@ impl RewriteRule {
             }
         }
 
+        // The body ends in a walk result, if any; a `walk_result` reads what a
+        // native call of the body computed.
+        let walk_result = rewrite.body().terminator(stage);
+        if let Some(terminator) = walk_result {
+            match terminator.expect_info(stage).definition() {
+                PatternLanguage::Wildcard(
+                    PatternStatement::Advance(_)
+                    | PatternStatement::Skip(_)
+                    | PatternStatement::Interrupt(_),
+                ) => {}
+                PatternLanguage::Wildcard(PatternStatement::WalkResultOf(walk)) => {
+                    let computed = producer(stage, walk.value()).is_some_and(|p| {
+                        actions.contains(&p)
+                            && matches!(
+                                p.expect_info(stage).definition(),
+                                PatternLanguage::Wildcard(PatternStatement::NativeCall(_))
+                            )
+                    });
+                    if !computed {
+                        return Err(error(RuleErrorKind::WalkResultWithoutNativeCall));
+                    }
+                }
+                _ => return Err(error(RuleErrorKind::UnexpectedTerminator)),
+            }
+        }
+
         Ok(Self {
             name,
             root,
             checks,
             actions,
+            walk_result,
         })
     }
 }

@@ -139,7 +139,10 @@ impl RuleModel {
                         ));
                     }
                 }
-                StmtKind::Hole | StmtKind::Constraint { .. } | StmtKind::Rewrite { .. } => {}
+                StmtKind::Hole
+                | StmtKind::Constraint { .. }
+                | StmtKind::Rewrite { .. }
+                | StmtKind::WalkResult(_) => {}
             }
         }
     }

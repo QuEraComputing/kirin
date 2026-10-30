@@ -3,9 +3,13 @@ use proc_macro2::Span;
 use syn::{Stmt, Token, ext::IdentExt, punctuated::Punctuated, spanned::Spanned};
 
 use super::{RuleParser, rule_parser::MISSING_REWRITE};
-use crate::model::{Binding, StmtId, StmtKind, Use};
+use crate::model::{Binding, StmtId, StmtKind, Use, WalkResult};
 
 const OP_PATH: &str = "ops in `op![..]` must name their dialect, e.g. `op![Arith::add(x, y)]`";
+
+/// The macros naming a fixed walk result, the tail expression of a
+/// `rewrite!` body.
+const WALK_MACROS: [&str; 3] = ["advance", "skip", "interrupt"];
 
 impl RuleParser {
     /// Parse a statement of the match: a `let` binding or a constraint call,
@@ -320,6 +324,7 @@ impl RuleParser {
                 StmtKind::Rewrite {
                     root,
                     body: vec![action],
+                    walk_result: None,
                 },
                 vec![],
             )
@@ -351,14 +356,19 @@ impl RuleParser {
                 "the body of `rewrite!` must be a block",
             ));
         };
-        let stmts: Vec<StmtId> = body
-            .block
-            .stmts
+        // A tail expression is the walk result; everything before it, or the
+        // whole body if it has none, are the actions.
+        let (tail, actions) = match body.block.stmts.split_last() {
+            Some((last, init)) if Self::is_walk_result_tail(last) => (Some(last), init),
+            _ => (None, body.block.stmts.as_slice()),
+        };
+        let mut stmts: Vec<StmtId> = actions
             .iter()
             .map(|stmt| self.parse_replacement(stmt))
             .collect::<syn::Result<_>>()?;
 
-        // A body that only builds ops makes values nothing uses.
+        // A body that only builds ops creates values that are never used,
+        // and one that only has a walk result leaves the IR unchanged.
         let acts = stmts.iter().any(|&stmt| {
             matches!(
                 self.model().statement(stmt).kind,
@@ -372,7 +382,96 @@ impl RuleParser {
             ));
         }
 
-        self.add_statement(mac.span(), StmtKind::Rewrite { root, body: stmts }, vec![])
+        let walk_result = match tail {
+            Some(tail) => {
+                let (compute, walk_result) = self.parse_walk_result(tail)?;
+                stmts.extend(compute);
+                Some(walk_result)
+            }
+            None => None,
+        };
+        self.add_statement(
+            mac.span(),
+            StmtKind::Rewrite {
+                root,
+                body: stmts,
+                walk_result,
+            },
+            vec![],
+        )
+    }
+
+    /// Whether `stmt`, the last statement of a `rewrite!` body, is its walk
+    /// result: an expression without a semicolon. `erase!` and `replace!`
+    /// are not walk results: they must end in a semicolon, even when last.
+    fn is_walk_result_tail(stmt: &Stmt) -> bool {
+        match stmt {
+            Stmt::Macro(syn::StmtMacro {
+                mac,
+                semi_token: None,
+                ..
+            })
+            | Stmt::Expr(syn::Expr::Macro(syn::ExprMacro { mac, .. }), None) => {
+                WALK_MACROS.iter().any(|name| mac.path.is_ident(name))
+            }
+            Stmt::Expr(_, None) => true,
+            _ => false,
+        }
+    }
+
+    /// Parse the walk result `tail`: `advance!()`, `skip!()`, `interrupt!()`,
+    /// a native call, or the name of a value a native function in the
+    /// `rewrite!` body computed. Returns the native call's statement, if it
+    /// is one, and the [`StmtKind::WalkResult`].
+    fn parse_walk_result(&mut self, tail: &Stmt) -> syn::Result<(Option<StmtId>, StmtId)> {
+        let span = tail.span();
+        let (compute, walk_result) = match tail {
+            Stmt::Macro(syn::StmtMacro { mac, .. })
+            | Stmt::Expr(syn::Expr::Macro(syn::ExprMacro { mac, .. }), _) => {
+                let name = mac.path.get_ident().map(ToString::to_string);
+                if !mac.tokens.is_empty() {
+                    return Err(syn::Error::new_spanned(
+                        &mac.tokens,
+                        format!("`{}!` takes no arguments", name.unwrap_or_default()),
+                    ));
+                }
+                let walk_result = match name.as_deref() {
+                    Some("advance") => WalkResult::Advance,
+                    Some("skip") => WalkResult::Skip,
+                    Some("interrupt") => WalkResult::Interrupt,
+                    _ => unreachable!("`is_walk_result_tail` only accepts the walk macros"),
+                };
+                (None, walk_result)
+            }
+            Stmt::Expr(syn::Expr::Call(call), None) => {
+                let (func, args) = self.parse_native_call(call)?;
+                let compute = self.add_statement(
+                    span,
+                    StmtKind::NativeCompute { func, args },
+                    vec![(None, span)],
+                )?;
+                let value = self.model().statement(compute).results[0];
+                (Some(compute), WalkResult::Value(Use { value, span }))
+            }
+            Stmt::Expr(expr @ syn::Expr::Path(_), None) => {
+                let value = self.parse_use(expr)?;
+                if !self.model().is_rewrite_native_result(value.value) {
+                    return Err(syn::Error::new_spanned(
+                        expr,
+                        "the walk result must be computed by a native function in the `rewrite!` body",
+                    ));
+                }
+                (None, WalkResult::Value(value))
+            }
+            _ => {
+                return Err(syn::Error::new_spanned(
+                    tail,
+                    "the last expression of the body of `rewrite!` must be `advance!()`, `skip!()`, `interrupt!()`, a native call or the name of a native call's result",
+                ));
+            }
+        };
+        let walk_result = self.add_statement(span, StmtKind::WalkResult(walk_result), vec![])?;
+        Ok((compute, walk_result))
     }
 
     /// Parse a statement of a `rewrite!` body: a `let` binding a native call
@@ -474,6 +573,13 @@ impl RuleParser {
             return Err(syn::Error::new_spanned(
                 mac,
                 "`rewrite!` macros cannot be nested",
+            ));
+        } else if let Some(name) = WALK_MACROS.iter().find(|name| mac.path.is_ident(name)) {
+            return Err(syn::Error::new_spanned(
+                mac,
+                format!(
+                    "`{name}!()` can only be the last expression of the body of `rewrite!`, without a semicolon"
+                ),
             ));
         } else {
             return Err(syn::Error::new_spanned(
