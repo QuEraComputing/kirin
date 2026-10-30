@@ -48,7 +48,7 @@ pub trait WalkOrder {
     /// [`walk`](Self::walk) with a `visit` that may edit through `rewriter`,
     /// within the walk's contract (see the [module docs](super)). Fails if
     /// `visit` erases the statement it is visiting where the order does not
-    /// allow it.
+    /// allow it, or moves it by merging its block into another.
     fn walk_mut<'r, L: Dialect>(
         rewriter: &mut Rewriter<'r, L>,
         root: Statement,
@@ -100,15 +100,15 @@ pub enum WalkStatus {
     Interrupted,
 }
 
-/// A position in a walk. It holds only statement ids, so the IR can be
-/// edited between steps.
+/// A position in a walk. It holds only ids, so the IR can be edited between
+/// steps.
 pub trait WalkCursor {
     /// The next statement to visit, or `None` once the walk is done.
     ///
     /// The IR may be edited between calls within the walk's contract (see
     /// the [module docs](super)). Fails if the statement returned by the
     /// previous call has since been erased where the order does not allow
-    /// it.
+    /// it, or moved by merging its block into another.
     fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError>;
 
     /// Do not walk the statements nested in the statement the previous
@@ -123,9 +123,14 @@ pub trait WalkCursor {
 /// A walk whose contract was broken by an edit made during it.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum WalkError {
-    /// The statement being visited was erased before the walk moved on, in a
+    /// The statement being visited was erased before the walk proceeded, in a
     /// way its order does not allow (see the [module docs](super)).
     VisitedErased(Statement),
+    /// The statement being visited was moved before the walk proceeded, by
+    /// merging its block into another block
+    /// ([`Rewriter::merge_blocks`](crate::Rewriter::merge_blocks) with its
+    /// block as `succ`).
+    VisitedMoved(Statement),
 }
 
 impl fmt::Display for WalkError {
@@ -135,6 +140,12 @@ impl fmt::Display for WalkError {
                 write!(
                     f,
                     "statement {stmt:?} was erased while the walk was visiting it"
+                )
+            }
+            WalkError::VisitedMoved(stmt) => {
+                write!(
+                    f,
+                    "statement {stmt:?} was moved into another block while the walk was visiting it"
                 )
             }
         }

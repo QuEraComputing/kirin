@@ -7,11 +7,11 @@
 
 use std::collections::VecDeque;
 
-use super::depth_first::live;
+use super::depth_first::{check_not_moved, live, visited_block};
 use super::order::Position;
 use super::tree::{append_children, first_child, next_sibling, owns_bodies};
 use super::{WalkCursor, WalkError, WalkOrder};
-use crate::{Dialect, GetInfo, StageInfo, Statement};
+use crate::{Block, Dialect, GetInfo, StageInfo, Statement};
 
 /// Breadth-first by nesting depth: the root, then every statement nested
 /// directly in it, then every statement nested two levels down, and so on.
@@ -61,6 +61,8 @@ pub struct BFSCursor {
     /// its own parent is at the front, so every parent of one level is queued
     /// before any of the next.
     parents: VecDeque<Statement>,
+    /// The block the visited statement was in when visited.
+    visited_block: Option<Block>,
 }
 
 /// A [`ReverseBFS`] or [`KeepOrderReverseBFS`] walk in progress: the order
@@ -85,6 +87,7 @@ impl WalkOrder for BFS {
             root,
             position: Position::Start,
             parents: VecDeque::new(),
+            visited_block: None,
         }
     }
 }
@@ -97,6 +100,7 @@ impl WalkCursor for BFSCursor {
                 if visited.get_info(stage).is_none() {
                     return self.after_erased(stage, visited);
                 }
+                check_not_moved(stage, visited, self.visited_block)?;
                 // Queue it as a parent for the next level, whose statements
                 // are its children. Statements without bodies have none,
                 // and a skipped statement's are not walked.
@@ -123,6 +127,7 @@ impl WalkCursor for BFSCursor {
             Position::Done => None,
         };
         self.position = next.map_or(Position::Done, Position::At);
+        self.visited_block = visited_block(stage, self.root, next);
         Ok(next)
     }
 
@@ -153,6 +158,7 @@ impl BFSCursor {
         // drops them.
         let next = self.first_child_of_next_parent(stage);
         self.position = next.map_or(Position::Done, Position::At);
+        self.visited_block = visited_block(stage, self.root, next);
         Ok(next)
     }
 
