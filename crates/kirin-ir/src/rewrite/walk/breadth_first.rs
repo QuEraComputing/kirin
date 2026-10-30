@@ -1,9 +1,11 @@
 //! Breadth-first orders.
 //!
-//! [`BFS`] follows the IR's links, keeping only the statements of the
+//! [`BFS`] follows the IR's links, queuing only the statements of the
 //! current and next level that own bodies. [`ReverseBFS`] and
 //! [`KeepOrderReverseBFS`] need the deepest level first, so they build their
 //! order when the walk starts, in O(n) time and space.
+
+use std::collections::VecDeque;
 
 use super::depth_first::{check_live, live};
 use super::order::Position;
@@ -48,14 +50,11 @@ pub struct KeepOrderReverseBFS;
 pub struct BFSCursor {
     root: Statement,
     position: Position,
-    /// The previous level's statements that own bodies; the current level is
-    /// their children.
-    parents: Vec<Statement>,
-    /// The index in `parents` of the statement whose bodies are being read.
-    parent_index: usize,
-    /// The current level's statements that own bodies, collected as they are
-    /// visited: the next level's parents.
-    next_parents: Vec<Statement>,
+    /// The visited statements that own bodies, oldest first. The front is the
+    /// statement whose bodies are being read. A parent is queued only while
+    /// its own parent is at the front, so every parent of one level is queued
+    /// before any of the next.
+    parents: VecDeque<Statement>,
 }
 
 /// A [`ReverseBFS`] or [`KeepOrderReverseBFS`] walk in progress: the order
@@ -79,9 +78,7 @@ impl WalkOrder for BFS {
         BFSCursor {
             root,
             position: Position::Start,
-            parents: Vec::new(),
-            parent_index: 0,
-            next_parents: Vec::new(),
+            parents: VecDeque::new(),
         }
     }
 }
@@ -92,25 +89,25 @@ impl WalkCursor for BFSCursor {
             Position::Start => live(stage, self.root),
             Position::At(visited) | Position::Skipped(visited) => {
                 check_live(stage, visited)?;
-                // Keep it as a parent for the next level, whose statements
+                // Queue it as a parent for the next level, whose statements
                 // are its children. Statements without bodies have none,
                 // and a skipped statement's are not walked.
                 let skipped = matches!(self.position, Position::Skipped(_));
                 if !skipped && owns_bodies(stage, visited) {
-                    self.next_parents.push(visited);
+                    self.parents.push_back(visited);
                 }
                 // The root is the only statement of its level; every other
-                // statement is a child of `parents[parent_index]`.
+                // statement is a child of the front parent.
                 let sibling = if visited == self.root {
                     None
                 } else {
                     next_sibling(stage, visited)
                 };
-                // No next sibling: the current parent's children are done
+                // No next sibling: the front parent's children are done
                 // processing, so move to the next parent's.
                 sibling.or_else(|| {
                     if visited != self.root {
-                        self.parent_index += 1;
+                        self.parents.pop_front();
                     }
                     self.first_child_of_next_parent(stage)
                 })
@@ -127,34 +124,21 @@ impl WalkCursor for BFSCursor {
 }
 
 impl BFSCursor {
-    /// The first child of `parents[parent_index]` or a later parent, moving
-    /// on to the next level when this one runs out. `None` once a level has
-    /// no statements that own bodies.
+    /// The first child of the front parent or a later one, dropping parents
+    /// with no children. `None` once no queued parent has any.
     fn first_child_of_next_parent<L: Dialect>(
         &mut self,
         stage: &StageInfo<L>,
     ) -> Option<Statement> {
-        loop {
-            while let Some(&parent) = self.parents.get(self.parent_index) {
-                // Skip parents with no children: their bodies are empty, or
-                // they were erased.
-                if let Some(child) = first_child(stage, parent) {
-                    return Some(child);
-                }
-                self.parent_index += 1;
+        while let Some(&parent) = self.parents.front() {
+            // Skip parents with no children: their bodies are empty, or they
+            // were erased.
+            if let Some(child) = first_child(stage, parent) {
+                return Some(child);
             }
-            if self.next_parents.is_empty() {
-                return None;
-            }
-            // The level is done: its collected statements (`next_parents`)
-            // become the parents at the next level, and the finished
-            // parents' vector is emptied (keeping its capacity) to collect
-            // the level after.
-            std::mem::swap(&mut self.parents, &mut self.next_parents);
-            self.next_parents.clear();
-            // Start reading from the new level's first parent.
-            self.parent_index = 0;
+            self.parents.pop_front();
         }
+        None
     }
 }
 
