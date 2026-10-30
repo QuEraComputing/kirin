@@ -1,10 +1,7 @@
-use std::collections::HashSet;
-
 use kirin_ir::{
-    Block, CFG, DiGraph, Dialect, GetInfo, GlobalSymbol, Id, Port, SSAInfo, SSAValue, Signature,
-    SpecializedFunction, StagedFunction, Statement, Symbol, UnGraph,
+    Block, CFG, DiGraph, Dialect, GetInfo, GlobalSymbol, GraphMember, Id, Port, SSAInfo, SSAValue,
+    Signature, SpecializedFunction, StagedFunction, Statement, Symbol, UnGraph,
 };
-use petgraph::visit::IntoNodeReferences;
 use prettyless::DocAllocator;
 
 use crate::{ArenaDoc, PrettyPrint};
@@ -454,7 +451,8 @@ where
         self.list(yields.iter(), ", ", |ssa| self.print_ssa_type(*ssa))
     }
 
-    /// Print a DiGraph body only: statements + yield, no header, no braces.
+    /// Print a DiGraph body only: statements in id order + yield, no header,
+    /// no braces.
     pub fn print_digraph_body_only(&'a self, digraph: &DiGraph) -> ArenaDoc<'a> {
         if let Some(elided) = self.abbreviated_body("...") {
             return elided;
@@ -463,11 +461,11 @@ where
 
         let mut inner = self.nil();
         let mut first = true;
-        for (_idx, stmt) in info.graph().node_references() {
+        for (stmt, _) in info.members() {
             if !first {
                 inner += self.line_();
             }
-            inner += self.print_statement(stmt) + self.text(";");
+            inner += self.print_statement(&stmt) + self.text(";");
             first = false;
         }
 
@@ -482,55 +480,26 @@ where
         inner
     }
 
-    /// Print an UnGraph body only: interleaved edge/node statements, no header, no braces.
+    /// Print an UnGraph body only: edge and node statements interleaved in id
+    /// order, no header, no braces.
     pub fn print_ungraph_body_only(&'a self, ungraph: &UnGraph) -> ArenaDoc<'a> {
         if let Some(elided) = self.abbreviated_body("...") {
             return elided;
         }
         let info = ungraph.expect_info(self.stage);
-        let edge_stmts: Vec<Statement> = info.edge_statements().collect();
 
-        let edge_result_to_stmt: std::collections::HashMap<SSAValue, Statement> = edge_stmts
-            .iter()
-            .flat_map(|&edge_stmt| {
-                edge_stmt
-                    .results::<L>(self.stage)
-                    .map(move |rv| (SSAValue::from(*rv), edge_stmt))
-            })
-            .collect();
-
-        let mut printed_edges: HashSet<Statement> = HashSet::new();
         let mut inner = self.nil();
         let mut first = true;
-
-        for (_idx, node_stmt) in info.graph().node_references() {
-            for arg in node_stmt.arguments::<L>(self.stage) {
-                if let Some(&edge_stmt) = edge_result_to_stmt.get(arg)
-                    && printed_edges.insert(edge_stmt)
-                {
-                    if !first {
-                        inner += self.line_();
-                    }
-                    inner += self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
-                    first = false;
-                }
-            }
-
+        for (stmt, member) in info.members() {
             if !first {
                 inner += self.line_();
             }
-            inner += self.print_statement(node_stmt) + self.text(";");
+            let keyword = match member {
+                GraphMember::Edge => self.text("edge "),
+                GraphMember::Node(_) => self.nil(),
+            };
+            inner += keyword + self.print_statement(&stmt) + self.text(";");
             first = false;
-        }
-
-        for &edge_stmt in &edge_stmts {
-            if printed_edges.insert(edge_stmt) {
-                if !first {
-                    inner += self.line_();
-                }
-                inner += self.text("edge ") + self.print_statement(&edge_stmt) + self.text(";");
-                first = false;
-            }
         }
 
         inner

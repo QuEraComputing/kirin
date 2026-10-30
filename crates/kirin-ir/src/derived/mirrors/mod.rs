@@ -8,5 +8,6 @@
 
 pub(super) mod block_body;
 pub(super) mod cfg_blocks;
+pub(super) mod graph_topology;
 pub(super) mod predecessors;
 pub(super) mod uses;

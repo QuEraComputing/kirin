@@ -18,7 +18,7 @@ pub use function::{
     CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
     StagedFunction, StagedFunctionInfo, StagedNamePolicy, UniqueLiveSpecializationError,
 };
-pub use graph::{DiGraphExtra, GraphInfo, GraphMember, UnGraphExtra};
+pub use graph::{DiGraphExtra, GraphInfo, GraphMember, MemberRole, UnGraphExtra};
 pub use linked_list::{LinkedList, LinkedListNode};
 pub use port::{Port, PortParent};
 pub use ssa::{

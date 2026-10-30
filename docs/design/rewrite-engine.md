@@ -1413,8 +1413,8 @@ incrementally.
 The index is derived metadata over authoritative statement/yield slots, not a
 substitute for them. The pass-boundary checker must derive it independently
 because raw legacy mutation paths can still bypass `Rewriter`. Derived
-comparison has landed for the four mirrors that exist today (see below); the
-graph-topology mirrors have not. Type, visibility, dominance, and dialect
+comparison has landed for all five mirrors that exist today (see below),
+including the `DiGraph`/`UnGraph` graph mirror. Type, visibility, dominance, and dialect
 validity remain responsibilities of the separate future whole-stage verifier.
 
 The pass boundary derives expected uses from authoritative slots and compares
@@ -1432,8 +1432,8 @@ left to the separate whole-stage verifier.
 
 ### Derive, install, verify — never repair
 
-**Landed** for the use, predecessor, block-body, and CFG-block-list mirrors, in
-`kirin-ir`'s `derived` module. All derived services follow one split:
+**Landed** for the use, predecessor, block-body, CFG-block-list, and
+`DiGraph`/`UnGraph` graph mirrors, in `kirin-ir`'s `derived` module. All derived services follow one split:
 
 ```rust,ignore
 pub(crate) fn derive_mirrors<L: Dialect>(
@@ -1451,7 +1451,7 @@ pub fn verify_derived<L: Dialect>(
 ```
 
 `Mirrors` is deliberately not parameterized by the dialect: every mirror holds
-arena ids (`Statement`, `SSAValue`, `Block`, `DiGraph`) and nothing
+arena ids (`Statement`, `SSAValue`, `Block`, `DiGraph`, `UnGraph`) and nothing
 dialect-specific, so an `L` would only be `PhantomData`.
 
 Finalize first assembles a `StageInfo`, derives from `&StageInfo`, and installs
@@ -1463,7 +1463,7 @@ disagrees and therefore a mutation path is broken. Component derivation helpers
 and installers remain crate-private; no mutating recovery entry point is public.
 The only public names are `verify_derived`, `DeriveError`, `Finding`,
 `Mismatch`, `VerifyError`, and the payloads those carry: `ChainDefect`,
-`ChainFinding`, `DanglingParent`, and `BlockBody`.
+`ChainFinding`, `DanglingParent`, `BlockBody`, and `MemberRole`.
 
 
 Pure derivation replaces the public mutating `rebuild_use_index` and
@@ -1477,9 +1477,10 @@ successors: a non-terminator that does produces
 follows the same rule: a membership pointer naming a dead container produces
 `DanglingParent`, and the chain walker's own defects arrive as
 `Chain(ChainFinding)`. An `UnGraph` wire read by more than two node slots
-produces `UnGraphDegreeExceeded { graph, value, endpoints }`; the rewriter
-allows such a wire mid-pass and keeps no edge for it.
-Later derivations apply the same rule to graph membership and topology. Derivation
+produces `UnGraphDegreeExceeded { graph, value, occurrences }`, listing every
+`(Statement, operand_index)` that reads it; the rewriter allows such a wire
+mid-pass and keeps no edge for it. A statement parented to a `DiGraph` or
+`UnGraph` that is not live produces `DanglingParent::StatementInGraph`. Derivation
 collects independent findings rather than stopping at the first one — component
 derivations share one findings buffer instead of returning early, so a single
 scan reports every independent defect.
@@ -1506,13 +1507,14 @@ in the source arena.
 
 For graph bodies, `StatementInfo::parent` is authoritative membership.
 `StableGraph` plus `IndexMap<Statement, GraphMember>` is one derived mirror:
-the map supplies stable insertion-order presentation and direct node lookup;
-petgraph supplies connectivity. Verification compares member keys as sets and
-edges as normalized multisets over statement weights. It excludes `NodeIndex`
-and order, retains parallel-edge multiplicity, and normalizes undirected
-endpoints. A dangling statement owner is a `DanglingParent` finding; the variant
-pairing a statement with its graph does not exist yet, because graph membership
-derivation has not landed.
+the map supplies direct lookup of every member and its role; petgraph supplies
+connectivity. Derivation installs members in statement id order. Verification
+compares member keys and roles as sets (`Mismatch::GraphMembers`), each node
+member's `NodeIndex` against the petgraph node holding it
+(`Mismatch::GraphNodeIndex`), and edges as normalized multisets over statement
+weights (`Mismatch::GraphEdges`). It excludes `NodeIndex` values and order,
+retains parallel-edge multiplicity, and normalizes undirected endpoints. A
+dangling statement owner is `DanglingParent::StatementInGraph`.
 
 For blocks, membership also comes from `StatementInfo::parent`, but order is
 authoritative in child `prev`/`next` links. The member set partitions into
@@ -1798,7 +1800,7 @@ stage remains valid.
 | `replace_yield` | Rewrite one `DiGraph` yield slot; move its yield use `old → new`. Topology is unchanged. | `ChangedDiGraphYields` (none if slot unchanged) | live graph and value, index in range |
 | `insert_ungraph_node` | Allocate `definition` as a new `UnGraph` node; bind its results, add operand uses; each operand that is a wire of the graph becomes an endpoint, and a wire with two endpoints is an edge. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; non-terminator with no successors, not an edge statement; live operands; `new_result` results; a wire may exceed two endpoints (reported by `verify_derived`; it then has no edge) |
 | `insert_ungraph_edge` | Allocate `definition` as a new `UnGraph` edge statement and append it to the member map; its results are new wires with no endpoints. | `InsertedStatement`, `ChangedUnGraphTopology` | live graph; an edge statement with no operands, not a terminator, no successors; `new_result` results |
-| `replace_statement` | Swap the definition in place, keeping id, position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror, for a `DiGraph` member its incoming edges, or for an `UnGraph` node the wires it leaves and joins. | `ReplacedStatement`, then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` / `ChangedUnGraphTopology` for a member whose edges changed | parented by a block or graph; same result arity and terminator-ness as the original; a non-terminator replacement carries no successors; an `UnGraph` member keeps its edge role, and an edge statement has no operands |
+| `replace_statement` | Swap the definition in place, keeping id, position, and result SSA identity; fix operand uses and, for a terminator, the predecessor mirror, for a `DiGraph` member its incoming edges, or for an `UnGraph` node the wires it leaves and joins. Keeps body parents in step with the bodies the new definition names: bodies it drops are tombstoned with their contents, bodies it gains get the statement as parent. | `ReplacedStatement`, then `ChangedTerminator` for a terminator or `ChangedDiGraphTopology` / `ChangedUnGraphTopology` for a member whose edges changed; `ChangedBodyNesting` after `ReplacedStatement` when the bodies changed | parented by a block or graph; same result arity and terminator-ness as the original; a non-terminator replacement carries no successors; an `UnGraph` member keeps its edge role, and an edge statement has no operands; every gained body is live, owned by nothing else, named once, and does not enclose the statement |
 | `replace_results` | Redirect every result of a statement at once, one replacement per result. | one `ChangedOperands` per affected statement, then one `ReplacedUses` per redirected result | exact arity; rewrites uses only, never the result list |
 | `append_block` / `insert_block_before` / `insert_block_after` | Allocate an empty block (no terminator) with fresh typed arguments and link it into the `Cfg` block list. | `ChangedBlockList` | anchor must be a live block of a `Cfg` list (not a statement-owned body) |
 | `erase_block` | Unlink the block and tombstone it with its arguments, statements, results, and nested blocks/`Cfg`s; drop their uses and outgoing edges. | `ChangedBlockList`, `ChangedCfg` | rejects if another block still branches to it (a self-loop is fine) or an argument or top-level result is used outside the block; retarget those edges and replace those uses first |
@@ -1998,12 +2000,16 @@ axis — hence the column.
 | `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
 | `TerminatorKindMismatch(stmt)` | guard | replacement changes terminator-ness, desyncing the block's terminator cache | `replace_statement` |
 | `EdgeRoleMismatch(stmt)` | guard | the replacement of an `UnGraph` member changes `is_edge()`; nodes and edge statements are stored differently | `replace_statement` |
+| `UnknownBody(body)` | liveness | a body the replacement gains does not resolve to a live body | `replace_statement` |
+| `BodyOwnedElsewhere(body)` | guard | a body the replacement gains already belongs to another statement or, for a block, to a CFG | `replace_statement` |
+| `BodyListedTwice(body)` | guard | the replacement names the same body in two fields | `replace_statement` |
+| `BodyEnclosesOwner(body)` | guard | the replacement names a body the statement is nested in, which would make it its own ancestor | `replace_statement` |
 
 The immediate `MutationEvent` vocabulary recorded by these methods is
 `ChangedOperands`, `ReplacedUses`, `InsertedStatement`, `ErasedStatement`,
 `ReplacedStatement`, `ChangedBlockList { cfg }`, `ChangedCfg { cfg }`,
-`ChangedTerminator { block }`, `ChangedDiGraphTopology { graph }`, and
-`ChangedDiGraphYields { graph }`. `ErasedStatement` also covers everything nested
+`ChangedTerminator { block }`, `ChangedDiGraphTopology { graph }`,
+`ChangedDiGraphYields { graph }`, and `ChangedBodyNesting { owner }`. `ErasedStatement` also covers everything nested
 in the erased statement; no separate CFG or graph events are recorded for those
 bodies. The remaining documented event kinds (`UnGraph` and result-type events)
 grow in as
@@ -2739,61 +2745,62 @@ covers `Block` **and** `Cfg` bodies, because a block inside a `Cfg` is still a
   `insert_node`, member erasure through `erase_statement`, `replace_yield`
   (`ChangedDiGraphYields`), tombstoning owned `DiGraph`s with their owner, and
   edge maintenance in `replace_operand`, `replace_all_uses`/`replace_results`,
-  and `replace_statement` on members. Narrowed scope: no `StableGraph` migration and no topology mirror in `derived/` — the
-  petgraph is the store, kept correct incrementally.
+  and `replace_statement` on members. The `StableGraph` swap and the derived
+  graph mirror landed afterwards (see the graph-body prerequisites).
 - [x] `UnGraph` body surgery: insert/erase nodes and edge statements, maintaining
   undirected topology, member order, and degree constraints. Emits
   `ChangedUnGraphTopology`. Landed as `insert_ungraph_node`,
   `insert_ungraph_edge`, member erasure through `erase_statement`, tombstoning
   owned `UnGraph`s with their owner, wire resyncing in `replace_operand`,
   `replace_all_uses`/`replace_results`, and `replace_statement`, and builder
-  member checks. Narrowed scope, as for `DiGraph`: no `StableGraph` migration
-  and no topology mirror in `derived/`; member order is append on insert and
-  swap-remove on erase (printing order may change). The degree limit is not a
+  member checks. The degree limit is not a
   per-edit guard: a wire may exceed two readers mid-pass (it then has no edge),
   and `verify_derived` reports `Finding::UnGraphDegreeExceeded`.
 
 **Graph-body prerequisites found by code audit:**
 
-- [ ] Replace `petgraph::Graph` with `StableGraph` and store one
+- [x] Replace `petgraph::Graph` with `StableGraph` and store one
   `IndexMap<Statement, GraphMember>` beside it. `GraphMember::Node(NodeIndex)`
   and `GraphMember::Edge` give every member, node or edge statement, O(1)
-  lookup, insert, and removal (`swap_remove`; see the ordering paragraph
-  below). The map and petgraph are two halves of one derived mirror; membership
+  lookup and insert, and order-preserving removal (`shift_remove`; see the
+  ordering paragraph below). The map and petgraph are two halves of one derived mirror; membership
   remains authoritative in `StatementInfo::parent`. `UnGraphExtra` becomes
   empty once its separate edge-statement list moves into this map; generic
   `GraphInfo<L, D, Extra>` remains unified and DiGraph never constructs the
-  `Edge` variant. The member map has landed (serialized with the graph,
-  replacing the rebuild-on-load index) on top of `petgraph::Graph`; the
-  `StableGraph` swap is still to do.
-- [ ] Move petgraph construction out of graph builders. Builders record
-  parents, operands, ports, and yields; their allocation sequence initializes
-  the mixed member order, which is presentation state rather than authority.
+  `Edge` variant. Both halves are serialized, like the other mirrors, and
+  trusted on load.
+- [x] Move petgraph construction out of graph builders. Builders record
+  parents, operands, ports, and yields; their allocation sequence (statement
+  id order) initializes the mixed member order, which is presentation state
+  rather than authority.
   Finalize derives and installs the mirror once. An oversubscribed UnGraph is representable in
-  `BuilderStageInfo` and becomes `DeriveError::UnGraphDegreeExceeded` at the
+  `BuilderStageInfo` and becomes `Finding::UnGraphDegreeExceeded` (in the
+  `DeriveError`, so `FinalizeError::MalformedIR`) at the
   BuilderStageInfo-to-StageInfo boundary, with every `(Statement, operand_index)`
-  occurrence.
+  occurrence. The order of builder `.node()`/`.edge()` calls does not matter,
+  and the old BFS reordering is gone.
+- [x] Compare the graph mirror at the pass boundary. `verify_derived` derives
+  every live graph's members and edges and compares them with the installed
+  mirror (`Mismatch::GraphMembers`, `GraphNodeIndex`, `GraphEdges`), which
+  closes I3g.
 - [x] Keep topology value-derived. A DiGraph edge is an operand whose result
   producer is another member. An UnGraph endpoint is a use of an edge-member
   result or edge port. Captures are distinguished at the graph boundary by
   `edge_count`, never by consumer-field annotations; no per-field topology
   derive is added.
-- [ ] Add an atomic multi-operand edit. It validates the net UnGraph endpoint
-  delta before changing definitions, reverse uses, or mirrors. Single-slot
-  replacement delegates to it, and `replace_all_uses` applies its entire use set
-  atomically. Not needed for UnGraph endpoint swaps any more: the degree limit
-  is checked at verification (`Finding::UnGraphDegreeExceeded`), so single
-  edits may pass through an over-full wire.
 - [x] Make `replace_statement` require equal `is_edge()` and return
   `EdgeRoleMismatch`, paralleling its existing terminator classification
   guard. Narrowed to `UnGraph` members: `is_edge()` means nothing in blocks or
   `DiGraph`s. Declarative rule construction checks this once from op kinds.
 
 Graph bodies print in statement id order, not a canonical graph order. The
-member map does not keep that order itself: removal uses
-`IndexMap::swap_remove`, which moves the last member into the hole in O(1).
-Since id order is derivable, the printer sorts members by statement id, so an
-erase changes only the erased line of the output. Derived verification
+member map keeps that order itself: finalize installs it in id order, inserts
+append newly allocated (highest-id) statements, and removal uses
+`IndexMap::shift_remove`, which keeps the other members in order at O(members)
+per removal. Member order therefore carries no meaning but is deterministic,
+is the same order walks and printing use, and an erase changes only the erased
+line of the output. An `UnGraph` edge statement may print after a node that reads it; the
+parser's relaxed dominance accepts that. Derived verification
 compares member keys as sets and topology edges as normalized multisets over
 statement weights: never compare `NodeIndex`, preserve parallel-edge
 multiplicity, and normalize endpoint order for UnGraph. Independently built
@@ -2992,14 +2999,15 @@ implement the derive and its matching/remapping bodies.
 ### Gap 3 — MutationEvent vocabulary vs implementation — RESOLVED DELIVERY RULE
 
 The documented `MutationEvent` enum lists the full target vocabulary; the
-implementation currently emits **ten** — `ChangedOperands`, `ReplacedUses`,
+implementation currently emits **twelve** — `ChangedOperands`, `ReplacedUses`,
 `InsertedStatement`, `ErasedStatement`, `ReplacedStatement`, `ChangedBlockList`,
 `ChangedCfg`, `ChangedTerminator`, `ChangedDiGraphTopology`,
-`ChangedDiGraphYields` — covering operand and yield rewriting,
-block-body statement and terminator surgery (erase/insert/replace),
-`Cfg` block-list surgery, and `DiGraph` node surgery. The remaining documented
-variants (`UnGraph`-topology and result-type events) are not emitted because that surgery is not yet
-implemented, so an analysis-invalidation policy written against them would
+`ChangedDiGraphYields`, `ChangedUnGraphTopology`, `ChangedBodyNesting` —
+covering operand and yield rewriting, block-body statement and terminator
+surgery (erase/insert/replace), `Cfg` block-list surgery, `DiGraph` and
+`UnGraph` member surgery, and body changes through `replace_statement`. The
+remaining documented variants (result-type events) are not emitted because that
+surgery is not yet implemented, so an analysis-invalidation policy written against them would
 subscribe to events that never fire. Resolution: keep growing the enum in
 lockstep with mutation capability (CFG/graph events as that surgery lands in
 M1; M6/M7 are matching-only), keep drop-all-on-mutation invalidation until

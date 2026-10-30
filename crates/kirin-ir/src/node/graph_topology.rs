@@ -6,10 +6,36 @@ use petgraph::EdgeType;
 use petgraph::graph::NodeIndex;
 use petgraph::visit::EdgeRef;
 
-use super::graph::{GraphInfo, GraphMember};
+use super::graph::{GraphInfo, GraphMember, MemberRole};
 use crate::{DiGraphInfo, Dialect, SSAValue, Statement, UnGraphInfo};
 
 impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
+    /// Replace the whole mirror: `members` in the given order (each `Node`
+    /// gets a petgraph node), then one petgraph edge per `(a, b, value)`
+    /// (from `a` to `b` if directed). Finalization only.
+    ///
+    /// # Panics
+    ///
+    /// If an edge endpoint is not a node member.
+    pub(crate) fn install_mirror(
+        &mut self,
+        members: &[(Statement, MemberRole)],
+        edges: &[(Statement, Statement, SSAValue)],
+    ) {
+        self.graph.clear();
+        self.members.clear();
+        for &(stmt, role) in members {
+            let member = match role {
+                MemberRole::Node => GraphMember::Node(self.graph.add_node(stmt)),
+                MemberRole::Edge => GraphMember::Edge,
+            };
+            self.members.insert(stmt, member);
+        }
+        for &(a, b, value) in edges {
+            self.insert_edge(a, b, value);
+        }
+    }
+
     /// Append `stmt` as a new node. Returns `false`, changing nothing, if
     /// `stmt` is already a member.
     pub(crate) fn add_node(&mut self, stmt: Statement) -> bool {
@@ -21,19 +47,16 @@ impl<L: Dialect, D: EdgeType, Extra> GraphInfo<L, D, Extra> {
         true
     }
 
-    /// Remove node `stmt` together with its incident edges, in O(1) plus its
-    /// degree. The last member takes `stmt`'s place in the member map, so
-    /// member order is not kept. Returns `false` if `stmt` is not a node.
+    /// Remove node `stmt` together with its incident edges, in O(members)
+    /// plus its degree. The other members keep their order. Returns `false`
+    /// if `stmt` is not a node.
     pub(crate) fn remove_node(&mut self, stmt: Statement) -> bool {
         let Some(GraphMember::Node(node)) = self.member(stmt) else {
             return false;
         };
-        self.members.swap_remove(&stmt);
+        self.members.shift_remove(&stmt);
+        // A `StableGraph` leaves the other nodes where they are.
         self.graph.remove_node(node);
-        // `Graph::remove_node` swap-removes: the last node now sits at `node`.
-        if let Some(&moved) = self.graph.node_weight(node) {
-            self.members.insert(moved, GraphMember::Node(node));
-        }
         true
     }
 
@@ -99,14 +122,13 @@ impl<L: Dialect> UnGraphInfo<L> {
         true
     }
 
-    /// Remove edge statement `stmt` in O(1). The last member takes its place
-    /// in the member map, so member order is not kept. Returns `false` if
-    /// `stmt` is not an edge statement.
+    /// Remove edge statement `stmt` in O(members). The other members keep
+    /// their order. Returns `false` if `stmt` is not an edge statement.
     pub(crate) fn remove_edge_member(&mut self, stmt: Statement) -> bool {
         if self.member(stmt) != Some(GraphMember::Edge) {
             return false;
         }
-        self.members.swap_remove(&stmt);
+        self.members.shift_remove(&stmt);
         true
     }
 
@@ -132,6 +154,8 @@ impl<L: Dialect> UnGraphInfo<L> {
 
 #[cfg(test)]
 mod tests {
+    use petgraph::visit::IntoEdgeReferences;
+
     use crate::arena::Id;
     use crate::stage::tests::LangA;
     use crate::{
@@ -176,19 +200,17 @@ mod tests {
     }
 
     #[test]
-    fn remove_node_repoints_the_swapped_in_node() {
+    fn remove_node_leaves_other_node_indices_unchanged() {
         let mut info = empty_digraph();
         for raw in 0..3 {
             info.add_node(stmt(raw));
         }
+        let last = info.node_idx_of(stmt(2));
 
-        // Removing the first node moves the last one into its slot.
         assert!(info.remove_node(stmt(0)));
         assert_eq!(info.node_idx_of(stmt(0)), None);
-        assert_map_in_sync(&info);
-
-        // Removing the last node moves nothing.
-        assert!(info.remove_node(stmt(1)));
+        // A StableGraph does not move the last node into the hole.
+        assert_eq!(info.node_idx_of(stmt(2)), last);
         assert_map_in_sync(&info);
 
         assert!(!info.remove_node(stmt(0)));
@@ -238,7 +260,7 @@ mod tests {
     }
 
     #[test]
-    fn edge_members_have_no_node_and_removal_swaps_in_the_last_member() {
+    fn edge_members_have_no_node_and_removal_keeps_member_order() {
         let mut info = empty_ungraph();
         info.add_node(stmt(0));
         assert!(info.add_edge_member(stmt(1)));
@@ -252,13 +274,13 @@ mod tests {
         assert_eq!(info.edge_statements().collect::<Vec<_>>(), [stmt(1)]);
         assert_eq!(info.nodes().collect::<Vec<_>>(), [stmt(0), stmt(2)]);
 
-        // A node is not an edge member and vice versa. Removing a member is
-        // O(1): the last member takes its place in the map.
+        // A node is not an edge member and vice versa. Removing a member
+        // keeps the others in order.
         assert!(!info.remove_edge_member(stmt(0)));
         assert!(!info.remove_node(stmt(1)));
         assert!(info.remove_node(stmt(0)));
         let members: Vec<_> = info.members().map(|(stmt, _)| stmt).collect();
-        assert_eq!(members, [stmt(2), stmt(1)]);
+        assert_eq!(members, [stmt(1), stmt(2)]);
         assert_eq!(info.graph()[info.node_idx_of(stmt(2)).unwrap()], stmt(2));
         assert!(info.remove_edge_member(stmt(1)));
         assert_eq!(info.members().count(), 1);
