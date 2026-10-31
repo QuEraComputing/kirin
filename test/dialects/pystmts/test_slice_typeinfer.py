@@ -37,10 +37,13 @@ def test_slice_keeps_none_bounds():
         assert frame.get(stmt.step).is_subseteq(types.NoneType)
 
 
-def test_slice_of_only_none_is_bottom():
+def test_slice_of_only_none_keeps_argument_types():
     @basic_no_opt
     def only_none():
         return slice(None, None, 1)
 
     stmt = slice_stmt(only_none)
-    assert infer(only_none).get(stmt.result).is_subseteq(types.Bottom)
+    frame = infer(only_none)
+    assert frame.get(stmt.start) == types.NoneType
+    assert frame.get(stmt.stop) == types.NoneType
+    assert frame.get(stmt.step) == types.Int
