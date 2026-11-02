@@ -1,0 +1,232 @@
+---
+source: crates/kirin-derive-wildcard/src/codegen/tests.rs
+expression: "kirin_test_utils::rustfmt(code.to_string())"
+---
+fn rule(
+    stage: &mut impl ::kirin_wildcard::__private::ir::AsBuildStage<::kirin_wildcard::PatternLanguage<L>>,
+) -> ::kirin_wildcard::PatternRule<L> {
+    let stage = ::kirin_wildcard::__private::ir::AsBuildStage::as_build_stage(stage);
+    let pattern = {
+        let statement_0 = stage.statement_arena().next_id();
+        let value_x: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("x")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_0,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::Hole::<
+                <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+            >::new_hole(value_x))
+            .new();
+        let statement_1 = stage.statement_arena().next_id();
+        let value_r: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("r")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_1,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::PatternLanguage::<L>::Op(
+                ::core::convert::From::from(Arith::new_neg(
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_x),
+                    value_r,
+                )),
+            ))
+            .new();
+        let statement_2 = stage.statement_arena().next_id();
+        let value_v: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("v")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_2,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::NativeCall::<
+                <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+            >::new_native_call(
+                ::std::string::String::from("constant_value"),
+                ::std::vec![<::kirin_wildcard::__private::ir::SSAValue>::from(value_x)],
+                ::std::vec![value_v],
+            ))
+            .new();
+        let statement_3 = stage.statement_arena().next_id();
+        let value_3: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_3,
+                0usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::NativeCall::<
+                <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+            >::new_native_call(
+                ::std::string::String::from("is_small"),
+                ::std::vec![<::kirin_wildcard::__private::ir::SSAValue>::from(value_v)],
+                ::std::vec![value_3],
+            ))
+            .new();
+        let statement_4 = ::kirin_wildcard::Constraint::<
+            <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+        >::new(stage, value_3)
+        .id;
+        let statement_5 = stage.statement_arena().next_id();
+        let value_q: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("q")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_5,
+                0usize,
+            ))
+            .new()
+            .into();
+        let value_k: ::kirin_wildcard::__private::ir::ResultValue = stage
+            .ssa()
+            .name("k")
+            .ty(::kirin_wildcard::__private::ir::Placeholder::placeholder())
+            .kind(::kirin_wildcard::__private::ir::BuilderSSAKind::Result(
+                statement_5,
+                1usize,
+            ))
+            .new()
+            .into();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::NativeCall::<
+                <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+            >::new_native_call(
+                ::std::string::String::from("split"),
+                ::std::vec![<::kirin_wildcard::__private::ir::SSAValue>::from(value_v)],
+                ::std::vec![value_q, value_k],
+            ))
+            .new();
+        let statement_6 = stage.statement_arena().next_id();
+        stage
+            .statement()
+            .definition(::kirin_wildcard::NativeCall::<
+                <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+            >::new_native_call(
+                ::std::string::String::from("emit"),
+                ::std::vec![
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_q),
+                    <::kirin_wildcard::__private::ir::SSAValue>::from(value_k)
+                ],
+                ::std::vec![],
+            ))
+            .new();
+        let statement_7 = ::kirin_wildcard::Replace::<
+            <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+        >::new(stage, value_r, value_x)
+        .id;
+        let rewrite_body = stage
+            .block()
+            .name("rule_rw")
+            .stmt(statement_5)
+            .stmt(statement_6)
+            .stmt(statement_7)
+            .new();
+        let statement_8 = ::kirin_wildcard::Rewrite::<
+            <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
+        >::new(stage, statement_1, rewrite_body)
+        .id;
+        let pattern_body = stage
+            .block()
+            .name("rule_pat")
+            .stmt(statement_0)
+            .stmt(statement_1)
+            .stmt(statement_2)
+            .stmt(statement_3)
+            .stmt(statement_4)
+            .terminator(statement_8)
+            .new();
+        let pattern_name = stage
+            .symbol_table_mut()
+            .intern(::std::string::String::from("rule"));
+        ::kirin_wildcard::Pattern::<<L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(
+            stage,
+            pattern_name,
+            pattern_body,
+        )
+        .id
+    };
+    ::kirin_wildcard::PatternRule::<L>::new(pattern)
+        .check(
+            "constant_value",
+            |native_stage, native_args: &[::kirin_wildcard::NativeValue]| {
+                let native_result = constant_value(
+                    native_stage,
+                    ::kirin_wildcard::NativeValue::arg(native_args, 0usize)?,
+                );
+                let ::core::option::Option::Some(native_result) = native_result else {
+                    return ::core::result::Result::Ok(::core::option::Option::None);
+                };
+                ::core::result::Result::Ok(::core::option::Option::Some(::std::vec![
+                    ::kirin_wildcard::NativeValue::new(native_result)
+                ]))
+            },
+        )
+        .check(
+            "is_small",
+            |native_stage, native_args: &[::kirin_wildcard::NativeValue]| {
+                let native_result = is_small(
+                    native_stage,
+                    ::kirin_wildcard::NativeValue::arg(native_args, 0usize)?,
+                );
+                let native_result: bool = native_result;
+                ::core::result::Result::Ok(::core::option::Option::Some(::std::vec![
+                    ::kirin_wildcard::NativeValue::new(native_result)
+                ]))
+            },
+        )
+        .action(
+            "split",
+            |native_rewriter, native_args: &[::kirin_wildcard::NativeValue]| {
+                let native_result = split(
+                    native_rewriter,
+                    ::kirin_wildcard::NativeValue::arg(native_args, 0usize)?,
+                );
+                ::core::result::Result::Ok({
+                    let (native_result_0, native_result_1) = native_result;
+                    ::std::vec![
+                        ::kirin_wildcard::NativeValue::new(native_result_0),
+                        ::kirin_wildcard::NativeValue::new(native_result_1)
+                    ]
+                })
+            },
+        )
+        .action(
+            "emit",
+            |native_rewriter, native_args: &[::kirin_wildcard::NativeValue]| {
+                let native_result = emit(
+                    native_rewriter,
+                    ::kirin_wildcard::NativeValue::arg(native_args, 0usize)?,
+                    ::kirin_wildcard::NativeValue::arg(native_args, 1usize)?,
+                );
+                let native_result = native_result?;
+                ::core::result::Result::Ok({
+                    let () = native_result;
+                    ::std::vec::Vec::new()
+                })
+            },
+        )
+}

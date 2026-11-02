@@ -1,0 +1,5 @@
+error: `argument_index` is called in two different ways here; call it the same way each time, or use two functions
+  --> tests/compile-fail/native_called_two_ways.rs:15:13
+   |
+15 |     let b = argument_index(x);
+   |             ^^^^^^^^^^^^^^

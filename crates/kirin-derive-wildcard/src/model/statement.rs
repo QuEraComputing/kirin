@@ -83,7 +83,14 @@ pub(crate) enum StmtKind {
     /// parser's name table and is mainly used to bind zero-result statements.
     Op { op: syn::Path, args: Vec<Use> },
     /// `let log_val = log2(val);`: a native function computing values.
-    NativeCompute { func: syn::Path, args: Vec<Use> },
+    /// `fallible` if the call ends in `?`: the function returns an `Option`
+    /// in the match, where `None` fails it, or a `Result` in a `rewrite!`
+    /// body, where `Err` fails the rewrite.
+    NativeCompute {
+        func: syn::Path,
+        args: Vec<Use>,
+        fallible: bool,
+    },
     /// Requires `success` to hold. `is_power_of_two(val);` becomes a
     /// [`StmtKind::NativeCompute`] whose anonymous result is `success`,
     /// followed by this.

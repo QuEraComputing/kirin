@@ -241,16 +241,35 @@ fn parse_replacement_accepts_lets_and_actions() {
 
 #[test]
 fn parse_replacement_rejects_other_statements() {
-    let message = "only `let` bindings, `erase!(..);` and `replace!(..);` are allowed in the body of `rewrite!`";
+    let message = "only `let` bindings, native calls, `erase!(..);` and `replace!(..);` are allowed in the body of `rewrite!`";
     let cases: [syn::Stmt; 3] = [
         // No semicolon: the block's tail expression.
         tail(parse_quote!({ erase!(r) })),
         // A brace macro is a statement without needing a semicolon.
         parse_quote!(erase! { r }),
-        parse_quote!(is_power_of_two(val);),
+        parse_quote!(x + y;),
     ];
     for stmt in cases {
         assert_eq!(error(parser().parse_replacement(&stmt)), message);
+    }
+}
+
+/// A native call whose result is not bound only acts on the IR, so it binds
+/// nothing, with or without `?`.
+#[test]
+fn parse_replacement_accepts_a_native_call_on_its_own() {
+    let mut parser = matched_parser();
+    let plain = parser.parse_replacement(&parse_quote!(record(r);)).unwrap();
+    let fallible = parser
+        .parse_replacement(&parse_quote!(erase_dead(r)?;))
+        .unwrap();
+    let model = parser.model;
+    for (stmt, expected) in [(plain, false), (fallible, true)] {
+        let StmtKind::NativeCompute { fallible, .. } = model.statement(stmt).kind else {
+            panic!("expected a native computation");
+        };
+        assert_eq!(fallible, expected);
+        assert!(model.statement(stmt).results.is_empty());
     }
 }
 

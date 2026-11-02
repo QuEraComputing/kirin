@@ -64,6 +64,7 @@ pub(super) fn compute() -> StmtKind {
     StmtKind::NativeCompute {
         func: parse_quote!(f),
         args: vec![],
+        fallible: false,
     }
 }
 

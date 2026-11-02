@@ -23,10 +23,9 @@ fn double_neg() {
     })
 }
 
-/// Only named by `double_neg_of_argument`; the driver calls the
-/// `is_block_argument` registered in [`natives`].
-fn is_block_argument(_x: i64) -> bool {
-    unreachable!("the rule only names it")
+/// Whether `x` is a block argument.
+fn is_block_argument(stage: &StageInfo<L>, x: SSAValue) -> bool {
+    matches!(x.expect_info(stage).kind(), SSAKind::BlockArgument(..))
 }
 
 /// `double_neg`, restricted by a native check to negations of a block
@@ -41,35 +40,27 @@ fn double_neg_of_argument() {
     })
 }
 
-/// Only named by the rules below; the driver calls the `argument_index` and
-/// `is_zero` registered in [`natives`].
-fn argument_index(_x: i64) -> i64 {
-    unreachable!("the rules only name it")
+/// The position of `x` among its block's arguments, or `None` if `x` is not
+/// a block argument.
+fn argument_index(stage: &StageInfo<L>, x: SSAValue) -> Option<i64> {
+    match x.expect_info(stage).kind() {
+        SSAKind::BlockArgument(_, index) => Some(*index as i64),
+        _ => None,
+    }
 }
 
-fn is_zero(_index: i64) -> bool {
-    unreachable!("the rule only names it")
+fn is_zero(_stage: &StageInfo<L>, index: i64) -> bool {
+    index == 0
 }
 
-/// `double_neg` of the first block argument: one check computes an `i64`
-/// that another reads.
+/// `double_neg` of the first block argument: one check computes an `i64`,
+/// failing the match if there is none, and another reads it.
 #[rewrite_rule(language = L)]
 fn double_neg_of_first_argument() {
     let a = op![Arith::neg(x)];
     let r = op![Arith::neg(a)];
-    let index = argument_index(x);
+    let index = argument_index(x)?;
     is_zero(index);
-    rewrite!(r, {
-        replace!(r, x);
-    })
-}
-
-/// `double_neg` with a constraint on an `i64`, which is not a condition.
-#[rewrite_rule(language = L)]
-fn double_neg_constraining_an_index() {
-    let a = op![Arith::neg(x)];
-    let r = op![Arith::neg(a)];
-    argument_index(x);
     rewrite!(r, {
         replace!(r, x);
     })
@@ -118,28 +109,6 @@ fn add_self() {
     rewrite!(r, {
         replace!(r, x);
     })
-}
-
-/// `pattern` with the native functions the rules above call.
-fn with_natives(pattern: Statement) -> PatternRule<L> {
-    PatternRule::new(pattern)
-        .check("is_block_argument", |stage, args| {
-            let value: SSAValue = NativeValue::arg(args, 0)?;
-            let kind = value.expect_info(stage).kind();
-            let argument = matches!(kind, SSAKind::BlockArgument(..));
-            Ok(Some(vec![NativeValue::new(argument)]))
-        })
-        .check("argument_index", |stage, args| {
-            let value: SSAValue = NativeValue::arg(args, 0)?;
-            Ok(match value.expect_info(stage).kind() {
-                SSAKind::BlockArgument(_, index) => Some(vec![NativeValue::new(*index as i64)]),
-                _ => None,
-            })
-        })
-        .check("is_zero", |_, args| {
-            let index: i64 = NativeValue::arg(args, 0)?;
-            Ok(Some(vec![NativeValue::new(index == 0)]))
-        })
 }
 
 fn neg_rules() -> RuleSet<L> {
@@ -308,7 +277,7 @@ fn a_hole_used_twice_matches_only_the_same_value() {
 
 #[test]
 fn a_native_check_decides_whether_the_rule_applies() {
-    let rules = RuleSet::build(|stage| vec![with_natives(double_neg_of_argument(stage))]).unwrap();
+    let rules = RuleSet::build(|stage| vec![double_neg_of_argument(stage)]).unwrap();
     let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
     assert_rewrites(&rules, &of_argument, &program("", "%x"));
 
@@ -321,8 +290,7 @@ fn a_native_check_decides_whether_the_rule_applies() {
 
 #[test]
 fn a_native_check_passes_an_i64_to_another() {
-    let rules =
-        RuleSet::build(|stage| vec![with_natives(double_neg_of_first_argument(stage))]).unwrap();
+    let rules = RuleSet::build(|stage| vec![double_neg_of_first_argument(stage)]).unwrap();
     let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
     assert_rewrites(&rules, &of_argument, &program("", "%x"));
 
@@ -335,8 +303,17 @@ fn a_native_check_passes_an_i64_to_another() {
 
 #[test]
 fn a_constraint_on_a_non_bool_fails_the_run() {
-    let rules = RuleSet::build(|stage| vec![with_natives(double_neg_constraining_an_index(stage))])
-        .unwrap();
+    // The macro makes a constraint's function return a `bool`, so only a
+    // hand-built rule can pass it anything else.
+    let rules = RuleSet::build(|stage| {
+        let pattern = double_neg_of_argument(stage).pattern();
+        vec![
+            PatternRule::new(pattern).check("is_block_argument", |_, _| {
+                Ok(Some(vec![NativeValue::new(1_i64)]))
+            }),
+        ]
+    })
+    .unwrap();
     let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
     let (mut pipeline, stage) = parse(&input);
     let driver = RewriteDriver::new(&rules);
@@ -352,14 +329,14 @@ fn a_constraint_on_a_non_bool_fails_the_run() {
     assert_eq!(
         failure,
         Some(DriverError::ConstraintNotBool {
-            rule: "double_neg_constraining_an_index".to_string()
+            rule: "double_neg_of_argument".to_string()
         })
     );
 }
 
 #[test]
 fn a_native_argument_of_the_wrong_type_fails_the_run() {
-    let rules = RuleSet::build(|stage| vec![with_natives(double_neg_of_zero(stage))]).unwrap();
+    let rules = RuleSet::build(|stage| vec![double_neg_of_zero(stage)]).unwrap();
     let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
     let (mut pipeline, stage) = parse(&input);
     let driver = RewriteDriver::new(&rules);
@@ -386,9 +363,15 @@ fn a_native_argument_of_the_wrong_type_fails_the_run() {
 
 #[test]
 fn an_unregistered_native_function_rejects_the_rule() {
-    let error = RuleSet::build(|stage| vec![double_neg_of_argument(stage)])
-        .err()
-        .expect("`is_block_argument` is not registered");
+    // The macro registers every function a rule calls, so only a hand-built
+    // rule can leave one out.
+    let error = RuleSet::build(|stage| {
+        vec![PatternRule::<L>::new(
+            double_neg_of_argument(stage).pattern(),
+        )]
+    })
+    .err()
+    .expect("`is_block_argument` is not registered");
     assert_eq!(error.rule.as_deref(), Some("double_neg_of_argument"));
     assert_eq!(
         error.kind,

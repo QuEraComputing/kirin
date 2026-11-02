@@ -8,9 +8,23 @@ mod rewrite_rule;
 use proc_macro::TokenStream;
 
 /// Turn a Rust function whose body describes a rewrite rule into a function
-/// `fn rule(stage: &mut impl AsBuildStage<PatternLanguage<L>>) -> Statement`
-/// that builds the pattern in `stage` and returns its `wildcard.pattern`
-/// statement.
+/// `fn rule(stage: &mut impl AsBuildStage<PatternLanguage<L>>) -> PatternRule<L>`
+/// that builds the pattern in `stage` and returns it with the native
+/// functions it calls.
+///
+/// A native call is an ordinary Rust function, called with one more first
+/// argument: `&StageInfo<L>` in the match, `&mut Rewriter<L>` in the
+/// `rewrite!` body. Its other arguments are read as the types it takes. How
+/// the rule calls it says what it returns:
+///
+/// | Call | Returns |
+/// |------|---------|
+/// | `f(x);` in the match (a constraint) | `bool`; `false` fails the match |
+/// | `let v = f(x);` | the value |
+/// | `let v = f(x)?;` in the match | `Option<_>`; `None` fails the match |
+/// | `let v = f(x)?;` in the `rewrite!` body | `Result<_, RewriteError>`; `Err` fails the rewrite |
+/// | `let (a, b) = f(x);` | a tuple, one value per name |
+/// | `f(x);` in the `rewrite!` body | `()`, or a `Result` with `?` |
 ///
 /// The function may be generic, with its `language` parameter assigned to one
 /// of the generic parameters. This allows the rule to apply to any language

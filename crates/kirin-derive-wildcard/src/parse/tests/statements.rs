@@ -21,10 +21,16 @@ fn parse_statement_splits_an_unbound_call_into_a_call_and_a_constraint() {
     };
 
     // The call computes one anonymous value: whether the constraint holds.
-    let StmtKind::NativeCompute { func, args } = &model.statement(compute).kind else {
+    let StmtKind::NativeCompute {
+        func,
+        args,
+        fallible,
+    } = &model.statement(compute).kind
+    else {
         panic!("expected a native computation");
     };
     assert!(func.is_ident("is_power_of_two"));
+    assert!(!fallible);
     assert_eq!(names(&model, &ids(args)), ["val"]);
     let [success] = model.statement(compute).results[..] else {
         panic!("expected one result");
@@ -91,12 +97,51 @@ fn parse_local_binds_a_native_computation() {
         .parse_local(&local(parse_quote!(let (q, r) = divmod(x, y);)))
         .unwrap();
     let model = parser.model;
-    let StmtKind::NativeCompute { func, args } = &model.statement(stmt).kind else {
+    let StmtKind::NativeCompute {
+        func,
+        args,
+        fallible,
+    } = &model.statement(stmt).kind
+    else {
         panic!("expected a native computation");
     };
     assert!(func.is_ident("divmod"));
+    assert!(!fallible);
     assert_eq!(names(&model, &ids(args)), ["x", "y"]);
     assert_eq!(names(&model, &model.statement(stmt).results), ["q", "r"]);
+}
+
+/// `?` after the call marks it fallible: its function returns an `Option`.
+#[test]
+fn parse_local_marks_a_call_with_try_as_fallible() {
+    let mut parser = parser();
+    let stmt = parser
+        .parse_local(&local(parse_quote!(let v = constant_value(x)?;)))
+        .unwrap();
+    let model = parser.model;
+    let StmtKind::NativeCompute { func, fallible, .. } = &model.statement(stmt).kind else {
+        panic!("expected a native computation");
+    };
+    assert!(func.is_ident("constant_value"));
+    assert!(fallible);
+}
+
+#[test]
+fn parse_local_rejects_try_after_anything_but_a_call() {
+    assert_eq!(
+        error(parser().parse_local(&local(parse_quote!(let v = x?;)))),
+        "`?` can only follow a native function call in `#[rewrite_rule]` functions"
+    );
+}
+
+/// A constraint's function returns a `bool`, so `?` would give a second way
+/// to fail the match.
+#[test]
+fn parse_statement_rejects_try_on_a_constraint() {
+    assert_eq!(
+        error(parser().parse_statement(&parse_quote!(is_power_of_two(x)?;))),
+        "a constraint cannot use `?`: its function returns a `bool`, and `false` fails the match"
+    );
 }
 
 #[test]

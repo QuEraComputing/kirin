@@ -8,7 +8,8 @@ use crate::rewrite_rule::RuleArgs;
 /// Generates the code a `#[rewrite_rule]` function expands into.
 ///
 /// The expansion replaces the function with one of the same name and
-/// visibility that builds the rule as pattern IR in the stage it is given.
+/// visibility that builds the rule as pattern IR in the stage it is given,
+/// and returns it as a `PatternRule` with the native functions it calls.
 /// Building into the caller's stage lets several rules share one stage,
 /// which the caller finalizes at the end.
 pub(crate) struct RuleCodegen {
@@ -26,12 +27,17 @@ impl RuleCodegen {
         let codegen = Self::new(model, item, args);
         let signature = codegen.signature();
         let pattern = codegen.pattern();
+        let natives = codegen.natives();
         let ir = codegen.ir_path();
+        let krate = &codegen.args.crate_path;
+        let language = &codegen.args.language;
         let stage = codegen.stage_ident();
+        let pattern_id = syn::Ident::new("pattern", Span::mixed_site());
         quote! {
             #signature {
                 let #stage = #ir::AsBuildStage::as_build_stage(#stage);
-                #pattern
+                let #pattern_id = #pattern;
+                #krate::PatternRule::<#language>::new(#pattern_id) #natives
             }
         }
     }
@@ -43,11 +49,12 @@ impl RuleCodegen {
     /// The generated function's signature, keeping the attributes,
     /// visibility, name, generic parameters and where clause of the
     /// original. It takes the stage to build the pattern in and returns the
-    /// `wildcard.pattern` statement.
+    /// `PatternRule` for the `wildcard.pattern` statement.
     ///
     /// A rule with generics also gets the where clauses its body needs,
     /// allowing the author to define the rule on a generic language that
-    /// derives the dialects it should apply to with `L: From<..>`.
+    /// derives the dialects it should apply to with `L: From<..>`. The
+    /// language must be `'static`, since the rule stores closures over it.
     pub(super) fn signature(&self) -> TokenStream {
         let syn::ItemFn {
             attrs, vis, sig, ..
@@ -62,7 +69,7 @@ impl RuleCodegen {
         if !generics.params.is_empty() {
             let ty = self.ir_type();
             let predicates = &mut generics.make_where_clause().predicates;
-            predicates.push(syn::parse_quote!(#language: #ir::Dialect));
+            predicates.push(syn::parse_quote!(#language: #ir::Dialect + 'static));
             predicates.push(syn::parse_quote!(#ty: #ir::Placeholder));
         }
         let where_clause = &generics.where_clause;
@@ -70,7 +77,7 @@ impl RuleCodegen {
             #(#attrs)*
             #vis fn #name #generics(
                 #stage: &mut impl #ir::AsBuildStage<#krate::PatternLanguage<#language>>,
-            ) -> #ir::Statement
+            ) -> #krate::PatternRule<#language>
             #where_clause
         }
     }

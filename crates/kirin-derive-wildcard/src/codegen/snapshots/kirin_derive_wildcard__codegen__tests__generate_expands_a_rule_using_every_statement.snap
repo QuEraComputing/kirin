@@ -5,9 +5,9 @@ expression: "kirin_test_utils::rustfmt(code.to_string())"
 #[doc = r" Rewrites `-x + _` into `-log2(x)` when `x` is a power of two."]
 pub fn rule(
     stage: &mut impl ::kirin_wildcard::__private::ir::AsBuildStage<::kirin_wildcard::PatternLanguage<L>>,
-) -> ::kirin_wildcard::__private::ir::Statement {
+) -> ::kirin_wildcard::PatternRule<L> {
     let stage = ::kirin_wildcard::__private::ir::AsBuildStage::as_build_stage(stage);
-    {
+    let pattern = {
         let statement_0 = stage.statement_arena().next_id();
         let value_x: ::kirin_wildcard::__private::ir::ResultValue = stage
             .ssa()
@@ -82,7 +82,6 @@ pub fn rule(
                 )),
             ))
             .new();
-        let _ = is_power_of_two;
         let statement_4 = stage.statement_arena().next_id();
         let value_4: ::kirin_wildcard::__private::ir::ResultValue = stage
             .ssa()
@@ -107,7 +106,6 @@ pub fn rule(
             <L as ::kirin_wildcard::__private::ir::Dialect>::Type,
         >::new(stage, value_4)
         .id;
-        let _ = math::log2;
         let statement_6 = stage.statement_arena().next_id();
         let value_k: ::kirin_wildcard::__private::ir::ResultValue = stage
             .ssa()
@@ -189,5 +187,31 @@ pub fn rule(
             pattern_body,
         )
         .id
-    }
+    };
+    ::kirin_wildcard::PatternRule::<L>::new(pattern)
+        .check(
+            "is_power_of_two",
+            |native_stage, native_args: &[::kirin_wildcard::NativeValue]| {
+                let native_result = is_power_of_two(
+                    native_stage,
+                    ::kirin_wildcard::NativeValue::arg(native_args, 0usize)?,
+                );
+                let native_result: bool = native_result;
+                ::core::result::Result::Ok(::core::option::Option::Some(::std::vec![
+                    ::kirin_wildcard::NativeValue::new(native_result)
+                ]))
+            },
+        )
+        .action(
+            "math::log2",
+            |native_rewriter, native_args: &[::kirin_wildcard::NativeValue]| {
+                let native_result = math::log2(
+                    native_rewriter,
+                    ::kirin_wildcard::NativeValue::arg(native_args, 0usize)?,
+                );
+                ::core::result::Result::Ok(::std::vec![::kirin_wildcard::NativeValue::new(
+                    native_result
+                )])
+            },
+        )
 }

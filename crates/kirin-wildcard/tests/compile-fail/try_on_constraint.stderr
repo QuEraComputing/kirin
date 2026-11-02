@@ -1,0 +1,5 @@
+error: a constraint cannot use `?`: its function returns a `bool`, and `false` fails the match
+  --> tests/compile-fail/try_on_constraint.rs:14:25
+   |
+14 |     is_block_argument(x)?;
+   |                         ^

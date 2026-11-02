@@ -6,15 +6,15 @@ expression: "kirin_test_utils::rustfmt(code.to_string())"
 #[doc = r" `Arith` and `Cmp`."]
 pub fn eq_of_negs<L>(
     stage: &mut impl ::kirin_wildcard::__private::ir::AsBuildStage<::kirin_wildcard::PatternLanguage<L>>,
-) -> ::kirin_wildcard::__private::ir::Statement
+) -> ::kirin_wildcard::PatternRule<L>
 where
     L: From<Arith<L::Type>> + From<Cmp<L::Type>>,
-    L: ::kirin_wildcard::__private::ir::Dialect,
+    L: ::kirin_wildcard::__private::ir::Dialect + 'static,
     <L as ::kirin_wildcard::__private::ir::Dialect>::Type:
         ::kirin_wildcard::__private::ir::Placeholder,
 {
     let stage = ::kirin_wildcard::__private::ir::AsBuildStage::as_build_stage(stage);
-    {
+    let pattern = {
         let statement_0 = stage.statement_arena().next_id();
         let value_a: ::kirin_wildcard::__private::ir::ResultValue = stage
             .ssa()
@@ -164,5 +164,6 @@ where
             pattern_body,
         )
         .id
-    }
+    };
+    ::kirin_wildcard::PatternRule::<L>::new(pattern)
 }
