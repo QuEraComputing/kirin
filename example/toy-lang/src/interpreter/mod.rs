@@ -180,14 +180,14 @@ pub fn analyze_classic_liveness(
     function_name: &str,
 ) -> Result<(CompileStage, CFG, DenseLivenessResult), InterpreterError> {
     let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-    let (root, analysis) = analysis.analyze_by_name(stage_name, function_name)?;
-    let result = DenseLivenessResult::from_engine(&analysis, root);
-    let Body::CFG(cfg) = root.body(pipeline)? else {
+    let (scope, analysis) = analysis.analyze_by_name(stage_name, function_name)?;
+    let result = DenseLivenessResult::from_engine(&analysis, scope);
+    let (stage, Body::CFG(cfg)) = scope else {
         return Err(InterpreterError::Custom(
             "classic liveness target is not a CFG function",
         ));
     };
-    Ok((root.stage, cfg, result))
+    Ok((stage, cfg, result))
 }
 
 /// Run strong liveness (sparse backward demand) over `function_name`'s body

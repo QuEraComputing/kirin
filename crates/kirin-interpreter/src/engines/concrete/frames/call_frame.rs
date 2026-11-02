@@ -81,16 +81,16 @@ enum CallDest {
 
 impl<V> CallRequest<V> {
     /// A call issued by a statement ([`SparseForwardEffect::Call`](crate::SparseForwardEffect::Call)):
-    /// returned values land in `call.outputs` of the caller's activation.
+    /// returned values land in `call.results` of the caller's activation.
     pub fn pending(scope_stage: CompileStage, caller_env: EnvIndex, call: CallEffect<V>) -> Self {
         Self {
             state: CallState::Pending {
                 lookup_stage: call.stage.unwrap_or(scope_stage),
                 callee: call.callee,
-                args: call.inputs,
+                args: call.args,
                 dest: CallDest::Caller {
                     env: caller_env,
-                    results: call.outputs,
+                    results: call.results,
                 },
             },
         }

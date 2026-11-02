@@ -62,10 +62,10 @@ impl LatticeAnchor for ProgramPoint {}
 ///
 /// Framework-level summary keys are never bare anchors: the same [`SSAValue`]
 /// or [`Block`] under two scopes (two stages, two analyzed bodies, two call
-/// contexts) is two distinct facts, so keys carry their scope. Dense liveness
-/// uses the analyzed callable ([`LinkTarget`](crate::LinkTarget)) as the
-/// scope; interprocedural analyses generalize `K` to a call-context key, as
-/// the sparse forward engine does for its value-reader dependencies.
+/// contexts) is two distinct facts, so keys carry their scope. Body-level
+/// analyses use [`BodyScope`](crate::BodyScope) — `(CompileStage, Body)` — as
+/// the scope; interprocedural analyses generalize `K` to a call-context key,
+/// as the sparse forward engine does for its value-reader dependencies.
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub struct Scoped<K, T> {
     pub scope: K,

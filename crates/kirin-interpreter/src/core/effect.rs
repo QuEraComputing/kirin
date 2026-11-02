@@ -67,15 +67,10 @@ pub struct CallEffect<V> {
     /// Optional explicit lookup stage (e.g. staged calls); defaults to the
     /// caller's stage. The linker may select a different target stage.
     pub stage: Option<CompileStage>,
-    /// Values supplied to the call boundary, in the analysis direction.
-    /// Forward/concrete: function argument values. Backward: facts requested
-    /// on function results (for example, result demands), not argument values.
-    pub inputs: Product<V>,
-    /// Caller SSA slots receiving the boundary response, not returned values.
-    /// Forward/concrete: call result slots to bind. Backward: call argument
-    /// slots on which to raise the callee's parameter facts. These are outputs
-    /// of the boundary request, not necessarily outputs of the function.
-    pub outputs: Product<SSAValue>,
+    /// Argument values.
+    pub args: Product<V>,
+    /// Result slots to bind when the callee returns.
+    pub results: Product<SSAValue>,
 }
 
 /// Callee designators understood by [`Linker`](crate::Linker)s.

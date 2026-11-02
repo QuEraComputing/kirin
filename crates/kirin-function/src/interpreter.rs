@@ -1,8 +1,8 @@
 use kirin::prelude::{CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
     CallEffect, Callee, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
-    ForwardEval, Interpretable, InterpreterError, SparseBackwardEffect, SparseForwardEffect,
-    SparseForwardInterp, StrongDemand,
+    ForwardEval, Interpretable, InterpreterError, SparseForwardEffect, SparseForwardInterp,
+    StrongDemand,
 };
 
 use crate::{
@@ -66,57 +66,41 @@ where
     if result_values.iter().all(|fact| *fact == I::Value::bottom()) {
         return Ok(interp.effect());
     }
-    Ok(SparseBackwardEffect::Call(CallEffect {
-        callee,
-        stage: call.stage(),
-        inputs: result_values,
-        outputs: call.arguments().copied().collect(),
-    }))
+    let parameter_values = interp.summarize_call(callee, call.stage(), result_values)?;
+    let arguments: Vec<SSAValue> = call.arguments().copied().collect();
+    if parameter_values.len() != arguments.len() {
+        return Err(I::Error::from(InterpreterError::ProductArityMismatch {
+            expected: parameter_values.len(),
+            actual: arguments.len(),
+        }));
+    }
+    for (argument, fact) in arguments.into_iter().zip(parameter_values) {
+        if fact != I::Value::bottom() {
+            interp.raise_fact(argument, fact)?;
+        }
+    }
+    Ok(interp.effect())
 }
 
-impl<I, T> Interpretable<I, StrongDemand> for CallNamed<T>
-where
-    I: DemandInterp,
-    I::Value: HasBottom + PartialEq,
-    T: CompileTimeValue,
-{
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        call_demand(self, Callee::Named(self.target()), interp)
-    }
+macro_rules! backward_call {
+    ($ty:ident, $callee:ident) => {
+        impl<I, T> Interpretable<I, StrongDemand> for $ty<T>
+        where
+            I: DemandInterp,
+            I::Value: HasBottom + PartialEq,
+            T: CompileTimeValue,
+        {
+            fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+                call_demand(self, Callee::$callee(self.target()), interp)
+            }
+        }
+    };
 }
 
-impl<I, T> Interpretable<I, StrongDemand> for CallFunction<T>
-where
-    I: DemandInterp,
-    I::Value: HasBottom + PartialEq,
-    T: CompileTimeValue,
-{
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        call_demand(self, Callee::Function(self.target()), interp)
-    }
-}
-
-impl<I, T> Interpretable<I, StrongDemand> for CallStaged<T>
-where
-    I: DemandInterp,
-    I::Value: HasBottom + PartialEq,
-    T: CompileTimeValue,
-{
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        call_demand(self, Callee::Staged(self.target()), interp)
-    }
-}
-
-impl<I, T> Interpretable<I, StrongDemand> for CallSpecialized<T>
-where
-    I: DemandInterp,
-    I::Value: HasBottom + PartialEq,
-    T: CompileTimeValue,
-{
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        call_demand(self, Callee::Specialized(self.target()), interp)
-    }
-}
+backward_call!(CallNamed, Named);
+backward_call!(CallFunction, Function);
+backward_call!(CallStaged, Staged);
+backward_call!(CallSpecialized, Specialized);
 
 /// Classic (weak) per-point liveness: kill defs, gen all uses — the same
 /// transfer for calls (purity is irrelevant to per-point live sets).
@@ -222,8 +206,8 @@ where
     Ok(SparseForwardEffect::Call(CallEffect {
         callee,
         stage: call.stage(),
-        inputs: args,
-        outputs: results,
+        args,
+        results,
     }))
 }
 

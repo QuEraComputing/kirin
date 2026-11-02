@@ -84,7 +84,7 @@ where
             Completion = DenseBackwardCompletion<LiveSet>,
         > + From<DenseBlockFrame<LiveSet, InterpreterError>>,
 {
-    let (root, engine) =
+    let (scope, engine) =
         DenseLiveness::<S, InterpreterError, F>::new(pipeline).analyze(stage, callee)?;
-    Ok(DenseLivenessResult::from_engine(&engine, root))
+    Ok(DenseLivenessResult::from_engine(&engine, scope))
 }
