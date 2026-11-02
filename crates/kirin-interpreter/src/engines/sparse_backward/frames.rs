@@ -3,7 +3,7 @@
 
 use kirin_ir::{CompileStage, HasBottom, Lattice, SSAValue, StageMeta, Statement};
 
-use super::{DemandContext, SparseBackwardDriver, SparseBackwardEffect};
+use super::{DemandContext, SparseBackwardDriver};
 use crate::{
     Frame, FrameEffect, InterpDispatch, InterpreterError, Linker, SparseBackwardSemantic,
     StageQuery,
@@ -50,8 +50,7 @@ where
     ) -> Result<FrameEffect<Self, Self::Completion>, E> {
         match self.work.pop() {
             Some(statement) => {
-                let SparseBackwardEffect::Demands(demands) =
-                    interp.run_statement(&self.context, self.stage, statement)?;
+                let demands = interp.run_statement(&self.context, self.stage, statement)?;
                 self.collected.extend(demands);
                 Ok(FrameEffect::Continue(self))
             }

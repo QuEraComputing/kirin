@@ -1,8 +1,8 @@
 use kirin::prelude::{CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
     CallEffect, Callee, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
-    ForwardEval, Interpretable, InterpreterError, SparseForwardEffect, SparseForwardInterp,
-    StrongDemand,
+    ForwardEval, Interpretable, InterpreterError, SparseBackwardEffect, SparseForwardEffect,
+    SparseForwardInterp, StrongDemand,
 };
 
 use crate::{
@@ -66,20 +66,12 @@ where
     if result_values.iter().all(|fact| *fact == I::Value::bottom()) {
         return Ok(interp.effect());
     }
-    let parameter_values = interp.summarize_call(callee, call.stage(), result_values)?;
-    let arguments: Vec<SSAValue> = call.arguments().copied().collect();
-    if parameter_values.len() != arguments.len() {
-        return Err(I::Error::from(InterpreterError::ProductArityMismatch {
-            expected: parameter_values.len(),
-            actual: arguments.len(),
-        }));
-    }
-    for (argument, fact) in arguments.into_iter().zip(parameter_values) {
-        if fact != I::Value::bottom() {
-            interp.raise_fact(argument, fact)?;
-        }
-    }
-    Ok(interp.effect())
+    Ok(SparseBackwardEffect::Call(CallEffect {
+        callee,
+        stage: call.stage(),
+        inputs: result_values,
+        outputs: call.arguments().copied().collect(),
+    }))
 }
 
 macro_rules! backward_call {
@@ -206,8 +198,8 @@ where
     Ok(SparseForwardEffect::Call(CallEffect {
         callee,
         stage: call.stage(),
-        args,
-        results,
+        inputs: args,
+        outputs: results,
     }))
 }
 
