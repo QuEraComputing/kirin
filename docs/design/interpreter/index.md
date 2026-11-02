@@ -434,6 +434,14 @@ engines. They do not select statement rules: `Interp::Semantics` remains the
 `SemanticKey` used for that dispatch. Solver parameters named `owner_analysis`
 and their generic type `Analysis` refer to these callbacks.
 
+`Summary::merge(candidate) -> bool` reports whether the summary changed; the
+driver then asks the dependency index which owners to reschedule. `solve_many`
+seeds the worklist, including single-root runs via a one-element iterator.
+`OwnerSummaryDeps` automatically reschedules a changed owner, while
+`ExplicitSummaryDeps` schedules only registered dependencies and is shared by
+the forward and dense-backward engines. Widening stays in the forward engine's
+analysis policy; the shared driver has no phase or strategy state.
+
 ### `ConcreteInterpreter` and `ConcreteInterpreterCore`
 
 `ConcreteInterpreter<'ir, S, V, E, Lk>` is the public, framework-default

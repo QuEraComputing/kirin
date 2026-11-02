@@ -2,17 +2,17 @@
 //!
 //! [`StandardFixpointInterpreter`] wraps one [`Interp`] (`inner`) and adds the
 //! outer, inter-owner convergence loop: a per-owner summary map, an owner
-//! worklist, a pluggable dependency index, and the widen/narrow phase state. It
+//! worklist, and a pluggable dependency index. It
 //! *is* an [`Interp`] itself (by delegation to `inner`, see `delegates.rs`), so
 //! frames and dialect rules see a single interpreter. The intra-owner traversal
 //! runs on the frame stack via [`run_frame`](Self::run_frame); the inter-owner
-//! iteration runs via [`solve`](Self::solve) (see `solver.rs`).
+//! iteration runs via [`solve_many`](Self::solve_many) (see `solver.rs`).
 
 use std::collections::{HashMap, VecDeque};
 
 use crate::Interp;
 
-use super::{FixpointPhase, FixpointProfile, OwnerSummaryDeps, Summary, SummaryEffect, WorkItem};
+use super::{FixpointProfile, OwnerSummaryDeps, WorkItem};
 
 /// Drives a [`FixpointProfile`] over an interpreter `I` to an owner-summary
 /// fixpoint.
@@ -28,18 +28,7 @@ where
     pub(super) worklist: VecDeque<WorkItem<P::SummaryKey>>,
     pub(super) frame_stack: Vec<P::Frame>,
     pub(super) current_owner: Option<P::SummaryKey>,
-    pub(super) pending_effects: Vec<SummaryEffect<P::SummaryKey, P::Summary>>,
-    pub(super) phase: FixpointPhase,
-    pub(super) strategy: <P::Summary as Summary>::Strategy,
 }
-
-/// A [`StandardFixpointInterpreter`] with the default self-dependent index.
-pub type SimpleFixpointInterpreter<I, P, Store> = StandardFixpointInterpreter<
-    I,
-    P,
-    Store,
-    OwnerSummaryDeps<<P as FixpointProfile<I>>::SummaryKey>,
->;
 
 impl<I, P, Store, Deps> StandardFixpointInterpreter<I, P, Store, Deps>
 where
@@ -47,12 +36,7 @@ where
     P: FixpointProfile<I>,
 {
     /// Build a driver wrapping `inner`, with an explicit dependency index.
-    pub fn with_dependency_index(
-        inner: I,
-        store: Store,
-        strategy: <P::Summary as Summary>::Strategy,
-        deps: Deps,
-    ) -> Self {
+    pub fn with_dependency_index(inner: I, store: Store, deps: Deps) -> Self {
         Self {
             inner,
             summaries: HashMap::new(),
@@ -61,9 +45,6 @@ where
             worklist: VecDeque::new(),
             frame_stack: Vec::new(),
             current_owner: None,
-            pending_effects: Vec::new(),
-            phase: FixpointPhase::Join,
-            strategy,
         }
     }
 
@@ -102,16 +83,6 @@ where
         &mut self.deps
     }
 
-    /// The current convergence phase.
-    pub fn phase(&self) -> FixpointPhase {
-        self.phase
-    }
-
-    /// Set the convergence phase.
-    pub fn set_phase(&mut self, phase: FixpointPhase) {
-        self.phase = phase;
-    }
-
     /// The current summary for `owner`, if any.
     pub fn summary(&self, owner: &P::SummaryKey) -> Option<&P::Summary> {
         self.summaries.get(owner)
@@ -120,7 +91,7 @@ where
     /// The current summary for `owner`, mutably, if present.
     ///
     /// For analyses (e.g. the forward engine) whose per-owner merge is driven by
-    /// an analysis policy rather than the context-free [`Summary::merge`], and so
+    /// an analysis policy rather than the context-free [`super::Summary::merge`], and so
     /// update summary storage directly.
     pub fn summary_mut(&mut self, owner: &P::SummaryKey) -> Option<&mut P::Summary> {
         self.summaries.get_mut(owner)
@@ -143,24 +114,9 @@ where
         self.worklist.push_back(WorkItem::Analyze(owner));
     }
 
-    /// The current frame stack (empty except mid-`run_frame`).
-    pub fn frame_stack(&self) -> &[P::Frame] {
-        self.frame_stack.as_slice()
-    }
-
-    /// Drop any frames left on the stack.
-    pub fn clear_frame_stack(&mut self) {
-        self.frame_stack.clear();
-    }
-
     /// The owner currently being analysed, if any.
     pub fn current_owner(&self) -> Option<&P::SummaryKey> {
         self.current_owner.as_ref()
-    }
-
-    /// Queue a summary effect to be applied after the current owner completes.
-    pub fn push_summary_effect(&mut self, effect: SummaryEffect<P::SummaryKey, P::Summary>) {
-        self.pending_effects.push(effect);
     }
 }
 
@@ -170,7 +126,7 @@ where
     P: FixpointProfile<I>,
 {
     /// Build a driver wrapping `inner`, with the default self-dependent index.
-    pub fn new(inner: I, store: Store, strategy: <P::Summary as Summary>::Strategy) -> Self {
-        Self::with_dependency_index(inner, store, strategy, OwnerSummaryDeps::new())
+    pub fn new(inner: I, store: Store) -> Self {
+        Self::with_dependency_index(inner, store, OwnerSummaryDeps::new())
     }
 }

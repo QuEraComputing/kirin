@@ -2,8 +2,8 @@
 //!
 //! [`SummaryDependencyIndex`] is the pluggable re-scheduling graph the driver
 //! consults after a summary changes. [`OwnerSummaryDeps`] auto-reanalyses the
-//! changed owner itself (the default self-dependent behaviour); the directional
-//! [`ForwardSummaryDeps`] / [`BackwardSummaryDeps`] register only the explicit
+//! changed owner itself (the default self-dependent behaviour);
+//! [`ExplicitSummaryDeps`] registers only the explicit
 //! edges an analysis declares (callee→caller for forward, successor→predecessor
 //! for backward), so a same-owner reanalysis happens only when registered.
 
@@ -39,11 +39,7 @@ pub trait SummaryDependencyIndex<K> {
     ) -> Result<(), Self::Error>;
 
     /// The dependencies to schedule now that `owner`'s summary changed.
-    fn on_summary_changed<Change>(
-        &mut self,
-        owner: &K,
-        change: Change,
-    ) -> Result<SummaryDependencies<K>, Self::Error>;
+    fn on_summary_changed(&mut self, owner: &K) -> Result<SummaryDependencies<K>, Self::Error>;
 }
 
 /// Dependency index whose owners are self-dependent by default: an owner that
@@ -123,25 +119,20 @@ where
         Ok(())
     }
 
-    fn on_summary_changed<Change>(
-        &mut self,
-        owner: &K,
-        _change: Change,
-    ) -> Result<SummaryDependencies<K>, Self::Error> {
+    fn on_summary_changed(&mut self, owner: &K) -> Result<SummaryDependencies<K>, Self::Error> {
         self.ensure_dependency_owner(owner);
         Ok(self.deps.get(owner).cloned().unwrap_or_default())
     }
 }
 
-/// Forward dependency index: `callee changed → reanalyse caller`. Owners are not
-/// self-dependent unless a self-edge is explicitly registered (same-key
-/// recursion).
+/// Dependency index with only explicitly registered edges. Owners are not
+/// self-dependent unless a self-edge is explicitly registered.
 #[derive(Clone, Debug)]
-pub struct ForwardSummaryDeps<K> {
+pub struct ExplicitSummaryDeps<K> {
     deps: OwnerSummaryDeps<K>,
 }
 
-impl<K> Default for ForwardSummaryDeps<K> {
+impl<K> Default for ExplicitSummaryDeps<K> {
     fn default() -> Self {
         Self {
             deps: OwnerSummaryDeps::default(),
@@ -149,7 +140,7 @@ impl<K> Default for ForwardSummaryDeps<K> {
     }
 }
 
-impl<K> ForwardSummaryDeps<K>
+impl<K> ExplicitSummaryDeps<K>
 where
     K: Clone + Eq + Hash,
 {
@@ -158,7 +149,7 @@ where
     }
 }
 
-impl<K> SummaryDependencyIndex<K> for ForwardSummaryDeps<K>
+impl<K> SummaryDependencyIndex<K> for ExplicitSummaryDeps<K>
 where
     K: Clone + Eq + Hash,
 {
@@ -179,67 +170,7 @@ where
         Ok(())
     }
 
-    fn on_summary_changed<Change>(
-        &mut self,
-        owner: &K,
-        _change: Change,
-    ) -> Result<SummaryDependencies<K>, Self::Error> {
-        self.deps.ensure_empty_owner(owner);
-        Ok(self.deps.deps.get(owner).cloned().unwrap_or_default())
-    }
-}
-
-/// Backward dependency index: `successor changed → reanalyse predecessor`. Like
-/// [`ForwardSummaryDeps`], owners are self-dependent only when explicitly
-/// registered.
-#[derive(Clone, Debug)]
-pub struct BackwardSummaryDeps<K> {
-    deps: OwnerSummaryDeps<K>,
-}
-
-impl<K> Default for BackwardSummaryDeps<K> {
-    fn default() -> Self {
-        Self {
-            deps: OwnerSummaryDeps::default(),
-        }
-    }
-}
-
-impl<K> BackwardSummaryDeps<K>
-where
-    K: Clone + Eq + Hash,
-{
-    pub fn new() -> Self {
-        Self::default()
-    }
-}
-
-impl<K> SummaryDependencyIndex<K> for BackwardSummaryDeps<K>
-where
-    K: Clone + Eq + Hash,
-{
-    type Error = Infallible;
-
-    fn ensure_owner(&mut self, owner: &K) -> Result<(), Self::Error> {
-        self.deps.ensure_empty_owner(owner);
-        Ok(())
-    }
-
-    fn register(
-        &mut self,
-        trigger_owner: &K,
-        dependency: SummaryDependency<K>,
-    ) -> Result<(), Self::Error> {
-        self.deps
-            .register_explicit_dependency(trigger_owner, dependency);
-        Ok(())
-    }
-
-    fn on_summary_changed<Change>(
-        &mut self,
-        owner: &K,
-        _change: Change,
-    ) -> Result<SummaryDependencies<K>, Self::Error> {
+    fn on_summary_changed(&mut self, owner: &K) -> Result<SummaryDependencies<K>, Self::Error> {
         self.deps.ensure_empty_owner(owner);
         Ok(self.deps.deps.get(owner).cloned().unwrap_or_default())
     }

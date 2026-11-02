@@ -5,7 +5,7 @@
 //!
 //! - **callee summary → caller owners**, the generic
 //!   [`SummaryDependencyIndex`] edge the driver consults after a summary
-//!   changes (`ForwardSummaryDeps`, registered on a call, including same-key
+//!   changes (`ExplicitSummaryDeps`, registered on a call, including same-key
 //!   self-recursion);
 //! - **context-qualified SSA fact → reader owners**, for the direct dominated
 //!   cross-block uses that never travel along a block edge: a block that read a
@@ -21,7 +21,7 @@ use std::hash::Hash;
 use kirin_ir::SSAValue;
 
 use crate::{
-    ForwardSummaryDeps, Scoped, SummaryDependencies, SummaryDependency, SummaryDependencyIndex,
+    ExplicitSummaryDeps, Scoped, SummaryDependencies, SummaryDependency, SummaryDependencyIndex,
 };
 
 use super::interp::Owner;
@@ -32,14 +32,14 @@ use super::interp::Owner;
 /// two function contexts is two distinct facts, so readers never
 /// cross-contaminate.
 pub struct ForwardDeps<K> {
-    summaries: ForwardSummaryDeps<Owner<K>>,
+    summaries: ExplicitSummaryDeps<Owner<K>>,
     value_readers: HashMap<Scoped<K, SSAValue>, HashSet<Owner<K>>>,
 }
 
 impl<K> Default for ForwardDeps<K> {
     fn default() -> Self {
         Self {
-            summaries: ForwardSummaryDeps::default(),
+            summaries: ExplicitSummaryDeps::default(),
             value_readers: HashMap::new(),
         }
     }
@@ -82,11 +82,10 @@ impl<K: Clone + Eq + Hash> SummaryDependencyIndex<Owner<K>> for ForwardDeps<K> {
         self.summaries.register(trigger_owner, dependency)
     }
 
-    fn on_summary_changed<Change>(
+    fn on_summary_changed(
         &mut self,
         owner: &Owner<K>,
-        change: Change,
     ) -> Result<SummaryDependencies<Owner<K>>, Self::Error> {
-        self.summaries.on_summary_changed(owner, change)
+        self.summaries.on_summary_changed(owner)
     }
 }

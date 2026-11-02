@@ -329,21 +329,13 @@ impl<V> Summary for DemandSummary<V>
 where
     V: Clone + PartialEq + Lattice,
 {
-    type Strategy = ();
-    type Change = ();
-
-    fn merge(
-        &mut self,
-        _phase: crate::FixpointPhase,
-        candidate: Self,
-        _strategy: &mut Self::Strategy,
-    ) -> Option<Self::Change> {
+    fn merge(&mut self, candidate: Self) -> bool {
         let joined = self.0.join(&candidate.0);
         if joined == self.0 {
-            None
+            false
         } else {
             self.0 = joined;
-            Some(())
+            true
         }
     }
 }
@@ -580,8 +572,7 @@ where
         outputs: Product<V>,
     ) -> Result<Product<V>, E> {
         let lookup_stage = stage.unwrap_or(self.stage());
-        let (target, key) =
-            self.resolve_call_context(lookup_stage, &callee, &outputs)?;
+        let (target, key) = self.resolve_call_context(lookup_stage, &callee, &outputs)?;
         let work = self.current_owner().cloned().ok_or_else(|| {
             E::from(InterpreterError::Custom(
                 "a call boundary was crossed outside propagation work",
@@ -618,11 +609,10 @@ where
         callee: &Callee,
         outputs: &Product<V>,
     ) -> Result<(LinkTarget, P::Key), E> {
-        let target = self.inner().linker.resolve(
-            self.inner().pipeline(),
-            lookup_stage,
-            callee,
-        )?;
+        let target = self
+            .inner()
+            .linker
+            .resolve(self.inner().pipeline(), lookup_stage, callee)?;
         let key = self.inner_mut().policy.key(&target, outputs);
         Ok((target, key))
     }
@@ -907,7 +897,6 @@ where
             driver: StandardFixpointInterpreter::with_dependency_index(
                 transfer,
                 Default::default(),
-                (),
                 OwnerSummaryDeps::new(),
             ),
         }
@@ -1064,8 +1053,7 @@ where
         result_values: impl IntoIterator<Item = V>,
     ) -> Result<(Product<V>, Self), E> {
         let outputs: Product<V> = result_values.into_iter().collect();
-        let (target, root) =
-            self.driver.resolve_call_context(stage, &callee, &outputs)?;
+        let (target, root) = self.driver.resolve_call_context(stage, &callee, &outputs)?;
         self.driver
             .inner_mut()
             .activations
