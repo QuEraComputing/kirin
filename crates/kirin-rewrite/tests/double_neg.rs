@@ -649,6 +649,38 @@ fn every_function_in_the_stage_is_rewritten() {
 }
 
 #[test]
+fn a_redefined_function_is_not_rewritten() {
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let (mut pipeline, stage) = parse(&input);
+    let old = pipeline
+        .resolve_staged_function("f", stage)
+        .expect("`@f` exists");
+    let info = pipeline.stage_mut(stage).expect("the stage exists");
+    let (name, signature) = {
+        let old = old.expect_info(info);
+        (old.name(), old.signature().clone())
+    };
+    // The replacement has no specialization, so the driver has nothing
+    // live to visit.
+    info.with_builder(|b| {
+        let conflict = b
+            .staged_function()
+            .maybe_name(name)
+            .signature(signature)
+            .new()
+            .expect_err("`@f` already holds this signature");
+        b.redefine_staged_function(conflict);
+    });
+
+    let rules = neg_rules();
+    let driver = RewriteDriver::new(&rules);
+    let summary = pipeline
+        .run_pass(stage, |rewriter| driver.run::<PostOrder>(rewriter))
+        .expect("the pass succeeds");
+    assert_eq!((summary.applied, summary.erased), (0, 0));
+}
+
+#[test]
 fn a_hole_used_twice_matches_only_the_same_value() {
     let rules = RuleSet::build(|stage| vec![add_self(stage)]).unwrap();
     let same = program("    %a = add %x, %x -> i64;", "%a");
