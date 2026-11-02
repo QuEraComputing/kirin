@@ -866,24 +866,25 @@ where
         let CallEffect {
             callee,
             stage: call_stage,
-            args,
-            results,
+            inputs: args,
+            outputs: results,
         } = call;
         let lookup_stage = call_stage.unwrap_or(stage);
         let key = self.contribute_call_entry(lookup_stage, &callee, args)?;
 
-        let owner = Owner::Function(key);
-        if let Some(caller) = self.current_owner().cloned() {
-            self.dependency_index_mut()
-                .register(&owner, SummaryDependency::Reanalyze(caller))
-                .expect("forward dependency index is infallible");
-        }
+        let caller = self.current_owner().cloned().ok_or_else(|| {
+            E::from(InterpreterError::Custom(
+                "a call boundary was crossed outside propagation work",
+            ))
+        })?;
+        self.dependency_index_mut()
+            .register(
+                &Owner::Function(key.clone()),
+                SummaryDependency::Reanalyze(caller),
+            )
+            .expect("forward dependency index is infallible");
 
-        let ret = self
-            .summary(&owner)
-            .and_then(|info| info.as_function())
-            .and_then(|function| function.ret.clone());
-        match ret {
+        match self.call_return(&key) {
             Some(values) => self.bind_values(index, results.as_slice(), values),
             None => {
                 for slot in results.iter().copied() {
@@ -928,6 +929,14 @@ where
         })?;
 
         Ok(key)
+    }
+
+    /// The callee's current return summary. `None` means no return has been
+    /// reached yet, which differs from a reached zero-value return.
+    fn call_return(&self, key: &<P as CallContext<V>>::Key) -> Option<Product<V>> {
+        self.summary(&Owner::Function(key.clone()))
+            .and_then(|info| info.as_function())
+            .and_then(|function| function.ret.clone())
     }
 
     fn apply_update(
@@ -1583,12 +1592,7 @@ where
         let mut owner_analysis = SparseForwardOwnerAnalysis::new();
         self.driver.drain_worklist(&mut owner_analysis)?;
 
-        let ret = self
-            .driver
-            .summary(&Owner::Function(key))
-            .and_then(|info| info.as_function())
-            .and_then(|function| function.ret.clone())
-            .unwrap_or_default();
+        let ret = self.driver.call_return(&key).unwrap_or_default();
         Ok((ret, self))
     }
 }
