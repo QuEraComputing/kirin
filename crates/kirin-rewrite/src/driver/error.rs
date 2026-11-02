@@ -46,6 +46,9 @@ pub enum DriverError {
     ConstraintNotBool { rule: String },
     /// A `replace` redirected to or from a value that is not an SSA value.
     NotAnSsaValue { rule: String },
+    /// Rule `rule` erases its root, the statement being visited, which an
+    /// `order` walk does not allow. Nothing was edited.
+    ErasesRoot { rule: String, order: &'static str },
     /// The tree under `root` was still changing after `sweeps` sweeps, the
     /// driver's limit: the rules most likely keep undoing each other.
     BudgetExhausted { root: Statement, sweeps: usize },
@@ -143,6 +146,10 @@ impl fmt::Display for DriverError {
                     "rule `{rule}`: a replace names a value that is not an SSA value"
                 )
             }
+            DriverError::ErasesRoot { rule, order } => write!(
+                f,
+                "rule `{rule}` erases its root, the statement being visited, which a `{order}` walk does not allow; run it in an order that does, such as `ReverseBFS`"
+            ),
             DriverError::BudgetExhausted { root, sweeps } => write!(
                 f,
                 "the IR under {root:?} was still changing after {sweeps} sweeps; \

@@ -22,6 +22,8 @@ pub struct RewriteRule<L: Dialect> {
     checks: Vec<Step<CheckFn<L>>>,
     /// The rewrite body, in order.
     actions: Vec<Step<ActionFn<L>>>,
+    /// Whether the rewrite body erases the root.
+    erases_root: bool,
 }
 
 /// A statement of a pattern or rewrite body, in the order the driver runs
@@ -52,17 +54,24 @@ impl<L: Dialect> RewriteRule<L> {
         &self.actions
     }
 
+    /// Whether the rule erases its root, the statement the driver is
+    /// visiting when the rule runs. Only some walk orders allow that, so the
+    /// driver checks it against the order of each run.
+    pub fn erases_root(&self) -> bool {
+        self.erases_root
+    }
+
     /// Check `rule`'s pattern and record its parts.
     ///
     /// The matched ops are the root and, through their operands, the ops
     /// producing them, stopping at holes. Every other op is rejected, as is
     /// anything the driver cannot run yet.
     ///
-    /// A rule must not erase its root: the driver is visiting it, and a walk
-    /// forbids erasing the statement being visited (see
-    /// [`kirin_ir::walk`]). Dead roots are left to the dead-code cleanup. The
-    /// producers a rule may erase are never nested in or around the root,
-    /// so no other erase can break the walk.
+    /// A rule may erase its root, which is recorded so the driver can check
+    /// it against the walk order (see [`kirin_ir::walk`]). The other ops a
+    /// rule may erase are producers of the root. Matched ops own no bodies,
+    /// so a producer is never an ancestor of the root, and no other erase can
+    /// break the walk in any order.
     pub(crate) fn new(
         stage: &StageInfo<PatternLanguage<L>>,
         natives: PatternRule<L>,
@@ -163,6 +172,7 @@ impl<L: Dialect> RewriteRule<L> {
         }
 
         let mut actions = Vec::new();
+        let mut erases_root = false;
         for (position, stmt) in rewrite.body().statements(stage).enumerate() {
             match stmt.expect_info(stage).definition() {
                 PatternLanguage::Wildcard(PatternStatement::Replace(replace)) => {
@@ -175,9 +185,7 @@ impl<L: Dialect> RewriteRule<L> {
                 }
                 PatternLanguage::Wildcard(PatternStatement::Erase(erase)) => {
                     let target = erase.target();
-                    if target == root {
-                        return Err(error(RuleErrorKind::ErasesRoot));
-                    }
+                    erases_root |= target == root;
                     if !matched.contains(&target) {
                         return Err(error(RuleErrorKind::EraseNotMatched { position }));
                     }
@@ -201,6 +209,7 @@ impl<L: Dialect> RewriteRule<L> {
             root,
             checks,
             actions,
+            erases_root,
         })
     }
 }

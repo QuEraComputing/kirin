@@ -1,5 +1,5 @@
 use kirin_ir::walk::{WalkCursor, WalkOrder};
-use kirin_ir::{Dialect, Rewriter, Statement};
+use kirin_ir::{Dialect, GetInfo, Rewriter, Statement};
 
 use super::{DriverError, Match};
 use crate::RuleSet;
@@ -44,10 +44,11 @@ impl std::ops::AddAssign for RewriteSummary {
 /// be far above what a terminating rule set needs, never a way to stop a
 /// run early. A single sweep has no limit.
 ///
-/// Rules never erase the statement being visited, which
-/// [`RuleSet::add`](crate::RuleSet::add) checks, so dead statements are left
-/// to the dead-code cleanup. Native actions are not checked; one breaking the
-/// walk's contract (see [`kirin_ir::walk`]) fails the run.
+/// A rule erasing its root erases the statement being visited, which only
+/// some walk orders allow (see [`kirin_ir::walk`]). A run in another order
+/// fails with [`DriverError::ErasesRoot`] before editing anything. Native
+/// actions can edit anything, so they are checked by the walk as it runs: one
+/// breaking the walk's contract fails the run with [`DriverError::Walk`].
 ///
 /// The driver edits through the [`Rewriter`] a pass is given, so it runs
 /// inside [`Pipeline::run_pass`](kirin_ir::Pipeline::run_pass):
@@ -104,6 +105,15 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<RewriteSummary, DriverError> {
+        if !O::ALLOWS_ERASING_VISITED
+            && let Some(rule) = self.rules.rules().iter().find(|rule| rule.erases_root())
+        {
+            let order = std::any::type_name::<O>();
+            return Err(DriverError::ErasesRoot {
+                rule: rule.name().to_string(),
+                order: order.rsplit("::").next().unwrap_or(order),
+            });
+        }
         let mut summary = RewriteSummary::default();
         while summary.sweeps < self.max_sweeps {
             let applied = self.sweep::<O>(rewriter, root)?;
@@ -141,6 +151,10 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
                 found.apply(self.rules, rule, rewriter, stmt)?;
                 if rewriter.events().len() > before {
                     applied += 1;
+                }
+                // The rule erased the statement, so no later rule can match it.
+                if stmt.get_info(rewriter.stage()).is_none() {
+                    break;
                 }
             }
         }

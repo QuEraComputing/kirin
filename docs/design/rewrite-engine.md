@@ -2856,10 +2856,12 @@ statement, then runs a dead-code cleanup, and the fixpoint ends at the first
 sweep recording no `MutationEvent`. Decisions to revisit in later
 milestones:
 
-- Rules may not erase their root (`RuleErrorKind::ErasesRoot`); a root left
-  dead goes to the dead-code cleanup. A rule's other erase targets are
-  producers of the root, never nested in or around it, so declarative rules
-  meet the walk contract by construction. Native actions are not checked.
+- A rule may erase its root, the statement being visited, only in a walk
+  order that allows it (`WalkOrder::ALLOWS_ERASING_VISITED`: the reverse BFS
+  orders). A run in another order fails with `DriverError::ErasesRoot`
+  before editing anything. A rule's other erase targets are producers of the
+  root, never nested in or around it, so they meet the walk contract in
+  every order. Native actions are checked by the walk as it runs.
 - `UnGraph`s are not cleaned, by design: their nodes consume wires but are not
   consumed, so there is no "unused" to test.
 - Until the `RewriteDialect` derive (M4) exists, op matching clones the

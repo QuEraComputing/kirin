@@ -8,9 +8,8 @@ impl<L: Dialect> RewriteDriver<'_, L> {
     /// Erase the statements left dead under `root`, and return how many
     /// were erased.
     ///
-    /// Rules never erase their root, so a rule that replaces its root's
-    /// results leaves the root, and often its producers, behind with no
-    /// uses. Erasing them after each sweep keeps later sweeps from walking
+    /// A rule that replaces its root's results without erasing the root
+    /// leaves it, and often its producers, behind with no uses. Erasing them after each sweep keeps later sweeps from walking
     /// and matching them again. This also removes dead statements no rule
     /// touched.
     ///

@@ -379,12 +379,43 @@ fn an_unregistered_native_function_rejects_the_rule() {
     );
 }
 
+/// The reverse BFS orders allow erasing the statement being visited.
 #[test]
-fn a_rule_erasing_its_root_is_rejected() {
-    let error = RuleSet::build(|stage| vec![double_neg_erasing_root(stage)])
-        .err()
-        .expect("the rule erases its root");
-    assert_eq!(error.kind, RuleErrorKind::ErasesRoot);
+fn a_rule_erasing_its_root_runs_in_the_reverse_bfs_orders() {
+    let rules = RuleSet::build(|stage| vec![double_neg_erasing_root(stage)]).unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let expected = printed(&program("", "%x"));
+    assert_eq!(rewrite::<ReverseBFS>(&rules, &input).0, expected);
+    assert_eq!(rewrite::<KeepOrderReverseBFS>(&rules, &input).0, expected);
+}
+
+/// The other orders forbid erasing the statement being visited, so the run
+/// fails before editing anything.
+#[test]
+fn a_rule_erasing_its_root_fails_in_the_other_orders() {
+    let rules = RuleSet::build(|stage| vec![double_neg_erasing_root(stage)]).unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let (mut pipeline, stage) = parse(&input);
+    let driver = RewriteDriver::new(&rules);
+
+    let mut failure = None;
+    let mut edits = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        edits = Some(rewriter.events().len());
+        result
+    });
+
+    assert!(result.is_err());
+    assert_eq!(
+        failure,
+        Some(DriverError::ErasesRoot {
+            rule: "double_neg_erasing_root".to_string(),
+            order: "PostOrder",
+        })
+    );
+    assert_eq!(edits, Some(0));
 }
 
 #[test]

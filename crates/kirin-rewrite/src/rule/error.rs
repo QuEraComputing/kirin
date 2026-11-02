@@ -40,9 +40,6 @@ pub enum RuleErrorKind {
     /// The `erase` at this position of the rewrite body does not name a
     /// matched op.
     EraseNotMatched { position: usize },
-    /// An `erase` names the root, which the driver is visiting when the rule
-    /// runs. The dead-code cleanup removes a root left unused instead.
-    ErasesRoot,
     /// A rewrite-body statement the driver cannot run yet, such as building
     /// a new op.
     UnsupportedAction { position: usize },
@@ -105,10 +102,6 @@ impl fmt::Display for RuleError {
             RuleErrorKind::ReplaceNotMatched { position } => write!(
                 f,
                 "the replace at position {position} of the rewrite body redirects a value the match does not define"
-            ),
-            RuleErrorKind::ErasesRoot => write!(
-                f,
-                "the rewrite erases its root; leave a dead root to dead-code elimination"
             ),
             RuleErrorKind::EraseNotMatched { position } => write!(
                 f,
