@@ -25,8 +25,8 @@ pub use rewrite::walk;
 pub use arena::{Arena, GetInfo, Id, Identifier, Item};
 pub use body::{Body, HasCallableBody};
 pub use builder::error::{
-    PipelineError, PipelineStagedError, SpecializeError, StagedFunctionConflictKind,
-    StagedFunctionError,
+    DuplicateSpecialization, PipelineError, PipelineStagedError, SpecializeError,
+    StagedFunctionConflictKind, StagedFunctionError,
 };
 pub use builder::{AsBuildStage, BuilderStageInfo, FinalizeError};
 pub use comptime::{CompileTimeValue, Placeholder, Typeof};
