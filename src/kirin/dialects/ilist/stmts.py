@@ -55,7 +55,7 @@ class New(ir.Statement):
 class Push(ir.Statement):
     traits = frozenset({ir.Pure(), lowering.FromPythonCall()})
     lst: ir.SSAValue = info.argument(IListType[ElemT])
-    value: ir.SSAValue = info.argument(IListType[ElemT])
+    value: ir.SSAValue = info.argument(ElemT)
     result: ir.ResultValue = info.result(IListType[ElemT])
 
 

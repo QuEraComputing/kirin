@@ -66,7 +66,7 @@ class TypeInfer(MethodTable):
         if not lst_type.is_subseteq(IListType):
             return (types.Bottom,)
 
-        if not lst_type.vars[0].is_subseteq(value_type):
+        if not value_type.is_subseteq(lst_type.vars[0]):
             return (types.Bottom,)
 
         lst_len = self._get_list_len(lst_type)
