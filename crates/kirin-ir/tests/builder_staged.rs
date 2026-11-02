@@ -157,6 +157,13 @@ fn redefine_staged_function_invalidates_and_registers() {
     let mut stage = new_stage();
 
     let sf1 = stage.staged_function().name(foo).new().unwrap();
+    let definition = stage.statement().definition(BuilderDialect::Return).new();
+    let spec1 = stage
+        .specialize()
+        .staged_func(sf1)
+        .definition(definition)
+        .new()
+        .unwrap();
 
     let err = stage
         .staged_function()
@@ -169,6 +176,8 @@ fn redefine_staged_function_invalidates_and_registers() {
     let stage = stage.finalize().unwrap();
     let old_info = sf1.get_info(&stage).unwrap();
     assert!(old_info.is_invalidated());
+    // The old function's specializations go with it.
+    assert!(spec1.get_info(&stage).unwrap().is_invalidated());
 
     let new_info = sf2.get_info(&stage).unwrap();
     assert!(!new_info.is_invalidated());

@@ -104,9 +104,13 @@ impl<L: Dialect> StagedFunctionInfo<L> {
         self.invalidated
     }
 
-    /// Mark this staged function as invalidated.
+    /// Mark this staged function, and with it every specialization, as
+    /// invalidated.
     pub fn invalidate(&mut self) {
         self.invalidated = true;
+        self.specializations
+            .iter_mut()
+            .for_each(SpecializedFunctionInfo::invalidate);
     }
 
     /// Get the specializations of this staged function.
