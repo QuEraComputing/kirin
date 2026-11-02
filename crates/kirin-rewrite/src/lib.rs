@@ -1,8 +1,8 @@
 //! Matching and scheduling for Kirin rewrite rules.
 //!
 //! A rule is a `wildcard.pattern` from `kirin-wildcard`, usually written with
-//! `#[rewrite_rule]`. A [`RuleSet`] checks the patterns once and holds the
-//! [`NativeRegistry`] of Rust functions they call by name. A
+//! `#[rewrite_rule]`. A [`RuleSet`] checks each [`PatternRule`], a pattern
+//! with the Rust functions it calls by name, once. A
 //! [`RewriteDriver`] walks the IR in a [`WalkOrder`](kirin_ir::walk::WalkOrder),
 //! matches every rule at every statement, runs the rewrite of each match
 //! through the pass's [`Rewriter`](kirin_ir::Rewriter), and repeats until a
@@ -13,9 +13,8 @@
 #![forbid(unsafe_code)]
 
 mod driver;
-mod native;
 mod rule;
 
 pub use driver::{DriverError, RewriteDriver, RewriteSummary};
-pub use native::{ActionFn, CheckFn, NativeRegistry, NativeValue};
+pub use kirin_wildcard::{ActionFn, CheckFn, NativeError, NativeValue, PatternRule};
 pub use rule::{RewriteRule, RuleError, RuleErrorKind, RuleSet};

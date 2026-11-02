@@ -6,7 +6,7 @@ use kirin::prelude::*;
 use kirin_arith::ArithType;
 use kirin_function::Call;
 use kirin_ir::walk::PostOrder;
-use kirin_rewrite::{NativeRegistry, RewriteDriver, RuleSet};
+use kirin_rewrite::{PatternRule, RewriteDriver, RuleSet};
 use kirin_test_languages::GraphFunctionLanguage as L;
 use kirin_wildcard::{NativeCall, Pattern, PatternLanguage, Rewrite};
 
@@ -21,11 +21,7 @@ fn named_call(target: Symbol) -> L {
 fn matches_call(symbols: &[&str], target: usize) -> usize {
     let matches = Rc::new(Cell::new(0));
     let recorded = matches.clone();
-    let natives = NativeRegistry::new().action("record", move |_, _| {
-        recorded.set(recorded.get() + 1);
-        Ok(vec![])
-    });
-    let rules = RuleSet::build(natives, |stage| {
+    let rules = RuleSet::build(|stage| {
         let target = stage.symbol_table_mut().intern("foo".to_string());
         let op = stage
             .statement()
@@ -36,7 +32,11 @@ fn matches_call(symbols: &[&str], target: usize) -> usize {
         let rewrite = Rewrite::<ArithType>::new(stage, op, actions);
         let body = stage.block().stmt(op).terminator(rewrite.id).new();
         let name = stage.symbol_table_mut().intern("match_foo".to_string());
-        vec![Pattern::<ArithType>::new(stage, name, body).id]
+        let pattern = Pattern::<ArithType>::new(stage, name, body).id;
+        vec![PatternRule::new(pattern).action("record", move |_, _| {
+            recorded.set(recorded.get() + 1);
+            Ok(vec![])
+        })]
     })
     .unwrap();
 

@@ -2,6 +2,7 @@ use std::fmt;
 
 use kirin_ir::walk::WalkError;
 use kirin_ir::{RewriteError, Statement};
+use kirin_wildcard::NativeError;
 
 /// Why a driver run failed.
 ///
@@ -25,10 +26,23 @@ pub enum DriverError {
         expected: usize,
         found: usize,
     },
+    /// Native function `name` was given an argument of the wrong type.
+    ///
+    /// - `position`: which argument, counting from 0
+    /// - `expected`: the type the function takes, e.g. `"i64"`
+    /// - `found`: the value it was given, printed with `Debug`, or `None` if
+    ///   the call has fewer arguments than that
+    NativeArgument {
+        rule: String,
+        name: String,
+        position: usize,
+        expected: &'static str,
+        found: Option<String>,
+    },
     /// A value the rule reads was never bound, such as a hole no matched op
     /// uses.
     Unbound { rule: String },
-    /// A `constraint` tested a value that is not a [`NativeValue::Bool`](crate::NativeValue::Bool).
+    /// A `constraint` tested a value that is not a `bool`.
     ConstraintNotBool { rule: String },
     /// A `replace` redirected to or from a value that is not an SSA value.
     NotAnSsaValue { rule: String },
@@ -43,6 +57,31 @@ pub enum DriverError {
         stmt: Statement,
         error: RewriteError,
     },
+}
+
+impl DriverError {
+    /// The failure of native function `name`, called by `rule` matched at
+    /// `stmt`.
+    pub(crate) fn native(rule: &str, name: &str, stmt: Statement, error: NativeError) -> Self {
+        match error {
+            NativeError::Argument {
+                position,
+                expected,
+                found,
+            } => DriverError::NativeArgument {
+                rule: rule.to_string(),
+                name: name.to_string(),
+                position,
+                expected,
+                found,
+            },
+            NativeError::Rewrite(error) => DriverError::Rewrite {
+                rule: rule.to_string(),
+                stmt,
+                error,
+            },
+        }
+    }
 }
 
 impl From<WalkError> for DriverError {
@@ -68,6 +107,26 @@ impl fmt::Display for DriverError {
             } => write!(
                 f,
                 "rule `{rule}`: native function `{name}` returned {found} values, expected {expected}"
+            ),
+            DriverError::NativeArgument {
+                rule,
+                name,
+                position,
+                expected,
+                found: Some(found),
+            } => write!(
+                f,
+                "rule `{rule}`: argument {position} of native function `{name}` is {found}, expected a `{expected}`"
+            ),
+            DriverError::NativeArgument {
+                rule,
+                name,
+                position,
+                expected,
+                found: None,
+            } => write!(
+                f,
+                "rule `{rule}`: native function `{name}` has no argument {position}, expected a `{expected}`"
             ),
             DriverError::Unbound { rule } => {
                 write!(f, "rule `{rule}` reads a value the match did not bind")

@@ -1,29 +1,39 @@
 use std::collections::HashSet;
 
 use kirin_ir::{Dialect, GetInfo, SSAKind, SSAValue, StageInfo, Statement};
-use kirin_wildcard::{PatternLanguage, PatternStatement};
+use kirin_wildcard::{
+    ActionFn, CheckFn, NativeCall, PatternLanguage, PatternRule, PatternStatement,
+};
 
 use super::{RuleError, RuleErrorKind};
-use crate::NativeRegistry;
 
 /// A `wildcard.pattern`, checked once so the driver can run it without
 /// re-validating.
 ///
 /// The pattern stays the source of truth: every field is a statement of the
 /// [`RuleSet`](crate::RuleSet)'s pattern stage, and the rule only records
-/// where the parts of the pattern are.
-#[derive(Clone, Debug)]
-pub struct RewriteRule {
+/// where the parts of the pattern are. Each `native_call` is resolved to
+/// its function here, so the driver never looks a name up.
+pub struct RewriteRule<L: Dialect> {
     name: String,
     /// The op the match is rooted at.
     root: Statement,
     /// The `native_call`s and `constraint`s of the pattern body, in order.
-    checks: Vec<Statement>,
+    checks: Vec<Step<CheckFn<L>>>,
     /// The rewrite body, in order.
-    actions: Vec<Statement>,
+    actions: Vec<Step<ActionFn<L>>>,
 }
 
-impl RewriteRule {
+/// A statement of a pattern or rewrite body, in the order the driver runs
+/// them.
+pub(crate) enum Step<F> {
+    /// A `native_call`, with the function it calls.
+    Native { stmt: Statement, function: F },
+    /// Any other statement: a `constraint`, `replace` or `erase`.
+    Other(Statement),
+}
+
+impl<L: Dialect> RewriteRule<L> {
     /// The name the pattern was given.
     pub fn name(&self) -> &str {
         &self.name
@@ -34,15 +44,15 @@ impl RewriteRule {
         self.root
     }
 
-    pub(crate) fn checks(&self) -> &[Statement] {
+    pub(crate) fn checks(&self) -> &[Step<CheckFn<L>>] {
         &self.checks
     }
 
-    pub(crate) fn actions(&self) -> &[Statement] {
+    pub(crate) fn actions(&self) -> &[Step<ActionFn<L>>] {
         &self.actions
     }
 
-    /// Check `pattern` and record its parts.
+    /// Check `rule`'s pattern and record its parts.
     ///
     /// The matched ops are the root and, through their operands, the ops
     /// producing them, stopping at holes. Every other op is rejected, as is
@@ -53,11 +63,11 @@ impl RewriteRule {
     /// [`kirin_ir::walk`]). Dead roots are left to the dead-code cleanup. The
     /// producers a rule may erase are never nested in or around the root,
     /// so no other erase can break the walk.
-    pub(crate) fn new<L: Dialect>(
+    pub(crate) fn new(
         stage: &StageInfo<PatternLanguage<L>>,
-        natives: &NativeRegistry<L>,
-        pattern: Statement,
+        natives: PatternRule<L>,
     ) -> Result<Self, RuleError> {
+        let pattern = natives.pattern();
         let not_a_pattern = || RuleError {
             rule: None,
             kind: RuleErrorKind::NotAPattern(pattern),
@@ -126,10 +136,13 @@ impl RewriteRule {
                 }
                 PatternLanguage::Wildcard(PatternStatement::Hole(_)) => {}
                 PatternLanguage::Wildcard(PatternStatement::NativeCall(call)) => {
-                    if natives.get_check(call.name()).is_none() {
-                        return Err(error(RuleErrorKind::UnknownCheck(call.name().to_string())));
-                    }
-                    checks.push(stmt);
+                    let native = natives.check_fn(call.name()).ok_or_else(|| {
+                        error(RuleErrorKind::UnknownCheck(call.name().to_string()))
+                    })?;
+                    checks.push(Step::Native {
+                        stmt,
+                        function: native.clone(),
+                    });
                 }
                 PatternLanguage::Wildcard(PatternStatement::Constraint(constraint)) => {
                     let computed = producer(stage, constraint.success()).is_some_and(|p| {
@@ -143,14 +156,14 @@ impl RewriteRule {
                             position,
                         }));
                     }
-                    checks.push(stmt);
+                    checks.push(Step::Other(stmt));
                 }
                 _ => return Err(error(RuleErrorKind::UnexpectedStatement { position })),
             }
         }
 
-        let actions: Vec<Statement> = rewrite.body().statements(stage).collect();
-        for (position, &stmt) in actions.iter().enumerate() {
+        let mut actions = Vec::new();
+        for (position, stmt) in rewrite.body().statements(stage).enumerate() {
             match stmt.expect_info(stage).definition() {
                 PatternLanguage::Wildcard(PatternStatement::Replace(replace)) => {
                     let redirects_match =
@@ -158,6 +171,7 @@ impl RewriteRule {
                     if !redirects_match {
                         return Err(error(RuleErrorKind::ReplaceNotMatched { position }));
                     }
+                    actions.push(Step::Other(stmt));
                 }
                 PatternLanguage::Wildcard(PatternStatement::Erase(erase)) => {
                     let target = erase.target();
@@ -167,11 +181,16 @@ impl RewriteRule {
                     if !matched.contains(&target) {
                         return Err(error(RuleErrorKind::EraseNotMatched { position }));
                     }
+                    actions.push(Step::Other(stmt));
                 }
                 PatternLanguage::Wildcard(PatternStatement::NativeCall(call)) => {
-                    if natives.get_action(call.name()).is_none() {
-                        return Err(error(RuleErrorKind::UnknownAction(call.name().to_string())));
-                    }
+                    let native = natives.action_fn(call.name()).ok_or_else(|| {
+                        error(RuleErrorKind::UnknownAction(call.name().to_string()))
+                    })?;
+                    actions.push(Step::Native {
+                        stmt,
+                        function: native.clone(),
+                    });
                 }
                 _ => return Err(error(RuleErrorKind::UnsupportedAction { position })),
             }
@@ -183,6 +202,17 @@ impl RewriteRule {
             checks,
             actions,
         })
+    }
+}
+
+/// The `native_call` a [`Step::Native`] runs.
+pub(crate) fn native_call<L: Dialect>(
+    patterns: &StageInfo<PatternLanguage<L>>,
+    stmt: Statement,
+) -> &NativeCall<L::Type> {
+    match stmt.expect_info(patterns).definition() {
+        PatternLanguage::Wildcard(PatternStatement::NativeCall(call)) => call,
+        _ => unreachable!("RewriteRule::new makes `Step::Native` only for native_calls"),
     }
 }
 

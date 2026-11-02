@@ -4,7 +4,7 @@
 use kirin::prelude::*;
 use kirin_arith::Arith;
 use kirin_ir::walk::PostOrder;
-use kirin_rewrite::{NativeRegistry, RewriteDriver, RewriteSummary, RuleSet};
+use kirin_rewrite::{RewriteDriver, RewriteSummary, RuleSet};
 use kirin_test_languages::GraphFunctionLanguage as L;
 use kirin_wildcard::rewrite_rule;
 
@@ -49,7 +49,7 @@ fn rewrite(rules: &RuleSet<L>, input: &str) -> (String, RewriteSummary) {
 
 #[test]
 fn dead_digraph_members_are_erased_from_the_sinks_back() {
-    let no_rules = RuleSet::build(NativeRegistry::new(), |_| Vec::new()).unwrap();
+    let no_rules = RuleSet::build(|_| Vec::<Statement>::new()).unwrap();
     // `%u` is an unused sink. `%p` has two consumers, both dead, so it only
     // becomes dead once the second is erased. `%k` is a sink kept alive by
     // the yield.
@@ -71,7 +71,7 @@ fn dead_digraph_members_are_erased_from_the_sinks_back() {
 
 #[test]
 fn double_negation_is_removed_in_a_digraph() {
-    let rules = RuleSet::build(NativeRegistry::new(), |stage| vec![double_neg(stage)]).unwrap();
+    let rules = RuleSet::build(|stage| vec![double_neg(stage)]).unwrap();
     let input = graph_program("  %a = neg %x -> i64;\n  %b = neg %a -> i64;", "%b");
     let (output, summary) = rewrite(&rules, &input);
     assert_eq!(output, printed(&graph_program("", "%x")));

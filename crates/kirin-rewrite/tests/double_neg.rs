@@ -6,7 +6,7 @@ use kirin_arith::Arith;
 use kirin_ir::SSAKind;
 use kirin_ir::walk::{BFS, KeepOrderReverseBFS, PostOrder, PreOrder, ReverseBFS, WalkOrder};
 use kirin_rewrite::{
-    DriverError, NativeRegistry, NativeValue, RewriteDriver, RewriteSummary, RuleErrorKind, RuleSet,
+    DriverError, NativeValue, PatternRule, RewriteDriver, RewriteSummary, RuleErrorKind, RuleSet,
 };
 use kirin_test_languages::ArithFunctionLanguage as L;
 use kirin_wildcard::rewrite_rule;
@@ -36,6 +36,52 @@ fn double_neg_of_argument() {
     let a = op![Arith::neg(x)];
     let r = op![Arith::neg(a)];
     is_block_argument(x);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// Only named by the rules below; the driver calls the `argument_index` and
+/// `is_zero` registered in [`natives`].
+fn argument_index(_x: i64) -> i64 {
+    unreachable!("the rules only name it")
+}
+
+fn is_zero(_index: i64) -> bool {
+    unreachable!("the rule only names it")
+}
+
+/// `double_neg` of the first block argument: one check computes an `i64`
+/// that another reads.
+#[rewrite_rule(language = L)]
+fn double_neg_of_first_argument() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let index = argument_index(x);
+    is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// `double_neg` with a constraint on an `i64`, which is not a condition.
+#[rewrite_rule(language = L)]
+fn double_neg_constraining_an_index() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    argument_index(x);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// `double_neg` passing the SSA value `x` to `is_zero`, which takes an
+/// `i64`.
+#[rewrite_rule(language = L)]
+fn double_neg_of_zero() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    is_zero(x);
     rewrite!(r, {
         replace!(r, x);
     })
@@ -74,19 +120,30 @@ fn add_self() {
     })
 }
 
-fn natives() -> NativeRegistry<L> {
-    NativeRegistry::new().check("is_block_argument", |stage, args| {
-        let [NativeValue::Value(value)] = args else {
-            return None;
-        };
-        let argument = matches!(value.get_info(stage)?.kind(), SSAKind::BlockArgument(..));
-        Some(vec![NativeValue::Bool(argument)])
-    })
+/// `pattern` with the native functions the rules above call.
+fn with_natives(pattern: Statement) -> PatternRule<L> {
+    PatternRule::new(pattern)
+        .check("is_block_argument", |stage, args| {
+            let value: SSAValue = NativeValue::arg(args, 0)?;
+            let kind = value.expect_info(stage).kind();
+            let argument = matches!(kind, SSAKind::BlockArgument(..));
+            Ok(Some(vec![NativeValue::new(argument)]))
+        })
+        .check("argument_index", |stage, args| {
+            let value: SSAValue = NativeValue::arg(args, 0)?;
+            Ok(match value.expect_info(stage).kind() {
+                SSAKind::BlockArgument(_, index) => Some(vec![NativeValue::new(*index as i64)]),
+                _ => None,
+            })
+        })
+        .check("is_zero", |_, args| {
+            let index: i64 = NativeValue::arg(args, 0)?;
+            Ok(Some(vec![NativeValue::new(index == 0)]))
+        })
 }
 
 fn neg_rules() -> RuleSet<L> {
-    RuleSet::build(NativeRegistry::new(), |stage| vec![double_neg(stage)])
-        .expect("the rules are valid")
+    RuleSet::build(|stage| vec![double_neg(stage)]).expect("the rules are valid")
 }
 
 /// A one-function program on `%x: i64` with `body` before `ret`.
@@ -241,7 +298,7 @@ fn every_function_in_the_stage_is_rewritten() {
 
 #[test]
 fn a_hole_used_twice_matches_only_the_same_value() {
-    let rules = RuleSet::build(NativeRegistry::new(), |stage| vec![add_self(stage)]).unwrap();
+    let rules = RuleSet::build(|stage| vec![add_self(stage)]).unwrap();
     let same = program("    %a = add %x, %x -> i64;", "%a");
     assert_rewrites(&rules, &same, &program("", "%x"));
 
@@ -251,7 +308,7 @@ fn a_hole_used_twice_matches_only_the_same_value() {
 
 #[test]
 fn a_native_check_decides_whether_the_rule_applies() {
-    let rules = RuleSet::build(natives(), |stage| vec![double_neg_of_argument(stage)]).unwrap();
+    let rules = RuleSet::build(|stage| vec![with_natives(double_neg_of_argument(stage))]).unwrap();
     let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
     assert_rewrites(&rules, &of_argument, &program("", "%x"));
 
@@ -263,12 +320,75 @@ fn a_native_check_decides_whether_the_rule_applies() {
 }
 
 #[test]
+fn a_native_check_passes_an_i64_to_another() {
+    let rules =
+        RuleSet::build(|stage| vec![with_natives(double_neg_of_first_argument(stage))]).unwrap();
+    let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &of_argument, &program("", "%x"));
+
+    let of_sum = program(
+        "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    assert_rewrites(&rules, &of_sum, &of_sum);
+}
+
+#[test]
+fn a_constraint_on_a_non_bool_fails_the_run() {
+    let rules = RuleSet::build(|stage| vec![with_natives(double_neg_constraining_an_index(stage))])
+        .unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let (mut pipeline, stage) = parse(&input);
+    let driver = RewriteDriver::new(&rules);
+
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    assert_eq!(
+        failure,
+        Some(DriverError::ConstraintNotBool {
+            rule: "double_neg_constraining_an_index".to_string()
+        })
+    );
+}
+
+#[test]
+fn a_native_argument_of_the_wrong_type_fails_the_run() {
+    let rules = RuleSet::build(|stage| vec![with_natives(double_neg_of_zero(stage))]).unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let (mut pipeline, stage) = parse(&input);
+    let driver = RewriteDriver::new(&rules);
+
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    assert!(matches!(
+        failure,
+        Some(DriverError::NativeArgument {
+            ref name,
+            position: 0,
+            expected: "i64",
+            found: Some(_),
+            ..
+        }) if name == "is_zero"
+    ));
+}
+
+#[test]
 fn an_unregistered_native_function_rejects_the_rule() {
-    let error = RuleSet::build(NativeRegistry::new(), |stage| {
-        vec![double_neg_of_argument(stage)]
-    })
-    .err()
-    .expect("`is_block_argument` is not registered");
+    let error = RuleSet::build(|stage| vec![double_neg_of_argument(stage)])
+        .err()
+        .expect("`is_block_argument` is not registered");
     assert_eq!(error.rule.as_deref(), Some("double_neg_of_argument"));
     assert_eq!(
         error.kind,
@@ -278,11 +398,9 @@ fn an_unregistered_native_function_rejects_the_rule() {
 
 #[test]
 fn a_rule_erasing_its_root_is_rejected() {
-    let error = RuleSet::build(NativeRegistry::new(), |stage| {
-        vec![double_neg_erasing_root(stage)]
-    })
-    .err()
-    .expect("the rule erases its root");
+    let error = RuleSet::build(|stage| vec![double_neg_erasing_root(stage)])
+        .err()
+        .expect("the rule erases its root");
     assert_eq!(error.kind, RuleErrorKind::ErasesRoot);
 }
 
@@ -294,10 +412,7 @@ fn a_failed_rewrite_quarantines_the_stage() {
         "%s",
     );
     let (mut pipeline, stage) = parse(&input);
-    let rules = RuleSet::build(NativeRegistry::new(), |stage| {
-        vec![double_neg_erasing_producer(stage)]
-    })
-    .unwrap();
+    let rules = RuleSet::build(|stage| vec![double_neg_erasing_producer(stage)]).unwrap();
     let driver = RewriteDriver::new(&rules);
 
     let mut failure = None;

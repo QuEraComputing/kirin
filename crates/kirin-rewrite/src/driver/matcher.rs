@@ -6,7 +6,7 @@ use kirin_ir::{
 use kirin_wildcard::{PatternLanguage, PatternStatement};
 
 use super::DriverError;
-use crate::rule::producer;
+use crate::rule::{Step, native_call, producer};
 use crate::{NativeValue, RewriteRule, RuleSet};
 
 /// A successful match of one rule: what each pattern value and matched
@@ -21,7 +21,7 @@ impl Match {
     /// structure does not match or a check fails.
     pub(crate) fn find<L: Dialect>(
         rules: &RuleSet<L>,
-        rule: &RewriteRule,
+        rule: &RewriteRule<L>,
         stage: &StageInfo<L>,
         stmt: Statement,
     ) -> Result<Option<Self>, DriverError> {
@@ -32,18 +32,18 @@ impl Match {
         if !found.op(rules.patterns(), stage, rule.root(), stmt) {
             return Ok(None);
         }
-        found.check(rules, rule, stage)
+        found.check(rules, rule, stage, stmt)
     }
 
     /// What pattern value `value` is bound to.
-    pub(crate) fn value(
+    pub(crate) fn value<L: Dialect>(
         &self,
-        rule: &RewriteRule,
+        rule: &RewriteRule<L>,
         value: SSAValue,
     ) -> Result<NativeValue, DriverError> {
         self.values
             .get(&value)
-            .copied()
+            .cloned()
             .ok_or_else(|| DriverError::Unbound {
                 rule: rule.name().to_string(),
             })
@@ -57,7 +57,7 @@ impl Match {
     /// Bind each result of the pattern `native_call` `call` to `found`.
     pub(crate) fn bind_results<L: Dialect>(
         &mut self,
-        rule: &RewriteRule,
+        rule: &RewriteRule<L>,
         patterns: &StageInfo<PatternLanguage<L>>,
         call: Statement,
         name: &str,
@@ -191,50 +191,56 @@ impl Match {
 
     /// Bind pattern value `pattern` to `value`, or check it already is.
     fn bind(&mut self, pattern: SSAValue, value: SSAValue) -> bool {
-        *self
-            .values
+        self.values
             .entry(pattern)
-            .or_insert(NativeValue::Value(value))
-            == NativeValue::Value(value)
+            .or_insert_with(|| value.into())
+            .ssa()
+            == Some(value)
     }
 
-    /// Run the pattern body's `native_call`s and `constraint`s, in order.
+    /// Run the pattern body's `native_call`s and `constraint`s, in order,
+    /// for the match rooted at `root`.
     fn check<L: Dialect>(
         mut self,
         rules: &RuleSet<L>,
-        rule: &RewriteRule,
+        rule: &RewriteRule<L>,
         stage: &StageInfo<L>,
+        root: Statement,
     ) -> Result<Option<Self>, DriverError> {
         let patterns = rules.patterns();
-        for &check in rule.checks() {
-            match check.expect_info(patterns).definition() {
-                PatternLanguage::Wildcard(PatternStatement::NativeCall(call)) => {
+        for step in rule.checks() {
+            match step {
+                Step::Native { stmt, function } => {
+                    let call = native_call(patterns, *stmt);
                     let args = call
                         .args()
                         .iter()
                         .map(|&arg| self.value(rule, arg))
                         .collect::<Result<Vec<_>, _>>()?;
-                    let function = rules
-                        .natives()
-                        .get_check(call.name())
-                        .expect("RuleSet::add checked the function is registered");
-                    let Some(found) = function(stage, &args) else {
+                    let found = function(stage, &args).map_err(|error| {
+                        DriverError::native(rule.name(), call.name(), root, error)
+                    })?;
+                    let Some(found) = found else {
                         return Ok(None);
                     };
-                    self.bind_results(rule, patterns, check, call.name(), found)?;
+                    self.bind_results(rule, patterns, *stmt, call.name(), found)?;
                 }
-                PatternLanguage::Wildcard(PatternStatement::Constraint(constraint)) => {
-                    match self.value(rule, constraint.success())? {
-                        NativeValue::Bool(true) => {}
-                        NativeValue::Bool(false) => return Ok(None),
-                        NativeValue::Value(_) => {
+                Step::Other(stmt) => {
+                    let PatternLanguage::Wildcard(PatternStatement::Constraint(constraint)) =
+                        stmt.expect_info(patterns).definition()
+                    else {
+                        unreachable!("RewriteRule::new keeps only calls and constraints as checks")
+                    };
+                    match self.value(rule, constraint.success())?.get::<bool>() {
+                        Some(true) => {}
+                        Some(false) => return Ok(None),
+                        None => {
                             return Err(DriverError::ConstraintNotBool {
                                 rule: rule.name().to_string(),
                             });
                         }
                     }
                 }
-                _ => unreachable!("RewriteRule::new keeps only calls and constraints as checks"),
             }
         }
         Ok(Some(self))
