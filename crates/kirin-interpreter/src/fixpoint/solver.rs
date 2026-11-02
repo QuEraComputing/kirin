@@ -1,6 +1,6 @@
 //! The inter-owner convergence loop.
 //!
-//! [`solve`](StandardFixpointInterpreter::solve) drains an owner worklist: each
+//! [`solve_many`](StandardFixpointInterpreter::solve_many) drains an owner worklist: each
 //! item analyses one owner (via [`run_frame`](StandardFixpointInterpreter::run_frame),
 //! see `runner.rs`), merges the resulting summary, and — if it changed — schedules
 //! the owners the dependency index says to reanalyse. This nests *outside* the
@@ -10,8 +10,8 @@
 use crate::{Frame, Interp, InterpreterError};
 
 use super::{
-    FixpointPhase, FixpointProfile, OwnerAnalysis, StandardFixpointInterpreter, Summary,
-    SummaryDependencies, SummaryDependency, SummaryDependencyIndex, SummaryEffect, WorkItem,
+    FixpointProfile, OwnerAnalysis, StandardFixpointInterpreter, Summary, SummaryDependencies,
+    SummaryDependency, SummaryDependencyIndex, SummaryEffect, WorkItem,
 };
 
 impl<I, P, Store, Deps> StandardFixpointInterpreter<I, P, Store, Deps>
@@ -42,24 +42,6 @@ where
         Ok(())
     }
 
-    /// Analyse `entry` and everything it transitively schedules, to a fixpoint.
-    pub fn solve<Analysis>(
-        &mut self,
-        owner_analysis: &mut Analysis,
-        entry: P::SummaryKey,
-    ) -> Result<(), I::Error>
-    where
-        P::Frame: Frame<Self, Completion = P::Completion>,
-        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
-        Deps: SummaryDependencyIndex<P::SummaryKey>,
-        InterpreterError: From<Deps::Error>,
-    {
-        self.ensure_owner(owner_analysis, entry.clone())?;
-        self.phase = FixpointPhase::Widen;
-        self.schedule(entry);
-        self.drain_worklist(owner_analysis)
-    }
-
     /// Seed several owners and analyse them (and everything they schedule) to a
     /// fixpoint.
     ///
@@ -78,40 +60,11 @@ where
         Deps: SummaryDependencyIndex<P::SummaryKey>,
         InterpreterError: From<Deps::Error>,
     {
-        self.phase = FixpointPhase::Widen;
         for entry in entries {
             self.ensure_owner(owner_analysis, entry.clone())?;
             self.schedule(entry);
         }
         self.drain_worklist(owner_analysis)
-    }
-
-    /// Re-run every owner under [`FixpointPhase::Narrow`] up to `iterations`
-    /// times, refining a post-fixpoint back towards the least fixpoint.
-    pub fn run_narrowing<Analysis>(
-        &mut self,
-        owner_analysis: &mut Analysis,
-        iterations: usize,
-    ) -> Result<(), I::Error>
-    where
-        P::Frame: Frame<Self, Completion = P::Completion>,
-        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
-        Deps: SummaryDependencyIndex<P::SummaryKey>,
-        InterpreterError: From<Deps::Error>,
-    {
-        self.phase = FixpointPhase::Narrow;
-        for owner in self.summaries.keys().cloned().collect::<Vec<_>>() {
-            self.schedule(owner);
-        }
-
-        for _ in 0..iterations {
-            if self.worklist.is_empty() {
-                break;
-            }
-            self.drain_worklist(owner_analysis)?;
-        }
-
-        Ok(())
     }
 
     /// Pop and analyse owners until the worklist is empty.
@@ -152,12 +105,11 @@ where
             ))
         })?;
 
-        let change = summary.merge(self.phase, candidate, &mut self.strategy);
-        let changed = change.is_some();
-        if let Some(change) = change {
+        let changed = summary.merge(candidate);
+        if changed {
             let deps = self
                 .deps
-                .on_summary_changed(&owner, change)
+                .on_summary_changed(&owner)
                 .map_err(|error| I::Error::from(InterpreterError::from(error)))?;
             self.schedule_dependencies(owner_analysis, deps)?;
         }
@@ -223,7 +175,6 @@ where
         self.current_owner = None;
         let effect = owner_analysis.complete_owner(self, owner, completion)?;
         self.apply_summary_effect(owner_analysis, effect)?;
-        self.apply_pending_summary_effects(owner_analysis)?;
         Ok(())
     }
 
@@ -250,21 +201,5 @@ where
                 Ok(())
             }
         }
-    }
-
-    fn apply_pending_summary_effects<Analysis>(
-        &mut self,
-        owner_analysis: &mut Analysis,
-    ) -> Result<(), I::Error>
-    where
-        Analysis: OwnerAnalysis<Self, P::SummaryKey, P::Summary, P::Frame, P::Completion, I::Error>,
-        Deps: SummaryDependencyIndex<P::SummaryKey>,
-        InterpreterError: From<Deps::Error>,
-    {
-        let effects = std::mem::take(&mut self.pending_effects);
-        for effect in effects {
-            self.apply_summary_effect(owner_analysis, effect)?;
-        }
-        Ok(())
     }
 }
