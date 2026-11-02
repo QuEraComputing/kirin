@@ -111,15 +111,19 @@ impl Match {
             return false;
         };
 
-        // Step 1: compare attributes across stages, normalizing local IDs
-        // on a clone before using structural equality.
-        let pattern_operands: Vec<SSAValue> = op.arguments().copied().collect();
-        let operands: Vec<SSAValue> = concrete.arguments().copied().collect();
-        let pattern_results: Vec<ResultValue> = op.results().copied().collect();
-        let results: Vec<ResultValue> = concrete.results().copied().collect();
-        if pattern_operands.len() != operands.len() || pattern_results.len() != results.len() {
+        // Step 1: an op of another kind, or with another number of operands
+        // or results, cannot match, so reject it before cloning the pattern
+        // op. Only the outermost enum variant is compared here; ops that pass
+        // are compared in full below.
+        if std::mem::discriminant(op) != std::mem::discriminant(concrete)
+            || op.arguments().count() != concrete.arguments().count()
+            || op.results().count() != concrete.results().count()
+        {
             return false;
         }
+
+        // Step 2: compare attributes across stages, normalizing local IDs
+        // on a clone before using structural equality.
         let mut probe = op.clone();
         {
             let mut pattern_symbols = probe.symbols_mut();
@@ -140,27 +144,27 @@ impl Match {
                 }
             }
         }
-        for (slot, &operand) in probe.arguments_mut().zip(&operands) {
+        for (slot, &operand) in probe.arguments_mut().zip(concrete.arguments()) {
             *slot = operand;
         }
-        for (slot, &result) in probe.results_mut().zip(&results) {
+        for (slot, &result) in probe.results_mut().zip(concrete.results()) {
             *slot = result;
         }
         if probe != *concrete {
             return false;
         }
 
-        // Step 2: record what each pattern value stands for in this match,
+        // Step 3: record what each pattern value stands for in this match,
         // starting with the results.
         self.statements.insert(pattern, stmt);
-        for (pattern_result, result) in pattern_results.into_iter().zip(results) {
+        for (&pattern_result, &result) in op.results().zip(concrete.results()) {
             if !self.bind(pattern_result.into(), result.into()) {
                 return false;
             }
         }
-        // Step 3: follow each operand. A hole takes whatever value is there;
+        // Step 4: follow each operand. A hole takes whatever value is there;
         // an op must match the IR statement producing that value.
-        for (pattern_operand, operand) in pattern_operands.into_iter().zip(operands) {
+        for (&pattern_operand, &operand) in op.arguments().zip(concrete.arguments()) {
             let Some(producer) = producer(patterns, pattern_operand) else {
                 return false;
             };
