@@ -20,7 +20,7 @@ mod native {
     use kirin::ir::{Rewriter, SSAValue};
 
     pub fn build_neg(_rewriter: &mut Rewriter<'_, super::L>, _x: SSAValue) -> SSAValue {
-        unimplemented!("only named by the rule")
+        unimplemented!("these tests never run the rule")
     }
 }
 
@@ -38,7 +38,7 @@ fn double_neg() {
 /// Whether `x` has no uses; dead-code elimination guards its `erase!` with
 /// it, since the results are not replaced.
 fn has_no_uses(_stage: &StageInfo<L>, _x: SSAValue) -> bool {
-    unimplemented!("only named by the rule")
+    unimplemented!("these tests never run the rule")
 }
 
 /// Dead-code elimination: erase a `neg` whose result is unused, without

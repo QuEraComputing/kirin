@@ -10,7 +10,8 @@ use kirin::prelude::*;
 /// In a [`Rewrite`](crate::Rewrite) body it computes its results, such as the
 /// shift amount `log2(%c)`, and may also act on the IR itself, erasing or
 /// replacing ops. The pattern stores only the name and the arguments; the
-/// function itself is looked up when the rule runs.
+/// function itself comes from the rule's [`PatternRule`](crate::PatternRule),
+/// and is looked up once when the rule is added to a rule set.
 ///
 /// The name is a plain string, not a [`Symbol`]: nothing in the IR defines
 /// the function, so it must not read as an `@` reference to an IR entity.
