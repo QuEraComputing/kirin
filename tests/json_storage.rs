@@ -158,12 +158,14 @@ specialize @target fn @f(i64) -> i64 cfg { ^entry(%x: i64) { ret %x; } }
     // Redefinition is the public route to invalidation: each conflicting
     // redefinition invalidates the entry it replaces.
     stage.with_builder(|b| {
-        let conflict = b
+        let Err(kirin::ir::SpecializeError::Duplicate(conflict)) = b
             .specialize()
             .staged_func(source_fn)
             .definition(definition)
             .new()
-            .expect_err("the existing specialization holds this signature");
+        else {
+            panic!("the existing specialization holds this signature");
+        };
         b.redefine_specialization(conflict);
         let conflict = b
             .staged_function()
