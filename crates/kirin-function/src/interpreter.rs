@@ -74,25 +74,49 @@ where
     }))
 }
 
-macro_rules! backward_call {
-    ($ty:ident, $callee:ident) => {
-        impl<I, T> Interpretable<I, StrongDemand> for $ty<T>
-        where
-            I: DemandInterp,
-            I::Value: HasBottom + PartialEq,
-            T: CompileTimeValue,
-        {
-            fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-                call_demand(self, Callee::$callee(self.target()), interp)
-            }
-        }
-    };
+impl<I, T> Interpretable<I, StrongDemand> for CallNamed<T>
+where
+    I: DemandInterp,
+    I::Value: HasBottom + PartialEq,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        call_demand(self, Callee::Named(self.target()), interp)
+    }
 }
 
-backward_call!(CallNamed, Named);
-backward_call!(CallFunction, Function);
-backward_call!(CallStaged, Staged);
-backward_call!(CallSpecialized, Specialized);
+impl<I, T> Interpretable<I, StrongDemand> for CallFunction<T>
+where
+    I: DemandInterp,
+    I::Value: HasBottom + PartialEq,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        call_demand(self, Callee::Function(self.target()), interp)
+    }
+}
+
+impl<I, T> Interpretable<I, StrongDemand> for CallStaged<T>
+where
+    I: DemandInterp,
+    I::Value: HasBottom + PartialEq,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        call_demand(self, Callee::Staged(self.target()), interp)
+    }
+}
+
+impl<I, T> Interpretable<I, StrongDemand> for CallSpecialized<T>
+where
+    I: DemandInterp,
+    I::Value: HasBottom + PartialEq,
+    T: CompileTimeValue,
+{
+    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
+        call_demand(self, Callee::Specialized(self.target()), interp)
+    }
+}
 
 /// Classic (weak) per-point liveness: kill defs, gen all uses — the same
 /// transfer for calls (purity is irrelevant to per-point live sets).
