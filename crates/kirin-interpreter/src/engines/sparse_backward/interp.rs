@@ -42,8 +42,9 @@
 //! sites (declared through [`declare_return`](SparseBackwardInterp::declare_return)).
 //!
 //! Call rules return [`SparseBackwardEffect::Call`]; the engine crosses into
-//! the callee's context and registers the one non-topological dependency: callee parameter facts → the caller's call
-//! work. All fact mutation flows through the driver's single merge path.
+//! the callee's context and registers the one non-topological dependency:
+//! callee parameter facts → the caller's call work. All fact mutation flows
+//! through the driver's single merge path.
 //! Facts only rise in a finite-height lattice and the default context space
 //! is bounded, so one shared worklist converges — recursion included — with no
 //! nested fixpoints, no widening, and no frames for structured control.
@@ -69,7 +70,7 @@ use crate::{
 };
 
 /// A resolved `(stage, body)` pair: the structure one callable context
-/// analyzes (and the scope dense liveness qualifies its facts with).
+/// analyzes.
 ///
 /// Arena ids are per-stage, so the stage is part of the scope.
 pub type BodyScope = (CompileStage, Body);
@@ -110,7 +111,9 @@ impl<V> DemandContext<V> for ContextInsensitive {
 /// spelling [`demand`](DemandInterp::demand)) and finish with
 /// [`effect()`](SparseBackwardInterp::effect), which drains the buffer into
 /// this value; the driver qualifies the values with the rule's callable
-/// context and applies them through its single merge path.
+/// context and applies them through its single merge path. A call rule
+/// returns [`Call`](Self::Call) instead, and the engine adds the callee's
+/// parameter facts to the buffered ones.
 pub enum SparseBackwardEffect<V> {
     /// Demand facts to merge (possibly empty).
     Demands(Vec<(SSAValue, V)>),
@@ -125,8 +128,8 @@ pub enum SparseBackwardEffect<V> {
 /// sparse-backward semantics ([`StrongDemand`] today, downstream keys
 /// tomorrow) shares this surface: read a converged per-value fact, raise a
 /// fact, drain the raised facts into the rule's effect, query the block
-/// boundary facts terminator/structured rules map across, and cross callable
-/// boundaries. Rules are context-blind: they name bare SSA values and output
+/// boundary facts terminator/structured rules map across, and declare a
+/// callable's return sites. Rules are context-blind: they name bare SSA values and output
 /// positions, and the engine qualifies them with the callable context the
 /// dispatching work carries.
 ///

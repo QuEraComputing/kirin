@@ -310,8 +310,8 @@ lookup stage + Callee
 The boundary input is intentionally not unified: concrete calls and forward
 abstract analysis accept values, while the current backward roots accept only
 `(stage, Callee)` until their analysis-specific boundary policies are added.
-Both backward `analyze` methods return the resolved `(target stage, Body)` scope
-used to qualify their facts.
+Dense backward `analyze` returns the resolved `LinkTarget` that qualifies its
+facts; sparse backward `analyze` returns the root's parameter facts.
 
 ## Compiler-author surface
 
@@ -1141,6 +1141,8 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
     `DenseBackwardInterpreter`): here `Interp::Value` *is* the point state
     (`LiveSet`), realizing the sketch's `Value = LiveSet` — with the textbook
     kill/gen transfer (`gen_uses_kill_defs`, purity-irrelevant). Block owners
+    and point facts are keyed by the analyzed callable
+    (`Scoped<LinkTarget, _>`), which `analyze` returns. Block owners
     converge boundary summaries; `live_before`/`live_after` are reconstructed
     per point on demand (never persisted by the fixpoint); scf owns dense
     frames (arm-join, loop fixpoint). Classic liveness consumes finalized IR
