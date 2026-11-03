@@ -552,9 +552,10 @@ to implement any of the underlying mechanism.
 
 ### SparseForwardInterpreter
 
-Unlike `ConcreteInterpreter` which uses the standard `drive_frames` function in
-its execution, when `SparseForwardInterpreter::analyze` is called, it uses an
-internal driver that underpins its analysis mechanism.
+`SparseForwardInterpreter` and `ConcreteInterpreter` both use `drive_frames`
+to run frames. Sparse-forward analysis also has an internal fixpoint driver:
+its worklist determines which analysis items need to run, and its `run_frame`
+method delegates each frame computation to `drive_frames`.
 
 ```rust
 pub struct SparseForwardInterpreter<
@@ -583,15 +584,22 @@ runs constant propagation until there are no more changes in the analysis:
 type ForwardDriver<'ir, S, V, E, Lk, P, F, Sem> = StandardFixpointInterpreter<
     SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>,
     SparseForwardProfile<V, E, <P as CallContext<V>>::Key, F>,
-    ForwardStore<<P as CallContext<V>>::Key, V>,
-    ForwardSummaryDeps<Owner<<P as CallContext<V>>::Key>>,
+    (),
+    ForwardDeps<<P as CallContext<V>>::Key>,
 >;
 ```
 
-Without delving into the details, the forward driver is the mechanism that
-traverses the IR and computes the given analysis at each SSA-value. Remember,
-these values are computed from [dialect rules](#dialect-rules). It will do this
-until the analysis no longer updates and reaches a fixed point.
+The `()` argument means the shared driver's auxiliary store is unused here.
+`ForwardDeps` combines explicit summary dependencies, stored in
+`ExplicitSummaryDeps`, with dependencies from SSA values to the analysis items
+that read them. These dependencies determine what must be analyzed again when
+a fact changes.
+
+Frames traverse the IR and invoke [dialect rules](#dialect-rules) to compute
+analysis values. The forward driver schedules affected work until the analysis
+reaches a fixed point. Forward fact merging and widening remain in the engine's
+`apply_update` path and analysis policy; its `Summary::merge` implementation is
+a no-op that returns `false`.
 
 `ConstProp` doesn’t need to re-implement any of this mechanism. Instead, it
 defines the lattice of values (`ConstPropValue`) that the constant propagation

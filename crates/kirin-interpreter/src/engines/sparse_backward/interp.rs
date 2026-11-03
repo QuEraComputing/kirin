@@ -321,7 +321,7 @@ const UNDISCOVERED: InterpreterError =
     InterpreterError::Custom("demand context was never discovered");
 
 /// The per-location summary: one demand fact. Its merge is a real lattice
-/// join — `Some(())` iff the fact rose — which is what drives rescheduling.
+/// join — `true` iff the fact rose — which is what drives rescheduling.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DemandSummary<V>(pub V);
 
