@@ -3,7 +3,7 @@
 
 use kirin_ir::{CompileStage, HasBottom, Lattice, SSAValue, StageMeta, Statement};
 
-use super::{DemandContext, SparseBackwardDriver};
+use super::{DemandContext, SparseBackwardDriver, SparseBackwardEffect};
 use crate::{
     Frame, FrameEffect, InterpDispatch, InterpreterError, Linker, SparseBackwardSemantic,
     StageQuery,
@@ -11,7 +11,8 @@ use crate::{
 
 /// One work-item analysis: dispatch each statement whose rule can translate
 /// the item's demand, under the item's callable context, accumulating the
-/// local demands the rules raise.
+/// local demands the rules raise and the callee parameter facts of the calls
+/// they cross.
 pub struct DemandFrame<K, V> {
     context: K,
     stage: CompileStage,
@@ -50,8 +51,17 @@ where
     ) -> Result<FrameEffect<Self, Self::Completion>, E> {
         match self.work.pop() {
             Some(statement) => {
-                let demands = interp.run_statement(&self.context, self.stage, statement)?;
-                self.collected.extend(demands);
+                match interp.run_statement(&self.context, self.stage, statement)? {
+                    SparseBackwardEffect::Demands(demands) => self.collected.extend(demands),
+                    // Summarize, don't descend: the callee context is analyzed
+                    // as its own work.
+                    SparseBackwardEffect::Call(call) => {
+                        // Keep the facts the rule raised before returning the call.
+                        self.collected.extend(interp.inner_mut().take_demands());
+                        self.collected
+                            .extend(interp.summarize_call(self.stage, call)?);
+                    }
+                }
                 Ok(FrameEffect::Continue(self))
             }
             None => Ok(FrameEffect::Complete(self.collected)),

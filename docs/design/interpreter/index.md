@@ -582,13 +582,14 @@ C.result[i] demanded ──Call effect──▶ D.ret_operand[i] (every return s
    (ignored and zero-result calls never activate callees — demandedness only,
    no effect preservation).
 2. Otherwise it returns `SparseBackwardEffect::Call` with its result facts
-   and argument slots. The engine handles it before leaving the caller's
-   context: it resolves through the linker at the call's lookup stage,
-   selects `D`, queues the activation, checks the argument count against
-   `D`'s parameters, registers `D.param[j] → current work` for every
-   parameter (so bottom reads still wake the caller), and raises each
-   non-bottom parameter fact on argument `j`. Discovery runs outside any work
-   and cannot cross calls.
+   and argument slots. The caller's `DemandFrame` matches it, as the forward
+   block frame matches `SparseForwardEffect::Call`, and summarizes the call
+   without descending (`summarize_call`): it resolves through the linker at
+   the call's lookup stage, selects `D`, queues the activation, checks the
+   argument count against `D`'s parameters, registers `D.param[j] → current
+   work` for every parameter (so bottom reads still wake the caller), and
+   raises each non-bottom parameter fact on argument `j`. Discovery runs
+   outside any work and rejects a `Call`.
 3. After the work completes, activations are applied: `D` is discovered if
    new, the call's result count is checked against `D`'s return arity, and
    each non-bottom result fact `i` merges into operand `i` of every return
@@ -671,7 +672,8 @@ below, composed by the `ForwardFrameEngine` / `ForwardDataflowFrameEngine`
 umbrellas, and `DenseBackwardFrameEngine` for the dense backward engine
 (statement dispatch, point-state access, edge absorption against the converged
 summaries, per-point recording). The sparse backward engine needs no capability
-surface at all — its `DemandFrame` dispatches rules directly on the transfer.
+surface at all — its `DemandFrame` runs only on the concrete driver, on which
+its rules dispatch.
 
 **"Engine" means three different things**, so the names are kept distinct:
 

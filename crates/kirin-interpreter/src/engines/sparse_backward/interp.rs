@@ -41,10 +41,10 @@
 //! Requested outputs merge directly into the operands of the context's return
 //! sites (declared through [`declare_return`](SparseBackwardInterp::declare_return)).
 //!
-//! Call rules return [`SparseBackwardEffect::Call`]; the engine crosses into
-//! the callee's context and registers the one non-topological dependency:
-//! callee parameter facts → the caller's call work. All fact mutation flows
-//! through the driver's single merge path.
+//! Call rules return [`SparseBackwardEffect::Call`]; the [`DemandFrame`]
+//! summarizes the call, queueing the callee's context and registering the one
+//! non-topological dependency: callee parameter facts → the caller's call
+//! work. All fact mutation flows through the driver's single merge path.
 //! Facts only rise in a finite-height lattice and the default context space
 //! is bounded, so one shared worklist converges — recursion included — with no
 //! nested fixpoints, no widening, and no frames for structured control.
@@ -311,6 +311,8 @@ pub type DemandContexts<K> = HashMap<K, CallableContext>;
 const UNDISCOVERED: InterpreterError =
     InterpreterError::Custom("demand context was never discovered");
 
+const CALL_OUTSIDE_WORK: InterpreterError =
+    InterpreterError::Custom("a call boundary was crossed outside propagation work");
 /// The per-location summary: one demand fact. Its merge is a real lattice
 /// join — `Some(())` iff the fact rose — which is what drives rescheduling.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -470,6 +472,11 @@ where
         (self.location, self.context) = saved;
     }
 
+    /// Drain the local facts the current rule has raised.
+    pub(super) fn take_demands(&mut self) -> Vec<(SSAValue, V)> {
+        mem::take(&mut self.demands)
+    }
+
     pub(super) fn current_context(&self) -> Result<&P::Key, InterpreterError> {
         self.context.as_ref().ok_or(InterpreterError::Custom(
             "no demand context is being dispatched",
@@ -544,7 +551,7 @@ where
     }
 
     fn effect(&mut self) -> SparseBackwardEffect<V> {
-        SparseBackwardEffect::Demands(mem::take(&mut self.inner_mut().demands))
+        SparseBackwardEffect::Demands(self.inner_mut().take_demands())
     }
 
     fn block_params(&self, block: Block) -> Result<Vec<SSAValue>, E> {
@@ -591,6 +598,49 @@ where
             .activations
             .push((key.clone(), target, outputs));
         Ok((target, key))
+    }
+
+    /// Summarize a call without descending, mirroring the forward engine's
+    /// [`summarize_call`](crate::ForwardDataflowFrameEngine::summarize_call):
+    /// queue the callee context, register the caller's work on each callee
+    /// parameter fact, and return the callee's current non-bottom parameter
+    /// facts on the call's arguments for the driver to merge.
+    pub(super) fn summarize_call(
+        &mut self,
+        caller_stage: CompileStage,
+        call: CallEffect<V>,
+    ) -> Result<Vec<(SSAValue, V)>, E> {
+        let (target, key) = self.submit_call(
+            call.stage.unwrap_or(caller_stage),
+            &call.callee,
+            call.inputs,
+        )?;
+        let work = self
+            .current_owner()
+            .cloned()
+            .ok_or_else(|| E::from(CALL_OUTSIDE_WORK))?;
+        let params = self.entry_params(target)?;
+        if params.len() != call.outputs.len() {
+            return Err(E::from(InterpreterError::ProductArityMismatch {
+                expected: params.len(),
+                actual: call.outputs.len(),
+            }));
+        }
+        for param in &params {
+            self.dependency_index_mut()
+                .register(
+                    &Scoped::new(key.clone(), *param),
+                    SummaryDependency::Reanalyze(work.clone()),
+                )
+                .map_err(|error| E::from(InterpreterError::from(error)))?;
+        }
+        let facts = self.param_facts(&key, &params);
+        Ok(call
+            .outputs
+            .into_iter()
+            .zip(facts)
+            .filter(|(_, fact)| *fact != V::bottom())
+            .collect())
     }
 
     /// The current facts on a context's entry parameters.
@@ -646,13 +696,14 @@ where
     Sem: SparseBackwardSemantic,
 {
     /// Dispatch one statement's backward rule at `stage` under `context` and
-    /// return the local facts to merge, crossing a call if the rule returns one.
+    /// return its effect. The caller decides what a [`Call`](SparseBackwardEffect::Call)
+    /// means: a [`DemandFrame`] summarizes it, discovery rejects it.
     pub(super) fn run_statement(
         &mut self,
         context: &P::Key,
         stage: CompileStage,
         statement: Statement,
-    ) -> Result<Vec<(SSAValue, V)>, E> {
+    ) -> Result<SparseBackwardEffect<V>, E> {
         let pipeline = self.inner().pipeline();
         let info = pipeline
             .stage(stage)
@@ -666,47 +717,7 @@ where
             },
             context.clone(),
         );
-        // Cross a call before restoring the caller's location and context.
-        // Discovery runs outside any work, so it cannot cross calls; the shipped
-        // call rule never does, since every fact is still bottom there.
-        let result = info
-            .dispatch_statement(statement, self)
-            .and_then(|effect| match effect {
-                SparseBackwardEffect::Demands(demands) => Ok(demands),
-                SparseBackwardEffect::Call(call) => {
-                    let (target, key) =
-                        self.submit_call(call.stage.unwrap_or(stage), &call.callee, call.inputs)?;
-                    let work = self.current_owner().cloned().ok_or_else(|| {
-                        E::from(InterpreterError::Custom(
-                            "a call boundary was crossed outside propagation work",
-                        ))
-                    })?;
-                    let params = self.entry_params(target)?;
-                    if params.len() != call.outputs.len() {
-                        return Err(E::from(InterpreterError::ProductArityMismatch {
-                            expected: params.len(),
-                            actual: call.outputs.len(),
-                        }));
-                    }
-                    for param in &params {
-                        self.dependency_index_mut()
-                            .register(
-                                &Scoped::new(key.clone(), *param),
-                                SummaryDependency::Reanalyze(work.clone()),
-                            )
-                            .map_err(|error| E::from(InterpreterError::from(error)))?;
-                    }
-                    let facts = self.param_facts(&key, &params);
-                    let mut demands = mem::take(&mut self.inner_mut().demands);
-                    demands.extend(
-                        call.outputs
-                            .into_iter()
-                            .zip(facts)
-                            .filter(|(_, fact)| *fact != V::bottom()),
-                    );
-                    Ok(demands)
-                }
-            });
+        let result = info.dispatch_statement(statement, self);
         self.inner_mut().restore(saved);
         result
     }
@@ -716,7 +727,9 @@ where
     /// definitions — with nothing demanded yet, collecting the unconditional
     /// contributions (control roots) before any of them is merged. Rules
     /// whose contributions are conditional read bottom here and rerun when
-    /// the facts they consulted rise.
+    /// the facts they consulted rise. Discovery runs outside any work, so it
+    /// rejects a call; the shipped call rule never crosses here, since every
+    /// fact is still bottom.
     pub(super) fn discover(
         &mut self,
         key: &P::Key,
@@ -745,7 +758,10 @@ where
             let contents = query::body_contents(self.inner().pipeline(), stage, body)?;
             bodies.extend(contents.children);
             for statement in contents.statements {
-                let demands = self.run_statement(key, stage, statement)?;
+                let demands = match self.run_statement(key, stage, statement)? {
+                    SparseBackwardEffect::Demands(demands) => demands,
+                    SparseBackwardEffect::Call(_) => return Err(E::from(CALL_OUTSIDE_WORK)),
+                };
                 seeds.extend(
                     demands.into_iter().map(|(value, fact)| {
                         (Scoped::new(key.clone(), value), DemandSummary(fact))
