@@ -30,7 +30,7 @@ impl<L: Dialect> PatternRule<L> {
         }
     }
 
-    /// Run `check` for `native_call`s named `name` in the pattern body.
+    /// Add function `check` for `native_call`s named `name` in the pattern body.
     pub fn check(
         mut self,
         name: impl Into<String>,
