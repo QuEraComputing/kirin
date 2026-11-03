@@ -19,7 +19,7 @@ impl RuleModel {
     /// The rewrite's body must also use nothing an earlier action of it
     /// removed (see [`Self::check_liveness`]).
     pub(crate) fn verify(&self) -> syn::Result<()> {
-        let (root, body) = self.rewrite();
+        let (root, rewrite_body) = self.rewrite();
 
         // Track the ops that feed the root.
         let mut matched = HashSet::new();
@@ -67,9 +67,9 @@ impl RuleModel {
             }
         }
 
-        self.check_liveness(body, &mut report);
+        self.check_liveness(rewrite_body, &mut report);
         self.check_native_calls(self.body(), &mut report);
-        self.check_native_calls(body, &mut report);
+        self.check_native_calls(rewrite_body, &mut report);
 
         errors.map_or(Ok(()), Err)
     }
