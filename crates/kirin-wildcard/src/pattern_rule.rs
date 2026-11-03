@@ -41,7 +41,7 @@ impl<L: Dialect> PatternRule<L> {
         self
     }
 
-    /// Run `action` for `native_call`s named `name` in the rewrite body.
+    /// Add function `action` for `native_call`s named `name` in the rewrite body.
     pub fn action(
         mut self,
         name: impl Into<String>,
