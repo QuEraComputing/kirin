@@ -56,8 +56,8 @@ use super::frames::DenseBlockFrame;
 use crate::Body;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, Callee, ClassicLiveness, DenseBackwardSemantic,
-    EnvIndex, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
+    AbstractInterpreter, Callee, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
+    ExplicitSummaryDeps, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
     InterpreterError, LinkTarget, Linker, OwnerAnalysis, ProgramPoint, SameStageLinker, Scoped,
     StageQuery, StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex,
     SummaryEffect, TerminatorArgs,
@@ -338,7 +338,7 @@ pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardF
     DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
     FactStore<Scoped<LinkTarget, ProgramPoint>, V>,
-    BackwardSummaryDeps<Scoped<LinkTarget, Block>>,
+    ExplicitSummaryDeps<Scoped<LinkTarget, Block>>,
 >;
 
 // ===========================================================================
