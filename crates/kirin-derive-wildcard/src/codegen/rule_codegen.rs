@@ -36,7 +36,7 @@ impl RuleCodegen {
         quote! {
             #signature {
                 let #stage = #ir::AsBuildStage::as_build_stage(#stage);
-                let #pattern_id = #pattern;
+                #pattern
                 #krate::PatternRule::<#language>::new(#pattern_id) #natives
             }
         }
@@ -104,10 +104,11 @@ impl RuleCodegen {
         syn::Ident::new("stage", Span::mixed_site())
     }
 
-    /// The `wildcard.pattern` statement, named after the function. Consists
-    /// of a block expression building the function's top-level statements
-    /// with the `rewrite` as its terminator, and the pattern object itself. It
-    /// evaluates to the pattern's `Statement`.
+    /// The `wildcard.pattern` statement, named after the function: the
+    /// statements building the function's top-level statements with the
+    /// `rewrite` as its terminator, then the pattern itself, bound to
+    /// `pattern`. The statements' locals stay in scope, so each native call's
+    /// function can be attached to its `Statement`.
     pub(super) fn pattern(&self) -> TokenStream {
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
@@ -128,7 +129,8 @@ impl RuleCodegen {
         let rewrite_id = self.statement_ident(rewrite);
         let block_name = format!("{rule_name}_pat");
 
-        quote! {{
+        let pattern_id = syn::Ident::new("pattern", Span::mixed_site());
+        quote! {
             #(#stmt_quotes)*
             let #body_id = #stage
                 .block()
@@ -139,8 +141,8 @@ impl RuleCodegen {
             let #name_id = #stage
                 .symbol_table_mut()
                 .intern(::std::string::String::from(#rule_name));
-            #krate::Pattern::<#ty>::new(#stage, #name_id, #body_id).id
-        }}
+            let #pattern_id = #krate::Pattern::<#ty>::new(#stage, #name_id, #body_id).id;
+        }
     }
 
     /// Generates an ident for the local variables holding the `ResultValue`'s

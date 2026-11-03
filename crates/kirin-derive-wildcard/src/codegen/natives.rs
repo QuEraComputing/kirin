@@ -1,20 +1,19 @@
-use std::collections::HashSet;
-
 use proc_macro2::{Span, TokenStream};
 use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
 
 use super::RuleCodegen;
-use crate::model::{RuleModel, StmtId, StmtKind};
+use crate::model::{StmtId, StmtKind};
 
 impl RuleCodegen {
-    /// The native functions the rule calls, registered on its `PatternRule`:
-    /// a `.check(..)` for each function called in the match and an
-    /// `.action(..)` for each one called in the `rewrite!` body.
+    /// The native functions the rule calls, attached to its `PatternRule`:
+    /// a `.check_at(..)` for each native call in the match and an
+    /// `.action_at(..)` for each one in the `rewrite!` body.
     ///
-    /// Each registers a closure that reads the call's arguments, calls the
-    /// function and wraps its results. A function called several times is
-    /// registered once; the verifier checks every call is made the same way.
+    /// Each attaches a closure that reads the call's arguments, calls the
+    /// function and wraps its results. Every call gets its own closure, so
+    /// each is compiled against the function, and one function may be called
+    /// in several ways, e.g. with and without `?`.
     pub(super) fn natives(&self) -> TokenStream {
         let (_, rewrite_body) = self.model.rewrite();
         let checks = self.native_calls(self.model.body()).map(|s| self.check(s));
@@ -22,19 +21,17 @@ impl RuleCodegen {
         quote! { #(#checks)* #(#actions)* }
     }
 
-    /// The native calls among `stmts`, the first of each function.
+    /// The native calls among `stmts`.
     fn native_calls<'a>(&'a self, stmts: &'a [StmtId]) -> impl Iterator<Item = StmtId> + 'a {
-        let mut seen = HashSet::new();
-        stmts
-            .iter()
-            .copied()
-            .filter(move |&stmt| match &self.model.statement(stmt).kind {
-                StmtKind::NativeCompute { func, .. } => seen.insert(RuleModel::native_name(func)),
-                _ => false,
-            })
+        stmts.iter().copied().filter(|&stmt| {
+            matches!(
+                self.model.statement(stmt).kind,
+                StmtKind::NativeCompute { .. }
+            )
+        })
     }
 
-    /// `.check(name, ..)` for the native call `stmt` in the match. The function
+    /// `.check_at(statement, ..)` for the native call `stmt` in the match. The function
     /// takes the `&StageInfo<L>` being matched first. A `?` call returns a
     /// `CheckOutcome`: an `Option`, whose `None` fails the match, or a
     /// `Result`, whose `Err` fails the run. A constraint's returns a `bool`,
@@ -43,7 +40,8 @@ impl RuleCodegen {
         let krate = &self.args.crate_path;
         let span = self.native_span(stmt);
         let stage = syn::Ident::new("native_stage", Span::mixed_site());
-        let (name, call, fallible) = self.native_call(stmt, &stage);
+        let (call, fallible) = self.native_call(stmt, &stage);
+        let statement = self.statement_ident(stmt);
         let result = Self::native_result();
         // Checked at the call, so a function returning something else is
         // reported there.
@@ -73,7 +71,7 @@ impl RuleCodegen {
         let values = self.native_values(stmt);
         let args = Self::native_args();
         quote! {
-            .check(#name, |#stage, #args: &[#krate::NativeValue]| {
+            .check_at(#statement, |#stage, #args: &[#krate::NativeValue]| {
                 let #result = #call;
                 #unwrap
                 #constraint
@@ -82,21 +80,22 @@ impl RuleCodegen {
         }
     }
 
-    /// `.action(name, ..)` for the native call `stmt` in the `rewrite!` body.
+    /// `.action_at(statement, ..)` for the native call `stmt` in the `rewrite!` body.
     /// The function takes the pass's `&mut Rewriter<L>` first. A `?` call
     /// returns a `Result`, whose `Err` fails the rewrite.
     fn action(&self, stmt: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
         let span = self.native_span(stmt);
         let rewriter = syn::Ident::new("native_rewriter", Span::mixed_site());
-        let (name, call, fallible) = self.native_call(stmt, &rewriter);
+        let (call, fallible) = self.native_call(stmt, &rewriter);
+        let statement = self.statement_ident(stmt);
         let result = Self::native_result();
 
         let unwrap = fallible.then(|| quote_spanned! {span=> let #result = #result?; });
         let values = self.native_values(stmt);
         let args = Self::native_args();
         quote! {
-            .action(#name, |#rewriter, #args: &[#krate::NativeValue]| {
+            .action_at(#statement, |#rewriter, #args: &[#krate::NativeValue]| {
                 let #result = #call;
                 #unwrap
                 ::core::result::Result::Ok(#values)
@@ -104,10 +103,10 @@ impl RuleCodegen {
         }
     }
 
-    /// The name the native call `stmt` is registered under, the call
-    /// `func(context, NativeValue::arg(args, 0)?, ..)`, and whether it ends in
-    /// `?`. Each argument is read as the type the function takes.
-    fn native_call(&self, stmt: StmtId, context: &syn::Ident) -> (String, TokenStream, bool) {
+    /// The call `func(context, NativeValue::arg(args, 0)?, ..)` of the
+    /// native call `stmt`, and whether it ends in `?`. Each argument is read
+    /// as the type the function takes.
+    fn native_call(&self, stmt: StmtId, context: &syn::Ident) -> (TokenStream, bool) {
         let StmtKind::NativeCompute {
             func,
             args,
@@ -125,7 +124,7 @@ impl RuleCodegen {
         // `#func` keeps its own spans, so it resolves where the rule is
         // written and a missing function is reported at it.
         let call = quote_spanned! {span=> #func(#context, #(#values),*) };
-        (RuleModel::native_name(func), call, *fallible)
+        (call, *fallible)
     }
 
     /// The function's result as the `Vec<NativeValue>` of the call's results:

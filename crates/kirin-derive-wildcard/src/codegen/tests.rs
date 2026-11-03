@@ -489,7 +489,7 @@ fn pattern_builds_its_body_with_the_rewrite_as_terminator() {
     let (rewrite, matched) = body.split_last().unwrap();
     let ids = matched.iter().map(|&s| codegen.statement_ident(s));
     let rewrite_id = codegen.statement_ident(*rewrite);
-    let expected = quote! {{
+    let expected = quote! {
         #(#code)*
         let pattern_body = stage
             .block()
@@ -500,8 +500,8 @@ fn pattern_builds_its_body_with_the_rewrite_as_terminator() {
         let pattern_name = stage
             .symbol_table_mut()
             .intern(::std::string::String::from("add_zero"));
-        ::kirin_wildcard::Pattern::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(stage, pattern_name, pattern_body).id
-    }};
+        let pattern = ::kirin_wildcard::Pattern::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(stage, pattern_name, pattern_body).id;
+    };
     assert_eq!(codegen.pattern().to_string(), expected.to_string());
 }
 

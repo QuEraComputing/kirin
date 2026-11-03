@@ -13,7 +13,7 @@ use super::{RuleError, RuleErrorKind};
 /// The pattern stays the source of truth: every field is a statement of the
 /// [`RuleSet`](crate::RuleSet)'s pattern stage, and the rule only records
 /// where the parts of the pattern are. Each `native_call` is resolved to
-/// its function here, so the driver never looks a name up.
+/// its one function here, so the driver never looks a function up.
 pub struct CheckedRule<L: Dialect> {
     name: String,
     /// The op the match is rooted at.
@@ -145,13 +145,16 @@ impl<L: Dialect> CheckedRule<L> {
                 }
                 PatternLanguage::Wildcard(PatternStatement::Hole(_)) => {}
                 PatternLanguage::Wildcard(PatternStatement::NativeCall(call)) => {
-                    let native = natives.check_fn(call.name()).ok_or_else(|| {
-                        error(RuleErrorKind::UnknownCheck(call.name().to_string()))
-                    })?;
-                    checks.push(Step::Native {
-                        stmt,
-                        function: native.clone(),
-                    });
+                    // The call needs exactly one function, attached to it
+                    // or to its name: none or two reject the rule.
+                    let name = || call.name().to_string();
+                    let mut found = natives.checks_of(stmt, call.name());
+                    let function = match (found.next(), found.next()) {
+                        (Some(function), None) => function.clone(),
+                        (None, _) => return Err(error(RuleErrorKind::UnknownCheck(name()))),
+                        (Some(_), Some(_)) => return Err(error(RuleErrorKind::TwoChecks(name()))),
+                    };
+                    checks.push(Step::Native { stmt, function });
                 }
                 PatternLanguage::Wildcard(PatternStatement::Constraint(constraint)) => {
                     let computed = producer(stage, constraint.success()).is_some_and(|p| {
@@ -192,13 +195,15 @@ impl<L: Dialect> CheckedRule<L> {
                     actions.push(Step::Other(stmt));
                 }
                 PatternLanguage::Wildcard(PatternStatement::NativeCall(call)) => {
-                    let native = natives.action_fn(call.name()).ok_or_else(|| {
-                        error(RuleErrorKind::UnknownAction(call.name().to_string()))
-                    })?;
-                    actions.push(Step::Native {
-                        stmt,
-                        function: native.clone(),
-                    });
+                    // Exactly one function, as for a check.
+                    let name = || call.name().to_string();
+                    let mut found = natives.actions_of(stmt, call.name());
+                    let function = match (found.next(), found.next()) {
+                        (Some(function), None) => function.clone(),
+                        (None, _) => return Err(error(RuleErrorKind::UnknownAction(name()))),
+                        (Some(_), Some(_)) => return Err(error(RuleErrorKind::TwoActions(name()))),
+                    };
+                    actions.push(Step::Native { stmt, function });
                 }
                 _ => return Err(error(RuleErrorKind::UnsupportedAction { position })),
             }

@@ -2,7 +2,7 @@
 //!
 //! A rule is a `wildcard.pattern` from `kirin-wildcard`, usually written with
 //! `#[rewrite_rule]`. A [`RuleSet`] checks each [`PatternRule`], a pattern
-//! with the Rust functions it calls by name, once. A
+//! with the Rust functions its calls run, once. A
 //! [`RewriteDriver`] walks the IR in a [`WalkOrder`](kirin_ir::walk::WalkOrder),
 //! matches every rule at every statement, runs the rewrite of each match
 //! through the pass's [`Rewriter`](kirin_ir::Rewriter), and repeats until a

@@ -43,10 +43,18 @@ pub enum RuleErrorKind {
     /// A rewrite-body statement the driver cannot run yet, such as building
     /// a new op.
     UnsupportedAction { position: usize },
-    /// A pattern body calls a check function that is not registered.
+    /// A `native_call` in the pattern body named this has no check function
+    /// attached, to it or to its name.
     UnknownCheck(String),
-    /// A rewrite body calls an action function that is not registered.
+    /// A `native_call` in the rewrite body named this has no action function
+    /// attached.
     UnknownAction(String),
+    /// A `native_call` in the pattern body named this has two check
+    /// functions attached, e.g. one for its statement and one for its name.
+    TwoChecks(String),
+    /// A `native_call` in the rewrite body named this has two action
+    /// functions attached.
+    TwoActions(String),
 }
 
 impl RuleError {
@@ -112,10 +120,16 @@ impl fmt::Display for RuleError {
                 "the statement at position {position} of the rewrite body is not supported yet"
             ),
             RuleErrorKind::UnknownCheck(name) => {
-                write!(f, "no check function is registered as `{name}`")
+                write!(f, "a call of `{name}` has no check function attached")
             }
             RuleErrorKind::UnknownAction(name) => {
-                write!(f, "no action function is registered as `{name}`")
+                write!(f, "a call of `{name}` has no action function attached")
+            }
+            RuleErrorKind::TwoChecks(name) => {
+                write!(f, "a call of `{name}` has two check functions attached")
+            }
+            RuleErrorKind::TwoActions(name) => {
+                write!(f, "a call of `{name}` has two action functions attached")
             }
         }
     }

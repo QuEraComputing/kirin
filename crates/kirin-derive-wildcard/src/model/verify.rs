@@ -1,9 +1,7 @@
 //! [`RuleModel::verify`]: the checks that need the whole rule, run once the
 //! parser has built it.
 
-use std::collections::{HashMap, HashSet};
-
-use quote::ToTokens;
+use std::collections::HashSet;
 
 use super::RuleModel;
 use super::statement::{StmtId, StmtKind, Use};
@@ -68,37 +66,8 @@ impl RuleModel {
         }
 
         self.check_liveness(rewrite_body, &mut report);
-        self.check_native_calls(self.body(), &mut report);
-        self.check_native_calls(rewrite_body, &mut report);
 
         errors.map_or(Ok(()), Err)
-    }
-
-    /// Report a native function called in two ways among `stmts`, which are
-    /// the match or the `rewrite!` body: the rule registers one function per
-    /// name there, which can only handle one way of calling it.
-    ///
-    /// A way of calling it is whether it ends in `?`, how many values the
-    /// call binds, and whether it is a constraint.
-    fn check_native_calls(&self, stmts: &[StmtId], report: &mut impl FnMut(syn::Error)) {
-        let mut seen = HashMap::new();
-        for &id in stmts {
-            let stmt = self.statement(id);
-            let StmtKind::NativeCompute { func, fallible, .. } = &stmt.kind else {
-                continue;
-            };
-            let way = (*fallible, stmt.results.len(), self.is_constraint_call(id));
-            let name = Self::native_name(func);
-            if *seen.entry(name).or_insert(way) != way {
-                report(syn::Error::new_spanned(
-                    func,
-                    format!(
-                        "`{}` is called in two different ways here; call it the same way each time, or use two functions",
-                        func.to_token_stream()
-                    ),
-                ));
-            }
-        }
     }
 
     /// Add `stmt_id` to `matched`, recursively visit the statement's operands

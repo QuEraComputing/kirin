@@ -138,6 +138,51 @@ fn double_neg_constrained_to_first_argument() {
     })
 }
 
+/// Whether `maybe`, the result of `argument_index` called without `?`, is
+/// `index`, its result with `?`.
+fn is_index(_stage: &StageInfo<L>, maybe: Option<i64>, index: i64) -> bool {
+    maybe == Some(index)
+}
+
+/// `double_neg_of_first_argument`, also calling `argument_index` without
+/// `?`, which passes on the whole `Option`.
+#[rewrite_rule(language = L)]
+fn double_neg_with_and_without_try() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let index = argument_index(x)?;
+    let maybe = argument_index(x);
+    is_index(maybe, index);
+    is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+fn is_one(_stage: &StageInfo<L>, index: i64) -> bool {
+    index == 1
+}
+
+fn either(_stage: &StageInfo<L>, a: bool, b: bool) -> bool {
+    a || b
+}
+
+/// `double_neg` of the first or second block argument: `is_zero` and
+/// `is_one` compute `bool`s, and the constraint `either` requires one of
+/// them to hold.
+#[rewrite_rule(language = L)]
+fn double_neg_of_first_two_arguments() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let index = argument_index(x)?;
+    let zero = is_zero(index);
+    let one = is_one(index);
+    either(zero, one);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
 /// `double_neg` passing the SSA value `x` to `is_zero`, which takes an
 /// `i64`.
 #[rewrite_rule(language = L)]
@@ -485,6 +530,35 @@ fn a_constraint_with_try_applies_on_ok_true_and_fails_the_run_on_err() {
 }
 
 #[test]
+fn a_native_function_may_be_called_with_and_without_try() {
+    let rules = RuleSet::build(|stage| vec![double_neg_with_and_without_try(stage)]).unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &input, &program("", "%x"));
+}
+
+#[test]
+fn a_constraint_function_may_also_compute_a_bool() {
+    let rules = RuleSet::build(|stage| vec![double_neg_of_first_two_arguments(stage)]).unwrap();
+    let two_arguments = |ret| {
+        format!(
+            "stage @arith fn @f(i64, i64, i64) -> i64;\n\
+             specialize @arith fn @f(i64, i64, i64) -> i64 cfg {{\n\
+               ^entry(%x: i64, %y: i64, %z: i64) {{\n    %a = neg {ret} -> i64;\n    %b = neg %a -> i64;\n    ret %b;\n  }}\n}}\n"
+        )
+    };
+    let rewritten = |ret| {
+        format!(
+            "stage @arith fn @f(i64, i64, i64) -> i64;\n\
+             specialize @arith fn @f(i64, i64, i64) -> i64 cfg {{\n\
+               ^entry(%x: i64, %y: i64, %z: i64) {{\n    ret {ret};\n  }}\n}}\n"
+        )
+    };
+    assert_rewrites(&rules, &two_arguments("%x"), &rewritten("%x"));
+    assert_rewrites(&rules, &two_arguments("%y"), &rewritten("%y"));
+    assert_rewrites(&rules, &two_arguments("%z"), &two_arguments("%z"));
+}
+
+#[test]
 fn a_constraint_on_a_non_bool_fails_the_run() {
     // The macro makes a constraint's function return a `bool`, so only a
     // hand-built rule can pass it anything else.
@@ -546,8 +620,8 @@ fn a_native_argument_of_the_wrong_type_fails_the_run() {
 
 #[test]
 fn an_unregistered_native_function_rejects_the_rule() {
-    // The macro registers every function a rule calls, so only a hand-built
-    // rule can leave one out.
+    // The macro attaches a function to every call, so only a hand-built rule
+    // can leave one out.
     let error = RuleSet::build(|stage| {
         vec![PatternRule::<L>::new(
             double_neg_of_argument(stage).pattern(),
@@ -559,6 +633,22 @@ fn an_unregistered_native_function_rejects_the_rule() {
     assert_eq!(
         error.kind,
         RuleErrorKind::UnknownCheck("is_block_argument".to_string())
+    );
+}
+
+#[test]
+fn a_native_call_with_two_functions_rejects_the_rule() {
+    // The macro attaches a function to each call; one more for the name
+    // gives the call two.
+    let error = RuleSet::build(|stage| {
+        vec![double_neg_of_argument(stage).check("is_block_argument", |_, _| Ok(None))]
+    })
+    .err()
+    .expect("`is_block_argument` has two functions");
+    assert_eq!(error.rule.as_deref(), Some("double_neg_of_argument"));
+    assert_eq!(
+        error.kind,
+        RuleErrorKind::TwoChecks("is_block_argument".to_string())
     );
 }
 

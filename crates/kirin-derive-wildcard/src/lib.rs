@@ -27,6 +27,10 @@ use proc_macro::TokenStream;
 /// | `let (a, b) = f(x);` | a tuple, one value per name |
 /// | `f(x);` in the `rewrite!` body | `()`, or a `Result` with `?` |
 ///
+/// Each call is compiled on its own, so one function may be called in
+/// several of these ways, e.g. both `f(x)?` and `f(x)`, or as a constraint
+/// and for its `bool`.
+///
 /// The function may be generic, with its `language` parameter assigned to one
 /// of the generic parameters. This allows the rule to apply to any language
 /// that implement the `where` bounds the rule describes. Normally, these are
