@@ -1,5 +1,5 @@
-//! `?` in the match needs the function to return an `Option`: the error
-//! points at the call.
+//! `?` in the match needs the function to return an `Option` or a
+//! `Result`: the error points at the call.
 use kirin::prelude::*;
 use kirin_arith::Arith;
 use kirin_test_languages::GraphFunctionLanguage as L;

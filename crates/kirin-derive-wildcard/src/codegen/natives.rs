@@ -35,9 +35,9 @@ impl RuleCodegen {
     }
 
     /// `.check(name, ..)` for the native call `stmt` in the match. The function
-    /// takes the `&StageInfo<L>` being matched first. A `?` call returns an
-    /// `Option`, whose `None` fails the match, and a constraint's returns a
-    /// `bool`.
+    /// takes the `&StageInfo<L>` being matched first. A `?` call returns a
+    /// `CheckOutcome`: an `Option`, whose `None` fails the match, or a
+    /// `Result`, whose `Err` fails the run. A constraint's returns a `bool`.
     fn check(&self, stmt: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
         let span = self.native_span(stmt);
@@ -48,10 +48,19 @@ impl RuleCodegen {
         // reported there.
         let mut checked = result.clone();
         checked.set_span(span);
+        let into_check_result: TokenStream = quote!(#krate::CheckOutcome::into_check_result)
+            .into_iter()
+            .map(|mut token| {
+                token.set_span(span);
+                token
+            })
+            .collect();
 
         let unwrap = fallible.then(|| {
             quote_spanned! {span=>
-                let ::core::option::Option::Some(#result) = #checked else {
+                let ::core::option::Option::Some(#result) =
+                    #into_check_result(#checked)?
+                else {
                     return ::core::result::Result::Ok(::core::option::Option::None);
                 };
             }

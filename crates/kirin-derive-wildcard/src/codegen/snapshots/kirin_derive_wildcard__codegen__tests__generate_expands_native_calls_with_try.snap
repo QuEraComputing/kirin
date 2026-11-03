@@ -177,7 +177,9 @@ fn rule(
                     native_stage,
                     ::kirin_wildcard::NativeValue::arg(native_args, 0usize)?,
                 );
-                let ::core::option::Option::Some(native_result) = native_result else {
+                let ::core::option::Option::Some(native_result) =
+                    ::kirin_wildcard::CheckOutcome::into_check_result(native_result)?
+                else {
                     return ::core::result::Result::Ok(::core::option::Option::None);
                 };
                 ::core::result::Result::Ok(::core::option::Option::Some(::std::vec![

@@ -6,7 +6,8 @@ use kirin_arith::Arith;
 use kirin_ir::SSAKind;
 use kirin_ir::walk::{BFS, KeepOrderReverseBFS, PostOrder, PreOrder, ReverseBFS, WalkOrder};
 use kirin_rewrite::{
-    DriverError, NativeValue, PatternRule, RewriteDriver, RewriteSummary, RuleErrorKind, RuleSet,
+    DriverError, NativeError, NativeValue, PatternRule, RewriteDriver, RewriteSummary,
+    RuleErrorKind, RuleSet,
 };
 use kirin_test_languages::ArithFunctionLanguage as L;
 use kirin_wildcard::rewrite_rule;
@@ -61,6 +62,29 @@ fn double_neg_of_first_argument() {
     let r = op![Arith::neg(a)];
     let index = argument_index(x)?;
     is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// The number of operands of the statement defining `x`, or 0 for a block
+/// argument. Never fails; it returns a `Result` to exercise a `?` check
+/// returning one.
+fn operand_count(stage: &StageInfo<L>, x: SSAValue) -> Result<i64, NativeError> {
+    Ok(match x.expect_info(stage).kind() {
+        SSAKind::Result(stmt, _) => stmt.expect_info(stage).definition().arguments().count() as i64,
+        _ => 0,
+    })
+}
+
+/// `double_neg` of a value defined without operands: a `?` check returning
+/// a `Result` binds its `Ok` value for another check.
+#[rewrite_rule(language = L)]
+fn double_neg_of_leaf() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let count = operand_count(x)?;
+    is_zero(count);
     rewrite!(r, {
         replace!(r, x);
     })
@@ -333,6 +357,19 @@ fn a_native_check_decides_whether_the_rule_applies() {
 #[test]
 fn a_native_check_passes_an_i64_to_another() {
     let rules = RuleSet::build(|stage| vec![double_neg_of_first_argument(stage)]).unwrap();
+    let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &of_argument, &program("", "%x"));
+
+    let of_sum = program(
+        "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    assert_rewrites(&rules, &of_sum, &of_sum);
+}
+
+#[test]
+fn a_native_check_returning_ok_binds_its_value() {
+    let rules = RuleSet::build(|stage| vec![double_neg_of_leaf(stage)]).unwrap();
     let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
     assert_rewrites(&rules, &of_argument, &program("", "%x"));
 

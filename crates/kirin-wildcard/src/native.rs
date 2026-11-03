@@ -126,6 +126,38 @@ impl From<RewriteError> for NativeError {
     }
 }
 
+/// What a native call ending in `?` in a rule's match may return: an
+/// `Option`, whose `None` fails the match, or a `Result`, whose `Err` fails
+/// the driver's run.
+#[diagnostic::on_unimplemented(
+    message = "a native call ending in `?` in the match must return an `Option` or a `Result`, not `{Self}`",
+    label = "returns `{Self}`"
+)]
+pub trait CheckOutcome {
+    /// The value the call binds.
+    type Value;
+
+    /// `Ok(Some(value))` to go on with `value`, `Ok(None)` to fail the
+    /// match, or `Err` to fail the run.
+    fn into_check_result(self) -> Result<Option<Self::Value>, NativeError>;
+}
+
+impl<T> CheckOutcome for Option<T> {
+    type Value = T;
+
+    fn into_check_result(self) -> Result<Option<T>, NativeError> {
+        Ok(self)
+    }
+}
+
+impl<T, E: Into<NativeError>> CheckOutcome for Result<T, E> {
+    type Value = T;
+
+    fn into_check_result(self) -> Result<Option<T>, NativeError> {
+        self.map(Some).map_err(Into::into)
+    }
+}
+
 /// A native function called while matching. It reads the IR and returns the
 /// results of its `native_call`, or `Ok(None)` if the match should fail,
 /// e.g. because an operand is not the constant it needs.
