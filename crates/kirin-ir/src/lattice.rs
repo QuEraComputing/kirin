@@ -29,6 +29,26 @@ pub trait Lattice {
     fn join(&self, other: &Self) -> Self;
     fn meet(&self, other: &Self) -> Self;
     fn is_subseteq(&self, other: &Self) -> bool;
+
+    /// Join `incoming` into `self`, returning `true` exactly when `self`
+    /// changed.
+    ///
+    /// Fixpoint engines use the flag to decide whether dependents must rerun.
+    /// The default relies on ordering consistency (`incoming ⊑ self` iff
+    /// `self ⊔ incoming == self`): it leaves `self` untouched when `incoming`
+    /// adds nothing, and assigns [`join`](Self::join) otherwise. Override it
+    /// when merging in place is cheaper, for example extending a set; an
+    /// override must agree with `join` and `is_subseteq`.
+    fn join_assign(&mut self, incoming: &Self) -> bool
+    where
+        Self: Sized,
+    {
+        if incoming.is_subseteq(self) {
+            return false;
+        }
+        *self = self.join(incoming);
+        true
+    }
 }
 
 /// A lattice with a bottom element (least element).
