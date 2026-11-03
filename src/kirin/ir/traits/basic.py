@@ -1,8 +1,10 @@
 from typing import TYPE_CHECKING
 from dataclasses import dataclass
 
+from kirin.ir.ssa import ResultValue, BlockArgument
 from kirin.ir.exception import ValidationError
 from kirin.ir.nodes.stmt import Statement
+from kirin.ir.nodes.block import Block
 
 from .abc import StmtTrait
 
@@ -85,10 +87,30 @@ class IsolatedFromAbove(StmtTrait):
     """
 
     def verify(self, node: Statement):
-        for stmt in node.walk(include_self=False):
+        # A value is inside `node` exactly when the block that defines it is
+        # inside `node`. The loop collects those blocks once, so each operand
+        # check below is one set lookup.
+        blocks: set[Block] = set()
+        users: list[Statement] = []
+        stack = [node]
+        while stack:
+            for region in stack.pop().regions:
+                for block in region.blocks:
+                    blocks.add(block)
+                    for stmt in block.stmts:
+                        users.append(stmt)
+                        if stmt.regions:
+                            stack.append(stmt)
+
+        for stmt in users:
             for arg in stmt.args:
-                # The result of `node` itself lives outside of its regions.
-                if arg.owner is node or not node.is_ancestor(arg.owner):
+                if isinstance(arg, BlockArgument):
+                    owner = arg.block
+                elif isinstance(arg, ResultValue):
+                    owner = arg.stmt.parent_block
+                else:
+                    owner = None
+                if owner not in blocks:
                     raise ValidationError(
                         stmt,
                         f"Statement {stmt.name} uses a value that the "
