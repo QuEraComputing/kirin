@@ -1,4 +1,4 @@
-use crate::{Block, CFG, DiGraph, UnGraph};
+use crate::{Block, CFG, DiGraph, Dialect, GetInfo, StageInfo, Statement, UnGraph};
 
 /// A handle to one of Kirin's computation representations.
 ///
@@ -11,6 +11,22 @@ pub enum Body {
     CFG(CFG),
     DiGraph(DiGraph),
     UnGraph(UnGraph),
+}
+
+impl Body {
+    /// The first statement of this body, or `None` if it is empty: a
+    /// `CFG`'s is the first statement of its first non-empty block, and a
+    /// graph's is its first member.
+    pub fn first_statement<L: Dialect>(&self, stage: &StageInfo<L>) -> Option<Statement> {
+        match self {
+            Body::Block(block) => block.first_statement(stage),
+            Body::CFG(cfg) => cfg
+                .blocks(stage)
+                .find_map(|block| block.first_statement(stage)),
+            Body::DiGraph(graph) => graph.get_info(stage)?.first_member(),
+            Body::UnGraph(graph) => graph.get_info(stage)?.first_member(),
+        }
+    }
 }
 
 impl From<Block> for Body {
