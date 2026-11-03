@@ -16,5 +16,5 @@ mod driver;
 mod rule;
 
 pub use driver::{DriverError, RewriteDriver, RewriteSummary};
-pub use kirin_wildcard::{ActionFn, CheckFn, NativeError, NativeValue, PatternRule};
+pub use kirin_wildcard::{ActionFn, CheckFn, NativeError, NativeFailure, NativeValue, PatternRule};
 pub use rule::{CheckedRule, RuleError, RuleErrorKind, RuleSet};

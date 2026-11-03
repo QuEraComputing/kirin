@@ -6,8 +6,7 @@ use kirin_arith::Arith;
 use kirin_ir::SSAKind;
 use kirin_ir::walk::{BFS, KeepOrderReverseBFS, PostOrder, PreOrder, ReverseBFS, WalkOrder};
 use kirin_rewrite::{
-    DriverError, NativeError, NativeValue, PatternRule, RewriteDriver, RewriteSummary,
-    RuleErrorKind, RuleSet,
+    DriverError, NativeValue, PatternRule, RewriteDriver, RewriteSummary, RuleErrorKind, RuleSet,
 };
 use kirin_test_languages::ArithFunctionLanguage as L;
 use kirin_wildcard::rewrite_rule;
@@ -70,7 +69,7 @@ fn double_neg_of_first_argument() {
 /// The number of operands of the statement defining `x`, or 0 for a block
 /// argument. Never fails; it returns a `Result` to exercise a `?` check
 /// returning one.
-fn operand_count(stage: &StageInfo<L>, x: SSAValue) -> Result<i64, NativeError> {
+fn operand_count(stage: &StageInfo<L>, x: SSAValue) -> Result<i64, std::convert::Infallible> {
     Ok(match x.expect_info(stage).kind() {
         SSAKind::Result(stmt, _) => stmt.expect_info(stage).definition().arguments().count() as i64,
         _ => 0,
@@ -85,6 +84,37 @@ fn double_neg_of_leaf() {
     let r = op![Arith::neg(a)];
     let count = operand_count(x)?;
     is_zero(count);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// What `argument_position` fails with.
+#[derive(Debug, PartialEq)]
+struct NotAnArgument;
+
+impl std::fmt::Display for NotAnArgument {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("not a block argument")
+    }
+}
+
+impl std::error::Error for NotAnArgument {}
+
+/// `argument_index`, but failing with an error for anything other than a
+/// block argument.
+fn argument_position(stage: &StageInfo<L>, x: SSAValue) -> Result<i64, NotAnArgument> {
+    argument_index(stage, x).ok_or(NotAnArgument)
+}
+
+/// `double_neg` of the first block argument, whose check fails the run
+/// rather than the match for anything else.
+#[rewrite_rule(language = L)]
+fn double_neg_requiring_argument() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let index = argument_position(x)?;
+    is_zero(index);
     rewrite!(r, {
         replace!(r, x);
     })
@@ -378,6 +408,34 @@ fn a_native_check_returning_ok_binds_its_value() {
         "%b",
     );
     assert_rewrites(&rules, &of_sum, &of_sum);
+}
+
+#[test]
+fn a_native_check_returning_err_fails_the_run() {
+    let rules = RuleSet::build(|stage| vec![double_neg_requiring_argument(stage)]).unwrap();
+    let input = program(
+        "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    let (mut pipeline, stage) = parse(&input);
+    let driver = RewriteDriver::new(&rules);
+
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    let failure = failure.expect("the driver fails");
+    let source = std::error::Error::source(&failure).and_then(|source| source.downcast_ref());
+    assert_eq!(source, Some(&NotAnArgument));
+    let DriverError::NativeFailed { name, error, .. } = failure else {
+        panic!("expected `NativeFailed`, got {failure:?}");
+    };
+    assert_eq!(name, "argument_position");
+    assert_eq!(error.error().downcast_ref(), Some(&NotAnArgument));
 }
 
 #[test]

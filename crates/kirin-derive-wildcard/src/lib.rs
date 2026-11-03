@@ -21,7 +21,7 @@ use proc_macro::TokenStream;
 /// |------|---------|
 /// | `f(x);` in the match (a constraint) | `bool`; `false` fails the match |
 /// | `let v = f(x);` | the value |
-/// | `let v = f(x)?;` in the match | `Option<_>`, whose `None` fails the match, or `Result<_, E>`, whose `Err` fails the run |
+/// | `let v = f(x)?;` in the match | `Option<_>`, whose `None` fails the match, or `Result<_, E>`, whose `Err` fails the run with the error (`E: Error + Send + Sync + 'static`) |
 /// | `let v = f(x)?;` in the `rewrite!` body | `Result<_, RewriteError>`; `Err` fails the rewrite |
 /// | `let (a, b) = f(x);` | a tuple, one value per name |
 /// | `f(x);` in the `rewrite!` body | `()`, or a `Result` with `?` |

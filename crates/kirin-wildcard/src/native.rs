@@ -1,6 +1,8 @@
 use std::any::{Any, type_name};
+use std::error::Error;
 use std::fmt::{self, Debug};
 use std::rc::Rc;
+use std::sync::Arc;
 
 use kirin::ir::{RewriteError, Rewriter, SSAValue, StageInfo};
 
@@ -118,6 +120,42 @@ pub enum NativeError {
     },
     /// An action's edit was rejected by the [`Rewriter`].
     Rewrite(RewriteError),
+    /// A check returned an `Err`.
+    Failed(NativeFailure),
+}
+
+/// The error a native function returned, kept as is so the caller can
+/// downcast it back to its type.
+///
+/// Shared, so the errors holding it can be cloned. Two are equal only if
+/// they are the same error, not two equal ones.
+#[derive(Clone, Debug)]
+pub struct NativeFailure(Arc<dyn Error + Send + Sync>);
+
+impl NativeFailure {
+    /// Wrap `error`.
+    pub fn new(error: impl Error + Send + Sync + 'static) -> Self {
+        Self(Arc::new(error))
+    }
+
+    /// The error, e.g. to `downcast_ref` it.
+    pub fn error(&self) -> &(dyn Error + Send + Sync + 'static) {
+        self.0.as_ref()
+    }
+}
+
+impl PartialEq for NativeFailure {
+    fn eq(&self, other: &Self) -> bool {
+        Arc::ptr_eq(&self.0, &other.0)
+    }
+}
+
+impl Eq for NativeFailure {}
+
+impl fmt::Display for NativeFailure {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        fmt::Display::fmt(&self.0, f)
+    }
 }
 
 impl From<RewriteError> for NativeError {
@@ -128,10 +166,11 @@ impl From<RewriteError> for NativeError {
 
 /// What a native call ending in `?` in a rule's match may return: an
 /// `Option`, whose `None` fails the match, or a `Result`, whose `Err` fails
-/// the driver's run.
+/// the driver's run with the error as a [`NativeFailure`].
 #[diagnostic::on_unimplemented(
     message = "a native call ending in `?` in the match must return an `Option` or a `Result`, not `{Self}`",
-    label = "returns `{Self}`"
+    label = "returns `{Self}`",
+    note = "a `Result`'s error must implement `std::error::Error + Send + Sync + 'static`"
 )]
 pub trait CheckOutcome {
     /// The value the call binds.
@@ -150,11 +189,12 @@ impl<T> CheckOutcome for Option<T> {
     }
 }
 
-impl<T, E: Into<NativeError>> CheckOutcome for Result<T, E> {
+impl<T, E: Error + Send + Sync + 'static> CheckOutcome for Result<T, E> {
     type Value = T;
 
     fn into_check_result(self) -> Result<Option<T>, NativeError> {
-        self.map(Some).map_err(Into::into)
+        self.map(Some)
+            .map_err(|error| NativeError::Failed(NativeFailure::new(error)))
     }
 }
 

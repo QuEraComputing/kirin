@@ -2,7 +2,7 @@ use std::fmt;
 
 use kirin_ir::walk::WalkError;
 use kirin_ir::{RewriteError, Statement};
-use kirin_wildcard::NativeError;
+use kirin_wildcard::{NativeError, NativeFailure};
 
 /// Why a driver run failed.
 ///
@@ -38,6 +38,14 @@ pub enum DriverError {
         position: usize,
         expected: &'static str,
         found: Option<String>,
+    },
+    /// Native function `name`, called by `rule` matched at `stmt`, returned
+    /// `error`. [`NativeFailure::error`] gives the error back.
+    NativeFailed {
+        rule: String,
+        name: String,
+        stmt: Statement,
+        error: NativeFailure,
     },
     /// A value the rule reads was never bound, such as a hole no matched op
     /// uses.
@@ -80,6 +88,12 @@ impl DriverError {
             },
             NativeError::Rewrite(error) => DriverError::Rewrite {
                 rule: rule.to_string(),
+                stmt,
+                error,
+            },
+            NativeError::Failed(error) => DriverError::NativeFailed {
+                rule: rule.to_string(),
+                name: name.to_string(),
                 stmt,
                 error,
             },
@@ -131,6 +145,15 @@ impl fmt::Display for DriverError {
                 f,
                 "rule `{rule}`: native function `{name}` has no argument {position}, expected a `{expected}`"
             ),
+            DriverError::NativeFailed {
+                rule,
+                name,
+                stmt,
+                error,
+            } => write!(
+                f,
+                "rule `{rule}` matched at {stmt:?} but native function `{name}` failed: {error}"
+            ),
             DriverError::Unbound { rule } => {
                 write!(f, "rule `{rule}` reads a value the match did not bind")
             }
@@ -163,4 +186,11 @@ impl fmt::Display for DriverError {
     }
 }
 
-impl std::error::Error for DriverError {}
+impl std::error::Error for DriverError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            DriverError::NativeFailed { error, .. } => Some(error.error()),
+            _ => None,
+        }
+    }
+}
