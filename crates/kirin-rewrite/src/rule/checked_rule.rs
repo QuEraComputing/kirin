@@ -14,7 +14,7 @@ use super::{RuleError, RuleErrorKind};
 /// [`RuleSet`](crate::RuleSet)'s pattern stage, and the rule only records
 /// where the parts of the pattern are. Each `native_call` is resolved to
 /// its function here, so the driver never looks a name up.
-pub struct RewriteRule<L: Dialect> {
+pub struct CheckedRule<L: Dialect> {
     name: String,
     /// The op the match is rooted at.
     root: Statement,
@@ -35,7 +35,7 @@ pub(crate) enum Step<F> {
     Other(Statement),
 }
 
-impl<L: Dialect> RewriteRule<L> {
+impl<L: Dialect> CheckedRule<L> {
     /// The name the pattern was given.
     pub fn name(&self) -> &str {
         &self.name
@@ -221,7 +221,7 @@ pub(crate) fn native_call<L: Dialect>(
 ) -> &NativeCall<L::Type> {
     match stmt.expect_info(patterns).definition() {
         PatternLanguage::Wildcard(PatternStatement::NativeCall(call)) => call,
-        _ => unreachable!("RewriteRule::new makes `Step::Native` only for native_calls"),
+        _ => unreachable!("CheckedRule::new makes `Step::Native` only for native_calls"),
     }
 }
 

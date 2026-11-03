@@ -14,7 +14,7 @@ pub(crate) struct RuleArgs {
     pub crate_path: syn::Path,
 }
 
-/// Expand `#[rewrite_rule]` on a function into a `RewriteRule` constructor.
+/// Expand `#[rewrite_rule]` on a function into a `PatternRule` constructor.
 pub(crate) fn expand(attr: TokenStream, item: TokenStream) -> syn::Result<TokenStream> {
     let args = RuleArgs::from_list(&NestedMeta::parse_meta_list(attr)?)?;
     let item: syn::ItemFn = syn::parse2(item)?;

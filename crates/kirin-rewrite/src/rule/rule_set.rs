@@ -1,7 +1,7 @@
 use kirin_ir::{BuilderStageInfo, Dialect, StageInfo};
 use kirin_wildcard::{PatternLanguage, PatternRule};
 
-use super::{RewriteRule, RuleError, RuleErrorKind};
+use super::{CheckedRule, RuleError, RuleErrorKind};
 
 /// The rules one driver run tries, in order, with the stage holding their
 /// patterns.
@@ -10,7 +10,7 @@ use super::{RewriteRule, RuleError, RuleErrorKind};
 /// statement.
 pub struct RuleSet<L: Dialect> {
     patterns: StageInfo<PatternLanguage<L>>,
-    rules: Vec<RewriteRule<L>>,
+    rules: Vec<CheckedRule<L>>,
 }
 
 impl<L: Dialect> RuleSet<L> {
@@ -46,13 +46,13 @@ impl<L: Dialect> RuleSet<L> {
 
     /// Check `rule`'s pattern and add it as the last rule to try.
     pub fn add(&mut self, rule: impl Into<PatternRule<L>>) -> Result<&mut Self, RuleError> {
-        let rule = RewriteRule::new(&self.patterns, rule.into())?;
+        let rule = CheckedRule::new(&self.patterns, rule.into())?;
         self.rules.push(rule);
         Ok(self)
     }
 
     /// The rules, in the order they are tried.
-    pub fn rules(&self) -> &[RewriteRule<L>] {
+    pub fn rules(&self) -> &[CheckedRule<L>] {
         &self.rules
     }
 

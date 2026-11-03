@@ -7,7 +7,7 @@ use kirin_wildcard::{PatternLanguage, PatternStatement};
 
 use super::DriverError;
 use crate::rule::{Step, native_call, producer};
-use crate::{NativeValue, RewriteRule, RuleSet};
+use crate::{CheckedRule, NativeValue, RuleSet};
 
 /// A successful match of one rule: what each pattern value and matched
 /// pattern statement stands for in the IR.
@@ -21,7 +21,7 @@ impl Match {
     /// structure does not match or a check fails.
     pub(crate) fn find<L: Dialect>(
         rules: &RuleSet<L>,
-        rule: &RewriteRule<L>,
+        rule: &CheckedRule<L>,
         stage: &StageInfo<L>,
         stmt: Statement,
     ) -> Result<Option<Self>, DriverError> {
@@ -38,7 +38,7 @@ impl Match {
     /// What pattern value `value` is bound to.
     pub(crate) fn value<L: Dialect>(
         &self,
-        rule: &RewriteRule<L>,
+        rule: &CheckedRule<L>,
         value: SSAValue,
     ) -> Result<NativeValue, DriverError> {
         self.values
@@ -57,7 +57,7 @@ impl Match {
     /// Bind each result of the pattern `native_call` `call` to `found`.
     pub(crate) fn bind_results<L: Dialect>(
         &mut self,
-        rule: &RewriteRule<L>,
+        rule: &CheckedRule<L>,
         patterns: &StageInfo<PatternLanguage<L>>,
         call: Statement,
         name: &str,
@@ -207,7 +207,7 @@ impl Match {
     fn check<L: Dialect>(
         mut self,
         rules: &RuleSet<L>,
-        rule: &RewriteRule<L>,
+        rule: &CheckedRule<L>,
         stage: &StageInfo<L>,
         root: Statement,
     ) -> Result<Option<Self>, DriverError> {
@@ -233,7 +233,7 @@ impl Match {
                     let PatternLanguage::Wildcard(PatternStatement::Constraint(constraint)) =
                         stmt.expect_info(patterns).definition()
                     else {
-                        unreachable!("RewriteRule::new keeps only calls and constraints as checks")
+                        unreachable!("CheckedRule::new keeps only calls and constraints as checks")
                     };
                     match self.value(rule, constraint.success())?.get::<bool>() {
                         Some(true) => {}

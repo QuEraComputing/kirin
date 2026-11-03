@@ -3,14 +3,14 @@ use kirin_wildcard::{PatternLanguage, PatternStatement};
 
 use super::{DriverError, Match};
 use crate::rule::{Step, native_call};
-use crate::{RewriteRule, RuleSet};
+use crate::{CheckedRule, RuleSet};
 
 impl Match {
     /// Run `rule`'s rewrite body, in order, for this match rooted at `root`.
     pub(crate) fn apply<L: Dialect>(
         mut self,
         rules: &RuleSet<L>,
-        rule: &RewriteRule<L>,
+        rule: &CheckedRule<L>,
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<(), DriverError> {
@@ -45,10 +45,10 @@ impl Match {
                     PatternLanguage::Wildcard(PatternStatement::Erase(erase)) => {
                         let target = self
                             .statement(erase.target())
-                            .expect("RewriteRule::new checked `erase` names a matched op");
+                            .expect("CheckedRule::new checked `erase` names a matched op");
                         rewriter.erase_statement(target).map_err(failed)?;
                     }
-                    _ => unreachable!("RewriteRule::new rejects other rewrite-body statements"),
+                    _ => unreachable!("CheckedRule::new rejects other rewrite-body statements"),
                 },
             }
         }
@@ -58,7 +58,7 @@ impl Match {
     /// The SSA value pattern value `value` is bound to.
     fn ssa<L: Dialect>(
         &self,
-        rule: &RewriteRule<L>,
+        rule: &CheckedRule<L>,
         value: SSAValue,
     ) -> Result<SSAValue, DriverError> {
         self.value(rule, value)?
