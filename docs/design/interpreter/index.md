@@ -105,8 +105,8 @@ conflict):
 
 - `StrongDemand` (on `SparseBackwardShape`) — engine surface split in two:
   the shape-generic `SparseBackwardInterp` (`fact`/`raise_fact`/`effect`, the
-  block-topology queries, and the callable-boundary mechanics
-  `declare_return`/`summarize_call`) serves any sparse-backward key, and
+  block-topology queries, and the callable-boundary mechanic
+  `declare_return`) serves any sparse-backward key, and
   `DemandInterp` (pinned to `StrongDemand` via its supertrait) adds the demand
   vocabulary. `raise_fact` takes the lattice element to merge, so the shape
   moves facts without inspecting them; ⊤ is `demand`'s business, and `HasTop`
@@ -118,9 +118,9 @@ conflict):
   contribution with the callable context of the work dispatching the rule.
   The function dialect owns the call-boundary semantics: `ret` declares
   operand `i` as output `i` (`declare_return`), and a call with a demanded result
-  sends its result facts through `summarize_call` and maps the returned callee
-  parameter facts onto its arguments (see [Interprocedural
-  demand](#interprocedural-demand)).
+  returns `SparseBackwardEffect::Call` carrying its result facts and argument
+  slots; the engine crosses the call and maps the callee's parameter facts onto
+  those arguments (see [Interprocedural demand](#interprocedural-demand)).
 - `ClassicLiveness` (on `DenseBackwardShape`) — likewise split: the
   shape-generic `DenseBackwardInterp` (`insert_fact`/`remove_fact` point-state
   mechanics) serves any dense-backward key, and `ClassicLivenessInterp` adds
@@ -310,8 +310,8 @@ lookup stage + Callee
 The boundary input is intentionally not unified: concrete calls and forward
 abstract analysis accept values, while the current backward roots accept only
 `(stage, Callee)` until their analysis-specific boundary policies are added.
-Both backward `analyze` methods return the resolved `(target stage, Body)` scope
-used to qualify their facts.
+Dense backward `analyze` returns the resolved `LinkTarget` that qualifies its
+facts; sparse backward `analyze` returns the root's parameter facts.
 
 ## Compiler-author surface
 
@@ -573,18 +573,23 @@ into operand `i` of every return site of the context.
 The call protocol, for a call in context `C` with a demanded result:
 
 ```text
-C.result[i] demanded ──summarize_call──▶ D.ret_operand[i] (every return site)
+C.result[i] demanded ──Call effect──▶ D.ret_operand[i] (every return site)
       ▲                                                    │ ...
-      └──── C.argument[j] ◀──call rule── D.param[j] (dependency) ◀───┘
+      └──── C.argument[j] ◀──engine── D.param[j] (dependency) ◀───┘
 ```
 
 1. The call rule reads its result facts; with none demanded it returns
    (ignored and zero-result calls never activate callees — demandedness only,
    no effect preservation).
-2. `summarize_call` resolves through the linker at the call's lookup stage,
-   selects `D`, registers `D.param[j] → current work` for every parameter
-   (so bottom reads still wake the caller), returns the current parameter
-   facts, and queues the activation.
+2. Otherwise it returns `SparseBackwardEffect::Call` with its result facts
+   and argument slots. The caller's `DemandFrame` matches it, as the forward
+   block frame matches `SparseForwardEffect::Call`, and summarizes the call
+   without descending (`summarize_call`): it resolves through the linker at
+   the call's lookup stage, selects `D`, queues the activation, checks the
+   argument count against `D`'s parameters, registers `D.param[j] → current
+   work` for every parameter (so bottom reads still wake the caller), and
+   raises each non-bottom parameter fact on argument `j`. Discovery runs
+   outside any work and rejects a `Call`.
 3. After the work completes, activations are applied: `D` is discovered if
    new, the call's result count is checked against `D`'s return arity, and
    each non-bottom result fact `i` merges into operand `i` of every return
@@ -667,7 +672,8 @@ below, composed by the `ForwardFrameEngine` / `ForwardDataflowFrameEngine`
 umbrellas, and `DenseBackwardFrameEngine` for the dense backward engine
 (statement dispatch, point-state access, edge absorption against the converged
 summaries, per-point recording). The sparse backward engine needs no capability
-surface at all — its `DemandFrame` dispatches rules directly on the transfer.
+surface at all — its `DemandFrame` runs only on the concrete driver, on which
+its rules dispatch.
 
 **"Engine" means three different things**, so the names are kept distinct:
 
@@ -1128,7 +1134,7 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
     values, mirroring the forward per-value model. Helpers are
     `is_demanded`/`demand` (on `DemandInterp`)/`effect()` plus the purity-aware `demand_uses_if_observable`
     (rather than the sketched `live_after`/`use_def` names); the effect is
-    `SparseBackwardEffect::Demands`. Summary owners ARE context-qualified
+    `SparseBackwardEffect::Demands` or `Call`. Summary owners ARE context-qualified
     fact locations (`Scoped<K, SSAValue>`), so the fixpoint driver's default
     self-dependent index is the demand worklist; scf converges loop-carried
     demand with **no frames**, and demand crosses calls on the same worklist
@@ -1137,6 +1143,8 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
     `DenseBackwardInterpreter`): here `Interp::Value` *is* the point state
     (`LiveSet`), realizing the sketch's `Value = LiveSet` — with the textbook
     kill/gen transfer (`gen_uses_kill_defs`, purity-irrelevant). Block owners
+    and point facts are keyed by the analyzed callable
+    (`Scoped<LinkTarget, _>`), which `analyze` returns. Block owners
     converge boundary summaries; `live_before`/`live_after` are reconstructed
     per point on demand (never persisted by the fixpoint); scf owns dense
     frames (arm-join, loop fixpoint). Classic liveness consumes finalized IR

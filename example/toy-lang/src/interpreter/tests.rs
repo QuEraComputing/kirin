@@ -1057,31 +1057,35 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
 // ===========================================================================
 
 mod dense {
-    use kirin::prelude::{CompileStage, Pipeline, SSAValue};
+    use kirin::prelude::{CFG, CompileStage, Pipeline, SSAValue};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_interpreter::{Callee, ProgramPoint, Scoped};
+    use kirin_interpreter::{Body, Callee, ProgramPoint, Scoped};
     use kirin_liveness::{DenseLivenessResult, LiveSet};
     use kirin_scf::StructuredControlFlow;
 
     use super::demand::{FOR_CARRIED_DEMAND, IF_DEAD_RESULT};
     use super::demand::{
-        cfg_scope, constant_result, entry_params, find_statement, find_value, parse, source_root,
+        constant_result, entry_params, find_statement, find_value, parse, source_root,
     };
     use crate::interpreter::ToyDenseLiveness;
     use crate::language::HighLevel;
     use crate::stage::Stage;
 
-    /// Run classic dense liveness with the toy total frame.
+    /// Run classic dense liveness with the toy total frame, returning the
+    /// analyzed root's CFG alongside the result.
     fn analyze_dense_toy(
         pipeline: &Pipeline<Stage>,
         caller_stage: CompileStage,
         callee: Callee,
-    ) -> DenseLivenessResult {
+    ) -> (DenseLivenessResult, CFG) {
         let engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-        let (scope, engine) = engine
+        let (root, engine) = engine
             .analyze(caller_stage, callee)
             .expect("analysis succeeds");
-        DenseLivenessResult::from_engine(&engine, scope)
+        let Body::CFG(cfg) = root.body(pipeline).expect("analyzed root has a body") else {
+            panic!("expected analysis root to resolve to a CFG, got {root:?}");
+        };
+        (DenseLivenessResult::from_engine(&engine, root), cfg)
     }
 
     fn live_set(values: &[SSAValue]) -> LiveSet {
@@ -1096,10 +1100,9 @@ mod dense {
     fn dense_per_point_inside_scf_if_arm() {
         let pipeline = parse(IF_DEAD_RESULT);
         let (caller_stage, callee) = source_root(&pipeline, "if_dead");
-        let dense = analyze_dense_toy(&pipeline, caller_stage, callee);
-        let (_, cfg) = cfg_scope(dense.root_scope());
-        let scope = dense.root_scope();
-        let point = |item| Scoped::new(scope, item);
+        let (dense, cfg) = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let root = dense.root();
+        let point = |item| Scoped::new(root, item);
 
         let cond = entry_params(&pipeline, cfg)[0];
         let a = constant_result(&pipeline, cfg, 1);
@@ -1165,9 +1168,8 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
     fn dense_scf_if_joins_both_arm_entries() {
         let pipeline = parse(IF_ARMS_DIFFERENT_USES);
         let (caller_stage, callee) = source_root(&pipeline, "if_arms");
-        let dense = analyze_dense_toy(&pipeline, caller_stage, callee);
-        let (_, cfg) = cfg_scope(dense.root_scope());
-        let scope = dense.root_scope();
+        let (dense, cfg) = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let root = dense.root();
 
         let params = entry_params(&pipeline, cfg);
         let (cond, x, y) = (params[0], params[1], params[2]);
@@ -1185,11 +1187,11 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
         // After the if only its result matters; before it, the then-arm
         // contributed %x, the else-arm %y, and the rule genned %cond.
         assert_eq!(
-            dense.point_facts(Scoped::new(scope, ProgramPoint::After(if_stmt))),
+            dense.point_facts(Scoped::new(root, ProgramPoint::After(if_stmt))),
             Some(&live_set(&[r]))
         );
         assert_eq!(
-            dense.point_facts(Scoped::new(scope, ProgramPoint::Before(if_stmt))),
+            dense.point_facts(Scoped::new(root, ProgramPoint::Before(if_stmt))),
             Some(&live_set(&[cond, x, y]))
         );
     }
@@ -1202,9 +1204,8 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
     fn dense_loop_carried_fixpoint() {
         let pipeline = parse(FOR_CARRIED_DEMAND);
         let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
-        let dense = analyze_dense_toy(&pipeline, caller_stage, callee);
-        let (_, cfg) = cfg_scope(dense.root_scope());
-        let scope = dense.root_scope();
+        let (dense, cfg) = analyze_dense_toy(&pipeline, caller_stage, callee);
+        let root = dense.root();
 
         let params = entry_params(&pipeline, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
@@ -1232,11 +1233,11 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
 
         // Around the loop.
         assert_eq!(
-            dense.point_facts(Scoped::new(scope, ProgramPoint::After(for_stmt))),
+            dense.point_facts(Scoped::new(root, ProgramPoint::After(for_stmt))),
             Some(&live_set(&[sum]))
         );
         assert_eq!(
-            dense.point_facts(Scoped::new(scope, ProgramPoint::Before(for_stmt))),
+            dense.point_facts(Scoped::new(root, ProgramPoint::Before(for_stmt))),
             Some(&live_set(&[lo, hi, step, init]))
         );
 
@@ -1244,11 +1245,11 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
         // constant are live before the add; the yield slot is live after it
         // (it feeds the next iteration through the carry).
         assert_eq!(
-            dense.point_facts(Scoped::new(scope, ProgramPoint::Before(add_stmt))),
+            dense.point_facts(Scoped::new(root, ProgramPoint::Before(add_stmt))),
             Some(&live_set(&[lo, hi, step, init, acc, one]))
         );
         assert_eq!(
-            dense.point_facts(Scoped::new(scope, ProgramPoint::After(add_stmt))),
+            dense.point_facts(Scoped::new(root, ProgramPoint::After(add_stmt))),
             Some(&live_set(&[lo, hi, step, init, next]))
         );
     }

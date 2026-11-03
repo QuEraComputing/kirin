@@ -179,9 +179,9 @@ fn print_block_liveness<L: Dialect>(
     cfg: CFG,
     dense: &kirin_liveness::DenseLivenessResult,
 ) {
-    let scope = dense.root_scope();
+    let root = dense.root();
     for block in cfg.blocks(info) {
-        let point = |item| dense.point_facts(Scoped::new(scope, item));
+        let point = |item| dense.point_facts(Scoped::new(root, item));
         let (Some(live_in), Some(live_out)) = (
             point(ProgramPoint::BlockEntry(block)),
             point(ProgramPoint::BlockExit(block)),
