@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use kirin_ir::{
     Dialect, GetInfo, HasResults, ResultValue, SSAKind, SSAValue, StageInfo, Statement,
@@ -14,6 +14,9 @@ use crate::{CheckedRule, NativeValue, RuleSet};
 pub(crate) struct Match {
     values: HashMap<SSAValue, NativeValue>,
     statements: HashMap<Statement, Statement>,
+    /// The IR statements in `statements`, so each is matched by at most one
+    /// pattern op.
+    matched: HashSet<Statement>,
 }
 
 impl Match {
@@ -28,6 +31,7 @@ impl Match {
         let mut found = Self {
             values: HashMap::new(),
             statements: HashMap::new(),
+            matched: HashSet::new(),
         };
         if !found.op(rules.patterns(), stage, rule.root(), stmt) {
             return Ok(None);
@@ -103,6 +107,13 @@ impl Match {
         if let Some(&bound) = self.statements.get(&pattern) {
             return bound == stmt;
         }
+        // Each IR statement is matched by at most one pattern op: with
+        // `?a = neg ?x`, `?b = neg ?y` and `?r = add ?a, ?b`, the IR
+        // `%n = neg %x; %s = add %n, %n` does not match, as `?a` and `?b`
+        // would both be `%n`'s statement.
+        if self.matched.contains(&stmt) {
+            return false;
+        }
         let Some(info) = stmt.get_info(stage) else {
             return false;
         };
@@ -157,6 +168,7 @@ impl Match {
         // Step 3: record what each pattern value stands for in this match,
         // starting with the results.
         self.statements.insert(pattern, stmt);
+        self.matched.insert(stmt);
         for (&pattern_result, &result) in op.results().zip(concrete.results()) {
             if !self.bind(pattern_result.into(), result.into()) {
                 return false;

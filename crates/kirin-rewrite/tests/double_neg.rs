@@ -111,6 +111,28 @@ fn add_self() {
     })
 }
 
+/// Matches `x + y` only to exercise two holes binding the same value;
+/// replacing it with `x` is not a valid rewrite.
+#[rewrite_rule(language = L)]
+fn add_any() {
+    let r = op![Arith::add(x, y)];
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// Matches `-x + -y` only to exercise two ops that could match the same
+/// statement; replacing it with `x` is not a valid rewrite.
+#[rewrite_rule(language = L)]
+fn add_of_negs() {
+    let a = op![Arith::neg(x)];
+    let b = op![Arith::neg(y)];
+    let r = op![Arith::add(a, b)];
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
 fn neg_rules() -> RuleSet<L> {
     RuleSet::build(|stage| vec![double_neg(stage)]).expect("the rules are valid")
 }
@@ -273,6 +295,26 @@ fn a_hole_used_twice_matches_only_the_same_value() {
 
     let different = program("    %n = neg %x -> i64;\n    %a = add %x, %n -> i64;", "%a");
     assert_rewrites(&rules, &different, &different);
+}
+
+#[test]
+fn two_holes_may_bind_the_same_value() {
+    let rules = RuleSet::build(|stage| vec![add_any(stage)]).unwrap();
+    let input = program("    %a = add %x, %x -> i64;", "%a");
+    assert_rewrites(&rules, &input, &program("", "%x"));
+}
+
+#[test]
+fn two_ops_never_match_the_same_statement() {
+    let rules = RuleSet::build(|stage| vec![add_of_negs(stage)]).unwrap();
+    let same = program("    %n = neg %x -> i64;\n    %a = add %n, %n -> i64;", "%a");
+    assert_rewrites(&rules, &same, &same);
+
+    let different = program(
+        "    %n = neg %x -> i64;\n    %m = neg %x -> i64;\n    %a = add %n, %m -> i64;",
+        "%a",
+    );
+    assert_rewrites(&rules, &different, &program("", "%x"));
 }
 
 #[test]
