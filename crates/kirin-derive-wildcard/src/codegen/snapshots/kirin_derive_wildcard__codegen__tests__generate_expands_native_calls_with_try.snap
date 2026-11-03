@@ -226,7 +226,7 @@ fn rule(
                 let native_result = native_result?;
                 ::core::result::Result::Ok({
                     let () = native_result;
-                    ::std::vec::Vec::new()
+                    ::std::vec![]
                 })
             },
         )

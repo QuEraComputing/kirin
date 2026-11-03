@@ -3,7 +3,7 @@ use quote::{format_ident, quote, quote_spanned};
 use syn::spanned::Spanned;
 
 use super::RuleCodegen;
-use crate::model::{StmtId, StmtKind};
+use crate::model::{StmtId, StmtKind, Unpack};
 
 impl RuleCodegen {
     /// The native functions the rule calls, attached to its `PatternRule`:
@@ -111,6 +111,7 @@ impl RuleCodegen {
             func,
             args,
             fallible,
+            ..
         } = &self.model.statement(stmt).kind
         else {
             unreachable!("`native_calls` yields only native calls")
@@ -127,23 +128,49 @@ impl RuleCodegen {
         (call, *fallible)
     }
 
-    /// The function's result as the `Vec<NativeValue>` of the call's results:
-    /// `()` for none, the value for one, and a tuple for several.
+    /// The function's result as the `Vec<NativeValue>` of the call's
+    /// results, taken apart as the call's `let` pattern does: the whole
+    /// value for `v`, or a tuple pattern binding each result, so `(a,)`
+    /// binds the element of a 1-tuple and `()` binds nothing.
     fn native_values(&self, stmt: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
         let span = self.native_span(stmt);
         let result = Self::native_result();
-        match self.model.statement(stmt).results.len() {
-            0 => quote_spanned! {span=> { let () = #result; ::std::vec::Vec::new() } },
-            1 => quote! { ::std::vec![#krate::NativeValue::new(#result)] },
-            count => {
-                let parts: Vec<_> = (0..count)
-                    .map(|index| format_ident!("native_result_{index}", span = Span::mixed_site()))
+        let StmtKind::NativeCompute { unpack, .. } = &self.model.statement(stmt).kind else {
+            unreachable!("only native calls have native values")
+        };
+        if *unpack == Unpack::Whole {
+            return quote! { ::std::vec![#krate::NativeValue::new(#result)] };
+        }
+        let mut parts = Vec::new();
+        let pattern = Self::unpack_pattern(unpack, &mut parts);
+        quote_spanned! {span=> {
+            let #pattern = #result;
+            ::std::vec![#(#krate::NativeValue::new(#parts)),*]
+        }}
+    }
+
+    /// The Rust pattern taking a value apart as `unpack`, binding each leaf
+    /// to a new local pushed onto `parts`.
+    fn unpack_pattern(unpack: &Unpack, parts: &mut Vec<syn::Ident>) -> TokenStream {
+        match unpack {
+            Unpack::Whole => {
+                let part =
+                    format_ident!("native_result_{}", parts.len(), span = Span::mixed_site());
+                parts.push(part.clone());
+                quote!(#part)
+            }
+            // A trailing comma keeps a 1-tuple a tuple pattern.
+            Unpack::Tuple(elems) if elems.len() == 1 => {
+                let elem = Self::unpack_pattern(&elems[0], parts);
+                quote!((#elem,))
+            }
+            Unpack::Tuple(elems) => {
+                let elems: Vec<_> = elems
+                    .iter()
+                    .map(|e| Self::unpack_pattern(e, parts))
                     .collect();
-                quote_spanned! {span=> {
-                    let (#(#parts),*) = #result;
-                    ::std::vec![#(#krate::NativeValue::new(#parts)),*]
-                }}
+                quote!((#(#elems),*))
             }
         }
     }

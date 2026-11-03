@@ -3,7 +3,7 @@ use proc_macro2::Span;
 use syn::{Stmt, Token, ext::IdentExt, punctuated::Punctuated, spanned::Spanned};
 
 use super::{RuleParser, rule_parser::MISSING_REWRITE};
-use crate::model::{Binding, StmtId, StmtKind, Use};
+use crate::model::{Binding, StmtId, StmtKind, Unpack, Use};
 
 const OP_PATH: &str = "ops in `op![..]` must name their dialect, e.g. `op![Arith::add(x, y)]`";
 
@@ -66,6 +66,7 @@ impl RuleParser {
                 func,
                 args,
                 fallible,
+                unpack: Unpack::Whole,
             },
             vec![(None, span)],
         )?;
@@ -94,7 +95,7 @@ impl RuleParser {
         // `let x = f(x)` uses `x` before binding it.
         let (kind, op_name, values) = match init.expr.as_ref() {
             syn::Expr::Call(_) | syn::Expr::Try(_) => {
-                let kind = self.parse_native_compute(&init.expr)?;
+                let kind = self.parse_native_compute(&init.expr, Self::unpack(&local.pat))?;
                 let values = Self::parse_pat(&local.pat)?;
                 (kind, None, values)
             }
@@ -164,6 +165,16 @@ impl RuleParser {
         Ok(values)
     }
 
+    /// How the `let` pattern `pat` takes a native call's value apart, with
+    /// a leaf for each value [`Self::parse_pat`] returns. Any other pattern
+    /// is a leaf, which `parse_pat` rejects.
+    pub(super) fn unpack(pat: &syn::Pat) -> Unpack {
+        match pat {
+            syn::Pat::Tuple(tuple) => Unpack::Tuple(tuple.elems.iter().map(Self::unpack).collect()),
+            _ => Unpack::Whole,
+        }
+    }
+
     pub(super) fn parse_ident(ident: &syn::PatIdent) -> syn::Result<syn::Ident> {
         if ident.mutability.is_some() {
             return Err(syn::Error::new_spanned(
@@ -181,8 +192,12 @@ impl RuleParser {
     }
 
     /// Parse a native call `name(args..)` or `name(args..)?` computing
-    /// values.
-    pub(super) fn parse_native_compute(&mut self, expr: &syn::Expr) -> syn::Result<StmtKind> {
+    /// values, which its pattern takes apart as `unpack`.
+    pub(super) fn parse_native_compute(
+        &mut self,
+        expr: &syn::Expr,
+        unpack: Unpack,
+    ) -> syn::Result<StmtKind> {
         let (call, fallible) = match expr {
             syn::Expr::Call(call) => (call, false),
             syn::Expr::Try(syn::ExprTry { expr, .. }) => match expr.as_ref() {
@@ -206,6 +221,7 @@ impl RuleParser {
             func,
             args,
             fallible,
+            unpack,
         })
     }
 
@@ -460,7 +476,7 @@ impl RuleParser {
             }) => self.parse_rewrite_action(mac).map(|(action, _)| action),
             // A native call whose result is not bound only acts on the IR.
             Stmt::Expr(expr @ (syn::Expr::Call(_) | syn::Expr::Try(_)), Some(_)) => {
-                let kind = self.parse_native_compute(expr)?;
+                let kind = self.parse_native_compute(expr, Unpack::Tuple(vec![]))?;
                 self.add_statement(stmt.span(), kind, vec![])
             }
             _ => Err(syn::Error::new_spanned(

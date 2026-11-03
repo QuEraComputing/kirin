@@ -183,6 +183,47 @@ fn double_neg_of_first_two_arguments() {
     })
 }
 
+/// `argument_index` as a 1-tuple.
+fn argument_index_in_tuple(stage: &StageInfo<L>, x: SSAValue) -> Option<(i64,)> {
+    argument_index(stage, x).map(|index| (index,))
+}
+
+/// `double_neg_of_first_argument`, taking the index out of a 1-tuple.
+#[rewrite_rule(language = L)]
+fn double_neg_of_first_argument_in_tuple() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let (index,) = argument_index_in_tuple(x)?;
+    is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// The index of `x` twice, and whether `x` is a block argument at all.
+fn argument_indices(stage: &StageInfo<L>, x: SSAValue) -> ((i64, i64), bool) {
+    let index = argument_index(stage, x);
+    let index_or_zero = index.unwrap_or_default();
+    ((index_or_zero, index_or_zero), index.is_some())
+}
+
+fn holds(_stage: &StageInfo<L>, condition: bool) -> bool {
+    condition
+}
+
+/// `double_neg_of_first_argument`, taking the index out of a nested tuple.
+#[rewrite_rule(language = L)]
+fn double_neg_of_first_argument_in_nested_tuple() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let ((index, _), found) = argument_indices(x);
+    holds(found);
+    is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
 /// `double_neg` passing the SSA value `x` to `is_zero`, which takes an
 /// `i64`.
 #[rewrite_rule(language = L)]
@@ -556,6 +597,23 @@ fn a_constraint_function_may_also_compute_a_bool() {
     assert_rewrites(&rules, &two_arguments("%x"), &rewritten("%x"));
     assert_rewrites(&rules, &two_arguments("%y"), &rewritten("%y"));
     assert_rewrites(&rules, &two_arguments("%z"), &two_arguments("%z"));
+}
+
+#[test]
+fn a_native_call_pattern_takes_its_value_apart_as_in_rust() {
+    for rules in [
+        RuleSet::build(|stage| vec![double_neg_of_first_argument_in_tuple(stage)]).unwrap(),
+        RuleSet::build(|stage| vec![double_neg_of_first_argument_in_nested_tuple(stage)]).unwrap(),
+    ] {
+        let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+        assert_rewrites(&rules, &of_argument, &program("", "%x"));
+
+        let of_sum = program(
+            "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+            "%b",
+        );
+        assert_rewrites(&rules, &of_sum, &of_sum);
+    }
 }
 
 #[test]

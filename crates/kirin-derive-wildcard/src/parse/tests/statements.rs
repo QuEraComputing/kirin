@@ -1,6 +1,6 @@
 use syn::parse_quote;
 
-use crate::model::StmtKind;
+use crate::model::{StmtKind, Unpack};
 use crate::parse::RuleParser;
 
 use super::helpers::{
@@ -25,6 +25,7 @@ fn parse_statement_splits_an_unbound_call_into_a_call_and_a_constraint() {
         func,
         args,
         fallible,
+        ..
     } = &model.statement(compute).kind
     else {
         panic!("expected a native computation");
@@ -101,6 +102,7 @@ fn parse_local_binds_a_native_computation() {
         func,
         args,
         fallible,
+        ..
     } = &model.statement(stmt).kind
     else {
         panic!("expected a native computation");
@@ -124,6 +126,38 @@ fn parse_local_marks_a_call_with_try_as_fallible() {
     };
     assert!(func.is_ident("constant_value"));
     assert!(fallible);
+}
+
+/// A native call's pattern keeps its tuple structure, so `(a,)` and nested
+/// tuples take the value apart as in Rust.
+#[test]
+fn parse_local_records_how_a_native_call_pattern_unpacks_its_value() {
+    let cases: [(syn::Local, Unpack); 4] = [
+        (local(parse_quote!(let v = f(x);)), Unpack::Whole),
+        (
+            local(parse_quote!(let (a,) = f(x);)),
+            Unpack::Tuple(vec![Unpack::Whole]),
+        ),
+        (
+            local(parse_quote!(let (a, b) = f(x);)),
+            Unpack::Tuple(vec![Unpack::Whole, Unpack::Whole]),
+        ),
+        (
+            local(parse_quote!(let ((a, _), c) = f(x);)),
+            Unpack::Tuple(vec![
+                Unpack::Tuple(vec![Unpack::Whole, Unpack::Whole]),
+                Unpack::Whole,
+            ]),
+        ),
+    ];
+    for (local, expected) in cases {
+        let mut parser = parser();
+        let stmt = parser.parse_local(&local).unwrap();
+        let StmtKind::NativeCompute { unpack, .. } = &parser.model.statement(stmt).kind else {
+            panic!("expected a native computation");
+        };
+        assert_eq!(*unpack, expected);
+    }
 }
 
 #[test]
