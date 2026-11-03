@@ -1,12 +1,13 @@
-//! `?` on a constraint would give a second way to fail the match, besides
-//! the function returning `false`.
-//!
-//! The macro then emits only the error, so the imports go unused.
-#![allow(unused_imports)]
-
+//! `?` on a constraint needs the function to return an `Option<bool>` or a
+//! `Result<bool, _>`: the error points at the call.
+use kirin::prelude::*;
 use kirin_arith::Arith;
 use kirin_test_languages::GraphFunctionLanguage as L;
 use kirin_wildcard::rewrite_rule;
+
+fn is_block_argument(_stage: &StageInfo<L>, _x: SSAValue) -> bool {
+    true
+}
 
 #[rewrite_rule(language = L)]
 fn rule() {

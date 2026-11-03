@@ -25,15 +25,15 @@ impl RuleParser {
             }
             // A call whose result is not bound is a constraint.
             Stmt::Expr(syn::Expr::Call(call), Some(_)) => {
-                Ok(self.parse_constraint(call, stmt.span())?.to_vec())
+                Ok(self.parse_constraint(call, false, stmt.span())?.to_vec())
             }
             Stmt::Expr(syn::Expr::Try(try_expr), Some(_))
                 if matches!(*try_expr.expr, syn::Expr::Call(_)) =>
             {
-                Err(syn::Error::new_spanned(
-                    try_expr.question_token,
-                    "a constraint cannot use `?`: its function returns a `bool`, and `false` fails the match",
-                ))
+                let syn::Expr::Call(call) = &*try_expr.expr else {
+                    unreachable!("the guard matched a call")
+                };
+                Ok(self.parse_constraint(call, true, stmt.span())?.to_vec())
             }
             Stmt::Expr(expr, _) => Err(syn::Error::new_spanned(
                 expr,
@@ -50,9 +50,13 @@ impl RuleParser {
     /// It becomes: a `NativeCompute` whose one anonymous result says whether
     /// the constraint holds and a `Constraint` which takes that result.
     /// Both, and the result, carry the call's `span`.
+    ///
+    /// `fallible` if the call ends in `?`, as `is_power_of_two(val)?;`: its
+    /// function then returns an `Option<bool>` or a `Result<bool, _>`.
     pub(super) fn parse_constraint(
         &mut self,
         call: &syn::ExprCall,
+        fallible: bool,
         span: Span,
     ) -> syn::Result<[StmtId; 2]> {
         let (func, args) = self.parse_native_call(call)?;
@@ -61,7 +65,7 @@ impl RuleParser {
             StmtKind::NativeCompute {
                 func,
                 args,
-                fallible: false,
+                fallible,
             },
             vec![(None, span)],
         )?;

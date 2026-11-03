@@ -20,6 +20,7 @@ use proc_macro::TokenStream;
 /// | Call | Returns |
 /// |------|---------|
 /// | `f(x);` in the match (a constraint) | `bool`; `false` fails the match |
+/// | `f(x)?;` in the match | `Option<bool>` or `Result<bool, E>`, unwrapped as for `let v = f(x)?;` before the `bool` is tested |
 /// | `let v = f(x);` | the value |
 /// | `let v = f(x)?;` in the match | `Option<_>`, whose `None` fails the match, or `Result<_, E>`, whose `Err` fails the run with the error (`E: Error + Send + Sync + 'static`) |
 /// | `let v = f(x)?;` in the `rewrite!` body | `Result<_, RewriteError>`; `Err` fails the rewrite |

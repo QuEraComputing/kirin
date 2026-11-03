@@ -134,14 +134,24 @@ fn parse_local_rejects_try_after_anything_but_a_call() {
     );
 }
 
-/// A constraint's function returns a `bool`, so `?` would give a second way
-/// to fail the match.
+/// `?` on a constraint unwraps the function's `Option<bool>` or
+/// `Result<bool, _>` before the `bool` is tested.
 #[test]
-fn parse_statement_rejects_try_on_a_constraint() {
-    assert_eq!(
-        error(parser().parse_statement(&parse_quote!(is_power_of_two(x)?;))),
-        "a constraint cannot use `?`: its function returns a `bool`, and `false` fails the match"
-    );
+fn parse_statement_marks_a_constraint_with_try_as_fallible() {
+    let mut parser = parser();
+    let stmts = parser
+        .parse_statement(&parse_quote!(is_power_of_two(val)?;))
+        .unwrap();
+    let model = parser.model;
+    let [compute, constraint] = stmts[..] else {
+        panic!("expected two statements, got {stmts:?}");
+    };
+    let StmtKind::NativeCompute { func, fallible, .. } = &model.statement(compute).kind else {
+        panic!("expected a native computation");
+    };
+    assert!(func.is_ident("is_power_of_two"));
+    assert!(fallible);
+    assert_eq!(kind_name(&model, constraint), "constraint");
 }
 
 #[test]

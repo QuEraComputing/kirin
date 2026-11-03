@@ -37,7 +37,8 @@ impl RuleCodegen {
     /// `.check(name, ..)` for the native call `stmt` in the match. The function
     /// takes the `&StageInfo<L>` being matched first. A `?` call returns a
     /// `CheckOutcome`: an `Option`, whose `None` fails the match, or a
-    /// `Result`, whose `Err` fails the run. A constraint's returns a `bool`.
+    /// `Result`, whose `Err` fails the run. A constraint's returns a `bool`,
+    /// or a `CheckOutcome` of one if it ends in `?`.
     fn check(&self, stmt: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
         let span = self.native_span(stmt);

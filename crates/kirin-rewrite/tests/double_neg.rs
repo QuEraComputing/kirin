@@ -120,6 +120,24 @@ fn double_neg_requiring_argument() {
     })
 }
 
+/// Whether `x` is the first block argument, failing with an error for
+/// anything other than a block argument.
+fn is_first_argument(stage: &StageInfo<L>, x: SSAValue) -> Result<bool, NotAnArgument> {
+    Ok(argument_position(stage, x)? == 0)
+}
+
+/// `double_neg` of the first block argument, as one constraint ending in
+/// `?` whose `Err` fails the run.
+#[rewrite_rule(language = L)]
+fn double_neg_constrained_to_first_argument() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    is_first_argument(x)?;
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
 /// `double_neg` passing the SSA value `x` to `is_zero`, which takes an
 /// `i64`.
 #[rewrite_rule(language = L)]
@@ -435,6 +453,34 @@ fn a_native_check_returning_err_fails_the_run() {
         panic!("expected `NativeFailed`, got {failure:?}");
     };
     assert_eq!(name, "argument_position");
+    assert_eq!(error.error().downcast_ref(), Some(&NotAnArgument));
+}
+
+#[test]
+fn a_constraint_with_try_applies_on_ok_true_and_fails_the_run_on_err() {
+    let rules =
+        RuleSet::build(|stage| vec![double_neg_constrained_to_first_argument(stage)]).unwrap();
+    let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &of_argument, &program("", "%x"));
+
+    let of_sum = program(
+        "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    let (mut pipeline, stage) = parse(&of_sum);
+    let driver = RewriteDriver::new(&rules);
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    let Some(DriverError::NativeFailed { name, error, .. }) = failure else {
+        panic!("expected `NativeFailed`, got {failure:?}");
+    };
+    assert_eq!(name, "is_first_argument");
     assert_eq!(error.error().downcast_ref(), Some(&NotAnArgument));
 }
 
