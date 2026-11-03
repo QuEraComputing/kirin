@@ -3,6 +3,7 @@ use kirin_ir::{Dialect, GetInfo, Rewriter, Statement};
 
 use super::{DriverError, Match};
 use crate::RuleSet;
+use crate::rule::Rule;
 
 /// What a driver run did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -115,7 +116,12 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         root: Statement,
     ) -> Result<RewriteSummary, DriverError> {
         if !O::ALLOWS_ERASING_VISITED
-            && let Some(rule) = self.rules.rules().iter().find(|rule| rule.erases_root())
+            && let Some(rule) = self
+                .rules
+                .rules()
+                .iter()
+                .filter_map(Rule::as_pattern)
+                .find(|rule| rule.erases_root())
         {
             let order = std::any::type_name::<O>();
             return Err(DriverError::ErasesRoot {
@@ -158,7 +164,8 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         let mut cursor = O::start(rewriter.stage(), root);
         while let Some(stmt) = cursor.next(rewriter.stage())? {
             let mut skip = false;
-            for rule in self.rules.rules() {
+            // Native rules join the sweep in a later change.
+            for rule in self.rules.rules().iter().filter_map(Rule::as_pattern) {
                 let Some(found) = Match::find(self.rules, rule, rewriter.stage(), stmt)? else {
                     continue;
                 };
