@@ -55,13 +55,12 @@ use kirin_ir::{
 use super::frames::DenseBlockFrame;
 use crate::Body;
 use crate::core::query;
-use crate::engines::sparse_backward::BodyScope;
 use crate::{
-    AbstractInterpreter, Callee, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
-    ExplicitSummaryDeps, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, Linker, OwnerAnalysis, ProgramPoint, SameStageLinker, Scoped, StageQuery,
-    StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex, SummaryEffect,
-    TerminatorArgs,
+    AbstractInterpreter, BackwardSummaryDeps, Callee, ClassicLiveness, DenseBackwardSemantic,
+    EnvIndex, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
+    InterpreterError, LinkTarget, Linker, OwnerAnalysis, ProgramPoint, SameStageLinker, Scoped,
+    StageQuery, StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex,
+    SummaryEffect, TerminatorArgs,
 };
 
 // ===========================================================================
@@ -317,7 +316,7 @@ where
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
-    type SummaryKey = Scoped<BodyScope, Block>;
+    type SummaryKey = Scoped<LinkTarget, Block>;
     type Summary = BlockLiveness<V>;
     type Frame = F;
     type Completion = DenseBackwardCompletion<V>;
@@ -338,8 +337,8 @@ pub enum DenseBackwardCompletion<V> {
 pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardFixpointInterpreter<
     DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
-    FactStore<Scoped<BodyScope, ProgramPoint>, V>,
-    ExplicitSummaryDeps<Scoped<BodyScope, Block>>,
+    FactStore<Scoped<LinkTarget, ProgramPoint>, V>,
+    BackwardSummaryDeps<Scoped<LinkTarget, Block>>,
 >;
 
 // ===========================================================================
@@ -530,7 +529,7 @@ struct DenseBackwardOwnerAnalysis;
 impl<'ir, S, V, E, F, Sem>
     OwnerAnalysis<
         DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        Scoped<BodyScope, Block>,
+        Scoped<LinkTarget, Block>,
         BlockLiveness<V>,
         F,
         DenseBackwardCompletion<V>,
@@ -546,7 +545,7 @@ where
     fn bottom_summary(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        _owner: &Scoped<BodyScope, Block>,
+        _owner: &Scoped<LinkTarget, Block>,
     ) -> Result<BlockLiveness<V>, E> {
         Ok(BlockLiveness::bottom())
     }
@@ -554,10 +553,10 @@ where
     fn entry_frame(
         &mut self,
         interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: &Scoped<BodyScope, Block>,
+        owner: &Scoped<LinkTarget, Block>,
         _summary: &BlockLiveness<V>,
     ) -> Result<F, E> {
-        let (stage, _cfg) = owner.scope;
+        let stage = owner.scope.stage;
         // Each owner walk starts from an empty exit state; the terminator's
         // absorbed edges seed the real live-out.
         interp.replace_state(V::bottom());
@@ -567,9 +566,9 @@ where
     fn complete_owner(
         &mut self,
         _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        owner: Scoped<BodyScope, Block>,
+        owner: Scoped<LinkTarget, Block>,
         completion: DenseBackwardCompletion<V>,
-    ) -> Result<SummaryEffect<Scoped<BodyScope, Block>, BlockLiveness<V>>, E> {
+    ) -> Result<SummaryEffect<Scoped<LinkTarget, Block>, BlockLiveness<V>>, E> {
         match completion {
             DenseBackwardCompletion::Block { live_in, live_out } => Ok(SummaryEffect::Update {
                 owner,
@@ -590,8 +589,8 @@ where
 ///
 /// ```ignore
 /// let analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
-/// let (scope, analysis) = analysis.analyze(stage, callee)?;
-/// let point = Scoped::new(scope, ProgramPoint::BlockEntry(block));
+/// let (target, analysis) = analysis.analyze(stage, callee)?;
+/// let point = Scoped::new(target, ProgramPoint::BlockEntry(block));
 /// let live_in = analysis.point_facts(point);
 /// ```
 pub struct DenseBackwardInterpreter<
@@ -658,7 +657,7 @@ where
     /// CFG-owner boundaries come directly from their fixpoint summaries;
     /// statement and nested structured-block points come from the point store.
     /// Each fact therefore has one mutable source during solving.
-    pub fn point_facts(&self, point: Scoped<BodyScope, ProgramPoint>) -> Option<&V> {
+    pub fn point_facts(&self, point: Scoped<LinkTarget, ProgramPoint>) -> Option<&V> {
         let summary_fact = match point.item {
             ProgramPoint::BlockEntry(block) => self
                 .driver
@@ -679,7 +678,7 @@ where
     /// The solver keeps CFG-owner boundaries in summaries because they drive
     /// convergence. This copies each final boundary into the returned result;
     /// it does not create a second mutable representation inside the engine.
-    pub fn facts(&self) -> FactStore<Scoped<BodyScope, ProgramPoint>, V> {
+    pub fn facts(&self) -> FactStore<Scoped<LinkTarget, ProgramPoint>, V> {
         let mut facts = self.driver.store().clone();
 
         for (owner, summary) in self.driver.summaries() {
@@ -723,7 +722,7 @@ where
         self,
         stage_name: &str,
         function_name: &str,
-    ) -> Result<(BodyScope, Self), E> {
+    ) -> Result<(LinkTarget, Self), E> {
         let stage = self
             .driver
             .inner()
@@ -744,7 +743,7 @@ where
         self,
         stage: CompileStage,
         symbol: Symbol,
-    ) -> Result<(BodyScope, Self), E> {
+    ) -> Result<(LinkTarget, Self), E> {
         self.analyze(stage, symbol.into())
     }
 
@@ -754,16 +753,15 @@ where
     ///
     /// Each call solves from fresh state. It consumes the engine and returns
     /// it on success, like the other analysis engines; an error drops it.
-    pub fn analyze(mut self, stage: CompileStage, callee: Callee) -> Result<(BodyScope, Self), E> {
+    pub fn analyze(mut self, stage: CompileStage, callee: Callee) -> Result<(LinkTarget, Self), E> {
         let pipeline = self.driver.inner().pipeline();
         let target = self.linker.resolve(pipeline, stage, &callee)?;
         let body = target.body(pipeline)?;
-        let scope = (target.stage, body);
         let blocks = self.direct_body_blocks(target.stage, body)?;
-        let owners: Vec<Scoped<BodyScope, Block>> = blocks
+        let owners: Vec<Scoped<LinkTarget, Block>> = blocks
             .iter()
             .copied()
-            .map(|block| Scoped::new(scope, block))
+            .map(|block| Scoped::new(target, block))
             .collect();
         let pipeline = self.driver.inner().pipeline();
         self.driver = StandardFixpointInterpreter::with_dependency_index(
@@ -774,6 +772,6 @@ where
 
         let mut owner_analysis = DenseBackwardOwnerAnalysis;
         self.driver.solve_many(&mut owner_analysis, owners)?;
-        Ok((scope, self))
+        Ok((target, self))
     }
 }

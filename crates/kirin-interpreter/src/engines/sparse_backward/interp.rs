@@ -41,8 +41,8 @@
 //! Requested outputs merge directly into the operands of the context's return
 //! sites (declared through [`declare_return`](SparseBackwardInterp::declare_return)).
 //!
-//! Call rules cross into another context through
-//! [`summarize_call`](SparseBackwardInterp::summarize_call), which registers the one
+//! Call rules return [`SparseBackwardEffect::Call`]; the [`DemandFrame`]
+//! summarizes the call, queueing the callee's context and registering the one
 //! non-topological dependency: callee parameter facts → the caller's call
 //! work. All fact mutation flows through the driver's single merge path.
 //! Facts only rise in a finite-height lattice and the default context space
@@ -62,15 +62,15 @@ use kirin_ir::{
 use super::DemandFrame;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, Body, Callee, ContextInsensitive, EnvIndex, FixpointProfile, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, OwnerAnalysis,
+    AbstractInterpreter, Body, CallEffect, Callee, ContextInsensitive, EnvIndex, FixpointProfile,
+    Interp, InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, OwnerAnalysis,
     OwnerSummaryDeps, SameStageLinker, Scoped, SparseBackwardSemantic, SparseStore, StageQuery,
     StandardFixpointInterpreter, StrongDemand, Summary, SummaryDependency, SummaryDependencyIndex,
     SummaryEffect, TerminatorArgs,
 };
 
 /// A resolved `(stage, body)` pair: the structure one callable context
-/// analyzes (and the scope dense liveness qualifies its facts with).
+/// analyzes.
 ///
 /// Arena ids are per-stage, so the stage is part of the scope.
 pub type BodyScope = (CompileStage, Body);
@@ -111,10 +111,16 @@ impl<V> DemandContext<V> for ContextInsensitive {
 /// spelling [`demand`](DemandInterp::demand)) and finish with
 /// [`effect()`](SparseBackwardInterp::effect), which drains the buffer into
 /// this value; the driver qualifies the values with the rule's callable
-/// context and applies them through its single merge path.
+/// context and applies them through its single merge path. A call rule
+/// returns [`Call`](Self::Call) instead, and the engine adds the callee's
+/// parameter facts to the buffered ones.
 pub enum SparseBackwardEffect<V> {
     /// Demand facts to merge (possibly empty).
     Demands(Vec<(SSAValue, V)>),
+    /// Cross a call: `inputs` are the facts on the call's results, `outputs`
+    /// the caller's argument slots. The engine raises the callee's current
+    /// parameter facts on those arguments, keeping facts the rule already raised.
+    Call(CallEffect<V>),
 }
 
 /// [`SparseBackwardShape`](crate::SparseBackwardShape)-engine flavor: the
@@ -122,8 +128,8 @@ pub enum SparseBackwardEffect<V> {
 /// sparse-backward semantics ([`StrongDemand`] today, downstream keys
 /// tomorrow) shares this surface: read a converged per-value fact, raise a
 /// fact, drain the raised facts into the rule's effect, query the block
-/// boundary facts terminator/structured rules map across, and cross callable
-/// boundaries. Rules are context-blind: they name bare SSA values and output
+/// boundary facts terminator/structured rules map across, and declare a
+/// callable's return sites. Rules are context-blind: they name bare SSA values and output
 /// positions, and the engine qualifies them with the callable context the
 /// dispatching work carries.
 ///
@@ -161,21 +167,6 @@ pub trait SparseBackwardInterp:
     /// output merges directly into those operands. Every return site of one
     /// callable must declare the same arity.
     fn declare_return(&mut self, operands: &[SSAValue]) -> Result<(), Self::Error>;
-
-    /// Cross a call boundary backward.
-    ///
-    /// Resolves `callee` (looked up in `stage`, defaulting to the current
-    /// stage) through the engine's linker, selects the callee's context,
-    /// merges `outputs[i]` into its output position `i` (activating it on
-    /// first use), and returns the facts currently on the callee's
-    /// parameters. The dispatching work reruns whenever those parameter facts
-    /// rise — including facts that are still bottom now.
-    fn summarize_call(
-        &mut self,
-        callee: Callee,
-        stage: Option<CompileStage>,
-        outputs: Product<Self::Value>,
-    ) -> Result<Product<Self::Value>, Self::Error>;
 }
 
 /// [`StrongDemand`]'s helper vocabulary on top of the shape-generic
@@ -320,6 +311,8 @@ pub type DemandContexts<K> = HashMap<K, CallableContext>;
 const UNDISCOVERED: InterpreterError =
     InterpreterError::Custom("demand context was never discovered");
 
+const CALL_OUTSIDE_WORK: InterpreterError =
+    InterpreterError::Custom("a call boundary was crossed outside propagation work");
 /// The per-location summary: one demand fact. Its merge is a real lattice
 /// join — `Some(())` iff the fact rose — which is what drives rescheduling.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -471,6 +464,11 @@ where
         (self.location, self.context) = saved;
     }
 
+    /// Drain the local facts the current rule has raised.
+    pub(super) fn take_demands(&mut self) -> Vec<(SSAValue, V)> {
+        mem::take(&mut self.demands)
+    }
+
     pub(super) fn current_context(&self) -> Result<&P::Key, InterpreterError> {
         self.context.as_ref().ok_or(InterpreterError::Custom(
             "no demand context is being dispatched",
@@ -545,7 +543,7 @@ where
     }
 
     fn effect(&mut self) -> SparseBackwardEffect<V> {
-        SparseBackwardEffect::Demands(mem::take(&mut self.inner_mut().demands))
+        SparseBackwardEffect::Demands(self.inner_mut().take_demands())
     }
 
     fn block_params(&self, block: Block) -> Result<Vec<SSAValue>, E> {
@@ -564,33 +562,6 @@ where
             .add_return(operands)?;
         Ok(())
     }
-
-    fn summarize_call(
-        &mut self,
-        callee: Callee,
-        stage: Option<CompileStage>,
-        outputs: Product<V>,
-    ) -> Result<Product<V>, E> {
-        let lookup_stage = stage.unwrap_or(self.stage());
-        let (target, key) = self.resolve_call_context(lookup_stage, &callee, &outputs)?;
-        let work = self.current_owner().cloned().ok_or_else(|| {
-            E::from(InterpreterError::Custom(
-                "a call boundary was crossed outside propagation work",
-            ))
-        })?;
-
-        let params = self.entry_params(target)?;
-        let mut facts = Product::new();
-        for param in params {
-            let location = Scoped::new(key.clone(), param);
-            self.dependency_index_mut()
-                .register(&location, SummaryDependency::Reanalyze(work.clone()))
-                .map_err(|error| E::from(InterpreterError::from(error)))?;
-            facts.0.push(self.fact_at(location));
-        }
-        self.inner_mut().activations.push((key, target, outputs));
-        Ok(facts)
-    }
 }
 
 impl<'ir, S, V, E, Lk, P, Sem> SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>
@@ -602,19 +573,74 @@ where
     P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
-    /// Resolve a callable and select its demand context.
-    fn resolve_call_context(
+    /// Resolve a callable, select its demand context and queue its
+    /// activation. Discovery stays deferred until the current work completes.
+    fn submit_call(
         &mut self,
         lookup_stage: CompileStage,
         callee: &Callee,
-        outputs: &Product<V>,
+        outputs: Product<V>,
     ) -> Result<(LinkTarget, P::Key), E> {
         let target = self
             .inner()
             .linker
             .resolve(self.inner().pipeline(), lookup_stage, callee)?;
-        let key = self.inner_mut().policy.key(&target, outputs);
+        let key = self.inner_mut().policy.key(&target, &outputs);
+        self.inner_mut()
+            .activations
+            .push((key.clone(), target, outputs));
         Ok((target, key))
+    }
+
+    /// Summarize a call without descending, mirroring the forward engine's
+    /// [`summarize_call`](crate::ForwardDataflowFrameEngine::summarize_call):
+    /// queue the callee context, register the caller's work on each callee
+    /// parameter fact, and return the callee's current non-bottom parameter
+    /// facts on the call's arguments for the driver to merge.
+    pub(super) fn summarize_call(
+        &mut self,
+        caller_stage: CompileStage,
+        call: CallEffect<V>,
+    ) -> Result<Vec<(SSAValue, V)>, E> {
+        let (target, key) = self.submit_call(
+            call.stage.unwrap_or(caller_stage),
+            &call.callee,
+            call.inputs,
+        )?;
+        let work = self
+            .current_owner()
+            .cloned()
+            .ok_or_else(|| E::from(CALL_OUTSIDE_WORK))?;
+        let params = self.entry_params(target)?;
+        if params.len() != call.outputs.len() {
+            return Err(E::from(InterpreterError::ProductArityMismatch {
+                expected: params.len(),
+                actual: call.outputs.len(),
+            }));
+        }
+        for param in &params {
+            self.dependency_index_mut()
+                .register(
+                    &Scoped::new(key.clone(), *param),
+                    SummaryDependency::Reanalyze(work.clone()),
+                )
+                .map_err(|error| E::from(InterpreterError::from(error)))?;
+        }
+        let facts = self.param_facts(&key, &params);
+        Ok(call
+            .outputs
+            .into_iter()
+            .zip(facts)
+            .filter(|(_, fact)| *fact != V::bottom())
+            .collect())
+    }
+
+    /// The current facts on a context's entry parameters.
+    fn param_facts(&self, key: &P::Key, params: &[SSAValue]) -> Product<V> {
+        params
+            .iter()
+            .map(|param| self.fact_at(Scoped::new(key.clone(), *param)))
+            .collect()
     }
 
     /// The current fact at a context-qualified location (bottom if absent).
@@ -661,7 +687,9 @@ where
     P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
-    /// Dispatch one statement's backward rule at `stage` under `context`.
+    /// Dispatch one statement's backward rule at `stage` under `context` and
+    /// return its effect. The caller decides what a [`Call`](SparseBackwardEffect::Call)
+    /// means: a [`DemandFrame`] summarizes it, discovery rejects it.
     pub(super) fn run_statement(
         &mut self,
         context: &P::Key,
@@ -691,7 +719,9 @@ where
     /// definitions — with nothing demanded yet, collecting the unconditional
     /// contributions (control roots) before any of them is merged. Rules
     /// whose contributions are conditional read bottom here and rerun when
-    /// the facts they consulted rise.
+    /// the facts they consulted rise. Discovery runs outside any work, so it
+    /// rejects a call; the shipped call rule never crosses here, since every
+    /// fact is still bottom.
     pub(super) fn discover(
         &mut self,
         key: &P::Key,
@@ -720,8 +750,10 @@ where
             let contents = query::body_contents(self.inner().pipeline(), stage, body)?;
             bodies.extend(contents.children);
             for statement in contents.statements {
-                let SparseBackwardEffect::Demands(demands) =
-                    self.run_statement(key, stage, statement)?;
+                let demands = match self.run_statement(key, stage, statement)? {
+                    SparseBackwardEffect::Demands(demands) => demands,
+                    SparseBackwardEffect::Call(_) => return Err(E::from(CALL_OUTSIDE_WORK)),
+                };
                 seeds.extend(
                     demands.into_iter().map(|(value, fact)| {
                         (Scoped::new(key.clone(), value), DemandSummary(fact))
@@ -1053,11 +1085,7 @@ where
         result_values: impl IntoIterator<Item = V>,
     ) -> Result<(Product<V>, Self), E> {
         let outputs: Product<V> = result_values.into_iter().collect();
-        let (target, root) = self.driver.resolve_call_context(stage, &callee, &outputs)?;
-        self.driver
-            .inner_mut()
-            .activations
-            .push((root.clone(), target, outputs));
+        let (target, root) = self.driver.submit_call(stage, &callee, outputs)?;
         let updates = self.driver.apply_activations()?;
         let mut owner_analysis = SparseBackwardOwnerAnalysis;
         for (location, fact) in updates {
@@ -1065,13 +1093,9 @@ where
                 .merge_summary(&mut owner_analysis, location, fact)?;
         }
         self.driver.drain_worklist(&mut owner_analysis)?;
-        let params = self
-            .driver
-            .entry_params(target)?
-            .into_iter()
-            .map(|param| self.driver.fact_at(Scoped::new(root.clone(), param)))
-            .collect();
+        let params = self.driver.entry_params(target)?;
+        let facts = self.driver.param_facts(&root, &params);
         self.root = Some(root);
-        Ok((params, self))
+        Ok((facts, self))
     }
 }
