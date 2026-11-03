@@ -139,8 +139,8 @@ fn classic_liveness_boundary_sets() {
     let pipeline = parse(PROGRAM);
     let (caller_stage, callee) = function_root(&pipeline, "main");
     let result = analyze_dense(&pipeline, caller_stage, callee).expect("analysis succeeds");
-    let scope = result.root_scope();
-    let (stage, Body::CFG(cfg)) = scope else {
+    let root = result.root();
+    let Body::CFG(cfg) = root.body(&pipeline).expect("@main has a body") else {
         panic!("@main resolves to a CFG body")
     };
 
@@ -151,20 +151,12 @@ fn classic_liveness_boundary_sets() {
     let entry = nth_block(&pipeline, cfg, 0);
     let then_block = nth_block(&pipeline, cfg, 1);
     let else_block = nth_block(&pipeline, cfg, 2);
-    let point = |item| Scoped::new(scope, item);
+    let point = |item| Scoped::new(root, item);
 
     // live_in(entry): %x (used by add and both edges) and %cond (branch use).
     assert_eq!(
         result.point_facts(point(ProgramPoint::BlockEntry(entry))),
         Some(&live_set(&[x, cond]))
-    );
-    assert_eq!(
-        result.point_facts(Scoped::new(
-            (stage, Body::Block(entry)),
-            ProgramPoint::BlockEntry(entry),
-        )),
-        None,
-        "the same point under another body scope is a different fact"
     );
     // live_out(entry): both successors' live-ins mapped across the edges —
     // {%a} → {%x}, {%b} → {%x}; the branch condition is a terminator *use*,
@@ -198,32 +190,32 @@ fn reusing_dense_engine_replaces_the_previous_scoped_result() {
     let (_, second) = function_root(&pipeline, "second");
     let engine = DenseLiveness::<_, InterpreterError>::new(&pipeline);
 
-    let (first_scope, engine) = engine
+    let (first_root, engine) = engine
         .analyze(stage, first)
         .expect("first callable analysis succeeds");
-    let (_, Body::CFG(first_cfg)) = first_scope else {
+    let Body::CFG(first_cfg) = first_root.body(&pipeline).expect("@first has a body") else {
         panic!("@first resolves to a CFG body")
     };
     let first_entry = nth_block(&pipeline, first_cfg, 0);
     assert!(
         engine
             .point_facts(Scoped::new(
-                first_scope,
+                first_root,
                 ProgramPoint::BlockEntry(first_entry),
             ))
             .is_some()
     );
 
-    let (second_scope, engine) = engine
+    let (second_root, engine) = engine
         .analyze(stage, second)
         .expect("second callable analysis succeeds");
-    let (_, Body::CFG(second_cfg)) = second_scope else {
+    let Body::CFG(second_cfg) = second_root.body(&pipeline).expect("@second has a body") else {
         panic!("@second resolves to a CFG body")
     };
     let second_entry = nth_block(&pipeline, second_cfg, 0);
     assert_eq!(
         engine.point_facts(Scoped::new(
-            first_scope,
+            first_root,
             ProgramPoint::BlockEntry(first_entry),
         )),
         None,
@@ -232,7 +224,7 @@ fn reusing_dense_engine_replaces_the_previous_scoped_result() {
     assert!(
         engine
             .point_facts(Scoped::new(
-                second_scope,
+                second_root,
                 ProgramPoint::BlockEntry(second_entry),
             ))
             .is_some()
@@ -244,8 +236,8 @@ fn classic_per_point_sets_gen_dead_uses() {
     let pipeline = parse(DEAD_RESULT_PROGRAM);
     let (caller_stage, callee) = function_root(&pipeline, "main");
     let result = analyze_dense(&pipeline, caller_stage, callee).expect("analysis succeeds");
-    let scope = result.root_scope();
-    let (_, Body::CFG(cfg)) = scope else {
+    let root = result.root();
+    let Body::CFG(cfg) = root.body(&pipeline).expect("@main has a body") else {
         panic!("@main resolves to a CFG body")
     };
 
@@ -258,11 +250,11 @@ fn classic_per_point_sets_gen_dead_uses() {
     // before it — this is the conventional per-point meaning (the old strong
     // expectations were demand projections, not dense liveness).
     assert_eq!(
-        result.point_facts(Scoped::new(scope, ProgramPoint::Before(add))),
+        result.point_facts(Scoped::new(root, ProgramPoint::Before(add))),
         Some(&live_set(&[a, b]))
     );
     assert_eq!(
-        result.point_facts(Scoped::new(scope, ProgramPoint::After(add))),
+        result.point_facts(Scoped::new(root, ProgramPoint::After(add))),
         Some(&live_set(&[a]))
     );
 }
@@ -274,9 +266,9 @@ fn classic_sets_filtered_by_demand_drop_unneeded_values() {
     let dense = analyze_dense(&pipeline, caller_stage, callee).expect("dense analysis succeeds");
     let demand = analyze_demand(&pipeline, caller_stage, callee, [Demand::Live])
         .expect("demand analysis succeeds");
-    let scope = dense.root_scope();
-    assert_eq!(scope, demand.root_scope());
-    let (_, Body::CFG(cfg)) = scope else {
+    let root = dense.root();
+    assert_eq!(root, demand.root().0);
+    let Body::CFG(cfg) = root.body(&pipeline).expect("@main has a body") else {
         panic!("@main resolves to a CFG body")
     };
 
@@ -289,7 +281,7 @@ fn classic_sets_filtered_by_demand_drop_unneeded_values() {
     // Filtering the classic set by demand drops %b: it is classically live
     // before the dead add but not demanded.
     let classic = dense
-        .point_facts(Scoped::new(scope, ProgramPoint::Before(add)))
+        .point_facts(Scoped::new(root, ProgramPoint::Before(add)))
         .expect("point reconstructed");
     let strong: LiveSet = classic
         .iter()

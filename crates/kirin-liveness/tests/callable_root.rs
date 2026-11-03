@@ -136,10 +136,10 @@ fn every_callee_variant_uses_the_same_backward_root_protocol() {
         let demand_scope = demand.scope(root).expect("root context is selected");
         assert!(matches!(demand_scope, (_, Body::Block(_))));
 
-        let (dense_scope, _) = DenseLiveness::<TestStage>::new(&pipeline)
+        let (dense_root, _) = DenseLiveness::<TestStage>::new(&pipeline)
             .analyze(stage, callee)
             .expect("dense succeeds");
-        assert_eq!(dense_scope, demand_scope);
+        assert_eq!(dense_root, root.0);
     }
 }
 
@@ -214,20 +214,20 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
         "the root context is the resolved target"
     );
     let demand_scope = demand.scope(root).expect("root context is selected");
-    let (dense_scope, dense) = DenseLiveness::<TestStage>::new(&pipeline)
+    let (dense_root, dense) = DenseLiveness::<TestStage>::new(&pipeline)
         .with_linker(CrossStageLinker)
         .analyze(source, callee)
         .expect("cross-stage dense succeeds");
     assert_eq!(demand_scope.0, lowered);
     assert!(matches!(demand_scope.1, Body::Block(_)));
-    assert_eq!(dense_scope, demand_scope);
+    assert_eq!(dense_root, root.0);
 
     // Dense analysis rebuilds solver state between roots; configuration state
     // must survive that reset.
     let (again, _) = dense
         .analyze(source, callee)
         .expect("custom linker survives dense reset");
-    assert_eq!(again, dense_scope);
+    assert_eq!(again, dense_root);
 }
 
 #[derive(Clone, Copy)]
@@ -305,7 +305,7 @@ fn specialized_handles_are_validated_before_accepting_a_candidate_stage() {
         .unwrap();
     let root = demand.root().unwrap();
     assert_eq!(root.0, target);
-    assert_eq!(Some(dense), demand.scope(root));
+    assert_eq!(dense, root.0);
 }
 
 #[test]
