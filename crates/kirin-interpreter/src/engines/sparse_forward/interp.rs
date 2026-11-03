@@ -243,16 +243,8 @@ impl<V> ForwardSummary<V> {
 }
 
 impl<V: Clone> Summary for ForwardSummary<V> {
-    type Strategy = ();
-    type Change = ();
-
-    fn merge(
-        &mut self,
-        _phase: crate::FixpointPhase,
-        _candidate: Self,
-        _strategy: &mut Self::Strategy,
-    ) -> Option<Self::Change> {
-        None
+    fn merge(&mut self, _candidate: Self) -> bool {
+        false
     }
 }
 
@@ -1019,7 +1011,7 @@ where
                 if changed {
                     let deps = self
                         .dependency_index_mut()
-                        .on_summary_changed(&owner, ())
+                        .on_summary_changed(&owner)
                         .expect("forward dependency index is infallible");
                     for dep in deps {
                         let SummaryDependency::Reanalyze(caller) = dep;
@@ -1417,7 +1409,6 @@ where
             driver: StandardFixpointInterpreter::with_dependency_index(
                 SparseForwardTransfer::new(pipeline),
                 (),
-                (),
                 ForwardDeps::new(),
             ),
         }
@@ -1441,7 +1432,6 @@ where
         SparseForwardInterpreter {
             driver: StandardFixpointInterpreter::with_dependency_index(
                 transfer,
-                (),
                 (),
                 ForwardDeps::new(),
             ),
@@ -1472,7 +1462,6 @@ where
             driver: StandardFixpointInterpreter::with_dependency_index(
                 transfer,
                 (),
-                (),
                 ForwardDeps::new(),
             ),
         }
@@ -1486,7 +1475,6 @@ where
         Self {
             driver: StandardFixpointInterpreter::with_dependency_index(
                 transfer,
-                (),
                 (),
                 ForwardDeps::new(),
             ),

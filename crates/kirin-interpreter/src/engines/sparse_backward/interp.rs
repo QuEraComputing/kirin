@@ -314,7 +314,7 @@ const UNDISCOVERED: InterpreterError =
 const CALL_OUTSIDE_WORK: InterpreterError =
     InterpreterError::Custom("a call boundary was crossed outside propagation work");
 /// The per-location summary: one demand fact. Its merge is a real lattice
-/// join — `Some(())` iff the fact rose — which is what drives rescheduling.
+/// join — `true` iff the fact rose — which is what drives rescheduling.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct DemandSummary<V>(pub V);
 
@@ -322,21 +322,13 @@ impl<V> Summary for DemandSummary<V>
 where
     V: Clone + PartialEq + Lattice,
 {
-    type Strategy = ();
-    type Change = ();
-
-    fn merge(
-        &mut self,
-        _phase: crate::FixpointPhase,
-        candidate: Self,
-        _strategy: &mut Self::Strategy,
-    ) -> Option<Self::Change> {
+    fn merge(&mut self, candidate: Self) -> bool {
         let joined = self.0.join(&candidate.0);
         if joined == self.0 {
-            None
+            false
         } else {
             self.0 = joined;
-            Some(())
+            true
         }
     }
 }
@@ -937,7 +929,6 @@ where
             driver: StandardFixpointInterpreter::with_dependency_index(
                 transfer,
                 Default::default(),
-                (),
                 OwnerSummaryDeps::new(),
             ),
         }

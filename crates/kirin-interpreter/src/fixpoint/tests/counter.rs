@@ -18,20 +18,12 @@ impl FixpointProfile<UnitInterp> for CounterProfile {
 struct CounterSummary(u8);
 
 impl Summary for CounterSummary {
-    type Strategy = ();
-    type Change = ();
-
-    fn merge(
-        &mut self,
-        _phase: FixpointPhase,
-        candidate: Self,
-        _strategy: &mut Self::Strategy,
-    ) -> Option<Self::Change> {
+    fn merge(&mut self, candidate: Self) -> bool {
         if candidate.0 > self.0 {
             self.0 = candidate.0;
-            Some(())
+            true
         } else {
-            None
+            false
         }
     }
 }
@@ -99,10 +91,10 @@ impl OwnerAnalysis<CounterInterp, u8, CounterSummary, CounterFrame, u8, Interpre
 
 #[test]
 fn simple_fixpoint_reanalyzes_until_summary_stops_changing() {
-    let mut interp = CounterInterp::new(UnitInterp, (), ());
+    let mut interp = CounterInterp::new(UnitInterp, ());
     let mut owner_analysis = CounterOwnerAnalysis;
 
-    interp.solve(&mut owner_analysis, 0).unwrap();
+    interp.solve_many(&mut owner_analysis, [0]).unwrap();
 
     assert_eq!(interp.summary(&0), Some(&CounterSummary(2)));
 }

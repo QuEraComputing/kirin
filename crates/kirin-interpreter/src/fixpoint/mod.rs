@@ -19,9 +19,9 @@ mod traits;
 mod tests;
 
 pub use deps::{
-    BackwardSummaryDeps, ForwardSummaryDeps, OwnerSummaryDeps, SummaryDependencies,
-    SummaryDependency, SummaryDependencyIndex,
+    ExplicitSummaryDeps, OwnerSummaryDeps, SummaryDependencies, SummaryDependency,
+    SummaryDependencyIndex,
 };
-pub use driver::{SimpleFixpointInterpreter, StandardFixpointInterpreter};
+pub use driver::StandardFixpointInterpreter;
 pub use profile::FixpointProfile;
-pub use traits::{FixpointPhase, OwnerAnalysis, Summary, SummaryEffect, WorkItem};
+pub use traits::{OwnerAnalysis, Summary, SummaryEffect, WorkItem};

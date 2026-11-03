@@ -18,20 +18,12 @@ impl FixpointProfile<UnitInterp> for DepProfile {
 struct DepSummary(u8);
 
 impl Summary for DepSummary {
-    type Strategy = ();
-    type Change = ();
-
-    fn merge(
-        &mut self,
-        _phase: FixpointPhase,
-        candidate: Self,
-        _strategy: &mut Self::Strategy,
-    ) -> Option<Self::Change> {
+    fn merge(&mut self, candidate: Self) -> bool {
         if candidate.0 > self.0 {
             self.0 = candidate.0;
-            Some(())
+            true
         } else {
-            None
+            false
         }
     }
 }
@@ -102,12 +94,12 @@ where
 
 #[test]
 fn forward_dependencies_schedule_successors_when_summary_changes() {
-    let mut deps = ForwardSummaryDeps::new();
+    let mut deps = ExplicitSummaryDeps::new();
     deps.register(&0, SummaryDependency::Reanalyze(1)).unwrap();
-    let mut interp = DepInterp::with_dependency_index(UnitInterp, (), (), deps);
+    let mut interp = DepInterp::with_dependency_index(UnitInterp, (), deps);
     let mut owner_analysis = DepOwnerAnalysis;
 
-    interp.solve(&mut owner_analysis, 0).unwrap();
+    interp.solve_many(&mut owner_analysis, [0]).unwrap();
 
     assert_eq!(interp.summary(&0), Some(&DepSummary(1)));
     assert_eq!(interp.summary(&1), Some(&DepSummary(2)));
@@ -115,23 +107,22 @@ fn forward_dependencies_schedule_successors_when_summary_changes() {
 
 #[test]
 fn forward_dependencies_do_not_implicitly_reanalyze_the_same_owner() {
-    let mut interp =
-        DepInterp::with_dependency_index(UnitInterp, (), (), ForwardSummaryDeps::new());
+    let mut interp = DepInterp::with_dependency_index(UnitInterp, (), ExplicitSummaryDeps::new());
     let mut owner_analysis = DepOwnerAnalysis;
 
-    interp.solve(&mut owner_analysis, 0).unwrap();
+    interp.solve_many(&mut owner_analysis, [0]).unwrap();
 
     assert_eq!(interp.summary(&0), Some(&DepSummary(1)));
 }
 
 #[test]
 fn backward_dependencies_schedule_predecessors_when_summary_changes() {
-    let mut deps = BackwardSummaryDeps::new();
+    let mut deps = ExplicitSummaryDeps::new();
     deps.register(&1, SummaryDependency::Reanalyze(0)).unwrap();
-    let mut interp = DepInterp::with_dependency_index(UnitInterp, (), (), deps);
+    let mut interp = DepInterp::with_dependency_index(UnitInterp, (), deps);
     let mut owner_analysis = DepOwnerAnalysis;
 
-    interp.solve(&mut owner_analysis, 1).unwrap();
+    interp.solve_many(&mut owner_analysis, [1]).unwrap();
 
     assert_eq!(interp.summary(&1), Some(&DepSummary(2)));
     assert_eq!(interp.summary(&0), Some(&DepSummary(1)));
@@ -139,11 +130,10 @@ fn backward_dependencies_schedule_predecessors_when_summary_changes() {
 
 #[test]
 fn backward_dependencies_do_not_implicitly_reanalyze_the_same_owner() {
-    let mut interp =
-        DepInterp::with_dependency_index(UnitInterp, (), (), BackwardSummaryDeps::new());
+    let mut interp = DepInterp::with_dependency_index(UnitInterp, (), ExplicitSummaryDeps::new());
     let mut owner_analysis = DepOwnerAnalysis;
 
-    interp.solve(&mut owner_analysis, 1).unwrap();
+    interp.solve_many(&mut owner_analysis, [1]).unwrap();
 
     assert_eq!(interp.summary(&1), Some(&DepSummary(2)));
 }

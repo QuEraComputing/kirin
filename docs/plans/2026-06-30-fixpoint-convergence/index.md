@@ -1,6 +1,21 @@
 # Fixpoint framework convergence — restore the mature owner-summary engine on `dl/liveness` without duplicating `Interp`
 
-Status: **locked plan** (rev 2026-07-01). Supersedes the 2026-06-30 "rebase onto `rust`" framing (see §0).
+Status: **historical plan** (rev 2026-07-01; originally locked). Supersedes the
+2026-06-30 "rebase onto `rust`" framing (see §0). The API details below are
+partially superseded by the B1 framework cleanup.
+
+**B1 update:** this document preserves the original migration plan, not the
+current API contract. B1 removed `FixpointPhase`, framework phase/strategy state,
+`run_narrowing`, pending summary effects, the public frame-stack accessors, and
+`SimpleFixpointInterpreter`. `Summary::merge(candidate) -> bool` replaces the
+phase/strategy/change contract; dependency notifications no longer carry a
+change payload. `solve` was removed and its remaining tests use `solve_many`.
+`ExplicitSummaryDeps` replaces the identical `ForwardSummaryDeps` and
+`BackwardSummaryDeps`; `OwnerSummaryDeps` retains automatic self-dependencies.
+The forward driver uses `ForwardDeps` to combine explicit summary dependencies
+with SSA-value dependencies, and its auxiliary store is `()`. Widening remains
+in the forward engine's analysis policy, not in the shared driver.
+For the current design, see [Interpreter Framework — Engines](../../design/interpreter/index.md#engines).
 
 Goal: bring the mature owner-summary fixpoint framework from the `rust` branch onto
 `dl/liveness`, **adapted** to the current interpreter model. `Interp` stays the single

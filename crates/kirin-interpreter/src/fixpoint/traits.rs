@@ -3,47 +3,17 @@
 //! The driver ([`StandardFixpointInterpreter`](super::StandardFixpointInterpreter))
 //! runs one work item per **summary owner** and delegates intra-owner traversal
 //! to a frame stack. These traits describe only the convergence boundary:
-//! [`Summary`] (the facts at an owner, plus how they merge under a
-//! [`FixpointPhase`]), [`OwnerAnalysis`] (how to seed, enter, and complete an
-//! owner), and [`SummaryEffect`] (the summary updates an owner produces). The
+//! [`Summary`] (the facts at an owner, plus how they merge), [`OwnerAnalysis`]
+//! (how to seed, enter, and complete an owner), and [`SummaryEffect`] (the summary updates an owner produces). The
 //! value/error/effect/semantics of the analysis stay on the wrapped
 //! [`Interp`](crate::Interp).
-
-/// The convergence phase the driver is in.
-///
-/// Finite-lattice analyses (e.g. liveness) ignore `Widen`/`Narrow`; interval and
-/// constant-propagation analyses use them to force and then refine termination.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum FixpointPhase {
-    /// Least-upper-bound merge.
-    ///
-    /// Note: the driver may start directly in `Widen` (or switch phases
-    /// explicitly) depending on the analysis' convergence policy.
-    Join,
-    /// Accelerate towards a post-fixpoint with a widening operator.
-    Widen,
-    /// Refine a post-fixpoint back down towards the least fixpoint.
-    Narrow,
-}
 
 /// The per-owner fact bundle the driver converges.
 ///
 /// [`merge`](Summary::merge) folds a freshly computed `candidate` into `self`
-/// under the current [`FixpointPhase`], returning `Some(change)` iff `self`
-/// actually moved (which drives dependency re-scheduling) and `None` at a fixed
-/// point.
+/// and returns whether it changed, driving dependency re-scheduling.
 pub trait Summary: Clone {
-    /// Per-analysis widening/narrowing policy state threaded through `merge`.
-    type Strategy;
-    /// Evidence that a merge changed the summary (often `()`).
-    type Change;
-
-    fn merge(
-        &mut self,
-        phase: FixpointPhase,
-        candidate: Self,
-        strategy: &mut Self::Strategy,
-    ) -> Option<Self::Change>;
+    fn merge(&mut self, candidate: Self) -> bool;
 }
 
 /// How the driver seeds, enters, and completes one summary owner.

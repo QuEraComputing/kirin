@@ -24,7 +24,7 @@
 //!   spellings).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the block-boundary
 //!   summaries ([`BlockLiveness`], keyed by [`Scoped`] blocks), the block
-//!   worklist, and [`BackwardSummaryDeps`] (successor changed → reanalyse
+//!   worklist, and [`ExplicitSummaryDeps`] (successor changed → reanalyse
 //!   predecessor, registered self-discoveringly by
 //!   [`absorb_edges`](DenseBackwardFrameEngine::absorb_edges)).
 //!
@@ -56,8 +56,8 @@ use super::frames::DenseBlockFrame;
 use crate::Body;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, BackwardSummaryDeps, Callee, ClassicLiveness, DenseBackwardSemantic,
-    EnvIndex, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
+    AbstractInterpreter, Callee, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
+    ExplicitSummaryDeps, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
     InterpreterError, LinkTarget, Linker, OwnerAnalysis, ProgramPoint, SameStageLinker, Scoped,
     StageQuery, StandardFixpointInterpreter, Summary, SummaryDependency, SummaryDependencyIndex,
     SummaryEffect, TerminatorArgs,
@@ -265,8 +265,8 @@ where
 // ===========================================================================
 
 /// One block's converged boundary states. The merge is a real per-half
-/// lattice join — `Some(())` iff either boundary rose — which is what drives
-/// predecessor rescheduling through [`BackwardSummaryDeps`].
+/// lattice join — `true` iff either boundary rose — which is what drives
+/// predecessor rescheduling through [`ExplicitSummaryDeps`].
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BlockLiveness<V> {
     pub live_in: V,
@@ -286,15 +286,7 @@ impl<V> Summary for BlockLiveness<V>
 where
     V: Clone + PartialEq + Lattice,
 {
-    type Strategy = ();
-    type Change = ();
-
-    fn merge(
-        &mut self,
-        _phase: crate::FixpointPhase,
-        candidate: Self,
-        _strategy: &mut Self::Strategy,
-    ) -> Option<Self::Change> {
+    fn merge(&mut self, candidate: Self) -> bool {
         let mut changed = false;
         let live_in = self.live_in.join(&candidate.live_in);
         if live_in != self.live_in {
@@ -306,7 +298,7 @@ where
             self.live_out = live_out;
             changed = true;
         }
-        changed.then_some(())
+        changed
     }
 }
 
@@ -346,7 +338,7 @@ pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardF
     DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
     FactStore<Scoped<LinkTarget, ProgramPoint>, V>,
-    BackwardSummaryDeps<Scoped<LinkTarget, Block>>,
+    ExplicitSummaryDeps<Scoped<LinkTarget, Block>>,
 >;
 
 // ===========================================================================
@@ -631,8 +623,7 @@ where
             driver: StandardFixpointInterpreter::with_dependency_index(
                 DenseBackwardTransfer::new(pipeline),
                 FactStore::new(),
-                (),
-                BackwardSummaryDeps::new(),
+                ExplicitSummaryDeps::new(),
             ),
             linker: SameStageLinker,
         }
@@ -776,8 +767,7 @@ where
         self.driver = StandardFixpointInterpreter::with_dependency_index(
             DenseBackwardTransfer::new(pipeline),
             FactStore::new(),
-            (),
-            BackwardSummaryDeps::new(),
+            ExplicitSummaryDeps::new(),
         );
 
         let mut owner_analysis = DenseBackwardOwnerAnalysis;
