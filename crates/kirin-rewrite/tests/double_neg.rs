@@ -2,14 +2,16 @@
 //! driven to a fixpoint inside `Pipeline::run_pass` in every walk order.
 
 use kirin::prelude::*;
-use kirin_arith::Arith;
-use kirin_ir::SSAKind;
+use kirin_arith::{Arith, ArithType};
 use kirin_ir::walk::{BFS, KeepOrderReverseBFS, PostOrder, PreOrder, ReverseBFS, WalkOrder};
+use kirin_ir::{BuilderSSAKind, Placeholder, SSAKind};
 use kirin_rewrite::{
     DriverError, NativeValue, PatternRule, RewriteDriver, RewriteSummary, RuleErrorKind, RuleSet,
 };
 use kirin_test_languages::ArithFunctionLanguage as L;
-use kirin_wildcard::rewrite_rule;
+use kirin_wildcard::{
+    Constraint, Hole, NativeCall, Pattern, PatternLanguage, Replace, Rewrite, rewrite_rule,
+};
 
 /// `-(-x)` is `x`: integer negation wraps and float negation flips the sign
 /// bit, so negating twice is exact. The two `neg`s are left dead for the
@@ -293,6 +295,66 @@ fn add_of_negs() {
 
 fn neg_rules() -> RuleSet<L> {
     RuleSet::build(|stage| vec![double_neg(stage)]).expect("the rules are valid")
+}
+
+/// `double_neg_of_argument` built by hand, with no native function
+/// attached: the `wildcard.pattern` statement and its `is_block_argument`
+/// call.
+fn hand_built_double_neg_of_argument(
+    stage: &mut BuilderStageInfo<PatternLanguage<L>>,
+) -> (Statement, Statement) {
+    // The single result of the next statement built.
+    let next_result = |stage: &mut BuilderStageInfo<PatternLanguage<L>>| -> ResultValue {
+        let statement = stage.statement_arena().next_id();
+        stage
+            .ssa()
+            .ty(Placeholder::placeholder())
+            .kind(BuilderSSAKind::Result(statement, 0))
+            .new()
+            .into()
+    };
+    let x = next_result(stage);
+    let hole = stage.statement().definition(Hole::new_hole(x)).new();
+    let a = next_result(stage);
+    let neg_x = stage
+        .statement()
+        .definition(PatternLanguage::Op(
+            Arith::new_neg(SSAValue::from(x), a).into(),
+        ))
+        .new();
+    let r = next_result(stage);
+    let neg_a = stage
+        .statement()
+        .definition(PatternLanguage::Op(
+            Arith::new_neg(SSAValue::from(a), r).into(),
+        ))
+        .new();
+    let success = next_result(stage);
+    let call = stage
+        .statement()
+        .definition(NativeCall::new_native_call(
+            "is_block_argument".to_string(),
+            vec![SSAValue::from(x)],
+            vec![success],
+        ))
+        .new();
+    let constraint = Constraint::<ArithType>::new(stage, SSAValue::from(success)).id;
+    let replace = Replace::<ArithType>::new(stage, SSAValue::from(r), SSAValue::from(x)).id;
+    let rewrite_body = stage.block().stmt(replace).new();
+    let rewrite = Rewrite::<ArithType>::new(stage, neg_a, rewrite_body).id;
+    let body = stage
+        .block()
+        .stmt(hole)
+        .stmt(neg_x)
+        .stmt(neg_a)
+        .stmt(call)
+        .stmt(constraint)
+        .terminator(rewrite)
+        .new();
+    let name = stage
+        .symbol_table_mut()
+        .intern("double_neg_of_argument".to_string());
+    (Pattern::<ArithType>::new(stage, name, body).id, call)
 }
 
 /// A one-function program on `%x: i64` with `body` before `ret`.
@@ -621,11 +683,10 @@ fn a_constraint_on_a_non_bool_fails_the_run() {
     // The macro makes a constraint's function return a `bool`, so only a
     // hand-built rule can pass it anything else.
     let rules = RuleSet::build(|stage| {
-        let pattern = double_neg_of_argument(stage).pattern();
+        let (pattern, call) = hand_built_double_neg_of_argument(stage);
         vec![
-            PatternRule::new(pattern).check("is_block_argument", |_, _| {
-                Ok(Some(vec![NativeValue::new(1_i64)]))
-            }),
+            PatternRule::new(pattern)
+                .check_at(call, |_, _| Ok(Some(vec![NativeValue::new(1_i64)]))),
         ]
     })
     .unwrap();
@@ -696,10 +757,15 @@ fn an_unregistered_native_function_rejects_the_rule() {
 
 #[test]
 fn a_native_call_with_two_functions_rejects_the_rule() {
-    // The macro attaches a function to each call; one more for the name
-    // gives the call two.
+    // The macro attaches one function to each call, so only a hand-built
+    // rule can give a call two.
     let error = RuleSet::build(|stage| {
-        vec![double_neg_of_argument(stage).check("is_block_argument", |_, _| Ok(None))]
+        let (pattern, call) = hand_built_double_neg_of_argument(stage);
+        vec![
+            PatternRule::new(pattern)
+                .check_at(call, |_, _| Ok(None))
+                .check_at(call, |_, _| Ok(None)),
+        ]
     })
     .err()
     .expect("`is_block_argument` has two functions");

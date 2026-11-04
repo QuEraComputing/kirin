@@ -33,7 +33,7 @@ fn matches_call(symbols: &[&str], target: usize) -> usize {
         let body = stage.block().stmt(op).terminator(rewrite.id).new();
         let name = stage.symbol_table_mut().intern("match_foo".to_string());
         let pattern = Pattern::<ArithType>::new(stage, name, body).id;
-        vec![PatternRule::new(pattern).action("record", move |_, _| {
+        vec![PatternRule::new(pattern).action_at(action.id, move |_, _| {
             recorded.set(recorded.get() + 1);
             Ok(vec![])
         })]

@@ -145,10 +145,10 @@ impl<L: Dialect> CheckedRule<L> {
                 }
                 PatternLanguage::Wildcard(PatternStatement::Hole(_)) => {}
                 PatternLanguage::Wildcard(PatternStatement::NativeCall(call)) => {
-                    // The call needs exactly one function, attached to it
-                    // or to its name: none or two reject the rule.
+                    // The call needs exactly one function: none or two
+                    // reject the rule.
                     let name = || call.name().to_string();
-                    let mut found = natives.checks_of(stmt, call.name());
+                    let mut found = natives.checks_of(stmt);
                     let function = match (found.next(), found.next()) {
                         (Some(function), None) => function.clone(),
                         (None, _) => return Err(error(RuleErrorKind::UnknownCheck(name()))),
@@ -197,7 +197,7 @@ impl<L: Dialect> CheckedRule<L> {
                 PatternLanguage::Wildcard(PatternStatement::NativeCall(call)) => {
                     // Exactly one function, as for a check.
                     let name = || call.name().to_string();
-                    let mut found = natives.actions_of(stmt, call.name());
+                    let mut found = natives.actions_of(stmt);
                     let function = match (found.next(), found.next()) {
                         (Some(function), None) => function.clone(),
                         (None, _) => return Err(error(RuleErrorKind::UnknownAction(name()))),

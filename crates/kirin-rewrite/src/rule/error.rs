@@ -44,13 +44,13 @@ pub enum RuleErrorKind {
     /// a new op.
     UnsupportedAction { position: usize },
     /// A `native_call` in the pattern body named this has no check function
-    /// attached, to it or to its name.
+    /// attached.
     UnknownCheck(String),
     /// A `native_call` in the rewrite body named this has no action function
     /// attached.
     UnknownAction(String),
     /// A `native_call` in the pattern body named this has two check
-    /// functions attached, e.g. one for its statement and one for its name.
+    /// functions attached, e.g. by two `check_at`s for its statement.
     TwoChecks(String),
     /// A `native_call` in the rewrite body named this has two action
     /// functions attached.
