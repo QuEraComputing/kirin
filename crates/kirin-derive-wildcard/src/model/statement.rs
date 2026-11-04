@@ -84,8 +84,8 @@ pub(crate) enum StmtKind {
     Op { op: syn::Path, args: Vec<Use> },
     /// `let log_val = log2(val);`: a native function computing values.
     /// `fallible` if the call ends in `?`: the function returns an `Option`
-    /// in the match, where `None` fails it, or a `Result` in a `rewrite!`
-    /// body, where `Err` fails the rewrite.
+    /// or a `Result`. In the match, `None` fails the match and `Err` the
+    /// run; in a `rewrite!` body, both fail the run.
     ///
     /// `unpack` is how the `let` pattern takes the returned value apart into
     /// the results.

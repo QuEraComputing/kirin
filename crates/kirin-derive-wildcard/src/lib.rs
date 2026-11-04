@@ -24,7 +24,7 @@ use proc_macro::TokenStream;
 /// | `let v = f(x);` | the value |
 /// | `let v = f(x)?;` in the match | `Option<_>`, whose `None` fails the match, or `Result<_, E>`, whose `Err` fails the run with the error (`E: Error + Send + Sync + 'static`) |
 /// | `let v = f(x)?;` in the `rewrite!` body | `Option<_>` or `Result<_, E>` (`E: Error + Send + Sync + 'static`); `None` or `Err` fails the run, as the rule already matched |
-/// | `let (a, b) = f(x);` | a tuple, one value per name |
+/// | `let (a, b) = f(x);` | a tuple, taken apart as in Rust: `(a,)` binds a 1-tuple's element, and patterns nest, e.g. `let ((a, _), b) = f(x);` |
 /// | `f(x);` in the `rewrite!` body | `()`, or an `Option` or `Result` with `?` |
 ///
 /// Each call is compiled on its own, so one function may be called in

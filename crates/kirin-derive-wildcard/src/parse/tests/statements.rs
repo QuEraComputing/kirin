@@ -113,7 +113,8 @@ fn parse_local_binds_a_native_computation() {
     assert_eq!(names(&model, &model.statement(stmt).results), ["q", "r"]);
 }
 
-/// `?` after the call marks it fallible: its function returns an `Option`.
+/// `?` after the call marks it fallible: its function returns an `Option`
+/// or a `Result`.
 #[test]
 fn parse_local_marks_a_call_with_try_as_fallible() {
     let mut parser = parser();
