@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::Hash;
 
-use kirin_ir::{Arena, Id, Identifier};
+use kirin_ir::{Arena, HasBottom, Id, Identifier, Lattice};
 
 use crate::{FactStore, InterpreterError, LatticeAnchor};
 
@@ -78,11 +78,12 @@ where
 /// `EnvIndex -> FactStore<A, V>` (the facts it holds). Fact maps stay separate
 /// per environment, so equal anchors under different contexts never collide.
 ///
-/// The container is deliberately ignorant of what it stores. It knows nothing
-/// about bottom values, widening, dependencies, or scheduling, and an absent
-/// anchor is reported as absent rather than interpreted: what absence *means*
-/// is the engine's decision, made in [`Env`](crate::Env).
-/// [`write`](Self::write) assigns and never joins.
+/// The container knows nothing about widening, dependencies, or scheduling.
+/// [`read`](Self::read) reports an absent anchor as absent rather than
+/// interpreting it: what absence *means* is the engine's decision, made in
+/// [`Env`](crate::Env). [`write`](Self::write) assigns and never joins; for
+/// analyses, [`join`](Self::join) merges with [`Lattice::join_assign`] and
+/// reports whether the fact rose, and the engine schedules dependents.
 ///
 /// The *analysis* chooses context identity — a key `K` derived from a resolved
 /// call target and its abstract arguments — and this container only maps that
@@ -155,6 +156,28 @@ where
         Ok(())
     }
 
+    /// Join `incoming` into the fact at `anchor` and report whether it rose.
+    /// Absent is bottom: joining bottom into an absent anchor stores nothing.
+    pub fn join(
+        &mut self,
+        index: EnvIndex,
+        anchor: A,
+        incoming: &V,
+    ) -> Result<bool, InterpreterError>
+    where
+        V: Lattice + HasBottom + Clone,
+    {
+        let facts = self.environment_mut(index)?;
+        Ok(match facts.get_mut(anchor.clone()) {
+            Some(fact) => fact.join_assign(incoming),
+            None if incoming.is_subseteq(&V::bottom()) => false,
+            None => {
+                facts.set(anchor, incoming.clone());
+                true
+            }
+        })
+    }
+
     fn alloc_with(&mut self, key: Option<K>) -> EnvIndex {
         self.environments.alloc(Some(Environment {
             key,
@@ -199,6 +222,15 @@ where
         let index = self.alloc_with(Some(key.clone()));
         self.context_indices.insert(key, index);
         index
+    }
+
+    /// Every keyed context and its environment, each once, in no particular
+    /// order. Reading each environment's own facts from here visits every
+    /// context and fact once.
+    pub fn contexts(&self) -> impl Iterator<Item = (&K, EnvIndex)> {
+        self.context_indices
+            .iter()
+            .map(|(key, index)| (key, *index))
     }
 
     /// Retire an environment and drop its context association, if it had one.

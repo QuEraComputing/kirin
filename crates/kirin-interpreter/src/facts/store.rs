@@ -46,6 +46,11 @@ impl<A: LatticeAnchor, F> FactStore<A, F> {
         self.facts.get(&anchor)
     }
 
+    /// The fact stored at `anchor`, for an in-place update, or `None` if absent.
+    pub fn get_mut(&mut self, anchor: A) -> Option<&mut F> {
+        self.facts.get_mut(&anchor)
+    }
+
     /// Overwrite the fact at `anchor`.
     pub fn set(&mut self, anchor: A, fact: F) {
         self.facts.insert(anchor, fact);
