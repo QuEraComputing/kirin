@@ -17,19 +17,6 @@ use crate::{FactStore, InterpreterError, LatticeAnchor};
 pub struct EnvIndex(Id);
 
 impl EnvIndex {
-    /// A fixed handle for engines that keep no environments but must still
-    /// answer [`Interp::index`](crate::Interp::index) (the backward engines).
-    ///
-    /// It equals the handle an [`EnvStore`]'s first allocation returns, so it
-    /// must never be used to address a store. What prevents that is the type
-    /// system: environments are reached only through [`Env`](crate::Env) and
-    /// the [`SparseForwardInterp`](crate::SparseForwardInterp) helpers built on
-    /// it, and the backward engines implement neither. Remove this once the
-    /// backward engines keep their facts in environments.
-    pub(crate) fn placeholder() -> Self {
-        Arena::<Self, ()>::default().next_id()
-    }
-
     pub fn raw(self) -> usize {
         self.0.raw()
     }

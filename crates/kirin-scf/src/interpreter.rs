@@ -210,13 +210,13 @@ where
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        let stage = interp.stage();
+        let (stage, index) = (interp.stage(), interp.index());
         for result in &self.results {
             interp.kill_def(*result)?;
         }
         interp.gen_live(self.condition)?;
         Ok(DenseBackwardEffect::Push {
-            frame: DenseScfIfFrame::new(stage, self.then_body, self.else_body).into(),
+            frame: DenseScfIfFrame::new(stage, index, self.then_body, self.else_body).into(),
         })
     }
 }
@@ -232,7 +232,7 @@ where
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        let stage = interp.stage();
+        let (stage, index) = (interp.stage(), interp.index());
         for result in &self.results {
             interp.kill_def(*result)?;
         }
@@ -243,7 +243,7 @@ where
             interp.gen_live(*init)?;
         }
         Ok(DenseBackwardEffect::Push {
-            frame: DenseScfForFrame::new(stage, self.body).into(),
+            frame: DenseScfForFrame::new(stage, index, self.body).into(),
         })
     }
 }
@@ -268,6 +268,8 @@ where
 /// rule already applied the kills and the condition gen).
 pub struct DenseScfIfFrame<V, E> {
     stage: CompileStage,
+    /// The environment the arm walks run in.
+    index: EnvIndex,
     arms: VecDeque<Block>,
     /// The state after the `scf.if` (captured on the first step).
     after: Option<V>,
@@ -277,9 +279,10 @@ pub struct DenseScfIfFrame<V, E> {
 }
 
 impl<V, E> DenseScfIfFrame<V, E> {
-    pub fn new(stage: CompileStage, then_body: Block, else_body: Block) -> Self {
+    pub fn new(stage: CompileStage, index: EnvIndex, then_body: Block, else_body: Block) -> Self {
         Self {
             stage,
+            index,
             arms: VecDeque::from([then_body, else_body]),
             after: None,
             joined: None,
@@ -308,10 +311,10 @@ where
             Some(arm) => {
                 let after = self.after.clone().expect("after-state captured");
                 interp.replace_state(after);
-                let stage = self.stage;
+                let (stage, index) = (self.stage, self.index);
                 Ok(FrameEffect::Push {
                     parent: self,
-                    child: DenseBlockFrame::structured_body(stage, arm).into(),
+                    child: DenseBlockFrame::structured_body(stage, index, arm).into(),
                 })
             }
             None => {
@@ -362,6 +365,8 @@ where
 /// parameters — the initial-value gens were applied by the rule.
 pub struct DenseScfForFrame<V, E> {
     stage: CompileStage,
+    /// The environment the body walks run in.
+    index: EnvIndex,
     body: Block,
     /// Captured on the first step.
     seed: Option<V>,
@@ -373,9 +378,10 @@ pub struct DenseScfForFrame<V, E> {
 }
 
 impl<V, E> DenseScfForFrame<V, E> {
-    pub fn new(stage: CompileStage, body: Block) -> Self {
+    pub fn new(stage: CompileStage, index: EnvIndex, body: Block) -> Self {
         Self {
             stage,
+            index,
             body,
             seed: None,
             params: Vec::new(),
@@ -422,10 +428,10 @@ where
         }
         let entry = self.entry.clone().expect("entry estimate present");
         interp.replace_state(entry);
-        let (stage, body) = (self.stage, self.body);
+        let (stage, index, body) = (self.stage, self.index, self.body);
         Ok(FrameEffect::Push {
             parent: self,
-            child: DenseBlockFrame::structured_body(stage, body).into(),
+            child: DenseBlockFrame::structured_body(stage, index, body).into(),
         })
     }
 

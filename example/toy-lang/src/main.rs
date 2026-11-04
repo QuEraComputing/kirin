@@ -5,7 +5,7 @@ mod stage;
 use clap::{Parser, Subcommand};
 use kirin::prelude::*;
 use kirin::pretty::PipelinePrintExt;
-use kirin_interpreter::{ProgramPoint, Scoped};
+use kirin_interpreter::ProgramPoint;
 
 use stage::Stage;
 
@@ -179,9 +179,8 @@ fn print_block_liveness<L: Dialect>(
     cfg: CFG,
     dense: &kirin_liveness::DenseLivenessResult,
 ) {
-    let root = dense.root();
     for block in cfg.blocks(info) {
-        let point = |item| dense.point_facts(Scoped::new(root, item));
+        let point = |item| dense.point_facts(item);
         let (Some(live_in), Some(live_out)) = (
             point(ProgramPoint::BlockEntry(block)),
             point(ProgramPoint::BlockExit(block)),

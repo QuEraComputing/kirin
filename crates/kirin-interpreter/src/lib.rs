@@ -96,10 +96,9 @@ pub use engines::sparse_backward::{
 };
 // Dense backward engine (`Sem = ClassicLiveness`) + the dense standard frames.
 pub use engines::dense_backward::{
-    BlockLiveness, ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver,
-    DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter,
-    DenseBackwardProfile, DenseBackwardTransfer, DenseBlockFrame, DenseBlockMode, PointFacts,
-    SuccessorEdge,
+    ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardEffect,
+    DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter, DenseBackwardProfile,
+    DenseBackwardTransfer, DenseBlockFrame, DenseBlockMode, PointFacts, SuccessorEdge,
 };
 
 // Lattice anchors (*where* facts attach), scope qualification, and the
