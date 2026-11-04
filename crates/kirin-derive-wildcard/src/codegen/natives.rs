@@ -31,11 +31,14 @@ impl RuleCodegen {
         })
     }
 
-    /// `.check_at(statement, ..)` for the native call `stmt` in the match. The function
-    /// takes the `&StageInfo<L>` being matched first. A `?` call returns a
-    /// `CheckOutcome`: an `Option`, whose `None` fails the match, or a
-    /// `Result`, whose `Err` fails the run. A constraint's returns a `bool`,
-    /// or a `CheckOutcome` of one if it ends in `?`.
+    /// Generate the wrapper for the native call `stmt` in the match, and the
+    /// `.check_at(statement, ..)` attaching it to the call.
+    ///
+    /// The wrapper passes the function the `&StageInfo<L>` being matched
+    /// first. A `?` call's function returns a `CheckOutcome`: an `Option`,
+    /// whose `None` fails the match, or a `Result`, whose `Err` fails the
+    /// run. A constraint's function returns a `bool`, or an `Option<bool>`
+    /// or `Result<bool, E>` if the call ends in `?`.
     fn check(&self, stmt: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
         let span = self.native_span(stmt);
@@ -47,13 +50,8 @@ impl RuleCodegen {
         // reported there.
         let mut checked = result.clone();
         checked.set_span(span);
-        let into_check_result: TokenStream = quote!(#krate::CheckOutcome::into_check_result)
-            .into_iter()
-            .map(|mut token| {
-                token.set_span(span);
-                token
-            })
-            .collect();
+        let into_check_result =
+            Self::with_span(quote!(#krate::CheckOutcome::into_check_result), span);
 
         let unwrap = fallible.then(|| {
             quote_spanned! {span=>
@@ -80,9 +78,12 @@ impl RuleCodegen {
         }
     }
 
-    /// `.action_at(statement, ..)` for the native call `stmt` in the `rewrite!` body.
-    /// The function takes the pass's `&mut Rewriter<L>` first. A `?` call
-    /// returns a `Result`, whose `Err` fails the rewrite.
+    /// Generate the wrapper for the native call `stmt` in the `rewrite!`
+    /// body, and the `.action_at(statement, ..)` attaching it to the call.
+    ///
+    /// The wrapper passes the function the pass's `&mut Rewriter<L>` first.
+    /// A `?` call's function returns an `ActionOutcome`: an `Option` or a
+    /// `Result`. Both `None` and `Err` fail the run.
     fn action(&self, stmt: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
         let span = self.native_span(stmt);
@@ -91,7 +92,14 @@ impl RuleCodegen {
         let statement = self.statement_ident(stmt);
         let result = Self::native_result();
 
-        let unwrap = fallible.then(|| quote_spanned! {span=> let #result = #result?; });
+        // Checked at the call, so a function returning something else is
+        // reported there.
+        let mut checked = result.clone();
+        checked.set_span(span);
+        let into_action_result =
+            Self::with_span(quote!(#krate::ActionOutcome::into_action_result), span);
+        let unwrap = fallible
+            .then(|| quote_spanned! {span=> let #result = #into_action_result(#checked)?; });
         let values = self.native_values(stmt);
         let args = Self::native_args();
         quote! {
@@ -182,6 +190,19 @@ impl RuleCodegen {
             unreachable!("only native calls have a native span")
         };
         Span::mixed_site().located_at(func.span())
+    }
+
+    /// Set the span of every token in `tokens` to `span`, so that errors in
+    /// them are reported there. Used for the paths of generated trait calls,
+    /// whose crate prefix would otherwise point at the attribute.
+    fn with_span(tokens: TokenStream, span: Span) -> TokenStream {
+        tokens
+            .into_iter()
+            .map(|mut token| {
+                token.set_span(span);
+                token
+            })
+            .collect()
     }
 
     /// The local holding a native function's result.

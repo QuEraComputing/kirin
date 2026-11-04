@@ -223,7 +223,8 @@ fn rule(
                     ::kirin_wildcard::NativeValue::arg(native_args, 0usize)?,
                     ::kirin_wildcard::NativeValue::arg(native_args, 1usize)?,
                 );
-                let native_result = native_result?;
+                let native_result =
+                    ::kirin_wildcard::ActionOutcome::into_action_result(native_result)?;
                 ::core::result::Result::Ok({
                     let () = native_result;
                     ::std::vec![]

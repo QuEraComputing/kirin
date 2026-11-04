@@ -47,6 +47,13 @@ pub enum DriverError {
         stmt: Statement,
         error: NativeFailure,
     },
+    /// Native function `name`, called with `?` in the rewrite body of `rule`
+    /// matched at `stmt`, returned `None`.
+    NativeReturnedNone {
+        rule: String,
+        name: String,
+        stmt: Statement,
+    },
     /// A value the rule reads was never bound, such as a hole no matched op
     /// uses.
     Unbound { rule: String },
@@ -96,6 +103,11 @@ impl DriverError {
                 name: name.to_string(),
                 stmt,
                 error,
+            },
+            NativeError::NoValue => DriverError::NativeReturnedNone {
+                rule: rule.to_string(),
+                name: name.to_string(),
+                stmt,
             },
         }
     }
@@ -153,6 +165,10 @@ impl fmt::Display for DriverError {
             } => write!(
                 f,
                 "rule `{rule}` matched at {stmt:?} but native function `{name}` failed: {error}"
+            ),
+            DriverError::NativeReturnedNone { rule, name, stmt } => write!(
+                f,
+                "rule `{rule}` matched at {stmt:?} but native function `{name}` returned `None` in its rewrite body"
             ),
             DriverError::Unbound { rule } => {
                 write!(f, "rule `{rule}` reads a value the match did not bind")

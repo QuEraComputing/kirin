@@ -120,8 +120,10 @@ pub enum NativeError {
     },
     /// An action's edit was rejected by the [`Rewriter`].
     Rewrite(RewriteError),
-    /// A check returned an `Err`.
+    /// A check or action returned an `Err`.
     Failed(NativeFailure),
+    /// An action's `?` call returned `None`.
+    NoValue,
 }
 
 /// The error a native function returned, kept as is so the caller can
@@ -195,6 +197,47 @@ impl<T, E: Error + Send + Sync + 'static> CheckOutcome for Result<T, E> {
     fn into_check_result(self) -> Result<Option<T>, NativeError> {
         self.map(Some)
             .map_err(|error| NativeError::Failed(NativeFailure::new(error)))
+    }
+}
+
+/// What a native call ending in `?` in a rule's `rewrite!` body may return:
+/// an `Option`, or a `Result` whose error implements
+/// `std::error::Error + Send + Sync + 'static`. The rule has already
+/// matched, and earlier actions may have edited the IR, so `None` and `Err`
+/// both fail the driver's run.
+#[diagnostic::on_unimplemented(
+    message = "a native call ending in `?` in the `rewrite!` body must return an `Option` or a `Result`, not `{Self}`",
+    label = "returns `{Self}`",
+    note = "a `Result`'s error must implement `std::error::Error + Send + Sync + 'static`"
+)]
+pub trait ActionOutcome {
+    /// The value the call binds.
+    type Value;
+
+    /// `Ok(value)` to go on with `value`, or `Err` to fail the run: with
+    /// [`NativeError::NoValue`] for `None`, [`NativeError::Rewrite`] for a
+    /// [`RewriteError`], and [`NativeError::Failed`] for any other error.
+    fn into_action_result(self) -> Result<Self::Value, NativeError>;
+}
+
+impl<T> ActionOutcome for Option<T> {
+    type Value = T;
+
+    fn into_action_result(self) -> Result<T, NativeError> {
+        self.ok_or(NativeError::NoValue)
+    }
+}
+
+impl<T, E: Error + Send + Sync + 'static> ActionOutcome for Result<T, E> {
+    type Value = T;
+
+    fn into_action_result(self) -> Result<T, NativeError> {
+        self.map_err(
+            |error| match (&error as &dyn Any).downcast_ref::<RewriteError>() {
+                Some(rewrite) => NativeError::Rewrite(rewrite.clone()),
+                None => NativeError::Failed(NativeFailure::new(error)),
+            },
+        )
     }
 }
 

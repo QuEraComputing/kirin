@@ -23,9 +23,9 @@ use proc_macro::TokenStream;
 /// | `f(x)?;` in the match | `Option<bool>` or `Result<bool, E>`, unwrapped as for `let v = f(x)?;` before the `bool` is tested |
 /// | `let v = f(x);` | the value |
 /// | `let v = f(x)?;` in the match | `Option<_>`, whose `None` fails the match, or `Result<_, E>`, whose `Err` fails the run with the error (`E: Error + Send + Sync + 'static`) |
-/// | `let v = f(x)?;` in the `rewrite!` body | `Result<_, RewriteError>`; `Err` fails the rewrite |
+/// | `let v = f(x)?;` in the `rewrite!` body | `Option<_>` or `Result<_, E>` (`E: Error + Send + Sync + 'static`); `None` or `Err` fails the run, as the rule already matched |
 /// | `let (a, b) = f(x);` | a tuple, one value per name |
-/// | `f(x);` in the `rewrite!` body | `()`, or a `Result` with `?` |
+/// | `f(x);` in the `rewrite!` body | `()`, or an `Option` or `Result` with `?` |
 ///
 /// Each call is compiled on its own, so one function may be called in
 /// several of these ways, e.g. both `f(x)?` and `f(x)`, or as a constraint

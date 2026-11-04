@@ -86,7 +86,9 @@ pub use constraint::Constraint;
 pub use erase::Erase;
 pub use hole::Hole;
 pub use language::PatternLanguage;
-pub use native::{ActionFn, CheckFn, CheckOutcome, NativeError, NativeFailure, NativeValue};
+pub use native::{
+    ActionFn, ActionOutcome, CheckFn, CheckOutcome, NativeError, NativeFailure, NativeValue,
+};
 pub use native_call::NativeCall;
 pub use op_ref::OpRef;
 pub use pattern::Pattern;
