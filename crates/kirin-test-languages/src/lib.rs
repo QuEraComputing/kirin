@@ -15,6 +15,8 @@ mod graph_function_language;
 mod namespaced_language;
 #[cfg(feature = "arith-function-language")]
 mod scalar_function_language;
+#[cfg(feature = "scf-function-language")]
+mod scf_function_language;
 #[cfg(feature = "simple-language")]
 mod simple_language;
 #[cfg(feature = "ungraph-language")]
@@ -34,6 +36,8 @@ pub use graph_function_language::GraphFunctionLanguage;
 pub use namespaced_language::NamespacedLanguage;
 #[cfg(feature = "arith-function-language")]
 pub use scalar_function_language::ScalarFunctionLanguage;
+#[cfg(feature = "scf-function-language")]
+pub use scf_function_language::ScfFunctionLanguage;
 #[cfg(feature = "simple-language")]
 pub use simple_language::SimpleLanguage;
 #[cfg(feature = "ungraph-language")]

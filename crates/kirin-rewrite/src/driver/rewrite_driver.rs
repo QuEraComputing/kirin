@@ -1,9 +1,9 @@
 use kirin_ir::walk::{WalkCursor, WalkOrder, WalkResult};
-use kirin_ir::{Dialect, GetInfo, Rewriter, Statement};
+use kirin_ir::{Block, Dialect, GetInfo, Rewriter, StageInfo, Statement};
 
 use super::{DriverError, Match};
-use crate::rule::Rule;
-use crate::{CheckedRule, RuleSet, StatementRule};
+use crate::rule::{NativeRule, Rule};
+use crate::{BlockRule, CheckedRule, RuleSet, StatementRule};
 
 /// What a driver run did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -47,10 +47,27 @@ impl std::ops::AddAssign for RewriteSummary {
 ///
 /// A [`StatementRule`] is tried at every statement the sweep visits, in its
 /// place in the rule list, and steers the sweep with the walk result it
-/// returns. It counts as applied when it edits the IR. The driver builds a
-/// fresh copy of it each sweep. Since its edits can't be known before the
+/// returns. It counts as applied when it edits the IR. Each sweep, the
+/// driver builds a fresh copy of the rule with the recipe given to
+/// [`RuleSet::add_statement_rule`]. Since its edits can't be known before the
 /// run, one erasing the statement being visited in an order that does not
 /// allow it fails the run with [`DriverError::Walk`].
+///
+/// A [`BlockRule`] runs, in its place in the rule list, on each block the
+/// visited statement owns: its `Block`s, then the blocks of its `CFG`s.
+/// Graph bodies are not handed to it. The blocks are listed when its turn
+/// comes, so it sees the edits of the rules before it at that statement. A
+/// block is therefore handed to it this sweep only if it is under its owner
+/// when the walk visits the owner: one created or moved under a statement
+/// the walk has already passed waits for the next sweep, which the edit
+/// causes. A listed block an earlier copy erased or merged away is skipped.
+/// For every block, the driver builds a fresh copy of the rule with the
+/// recipe given to [`RuleSet::add_block_rule`], and each block whose run
+/// edits the IR counts as one application. A `skip` from one block still
+/// runs the rule on the statement's remaining blocks, such as an `scf.if`'s
+/// `else` arm after its `then` arm, then leaves the statement's nested
+/// statements unwalked. An `interrupt` ends the sweep at once, leaving the
+/// remaining blocks unrun.
 ///
 /// An interrupted sweep counts like any other: if the run changed nothing,
 /// it ends, without visiting the statements after the interrupt again. So a
@@ -160,8 +177,7 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
     }
 
     /// Walk the tree under `root` once, applying every rule that matches
-    /// and every statement rule. Returns how many applications edited the
-    /// IR.
+    /// and every native rule. Returns how many applications edited the IR.
     ///
     /// Each applied rule's walk result steers the walk: after a `skip`, the
     /// remaining rules still run at the statement, then its nested
@@ -179,29 +195,7 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         while let Some(stmt) = cursor.next(rewriter.stage())? {
             let mut skip = false;
             for rule in &mut sweep_rules {
-                let before = rewriter.events().len();
-                let walk_result = match rule {
-                    SweepRule::Pattern(rule) => {
-                        let Some(found) = Match::find(self.rules, rule, rewriter.stage(), stmt)?
-                        else {
-                            continue;
-                        };
-                        found.apply(self.rules, rule, rewriter, stmt)?
-                    }
-                    SweepRule::Statement { name, rule } => {
-                        rule.apply(rewriter, stmt)
-                            .map_err(|error| DriverError::Rewrite {
-                                rule: name.to_string(),
-                                stmt,
-                                error,
-                            })?
-                    }
-                    SweepRule::Block => continue,
-                };
-                if rewriter.events().len() > before {
-                    applied += 1;
-                }
-                match walk_result {
+                match rule.apply(self.rules, rewriter, stmt, &mut applied)? {
                     WalkResult::Advance => {}
                     WalkResult::Skip => skip = true,
                     WalkResult::Interrupt => return Ok(applied),
@@ -219,16 +213,17 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
     }
 }
 
-/// A rule as one sweep runs it, holding the sweep's fresh copy of a native
-/// rule.
+/// A rule as one sweep holds it. Native rules of both kinds get fresh
+/// copies, at different times: a statement rule one per sweep, so the sweep
+/// builds it at the start and keeps it; a block rule one per block, so the
+/// sweep keeps its recipe and builds a copy at each block.
 enum SweepRule<'r, L: Dialect> {
     Pattern(&'r CheckedRule<L>),
     Statement {
         name: &'r str,
         rule: Box<dyn StatementRule<L>>,
     },
-    // Block rules join the sweep in a later change.
-    Block,
+    Block(&'r NativeRule<dyn BlockRule<L>>),
 }
 
 impl<'r, L: Dialect> SweepRule<'r, L> {
@@ -239,7 +234,81 @@ impl<'r, L: Dialect> SweepRule<'r, L> {
                 name: native.name(),
                 rule: native.build(),
             },
-            Rule::Block(_) => SweepRule::Block,
+            Rule::Block(native) => SweepRule::Block(native),
         }
     }
+
+    /// Run the rule at `stmt`, adding to `applied` each application that
+    /// edited the IR, and return how the walk goes on.
+    ///
+    /// A block rule runs on each block `stmt` owns, listed when its turn
+    /// comes, so after the rules before it ran. A `skip` from one block
+    /// still runs it on `stmt`'s remaining sibling blocks; an `interrupt`
+    /// stops at once.
+    fn apply(
+        &mut self,
+        rules: &RuleSet<L>,
+        rewriter: &mut Rewriter<'_, L>,
+        stmt: Statement,
+        applied: &mut usize,
+    ) -> Result<WalkResult, DriverError> {
+        let failed = |name: &str, error| DriverError::Rewrite {
+            rule: name.to_string(),
+            stmt,
+            error,
+        };
+        let before = rewriter.events().len();
+        let walk_result = match self {
+            SweepRule::Pattern(rule) => {
+                let Some(found) = Match::find(rules, rule, rewriter.stage(), stmt)? else {
+                    return Ok(WalkResult::Advance);
+                };
+                found.apply(rules, rule, rewriter, stmt)?
+            }
+            SweepRule::Statement { name, rule } => rule
+                .apply(rewriter, stmt)
+                .map_err(|error| failed(name, error))?,
+            SweepRule::Block(native) => {
+                let mut walk_result = WalkResult::Advance;
+                for block in owned_blocks(rewriter.stage(), stmt) {
+                    // An earlier copy erased or merged away this block.
+                    if block.get_info(rewriter.stage()).is_none() {
+                        continue;
+                    }
+                    let before = rewriter.events().len();
+                    let result = native
+                        .build()
+                        .apply(rewriter, block)
+                        .map_err(|error| failed(native.name(), error))?;
+                    if rewriter.events().len() > before {
+                        *applied += 1;
+                    }
+                    match result {
+                        WalkResult::Advance => {}
+                        WalkResult::Skip => walk_result = WalkResult::Skip,
+                        WalkResult::Interrupt => return Ok(WalkResult::Interrupt),
+                    }
+                }
+                return Ok(walk_result);
+            }
+        };
+        if rewriter.events().len() > before {
+            *applied += 1;
+        }
+        Ok(walk_result)
+    }
+}
+
+/// The blocks `stmt` owns: its `Block`s, then the blocks of its `CFG`s in
+/// layout order. Empty if `stmt` is not live.
+pub(super) fn owned_blocks<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Vec<Block> {
+    let Some(info) = stmt.get_info(stage) else {
+        return Vec::new();
+    };
+    let definition = info.definition();
+    definition
+        .blocks()
+        .copied()
+        .chain(definition.cfgs().flat_map(|cfg| cfg.blocks(stage)))
+        .collect()
 }
