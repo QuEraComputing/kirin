@@ -1,8 +1,7 @@
 use kirin_ir::{BuilderStageInfo, Dialect, StageInfo};
 use kirin_wildcard::{PatternLanguage, PatternRule};
 
-use super::native::NativeRule;
-use super::{BlockRule, CheckedRule, RuleError, RuleErrorKind, StatementRule};
+use super::{BlockRule, CheckedRule, NativeRule, RuleError, RuleErrorKind, StatementRule};
 
 /// A rule of a [`RuleSet`]: a checked pattern or a native rule's recipe.
 pub(crate) enum Rule<L: Dialect> {

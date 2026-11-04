@@ -2,6 +2,7 @@ use kirin_ir::{
     Block, DiGraph, Dialect, GetInfo, Rewriter, SSAKind, SSAValue, StageInfo, Statement,
 };
 
+use super::rewrite_driver::owned_blocks;
 use super::{DriverError, RewriteDriver};
 
 impl<L: Dialect> RewriteDriver<'_, L> {
@@ -42,14 +43,8 @@ fn erase_dead_nested_in<L: Dialect>(
     let Some(info) = stmt.get_info(rewriter.stage()) else {
         return Ok(0);
     };
-    let definition = info.definition();
-    let stage = rewriter.stage();
-    let blocks: Vec<Block> = definition
-        .blocks()
-        .copied()
-        .chain(definition.cfgs().flat_map(|cfg| cfg.blocks(stage)))
-        .collect();
-    let digraphs: Vec<DiGraph> = definition.digraphs().copied().collect();
+    let digraphs: Vec<DiGraph> = info.definition().digraphs().copied().collect();
+    let blocks = owned_blocks(rewriter.stage(), stmt);
 
     let mut erased = 0;
     for block in blocks {

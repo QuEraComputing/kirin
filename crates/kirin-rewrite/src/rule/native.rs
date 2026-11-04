@@ -25,8 +25,11 @@ pub trait StatementRule<L: Dialect> {
 /// every block, so anything the rule stores, such as a table of the
 /// expressions seen so far, is gone by the next block.
 ///
-/// The rule walks the block itself. The driver does not check its edits: a
-/// rule must edit only the block it is given.
+/// The rule walks the block itself. It may edit the block's statements,
+/// and redirect the uses of the block's values wherever they are, as
+/// common-subexpression elimination does. It must not edit the owning
+/// statement's other blocks: the driver does not check its edits, and only
+/// skips a block that no longer exists when its turn comes.
 pub trait BlockRule<L: Dialect> {
     /// Run the rule over `block`, editing through `rewriter`, and say how the
     /// driver goes on walking: `Skip` leaves the statements nested in the
