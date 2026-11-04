@@ -2398,11 +2398,12 @@ A later version may add applicability constraints and analysis requirements.
 ### `NativeRule`
 
 An executable Rust rule used when matching or replacement cannot yet be
-expressed as declarative `RewriteRule` data. It must publish driver metadata
-such as its name, candidate root operation kinds, match scope, and later its
-analysis requirements. Native rules remain subject to restricted in-place
-mutation through the pass's `Rewriter`; “native” is not raw mutable arena
-access.
+expressed as declarative `RewriteRule` data. It has a name, which driver
+errors report, and its scope is the trait it implements: `StatementRule` or
+`BlockRule`. Once the analysis manager (M3) lands, it will also declare the
+analyses it requires, which the driver checks before running it. Native rules
+remain subject to restricted in-place mutation through the pass's
+`Rewriter`; “native” is not raw mutable arena access.
 
 Native rules are a supported long-term extension point for stateful,
 algorithmic, analysis-driven, and larger-scope transformations. Declarative
@@ -2410,11 +2411,10 @@ rules and native rules are two permanent representations scheduled by the same
 driver; a native implementation is not required to be ported or deleted after
 wildcard matching lands.
 
-`RuleSet` stores immutable native configuration or factories. Each driver/pass
-run creates fresh native instances. Statement-scoped instances receive
-candidates from the driver; body-scoped instances run once for each declared
-body and may own their intrinsic traversal. State is never reused across
-bodies, functions, or pass invocations.
+`RuleSet` stores a recipe (factory) per native rule. A statement rule gets a
+fresh instance each sweep and is handed every visited statement; a block rule
+gets a fresh instance for each block a visited statement owns and walks that
+block itself. State never outlives a sweep, or a block for a block rule.
 
 ### `RuleSet`
 
@@ -2829,14 +2829,16 @@ policy.
 - [x] Implement `RewriteResult` / `RewriteChange` (`RewriteSummary`).
 - [x] Implement `Walk`, `Chain`, `Fixpoint` equivalents over arena ids.
 - [x] Have one driver/pass invocation mutate one `StageInfo` in place.
-- [ ] Support native Rust rules as a permanent restricted-mutation extension
+- [x] Support native Rust rules as a permanent restricted-mutation extension
   point for stateful, algorithmic, analysis-backed, and larger-scope work.
-- [ ] Store immutable native configuration/factories in `RuleSet` and create
-  fresh rule instances per driver/pass run.
-- [ ] Give statement-scoped rules candidates from the driver; invoke a declared
-  body-scoped rule exactly once per body and permit only that rule's declared
-  intrinsic traversal. Do not retain state across bodies, functions, or runs.
-- [ ] Exercise the state lifecycle with a test-only rule; do not add a
+- [x] Store immutable native configuration/factories in `RuleSet` and create
+  fresh rule instances per sweep for a statement rule, per block for a block
+  rule.
+- [x] Give statement-scoped rules candidates from the driver; invoke a block
+  rule once per block in each sweep. The rule walks its block itself, and the
+  driver does not check its edits. Do not retain state across sweeps, blocks,
+  functions, or runs.
+- [x] Exercise the state lifecycle with a test-only rule; do not add a
   disposable production rule that will be deleted when declarative matching
   lands.
 - [x] Ensure dead ids in worklists are skipped.
@@ -2847,14 +2849,14 @@ policy.
 
 **Landed ahead of the native path: a declarative-rule driver.** The walk and
 fixpoint items above landed with a driver for `#[rewrite_rule]` patterns
-rather than native rules; the native items stay open. The traversal orders
-and their edit contract are documented in `kirin_ir::walk`, and the rule set
-and driver in `kirin_rewrite`. In short: walks may edit a visited
-statement's siblings and nested statements, but must not erase it or any of
-its ancestors. Each sweep tries every rule in order at each visited
-statement, then runs a dead-code cleanup, and the fixpoint ends at the first
-sweep recording no `MutationEvent`. Decisions to revisit in later
-milestones:
+rather than native rules; the native items landed after it, in the same
+sweeps. The traversal orders and their edit contract are documented in
+`kirin_ir::walk`, and the rule set and driver in `kirin_rewrite`. In short:
+walks may edit a visited statement's siblings and nested statements, but must
+not erase it or any of its ancestors. Each sweep tries every rule in order at
+each visited statement, then runs a dead-code cleanup, and the fixpoint ends
+at the first sweep recording no `MutationEvent`. Decisions to revisit in
+later milestones:
 
 - A rule may erase its root, the statement being visited, only in a walk
   order that allows it (`WalkOrder::ALLOWS_ERASING_VISITED`: the reverse BFS
@@ -2877,6 +2879,11 @@ milestones:
   index yet).
 - Rewrite bodies support `replace`, `erase`, and native actions; building new
   ops in a rewrite body is not yet supported.
+- Block rules see one block at a time with a fresh table, so CSE cannot reuse
+  a value from an enclosing block (e.g. merge a `neg %x` in an `scf.if` arm
+  into one before the `if`). Scoped CSE would need either a rule allowed to
+  edit blocks nested in its own, or the driver handing it only outermost
+  blocks.
 
 Ordinary CSE is a permanent body-scoped native client. Start block-local with a
 fresh expression table per block; require strong `IsPure`, redirect exact-arity
@@ -3052,14 +3059,15 @@ implemented-vs-planned.
 ### Gap 4 — Native-rule stateful lifecycle — RESOLVED
 
 **Decision:** `RuleSet` owns immutable configuration or native-rule factories;
-the driver constructs fresh native state for each pass run. Statement-scoped
-rules receive candidates from the driver's traversal. Body-scoped rules are
-invoked once per body and may own the intrinsic traversal declared in their
-metadata. No native state is reused across bodies, functions, or driver runs.
-A body-scoped algorithm such as CSE is not wrapped in the driver's repeated
-statement fixpoint with one persistent table. Explicit `begin_scope` /
-`end_scope` hooks are unnecessary in v1; add them only if a concrete client
-cannot be expressed by factory construction plus one scoped invocation.
+the driver constructs fresh native state for each sweep, and for a block rule
+for each block. Statement-scoped rules receive candidates from the driver's
+traversal. Block rules are invoked once per block in each sweep and walk their
+block themselves. No native state is reused across sweeps, blocks, functions,
+or driver runs. A block-local algorithm such as CSE therefore runs inside the
+driver's repeated sweeps with a fresh table each time, not with one persistent
+table. Explicit `begin_scope` / `end_scope` hooks are unnecessary in v1; add
+them only if a concrete client cannot be expressed by factory construction
+plus one scoped invocation.
 
 ---
 
