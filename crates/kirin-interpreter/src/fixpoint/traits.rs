@@ -16,6 +16,14 @@ pub trait Summary: Clone {
     fn merge(&mut self, candidate: Self) -> bool;
 }
 
+/// No summary: for engines whose facts live in [`EnvStore`](crate::EnvStore)
+/// and only use the driver's worklist.
+impl Summary for () {
+    fn merge(&mut self, _candidate: Self) -> bool {
+        false
+    }
+}
+
 /// How the driver seeds, enters, and completes one summary owner.
 ///
 /// `I` is the wrapped interpreter (the driver passes itself, so the owner analysis

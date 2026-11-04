@@ -90,7 +90,7 @@ pub use engines::sparse_forward::{
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{
-    BodyScope, DemandContext, DemandFrame, DemandInterp, DemandSummary, SparseBackwardDriver,
+    BodyScope, DemandContext, DemandFrame, DemandInterp, SparseBackwardDriver,
     SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter, SparseBackwardProfile,
     SparseBackwardTransfer,
 };

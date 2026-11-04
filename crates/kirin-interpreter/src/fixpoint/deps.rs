@@ -175,3 +175,25 @@ where
         Ok(self.deps.deps.get(owner).cloned().unwrap_or_default())
     }
 }
+
+/// No owner-summary dependencies: for engines that track their own fact
+/// dependencies and only use the driver's worklist.
+impl<K> SummaryDependencyIndex<K> for () {
+    type Error = Infallible;
+
+    fn ensure_owner(&mut self, _owner: &K) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn register(
+        &mut self,
+        _trigger_owner: &K,
+        _dependency: SummaryDependency<K>,
+    ) -> Result<(), Self::Error> {
+        Ok(())
+    }
+
+    fn on_summary_changed(&mut self, _owner: &K) -> Result<SummaryDependencies<K>, Self::Error> {
+        Ok(SummaryDependencies::new())
+    }
+}
