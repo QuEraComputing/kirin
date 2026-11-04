@@ -2,8 +2,8 @@ use kirin_ir::walk::{WalkCursor, WalkOrder, WalkResult};
 use kirin_ir::{Dialect, GetInfo, Rewriter, Statement};
 
 use super::{DriverError, Match};
-use crate::RuleSet;
 use crate::rule::Rule;
+use crate::{CheckedRule, RuleSet, StatementRule};
 
 /// What a driver run did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
@@ -43,9 +43,16 @@ impl std::ops::AddAssign for RewriteSummary {
 /// statement being visited unwalked, and `interrupt` ends the sweep there.
 /// An interrupted sweep counts like any other: if the run changed nothing,
 /// it ends, without visiting the statements after the interrupt again. Since
-/// a rule's root never owns bodies yet (see
+/// a pattern's root never owns bodies yet (see
 /// [`RuleErrorKind::OpWithBodies`](crate::RuleErrorKind::OpWithBodies)),
-/// `skip` has no effect so far.
+/// `skip` from a pattern rule has no effect so far.
+///
+/// A [`StatementRule`] is tried at every statement the sweep visits, in its
+/// place in the rule list, and steers the sweep with the walk result it
+/// returns. It counts as applied when it edits the IR. The driver builds a
+/// fresh copy of it each sweep. Since its edits can't be known before the
+/// run, one erasing the statement being visited in an order that does not
+/// allow it fails the run with [`DriverError::Walk`].
 ///
 /// Rules that keep undoing each other never reach a fixpoint. As a safety
 /// net, a run still changing after [`max_sweeps`](Self::max_sweeps) sweeps
@@ -148,8 +155,9 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         })
     }
 
-    /// Walk the tree under `root` once, applying every rule that matches.
-    /// Returns how many applications edited the IR.
+    /// Walk the tree under `root` once, applying every rule that matches
+    /// and every statement rule. Returns how many applications edited the
+    /// IR.
     ///
     /// Each applied rule's walk result steers the walk: after a `skip`, the
     /// remaining rules still run at the statement, then its nested
@@ -162,15 +170,30 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
     ) -> Result<usize, DriverError> {
         let mut applied = 0;
         let mut cursor = O::start(rewriter.stage(), root);
+        let mut sweep_rules: Vec<SweepRule<'_, L>> =
+            self.rules.rules().iter().map(SweepRule::new).collect();
         while let Some(stmt) = cursor.next(rewriter.stage())? {
             let mut skip = false;
-            // Native rules join the sweep in a later change.
-            for rule in self.rules.rules().iter().filter_map(Rule::as_pattern) {
-                let Some(found) = Match::find(self.rules, rule, rewriter.stage(), stmt)? else {
-                    continue;
-                };
+            for rule in &mut sweep_rules {
                 let before = rewriter.events().len();
-                let walk_result = found.apply(self.rules, rule, rewriter, stmt)?;
+                let walk_result = match rule {
+                    SweepRule::Pattern(rule) => {
+                        let Some(found) = Match::find(self.rules, rule, rewriter.stage(), stmt)?
+                        else {
+                            continue;
+                        };
+                        found.apply(self.rules, rule, rewriter, stmt)?
+                    }
+                    SweepRule::Statement { name, rule } => {
+                        rule.apply(rewriter, stmt)
+                            .map_err(|error| DriverError::Rewrite {
+                                rule: name.to_string(),
+                                stmt,
+                                error,
+                            })?
+                    }
+                    SweepRule::Block => continue,
+                };
                 if rewriter.events().len() > before {
                     applied += 1;
                 }
@@ -179,7 +202,7 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
                     WalkResult::Skip => skip = true,
                     WalkResult::Interrupt => return Ok(applied),
                 }
-                // The rule erased the statement, so no later rule can match it.
+                // The rule erased the statement, so no later rule can see it.
                 if stmt.get_info(rewriter.stage()).is_none() {
                     break;
                 }
@@ -189,5 +212,30 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
             }
         }
         Ok(applied)
+    }
+}
+
+/// A rule as one sweep runs it, holding the sweep's fresh copy of a native
+/// rule.
+enum SweepRule<'r, L: Dialect> {
+    Pattern(&'r CheckedRule<L>),
+    Statement {
+        name: &'r str,
+        rule: Box<dyn StatementRule<L>>,
+    },
+    // Block rules join the sweep in a later change.
+    Block,
+}
+
+impl<'r, L: Dialect> SweepRule<'r, L> {
+    fn new(rule: &'r Rule<L>) -> Self {
+        match rule {
+            Rule::Pattern(rule) => SweepRule::Pattern(rule),
+            Rule::Statement(native) => SweepRule::Statement {
+                name: native.name(),
+                rule: native.build(),
+            },
+            Rule::Block(_) => SweepRule::Block,
+        }
     }
 }
