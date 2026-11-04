@@ -244,6 +244,51 @@ fn double_neg_if_first_argument() {
     })
 }
 
+fn in_tuple(_rewriter: &mut Rewriter<'_, L>, x: SSAValue) -> (SSAValue,) {
+    (x,)
+}
+
+fn in_tuple_if_any(_rewriter: &mut Rewriter<'_, L>, x: SSAValue) -> Option<(SSAValue,)> {
+    Some((x,))
+}
+
+fn in_nested_tuple(_rewriter: &mut Rewriter<'_, L>, x: SSAValue) -> ((SSAValue, bool), i64) {
+    ((x, true), 0)
+}
+
+/// `double_neg`, taking the replacement out of a 1-tuple.
+#[rewrite_rule(language = L)]
+fn double_neg_via_tuple() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        let (y,) = in_tuple(x);
+        replace!(r, y);
+    })
+}
+
+/// `double_neg`, taking the replacement out of a 1-tuple in an `Option`.
+#[rewrite_rule(language = L)]
+fn double_neg_via_tuple_if_any() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        let (y,) = in_tuple_if_any(x)?;
+        replace!(r, y);
+    })
+}
+
+/// `double_neg`, taking the replacement out of a nested tuple.
+#[rewrite_rule(language = L)]
+fn double_neg_via_nested_tuple() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        let ((y, _), _) = in_nested_tuple(x);
+        replace!(r, y);
+    })
+}
+
 fn same_value(_rewriter: &mut Rewriter<'_, L>, x: SSAValue) -> Option<SSAValue> {
     Some(x)
 }
@@ -799,6 +844,18 @@ fn a_constraint_with_try_on_an_option_applies_only_on_some_true() {
         "%b",
     );
     assert_rewrites(&rules, &sum, &sum);
+}
+
+#[test]
+fn a_rewrite_body_call_pattern_takes_its_value_apart_as_in_rust() {
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    for rules in [
+        RuleSet::build(|stage| vec![double_neg_via_tuple(stage)]).unwrap(),
+        RuleSet::build(|stage| vec![double_neg_via_tuple_if_any(stage)]).unwrap(),
+        RuleSet::build(|stage| vec![double_neg_via_nested_tuple(stage)]).unwrap(),
+    ] {
+        assert_rewrites(&rules, &input, &program("", "%x"));
+    }
 }
 
 #[test]
