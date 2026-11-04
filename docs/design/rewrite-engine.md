@@ -2879,11 +2879,15 @@ later milestones:
   index yet).
 - Rewrite bodies support `replace`, `erase`, and native actions; building new
   ops in a rewrite body is not yet supported.
-- Block rules see one block at a time with a fresh table, so CSE cannot reuse
-  a value from an enclosing block (e.g. merge a `neg %x` in an `scf.if` arm
-  into one before the `if`). Scoped CSE would need either a rule allowed to
-  edit blocks nested in its own, or the driver handing it only outermost
-  blocks.
+- A block rule gets a fresh copy per block, so a block rule doing
+  common-subexpression elimination (CSE) starts each block with an empty
+  table of the expressions seen so far. It therefore cannot reuse a value
+  computed in an enclosing block, e.g. merge a `neg %x` in an `scf.if` arm
+  into an identical `neg %x` before the `if`. Reusing one needs no driver
+  change: hoist speculatable ops out of the nested block first, so both are
+  in the same block, or have the rule seed its table by reading the
+  statements of the enclosing blocks that come before the nested block's
+  owner.
 
 Ordinary CSE is a permanent body-scoped native client. Start block-local with a
 fresh expression table per block; require strong `IsPure`, redirect exact-arity
