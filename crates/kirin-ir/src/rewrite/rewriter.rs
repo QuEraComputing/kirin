@@ -483,8 +483,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         &self.events
     }
 
-    /// Take all recorded events, leaving the log empty.
-    pub fn drain_events(&mut self) -> Vec<MutationEvent> {
+    /// End the rewrite and return every event it recorded, in application
+    /// order. The log only grows while the `Rewriter` lives, so a position in
+    /// [`events`](Self::events) stays valid until then.
+    pub fn into_events(mut self) -> Vec<MutationEvent> {
         std::mem::take(&mut self.events)
     }
 

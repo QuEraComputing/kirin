@@ -1777,7 +1777,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
     // --- Immediate change/event log (current prototype API) ---
     pub fn events(&self) -> &[MutationEvent];
-    pub fn drain_events(&mut self) -> Vec<MutationEvent>;
+    pub fn into_events(self) -> Vec<MutationEvent>;
 }
 ```
 

@@ -6,7 +6,7 @@ mod common;
 
 use std::collections::HashSet;
 
-use common::{BuilderDialect, TestType, make_split, new_stage};
+use common::{BuilderDialect, EventCursor, TestType, make_split, new_stage};
 use kirin_ir::*;
 
 /// The def-use set of `value` (order-agnostic; `SSAInfo::uses` is a bag).
@@ -61,7 +61,7 @@ fn append_and_insert_blocks_link_into_cfg() {
         let after = rw
             .insert_block_after(entry, [TestType::I64, TestType::I32])
             .unwrap();
-        (tail, before, after, rw.drain_events())
+        (tail, before, after, rw.events().to_vec())
     };
 
     assert_eq!(
@@ -161,7 +161,7 @@ fn erase_block_tombstones_contents_and_maintains_mirrors() {
     let events = {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_block(dead).unwrap();
-        rw.drain_events()
+        rw.events().to_vec()
     };
     assert_eq!(
         events,
@@ -279,6 +279,7 @@ fn erase_block_at_cfg_ends_updates_head_and_tail() {
 
 #[test]
 fn erase_block_rejects_values_used_outside_without_mutating() {
+    let mut log = EventCursor::default();
     let mut stage = new_stage();
 
     // middle(y) { split -> r0 } -> exit { use r0; use_arg }
@@ -307,7 +308,7 @@ fn erase_block_rejects_values_used_outside_without_mutating() {
 
     // An argument read outside the block is rejected the same way.
     rw.replace_operand(use_r0, 0, y).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
     assert_eq!(
         rw.erase_block(middle),
         Err(RewriteError::BlockArgumentInUse {
@@ -317,7 +318,7 @@ fn erase_block_rejects_values_used_outside_without_mutating() {
     );
 
     // Nothing was touched.
-    assert!(rw.events().is_empty());
+    assert!(log.read_and_advance(&rw).is_empty());
     assert!(middle.get_info(rw.stage()).is_some());
     assert!(split.get_info(rw.stage()).is_some());
     assert_eq!(preds(rw.stage(), exit), HashSet::from([middle]));
@@ -415,7 +416,7 @@ fn split_block_moves_suffix_and_leaves_original_unterminated() {
     let (tail, events) = {
         let mut rw = Rewriter::new(&mut stage);
         let tail = rw.split_block(s1).unwrap();
-        (tail, rw.drain_events())
+        (tail, rw.events().to_vec())
     };
     assert_eq!(
         events,
@@ -558,7 +559,7 @@ fn insert_terminator_wires_operands_and_edges() {
                 BuilderDialect::Jump(Successor::from_block(target), vec![a]),
             )
             .unwrap();
-        (jump, rw.drain_events())
+        (jump, rw.events().to_vec())
     };
     assert_eq!(
         events,
@@ -694,7 +695,7 @@ fn merge_blocks_splices_successor_and_redirects_arguments() {
     let events = {
         let mut rw = Rewriter::new(&mut stage);
         rw.merge_blocks(entry, succ, &[real_a]).unwrap();
-        rw.drain_events()
+        rw.events().to_vec()
     };
     assert_eq!(
         events,
@@ -975,12 +976,16 @@ fn retarget_successor_rewrites_every_matching_slot() {
     let mut stage = stage.finalize().unwrap();
 
     let mut rw = Rewriter::new(&mut stage);
+    let mut log = EventCursor::default();
     assert_eq!(rw.retarget_successor(cond, t, u).unwrap(), 2);
-    assert_eq!(rw.drain_events(), vec![MutationEvent::ChangedCfg { cfg }]);
+    assert_eq!(
+        log.read_and_advance(&rw),
+        vec![MutationEvent::ChangedCfg { cfg }]
+    );
 
     // Nothing left to retarget: no-op, no event.
     assert_eq!(rw.retarget_successor(cond, t, u).unwrap(), 0);
-    assert!(rw.events().is_empty());
+    assert!(log.read_and_advance(&rw).is_empty());
 
     assert_eq!(
         cond.definition(rw.stage()),
@@ -1093,7 +1098,7 @@ fn insert_block_arg_shifts_arguments_and_rewrites_edges() {
             })
             .unwrap();
         assert_eq!(asked, vec![(jump, 0)], "one value per incoming edge");
-        (SSAValue::from(fresh), rw.drain_events())
+        (SSAValue::from(fresh), rw.events().to_vec())
     };
     assert_eq!(
         events,
