@@ -74,6 +74,11 @@
 //! - merging its block into another block
 //!   ([`Rewriter::merge_blocks`](crate::Rewriter::merge_blocks) with its
 //!   block as `succ`), reported as [`WalkError::VisitedMoved`];
+//! - moving it with [`Rewriter::move_before`](crate::Rewriter::move_before)
+//!   or [`Rewriter::move_after`](crate::Rewriter::move_after), reported as
+//!   [`WalkError::VisitedMoved`] by [`WalkOrder::walk_mut`] (a loop driving a
+//!   cursor by hand checks with [`WalkOrder::check_not_moved_since`]);
+//! - moving one of its ancestors, which is not checked;
 //! - reordering the bodies of one of its ancestors
 //!   ([`Rewriter::replace_statement`](crate::Rewriter::replace_statement)),
 //!   which is not checked.
@@ -93,7 +98,7 @@
 mod breadth_first;
 mod depth_first;
 mod order;
-mod tree;
+pub(crate) mod tree;
 
 pub use breadth_first::{BFS, BFSCursor, BuiltOrderCursor, KeepOrderReverseBFS, ReverseBFS};
 pub use depth_first::{PostOrder, PostOrderCursor, PreOrder, PreOrderCursor};
