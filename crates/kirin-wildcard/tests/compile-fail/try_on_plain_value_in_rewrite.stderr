@@ -1,0 +1,20 @@
+error[E0277]: a native call ending in `?` in the `rewrite!` body must return an `Option` or a `Result`, not `kirin::prelude::SSAValue`
+  --> tests/compile-fail/try_on_plain_value_in_rewrite.rs:16:17
+   |
+12 | #[rewrite_rule(language = L)]
+   | ----------------------------- in this attribute macro expansion
+...
+16 |         let y = value(x)?;
+   |                 ^^^^^ returns `kirin::prelude::SSAValue`
+   |
+   = help: the trait `ActionOutcome` is not implemented for `kirin::prelude::SSAValue`
+   = note: a `Result`'s error must implement `std::error::Error + Send + Sync + 'static`
+help: the following other types implement trait `ActionOutcome`
+  --> src/native.rs
+   |
+   | impl<T> ActionOutcome for Option<T> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Option<T>`
+...
+   | impl<T, E: Error + Send + Sync + 'static> ActionOutcome for Result<T, E> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `std::result::Result<T, E>`
+   = note: this error originates in the attribute macro `rewrite_rule` (in Nightly builds, run with -Z macro-backtrace for more info)

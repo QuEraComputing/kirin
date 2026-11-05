@@ -423,6 +423,66 @@ impl<'a> Iterator for MixedOpsUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for MixedOps {
+    type Iter = MixedOpsSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        match self {
+            Self::Add(field_0) => {
+                MixedOpsSymbolsIter::Add(<AddOp as ::kirin::ir::HasSymbols>::symbols(field_0))
+            }
+            Self::Literal { value } => {
+                MixedOpsSymbolsIter::Literal(std::iter::empty::<&'a ::kirin::ir::Symbol>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsSymbolsIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+    Literal(std::iter::Empty<&'a ::kirin::ir::Symbol>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for MixedOps {
+    type IterMut = MixedOpsSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Add(field_0) => MixedOpsSymbolsMutIter::Add(
+                <AddOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+            Self::Literal { value } => {
+                MixedOpsSymbolsMutIter::Literal(std::iter::empty::<&'a mut ::kirin::ir::Symbol>())
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedOpsSymbolsMutIter<'a> {
+    Add(<AddOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+    Literal(std::iter::Empty<&'a mut ::kirin::ir::Symbol>),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedOpsSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Add(inner) => inner.next(),
+            Self::Literal(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for MixedOps {
     fn is_terminator(&self) -> bool {
         match self {

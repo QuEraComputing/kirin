@@ -421,6 +421,66 @@ impl<'a, L: Dialect> Iterator for PatternOpsUngraphsMutIter<'a, L> {
     }
 }
 #[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasSymbols<'a> for PatternOps<L> {
+    type Iter = PatternOpsSymbolsIter<'a, L>;
+    fn symbols(&'a self) -> Self::Iter {
+        match self {
+            Self::Op(field_0) => {
+                PatternOpsSymbolsIter::Op(<L as ::kirin::ir::HasSymbols>::symbols(field_0))
+            }
+            Self::Hole(field_0) => PatternOpsSymbolsIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasSymbols>::symbols(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsSymbolsIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasSymbols<'a>>::Iter),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasSymbols<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsSymbolsIter<'a, L> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a, L: Dialect> ::kirin::ir::HasSymbolsMut<'a> for PatternOps<L> {
+    type IterMut = PatternOpsSymbolsMutIter<'a, L>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Op(field_0) => PatternOpsSymbolsMutIter::Op(
+                <L as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+            Self::Hole(field_0) => PatternOpsSymbolsMutIter::Hole(
+                <HoleOp<L::Type> as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum PatternOpsSymbolsMutIter<'a, L: Dialect> {
+    Op(<L as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+    Hole(<HoleOp<L::Type> as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a, L: Dialect> Iterator for PatternOpsSymbolsMutIter<'a, L> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Op(inner) => inner.next(),
+            Self::Hole(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl<L: Dialect> ::kirin::ir::IsTerminator for PatternOps<L> {
     fn is_terminator(&self) -> bool {
         match self {

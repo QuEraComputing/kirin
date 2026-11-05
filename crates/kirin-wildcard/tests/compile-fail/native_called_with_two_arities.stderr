@@ -1,0 +1,14 @@
+error[E0061]: this function takes 2 arguments but 3 arguments were supplied
+  --> tests/compile-fail/native_called_with_two_arities.rs:17:5
+   |
+13 | #[rewrite_rule(language = L)]
+   | ----------------------------- unexpected argument #3
+...
+17 |     same(x, y);
+   |     ^^^^
+   |
+note: function defined here
+  --> tests/compile-fail/native_called_with_two_arities.rs:9:4
+   |
+ 9 | fn same(_stage: &StageInfo<L>, _x: SSAValue) -> bool {
+   |    ^^^^

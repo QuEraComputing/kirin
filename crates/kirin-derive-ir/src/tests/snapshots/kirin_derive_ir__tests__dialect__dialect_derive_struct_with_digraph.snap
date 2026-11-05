@@ -387,6 +387,60 @@ impl<'a> Iterator for QuantumEvalUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for QuantumEval {
+    type Iter = QuantumEvalSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalSymbolsIter {
+            inner: std::iter::empty::<&'a ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalSymbolsIter<'a> {
+    inner: std::iter::Empty<&'a ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for QuantumEval {
+    type IterMut = QuantumEvalSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            qubit,
+            angle,
+            body,
+            res,
+        } = self;
+        QuantumEvalSymbolsMutIter {
+            inner: std::iter::empty::<&'a mut ::kirin::ir::Symbol>(),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct QuantumEvalSymbolsMutIter<'a> {
+    inner: std::iter::Empty<&'a mut ::kirin::ir::Symbol>,
+}
+#[automatically_derived]
+impl<'a> Iterator for QuantumEvalSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for QuantumEval {
     fn is_terminator(&self) -> bool {
         false

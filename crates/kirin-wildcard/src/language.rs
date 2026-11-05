@@ -21,6 +21,8 @@ use crate::{Constraint, Erase, Hole, NativeCall, Pattern, PatternStatement, Repl
     HasArgumentsMut,
     HasResults,
     HasResultsMut,
+    HasSymbols,
+    HasSymbolsMut,
     HasBlocks,
     HasBlocksMut,
     HasSuccessors,

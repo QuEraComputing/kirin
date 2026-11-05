@@ -138,6 +138,35 @@ impl RuleModel {
         self.in_match(id) && matches!(self.defining(id), StmtKind::NativeCompute { .. })
     }
 
+    /// The name a `wildcard.native_call` stores for `func`. The string
+    /// contains the whole path, `::`-separated, with any leading `::` and
+    /// dropping raw prefixes. The parser rejects generic arguments, so the
+    /// segments' names are the whole path.
+    pub fn native_name(func: &syn::Path) -> String {
+        let mut name = String::new();
+        if func.leading_colon.is_some() {
+            name.push_str("::");
+        }
+        for (index, segment) in func.segments.iter().enumerate() {
+            if index > 0 {
+                name.push_str("::");
+            }
+            name.push_str(&segment.ident.unraw().to_string());
+        }
+        name
+    }
+
+    /// Whether the native call `stmt` is a constraint's: its one result is
+    /// tested by a `Constraint`.
+    pub fn is_constraint_call(&self, stmt: StmtId) -> bool {
+        let [result] = self.statement(stmt).results[..] else {
+            return false;
+        };
+        self.body.iter().any(|&id| {
+            matches!(self.statement(id).kind, StmtKind::Constraint { success } if success == result)
+        })
+    }
+
     /// Whether `id` is defined by one of the body's statements.
     fn in_match(&self, id: ValueId) -> bool {
         self.body.contains(&self.value(id).stmt)

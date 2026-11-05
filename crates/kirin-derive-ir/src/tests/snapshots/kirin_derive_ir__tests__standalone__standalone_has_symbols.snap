@@ -1,0 +1,72 @@
+---
+source: crates/kirin-derive-ir/src/tests/standalone.rs
+expression: rustfmt(tokens.to_string())
+---
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for NamedOp {
+    type Iter = NamedOpSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        let Self {
+            target,
+            aliases,
+            fallback,
+        } = self;
+        NamedOpSymbolsIter {
+            inner: std::iter::once(target)
+                .chain(aliases.iter())
+                .chain(fallback.iter()),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NamedOpSymbolsIter<'a> {
+    inner: std::iter::Chain<
+        std::iter::Chain<
+            std::iter::Once<&'a ::kirin::ir::Symbol>,
+            std::slice::Iter<'a, ::kirin::ir::Symbol>,
+        >,
+        std::option::Iter<'a, ::kirin::ir::Symbol>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for NamedOpSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for NamedOp {
+    type IterMut = NamedOpSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        let Self {
+            target,
+            aliases,
+            fallback,
+        } = self;
+        NamedOpSymbolsMutIter {
+            inner: std::iter::once(target)
+                .chain(aliases.iter_mut())
+                .chain(fallback.iter_mut()),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub struct NamedOpSymbolsMutIter<'a> {
+    inner: std::iter::Chain<
+        std::iter::Chain<
+            std::iter::Once<&'a mut ::kirin::ir::Symbol>,
+            std::slice::IterMut<'a, ::kirin::ir::Symbol>,
+        >,
+        std::option::IterMut<'a, ::kirin::ir::Symbol>,
+    >,
+}
+#[automatically_derived]
+impl<'a> Iterator for NamedOpSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        self.inner.next()
+    }
+}

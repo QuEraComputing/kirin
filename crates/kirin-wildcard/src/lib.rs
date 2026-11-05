@@ -62,9 +62,10 @@
 //! }
 //! ```
 //!
-//! This crate only defines the pattern data. It does not match patterns or
-//! mutate concrete IR; those responsibilities belong to `kirin-rewrite` and
-//! `kirin-ir`, respectively.
+//! This crate only defines the rule data: the patterns, and in a
+//! [`PatternRule`] the native functions a pattern calls. It does not match
+//! patterns or mutate concrete IR; those responsibilities belong to
+//! `kirin-rewrite` and `kirin-ir`, respectively.
 //!
 //! Patterns are never executed, so the dialect has no interpreter rules.
 #![forbid(unsafe_code)]
@@ -73,9 +74,11 @@ mod constraint;
 mod erase;
 mod hole;
 mod language;
+mod native;
 mod native_call;
 mod op_ref;
 mod pattern;
+mod pattern_rule;
 mod replace;
 mod rewrite;
 
@@ -83,9 +86,13 @@ pub use constraint::Constraint;
 pub use erase::Erase;
 pub use hole::Hole;
 pub use language::PatternLanguage;
+pub use native::{
+    ActionFn, ActionOutcome, CheckFn, CheckOutcome, NativeError, NativeFailure, NativeValue,
+};
 pub use native_call::NativeCall;
 pub use op_ref::OpRef;
 pub use pattern::Pattern;
+pub use pattern_rule::PatternRule;
 pub use replace::Replace;
 pub use rewrite::Rewrite;
 

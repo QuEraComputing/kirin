@@ -46,6 +46,21 @@ fn test_standalone_has_results() {
 }
 
 #[test]
+fn test_standalone_has_symbols() {
+    let input: syn::DeriveInput = syn::parse_quote! {
+        #[kirin(type = SimpleType)]
+        struct NamedOp {
+            target: Symbol,
+            aliases: Vec<Symbol>,
+            fallback: Option<Symbol>,
+        }
+    };
+    let mut tokens = generate_field_iter(&input, HAS_SYMBOLS).unwrap();
+    tokens.extend(generate_field_iter(&input, HAS_SYMBOLS_MUT).unwrap());
+    insta::assert_snapshot!(rustfmt(tokens.to_string()));
+}
+
+#[test]
 fn test_standalone_has_cfgs() {
     let input: syn::DeriveInput = syn::parse_quote! {
         #[kirin(type = SimpleType)]

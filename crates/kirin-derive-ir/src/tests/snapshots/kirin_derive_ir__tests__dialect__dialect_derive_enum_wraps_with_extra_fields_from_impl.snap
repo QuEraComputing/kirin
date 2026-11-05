@@ -423,6 +423,66 @@ impl<'a> Iterator for MixedWrapsUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for MixedWraps {
+    type Iter = MixedWrapsSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        match self {
+            Self::Simple(field_0) => MixedWrapsSymbolsIter::Simple(
+                <SimpleOp as ::kirin::ir::HasSymbols>::symbols(field_0),
+            ),
+            Self::Wrapped { inner, tag } => {
+                MixedWrapsSymbolsIter::Wrapped(<InnerOp as ::kirin::ir::HasSymbols>::symbols(inner))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsSymbolsIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+    Wrapped(<InnerOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for MixedWraps {
+    type IterMut = MixedWrapsSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Simple(field_0) => MixedWrapsSymbolsMutIter::Simple(
+                <SimpleOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+            Self::Wrapped { inner, tag } => MixedWrapsSymbolsMutIter::Wrapped(
+                <InnerOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(inner),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum MixedWrapsSymbolsMutIter<'a> {
+    Simple(<SimpleOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+    Wrapped(<InnerOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for MixedWrapsSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Simple(inner) => inner.next(),
+            Self::Wrapped(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for MixedWraps {
     fn is_terminator(&self) -> bool {
         match self {

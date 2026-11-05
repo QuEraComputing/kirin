@@ -83,7 +83,18 @@ pub(crate) enum StmtKind {
     /// parser's name table and is mainly used to bind zero-result statements.
     Op { op: syn::Path, args: Vec<Use> },
     /// `let log_val = log2(val);`: a native function computing values.
-    NativeCompute { func: syn::Path, args: Vec<Use> },
+    /// `fallible` if the call ends in `?`: the function returns an `Option`
+    /// or a `Result`. In the match, `None` fails the match and `Err` the
+    /// run; in a `rewrite!` body, both fail the run.
+    ///
+    /// `unpack` is how the `let` pattern takes the returned value apart into
+    /// the results.
+    NativeCompute {
+        func: syn::Path,
+        args: Vec<Use>,
+        fallible: bool,
+        unpack: Unpack,
+    },
     /// Requires `success` to hold. `is_power_of_two(val);` becomes a
     /// [`StmtKind::NativeCompute`] whose anonymous result is `success`,
     /// followed by this.
@@ -97,4 +108,16 @@ pub(crate) enum StmtKind {
     /// `erase!(r);`: erase the matched `stmt`, named directly in the source
     /// rule or by one of its results.
     Erase { stmt: StmtId },
+}
+
+/// How a native call's `let` pattern takes the function's value apart, as
+/// Rust's own tuple patterns do: `let (lo, (hi, ok)) = f(x)` binds three
+/// results. The leaves are the call's results, in order.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Unpack {
+    /// The whole value is one result, as `v` or `_` binds it.
+    Whole,
+    /// A tuple, taken apart element by element: `(a,)` binds the element of
+    /// a 1-tuple, and `()` binds nothing.
+    Tuple(Vec<Unpack>),
 }

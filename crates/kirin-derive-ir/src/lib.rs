@@ -70,6 +70,8 @@ derive_field_iter_macro!(derive_has_arguments, HasArguments, HAS_ARGUMENTS);
 derive_field_iter_macro!(derive_has_arguments_mut, HasArgumentsMut, HAS_ARGUMENTS_MUT);
 derive_field_iter_macro!(derive_has_results, HasResults, HAS_RESULTS);
 derive_field_iter_macro!(derive_has_results_mut, HasResultsMut, HAS_RESULTS_MUT);
+derive_field_iter_macro!(derive_has_symbols, HasSymbols, HAS_SYMBOLS);
+derive_field_iter_macro!(derive_has_symbols_mut, HasSymbolsMut, HAS_SYMBOLS_MUT);
 derive_field_iter_macro!(derive_has_blocks, HasBlocks, HAS_BLOCKS);
 derive_field_iter_macro!(derive_has_blocks_mut, HasBlocksMut, HAS_BLOCKS_MUT);
 derive_field_iter_macro!(derive_has_successors, HasSuccessors, HAS_SUCCESSORS);

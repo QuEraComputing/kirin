@@ -3,7 +3,7 @@
 use proc_macro2::Span;
 use syn::parse_quote;
 
-use crate::model::{Binding, RuleModel, StmtId, StmtKind, Use, ValueId};
+use crate::model::{Binding, RuleModel, StmtId, StmtKind, Unpack, Use, ValueId};
 use crate::parse::RuleParser;
 
 pub(super) fn parser() -> RuleParser {
@@ -64,6 +64,8 @@ pub(super) fn compute() -> StmtKind {
     StmtKind::NativeCompute {
         func: parse_quote!(f),
         args: vec![],
+        fallible: false,
+        unpack: Unpack::Whole,
     }
 }
 

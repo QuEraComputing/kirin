@@ -5,19 +5,22 @@ use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType};
 use kirin_test_languages::{EffectLanguage, GraphFunctionLanguage as L};
 use kirin_test_utils::roundtrip;
-use kirin_wildcard::{PatternLanguage, PatternStatement, Rewrite, rewrite_rule};
+use kirin_wildcard::{PatternLanguage, PatternRule, PatternStatement, Rewrite, rewrite_rule};
 
 type Stage = StageInfo<PatternLanguage<L>>;
 
-/// Constraint and computation functions only have to exist: the generated
-/// code names them so rustc checks it, but never calls them.
-fn is_power_of_two(x: i64) -> bool {
+/// The rules' native functions. The generated closures call them, so rustc
+/// checks their signatures, but these tests only build patterns and never
+/// run them.
+fn is_power_of_two(_stage: &StageInfo<L>, x: i64) -> bool {
     x > 0 && (x & (x - 1)) == 0
 }
 
 mod native {
-    pub fn build_neg(x: i64) -> i64 {
-        -x
+    use kirin::ir::{Rewriter, SSAValue};
+
+    pub fn build_neg(_rewriter: &mut Rewriter<'_, super::L>, _x: SSAValue) -> SSAValue {
+        unimplemented!("these tests never run the rule")
     }
 }
 
@@ -34,8 +37,8 @@ fn double_neg() {
 
 /// Whether `x` has no uses; dead-code elimination guards its `erase!` with
 /// it, since the results are not replaced.
-fn has_no_uses(_x: i64) -> bool {
-    unimplemented!("only named by the rule")
+fn has_no_uses(_stage: &StageInfo<L>, _x: SSAValue) -> bool {
+    unimplemented!("these tests never run the rule")
 }
 
 /// Dead-code elimination: erase a `neg` whose result is unused, without
@@ -117,10 +120,10 @@ fn describe(stage: &Stage, stmt: Statement) -> String {
 
 /// Build `rule`'s pattern in a stage of its own, and finalize it.
 fn build<Lang: Dialect>(
-    rule: impl FnOnce(&mut BuilderStageInfo<PatternLanguage<Lang>>) -> Statement,
+    rule: impl FnOnce(&mut BuilderStageInfo<PatternLanguage<Lang>>) -> PatternRule<Lang>,
 ) -> (StageInfo<PatternLanguage<Lang>>, Statement) {
     let mut stage = BuilderStageInfo::default();
-    let pattern = rule(&mut stage);
+    let pattern = rule(&mut stage).pattern();
     let stage = stage.finalize().expect("the rule builds a valid pattern");
     (stage, pattern)
 }
@@ -400,10 +403,10 @@ fn rewrite_rule_keeps_visibility_and_takes_a_crate_path() {
 #[test]
 fn rewrite_rules_share_one_stage() {
     let mut stage = BuilderStageInfo::<PatternLanguage<L>>::default();
-    let first = double_neg(&mut stage);
-    let second = dead_neg(&mut stage);
+    let first = double_neg(&mut stage).pattern();
+    let second = dead_neg(&mut stage).pattern();
     let mut stage = stage.finalize().expect("both rules build valid patterns");
-    let third = stage.with_builder(rules::add_any);
+    let third = stage.with_builder(rules::add_any).pattern();
 
     let roots: Vec<(String, Statement)> = [first, second, third]
         .into_iter()

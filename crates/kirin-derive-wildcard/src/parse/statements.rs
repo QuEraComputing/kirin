@@ -3,7 +3,7 @@ use proc_macro2::Span;
 use syn::{Stmt, Token, ext::IdentExt, punctuated::Punctuated, spanned::Spanned};
 
 use super::{RuleParser, rule_parser::MISSING_REWRITE};
-use crate::model::{Binding, StmtId, StmtKind, Use};
+use crate::model::{Binding, StmtId, StmtKind, Unpack, Use};
 
 const OP_PATH: &str = "ops in `op![..]` must name their dialect, e.g. `op![Arith::add(x, y)]`";
 
@@ -25,7 +25,15 @@ impl RuleParser {
             }
             // A call whose result is not bound is a constraint.
             Stmt::Expr(syn::Expr::Call(call), Some(_)) => {
-                Ok(self.parse_constraint(call, stmt.span())?.to_vec())
+                Ok(self.parse_constraint(call, false, stmt.span())?.to_vec())
+            }
+            Stmt::Expr(syn::Expr::Try(try_expr), Some(_))
+                if matches!(*try_expr.expr, syn::Expr::Call(_)) =>
+            {
+                let syn::Expr::Call(call) = &*try_expr.expr else {
+                    unreachable!("the guard matched a call")
+                };
+                Ok(self.parse_constraint(call, true, stmt.span())?.to_vec())
             }
             Stmt::Expr(expr, _) => Err(syn::Error::new_spanned(
                 expr,
@@ -42,15 +50,24 @@ impl RuleParser {
     /// It becomes: a `NativeCompute` whose one anonymous result says whether
     /// the constraint holds and a `Constraint` which takes that result.
     /// Both, and the result, carry the call's `span`.
+    ///
+    /// `fallible` if the call ends in `?`, as `is_power_of_two(val)?;`: its
+    /// function then returns an `Option<bool>` or a `Result<bool, _>`.
     pub(super) fn parse_constraint(
         &mut self,
         call: &syn::ExprCall,
+        fallible: bool,
         span: Span,
     ) -> syn::Result<[StmtId; 2]> {
         let (func, args) = self.parse_native_call(call)?;
         let compute = self.add_statement(
             span,
-            StmtKind::NativeCompute { func, args },
+            StmtKind::NativeCompute {
+                func,
+                args,
+                fallible,
+                unpack: Unpack::Whole,
+            },
             vec![(None, span)],
         )?;
         let success = self.model().statement(compute).results[0];
@@ -58,7 +75,8 @@ impl RuleParser {
         Ok([compute, constraint])
     }
 
-    /// Parse `let pattern = init;`, where `init` is a native call or `op![..]`.
+    /// Parse `let pattern = init;`, where `init` is a native call, optionally
+    /// followed by `?`, or `op![..]`.
     pub(super) fn parse_local(&mut self, local: &syn::Local) -> syn::Result<StmtId> {
         let Some(init) = &local.init else {
             return Err(syn::Error::new_spanned(
@@ -76,10 +94,10 @@ impl RuleParser {
         // The initializer is resolved before the pattern binds its names, so
         // `let x = f(x)` uses `x` before binding it.
         let (kind, op_name, values) = match init.expr.as_ref() {
-            syn::Expr::Call(call) => {
-                let (func, args) = self.parse_native_call(call)?;
+            syn::Expr::Call(_) | syn::Expr::Try(_) => {
+                let kind = self.parse_native_compute(&init.expr, Self::unpack(&local.pat))?;
                 let values = Self::parse_pat(&local.pat)?;
-                (StmtKind::NativeCompute { func, args }, None, values)
+                (kind, None, values)
             }
             syn::Expr::Macro(syn::ExprMacro { mac, .. }) => {
                 let kind = self.parse_op(mac)?;
@@ -147,6 +165,16 @@ impl RuleParser {
         Ok(values)
     }
 
+    /// How the `let` pattern `pat` takes a native call's value apart, with
+    /// a leaf for each value [`Self::parse_pat`] returns. Any other pattern
+    /// is a leaf, which `parse_pat` rejects.
+    pub(super) fn unpack(pat: &syn::Pat) -> Unpack {
+        match pat {
+            syn::Pat::Tuple(tuple) => Unpack::Tuple(tuple.elems.iter().map(Self::unpack).collect()),
+            _ => Unpack::Whole,
+        }
+    }
+
     pub(super) fn parse_ident(ident: &syn::PatIdent) -> syn::Result<syn::Ident> {
         if ident.mutability.is_some() {
             return Err(syn::Error::new_spanned(
@@ -161,6 +189,40 @@ impl RuleParser {
             ));
         }
         Ok(ident.ident.clone())
+    }
+
+    /// Parse a native call `name(args..)` or `name(args..)?` computing
+    /// values, which its pattern takes apart as `unpack`.
+    pub(super) fn parse_native_compute(
+        &mut self,
+        expr: &syn::Expr,
+        unpack: Unpack,
+    ) -> syn::Result<StmtKind> {
+        let (call, fallible) = match expr {
+            syn::Expr::Call(call) => (call, false),
+            syn::Expr::Try(syn::ExprTry { expr, .. }) => match expr.as_ref() {
+                syn::Expr::Call(call) => (call, true),
+                expr => {
+                    return Err(syn::Error::new_spanned(
+                        expr,
+                        "`?` can only follow a native function call in `#[rewrite_rule]` functions",
+                    ));
+                }
+            },
+            expr => {
+                return Err(syn::Error::new_spanned(
+                    expr,
+                    "expected a native function call in `#[rewrite_rule]` functions",
+                ));
+            }
+        };
+        let (func, args) = self.parse_native_call(call)?;
+        Ok(StmtKind::NativeCompute {
+            func,
+            args,
+            fallible,
+            unpack,
+        })
     }
 
     /// Parse a native function call `name(args..)` into the function's path
@@ -376,7 +438,8 @@ impl RuleParser {
     }
 
     /// Parse a statement of a `rewrite!` body: a `let` binding a native call
-    /// or an `op![..]`, `erase!(..);` or `replace!(..);`.
+    /// or an `op![..]`, a native call on its own, `erase!(..);` or
+    /// `replace!(..);`.
     pub(super) fn parse_replacement(&mut self, stmt: &Stmt) -> syn::Result<StmtId> {
         match stmt {
             Stmt::Local(local) => {
@@ -411,9 +474,14 @@ impl RuleParser {
                 semi_token: Some(_),
                 ..
             }) => self.parse_rewrite_action(mac).map(|(action, _)| action),
+            // A native call whose result is not bound only acts on the IR.
+            Stmt::Expr(expr @ (syn::Expr::Call(_) | syn::Expr::Try(_)), Some(_)) => {
+                let kind = self.parse_native_compute(expr, Unpack::Tuple(vec![]))?;
+                self.add_statement(stmt.span(), kind, vec![])
+            }
             _ => Err(syn::Error::new_spanned(
                 stmt,
-                "only `let` bindings, `erase!(..);` and `replace!(..);` are allowed in the body of `rewrite!`",
+                "only `let` bindings, native calls, `erase!(..);` and `replace!(..);` are allowed in the body of `rewrite!`",
             )),
         }
     }

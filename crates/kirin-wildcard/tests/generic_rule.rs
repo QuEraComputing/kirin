@@ -6,7 +6,7 @@ use std::fmt::Debug;
 use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType};
 use kirin_test_languages::{EffectLanguage, GraphFunctionLanguage};
-use kirin_wildcard::{PatternLanguage, rewrite_rule};
+use kirin_wildcard::{PatternLanguage, PatternRule, rewrite_rule};
 
 /// `-(-x)` into `x`, for any language containing `Arith`.
 #[rewrite_rule(language = L)]
@@ -22,10 +22,10 @@ where
 /// Build `rule`'s pattern in a stage of its own, finalize it, and return
 /// the stage with the statements of the pattern's body.
 fn build<Lang: Dialect>(
-    rule: impl FnOnce(&mut BuilderStageInfo<PatternLanguage<Lang>>) -> Statement,
+    rule: impl FnOnce(&mut BuilderStageInfo<PatternLanguage<Lang>>) -> PatternRule<Lang>,
 ) -> (StageInfo<PatternLanguage<Lang>>, Vec<Statement>) {
     let mut stage = BuilderStageInfo::default();
-    let pattern = rule(&mut stage);
+    let pattern = rule(&mut stage).pattern();
     let stage = stage.finalize().expect("the rule builds a valid pattern");
     let PatternLanguage::Wildcard(kirin_wildcard::PatternStatement::Pattern(pattern)) =
         pattern.expect_info(&stage).definition()
@@ -54,7 +54,7 @@ fn result<Lang: Dialect>(stage: &StageInfo<PatternLanguage<Lang>>, stmt: Stateme
 /// `Lang` would hold for it: the `Arith` op, wrapped by `Lang`'s `From`.
 fn check_double_neg<Lang>()
 where
-    Lang: Dialect<Type = ArithType> + From<Arith<ArithType>> + Debug,
+    Lang: Dialect<Type = ArithType> + From<Arith<ArithType>> + Debug + 'static,
 {
     let (stage, body) = build(double_neg::<Lang>);
     let [x, a, r] = body[..] else {

@@ -3,7 +3,7 @@ use quote::{format_ident, quote, quote_spanned};
 use syn::{ext::IdentExt, spanned::Spanned};
 
 use super::RuleCodegen;
-use crate::model::{StmtId, StmtKind, Use, ValueId};
+use crate::model::{RuleModel, StmtId, StmtKind, Use, ValueId};
 
 impl RuleCodegen {
     /// The code building statement `id`, by its kind.
@@ -11,7 +11,7 @@ impl RuleCodegen {
         match &self.model.statement(id).kind {
             StmtKind::Hole => self.hole(id),
             StmtKind::Op { op, args } => self.op(id, op, args),
-            StmtKind::NativeCompute { func, args } => self.native_compute(id, func, args),
+            StmtKind::NativeCompute { func, args, .. } => self.native_compute(id, func, args),
             StmtKind::Constraint { success } => self.constraint(id, *success),
             StmtKind::Rewrite { root, body } => self.rewrite(id, *root, body),
             StmtKind::Replace {
@@ -135,28 +135,22 @@ impl RuleCodegen {
     }
 
     /// `let log_val = math::log2(val);`: a `wildcard.native_call` named
-    /// `"math::log2"` computing the results of `stmt`
+    /// `"math::log2"` computing the results of `stmt`. The function itself is
+    /// called by the rule's [`Self::natives`].
     pub(super) fn native_compute(
         &self,
         stmt: StmtId,
         func: &syn::Path,
         args: &[Use],
     ) -> TokenStream {
-        let name = Self::native_name(func);
+        let name = RuleModel::native_name(func);
         let krate = &self.args.crate_path;
         let stage = self.stage_ident();
         let ty = self.ir_type();
 
-        // `#func` keeps its own spans, so it resolves where the rule is
-        // written and a missing function is reported at it.
-        let span = Span::mixed_site().located_at(self.model.statement(stmt).span);
-        // Have rustc check the results of the function
-        let check = quote_spanned! {span=> let _ = #func; };
-
         let (declare_results, result_values) = self.results(stmt);
         let operands = args.iter().map(|&arg| self.operand(arg));
         quote! {
-            #check
             #declare_results
             #stage
                 .statement()
@@ -167,24 +161,6 @@ impl RuleCodegen {
                 ))
                 .new();
         }
-    }
-
-    /// The name a `wildcard.native_call` stores for `func`. The string
-    /// contains the whole path, `::`-separated, with any leading `::` and
-    /// dropping raw prefixes. The parser rejects generic arguments, so the
-    /// segments' names are the whole path.
-    pub(super) fn native_name(func: &syn::Path) -> String {
-        let mut name = String::new();
-        if func.leading_colon.is_some() {
-            name.push_str("::");
-        }
-        for (index, segment) in func.segments.iter().enumerate() {
-            if index > 0 {
-                name.push_str("::");
-            }
-            name.push_str(&segment.ident.unraw().to_string());
-        }
-        name
     }
 
     /// `wildcard.constraint`, requiring `success` to hold: the second statement

@@ -13,6 +13,10 @@ pub trait WalkOrder {
     /// The cursor walking this order.
     type Cursor: WalkCursor;
 
+    /// Whether an edit may erase the statement being visited, as the
+    /// [contract](super#contract) allows for this order.
+    const ALLOWS_ERASING_VISITED: bool;
+
     /// A cursor at the start of the walk of the tree under `root`, `root`
     /// included.
     fn start<L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Self::Cursor;

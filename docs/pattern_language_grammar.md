@@ -176,14 +176,15 @@ See [dialect-rewrite-rules.md](design/dialect-rewrite-rules.md).
 | erasing an op whose results are still used | not checked statically: kirin-ir's [`Rewriter::erase_statement`](../crates/kirin-ir/src/rewrite/rewriter.rs#L451-L458) rejects it ([`StatementResultsInUse`](../crates/kirin-ir/src/rewrite/rewriter.rs#L109-L111)) and the pass quarantines the stage |
 | $\textsf{rooted}$, $\textsf{acts}$ | macro ($\textsf{rooted}$ in its verification pass) |
 | $O : m \to n$ (argument and result counts), $O$ in the language | rustc, through the generated constructor call `new_<op_name>`; for a generic rule, through the bounds its author writes |
-| native call arity and result sorts $\tau_i$ | not yet checked |
+| native call arity $m$ and result count $n$ | rustc, through the call of the function generated for each native call |
+| native call result sorts $\tau_i$ | not checked statically: a `replace` with a $\textsf{host}$ value fails the run ([`NotAnSsaValue`](../crates/kirin-rewrite/src/driver/error.rs)) |
+| distinct `op!` statements match distinct statements | the matcher |
 
 ## 9. Future Work
 
 - A pattern registry into which the derived macro functions get added to.
 - Type matching (type variables, op type schemes)
 - Attributes (compile-time value fields, e.g. [`Constant::value`](../crates/kirin-constant/src/lib.rs#L14)) are not matchable yet.
-- Injectivity: may two op names match the same statement?
 - `Vec` / `Option` result fields (`scf.if`, calls, `tuple.unpack`): how a rule binds them.
-- Implement native function registry to disambiguate between multiple functions with the same name.
-  Also to check argument counts and types at compile time.
+- Check native call argument types at compile time. They are checked when the rule runs
+  ([`NativeArgument`](../crates/kirin-rewrite/src/driver/error.rs)).

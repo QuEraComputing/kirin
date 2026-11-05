@@ -46,7 +46,7 @@ fn first_call(model: &RuleModel) -> (Vec<ValueId>, Vec<ValueId>) {
 // --- signature ---
 
 /// The rule keeps its attributes, visibility and name, takes the stage to
-/// build its pattern in, and returns the pattern statement.
+/// build its pattern in, and returns the pattern as a `PatternRule`.
 #[test]
 fn signature_takes_the_stage_and_returns_the_pattern() {
     let item: syn::ItemFn = parse_quote!(
@@ -61,7 +61,7 @@ fn signature_takes_the_stage_and_returns_the_pattern() {
         #[inline]
         pub fn add_zero(
             stage: &mut impl ::kirin_wildcard::__private::ir::AsBuildStage<::kirin_wildcard::PatternLanguage<L>>,
-        ) -> ::kirin_wildcard::__private::ir::Statement
+        ) -> ::kirin_wildcard::PatternRule<L>
     };
     assert_eq!(codegen.signature().to_string(), expected.to_string());
 }
@@ -83,11 +83,11 @@ fn signature_keeps_generics_and_bounds_the_language() {
     let expected = quote! {
         fn add_zero<L>(
             stage: &mut impl ::kirin_wildcard::__private::ir::AsBuildStage<::kirin_wildcard::PatternLanguage<L>>,
-        ) -> ::kirin_wildcard::__private::ir::Statement
+        ) -> ::kirin_wildcard::PatternRule<L>
         where
             // Spaced as `syn` prints the original bound.
             L: From<Arith<L::Type> >,
-            L: ::kirin_wildcard::__private::ir::Dialect,
+            L: ::kirin_wildcard::__private::ir::Dialect + 'static,
             <L as ::kirin_wildcard::__private::ir::Dialect>::Type: ::kirin_wildcard::__private::ir::Placeholder
     };
     assert_eq!(codegen.signature().to_string(), expected.to_string());
@@ -107,7 +107,7 @@ fn signature_adds_the_bounds_without_a_where_clause() {
     let signature = codegen.signature().to_string();
     let bounds = quote! {
         where
-            L: ::kirin_wildcard::__private::ir::Dialect,
+            L: ::kirin_wildcard::__private::ir::Dialect + 'static,
             <L as ::kirin_wildcard::__private::ir::Dialect>::Type: ::kirin_wildcard::__private::ir::Placeholder
     };
     assert!(
@@ -313,7 +313,7 @@ fn native_name_spells_out_the_whole_path() {
         (parse_quote!(r#type::convert), "type::convert"),
     ];
     for (path, name) in cases {
-        assert_eq!(RuleCodegen::native_name(&path), name);
+        assert_eq!(RuleModel::native_name(&path), name);
     }
 }
 
@@ -332,6 +332,7 @@ fn native_compute_builds_a_named_native_call() {
     let StmtKind::NativeCompute {
         func,
         args: operands,
+        ..
     } = &model.statement(stmt).kind
     else {
         panic!("expected a native computation");
@@ -339,7 +340,6 @@ fn native_compute_builds_a_named_native_call() {
 
     let (results, _) = codegen.results(stmt);
     let expected = quote! {
-        let _ = math::divmod;
         #results
         stage
             .statement()
@@ -489,7 +489,7 @@ fn pattern_builds_its_body_with_the_rewrite_as_terminator() {
     let (rewrite, matched) = body.split_last().unwrap();
     let ids = matched.iter().map(|&s| codegen.statement_ident(s));
     let rewrite_id = codegen.statement_ident(*rewrite);
-    let expected = quote! {{
+    let expected = quote! {
         #(#code)*
         let pattern_body = stage
             .block()
@@ -500,8 +500,8 @@ fn pattern_builds_its_body_with_the_rewrite_as_terminator() {
         let pattern_name = stage
             .symbol_table_mut()
             .intern(::std::string::String::from("add_zero"));
-        ::kirin_wildcard::Pattern::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(stage, pattern_name, pattern_body).id
-    }};
+        let pattern = ::kirin_wildcard::Pattern::< <L as ::kirin_wildcard::__private::ir::Dialect>::Type>::new(stage, pattern_name, pattern_body).id;
+    };
     assert_eq!(codegen.pattern().to_string(), expected.to_string());
 }
 
@@ -524,6 +524,28 @@ fn generate_expands_a_rule_using_every_statement() {
                 let n = op![Arith::neg(k)];
                 replace!(r, n);
                 erase!(s);
+            })
+        }
+    );
+    let code = RuleCodegen::generate(RuleParser::parse(&item).unwrap(), item, args());
+    insta::assert_snapshot!(kirin_test_utils::rustfmt(code.to_string()));
+}
+
+/// The whole expansion of a rule whose native calls use `?` and bind
+/// several values or none: a fallible check returns `Ok(None)` on `None`, a
+/// fallible action propagates its error, and the results are split into one
+/// `NativeValue` each.
+#[test]
+fn generate_expands_native_calls_with_try() {
+    let item: syn::ItemFn = parse_quote!(
+        fn rule() {
+            let r = op![Arith::neg(x)];
+            let v = constant_value(x)?;
+            is_small(v);
+            rewrite!(r, {
+                let (q, k) = split(v);
+                emit(q, k)?;
+                replace!(r, x);
             })
         }
     );

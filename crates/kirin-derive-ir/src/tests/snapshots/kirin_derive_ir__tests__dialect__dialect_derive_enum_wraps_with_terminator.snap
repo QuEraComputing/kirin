@@ -423,6 +423,66 @@ impl<'a> Iterator for CfOpsUngraphsMutIter<'a> {
     }
 }
 #[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbols<'a> for CfOps {
+    type Iter = CfOpsSymbolsIter<'a>;
+    fn symbols(&'a self) -> Self::Iter {
+        match self {
+            Self::Branch(field_0) => {
+                CfOpsSymbolsIter::Branch(<BranchOp as ::kirin::ir::HasSymbols>::symbols(field_0))
+            }
+            Self::Return(field_0) => {
+                CfOpsSymbolsIter::Return(<ReturnOp as ::kirin::ir::HasSymbols>::symbols(field_0))
+            }
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsSymbolsIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+    Return(<ReturnOp as ::kirin::ir::HasSymbols<'a>>::Iter),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsSymbolsIter<'a> {
+    type Item = &'a ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
+impl<'a> ::kirin::ir::HasSymbolsMut<'a> for CfOps {
+    type IterMut = CfOpsSymbolsMutIter<'a>;
+    fn symbols_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            Self::Branch(field_0) => CfOpsSymbolsMutIter::Branch(
+                <BranchOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+            Self::Return(field_0) => CfOpsSymbolsMutIter::Return(
+                <ReturnOp as ::kirin::ir::HasSymbolsMut>::symbols_mut(field_0),
+            ),
+        }
+    }
+}
+#[automatically_derived]
+#[doc(hidden)]
+pub enum CfOpsSymbolsMutIter<'a> {
+    Branch(<BranchOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+    Return(<ReturnOp as ::kirin::ir::HasSymbolsMut<'a>>::IterMut),
+}
+#[automatically_derived]
+impl<'a> Iterator for CfOpsSymbolsMutIter<'a> {
+    type Item = &'a mut ::kirin::ir::Symbol;
+    fn next(&mut self) -> Option<Self::Item> {
+        match self {
+            Self::Branch(inner) => inner.next(),
+            Self::Return(inner) => inner.next(),
+        }
+    }
+}
+#[automatically_derived]
 impl ::kirin::ir::IsTerminator for CfOps {
     fn is_terminator(&self) -> bool {
         match self {

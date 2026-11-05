@@ -1,0 +1,20 @@
+error[E0277]: a native call ending in `?` in the match must return an `Option` or a `Result`, not `i64`
+  --> tests/compile-fail/try_on_plain_value.rs:15:17
+   |
+12 | #[rewrite_rule(language = L)]
+   | ----------------------------- in this attribute macro expansion
+...
+15 |     let index = argument_index(x)?;
+   |                 ^^^^^^^^^^^^^^ returns `i64`
+   |
+   = help: the trait `CheckOutcome` is not implemented for `i64`
+   = note: a `Result`'s error must implement `std::error::Error + Send + Sync + 'static`
+help: the following other types implement trait `CheckOutcome`
+  --> src/native.rs
+   |
+   | impl<T> CheckOutcome for Option<T> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `Option<T>`
+...
+   | impl<T, E: Error + Send + Sync + 'static> CheckOutcome for Result<T, E> {
+   | ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^ `std::result::Result<T, E>`
+   = note: this error originates in the attribute macro `rewrite_rule` (in Nightly builds, run with -Z macro-backtrace for more info)

@@ -1,6 +1,7 @@
 //! Generating the code a `#[rewrite_rule]` function expands into from its
 //! [`RuleModel`](crate::model::RuleModel).
 
+mod natives;
 mod rule_codegen;
 mod statements;
 

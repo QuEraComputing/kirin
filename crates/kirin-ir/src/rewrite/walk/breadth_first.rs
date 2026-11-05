@@ -81,6 +81,7 @@ pub struct BuiltOrderCursor {
 
 impl WalkOrder for BFS {
     type Cursor = BFSCursor;
+    const ALLOWS_ERASING_VISITED: bool = false;
 
     fn start<L: Dialect>(_stage: &StageInfo<L>, root: Statement) -> Self::Cursor {
         BFSCursor {
@@ -182,6 +183,7 @@ impl BFSCursor {
 
 impl WalkOrder for ReverseBFS {
     type Cursor = BuiltOrderCursor;
+    const ALLOWS_ERASING_VISITED: bool = true;
 
     fn start<L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Self::Cursor {
         let mut ordered_nodes = breadth_first(stage, root, |_| {});
@@ -192,6 +194,7 @@ impl WalkOrder for ReverseBFS {
 
 impl WalkOrder for KeepOrderReverseBFS {
     type Cursor = BuiltOrderCursor;
+    const ALLOWS_ERASING_VISITED: bool = true;
 
     fn start<L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Self::Cursor {
         let mut level_starts = Vec::new();

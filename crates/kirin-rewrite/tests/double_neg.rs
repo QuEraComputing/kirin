@@ -1,0 +1,1084 @@
+//! Proof of concept: removing double negations with `#[rewrite_rule]` rules,
+//! driven to a fixpoint inside `Pipeline::run_pass` in every walk order.
+
+use kirin::prelude::*;
+use kirin_arith::{Arith, ArithType};
+use kirin_ir::walk::{BFS, KeepOrderReverseBFS, PostOrder, PreOrder, ReverseBFS, WalkOrder};
+use kirin_ir::{BuilderSSAKind, Placeholder, SSAKind};
+use kirin_rewrite::{
+    DriverError, NativeValue, PatternRule, RewriteDriver, RewriteSummary, RuleErrorKind, RuleSet,
+};
+use kirin_test_languages::ArithFunctionLanguage as L;
+use kirin_wildcard::{
+    Constraint, Hole, NativeCall, Pattern, PatternLanguage, Replace, Rewrite, rewrite_rule,
+};
+
+/// `-(-x)` is `x`: integer negation wraps and float negation flips the sign
+/// bit, so negating twice is exact. The two `neg`s are left dead for the
+/// driver's dead-code cleanup.
+#[rewrite_rule(language = L)]
+fn double_neg() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// Whether `x` is a block argument.
+fn is_block_argument(stage: &StageInfo<L>, x: SSAValue) -> bool {
+    matches!(x.expect_info(stage).kind(), SSAKind::BlockArgument(..))
+}
+
+/// `double_neg`, restricted by a native check to negations of a block
+/// argument.
+#[rewrite_rule(language = L)]
+fn double_neg_of_argument() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    is_block_argument(x);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// The position of `x` among its block's arguments, or `None` if `x` is not
+/// a block argument.
+fn argument_index(stage: &StageInfo<L>, x: SSAValue) -> Option<i64> {
+    match x.expect_info(stage).kind() {
+        SSAKind::BlockArgument(_, index) => Some(*index as i64),
+        _ => None,
+    }
+}
+
+fn is_zero(_stage: &StageInfo<L>, index: i64) -> bool {
+    index == 0
+}
+
+/// `double_neg` of the first block argument: one check computes an `i64`,
+/// failing the match if there is none, and another reads it.
+#[rewrite_rule(language = L)]
+fn double_neg_of_first_argument() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let index = argument_index(x)?;
+    is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// The number of operands of the statement defining `x`, or 0 for a block
+/// argument. Never fails; it returns a `Result` to exercise a `?` check
+/// returning one.
+fn operand_count(stage: &StageInfo<L>, x: SSAValue) -> Result<i64, std::convert::Infallible> {
+    Ok(match x.expect_info(stage).kind() {
+        SSAKind::Result(stmt, _) => stmt.expect_info(stage).definition().arguments().count() as i64,
+        _ => 0,
+    })
+}
+
+/// `double_neg` of a value defined without operands: a `?` check returning
+/// a `Result` binds its `Ok` value for another check.
+#[rewrite_rule(language = L)]
+fn double_neg_of_leaf() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let count = operand_count(x)?;
+    is_zero(count);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// What `argument_position` fails with.
+#[derive(Debug, PartialEq)]
+struct NotAnArgument;
+
+impl std::fmt::Display for NotAnArgument {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.write_str("not a block argument")
+    }
+}
+
+impl std::error::Error for NotAnArgument {}
+
+/// `argument_index`, but failing with an error for anything other than a
+/// block argument.
+fn argument_position(stage: &StageInfo<L>, x: SSAValue) -> Result<i64, NotAnArgument> {
+    argument_index(stage, x).ok_or(NotAnArgument)
+}
+
+/// `double_neg` of the first block argument, whose check fails the run
+/// rather than the match for anything else.
+#[rewrite_rule(language = L)]
+fn double_neg_requiring_argument() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let index = argument_position(x)?;
+    is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// Whether `x` is the first block argument, failing with an error for
+/// anything other than a block argument.
+fn is_first_argument(stage: &StageInfo<L>, x: SSAValue) -> Result<bool, NotAnArgument> {
+    Ok(argument_position(stage, x)? == 0)
+}
+
+/// `double_neg` of the first block argument, as one constraint ending in
+/// `?` whose `Err` fails the run.
+#[rewrite_rule(language = L)]
+fn double_neg_constrained_to_first_argument() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    is_first_argument(x)?;
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// Whether `maybe`, the result of `argument_index` called without `?`, is
+/// `index`, its result with `?`.
+fn is_index(_stage: &StageInfo<L>, maybe: Option<i64>, index: i64) -> bool {
+    maybe == Some(index)
+}
+
+/// `double_neg_of_first_argument`, also calling `argument_index` without
+/// `?`, which passes on the whole `Option`.
+#[rewrite_rule(language = L)]
+fn double_neg_with_and_without_try() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let index = argument_index(x)?;
+    let maybe = argument_index(x);
+    is_index(maybe, index);
+    is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+fn is_one(_stage: &StageInfo<L>, index: i64) -> bool {
+    index == 1
+}
+
+fn either(_stage: &StageInfo<L>, a: bool, b: bool) -> bool {
+    a || b
+}
+
+/// `double_neg` of the first or second block argument: `is_zero` and
+/// `is_one` compute `bool`s, and the constraint `either` requires one of
+/// them to hold.
+#[rewrite_rule(language = L)]
+fn double_neg_of_first_two_arguments() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let index = argument_index(x)?;
+    let zero = is_zero(index);
+    let one = is_one(index);
+    either(zero, one);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// `argument_index` as a 1-tuple.
+fn argument_index_in_tuple(stage: &StageInfo<L>, x: SSAValue) -> Option<(i64,)> {
+    argument_index(stage, x).map(|index| (index,))
+}
+
+/// `double_neg_of_first_argument`, taking the index out of a 1-tuple.
+#[rewrite_rule(language = L)]
+fn double_neg_of_first_argument_in_tuple() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let (index,) = argument_index_in_tuple(x)?;
+    is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// The index of `x` twice, and whether `x` is a block argument at all.
+fn argument_indices(stage: &StageInfo<L>, x: SSAValue) -> ((i64, i64), bool) {
+    let index = argument_index(stage, x);
+    let index_or_zero = index.unwrap_or_default();
+    ((index_or_zero, index_or_zero), index.is_some())
+}
+
+fn holds(_stage: &StageInfo<L>, condition: bool) -> bool {
+    condition
+}
+
+/// `double_neg_of_first_argument`, taking the index out of a nested tuple.
+#[rewrite_rule(language = L)]
+fn double_neg_of_first_argument_in_nested_tuple() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    let ((index, _), found) = argument_indices(x);
+    holds(found);
+    is_zero(index);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// Whether `x` is the first block argument, or `None` if it is not a block
+/// argument at all.
+fn is_first_argument_if_any(stage: &StageInfo<L>, x: SSAValue) -> Option<bool> {
+    argument_index(stage, x).map(|index| index == 0)
+}
+
+/// `double_neg` of the first block argument, as one constraint ending in
+/// `?` on an `Option<bool>`: `None` and `Some(false)` both fail the match.
+#[rewrite_rule(language = L)]
+fn double_neg_if_first_argument() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    is_first_argument_if_any(x)?;
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+fn in_tuple(_rewriter: &mut Rewriter<'_, L>, x: SSAValue) -> (SSAValue,) {
+    (x,)
+}
+
+fn in_tuple_if_any(_rewriter: &mut Rewriter<'_, L>, x: SSAValue) -> Option<(SSAValue,)> {
+    Some((x,))
+}
+
+fn in_nested_tuple(_rewriter: &mut Rewriter<'_, L>, x: SSAValue) -> ((SSAValue, bool), i64) {
+    ((x, true), 0)
+}
+
+/// `double_neg`, taking the replacement out of a 1-tuple.
+#[rewrite_rule(language = L)]
+fn double_neg_via_tuple() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        let (y,) = in_tuple(x);
+        replace!(r, y);
+    })
+}
+
+/// `double_neg`, taking the replacement out of a 1-tuple in an `Option`.
+#[rewrite_rule(language = L)]
+fn double_neg_via_tuple_if_any() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        let (y,) = in_tuple_if_any(x)?;
+        replace!(r, y);
+    })
+}
+
+/// `double_neg`, taking the replacement out of a nested tuple.
+#[rewrite_rule(language = L)]
+fn double_neg_via_nested_tuple() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        let ((y, _), _) = in_nested_tuple(x);
+        replace!(r, y);
+    })
+}
+
+fn same_value(_rewriter: &mut Rewriter<'_, L>, x: SSAValue) -> Option<SSAValue> {
+    Some(x)
+}
+
+fn no_value(_rewriter: &mut Rewriter<'_, L>, _x: SSAValue) -> Option<SSAValue> {
+    None
+}
+
+fn refused(_rewriter: &mut Rewriter<'_, L>, _x: SSAValue) -> Result<SSAValue, NotAnArgument> {
+    Err(NotAnArgument)
+}
+
+/// Erase the statement defining `value`, which fails while it is used.
+fn erase_producer(rewriter: &mut Rewriter<'_, L>, value: SSAValue) -> Result<(), RewriteError> {
+    let SSAKind::Result(stmt, _) = *value.expect_info(rewriter.stage()).kind() else {
+        panic!("`value` is a result");
+    };
+    rewriter.erase_statement(stmt)
+}
+
+/// `double_neg` replacing the root with what `same_value(x)?` returns.
+#[rewrite_rule(language = L)]
+fn double_neg_via_some() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        let y = same_value(x)?;
+        replace!(r, y);
+    })
+}
+
+/// `double_neg` replacing the root with what `no_value(x)?` returns.
+#[rewrite_rule(language = L)]
+fn double_neg_via_none() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        let y = no_value(x)?;
+        replace!(r, y);
+    })
+}
+
+/// `double_neg` replacing the root with what `refused(x)?` returns.
+#[rewrite_rule(language = L)]
+fn double_neg_via_err() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        let y = refused(x)?;
+        replace!(r, y);
+    })
+}
+
+/// `double_neg` first erasing the inner `neg`, which the root still uses.
+#[rewrite_rule(language = L)]
+fn double_neg_erasing_used_producer() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        erase_producer(a)?;
+        replace!(r, x);
+    })
+}
+
+/// The error running `rules` over `input` in post-order fails with, or
+/// `None` if the run succeeds.
+fn run_error(rules: &RuleSet<L>, input: &str) -> Option<DriverError> {
+    let (mut pipeline, stage) = parse(input);
+    let driver = RewriteDriver::new(rules);
+    let mut failure = None;
+    let _ = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+    failure
+}
+
+/// `double_neg` passing the SSA value `x` to `is_zero`, which takes an
+/// `i64`.
+#[rewrite_rule(language = L)]
+fn double_neg_of_zero() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    is_zero(x);
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// `double_neg` erasing its root, which the driver is visiting.
+#[rewrite_rule(language = L)]
+fn double_neg_erasing_root() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        replace!(r, x);
+        erase!(r);
+    })
+}
+
+/// `double_neg` erasing the inner `neg`, a matched producer, which fails if
+/// anything else still uses it.
+#[rewrite_rule(language = L)]
+fn double_neg_erasing_producer() {
+    let a = op![Arith::neg(x)];
+    let r = op![Arith::neg(a)];
+    rewrite!(r, {
+        replace!(r, x);
+        erase!(a);
+    })
+}
+
+/// Matches `x + x` only to exercise a hole used twice; replacing it with `x`
+/// is not a valid rewrite.
+#[rewrite_rule(language = L)]
+fn add_self() {
+    let r = op![Arith::add(x, x)];
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// Matches `x + y` only to exercise two holes binding the same value;
+/// replacing it with `x` is not a valid rewrite.
+#[rewrite_rule(language = L)]
+fn add_any() {
+    let r = op![Arith::add(x, y)];
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+/// Matches `-x + -y` only to exercise two ops that could match the same
+/// statement; replacing it with `x` is not a valid rewrite.
+#[rewrite_rule(language = L)]
+fn add_of_negs() {
+    let a = op![Arith::neg(x)];
+    let b = op![Arith::neg(y)];
+    let r = op![Arith::add(a, b)];
+    rewrite!(r, {
+        replace!(r, x);
+    })
+}
+
+fn neg_rules() -> RuleSet<L> {
+    RuleSet::build(|stage| vec![double_neg(stage)]).expect("the rules are valid")
+}
+
+/// `double_neg_of_argument` built by hand, with no native function
+/// attached: the `wildcard.pattern` statement and its `is_block_argument`
+/// call.
+fn hand_built_double_neg_of_argument(
+    stage: &mut BuilderStageInfo<PatternLanguage<L>>,
+) -> (Statement, Statement) {
+    // The single result of the next statement built.
+    let next_result = |stage: &mut BuilderStageInfo<PatternLanguage<L>>| -> ResultValue {
+        let statement = stage.statement_arena().next_id();
+        stage
+            .ssa()
+            .ty(Placeholder::placeholder())
+            .kind(BuilderSSAKind::Result(statement, 0))
+            .new()
+            .into()
+    };
+    let x = next_result(stage);
+    let hole = stage.statement().definition(Hole::new_hole(x)).new();
+    let a = next_result(stage);
+    let neg_x = stage
+        .statement()
+        .definition(PatternLanguage::Op(
+            Arith::new_neg(SSAValue::from(x), a).into(),
+        ))
+        .new();
+    let r = next_result(stage);
+    let neg_a = stage
+        .statement()
+        .definition(PatternLanguage::Op(
+            Arith::new_neg(SSAValue::from(a), r).into(),
+        ))
+        .new();
+    let success = next_result(stage);
+    let call = stage
+        .statement()
+        .definition(NativeCall::new_native_call(
+            "is_block_argument".to_string(),
+            vec![SSAValue::from(x)],
+            vec![success],
+        ))
+        .new();
+    let constraint = Constraint::<ArithType>::new(stage, SSAValue::from(success)).id;
+    let replace = Replace::<ArithType>::new(stage, SSAValue::from(r), SSAValue::from(x)).id;
+    let rewrite_body = stage.block().stmt(replace).new();
+    let rewrite = Rewrite::<ArithType>::new(stage, neg_a, rewrite_body).id;
+    let body = stage
+        .block()
+        .stmt(hole)
+        .stmt(neg_x)
+        .stmt(neg_a)
+        .stmt(call)
+        .stmt(constraint)
+        .terminator(rewrite)
+        .new();
+    let name = stage
+        .symbol_table_mut()
+        .intern("double_neg_of_argument".to_string());
+    (Pattern::<ArithType>::new(stage, name, body).id, call)
+}
+
+/// A one-function program on `%x: i64` with `body` before `ret`.
+fn program(body: &str, ret: &str) -> String {
+    format!(
+        "stage @arith fn @f(i64) -> i64;\n\
+         specialize @arith fn @f(i64) -> i64 cfg {{\n\
+           ^entry(%x: i64) {{\n{body}\n    ret {ret};\n  }}\n}}\n"
+    )
+}
+
+fn parse(input: &str) -> (Pipeline<StageInfo<L>>, CompileStage) {
+    let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
+    pipeline.parse(input).expect("the program parses");
+    let stage = pipeline.stage_by_name("arith").expect("the stage exists");
+    (pipeline, stage)
+}
+
+/// Run `rules` over `input` in order `O`, returning the printed result.
+fn rewrite<O: WalkOrder>(rules: &RuleSet<L>, input: &str) -> (String, RewriteSummary) {
+    let (mut pipeline, stage) = parse(input);
+    let driver = RewriteDriver::new(rules);
+    let summary = pipeline
+        .run_pass(stage, |rewriter| driver.run::<O>(rewriter))
+        .expect("the pass succeeds");
+    (pipeline.sprint(), summary)
+}
+
+/// `input` printed, to compare against without depending on spacing.
+fn printed(input: &str) -> String {
+    parse(input).0.sprint()
+}
+
+/// Check `rules` turn `input` into `expected` in every walk order.
+fn assert_rewrites(rules: &RuleSet<L>, input: &str, expected: &str) {
+    let expected = printed(expected);
+    assert_eq!(rewrite::<PreOrder>(rules, input).0, expected, "PreOrder");
+    assert_eq!(rewrite::<PostOrder>(rules, input).0, expected, "PostOrder");
+    assert_eq!(rewrite::<BFS>(rules, input).0, expected, "BFS");
+    assert_eq!(
+        rewrite::<ReverseBFS>(rules, input).0,
+        expected,
+        "ReverseBFS"
+    );
+    assert_eq!(
+        rewrite::<KeepOrderReverseBFS>(rules, input).0,
+        expected,
+        "KeepOrderReverseBFS"
+    );
+}
+
+#[test]
+fn double_negation_is_removed() {
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&neg_rules(), &input, &program("", "%x"));
+}
+
+#[test]
+fn a_chain_of_negations_reduces_by_parity() {
+    let rules = neg_rules();
+    let three = program(
+        "    %a = neg %x -> i64;\n    %b = neg %a -> i64;\n    %c = neg %b -> i64;",
+        "%c",
+    );
+    // Left to right, `%b` folds first and `%c = neg %x` survives; right to
+    // left, `%c` folds into `%a` and `%a = neg %x` survives. Both are `-x`.
+    let c_survives = printed(&program("    %c = neg %x -> i64;", "%c"));
+    let a_survives = printed(&program("    %a = neg %x -> i64;", "%a"));
+    assert_eq!(
+        rewrite::<PreOrder>(&rules, &three).0,
+        c_survives,
+        "PreOrder"
+    );
+    assert_eq!(
+        rewrite::<PostOrder>(&rules, &three).0,
+        c_survives,
+        "PostOrder"
+    );
+    assert_eq!(rewrite::<BFS>(&rules, &three).0, c_survives, "BFS");
+    assert_eq!(
+        rewrite::<KeepOrderReverseBFS>(&rules, &three).0,
+        c_survives,
+        "KeepOrderReverseBFS"
+    );
+    assert_eq!(
+        rewrite::<ReverseBFS>(&rules, &three).0,
+        a_survives,
+        "ReverseBFS"
+    );
+
+    let four = program(
+        "    %a = neg %x -> i64;\n    %b = neg %a -> i64;\n    %c = neg %b -> i64;\n    %d = neg %c -> i64;",
+        "%d",
+    );
+    assert_rewrites(&rules, &four, &program("", "%x"));
+}
+
+#[test]
+fn the_fixpoint_ends_with_a_sweep_that_changes_nothing() {
+    // Sweep 1: `double_neg` folds `%b` into `%x`; the dead-code cleanup then
+    // erases `%b` and, with it unused, `%a`. Sweep 2 changes nothing.
+    let input = program(
+        "    %a = neg %x -> i64;\n    %b = neg %a -> i64;\n    %c = neg %b -> i64;",
+        "%c",
+    );
+    let (_, summary) = rewrite::<PostOrder>(&neg_rules(), &input);
+    assert_eq!(
+        summary,
+        RewriteSummary {
+            sweeps: 2,
+            applied: 1,
+            erased: 2,
+        }
+    );
+}
+
+#[test]
+fn a_program_without_matches_is_left_alone() {
+    let input = program("    %a = neg %x -> i64;\n    %b = add %a, %x -> i64;", "%b");
+    let (output, summary) = rewrite::<PostOrder>(&neg_rules(), &input);
+    assert_eq!(output, printed(&input));
+    assert_eq!(
+        summary,
+        RewriteSummary {
+            sweeps: 1,
+            applied: 0,
+            erased: 0,
+        }
+    );
+}
+
+#[test]
+fn every_function_in_the_stage_is_rewritten() {
+    let input = "stage @arith fn @f(i64) -> i64;\n\
+                 stage @arith fn @g(i64) -> i64;\n\
+                 specialize @arith fn @f(i64) -> i64 cfg {\n\
+                   ^entry(%x: i64) {\n    %a = neg %x -> i64;\n    %b = neg %a -> i64;\n    ret %b;\n  }\n}\n\
+                 specialize @arith fn @g(i64) -> i64 cfg {\n\
+                   ^entry(%y: i64) {\n    %c = neg %y -> i64;\n    %d = neg %c -> i64;\n    ret %d;\n  }\n}\n";
+    let expected = "stage @arith fn @f(i64) -> i64;\n\
+                    stage @arith fn @g(i64) -> i64;\n\
+                    specialize @arith fn @f(i64) -> i64 cfg {\n  ^entry(%x: i64) {\n    ret %x;\n  }\n}\n\
+                    specialize @arith fn @g(i64) -> i64 cfg {\n  ^entry(%y: i64) {\n    ret %y;\n  }\n}\n";
+    let (output, summary) = rewrite::<PostOrder>(&neg_rules(), input);
+    assert_eq!(output, printed(expected));
+    assert_eq!(
+        (summary.applied, summary.erased),
+        (2, 4),
+        "per function: one double_neg, two dead negs"
+    );
+}
+
+#[test]
+fn a_hole_used_twice_matches_only_the_same_value() {
+    let rules = RuleSet::build(|stage| vec![add_self(stage)]).unwrap();
+    let same = program("    %a = add %x, %x -> i64;", "%a");
+    assert_rewrites(&rules, &same, &program("", "%x"));
+
+    let different = program("    %n = neg %x -> i64;\n    %a = add %x, %n -> i64;", "%a");
+    assert_rewrites(&rules, &different, &different);
+}
+
+#[test]
+fn two_holes_may_bind_the_same_value() {
+    let rules = RuleSet::build(|stage| vec![add_any(stage)]).unwrap();
+    let input = program("    %a = add %x, %x -> i64;", "%a");
+    assert_rewrites(&rules, &input, &program("", "%x"));
+}
+
+#[test]
+fn two_ops_never_match_the_same_statement() {
+    let rules = RuleSet::build(|stage| vec![add_of_negs(stage)]).unwrap();
+    let same = program("    %n = neg %x -> i64;\n    %a = add %n, %n -> i64;", "%a");
+    assert_rewrites(&rules, &same, &same);
+
+    let different = program(
+        "    %n = neg %x -> i64;\n    %m = neg %x -> i64;\n    %a = add %n, %m -> i64;",
+        "%a",
+    );
+    assert_rewrites(&rules, &different, &program("", "%x"));
+}
+
+#[test]
+fn a_native_check_decides_whether_the_rule_applies() {
+    let rules = RuleSet::build(|stage| vec![double_neg_of_argument(stage)]).unwrap();
+    let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &of_argument, &program("", "%x"));
+
+    let of_sum = program(
+        "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    assert_rewrites(&rules, &of_sum, &of_sum);
+}
+
+#[test]
+fn a_native_check_passes_an_i64_to_another() {
+    let rules = RuleSet::build(|stage| vec![double_neg_of_first_argument(stage)]).unwrap();
+    let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &of_argument, &program("", "%x"));
+
+    let of_sum = program(
+        "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    assert_rewrites(&rules, &of_sum, &of_sum);
+}
+
+#[test]
+fn a_native_check_returning_ok_binds_its_value() {
+    let rules = RuleSet::build(|stage| vec![double_neg_of_leaf(stage)]).unwrap();
+    let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &of_argument, &program("", "%x"));
+
+    let of_sum = program(
+        "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    assert_rewrites(&rules, &of_sum, &of_sum);
+}
+
+#[test]
+fn a_native_check_returning_err_fails_the_run() {
+    let rules = RuleSet::build(|stage| vec![double_neg_requiring_argument(stage)]).unwrap();
+    let input = program(
+        "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    let (mut pipeline, stage) = parse(&input);
+    let driver = RewriteDriver::new(&rules);
+
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    let failure = failure.expect("the driver fails");
+    let source = std::error::Error::source(&failure).and_then(|source| source.downcast_ref());
+    assert_eq!(source, Some(&NotAnArgument));
+    let DriverError::NativeFailed { name, error, .. } = failure else {
+        panic!("expected `NativeFailed`, got {failure:?}");
+    };
+    assert_eq!(name, "argument_position");
+    assert_eq!(error.error().downcast_ref(), Some(&NotAnArgument));
+}
+
+#[test]
+fn a_constraint_with_try_applies_on_ok_true_and_fails_the_run_on_err() {
+    let rules =
+        RuleSet::build(|stage| vec![double_neg_constrained_to_first_argument(stage)]).unwrap();
+    let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &of_argument, &program("", "%x"));
+
+    let of_sum = program(
+        "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    let (mut pipeline, stage) = parse(&of_sum);
+    let driver = RewriteDriver::new(&rules);
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    let Some(DriverError::NativeFailed { name, error, .. }) = failure else {
+        panic!("expected `NativeFailed`, got {failure:?}");
+    };
+    assert_eq!(name, "is_first_argument");
+    assert_eq!(error.error().downcast_ref(), Some(&NotAnArgument));
+}
+
+#[test]
+fn a_native_function_may_be_called_with_and_without_try() {
+    let rules = RuleSet::build(|stage| vec![double_neg_with_and_without_try(stage)]).unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &input, &program("", "%x"));
+}
+
+#[test]
+fn a_constraint_function_may_also_compute_a_bool() {
+    let rules = RuleSet::build(|stage| vec![double_neg_of_first_two_arguments(stage)]).unwrap();
+    let two_arguments = |ret| {
+        format!(
+            "stage @arith fn @f(i64, i64, i64) -> i64;\n\
+             specialize @arith fn @f(i64, i64, i64) -> i64 cfg {{\n\
+               ^entry(%x: i64, %y: i64, %z: i64) {{\n    %a = neg {ret} -> i64;\n    %b = neg %a -> i64;\n    ret %b;\n  }}\n}}\n"
+        )
+    };
+    let rewritten = |ret| {
+        format!(
+            "stage @arith fn @f(i64, i64, i64) -> i64;\n\
+             specialize @arith fn @f(i64, i64, i64) -> i64 cfg {{\n\
+               ^entry(%x: i64, %y: i64, %z: i64) {{\n    ret {ret};\n  }}\n}}\n"
+        )
+    };
+    assert_rewrites(&rules, &two_arguments("%x"), &rewritten("%x"));
+    assert_rewrites(&rules, &two_arguments("%y"), &rewritten("%y"));
+    assert_rewrites(&rules, &two_arguments("%z"), &two_arguments("%z"));
+}
+
+#[test]
+fn a_native_call_pattern_takes_its_value_apart_as_in_rust() {
+    for rules in [
+        RuleSet::build(|stage| vec![double_neg_of_first_argument_in_tuple(stage)]).unwrap(),
+        RuleSet::build(|stage| vec![double_neg_of_first_argument_in_nested_tuple(stage)]).unwrap(),
+    ] {
+        let of_argument = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+        assert_rewrites(&rules, &of_argument, &program("", "%x"));
+
+        let of_sum = program(
+            "    %s = add %x, %x -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+            "%b",
+        );
+        assert_rewrites(&rules, &of_sum, &of_sum);
+    }
+}
+
+#[test]
+fn a_constraint_with_try_on_an_option_applies_only_on_some_true() {
+    let rules = RuleSet::build(|stage| vec![double_neg_if_first_argument(stage)]).unwrap();
+    let two_arguments = |body: &str, ret: &str| {
+        format!(
+            "stage @arith fn @f(i64, i64) -> i64;\n\
+             specialize @arith fn @f(i64, i64) -> i64 cfg {{\n\
+               ^entry(%x: i64, %y: i64) {{\n{body}\n    ret {ret};\n  }}\n}}\n"
+        )
+    };
+
+    // `Some(true)`: `%x` is the first argument.
+    let first = two_arguments("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &first, &two_arguments("", "%x"));
+
+    // `Some(false)`: `%y` is the second.
+    let second = two_arguments("    %a = neg %y -> i64;\n    %b = neg %a -> i64;", "%b");
+    assert_rewrites(&rules, &second, &second);
+
+    // `None`: `%s` is not an argument.
+    let sum = two_arguments(
+        "    %s = add %x, %y -> i64;\n    %a = neg %s -> i64;\n    %b = neg %a -> i64;",
+        "%b",
+    );
+    assert_rewrites(&rules, &sum, &sum);
+}
+
+#[test]
+fn a_rewrite_body_call_pattern_takes_its_value_apart_as_in_rust() {
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    for rules in [
+        RuleSet::build(|stage| vec![double_neg_via_tuple(stage)]).unwrap(),
+        RuleSet::build(|stage| vec![double_neg_via_tuple_if_any(stage)]).unwrap(),
+        RuleSet::build(|stage| vec![double_neg_via_nested_tuple(stage)]).unwrap(),
+    ] {
+        assert_rewrites(&rules, &input, &program("", "%x"));
+    }
+}
+
+#[test]
+fn a_try_call_in_the_rewrite_body_unwraps_an_option_or_fails_the_run() {
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+
+    let some = RuleSet::build(|stage| vec![double_neg_via_some(stage)]).unwrap();
+    assert_rewrites(&some, &input, &program("", "%x"));
+
+    let none = RuleSet::build(|stage| vec![double_neg_via_none(stage)]).unwrap();
+    let Some(DriverError::NativeReturnedNone { name, .. }) = run_error(&none, &input) else {
+        panic!("expected `NativeReturnedNone`");
+    };
+    assert_eq!(name, "no_value");
+}
+
+#[test]
+fn a_try_call_in_the_rewrite_body_reports_its_error() {
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+
+    // A user's error is kept as is.
+    let err = RuleSet::build(|stage| vec![double_neg_via_err(stage)]).unwrap();
+    let Some(DriverError::NativeFailed { name, error, .. }) = run_error(&err, &input) else {
+        panic!("expected `NativeFailed`");
+    };
+    assert_eq!(name, "refused");
+    assert_eq!(error.error().downcast_ref(), Some(&NotAnArgument));
+
+    // A rejected edit is reported as one.
+    let rewrite = RuleSet::build(|stage| vec![double_neg_erasing_used_producer(stage)]).unwrap();
+    assert!(matches!(
+        run_error(&rewrite, &input),
+        Some(DriverError::Rewrite {
+            error: RewriteError::StatementResultsInUse(_),
+            ..
+        })
+    ));
+}
+
+#[test]
+fn a_constraint_on_a_non_bool_fails_the_run() {
+    // The macro makes a constraint's function return a `bool`, so only a
+    // hand-built rule can pass it anything else.
+    let rules = RuleSet::build(|stage| {
+        let (pattern, call) = hand_built_double_neg_of_argument(stage);
+        vec![
+            PatternRule::new(pattern)
+                .check_at(call, |_, _| Ok(Some(vec![NativeValue::new(1_i64)]))),
+        ]
+    })
+    .unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let (mut pipeline, stage) = parse(&input);
+    let driver = RewriteDriver::new(&rules);
+
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    assert_eq!(
+        failure,
+        Some(DriverError::ConstraintNotBool {
+            rule: "double_neg_of_argument".to_string()
+        })
+    );
+}
+
+#[test]
+fn a_native_argument_of_the_wrong_type_fails_the_run() {
+    let rules = RuleSet::build(|stage| vec![double_neg_of_zero(stage)]).unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let (mut pipeline, stage) = parse(&input);
+    let driver = RewriteDriver::new(&rules);
+
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    assert!(matches!(
+        failure,
+        Some(DriverError::NativeArgument {
+            ref name,
+            position: 0,
+            expected: "i64",
+            found: Some(_),
+            ..
+        }) if name == "is_zero"
+    ));
+}
+
+#[test]
+fn an_unregistered_native_function_rejects_the_rule() {
+    // The macro attaches a function to every call, so only a hand-built rule
+    // can leave one out.
+    let error = RuleSet::build(|stage| {
+        vec![PatternRule::<L>::new(
+            double_neg_of_argument(stage).pattern(),
+        )]
+    })
+    .err()
+    .expect("`is_block_argument` is not registered");
+    assert_eq!(error.rule.as_deref(), Some("double_neg_of_argument"));
+    assert_eq!(
+        error.kind,
+        RuleErrorKind::UnknownCheck("is_block_argument".to_string())
+    );
+}
+
+#[test]
+fn a_native_call_with_two_functions_rejects_the_rule() {
+    // The macro attaches one function to each call, so only a hand-built
+    // rule can give a call two.
+    let error = RuleSet::build(|stage| {
+        let (pattern, call) = hand_built_double_neg_of_argument(stage);
+        vec![
+            PatternRule::new(pattern)
+                .check_at(call, |_, _| Ok(None))
+                .check_at(call, |_, _| Ok(None)),
+        ]
+    })
+    .err()
+    .expect("`is_block_argument` has two functions");
+    assert_eq!(error.rule.as_deref(), Some("double_neg_of_argument"));
+    assert_eq!(
+        error.kind,
+        RuleErrorKind::TwoChecks("is_block_argument".to_string())
+    );
+}
+
+/// The reverse BFS orders allow erasing the statement being visited.
+#[test]
+fn a_rule_erasing_its_root_runs_in_the_reverse_bfs_orders() {
+    let rules = RuleSet::build(|stage| vec![double_neg_erasing_root(stage)]).unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let expected = printed(&program("", "%x"));
+    assert_eq!(rewrite::<ReverseBFS>(&rules, &input).0, expected);
+    assert_eq!(rewrite::<KeepOrderReverseBFS>(&rules, &input).0, expected);
+}
+
+/// The other orders forbid erasing the statement being visited, so the run
+/// fails before editing anything.
+#[test]
+fn a_rule_erasing_its_root_fails_in_the_other_orders() {
+    let rules = RuleSet::build(|stage| vec![double_neg_erasing_root(stage)]).unwrap();
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let (mut pipeline, stage) = parse(&input);
+    let driver = RewriteDriver::new(&rules);
+
+    let mut failure = None;
+    let mut edits = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        edits = Some(rewriter.events().len());
+        result
+    });
+
+    assert!(result.is_err());
+    assert_eq!(
+        failure,
+        Some(DriverError::ErasesRoot {
+            rule: "double_neg_erasing_root".to_string(),
+            order: "PostOrder",
+        })
+    );
+    assert_eq!(edits, Some(0));
+}
+
+#[test]
+fn a_failed_rewrite_quarantines_the_stage() {
+    // `%a` is also used by the `add`, so erasing it fails.
+    let input = program(
+        "    %a = neg %x -> i64;\n    %b = neg %a -> i64;\n    %s = add %a, %b -> i64;",
+        "%s",
+    );
+    let (mut pipeline, stage) = parse(&input);
+    let rules = RuleSet::build(|stage| vec![double_neg_erasing_producer(stage)]).unwrap();
+    let driver = RewriteDriver::new(&rules);
+
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    assert!(matches!(
+        failure,
+        Some(DriverError::Rewrite {
+            error: RewriteError::StatementResultsInUse(_),
+            ..
+        })
+    ));
+    assert_eq!(pipeline.stage_status(stage), Some(StageStatus::Poisoned));
+}
+
+#[test]
+fn running_out_of_sweeps_quarantines_the_stage() {
+    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
+    let (mut pipeline, stage) = parse(&input);
+    let rules = neg_rules();
+    let driver = RewriteDriver::new(&rules).max_sweeps(1);
+
+    let mut failure = None;
+    let result = pipeline.run_pass(stage, |rewriter| {
+        let result = driver.run::<PostOrder>(rewriter);
+        failure = result.clone().err();
+        result
+    });
+
+    assert!(result.is_err());
+    assert!(matches!(
+        failure,
+        Some(DriverError::BudgetExhausted { sweeps: 1, .. })
+    ));
+    assert_eq!(pipeline.stage_status(stage), Some(StageStatus::Poisoned));
+}
