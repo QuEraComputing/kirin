@@ -814,3 +814,39 @@ fn replace_statement_on_ungraph_member_rejects_role_changes() {
     assert_topology(&stage, ug);
     verify_derived(&stage).unwrap();
 }
+
+#[test]
+fn replace_uses_if_moves_only_the_selected_reader_to_the_new_wire() {
+    let Fixture {
+        mut stage,
+        ug,
+        w,
+        v,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    assert_eq!(edges(rw.stage(), ug), HashMap::from([(w, pair(a, b))]));
+    rw.drain_events();
+
+    // Only `a` moves: `w` keeps one reader and loses its edge, and `v` gains
+    // one, joining `c`.
+    let only_a =
+        |_: &StageInfo<BuilderDialect>, site| site == Use::StatementOperand { stmt: a, index: 0 };
+    assert_eq!(rw.replace_uses_if(w, v, only_a), Ok(1));
+    assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(a, c))]));
+    assert_eq!(
+        rw.drain_events(),
+        vec![
+            MutationEvent::ChangedOperands { stmt: a },
+            MutationEvent::ChangedUnGraphTopology { graph: ug },
+        ]
+    );
+    drop(rw);
+
+    assert_eq!(*b.definition(&stage), BuilderDialect::Use(w));
+    assert_topology(&stage, ug);
+    verify_derived(&stage).unwrap();
+}
