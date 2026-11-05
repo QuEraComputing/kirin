@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+from kirin.rewrite import Walk
 from kirin.ir.method import Method
 from kirin.rewrite.abc import RewriteResult
 
@@ -13,5 +14,5 @@ class PostInference(Pass):
         result = RewriteResult()
         for dialect in self.dialects:
             for rule in dialect.rules.inference:
-                result = rule.rewrite(mt.code).join(result)
+                result = Walk(rule).rewrite(mt.code).join(result)
         return result
