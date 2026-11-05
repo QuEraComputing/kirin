@@ -172,6 +172,11 @@ def test_unroll_preserves_results_and_effect_order(operation, capsys):
         return acc * 2 + i
 
     @kernel
+    def right_step(i: int, acc: int):
+        debug.info("element", i)
+        return acc * 2 + i
+
+    @kernel
     def scan_step(acc: int, i: int):
         debug.info("element", i)
         updated = acc * 2 + i
@@ -192,7 +197,7 @@ def test_unroll_preserves_results_and_effect_order(operation, capsys):
 
     @kernel
     def foldr(initial: int):
-        return ilist.foldr(step, ilist.range(12), initial)
+        return ilist.foldr(right_step, ilist.range(12), initial)
 
     @kernel
     def scan(initial: int):

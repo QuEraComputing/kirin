@@ -10,7 +10,9 @@ out: list = []
 
 
 @pytest.fixture(autouse=True)
-def _reset_out():
+def _reset_out(monkeypatch):
+    # Observe the live captured objects, rather than copies loaded from disk.
+    monkeypatch.setenv("KIRIN_COMPILE_CACHE_DIR", "FALSE")
     out.clear()
 
 

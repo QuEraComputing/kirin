@@ -13,7 +13,10 @@ out: list = []
 
 
 @pytest.fixture(autouse=True)
-def _reset_out():
+def _reset_out(monkeypatch):
+    # These tests observe mutations of this live list. A deserialized kernel
+    # holds a different list, so compile fresh IR for each specialization test.
+    monkeypatch.setenv("KIRIN_COMPILE_CACHE_DIR", "FALSE")
     out.clear()
 
 
