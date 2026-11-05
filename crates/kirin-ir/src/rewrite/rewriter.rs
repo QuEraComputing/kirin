@@ -143,6 +143,9 @@ pub enum MutationEvent {
     /// `stmt` was moved to another place in a block body, keeping its id,
     /// results, uses and nested bodies.
     MovedStatement { stmt: Statement },
+    /// Every statement of `source`, except its terminator, was moved into
+    /// `dest`, keeping their ids, results, uses and nested bodies.
+    SplicedBlock { source: Block, dest: Block },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -235,6 +238,10 @@ pub enum RewriteError {
     /// statement's own bodies, which would make the statement its own
     /// ancestor.
     MovedIntoItself { stmt: Statement, anchor: Statement },
+    /// `splice_block_before`/`splice_block_after` was given an anchor in
+    /// `source` or nested in one of its statements, which would place a
+    /// spliced statement next to or inside itself.
+    SplicedIntoItself { source: Block, anchor: Statement },
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -390,6 +397,12 @@ impl fmt::Display for RewriteError {
                 write!(
                     f,
                     "cannot move {stmt:?} next to {anchor:?}, which is nested in it"
+                )
+            }
+            RewriteError::SplicedIntoItself { source, anchor } => {
+                write!(
+                    f,
+                    "cannot splice {source:?} next to {anchor:?}, which is in it"
                 )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {

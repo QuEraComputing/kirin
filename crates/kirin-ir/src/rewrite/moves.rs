@@ -1,7 +1,8 @@
-use crate::arena::GetInfo;
+use crate::arena::{GetInfo, GetInfoMut};
+use crate::node::linked_list::LinkedList;
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter};
 use crate::rewrite::walk::tree;
-use crate::{Dialect, Statement, StatementParent};
+use crate::{Block, Dialect, SSAValue, Statement, StatementParent};
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Move `stmt` to immediately before `anchor`, which may be in any block
@@ -75,5 +76,161 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         self.link_into_block(stmt, block, prev, next);
         self.events.push(MutationEvent::MovedStatement { stmt });
         Ok(())
+    }
+
+    /// Move every statement of `source`, except its terminator, to
+    /// immediately before `anchor`, which may be in any block body, and
+    /// redirect every use of `source`'s `i`-th argument to
+    /// `arg_replacements[i]`.
+    ///
+    /// The statements keep their order, ids, results, uses and nested bodies.
+    /// `source` keeps its arguments and terminator and is not erased. `anchor`
+    /// follows the rules of [`Rewriter::move_before`]: before a terminator
+    /// means at the end of that block's statement chain. A replacement may be
+    /// one of `source`'s own arguments.
+    ///
+    /// Rejects, leaving the stage untouched, if `source` or `anchor` is
+    /// unknown, if `anchor` is not in a block body
+    /// ([`RewriteError::NotInBlockBody`]), if `anchor` is in `source` or
+    /// nested in one of its statements ([`RewriteError::SplicedIntoItself`]),
+    /// if the replacement count differs from `source`'s argument count
+    /// ([`RewriteError::BlockArgumentArityMismatch`]), or if a replacement is
+    /// not live.
+    ///
+    /// Records the [`Rewriter::replace_all_uses`] events for the argument
+    /// redirection, then [`MutationEvent::SplicedBlock`]. A walk visiting a
+    /// statement of `source` reports the splice (see [`crate::walk`]).
+    pub fn splice_block_before(
+        &mut self,
+        source: Block,
+        anchor: Statement,
+        arg_replacements: &[SSAValue],
+    ) -> Result<(), RewriteError> {
+        self.splice_relative(source, anchor, arg_replacements, false)
+    }
+
+    /// Move every statement of `source`, except its terminator, to
+    /// immediately after `anchor`, and redirect `source`'s arguments.
+    ///
+    /// As [`Rewriter::splice_block_before`], except that `anchor` must not be
+    /// a terminator ([`RewriteError::AnchorIsTerminator`]): nothing follows
+    /// one.
+    pub fn splice_block_after(
+        &mut self,
+        source: Block,
+        anchor: Statement,
+        arg_replacements: &[SSAValue],
+    ) -> Result<(), RewriteError> {
+        self.splice_relative(source, anchor, arg_replacements, true)
+    }
+
+    fn splice_relative(
+        &mut self,
+        source: Block,
+        anchor: Statement,
+        arg_replacements: &[SSAValue],
+        after: bool,
+    ) -> Result<(), RewriteError> {
+        let args: Vec<SSAValue> = self
+            .live_block(source)?
+            .arguments
+            .iter()
+            .map(|&arg| arg.into())
+            .collect();
+        let (dest, prev, next) = self.slot_at(anchor, after)?;
+        // Check `anchor` and every statement whose body encloses it. If one
+        // of them is a statement of the block `source`, it would be spliced
+        // next to or inside itself.
+        let mut current = Some(anchor);
+        while let Some(stmt) = current {
+            if *stmt.parent(self.stage) == Some(StatementParent::Block(source)) {
+                return Err(RewriteError::SplicedIntoItself { source, anchor });
+            }
+            current = tree::parent(self.stage, stmt);
+        }
+        if arg_replacements.len() != args.len() {
+            return Err(RewriteError::BlockArgumentArityMismatch {
+                block: source,
+                expected: args.len(),
+                found: arg_replacements.len(),
+            });
+        }
+        for &value in arg_replacements {
+            if value.get_info(self.stage).is_none() {
+                return Err(RewriteError::UnknownValue(value));
+            }
+        }
+
+        let pairs: Vec<(SSAValue, SSAValue)> = args
+            .into_iter()
+            .zip(arg_replacements.iter().copied())
+            .filter(|(old, new)| old != new)
+            .collect();
+        self.redirect_uses(&pairs);
+
+        let chain = match source.get_info_mut(self.stage) {
+            Some(info) => std::mem::take(&mut info.statements),
+            None => LinkedList::new(),
+        };
+        self.link_chain(chain, dest, prev, next);
+        self.events
+            .push(MutationEvent::SplicedBlock { source, dest });
+        Ok(())
+    }
+
+    /// Link `chain`, a whole statement chain already taken out of its block,
+    /// into `block` between `prev` and `next` (the block head or tail when one
+    /// is `None`), making `block` the parent of each statement.
+    pub(super) fn link_chain(
+        &mut self,
+        chain: LinkedList<Statement>,
+        block: Block,
+        prev: Option<Statement>,
+        next: Option<Statement>,
+    ) {
+        let (Some(head), Some(tail)) = (chain.head, chain.tail) else {
+            return;
+        };
+        let mut current = Some(head);
+        while let Some(stmt) = current {
+            let Some(info) = stmt.get_info_mut(self.stage) else {
+                break;
+            };
+            info.parent = Some(StatementParent::Block(block));
+            current = info.node.next;
+        }
+        if let Some(info) = head.get_info_mut(self.stage) {
+            info.node.prev = prev;
+        }
+        if let Some(info) = tail.get_info_mut(self.stage) {
+            info.node.next = next;
+        }
+        match prev {
+            Some(p) => {
+                if let Some(info) = p.get_info_mut(self.stage) {
+                    info.node.next = Some(head);
+                }
+            }
+            None => {
+                if let Some(info) = block.get_info_mut(self.stage) {
+                    info.statements.head = Some(head);
+                }
+            }
+        }
+        match next {
+            Some(n) => {
+                if let Some(info) = n.get_info_mut(self.stage) {
+                    info.node.prev = Some(tail);
+                }
+            }
+            None => {
+                if let Some(info) = block.get_info_mut(self.stage) {
+                    info.statements.tail = Some(tail);
+                }
+            }
+        }
+        if let Some(info) = block.get_info_mut(self.stage) {
+            info.statements.len += chain.len;
+        }
     }
 }
