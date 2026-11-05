@@ -10,12 +10,13 @@
 //!   of rule dispatch: pipeline, linker, the [`EnvStore`] container (one
 //!   environment per analysis context, addressed by the policy's context key,
 //!   holding SSA facts), the contexts (entry, return, and callers), analysis
-//!   policy, read/write logging, and the SSA facts that changed; it provides
-//!   the dialect-dispatch / IR-query surface ([`StatementDispatch`], [`BlockQueries`], [`CFGQueries`],
-//!   [`DiGraphQueries`], and — for concrete-shaped callers — [`CallServices`]).
-//! - the **[`StandardFixpointInterpreter`]** driver owns the worklist and the
-//!   readers of each SSA fact (blocks that read a value they do not define);
-//!   after each walk it drains the changed facts and reruns their readers.
+//!   policy, and the SSA facts that changed; it provides the dialect-dispatch
+//!   / IR-query surface ([`StatementDispatch`], [`BlockQueries`],
+//!   [`CFGQueries`], [`DiGraphQueries`], and — for concrete-shaped callers —
+//!   [`CallServices`]).
+//! - the **[`StandardFixpointInterpreter`]** driver owns the worklist; after
+//!   each walk it drains the changed facts and reruns the reached units that
+//!   use them.
 //!
 //! # Work items
 //!
@@ -25,11 +26,11 @@
 //! CFG edge's arguments — merge into the unit's parameters through the
 //! analysis policy (join, then widen by visits) and schedule the unit on first
 //! reach or when a parameter rose. A reached `ret` joins slot by slot into its
-//! context's return and, if it rose, reruns the context's callers. Direct
-//! dominated cross-block SSA uses are tracked by read logging, so a reader
-//! block reruns when a value it read directly rises.
+//! context's return and, if it rose, reruns the context's callers. A rising SSA
+//! fact reruns, through the IR's use list, the innermost reached unit around
+//! each use outside the defining unit (uses in nested structured bodies map to
+//! their enclosing unit), so direct dominated cross-block uses see it.
 
-use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
 use std::hash::Hash;
 use std::marker::PhantomData;
@@ -135,10 +136,6 @@ struct ForwardContext<V> {
 /// graph as [`Body::DiGraph`]) in the environment `EnvIndex`.
 pub(super) type ForwardWork = (EnvIndex, Body);
 
-/// The driver's `store` slot: the walks to rerun when an SSA fact rises —
-/// blocks that read a value they do not define.
-pub(super) type ForwardReaders = HashMap<(EnvIndex, SSAValue), Vec<ForwardWork>>;
-
 /// The work-item type family for the forward engine. Facts live in the
 /// transfer's [`EnvStore`].
 pub struct SparseForwardProfile<V, E, F> {
@@ -162,12 +159,12 @@ where
 }
 
 /// The forward driver: a [`StandardFixpointInterpreter`] over
-/// [`SparseForwardTransfer`] whose work items are block and graph walks, with
-/// the readers of each fact in its `store` slot.
+/// [`SparseForwardTransfer`] whose work items are block and graph walks. It
+/// keeps no readers: the IR's use lists name them.
 type ForwardDriver<'ir, S, V, E, Lk, P, F, Sem> = StandardFixpointInterpreter<
     SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>,
     SparseForwardProfile<V, E, F>,
-    ForwardReaders,
+    (),
 >;
 
 // ===========================================================================
@@ -204,15 +201,8 @@ pub struct SparseForwardTransfer<
     analysis: P,
     max_iterations: usize,
     location: Option<InterpLocation>,
-    /// SSA values read during the current walk (interior-mutable because
-    /// [`Env::env_read`] takes `&self`).
-    read_log: RefCell<Vec<SSAValue>>,
-    /// SSA values written during the current walk.
-    write_log: Vec<SSAValue>,
-    /// SSA facts that rose since the driver last woke their readers.
+    /// SSA facts that rose since the driver last reran their uses.
     changed: Vec<(EnvIndex, SSAValue)>,
-    /// Whether read/write logging is active (only during a walk).
-    logging: bool,
     #[allow(clippy::type_complexity)]
     _marker: PhantomData<fn() -> (E, F, Sem)>,
 }
@@ -243,10 +233,7 @@ where
             analysis,
             max_iterations: 1000,
             location: None,
-            read_log: RefCell::new(Vec::new()),
-            write_log: Vec::new(),
             changed: Vec::new(),
-            logging: false,
             _marker: PhantomData,
         }
     }
@@ -289,7 +276,7 @@ where
         self.contexts.get(&env).ok_or(UNSELECTED)
     }
 
-    /// The fact of `value` in `env`, without logging; absent is bottom.
+    /// The fact of `value` in `env`; absent is bottom.
     fn fact<E2>(&self, env: EnvIndex, value: SSAValue) -> Result<V, E2>
     where
         V: Clone + HasBottom,
@@ -298,19 +285,12 @@ where
         Ok(self.env.read(env, value)?.unwrap_or_else(V::bottom))
     }
 
-    /// Begin logging reads/writes for a walk.
-    fn begin_block_log(&mut self) {
-        self.logging = true;
-        self.read_log.borrow_mut().clear();
-        self.write_log.clear();
-    }
-
-    /// Stop logging and take the accumulated `(reads, writes)`.
-    fn take_logs(&mut self) -> (Vec<SSAValue>, Vec<SSAValue>) {
-        self.logging = false;
-        let reads = std::mem::take(&mut *self.read_log.borrow_mut());
-        let writes = std::mem::take(&mut self.write_log);
-        (reads, writes)
+    /// The innermost unit of `units` reached in `env`.
+    fn reached(&self, env: EnvIndex, units: &[Body]) -> Option<ForwardWork> {
+        units
+            .iter()
+            .map(|body| (env, *body))
+            .find(|work| self.entry_joins.contains_key(work))
     }
 }
 
@@ -400,12 +380,6 @@ where
     type Anchor = SSAValue;
 
     fn env_read(&self, index: EnvIndex, value: SSAValue) -> Result<V, E> {
-        // Log the read regardless of whether it resolves to a bound value or
-        // bottom — an unbound read of a value defined elsewhere is exactly the
-        // cross-block dependency to track.
-        if self.logging {
-            self.read_log.borrow_mut().push(value);
-        }
         // An absent binding is bottom, not an error: this analysis may reach a
         // use before the definition's walk has run. An invalid environment
         // handle is still an error.
@@ -416,9 +390,6 @@ where
     fn env_write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
         if self.env.join(index, value, &data)? {
             self.changed.push((index, value));
-        }
-        if self.logging {
-            self.write_log.push(value);
         }
         Ok(())
     }
@@ -881,22 +852,25 @@ where
         Ok(())
     }
 
-    /// Register `work` as a reader of `value` in `env`.
-    fn subscribe(&mut self, env: EnvIndex, value: SSAValue, work: ForwardWork) {
-        let readers = self.store_mut().entry((env, value)).or_default();
-        if !readers.contains(&work) {
-            readers.push(work);
-        }
-    }
-
-    /// Schedule the readers of every SSA fact that changed.
-    fn wake_changed(&mut self) {
-        for key in std::mem::take(&mut self.inner_mut().changed) {
-            let readers = self.store().get(&key).cloned().unwrap_or_default();
-            for reader in readers {
-                self.schedule_work(reader);
+    /// Rerun every reached unit that uses an SSA fact that changed, except
+    /// the unit defining it: a use there follows the definition in the same
+    /// walk, and a rising entry parameter already scheduled its unit.
+    fn wake_changed(&mut self) -> Result<(), E> {
+        let mut woken = HashSet::new();
+        for (env, value) in std::mem::take(&mut self.inner_mut().changed) {
+            let stage = self.inner().context(env)?.stage;
+            let (def, uses) = query::value_units(self.inner().pipeline(), stage, value)?;
+            let def = self.inner().reached(env, &def);
+            for units in uses {
+                if let Some(unit) = self.inner().reached(env, &units)
+                    && Some(unit) != def
+                    && woken.insert(unit)
+                {
+                    self.schedule_work(unit);
+                }
             }
         }
+        Ok(())
     }
 
     fn schedule_work(&mut self, work: ForwardWork) {
@@ -913,7 +887,7 @@ const UNSELECTED: InterpreterError =
 
 /// The forward work analysis: bind the unit's current entry parameters, walk
 /// it once, then register its cross-block reads, merge its edges into
-/// successors, and wake the readers of what changed.
+/// successors, and rerun the uses of what changed.
 struct SparseForwardWorkAnalysis<V> {
     _marker: PhantomData<fn() -> V>,
 }
@@ -955,7 +929,6 @@ where
             .into_iter()
             .map(|param| interp.inner().fact(env, param))
             .collect::<Result<_, E>>()?;
-        interp.inner_mut().begin_block_log();
         match body {
             Body::Block(block) => {
                 Ok(AbstractBlockFrame::new_cfg_block(stage, env, block, args).into())
@@ -992,24 +965,12 @@ where
             interp.raise_return(env, values)?;
         }
 
-        // Register the walk's reads of values it did not write before waking
-        // the readers of what changed, so a walk that reads a fact it then
-        // raises reruns.
-        let (reads, writes) = interp.inner_mut().take_logs();
-        let written: HashSet<SSAValue> = writes.into_iter().collect();
-        for value in reads {
-            if !written.contains(&value) {
-                interp.subscribe(env, value, work);
-            }
-        }
-
         // CFG edges merge into the successors' entry parameters. Empty for a
         // returning block and for a graph.
         for edge in edges {
             interp.merge_entry((env, Body::Block(edge.target)), edge.args)?;
         }
-        interp.wake_changed();
-        Ok(())
+        interp.wake_changed()
     }
 }
 
@@ -1064,10 +1025,7 @@ where
 {
     pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
-            driver: StandardFixpointInterpreter::new(
-                SparseForwardTransfer::new(pipeline),
-                ForwardReaders::new(),
-            ),
+            driver: StandardFixpointInterpreter::new(SparseForwardTransfer::new(pipeline), ()),
         }
     }
 }
@@ -1087,7 +1045,7 @@ where
     ) -> SparseForwardInterpreter<'ir, S, V, E, Lk2, P, F, Sem> {
         let transfer = self.driver.into_inner().with_linker(linker);
         SparseForwardInterpreter {
-            driver: StandardFixpointInterpreter::new(transfer, ForwardReaders::new()),
+            driver: StandardFixpointInterpreter::new(transfer, ()),
         }
     }
 
@@ -1104,7 +1062,7 @@ where
     {
         let transfer = self.driver.into_inner().with_analysis(analysis);
         SparseForwardInterpreter {
-            driver: StandardFixpointInterpreter::new(transfer, ForwardReaders::new()),
+            driver: StandardFixpointInterpreter::new(transfer, ()),
         }
     }
 
@@ -1113,7 +1071,7 @@ where
     pub fn with_policy(self, analysis: P) -> Self {
         let transfer = self.driver.into_inner().with_policy(analysis);
         Self {
-            driver: StandardFixpointInterpreter::new(transfer, ForwardReaders::new()),
+            driver: StandardFixpointInterpreter::new(transfer, ()),
         }
     }
 
@@ -1212,7 +1170,7 @@ where
     ) -> Result<(Product<V>, Self), E> {
         let args: Product<V> = args.into_iter().collect();
         let env = self.driver.contribute_call_entry(stage, &callee, args)?;
-        self.driver.wake_changed();
+        self.driver.wake_changed()?;
         let mut analysis = SparseForwardWorkAnalysis::new();
         self.driver.drain_worklist(&mut analysis)?;
 

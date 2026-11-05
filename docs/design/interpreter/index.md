@@ -731,7 +731,7 @@ slots is only meaningful for an SSA-anchored engine, so it lives on the
 blanket-implemented `SSABinding` rather than narrowing `Env` for everyone — the
 same read/write vocabulary then serves a dense, `ProgramPoint`-anchored engine
 unchanged (`PointAnchoredEngine` in `tests/frame_engine_capabilities.rs` is that
-assertion). Binding still goes through `env_write`, so an engine's logging and
+assertion). Binding still goes through `env_write`, so an engine's merge and
 absence policy apply to bound values too. `Env` deliberately stops there. Choosing
 a *context key* is analysis policy, so `EnvStore::get_or_allocate` stays internal to
 the engine that has a policy; and *creating or retiring* an activation is the
@@ -998,7 +998,8 @@ becomes executable work, translating the closed `Body` vocabulary into a unit:
 `CFG` → its entry block, `Block` → itself, `DiGraph` → itself. Entries (call and
 edge arguments) merge into a unit's parameters through the analysis policy —
 join, then widen by visits — and schedule the unit on first reach or when a
-parameter rose. A graph is one unit because a single dependency-ordered pass is
+parameter rose. A rising SSA fact reruns, through the IR's use list, the
+innermost reached unit around each use outside its defining unit. A graph is one unit because a single dependency-ordered pass is
 *exact* for a DAG — no intra-graph widening is needed, and convergence pressure
 comes only from entry widening when a new call site raises the graph's ports. On
 completion a graph has no successor edges; its declared yields become the
@@ -1067,7 +1068,7 @@ them onto `EnvStore<LinkTarget, _, _>` is the remaining work.
 |---|---|
 | analysis policy (`CallContext`) | context identity — the key `K` from a resolved target plus abstract arguments. Context-*insensitive* means `K = LinkTarget`: one environment and one summary per resolved target, shared across its call sites |
 | `EnvStore<K, A, V>` | mapping that identity to a live environment, and holding its facts |
-| `Env` | what an access *means* for this engine (unbound-is-an-error vs. bottom, read/write logging), at its `Env::Anchor` family |
+| `Env` | what an access *means* for this engine (unbound-is-an-error vs. bottom, assign vs. join), at its `Env::Anchor` family |
 | `CallServices` | activation lifetime (`alloc_env`/`free_env`) plus callable resolution (`resolve_callee`/`discover_body`) — a sibling of `Env`, not a subtrait |
 | `CallFrame` | *when* those lifetime operations run, and pairing them exactly once |
 | fixpoint driver | dependencies, worklist |
