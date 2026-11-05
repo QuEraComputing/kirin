@@ -10,6 +10,26 @@ from ._dialect import dialect
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 
+    def lower_IfExp(self, state: lowering.State, node: ast.IfExp) -> lowering.Result:
+        cond = state.lower(node.test).expect_one()
+        regions: list[ir.Region] = []
+        values: list[ir.SSAValue] = []
+        for expression in (node.body, node.orelse):
+            with state.frame([], finalize_next=False) as branch_frame:
+                branch_frame.entr_block.args.append_from(cond.type, cond.name)
+                value = state.lower(expression).expect_one()
+                if branch_frame.defs:
+                    raise lowering.BuildError(
+                        "Assignment expressions in conditional branches are not supported"
+                    )
+                branch_frame.push(Yield(value))
+                regions.append(branch_frame.curr_region)
+                values.append(value)
+
+        stmt = IfElse(cond, then_body=regions[0], else_body=regions[1])
+        stmt.results[0].type = values[0].type.join(values[1].type)
+        return state.current_frame.push(stmt)
+
     @staticmethod
     def _frame_or_any_parent_has_def(frame, name) -> ir.SSAValue | None:
         # NOTE: this recursively checks all parents of the current frame for the
@@ -45,9 +65,8 @@ class Lowering(lowering.FromPythonAST):
         yield_names: list[str] = []
         body_yields: list[ir.SSAValue] = []
         else_yields: list[ir.SSAValue] = []
-        all_names: set[str] = set(body_frame.defs.keys()) | (
-            set(else_frame.defs.keys())
-        )
+        # a dict rather than a set: set order depends on the hash seed
+        all_names = dict.fromkeys([*body_frame.defs, *else_frame.defs])
         for name in all_names:
             if name in body_frame.defs and name in else_frame.defs:
                 yield_names.append(name)
@@ -129,7 +148,7 @@ class Lowering(lowering.FromPythonAST):
             # if a variable is assigned in loop body and exist in parent frame
             # it should be captured as initializers and yielded
             for name, value in body_frame.defs.items():
-                if name in parent_frame.defs:
+                if name in parent_frame.defs and name not in yields:
                     yields.append(name)
                     body_frame.curr_block.args.append_from(value.type, name)
 

@@ -11,7 +11,7 @@ from kirin.rewrite.abc import RewriteResult
 class HintConst(Pass):
 
     def unsafe_run(self, mt: Method) -> RewriteResult:
-        constprop = const.Propagate(self.dialects)
+        constprop = const.Propagate(self.dialects, cache_calls=True)
         if self.no_raise:
             frame, _ = constprop.run_no_raise(mt)
         else:

@@ -113,3 +113,61 @@ def test_recursive_ifelse():
     assert code.body.blocks[2].last_stmt.else_successor is code.body.blocks[4]
     assert isinstance(code.body.blocks[3].last_stmt, func.Return)
     assert isinstance(code.body.blocks[4].last_stmt, func.Return)
+
+
+def test_ifelse_order_independent_of_hash_seed(tmp_path):
+    import os
+    import sys
+    import textwrap
+    import subprocess
+
+    # lowers the same if/else with cf and with scf, then prints the join block's
+    # arguments and the scf.IfElse results
+    script = textwrap.dedent("""\
+        from kirin.dialects import scf
+        from kirin.prelude import basic_no_opt, structural_no_opt
+
+
+        @basic_no_opt
+        def with_cf(x: int, y: int, flag: bool) -> int:
+            if flag:
+                x = 1
+                y = 3
+            else:
+                x = 2
+                y = 4
+            return x + y
+
+
+        @structural_no_opt
+        def with_scf(x: int, y: int, flag: bool) -> int:
+            if flag:
+                x = 1
+                y = 3
+            else:
+                x = 2
+                y = 4
+            return x + y
+
+
+        join = with_cf.callable_region.blocks[-1]
+        (if_else,) = (s for s in with_scf.callable_region.walk() if isinstance(s, scf.IfElse))
+        print([arg.name for arg in join.args], [result.name for result in if_else.results])
+        """)
+
+    # the hash seed is fixed per process, so each seed needs a fresh process
+    (tmp_path / "ifelse.py").write_text(script)
+    outputs = set()
+    for seed in range(4):
+        env = dict(os.environ, PYTHONHASHSEED=str(seed))
+        env["KIRIN_COMPILE_CACHE_DIR"] = "FALSE"
+        out = subprocess.run(
+            [sys.executable, "ifelse.py"],
+            cwd=tmp_path,
+            env=env,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+        outputs.add(out.stdout)
+    assert outputs == {"['flag', 'x', 'y'] ['flag', 'x', 'y']\n"}

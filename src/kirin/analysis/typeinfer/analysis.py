@@ -72,11 +72,15 @@ class TypeInference(Forward[types.TypeAttribute]):
         self, frame: ForwardFrame[types.TypeAttribute], node: ir.Statement
     ) -> interp.StatementResult[types.TypeAttribute]:
         resolve = TypeResolution()
-        fs = fields(node)
-        for f, value in zip(fs.args.values(), frame.get_values(node.args)):
-            resolve.solve(f.type, value)
-        for arg, f in zip(node.args, fs.args.values()):
-            frame.set(arg, frame.get(arg).meet(resolve.substitute(f.type)))
+        typed = [
+            (arg, f.type)
+            for name, f in fields(node).args.items()
+            for arg in (getattr(node, name) if f.group else (getattr(node, name),))
+        ]
+        for arg, declared in typed:
+            resolve.solve(declared, frame.get(arg))
+        for arg, declared in typed:
+            frame.set(arg, frame.get(arg).meet(resolve.substitute(declared)))
         return tuple(resolve.substitute(result.type) for result in node.results)
 
     # NOTE: unlike concrete interpreter, instead of using type information

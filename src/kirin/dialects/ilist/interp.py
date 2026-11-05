@@ -1,3 +1,6 @@
+import typing
+from collections.abc import Iterable
+
 from kirin import ir, types
 from kirin.interp import Frame, Interpreter, MethodTable, impl
 from kirin.dialects.py.len import Len
@@ -67,25 +70,36 @@ class IListInterpreter(MethodTable):
             return ((carry, IList(ys, types.Any)),)
 
     @impl(Foldr)
-    def foldr(self, interp: Interpreter, frame: Frame, stmt: Foldr):
+    def foldr(
+        self, interp: Interpreter, frame: Frame, stmt: Foldr
+    ) -> tuple[typing.Any]:
         return self.fold(
             interp, frame, stmt, reversed(frame.get_casted(stmt.collection, IList).data)
         )
 
     @impl(Foldl)
-    def foldl(self, interp: Interpreter, frame: Frame, stmt: Foldl):
+    def foldl(
+        self, interp: Interpreter, frame: Frame, stmt: Foldl
+    ) -> tuple[typing.Any]:
         return self.fold(
             interp, frame, stmt, frame.get_casted(stmt.collection, IList).data
         )
 
-    def fold(self, interp: Interpreter, frame: Frame, stmt: Foldr | Foldl, coll):
-        fn: ir.Method = frame.get(stmt.fn)
+    def fold(
+        self,
+        interp: Interpreter,
+        frame: Frame,
+        stmt: Foldr | Foldl,
+        coll: Iterable[typing.Any],
+    ) -> tuple[typing.Any]:
+        fn: ir.Method[..., typing.Any] = frame.get(stmt.fn)
         init = frame.get(stmt.init)
 
         acc = init
         for elem in coll:
             # NOTE: assume fn has been type checked
-            _, acc = interp.call(fn.code, fn, acc, elem)
+            inputs = (elem, acc) if isinstance(stmt, Foldr) else (acc, elem)
+            _, acc = interp.call(fn.code, fn, *inputs)
         return (acc,)
 
     @impl(ForEach)

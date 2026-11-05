@@ -36,6 +36,11 @@ def tuple_const_index(xs: tuple[int, float, str]):
 
 
 @basic(typeinfer=True)
+def tuple_const_index_zero(xs: tuple[int, float, str]):
+    return xs[0]
+
+
+@basic(typeinfer=True)
 def tuple_err(xs: tuple[int, float, str], i: str):
     return xs[i]
 
@@ -67,6 +72,7 @@ def test_getitem_typeinfer():
         types.Tuple[types.Vararg(types.Int | types.Float | types.String)]
     )
     assert tuple_const_index.return_type.is_subseteq(types.Float)
+    assert tuple_const_index_zero.return_type.is_subseteq(types.Int)
     assert tuple_vararg_slice.return_type.is_subseteq(
         types.Tuple[types.Vararg(types.Int)]
     )

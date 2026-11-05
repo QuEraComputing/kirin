@@ -33,7 +33,7 @@ class DialectConstProp(MethodTable):
             return (ret,)
 
         if not (isinstance(callee, const.Value) and isinstance(callee.data, ir.Method)):
-            return (const.Result.bottom(),)
+            return (const.Unknown(),)
 
         mt: ir.Method = callee.data
         call_frame, ret = interp.call(

@@ -4,4 +4,5 @@ from .unroll import Unroll as Unroll
 from .hint_len import HintLen as HintLen
 from .flatten_add import FlattenAdd as FlattenAdd
 from .to_range_loop import ToRangeFor as ToRangeFor
+from .hoist_constant import HoistConstant as HoistConstant
 from .inline_getitem import InlineGetItem as InlineGetItem

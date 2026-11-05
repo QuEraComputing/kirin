@@ -11,6 +11,39 @@ dialect = ir.Dialect("lowering.cf")
 @dialect.register
 class CfLowering(lowering.FromPythonAST):
 
+    def lower_IfExp(self, state: lowering.State, node: ast.IfExp) -> lowering.Result:
+        cond = state.lower(node.test).expect_one()
+        frame = state.current_frame
+        merge = ir.Block()
+        branches: list[ir.Block] = []
+        values: list[ir.SSAValue] = []
+        for expression in (node.body, node.orelse):
+            with state.frame(
+                [], region=frame.curr_region, finalize_next=False
+            ) as branch_frame:
+                value = state.lower(expression).expect_one()
+                if branch_frame.defs:
+                    raise lowering.BuildError(
+                        "Assignment expressions in conditional branches are not supported"
+                    )
+                branch_frame.push(cf.Branch(arguments=(value,), successor=merge))
+                branches.append(branch_frame.entr_block)
+                values.append(value)
+
+        frame.push(
+            cf.ConditionalBranch(
+                cond,
+                then_arguments=(),
+                else_arguments=(),
+                then_successor=branches[0],
+                else_successor=branches[1],
+            )
+        )
+        result = merge.args.append_from(values[0].type.join(values[1].type))
+        # Continue the enclosing expression without consuming the statement stream.
+        frame.push(merge)
+        return result
+
     def lower_Pass(self, state: lowering.State, node: ast.Pass):
         state.current_frame.push(
             cf.Branch(arguments=(), successor=state.current_frame.next_block)
@@ -38,6 +71,20 @@ class CfLowering(lowering.FromPythonAST):
             next_value = body_frame.entr_block.args.append_from(types.Any, "next_value")
             py.unpack.unpacking(state, node.target, next_value)
             body_frame.exhaust()
+            # Variables assigned in the body but never read there do not
+            # trigger the capture callback, yet they are still loop-carried
+            # if they resolve to a local in an enclosing frame. Add them
+            # here; body_frame.defs[name] keeps the body's final value,
+            # which is what the back-edge and exit branches below yield.
+            for name in body_frame.defs:
+                if name in yields:
+                    continue
+                outer = frame.get_local(name)
+                if outer is None:
+                    continue
+                yields.append(name)
+                frame.defs[name] = outer
+                body_frame.entr_block.args.append_from(outer.type, name)
             self.branch_next_if_not_terminated(body_frame)
             yield_args = tuple(body_frame[name] for name in yields)
             next_stmt = py.iterable.Next(iter_stmt.iter)
@@ -95,16 +142,17 @@ class CfLowering(lowering.FromPythonAST):
 
         with state.frame(frame.stream.split(), region=frame.curr_region) as after_frame:
             after_frame.defs.update(frame.defs)
-            phi: set[str] = set()
+            # a dict rather than a set: set order depends on the hash seed
+            phi: dict[str, None] = {}
             for name in if_frame.defs.keys():
                 if frame.get(name):
-                    phi.add(name)
+                    phi[name] = None
                 elif name in else_frame.defs:
-                    phi.add(name)
+                    phi[name] = None
 
             for name in else_frame.defs.keys():
                 if frame.get(name):  # not defined in if_frame
-                    phi.add(name)
+                    phi[name] = None
 
             for name in phi:
                 after_frame.defs[name] = after_frame.entr_block.args.append_from(

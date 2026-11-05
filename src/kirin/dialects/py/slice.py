@@ -76,6 +76,50 @@ class Concrete(interp.MethodTable):
             return (slice(start, stop, step),)
 
 
+def _drop_none(typ: types.TypeAttribute) -> types.TypeAttribute:
+    """Remove `NoneType` from the type of one bound of a slice.
+
+    Args:
+        typ: the type of the bound.
+
+    Returns:
+        The type of the bound with every `NoneType` member removed.
+        The result is `Bottom` if the bound is always `None`.
+    """
+    if isinstance(typ, types.Union):
+        kept = [t for t in typ.types if not t.is_subseteq(types.NoneType)]
+        return types.Union(kept) if kept else types.Bottom
+    elif typ.is_subseteq(types.NoneType):
+        return types.Bottom
+    return typ
+
+
+@dialect.register(key="typeinfer")
+class TypeInfer(interp.MethodTable):
+
+    @interp.impl(Slice)
+    def slice_(
+        self,
+        interp_: interp.AbstractInterpreter,
+        frame: interp.Frame[types.TypeAttribute],
+        stmt: Slice,
+    ):
+        """Infer the type of a slice from the types of its start and stop.
+
+        The fields of `Slice` declare the type `T | NoneType`. The join of a
+        type variable and `NoneType` gives the type variable, so the declared
+        type is `T`. The generic fallback then meets a `None` bound with the
+        type of the other bound and narrows it to `Bottom`. This rule leaves
+        the types of the arguments unchanged. The element type is the join of
+        the start type and the stop type, each without `NoneType`.
+        """
+        start, stop = frame.get_values((stmt.start, stmt.stop))
+        elem = _drop_none(start).join(_drop_none(stop))
+        if elem.is_subseteq(types.Bottom):
+            return (types.Bottom,)
+        return (types.Slice[elem],)
+
+
 @dialect.register
 class Lowering(lowering.FromPythonAST):
 

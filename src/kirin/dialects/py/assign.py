@@ -14,6 +14,7 @@ import ast
 from kirin import ir, types, interp, lowering
 from kirin.decl import info, statement
 from kirin.print import Printer
+from kirin.dialects.py.indexing import GetItem
 
 dialect = ir.Dialect("py.assign")
 
@@ -192,11 +193,42 @@ class Lowering(lowering.FromPythonAST):
     def assign_item(cls, state: lowering.State, target, result: lowering.State.Result):
         match target:
             case ast.Tuple(elts, ast.Store()):
-                if len(elts) != len(result.data):
+                values = cls.unpack_values(state, result)
+                if len(elts) != len(values):
                     raise lowering.BuildError(
-                        f"tuple assignment length mismatch: {len(elts)} != {len(result.data)}"
+                        f"tuple assignment length mismatch: {len(elts)} != {len(values)}"
                     )
-                for target, value in zip(elts, result.data):
-                    cls.assign_item_value(state, target, value)
+                for target, value in zip(elts, values):
+                    cls.assign_item(state, target, lowering.State.Result((value,)))
             case _:
                 cls.assign_item_value(state, target, result.expect_one())
+
+    @staticmethod
+    def unpack_values(
+        state: lowering.State, result: lowering.State.Result
+    ) -> tuple[ir.SSAValue, ...]:
+        """Return the values that a tuple target on the left side binds to.
+
+        A call such as `pair()` lowers to one value that holds the whole tuple.
+        If that value has a tuple type of known length, this function pushes
+        one `py.indexing.GetItem` per element and returns the item values.
+        Otherwise, it returns the lowered values unchanged.
+        """
+        if len(result.data) != 1:
+            return result.data
+        value = result.data[0]
+        value_type = value.type
+        if not (
+            isinstance(value_type, types.Generic)
+            and value_type.body.typ is tuple
+            and value_type.vararg is None
+        ):
+            return result.data
+        items = []
+        for idx, item_type in enumerate(value_type.vars):
+            stmt = state.current_frame.push(
+                GetItem(obj=value, index=state.get_literal(idx))
+            )
+            stmt.result.type = item_type
+            items.append(stmt.result)
+        return tuple(items)

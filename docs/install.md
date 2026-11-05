@@ -8,7 +8,7 @@ Install Kirin using the following command:
 pip install kirin-toolchain
 ```
 
-Kirin supports Python 3.9 or later. We recommend using Python 3.10+ for the best experience.
+Kirin supports Python 3.11 or later.
 
 We strongly recommend developing your compiler project using [`uv`](https://docs.astral.sh/uv/),
 which is the official development environment for Kirin. You can install `uv` using the following command:

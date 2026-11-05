@@ -147,7 +147,8 @@ class TypeInfer(interp.MethodTable):
         obj: types.Generic,
         index: types.TypeAttribute,
     ):
-        if index_ := interp.maybe_const(stmt.index, int):
+        index_ = interp.maybe_const(stmt.index, int)
+        if index_ is not None:
             if obj.vararg and (index_ >= len(obj.vars) or -len(obj.vars) <= index_ < 0):
                 return (obj.vararg.typ,)
             elif obj.vars and (
