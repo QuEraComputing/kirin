@@ -287,7 +287,8 @@ class Specialize(Pass):
             # This is an already-bound method: its fields hold the captures.
             # The detached clone must not reference the original creation site.
             code.captured = ()
-        clone.sym_name = self._bind(code, args, retained, original.sym_name, original)
+        base = original.sym_name if original.sym_name is not None else code.sym_name
+        clone.sym_name = self._bind(code, args, retained, base, original)
         clone.nargs = len(clone.callable_region.blocks[0].args)
         if original.arg_names is not None:
             clone.arg_names = [original.arg_names[0]] + [
