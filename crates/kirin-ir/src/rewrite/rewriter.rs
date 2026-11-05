@@ -23,7 +23,9 @@
 //! applied are available for diagnosis only.
 //!
 //! Scope is operand/yield rewriting (including bulk result redirection through
-//! [`Rewriter::replace_results`]), block-body statement surgery
+//! [`Rewriter::replace_results`], and selective redirection through
+//! [`Rewriter::replace_uses_if`] and
+//! [`Rewriter::replace_all_uses_except_stmt`]), block-body statement surgery
 //! ([`Rewriter::erase_statement`], [`Rewriter::insert_before`],
 //! [`Rewriter::insert_after`], [`Rewriter::replace_statement`],
 //! [`Rewriter::insert_terminator`]), `CFG`
@@ -601,6 +603,75 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(self.redirect_uses(&[(old, new)]))
     }
 
+    /// Replace the uses of `old` that `select` accepts with `new`, returning
+    /// the number of use slots rewritten. Replacing a value with itself is a
+    /// no-op returning `Ok(0)`.
+    ///
+    /// `select` is called with the stage and each use site of `old` (a
+    /// statement operand or a `DiGraph` yield slot), all before anything is
+    /// written, so it sees the stage unchanged and can look up the using
+    /// statement, e.g. its parent block. The sites it rejects stay uses of
+    /// `old`. Otherwise this is [`Rewriter::replace_all_uses`] restricted to
+    /// the selected sites.
+    ///
+    /// Rejects, leaving the stage untouched, if `old` or `new` is unknown.
+    /// Records the events of [`Rewriter::replace_all_uses`] for the rewritten
+    /// slots, except that [`MutationEvent::ReplacedUses`] is recorded only if
+    /// `select` accepted every use, since it promises that every use of `old`
+    /// moved.
+    pub fn replace_uses_if(
+        &mut self,
+        old: impl Into<SSAValue>,
+        new: impl Into<SSAValue>,
+        select: impl FnMut(&StageInfo<L>, Use) -> bool,
+    ) -> Result<usize, RewriteError> {
+        let old: SSAValue = old.into();
+        let new: SSAValue = new.into();
+        if old.get_info(self.stage).is_none() {
+            return Err(RewriteError::UnknownValue(old));
+        }
+        if new.get_info(self.stage).is_none() {
+            return Err(RewriteError::UnknownValue(new));
+        }
+        if old == new {
+            return Ok(0);
+        }
+        Ok(self.redirect_uses_where(&[(old, new)], select))
+    }
+
+    /// Replace every use of `old` with `new` except `except`'s own operands,
+    /// returning the number of use slots rewritten.
+    ///
+    /// Only `except`'s operands are kept: uses by statements nested in its
+    /// bodies are replaced (for those, use [`Rewriter::replace_uses_if`]).
+    /// Rejects, leaving the stage untouched, if `old`, `new` or `except` is
+    /// unknown. Records the events of [`Rewriter::replace_uses_if`].
+    pub fn replace_all_uses_except_stmt(
+        &mut self,
+        old: impl Into<SSAValue>,
+        new: impl Into<SSAValue>,
+        except: Statement,
+    ) -> Result<usize, RewriteError> {
+        self.replace_all_uses_except_stmts(old, new, &[except])
+    }
+
+    /// [`Rewriter::replace_all_uses_except_stmt`] keeping the operands of every
+    /// statement in `except`.
+    pub fn replace_all_uses_except_stmts(
+        &mut self,
+        old: impl Into<SSAValue>,
+        new: impl Into<SSAValue>,
+        except: &[Statement],
+    ) -> Result<usize, RewriteError> {
+        for &stmt in except {
+            self.live_statement(stmt)?;
+        }
+        self.replace_uses_if(old, new, |_, site| match site {
+            Use::StatementOperand { stmt, .. } => !except.contains(&stmt),
+            Use::DiGraphYield { .. } => true,
+        })
+    }
+
     /// Redirect **every** result of `stmt` at once, one replacement per result
     /// in result order, exact arity required.
     ///
@@ -667,14 +738,28 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// *to* it. A sequential loop would instead let a later pair carry away the
     /// sites an earlier one just moved.
     pub(super) fn redirect_uses(&mut self, pairs: &[(SSAValue, SSAValue)]) -> usize {
-        // Snapshot the use sites so we can mutate the arenas while walking them
-        // (the borrows of the `old` infos end here).
+        self.redirect_uses_where(pairs, |_, _| true)
+    }
+
+    /// [`Rewriter::redirect_uses`], rewriting only the use sites `select`
+    /// accepts. `select` sees every site before anything is written. The
+    /// sites it rejects stay uses of `old`.
+    fn redirect_uses_where(
+        &mut self,
+        pairs: &[(SSAValue, SSAValue)],
+        mut select: impl FnMut(&StageInfo<L>, Use) -> bool,
+    ) -> usize {
+        // Snapshot the selected use sites so we can mutate the arenas while
+        // walking them (the borrows of the `old` infos end here).
         let sites: Vec<Vec<Use>> = pairs
             .iter()
             .map(|(old, _)| {
                 old.get_info(self.stage)
                     .map(|info| info.uses().to_vec())
                     .unwrap_or_default()
+                    .into_iter()
+                    .filter(|&site| select(self.stage, site))
+                    .collect()
             })
             .collect();
 
@@ -754,13 +839,24 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
         // Transfer the use records in two phases: drop every moved list before
         // installing any of them, so a value appearing on both sides of the
-        // substitution keeps only the sites redirected to it.
-        for (&(old, _), moved) in pairs.iter().zip(&moved) {
-            if !moved.is_empty()
-                && let Some(info) = old.get_info_mut(self.stage)
-            {
-                info.uses_mut().clear();
+        // substitution keeps only the sites redirected to it. A selected site
+        // that no longer applied was stale, and is dropped too. Whether `old`
+        // is left with no uses is read here, before any replacement gains its
+        // sites: a value can be both.
+        let mut emptied: Vec<bool> = Vec::with_capacity(pairs.len());
+        for (&(old, _), sites) in pairs.iter().zip(&sites) {
+            let Some(info) = old.get_info_mut(self.stage) else {
+                emptied.push(false);
+                continue;
+            };
+            let uses = info.uses_mut();
+            if sites.len() == uses.len() {
+                uses.clear();
+            } else if !sites.is_empty() {
+                let sites: HashSet<Use> = sites.iter().copied().collect();
+                uses.retain(|site| !sites.contains(site));
             }
+            emptied.push(uses.is_empty());
         }
         for (&(_, new), moved) in pairs.iter().zip(&moved) {
             if !moved.is_empty()
@@ -791,8 +887,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             self.events
                 .push(MutationEvent::ChangedDiGraphYields { graph });
         }
-        for (&(old, new), moved) in pairs.iter().zip(&moved) {
-            if !moved.is_empty() {
+        // `ReplacedUses` promises every use of `old` moved; a partial
+        // redirection is covered by the events above only.
+        for ((&(old, new), moved), &emptied) in pairs.iter().zip(&moved).zip(&emptied) {
+            if !moved.is_empty() && emptied {
                 self.events.push(MutationEvent::ReplacedUses { old, new });
             }
         }

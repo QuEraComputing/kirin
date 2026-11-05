@@ -1003,10 +1003,22 @@ fn replace_results_substitutes_simultaneously() {
     let mut stage = stage.finalize().unwrap();
 
     // a -> b and b -> x at once.
-    {
+    let events = {
         let mut rw = Rewriter::new(&mut stage);
         rw.replace_results(split, &[b, x]).unwrap();
-    }
+        rw.drain_events()
+    };
+    // Every use of `a` and of `b` moved, so both get a `ReplacedUses`, even
+    // though `b` gained the site that read `a`.
+    assert_eq!(
+        events,
+        vec![
+            MutationEvent::ChangedOperands { stmt: reads_a },
+            MutationEvent::ChangedOperands { stmt: reads_b },
+            MutationEvent::ReplacedUses { old: a, new: b },
+            MutationEvent::ReplacedUses { old: b, new: x },
+        ]
+    );
 
     // The site that read `a` reads `b`; the site that read `b` reads `x`.
     match reads_a.definition(&stage) {
@@ -1085,4 +1097,322 @@ fn replace_results_rejects_bad_arity_and_dead_ids() {
     // Only the erase recorded anything; no rejected call moved a use list.
     assert_eq!(events, vec![MutationEvent::ErasedStatement { stmt: nop }]);
     assert_eq!((uses_set(&stage, a), uses_set(&stage, b)), before);
+}
+
+/// `%a` read by `u0` in the outer block and by `u1` / `u2` in the two blocks
+/// `owner` owns; `outer`'s argument is the replacement.
+struct NestedUses {
+    stage: StageInfo<BuilderDialect>,
+    a: SSAValue,
+    new: SSAValue,
+    u0: Statement,
+    u1: Statement,
+    u2: Statement,
+    b1: Block,
+    owner: Statement,
+}
+
+fn nested_uses() -> NestedUses {
+    let mut stage = new_stage();
+    let s_src = stage.statement().definition(BuilderDialect::Nop).new();
+    let a = stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Result(s_src, 0))
+        .new();
+    let u0 = stage.statement().definition(BuilderDialect::Use(a)).new();
+    let u1 = stage.statement().definition(BuilderDialect::Use(a)).new();
+    let u2 = stage.statement().definition(BuilderDialect::Use(a)).new();
+    let b1 = stage.block().stmt(u1).new();
+    let b2 = stage.block().stmt(u2).new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnBlocks(b1, b2))
+        .new();
+    let outer = stage
+        .block()
+        .argument(TestType::I32)
+        .stmt(s_src)
+        .stmt(u0)
+        .stmt(owner)
+        .new();
+    let stage = stage.finalize().unwrap();
+    let new = SSAValue::from(outer.expect_info(&stage).arguments()[0]);
+    NestedUses {
+        stage,
+        a,
+        new,
+        u0,
+        u1,
+        u2,
+        b1,
+        owner,
+    }
+}
+
+fn used(stage: &StageInfo<BuilderDialect>, stmt: Statement) -> SSAValue {
+    match stmt.definition(stage) {
+        BuilderDialect::Use(value) => *value,
+        other => panic!("expected Use, got {other:?}"),
+    }
+}
+
+#[test]
+fn replace_uses_if_rewrites_only_the_selected_sites() {
+    let NestedUses {
+        mut stage,
+        a,
+        new,
+        u0,
+        u1,
+        u2,
+        ..
+    } = nested_uses();
+
+    let events = {
+        let mut rewriter = Rewriter::new(&mut stage);
+        let replaced = rewriter
+            .replace_uses_if(a, new, |_, site| site == so(u1, 0))
+            .unwrap();
+        assert_eq!(replaced, 1);
+        rewriter.drain_events()
+    };
+
+    assert_eq!(
+        (used(&stage, u0), used(&stage, u1), used(&stage, u2)),
+        (a, new, a)
+    );
+    // The rejected sites stay uses of `a`.
+    assert_eq!(uses_set(&stage, a), HashSet::from([so(u0, 0), so(u2, 0)]));
+    assert_eq!(uses_set(&stage, new), HashSet::from([so(u1, 0)]));
+    // Not every use moved, so no `ReplacedUses`.
+    assert_eq!(events, vec![MutationEvent::ChangedOperands { stmt: u1 }]);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_uses_if_can_look_up_the_using_statement() {
+    let NestedUses {
+        mut stage,
+        a,
+        new,
+        u0,
+        u1,
+        u2,
+        b1,
+        ..
+    } = nested_uses();
+
+    let mut rewriter = Rewriter::new(&mut stage);
+    let replaced = rewriter
+        .replace_uses_if(a, new, |stage, site| match site {
+            Use::StatementOperand { stmt, .. } => {
+                *stmt.parent(stage) == Some(StatementParent::Block(b1))
+            }
+            Use::DiGraphYield { .. } => false,
+        })
+        .unwrap();
+    assert_eq!(replaced, 1);
+    drop(rewriter);
+
+    assert_eq!(
+        (used(&stage, u0), used(&stage, u1), used(&stage, u2)),
+        (a, new, a)
+    );
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_uses_if_selecting_every_use_records_replaced_uses() {
+    let NestedUses {
+        mut stage,
+        a,
+        new,
+        u0,
+        u1,
+        u2,
+        ..
+    } = nested_uses();
+
+    let mut rewriter = Rewriter::new(&mut stage);
+    assert_eq!(rewriter.replace_uses_if(a, new, |_, _| true), Ok(3));
+    let events = rewriter.drain_events();
+    drop(rewriter);
+
+    assert_eq!(
+        events,
+        vec![
+            MutationEvent::ChangedOperands { stmt: u0 },
+            MutationEvent::ChangedOperands { stmt: u1 },
+            MutationEvent::ChangedOperands { stmt: u2 },
+            MutationEvent::ReplacedUses { old: a, new },
+        ]
+    );
+    assert!(uses_set(&stage, a).is_empty());
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_all_uses_except_stmt_keeps_only_its_own_operands() {
+    // Excepting `u0` keeps its operand.
+    let NestedUses {
+        mut stage,
+        a,
+        new,
+        u0,
+        u1,
+        u2,
+        ..
+    } = nested_uses();
+    let mut rewriter = Rewriter::new(&mut stage);
+    assert_eq!(rewriter.replace_all_uses_except_stmt(a, new, u0), Ok(2));
+    drop(rewriter);
+    assert_eq!(
+        (used(&stage, u0), used(&stage, u1), used(&stage, u2)),
+        (a, new, new)
+    );
+    verify_derived(&stage).unwrap();
+
+    // Excepting `owner` keeps nothing: the uses nested in its blocks are not
+    // its own operands.
+    let NestedUses {
+        mut stage,
+        a,
+        new,
+        u0,
+        u1,
+        u2,
+        owner,
+        ..
+    } = nested_uses();
+    let mut rewriter = Rewriter::new(&mut stage);
+    assert_eq!(rewriter.replace_all_uses_except_stmt(a, new, owner), Ok(3));
+    drop(rewriter);
+    assert_eq!(
+        (used(&stage, u0), used(&stage, u1), used(&stage, u2)),
+        (new, new, new)
+    );
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_all_uses_except_stmts_keeps_the_operands_of_each() {
+    let NestedUses {
+        mut stage,
+        a,
+        new,
+        u0,
+        u1,
+        u2,
+        ..
+    } = nested_uses();
+    let mut rewriter = Rewriter::new(&mut stage);
+    assert_eq!(
+        rewriter.replace_all_uses_except_stmts(a, new, &[u0, u1]),
+        Ok(1)
+    );
+    drop(rewriter);
+    assert_eq!(
+        (used(&stage, u0), used(&stage, u1), used(&stage, u2)),
+        (a, a, new)
+    );
+    assert_eq!(uses_set(&stage, a), HashSet::from([so(u0, 0), so(u1, 0)]));
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_uses_if_rejects_unknown_ids_leaving_the_stage_untouched() {
+    let NestedUses {
+        mut stage,
+        a,
+        new,
+        u0,
+        u1,
+        u2,
+        ..
+    } = nested_uses();
+    let dead_value = stage.ssa_arena().next_id();
+    let dead_stmt = stage.statement_arena().next_id();
+
+    let mut rewriter = Rewriter::new(&mut stage);
+    assert_eq!(
+        rewriter.replace_uses_if(dead_value, new, |_, _| true),
+        Err(RewriteError::UnknownValue(dead_value))
+    );
+    assert_eq!(
+        rewriter.replace_uses_if(a, dead_value, |_, _| true),
+        Err(RewriteError::UnknownValue(dead_value))
+    );
+    assert_eq!(
+        rewriter.replace_all_uses_except_stmt(a, new, dead_stmt),
+        Err(RewriteError::UnknownStatement(dead_stmt))
+    );
+    assert_eq!(
+        rewriter.replace_all_uses_except_stmts(a, new, &[u0, dead_stmt]),
+        Err(RewriteError::UnknownStatement(dead_stmt))
+    );
+    assert!(rewriter.events().is_empty());
+    drop(rewriter);
+
+    assert_eq!(
+        (used(&stage, u0), used(&stage, u1), used(&stage, u2)),
+        (a, a, a)
+    );
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_uses_if_separates_a_digraph_operand_from_its_yield() {
+    let mut stage = new_stage();
+    let s_src = stage.statement().definition(BuilderDialect::Nop).new();
+    let a = stage
+        .ssa()
+        .ty(TestType::I32)
+        .kind(BuilderSSAKind::Result(s_src, 0))
+        .new();
+    let consumer = stage.statement().definition(BuilderDialect::Use(a)).new();
+    let dg = stage
+        .digraph()
+        .node(s_src)
+        .node(consumer)
+        .yield_value(a)
+        .new();
+    let block = stage.block().argument(TestType::I32).new();
+    let mut stage = stage.finalize().unwrap();
+    let b = SSAValue::from(block.expect_info(&stage).arguments()[0]);
+
+    // Only the yield: the operand keeps `a`, and with it the edge.
+    let events = {
+        let mut rewriter = Rewriter::new(&mut stage);
+        let is_yield =
+            |_: &StageInfo<BuilderDialect>, site| matches!(site, Use::DiGraphYield { .. });
+        assert_eq!(rewriter.replace_uses_if(a, b, is_yield), Ok(1));
+        rewriter.drain_events()
+    };
+    assert_eq!(
+        events,
+        vec![MutationEvent::ChangedDiGraphYields { graph: dg }]
+    );
+    assert_eq!(dg.expect_info(&stage).yields()[0], b);
+    assert_eq!(used(&stage, consumer), a);
+    assert_eq!(dg.expect_info(&stage).graph().edge_count(), 1);
+    assert_eq!(uses_set(&stage, a), HashSet::from([so(consumer, 0)]));
+    verify_derived(&stage).unwrap();
+
+    // Then the operand: the edge goes, since `b` is not a member result.
+    let events = {
+        let mut rewriter = Rewriter::new(&mut stage);
+        assert_eq!(rewriter.replace_uses_if(a, b, |_, _| true), Ok(1));
+        rewriter.drain_events()
+    };
+    assert_eq!(
+        events,
+        vec![
+            MutationEvent::ChangedOperands { stmt: consumer },
+            MutationEvent::ChangedDiGraphTopology { graph: dg },
+            MutationEvent::ReplacedUses { old: a, new: b },
+        ]
+    );
+    assert_eq!(dg.expect_info(&stage).graph().edge_count(), 0);
+    verify_derived(&stage).unwrap();
 }
