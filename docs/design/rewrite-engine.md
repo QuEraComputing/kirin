@@ -1114,6 +1114,7 @@ pub enum MutationEvent {
     ChangedDiGraphYields { graph: DiGraph },
     ChangedUnGraphTopology { graph: UnGraph },
     ChangedBodyNesting { owner: Statement },
+    MovedStatement { stmt: Statement },
 }
 ```
 
@@ -1797,6 +1798,7 @@ stage remains valid.
 | `erase_statement` | Tombstone the statement, unlink it from its block list (or remove its graph node and the edges touching it, or drop an `UnGraph` edge statement from the member map), drop its operand uses, tombstone its (unused) result values. Statement-owned blocks, `Cfg`s, `DiGraph`s, and `UnGraph`s nested in it are tombstoned with it. Erasing a terminator clears the block's terminator and removes its outgoing edges, leaving the block unterminated. | `ErasedStatement` (covers the nested bodies; no CFG or graph events), then `ChangedTerminator` for a terminator, `ChangedDiGraphTopology` for a `DiGraph` member, or `ChangedUnGraphTopology` for an `UnGraph` member | parented by a block or graph; no live result uses (a `DiGraph` yield is a use, and so is a node reading an edge statement's wire) |
 | `new_result` | Allocate a typed result value for a statement not inserted yet; its arena slot stays empty (not live) until an insert binds it. | none | a value its `Rewriter` never binds is tombstoned when the `Rewriter` is dropped (`run_pass` drops it before verifying) |
 | `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, bind its results, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with no successors; operands must be live; results must be distinct, unbound `new_result` values |
+| `move_before` / `move_after` | Unlink a statement and link it adjacent to `anchor`, in any block body; id, results, uses and nested bodies are unchanged. | `MovedStatement` | both are block-parented; the moved statement is not a terminator; only `move_before` may anchor on the terminator, which appends to the end of the chain; the anchor is not nested in the moved statement; moving next to itself is a no-op |
 | `insert_terminator` | Allocate `definition` as the terminator of a block that has none; add operand uses and predecessor entries. | `InsertedStatement`, `ChangedTerminator` | any block (`Cfg` member or statement-owned body); `definition` is a result-less terminator with live operands and successors |
 | `insert_node` | Allocate `definition` as a new `DiGraph` member and node; bind its results, add operand uses and an edge from each member producer of an operand. | `InsertedStatement`, `ChangedDiGraphTopology` | live graph; non-terminator with no successors; live operands (outside ones get no edge); results must be `new_result` values |
 | `replace_yield` | Rewrite one `DiGraph` yield slot; move its yield use `old → new`. Topology is unchanged. | `ChangedDiGraphYields` (none if slot unchanged) | live graph and value, index in range |
@@ -2006,12 +2008,14 @@ axis — hence the column.
 | `BodyOwnedElsewhere(body)` | guard | a body the replacement gains already belongs to another statement or, for a block, to a CFG | `replace_statement` |
 | `BodyListedTwice(body)` | guard | the replacement names the same body in two fields | `replace_statement` |
 | `BodyEnclosesOwner(body)` | guard | the replacement names a body the statement is nested in, which would make it its own ancestor | `replace_statement` |
+| `MovedIntoItself { stmt, anchor }` | guard | the anchor is nested in the moved statement, which would make it its own ancestor | `move_before`, `move_after` |
 
 The immediate `MutationEvent` vocabulary recorded by these methods is
 `ChangedOperands`, `ReplacedUses`, `InsertedStatement`, `ErasedStatement`,
 `ReplacedStatement`, `ChangedBlockList { cfg }`, `ChangedCfg { cfg }`,
 `ChangedTerminator { block }`, `ChangedDiGraphTopology { graph }`,
-`ChangedDiGraphYields { graph }`, and `ChangedBodyNesting { owner }`. `ErasedStatement` also covers everything nested
+`ChangedDiGraphYields { graph }`, `ChangedBodyNesting { owner }`, and
+`MovedStatement { stmt }`. `ErasedStatement` also covers everything nested
 in the erased statement; no separate CFG or graph events are recorded for those
 bodies. The remaining documented event kinds (`UnGraph` and result-type events)
 grow in as
@@ -2859,7 +2863,7 @@ sweep recording no `MutationEvent`. Decisions to revisit in later
 milestones:
 
 - A rule may erase its root, the statement being visited, only in a walk
-  order that allows it (`WalkOrder::ALLOWS_ERASING_VISITED`: the reverse BFS
+  order that allows it (`WalkOrder::ALLOWS_DISPLACING_VISITED`: the reverse BFS
   orders). A run in another order fails with `DriverError::ErasesRoot`
   before editing anything. A rule's other erase targets are producers of the
   root, never nested in or around it, so they meet the walk contract in
@@ -3036,12 +3040,13 @@ implement the derive and its matching/remapping bodies.
 ### Gap 3 — MutationEvent vocabulary vs implementation — RESOLVED DELIVERY RULE
 
 The documented `MutationEvent` enum lists the full target vocabulary; the
-implementation currently emits **twelve** — `ChangedOperands`, `ReplacedUses`,
-`InsertedStatement`, `ErasedStatement`, `ReplacedStatement`, `ChangedBlockList`,
-`ChangedCfg`, `ChangedTerminator`, `ChangedDiGraphTopology`,
-`ChangedDiGraphYields`, `ChangedUnGraphTopology`, `ChangedBodyNesting` —
-covering operand and yield rewriting, block-body statement and terminator
-surgery (erase/insert/replace), `Cfg` block-list surgery, `DiGraph` and
+implementation currently emits **thirteen** — `ChangedOperands`,
+`ReplacedUses`, `InsertedStatement`, `ErasedStatement`, `ReplacedStatement`,
+`ChangedBlockList`, `ChangedCfg`, `ChangedTerminator`,
+`ChangedDiGraphTopology`, `ChangedDiGraphYields`, `ChangedUnGraphTopology`,
+`ChangedBodyNesting`, `MovedStatement` — covering operand and yield
+rewriting, block-body statement and terminator surgery
+(erase/insert/replace/move), `Cfg` block-list surgery, `DiGraph` and
 `UnGraph` member surgery, and body changes through `replace_statement`. The
 remaining documented variants (result-type events) are not emitted because that
 surgery is not yet implemented, so an analysis-invalidation policy written against them would

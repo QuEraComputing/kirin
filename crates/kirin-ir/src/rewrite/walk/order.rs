@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Dialect, Rewriter, StageInfo, Statement};
+use crate::{Dialect, MutationEvent, Rewriter, StageInfo, Statement};
 
 /// A traversal order over the statements nested under a root statement.
 ///
@@ -13,9 +13,11 @@ pub trait WalkOrder {
     /// The cursor walking this order.
     type Cursor: WalkCursor;
 
-    /// Whether an edit may erase the statement being visited, as the
-    /// [contract](super#contract) allows for this order.
-    const ALLOWS_ERASING_VISITED: bool;
+    /// Whether an edit may erase or move the statement being visited (see
+    /// the [contract](super#contract)). Only the reverse BFS orders allow it:
+    /// they build their order at the start, while the others find the next
+    /// statement through the visited one.
+    const ALLOWS_DISPLACING_VISITED: bool;
 
     /// A cursor at the start of the walk of the tree under `root`, `root`
     /// included.
@@ -52,7 +54,8 @@ pub trait WalkOrder {
     /// [`walk`](Self::walk) with a `visit` that may edit through `rewriter`,
     /// within the walk's contract (see the [module docs](super)). Fails if
     /// `visit` erases the statement it is visiting where the order does not
-    /// allow it, or moves it by merging its block into another.
+    /// allow it, or moves it where the order does not allow it (see
+    /// [`check_not_moved_since`](Self::check_not_moved_since)).
     fn walk_mut<'r, L: Dialect>(
         rewriter: &mut Rewriter<'r, L>,
         root: Statement,
@@ -60,11 +63,42 @@ pub trait WalkOrder {
     ) -> Result<WalkStatus, WalkError> {
         let mut cursor = Self::start(rewriter.stage(), root);
         while let Some(stmt) = cursor.next(rewriter.stage())? {
-            if let Some(status) = visit(rewriter, stmt).steer(&mut cursor) {
+            let seen = rewriter.events().len();
+            let result = visit(rewriter, stmt);
+            Self::check_not_moved_since(rewriter, stmt, seen)?;
+            if let Some(status) = result.steer(&mut cursor) {
                 return Ok(status);
             }
         }
         Ok(WalkStatus::Completed)
+    }
+
+    /// Fail with [`WalkError::VisitedMoved`] if an event recorded since the
+    /// first `seen` events of `rewriter` moved `visited`, in an order that
+    /// does not allow it
+    /// ([`ALLOWS_DISPLACING_VISITED`](Self::ALLOWS_DISPLACING_VISITED)).
+    /// Panics if `rewriter` has recorded fewer than `seen` events.
+    ///
+    /// [`walk_mut`](Self::walk_mut) calls this after each visit. A loop driving
+    /// a cursor by hand calls it too: note `rewriter.events().len()` before
+    /// editing at a statement, and check before the next
+    /// [`WalkCursor::next`].
+    fn check_not_moved_since<L: Dialect>(
+        rewriter: &Rewriter<'_, L>,
+        visited: Statement,
+        seen: usize,
+    ) -> Result<(), WalkError> {
+        if Self::ALLOWS_DISPLACING_VISITED {
+            return Ok(());
+        }
+        let moved = rewriter.events()[seen..].iter().any(
+            |event| matches!(event, MutationEvent::MovedStatement { stmt } if *stmt == visited),
+        );
+        if moved {
+            Err(WalkError::VisitedMoved(visited))
+        } else {
+            Ok(())
+        }
     }
 }
 
@@ -130,10 +164,13 @@ pub enum WalkError {
     /// The statement being visited was erased before the walk proceeded, in a
     /// way its order does not allow (see the [module docs](super)).
     VisitedErased(Statement),
-    /// The statement being visited was moved before the walk proceeded, by
-    /// merging its block into another block
+    /// The statement being visited was moved before the walk proceeded, in an
+    /// order a move breaks: by merging its block into another block
     /// ([`Rewriter::merge_blocks`](crate::Rewriter::merge_blocks) with its
-    /// block as `succ`).
+    /// block as `succ`), or with
+    /// [`Rewriter::move_before`](crate::Rewriter::move_before) /
+    /// [`Rewriter::move_after`](crate::Rewriter::move_after) (see
+    /// [`WalkOrder::check_not_moved_since`]).
     VisitedMoved(Statement),
 }
 
@@ -149,7 +186,7 @@ impl fmt::Display for WalkError {
             WalkError::VisitedMoved(stmt) => {
                 write!(
                     f,
-                    "statement {stmt:?} was moved into another block while the walk was visiting it"
+                    "statement {stmt:?} was moved while the walk was visiting it"
                 )
             }
         }

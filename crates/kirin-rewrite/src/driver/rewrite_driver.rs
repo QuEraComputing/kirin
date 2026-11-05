@@ -105,7 +105,7 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<RewriteSummary, DriverError> {
-        if !O::ALLOWS_ERASING_VISITED
+        if !O::ALLOWS_DISPLACING_VISITED
             && let Some(rule) = self.rules.rules().iter().find(|rule| rule.erases_root())
         {
             let order = std::any::type_name::<O>();

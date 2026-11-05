@@ -28,7 +28,8 @@
 //! [`Rewriter::replace_all_uses_except_stmt`]), block-body statement surgery
 //! ([`Rewriter::erase_statement`], [`Rewriter::insert_before`],
 //! [`Rewriter::insert_after`], [`Rewriter::replace_statement`],
-//! [`Rewriter::insert_terminator`]), `CFG`
+//! [`Rewriter::insert_terminator`], [`Rewriter::move_before`],
+//! [`Rewriter::move_after`]), `CFG`
 //! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
 //! merge blocks, [`Rewriter::retarget_successor`], and block-argument insertion
 //! and erasure), `DiGraph` node surgery in the sibling `digraph` module
@@ -139,6 +140,9 @@ pub enum MutationEvent {
     /// the bodies it dropped were tombstoned with everything nested in them,
     /// and the bodies it gained now have `owner` as their parent.
     ChangedBodyNesting { owner: Statement },
+    /// `stmt` was moved to another place in a block body, keeping its id,
+    /// results, uses and nested bodies.
+    MovedStatement { stmt: Statement },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -162,11 +166,12 @@ pub enum RewriteError {
     /// Nothing can follow a block's terminator, so `insert_after` cannot anchor
     /// on one. (`insert_before` can: it appends to the end of the chain.)
     AnchorIsTerminator(Statement),
-    /// The inserted definition is a terminator where a non-terminator is
-    /// required: `insert_before`/`insert_after` do not splice terminators into
-    /// a block's statement list (use [`Rewriter::insert_terminator`] on a block
-    /// that has none), and a `DiGraph` has no terminators for `insert_node` to
-    /// add. The counterpart of [`RewriteError::ExpectedTerminator`].
+    /// The inserted definition, or the moved statement, is a terminator where
+    /// a non-terminator is required: `insert_before`/`insert_after` and
+    /// `move_before`/`move_after` do not splice terminators into a block's
+    /// statement list (use [`Rewriter::insert_terminator`] on a block that has
+    /// none), and a `DiGraph` has no terminators for `insert_node` to add. The
+    /// counterpart of [`RewriteError::ExpectedTerminator`].
     UnexpectedTerminator,
     /// The inserted or replacement definition is a non-terminator that carries
     /// successors. Only a block's terminator may transfer control, so such a
@@ -226,6 +231,10 @@ pub enum RewriteError {
     /// A `replace_statement` definition names a body the statement itself is
     /// nested in, which would make the statement its own ancestor.
     BodyEnclosesOwner(Body),
+    /// `move_before`/`move_after` was given an anchor nested in the moved
+    /// statement's own bodies, which would make the statement its own
+    /// ancestor.
+    MovedIntoItself { stmt: Statement, anchor: Statement },
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -301,7 +310,7 @@ impl fmt::Display for RewriteError {
             RewriteError::UnexpectedTerminator => {
                 write!(
                     f,
-                    "expected a non-terminator: terminators are only inserted with insert_terminator"
+                    "expected a non-terminator: terminators are only inserted with insert_terminator, and are not moved"
                 )
             }
             RewriteError::BlockHasTerminator(block) => {
@@ -375,6 +384,12 @@ impl fmt::Display for RewriteError {
                 write!(
                     f,
                     "the replacement names body {body:?}, which encloses the statement"
+                )
+            }
+            RewriteError::MovedIntoItself { stmt, anchor } => {
+                write!(
+                    f,
+                    "cannot move {stmt:?} next to {anchor:?}, which is nested in it"
                 )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
@@ -932,7 +947,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 _ => {}
             }
         }
-        let (block, prev, next, operands, results, successors, is_terminator) = {
+        let (block, operands, results, successors, is_terminator) = {
             let item = self.live_statement(stmt)?;
             let block = match item.parent {
                 Some(StatementParent::Block(block)) => block,
@@ -940,8 +955,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             };
             (
                 block,
-                item.node.prev,
-                item.node.next,
                 item.definition
                     .arguments()
                     .copied()
@@ -971,37 +984,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 remove_predecessor(self.stage, target, block);
             }
         } else {
-            // Unlink from the block's statement linked list (fix neighbours, or
-            // the block head/tail when the statement is at an end).
-            match prev {
-                Some(p) => {
-                    if let Some(info) = p.get_info_mut(self.stage) {
-                        info.node.next = next;
-                    }
-                }
-                None => {
-                    if let Some(block_info) = block.get_info_mut(self.stage) {
-                        block_info.statements.head = next;
-                    }
-                }
-            }
-            match next {
-                Some(n) => {
-                    if let Some(info) = n.get_info_mut(self.stage) {
-                        info.node.prev = prev;
-                    }
-                }
-                None => {
-                    if let Some(block_info) = block.get_info_mut(self.stage) {
-                        block_info.statements.tail = prev;
-                    }
-                }
-            }
-            if let Some(block_info) = block.get_info_mut(self.stage)
-                && block_info.statements.len > 0
-            {
-                block_info.statements.len -= 1;
-            }
+            self.unlink_from_block(stmt, block);
         }
 
         // Drop the def-use edges this statement contributed, erase the bodies
@@ -1148,37 +1131,132 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         self.insert_relative(anchor, definition, true)
     }
 
+    /// Where a statement goes when placed before (`after == false`) or after
+    /// `anchor`: its block, and the chain statements that will sit directly
+    /// before and after it (`None` at either end of the chain).
+    ///
+    /// The terminator sits outside the chain, so a place before it is the end
+    /// of the chain, and nothing can follow it ([`RewriteError::AnchorIsTerminator`]).
+    /// Rejects an unknown `anchor` or one not in a block body.
+    pub(super) fn slot_at(
+        &self,
+        anchor: Statement,
+        after: bool,
+    ) -> Result<(Block, Option<Statement>, Option<Statement>), RewriteError> {
+        let item = self.live_statement(anchor)?;
+        let block = match item.parent {
+            Some(StatementParent::Block(block)) => block,
+            _ => return Err(RewriteError::NotInBlockBody(anchor)),
+        };
+        match (item.definition.is_terminator(), after) {
+            (true, true) => Err(RewriteError::AnchorIsTerminator(anchor)),
+            (true, false) => {
+                let tail = block
+                    .get_info(self.stage)
+                    .and_then(|b| b.statements.tail().copied());
+                // The tail ends the chain, so the statement becomes the tail.
+                debug_assert!(tail.is_none_or(|t| t.next(self.stage).is_none()));
+                Ok((block, tail, None))
+            }
+            (false, true) => Ok((block, Some(anchor), item.node.next)),
+            (false, false) => Ok((block, item.node.prev, Some(anchor))),
+        }
+    }
+
+    /// Link the live, unlinked `stmt` into `block`'s chain between `prev` and
+    /// `next` (the block head or tail when one is `None`), making `block` its
+    /// parent.
+    pub(super) fn link_into_block(
+        &mut self,
+        stmt: Statement,
+        block: Block,
+        prev: Option<Statement>,
+        next: Option<Statement>,
+    ) {
+        if let Some(info) = stmt.get_info_mut(self.stage) {
+            info.parent = Some(StatementParent::Block(block));
+            info.node.prev = prev;
+            info.node.next = next;
+        }
+        match prev {
+            Some(p) => {
+                if let Some(info) = p.get_info_mut(self.stage) {
+                    info.node.next = Some(stmt);
+                }
+            }
+            None => {
+                if let Some(block_info) = block.get_info_mut(self.stage) {
+                    block_info.statements.head = Some(stmt);
+                }
+            }
+        }
+        match next {
+            Some(n) => {
+                if let Some(info) = n.get_info_mut(self.stage) {
+                    info.node.prev = Some(stmt);
+                }
+            }
+            None => {
+                if let Some(block_info) = block.get_info_mut(self.stage) {
+                    block_info.statements.tail = Some(stmt);
+                }
+            }
+        }
+        if let Some(block_info) = block.get_info_mut(self.stage) {
+            block_info.statements.len += 1;
+        }
+    }
+
+    /// Unlink the non-terminator `stmt` from `block`'s chain, fixing its
+    /// neighbours (or the block head/tail at an end) and clearing its own
+    /// links. Its parent is left for the caller.
+    pub(super) fn unlink_from_block(&mut self, stmt: Statement, block: Block) {
+        let Some(node) = stmt.get_info(self.stage).map(|item| item.node) else {
+            return;
+        };
+        let (prev, next) = (node.prev, node.next);
+        match prev {
+            Some(p) => {
+                if let Some(info) = p.get_info_mut(self.stage) {
+                    info.node.next = next;
+                }
+            }
+            None => {
+                if let Some(block_info) = block.get_info_mut(self.stage) {
+                    block_info.statements.head = next;
+                }
+            }
+        }
+        match next {
+            Some(n) => {
+                if let Some(info) = n.get_info_mut(self.stage) {
+                    info.node.prev = prev;
+                }
+            }
+            None => {
+                if let Some(block_info) = block.get_info_mut(self.stage) {
+                    block_info.statements.tail = prev;
+                }
+            }
+        }
+        if let Some(block_info) = block.get_info_mut(self.stage)
+            && block_info.statements.len > 0
+        {
+            block_info.statements.len -= 1;
+        }
+        if let Some(info) = stmt.get_info_mut(self.stage) {
+            info.node.prev = None;
+            info.node.next = None;
+        }
+    }
+
     fn insert_relative(
         &mut self,
         anchor: Statement,
         definition: L,
         after: bool,
     ) -> Result<Statement, RewriteError> {
-        let (block, prev, next) = {
-            let item = self.live_statement(anchor)?;
-            let block = match item.parent {
-                Some(StatementParent::Block(block)) => block,
-                _ => return Err(RewriteError::NotInBlockBody(anchor)),
-            };
-            match (item.definition.is_terminator(), after) {
-                // Nothing can follow a terminator.
-                (true, true) => return Err(RewriteError::AnchorIsTerminator(anchor)),
-                // The terminator sits outside the chain, so inserting before it
-                // appends to the end of the chain
-                (true, false) => {
-                    let tail = block
-                        .get_info(self.stage)
-                        .and_then(|b| b.statements.tail().copied());
-
-                    // The tail ends the chain, so the new statement becomes the tail.
-                    debug_assert!(tail.is_none_or(|t| t.next(self.stage).is_none()));
-
-                    (block, tail, None)
-                }
-                (false, true) => (block, Some(anchor), item.node.next),
-                (false, false) => (block, item.node.prev, Some(anchor)),
-            }
-        };
+        let (block, prev, next) = self.slot_at(anchor, after)?;
 
         if definition.is_terminator() {
             return Err(RewriteError::UnexpectedTerminator);
@@ -1196,34 +1274,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             &operands,
         );
 
-        // Wire neighbours (or the block head/tail when inserting at an end).
-        match prev {
-            Some(p) => {
-                if let Some(info) = p.get_info_mut(self.stage) {
-                    info.node.next = Some(new_stmt);
-                }
-            }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.head = Some(new_stmt);
-                }
-            }
-        }
-        match next {
-            Some(n) => {
-                if let Some(info) = n.get_info_mut(self.stage) {
-                    info.node.prev = Some(new_stmt);
-                }
-            }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.tail = Some(new_stmt);
-                }
-            }
-        }
-        if let Some(block_info) = block.get_info_mut(self.stage) {
-            block_info.statements.len += 1;
-        }
+        self.link_into_block(new_stmt, block, prev, next);
 
         // Predecessor mirror does not need to be updated since we rejected terminators earlier.
         self.events
