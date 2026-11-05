@@ -78,6 +78,10 @@
 //!   or [`Rewriter::move_after`](crate::Rewriter::move_after), reported as
 //!   [`WalkError::VisitedMoved`] by [`WalkOrder::walk_mut`] (a loop driving a
 //!   cursor by hand checks with [`WalkOrder::check_not_moved_since`]);
+//! - splicing its block's statements elsewhere with
+//!   [`Rewriter::splice_block_before`](crate::Rewriter::splice_block_before)
+//!   or [`Rewriter::splice_block_after`](crate::Rewriter::splice_block_after),
+//!   reported the same way;
 //! - moving one of its ancestors, which is not checked;
 //! - reordering the bodies of one of its ancestors
 //!   ([`Rewriter::replace_statement`](crate::Rewriter::replace_statement)),

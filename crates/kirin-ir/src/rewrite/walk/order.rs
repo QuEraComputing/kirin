@@ -1,6 +1,6 @@
 use std::fmt;
 
-use crate::{Dialect, MutationEvent, Rewriter, StageInfo, Statement};
+use crate::{Dialect, MutationEvent, Rewriter, StageInfo, Statement, StatementParent};
 
 /// A traversal order over the statements nested under a root statement.
 ///
@@ -64,8 +64,9 @@ pub trait WalkOrder {
         let mut cursor = Self::start(rewriter.stage(), root);
         while let Some(stmt) = cursor.next(rewriter.stage())? {
             let seen = rewriter.events().len();
+            let parent = *stmt.parent(rewriter.stage());
             let result = visit(rewriter, stmt);
-            Self::check_not_moved_since(rewriter, stmt, seen)?;
+            Self::check_not_moved_since(rewriter, stmt, parent, seen)?;
             if let Some(status) = result.steer(&mut cursor) {
                 return Ok(status);
             }
@@ -76,24 +77,32 @@ pub trait WalkOrder {
     /// Fail with [`WalkError::VisitedMoved`] if an event recorded since the
     /// first `seen` events of `rewriter` moved `visited`, in an order that
     /// does not allow it
-    /// ([`ALLOWS_DISPLACING_VISITED`](Self::ALLOWS_DISPLACING_VISITED)).
+    /// ([`ALLOWS_DISPLACING_VISITED`](Self::ALLOWS_DISPLACING_VISITED)):
+    /// a move of `visited` itself, or a splice of `visited_parent`'s block.
     /// Panics if `rewriter` has recorded fewer than `seen` events.
     ///
     /// [`walk_mut`](Self::walk_mut) calls this after each visit. A loop driving
-    /// a cursor by hand calls it too: note `rewriter.events().len()` before
-    /// editing at a statement, and check before the next
-    /// [`WalkCursor::next`].
+    /// a cursor by hand calls it too: note `rewriter.events().len()` and
+    /// `visited.parent(stage)` before editing at a statement, and check before
+    /// the next [`WalkCursor::next`]. The parent is needed because a splice
+    /// changes it: afterwards, a statement spliced into a block cannot be told
+    /// from one that was there already.
     fn check_not_moved_since<L: Dialect>(
         rewriter: &Rewriter<'_, L>,
         visited: Statement,
+        visited_parent: Option<StatementParent>,
         seen: usize,
     ) -> Result<(), WalkError> {
         if Self::ALLOWS_DISPLACING_VISITED {
             return Ok(());
         }
-        let moved = rewriter.events()[seen..].iter().any(
-            |event| matches!(event, MutationEvent::MovedStatement { stmt } if *stmt == visited),
-        );
+        let moved = rewriter.events()[seen..].iter().any(|event| match *event {
+            MutationEvent::MovedStatement { stmt } => stmt == visited,
+            MutationEvent::SplicedBlock { source, .. } => {
+                visited_parent == Some(StatementParent::Block(source))
+            }
+            _ => false,
+        });
         if moved {
             Err(WalkError::VisitedMoved(visited))
         } else {
@@ -169,8 +178,11 @@ pub enum WalkError {
     /// ([`Rewriter::merge_blocks`](crate::Rewriter::merge_blocks) with its
     /// block as `succ`), or with
     /// [`Rewriter::move_before`](crate::Rewriter::move_before) /
-    /// [`Rewriter::move_after`](crate::Rewriter::move_after) (see
-    /// [`WalkOrder::check_not_moved_since`]).
+    /// [`Rewriter::move_after`](crate::Rewriter::move_after), or by splicing
+    /// its block with
+    /// [`Rewriter::splice_block_before`](crate::Rewriter::splice_block_before) /
+    /// [`Rewriter::splice_block_after`](crate::Rewriter::splice_block_after)
+    /// (see [`WalkOrder::check_not_moved_since`]).
     VisitedMoved(Statement),
 }
 

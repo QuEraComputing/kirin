@@ -43,7 +43,7 @@ ids and must map every operand, which costs O(size of what is copied).
 | MLIR (`RewriterBase`, `Region`, `Operation`) | Kirin today | This plan |
 |---|---|---|
 | `moveOpBefore` / `moveOpAfter` | none | step 2 |
-| `Block::moveBefore` | none | step 3 |
+| `Block::moveBefore` | none | not in this plan (step 3, dropped) |
 | `inlineBlockBefore(source, dest, before, args)` | `merge_blocks` (end of block, same CFG only) | step 4 |
 | `inlineRegionBefore(region, parent, before)` | none | step 5 |
 | `Operation::clone`, `Region::cloneInto` with `IRMapping` | none | step 6 |
@@ -135,37 +135,36 @@ log, so nothing new is stored in the IR:
 
 Cost: O(1), plus O(nesting depth) for the cycle check.
 
-### 3. Move a block within its CFG
+### 3. Move a block within its CFG (dropped)
 
-```rust
-rewriter.move_block_before(block, anchor)?;
-rewriter.move_block_after(block, anchor)?;
-```
-
-Reorders a CFG's block list. Branches, arguments and statements are unchanged.
-Both blocks must be in the same CFG. Records `ChangedBlockList`, whose docs
-already cover "moved within `cfg`'s block list", and a new
-`MovedBlock { block }` for the walk check (step 2).
-
-The entry block is the first block in the list, so moving a block to the
-front, or moving the first block away, changes which block runs first. That is
-allowed and documented, not rejected.
-
-Cost: O(1).
+Not added. A CFG's block order has one semantic effect, choosing the entry
+block (the first in the list); otherwise it only changes printing and
+iteration order. A new entry block can already be made with
+`insert_block_before` plus a branch, and steps 5 and 7 place blocks while
+splicing, so nothing needs a separate move. Add it when block layout starts
+to matter (e.g. a backend or an analysis seeded in reverse postorder).
 
 ### 4. Splice a block's statements into another block
 
 ```rust
 rewriter.splice_block_before(source, anchor, &arg_replacements)?;
+rewriter.splice_block_after(source, anchor, &arg_replacements)?;
 ```
 
 MLIR's `inlineBlockBefore`. Moves `source`'s statements (not its terminator)
-in front of `anchor`, and redirects uses of `source`'s arguments to
-`arg_replacements`. `source` is left empty, keeping its arguments and
+next to `anchor`, and redirects uses of `source`'s arguments to
+`arg_replacements`. The anchor rules are those of `move_before` /
+`move_after`. `splice_block_after` is for step 7, where the callee's entry is
+spliced after the call, the last statement of an unterminated block. `source` is left empty, keeping its arguments and
 terminator, and is not erased: the caller decides what to do with it.
 Generalizes `merge_blocks`: any position, in any block of any CFG or
 statement-owned body. Records a new `SplicedBlock { source, dest }`, which the
-walk check reads as "every statement of `source` moved".
+walk check reads as "every statement of `source` moved". Afterwards a spliced
+statement's parent is `dest`, so the check also takes the visited statement's
+parent from before the visit, and compares it with `source`.
+
+Rejects an anchor in `source` or nested in one of its statements
+(`SplicedIntoItself`).
 
 Example, folding `scf.if` with a known condition: splice the `then` arm in
 front of the `if`, replace the `if`'s results with the arm's `yield` values,
@@ -239,10 +238,10 @@ the new moves.
 ## Decisions
 
 1. Moves record new events naming what moved: `MovedStatement`,
-   `MovedBlock`, `SplicedBlock`, `SplicedCfg`.
+   `SplicedBlock`, `SplicedCfg`.
 2. The walk checks for a moved visited statement or block by reading the
    `Rewriter`'s event log (step 2). Ancestors are not checked.
-3. Moving a block to or from the front of its CFG is allowed, not rejected.
+3. Moving a block within its CFG is not added (step 3).
 4. A block's statements can be spliced into any block.
 5. Splicing leaves the source block or CFG empty and does not erase it.
 6. Copying includes graph bodies.

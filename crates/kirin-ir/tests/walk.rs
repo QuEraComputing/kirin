@@ -843,6 +843,90 @@ fn moving_another_statement_keeps_the_walk() {
     }
 }
 
+/// The block `stmt` is in.
+fn block_of(stage: &StageInfo<BuilderDialect>, stmt: Statement) -> Block {
+    match *stmt.parent(stage) {
+        Some(StatementParent::Block(block)) => block,
+        other => panic!("{stmt:?} is not in a block: {other:?}"),
+    }
+}
+
+/// Splices the `then` arm before `owner` while visiting `then_nop`, its only
+/// statement.
+fn splice_then_arm_while_visiting_it<O: WalkOrder>()
+-> (Statement, Result<Vec<Statement>, WalkError>) {
+    let mut t = tree();
+    let (then_nop, owner) = (t.then_nop, t.owner);
+    let then_block = block_of(&t.stage, then_nop);
+    let result = walk_mut_editing::<O>(&mut t, |rewriter, stmt| {
+        if stmt == then_nop {
+            rewriter
+                .splice_block_before(then_block, owner, &[])
+                .unwrap();
+        }
+    });
+    (then_nop, result)
+}
+
+#[test]
+fn splicing_the_visited_statements_block_breaks_link_following_walks() {
+    for (then_nop, result) in [
+        splice_then_arm_while_visiting_it::<PreOrder>(),
+        splice_then_arm_while_visiting_it::<PostOrder>(),
+        splice_then_arm_while_visiting_it::<BFS>(),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(then_nop)));
+    }
+}
+
+#[test]
+fn reverse_bfs_orders_go_on_after_the_visited_statements_block_is_spliced() {
+    let t = tree();
+    let (_, reverse) = splice_then_arm_while_visiting_it::<ReverseBFS>();
+    assert_eq!(reverse.unwrap(), ReverseBFS::schedule(&t.stage, t.root));
+    let (_, keep_order) = splice_then_arm_while_visiting_it::<KeepOrderReverseBFS>();
+    assert_eq!(
+        keep_order.unwrap(),
+        KeepOrderReverseBFS::schedule(&t.stage, t.root)
+    );
+}
+
+#[test]
+fn splicing_another_block_into_the_visited_statements_block_keeps_the_walk() {
+    /// Splices the `else` arm after `a`, into the block `a` is in.
+    fn splice_else_arm_after_a(rewriter: &mut Rewriter<BuilderDialect>, t: &Tree) {
+        let else_block = block_of(rewriter.stage(), t.else_nop);
+        rewriter.splice_block_after(else_block, t.a, &[]).unwrap();
+    }
+    /// The schedule of `O` over [`tree`] with the splice already made.
+    fn spliced_schedule<O: WalkOrder>() -> Vec<Statement> {
+        let mut t = tree();
+        let ids = tree();
+        splice_else_arm_after_a(&mut Rewriter::new(&mut t.stage), &ids);
+        O::schedule(&t.stage, t.root)
+    }
+    fn splice_while_visiting_a<O: WalkOrder>() -> Vec<Statement> {
+        let mut t = tree();
+        let ids = tree();
+        walk_mut_editing::<O>(&mut t, |rewriter, stmt| {
+            if stmt == ids.a {
+                splice_else_arm_after_a(rewriter, &ids);
+            }
+        })
+        .unwrap()
+    }
+    // `else_nop` now follows `a`, and the walk visits it there.
+    assert_eq!(
+        splice_while_visiting_a::<PreOrder>(),
+        spliced_schedule::<PreOrder>()
+    );
+    assert_eq!(
+        splice_while_visiting_a::<PostOrder>(),
+        spliced_schedule::<PostOrder>()
+    );
+    assert_eq!(splice_while_visiting_a::<BFS>(), spliced_schedule::<BFS>());
+}
+
 /// Splits the entry block at `a` while visiting `a`; the walk's schedule
 /// before the split, and the statements it visited.
 fn split_at_a_while_visiting<O: WalkOrder>() -> (Vec<Statement>, Result<Vec<Statement>, WalkError>)

@@ -1115,6 +1115,7 @@ pub enum MutationEvent {
     ChangedUnGraphTopology { graph: UnGraph },
     ChangedBodyNesting { owner: Statement },
     MovedStatement { stmt: Statement },
+    SplicedBlock { source: Block, dest: Block },
 }
 ```
 
@@ -1750,6 +1751,20 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
     pub fn erase_block(&mut self, block: Block) -> Result<(), RewriteError>;
 
+    pub fn splice_block_before(
+        &mut self,
+        source: Block,
+        anchor: Statement,
+        arg_replacements: &[SSAValue],
+    ) -> Result<(), RewriteError>;
+
+    pub fn splice_block_after(
+        &mut self,
+        source: Block,
+        anchor: Statement,
+        arg_replacements: &[SSAValue],
+    ) -> Result<(), RewriteError>;
+
     pub fn split_block(&mut self, at: Statement) -> Result<Block, RewriteError>;
 
     pub fn merge_blocks(
@@ -1799,6 +1814,7 @@ stage remains valid.
 | `new_result` | Allocate a typed result value for a statement not inserted yet; its arena slot stays empty (not live) until an insert binds it. | none | a value its `Rewriter` never binds is tombstoned when the `Rewriter` is dropped (`run_pass` drops it before verifying) |
 | `insert_before` / `insert_after` | Allocate a statement, splice it adjacent to `anchor`, bind its results, add operand uses; return the new id. | `InsertedStatement` | anchor is block-parented; only `insert_before` may anchor on the terminator, which appends to the end of the chain; `definition` is a non-terminator with no successors; operands must be live; results must be distinct, unbound `new_result` values |
 | `move_before` / `move_after` | Unlink a statement and link it adjacent to `anchor`, in any block body; id, results, uses and nested bodies are unchanged. | `MovedStatement` | both are block-parented; the moved statement is not a terminator; only `move_before` may anchor on the terminator, which appends to the end of the chain; the anchor is not nested in the moved statement; moving next to itself is a no-op |
+| `splice_block_before` / `splice_block_after` | Move every statement of `source` but its terminator, in order, adjacent to `anchor` in any block body; redirect `source`'s arguments to `arg_replacements`. `source` keeps its arguments and terminator and is not erased. | the `replace_all_uses` events, `SplicedBlock` | the anchor is block-parented, not in `source` and not nested in its statements; only `splice_block_before` may anchor on the terminator, which appends to the end of the chain; exact argument arity; replacements must be live and may be `source`'s own arguments |
 | `insert_terminator` | Allocate `definition` as the terminator of a block that has none; add operand uses and predecessor entries. | `InsertedStatement`, `ChangedTerminator` | any block (`Cfg` member or statement-owned body); `definition` is a result-less terminator with live operands and successors |
 | `insert_node` | Allocate `definition` as a new `DiGraph` member and node; bind its results, add operand uses and an edge from each member producer of an operand. | `InsertedStatement`, `ChangedDiGraphTopology` | live graph; non-terminator with no successors; live operands (outside ones get no edge); results must be `new_result` values |
 | `replace_yield` | Rewrite one `DiGraph` yield slot; move its yield use `old → new`. Topology is unchanged. | `ChangedDiGraphYields` (none if slot unchanged) | live graph and value, index in range |
@@ -1972,7 +1988,7 @@ axis — hence the column.
 | Variant | Category | Meaning | Raised by |
 |---|---|---|---|
 | `UnknownStatement(stmt)` | liveness | id does not resolve to a live (non-tombstoned) statement | all statement methods |
-| `UnknownValue(value)` | liveness | SSA id does not resolve to a live value | `replace_operand`, `replace_all_uses`, `insert_*`, `replace_statement` |
+| `UnknownValue(value)` | liveness | SSA id does not resolve to a live value | `replace_operand`, `replace_all_uses`, `insert_*`, `replace_statement`, `splice_block_*` |
 | `UnknownBlock(block)` | liveness | a block id (anchor, operand block, or successor target) does not resolve to a live block | `replace_statement`, CFG block-list methods |
 | `UnknownCfg(cfg)` | liveness | the `Cfg` id does not resolve to a live `Cfg` | `append_block` |
 | `UnknownDiGraph(graph)` | liveness | the `DiGraph` id does not resolve to a live `DiGraph` | `insert_node`, `replace_yield` |
@@ -1986,7 +2002,7 @@ axis — hence the column.
 | `CannotMergeBlockIntoItself(block)` | guard | `merge_blocks` was given the same block twice | `merge_blocks` |
 | `ExpectedTerminator` | guard | the definition is not a terminator | `insert_terminator` |
 | `BlockHasTerminator(block)` | guard | the block already has a terminator | `insert_terminator` |
-| `BlockArgumentArityMismatch { block, expected, found }` | guard | values do not line up one-for-one with the block's arguments | `merge_blocks` |
+| `BlockArgumentArityMismatch { block, expected, found }` | guard | values do not line up one-for-one with the block's arguments | `merge_blocks`, `splice_block_*` |
 | `BlockArgumentIndexOutOfRange { block, index }` | liveness | argument index past the block's argument list (for insertion, past its end) | `insert_block_arg`, `erase_block_arg` |
 | `ReplacementIsMergedArgument { block, value }` | guard | a replacement is one of the merged block's own arguments, which the merge deletes | `merge_blocks` |
 | `BlockHasPredecessors { block, pred }` | guard | `pred` still branches to the block being removed; retarget its edges first | `erase_block`, `merge_blocks` |
@@ -2009,13 +2025,14 @@ axis — hence the column.
 | `BodyListedTwice(body)` | guard | the replacement names the same body in two fields | `replace_statement` |
 | `BodyEnclosesOwner(body)` | guard | the replacement names a body the statement is nested in, which would make it its own ancestor | `replace_statement` |
 | `MovedIntoItself { stmt, anchor }` | guard | the anchor is nested in the moved statement, which would make it its own ancestor | `move_before`, `move_after` |
+| `SplicedIntoItself { source, anchor }` | guard | the anchor is in `source` or nested in one of its statements, which would place a spliced statement next to or inside itself | `splice_block_before`, `splice_block_after` |
 
 The immediate `MutationEvent` vocabulary recorded by these methods is
 `ChangedOperands`, `ReplacedUses`, `InsertedStatement`, `ErasedStatement`,
 `ReplacedStatement`, `ChangedBlockList { cfg }`, `ChangedCfg { cfg }`,
 `ChangedTerminator { block }`, `ChangedDiGraphTopology { graph }`,
-`ChangedDiGraphYields { graph }`, `ChangedBodyNesting { owner }`, and
-`MovedStatement { stmt }`. `ErasedStatement` also covers everything nested
+`ChangedDiGraphYields { graph }`, `ChangedBodyNesting { owner }`,
+`MovedStatement { stmt }`, and `SplicedBlock { source, dest }`. `ErasedStatement` also covers everything nested
 in the erased statement; no separate CFG or graph events are recorded for those
 bodies. The remaining documented event kinds (`UnGraph` and result-type events)
 grow in as
