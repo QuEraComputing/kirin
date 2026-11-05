@@ -1055,28 +1055,28 @@
             </script> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.slice.Lowering.lower_Call_slice class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">lower_Call_slice</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>lower_Call_slice</span><span class=p>(</span>
     <span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>Call</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/slice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>95</span>
-<span class=normal>96</span>
-<span class=normal>97</span>
-<span class=normal>98</span>
-<span class=normal>99</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@lowering</span><span class=o>.</span><span class=n>akin</span><span class=p>(</span><span class=nb>slice</span><span class=p>)</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/slice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>139</span>
+<span class=normal>140</span>
+<span class=normal>141</span>
+<span class=normal>142</span>
+<span class=normal>143</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@lowering</span><span class=o>.</span><span class=n>akin</span><span class=p>(</span><span class=nb>slice</span><span class=p>)</span>
 <span class=k>def</span><span class=w> </span><span class=nf>lower_Call_slice</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=k>return</span> <span class=n>_lower_slice</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>node</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.slice.Lowering.lower_Slice class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">lower_Slice</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>lower_Slice</span><span class=p>(</span><span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>Slice</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/slice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>82</span>
-<span class=normal>83</span>
-<span class=normal>84</span>
-<span class=normal>85</span>
-<span class=normal>86</span>
-<span class=normal>87</span>
-<span class=normal>88</span>
-<span class=normal>89</span>
-<span class=normal>90</span>
-<span class=normal>91</span>
-<span class=normal>92</span>
-<span class=normal>93</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_Slice</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Slice</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/slice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>126</span>
+<span class=normal>127</span>
+<span class=normal>128</span>
+<span class=normal>129</span>
+<span class=normal>130</span>
+<span class=normal>131</span>
+<span class=normal>132</span>
+<span class=normal>133</span>
+<span class=normal>134</span>
+<span class=normal>135</span>
+<span class=normal>136</span>
+<span class=normal>137</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>lower_Slice</span><span class=p>(</span><span class=bp>self</span><span class=p>,</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Slice</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=k>def</span><span class=w> </span><span class=nf>value_or_none</span><span class=p>(</span><span class=n>expr</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>expr</span> <span class=o>|</span> <span class=kc>None</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>ir</span><span class=o>.</span><span class=n>SSAValue</span><span class=p>:</span>
         <span class=k>if</span> <span class=n>expr</span> <span class=ow>is</span> <span class=ow>not</span> <span class=kc>None</span><span class=p>:</span>
             <span class=k>return</span> <span class=n>state</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>expr</span><span class=p>)</span><span class=o>.</span><span class=n>expect_one</span><span class=p>()</span>
@@ -1245,8 +1245,35 @@
     <span class=bp>self</span><span class=p>,</span> <span class=n>stmt</span><span class=p>:</span> <span class=nb>type</span><span class=p>[</span><span class=s2>&quot;Slice&quot;</span><span class=p>],</span> <span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=k>return</span> <span class=n>_lower_slice</span><span class=p>(</span><span class=n>state</span><span class=p>,</span> <span class=n>node</span><span class=p>)</span>
-</code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.py.slice._lower_slice class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code> <span class="doc doc-object-name doc-function-name">_lower_slice</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>_lower_slice</span><span class=p>(</span><span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>Call</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
-</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/slice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>102</span>
+</code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-class"> <h3 id=kirin.dialects.py.slice.TypeInfer class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-class"></code> <span class="doc doc-object-name doc-class-name">TypeInfer</span> </h3> <div class="doc doc-contents "> <p class="doc doc-class-bases"> Bases: <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">MethodTable</span> (<code>kirin.interp.MethodTable</code>)' href=../../../reference/kirin/interp/table/#kirin.interp.table.MethodTable>MethodTable</a></code></p> <div style="display: none"> <a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">TypeInfer</span> (<code>kirin.dialects.py.slice.TypeInfer</code>)' href=#kirin.dialects.py.slice.TypeInfer id=mermaid-link-kirin.dialects.py.slice.TypeInfer></a> <a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">MethodTable</span> (<code>kirin.interp.table.MethodTable</code>)' href=../../../reference/kirin/interp/table/#kirin.interp.table.MethodTable id=mermaid-link-kirin.interp.table.MethodTable></a> </div> <pre class=mermaid><code id=mermaid-diagram-kirin.dialects.py.slice.TypeInfer>
+              flowchart TD
+              kirin.dialects.py.slice.TypeInfer[TypeInfer]
+              kirin.interp.table.MethodTable[MethodTable]
+
+                              kirin.interp.table.MethodTable --> kirin.dialects.py.slice.TypeInfer
+                
+
+
+              click kirin.dialects.py.slice.TypeInfer href "" "kirin.dialects.py.slice.TypeInfer"
+              click kirin.interp.table.MethodTable href "" "kirin.interp.table.MethodTable"
+            </code></pre> <script>
+              var diagram = document.getElementById('mermaid-diagram-kirin.dialects.py.slice.TypeInfer');
+              diagram.innerHTML = diagram.innerHTML.replace(/click ([\w.]+) href "" "\1"/g, function(match, nodeID, offset) {
+                try {
+                  const link = document.getElementById("mermaid-link-" + nodeID).href;
+                  return `click ${nodeID} href "${link}" "${nodeID}"`
+                } catch (e) {
+                  return '';
+                }
+              });
+            </script> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h4 id=kirin.dialects.py.slice.TypeInfer.slice_ class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">slice_</span> </h4> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>slice_</span><span class=p>(</span>
+    <span class=n>interp_</span><span class=p>:</span> <span class=n>AbstractInterpreter</span><span class=p>,</span>
+    <span class=n>frame</span><span class=p>:</span> <span class=n>Frame</span><span class=p>[</span><span class=n>TypeAttribute</span><span class=p>],</span>
+    <span class=n>stmt</span><span class=p>:</span> <span class=n>Slice</span><span class=p>,</span>
+<span class=p>)</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Infer the type of a slice from the types of its start and stop.</p> <p>The fields of <code>Slice</code> declare the type <code>T | NoneType</code>. The join of a type variable and <code>NoneType</code> gives the type variable, so the declared type is <code>T</code>. The generic fallback then meets a <code>None</code> bound with the type of the other bound and narrows it to <code>Bottom</code>. This rule leaves the types of the arguments unchanged. The element type is the join of the start type and the stop type, each without <code>NoneType</code>.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/slice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>100</span>
+<span class=normal>101</span>
+<span class=normal>102</span>
 <span class=normal>103</span>
 <span class=normal>104</span>
 <span class=normal>105</span>
@@ -1262,7 +1289,94 @@
 <span class=normal>115</span>
 <span class=normal>116</span>
 <span class=normal>117</span>
-<span class=normal>118</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>_lower_slice</span><span class=p>(</span><span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
+<span class=normal>118</span>
+<span class=normal>119</span>
+<span class=normal>120</span></pre></div></td><td class=code><div><pre><span></span><code><span class=nd>@interp</span><span class=o>.</span><span class=n>impl</span><span class=p>(</span><span class=n>Slice</span><span class=p>)</span>
+<span class=k>def</span><span class=w> </span><span class=nf>slice_</span><span class=p>(</span>
+    <span class=bp>self</span><span class=p>,</span>
+    <span class=n>interp_</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>AbstractInterpreter</span><span class=p>,</span>
+    <span class=n>frame</span><span class=p>:</span> <span class=n>interp</span><span class=o>.</span><span class=n>Frame</span><span class=p>[</span><span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>],</span>
+    <span class=n>stmt</span><span class=p>:</span> <span class=n>Slice</span><span class=p>,</span>
+<span class=p>):</span>
+<span class=w>    </span><span class=sd>&quot;&quot;&quot;Infer the type of a slice from the types of its start and stop.</span>
+
+<span class=sd>    The fields of `Slice` declare the type `T | NoneType`. The join of a</span>
+<span class=sd>    type variable and `NoneType` gives the type variable, so the declared</span>
+<span class=sd>    type is `T`. The generic fallback then meets a `None` bound with the</span>
+<span class=sd>    type of the other bound and narrows it to `Bottom`. This rule leaves</span>
+<span class=sd>    the types of the arguments unchanged. The element type is the join of</span>
+<span class=sd>    the start type and the stop type, each without `NoneType`.</span>
+<span class=sd>    &quot;&quot;&quot;</span>
+    <span class=n>start</span><span class=p>,</span> <span class=n>stop</span> <span class=o>=</span> <span class=n>frame</span><span class=o>.</span><span class=n>get_values</span><span class=p>((</span><span class=n>stmt</span><span class=o>.</span><span class=n>start</span><span class=p>,</span> <span class=n>stmt</span><span class=o>.</span><span class=n>stop</span><span class=p>))</span>
+    <span class=n>elem</span> <span class=o>=</span> <span class=n>_drop_none</span><span class=p>(</span><span class=n>start</span><span class=p>)</span><span class=o>.</span><span class=n>join</span><span class=p>(</span><span class=n>_drop_none</span><span class=p>(</span><span class=n>stop</span><span class=p>))</span>
+    <span class=k>if</span> <span class=n>elem</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>):</span>
+        <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Bottom</span><span class=p>,)</span>
+    <span class=k>return</span> <span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>Slice</span><span class=p>[</span><span class=n>elem</span><span class=p>],)</span>
+</code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.py.slice._drop_none class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code> <span class="doc doc-object-name doc-function-name">_drop_none</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>_drop_none</span><span class=p>(</span><span class=n>typ</span><span class=p>:</span> <span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Remove <code>NoneType</code> from the type of one bound of a slice.</p> <p><span class=doc-section-title>Parameters:</span></p> <table> <thead> <tr> <th>Name</th> <th>Type</th> <th>Description</th> <th>Default</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code>typ</code> </td> <td> <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">TypeAttribute</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span> (<code>kirin.types.TypeAttribute</code>)' href=../../../reference/kirin/ir/attrs/types/#kirin.ir.attrs.types.TypeAttribute>TypeAttribute</a></code> </td> <td> <div class=doc-md-description> <p>the type of the bound.</p> </div> </td> <td> <em>required</em> </td> </tr> </tbody> </table> <p><span class=doc-section-title>Returns:</span></p> <table> <thead> <tr> <th>Type</th> <th>Description</th> </tr> </thead> <tbody> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">TypeAttribute</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span> (<code>kirin.types.TypeAttribute</code>)' href=../../../reference/kirin/ir/attrs/types/#kirin.ir.attrs.types.TypeAttribute>TypeAttribute</a></code> </td> <td> <div class=doc-md-description> <p>The type of the bound with every <code>NoneType</code> member removed.</p> </div> </td> </tr> <tr class=doc-section-item> <td> <code><a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">TypeAttribute</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span> (<code>kirin.types.TypeAttribute</code>)' href=../../../reference/kirin/ir/attrs/types/#kirin.ir.attrs.types.TypeAttribute>TypeAttribute</a></code> </td> <td> <div class=doc-md-description> <p>The result is <code>Bottom</code> if the bound is always <code>None</code>.</p> </div> </td> </tr> </tbody> </table> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/slice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>79</span>
+<span class=normal>80</span>
+<span class=normal>81</span>
+<span class=normal>82</span>
+<span class=normal>83</span>
+<span class=normal>84</span>
+<span class=normal>85</span>
+<span class=normal>86</span>
+<span class=normal>87</span>
+<span class=normal>88</span>
+<span class=normal>89</span>
+<span class=normal>90</span>
+<span class=normal>91</span>
+<span class=normal>92</span>
+<span class=normal>93</span>
+<span class=normal>94</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>_drop_none</span><span class=p>(</span><span class=n>typ</span><span class=p>:</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>types</span><span class=o>.</span><span class=n>TypeAttribute</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>&quot;&quot;&quot;Remove `NoneType` from the type of one bound of a slice.</span>
+
+<span class=sd>    Args:</span>
+<span class=sd>        typ: the type of the bound.</span>
+
+<span class=sd>    Returns:</span>
+<span class=sd>        The type of the bound with every `NoneType` member removed.</span>
+<span class=sd>        The result is `Bottom` if the bound is always `None`.</span>
+<span class=sd>    &quot;&quot;&quot;</span>
+    <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>typ</span><span class=p>,</span> <span class=n>types</span><span class=o>.</span><span class=n>Union</span><span class=p>):</span>
+        <span class=n>kept</span> <span class=o>=</span> <span class=p>[</span><span class=n>t</span> <span class=k>for</span> <span class=n>t</span> <span class=ow>in</span> <span class=n>typ</span><span class=o>.</span><span class=n>types</span> <span class=k>if</span> <span class=ow>not</span> <span class=n>t</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>NoneType</span><span class=p>)]</span>
+        <span class=k>return</span> <span class=n>types</span><span class=o>.</span><span class=n>Union</span><span class=p>(</span><span class=n>kept</span><span class=p>)</span> <span class=k>if</span> <span class=n>kept</span> <span class=k>else</span> <span class=n>types</span><span class=o>.</span><span class=n>Bottom</span>
+    <span class=k>elif</span> <span class=n>typ</span><span class=o>.</span><span class=n>is_subseteq</span><span class=p>(</span><span class=n>types</span><span class=o>.</span><span class=n>NoneType</span><span class=p>):</span>
+        <span class=k>return</span> <span class=n>types</span><span class=o>.</span><span class=n>Bottom</span>
+    <span class=k>return</span> <span class=n>typ</span>
+</code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.dialects.py.slice._lower_slice class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code> <span class="doc doc-object-name doc-function-name">_lower_slice</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>_lower_slice</span><span class=p>(</span><span class=n>state</span><span class=p>:</span> <span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>Call</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span>
+</code></pre></div> <div class="doc doc-contents "> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/dialects/py/slice.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>146</span>
+<span class=normal>147</span>
+<span class=normal>148</span>
+<span class=normal>149</span>
+<span class=normal>150</span>
+<span class=normal>151</span>
+<span class=normal>152</span>
+<span class=normal>153</span>
+<span class=normal>154</span>
+<span class=normal>155</span>
+<span class=normal>156</span>
+<span class=normal>157</span>
+<span class=normal>158</span>
+<span class=normal>159</span>
+<span class=normal>160</span>
+<span class=normal>161</span>
+<span class=normal>162</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>_lower_slice</span><span class=p>(</span><span class=n>state</span><span class=p>:</span> <span class=n>lowering</span><span class=o>.</span><span class=n>State</span><span class=p>,</span> <span class=n>node</span><span class=p>:</span> <span class=n>ast</span><span class=o>.</span><span class=n>Call</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>lowering</span><span class=o>.</span><span class=n>Result</span><span class=p>:</span>
     <span class=k>if</span> <span class=nb>len</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>args</span><span class=p>)</span> <span class=o>==</span> <span class=mi>1</span><span class=p>:</span>
         <span class=n>start</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>ast</span><span class=o>.</span><span class=n>Constant</span><span class=p>(</span><span class=kc>None</span><span class=p>))</span><span class=o>.</span><span class=n>expect_one</span><span class=p>()</span>
         <span class=n>stop</span> <span class=o>=</span> <span class=n>state</span><span class=o>.</span><span class=n>lower</span><span class=p>(</span><span class=n>node</span><span class=o>.</span><span class=n>args</span><span class=p>[</span><span class=mi>0</span><span class=p>])</span><span class=o>.</span><span class=n>expect_one</span><span class=p>()</span>
