@@ -37,7 +37,7 @@ use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::Lexical;
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, BlockFrame,
-    Body, CFGFrame, CallContext, CallFrame, CallRequest, Callee, Completion, ConcreteInterpreter,
+    Body, CFGFrame, CallFrame, CallRequest, Callee, Completion, ConcreteInterpreter,
     ConcreteInterpreterCore, ContextInsensitive, DefaultCallBodyTraversal, DiGraphFrame, Frame,
     FrameEffect, FrameEngine, Interpretable, InterpreterError, SameStageLinker,
     SparseForwardInterpreter, expect_single,
@@ -587,9 +587,6 @@ fn ungraph_without_traversal_reports_no_default_walker() {
 //   abstract walker can be substituted. Both refusals are asserted rather than
 //   left implicit.
 
-/// Summary key of the constant-propagation context policy.
-type CpKey = <ConstPropContext<i64> as CallContext<TestValue>>::Key;
-
 /// Total abstract frame for the graph language: the standard abstract
 /// traversal (blocks, calls, graph bodies), plus a variant recording the
 /// absence of a walker.
@@ -604,44 +601,44 @@ type CpKey = <ConstPropContext<i64> as CallContext<TestValue>>::Key;
 /// silently running concrete traversal over lattice values. Giving `graph_eval`
 /// a per-engine dispatch trait (as `kirin-scf` does for `scf.if`/`scf.for`)
 /// would remove the need for both the bound and this variant.
-enum GraphAbstractFrame<V, E, K> {
-    Block(AbstractBlockFrame<V, E, K>),
-    Call(AbstractCallFrame<V, E, K>),
-    DiGraph(AbstractDiGraphFrame<V, E, K>),
+enum GraphAbstractFrame<V, E> {
+    Block(AbstractBlockFrame<V, E>),
+    Call(AbstractCallFrame<V, E>),
+    DiGraph(AbstractDiGraphFrame<V, E>),
     /// No abstract walker exists for this body kind; carries the reason.
     NoWalker(&'static str),
 }
 
-impl<V, E, K> From<AbstractBlockFrame<V, E, K>> for GraphAbstractFrame<V, E, K> {
-    fn from(frame: AbstractBlockFrame<V, E, K>) -> Self {
+impl<V, E> From<AbstractBlockFrame<V, E>> for GraphAbstractFrame<V, E> {
+    fn from(frame: AbstractBlockFrame<V, E>) -> Self {
         Self::Block(frame)
     }
 }
 
-impl<V, E, K> From<AbstractCallFrame<V, E, K>> for GraphAbstractFrame<V, E, K> {
-    fn from(frame: AbstractCallFrame<V, E, K>) -> Self {
+impl<V, E> From<AbstractCallFrame<V, E>> for GraphAbstractFrame<V, E> {
+    fn from(frame: AbstractCallFrame<V, E>) -> Self {
         Self::Call(frame)
     }
 }
 
-impl<V, E, K> From<AbstractDiGraphFrame<V, E, K>> for GraphAbstractFrame<V, E, K> {
-    fn from(frame: AbstractDiGraphFrame<V, E, K>) -> Self {
+impl<V, E> From<AbstractDiGraphFrame<V, E>> for GraphAbstractFrame<V, E> {
+    fn from(frame: AbstractDiGraphFrame<V, E>) -> Self {
         Self::DiGraph(frame)
     }
 }
 
-impl<V, E, K> From<DiGraphFrame<V, E>> for GraphAbstractFrame<V, E, K> {
+impl<V, E> From<DiGraphFrame<V, E>> for GraphAbstractFrame<V, E> {
     fn from(_: DiGraphFrame<V, E>) -> Self {
         GraphAbstractFrame::NoWalker("no abstract digraph walker")
     }
 }
 
-impl<I, V, E, K> Frame<I> for GraphAbstractFrame<V, E, K>
+impl<I, V, E> Frame<I> for GraphAbstractFrame<V, E>
 where
     I: FrameEngine<Error = E>,
-    AbstractBlockFrame<V, E, K>: Frame<I, Self, Completion = AbstractCompletion<V>>,
-    AbstractCallFrame<V, E, K>: Frame<I, Self, Completion = AbstractCompletion<V>>,
-    AbstractDiGraphFrame<V, E, K>: Frame<I, Self, Completion = AbstractCompletion<V>>,
+    AbstractBlockFrame<V, E>: Frame<I, Self, Completion = AbstractCompletion<V>>,
+    AbstractCallFrame<V, E>: Frame<I, Self, Completion = AbstractCompletion<V>>,
+    AbstractDiGraphFrame<V, E>: Frame<I, Self, Completion = AbstractCompletion<V>>,
     E: From<InterpreterError>,
 {
     type Completion = AbstractCompletion<V>;
@@ -687,7 +684,7 @@ type AbstractEngine<'ir> = SparseForwardInterpreter<
     TestError,
     SameStageLinker,
     ConstPropContext<i64>,
-    GraphAbstractFrame<TestValue, TestError, CpKey>,
+    GraphAbstractFrame<TestValue, TestError>,
 >;
 
 /// The value these tests run constant propagation over: the graph language
@@ -707,10 +704,6 @@ fn analyze(
     expect_single(ret)
 }
 
-/// Summary key of the *context-insensitive* policy: one key per function, so
-/// every call site shares one owner and their arguments join.
-type CiKey = <ContextInsensitive as CallContext<TestValue>>::Key;
-
 type InsensitiveEngine<'ir> = SparseForwardInterpreter<
     'ir,
     L,
@@ -718,7 +711,7 @@ type InsensitiveEngine<'ir> = SparseForwardInterpreter<
     TestError,
     SameStageLinker,
     ContextInsensitive,
-    GraphAbstractFrame<TestValue, TestError, CiKey>,
+    GraphAbstractFrame<TestValue, TestError>,
 >;
 
 /// The same analysis under [`ContextInsensitive`] keying: distinct call sites

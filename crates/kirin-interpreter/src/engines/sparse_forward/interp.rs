@@ -1,34 +1,34 @@
 //! The forward lattice-based abstract interpreter.
 //!
-//! # Layering (owner-summary fixpoint)
+//! # Layering
 //!
 //! [`SparseForwardInterpreter`] is the public engine. Internally it is a thin
-//! wrapper over a [`StandardFixpointInterpreter`] driving a summary-free
+//! wrapper over a [`StandardFixpointInterpreter`] driving a
 //! [`SparseForwardTransfer`]:
 //!
-//! - **[`SparseForwardTransfer`]** is the [`Interp`] delegate: pipeline, linker,
-//!   the [`EnvStore`] container (one environment per analysis context, addressed by
-//!   the policy's context key), analysis policy, per-function return
-//!   accumulator, and read/write logging; it provides the dialect-dispatch /
-//!   IR-query surface ([`StatementDispatch`], [`BlockQueries`], [`CFGQueries`],
+//! - **[`SparseForwardTransfer`]** is the [`Interp`] delegate and the target
+//!   of rule dispatch: pipeline, linker, the [`EnvStore`] container (one
+//!   environment per analysis context, addressed by the policy's context key,
+//!   holding SSA facts and the function's return slots), the contexts'
+//!   metadata, analysis policy, per-walk return accumulator, and read/write
+//!   logging; it provides the dialect-dispatch / IR-query surface
+//!   ([`StatementDispatch`], [`BlockQueries`], [`CFGQueries`],
 //!   [`DiGraphQueries`], and — for concrete-shaped callers — [`CallServices`]).
-//! - the **[`StandardFixpointInterpreter`]** driver owns the summaries, the
-//!   forward dependency bookkeeping ([`ForwardDeps`] — callee-summary edges plus
-//!   context-qualified value-reader edges), and the owner worklist.
+//! - the **[`StandardFixpointInterpreter`]** driver owns the worklist and the
+//!   readers of each fact (blocks that read a value they do not define,
+//!   callers of a function's return).
 //!
-//! # Owner kinds
+//! # Work items
 //!
-//! [`Owner::Function`] is a **summary/storage** owner — it is *never scheduled*; it
-//! records a function context's entry/return/entry-block. [`Owner::Block`] and
-//! [`Owner::Graph`] are the **executable** owners: exactly those run frames (one
-//! single-pass walk each — a CFG block, or a whole graph body in dependency
-//! order). CFG convergence is owner-summary convergence: a block emits its
-//! successor block-entries, its function return, its outputs, and its external
-//! read dependencies through the single [`apply_update`](ForwardDriver::apply_update)
-//! path, which merges via the analysis policy and reschedules owners / value
-//! readers. Direct dominated cross-block SSA uses are tracked by context-qualified
-//! [`Scoped`](crate::Scoped) value-reader deps, so a reader block reruns when a value it
-//! read directly rises.
+//! A work item is `(EnvIndex, Body)`: a CFG block walk ([`Body::Block`]), or one
+//! dependency-ordered pass over a graph body ([`Body::DiGraph`]). Writes join
+//! into the environment ([`EnvStore::join`]); entries — a call's arguments, a
+//! CFG edge's arguments — merge into the unit's parameters through the
+//! analysis policy (join, then widen by visits) and schedule the unit on first
+//! reach or when a parameter rose. A reached `ret` joins into the function's
+//! return slots and wakes their callers. Direct dominated cross-block SSA uses
+//! are tracked by read logging, so a reader block reruns when a value it read
+//! directly rises.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -36,7 +36,7 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CFG, CompileStage, DiGraph, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
+    Block, CFG, CompileStage, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
     StageMeta, Statement, Symbol, Widen,
 };
 
@@ -45,20 +45,17 @@ use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
     BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
     EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval, Frame, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, OwnerAnalysis,
-    SSABinding, SameStageLinker, Scoped, SparseForwardEffect, SparseForwardSemantic, StageQuery,
-    StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, Summary,
-    SummaryDependency, SummaryDependencyIndex, SummaryEffect,
+    InterpDispatch, InterpLocation, InterpreterError, LatticeAnchor, LinkTarget, Linker,
+    SSABinding, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
+    StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, WorkAnalysis,
 };
-
-use super::deps::ForwardDeps;
 
 // ===========================================================================
 // Pluggable analysis seams (policy `P`)
 // ===========================================================================
 
-/// Summary-key strategy: maps a resolved call target plus its abstract arguments
-/// to the key under which that function's entry/return summary is tracked.
+/// Context-key strategy: maps a resolved call target plus its abstract arguments
+/// to the key that selects that function context's environment.
 pub trait CallContext<V> {
     type Key: Clone + Eq + Hash;
 
@@ -89,7 +86,7 @@ impl Default for ContextInsensitive {
     }
 }
 
-/// One summary per resolved [`LinkTarget`], shared by every call site of that
+/// One context per resolved [`LinkTarget`], shared by every call site of that
 /// target.
 ///
 /// The target *is* the context-insensitive key: it already identifies the stage
@@ -119,170 +116,50 @@ where
 }
 
 // ===========================================================================
-// Owners + summaries
+// Anchors, contexts, work items
 // ===========================================================================
 
-/// Owner of a summary in the forward fixpoint.
-///
-/// [`Owner::Function`] is a **summary/storage** owner (never scheduled);
-/// [`Owner::Block`] and [`Owner::Graph`] are the **executable** owners
-/// (frame-executed) — one per unit of re-analysis. `Owner` is a
-/// dataflow-equation identity — deliberately **not** a
-/// [`LatticeAnchor`](crate::LatticeAnchor).
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub enum Owner<K> {
-    /// A function summary/storage owner (not frame-executed).
-    Function(K),
-    /// A CFG block executable owner within function context `K`.
-    Block { function: K, block: Block },
-    /// A graph-body executable owner within function context `K`: the whole
-    /// graph is one unit, re-analyzed as a single dependency-ordered pass
-    /// whenever its entry product rises. One pass is exact for a DAG, so there
-    /// is no intra-graph fixpoint to split into finer owners.
-    Graph { function: K, graph: DiGraph },
+/// Where a forward fact lives in an environment: an SSA value, or slot `i` of
+/// the function's return. Dialect rules only ever name SSA values
+/// ([`Env::Anchor`] stays [`SSAValue`]); return slots are the engine's own.
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum ForwardAnchor {
+    /// The fact of an SSA value.
+    Value(SSAValue),
+    /// Slot `i` of the function's return, joined over every reached `ret`.
+    Return(usize),
 }
 
-impl<K> Owner<K> {
-    /// The function context this owner belongs to.
-    pub fn function(&self) -> &K {
-        match self {
-            Owner::Function(function)
-            | Owner::Block { function, .. }
-            | Owner::Graph { function, .. } => function,
-        }
-    }
+impl LatticeAnchor for ForwardAnchor {}
+
+/// One selected function context: what it analyzes. Metadata, not facts.
+struct ForwardContext<K> {
+    key: K,
+    stage: CompileStage,
+    /// The unit a call enters: the CFG's entry block, a block body, or a graph.
+    entry: Body,
+    /// Set by the first reached return; `None` means no return reached yet.
+    return_arity: Option<usize>,
 }
 
-/// Per-function summary/storage record: call-site metadata, the joined entry
-/// arguments, the entry block, and the joined return product.
-#[derive(Clone)]
-pub struct FunctionSummary<V> {
-    /// `(stage, body)` — set when the owner is first seeded from a call site.
-    meta: Option<(CompileStage, Body)>,
-    entry: Product<V>,
-    entry_joins: usize,
-    ret: Option<Product<V>>,
-    /// The function's entry block (resolved when the entry is first seeded).
-    entry_block: Option<Block>,
-}
+/// One forward work item: walk `Body` (a CFG block as [`Body::Block`], or a
+/// graph as [`Body::DiGraph`]) in the environment `EnvIndex`.
+pub(super) type ForwardWork = (EnvIndex, Body);
 
-impl<V> FunctionSummary<V> {
-    fn bottom() -> Self {
-        Self {
-            meta: None,
-            entry: Product::new(),
-            entry_joins: 0,
-            ret: None,
-            entry_block: None,
-        }
-    }
-}
+/// The driver's `store` slot: the work to rerun when a fact rises — blocks
+/// that read a value they do not define, and callers of a function's return.
+pub(super) type ForwardReaders = HashMap<(EnvIndex, ForwardAnchor), Vec<ForwardWork>>;
 
-/// Per-block summary: the joined block-entry (parameter) product plus the block's
-/// output facts (the abstract values it defines, read elsewhere).
-#[derive(Clone)]
-pub struct BlockSummary<V> {
-    entry: Product<V>,
-    entry_joins: usize,
-    outputs: HashMap<SSAValue, V>,
-}
-
-impl<V> BlockSummary<V> {
-    fn bottom() -> Self {
-        Self {
-            entry: Product::new(),
-            entry_joins: 0,
-            outputs: HashMap::new(),
-        }
-    }
-}
-
-/// The unified per-owner summary the driver stores (its `summaries` map is keyed
-/// by a single [`Owner`]).
-///
-/// [`Summary::merge`] is inert: the forward engine merges entry/return/block facts
-/// through the analysis policy directly in
-/// [`apply_update`](ForwardDriver::apply_update), so the driver never emits
-/// [`SummaryEffect::Update`] for these summaries.
-#[derive(Clone)]
-pub enum ForwardSummary<V> {
-    /// A function context's entry/return record.
-    Function(FunctionSummary<V>),
-    /// A block's entry/output summary.
-    Block(BlockSummary<V>),
-}
-
-impl<V> ForwardSummary<V> {
-    fn as_function(&self) -> Option<&FunctionSummary<V>> {
-        match self {
-            ForwardSummary::Function(function) => Some(function),
-            ForwardSummary::Block(_) => None,
-        }
-    }
-
-    fn as_function_mut(&mut self) -> Option<&mut FunctionSummary<V>> {
-        match self {
-            ForwardSummary::Function(function) => Some(function),
-            ForwardSummary::Block(_) => None,
-        }
-    }
-
-    fn as_block(&self) -> Option<&BlockSummary<V>> {
-        match self {
-            ForwardSummary::Block(block) => Some(block),
-            ForwardSummary::Function(_) => None,
-        }
-    }
-
-    fn as_block_mut(&mut self) -> Option<&mut BlockSummary<V>> {
-        match self {
-            ForwardSummary::Block(block) => Some(block),
-            ForwardSummary::Function(_) => None,
-        }
-    }
-}
-
-impl<V: Clone> Summary for ForwardSummary<V> {
-    fn merge(&mut self, _candidate: Self) -> bool {
-        false
-    }
-}
-
-/// A single mutation the driver applies through [`apply_update`](ForwardDriver::apply_update).
-enum ForwardUpdate<K, V> {
-    /// Merge call args into a function context's entry (widen by visits); on rise,
-    /// (re)seed its entry block.
-    FunctionEntry {
-        key: K,
-        stage: CompileStage,
-        body: Body,
-        args: Product<V>,
-    },
-    /// Merge a return contribution into a function context's return (join); on
-    /// rise, reschedule its callers.
-    FunctionReturn { key: K, values: Product<V> },
-    /// Merge incoming args into an **executable** owner's entry (widen by
-    /// visits); on rise, (re)schedule that owner. The incoming args are a CFG
-    /// edge's arguments for a block owner, or the boundary-port values for a
-    /// graph owner.
-    OwnerEntry { owner: Owner<K>, args: Product<V> },
-    /// Merge an owner's freshly computed outputs (join); on any value's rise,
-    /// reschedule that value's readers.
-    OwnerOutputs {
-        owner: Owner<K>,
-        outputs: HashMap<SSAValue, V>,
-    },
-}
-
-/// The owner-summary type family bundling the forward summaries onto the driver.
-pub struct SparseForwardProfile<V, E, K, F> {
+/// The work-item type family for the forward engine. Facts live in the
+/// transfer's [`EnvStore`].
+pub struct SparseForwardProfile<V, E, F> {
     #[allow(clippy::type_complexity)]
-    _marker: PhantomData<fn() -> (V, E, K, F)>,
+    _marker: PhantomData<fn() -> (V, E, F)>,
 }
 
 impl<'ir, S, V, E, Lk, P, F, Sem>
     FixpointProfile<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>
-    for SparseForwardProfile<V, E, <P as CallContext<V>>::Key, F>
+    for SparseForwardProfile<V, E, F>
 where
     S: StageMeta,
     V: Clone + HasBottom,
@@ -290,29 +167,27 @@ where
     P: CallContext<V>,
     Sem: SparseForwardSemantic,
 {
-    type SummaryKey = Owner<<P as CallContext<V>>::Key>;
-    type Summary = ForwardSummary<V>;
+    type Work = ForwardWork;
     type Frame = F;
     type Completion = AbstractCompletion<V>;
 }
 
 /// The forward driver: a [`StandardFixpointInterpreter`] over
-/// [`SparseForwardTransfer`] with owner summaries and [`ForwardDeps`].
-///
-/// It needs no side store: environments live in the transfer's [`EnvStore`]
-/// container, and both dependency kinds live in the dependency index.
+/// [`SparseForwardTransfer`] whose work items are block and graph walks, with
+/// the readers of each fact in its `store` slot.
 type ForwardDriver<'ir, S, V, E, Lk, P, F, Sem> = StandardFixpointInterpreter<
     SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>,
-    SparseForwardProfile<V, E, <P as CallContext<V>>::Key, F>,
-    (),
-    ForwardDeps<<P as CallContext<V>>::Key>,
+    SparseForwardProfile<V, E, F>,
+    ForwardReaders,
 >;
 
 // ===========================================================================
-// SparseForwardTransfer — the summary-free Interp delegate
+// SparseForwardTransfer — facts, metadata, and rule dispatch
 // ===========================================================================
 
-/// The summary-free transfer + env of the forward abstract interpreter.
+/// The transfer of the forward abstract interpreter: pipeline, linker, the
+/// facts of every selected context, their metadata, the analysis policy, and
+/// the per-walk logs. Dialect rules dispatch on it.
 pub struct SparseForwardTransfer<
     'ir,
     S: StageMeta,
@@ -320,7 +195,7 @@ pub struct SparseForwardTransfer<
     E,
     Lk = SameStageLinker,
     P = ContextInsensitive,
-    F = StandardAbstractFrame<V, E, <P as CallContext<V>>::Key>,
+    F = StandardAbstractFrame<V, E>,
     Sem = ForwardEval,
 > where
     P: CallContext<V>,
@@ -329,19 +204,27 @@ pub struct SparseForwardTransfer<
     pipeline: &'ir Pipeline<S>,
     linker: Lk,
     /// One environment per analysis context, addressed by the policy's context
-    /// key. Blocks of the same context share it (so direct dominated cross-block
-    /// uses resolve); distinct contexts are isolated.
-    env: EnvStore<<P as CallContext<V>>::Key, SSAValue, V>,
+    /// key: SSA facts and return slots. Blocks of the same context share it
+    /// (so direct dominated cross-block uses resolve); distinct contexts are
+    /// isolated.
+    env: EnvStore<<P as CallContext<V>>::Key, ForwardAnchor, V>,
+    /// Selected contexts, by environment.
+    contexts: HashMap<EnvIndex, ForwardContext<<P as CallContext<V>>::Key>>,
+    /// Entry merges per unit, for widening by visits. A unit is reached once
+    /// it has an entry here.
+    entry_joins: HashMap<ForwardWork, usize>,
     analysis: P,
     max_iterations: usize,
     location: Option<InterpLocation>,
     ret_acc: Option<Product<V>>,
-    /// SSA values read during the current block-owner walk (interior-mutable
-    /// because [`Env::env_read`] takes `&self`).
+    /// SSA values read during the current walk (interior-mutable because
+    /// [`Env::env_read`] takes `&self`).
     read_log: RefCell<Vec<SSAValue>>,
-    /// SSA values written during the current block-owner walk.
+    /// SSA values written during the current walk.
     write_log: Vec<SSAValue>,
-    /// Whether read/write logging is active (only during a block-owner walk).
+    /// SSA values whose fact rose during the current walk.
+    risen_log: Vec<SSAValue>,
+    /// Whether read/write logging is active (only during a walk).
     logging: bool,
     #[allow(clippy::type_complexity)]
     _marker: PhantomData<fn() -> (E, F, Sem)>,
@@ -354,19 +237,7 @@ where
     Sem: SparseForwardSemantic,
 {
     fn new(pipeline: &'ir Pipeline<S>) -> Self {
-        Self {
-            pipeline,
-            linker: SameStageLinker,
-            env: EnvStore::new(),
-            analysis: P::default(),
-            max_iterations: 1000,
-            location: None,
-            ret_acc: None,
-            read_log: RefCell::new(Vec::new()),
-            write_log: Vec::new(),
-            logging: false,
-            _marker: PhantomData,
-        }
+        Self::with_parts(pipeline, SameStageLinker, P::default())
     }
 }
 
@@ -375,22 +246,34 @@ where
     P: CallContext<V>,
     Sem: SparseForwardSemantic,
 {
-    fn with_linker<Lk2>(self, linker: Lk2) -> SparseForwardTransfer<'ir, S, V, E, Lk2, P, F, Sem> {
-        SparseForwardTransfer {
-            pipeline: self.pipeline,
+    fn with_parts(pipeline: &'ir Pipeline<S>, linker: Lk, analysis: P) -> Self {
+        Self {
+            pipeline,
             linker,
-            env: self.env,
-            analysis: self.analysis,
-            max_iterations: self.max_iterations,
-            location: self.location,
-            ret_acc: self.ret_acc,
-            read_log: self.read_log,
-            write_log: self.write_log,
-            logging: self.logging,
+            env: EnvStore::new(),
+            contexts: HashMap::new(),
+            entry_joins: HashMap::new(),
+            analysis,
+            max_iterations: 1000,
+            location: None,
+            ret_acc: None,
+            read_log: RefCell::new(Vec::new()),
+            write_log: Vec::new(),
+            risen_log: Vec::new(),
+            logging: false,
             _marker: PhantomData,
         }
     }
 
+    /// Swap the linker, resetting the analysis state.
+    fn with_linker<Lk2>(self, linker: Lk2) -> SparseForwardTransfer<'ir, S, V, E, Lk2, P, F, Sem> {
+        let mut transfer = SparseForwardTransfer::with_parts(self.pipeline, linker, self.analysis);
+        transfer.max_iterations = self.max_iterations;
+        transfer
+    }
+
+    /// Swap the analysis policy (and so the context key type), resetting the
+    /// analysis state.
     #[allow(clippy::type_complexity)]
     fn with_analysis<P2>(
         self,
@@ -402,64 +285,82 @@ where
         E,
         Lk,
         P2,
-        StandardAbstractFrame<V, E, <P2 as CallContext<V>>::Key>,
+        StandardAbstractFrame<V, E>,
         Sem,
     >
     where
         P2: CallContext<V>,
     {
-        SparseForwardTransfer {
-            pipeline: self.pipeline,
-            linker: self.linker,
-            env: EnvStore::new(),
-            analysis,
-            max_iterations: self.max_iterations,
-            location: None,
-            ret_acc: None,
-            read_log: RefCell::new(Vec::new()),
-            write_log: Vec::new(),
-            logging: false,
-            _marker: PhantomData,
-        }
+        let mut transfer = SparseForwardTransfer::with_parts(self.pipeline, self.linker, analysis);
+        transfer.max_iterations = self.max_iterations;
+        transfer
     }
 
-    fn set_analysis(&mut self, analysis: P) {
-        self.analysis = analysis;
+    /// Replace the policy value, resetting the analysis state.
+    fn with_policy(self, analysis: P) -> Self {
+        let mut transfer = Self::with_parts(self.pipeline, self.linker, analysis);
+        transfer.max_iterations = self.max_iterations;
+        transfer
     }
 
     fn pipeline(&self) -> &'ir Pipeline<S> {
         self.pipeline
     }
 
-    /// The environment shared by every owner of analysis context `key`,
-    /// allocating and registering it on first use.
-    ///
-    /// Keyed allocation is *this engine's* business: the analysis policy chooses
-    /// the context key, so no shared engine surface exposes this method.
-    /// [`CallServices`] offers only the unkeyed `alloc_env`/`free_env`, and
-    /// [`Env`] does not deal in activation lifetime at all.
-    fn context_env(&mut self, key: <P as CallContext<V>>::Key) -> EnvIndex {
-        self.env.get_or_allocate(key)
+    /// A selected context's metadata.
+    fn context(
+        &self,
+        env: EnvIndex,
+    ) -> Result<&ForwardContext<<P as CallContext<V>>::Key>, InterpreterError> {
+        self.contexts.get(&env).ok_or(UNSELECTED)
     }
 
-    /// The environment of an already-seeded context, if it has one.
-    fn lookup_context_env(&self, key: &<P as CallContext<V>>::Key) -> Option<EnvIndex> {
-        self.env.context_env(key)
+    /// The fact at `anchor` in `env`, without logging; absent is bottom.
+    fn fact<E2>(&self, env: EnvIndex, anchor: ForwardAnchor) -> Result<V, E2>
+    where
+        V: Clone + HasBottom,
+        E2: From<InterpreterError>,
+    {
+        Ok(self.env.read(env, anchor)?.unwrap_or_else(V::bottom))
     }
 
-    /// Begin logging reads/writes for a block-owner walk.
+    /// Begin logging reads/writes for a walk.
     fn begin_block_log(&mut self) {
         self.logging = true;
         self.read_log.borrow_mut().clear();
         self.write_log.clear();
+        self.risen_log.clear();
     }
 
-    /// Stop logging and take the accumulated `(reads, writes)`.
-    fn take_logs(&mut self) -> (Vec<SSAValue>, Vec<SSAValue>) {
+    /// Stop logging and take the accumulated `(reads, writes, risen)`.
+    fn take_logs(&mut self) -> (Vec<SSAValue>, Vec<SSAValue>, Vec<SSAValue>) {
         self.logging = false;
         let reads = std::mem::take(&mut *self.read_log.borrow_mut());
         let writes = std::mem::take(&mut self.write_log);
-        (reads, writes)
+        let risen = std::mem::take(&mut self.risen_log);
+        (reads, writes, risen)
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F, Sem> SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
+where
+    S: StageQuery,
+    E: From<InterpreterError>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
+    /// The SSA values a unit's entry binds: a block's parameters, or a
+    /// graph's boundary ports.
+    fn entry_params(&self, stage: CompileStage, body: Body) -> Result<Vec<SSAValue>, E> {
+        match body {
+            Body::Block(block) => Ok(query::block_params(self.pipeline, stage, block)?),
+            Body::DiGraph(graph) => Ok(query::digraph_walk_plan(self.pipeline, stage, graph)?
+                .ports
+                .into_iter()
+                .map(SSAValue::from)
+                .collect()),
+            _ => Err(E::from(InterpreterError::NoDefaultWalker(body))),
+        }
     }
 }
 
@@ -553,20 +454,21 @@ where
             self.read_log.borrow_mut().push(value);
         }
         // An absent binding is bottom, not an error: this analysis may reach a
-        // use before the definition's owner has run. An invalid environment
+        // use before the definition's walk has run. An invalid environment
         // handle is still an error.
-        Ok(self
-            .env
-            .read(index, value)
-            .map_err(E::from)?
-            .unwrap_or_else(V::bottom))
+        self.fact(index, ForwardAnchor::Value(value))
     }
 
+    /// An abstract write is a contribution: it joins into the stored fact.
     fn env_write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
+        let rose = self.env.join(index, ForwardAnchor::Value(value), &data)?;
         if self.logging {
             self.write_log.push(value);
+            if rose {
+                self.risen_log.push(value);
+            }
         }
-        self.env.write(index, value, data).map_err(E::from)
+        Ok(())
     }
 }
 
@@ -826,8 +728,6 @@ where
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
 {
-    type SummaryKey = <P as CallContext<V>>::Key;
-
     fn analysis_merge(
         &self,
         current: &Product<V>,
@@ -841,14 +741,10 @@ where
         self.inner_mut().contribute_return(values)
     }
 
-    fn current_function_key(&self) -> Option<<P as CallContext<V>>::Key> {
-        self.current_owner().map(|owner| owner.function().clone())
-    }
-
-    /// Summarize a call atomically: resolve, merge the callee entry (which seeds
-    /// its entry block) through [`apply_update`](Self::apply_update), register the
-    /// caller dependency (including same-key self-recursion), and read the callee's
-    /// current return (or bottom).
+    /// Summarize a call atomically: resolve, merge the callee entry (which
+    /// schedules its entry unit), register the caller on each callee return
+    /// slot (including same-key self-recursion), and bind the callee's current
+    /// return (or bottom per slot).
     fn summarize_call(
         &mut self,
         stage: CompileStage,
@@ -862,21 +758,18 @@ where
             outputs: results,
         } = call;
         let lookup_stage = call_stage.unwrap_or(stage);
-        let key = self.contribute_call_entry(lookup_stage, &callee, args)?;
+        let callee_env = self.contribute_call_entry(lookup_stage, &callee, args)?;
 
-        let caller = self.current_owner().cloned().ok_or_else(|| {
+        let caller = *self.current_work().ok_or_else(|| {
             E::from(InterpreterError::Custom(
                 "a call boundary was crossed outside propagation work",
             ))
         })?;
-        self.dependency_index_mut()
-            .register(
-                &Owner::Function(key.clone()),
-                SummaryDependency::Reanalyze(caller),
-            )
-            .expect("forward dependency index is infallible");
+        for slot in 0..results.len() {
+            self.subscribe(callee_env, ForwardAnchor::Return(slot), caller);
+        }
 
-        match self.call_return(&key) {
+        match self.call_return(callee_env)? {
             Some(values) => self.bind_values(index, results.as_slice(), values),
             None => {
                 for slot in results.iter().copied() {
@@ -892,8 +785,9 @@ where
     }
 }
 
-// The single mutation/scheduling path (constraint 5): every summary/fact change
-// and every reschedule flows through `apply_update`.
+// Every fact change and every reschedule flows through these driver methods:
+// SSA facts join on write (`Env::env_write`), entries merge through the
+// analysis policy (join or widen by visits), and returns join per slot.
 impl<'ir, S, V, E, Lk, P, F, Sem> ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>
 where
     S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
@@ -903,271 +797,178 @@ where
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
 {
+    /// Resolve and key a call, select (allocating on first use) the context's
+    /// environment, and merge the arguments into its entry unit.
     fn contribute_call_entry(
         &mut self,
         lookup_stage: CompileStage,
         callee: &Callee,
         args: Product<V>,
-    ) -> Result<<P as CallContext<V>>::Key, E> {
+    ) -> Result<EnvIndex, E> {
         let target = self.inner().resolve_callee(lookup_stage, callee)?;
         let body = target.body(self.inner().pipeline()).map_err(E::from)?;
         let key = self.inner_mut().key(&target, &args);
-
-        self.apply_update(ForwardUpdate::FunctionEntry {
-            key: key.clone(),
-            stage: target.stage,
-            body,
-            args,
-        })?;
-
-        Ok(key)
-    }
-
-    /// The callee's current return summary. `None` means no return has been
-    /// reached yet, which differs from a reached zero-value return.
-    fn call_return(&self, key: &<P as CallContext<V>>::Key) -> Option<Product<V>> {
-        self.summary(&Owner::Function(key.clone()))
-            .and_then(|info| info.as_function())
-            .and_then(|function| function.ret.clone())
-    }
-
-    fn apply_update(
-        &mut self,
-        update: ForwardUpdate<<P as CallContext<V>>::Key, V>,
-    ) -> Result<(), E> {
-        match update {
-            ForwardUpdate::FunctionEntry {
-                key,
-                stage,
-                body,
-                args,
-            } => {
-                let owner = Owner::Function(key.clone());
-                let changed = if self.summary(&owner).is_none() {
-                    self.summaries_mut().insert(
-                        owner.clone(),
-                        ForwardSummary::Function(FunctionSummary {
-                            meta: Some((stage, body)),
-                            entry: args,
-                            entry_joins: 0,
-                            ret: None,
-                            entry_block: None,
-                        }),
-                    );
-                    self.dependency_index_mut()
-                        .ensure_owner(&owner)
-                        .expect("forward dependency index is infallible");
-                    true
-                } else {
-                    let (old, visits) = {
-                        let function = self
-                            .summary(&owner)
-                            .and_then(|info| info.as_function())
-                            .expect("function summary present");
-                        (function.entry.clone(), function.entry_joins + 1)
-                    };
-                    let merged = self.inner().merge_products(&old, &args, visits)?;
-                    let changed = merged != old;
-                    let function = self
-                        .summary_mut(&owner)
-                        .and_then(|info| info.as_function_mut())
-                        .expect("function summary present");
-                    function.entry_joins = visits;
-                    if changed {
-                        function.entry = merged;
-                    }
-                    changed
-                };
-                if changed {
-                    self.seed_entry_block(&key, stage, body)?;
+        let env = self.inner_mut().env.get_or_allocate(key.clone());
+        if !self.inner().contexts.contains_key(&env) {
+            // The one place a function becomes runnable work: a CFG's entry
+            // block or a block body walk as a block; a graph is its own unit;
+            // an undirected graph has no traversal order.
+            let entry = match body {
+                Body::CFG(cfg) => Body::Block(
+                    self.cfg_entry(target.stage, cfg)?
+                        .ok_or_else(|| E::from(InterpreterError::EmptyCFG))?,
+                ),
+                Body::Block(_) | Body::DiGraph(_) => body,
+                Body::UnGraph(_) => {
+                    return Err(E::from(InterpreterError::NoDefaultWalker(body)));
                 }
-                Ok(())
-            }
-
-            ForwardUpdate::FunctionReturn { key, values } => {
-                let owner = Owner::Function(key);
-                let old = self
-                    .summary(&owner)
-                    .and_then(|info| info.as_function())
-                    .and_then(|function| function.ret.clone());
-                let merged = match old {
-                    None => values,
-                    Some(old) => self.inner().merge_products(&old, &values, 0)?,
-                };
-                let changed = {
-                    let function = self
-                        .summary_mut(&owner)
-                        .and_then(|info| info.as_function_mut())
-                        .ok_or_else(|| {
-                            E::from(InterpreterError::Custom("missing function summary"))
-                        })?;
-                    if function.ret.as_ref() != Some(&merged) {
-                        function.ret = Some(merged);
-                        true
-                    } else {
-                        false
-                    }
-                };
-                if changed {
-                    let deps = self
-                        .dependency_index_mut()
-                        .on_summary_changed(&owner)
-                        .expect("forward dependency index is infallible");
-                    for dep in deps {
-                        let SummaryDependency::Reanalyze(caller) = dep;
-                        self.schedule(caller);
-                    }
-                }
-                Ok(())
-            }
-
-            ForwardUpdate::OwnerEntry { owner, args } => {
-                let changed = if self.summary(&owner).is_none() {
-                    self.summaries_mut().insert(
-                        owner.clone(),
-                        ForwardSummary::Block(BlockSummary {
-                            entry: args,
-                            entry_joins: 0,
-                            outputs: HashMap::new(),
-                        }),
-                    );
-                    self.dependency_index_mut()
-                        .ensure_owner(&owner)
-                        .expect("forward dependency index is infallible");
-                    true
-                } else {
-                    let (old, visits) = {
-                        let summary = self
-                            .summary(&owner)
-                            .and_then(|info| info.as_block())
-                            .expect("block summary present");
-                        (summary.entry.clone(), summary.entry_joins + 1)
-                    };
-                    let merged = self.inner().merge_products(&old, &args, visits)?;
-                    let changed = merged != old;
-                    let summary = self
-                        .summary_mut(&owner)
-                        .and_then(|info| info.as_block_mut())
-                        .expect("block summary present");
-                    summary.entry_joins = visits;
-                    if changed {
-                        summary.entry = merged;
-                    }
-                    changed
-                };
-                if changed {
-                    self.schedule(owner);
-                }
-                Ok(())
-            }
-
-            ForwardUpdate::OwnerOutputs { owner, outputs } => {
-                let function = owner.function().clone();
-                let mut risen = Vec::new();
-                for (value, incoming) in outputs {
-                    let old = self
-                        .summary(&owner)
-                        .and_then(|info| info.as_block())
-                        .and_then(|summary| summary.outputs.get(&value).cloned());
-                    let merged = match &old {
-                        None => incoming,
-                        Some(old) => old.join(&incoming),
-                    };
-                    if old.as_ref() != Some(&merged) {
-                        let summary = self
-                            .summary_mut(&owner)
-                            .and_then(|info| info.as_block_mut())
-                            .expect("block summary present");
-                        summary.outputs.insert(value, merged);
-                        risen.push(value);
-                    }
-                }
-                for value in risen {
-                    let readers = self
-                        .dependency_index()
-                        .readers_of(&Scoped::new(function.clone(), value));
-                    for reader in readers {
-                        self.schedule(reader);
-                    }
-                }
-                Ok(())
-            }
-        }
-    }
-
-    /// Resolve the executable entry owner of `key`'s function (allocating the
-    /// context's shared environment on first use) and seed it with the entry
-    /// arguments.
-    ///
-    /// This is the one place a *function* becomes runnable *work*: it translates
-    /// the callable [`Body`] into the executable [`Owner`] the worklist can
-    /// hold — a `CFG`'s entry block or a `Block` body become an
-    /// [`Owner::Block`], a `DiGraph` body becomes an [`Owner::Graph`]. An
-    /// `UnGraph` has no derivable traversal order at all, so it is rejected.
-    fn seed_entry_block(
-        &mut self,
-        key: &<P as CallContext<V>>::Key,
-        stage: CompileStage,
-        body: Body,
-    ) -> Result<(), E> {
-        self.inner_mut().context_env(key.clone());
-        let entry_args = self
-            .summary(&Owner::Function(key.clone()))
-            .and_then(|info| info.as_function())
-            .map(|function| function.entry.clone())
-            .expect("function summary present");
-        let owner = match body {
-            Body::CFG(cfg) => Owner::Block {
-                function: key.clone(),
-                block: self
-                    .cfg_entry(stage, cfg)?
-                    .ok_or_else(|| E::from(InterpreterError::EmptyCFG))?,
-            },
-            Body::Block(block) => Owner::Block {
-                function: key.clone(),
-                block,
-            },
-            // A graph body has no blocks: it is its own unit of re-analysis.
-            Body::DiGraph(graph) => Owner::Graph {
-                function: key.clone(),
-                graph,
-            },
-            // An undirected graph has no producer/consumer direction, so no
-            // traversal order can be derived from its structure.
-            graph @ Body::UnGraph(_) => {
-                return Err(E::from(InterpreterError::NoDefaultWalker(graph)));
-            }
-        };
-        if let Some(function) = self
-            .summary_mut(&Owner::Function(key.clone()))
-            .and_then(|info| info.as_function_mut())
-        {
-            function.entry_block = match &owner {
-                Owner::Block { block, .. } => Some(*block),
-                _ => None,
             };
+            self.inner_mut().contexts.insert(
+                env,
+                ForwardContext {
+                    key,
+                    stage: target.stage,
+                    entry,
+                    return_arity: None,
+                },
+            );
         }
-        self.apply_update(ForwardUpdate::OwnerEntry {
-            owner,
-            args: entry_args,
-        })
+        let entry = self.inner().context(env)?.entry;
+        self.merge_entry((env, entry), args)?;
+        Ok(env)
+    }
+
+    /// Merge incoming arguments into a unit's entry parameters through the
+    /// analysis policy (join, then widen by visits). Schedule the unit on its
+    /// first reach or when a parameter rose, and wake the readers of every
+    /// parameter that rose.
+    fn merge_entry(&mut self, work: ForwardWork, args: Product<V>) -> Result<(), E> {
+        let (env, body) = work;
+        let stage = self.inner().context(env)?.stage;
+        let params = self.inner().entry_params(stage, body)?;
+        if params.len() != args.len() {
+            return Err(E::from(match body {
+                Body::Block(block) => InterpreterError::BlockArityMismatch {
+                    block,
+                    expected: params.len(),
+                    actual: args.len(),
+                },
+                _ => InterpreterError::ProductArityMismatch {
+                    expected: params.len(),
+                    actual: args.len(),
+                },
+            }));
+        }
+        let current: Product<V> = params
+            .iter()
+            .map(|param| self.inner().fact(env, ForwardAnchor::Value(*param)))
+            .collect::<Result<_, E>>()?;
+        let visits = self.inner().entry_joins.get(&work).copied();
+        let merged = match visits {
+            None => args,
+            Some(visits) => self.inner().merge_products(&current, &args, visits + 1)?,
+        };
+        self.inner_mut()
+            .entry_joins
+            .insert(work, visits.map_or(0, |visits| visits + 1));
+
+        let mut rose = false;
+        for ((param, old), new) in params.iter().zip(current.iter()).zip(merged) {
+            if *old != new {
+                rose = true;
+                self.inner_mut()
+                    .env
+                    .write(env, ForwardAnchor::Value(*param), new)
+                    .map_err(E::from)?;
+                self.wake(env, ForwardAnchor::Value(*param));
+            }
+        }
+        if visits.is_none() || rose {
+            self.schedule_work(work);
+        }
+        Ok(())
+    }
+
+    /// Join a reached return into the function's return slots and wake the
+    /// callers of every slot that rose. Every return of one function must have
+    /// the same arity.
+    fn raise_return(&mut self, env: EnvIndex, values: Product<V>) -> Result<(), E> {
+        let context = self
+            .inner_mut()
+            .contexts
+            .get_mut(&env)
+            .ok_or_else(|| E::from(UNSELECTED))?;
+        match context.return_arity {
+            None => context.return_arity = Some(values.len()),
+            Some(arity) if arity != values.len() => {
+                return Err(E::from(InterpreterError::ProductArityMismatch {
+                    expected: arity,
+                    actual: values.len(),
+                }));
+            }
+            Some(_) => {}
+        }
+        for (slot, value) in values.into_iter().enumerate() {
+            let anchor = ForwardAnchor::Return(slot);
+            if self.inner_mut().env.join(env, anchor, &value)? {
+                self.wake(env, anchor);
+            }
+        }
+        Ok(())
+    }
+
+    /// The callee's current return. `None` means no return has been reached
+    /// yet, which differs from a reached zero-value return.
+    fn call_return(&self, env: EnvIndex) -> Result<Option<Product<V>>, E> {
+        let Some(arity) = self.inner().context(env)?.return_arity else {
+            return Ok(None);
+        };
+        (0..arity)
+            .map(|slot| self.inner().fact(env, ForwardAnchor::Return(slot)))
+            .collect::<Result<_, E>>()
+            .map(Some)
+    }
+
+    /// Register `work` as a reader of `anchor` in `env`.
+    fn subscribe(&mut self, env: EnvIndex, anchor: ForwardAnchor, work: ForwardWork) {
+        let readers = self.store_mut().entry((env, anchor)).or_default();
+        if !readers.contains(&work) {
+            readers.push(work);
+        }
+    }
+
+    /// Schedule every reader of `anchor` in `env`.
+    fn wake(&mut self, env: EnvIndex, anchor: ForwardAnchor) {
+        let readers = self
+            .store()
+            .get(&(env, anchor))
+            .cloned()
+            .unwrap_or_default();
+        for reader in readers {
+            self.schedule_work(reader);
+        }
+    }
+
+    fn schedule_work(&mut self, work: ForwardWork) {
+        self.schedule(work);
     }
 }
 
+const UNSELECTED: InterpreterError =
+    InterpreterError::Custom("forward work names an unselected context");
+
 // ===========================================================================
-// Owner analysis: block and graph owners are executable.
+// Work analysis: block and graph walks are the work items.
 // ===========================================================================
 
-/// The forward owner analysis. [`Owner::Block`] and [`Owner::Graph`] owners are
-/// analyzed: bind the entry product, walk the unit once, then route its outputs /
-/// successor edges / return / read-deps through
-/// [`apply_update`](ForwardDriver::apply_update). A graph owner has no successor
-/// edges — its declared yields are the function's return instead.
-struct SparseForwardOwnerAnalysis<V> {
+/// The forward work analysis: bind the unit's current entry parameters, walk
+/// it once, then register its cross-block reads, wake readers of what rose,
+/// merge its edges into successors, and join its return.
+struct SparseForwardWorkAnalysis<V> {
     _marker: PhantomData<fn() -> V>,
 }
 
-impl<V> SparseForwardOwnerAnalysis<V> {
+impl<V> SparseForwardWorkAnalysis<V> {
     fn new() -> Self {
         Self {
             _marker: PhantomData,
@@ -1176,14 +977,13 @@ impl<V> SparseForwardOwnerAnalysis<V> {
 }
 
 impl<'ir, S, V, E, Lk, P, F, Sem>
-    OwnerAnalysis<
+    WorkAnalysis<
         ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
-        Owner<<P as CallContext<V>>::Key>,
-        ForwardSummary<V>,
+        ForwardWork,
         F,
         AbstractCompletion<V>,
         E,
-    > for SparseForwardOwnerAnalysis<V>
+    > for SparseForwardWorkAnalysis<V>
 where
     S: StageQuery + InterpDispatch<SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>>,
     V: Clone + PartialEq + Widen + HasBottom,
@@ -1191,106 +991,51 @@ where
     Lk: Linker<S>,
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
-    F: From<AbstractBlockFrame<V, E, <P as CallContext<V>>::Key>>
-        + From<AbstractDiGraphFrame<V, E, <P as CallContext<V>>::Key>>,
+    F: From<AbstractBlockFrame<V, E>>
+        + From<AbstractDiGraphFrame<V, E>>,
 {
-    fn bottom_summary(
-        &mut self,
-        _interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
-        owner: &Owner<<P as CallContext<V>>::Key>,
-    ) -> Result<ForwardSummary<V>, E> {
-        // `apply_update` seeds real summaries before scheduling; this is only a
-        // safe default for the dependency-index bookkeeping path.
-        Ok(match owner {
-            Owner::Function(_) => ForwardSummary::Function(FunctionSummary::bottom()),
-            // Both executable owners carry the same shape of summary: a joined
-            // entry product plus the output facts they define.
-            Owner::Block { .. } | Owner::Graph { .. } => {
-                ForwardSummary::Block(BlockSummary::bottom())
-            }
-        })
-    }
-
     fn entry_frame(
         &mut self,
         interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
-        owner: &Owner<<P as CallContext<V>>::Key>,
-        summary: &ForwardSummary<V>,
+        &(env, body): &ForwardWork,
     ) -> Result<F, E> {
-        let function = match owner {
-            Owner::Block { function, .. } | Owner::Graph { function, .. } => function.clone(),
-            Owner::Function(_) => {
-                return Err(E::from(InterpreterError::Custom(
-                    "function owners are storage-only and never executed",
-                )));
-            }
-        };
-        let block_entry = summary
-            .as_block()
-            .ok_or_else(|| {
-                E::from(InterpreterError::Custom(
-                    "block owner analyzed with a non-block summary",
-                ))
-            })?
-            .entry
-            .clone();
-        let stage = interp
-            .summary(&Owner::Function(function.clone()))
-            .and_then(|info| info.as_function())
-            .and_then(|f| f.meta)
-            .map(|(stage, _)| stage)
-            .ok_or_else(|| {
-                E::from(InterpreterError::Custom(
-                    "block owner's function is unseeded",
-                ))
-            })?;
-        let env = interp
+        let stage = interp.inner().context(env)?.stage;
+        let args: Product<V> = interp
             .inner()
-            .lookup_context_env(&function)
-            .ok_or_else(|| {
-                E::from(InterpreterError::Custom(
-                    "block owner's function has no shared env",
-                ))
-            })?;
+            .entry_params(stage, body)?
+            .into_iter()
+            .map(|param| interp.inner().fact(env, ForwardAnchor::Value(param)))
+            .collect::<Result<_, E>>()?;
         interp.inner_mut().begin_block_log();
-        match owner {
-            Owner::Block { block, .. } => {
-                Ok(AbstractBlockFrame::new_cfg_block(stage, env, *block, block_entry).into())
+        match body {
+            Body::Block(block) => {
+                Ok(AbstractBlockFrame::new_cfg_block(stage, env, block, args).into())
             }
             // One dependency-ordered pass over the whole graph. Exact for a DAG,
             // so the pass never needs to iterate internally.
-            Owner::Graph { graph, .. } => {
-                Ok(AbstractDiGraphFrame::new(stage, env, *graph, block_entry).into())
-            }
-            Owner::Function(_) => Err(E::from(InterpreterError::Custom(
-                "function owners are storage-only and never executed",
+            Body::DiGraph(graph) => Ok(AbstractDiGraphFrame::new(stage, env, graph, args).into()),
+            _ => Err(E::from(InterpreterError::Custom(
+                "forward work must be a block or a directed graph",
             ))),
         }
     }
 
-    fn complete_owner(
+    fn complete_work(
         &mut self,
         interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
-        owner: Owner<<P as CallContext<V>>::Key>,
+        work: ForwardWork,
         completion: AbstractCompletion<V>,
-    ) -> Result<SummaryEffect<Owner<<P as CallContext<V>>::Key>, ForwardSummary<V>>, E> {
-        let function = match &owner {
-            Owner::Block { function, .. } | Owner::Graph { function, .. } => function.clone(),
-            Owner::Function(_) => {
-                return Err(E::from(InterpreterError::Custom(
-                    "function owners are storage-only and never executed",
-                )));
-            }
-        };
-        // A block owner completes with its outgoing CFG edges. A graph owner has
-        // no successors at all — it completes with the graph's declared yields,
-        // which for a callable graph body *are* the function's return values.
-        let (edges, graph_yields) = match (&owner, completion) {
-            (Owner::Block { .. }, AbstractCompletion::CFGBlock { edges }) => (edges, None),
-            (Owner::Graph { .. }, AbstractCompletion::Finished(values)) => (Vec::new(), values),
+    ) -> Result<(), E> {
+        let env = work.0;
+        // A block completes with its outgoing CFG edges. A graph has no
+        // successors at all — it completes with its declared yields, which for
+        // a callable graph body *are* the function's return values.
+        let (edges, graph_yields) = match (work.1, completion) {
+            (Body::Block(_), AbstractCompletion::CFGBlock { edges }) => (edges, None),
+            (Body::DiGraph(_), AbstractCompletion::Finished(values)) => (Vec::new(), values),
             _ => {
                 return Err(E::from(InterpreterError::Custom(
-                    "executable owner completed with a mismatched completion",
+                    "forward work completed with a mismatched completion",
                 )));
             }
         };
@@ -1298,60 +1043,30 @@ where
             interp.contribute_return(values)?;
         }
 
-        let (reads, writes) = interp.inner_mut().take_logs();
-        let env = interp
-            .inner()
-            .lookup_context_env(&function)
-            .ok_or_else(|| {
-                E::from(InterpreterError::Custom(
-                    "block owner's function has no shared env",
-                ))
-            })?;
-
-        // Register external direct reads (values read but not written locally) as
-        // context-qualified value-reader deps on this block owner.
-        let written: HashSet<SSAValue> = writes.iter().copied().collect();
+        // Register the walk's reads of values it did not write before waking
+        // the readers of what it raised, so a walk that reads a fact it then
+        // raises reruns.
+        let (reads, writes, risen) = interp.inner_mut().take_logs();
+        let written: HashSet<SSAValue> = writes.into_iter().collect();
         for value in reads {
             if !written.contains(&value) {
-                interp
-                    .dependency_index_mut()
-                    .register_reader(Scoped::new(function.clone(), value), owner.clone());
+                interp.subscribe(env, ForwardAnchor::Value(value), work);
             }
         }
-
-        // Capture this block's output facts from the shared env (logging is now
-        // off, so these reads are not re-logged).
-        let mut outputs = HashMap::new();
-        for value in writes {
-            let fact = interp.inner().env_read(env, value)?;
-            outputs.insert(value, fact);
+        for value in risen {
+            interp.wake(env, ForwardAnchor::Value(value));
         }
-        interp.apply_update(ForwardUpdate::OwnerOutputs {
-            owner: owner.clone(),
-            outputs,
-        })?;
 
-        // Propagate CFG successor edges as block-owner entry updates. Empty for a
-        // returning block and for a graph owner.
+        // CFG edges merge into the successors' entry parameters. Empty for a
+        // returning block and for a graph.
         for edge in edges {
-            interp.apply_update(ForwardUpdate::OwnerEntry {
-                owner: Owner::Block {
-                    function: function.clone(),
-                    block: edge.target,
-                },
-                args: edge.args,
-            })?;
+            interp.merge_entry((env, Body::Block(edge.target)), edge.args)?;
         }
 
-        // Flush any return this block contributed into the function return.
         if let Some(values) = interp.inner_mut().take_ret_acc() {
-            interp.apply_update(ForwardUpdate::FunctionReturn {
-                key: function,
-                values,
-            })?;
+            interp.raise_return(env, values)?;
         }
-
-        Ok(SummaryEffect::None)
+        Ok(())
     }
 }
 
@@ -1363,13 +1078,13 @@ where
 ///
 /// Drives the same forward dialect rules (`Interpretable<I, ForwardEval>`) and
 /// [`SparseForwardEffect`] as concrete execution, over an abstract value domain.
-/// Traversal is owned by the total frame type `F`; summary keying and merge/widen
+/// Traversal is owned by the total frame type `F`; context keying and merge/widen
 /// behavior are owned by the policy `P`.
 ///
 /// `analyze` consumes the engine and hands it back only on success, so a
 /// failed analysis can never be resumed: build a new engine instead.
-/// Successful analyses accumulate summaries, so a request whose policy key
-/// matches an earlier summary returns the join with the earlier requests
+/// Successful analyses accumulate facts, so a request whose policy key
+/// matches an earlier context returns the join with the earlier requests
 /// (for every repeated callee under [`ContextInsensitive`]) and can depend on
 /// query order. Use a fresh engine for an isolated answer.
 ///
@@ -1385,7 +1100,7 @@ pub struct SparseForwardInterpreter<
     E,
     Lk = SameStageLinker,
     P = ContextInsensitive,
-    F = StandardAbstractFrame<V, E, <P as CallContext<V>>::Key>,
+    F = StandardAbstractFrame<V, E>,
     Sem = ForwardEval,
 > where
     V: Clone + HasBottom,
@@ -1406,10 +1121,9 @@ where
 {
     pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
-            driver: StandardFixpointInterpreter::with_dependency_index(
+            driver: StandardFixpointInterpreter::new(
                 SparseForwardTransfer::new(pipeline),
-                (),
-                ForwardDeps::new(),
+                ForwardReaders::new(),
             ),
         }
     }
@@ -1423,23 +1137,23 @@ where
     Sem: SparseForwardSemantic,
 {
     /// Swap the calling-convention component (the [`Linker`]). Preserves the frame
-    /// type `F`; resets the (empty) summary tables.
+    /// type `F`; resets the analysis state.
     pub fn with_linker<Lk2>(
         self,
         linker: Lk2,
     ) -> SparseForwardInterpreter<'ir, S, V, E, Lk2, P, F, Sem> {
         let transfer = self.driver.into_inner().with_linker(linker);
         SparseForwardInterpreter {
-            driver: StandardFixpointInterpreter::with_dependency_index(
+            driver: StandardFixpointInterpreter::new(
                 transfer,
-                (),
-                ForwardDeps::new(),
+                ForwardReaders::new(),
             ),
         }
     }
 
     /// Swap the analysis policy (context abstraction + join/widen). Changes the
-    /// [`CallContext::Key`] type, so this resets the summary tables and frame type.
+    /// [`CallContext::Key`] type, so this resets the analysis state; the frame
+    /// type resets to [`StandardAbstractFrame`].
     #[allow(clippy::type_complexity)]
     pub fn with_analysis<P2>(
         self,
@@ -1451,7 +1165,7 @@ where
         E,
         Lk,
         P2,
-        StandardAbstractFrame<V, E, <P2 as CallContext<V>>::Key>,
+        StandardAbstractFrame<V, E>,
         Sem,
     >
     where
@@ -1459,24 +1173,21 @@ where
     {
         let transfer = self.driver.into_inner().with_analysis(analysis);
         SparseForwardInterpreter {
-            driver: StandardFixpointInterpreter::with_dependency_index(
+            driver: StandardFixpointInterpreter::new(
                 transfer,
-                (),
-                ForwardDeps::new(),
+                ForwardReaders::new(),
             ),
         }
     }
 
     /// Replace the analysis policy *value* while keeping its type (and so the
-    /// [`CallContext::Key`] and the frame type `F`).
+    /// [`CallContext::Key`]) and the frame type `F`. Resets the analysis state.
     pub fn with_policy(self, analysis: P) -> Self {
-        let mut transfer = self.driver.into_inner();
-        transfer.set_analysis(analysis);
+        let transfer = self.driver.into_inner().with_policy(analysis);
         Self {
-            driver: StandardFixpointInterpreter::with_dependency_index(
+            driver: StandardFixpointInterpreter::new(
                 transfer,
-                (),
-                ForwardDeps::new(),
+                ForwardReaders::new(),
             ),
         }
     }
@@ -1500,21 +1211,27 @@ where
         self
     }
 
-    /// Inspect the return summary of an analyzed function (context-insensitive
-    /// keying only).
+    /// The joined return of an analyzed function (context-insensitive keying
+    /// only); `None` if it was never analyzed or never returned.
     pub fn return_summary(
         &self,
         stage: CompileStage,
         function: SpecializedFunction,
-    ) -> Option<&Product<V>> {
+    ) -> Option<Product<V>> {
         let target = LinkTarget {
             stage,
             specialization: function,
         };
-        self.driver
-            .summary(&Owner::Function(target))
-            .and_then(|info| info.as_function())
-            .and_then(|function| function.ret.as_ref())
+        let transfer = self.driver.inner();
+        let env = transfer.env.context_env(&target)?;
+        let arity = transfer.context(env).ok()?.return_arity?;
+        (0..arity)
+            .map(|slot| {
+                transfer
+                    .fact::<InterpreterError>(env, ForwardAnchor::Return(slot))
+                    .ok()
+            })
+            .collect()
     }
 }
 
@@ -1527,8 +1244,8 @@ where
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
     F: Frame<ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>, F, Completion = AbstractCompletion<V>>
-        + From<AbstractBlockFrame<V, E, <P as CallContext<V>>::Key>>
-        + From<AbstractDiGraphFrame<V, E, <P as CallContext<V>>::Key>>,
+        + From<AbstractBlockFrame<V, E>>
+        + From<AbstractDiGraphFrame<V, E>>,
 {
     /// Resolve `stage`/`function` by name and analyze. Returns the function's
     /// inferred return product at the fixpoint (empty if it never returns).
@@ -1566,9 +1283,9 @@ where
         self.analyze(stage, symbol.into(), args)
     }
 
-    /// Run the fixpoint from a single entry. Seeds the entry function's entry block
-    /// owner and drains the owner worklist. Returns the engine on success; an
-    /// error drops it.
+    /// Run the fixpoint from a single entry. Seeds the entry function's entry unit
+    /// and drains the worklist. Returns the engine on success; an error drops
+    /// it.
     pub fn analyze(
         mut self,
         stage: CompileStage,
@@ -1576,11 +1293,11 @@ where
         args: impl IntoIterator<Item = V>,
     ) -> Result<(Product<V>, Self), E> {
         let args: Product<V> = args.into_iter().collect();
-        let key = self.driver.contribute_call_entry(stage, &callee, args)?;
-        let mut owner_analysis = SparseForwardOwnerAnalysis::new();
-        self.driver.drain_worklist(&mut owner_analysis)?;
+        let env = self.driver.contribute_call_entry(stage, &callee, args)?;
+        let mut analysis = SparseForwardWorkAnalysis::new();
+        self.driver.drain_worklist(&mut analysis)?;
 
-        let ret = self.driver.call_return(&key).unwrap_or_default();
+        let ret = self.driver.call_return(env)?.unwrap_or_default();
         Ok((ret, self))
     }
 }

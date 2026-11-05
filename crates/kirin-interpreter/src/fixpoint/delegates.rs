@@ -15,7 +15,7 @@ use crate::{Env, EnvIndex, Interp};
 
 use super::{FixpointProfile, StandardFixpointInterpreter};
 
-impl<I, P, Store, Deps> Interp for StandardFixpointInterpreter<I, P, Store, Deps>
+impl<I, P, Store> Interp for StandardFixpointInterpreter<I, P, Store>
 where
     I: Interp,
     P: FixpointProfile<I>,
@@ -38,7 +38,7 @@ where
     }
 }
 
-impl<I, P, Store, Deps> Env for StandardFixpointInterpreter<I, P, Store, Deps>
+impl<I, P, Store> Env for StandardFixpointInterpreter<I, P, Store>
 where
     I: Env,
     P: FixpointProfile<I>,

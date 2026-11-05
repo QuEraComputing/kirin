@@ -48,12 +48,12 @@ impl<V, E> From<CallRequest<V>> for ToyFrame<V, E> {
 /// The graph variant is present because the generic sparse-forward engine can
 /// select a graph body even though the current toy programs use CFG bodies.
 #[derive(Frame)]
-pub enum ToyAbstractFrame<V, E, K> {
-    Block(AbstractBlockFrame<V, E, K>),
-    Call(AbstractCallFrame<V, E, K>),
-    DiGraph(AbstractDiGraphFrame<V, E, K>),
-    ScfIf(AbstractScfIfFrame<V, E, K>),
-    ScfFor(AbstractScfForFrame<V, E, K>),
+pub enum ToyAbstractFrame<V, E> {
+    Block(AbstractBlockFrame<V, E>),
+    Call(AbstractCallFrame<V, E>),
+    DiGraph(AbstractDiGraphFrame<V, E>),
+    ScfIf(AbstractScfIfFrame<V, E>),
+    ScfFor(AbstractScfForFrame<V, E>),
 }
 
 // ===========================================================================

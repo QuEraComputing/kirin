@@ -1,382 +1,428 @@
-# Fixpoint fact store: typed per-context storage and one update path (B2)
+# Fixpoint fact store: per-context facts and one update path (B2–B6)
 
-Status: **design spike, for review before B3.** The only code change is the
-decided default [`Lattice::join_assign`](../../../crates/kirin-ir/src/lattice.rs).
-No engine was migrated. The design was checked with a throwaway test-only
-prototype of the API below; it is not in the tree, and B3 adds tests against
-the real API (§14).
+Status: **B2 design, revised at B3 review; B3–B5 landed; B6 landed
+(uncommitted).** B3 adds
+[`Lattice::join_assign`](../../../crates/kirin-ir/src/lattice.rs) plus
+`EnvStore::join`, `EnvStore::contexts` and `FactStore::get_mut`
+([store.rs](../../../crates/kirin-interpreter/src/core/env/store.rs)). B4
+moves demand onto them (§15), B5 liveness (§16), B6 constprop (§17). B2 checked an earlier version of this design
+with a throwaway test-only prototype, which is not in the tree.
 
 ## 1. Problem
 
 The three abstract engines store and update facts three ways:
 
-- **Constprop** (sparse forward) keeps SSA facts in `EnvStore` and a second
-  copy of each block's outputs in `BlockSummary.outputs`, and merges by hand
-  in `apply_update`.
+- **Constprop** (sparse forward) keeps SSA facts in `EnvStore`, a second copy
+  of each block's outputs in `BlockSummary.outputs`, and function returns in
+  `FunctionSummary`. It merges by hand in `apply_update`.
 - **Demand** (sparse backward) keeps one flat driver table keyed
   `(context, SSAValue)`. Building `DemandResult` scans it once per context,
   O(C × F).
 - **Liveness** (dense backward) keeps `BlockLiveness` summaries and a
   separate point-fact store.
 
-Target: `EnvStore` owns per-context facts and their lifetime, and every
-analysis update goes through one merge → notify → schedule mechanism.
+Target: every fact lives in one place, its environment's `FactStore`, and
+every analysis update goes through one merge path that reports whether the
+fact rose.
 
-## 2. Decisions this note builds on
+## 2. Decisions
 
 1. Reuse `kirin_ir::Lattice`, with a default
-   `join_assign(&mut self, &Self) -> bool` that domains may override. Keep the
-   value-returning `join`.
-2. Widening is deferred. The mechanism uses ordinary joins (§9).
-3. Storage is typed within each context, not a map with enum payloads:
-   - sparse forward: SSA facts plus a stored return approximation;
-   - sparse backward: SSA facts plus a stored parameter-demand approximation;
-   - dense backward: program-point facts, block boundaries included.
-4. One authoritative representation per query role. Local queries read
-   facts. Callable responses and caller subscriptions use the stored
-   approximation.
-5. Demand's approximation deliberately duplicates its entry-parameter facts.
-   A changed parameter fact synchronizes its component before any response
-   can be read. Changed approximations notify callers; changed local facts
-   notify their own dependents. Nothing writes back from the approximation.
-6. `EnvStore::write` stays assignment.
-7. Fact identity is separate from work identity, and names both the
-   environment and the fact kind.
-8. Demand results visit each context and its own facts once: O(C + F).
-9. Return-site routing and discovery metadata stay private and are not facts.
+   `join_assign(&mut self, &Self) -> bool` that domains may override.
+2. Widening is deferred; updates use ordinary joins (§9).
+3. **Everything is an anchored fact.** Each environment's `FactStore<A, V>`
+   holds every fact of its context, with one value type `V`. There is no
+   separate summary slot and no enum payload. A callable's response is stored
+   at anchors too (§6, §7).
+4. **One authoritative representation per query role.** Callers read the
+   callee's anchors. Nothing is duplicated, so nothing needs synchronizing.
+5. `EnvStore::write` stays assignment; analysis updates use `EnvStore::join`.
+6. Fact identity is `(EnvIndex, anchor)`. It is separate from work identity,
+   which each engine chooses.
+7. Demand results visit each context and its own facts once: O(C + F).
+8. Return-site routing, return arity and discovery state are private
+   metadata, not facts.
 
-## 3. Storage: `EnvStore<K, A, V, S = ()>`
+B2 had proposed a typed per-environment summary slot (`EnvStore<K, A, V, S>`)
+and a demand parameter summary kept in sync with the entry parameters. The B3
+review replaced both with anchors (§11).
 
-The smallest change that keeps decisions 3 and 6. Each environment record
-gains one typed slot next to its facts:
+## 3. Storage
 
 ```rust
-struct Environment<K, A, V, S> {
-    key: Option<K>,
-    facts: FactStore<A, V>,
-    summary: Option<S>,          // new
+impl<K, A, V> EnvStore<K, A, V> {
+    pub fn join(&mut self, env: EnvIndex, anchor: A, incoming: &V) -> Result<bool, _>
+    where V: Lattice + HasBottom + Clone;                                // new
+    pub fn contexts(&self) -> impl Iterator<Item = (&K, EnvIndex)>;       // new
+    // unchanged: alloc, get_or_allocate, context_env, read, write, free, environment
 }
-
-impl EnvStore<K, A, V, S = ()> {
-    pub fn summary(&self, index: EnvIndex) -> Result<Option<&S>, InterpreterError>;
-    pub fn summary_mut(&mut self, index: EnvIndex) -> Result<&mut Option<S>, InterpreterError>;
-    pub fn contexts(&self) -> impl Iterator<Item = (&K, EnvIndex)>;   // keyed contexts, each once
-}
-// plus FactStore::get_mut, so join_assign can run in place
 ```
 
-| Engine | Instantiation |
-|---|---|
-| Concrete | `EnvStore<Infallible, SSAValue, V>`: spelling unchanged, `S = ()` |
-| Constprop | `EnvStore<Key, SSAValue, V, Product<V>>`: return approximation |
-| Demand | `EnvStore<Key, SSAValue, Demand, Product<Demand>>`: parameter demand |
-| Liveness | `EnvStore<LinkTarget, ProgramPoint, LiveSet>`: `S = ()` |
+- `join` reads absent as bottom. Joining bottom into an absent anchor stores
+  nothing and reports no change. Otherwise it calls `join_assign` in place
+  (through `FactStore::get_mut`).
+- `contexts()` lists each keyed context once. Iterating it, and each
+  environment's own facts, is O(C + F) (decision 7).
+- Concrete execution is untouched: `EnvStore<Infallible, SSAValue, V>`, using
+  `write` only.
 
-- The approximation is freed with its environment, and it errors on a dead
-  `EnvIndex` like every other access. It lives with the store, not in an
-  engine-side map.
-- The store still knows nothing about bottom, joins or dependencies.
-  `summary` reports absence; the engine decides what absence means (§6, §7).
-- Concrete execution never names `S`: its spelling is unchanged.
-- `contexts()` exists because results need each context's key. Iterating the
-  directory and each environment's own `FactStore` is O(C + F) (decision 8).
+| Engine | Store | Anchors |
+|---|---|---|
+| Concrete | `EnvStore<Infallible, SSAValue, V>` | SSA values |
+| Constprop | `EnvStore<Key, ForwardAnchor, V>` | `Value(SSAValue)`, `Return(i)` |
+| Demand | `EnvStore<Key, SSAValue, Demand>` | SSA values |
+| Liveness | `EnvStore<LinkTarget, ProgramPoint, LiveSet>` | program points |
 
 ## 4. Fact identity and work identity
 
-```rust
-enum FactId<A> {
-    Local { env: EnvIndex, anchor: A },   // an SSA value or a program point
-    Summary { env: EnvIndex },            // the environment's approximation
-}
-```
-
-- Keyed by `EnvIndex`, not by context key, so there is no second context
-  directory.
-- Callers subscribe to the whole approximation, not to its components.
-- Work identity is an engine type and never derived from a fact:
+A dependency names a fact by `(EnvIndex, anchor)`. It is keyed by `EnvIndex`,
+not the context key, so there is no second context directory. Work identity
+is an engine type and never derived from a fact:
 
 | Engine | Work | Typical subscriptions |
 |---|---|---|
-| Constprop | block or graph walk in an environment | facts read across blocks; callee `Summary` |
-| Demand | propagate one value in a context | facts read by the rule; callee `Summary` |
+| Constprop | block or graph walk in an environment | values read across blocks; callee `Return(i)` |
+| Demand | propagate one value in a context | facts read by the rule; callee entry parameters |
 | Liveness | block walk in an environment | successors' `BlockEntry` points |
 
 Demand's work has a fact's coordinates (`Propagate { env, value }`) and is
-still a different identity. The engine gives each changed local fact its own
-propagation work (§7). That is a discovery rule, not a subscription.
+still a different identity. The engine gives each changed fact its own
+propagation work, which is a discovery rule, not a subscription.
 
-## 5. The update mechanism
+## 5. Updates, reads and scheduling
 
-The helper is split along the borrow boundary every engine already has. Rules
-hold only the transfer, reading through `&self` and writing through
-`&mut self`. Only the driver holds the dependency index and the worklist.
+- **Merge:** `EnvStore::join`, returning whether the fact rose.
+- **Notify and schedule:** the engine and its existing driver. The engine
+  records what the running work read, absent facts included, and which
+  `join`s returned `true`. It then registers and schedules through the
+  driver's dependency index and worklist. Forward already keeps a read log
+  (`read_log` in `sparse_forward/interp.rs`). Whether the bookkeeping becomes
+  a shared type is decided with the first client (B4).
 
-**`FactLog<A>`, on the transfer next to the store.** Every analysis read and
-update goes through it:
+Each migration keeps these rules:
+
+- Reads during work subscribe, absent facts included. Result queries after
+  the solve never subscribe.
+- **Register reads before notifying changes.** A work item that reads a fact
+  and then raises it, directly or through a callee it calls recursively, must
+  rerun. Notifying first misses this the first time the item runs, because it
+  is not yet subscribed. In the B2 prototype, swapping the two steps left a
+  recursive call site's argument dead: the call site ran once instead of
+  three times.
+- Writes are visible to the running work at once; only notification waits
+  until the work completes.
+- An unchanged update schedules nothing.
+
+## 6. Constprop returns: one anchor per return slot
+
+A multi-value return is not one IR value. `Return` holds
+`values: Vec<SSAValue>` (`kirin-function/src/ret.rs`) and `Call` holds
+`results: Vec<ResultValue>` (`kirin-function/src/call/mod.rs`). So the return
+is stored per slot, at an engine-private anchor:
 
 ```rust
-fn read_fact(&self, store, env, anchor) -> Result<V, _>;              // absent = bottom; records the read
-fn read_summary(&self, store, env) -> Result<Option<S>, _>;           // records the read
-fn join_fact(&mut self, store, env, anchor, &V) -> Result<bool, _>;   // join_assign; records a change
-fn join_summary(&mut self, store, env, &Product<V>) -> Result<bool, _>;            // lifted, arity-checked
-fn join_summary_at(&mut self, store, env, position, &V) -> Result<bool, _>;        // one component
+enum ForwardAnchor { Value(SSAValue), Return(usize) }   // implements LatticeAnchor
+
+// `ret %a, %b` in env: each slot joins like any fact
+for (i, fact) in values.iter().enumerate() {
+    store.join(env, ForwardAnchor::Return(i), fact)?;
+}
+
+// nested caller with n results: an absent slot reads as ⊥, like any fact
+let response: Product<V> = (0..n)
+    .map(|i| store.read(callee, ForwardAnchor::Return(i)).map(|f| f.unwrap_or_else(V::bottom)))
+    .collect::<Result<_, _>>()?;
 ```
 
-- `join_fact` reads absent as bottom. Joining bottom into an absent fact
-  stores nothing and reports no change.
-- The `FactId` is built from where the update lands, so a caller cannot
-  notify the wrong location.
-- Reads record only while a work item is running.
-
-**`FactSolver<A, W>`, on the driver.**
-
-```rust
-fn schedule(&mut self, work: W);                                          // coalesces queued work
-fn begin(&mut self, log: &FactLog<A>) -> Result<Option<W>, _>;            // pop; start recording
-fn commit(&mut self, log: &mut FactLog<A>) -> Vec<FactId<A>>;             // see below
-```
-
-`commit` first subscribes the running work to every fact it read, present
-or absent. It then schedules the dependents of every fact that changed. It
-returns the changes so an engine can derive its own work from them.
-
-**Ordering rule: register reads before notifying changes.** A work item that
-reads a fact and then raises it, directly or through an approximation, must
-rerun. Notifying first misses this the first time the item runs, because it
-is not yet subscribed. In the prototype, the recursive example of §7 with
-the two steps swapped left `b` dead: the call site ran once instead of
-three times.
-
-Further properties:
-
-- Writes are visible to the running work at once. Only notification waits
-  for `commit`.
-- Outside work (seeding, discovery with no owner) nothing is recorded as
-  read, and `commit` notifies at once.
-- `begin` refuses to start while a log is uncommitted, so changes cannot be
-  dropped.
-
-**Ownership in production (B3):**
-
-- `FactLog` and `FactId` belong in `core/env`, beside the store.
-- The solver half becomes the existing driver's dependency index (keyed by
-  `FactId`) and its worklist, gaining coalescing and a `commit` method.
-  `drive_frames` and the frame protocol are unchanged. This is not a second
-  driver.
-
-## 6. Forward returns
-
-The approximation is `Option<Product<V>>` with lifted semantics:
-
-| State | Stored | Root reads | Nested caller binds |
-|---|---|---|---|
-| No return reached | `None` | `None` | bottom in each of its result slots, subscribed |
-| Zero-result return reached | `Some([])` | `Some([])` | `[]` |
-| Returns reached | `Some(join of each site)` | the product | the product, subscribed |
-
-- **First contribution:** absent is below every product, so the first
-  `join_summary` reports a change even for `[]`. "Returned nothing" wakes
-  callers that are waiting on "never returned".
-- **Multiple return sites:** results join per position, e.g.
-  `[1, 2] ⊔ [1, 3] = [1, ⊤]`.
-- **Arity:** a contribution whose arity differs from the stored product
-  fails with `ProductArityMismatch`. It records no change and leaves the
-  approximation untouched. A caller whose result count differs fails the
-  same way. Today's root (`call_return(..).unwrap_or_default()`,
-  `sparse_forward/interp.rs:1583`) collapses `None` into `[]`. Exposing the
-  `Option` is the A2/C decision.
+- **`Env::Anchor` stays `SSAValue`.** The engine maps `v` to `Value(v)`, so
+  dialect rules and `SSABinding` are unchanged.
+- **Bottom per slot is free.** A slot no `ret` has raised reads as ⊥, so
+  "start at `[⊥; n]`" needs no `n` at context creation.
+- **Return arity is private metadata.** Each context keeps a
+  `return_arity: Option<usize>`, set by the first reached `ret`. It does
+  three jobs:
+  - a later `ret` with a different arity is an error;
+  - the root reads `Return(0..arity)`;
+  - `None` means no return was reached, so the root can still tell "never
+    returned" from "returned nothing". Today's root collapses the two
+    (`call_return(..).unwrap_or_default()`); exposing the difference is an
+    A2/C decision.
+- **Joins per slot:** `ret 1, 2` then `ret 1, 3` leaves `Return(0) = 1` and
+  `Return(1) = ⊤`.
 - **Reaching a block** with no parameters, or with bottom arguments, changes
-  no fact. The first reach is discovery and is recorded in private
-  bookkeeping, as constprop's `Owner` presence checks do today.
-- **No fake SSA values** anywhere: the return has its own typed slot.
+  no fact. First reach is discovery, recorded in private bookkeeping, as
+  constprop's `Owner` presence checks do today.
 
-## 7. Demand's parameter-demand approximation
+Not one fact per function: `HasProductValue` can pack a product into one
+value, but only domains that opt in support it (`Demand` does not). It would
+also conflate `ret %t`, one tuple-valued result, with `ret %a, %b`, two
+results.
 
-- **Initialization: at context selection, not at discovery.** Selecting a
-  context allocates its environment and stores a bottom product of the
-  parameter arity, read from the IR. A caller can then read the response and
-  subscribe before the discovery scan runs. The scan still runs once,
-  deferred, so rule dispatch never re-enters. This changes `AGENTS.md`'s
-  "per-context state exists only once discovered": the environment and its
-  bottom approximation exist from selection.
-- **Synchronization: one mutation path.** Every demand fact change, from a
-  rule's `raise_fact` or from routing requested outputs into return
-  operands, goes through one private `raise`:
-  1. `join_fact`;
-  2. if the value is entry parameter `i`, `join_summary_at(i, new fact)`.
+## 7. Demand: callers read the callee's entry parameters
 
-  Both happen before control returns, so no response can be read out of
-  sync. The approximation has no write-back path. In the prototype,
-  removing the synchronization step broke three of the five demand
-  scenarios.
-- **Notification:**
-  - a changed parameter fact notifies its local dependents and gets its own
-    propagation work;
-  - the approximation change it causes notifies subscribed callers;
-  - a changed non-parameter fact notifies no caller.
-- **Recursion:** a recursive call site subscribes to its own context's
-  approximation, even while it is bottom. Through the ordering rule in §5, it
-  reruns whenever its own raises change that approximation.
-- **Metadata:** parameters and return-site operands live in private
-  `HashMap<EnvIndex, ContextMeta>` bookkeeping, keyed by environment.
-  - Return sites must agree on arity, and a requested output's arity must
-    match.
-  - Requested outputs route straight into return operands, as after #805.
-- **Caller subscription:** one `Summary` subscription per caller replaces
-  today's per-parameter registrations (`summarize_call`,
-  `sparse_backward/interp.rs:623`).
+A callee's response is the demand on its entry parameters, which are already
+SSA anchors in its environment. A caller reads them directly and subscribes
+to each:
+
+```rust
+// caller of f(x, y)
+for (argument, param) in [x, y].into_iter().zip(entry_params(f)) {
+    let demand = store.read(f_env, param)?.unwrap_or(Demand::Dead);
+    raise(argument, demand);                     // the caller subscribes to (f_env, param)
+}
+```
+
+- **No duplicate.** There is no parameter summary to keep in sync, and no
+  write-back to forbid.
+- **Subscriptions:** one per parameter, as today's per-parameter
+  registrations (`summarize_call`, `sparse_backward/interp.rs:623`).
+  Subscribing to a parameter that is still bottom is what makes recursion
+  converge.
+- **Environment at selection.** A caller can only subscribe to
+  `(f_env, param)` if the environment exists. So selecting a context
+  allocates its environment at once, while the discovery scan stays deferred
+  and runs once, so rule dispatch never re-enters. This changes `AGENTS.md`'s
+  "per-context state exists only once discovered".
+- **Metadata:** parameters and return-site operands stay in private
+  per-context bookkeeping keyed by `EnvIndex`. Return sites must agree on
+  arity, and so must a requested output. Requested outputs route straight
+  into return operands, as after #805.
 
 ## 8. Recommendation: dispatch demand rules on `SparseBackwardTransfer`
 
-Move the `EnvStore`, the `FactLog` and the context metadata into
-`SparseBackwardTransfer`, dispatch rules on it as forward and dense already
-dispatch on their transfers, and have the driver's `run_statement` delegate.
+Move the `EnvStore`, its read bookkeeping and the context metadata into
+`SparseBackwardTransfer`. Dispatch rules on it, as forward and liveness
+already dispatch on their transfers, and have the driver's `run_statement`
+delegate.
 
-Evidence from the prototype: every rule-facing operation of
-`SparseBackwardInterp` was local to the transfer.
-
-| Operation | Needs |
+| Rule-facing operation | Needs |
 |---|---|
-| `fact` | store, log, current context |
-| `raise_fact` | store, log, metadata (synchronization) |
-| `declare_return` | metadata of the current context |
-| call response (from the `Call` effect) | store, log |
-| `block_params`, `terminator_args` | pipeline (already on the transfer) |
+| `fact` | store, read bookkeeping, current context |
+| `raise_fact` | store, change bookkeeping |
+| `declare_return` | the current context's metadata |
+| call response (from the `Call` effect) | store, read bookkeeping |
+| `block_params`, `terminator_args` | pipeline, already on the transfer |
 
-The prototype's rules took only the transfer and never saw the solver. The
-driver began work, ran the rule, committed, and scheduled propagation for
-changed facts. Two benefits:
-
-- One dispatch shape for all three engines.
-- The driver keeps only scheduling. Today `SparseBackwardInterp` is
-  implemented on the driver only because `fact` reads its summary map and
-  `declare_return` writes its store slot. Both move with the storage.
-
-Consequence for B4: `S: InterpDispatch<SparseBackwardDriver<..>>` becomes
+`SparseBackwardInterp` is implemented on the driver today only because `fact`
+reads the driver's summary map and `declare_return` writes its store slot.
+Both move with the storage, so the driver keeps only scheduling. The bound
+`InterpDispatch<SparseBackwardDriver<..>>` becomes
 `InterpDispatch<SparseBackwardTransfer<..>>` in the engine and in
-`kirin-demand`'s bound. Dialect rules are generic over
-`I: SparseBackwardInterp` and do not change.
+`kirin-demand`. Dialect rules are generic over `I: SparseBackwardInterp` and
+do not change.
 
 ## 9. Budgets, guards and widening stay distinct
 
 - **Context budgets** bound how many environments exist. They belong to
   context selection: `ConstPropContext::with_budget` and
-  `OutputDemandContext` (default budget 64) today, problem D later. B does not
-  touch them.
+  `OutputDemandContext` (default budget 64) today, problem D later.
 - **Divergence guards** bound a nested local iteration and fail instead of
-  approximating: `max_iterations` (`core/frame.rs:473`), used by abstract
-  loop frames. They stay in frames.
-- **Widening** changes the merge operator at loop heads (`widen_after`,
-  `entry_joins`). It is deferred; the mechanism only joins.
-  - Constprop's `widen` already delegates to `join`
-    (`kirin-constprop/src/value/lattice_impl.rs:80`), so dropping the
-    widening counters in B6 should keep its results. B6's guard tests must
-    confirm that.
-  - Domains with infinite ascending chains need widening reintroduced later,
-    as a merge choice inside `FactLog` (for example a widening variant of
-    `join_fact` for one fact kind), never by bypassing the log.
+  approximating: `max_iterations` (`core/frame.rs:473`), used by abstract loop
+  frames.
+- **Widening** changes the merge at loop heads (`widen_after`,
+  `entry_joins`). It is deferred. Constprop's `widen` already delegates to
+  `join` (`kirin-constprop/src/value/lattice_impl.rs:80`), so B6 should keep
+  its results; its guard tests must confirm that. Domains with infinite
+  ascending chains need widening reintroduced later, as a merge choice beside
+  `join`, never by bypassing change reporting.
 
 ## 10. Invariants
 
-1. One authoritative representation per query role. The demand duplicate is
-   derived, synchronized on every change, and never written back.
-2. `EnvStore::write` assigns; analysis updates go through `FactLog`.
-3. Absent local facts read as bottom; an absent approximation is the lifted
-   bottom (forward) or impossible after selection (demand).
-4. Every read during work subscribes, absent facts included; reads outside
-   work never do.
-5. `commit` registers reads, then notifies changes. Queued work coalesces;
-   running work can reschedule itself.
-6. Unchanged updates schedule nothing and materialize no bottom facts.
-7. Facts in different environments, or of different kinds, never alias.
+1. Every fact has one home: its environment's `FactStore`, at one anchor.
+2. `write` assigns; analysis updates go through `join`.
+3. Absent reads as bottom, including return slots.
+4. Reads during work subscribe, absent facts included; reads outside work
+   never do.
+5. Reads register before changes notify. Running work can reschedule itself.
+6. Unchanged updates schedule nothing and store no bottom facts.
+7. Facts in different environments, or at different anchors, never alias.
    Work identity never implies a subscription.
-8. Dependencies persist for the run. Freeing an environment retires its
-   facts and approximation. Abstract engines do not free mid-run; an engine
-   that does must also retire edges that name the freed `EnvIndex` (B3).
+8. Dependencies persist for the run. Abstract engines do not free
+   environments mid-run; an engine that does must also retire the edges that
+   name the freed `EnvIndex`.
 
 ## 11. Alternatives rejected
 
-- **One map with enum anchors and payloads** (`Value | Return` holding
-  `V | Product<V>`): every read needs a mismatch error, every entry is the
-  size of the largest variant, and a zero-result return needs a marker. The
-  layout benchmark (`wip/fact-store-layout-bench`) favored typed storage in
-  most operations. The decisive gain there was per-context partitioning,
-  which both layouts allow.
-- **Fake SSA anchors for returns or parameter demand:** they would name
-  values that do not exist in the IR.
-- **An engine-side `HashMap<EnvIndex, S>`:** a second place whose lifetime
-  `EnvStore::free` does not control.
-- **A generic per-environment record (`EnvStore<K, R>`):** every access would
-  go through a trait, and the concrete engine's spelling would change.
-- **Deriving the forward return from return-site operands** (the MLIR
-  approach): it needs reachability facts and return-site discovery in
-  forward. That is more than B needs, and the stored approximation is what
-  decision 3 chose.
-- **A join method on `EnvStore`:** the store would have to know bottom. That
-  knowledge stays in `FactLog`.
-- **Notifying at update time instead of at commit:** it misses
+- **A typed per-environment summary slot** (`EnvStore<K, A, V, S = ()>`, with
+  `summary`/`join_summary`): it was B2's proposal. It adds a second kind of
+  fact with its own merge, its own "absent" rule and its own dependency kind,
+  while anchors already cover returns with the existing rules.
+- **A demand parameter summary synchronized from the entry parameters:** it
+  duplicates facts that callers can read directly.
+- **One fact per function via `HasProductValue`:** only some domains opt in,
+  and it conflates a tuple-valued result with several results (§6).
+- **An enum payload in one map** (`V | Product<V>`): every read needs a
+  mismatch error.
+- **Fake SSA values for returns:** they would name values that do not exist
+  in the IR. `Return(i)` is a distinct anchor variant, not an SSA value.
+- **A shared access-log type** (`FactLog`/`FactId`): the engines' existing
+  read bookkeeping covers it. Reconsider at B4 if the three engines'
+  bookkeeping turns out identical.
+- **Notifying at update time** instead of when the work completes: it misses
   self-dependencies whose subscription is still being recorded (§5).
-- **Per-parameter caller subscriptions:** the stored approximation is
-  exactly what decision 4 makes the single subscription target.
 
-## 12. What the spike did not check
+## 12. Open questions for the migrations
 
-- In-place joins: the prototype cloned the stored fact because `FactStore`
-  has no `get_mut` yet.
-- Scheduling order: the prototype kept subscriptions in insertion order,
-  which made scheduling deterministic. B3 should keep a deterministic order.
-- Real IR and dispatch: contexts were string keys and anchors id-only
-  handles. The real-engine proof is B4.
-- Error recovery: a rule that errors leaves its log uncommitted. Engines are
-  dropped on error (`analyze(self)`), so B3 needs no recovery path.
-
-## 13. Open questions for the migrations
-
-- **B4: demand read logging.** Uniform logging subscribes each propagation
-  work to the facts its rule reads. This duplicates the intrinsic
-  propagation that already covers them, and costs one index entry per read.
-  The parameter-position lookup in `raise` adds O(parameters) per changed
-  fact. Neither cost was measured; the layout benchmark did not cover
-  synchronization. Measure on the 2,000-function chain from the #805 review.
-- **B6: constprop rereads.** A block that reads values it defined reruns
-  once after they first rise. Today's forward engine excludes values it
-  wrote itself. B6 can exclude values defined by the running block, but not
+- **B6: constprop rereads.** A block that reads values it defined reruns once
+  after they first rise. Exclude values defined by the running block, but not
   block parameters: a self-loop's back edge writes its own parameters.
-- **B6: edge arguments.** Edge arguments become `join_fact` contributions to
-  the successor's parameters, plus first-reach scheduling, replacing
-  `OwnerEntry`.
-- **A2/C:** the public root response becomes `Option<Product<V>>`.
+- **B6: edge arguments** become `join` contributions to the successor's
+  parameters, plus first-reach scheduling, replacing `OwnerEntry`.
+- **B6: anchor enum cost.** Each read of an SSA fact hashes a
+  `ForwardAnchor` instead of an `SSAValue`. Measure it.
+- **A2/C:** whether the public root response exposes "never returned".
 
-## 14. Can B3 proceed?
+## 13. Tests for the migrations
 
-Yes, once this note is reviewed. B3 lands:
+B3 adds no tests; the first client (B4) tests the mechanism through a real
+engine. These rules need coverage there:
 
-- `EnvStore<K, A, V, S = ()>` with `summary`, `summary_mut` and `contexts`;
-- `FactStore::get_mut`;
-- `FactId` and `FactLog` in `core/env`;
-- the fact-keyed dependency index with coalescing and `commit` on the
-  existing driver.
+1. **Commit order:** a work item that reads a fact and then raises it reruns;
+   an unchanged rerun schedules nothing.
+2. **Recording:** absent reads subscribe during work; result queries record
+   nothing; unchanged joins schedule nothing.
+3. **Constprop returns (B6):** per-slot joins over several `ret`s, arity
+   errors, and `return_arity = None` for a callee that never returns.
+4. **Demand responses:** a caller subscribed to a still-bottom parameter
+   reruns when it rises, including through recursion.
 
-It adds focused tests against the real API (§15). No engine uses any of it
-until B4.
+## 14. Work and dependency keys: arena handles only (agreed 2026-11-04)
 
-## 15. Tests for B3
+Every engine keys work and dependencies by `EnvIndex` plus an existing IR
+handle. `Owner` and `Scoped` go away; the policy key `K` appears only where a
+context is selected (`get_or_allocate(K)`).
 
-The prototype covered every requirement in the B2 brief. Against the real
-API, these few are the ones worth keeping, because each guards a rule that
-is easy to get wrong:
+| Engine | Work | Dependency (fact) key |
+|---|---|---|
+| Demand | `(EnvIndex, Statement)` | `(EnvIndex, SSAValue)` |
+| Liveness | `(EnvIndex, Body)`, a block as `Body::Block` | `(EnvIndex, ProgramPoint)` |
+| Constprop | `(EnvIndex, Body)`, a CFG block as `Body::Block`, a graph as `Body::DiGraph` | `(EnvIndex, SSAValue)`, `(EnvIndex, Return(i))` |
 
-1. **Commit order.** A recursive call site that raises its own context's
-   approximation reruns until it converges. Swapping `commit`'s two steps
-   made this fail in the prototype.
-2. **Demand synchronization.** After every change, each approximation
-   component equals its parameter's fact; a non-parameter change wakes no
-   caller. Removing the synchronization step made this fail.
-3. **Forward return states.** Absent versus `[]`, per-position joins of
-   several return sites, and arity errors that leave the stored product
-   unchanged.
-4. **Absent reads subscribe, inspection does not,** and an unchanged update
-   schedules nothing.
+Work names what reruns; a fact key names what changed. Demand allocates a
+callee's environment at context selection so callers can subscribe to its
+parameters; the discovery scan stays deferred. Order: B4 demand, B5 liveness
+(including its public `Scoped<LinkTarget, ProgramPoint>` signatures), B6
+constprop (`Owner<K>`, `value_readers`), then delete `Owner` and `Scoped`.
 
-The `join_assign` default has no dedicated test; B3's tests exercise it
-through every update.
+## 15. B4: demand migrated
+
+- **Storage:** `SparseBackwardTransfer` holds
+  `env: EnvStore<P::Key, SSAValue, V>` and the per-context metadata
+  `contexts: HashMap<EnvIndex, CallableContext>`. `DemandSummary`, the
+  `DemandContexts` store slot and the placeholder `EnvIndex` are gone;
+  `Interp::index()` is the dispatched context's environment.
+- **Work and dependencies:** work is `(EnvIndex, Statement)`. When
+  `EnvStore::join` reports a rise of `(env, value)`, the driver reruns the
+  statements that translate it, from SSA topology, plus the callers
+  registered on it. The one registered dependency is callee parameter →
+  caller's call statement, in `DemandCallers = HashMap<(EnvIndex, SSAValue),
+  Vec<(EnvIndex, Statement)>>`, the driver's store slot.
+- **Driver loop:** unchanged. The profile uses `Summary = ()` and
+  `Deps = ()`, both inert implementations added to `fixpoint/` until B7.
+  `DemandCallers` sits in the store slot rather than `Deps` only because
+  `SummaryDependencyIndex` keys trigger and dependent alike; B7 moves every
+  engine's fact-keyed index into `Deps` once that trait is gone.
+  Each scheduled work item still gets an empty summary entry, which the
+  existing loop requires.
+- **Reads:** no read log. Reads inside a context are covered by topology;
+  the only cross-context read, the callee's parameters, is registered in
+  `summarize_call` during the work, before its changes are applied.
+- **Dispatch:** rules dispatch on `SparseBackwardTransfer`, which now
+  implements `SparseBackwardInterp`. Selection, discovery, activation and
+  parameter reads also live on the transfer; the driver keeps only
+  `summarize_call` (registration) and `raise` (join + schedule). Selecting a
+  context allocates its environment; discovery stays deferred and runs once.
+- **Public API:** unchanged except removals: `DemandSummary` is gone, and
+  `SparseBackwardProfile`/`DemandFrame` lose their context-key parameter.
+  `kirin-demand`'s `analyze_demand` bound names `SparseBackwardTransfer`.
+- **Scaling** (release, call chain, best of 3; probe in `/tmp`, not kept):
+
+  | Functions | Analysis before → after | `DemandResult` before → after |
+  |---:|---:|---:|
+  | 500 | 1.13 → 0.68 ms | 0.42 → 0.09 ms |
+  | 1,000 | 2.27 → 1.37 ms | 1.76 → 0.17 ms |
+  | 2,000 | 4.93 → 2.68 ms | 6.75 → 0.33 ms |
+  | 4,000 | 12.42 → 6.92 ms | 26.88 → 0.74 ms |
+
+  Result construction now doubles with the chain instead of quadrupling.
+- **Tests:** none added; the 1,666 workspace tests pass unchanged, including
+  `kirin-demand`'s recursive and boundary suites.
+
+## 16. B5: liveness migrated
+
+- **Storage:** `DenseBackwardTransfer` holds
+  `env: EnvStore<LinkTarget, ProgramPoint, V>` with one environment per
+  `analyze` (`root: Option<(LinkTarget, EnvIndex)>`). The `BlockLiveness`
+  summaries, the driver's point `FactStore` and `EnvIndex::placeholder` are
+  gone; `Interp::index()` is the analyzed callable's environment.
+- **Every recorded point joins** (decided 2026-11-04): statement points,
+  nested structured-block boundaries and the walked block's own boundaries,
+  so `BlockEntry(b)` always equals `Before(first statement of b)`. A
+  recorded bottom point stays present (`record` writes it when the join
+  stores nothing), so results still tell "nothing live" (`Some(∅)`) from
+  "never reached" (`None`), as before.
+- **Work and dependencies:** work is `(EnvIndex, Body::Block(block))`.
+  `absorb_edges` registers the walking block on each successor's
+  `(EnvIndex, BlockEntry)`; a rise of that entry reruns the readers. These
+  live in `DenseReaders`, the driver's store slot, with `Deps = ()` (B7 moves
+  them). Predecessors no longer rerun when only a successor's live-out rises.
+- **Public API:** `point_facts(ProgramPoint)` and
+  `facts() -> FactStore<ProgramPoint, V>` on the engine and
+  `DenseLivenessResult`; `BlockLiveness` is no longer exported;
+  `DenseBackwardFrameEngine::record_point` returns `Result`.
+- **Dispatch, as in the sparse engines:** `DenseBackwardTransfer::run_statement`
+  dispatches rules on the transfer. `DenseBackwardFrameEngine` now extends
+  the shared `StatementDispatch` and `BlockQueries` instead of redeclaring
+  `run_statement` and `block_params`; it keeps only the backward-walk
+  queries (`last_statement`, `previous_statement`, `terminator_args`) and the
+  dense point state. Dense frames carry their environment `index`:
+  `DenseBlockFrame::cfg_owner/structured_body` and kirin-scf's
+  `DenseScfIfFrame::new`/`DenseScfForFrame::new` take it.
+- **Tests:** none added; 1,666 workspace tests pass after updating the call
+  sites in `kirin-liveness/tests/cfg.rs` and toy-lang to bare points.
+
+## 17. B6: constprop migrated
+
+- **Storage:** `SparseForwardTransfer` holds
+  `env: EnvStore<P::Key, ForwardAnchor, V>` with
+  `ForwardAnchor { Value(SSAValue), Return(usize) }` (`Env::Anchor` stays
+  `SSAValue`; the engine maps `v` to `Value(v)`), per-context metadata
+  `contexts: HashMap<EnvIndex, ForwardContext>` (key, stage, entry unit,
+  `return_arity`), and per-unit `entry_joins` visit counters, whose presence
+  also marks a unit as reached. `Owner`, `ForwardSummary`,
+  `FunctionSummary`, `BlockSummary`, `ForwardUpdate`, `apply_update`,
+  `seed_entry_block` and `ForwardDeps` are gone; `Scoped` and
+  `ScopedSparseStore` are deleted, since no engine uses them any more.
+- **Updates:**
+  - an abstract `env_write` joins (`EnvStore::join`) and logs what rose;
+  - call and edge arguments merge into the entry unit's parameters through
+    the analysis policy (`analysis_merge`: join, then widen by visits — widening
+    is left as is, decided 2026-11-04) and are written; the unit is scheduled
+    on first reach or when a parameter rose, and readers of every risen
+    parameter are woken;
+  - a reached `ret` joins into `Return(i)` per slot and wakes that slot's
+    callers; `return_arity` is set by the first return and checked after.
+- **Work and dependencies:** work is `(EnvIndex, Body)` (`Body::Block`,
+  `Body::DiGraph`). `ForwardReaders = HashMap<(EnvIndex, ForwardAnchor),
+  Vec<(EnvIndex, Body)>>` in the driver's store slot holds both dependency
+  kinds: blocks that read a value they did not write (registered at walk
+  completion, before risen values are woken) and callers of each return
+  slot (registered in `summarize_call`). `Deps = ()`; B7 moves the map.
+- **Widening timing:** a function's entry and its entry block used to keep
+  separate visit counters over two stored copies of the arguments; with one
+  copy (the entry block's parameters) there is one counter. This changes when
+  widening would start only for a domain whose `widen` differs from `join`;
+  none ships.
+- **Public API:** `Owner` is replaced by `ForwardAnchor` in the exports;
+  `return_summary` returns an owned `Option<Product<V>>`; `with_linker` and
+  `with_policy` now reset the analysis state (as `with_analysis` already
+  did). `analyze` still returns `Product<V>`, with "never returned" read as
+  `[]`, symmetric with demand.
+- **Tests:** none added; 1,666 workspace tests pass, including the guard
+  tests (`constprop_loop_carried_cross_block_rise_is_top`,
+  `constprop_direct_dominated_cross_block_use`,
+  `constprop_context_budget_overflow_falls_back_to_top`,
+  `abstract_digraph_owner_joins_two_call_sites`,
+  `abstract_digraph_self_recursion_converges`), and factorial still gives
+  `Const(120)`.
+

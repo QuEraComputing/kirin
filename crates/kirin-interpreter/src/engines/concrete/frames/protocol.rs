@@ -67,9 +67,9 @@ pub struct BodyFrameEntry<B, V> {
 ///
 /// **Concrete execution only.** Forward abstract interpretation does not
 /// descend into a callee — `AbstractCallFrame` *summarizes* the call and the
-/// fixpoint engine separately maps a callable body to an
-/// [`Owner`](crate::Owner). Customizing that would be an abstract
-/// body-entry/owner policy, not this one. The backward engines don't walk
+/// fixpoint engine separately maps a callable body to an `(EnvIndex, Body)`
+/// work item. Customizing that would be an abstract body-entry policy, not
+/// this one. The backward engines don't walk
 /// callable bodies through a call frame at all.
 ///
 /// The traversal returns the configuration's child representation `F`. Concrete

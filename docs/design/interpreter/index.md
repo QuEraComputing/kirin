@@ -549,9 +549,10 @@ specialization.
 
 #### Interprocedural demand
 
-The sparse backward engine runs one worklist over **context-qualified fact
-locations** `Scoped<K, SSAValue>`: demand on a local SSA value in callable
-context `K`. `K` comes from the `DemandContext<V>` policy `P`, fed the
+The sparse backward engine keys facts by `(EnvIndex, SSAValue)`: demand on a
+local SSA value in the environment of callable context `K`. Its one worklist
+holds `(EnvIndex, Statement)` work items: rerun one statement's rule in one
+context. `K` comes from the `DemandContext<V>` policy `P`, fed the
 resolved `LinkTarget` and `Product<V>` of result lattice values. Public entry
 points accept an iterator and collect it into this product internally.
 The generic engine defaults to `ContextInsensitive`, selecting the target itself.
@@ -559,15 +560,20 @@ The shipped `DemandAnalysis` engine instead uses `OutputDemandContext`, with
 `Key = (LinkTarget, DemandCallCtx)`: result-demand products or a `Shared` fallback
 after 64 admitted requests per target. Changing demand selects a new context; existing
 parameter-to-caller dependencies remain registered. A policy must select stable keys from a bounded
-space; a key naming two targets is an error. Facts stay in `DemandSummary`
-behind `Summary::merge`. The engine's per-context metadata (target, body, and
-the return operands per output) lives in the driver's store slot and is never a
-second copy of facts. It holds only what the IR cannot answer: an entry exists
-once its context is discovered, and entry parameters are read from the IR. Work carries its context, so
+space; a key naming two targets is an error. Facts live in the transfer's
+`EnvStore`, one environment per selected context, and merge with
+`EnvStore::join`; the driver keeps no summaries (`Summary = ()`) and holds
+only the worklist and the call-boundary callers. Selecting a context allocates
+its environment at once, so a caller can register on its parameters before the
+deferred discovery scan runs. The per-context metadata (target, body, and the
+return operands per output) lives on the transfer, keyed by `EnvIndex`, and is
+never a second copy of facts. It holds only what the IR cannot answer: an entry
+exists once its context is discovered, and entry parameters are read from the
+IR. Rules dispatch on the transfer, as forward and dense rules do. Work carries its context, so
 the frame dispatching a rule supplies the context that rule's reads and local
 contributions are qualified with — there is no global analysis scope.
 
-Each fact location is also runnable work:
+When a fact rises, the driver reruns the statements that translate it:
 
 | Location | Work when its fact rises |
 |---|---|
@@ -798,8 +804,8 @@ pub trait ForwardDataflowFrameEngine:
 An abstract engine therefore **no longer inherits the concrete call lifecycle**.
 That follows the semantics: forward abstract interpretation *summarizes* a call
 (`summarize_call` → `AbstractCallFrame`) rather than descending into it, and
-reaches a callable body's entry block through `Owner` seeding in the fixpoint
-driver rather than `cfg_entry`. Requiring its frame universe to expose
+reaches a callable body's entry unit through the fixpoint driver's
+`contribute_call_entry` rather than `cfg_entry`. Requiring its frame universe to expose
 `alloc_env`, `free_env`, `resolve_callee`/`discover_body`, and `cfg_entry` was
 demanding a call convention it never performs.
 `tests/frame_engine_capabilities.rs` pins this down with deliberately
@@ -957,9 +963,10 @@ permanently fix one traversal for every engine.
 **Concrete execution only, and deliberately so.** Concrete execution descends
 into a callee — `CallFrame` → body walker → completion → `CallFrame`. Forward
 abstract interpretation does not: `AbstractCallFrame` *summarizes* the call while
-the fixpoint engine separately maps a callable body to an `Owner::Block` or
-`Owner::Graph` in `seed_entry_block`. Customizing that would be an abstract
-body-entry/owner policy, not this one. The backward engines differ further —
+the fixpoint engine separately maps a callable body to a `(EnvIndex,
+Body::Block)` or `(EnvIndex, Body::DiGraph)` work item in
+`contribute_call_entry`. Customizing that would be an abstract body-entry
+policy, not this one. The backward engines differ further —
 sparse backward uses SSA values as owners and never walks callable bodies through
 a call frame; dense backward uses block owners and reverse walks. If those ever
 need configurable representation traversal, add engine-family-specific policies;
@@ -984,17 +991,19 @@ per-key call summarization. A custom enum composes them with ordinary
 adds the dialect-owned `AbstractScfIfFrame` and `AbstractScfForFrame`; no member
 constructs a `ToyAbstractFrame` variant.
 
-**Executable owners and the body vocabulary.** The forward fixpoint's work items
-are `Owner`s, and only *executable* owners run frames: `Owner::Block` (one CFG
-block) and `Owner::Graph` (one whole graph body). `Owner::Function` is
-storage-only — it accumulates a context's joined entry arguments and joined
-return, and is never scheduled. `seed_entry_block` is the single place a callable
-body becomes executable work, translating the closed `Body` vocabulary into an
-owner: `CFG` → its entry block, `Block` → itself, `DiGraph` → an `Owner::Graph`.
-A graph owner is one unit because a single dependency-ordered pass is *exact* for
-a DAG — no intra-graph widening is needed, and convergence pressure comes only
-from entry widening when a new call site raises the owner's entry product. On
-completion a graph owner has no successor edges; its declared yields become the
+**Work items and the body vocabulary.** The forward fixpoint's work items are
+`(EnvIndex, Body)`: `Body::Block` (one CFG block walk) and `Body::DiGraph` (one
+whole graph body). A context's entry arguments are its entry unit's parameter
+facts, and its return is the `Return(i)` slots of its environment; neither is a
+separate summary. `contribute_call_entry` is the single place a callable body
+becomes executable work, translating the closed `Body` vocabulary into a unit:
+`CFG` → its entry block, `Block` → itself, `DiGraph` → itself. Entries (call and
+edge arguments) merge into a unit's parameters through the analysis policy —
+join, then widen by visits — and schedule the unit on first reach or when a
+parameter rose. A graph is one unit because a single dependency-ordered pass is
+*exact* for a DAG — no intra-graph widening is needed, and convergence pressure
+comes only from entry widening when a new call site raises the graph's ports. On
+completion a graph has no successor edges; its declared yields become the
 function's return contribution. `UnGraph` bodies are rejected with
 `NoDefaultWalker`: an undirected graph has no derivable traversal order, and
 unlike the concrete engine's `CallBodyTraversal` there is currently no seam
@@ -1014,8 +1023,8 @@ StatementDispatch + BlockQueries + DiGraphQueries` —
 `analysis_merge`, `contribute_return`, and `summarize_call`. It does **not**
 extend `CallServices`: `AbstractCallFrame`'s single engine requirement is
 `summarize_call`, so summarizing a call needs no call convention at all. Nor
-`CFGQueries`, since the entry block of a callable body arrives via `Owner`
-seeding rather than `cfg_entry`. The interprocedural protocol stays **atomic in
+`CFGQueries`, since the entry unit of a callable body arrives via the
+driver's `contribute_call_entry` rather than `cfg_entry`. The interprocedural protocol stays **atomic in
 the engine**:
 `summarize_call` performs resolve → key → join-into-callee-entry → record-caller
 (*including same-key recursion*) → read-return-summary in one step, so a custom
@@ -1142,20 +1151,23 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
     values, mirroring the forward per-value model. Helpers are
     `is_demanded`/`demand` (on `DemandInterp`)/`effect()` plus the purity-aware `demand_uses_if_observable`
     (rather than the sketched `live_after`/`use_def` names); the effect is
-    `SparseBackwardEffect::Demands` or `Call`. Summary owners ARE context-qualified
-    fact locations (`Scoped<K, SSAValue>`), so the fixpoint driver's default
-    self-dependent index is the demand worklist; scf converges loop-carried
+    `SparseBackwardEffect::Demands` or `Call`. Facts are keyed
+    `(EnvIndex, SSAValue)`, and a rise reruns the statements that translate it
+    (work items `(EnvIndex, Statement)`); scf converges loop-carried
     demand with **no frames**, and demand crosses calls on the same worklist
     (see [Interprocedural demand](#interprocedural-demand)).
   - **Classic per-point liveness** (`ClassicLiveness`,
     `DenseBackwardInterpreter`): here `Interp::Value` *is* the point state
     (`LiveSet`), realizing the sketch's `Value = LiveSet` — with the textbook
-    kill/gen transfer (`gen_uses_kill_defs`, purity-irrelevant). Block owners
-    and point facts are keyed by the analyzed callable
-    (`Scoped<LinkTarget, _>`), which `analyze` returns. Block owners
-    converge boundary summaries; `live_before`/`live_after` are reconstructed
-    per point on demand (never persisted by the fixpoint); scf owns dense
-    frames (arm-join, loop fixpoint). Classic liveness consumes finalized IR
+    kill/gen transfer (`gen_uses_kill_defs`, purity-irrelevant). Each
+    `analyze` solves one callable from fresh state in one `EnvStore`
+    environment; work items are `(EnvIndex, Body::Block(block))`, and every
+    recorded program point (block boundaries, `Before`/`After` statement
+    points, nested structured-block boundaries) joins into that environment,
+    so a block's `BlockEntry` always equals its first statement's `Before`.
+    A rise of a block's `BlockEntry` reruns the predecessors that read it.
+    Queries take a bare `ProgramPoint` (the callable is the one `analyze`
+    returned); scf owns dense frames (arm-join, loop fixpoint). Classic liveness consumes finalized IR
     directly and does not require a sparse-demand pre-pass.
   The two analyses live in separate crates (`kirin-demand`, `kirin-liveness`)
   that do not depend on each other. Filtering a dense set by demand drops

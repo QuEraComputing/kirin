@@ -23,7 +23,7 @@
 //!   context), the discovered contexts' metadata, the dispatch location, and
 //!   the per-rule buffers.
 //! - the **[`StandardFixpointInterpreter`]** driver owns the worklist and the
-//!   call-boundary callers ([`DemandCallers`]). It keeps no summaries.
+//!   call-boundary callers ([`DemandCallers`]).
 //!
 //! # Work is a statement; a fact is a value
 //!
@@ -64,8 +64,8 @@ use crate::core::query;
 use crate::{
     AbstractInterpreter, Body, CallEffect, Callee, ContextInsensitive, EnvIndex, EnvStore,
     FixpointProfile, Interp, InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker,
-    OwnerAnalysis, SameStageLinker, SparseBackwardSemantic, SparseStore, StageQuery,
-    StandardFixpointInterpreter, StrongDemand, SummaryEffect, TerminatorArgs,
+    SameStageLinker, SparseBackwardSemantic, SparseStore, StageQuery,
+    StandardFixpointInterpreter, StrongDemand, TerminatorArgs, WorkAnalysis,
 };
 
 /// A resolved `(stage, body)` pair: the structure one callable context
@@ -320,7 +320,7 @@ pub(super) type DemandUpdate<V> = (EnvIndex, SSAValue, V);
 pub type DemandCallers = HashMap<(EnvIndex, SSAValue), Vec<DemandWork>>;
 
 /// The work-item type family for the sparse backward engine. Facts live in
-/// the transfer's [`EnvStore`], so the driver keeps no summaries.
+/// the transfer's [`EnvStore`].
 pub struct SparseBackwardProfile<V, E> {
     _marker: PhantomData<fn() -> (V, E)>,
 }
@@ -334,8 +334,7 @@ where
     P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
-    type SummaryKey = DemandWork;
-    type Summary = ();
+    type Work = DemandWork;
     type Frame = DemandFrame<V>;
     type Completion = Vec<(SSAValue, V)>;
 }
@@ -355,7 +354,6 @@ pub type SparseBackwardDriver<
     SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>,
     SparseBackwardProfile<V, E>,
     DemandCallers,
-    (),
 >;
 
 // ===========================================================================
@@ -727,7 +725,7 @@ where
             call.inputs,
         )?;
         let work = *self
-            .current_owner()
+            .current_work()
             .ok_or_else(|| E::from(CALL_OUTSIDE_WORK))?;
         let params = self.inner().entry_params(target)?;
         if params.len() != call.outputs.len() {
@@ -768,26 +766,24 @@ where
     }
 
     fn schedule_work(&mut self, work: DemandWork) {
-        self.summaries_mut().insert(work, ());
         self.schedule(work);
     }
 }
 
 // ===========================================================================
-// Owner semantics: one work item = one statement's rule in one context
+// Work analysis: one work item = one statement's rule in one context
 // ===========================================================================
 
-pub(super) struct SparseBackwardOwnerAnalysis;
+pub(super) struct SparseBackwardWorkAnalysis;
 
 impl<'ir, S, V, E, Lk, P, Sem>
-    OwnerAnalysis<
+    WorkAnalysis<
         SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
         DemandWork,
-        (),
         DemandFrame<V>,
         Vec<(SSAValue, V)>,
         E,
-    > for SparseBackwardOwnerAnalysis
+    > for SparseBackwardWorkAnalysis
 where
     S: StageMeta + StageQuery + InterpDispatch<SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom,
@@ -796,19 +792,10 @@ where
     P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
-    fn bottom_summary(
-        &mut self,
-        _interp: &mut SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
-        _owner: &DemandWork,
-    ) -> Result<(), E> {
-        Ok(())
-    }
-
     fn entry_frame(
         &mut self,
         interp: &mut SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
         &(env, statement): &DemandWork,
-        _summary: &(),
     ) -> Result<DemandFrame<V>, E> {
         let stage = interp
             .inner()
@@ -820,12 +807,12 @@ where
         Ok(DemandFrame::new(env, stage, statement))
     }
 
-    fn complete_owner(
+    fn complete_work(
         &mut self,
         interp: &mut SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
         (env, _): DemandWork,
         completion: Vec<(SSAValue, V)>,
-    ) -> Result<SummaryEffect<DemandWork, ()>, E> {
+    ) -> Result<(), E> {
         // Discover the contexts the work's calls crossed into before merging
         // anything, then merge the rule's local demands and the routed
         // outputs.
@@ -836,7 +823,7 @@ where
         for update in activations {
             interp.raise(update)?;
         }
-        Ok(SummaryEffect::None)
+        Ok(())
     }
 }
 
@@ -909,11 +896,7 @@ where
     fn from_transfer(transfer: SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>) -> Self {
         Self {
             root: None,
-            driver: StandardFixpointInterpreter::with_dependency_index(
-                transfer,
-                DemandCallers::new(),
-                (),
-            ),
+            driver: StandardFixpointInterpreter::new(transfer, DemandCallers::new()),
         }
     }
 
@@ -1083,7 +1066,7 @@ where
             self.driver.raise(update)?;
         }
         self.driver
-            .drain_worklist(&mut SparseBackwardOwnerAnalysis)?;
+            .drain_worklist(&mut SparseBackwardWorkAnalysis)?;
         let params = self.driver.inner().entry_params(target)?;
         let facts = self.driver.inner().param_facts(env, &params)?;
         self.root = Some(root);

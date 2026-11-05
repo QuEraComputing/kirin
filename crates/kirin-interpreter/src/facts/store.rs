@@ -10,13 +10,13 @@
 use kirin_ir::SSAValue;
 use rustc_hash::FxHashMap;
 
-use super::anchor::{Change, LatticeAnchor, Scoped};
+use super::anchor::LatticeAnchor;
 
 /// One interpreter value or analysis fact per [`LatticeAnchor`].
 ///
 /// Missing anchors return `None`. Concrete engines report unbound values;
 /// abstract engines can interpret absence as bottom. Assignment never joins
-/// implicitly; [`join_with`](Self::join_with) takes an explicit bottom and merge.
+/// implicitly.
 ///
 /// Anchors are small integer ids or tuples of them, so the map uses Fx hashing
 /// instead of the std default (SipHash).
@@ -81,41 +81,15 @@ impl<A: LatticeAnchor, F> FactStore<A, F> {
     }
 }
 
-impl<A: LatticeAnchor, F: PartialEq> FactStore<A, F> {
-    /// Join `incoming` into the fact at `anchor` using `merge`, reporting
-    /// whether the stored fact changed. `bottom` supplies the implicit fact
-    /// for an absent anchor.
-    pub fn join_with(
-        &mut self,
-        anchor: A,
-        incoming: &F,
-        bottom: &F,
-        merge: impl Fn(&F, &F) -> F,
-    ) -> Change {
-        let old = self.facts.get(&anchor).unwrap_or(bottom);
-        let merged = merge(old, incoming);
-        if &merged == old {
-            Change::Unchanged
-        } else {
-            self.facts.insert(anchor, merged);
-            Change::Changed
-        }
-    }
-}
-
 /// A sparse store keyed by SSA values, for sparse-shaped analyses
 /// ([`SparseForwardShape`](crate::SparseForwardShape) /
 /// [`SparseBackwardShape`](crate::SparseBackwardShape)).
 pub type SparseStore<F> = FactStore<SSAValue, F>;
 
-/// A sparse store whose SSA-value anchors are scope-qualified: the same value
-/// under two scopes is two distinct facts.
-pub type ScopedSparseStore<K, F> = FactStore<Scoped<K, SSAValue>, F>;
-
 #[cfg(test)]
 mod tests {
-    use crate::{Body, BodyScope, ProgramPoint};
-    use kirin_ir::{Block, CFG, CompileStage, Id, Statement, TestSSAValue};
+    use crate::ProgramPoint;
+    use kirin_ir::{Block, Id, Statement, TestSSAValue};
 
     use super::*;
 
@@ -124,7 +98,7 @@ mod tests {
     }
 
     #[test]
-    fn fact_store_get_set_join() {
+    fn fact_store_get_set() {
         let mut store: SparseStore<u32> = FactStore::new();
         assert!(store.is_empty());
         assert_eq!(store.get(ssa(1)), None);
@@ -134,13 +108,10 @@ mod tests {
         assert_eq!(store.get(ssa(1)), Some(&3));
         assert_eq!(store.len(), 1);
 
-        // Join with max: rising changes, non-rising doesn't.
-        let max = |a: &u32, b: &u32| *a.max(b);
-        assert_eq!(store.join_with(ssa(1), &5, &0, max), Change::Changed);
-        assert_eq!(store.join_with(ssa(1), &4, &0, max), Change::Unchanged);
+        // Assignment replaces the stored fact.
+        store.set(ssa(1), 5);
+        store.set(ssa(2), 1);
         assert_eq!(store.get(ssa(1)), Some(&5));
-        // An absent anchor joins from the supplied bottom.
-        assert_eq!(store.join_with(ssa(2), &1, &0, max), Change::Changed);
 
         let mut pairs: Vec<(SSAValue, u32)> =
             store.iter().map(|(anchor, fact)| (anchor, *fact)).collect();
@@ -149,62 +120,22 @@ mod tests {
     }
 
     #[test]
-    fn scoped_anchors_keep_scopes_distinct() {
-        type Scope = (CompileStage, CFG);
-        let scope_a: Scope = (
-            CompileStage::from(Id::from(ssa(100))),
-            CFG::from(Id::from(ssa(200))),
-        );
-        let scope_b: Scope = (
-            CompileStage::from(Id::from(ssa(101))),
-            CFG::from(Id::from(ssa(200))),
-        );
-
-        let mut store: ScopedSparseStore<Scope, &'static str> = FactStore::new();
-        // The SAME SSA value under two scopes is two distinct facts.
-        store.set(Scoped::new(scope_a, ssa(7)), "a");
-        store.set(Scoped::new(scope_b, ssa(7)), "b");
-
-        assert_eq!(store.len(), 2);
-        assert_eq!(store.get(Scoped::new(scope_a, ssa(7))), Some(&"a"));
-        assert_eq!(store.get(Scoped::new(scope_b, ssa(7))), Some(&"b"));
-        assert!(!store.contains(Scoped::new(scope_a, ssa(8))));
-    }
-
-    #[test]
-    fn scoped_dense_facts_keep_block_and_statement_boundaries_distinct() {
+    fn dense_facts_keep_block_and_statement_boundaries_distinct() {
         let block = Block::from(Id::from(ssa(0)));
         let other = Block::from(Id::from(ssa(1)));
         let statement = Statement::from(Id::from(ssa(3)));
 
-        let scope: BodyScope = (
-            CompileStage::from(Id::from(ssa(10))),
-            Body::CFG(CFG::from(Id::from(ssa(11)))),
-        );
-        let point = |item| Scoped::new(scope, item);
-        let mut store: FactStore<Scoped<BodyScope, ProgramPoint>, &'static str> = FactStore::new();
-        store.set(point(ProgramPoint::BlockEntry(block)), "in");
-        store.set(point(ProgramPoint::BlockExit(block)), "out");
-        store.set(point(ProgramPoint::Before(statement)), "before");
-        store.set(point(ProgramPoint::After(statement)), "after");
+        let mut store: FactStore<ProgramPoint, &'static str> = FactStore::new();
+        store.set(ProgramPoint::BlockEntry(block), "in");
+        store.set(ProgramPoint::BlockExit(block), "out");
+        store.set(ProgramPoint::Before(statement), "before");
+        store.set(ProgramPoint::After(statement), "after");
 
-        assert_eq!(
-            store.get(point(ProgramPoint::BlockEntry(block))),
-            Some(&"in")
-        );
-        assert_eq!(
-            store.get(point(ProgramPoint::BlockExit(block))),
-            Some(&"out")
-        );
-        assert_eq!(store.get(point(ProgramPoint::BlockEntry(other))), None);
-        assert_eq!(
-            store.get(point(ProgramPoint::Before(statement))),
-            Some(&"before")
-        );
-        assert_eq!(
-            store.get(point(ProgramPoint::After(statement))),
-            Some(&"after")
-        );
+        assert_eq!(store.get(ProgramPoint::BlockEntry(block)), Some(&"in"));
+        assert_eq!(store.get(ProgramPoint::BlockExit(block)), Some(&"out"));
+        assert_eq!(store.get(ProgramPoint::BlockEntry(other)), None);
+        assert_eq!(store.get(ProgramPoint::Before(statement)), Some(&"before"));
+        assert_eq!(store.get(ProgramPoint::After(statement)), Some(&"after"));
         assert_eq!(store.len(), 4);
     }
 }

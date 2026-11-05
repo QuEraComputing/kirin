@@ -5,5 +5,5 @@
 pub(crate) mod anchor;
 pub(crate) mod store;
 
-pub use anchor::{Change, LatticeAnchor, ProgramPoint, Scoped};
-pub use store::{FactStore, ScopedSparseStore, SparseStore};
+pub use anchor::{LatticeAnchor, ProgramPoint};
+pub use store::{FactStore, SparseStore};

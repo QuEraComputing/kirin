@@ -26,7 +26,6 @@
 //! - the **[`StandardFixpointInterpreter`]** driver owns the block worklist
 //!   and the readers of each block's entry point ([`DenseReaders`],
 //!   registered by [`absorb_edges`](DenseBackwardFrameEngine::absorb_edges)).
-//!   It keeps no summaries.
 //!
 //! # Work is a block walk; facts are program points
 //!
@@ -60,8 +59,8 @@ use crate::core::query;
 use crate::{
     AbstractInterpreter, BlockQueries, Callee, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
     EnvStore, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, LinkTarget, Linker, OwnerAnalysis, ProgramPoint, SameStageLinker, StageQuery,
-    StandardFixpointInterpreter, StatementDispatch, SummaryEffect, TerminatorArgs,
+    InterpreterError, LinkTarget, Linker, ProgramPoint, SameStageLinker, StageQuery,
+    StandardFixpointInterpreter, StatementDispatch, TerminatorArgs, WorkAnalysis,
 };
 
 // ===========================================================================
@@ -336,7 +335,7 @@ pub(super) type DenseWork = (EnvIndex, Body);
 pub type DenseReaders = HashMap<(EnvIndex, ProgramPoint), Vec<DenseWork>>;
 
 /// The work-item type family for the dense backward engine. Facts live in the
-/// transfer's [`EnvStore`], so the driver keeps no summaries.
+/// transfer's [`EnvStore`].
 pub struct DenseBackwardProfile<V, E, F> {
     #[allow(clippy::type_complexity)]
     _marker: PhantomData<fn() -> (V, E, F)>,
@@ -350,8 +349,7 @@ where
     E: From<InterpreterError>,
     Sem: DenseBackwardSemantic,
 {
-    type SummaryKey = DenseWork;
-    type Summary = ();
+    type Work = DenseWork;
     type Frame = F;
     type Completion = DenseBackwardCompletion<V>;
 }
@@ -372,7 +370,6 @@ pub type DenseBackwardDriver<'ir, S, V, E, F, Sem = ClassicLiveness> = StandardF
     DenseBackwardTransfer<'ir, S, V, E, F, Sem>,
     DenseBackwardProfile<V, E, F>,
     DenseReaders,
-    (),
 >;
 
 // ===========================================================================
@@ -446,10 +443,10 @@ where
     Sem: DenseBackwardSemantic,
 {
     /// The work item being walked.
-    fn current_work(&self) -> Result<DenseWork, E> {
-        self.current_owner()
+    fn active_work(&self) -> Result<DenseWork, E> {
+        self.current_work()
             .copied()
-            .ok_or_else(|| E::from(InterpreterError::Custom("no active backward owner")))
+            .ok_or_else(|| E::from(InterpreterError::Custom("no active backward work")))
     }
 }
 
@@ -530,13 +527,13 @@ where
     }
 
     fn record_point(&mut self, point: ProgramPoint, facts: V) -> Result<(), E> {
-        let (env, _) = self.current_work()?;
+        let (env, _) = self.active_work()?;
         self.inner_mut().record(env, point, &facts)?;
         Ok(())
     }
 
     fn absorb_edges(&mut self, stage: CompileStage, edges: &[SuccessorEdge]) -> Result<V, E> {
-        let current = self.current_work()?;
+        let current = self.active_work()?;
         let env = current.0;
 
         let mut out = V::bottom();
@@ -578,23 +575,22 @@ where
 }
 
 // ===========================================================================
-// Owner analysis: one work item = one block walk
+// Work analysis: one work item = one block walk
 // ===========================================================================
 
-struct DenseBackwardOwnerAnalysis;
+struct DenseBackwardWorkAnalysis;
 
 const NOT_A_BLOCK: InterpreterError =
     InterpreterError::Custom("dense backward work must be a CFG block");
 
 impl<'ir, S, V, E, F, Sem>
-    OwnerAnalysis<
+    WorkAnalysis<
         DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         DenseWork,
-        (),
         F,
         DenseBackwardCompletion<V>,
         E,
-    > for DenseBackwardOwnerAnalysis
+    > for DenseBackwardWorkAnalysis
 where
     S: StageMeta + StageQuery + InterpDispatch<DenseBackwardTransfer<'ir, S, V, E, F, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom + PointFacts,
@@ -602,19 +598,10 @@ where
     Sem: DenseBackwardSemantic,
     F: From<DenseBlockFrame<V, E>>,
 {
-    fn bottom_summary(
-        &mut self,
-        _interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        _owner: &DenseWork,
-    ) -> Result<(), E> {
-        Ok(())
-    }
-
     fn entry_frame(
         &mut self,
         interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         &(env, body): &DenseWork,
-        _summary: &(),
     ) -> Result<F, E> {
         let Body::Block(block) = body else {
             return Err(E::from(NOT_A_BLOCK));
@@ -626,12 +613,12 @@ where
         Ok(DenseBlockFrame::cfg_owner(target.stage, env, block).into())
     }
 
-    fn complete_owner(
+    fn complete_work(
         &mut self,
         interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         (env, body): DenseWork,
         completion: DenseBackwardCompletion<V>,
-    ) -> Result<SummaryEffect<DenseWork, ()>, E> {
+    ) -> Result<(), E> {
         let Body::Block(block) = body else {
             return Err(E::from(NOT_A_BLOCK));
         };
@@ -654,7 +641,7 @@ where
                 interp.schedule(reader);
             }
         }
-        Ok(SummaryEffect::None)
+        Ok(())
     }
 }
 
@@ -696,10 +683,9 @@ where
 {
     pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
-            driver: StandardFixpointInterpreter::with_dependency_index(
+            driver: StandardFixpointInterpreter::new(
                 DenseBackwardTransfer::new(pipeline),
                 DenseReaders::new(),
-                (),
             ),
             linker: SameStageLinker,
         }
@@ -815,11 +801,11 @@ where
         let env = transfer.env.get_or_allocate(target);
         transfer.root = Some((target, env));
         self.driver =
-            StandardFixpointInterpreter::with_dependency_index(transfer, DenseReaders::new(), ());
+            StandardFixpointInterpreter::new(transfer, DenseReaders::new());
 
         let work = blocks.into_iter().map(|block| (env, Body::Block(block)));
         self.driver
-            .solve_many(&mut DenseBackwardOwnerAnalysis, work)?;
+            .solve_many(&mut DenseBackwardWorkAnalysis, work)?;
         Ok((target, self))
     }
 }

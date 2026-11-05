@@ -20,7 +20,6 @@
 //! contributes these continuations through an explicit engine composition.
 
 use std::collections::VecDeque;
-use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin::prelude::Lattice;
@@ -699,19 +698,18 @@ where
 /// condition is undecided in the value domain — both arms, joining their finish
 /// results. The "both arms + join" structured behavior is owned here; the
 /// framework has no alternatives concept.
-pub struct AbstractScfIfFrame<V, E, K> {
+pub struct AbstractScfIfFrame<V, E> {
     stage: CompileStage,
     env: EnvIndex,
     remaining: VecDeque<Block>,
     acc: Option<Product<V>>,
-    _marker: PhantomData<fn() -> (E, K)>,
+    _marker: PhantomData<fn() -> E>,
 }
 
-impl<V, E, K> AbstractScfIfFrame<V, E, K>
+impl<V, E> AbstractScfIfFrame<V, E>
 where
     V: Clone + PartialEq,
     E: From<InterpreterError>,
-    K: Clone + Eq + std::hash::Hash,
 {
     pub fn new(
         stage: CompileStage,
@@ -747,13 +745,12 @@ where
     }
 }
 
-impl<I, F, V, E, K> Frame<I, F> for AbstractScfIfFrame<V, E, K>
+impl<I, F, V, E> Frame<I, F> for AbstractScfIfFrame<V, E>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>,
-    F: From<AbstractBlockFrame<V, E, K>>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E>,
+    F: From<AbstractBlockFrame<V, E>>,
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
@@ -926,7 +923,7 @@ where
 /// analysis threshold, until the entry is stable. Finish values join across the
 /// possible exits (including the zero-iteration "skip" when the loop condition
 /// is undecided). Loop policy lives here, not in the framework.
-pub struct AbstractScfForFrame<V, E, K> {
+pub struct AbstractScfForFrame<V, E> {
     stage: CompileStage,
     env: EnvIndex,
     body: Block,
@@ -940,14 +937,13 @@ pub struct AbstractScfForFrame<V, E, K> {
     finish: Option<Product<V>>,
     iterations: usize,
     entered: bool,
-    _marker: PhantomData<fn() -> (E, K)>,
+    _marker: PhantomData<fn() -> E>,
 }
 
-impl<V, E, K> AbstractScfForFrame<V, E, K>
+impl<V, E> AbstractScfForFrame<V, E>
 where
     V: Clone + PartialEq + ForLoopValue,
     E: From<InterpreterError>,
-    K: Clone + Eq + std::hash::Hash,
 {
     pub fn new(
         stage: CompileStage,
@@ -997,13 +993,12 @@ where
     }
 }
 
-impl<I, F, V, E, K> Frame<I, F> for AbstractScfForFrame<V, E, K>
+impl<I, F, V, E> Frame<I, F> for AbstractScfForFrame<V, E>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>,
-    F: From<AbstractBlockFrame<V, E, K>>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E>,
+    F: From<AbstractBlockFrame<V, E>>,
     V: Clone + PartialEq + ForLoopValue + Lattice,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
