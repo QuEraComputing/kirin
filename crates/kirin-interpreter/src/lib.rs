@@ -85,8 +85,8 @@ pub use kirin_ir::Body;
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
 pub use engines::sparse_forward::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, CallContext,
-    ContextInsensitive, ForwardAnchor, SparseForwardInterpreter, SparseForwardTransfer,
-    StandardAbstractFrame, WideningStrategy,
+    ContextInsensitive, SparseForwardInterpreter, SparseForwardTransfer, StandardAbstractFrame,
+    WideningStrategy,
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{

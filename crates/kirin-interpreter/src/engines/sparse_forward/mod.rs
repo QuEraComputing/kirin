@@ -10,6 +10,6 @@ pub use frames::{
     StandardAbstractFrame,
 };
 pub use interp::{
-    CallContext, ContextInsensitive, ForwardAnchor, SparseForwardInterpreter,
-    SparseForwardTransfer, WideningStrategy,
+    CallContext, ContextInsensitive, SparseForwardInterpreter, SparseForwardTransfer,
+    WideningStrategy,
 };

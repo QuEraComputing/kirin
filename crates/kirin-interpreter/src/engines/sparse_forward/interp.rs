@@ -9,14 +9,13 @@
 //! - **[`SparseForwardTransfer`]** is the [`Interp`] delegate and the target
 //!   of rule dispatch: pipeline, linker, the [`EnvStore`] container (one
 //!   environment per analysis context, addressed by the policy's context key,
-//!   holding SSA facts and the function's return slots), the contexts'
-//!   metadata, analysis policy, per-walk return accumulator, and read/write
-//!   logging; it provides the dialect-dispatch / IR-query surface
+//!   holding SSA facts), the contexts (entry, return, and callers), analysis
+//!   policy, and read/write logging; it provides the dialect-dispatch /
+//!   IR-query surface
 //!   ([`StatementDispatch`], [`BlockQueries`], [`CFGQueries`],
 //!   [`DiGraphQueries`], and — for concrete-shaped callers — [`CallServices`]).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the worklist and the
-//!   readers of each fact (blocks that read a value they do not define,
-//!   callers of a function's return).
+//!   readers of each SSA fact (blocks that read a value they do not define).
 //!
 //! # Work items
 //!
@@ -25,10 +24,10 @@
 //! into the environment ([`EnvStore::join`]); entries — a call's arguments, a
 //! CFG edge's arguments — merge into the unit's parameters through the
 //! analysis policy (join, then widen by visits) and schedule the unit on first
-//! reach or when a parameter rose. A reached `ret` joins into the function's
-//! return slots and wakes their callers. Direct dominated cross-block SSA uses
-//! are tracked by read logging, so a reader block reruns when a value it read
-//! directly rises.
+//! reach or when a parameter rose. A reached `ret` joins slot by slot into its
+//! context's return and, if it rose, reruns the context's callers. Direct
+//! dominated cross-block SSA uses are tracked by read logging, so a reader
+//! block reruns when a value it read directly rises.
 
 use std::cell::RefCell;
 use std::collections::{HashMap, HashSet};
@@ -45,9 +44,9 @@ use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
     BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
     EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval, Frame, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, LatticeAnchor, LinkTarget, Linker,
-    SSABinding, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
-    StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, WorkAnalysis,
+    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, SSABinding,
+    SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
+    StandardFixpointInterpreter, StatementDispatch, WorkAnalysis,
 };
 
 // ===========================================================================
@@ -119,35 +118,26 @@ where
 // Anchors, contexts, work items
 // ===========================================================================
 
-/// Where a forward fact lives in an environment: an SSA value, or slot `i` of
-/// the function's return. Dialect rules only ever name SSA values
-/// ([`Env::Anchor`] stays [`SSAValue`]); return slots are the engine's own.
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum ForwardAnchor {
-    /// The fact of an SSA value.
-    Value(SSAValue),
-    /// Slot `i` of the function's return, joined over every reached `ret`.
-    Return(usize),
-}
-
-impl LatticeAnchor for ForwardAnchor {}
-
-/// One selected function context: what it analyzes. Metadata, not facts.
-struct ForwardContext {
+/// One selected function context: what it analyzes, what it returns, and who
+/// reads the return.
+struct ForwardContext<V> {
     stage: CompileStage,
     /// The unit a call enters: the CFG's entry block, a block body, or a graph.
     entry: Body,
-    /// Set by the first reached return; `None` means no return reached yet.
-    return_arity: Option<usize>,
+    /// The join of every reached return; `None` means no return reached yet,
+    /// which differs from a reached zero-value return.
+    ret: Option<Product<V>>,
+    /// The walks that call this context, rerun when `ret` rises.
+    callers: Vec<ForwardWork>,
 }
 
 /// One forward work item: walk `Body` (a CFG block as [`Body::Block`], or a
 /// graph as [`Body::DiGraph`]) in the environment `EnvIndex`.
 pub(super) type ForwardWork = (EnvIndex, Body);
 
-/// The driver's `store` slot: the work to rerun when a fact rises — blocks
-/// that read a value they do not define, and callers of a function's return.
-pub(super) type ForwardReaders = HashMap<(EnvIndex, ForwardAnchor), Vec<ForwardWork>>;
+/// The driver's `store` slot: the walks to rerun when an SSA fact rises —
+/// blocks that read a value they do not define.
+pub(super) type ForwardReaders = HashMap<(EnvIndex, SSAValue), Vec<ForwardWork>>;
 
 /// The work-item type family for the forward engine. Facts live in the
 /// transfer's [`EnvStore`].
@@ -203,19 +193,17 @@ pub struct SparseForwardTransfer<
     pipeline: &'ir Pipeline<S>,
     linker: Lk,
     /// One environment per analysis context, addressed by the policy's context
-    /// key: SSA facts and return slots. Blocks of the same context share it
-    /// (so direct dominated cross-block uses resolve); distinct contexts are
-    /// isolated.
-    env: EnvStore<<P as CallContext<V>>::Key, ForwardAnchor, V>,
+    /// key. Blocks of the same context share it (so direct dominated
+    /// cross-block uses resolve); distinct contexts are isolated.
+    env: EnvStore<<P as CallContext<V>>::Key, SSAValue, V>,
     /// Selected contexts, by environment.
-    contexts: HashMap<EnvIndex, ForwardContext>,
+    contexts: HashMap<EnvIndex, ForwardContext<V>>,
     /// Entry merges per unit, for widening by visits. A unit is reached once
     /// it has an entry here.
     entry_joins: HashMap<ForwardWork, usize>,
     analysis: P,
     max_iterations: usize,
     location: Option<InterpLocation>,
-    ret_acc: Option<Product<V>>,
     /// SSA values read during the current walk (interior-mutable because
     /// [`Env::env_read`] takes `&self`).
     read_log: RefCell<Vec<SSAValue>>,
@@ -255,7 +243,6 @@ where
             analysis,
             max_iterations: 1000,
             location: None,
-            ret_acc: None,
             read_log: RefCell::new(Vec::new()),
             write_log: Vec::new(),
             risen_log: Vec::new(),
@@ -298,17 +285,17 @@ where
     }
 
     /// A selected context's metadata.
-    fn context(&self, env: EnvIndex) -> Result<&ForwardContext, InterpreterError> {
+    fn context(&self, env: EnvIndex) -> Result<&ForwardContext<V>, InterpreterError> {
         self.contexts.get(&env).ok_or(UNSELECTED)
     }
 
-    /// The fact at `anchor` in `env`, without logging; absent is bottom.
-    fn fact<E2>(&self, env: EnvIndex, anchor: ForwardAnchor) -> Result<V, E2>
+    /// The fact of `value` in `env`, without logging; absent is bottom.
+    fn fact<E2>(&self, env: EnvIndex, value: SSAValue) -> Result<V, E2>
     where
         V: Clone + HasBottom,
         E2: From<InterpreterError>,
     {
-        Ok(self.env.read(env, anchor)?.unwrap_or_else(V::bottom))
+        Ok(self.env.read(env, value)?.unwrap_or_else(V::bottom))
     }
 
     /// Begin logging reads/writes for a walk.
@@ -351,7 +338,7 @@ where
     }
 }
 
-// Policy-driven merge + return accumulation, kept on the transfer (the analysis `P`
+// Policy-driven merge, kept on the transfer (the analysis `P`
 // lives here). The driver's `ForwardDataflowFrameEngine` impl delegates to these.
 impl<'ir, S: StageMeta, V, E, Lk, P, F, Sem> SparseForwardTransfer<'ir, S, V, E, Lk, P, F, Sem>
 where
@@ -374,25 +361,6 @@ where
     /// Key a resolved call target through the analysis.
     fn key(&mut self, target: &LinkTarget, args: &Product<V>) -> <P as CallContext<V>>::Key {
         self.analysis.key(target, args)
-    }
-
-    fn take_ret_acc(&mut self) -> Option<Product<V>> {
-        self.ret_acc.take()
-    }
-
-    /// Join `incoming` into the return accumulator (never widens).
-    fn contribute_return(&mut self, incoming: Product<V>) -> Result<(), E> {
-        match &self.ret_acc {
-            None => self.ret_acc = Some(incoming),
-            Some(current) => {
-                self.ret_acc = Some(
-                    self.analysis
-                        .merge(current, &incoming, 0)
-                        .map_err(E::from)?,
-                );
-            }
-        }
-        Ok(())
     }
 }
 
@@ -443,12 +411,12 @@ where
         // An absent binding is bottom, not an error: this analysis may reach a
         // use before the definition's walk has run. An invalid environment
         // handle is still an error.
-        self.fact(index, ForwardAnchor::Value(value))
+        self.fact(index, value)
     }
 
     /// An abstract write is a contribution: it joins into the stored fact.
     fn env_write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
-        let rose = self.env.join(index, ForwardAnchor::Value(value), &data)?;
+        let rose = self.env.join(index, value, &data)?;
         if self.logging {
             self.write_log.push(value);
             if rose {
@@ -725,12 +693,17 @@ where
     }
 
     fn contribute_return(&mut self, values: Product<V>) -> Result<(), E> {
-        self.inner_mut().contribute_return(values)
+        let (env, _) = *self.current_work().ok_or_else(|| {
+            E::from(InterpreterError::Custom(
+                "a return was reached outside propagation work",
+            ))
+        })?;
+        self.raise_return(env, values)
     }
 
     /// Summarize a call atomically: resolve, merge the callee entry (which
-    /// schedules its entry unit), register the caller on each callee return
-    /// slot (including same-key self-recursion), and bind the callee's current
+    /// schedules its entry unit), register the caller on the callee's return
+    /// (including same-key self-recursion), and bind the callee's current
     /// return (or bottom per slot).
     fn summarize_call(
         &mut self,
@@ -752,11 +725,16 @@ where
                 "a call boundary was crossed outside propagation work",
             ))
         })?;
-        for slot in 0..results.len() {
-            self.subscribe(callee_env, ForwardAnchor::Return(slot), caller);
+        let context = self
+            .inner_mut()
+            .contexts
+            .get_mut(&callee_env)
+            .ok_or_else(|| E::from(UNSELECTED))?;
+        if !context.callers.contains(&caller) {
+            context.callers.push(caller);
         }
 
-        match self.call_return(callee_env)? {
+        match context.ret.clone() {
             Some(values) => self.bind_values(index, results.as_slice(), values),
             None => {
                 for slot in results.iter().copied() {
@@ -815,7 +793,8 @@ where
                 ForwardContext {
                     stage: target.stage,
                     entry,
-                    return_arity: None,
+                    ret: None,
+                    callers: Vec::new(),
                 },
             );
         }
@@ -847,7 +826,7 @@ where
         }
         let current: Product<V> = params
             .iter()
-            .map(|param| self.inner().fact(env, ForwardAnchor::Value(*param)))
+            .map(|param| self.inner().fact(env, *param))
             .collect::<Result<_, E>>()?;
         let visits = self.inner().entry_joins.get(&work).copied();
         let merged = match visits {
@@ -864,9 +843,9 @@ where
                 rose = true;
                 self.inner_mut()
                     .env
-                    .write(env, ForwardAnchor::Value(*param), new)
+                    .write(env, *param, new)
                     .map_err(E::from)?;
-                self.wake(env, ForwardAnchor::Value(*param));
+                self.wake(env, *param);
             }
         }
         if visits.is_none() || rose {
@@ -875,8 +854,8 @@ where
         Ok(())
     }
 
-    /// Join a reached return into the function's return slots and wake the
-    /// callers of every slot that rose. Every return of one function must have
+    /// Join a reached return into the function's return, slot by slot, and
+    /// rerun its callers if it rose. Every return of one function must have
     /// the same arity.
     fn raise_return(&mut self, env: EnvIndex, values: Product<V>) -> Result<(), E> {
         let context = self
@@ -884,52 +863,38 @@ where
             .contexts
             .get_mut(&env)
             .ok_or_else(|| E::from(UNSELECTED))?;
-        match context.return_arity {
-            None => context.return_arity = Some(values.len()),
-            Some(arity) if arity != values.len() => {
-                return Err(E::from(InterpreterError::ProductArityMismatch {
-                    expected: arity,
-                    actual: values.len(),
-                }));
-            }
-            Some(_) => {}
+        let ret = context
+            .ret
+            .get_or_insert_with(|| values.iter().map(|_| V::bottom()).collect());
+        if ret.len() != values.len() {
+            return Err(E::from(InterpreterError::ProductArityMismatch {
+                expected: ret.len(),
+                actual: values.len(),
+            }));
         }
-        for (slot, value) in values.into_iter().enumerate() {
-            let anchor = ForwardAnchor::Return(slot);
-            if self.inner_mut().env.join(env, anchor, &value)? {
-                self.wake(env, anchor);
+        let rose = ret
+            .iter_mut()
+            .zip(values.iter())
+            .fold(false, |rose, (slot, value)| slot.join_assign(value) | rose);
+        if rose {
+            for caller in context.callers.clone() {
+                self.schedule_work(caller);
             }
         }
         Ok(())
     }
 
-    /// The callee's current return. `None` means no return has been reached
-    /// yet, which differs from a reached zero-value return.
-    fn call_return(&self, env: EnvIndex) -> Result<Option<Product<V>>, E> {
-        let Some(arity) = self.inner().context(env)?.return_arity else {
-            return Ok(None);
-        };
-        (0..arity)
-            .map(|slot| self.inner().fact(env, ForwardAnchor::Return(slot)))
-            .collect::<Result<_, E>>()
-            .map(Some)
-    }
-
-    /// Register `work` as a reader of `anchor` in `env`.
-    fn subscribe(&mut self, env: EnvIndex, anchor: ForwardAnchor, work: ForwardWork) {
-        let readers = self.store_mut().entry((env, anchor)).or_default();
+    /// Register `work` as a reader of `value` in `env`.
+    fn subscribe(&mut self, env: EnvIndex, value: SSAValue, work: ForwardWork) {
+        let readers = self.store_mut().entry((env, value)).or_default();
         if !readers.contains(&work) {
             readers.push(work);
         }
     }
 
-    /// Schedule every reader of `anchor` in `env`.
-    fn wake(&mut self, env: EnvIndex, anchor: ForwardAnchor) {
-        let readers = self
-            .store()
-            .get(&(env, anchor))
-            .cloned()
-            .unwrap_or_default();
+    /// Schedule every reader of `value` in `env`.
+    fn wake(&mut self, env: EnvIndex, value: SSAValue) {
+        let readers = self.store().get(&(env, value)).cloned().unwrap_or_default();
         for reader in readers {
             self.schedule_work(reader);
         }
@@ -949,7 +914,7 @@ const UNSELECTED: InterpreterError =
 
 /// The forward work analysis: bind the unit's current entry parameters, walk
 /// it once, then register its cross-block reads, wake readers of what rose,
-/// merge its edges into successors, and join its return.
+/// and merge its edges into successors.
 struct SparseForwardWorkAnalysis<V> {
     _marker: PhantomData<fn() -> V>,
 }
@@ -989,7 +954,7 @@ where
             .inner()
             .entry_params(stage, body)?
             .into_iter()
-            .map(|param| interp.inner().fact(env, ForwardAnchor::Value(param)))
+            .map(|param| interp.inner().fact(env, param))
             .collect::<Result<_, E>>()?;
         interp.inner_mut().begin_block_log();
         match body {
@@ -1025,7 +990,7 @@ where
             }
         };
         if let Some(values) = graph_yields {
-            interp.contribute_return(values)?;
+            interp.raise_return(env, values)?;
         }
 
         // Register the walk's reads of values it did not write before waking
@@ -1035,21 +1000,17 @@ where
         let written: HashSet<SSAValue> = writes.into_iter().collect();
         for value in reads {
             if !written.contains(&value) {
-                interp.subscribe(env, ForwardAnchor::Value(value), work);
+                interp.subscribe(env, value, work);
             }
         }
         for value in risen {
-            interp.wake(env, ForwardAnchor::Value(value));
+            interp.wake(env, value);
         }
 
         // CFG edges merge into the successors' entry parameters. Empty for a
         // returning block and for a graph.
         for edge in edges {
             interp.merge_entry((env, Body::Block(edge.target)), edge.args)?;
-        }
-
-        if let Some(values) = interp.inner_mut().take_ret_acc() {
-            interp.raise_return(env, values)?;
         }
         Ok(())
     }
@@ -1191,14 +1152,7 @@ where
         };
         let transfer = self.driver.inner();
         let env = transfer.env.context_env(&target)?;
-        let arity = transfer.context(env).ok()?.return_arity?;
-        (0..arity)
-            .map(|slot| {
-                transfer
-                    .fact::<InterpreterError>(env, ForwardAnchor::Return(slot))
-                    .ok()
-            })
-            .collect()
+        transfer.context(env).ok()?.ret.clone()
     }
 }
 
@@ -1264,7 +1218,13 @@ where
         let mut analysis = SparseForwardWorkAnalysis::new();
         self.driver.drain_worklist(&mut analysis)?;
 
-        let ret = self.driver.call_return(env)?.unwrap_or_default();
+        let ret = self
+            .driver
+            .inner()
+            .context(env)?
+            .ret
+            .clone()
+            .unwrap_or_default();
         Ok((ret, self))
     }
 }

@@ -992,8 +992,8 @@ constructs a `ToyAbstractFrame` variant.
 **Work items and the body vocabulary.** The forward fixpoint's work items are
 `(EnvIndex, Body)`: `Body::Block` (one CFG block walk) and `Body::DiGraph` (one
 whole graph body). A context's entry arguments are its entry unit's parameter
-facts, and its return is the `Return(i)` slots of its environment; neither is a
-separate summary. `contribute_call_entry` is the single place a callable body
+facts, and its return is one `Option<Product<V>>` on the context, next to the
+walks that call it. `contribute_call_entry` is the single place a callable body
 becomes executable work, translating the closed `Body` vocabulary into a unit:
 `CFG` → its entry block, `Block` → itself, `DiGraph` → itself. Entries (call and
 edge arguments) merge into a unit's parameters through the analysis policy —
