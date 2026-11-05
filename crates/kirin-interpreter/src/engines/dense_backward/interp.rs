@@ -800,8 +800,7 @@ where
         let mut transfer = DenseBackwardTransfer::new(pipeline);
         let env = transfer.env.get_or_allocate(target);
         transfer.root = Some((target, env));
-        self.driver =
-            StandardFixpointInterpreter::new(transfer, DenseReaders::new());
+        self.driver = StandardFixpointInterpreter::new(transfer, DenseReaders::new());
 
         let work = blocks.into_iter().map(|block| (env, Body::Block(block)));
         self.driver

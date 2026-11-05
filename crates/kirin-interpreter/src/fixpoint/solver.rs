@@ -51,7 +51,11 @@ where
         Ok(())
     }
 
-    fn analyze_work<Analysis>(&mut self, analysis: &mut Analysis, work: P::Work) -> Result<(), I::Error>
+    fn analyze_work<Analysis>(
+        &mut self,
+        analysis: &mut Analysis,
+        work: P::Work,
+    ) -> Result<(), I::Error>
     where
         P::Frame: Frame<Self, Completion = P::Completion>,
         Analysis: WorkAnalysis<Self, P::Work, P::Frame, P::Completion, I::Error>,

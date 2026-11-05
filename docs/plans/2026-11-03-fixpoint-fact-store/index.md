@@ -426,3 +426,34 @@ constprop (`Owner<K>`, `value_readers`), then delete `Owner` and `Scoped`.
   `abstract_digraph_self_recursion_converges`), and factorial still gives
   `Const(120)`.
 
+## 18. B7: old summary layer removed
+
+- **Removed from `fixpoint/`:**
+  - `Summary` (and `impl Summary for ()`), `SummaryEffect`, `WorkItem`;
+  - the driver's `summaries` map and accessors, `dependency_index`/`_mut`;
+  - the solver's `ensure_owner`, `merge_summary`, `schedule_dependencies`
+    and `apply_summary_effect`;
+  - all of `deps.rs` (`SummaryDependency`, `SummaryDependencies`,
+    `SummaryDependencyIndex`, `OwnerSummaryDeps`, `ExplicitSummaryDeps`) and
+    the old layer's tests (`fixpoint/tests/`).
+- **Driver:** `StandardFixpointInterpreter<I, P, Store>`. The inert `Deps`
+  slot is gone instead of receiving the dependency maps (reverses the B4–B6
+  notes above): `ForwardReaders`, `DemandCallers` and `DenseReaders` stay
+  in the store slot. `new(inner, store)` replaces `with_dependency_index`.
+  The worklist holds work items directly.
+- **Profile and callbacks:** `FixpointProfile` is `Work`, `Frame`,
+  `Completion`. `OwnerAnalysis` is now `WorkAnalysis` with `entry_frame`
+  and `complete_work` (returns `Result<(), E>`); `current_owner` is
+  `current_work`. The engines' `*OwnerAnalysis` structs are
+  `*WorkAnalysis`, and their `bottom_summary`, summary-insert and
+  `SummaryEffect::None` shims are gone.
+- **Frames:** `ForwardDataflowFrameEngine` loses `SummaryKey` and
+  `current_function_key` (no callers). The phantom context key `K` is gone
+  from the six abstract frames, `StandardAbstractFrame` and toy-lang's
+  `ToyAbstractFrame`. `ForwardContext` loses its `key`, which only
+  `current_function_key` read.
+- **Facts:** `FactStore::join_with` and `facts::Change` are removed.
+- **Unchanged:** fact visibility, discovery, subscription, notification,
+  and worklist order. The per-engine buffers (`risen_log`, `demands`, dense
+  recording) and the phantom `E` are as before.
+

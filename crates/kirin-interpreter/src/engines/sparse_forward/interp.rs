@@ -133,8 +133,7 @@ pub enum ForwardAnchor {
 impl LatticeAnchor for ForwardAnchor {}
 
 /// One selected function context: what it analyzes. Metadata, not facts.
-struct ForwardContext<K> {
-    key: K,
+struct ForwardContext {
     stage: CompileStage,
     /// The unit a call enters: the CFG's entry block, a block body, or a graph.
     entry: Body,
@@ -209,7 +208,7 @@ pub struct SparseForwardTransfer<
     /// isolated.
     env: EnvStore<<P as CallContext<V>>::Key, ForwardAnchor, V>,
     /// Selected contexts, by environment.
-    contexts: HashMap<EnvIndex, ForwardContext<<P as CallContext<V>>::Key>>,
+    contexts: HashMap<EnvIndex, ForwardContext>,
     /// Entry merges per unit, for widening by visits. A unit is reached once
     /// it has an entry here.
     entry_joins: HashMap<ForwardWork, usize>,
@@ -278,16 +277,7 @@ where
     fn with_analysis<P2>(
         self,
         analysis: P2,
-    ) -> SparseForwardTransfer<
-        'ir,
-        S,
-        V,
-        E,
-        Lk,
-        P2,
-        StandardAbstractFrame<V, E>,
-        Sem,
-    >
+    ) -> SparseForwardTransfer<'ir, S, V, E, Lk, P2, StandardAbstractFrame<V, E>, Sem>
     where
         P2: CallContext<V>,
     {
@@ -308,10 +298,7 @@ where
     }
 
     /// A selected context's metadata.
-    fn context(
-        &self,
-        env: EnvIndex,
-    ) -> Result<&ForwardContext<<P as CallContext<V>>::Key>, InterpreterError> {
+    fn context(&self, env: EnvIndex) -> Result<&ForwardContext, InterpreterError> {
         self.contexts.get(&env).ok_or(UNSELECTED)
     }
 
@@ -808,7 +795,7 @@ where
         let target = self.inner().resolve_callee(lookup_stage, callee)?;
         let body = target.body(self.inner().pipeline()).map_err(E::from)?;
         let key = self.inner_mut().key(&target, &args);
-        let env = self.inner_mut().env.get_or_allocate(key.clone());
+        let env = self.inner_mut().env.get_or_allocate(key);
         if !self.inner().contexts.contains_key(&env) {
             // The one place a function becomes runnable work: a CFG's entry
             // block or a block body walk as a block; a graph is its own unit;
@@ -826,7 +813,6 @@ where
             self.inner_mut().contexts.insert(
                 env,
                 ForwardContext {
-                    key,
                     stage: target.stage,
                     entry,
                     return_arity: None,
@@ -991,8 +977,7 @@ where
     Lk: Linker<S>,
     P: CallContext<V> + WideningStrategy<V>,
     Sem: SparseForwardSemantic,
-    F: From<AbstractBlockFrame<V, E>>
-        + From<AbstractDiGraphFrame<V, E>>,
+    F: From<AbstractBlockFrame<V, E>> + From<AbstractDiGraphFrame<V, E>>,
 {
     fn entry_frame(
         &mut self,
@@ -1144,10 +1129,7 @@ where
     ) -> SparseForwardInterpreter<'ir, S, V, E, Lk2, P, F, Sem> {
         let transfer = self.driver.into_inner().with_linker(linker);
         SparseForwardInterpreter {
-            driver: StandardFixpointInterpreter::new(
-                transfer,
-                ForwardReaders::new(),
-            ),
+            driver: StandardFixpointInterpreter::new(transfer, ForwardReaders::new()),
         }
     }
 
@@ -1158,25 +1140,13 @@ where
     pub fn with_analysis<P2>(
         self,
         analysis: P2,
-    ) -> SparseForwardInterpreter<
-        'ir,
-        S,
-        V,
-        E,
-        Lk,
-        P2,
-        StandardAbstractFrame<V, E>,
-        Sem,
-    >
+    ) -> SparseForwardInterpreter<'ir, S, V, E, Lk, P2, StandardAbstractFrame<V, E>, Sem>
     where
         P2: CallContext<V>,
     {
         let transfer = self.driver.into_inner().with_analysis(analysis);
         SparseForwardInterpreter {
-            driver: StandardFixpointInterpreter::new(
-                transfer,
-                ForwardReaders::new(),
-            ),
+            driver: StandardFixpointInterpreter::new(transfer, ForwardReaders::new()),
         }
     }
 
@@ -1185,10 +1155,7 @@ where
     pub fn with_policy(self, analysis: P) -> Self {
         let transfer = self.driver.into_inner().with_policy(analysis);
         Self {
-            driver: StandardFixpointInterpreter::new(
-                transfer,
-                ForwardReaders::new(),
-            ),
+            driver: StandardFixpointInterpreter::new(transfer, ForwardReaders::new()),
         }
     }
 

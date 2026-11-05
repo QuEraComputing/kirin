@@ -426,21 +426,20 @@ belongs to.
 
 ## Engines
 
-The fixpoint driver uses `OwnerAnalysis` callbacks to initialize an owner's
-summary, construct its entry frame, and process its completion. The adapters
-`SparseForwardOwnerAnalysis`, `SparseBackwardOwnerAnalysis`, and
-`DenseBackwardOwnerAnalysis` supply these operations for their respective
+The fixpoint driver uses `WorkAnalysis` callbacks to construct a work item's
+entry frame and process its completion. The adapters
+`SparseForwardWorkAnalysis`, `SparseBackwardWorkAnalysis`, and
+`DenseBackwardWorkAnalysis` supply these operations for their respective
 engines. They do not select statement rules: `Interp::Semantics` remains the
-`SemanticKey` used for that dispatch. Solver parameters named `owner_analysis`
-and their generic type `Analysis` refer to these callbacks.
+`SemanticKey` used for that dispatch. Solver parameters named `analysis` and
+their generic type `Analysis` refer to these callbacks.
 
-`Summary::merge(candidate) -> bool` reports whether the summary changed; the
-driver then asks the dependency index which owners to reschedule. `solve_many`
-seeds the worklist, including single-root runs via a one-element iterator.
-`OwnerSummaryDeps` automatically reschedules a changed owner, while
-`ExplicitSummaryDeps` schedules only registered dependencies and is shared by
-the forward and dense-backward engines. Widening stays in the forward engine's
-analysis policy; the shared driver has no phase or strategy state.
+The driver holds the worklist and one engine-chosen side store (each engine's
+dependency map). An engine schedules dependents itself when a fact rises.
+`solve_many` seeds the worklist, including single-root runs via a one-element
+iterator; `drain_worklist` pops and analyses work items until it is empty.
+Widening stays in the forward engine's analysis policy; the shared driver has
+no phase or strategy state.
 
 ### `ConcreteInterpreter` and `ConcreteInterpreterCore`
 
@@ -470,7 +469,7 @@ member frames, organized along two independent axes:
   `CallBodyTraversal`; the default returns `NoDefaultWalker`.
 - **Entry context**: the same walker serves a *callable* body (entered
   through `CallFrame`) and a *nested structured-operation* body (entered
-  through a dialect frame); analysis owners are the abstract engines' third
+  through a dialect frame); analysis work items are the abstract engines' third
   context. Walkers never know their role — they surface exits through the
   completion protocol (`Completion::Returned` for a function `Return`,
   `Completion::Yielded` for a structured `Yield`, `Completion::Finished` for
@@ -562,8 +561,8 @@ after 64 admitted requests per target. Changing demand selects a new context; ex
 parameter-to-caller dependencies remain registered. A policy must select stable keys from a bounded
 space; a key naming two targets is an error. Facts live in the transfer's
 `EnvStore`, one environment per selected context, and merge with
-`EnvStore::join`; the driver keeps no summaries (`Summary = ()`) and holds
-only the worklist and the call-boundary callers. Selecting a context allocates
+`EnvStore::join`; the driver holds only the worklist and the call-boundary
+callers. Selecting a context allocates
 its environment at once, so a caller can register on its parameters before the
 deferred discovery scan runs. The per-context metadata (target, body, and the
 return operands per output) lives on the transfer, keyed by `EnvIndex`, and is
@@ -795,8 +794,7 @@ where T: StatementDispatch + Env<Anchor = SSAValue> + CFGQueries + DiGraphQuerie
 pub trait ForwardDataflowFrameEngine:
     Env<Anchor = SSAValue> + StatementDispatch + BlockQueries + DiGraphQueries
 {
-    type SummaryKey: Clone + Eq + Hash;
-    fn analysis_merge(..); fn contribute_return(..); fn current_function_key(..);
+    fn analysis_merge(..); fn contribute_return(..);
     fn summarize_call(..); fn max_iterations(..);
 }
 ```
@@ -1035,9 +1033,8 @@ break soundness.
 
 `FactStore<A, V>` is the common anchor-to-payload map for interpreter values and
 analysis facts. Anchors need only `Eq + Hash`; payloads need no lattice contract
-for ordinary lookup and assignment. `set` assigns, `get` returns `None` for an
-absent anchor, and `join_with` explicitly receives the analysis's bottom and merge
-operation and reports whether the stored fact changed.
+for ordinary lookup and assignment. `set` assigns and `get` returns `None` for an
+absent anchor.
 
 `EnvStore<K, A, V>` is the environment **storage container**, and it owns both halves
 of environment identity:
@@ -1073,7 +1070,7 @@ them onto `EnvStore<LinkTarget, _, _>` is the remaining work.
 | `Env` | what an access *means* for this engine (unbound-is-an-error vs. bottom, read/write logging), at its `Env::Anchor` family |
 | `CallServices` | activation lifetime (`alloc_env`/`free_env`) plus callable resolution (`resolve_callee`/`discover_body`) — a sibling of `Env`, not a subtrait |
 | `CallFrame` | *when* those lifetime operations run, and pairing them exactly once |
-| fixpoint driver | summaries, dependencies, worklist |
+| fixpoint driver | dependencies, worklist |
 
 Keyed allocation never reaches a shared engine surface: `CallServices` exposes
 only the unkeyed `alloc_env`/`free_env`, and the sparse-forward engine calls

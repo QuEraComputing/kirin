@@ -291,16 +291,10 @@ impl From<AbstractDiGraphFrame<i64, InterpreterError>> for MockAbstractFrame {
 fn abstract_engine_needs_no_concrete_call_lifecycle() {
     assert_dataflow_engine::<AbstractOnlyEngine>();
 
-    assert_frame::<
-        AbstractOnlyEngine,
-        MockAbstractFrame,
-        AbstractBlockFrame<i64, InterpreterError>,
-    >();
-    assert_frame::<
-        AbstractOnlyEngine,
-        MockAbstractFrame,
-        AbstractCallFrame<i64, InterpreterError>,
-    >();
+    assert_frame::<AbstractOnlyEngine, MockAbstractFrame, AbstractBlockFrame<i64, InterpreterError>>(
+    );
+    assert_frame::<AbstractOnlyEngine, MockAbstractFrame, AbstractCallFrame<i64, InterpreterError>>(
+    );
     assert_frame::<
         AbstractOnlyEngine,
         MockAbstractFrame,

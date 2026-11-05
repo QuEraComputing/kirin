@@ -64,8 +64,8 @@ use crate::core::query;
 use crate::{
     AbstractInterpreter, Body, CallEffect, Callee, ContextInsensitive, EnvIndex, EnvStore,
     FixpointProfile, Interp, InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker,
-    SameStageLinker, SparseBackwardSemantic, SparseStore, StageQuery,
-    StandardFixpointInterpreter, StrongDemand, TerminatorArgs, WorkAnalysis,
+    SameStageLinker, SparseBackwardSemantic, SparseStore, StageQuery, StandardFixpointInterpreter,
+    StrongDemand, TerminatorArgs, WorkAnalysis,
 };
 
 /// A resolved `(stage, body)` pair: the structure one callable context

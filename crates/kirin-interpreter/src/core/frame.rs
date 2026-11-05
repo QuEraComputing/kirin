@@ -76,7 +76,6 @@
 //!   **not** inherit [`CallServices`] or [`CFGQueries`], because an abstract
 //!   engine summarizes calls rather than entering them.
 
-
 use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
 use crate::{

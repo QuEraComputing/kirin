@@ -117,8 +117,7 @@ where
 
 impl<I, F, V, E> Frame<I, F> for AbstractBlockFrame<V, E>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E>
-        + SparseForwardInterp<Frame = F>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
     F: From<AbstractCallFrame<V, E>>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
@@ -320,8 +319,7 @@ where
 
 impl<I, F, V, E> Frame<I, F> for AbstractDiGraphFrame<V, E>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E>
-        + SparseForwardInterp<Frame = F>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
     F: From<AbstractCallFrame<V, E>>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,

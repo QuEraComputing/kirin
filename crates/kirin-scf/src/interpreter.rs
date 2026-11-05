@@ -525,7 +525,7 @@ where
     V: Clone + PartialEq + ForLoopValue + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
-    F: From<AbstractScfForFrame<V, E, <P as CallContext<V>>::Key>>,
+    F: From<AbstractScfForFrame<V, E>>,
 {
     fn scf_for_frame(
         &mut self,
@@ -583,7 +583,7 @@ where
     V: Clone + PartialEq + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
-    F: From<AbstractScfIfFrame<V, E, <P as CallContext<V>>::Key>>,
+    F: From<AbstractScfIfFrame<V, E>>,
 {
     fn scf_if_frame(
         &mut self,

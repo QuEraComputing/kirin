@@ -22,8 +22,8 @@ use kirin::prelude::{CFG, CompileStage, Pipeline};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_demand::DemandResult;
 use kirin_interpreter::engine::{
-    ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
-    SparseForwardInterpreter, expect_single,
+    ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker, SparseForwardInterpreter,
+    expect_single,
 };
 use kirin_interpreter::{Body, Callee, InterpDispatch, InterpreterError, SparseForwardTransfer};
 use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};

@@ -5,7 +5,7 @@
 //! - **Shared framework** ([`Interp`],
 //!   [`Interpretable`], [`Frame`]/[`FrameEngine`]/[`FrameEffect`]/[`drive_frames`],
 //!   [`StandardFixpointInterpreter`]): the engine trait, the direction-neutral
-//!   frame driver loop, and the owner-summary fixpoint driver.
+//!   frame driver loop, and the worklist fixpoint driver.
 //! - **Semantics vs shape** ([`semantics`]): statement rules are selected by a
 //!   compile-time [`SemanticKey`] — [`ForwardEval`], [`StrongDemand`],
 //!   [`ClassicLiveness`], or a downstream key — naming *what* a rule means.
