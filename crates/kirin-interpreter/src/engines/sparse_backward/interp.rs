@@ -20,10 +20,11 @@
 //! - **[`SparseBackwardTransfer`]** is the [`Interp`] delegate and the target
 //!   of rule dispatch: pipeline access, the calling convention and context
 //!   policy, the demand facts (one [`EnvStore`] environment per selected
-//!   context), the discovered contexts' metadata, the dispatch location, and
-//!   the per-rule buffers.
+//!   context), the discovered contexts' metadata, the dispatch location, the
+//!   facts that changed, and the pending call activations.
 //! - the **[`StandardFixpointInterpreter`]** driver owns the worklist and the
-//!   call-boundary callers ([`DemandCallers`]).
+//!   call-boundary callers ([`DemandCallers`]); after each work item it drains
+//!   the changed facts and reruns their dependents.
 //!
 //! # Work is a statement; a fact is a value
 //!
@@ -103,22 +104,19 @@ impl<V> DemandContext<V> for ContextInsensitive {
 // Effect + dialect-facing trait
 // ===========================================================================
 
-/// What a backward rule produced: the local demand facts it raised.
+/// What a backward rule produced.
 ///
 /// Rules raise facts imperatively through
 /// [`raise_fact`](SparseBackwardInterp::raise_fact) (or its [`DemandInterp`]
-/// spelling [`demand`](DemandInterp::demand)) and finish with
-/// [`effect()`](SparseBackwardInterp::effect), which drains the buffer into
-/// this value; the driver qualifies the values with the rule's callable
-/// context and applies them through its single merge path. A call rule
-/// returns [`Call`](Self::Call) instead, and the engine adds the callee's
-/// parameter facts to the buffered ones.
+/// spelling [`demand`](DemandInterp::demand)), which joins into the rule's
+/// callable context at once, and finish with [`Next`](Self::Next). A call
+/// rule returns [`Call`](Self::Call) instead.
 pub enum SparseBackwardEffect<V> {
-    /// Demand facts to merge (possibly empty).
-    Demands(Vec<(SSAValue, V)>),
+    /// The rule is done.
+    Next,
     /// Cross a call: `inputs` are the facts on the call's results, `outputs`
     /// the caller's argument slots. The engine raises the callee's current
-    /// parameter facts on those arguments, keeping facts the rule already raised.
+    /// parameter facts on those arguments.
     Call(CallEffect<V>),
 }
 
@@ -126,7 +124,7 @@ pub enum SparseBackwardEffect<V> {
 /// *shape-generic* fact mechanics plus [`SparseBackwardEffect`]. Any
 /// sparse-backward semantics ([`StrongDemand`] today, downstream keys
 /// tomorrow) shares this surface: read a converged per-value fact, raise a
-/// fact, drain the raised facts into the rule's effect, query the block
+/// fact, query the block
 /// boundary facts terminator/structured rules map across, and declare a
 /// callable's return sites. Rules are context-blind: they name bare SSA values and output
 /// positions, and the engine qualifies them with the callable context the
@@ -140,8 +138,7 @@ pub trait SparseBackwardInterp:
     /// The converged fact for `value` (bottom if absent).
     fn fact(&self, value: impl Into<SSAValue>) -> Result<Self::Value, Self::Error>;
 
-    /// Merge `fact` into `value`'s fact (buffered; returned by
-    /// [`effect`](Self::effect)).
+    /// Join `fact` into `value`'s fact in the dispatched context.
     ///
     /// The engine moves the fact and never inspects it — which element of the
     /// lattice a rule raises is the semantics' business, not the shape's.
@@ -150,9 +147,6 @@ pub trait SparseBackwardInterp:
         value: impl Into<SSAValue>,
         fact: Self::Value,
     ) -> Result<(), Self::Error>;
-
-    /// Drain the raised-fact buffer into this rule's effect.
-    fn effect(&mut self) -> Self::Effect;
 
     /// The parameters of `block` (for mapping parameter facts onto edge or
     /// carried arguments in terminator/structured rules).
@@ -218,7 +212,7 @@ pub trait DemandInterp:
                 self.demand(*argument)?;
             }
         }
-        Ok(self.effect())
+        Ok(SparseBackwardEffect::Next)
     }
 }
 
@@ -271,15 +265,14 @@ impl CallableContext {
         Ok(())
     }
 
-    /// The updates merging a request for `outputs` into the operands of every
+    /// The facts merging a request for `outputs` into the operands of every
     /// return site, after checking its arity. A callable without return sites
     /// accepts any request: no return operand exists that the demand could
     /// reach.
-    pub(super) fn route_outputs<V: Clone + PartialEq + HasBottom>(
+    pub(super) fn route_outputs<V: Clone>(
         &self,
-        env: EnvIndex,
         outputs: Product<V>,
-    ) -> Result<Vec<DemandUpdate<V>>, InterpreterError> {
+    ) -> Result<Vec<(SSAValue, V)>, InterpreterError> {
         let Some(operands) = &self.outputs else {
             return Ok(Vec::new());
         };
@@ -289,15 +282,13 @@ impl CallableContext {
                 actual: outputs.len(),
             });
         }
-        let mut updates = Vec::new();
-        for (operands, fact) in operands.iter().zip(outputs) {
-            if fact != V::bottom() {
-                for operand in operands {
-                    updates.push((env, *operand, fact.clone()));
-                }
-            }
-        }
-        Ok(updates)
+        Ok(operands
+            .iter()
+            .zip(outputs)
+            .flat_map(|(operands, fact)| {
+                operands.iter().map(move |operand| (*operand, fact.clone()))
+            })
+            .collect())
     }
 }
 
@@ -310,9 +301,6 @@ const CALL_OUTSIDE_WORK: InterpreterError =
 /// One demand work item: rerun `Statement`'s backward rule in the context
 /// whose environment is `EnvIndex`.
 pub(super) type DemandWork = (EnvIndex, Statement);
-
-/// One fact update: join `V` into the demand of `SSAValue` in `EnvIndex`.
-pub(super) type DemandUpdate<V> = (EnvIndex, SSAValue, V);
 
 /// The driver's `store` slot: the callers to rerun when a callee context's
 /// parameter fact rises. This is the one dependency SSA topology does not
@@ -335,8 +323,8 @@ where
     Sem: SparseBackwardSemantic,
 {
     type Work = DemandWork;
-    type Frame = DemandFrame<V>;
-    type Completion = Vec<(SSAValue, V)>;
+    type Frame = DemandFrame;
+    type Completion = ();
 }
 
 /// The sparse backward driver: a [`StandardFixpointInterpreter`] over
@@ -385,8 +373,8 @@ pub struct SparseBackwardTransfer<
     pub(super) contexts: HashMap<EnvIndex, CallableContext>,
     /// The environment of the rule being dispatched.
     context: Option<EnvIndex>,
-    /// Local facts the currently dispatched rule has raised.
-    demands: Vec<(SSAValue, V)>,
+    /// Facts that rose since the driver last reran their dependents.
+    changed: Vec<(EnvIndex, SSAValue)>,
     /// Callee contexts the current work's call rules crossed into, each with
     /// the facts on the call's results. Applied after the work completes, so
     /// discovery never re-enters rule dispatch.
@@ -416,7 +404,7 @@ where
             env: EnvStore::new(),
             contexts: HashMap::new(),
             context: None,
-            demands: Vec::new(),
+            changed: Vec::new(),
             activations: Vec::new(),
             _marker: PhantomData,
         }
@@ -430,9 +418,20 @@ where
         self.pipeline
     }
 
-    /// Drain the local facts the current rule has raised.
-    pub(super) fn take_demands(&mut self) -> Vec<(SSAValue, V)> {
-        mem::take(&mut self.demands)
+    /// Join `fact` into `value`'s demand in `env`, recording it if it rose.
+    pub(super) fn raise(
+        &mut self,
+        env: EnvIndex,
+        value: SSAValue,
+        fact: &V,
+    ) -> Result<(), InterpreterError>
+    where
+        V: Lattice + HasBottom + Clone,
+    {
+        if self.env.join(env, value, fact)? {
+            self.changed.push((env, value));
+        }
+        Ok(())
     }
 
     fn current_context(&self) -> Result<EnvIndex, InterpreterError> {
@@ -502,20 +501,19 @@ where
 
     /// Discover a context once: record it, then evaluate every rule of
     /// its body and structured children — but not nested callable
-    /// definitions — with nothing demanded yet, collecting the unconditional
-    /// contributions (control roots) before any of them is merged. Rules
-    /// whose contributions are conditional read bottom here and rerun when
-    /// the facts they consulted rise. Discovery runs outside any work, so it
-    /// rejects a call; the shipped call rule never crosses here, since every
-    /// fact is still bottom.
-    fn discover(&mut self, env: EnvIndex, target: LinkTarget) -> Result<Vec<DemandUpdate<V>>, E> {
+    /// definitions — once, raising the unconditional contributions (control
+    /// roots). Rules whose contributions are conditional rerun when the facts
+    /// they consulted rise. Discovery runs outside any work, so it rejects a
+    /// call; the shipped call rule never crosses here before its results are
+    /// demanded.
+    fn discover(&mut self, env: EnvIndex, target: LinkTarget) -> Result<(), E> {
         if let Some(context) = self.contexts.get(&env) {
             if context.target != target {
                 return Err(E::from(InterpreterError::Custom(
                     "demand context key selected for two call targets",
                 )));
             }
-            return Ok(Vec::new());
+            return Ok(());
         }
         let (body, _) = self.callable_entry(target)?;
         self.contexts
@@ -524,7 +522,6 @@ where
 
         let mut bodies = VecDeque::from([body]);
         let mut visited = HashSet::new();
-        let mut seeds = Vec::new();
         while let Some(body) = bodies.pop_front() {
             if !visited.insert(body) {
                 continue;
@@ -532,34 +529,33 @@ where
             let contents = query::body_contents(self.pipeline, stage, body)?;
             bodies.extend(contents.children);
             for statement in contents.statements {
-                let demands = match self.run_statement(env, stage, statement)? {
-                    SparseBackwardEffect::Demands(demands) => demands,
-                    SparseBackwardEffect::Call(_) => return Err(E::from(CALL_OUTSIDE_WORK)),
-                };
-                seeds.extend(demands.into_iter().map(|(value, fact)| (env, value, fact)));
+                if let SparseBackwardEffect::Call(_) = self.run_statement(env, stage, statement)? {
+                    return Err(E::from(CALL_OUTSIDE_WORK));
+                }
             }
         }
-        Ok(seeds)
+        Ok(())
     }
 
     /// Apply the call boundaries crossed by the work that just completed:
-    /// discover each callee context if needed, then route the call's result
-    /// facts into its return operands. The driver merges the updates.
-    pub(super) fn apply_activations(&mut self) -> Result<Vec<DemandUpdate<V>>, E> {
-        let mut updates = Vec::new();
+    /// discover each callee context if needed, then raise the call's result
+    /// facts on its return operands.
+    pub(super) fn apply_activations(&mut self) -> Result<(), E> {
         loop {
             let activations = mem::take(&mut self.activations);
             if activations.is_empty() {
-                return Ok(updates);
+                return Ok(());
             }
             for (env, target, outputs) in activations {
-                updates.extend(self.discover(env, target)?);
-                updates.extend(
-                    self.contexts
-                        .get(&env)
-                        .ok_or(UNDISCOVERED)?
-                        .route_outputs(env, outputs)?,
-                );
+                self.discover(env, target)?;
+                let routed = self
+                    .contexts
+                    .get(&env)
+                    .ok_or(UNDISCOVERED)?
+                    .route_outputs(outputs)?;
+                for (operand, fact) in routed {
+                    self.raise(env, operand, &fact)?;
+                }
             }
         }
     }
@@ -671,12 +667,8 @@ where
     }
 
     fn raise_fact(&mut self, value: impl Into<SSAValue>, fact: V) -> Result<(), E> {
-        self.demands.push((value.into(), fact));
-        Ok(())
-    }
-
-    fn effect(&mut self) -> SparseBackwardEffect<V> {
-        SparseBackwardEffect::Demands(self.take_demands())
+        let env = self.current_context()?;
+        Ok(self.raise(env, value.into(), &fact)?)
     }
 
     fn block_params(&self, block: Block) -> Result<Vec<SSAValue>, E> {
@@ -711,14 +703,13 @@ where
     Sem: SparseBackwardSemantic,
 {
     /// Summarize a call without descending: queue the callee context,
-    /// register the caller's work on each callee parameter fact, and return
-    /// the callee's current non-bottom parameter facts on the call's
-    /// arguments.
+    /// register the caller's work on each callee parameter fact, and raise
+    /// the callee's current parameter facts on the call's arguments.
     pub(super) fn summarize_call(
         &mut self,
         caller_stage: CompileStage,
         call: CallEffect<V>,
-    ) -> Result<Vec<(SSAValue, V)>, E> {
+    ) -> Result<(), E> {
         let (target, _, callee) = self.inner_mut().submit_call(
             call.stage.unwrap_or(caller_stage),
             &call.callee,
@@ -741,26 +732,23 @@ where
             }
         }
         let facts = self.inner().param_facts(callee, &params)?;
-        Ok(call
-            .outputs
-            .into_iter()
-            .zip(facts)
-            .filter(|(_, fact)| *fact != V::bottom())
-            .collect())
+        for (argument, fact) in call.outputs.into_iter().zip(facts) {
+            self.inner_mut().raise(work.0, argument, &fact)?;
+        }
+        Ok(())
     }
 
-    /// Join `fact` into `value`'s demand in `env`. If it rose, rerun the
-    /// statements that translate it and the callers registered on it.
-    pub(super) fn raise(&mut self, (env, value, fact): DemandUpdate<V>) -> Result<(), E> {
-        if !self.inner_mut().env.join(env, value, &fact)? {
-            return Ok(());
-        }
-        for work in self.inner().dependent_work(env, value)? {
-            self.schedule_work(work);
-        }
-        let callers = self.store().get(&(env, value)).cloned().unwrap_or_default();
-        for work in callers {
-            self.schedule_work(work);
+    /// Rerun the dependents of every fact that changed: the statements that
+    /// translate it and the callers registered on it.
+    pub(super) fn wake_changed(&mut self) -> Result<(), E> {
+        for (env, value) in mem::take(&mut self.inner_mut().changed) {
+            for work in self.inner().dependent_work(env, value)? {
+                self.schedule_work(work);
+            }
+            let callers = self.store().get(&(env, value)).cloned().unwrap_or_default();
+            for work in callers {
+                self.schedule_work(work);
+            }
         }
         Ok(())
     }
@@ -777,13 +765,8 @@ where
 pub(super) struct SparseBackwardWorkAnalysis;
 
 impl<'ir, S, V, E, Lk, P, Sem>
-    WorkAnalysis<
-        SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
-        DemandWork,
-        DemandFrame<V>,
-        Vec<(SSAValue, V)>,
-        E,
-    > for SparseBackwardWorkAnalysis
+    WorkAnalysis<SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>, DemandWork, DemandFrame, (), E>
+    for SparseBackwardWorkAnalysis
 where
     S: StageMeta + StageQuery + InterpDispatch<SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom,
@@ -796,7 +779,7 @@ where
         &mut self,
         interp: &mut SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
         &(env, statement): &DemandWork,
-    ) -> Result<DemandFrame<V>, E> {
+    ) -> Result<DemandFrame, E> {
         let stage = interp
             .inner()
             .contexts
@@ -810,20 +793,13 @@ where
     fn complete_work(
         &mut self,
         interp: &mut SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
-        (env, _): DemandWork,
-        completion: Vec<(SSAValue, V)>,
+        _: DemandWork,
+        (): (),
     ) -> Result<(), E> {
-        // Discover the contexts the work's calls crossed into before merging
-        // anything, then merge the rule's local demands and the routed
-        // outputs.
-        let activations = interp.inner_mut().apply_activations()?;
-        for (value, fact) in completion {
-            interp.raise((env, value, fact))?;
-        }
-        for update in activations {
-            interp.raise(update)?;
-        }
-        Ok(())
+        // Discover the contexts the work's calls crossed into before waking
+        // anything, so every changed fact's context is discovered.
+        interp.inner_mut().apply_activations()?;
+        interp.wake_changed()
     }
 }
 
@@ -1062,9 +1038,8 @@ where
             .driver
             .inner_mut()
             .submit_call(stage, &callee, outputs)?;
-        for update in self.driver.inner_mut().apply_activations()? {
-            self.driver.raise(update)?;
-        }
+        self.driver.inner_mut().apply_activations()?;
+        self.driver.wake_changed()?;
         self.driver
             .drain_worklist(&mut SparseBackwardWorkAnalysis)?;
         let params = self.driver.inner().entry_params(target)?;

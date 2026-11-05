@@ -111,8 +111,8 @@ conflict):
   vocabulary. `raise_fact` takes the lattice element to merge, so the shape
   moves facts without inspecting them; ⊤ is `demand`'s business, and `HasTop`
   rides on `DemandInterp`'s supertrait so rules never spell it. Rules bind `DemandInterp`: read converged facts (`is_demanded`),
-  raise demands (`demand`), and end with `interp.effect()`
-  (= `SparseBackwardEffect`); ordinary dialects are the one-liner
+  raise demands (`demand`, which joins at once), and end with
+  `SparseBackwardEffect::Next`; ordinary dialects are the one-liner
   `interp.demand_uses_if_observable(self)` (purity-aware neededness via `IsPure`).
   Rules stay context-blind: the engine qualifies every read and local
   contribution with the callable context of the work dispatching the rule.
@@ -1146,9 +1146,9 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
     `SparseBackwardInterpreter`): `Interp::Value` is the *per-SSA-value* demand
     fact (`kirin_demand::Demand`), not a `LiveSet` — the sparse fact anchors to
     values, mirroring the forward per-value model. Helpers are
-    `is_demanded`/`demand` (on `DemandInterp`)/`effect()` plus the purity-aware `demand_uses_if_observable`
+    `is_demanded`/`demand` (on `DemandInterp`) plus the purity-aware `demand_uses_if_observable`
     (rather than the sketched `live_after`/`use_def` names); the effect is
-    `SparseBackwardEffect::Demands` or `Call`. Facts are keyed
+    `SparseBackwardEffect::Next` or `Call`. Facts are keyed
     `(EnvIndex, SSAValue)`, and a rise reruns the statements that translate it
     (work items `(EnvIndex, Statement)`); scf converges loop-carried
     demand with **no frames**, and demand crosses calls on the same worklist

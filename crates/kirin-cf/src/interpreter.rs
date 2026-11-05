@@ -1,8 +1,8 @@
 use kirin::prelude::{Block, CompileTimeValue, HasBottom, SSAValue};
 use kirin_interpreter::dialect::{
     BranchCondition, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
-    Edge, ForwardEval, Interpretable, SparseForwardEffect, SparseForwardInterp, StrongDemand,
-    SuccessorEdge,
+    Edge, ForwardEval, Interpretable, SparseBackwardEffect, SparseForwardEffect,
+    SparseForwardInterp, StrongDemand, SuccessorEdge,
 };
 
 use crate::ControlFlow;
@@ -90,7 +90,7 @@ where
             }
             ControlFlow::__Phantom(..) => unreachable!(),
         }
-        Ok(interp.effect())
+        Ok(SparseBackwardEffect::Next)
     }
 }
 

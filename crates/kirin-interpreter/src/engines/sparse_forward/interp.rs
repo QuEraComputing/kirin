@@ -10,12 +10,12 @@
 //!   of rule dispatch: pipeline, linker, the [`EnvStore`] container (one
 //!   environment per analysis context, addressed by the policy's context key,
 //!   holding SSA facts), the contexts (entry, return, and callers), analysis
-//!   policy, and read/write logging; it provides the dialect-dispatch /
-//!   IR-query surface
-//!   ([`StatementDispatch`], [`BlockQueries`], [`CFGQueries`],
+//!   policy, read/write logging, and the SSA facts that changed; it provides
+//!   the dialect-dispatch / IR-query surface ([`StatementDispatch`], [`BlockQueries`], [`CFGQueries`],
 //!   [`DiGraphQueries`], and — for concrete-shaped callers — [`CallServices`]).
 //! - the **[`StandardFixpointInterpreter`]** driver owns the worklist and the
-//!   readers of each SSA fact (blocks that read a value they do not define).
+//!   readers of each SSA fact (blocks that read a value they do not define);
+//!   after each walk it drains the changed facts and reruns their readers.
 //!
 //! # Work items
 //!
@@ -209,8 +209,8 @@ pub struct SparseForwardTransfer<
     read_log: RefCell<Vec<SSAValue>>,
     /// SSA values written during the current walk.
     write_log: Vec<SSAValue>,
-    /// SSA values whose fact rose during the current walk.
-    risen_log: Vec<SSAValue>,
+    /// SSA facts that rose since the driver last woke their readers.
+    changed: Vec<(EnvIndex, SSAValue)>,
     /// Whether read/write logging is active (only during a walk).
     logging: bool,
     #[allow(clippy::type_complexity)]
@@ -245,7 +245,7 @@ where
             location: None,
             read_log: RefCell::new(Vec::new()),
             write_log: Vec::new(),
-            risen_log: Vec::new(),
+            changed: Vec::new(),
             logging: false,
             _marker: PhantomData,
         }
@@ -303,16 +303,14 @@ where
         self.logging = true;
         self.read_log.borrow_mut().clear();
         self.write_log.clear();
-        self.risen_log.clear();
     }
 
-    /// Stop logging and take the accumulated `(reads, writes, risen)`.
-    fn take_logs(&mut self) -> (Vec<SSAValue>, Vec<SSAValue>, Vec<SSAValue>) {
+    /// Stop logging and take the accumulated `(reads, writes)`.
+    fn take_logs(&mut self) -> (Vec<SSAValue>, Vec<SSAValue>) {
         self.logging = false;
         let reads = std::mem::take(&mut *self.read_log.borrow_mut());
         let writes = std::mem::take(&mut self.write_log);
-        let risen = std::mem::take(&mut self.risen_log);
-        (reads, writes, risen)
+        (reads, writes)
     }
 }
 
@@ -416,12 +414,11 @@ where
 
     /// An abstract write is a contribution: it joins into the stored fact.
     fn env_write(&mut self, index: EnvIndex, value: SSAValue, data: V) -> Result<(), E> {
-        let rose = self.env.join(index, value, &data)?;
+        if self.env.join(index, value, &data)? {
+            self.changed.push((index, value));
+        }
         if self.logging {
             self.write_log.push(value);
-            if rose {
-                self.risen_log.push(value);
-            }
         }
         Ok(())
     }
@@ -805,8 +802,8 @@ where
 
     /// Merge incoming arguments into a unit's entry parameters through the
     /// analysis policy (join, then widen by visits). Schedule the unit on its
-    /// first reach or when a parameter rose, and wake the readers of every
-    /// parameter that rose.
+    /// first reach or when a parameter rose, and record every parameter that
+    /// changed.
     fn merge_entry(&mut self, work: ForwardWork, args: Product<V>) -> Result<(), E> {
         let (env, body) = work;
         let stage = self.inner().context(env)?.stage;
@@ -845,7 +842,7 @@ where
                     .env
                     .write(env, *param, new)
                     .map_err(E::from)?;
-                self.wake(env, *param);
+                self.inner_mut().changed.push((env, *param));
             }
         }
         if visits.is_none() || rose {
@@ -892,11 +889,13 @@ where
         }
     }
 
-    /// Schedule every reader of `value` in `env`.
-    fn wake(&mut self, env: EnvIndex, value: SSAValue) {
-        let readers = self.store().get(&(env, value)).cloned().unwrap_or_default();
-        for reader in readers {
-            self.schedule_work(reader);
+    /// Schedule the readers of every SSA fact that changed.
+    fn wake_changed(&mut self) {
+        for key in std::mem::take(&mut self.inner_mut().changed) {
+            let readers = self.store().get(&key).cloned().unwrap_or_default();
+            for reader in readers {
+                self.schedule_work(reader);
+            }
         }
     }
 
@@ -913,8 +912,8 @@ const UNSELECTED: InterpreterError =
 // ===========================================================================
 
 /// The forward work analysis: bind the unit's current entry parameters, walk
-/// it once, then register its cross-block reads, wake readers of what rose,
-/// and merge its edges into successors.
+/// it once, then register its cross-block reads, merge its edges into
+/// successors, and wake the readers of what changed.
 struct SparseForwardWorkAnalysis<V> {
     _marker: PhantomData<fn() -> V>,
 }
@@ -994,17 +993,14 @@ where
         }
 
         // Register the walk's reads of values it did not write before waking
-        // the readers of what it raised, so a walk that reads a fact it then
+        // the readers of what changed, so a walk that reads a fact it then
         // raises reruns.
-        let (reads, writes, risen) = interp.inner_mut().take_logs();
+        let (reads, writes) = interp.inner_mut().take_logs();
         let written: HashSet<SSAValue> = writes.into_iter().collect();
         for value in reads {
             if !written.contains(&value) {
                 interp.subscribe(env, value, work);
             }
-        }
-        for value in risen {
-            interp.wake(env, value);
         }
 
         // CFG edges merge into the successors' entry parameters. Empty for a
@@ -1012,6 +1008,7 @@ where
         for edge in edges {
             interp.merge_entry((env, Body::Block(edge.target)), edge.args)?;
         }
+        interp.wake_changed();
         Ok(())
     }
 }
@@ -1215,6 +1212,7 @@ where
     ) -> Result<(Product<V>, Self), E> {
         let args: Product<V> = args.into_iter().collect();
         let env = self.driver.contribute_call_entry(stage, &callee, args)?;
+        self.driver.wake_changed();
         let mut analysis = SparseForwardWorkAnalysis::new();
         self.driver.drain_worklist(&mut analysis)?;
 

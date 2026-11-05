@@ -22,10 +22,11 @@
 //!   rules transform through the shape-generic
 //!   [`DenseBackwardInterp::insert_fact`] / [`DenseBackwardInterp::remove_fact`]
 //!   (liveness rules use the [`ClassicLivenessInterp`] `gen_live`/`kill_def`
-//!   spellings).
+//!   spellings), and the points that changed.
 //! - the **[`StandardFixpointInterpreter`]** driver owns the block worklist
 //!   and the readers of each block's entry point ([`DenseReaders`],
-//!   registered by [`absorb_edges`](DenseBackwardFrameEngine::absorb_edges)).
+//!   registered by [`absorb_edges`](DenseBackwardFrameEngine::absorb_edges));
+//!   after each walk it drains the changed points and reruns their readers.
 //!
 //! # Work is a block walk; facts are program points
 //!
@@ -186,6 +187,8 @@ pub struct DenseBackwardTransfer<'ir, S: StageMeta, V, E, F, Sem = ClassicLivene
     /// the statement when its rule runs). Kill and gen act on it; only
     /// recorded points reach the store.
     state: V,
+    /// Points that rose since the driver last reran their readers.
+    changed: Vec<(EnvIndex, ProgramPoint)>,
     #[allow(clippy::type_complexity)]
     _marker: PhantomData<fn() -> (E, F, Sem)>,
 }
@@ -201,6 +204,7 @@ where
             env: EnvStore::new(),
             root: None,
             state: V::bottom(),
+            changed: Vec::new(),
             _marker: PhantomData,
         }
     }
@@ -218,23 +222,24 @@ impl<'ir, S: StageMeta, V, E, F, Sem> DenseBackwardTransfer<'ir, S, V, E, F, Sem
         ))
     }
 
-    /// Join `facts` into `point` and report whether it rose. A recorded point
+    /// Join `facts` into `point`, recording it if it rose. A recorded point
     /// stays present even at bottom, so results tell "nothing live" from
-    /// "never reached".
+    /// "never reached"; that bottom write is not a change.
     fn record(
         &mut self,
         env: EnvIndex,
         point: ProgramPoint,
         facts: &V,
-    ) -> Result<bool, InterpreterError>
+    ) -> Result<(), InterpreterError>
     where
         V: Lattice + HasBottom + Clone,
     {
-        let changed = self.env.join(env, point, facts)?;
-        if !changed && !self.env.environment(env)?.contains(point) {
+        if self.env.join(env, point, facts)? {
+            self.changed.push((env, point));
+        } else if !self.env.environment(env)?.contains(point) {
             self.env.write(env, point, facts.clone())?;
         }
-        Ok(changed)
+        Ok(())
     }
 }
 
@@ -351,15 +356,15 @@ where
 {
     type Work = DenseWork;
     type Frame = F;
-    type Completion = DenseBackwardCompletion<V>;
+    type Completion = DenseBackwardCompletion;
 }
 
-/// Completion payloads of the dense backward frames.
-pub enum DenseBackwardCompletion<V> {
+/// Completions of the dense backward frames. Both carry nothing: recorded
+/// points live in the engine's store, the walk state in its point state.
+pub enum DenseBackwardCompletion {
     /// A CFG block owner finished its backward walk.
-    Block { live_in: V, live_out: V },
-    /// A structured body / dialect frame finished; its effects live in the
-    /// engine's point state.
+    Block,
+    /// A structured body / dialect frame finished.
     Structured,
 }
 
@@ -528,8 +533,7 @@ where
 
     fn record_point(&mut self, point: ProgramPoint, facts: V) -> Result<(), E> {
         let (env, _) = self.active_work()?;
-        self.inner_mut().record(env, point, &facts)?;
-        Ok(())
+        Ok(self.inner_mut().record(env, point, &facts)?)
     }
 
     fn absorb_edges(&mut self, stage: CompileStage, edges: &[SuccessorEdge]) -> Result<V, E> {
@@ -588,7 +592,7 @@ impl<'ir, S, V, E, F, Sem>
         DenseBackwardDriver<'ir, S, V, E, F, Sem>,
         DenseWork,
         F,
-        DenseBackwardCompletion<V>,
+        DenseBackwardCompletion,
         E,
     > for DenseBackwardWorkAnalysis
 where
@@ -616,27 +620,18 @@ where
     fn complete_work(
         &mut self,
         interp: &mut DenseBackwardDriver<'ir, S, V, E, F, Sem>,
-        (env, body): DenseWork,
-        completion: DenseBackwardCompletion<V>,
+        _: DenseWork,
+        completion: DenseBackwardCompletion,
     ) -> Result<(), E> {
-        let Body::Block(block) = body else {
-            return Err(E::from(NOT_A_BLOCK));
-        };
-        let DenseBackwardCompletion::Block { live_in, live_out } = completion else {
+        let DenseBackwardCompletion::Block = completion else {
             return Err(E::from(InterpreterError::Custom(
                 "a block owner completed with a structured-frame completion",
             )));
         };
-        let entry = ProgramPoint::BlockEntry(block);
-        interp
-            .inner_mut()
-            .record(env, ProgramPoint::BlockExit(block), &live_out)?;
-        if interp.inner_mut().record(env, entry, &live_in)? {
-            let readers = interp
-                .store()
-                .get(&(env, entry))
-                .cloned()
-                .unwrap_or_default();
+        // Rewalk the readers of every point that changed (only block entries
+        // have readers).
+        for key in std::mem::take(&mut interp.inner_mut().changed) {
+            let readers = interp.store().get(&key).cloned().unwrap_or_default();
             for reader in readers {
                 interp.schedule(reader);
             }
@@ -740,7 +735,7 @@ where
     E: From<InterpreterError>,
     Lk: Linker<S>,
     Sem: DenseBackwardSemantic,
-    F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, F, Completion = DenseBackwardCompletion<V>>
+    F: Frame<DenseBackwardDriver<'ir, S, V, E, F, Sem>, F, Completion = DenseBackwardCompletion>
         + From<DenseBlockFrame<V, E>>,
 {
     /// The blocks directly selected as fixpoint owners for `body`.

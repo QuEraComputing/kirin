@@ -81,7 +81,7 @@ where
     F: Frame<
             DenseBackwardDriver<'ir, S, LiveSet, InterpreterError, F>,
             F,
-            Completion = DenseBackwardCompletion<LiveSet>,
+            Completion = DenseBackwardCompletion,
         > + From<DenseBlockFrame<LiveSet, InterpreterError>>,
 {
     let (root, engine) =

@@ -93,12 +93,12 @@ where
     V: Clone,
     E: From<InterpreterError>,
 {
-    type Completion = DenseBackwardCompletion<V>;
+    type Completion = DenseBackwardCompletion;
 
     fn step_into(
         mut self,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         if !self.initialized {
             if self.mode == DenseBlockMode::StructuredBody {
                 let facts = interp.state();
@@ -111,14 +111,13 @@ where
 
         let Some(statement) = self.cursor else {
             let live_in = interp.state();
-            if self.mode == DenseBlockMode::StructuredBody {
-                interp.record_point(ProgramPoint::BlockEntry(self.block), live_in.clone())?;
+            if self.mode == DenseBlockMode::CFGOwner {
+                let live_out = self.live_out.take().unwrap_or_else(|| live_in.clone());
+                interp.record_point(ProgramPoint::BlockExit(self.block), live_out)?;
             }
+            interp.record_point(ProgramPoint::BlockEntry(self.block), live_in)?;
             return Ok(FrameEffect::Complete(match self.mode {
-                DenseBlockMode::CFGOwner => DenseBackwardCompletion::Block {
-                    live_in: live_in.clone(),
-                    live_out: self.live_out.take().unwrap_or(live_in),
-                },
+                DenseBlockMode::CFGOwner => DenseBackwardCompletion::Block,
                 DenseBlockMode::StructuredBody => DenseBackwardCompletion::Structured,
             }));
         };
@@ -169,7 +168,7 @@ where
     fn resume_done_into(
         self,
         _interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         Err(E::from(InterpreterError::Custom(
             "dense block frames resume only with completions",
         )))
@@ -177,9 +176,9 @@ where
 
     fn resume_into(
         mut self,
-        completion: DenseBackwardCompletion<V>,
+        completion: DenseBackwardCompletion,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         match completion {
             DenseBackwardCompletion::Structured => {
                 if let Some(statement) = self.pending_point.take() {
@@ -188,7 +187,7 @@ where
                 }
                 Ok(FrameEffect::Continue(self))
             }
-            DenseBackwardCompletion::Block { .. } => Err(E::from(InterpreterError::Custom(
+            DenseBackwardCompletion::Block => Err(E::from(InterpreterError::Custom(
                 "a nested frame completed as a block owner",
             ))),
         }

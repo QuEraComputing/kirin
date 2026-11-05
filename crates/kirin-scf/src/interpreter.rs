@@ -26,8 +26,8 @@ use kirin::prelude::Lattice;
 use kirin::prelude::{Block, CompileStage, CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
     BranchCondition, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
-    ForwardEval, Interpretable, InterpreterError, SparseForwardEffect, SparseForwardInterp,
-    StrongDemand,
+    ForwardEval, Interpretable, InterpreterError, SparseBackwardEffect, SparseForwardEffect,
+    SparseForwardInterp, StrongDemand,
 };
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, BlockFrame, CallContext, Completion,
@@ -135,7 +135,7 @@ where
                 }
             }
         }
-        Ok(interp.effect())
+        Ok(SparseBackwardEffect::Next)
     }
 }
 
@@ -174,7 +174,7 @@ where
                 }
             }
         }
-        Ok(interp.effect())
+        Ok(SparseBackwardEffect::Next)
     }
 }
 
@@ -185,8 +185,8 @@ where
     I: DemandInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        Ok(interp.effect())
+    fn interpret(&self, _interp: &mut I) -> Result<I::Effect, I::Error> {
+        Ok(SparseBackwardEffect::Next)
     }
 }
 
@@ -297,12 +297,12 @@ where
     V: Clone + Lattice,
     E: From<InterpreterError>,
 {
-    type Completion = DenseBackwardCompletion<V>;
+    type Completion = DenseBackwardCompletion;
 
     fn step_into(
         mut self,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         if self.after.is_none() {
             self.after = Some(interp.state());
         }
@@ -329,9 +329,9 @@ where
 
     fn resume_into(
         mut self,
-        completion: DenseBackwardCompletion<V>,
+        completion: DenseBackwardCompletion,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         match completion {
             DenseBackwardCompletion::Structured => {
                 let arm_entry = interp.state();
@@ -341,7 +341,7 @@ where
                 });
                 self.step_into(interp)
             }
-            DenseBackwardCompletion::Block { .. } => Err(E::from(InterpreterError::Custom(
+            DenseBackwardCompletion::Block => Err(E::from(InterpreterError::Custom(
                 "an scf.if arm completed as a CFG block owner",
             ))),
         }
@@ -350,7 +350,7 @@ where
     fn resume_done_into(
         self,
         _interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         Err(E::from(InterpreterError::Custom(
             "scf.if dense frames resume only with completions",
         )))
@@ -413,12 +413,12 @@ where
     V: Clone + PartialEq + Lattice + PointFacts,
     E: From<InterpreterError>,
 {
-    type Completion = DenseBackwardCompletion<V>;
+    type Completion = DenseBackwardCompletion;
 
     fn step_into(
         mut self,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         if self.seed.is_none() {
             self.seed = Some(interp.state());
             self.params = interp.block_params(self.stage, self.body)?;
@@ -436,9 +436,9 @@ where
 
     fn resume_into(
         mut self,
-        completion: DenseBackwardCompletion<V>,
+        completion: DenseBackwardCompletion,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         match completion {
             DenseBackwardCompletion::Structured => {
                 let body_entry = interp.state();
@@ -459,7 +459,7 @@ where
                     Ok(FrameEffect::Complete(DenseBackwardCompletion::Structured))
                 }
             }
-            DenseBackwardCompletion::Block { .. } => Err(E::from(InterpreterError::Custom(
+            DenseBackwardCompletion::Block => Err(E::from(InterpreterError::Custom(
                 "an scf.for body completed as a CFG block owner",
             ))),
         }
@@ -468,7 +468,7 @@ where
     fn resume_done_into(
         self,
         _interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         Err(E::from(InterpreterError::Custom(
             "scf.for dense frames resume only with completions",
         )))
