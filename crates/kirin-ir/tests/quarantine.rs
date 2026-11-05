@@ -38,7 +38,7 @@ fn fixture(cause: QuarantineCause) -> Fixture {
 
     let mut rewriter = Rewriter::new(&mut stage);
     rewriter.erase_statement(nop).expect("nop is erasable");
-    let events = rewriter.drain_events();
+    let events = rewriter.events().to_vec();
     drop(rewriter);
 
     Fixture {

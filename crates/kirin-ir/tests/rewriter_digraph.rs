@@ -6,7 +6,7 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use common::{BuilderDialect, TestType, make_compute, make_split, new_stage};
+use common::{BuilderDialect, EventCursor, TestType, make_compute, make_split, new_stage};
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
@@ -84,7 +84,7 @@ fn insert_node_adds_operand_edges_and_binds_results() {
         .unwrap();
     // Two slots reading the same member result get two parallel edges.
     let n3 = rw.insert_node(dg, BuilderDialect::Add(rp, rp)).unwrap();
-    let events = rw.drain_events();
+    let events = rw.events().to_vec();
     drop(rw);
 
     let topology = MutationEvent::ChangedDiGraphTopology { graph: dg };
@@ -206,7 +206,7 @@ fn erase_statement_removes_digraph_member_and_its_edges() {
     rw.erase_statement(u).unwrap();
     // With `u` gone, `q`'s result is unused and `q` can go too.
     rw.erase_statement(q).unwrap();
-    let events = rw.drain_events();
+    let events = rw.events().to_vec();
     drop(rw);
 
     let topology = MutationEvent::ChangedDiGraphTopology { graph: dg };
@@ -264,7 +264,7 @@ fn replace_yield_moves_the_yield_use() {
     // Writing the value already there records nothing.
     assert_eq!(rw.replace_yield(dg, 0, x), Ok(x));
     assert_eq!(
-        rw.drain_events(),
+        rw.events().to_vec(),
         vec![MutationEvent::ChangedDiGraphYields { graph: dg }]
     );
     // No longer yielded, `p` can be erased.
@@ -305,7 +305,7 @@ fn erase_statement_tombstones_owned_digraph() {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(owner).unwrap();
         assert_eq!(
-            rw.drain_events(),
+            rw.events().to_vec(),
             vec![MutationEvent::ErasedStatement { stmt: owner }]
         );
     }
@@ -323,6 +323,7 @@ fn erase_statement_tombstones_owned_digraph() {
 
 #[test]
 fn replace_operand_on_member_retargets_its_edge() {
+    let mut log = EventCursor::default();
     let mut stage = new_stage();
 
     let (split, x, y) = make_split(&mut stage);
@@ -340,22 +341,22 @@ fn replace_operand_on_member_retargets_its_edge() {
     // Member result → member result: the edge moves to the new producer.
     assert_eq!(rw.replace_operand(c, 0, rq), Ok(rp));
     assert_eq!(edges(rw.stage(), dg), HashMap::from([((q, c, rq), 1)]));
-    assert_eq!(rw.drain_events(), vec![operands, topology]);
+    assert_eq!(log.read_and_advance(&rw), vec![operands, topology]);
 
     // Member result → outside value: the edge goes.
     rw.replace_operand(c, 0, x).unwrap();
     assert!(edges(rw.stage(), dg).is_empty());
-    assert_eq!(rw.drain_events(), vec![operands, topology]);
+    assert_eq!(log.read_and_advance(&rw), vec![operands, topology]);
 
     // Outside → outside: no edge either way, so no topology event.
     rw.replace_operand(c, 0, y).unwrap();
     assert!(edges(rw.stage(), dg).is_empty());
-    assert_eq!(rw.drain_events(), vec![operands]);
+    assert_eq!(log.read_and_advance(&rw), vec![operands]);
 
     // Outside → member result: an edge appears.
     rw.replace_operand(c, 0, rp).unwrap();
     assert_eq!(edges(rw.stage(), dg), HashMap::from([((p, c, rp), 1)]));
-    assert_eq!(rw.drain_events(), vec![operands, topology]);
+    assert_eq!(log.read_and_advance(&rw), vec![operands, topology]);
     drop(rw);
 
     assert_eq!(uses_set(&stage, rp), HashSet::from([so(c, 0)]));
@@ -389,7 +390,7 @@ fn replace_all_uses_retargets_every_member_edge() {
     let mut stage = stage.finalize().unwrap();
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(rw.replace_all_uses(rp, rq), Ok(4));
-    let events = rw.drain_events();
+    let events = rw.events().to_vec();
 
     // One topology and one yields event for the graph, however many slots.
     let expected = [
@@ -423,6 +424,7 @@ fn replace_all_uses_retargets_every_member_edge() {
 
 #[test]
 fn replace_statement_on_member_updates_operand_edges() {
+    let mut log = EventCursor::default();
     let mut stage = new_stage();
 
     // p → n → d, with q a second producer.
@@ -451,7 +453,7 @@ fn replace_statement_on_member_updates_operand_edges() {
     rw.replace_statement(n, BuilderDialect::Compute(rq, placeholder))
         .unwrap();
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![
             MutationEvent::ReplacedStatement { stmt: n },
             MutationEvent::ChangedDiGraphTopology { graph: dg },
@@ -466,7 +468,7 @@ fn replace_statement_on_member_updates_operand_edges() {
     rw.replace_statement(n, BuilderDialect::Compute(rq, placeholder))
         .unwrap();
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![MutationEvent::ReplacedStatement { stmt: n }]
     );
     drop(rw);

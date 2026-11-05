@@ -5,7 +5,7 @@ mod common;
 
 use std::collections::HashSet;
 
-use common::{BuilderDialect, TestType, make_split, make_wire, new_stage};
+use common::{BuilderDialect, EventCursor, TestType, make_split, make_wire, new_stage};
 use kirin_ir::*;
 
 /// The def-use set of `value` (order-agnostic; `SSAInfo::uses` is a bag).
@@ -57,10 +57,11 @@ fn replace_all_uses_rewrites_operands_and_records_events() {
     };
 
     let mut rewriter = Rewriter::new(&mut stage);
+    let mut log = EventCursor::default();
     let replaced = rewriter.replace_all_uses(real_x, real_y).unwrap();
     assert_eq!(replaced, 3, "Add uses x twice, Use once");
     assert_eq!(
-        rewriter.drain_events(),
+        log.read_and_advance(&rewriter),
         vec![
             MutationEvent::ChangedOperands { stmt: add },
             MutationEvent::ChangedOperands { stmt: use_stmt },
@@ -74,7 +75,7 @@ fn replace_all_uses_rewrites_operands_and_records_events() {
 
     // A second replacement finds nothing left to rewrite and records nothing.
     assert_eq!(rewriter.replace_all_uses(real_x, real_y).unwrap(), 0);
-    assert!(rewriter.events().is_empty());
+    assert!(log.read_and_advance(&rewriter).is_empty());
     drop(rewriter);
 
     match add.definition(&stage) {
@@ -141,7 +142,7 @@ fn replace_operand_updates_single_slot_and_rejects_illegal_edits() {
     assert_eq!(rewriter.replace_operand(add, 1, real_y).unwrap(), real_y);
 
     assert_eq!(
-        rewriter.drain_events(),
+        rewriter.events().to_vec(),
         vec![MutationEvent::ChangedOperands { stmt: add }],
         "only the one real edit is recorded"
     );
@@ -244,7 +245,7 @@ fn replace_all_uses_maintains_def_use_index_including_yields() {
         let mut rewriter = Rewriter::new(&mut stage);
         let replaced = rewriter.replace_all_uses(a, real_b).unwrap();
         assert_eq!(replaced, 2, "one operand slot + one yield slot");
-        rewriter.drain_events()
+        rewriter.events().to_vec()
     };
 
     // After: a has no uses; b absorbed both (operand + yield).
@@ -311,7 +312,7 @@ fn erase_statement_unlinks_and_maintains_index() {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(s1).unwrap();
         assert_eq!(
-            rw.drain_events(),
+            rw.events().to_vec(),
             vec![MutationEvent::ErasedStatement { stmt: s1 }]
         );
     }
@@ -350,7 +351,7 @@ fn erase_statement_tombstones_nested_bodies() {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(owner).unwrap();
         assert_eq!(
-            rw.drain_events(),
+            rw.events().to_vec(),
             vec![MutationEvent::ErasedStatement { stmt: owner }]
         );
     }
@@ -398,7 +399,7 @@ fn erase_statement_erases_a_terminator_and_its_edges() {
     let events = {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(jump).unwrap();
-        rw.drain_events()
+        rw.events().to_vec()
     };
     assert_eq!(
         events,
@@ -478,7 +479,7 @@ fn insert_before_and_after_splice_and_maintain_index() {
         let mut rw = Rewriter::new(&mut stage);
         let n0 = rw.insert_before(s0, BuilderDialect::Use(real_y)).unwrap();
         let n1 = rw.insert_after(s0, BuilderDialect::Use(real_x)).unwrap();
-        (n0, n1, rw.drain_events())
+        (n0, n1, rw.events().to_vec())
     };
 
     let order: Vec<Statement> = block.statements(&stage).collect();
@@ -615,7 +616,7 @@ fn insert_binds_fresh_results() {
 
     // One event per successful insert; the rejections recorded none.
     assert_eq!(
-        rw.drain_events(),
+        rw.events().to_vec(),
         vec![
             MutationEvent::InsertedStatement { stmt: split },
             MutationEvent::InsertedStatement { stmt: user },
@@ -644,7 +645,7 @@ fn insert_before_terminator_fills_a_terminator_only_block() {
     let (n0, events) = {
         let mut rw = Rewriter::new(&mut stage);
         let n0 = rw.insert_before(ret, BuilderDialect::Nop).unwrap();
-        (n0, rw.drain_events())
+        (n0, rw.events().to_vec())
     };
 
     assert_eq!(events, vec![MutationEvent::InsertedStatement { stmt: n0 }]);
@@ -691,7 +692,7 @@ fn replace_statement_swaps_def_and_updates_uses() {
         rw.replace_statement(s0, BuilderDialect::Add(real_y, real_x))
             .unwrap();
         assert_eq!(
-            rw.drain_events(),
+            rw.events().to_vec(),
             vec![MutationEvent::ReplacedStatement { stmt: s0 }]
         );
     }
@@ -880,7 +881,7 @@ fn replace_statement_maintains_predecessors_when_retargeting() {
             BuilderDialect::Branch(Successor::from_block(new_target)),
         )
         .unwrap();
-        rw.drain_events()
+        rw.events().to_vec()
     };
 
     // The reverse control-flow index followed the edge.
@@ -933,7 +934,7 @@ fn replace_results_redirects_every_result_and_unblocks_erase() {
     let events = {
         let mut rw = Rewriter::new(&mut stage);
         rw.replace_results(dup, &[orig_a, orig_b]).unwrap();
-        rw.drain_events()
+        rw.events().to_vec()
     };
 
     // Both results moved to the originals; the duplicate is now unread.
@@ -1006,7 +1007,7 @@ fn replace_results_substitutes_simultaneously() {
     let events = {
         let mut rw = Rewriter::new(&mut stage);
         rw.replace_results(split, &[b, x]).unwrap();
-        rw.drain_events()
+        rw.events().to_vec()
     };
     // Every use of `a` and of `b` moved, so both get a `ReplacedUses`, even
     // though `b` gained the site that read `a`.
@@ -1091,7 +1092,7 @@ fn replace_results_rejects_bad_arity_and_dead_ids() {
 
         // Replacing every result by itself is a no-op.
         assert_eq!(rw.replace_results(split, &[a, b]), Ok(()));
-        rw.drain_events()
+        rw.events().to_vec()
     };
 
     // Only the erase recorded anything; no rejected call moved a use list.
@@ -1175,7 +1176,7 @@ fn replace_uses_if_rewrites_only_the_selected_sites() {
             .replace_uses_if(a, new, |_, site| site == so(u1, 0))
             .unwrap();
         assert_eq!(replaced, 1);
-        rewriter.drain_events()
+        rewriter.events().to_vec()
     };
 
     assert_eq!(
@@ -1236,7 +1237,7 @@ fn replace_uses_if_selecting_every_use_records_replaced_uses() {
 
     let mut rewriter = Rewriter::new(&mut stage);
     assert_eq!(rewriter.replace_uses_if(a, new, |_, _| true), Ok(3));
-    let events = rewriter.drain_events();
+    let events = rewriter.events().to_vec();
     drop(rewriter);
 
     assert_eq!(
@@ -1387,7 +1388,7 @@ fn replace_uses_if_separates_a_digraph_operand_from_its_yield() {
         let is_yield =
             |_: &StageInfo<BuilderDialect>, site| matches!(site, Use::DiGraphYield { .. });
         assert_eq!(rewriter.replace_uses_if(a, b, is_yield), Ok(1));
-        rewriter.drain_events()
+        rewriter.events().to_vec()
     };
     assert_eq!(
         events,
@@ -1403,7 +1404,7 @@ fn replace_uses_if_separates_a_digraph_operand_from_its_yield() {
     let events = {
         let mut rewriter = Rewriter::new(&mut stage);
         assert_eq!(rewriter.replace_uses_if(a, b, |_, _| true), Ok(1));
-        rewriter.drain_events()
+        rewriter.events().to_vec()
     };
     assert_eq!(
         events,
