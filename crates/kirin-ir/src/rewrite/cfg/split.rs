@@ -10,9 +10,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// The original block is left **without a terminator**; the caller closes
     /// it, typically with a branch to the new block, through
-    /// [`Rewriter::insert_terminator`]. The new block has no arguments.
-    /// Splitting at the terminator moves only the terminator. Statement ids,
-    /// results, and uses are unchanged.
+    /// [`InsertionPoint::Terminator`](crate::InsertionPoint::Terminator). The
+    /// new block has no arguments. Splitting at the terminator moves only the
+    /// terminator. Statement ids, results, and uses are unchanged.
     ///
     /// Rejects, leaving the stage untouched, if `at` is unknown or not in a
     /// CFG block.
