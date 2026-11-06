@@ -54,7 +54,9 @@ pub use node::{
 pub use pipeline::Pipeline;
 pub use product::{HasProduct, Product};
 pub use project::{Project, ProjectError, TryProject, TryProjectTo};
-pub use rewrite::{MutationEvent, QuarantineCause, Quarantined, RewriteError, Rewriter};
+pub use rewrite::{
+    InsertionPoint, MutationEvent, QuarantineCause, Quarantined, RewriteError, Rewriter,
+};
 pub use signature::{
     ExactSemantics, HasSignature, LatticeSemantics, Signature, SignatureCmp, SignatureSemantics,
 };

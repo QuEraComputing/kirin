@@ -136,16 +136,23 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
     let mut rw = Rewriter::new(&mut stage);
 
     // One reader: an endpoint, but no edge yet.
-    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
     assert!(edges(rw.stage(), ug).is_empty());
     // A second reader completes the edge; the boundary port gets one reader.
     let b = rw
-        .insert_ungraph_node(ug, BuilderDialect::Gate(w, boundary))
+        .create(
+            InsertionPoint::UnGraph(ug),
+            BuilderDialect::Gate(w, boundary),
+        )
         .unwrap();
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(w, pair(a, b))]));
     // A third reader makes `w` a hyperedge: accepted, but `w` loses its edge
     // and verification reports it.
-    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let c = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
     assert!(edges(rw.stage(), ug).is_empty());
     assert_eq!(
         degree_findings(rw.stage()),
@@ -160,7 +167,10 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(w, pair(a, b))]));
     // A boundary port is a wire too; a capture is an ordinary use.
     let d = rw
-        .insert_ungraph_node(ug, BuilderDialect::Gate(boundary, capture))
+        .create(
+            InsertionPoint::UnGraph(ug),
+            BuilderDialect::Gate(boundary, capture),
+        )
         .unwrap();
     let events = rw.events().to_vec();
     drop(rw);
@@ -202,11 +212,13 @@ fn insert_ungraph_node_reading_a_wire_twice_is_a_self_loop() {
     let mut rw = Rewriter::new(&mut stage);
 
     let s = rw
-        .insert_ungraph_node(ug, BuilderDialect::Gate(v, v))
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Gate(v, v))
         .unwrap();
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(s, s))]));
     // Both of `v`'s endpoints are taken: a third reader leaves no edge.
-    let t = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    let t = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(v))
+        .unwrap();
     drop(rw);
 
     assert!(edges(&stage, ug).is_empty());
@@ -227,14 +239,16 @@ fn insert_ungraph_edge_adds_a_wire_nodes_can_read() {
     let mut rw = Rewriter::new(&mut stage);
 
     let r = rw.new_result(TestType::Qubit);
-    let e = rw.insert_ungraph_edge(ug, BuilderDialect::Wire(r)).unwrap();
+    let e = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Wire(r))
+        .unwrap();
     // The new wire has no readers, so no edge.
     assert!(edges(rw.stage(), ug).is_empty());
     let n1 = rw
-        .insert_ungraph_node(ug, BuilderDialect::Use(r.into()))
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(r.into()))
         .unwrap();
     let n2 = rw
-        .insert_ungraph_node(ug, BuilderDialect::Use(r.into()))
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(r.into()))
         .unwrap();
     let events = rw.events().to_vec();
     drop(rw);
@@ -276,39 +290,49 @@ fn ungraph_inserts_reject_without_mutating() {
     let fresh = rw.new_result(TestType::Qubit);
     let rejections = [
         (
-            rw.insert_ungraph_node(dead_graph, BuilderDialect::Isolated),
+            rw.create(
+                InsertionPoint::UnGraph(dead_graph),
+                BuilderDialect::Isolated,
+            ),
             RewriteError::UnknownUnGraph(dead_graph),
         ),
         (
-            rw.insert_ungraph_edge(dead_graph, BuilderDialect::Wire(fresh)),
+            rw.create(
+                InsertionPoint::UnGraph(dead_graph),
+                BuilderDialect::Wire(fresh),
+            ),
             RewriteError::UnknownUnGraph(dead_graph),
         ),
         (
-            rw.insert_ungraph_node(ug, BuilderDialect::Return),
+            rw.create(InsertionPoint::UnGraph(ug), BuilderDialect::Return),
             RewriteError::UnexpectedTerminator,
         ),
         (
-            rw.insert_ungraph_node(ug, BuilderDialect::Fork(Successor::from_block(dead_block))),
+            rw.create(
+                InsertionPoint::UnGraph(ug),
+                BuilderDialect::Fork(Successor::from_block(dead_block)),
+            ),
             RewriteError::NonTerminatorWithSuccessors,
         ),
         (
-            rw.insert_ungraph_node(ug, BuilderDialect::Wire(fresh)),
-            RewriteError::UnexpectedEdgeStatement,
-        ),
-        (
-            rw.insert_ungraph_node(ug, BuilderDialect::Use(dead_value())),
+            rw.create(
+                InsertionPoint::UnGraph(ug),
+                BuilderDialect::Use(dead_value()),
+            ),
             RewriteError::UnknownValue(dead_value()),
         ),
         (
-            rw.insert_ungraph_edge(ug, BuilderDialect::Use(w)),
-            RewriteError::ExpectedEdgeStatement,
-        ),
-        (
-            rw.insert_ungraph_edge(ug, BuilderDialect::ParamWire(w, fresh)),
+            rw.create(
+                InsertionPoint::UnGraph(ug),
+                BuilderDialect::ParamWire(w, fresh),
+            ),
             RewriteError::EdgeStatementWithOperands,
         ),
         (
-            rw.insert_ungraph_edge(ug, BuilderDialect::Wire(ResultValue::from(w))),
+            rw.create(
+                InsertionPoint::UnGraph(ug),
+                BuilderDialect::Wire(ResultValue::from(w)),
+            ),
             RewriteError::ResultNotFresh(w),
         ),
     ];
@@ -336,9 +360,15 @@ fn erase_ungraph_node_drops_its_edges_and_frees_the_wire() {
         ..
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
-    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let b = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let c = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(v))
+        .unwrap();
     log.advance(&rw);
 
     // `a` is not the last node, so the last one moves into its slot.
@@ -352,7 +382,9 @@ fn erase_ungraph_node_drops_its_edges_and_frees_the_wire() {
     );
     // `w` is left with one reader, so its edge is gone and it can take another.
     assert!(edges(rw.stage(), ug).is_empty());
-    let d = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let d = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
     drop(rw);
 
     assert!(a.get_info(&stage).is_none());
@@ -378,10 +410,13 @@ fn erase_ungraph_node_with_used_results_is_rejected() {
     let mut rw = Rewriter::new(&mut stage);
     let r = rw.new_result(TestType::I32);
     let n = rw
-        .insert_ungraph_node(ug, BuilderDialect::Compute(capture, r))
+        .create(
+            InsertionPoint::UnGraph(ug),
+            BuilderDialect::Compute(capture, r),
+        )
         .unwrap();
     let _reader = rw
-        .insert_ungraph_node(ug, BuilderDialect::Use(r.into()))
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(r.into()))
         .unwrap();
     log.advance(&rw);
 
@@ -408,7 +443,9 @@ fn erase_edge_statement_once_no_node_reads_its_wire() {
         ..
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
-    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
     log.advance(&rw);
 
     // A node still reads the wire.
@@ -505,10 +542,18 @@ fn replace_operand_swaps_endpoints_through_an_over_full_wire() {
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
     // w joins a — b, v joins c — d; both wires are full.
-    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
-    let d = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let b = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let c = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(v))
+        .unwrap();
+    let d = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(v))
+        .unwrap();
     log.advance(&rw);
     let topology = MutationEvent::ChangedUnGraphTopology { graph: ug };
 
@@ -557,8 +602,12 @@ fn replace_operand_off_a_wire_drops_its_edge() {
         ..
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
-    let _a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let _a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let b = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
     log.advance(&rw);
 
     // A capture is not a wire: b leaves w, so w's edge goes.
@@ -575,8 +624,11 @@ fn replace_operand_off_a_wire_drops_its_edge() {
     // Neither the capture nor a node's result is a wire: moving between them
     // changes no topology, so only the operand event is recorded.
     let r = rw.new_result(TestType::I32);
-    rw.insert_ungraph_node(ug, BuilderDialect::Compute(capture, r))
-        .unwrap();
+    rw.create(
+        InsertionPoint::UnGraph(ug),
+        BuilderDialect::Compute(capture, r),
+    )
+    .unwrap();
     log.advance(&rw);
     rw.replace_operand(b, 0, r).unwrap();
     assert_eq!(
@@ -600,8 +652,12 @@ fn replace_all_uses_moves_every_reader_to_the_new_wire() {
         ..
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
-    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let c = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(v))
+        .unwrap();
     log.advance(&rw);
 
     // One reader each: merging w into v gives v exactly two.
@@ -617,7 +673,9 @@ fn replace_all_uses_moves_every_reader_to_the_new_wire() {
     );
 
     // A third reader merged in leaves v over full, with no edge.
-    let e = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let e = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
     rw.replace_all_uses(w, v).unwrap();
     drop(rw);
 
@@ -646,8 +704,12 @@ fn replace_results_redirects_an_edge_statements_readers() {
         ..
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
-    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let b = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
     log.advance(&rw);
 
     // w's readers move to v, so the edge now carries v, and w_stmt is free
@@ -708,9 +770,15 @@ fn replace_statement_on_ungraph_node_moves_its_wires() {
         ..
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
-    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let b = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let c = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(v))
+        .unwrap();
     log.advance(&rw);
 
     // b now reads v instead of w: w loses its edge, v gains one.
@@ -749,8 +817,12 @@ fn replace_statement_on_edge_statement_keeps_its_wire() {
         ..
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
-    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let b = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
     log.advance(&rw);
 
     // The result slot is overwritten with the statement's own result, so `w`
@@ -790,7 +862,10 @@ fn replace_statement_on_ungraph_member_rejects_role_changes() {
     let mut rw = Rewriter::new(&mut stage);
     let r = rw.new_result(TestType::I32);
     let node = rw
-        .insert_ungraph_node(ug, BuilderDialect::Compute(capture, r))
+        .create(
+            InsertionPoint::UnGraph(ug),
+            BuilderDialect::Compute(capture, r),
+        )
         .unwrap();
     log.advance(&rw);
     let placeholder = ResultValue::from(TestSSAValue(0));
@@ -836,9 +911,15 @@ fn replace_uses_if_moves_only_the_selected_reader_to_the_new_wire() {
         ..
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
-    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let b = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let c = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(v))
+        .unwrap();
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(w, pair(a, b))]));
     log.advance(&rw);
 
