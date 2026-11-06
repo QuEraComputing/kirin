@@ -1,6 +1,7 @@
 //! `CFG` block-list surgery for the [`Rewriter`](super::Rewriter).
 //!
 //! These methods add, erase, split, and merge blocks of a [`CFG`](crate::CFG),
+//! splice one CFG's blocks into another,
 //! retarget control-flow edges, and insert or erase block arguments together
 //! with the incoming edges that forward them. Like statement surgery they
 //! maintain every derived mirror on each successful edit —
@@ -31,4 +32,5 @@ mod blocks;
 mod edges;
 mod helpers;
 mod merge;
+mod splice;
 mod split;

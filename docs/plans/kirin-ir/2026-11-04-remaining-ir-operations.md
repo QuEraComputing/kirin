@@ -184,7 +184,15 @@ since they all move together. `source` is left empty and not erased; its
 owner (e.g. the callee function) still names it, and the caller decides
 whether to erase the owner. Records `ChangedBlockList` for both CFGs and a new
 `SplicedCfg { source, dest }`, which the walk check reads as "every block of
-`source` moved".
+`source` moved". Afterwards a moved block's parent is `dest`, so, as in step 4,
+the check compares against where the visited statement was before the visit:
+a `VisitedPlace` holding its block and that block's CFG.
+`ChangedBlockList` alone could not drive the check, since `split_block`, which
+a walk allows, records it too.
+
+Rejects an anchor block in `source` or nested in one of its blocks
+(`CfgSplicedIntoItself`). There is no `_before` variant and no way to splice
+into an empty CFG, which has no anchor; inlining needs neither.
 
 Cost: O(blocks moved). This is the move-instead-of-copy path for inlining a
 callee's last use.
