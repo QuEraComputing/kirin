@@ -927,6 +927,116 @@ fn splicing_another_block_into_the_visited_statements_block_keeps_the_walk() {
     assert_eq!(splice_while_visiting_a::<BFS>(), spliced_schedule::<BFS>());
 }
 
+/// ```text
+/// root = own_cfg outer {
+///   ^o { p = own_cfg inner { ^i { q; ret } }; ret }
+/// }
+/// ```
+#[derive(Clone, Copy)]
+struct NestedCfg {
+    root: Statement,
+    o: Block,
+    p: Statement,
+    q: Statement,
+    inner: CFG,
+}
+
+fn nested_cfg() -> (StageInfo<BuilderDialect>, NestedCfg) {
+    let mut stage = new_stage();
+    let q = stage.statement().definition(BuilderDialect::Nop).new();
+    let i_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let i = stage.block().stmt(q).terminator(i_ret).new();
+    let inner = stage.cfg().add_block(i).new();
+    let p = stage
+        .statement()
+        .definition(BuilderDialect::OwnCFG(inner))
+        .new();
+    let o_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let o = stage.block().stmt(p).terminator(o_ret).new();
+    let outer = stage.cfg().add_block(o).new();
+    let root = stage
+        .statement()
+        .definition(BuilderDialect::OwnCFG(outer))
+        .new();
+    let ids = NestedCfg {
+        root,
+        o,
+        p,
+        q,
+        inner,
+    };
+    (stage.finalize().unwrap(), ids)
+}
+
+/// Splices `inner` after `^o`, into `outer`.
+fn splice_inner_after_o(rewriter: &mut Rewriter<BuilderDialect>, n: NestedCfg) {
+    rewriter.splice_cfg_after(n.inner, n.o).unwrap();
+}
+
+/// Walk `O` over [`nested_cfg`] with `walk_mut`, splicing `inner` into
+/// `outer` when visiting `at`; the statements visited.
+fn splice_inner_while_visiting<O: WalkOrder>(
+    at: impl Fn(NestedCfg) -> Statement,
+) -> Result<Vec<Statement>, WalkError> {
+    let (mut stage, n) = nested_cfg();
+    let mut rewriter = Rewriter::new(&mut stage);
+    let mut visited = Vec::new();
+    O::walk_mut(&mut rewriter, n.root, |rewriter, stmt| {
+        visited.push(stmt);
+        if stmt == at(n) {
+            splice_inner_after_o(rewriter, n);
+        }
+        WalkResult::Advance
+    })
+    .map(|_| visited)
+}
+
+#[test]
+fn splicing_the_visited_statements_cfg_breaks_link_following_walks() {
+    let (_, n) = nested_cfg();
+    for result in [
+        splice_inner_while_visiting::<PreOrder>(|n| n.q),
+        splice_inner_while_visiting::<PostOrder>(|n| n.q),
+        splice_inner_while_visiting::<BFS>(|n| n.q),
+    ] {
+        assert_eq!(result, Err(WalkError::VisitedMoved(n.q)));
+    }
+}
+
+#[test]
+fn reverse_bfs_orders_go_on_after_the_visited_statements_cfg_is_spliced() {
+    let (stage, n) = nested_cfg();
+    assert_eq!(
+        splice_inner_while_visiting::<ReverseBFS>(|n| n.q).unwrap(),
+        ReverseBFS::schedule(&stage, n.root)
+    );
+    assert_eq!(
+        splice_inner_while_visiting::<KeepOrderReverseBFS>(|n| n.q).unwrap(),
+        KeepOrderReverseBFS::schedule(&stage, n.root)
+    );
+}
+
+#[test]
+fn splicing_a_cfg_into_the_visited_statements_cfg_keeps_the_walk() {
+    /// The schedule of `O` over [`nested_cfg`] with the splice already made.
+    fn spliced_schedule<O: WalkOrder>() -> Vec<Statement> {
+        let (mut stage, n) = nested_cfg();
+        splice_inner_after_o(&mut Rewriter::new(&mut stage), n);
+        O::schedule(&stage, n.root)
+    }
+    // While visiting `p`, `inner`'s block moves into `outer`, after `^o`;
+    // the walk visits it there. Not `PostOrder`: it visits `p` after `q`, so
+    // the splice would put `q` ahead of the cursor a second time.
+    assert_eq!(
+        splice_inner_while_visiting::<PreOrder>(|n| n.p).unwrap(),
+        spliced_schedule::<PreOrder>()
+    );
+    assert_eq!(
+        splice_inner_while_visiting::<BFS>(|n| n.p).unwrap(),
+        spliced_schedule::<BFS>()
+    );
+}
+
 /// Splits the entry block at `a` while visiting `a`; the walk's schedule
 /// before the split, and the statements it visited.
 fn split_at_a_while_visiting<O: WalkOrder>() -> (Vec<Statement>, Result<Vec<Statement>, WalkError>)

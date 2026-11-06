@@ -82,6 +82,9 @@
 //!   [`Rewriter::splice_block_before`](crate::Rewriter::splice_block_before)
 //!   or [`Rewriter::splice_block_after`](crate::Rewriter::splice_block_after),
 //!   reported the same way;
+//! - splicing the blocks of its CFG into another CFG with
+//!   [`Rewriter::splice_cfg_after`](crate::Rewriter::splice_cfg_after),
+//!   reported the same way;
 //! - moving one of its ancestors, which is not checked;
 //! - reordering the bodies of one of its ancestors
 //!   ([`Rewriter::replace_statement`](crate::Rewriter::replace_statement)),
@@ -106,4 +109,4 @@ pub(crate) mod tree;
 
 pub use breadth_first::{BFS, BFSCursor, BuiltOrderCursor, KeepOrderReverseBFS, ReverseBFS};
 pub use depth_first::{PostOrder, PostOrderCursor, PreOrder, PreOrderCursor};
-pub use order::{WalkCursor, WalkError, WalkOrder, WalkResult, WalkStatus};
+pub use order::{VisitedPlace, WalkCursor, WalkError, WalkOrder, WalkResult, WalkStatus};

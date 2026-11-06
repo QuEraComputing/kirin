@@ -146,6 +146,10 @@ pub enum MutationEvent {
     /// Every statement of `source`, except its terminator, was moved into
     /// `dest`, keeping their ids, results, uses and nested bodies.
     SplicedBlock { source: Block, dest: Block },
+    /// Every block of `source` was moved into `dest`, keeping their ids,
+    /// arguments, statements and edges. Recorded after the
+    /// [`MutationEvent::ChangedBlockList`] of both CFGs.
+    SplicedCfg { source: CFG, dest: CFG },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -242,6 +246,10 @@ pub enum RewriteError {
     /// `source` or nested in one of its statements, which would place a
     /// spliced statement next to or inside itself.
     SplicedIntoItself { source: Block, anchor: Statement },
+    /// `splice_cfg_after` was given an anchor block in `source` or nested in
+    /// one of its blocks, which would place `source`'s blocks inside
+    /// themselves.
+    CfgSplicedIntoItself { source: CFG, anchor: Block },
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -403,6 +411,12 @@ impl fmt::Display for RewriteError {
                 write!(
                     f,
                     "cannot splice {source:?} next to {anchor:?}, which is in it"
+                )
+            }
+            RewriteError::CfgSplicedIntoItself { source, anchor } => {
+                write!(
+                    f,
+                    "cannot splice {source:?} after {anchor:?}, which is in it"
                 )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
