@@ -38,6 +38,11 @@ impl<L: Dialect> CFGInfo<L> {
             _marker: std::marker::PhantomData,
         }
     }
+
+    /// The parent statement that owns this CFG, if any.
+    pub fn parent(&self) -> Option<Statement> {
+        self.parent
+    }
 }
 
 impl<L: Dialect> GetInfo<L> for CFG {
