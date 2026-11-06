@@ -12,11 +12,11 @@ attempt) inlining a call.
 
 | Body | Operations |
 |---|---|
-| block body | `erase_statement`, `insert_before` / `insert_after` (new statements only), `replace_statement`, `insert_terminator` |
+| block body | `erase_statement`, `create` at `Before` / `After` (new statements only), `replace_statement`, `create` at `Terminator` |
 | CFG | `append_block`, `insert_block_before` / `_after` (new empty blocks only), `erase_block`, `split_block`, `merge_blocks`, `retarget_successor`, `insert_block_arg`, `erase_block_arg` |
 | values | `replace_operand`, `replace_all_uses`, `replace_results`, `new_result` |
-| `DiGraph` | `insert_node`, `replace_yield` (removal through `erase_statement`) |
-| `UnGraph` | `insert_ungraph_node`, `insert_ungraph_edge` (removal through `erase_statement`) |
+| `DiGraph` | `create` at `DiGraph`, `replace_yield` (removal through `erase_statement`) |
+| `UnGraph` | `create` at `UnGraph`, for nodes and edge statements (removal through `erase_statement`) |
 
 Nothing moves an existing statement or block, and nothing copies IR. The one
 operation that moves IR is `merge_blocks`, which appends one block's
@@ -84,7 +84,7 @@ rewriter.move_before(stmt, anchor)?;
 rewriter.move_after(stmt, anchor)?;
 ```
 
-Same anchor rules as `insert_before` / `insert_after`: `move_before` a
+Same anchor rules as `InsertionPoint::Before` / `After`: `move_before` a
 terminator appends to the end of that block's statements; nothing can go after
 a terminator. The anchor may be in any block, of any CFG or statement-owned
 body.
@@ -106,7 +106,7 @@ Rejects:
 - the anchor is inside `stmt`'s own nested bodies (moving an `scf.if` into its
   own arm would make it contain itself).
 
-Not checked, like `insert_before`: that every use of `stmt`'s results still
+Not checked, like `create`: that every use of `stmt`'s results still
 comes after it. That is the caller's job.
 
 Records a new `MutationEvent::MovedStatement { stmt }`. `ErasedStatement` +
@@ -199,21 +199,56 @@ callee's last use.
 
 ### 6. Copy a statement or a CFG
 
+As in MLIR, copying is separate from inserting, and creating a new statement
+is one call at an insertion point:
+
 ```rust
-let mut map = IrMap::default();           // MLIR's IRMapping
-let copy = rewriter.clone_before(stmt, anchor, &mut map)?;
-let blocks = rewriter.clone_cfg_after(source, anchor_block, &mut map)?;
+let s = rewriter.create(InsertionPoint::Before(anchor), definition)?;  // build + place
+let mut map = IrMap::default();                                       // MLIR's IRMapping
+let copy = rewriter.clone_statement(stmt, &mut map)?;                 // detached deep copy
+rewriter.insert(InsertionPoint::After(anchor), copy)?;                // place a detached statement
+let blocks = rewriter.clone_cfg_after(source, anchor_block, &mut map)?;   // like Region::cloneInto
 ```
 
-A deep copy with fresh ids: statements, results, blocks, block arguments and
-nested bodies, including `DiGraph` and `UnGraph` bodies. A copied graph gets
-new ports, copied members and yields, and its topology is rebuilt from the
-copied operands with the helpers `insert_node` / `insert_ungraph_node`
-already use. Every operand and branch target inside the copy is mapped
-through `map`. A value from outside the copied IR keeps pointing at the
-original. The caller can pre-seed `map`, e.g. to map the callee's entry
-arguments to the call's operands. `map` afterwards holds old → new for every
-value and block copied, so the caller can find the copied `ret`s.
+- **`InsertionPoint`** says where a statement goes: `Before(stmt)`,
+  `After(stmt)`, `Terminator(block)`, `DiGraph(graph)`, `UnGraph(graph)`. An
+  `UnGraph` member is an edge statement or a node as its definition says
+  (`IsEdge`).
+- **`create`** checks the point against the definition, then builds and places
+  the statement; a rejection leaves the stage untouched.
+- **`insert`** places a detached statement of this `Rewriter`, one it made
+  but has not placed, such as a copy (`NotDetached` otherwise). Detached
+  statements never inserted are tombstoned when the `Rewriter` is dropped.
+  Building a detached statement from a definition is internal to `create`.
+  `move_before` / `move_after` still require a statement that is already in a
+  block.
+- **`clone_statement`** makes a detached deep copy with fresh ids:
+  statements, results, blocks, block arguments and nested bodies. Every
+  operand and branch target inside the copy is mapped through `map`; a value
+  from outside keeps pointing at the original unless `map` was pre-seeded.
+  Terminators are not cloned, since a detached terminator could not be
+  inserted into a statement chain. Records no event.
+- **`clone_cfg_after`** copies a CFG's blocks into place after
+  `anchor_block`, as MLIR's `Region::cloneInto` does (a region cannot be
+  detached). Rejects an `anchor_block` inside `source`. Records
+  `ChangedBlockList` for the destination.
+- **A block argument already in `map` is not copied.** Its uses inside the copy
+  read the mapped value. Pre-seeding the callee entry block's arguments with a
+  call's operands gives a copied entry block with no arguments, ready to
+  splice into the call's block (step 7).
+- Names are not copied; symbols are.
+- `map` afterwards holds old → new for every value and block copied, so the
+  caller can find the copied `ret`s.
+
+Split in two:
+
+- **6a**: `InsertionPoint` with `create` / `insert`, then `IrMap`,
+  `clone_statement` and `clone_cfg_after` over block and CFG bodies. A
+  statement owning a `DiGraph` or `UnGraph` body is rejected
+  (`CopyOfGraphBody`).
+- **6b**: graph bodies. A copied graph gets new ports, copied members and
+  yields, and its topology is rebuilt from the copied operands with the
+  helpers `create` uses at `DiGraph` / `UnGraph` points.
 
 Cost: O(size of what is copied).
 

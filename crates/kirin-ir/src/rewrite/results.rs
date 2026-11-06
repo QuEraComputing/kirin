@@ -1,25 +1,26 @@
-//! Fresh result values for inserted statements.
+//! Fresh result values for built statements.
 //!
 //! A definition names its results by id, so the ids must exist before the
-//! definition can be built, while the statement that defines them does not
-//! exist until it is inserted. [`Rewriter::new_result`] bridges the gap: it
-//! allocates an id whose arena slot stays empty (so the value reads as not
-//! live and cannot be used yet) and keeps its type until an insert binds it.
-//! Dropping the `Rewriter` tombstones every value it never bound, so once it
-//! is gone each result slot is either bound or a real tombstone.
+//! definition can be written, while the statement that defines them does not
+//! exist until it is built. [`Rewriter::new_result`] bridges the gap: it
+//! allocates an id whose arena slot stays empty (so the value reads as not live
+//! and cannot be used yet) and keeps its type until [`Rewriter::create`] binds
+//! it. Dropping the `Rewriter` tombstones every value it never bound, so once
+//! it is gone each result slot is either bound or a real tombstone. It also
+//! tombstones every detached statement it never inserted.
 
 use crate::{Dialect, ResultValue, SSAInfo, SSAKind, SSAValue, Statement};
 
 use crate::rewrite::rewriter::{RewriteError, Rewriter};
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
-    /// Allocate a result value of type `ty` for a statement not inserted yet.
+    /// Allocate a result value of type `ty` for a statement not built yet.
     ///
-    /// Put it in a result slot of the definition passed to an insert; the
-    /// insert makes it a result of the new statement. Until then the value is
-    /// not live: using it as an operand is rejected with
-    /// [`RewriteError::UnknownValue`]. A value this `Rewriter` never binds is
-    /// tombstoned when the `Rewriter` is dropped.
+    /// Put it in a result slot of the definition passed to
+    /// [`Rewriter::create`], which makes it a result of the new statement.
+    /// Until then the value is not live: using it as an operand is rejected
+    /// with [`RewriteError::UnknownValue`]. A value this `Rewriter` never binds
+    /// is tombstoned when the `Rewriter` is dropped.
     pub fn new_result(&mut self, ty: L::Type) -> ResultValue {
         let value = self.stage.ssas.alloc(None);
         self.unbound_ssa_results.insert(value, ty);
@@ -60,9 +61,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 }
 
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
-    /// Tombstone every [`new_result`](Rewriter::new_result) value no insert
-    /// bound, so no empty, live-looking slot outlives the `Rewriter`.
+    /// Tombstone every detached statement no [`insert`](Rewriter::insert)
+    /// placed, with its results and operand uses, and every
+    /// [`new_result`](Rewriter::new_result) value no statement bound, so
+    /// nothing detached or empty outlives the `Rewriter`.
     fn drop(&mut self) {
+        for stmt in std::mem::take(&mut self.detached) {
+            self.tombstone_statement(stmt, None);
+        }
         for (value, _) in self.unbound_ssa_results.drain() {
             let _ = self.stage.ssas.delete(value);
         }
