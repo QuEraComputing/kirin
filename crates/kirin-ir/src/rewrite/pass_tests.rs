@@ -7,8 +7,8 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::testing::dialect::{TestLang, TestType, new_stage};
 use crate::{
-    Block, CompileStage, Mismatch, Program, QuarantineCause, Quarantined, RewriteError, Rewriter,
-    SSAValue, StageInfo, StagePassError, Statement, VerifyError,
+    Block, CompileStage, InsertionPoint, Mismatch, Program, QuarantineCause, Quarantined,
+    RewriteError, Rewriter, SSAValue, StageInfo, StagePassError, Statement, VerifyError,
 };
 
 /// Empty a value's use list while its operand slots still read it.
@@ -135,8 +135,8 @@ fn a_panicking_pass_leaves_its_detached_code_in_place() {
     let (_, result) =
         crate::rewrite::pass::drive_pass(f.stage_mut(), |rw| -> Result<(), RewriteError> {
             let block = rw.new_block([]);
-            let ret = rw.insert_terminator(block, TestLang::Return)?;
-            let nop = rw.insert_before(ret, TestLang::Nop)?;
+            let ret = rw.create(InsertionPoint::Terminator(block), TestLang::Return)?;
+            let nop = rw.create(InsertionPoint::Before(ret), TestLang::Nop)?;
             // Leave the block half-built, as a panic part-way through an edit
             // could: its chain still names a statement whose slot is gone.
             let _ = rw.stage.statement_arena_mut().delete(nop);

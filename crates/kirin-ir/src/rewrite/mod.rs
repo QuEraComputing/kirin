@@ -19,10 +19,10 @@
 //! See the [`rewriter`] module docs for what a single edit does and does not
 //! guarantee, and [`pass`] for the boundary's failure routes.
 
-mod alloc;
 mod bodies;
 pub(crate) mod cfg;
 pub(crate) mod digraph;
+mod insert;
 mod list;
 mod moves;
 pub(crate) mod pass;
@@ -34,6 +34,7 @@ pub(crate) mod rewriter;
 pub(crate) mod ungraph;
 pub mod walk;
 
+pub use insert::InsertionPoint;
 pub use quarantine::{QuarantineCause, Quarantined};
 pub use rewriter::{MutationEvent, RewriteError, Rewriter};
 

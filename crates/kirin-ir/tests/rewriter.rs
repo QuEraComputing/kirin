@@ -419,7 +419,7 @@ fn erase_statement_erases_a_terminator_and_its_edges() {
 
     // The block can be closed again.
     Rewriter::new(&mut stage)
-        .insert_terminator(entry, BuilderDialect::Return)
+        .create(InsertionPoint::Terminator(entry), BuilderDialect::Return)
         .unwrap();
     verify_derived(&stage).unwrap();
 }
@@ -477,8 +477,12 @@ fn insert_before_and_after_splice_and_maintain_index() {
 
     let (n0, n1, events) = {
         let mut rw = Rewriter::new(&mut stage);
-        let n0 = rw.insert_before(s0, BuilderDialect::Use(real_y)).unwrap();
-        let n1 = rw.insert_after(s0, BuilderDialect::Use(real_x)).unwrap();
+        let n0 = rw
+            .create(InsertionPoint::Before(s0), BuilderDialect::Use(real_y))
+            .unwrap();
+        let n1 = rw
+            .create(InsertionPoint::After(s0), BuilderDialect::Use(real_x))
+            .unwrap();
         (n0, n1, rw.events().to_vec())
     };
 
@@ -503,27 +507,45 @@ fn insert_before_and_after_splice_and_maintain_index() {
     // Rejections, none of which mutate the stage.
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
-        rw.insert_after(ret, BuilderDialect::Nop),
+        rw.create(InsertionPoint::After(ret), BuilderDialect::Nop),
         Err(RewriteError::AnchorIsTerminator(ret))
     );
     let not_fresh = ResultValue::from(TestSSAValue(0));
     assert_eq!(
-        rw.insert_before(s0, BuilderDialect::Wire(not_fresh)),
+        rw.create(InsertionPoint::Before(s0), BuilderDialect::Wire(not_fresh)),
         Err(RewriteError::ResultNotFresh(not_fresh.into()))
     );
     assert_eq!(
-        rw.insert_before(s0, BuilderDialect::Return),
+        rw.create(InsertionPoint::Before(s0), BuilderDialect::Return),
         Err(RewriteError::UnexpectedTerminator)
     );
     // Only a terminator may carry successors.
     assert_eq!(
-        rw.insert_after(s0, BuilderDialect::Fork(Successor::from_block(block))),
+        rw.create(
+            InsertionPoint::After(s0),
+            BuilderDialect::Fork(Successor::from_block(block))
+        ),
         Err(RewriteError::NonTerminatorWithSuccessors)
     );
     let bogus = SSAValue::from(TestSSAValue(9999));
     assert_eq!(
-        rw.insert_before(s0, BuilderDialect::Use(bogus)),
+        rw.create(InsertionPoint::Before(s0), BuilderDialect::Use(bogus)),
         Err(RewriteError::UnknownValue(bogus))
+    );
+    // `insert` places only a statement this rewriter holds detached: not one
+    // already in the IR, nor an unknown id.
+    assert_eq!(
+        rw.insert(InsertionPoint::Before(s0), s0),
+        Err(RewriteError::NotDetached(s0))
+    );
+    assert_eq!(
+        rw.insert(InsertionPoint::After(s0), n0),
+        Err(RewriteError::NotDetached(n0))
+    );
+    let unknown = rw.stage().statement_arena().next_id();
+    assert_eq!(
+        rw.insert(InsertionPoint::Before(s0), unknown),
+        Err(RewriteError::UnknownStatement(unknown))
     );
     assert!(rw.events().is_empty());
     drop(rw);
@@ -561,36 +583,41 @@ fn insert_binds_fresh_results() {
 
     // Unbound values are not live yet, and not visible to verification.
     assert_eq!(
-        rw.insert_before(s0, BuilderDialect::Use(a.into())),
+        rw.create(InsertionPoint::Before(s0), BuilderDialect::Use(a.into())),
         Err(RewriteError::UnknownValue(a.into()))
     );
     verify_derived(rw.stage()).unwrap();
 
     // Rejected: the same value twice, an existing value, a stale value.
     assert_eq!(
-        rw.insert_before(s0, BuilderDialect::Split(a, a)),
+        rw.create(InsertionPoint::Before(s0), BuilderDialect::Split(a, a)),
         Err(RewriteError::ResultNotFresh(a.into()))
     );
     assert_eq!(
-        rw.insert_before(s0, BuilderDialect::Wire(ResultValue::from(real_x))),
+        rw.create(
+            InsertionPoint::Before(s0),
+            BuilderDialect::Wire(ResultValue::from(real_x))
+        ),
         Err(RewriteError::ResultNotFresh(real_x))
     );
     assert_eq!(
-        rw.insert_before(s0, BuilderDialect::Wire(stale)),
+        rw.create(InsertionPoint::Before(s0), BuilderDialect::Wire(stale)),
         Err(RewriteError::ResultNotFresh(stale.into()))
     );
     // A rejection after the freshness check leaves `a` unbound: the `Split`
     // below still binds it.
     let dead = SSAValue::from(TestSSAValue(9_999));
     assert_eq!(
-        rw.insert_before(s0, BuilderDialect::Compute(dead, a)),
+        rw.create(InsertionPoint::Before(s0), BuilderDialect::Compute(dead, a)),
         Err(RewriteError::UnknownValue(dead))
     );
     assert!(a.get_info(rw.stage()).is_none());
     assert!(rw.events().is_empty());
 
     // Binding makes them results of the new statement, in slot order.
-    let split = rw.insert_before(s0, BuilderDialect::Split(a, b)).unwrap();
+    let split = rw
+        .create(InsertionPoint::Before(s0), BuilderDialect::Split(a, b))
+        .unwrap();
     let info = a.get_info(rw.stage()).unwrap();
     assert_eq!(*info.kind(), SSAKind::Result(split, 0));
     assert_eq!(*info.ty(), TestType::I32);
@@ -600,16 +627,18 @@ fn insert_binds_fresh_results() {
 
     // Bound values are usable, and cannot be bound again.
     let user = rw
-        .insert_after(split, BuilderDialect::Use(a.into()))
+        .create(InsertionPoint::After(split), BuilderDialect::Use(a.into()))
         .unwrap();
     assert_eq!(
-        rw.insert_after(split, BuilderDialect::Wire(b)),
+        rw.create(InsertionPoint::After(split), BuilderDialect::Wire(b)),
         Err(RewriteError::ResultNotFresh(b.into()))
     );
 
-    // `insert_after` binds results too.
+    // An `After` point binds results too.
     let c = rw.new_result(TestType::I32);
-    let wire = rw.insert_after(split, BuilderDialect::Wire(c)).unwrap();
+    let wire = rw
+        .create(InsertionPoint::After(split), BuilderDialect::Wire(c))
+        .unwrap();
     let info = c.get_info(rw.stage()).unwrap();
     assert_eq!(*info.kind(), SSAKind::Result(wire, 0));
     assert_eq!(*info.ty(), TestType::I32);
@@ -644,7 +673,9 @@ fn insert_before_terminator_fills_a_terminator_only_block() {
     // With no non-terminator to anchor on, the terminator is the only way in.
     let (n0, events) = {
         let mut rw = Rewriter::new(&mut stage);
-        let n0 = rw.insert_before(ret, BuilderDialect::Nop).unwrap();
+        let n0 = rw
+            .create(InsertionPoint::Before(ret), BuilderDialect::Nop)
+            .unwrap();
         (n0, rw.events().to_vec())
     };
 
