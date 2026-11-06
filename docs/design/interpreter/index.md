@@ -565,10 +565,11 @@ space; a key naming two targets is an error. Facts live in the transfer's
 callers. Selecting a context allocates
 its environment at once, so a caller can register on its parameters before the
 deferred discovery scan runs. The per-context metadata (target, body, and the
-return operands per output) lives on the transfer, keyed by `EnvIndex`, and is
-never a second copy of facts. It holds only what the IR cannot answer: an entry
-exists once its context is discovered, and entry parameters are read from the
-IR. Rules dispatch on the transfer, as forward and dense rules do. Work carries its context, so
+return operands per output) lives on the transfer, keyed by `EnvIndex`.
+Each context also retains joined output requests so return rules visited later
+receive them. SSA facts remain in `EnvStore`; entry parameters come from the IR.
+Rules dispatch on the transfer, as forward and dense rules do. Work carries its
+context, so
 the frame dispatching a rule supplies the context that rule's reads and local
 contributions are qualified with — there is no global analysis scope.
 
@@ -601,19 +602,19 @@ C.result[i] demanded ──Call effect──▶ D.ret_operand[i] (every return s
    the call's lookup stage, selects `D`, queues the activation, checks the
    argument count against `D`'s parameters, registers `D.param[j] → current
    work` for every parameter (so bottom reads still wake the caller), and
-   raises each non-bottom parameter fact on argument `j`. Discovery runs
-   outside any work and rejects a `Call`.
+   raises each non-bottom parameter fact on argument `j`.
 3. After the work completes, activations are applied: `D` is discovered if
-   new, the call's result count is checked against `D`'s return arity, and
-   each non-bottom result fact `i` merges into operand `i` of every return
-   site of `D`.
+   new, and its output request is retained and merged into already declared
+   return operands. Return rules visited later check the request's arity and
+   raise its facts on their operands.
 
 **Discovery** records the context first (so recursion never restarts it), then
-evaluates every rule of its body and structured children once, with nothing
-demanded, skipping nested callable definitions' bodies. Unconditional
-contributions become control roots; conditional rules read bottom and rerun
-through the table above. Return rules declare their operands here, which is
-why requests are routed only after discovery.
+enqueues every statement of its body and structured children, skipping nested
+callable definitions' bodies. It executes no rules. Normal propagation runs
+these initial visits, including return declarations and calls. Fact raises
+join immediately; later changes schedule dependents through the table above.
+Thus a call may observe demand from an earlier initial visit without depending
+on block storage order.
 The public backward `analyze` methods return `Product<V>` parameter facts in
 entry-parameter order, dual to forward analysis's returned output facts. `root()`
 exposes the most recent successful root context separately; `contexts()` and

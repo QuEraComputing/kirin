@@ -227,28 +227,37 @@ where
 // Callable contexts, work items, and the driver
 // ===========================================================================
 
-/// One discovered callable context: the body it analyzes and what demand
-/// learned by running its rules once. Parameters are read from the IR. This
-/// is metadata, not facts: the facts live in the context's environment.
-pub struct CallableContext {
+/// One callable context: its body, declared return operands, and requested
+/// output facts. SSA facts live in its environment; parameters come from the IR.
+pub struct CallableContext<V> {
     pub(super) target: LinkTarget,
     pub(super) body: Body,
-    /// `outputs[i]` holds operand `i` of every return site; `None` if the
-    /// body declares no return site.
+    /// `outputs[i]` holds operand `i` of each declared return site; `None`
+    /// until a return rule declares one.
     pub(super) outputs: Option<Vec<Vec<SSAValue>>>,
+    requested: Option<Product<V>>,
 }
 
-impl CallableContext {
+impl<V: Clone + Lattice> CallableContext<V> {
     pub(super) fn new(target: LinkTarget, body: Body) -> Self {
         Self {
             target,
             body,
             outputs: None,
+            requested: None,
         }
     }
 
     /// Record a return site: its operand `i` carries output `i`.
     pub(super) fn add_return(&mut self, operands: &[SSAValue]) -> Result<(), InterpreterError> {
+        if let Some(requested) = &self.requested
+            && requested.len() != operands.len()
+        {
+            return Err(InterpreterError::ProductArityMismatch {
+                expected: operands.len(),
+                actual: requested.len(),
+            });
+        }
         let Some(outputs) = &mut self.outputs else {
             self.outputs = Some(operands.iter().map(|operand| vec![*operand]).collect());
             return Ok(());
@@ -260,19 +269,32 @@ impl CallableContext {
             });
         }
         for (output, operand) in outputs.iter_mut().zip(operands) {
-            output.push(*operand);
+            if !output.contains(operand) {
+                output.push(*operand);
+            }
         }
         Ok(())
     }
 
-    /// The facts merging a request for `outputs` into the operands of every
-    /// return site, after checking its arity. A callable without return sites
-    /// accepts any request: no return operand exists that the demand could
-    /// reach.
-    pub(super) fn route_outputs<V: Clone>(
-        &self,
+    /// Retain requested output facts for return rules not yet visited, and
+    /// route this request to already declared return operands.
+    pub(super) fn route_outputs(
+        &mut self,
         outputs: Product<V>,
     ) -> Result<Vec<(SSAValue, V)>, InterpreterError> {
+        if let Some(requested) = &mut self.requested {
+            if requested.len() != outputs.len() {
+                return Err(InterpreterError::ProductArityMismatch {
+                    expected: requested.len(),
+                    actual: outputs.len(),
+                });
+            }
+            for (requested, fact) in requested.iter_mut().zip(outputs.iter()) {
+                requested.join_assign(fact);
+            }
+        } else {
+            self.requested = Some(outputs.clone());
+        }
         let Some(operands) = &self.outputs else {
             return Ok(Vec::new());
         };
@@ -370,7 +392,7 @@ pub struct SparseBackwardTransfer<
     /// Demand facts, one environment per selected context.
     pub(super) env: EnvStore<P::Key, SSAValue, V>,
     /// Discovered contexts, by environment.
-    pub(super) contexts: HashMap<EnvIndex, CallableContext>,
+    pub(super) contexts: HashMap<EnvIndex, CallableContext<V>>,
     /// The environment of the rule being dispatched.
     context: Option<EnvIndex>,
     /// Facts that rose since the driver last reran their dependents.
@@ -475,9 +497,7 @@ where
     }
 
     /// Dispatch one statement's backward rule at `stage` in context `env`
-    /// and return its effect. The caller decides what a
-    /// [`Call`](SparseBackwardEffect::Call) means: a [`DemandFrame`]
-    /// summarizes it, discovery rejects it.
+    /// and return its effect for [`DemandFrame`] to handle.
     pub(super) fn run_statement(
         &mut self,
         env: EnvIndex,
@@ -497,67 +517,6 @@ where
         let result = info.dispatch_statement(statement, self);
         (self.location, self.context) = saved;
         result
-    }
-
-    /// Discover a context once: record it, then evaluate every rule of
-    /// its body and structured children — but not nested callable
-    /// definitions — once, raising the unconditional contributions (control
-    /// roots). Rules whose contributions are conditional rerun when the facts
-    /// they consulted rise. Discovery runs outside any work, so it rejects a
-    /// call; the shipped call rule never crosses here before its results are
-    /// demanded.
-    fn discover(&mut self, env: EnvIndex, target: LinkTarget) -> Result<(), E> {
-        if let Some(context) = self.contexts.get(&env) {
-            if context.target != target {
-                return Err(E::from(InterpreterError::Custom(
-                    "demand context key selected for two call targets",
-                )));
-            }
-            return Ok(());
-        }
-        let (body, _) = self.callable_entry(target)?;
-        self.contexts
-            .insert(env, CallableContext::new(target, body));
-        let stage = target.stage;
-
-        let mut bodies = VecDeque::from([body]);
-        let mut visited = HashSet::new();
-        while let Some(body) = bodies.pop_front() {
-            if !visited.insert(body) {
-                continue;
-            }
-            let contents = query::body_contents(self.pipeline, stage, body)?;
-            bodies.extend(contents.children);
-            for statement in contents.statements {
-                if let SparseBackwardEffect::Call(_) = self.run_statement(env, stage, statement)? {
-                    return Err(E::from(CALL_OUTSIDE_WORK));
-                }
-            }
-        }
-        Ok(())
-    }
-
-    /// Apply the call boundaries crossed by the work that just completed:
-    /// discover each callee context if needed, then raise the call's result
-    /// facts on its return operands.
-    pub(super) fn apply_activations(&mut self) -> Result<(), E> {
-        loop {
-            let activations = mem::take(&mut self.activations);
-            if activations.is_empty() {
-                return Ok(());
-            }
-            for (env, target, outputs) in activations {
-                self.discover(env, target)?;
-                let routed = self
-                    .contexts
-                    .get(&env)
-                    .ok_or(UNDISCOVERED)?
-                    .route_outputs(outputs)?;
-                for (operand, fact) in routed {
-                    self.raise(env, operand, &fact)?;
-                }
-            }
-        }
     }
 
     /// The statements that translate `value`'s demand in `env`, as work:
@@ -681,10 +640,14 @@ where
 
     fn declare_return(&mut self, operands: &[SSAValue]) -> Result<(), E> {
         let env = self.current_context()?;
-        self.contexts
-            .get_mut(&env)
-            .ok_or(UNDISCOVERED)?
-            .add_return(operands)?;
+        let context = self.contexts.get_mut(&env).ok_or(UNDISCOVERED)?;
+        context.add_return(operands)?;
+        let requested = context.requested.clone();
+        if let Some(requested) = requested {
+            for (operand, fact) in operands.iter().zip(requested) {
+                self.raise(env, *operand, &fact)?;
+            }
+        }
         Ok(())
     }
 }
@@ -702,6 +665,57 @@ where
     P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
+    /// Record a context once and enqueue its body and structured children,
+    /// skipping nested callable definitions. Only propagation executes rules.
+    fn discover(&mut self, env: EnvIndex, target: LinkTarget) -> Result<(), E> {
+        if let Some(context) = self.inner().contexts.get(&env) {
+            if context.target != target {
+                return Err(E::from(InterpreterError::Custom(
+                    "demand context key selected for two call targets",
+                )));
+            }
+            return Ok(());
+        }
+        let (body, _) = self.inner().callable_entry(target)?;
+        self.inner_mut()
+            .contexts
+            .insert(env, CallableContext::new(target, body));
+        let stage = target.stage;
+
+        let mut bodies = VecDeque::from([body]);
+        let mut visited = HashSet::new();
+        while let Some(body) = bodies.pop_front() {
+            if !visited.insert(body) {
+                continue;
+            }
+            let contents = query::body_contents(self.inner().pipeline, stage, body)?;
+            bodies.extend(contents.children);
+            for statement in contents.statements {
+                self.schedule_work((env, statement));
+            }
+        }
+        Ok(())
+    }
+
+    /// Apply the call boundaries crossed by the work that just completed:
+    /// discover each callee context if needed, then raise the call's result
+    /// facts on its return operands.
+    pub(super) fn apply_activations(&mut self) -> Result<(), E> {
+        for (env, target, outputs) in mem::take(&mut self.inner_mut().activations) {
+            self.discover(env, target)?;
+            let routed = self
+                .inner_mut()
+                .contexts
+                .get_mut(&env)
+                .ok_or(UNDISCOVERED)?
+                .route_outputs(outputs)?;
+            for (operand, fact) in routed {
+                self.inner_mut().raise(env, operand, &fact)?;
+            }
+        }
+        Ok(())
+    }
+
     /// Summarize a call without descending: queue the callee context,
     /// register the caller's work on each callee parameter fact, and raise
     /// the callee's current parameter facts on the call's arguments.
@@ -798,7 +812,7 @@ where
     ) -> Result<(), E> {
         // Discover the contexts the work's calls crossed into before waking
         // anything, so every changed fact's context is discovered.
-        interp.inner_mut().apply_activations()?;
+        interp.apply_activations()?;
         interp.wake_changed()
     }
 }
@@ -1019,10 +1033,9 @@ where
     /// Infer one fact per entry parameter, in parameter order, from output
     /// lattice values. Supply exactly one lattice value per result.
     ///
-    /// Discover return sites and intrinsic roots once per context, merge the
-    /// supplied output facts into the return operands, then drain the shared
-    /// fixpoint worklist. Bottom output facts still allow intrinsic roots to
-    /// contribute parameter facts.
+    /// Enqueue each new context's statements, retain the supplied output facts
+    /// for its return rules, then drain the shared fixpoint worklist. Bottom
+    /// output facts still allow intrinsic roots to contribute parameter facts.
     /// Facts join with prior requests if the context policy reuses a key.
     /// Returns the engine on success, so detailed context facts remain
     /// accessible through [`Self::root`], [`Self::contexts`], and
@@ -1038,7 +1051,7 @@ where
             .driver
             .inner_mut()
             .submit_call(stage, &callee, outputs)?;
-        self.driver.inner_mut().apply_activations()?;
+        self.driver.apply_activations()?;
         self.driver.wake_changed()?;
         self.driver
             .drain_worklist(&mut SparseBackwardWorkAnalysis)?;
