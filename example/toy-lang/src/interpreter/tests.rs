@@ -1059,7 +1059,7 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
 mod dense {
     use kirin::prelude::{CFG, CompileStage, Pipeline, SSAValue};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_interpreter::{Body, Callee, ProgramPoint, Scoped};
+    use kirin_interpreter::{Body, Callee, ProgramPoint};
     use kirin_liveness::{DenseLivenessResult, LiveSet};
     use kirin_scf::StructuredControlFlow;
 
@@ -1101,8 +1101,6 @@ mod dense {
         let pipeline = parse(IF_DEAD_RESULT);
         let (caller_stage, callee) = source_root(&pipeline, "if_dead");
         let (dense, cfg) = analyze_dense_toy(&pipeline, caller_stage, callee);
-        let root = dense.root();
-        let point = |item| Scoped::new(root, item);
 
         let cond = entry_params(&pipeline, cfg)[0];
         let a = constant_result(&pipeline, cfg, 1);
@@ -1114,11 +1112,11 @@ mod dense {
         // Classic: after `%a = constant 1`, %a is live (the yield uses it)
         // and %cond flows through the arm; before it, %a is killed.
         assert_eq!(
-            dense.point_facts(point(ProgramPoint::After(a_const))),
+            dense.point_facts(ProgramPoint::After(a_const)),
             Some(&live_set(&[cond, a]))
         );
         assert_eq!(
-            dense.point_facts(point(ProgramPoint::Before(a_const))),
+            dense.point_facts(ProgramPoint::Before(a_const)),
             Some(&live_set(&[cond]))
         );
 
@@ -1128,7 +1126,7 @@ mod dense {
             matches!(definition, HighLevel::Structured(_))
         });
         assert_eq!(
-            dense.point_facts(point(ProgramPoint::Before(if_stmt))),
+            dense.point_facts(ProgramPoint::Before(if_stmt)),
             Some(&live_set(&[cond]))
         );
 
@@ -1137,11 +1135,11 @@ mod dense {
             _ => None,
         });
         assert_eq!(
-            dense.point_facts(point(ProgramPoint::BlockEntry(then_block))),
+            dense.point_facts(ProgramPoint::BlockEntry(then_block)),
             Some(&live_set(&[cond]))
         );
         assert_eq!(
-            dense.point_facts(point(ProgramPoint::BlockExit(then_block))),
+            dense.point_facts(ProgramPoint::BlockExit(then_block)),
             Some(&live_set(&[cond]))
         );
     }
@@ -1169,7 +1167,6 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
         let pipeline = parse(IF_ARMS_DIFFERENT_USES);
         let (caller_stage, callee) = source_root(&pipeline, "if_arms");
         let (dense, cfg) = analyze_dense_toy(&pipeline, caller_stage, callee);
-        let root = dense.root();
 
         let params = entry_params(&pipeline, cfg);
         let (cond, x, y) = (params[0], params[1], params[2]);
@@ -1187,11 +1184,11 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
         // After the if only its result matters; before it, the then-arm
         // contributed %x, the else-arm %y, and the rule genned %cond.
         assert_eq!(
-            dense.point_facts(Scoped::new(root, ProgramPoint::After(if_stmt))),
+            dense.point_facts(ProgramPoint::After(if_stmt)),
             Some(&live_set(&[r]))
         );
         assert_eq!(
-            dense.point_facts(Scoped::new(root, ProgramPoint::Before(if_stmt))),
+            dense.point_facts(ProgramPoint::Before(if_stmt)),
             Some(&live_set(&[cond, x, y]))
         );
     }
@@ -1205,7 +1202,6 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
         let pipeline = parse(FOR_CARRIED_DEMAND);
         let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
         let (dense, cfg) = analyze_dense_toy(&pipeline, caller_stage, callee);
-        let root = dense.root();
 
         let params = entry_params(&pipeline, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
@@ -1233,11 +1229,11 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
 
         // Around the loop.
         assert_eq!(
-            dense.point_facts(Scoped::new(root, ProgramPoint::After(for_stmt))),
+            dense.point_facts(ProgramPoint::After(for_stmt)),
             Some(&live_set(&[sum]))
         );
         assert_eq!(
-            dense.point_facts(Scoped::new(root, ProgramPoint::Before(for_stmt))),
+            dense.point_facts(ProgramPoint::Before(for_stmt)),
             Some(&live_set(&[lo, hi, step, init]))
         );
 
@@ -1245,11 +1241,11 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
         // constant are live before the add; the yield slot is live after it
         // (it feeds the next iteration through the carry).
         assert_eq!(
-            dense.point_facts(Scoped::new(root, ProgramPoint::Before(add_stmt))),
+            dense.point_facts(ProgramPoint::Before(add_stmt)),
             Some(&live_set(&[lo, hi, step, init, acc, one]))
         );
         assert_eq!(
-            dense.point_facts(Scoped::new(root, ProgramPoint::After(add_stmt))),
+            dense.point_facts(ProgramPoint::After(add_stmt)),
             Some(&live_set(&[lo, hi, step, init, next]))
         );
     }

@@ -18,7 +18,6 @@
 //! only choose what to step next.
 
 use std::collections::VecDeque;
-use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{Block, CompileStage, DiGraph, Product, SSAValue, Statement};
@@ -62,7 +61,7 @@ pub enum BlockMode {
     CFGBlock,
 }
 
-pub struct AbstractBlockFrame<V, E, K> {
+pub struct AbstractBlockFrame<V, E> {
     stage: CompileStage,
     index: EnvIndex,
     block: Block,
@@ -72,14 +71,13 @@ pub struct AbstractBlockFrame<V, E, K> {
     /// frame needs no engine access (see [`BlockFrame`](crate::BlockFrame)).
     pending: Option<Product<V>>,
     resume_slots: Option<Product<SSAValue>>,
-    _marker: PhantomData<fn() -> (E, K)>,
+    _marker: PhantomData<fn() -> E>,
 }
 
-impl<V, E, K> AbstractBlockFrame<V, E, K>
+impl<V, E> AbstractBlockFrame<V, E>
 where
     V: Clone + PartialEq,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     /// A structured-body block frame (completes on `Yield`). Binds its entry
     /// parameters on the first step. Pure construction — needs no engine access.
@@ -117,14 +115,12 @@ where
     }
 }
 
-impl<I, F, V, E, K> Frame<I, F> for AbstractBlockFrame<V, E, K>
+impl<I, F, V, E> Frame<I, F> for AbstractBlockFrame<V, E>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
-        + SparseForwardInterp<Frame = F>,
-    F: From<AbstractCallFrame<V, E, K>>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    F: From<AbstractCallFrame<V, E>>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
@@ -255,9 +251,8 @@ where
 ///
 /// A single pass is **exact** for a DAG — there is no loop inside the graph, so
 /// no widening happens here. Convergence pressure comes only from *outside*:
-/// the owner's entry product is widened at
-/// [`Owner`](crate::Owner) entry when a new call site raises it, and the whole
-/// pass is re-run.
+/// the graph's ports are widened at entry when a new call site raises them,
+/// and the whole pass is re-run.
 ///
 /// The one substantive difference from the concrete
 /// [`DiGraphFrame`](crate::DiGraphFrame) is call handling: a `Call` effect
@@ -269,7 +264,7 @@ where
 /// Like the other frames, construction is pure — the walk plan is fetched and
 /// the ports are bound on the first `step`, so a dialect frame can build one
 /// without engine access.
-pub struct AbstractDiGraphFrame<V, E, K> {
+pub struct AbstractDiGraphFrame<V, E> {
     stage: CompileStage,
     index: EnvIndex,
     graph: DiGraph,
@@ -280,14 +275,13 @@ pub struct AbstractDiGraphFrame<V, E, K> {
     yields: Vec<SSAValue>,
     /// Result slots awaiting a pushed child frame's completion values.
     resume_slots: Option<Product<SSAValue>>,
-    _marker: PhantomData<fn() -> (E, K)>,
+    _marker: PhantomData<fn() -> E>,
 }
 
-impl<V, E, K> AbstractDiGraphFrame<V, E, K>
+impl<V, E> AbstractDiGraphFrame<V, E>
 where
     V: Clone + PartialEq,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     /// Walk `graph`, binding `args` to its boundary ports on the first step.
     pub fn new(stage: CompileStage, index: EnvIndex, graph: DiGraph, args: Product<V>) -> Self {
@@ -323,14 +317,12 @@ where
     }
 }
 
-impl<I, F, V, E, K> Frame<I, F> for AbstractDiGraphFrame<V, E, K>
+impl<I, F, V, E> Frame<I, F> for AbstractDiGraphFrame<V, E>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>
-        + SparseForwardInterp<Frame = F>,
-    F: From<AbstractCallFrame<V, E, K>>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E> + SparseForwardInterp<Frame = F>,
+    F: From<AbstractCallFrame<V, E>>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
@@ -435,18 +427,17 @@ where
 
 /// Summarize one call through the engine's interprocedural protocol, then
 /// finish (results are written by `summarize_call`).
-pub struct AbstractCallFrame<V, E, K> {
+pub struct AbstractCallFrame<V, E> {
     stage: CompileStage,
     call: CallEffect<V>,
     index: EnvIndex,
-    _marker: PhantomData<fn() -> (E, K)>,
+    _marker: PhantomData<fn() -> E>,
 }
 
-impl<V, E, K> AbstractCallFrame<V, E, K>
+impl<V, E> AbstractCallFrame<V, E>
 where
     V: Clone + PartialEq,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     pub fn new(stage: CompileStage, call: CallEffect<V>, index: EnvIndex) -> Self {
         Self {
@@ -458,12 +449,11 @@ where
     }
 }
 
-impl<I, F, V, E, K> Frame<I, F> for AbstractCallFrame<V, E, K>
+impl<I, F, V, E> Frame<I, F> for AbstractCallFrame<V, E>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E>,
     V: Clone + PartialEq,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
@@ -498,36 +488,36 @@ where
 
 /// The default abstract stack-item composition: standard abstract traversal
 /// without structured-control dialect continuations.
-pub enum StandardAbstractFrame<V, E, K> {
-    Block(AbstractBlockFrame<V, E, K>),
-    Call(AbstractCallFrame<V, E, K>),
-    DiGraph(AbstractDiGraphFrame<V, E, K>),
+pub enum StandardAbstractFrame<V, E> {
+    Block(AbstractBlockFrame<V, E>),
+    Call(AbstractCallFrame<V, E>),
+    DiGraph(AbstractDiGraphFrame<V, E>),
 }
 
-impl<V, E, K> From<AbstractBlockFrame<V, E, K>> for StandardAbstractFrame<V, E, K> {
-    fn from(frame: AbstractBlockFrame<V, E, K>) -> Self {
+impl<V, E> From<AbstractBlockFrame<V, E>> for StandardAbstractFrame<V, E> {
+    fn from(frame: AbstractBlockFrame<V, E>) -> Self {
         Self::Block(frame)
     }
 }
 
-impl<V, E, K> From<AbstractCallFrame<V, E, K>> for StandardAbstractFrame<V, E, K> {
-    fn from(frame: AbstractCallFrame<V, E, K>) -> Self {
+impl<V, E> From<AbstractCallFrame<V, E>> for StandardAbstractFrame<V, E> {
+    fn from(frame: AbstractCallFrame<V, E>) -> Self {
         Self::Call(frame)
     }
 }
 
-impl<V, E, K> From<AbstractDiGraphFrame<V, E, K>> for StandardAbstractFrame<V, E, K> {
-    fn from(frame: AbstractDiGraphFrame<V, E, K>) -> Self {
+impl<V, E> From<AbstractDiGraphFrame<V, E>> for StandardAbstractFrame<V, E> {
+    fn from(frame: AbstractDiGraphFrame<V, E>) -> Self {
         Self::DiGraph(frame)
     }
 }
 
-impl<I, V, E, K> Frame<I> for StandardAbstractFrame<V, E, K>
+impl<I, V, E> Frame<I> for StandardAbstractFrame<V, E>
 where
     I: crate::FrameEngine,
-    AbstractBlockFrame<V, E, K>: Frame<I, Self, Completion = AbstractCompletion<V>>,
-    AbstractCallFrame<V, E, K>: Frame<I, Self, Completion = AbstractCompletion<V>>,
-    AbstractDiGraphFrame<V, E, K>: Frame<I, Self, Completion = AbstractCompletion<V>>,
+    AbstractBlockFrame<V, E>: Frame<I, Self, Completion = AbstractCompletion<V>>,
+    AbstractCallFrame<V, E>: Frame<I, Self, Completion = AbstractCompletion<V>>,
+    AbstractDiGraphFrame<V, E>: Frame<I, Self, Completion = AbstractCompletion<V>>,
 {
     type Completion = AbstractCompletion<V>;
 

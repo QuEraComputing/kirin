@@ -240,8 +240,6 @@ impl BlockQueries for AbstractOnlyEngine {
 impl DiGraphQueries for AbstractOnlyEngine {}
 
 impl ForwardDataflowFrameEngine for AbstractOnlyEngine {
-    type SummaryKey = ();
-
     fn analysis_merge(
         &self,
         _current: &Product<i64>,
@@ -252,10 +250,6 @@ impl ForwardDataflowFrameEngine for AbstractOnlyEngine {
     }
 
     fn contribute_return(&mut self, _values: Product<i64>) -> Result<(), InterpreterError> {
-        unimplemented!("compile-time capability test")
-    }
-
-    fn current_function_key(&self) -> Option<()> {
         unimplemented!("compile-time capability test")
     }
 
@@ -275,20 +269,20 @@ impl ForwardDataflowFrameEngine for AbstractOnlyEngine {
 
 struct MockAbstractFrame;
 
-impl From<AbstractBlockFrame<i64, InterpreterError, ()>> for MockAbstractFrame {
-    fn from(_: AbstractBlockFrame<i64, InterpreterError, ()>) -> Self {
+impl From<AbstractBlockFrame<i64, InterpreterError>> for MockAbstractFrame {
+    fn from(_: AbstractBlockFrame<i64, InterpreterError>) -> Self {
         unimplemented!("compile-time capability test")
     }
 }
 
-impl From<AbstractCallFrame<i64, InterpreterError, ()>> for MockAbstractFrame {
-    fn from(_: AbstractCallFrame<i64, InterpreterError, ()>) -> Self {
+impl From<AbstractCallFrame<i64, InterpreterError>> for MockAbstractFrame {
+    fn from(_: AbstractCallFrame<i64, InterpreterError>) -> Self {
         unimplemented!("compile-time capability test")
     }
 }
 
-impl From<AbstractDiGraphFrame<i64, InterpreterError, ()>> for MockAbstractFrame {
-    fn from(_: AbstractDiGraphFrame<i64, InterpreterError, ()>) -> Self {
+impl From<AbstractDiGraphFrame<i64, InterpreterError>> for MockAbstractFrame {
+    fn from(_: AbstractDiGraphFrame<i64, InterpreterError>) -> Self {
         unimplemented!("compile-time capability test")
     }
 }
@@ -297,20 +291,14 @@ impl From<AbstractDiGraphFrame<i64, InterpreterError, ()>> for MockAbstractFrame
 fn abstract_engine_needs_no_concrete_call_lifecycle() {
     assert_dataflow_engine::<AbstractOnlyEngine>();
 
+    assert_frame::<AbstractOnlyEngine, MockAbstractFrame, AbstractBlockFrame<i64, InterpreterError>>(
+    );
+    assert_frame::<AbstractOnlyEngine, MockAbstractFrame, AbstractCallFrame<i64, InterpreterError>>(
+    );
     assert_frame::<
         AbstractOnlyEngine,
         MockAbstractFrame,
-        AbstractBlockFrame<i64, InterpreterError, ()>,
-    >();
-    assert_frame::<
-        AbstractOnlyEngine,
-        MockAbstractFrame,
-        AbstractCallFrame<i64, InterpreterError, ()>,
-    >();
-    assert_frame::<
-        AbstractOnlyEngine,
-        MockAbstractFrame,
-        AbstractDiGraphFrame<i64, InterpreterError, ()>,
+        AbstractDiGraphFrame<i64, InterpreterError>,
     >();
 }
 

@@ -20,15 +20,14 @@
 //! contributes these continuations through an explicit engine composition.
 
 use std::collections::VecDeque;
-use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin::prelude::Lattice;
 use kirin::prelude::{Block, CompileStage, CompileTimeValue, HasBottom, Product, SSAValue};
 use kirin_interpreter::dialect::{
     BranchCondition, ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect,
-    ForwardEval, Interpretable, InterpreterError, SparseForwardEffect, SparseForwardInterp,
-    StrongDemand,
+    ForwardEval, Interpretable, InterpreterError, SparseBackwardEffect, SparseForwardEffect,
+    SparseForwardInterp, StrongDemand,
 };
 use kirin_interpreter::{
     AbstractBlockFrame, AbstractCompletion, BlockFrame, CallContext, Completion,
@@ -136,7 +135,7 @@ where
                 }
             }
         }
-        Ok(interp.effect())
+        Ok(SparseBackwardEffect::Next)
     }
 }
 
@@ -175,7 +174,7 @@ where
                 }
             }
         }
-        Ok(interp.effect())
+        Ok(SparseBackwardEffect::Next)
     }
 }
 
@@ -186,8 +185,8 @@ where
     I: DemandInterp,
     T: CompileTimeValue,
 {
-    fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        Ok(interp.effect())
+    fn interpret(&self, _interp: &mut I) -> Result<I::Effect, I::Error> {
+        Ok(SparseBackwardEffect::Next)
     }
 }
 
@@ -210,13 +209,13 @@ where
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        let stage = interp.stage();
+        let (stage, index) = (interp.stage(), interp.index());
         for result in &self.results {
             interp.kill_def(*result)?;
         }
         interp.gen_live(self.condition)?;
         Ok(DenseBackwardEffect::Push {
-            frame: DenseScfIfFrame::new(stage, self.then_body, self.else_body).into(),
+            frame: DenseScfIfFrame::new(stage, index, self.then_body, self.else_body).into(),
         })
     }
 }
@@ -232,7 +231,7 @@ where
     T: CompileTimeValue,
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
-        let stage = interp.stage();
+        let (stage, index) = (interp.stage(), interp.index());
         for result in &self.results {
             interp.kill_def(*result)?;
         }
@@ -243,7 +242,7 @@ where
             interp.gen_live(*init)?;
         }
         Ok(DenseBackwardEffect::Push {
-            frame: DenseScfForFrame::new(stage, self.body).into(),
+            frame: DenseScfForFrame::new(stage, index, self.body).into(),
         })
     }
 }
@@ -268,6 +267,8 @@ where
 /// rule already applied the kills and the condition gen).
 pub struct DenseScfIfFrame<V, E> {
     stage: CompileStage,
+    /// The environment the arm walks run in.
+    index: EnvIndex,
     arms: VecDeque<Block>,
     /// The state after the `scf.if` (captured on the first step).
     after: Option<V>,
@@ -277,9 +278,10 @@ pub struct DenseScfIfFrame<V, E> {
 }
 
 impl<V, E> DenseScfIfFrame<V, E> {
-    pub fn new(stage: CompileStage, then_body: Block, else_body: Block) -> Self {
+    pub fn new(stage: CompileStage, index: EnvIndex, then_body: Block, else_body: Block) -> Self {
         Self {
             stage,
+            index,
             arms: VecDeque::from([then_body, else_body]),
             after: None,
             joined: None,
@@ -295,12 +297,12 @@ where
     V: Clone + Lattice,
     E: From<InterpreterError>,
 {
-    type Completion = DenseBackwardCompletion<V>;
+    type Completion = DenseBackwardCompletion;
 
     fn step_into(
         mut self,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         if self.after.is_none() {
             self.after = Some(interp.state());
         }
@@ -308,10 +310,10 @@ where
             Some(arm) => {
                 let after = self.after.clone().expect("after-state captured");
                 interp.replace_state(after);
-                let stage = self.stage;
+                let (stage, index) = (self.stage, self.index);
                 Ok(FrameEffect::Push {
                     parent: self,
-                    child: DenseBlockFrame::structured_body(stage, arm).into(),
+                    child: DenseBlockFrame::structured_body(stage, index, arm).into(),
                 })
             }
             None => {
@@ -327,9 +329,9 @@ where
 
     fn resume_into(
         mut self,
-        completion: DenseBackwardCompletion<V>,
+        completion: DenseBackwardCompletion,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         match completion {
             DenseBackwardCompletion::Structured => {
                 let arm_entry = interp.state();
@@ -339,7 +341,7 @@ where
                 });
                 self.step_into(interp)
             }
-            DenseBackwardCompletion::Block { .. } => Err(E::from(InterpreterError::Custom(
+            DenseBackwardCompletion::Block => Err(E::from(InterpreterError::Custom(
                 "an scf.if arm completed as a CFG block owner",
             ))),
         }
@@ -348,7 +350,7 @@ where
     fn resume_done_into(
         self,
         _interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         Err(E::from(InterpreterError::Custom(
             "scf.if dense frames resume only with completions",
         )))
@@ -362,6 +364,8 @@ where
 /// parameters — the initial-value gens were applied by the rule.
 pub struct DenseScfForFrame<V, E> {
     stage: CompileStage,
+    /// The environment the body walks run in.
+    index: EnvIndex,
     body: Block,
     /// Captured on the first step.
     seed: Option<V>,
@@ -373,9 +377,10 @@ pub struct DenseScfForFrame<V, E> {
 }
 
 impl<V, E> DenseScfForFrame<V, E> {
-    pub fn new(stage: CompileStage, body: Block) -> Self {
+    pub fn new(stage: CompileStage, index: EnvIndex, body: Block) -> Self {
         Self {
             stage,
+            index,
             body,
             seed: None,
             params: Vec::new(),
@@ -408,12 +413,12 @@ where
     V: Clone + PartialEq + Lattice + PointFacts,
     E: From<InterpreterError>,
 {
-    type Completion = DenseBackwardCompletion<V>;
+    type Completion = DenseBackwardCompletion;
 
     fn step_into(
         mut self,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         if self.seed.is_none() {
             self.seed = Some(interp.state());
             self.params = interp.block_params(self.stage, self.body)?;
@@ -422,18 +427,18 @@ where
         }
         let entry = self.entry.clone().expect("entry estimate present");
         interp.replace_state(entry);
-        let (stage, body) = (self.stage, self.body);
+        let (stage, index, body) = (self.stage, self.index, self.body);
         Ok(FrameEffect::Push {
             parent: self,
-            child: DenseBlockFrame::structured_body(stage, body).into(),
+            child: DenseBlockFrame::structured_body(stage, index, body).into(),
         })
     }
 
     fn resume_into(
         mut self,
-        completion: DenseBackwardCompletion<V>,
+        completion: DenseBackwardCompletion,
         interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         match completion {
             DenseBackwardCompletion::Structured => {
                 let body_entry = interp.state();
@@ -454,7 +459,7 @@ where
                     Ok(FrameEffect::Complete(DenseBackwardCompletion::Structured))
                 }
             }
-            DenseBackwardCompletion::Block { .. } => Err(E::from(InterpreterError::Custom(
+            DenseBackwardCompletion::Block => Err(E::from(InterpreterError::Custom(
                 "an scf.for body completed as a CFG block owner",
             ))),
         }
@@ -463,7 +468,7 @@ where
     fn resume_done_into(
         self,
         _interp: &mut I,
-    ) -> Result<FrameEffect<Self, DenseBackwardCompletion<V>, F>, E> {
+    ) -> Result<FrameEffect<Self, DenseBackwardCompletion, F>, E> {
         Err(E::from(InterpreterError::Custom(
             "scf.for dense frames resume only with completions",
         )))
@@ -520,7 +525,7 @@ where
     V: Clone + PartialEq + ForLoopValue + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
-    F: From<AbstractScfForFrame<V, E, <P as CallContext<V>>::Key>>,
+    F: From<AbstractScfForFrame<V, E>>,
 {
     fn scf_for_frame(
         &mut self,
@@ -578,7 +583,7 @@ where
     V: Clone + PartialEq + HasBottom,
     E: From<InterpreterError>,
     P: CallContext<V>,
-    F: From<AbstractScfIfFrame<V, E, <P as CallContext<V>>::Key>>,
+    F: From<AbstractScfIfFrame<V, E>>,
 {
     fn scf_if_frame(
         &mut self,
@@ -693,19 +698,18 @@ where
 /// condition is undecided in the value domain — both arms, joining their finish
 /// results. The "both arms + join" structured behavior is owned here; the
 /// framework has no alternatives concept.
-pub struct AbstractScfIfFrame<V, E, K> {
+pub struct AbstractScfIfFrame<V, E> {
     stage: CompileStage,
     env: EnvIndex,
     remaining: VecDeque<Block>,
     acc: Option<Product<V>>,
-    _marker: PhantomData<fn() -> (E, K)>,
+    _marker: PhantomData<fn() -> E>,
 }
 
-impl<V, E, K> AbstractScfIfFrame<V, E, K>
+impl<V, E> AbstractScfIfFrame<V, E>
 where
     V: Clone + PartialEq,
     E: From<InterpreterError>,
-    K: Clone + Eq + std::hash::Hash,
 {
     pub fn new(
         stage: CompileStage,
@@ -741,13 +745,12 @@ where
     }
 }
 
-impl<I, F, V, E, K> Frame<I, F> for AbstractScfIfFrame<V, E, K>
+impl<I, F, V, E> Frame<I, F> for AbstractScfIfFrame<V, E>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>,
-    F: From<AbstractBlockFrame<V, E, K>>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E>,
+    F: From<AbstractBlockFrame<V, E>>,
     V: Clone + PartialEq + Lattice,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 
@@ -920,7 +923,7 @@ where
 /// analysis threshold, until the entry is stable. Finish values join across the
 /// possible exits (including the zero-iteration "skip" when the loop condition
 /// is undecided). Loop policy lives here, not in the framework.
-pub struct AbstractScfForFrame<V, E, K> {
+pub struct AbstractScfForFrame<V, E> {
     stage: CompileStage,
     env: EnvIndex,
     body: Block,
@@ -934,14 +937,13 @@ pub struct AbstractScfForFrame<V, E, K> {
     finish: Option<Product<V>>,
     iterations: usize,
     entered: bool,
-    _marker: PhantomData<fn() -> (E, K)>,
+    _marker: PhantomData<fn() -> E>,
 }
 
-impl<V, E, K> AbstractScfForFrame<V, E, K>
+impl<V, E> AbstractScfForFrame<V, E>
 where
     V: Clone + PartialEq + ForLoopValue,
     E: From<InterpreterError>,
-    K: Clone + Eq + std::hash::Hash,
 {
     pub fn new(
         stage: CompileStage,
@@ -991,13 +993,12 @@ where
     }
 }
 
-impl<I, F, V, E, K> Frame<I, F> for AbstractScfForFrame<V, E, K>
+impl<I, F, V, E> Frame<I, F> for AbstractScfForFrame<V, E>
 where
-    I: ForwardDataflowFrameEngine<Value = V, Error = E, SummaryKey = K>,
-    F: From<AbstractBlockFrame<V, E, K>>,
+    I: ForwardDataflowFrameEngine<Value = V, Error = E>,
+    F: From<AbstractBlockFrame<V, E>>,
     V: Clone + PartialEq + ForLoopValue + Lattice,
     E: From<InterpreterError>,
-    K: Clone + Eq + Hash,
 {
     type Completion = AbstractCompletion<V>;
 

@@ -22,17 +22,14 @@ use kirin::prelude::{CFG, CompileStage, Pipeline};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_demand::DemandResult;
 use kirin_interpreter::engine::{
-    CallContext, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
-    SparseForwardInterpreter, expect_single,
+    ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker, SparseForwardInterpreter,
+    expect_single,
 };
 use kirin_interpreter::{Body, Callee, InterpDispatch, InterpreterError, SparseForwardTransfer};
 use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
 use kirin_scf::ForLoopValue;
 
 use crate::stage::Stage;
-
-/// Summary key of the constant-propagation analysis policy.
-type CpKey<C> = <ConstPropContext<C> as CallContext<ConstPropValue<C>>>::Key;
 
 type ToyEngine<'ir, Lk> =
     ConcreteInterpreterCore<'ir, Stage, i64, ToyError, Lk, ToyFrame<i64, ToyError>>;
@@ -83,7 +80,7 @@ pub type ToyConstProp<'ir, C, Lk = CrossStageLinker> = SparseForwardInterpreter<
     ToyError,
     Lk,
     ConstPropContext<C>,
-    ToyAbstractFrame<ConstPropValue<C>, ToyError, CpKey<C>>,
+    ToyAbstractFrame<ConstPropValue<C>, ToyError>,
 >;
 
 /// Classic per-point liveness over toy's private dense stack item: the reverse
@@ -157,7 +154,7 @@ where
             ToyError,
             CrossStageLinker,
             ConstPropContext<C>,
-            ToyAbstractFrame<ConstPropValue<C>, ToyError, CpKey<C>>,
+            ToyAbstractFrame<ConstPropValue<C>, ToyError>,
         >,
     >,
 {

@@ -11,9 +11,8 @@
 //! [`SemanticKey`](crate::SemanticKey) dispatch tags live in
 //! [`semantics`](crate::semantics), not here.
 //!
-//! Framework-level fact keys are never bare anchors: [`Scoped`] qualifies an
-//! anchor with the scope/context it belongs to, so the same anchor under two
-//! contexts is two facts.
+//! The context a fact belongs to is its environment ([`EnvStore`](crate::EnvStore)),
+//! not part of the anchor: the same anchor in two environments is two facts.
 
 use std::hash::Hash;
 
@@ -25,10 +24,9 @@ use kirin_ir::{Block, SSAValue, Statement};
 
 /// A type that can anchor a lattice fact.
 ///
-/// Anchors key fact stores ([`FactStore`](crate::FactStore)) and summaries, so
-/// they must be cheap to clone, compare, and hash. Sparse anchors are
-/// [`SSAValue`]s; dense anchors are [`ProgramPoint`]s; [`Scoped`] qualifies any
-/// anchor with its scope.
+/// Anchors key fact stores ([`FactStore`](crate::FactStore)), so they must be
+/// cheap to clone, compare, and hash. Sparse anchors are [`SSAValue`]s; dense
+/// anchors are [`ProgramPoint`]s.
 pub trait LatticeAnchor: Clone + Eq + Hash {}
 
 impl LatticeAnchor for SSAValue {}
@@ -53,71 +51,3 @@ pub enum ProgramPoint {
 }
 
 impl LatticeAnchor for ProgramPoint {}
-
-// ===========================================================================
-// Scope qualification
-// ===========================================================================
-
-/// An anchor or owner qualified by the scope/context it belongs to.
-///
-/// Framework-level summary keys are never bare anchors: the same [`SSAValue`]
-/// or [`Block`] under two scopes (two stages, two analyzed bodies, two call
-/// contexts) is two distinct facts, so keys carry their scope. Dense liveness
-/// uses the analyzed callable ([`LinkTarget`](crate::LinkTarget)) as the
-/// scope; interprocedural analyses generalize `K` to a call-context key, as
-/// the sparse forward engine does for its value-reader dependencies.
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct Scoped<K, T> {
-    pub scope: K,
-    pub item: T,
-}
-
-impl<K, T> Scoped<K, T> {
-    pub fn new(scope: K, item: T) -> Self {
-        Self { scope, item }
-    }
-}
-
-impl<K, T> LatticeAnchor for Scoped<K, T>
-where
-    K: Clone + Eq + Hash,
-    T: Clone + Eq + Hash,
-{
-}
-
-// ===========================================================================
-// Change detection
-// ===========================================================================
-
-/// Whether a store update changed anything.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Change {
-    /// The store was not modified.
-    Unchanged,
-    /// The store was modified; the fixpoint has not yet stabilized.
-    Changed,
-}
-
-impl Change {
-    /// `true` if this is [`Change::Changed`].
-    pub fn changed(self) -> bool {
-        matches!(self, Change::Changed)
-    }
-
-    /// Combine two change results: `Changed` if either changed.
-    pub fn or(self, other: Change) -> Change {
-        match (self, other) {
-            (Change::Unchanged, Change::Unchanged) => Change::Unchanged,
-            _ => Change::Changed,
-        }
-    }
-
-    /// Fold a `bool` "did something change" into a [`Change`].
-    pub fn from_bool(changed: bool) -> Change {
-        if changed {
-            Change::Changed
-        } else {
-            Change::Unchanged
-        }
-    }
-}

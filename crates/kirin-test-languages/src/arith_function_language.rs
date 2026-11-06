@@ -37,7 +37,7 @@ pub enum ArithFunctionLanguage {
 mod interpreter {
     use kirin_interpreter::dialect::{
         ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, Interpretable,
-        StrongDemand,
+        SparseBackwardEffect, StrongDemand,
     };
     use kirin_ir::HasBottom;
 
@@ -52,7 +52,7 @@ mod interpreter {
     {
         fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
             match self {
-                ArithFunctionLanguage::Function { .. } => Ok(interp.effect()),
+                ArithFunctionLanguage::Function { .. } => Ok(SparseBackwardEffect::Next),
                 ArithFunctionLanguage::Arith(op) => op.interpret(interp),
                 ArithFunctionLanguage::ControlFlow(op) => op.interpret(interp),
                 ArithFunctionLanguage::Return(op) => op.interpret(interp),

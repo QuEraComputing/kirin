@@ -1,71 +1,61 @@
-//! The demand frame: one work item = dispatch the rules that translate its
-//! demand, in the callable context the work carries.
+//! The demand frame: one work item = dispatch one statement's rule in the
+//! callable context the work carries.
 
-use kirin_ir::{CompileStage, HasBottom, Lattice, SSAValue, StageMeta, Statement};
+use kirin_ir::{CompileStage, HasBottom, Lattice, StageMeta, Statement};
 
-use super::{DemandContext, SparseBackwardDriver, SparseBackwardEffect};
+use super::{DemandContext, SparseBackwardDriver, SparseBackwardEffect, SparseBackwardTransfer};
 use crate::{
-    Frame, FrameEffect, InterpDispatch, InterpreterError, Linker, SparseBackwardSemantic,
+    EnvIndex, Frame, FrameEffect, InterpDispatch, InterpreterError, Linker, SparseBackwardSemantic,
     StageQuery,
 };
 
-/// One work-item analysis: dispatch each statement whose rule can translate
-/// the item's demand, under the item's callable context, accumulating the
-/// local demands the rules raise and the callee parameter facts of the calls
-/// they cross.
-pub struct DemandFrame<K, V> {
-    context: K,
+/// One work-item analysis: dispatch the statement's rule in the item's
+/// context and, for a call, summarize the call.
+pub struct DemandFrame {
+    env: EnvIndex,
     stage: CompileStage,
-    work: Vec<Statement>,
-    collected: Vec<(SSAValue, V)>,
+    statement: Option<Statement>,
 }
 
-impl<K, V> DemandFrame<K, V> {
-    pub(super) fn new(context: K, stage: CompileStage, work: Vec<Statement>) -> Self {
+impl DemandFrame {
+    pub(super) fn new(env: EnvIndex, stage: CompileStage, statement: Statement) -> Self {
         Self {
-            context,
+            env,
             stage,
-            work,
-            collected: Vec::new(),
+            statement: Some(statement),
         }
     }
 }
 
 // This engine has one leaf continuation and never pushes a child, so its frame
 // is also its complete stack-item composition.
-impl<'ir, S, V, E, Lk, P, Sem> Frame<SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>>
-    for DemandFrame<P::Key, V>
+impl<'ir, S, V, E, Lk, P, Sem> Frame<SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>> for DemandFrame
 where
-    S: StageMeta + StageQuery + InterpDispatch<SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>>,
+    S: StageMeta + StageQuery + InterpDispatch<SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>>,
     V: Clone + PartialEq + Lattice + HasBottom,
     E: From<InterpreterError>,
     Lk: Linker<S>,
     P: DemandContext<V>,
     Sem: SparseBackwardSemantic,
 {
-    type Completion = Vec<(SSAValue, V)>;
+    type Completion = ();
 
     fn step_into(
         mut self,
         interp: &mut SparseBackwardDriver<'ir, S, V, E, Lk, P, Sem>,
     ) -> Result<FrameEffect<Self, Self::Completion>, E> {
-        match self.work.pop() {
-            Some(statement) => {
-                match interp.run_statement(&self.context, self.stage, statement)? {
-                    SparseBackwardEffect::Demands(demands) => self.collected.extend(demands),
-                    // Summarize, don't descend: the callee context is analyzed
-                    // as its own work.
-                    SparseBackwardEffect::Call(call) => {
-                        // Keep the facts the rule raised before returning the call.
-                        self.collected.extend(interp.inner_mut().take_demands());
-                        self.collected
-                            .extend(interp.summarize_call(self.stage, call)?);
-                    }
-                }
-                Ok(FrameEffect::Continue(self))
-            }
-            None => Ok(FrameEffect::Complete(self.collected)),
+        let Some(statement) = self.statement.take() else {
+            return Ok(FrameEffect::Complete(()));
+        };
+        // Summarize a call, don't descend: the callee context is analyzed as
+        // its own work.
+        if let SparseBackwardEffect::Call(call) = interp
+            .inner_mut()
+            .run_statement(self.env, self.stage, statement)?
+        {
+            interp.summarize_call(self.stage, call)?;
         }
+        Ok(FrameEffect::Continue(self))
     }
 
     fn resume_done_into(

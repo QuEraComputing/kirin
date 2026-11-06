@@ -29,8 +29,8 @@ pub use result::DemandResult;
 pub use value::Demand;
 
 use kirin_interpreter::{
-    Callee, InterpDispatch, InterpreterError, SameStageLinker, SparseBackwardDriver,
-    SparseBackwardInterpreter, StageQuery,
+    Callee, InterpDispatch, InterpreterError, SameStageLinker, SparseBackwardInterpreter,
+    SparseBackwardTransfer, StageQuery,
 };
 use kirin_ir::{CompileStage, Pipeline, StageMeta};
 
@@ -56,7 +56,7 @@ where
     S: StageMeta
         + StageQuery
         + InterpDispatch<
-            SparseBackwardDriver<
+            SparseBackwardTransfer<
                 'ir,
                 S,
                 Demand,

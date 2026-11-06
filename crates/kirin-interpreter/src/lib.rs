@@ -5,7 +5,7 @@
 //! - **Shared framework** ([`Interp`],
 //!   [`Interpretable`], [`Frame`]/[`FrameEngine`]/[`FrameEffect`]/[`drive_frames`],
 //!   [`StandardFixpointInterpreter`]): the engine trait, the direction-neutral
-//!   frame driver loop, and the owner-summary fixpoint driver.
+//!   frame driver loop, and the worklist fixpoint driver.
 //! - **Semantics vs shape** ([`semantics`]): statement rules are selected by a
 //!   compile-time [`SemanticKey`] — [`ForwardEval`], [`StrongDemand`],
 //!   [`ClassicLiveness`], or a downstream key — naming *what* a rule means.
@@ -85,29 +85,26 @@ pub use kirin_ir::Body;
 // Sparse forward engine (`Sem = ForwardEval`) + the abstract standard frames.
 pub use engines::sparse_forward::{
     AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, CallContext,
-    ContextInsensitive, Owner, SparseForwardInterpreter, SparseForwardTransfer,
-    StandardAbstractFrame, WideningStrategy,
+    ContextInsensitive, SparseForwardInterpreter, SparseForwardTransfer, StandardAbstractFrame,
+    WideningStrategy,
 };
 // Sparse backward engine (`Sem = StrongDemand`).
 pub use engines::sparse_backward::{
-    BodyScope, DemandContext, DemandFrame, DemandInterp, DemandSummary, SparseBackwardDriver,
+    BodyScope, DemandContext, DemandFrame, DemandInterp, SparseBackwardDriver,
     SparseBackwardEffect, SparseBackwardInterp, SparseBackwardInterpreter, SparseBackwardProfile,
     SparseBackwardTransfer,
 };
 // Dense backward engine (`Sem = ClassicLiveness`) + the dense standard frames.
 pub use engines::dense_backward::{
-    BlockLiveness, ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver,
-    DenseBackwardEffect, DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter,
-    DenseBackwardProfile, DenseBackwardTransfer, DenseBlockFrame, DenseBlockMode, PointFacts,
-    SuccessorEdge,
+    ClassicLivenessInterp, DenseBackwardCompletion, DenseBackwardDriver, DenseBackwardEffect,
+    DenseBackwardFrameEngine, DenseBackwardInterp, DenseBackwardInterpreter, DenseBackwardProfile,
+    DenseBackwardTransfer, DenseBlockFrame, DenseBlockMode, PointFacts, SuccessorEdge,
 };
 
 // Lattice anchors (*where* facts attach), scope qualification, and the
 // polymorphic fact stores. Anchor family is a property of the solver shape;
 // dispatch meaning lives in `semantics`.
-pub use facts::{
-    Change, FactStore, LatticeAnchor, ProgramPoint, Scoped, ScopedSparseStore, SparseStore,
-};
+pub use facts::{FactStore, LatticeAnchor, ProgramPoint, SparseStore};
 
 // Semantic keys (*what* a rule means — the `Interpretable`/`Interp::Semantics`
 // dispatch tags) and the solver shapes each key runs on.
@@ -117,17 +114,12 @@ pub use semantics::{
     SparseBackwardShape, SparseForwardSemantic, SparseForwardShape, StrongDemand,
 };
 
-// The owner-summary fixpoint framework: a [`StandardFixpointInterpreter`] wraps
-// any [`Interp`] and drives it to an owner-summary fixpoint (one work item per
-// owner, intra-owner traversal on the frame stack, inter-owner convergence via a
-// pluggable [`SummaryDependencyIndex`]). The wrapped interpreter stays the single
-// source of value/error/effect/semantics; a [`FixpointProfile`] adds only the
-// owner-summary types.
-pub use fixpoint::{
-    ExplicitSummaryDeps, FixpointProfile, OwnerAnalysis, OwnerSummaryDeps,
-    StandardFixpointInterpreter, Summary, SummaryDependencies, SummaryDependency,
-    SummaryDependencyIndex, SummaryEffect, WorkItem,
-};
+// The worklist fixpoint framework: a [`StandardFixpointInterpreter`] wraps any
+// [`Interp`] and drives it to a fixpoint over work items (each walked on the
+// frame stack, entered and completed by a [`WorkAnalysis`]). The wrapped
+// interpreter stays the single source of value/error/effect/semantics; a
+// [`FixpointProfile`] adds only the work item, frame and completion types.
+pub use fixpoint::{FixpointProfile, StandardFixpointInterpreter, WorkAnalysis};
 
 #[cfg(feature = "derive")]
 pub use kirin_derive_interpreter::{Frame, InterpDispatch, Interpretable};

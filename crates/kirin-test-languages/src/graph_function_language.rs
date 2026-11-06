@@ -94,7 +94,8 @@ mod interpreter {
     use kirin_interpreter::BranchCondition;
     use kirin_interpreter::{
         ClassicLiveness, ClassicLivenessInterp, DemandInterp, DenseBackwardEffect, DiGraphFrame,
-        ForwardEval, Interpretable, SparseForwardEffect, SparseForwardInterp, StrongDemand,
+        ForwardEval, Interpretable, SparseBackwardEffect, SparseForwardEffect, SparseForwardInterp,
+        StrongDemand,
     };
     use kirin_ir::{HasBottom, Product, SSAValue};
 
@@ -157,7 +158,7 @@ mod interpreter {
                 GraphFunctionLanguage::Function { .. }
                 | GraphFunctionLanguage::GraphFunction { .. }
                 | GraphFunctionLanguage::LinearFunction { .. }
-                | GraphFunctionLanguage::UnGraphFunction { .. } => Ok(interp.effect()),
+                | GraphFunctionLanguage::UnGraphFunction { .. } => Ok(SparseBackwardEffect::Next),
                 GraphFunctionLanguage::GraphEval { .. } => interp.demand_uses_if_observable(self),
                 GraphFunctionLanguage::Arith(op) => op.interpret(interp),
                 GraphFunctionLanguage::Cf(op) => op.interpret(interp),

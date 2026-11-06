@@ -12,7 +12,7 @@ use kirin_ir::{
     Block, BlockParent, CFG, CompileStage, Dialect, GetInfo, HasArguments, HasBlocks, HasCFG,
     HasCallableBody, HasDigraphs, HasStageInfo, HasUngraphs, Pipeline, PortParent, SSAKind,
     SSAValue, SpecializedFunction, StageAction, StageInfo, StageMeta, StagedFunction, Statement,
-    SupportsStageDispatch, Symbol, UniqueLiveSpecializationError,
+    StatementParent, SupportsStageDispatch, Symbol, UniqueLiveSpecializationError, Use,
 };
 use smallvec::{SmallVec, smallvec};
 
@@ -432,6 +432,82 @@ where
     }
 }
 
+/// The walk units enclosing a value's definition and each of its uses,
+/// innermost first: the block or graph holding the site, then the units around
+/// the structured statement owning it, up to a CFG block.
+pub struct ValueUnits(pub SSAValue);
+
+/// Enclosing units of one site, innermost first.
+pub type UnitChain = SmallVec<[Body; 2]>;
+
+impl<S, L> StageAction<S, L> for ValueUnits
+where
+    S: StageMeta + HasStageInfo<L>,
+    L: Dialect,
+{
+    type Output = (UnitChain, Vec<UnitChain>);
+    type Error = InterpreterError;
+
+    fn run(
+        &mut self,
+        _stage: CompileStage,
+        info: &StageInfo<L>,
+    ) -> Result<Self::Output, Self::Error> {
+        let value = self
+            .0
+            .get_info(info)
+            .ok_or(InterpreterError::MissingValue(self.0))?;
+        let def = match *value.kind() {
+            SSAKind::Result(statement, _) => units(info, *statement.parent(info)),
+            SSAKind::BlockArgument(block, _) => units(info, Some(StatementParent::Block(block))),
+            SSAKind::Port(PortParent::DiGraph(graph), _) => {
+                units(info, Some(StatementParent::DiGraph(graph)))
+            }
+            SSAKind::Port(PortParent::UnGraph(graph), _) => {
+                units(info, Some(StatementParent::UnGraph(graph)))
+            }
+        };
+        let uses = value
+            .uses()
+            .iter()
+            .map(|site| match *site {
+                Use::StatementOperand { stmt, .. } => units(info, *stmt.parent(info)),
+                Use::DiGraphYield { graph, .. } => {
+                    units(info, Some(StatementParent::DiGraph(graph)))
+                }
+            })
+            .collect();
+        Ok((def, uses))
+    }
+}
+
+/// The units enclosing a site whose parent is `parent`, innermost first.
+fn units<L: Dialect>(info: &StageInfo<L>, mut parent: Option<StatementParent>) -> UnitChain {
+    let mut chain = UnitChain::new();
+    while let Some(next) = parent {
+        let owner = match next {
+            StatementParent::Block(block) => {
+                chain.push(Body::Block(block));
+                // A CFG block is the outermost unit; a structured body block
+                // belongs to its owning statement's unit.
+                match block.get_info(info).and_then(|block| block.parent()) {
+                    Some(BlockParent::Statement(owner)) => Some(owner),
+                    _ => None,
+                }
+            }
+            StatementParent::DiGraph(graph) => {
+                chain.push(Body::DiGraph(graph));
+                graph.get_info(info).and_then(|graph| graph.parent())
+            }
+            StatementParent::UnGraph(graph) => {
+                graph.get_info(info).and_then(|graph| graph.parent())
+            }
+        };
+        parent = owner.and_then(|owner| *owner.parent(info));
+    }
+    chain
+}
+
 /// Blocks directly selected as dense fixpoint owners by an analysis root.
 /// Graph bodies have no block-owner interpretation and fail explicitly.
 pub struct DirectBodyBlocks(pub Body);
@@ -586,6 +662,7 @@ pub trait StageQuery:
         BlockArgumentPredecessorStatements,
         InterpreterError,
     > + SupportsStageDispatch<GraphPortOwner, Statement, InterpreterError>
+    + SupportsStageDispatch<ValueUnits, (UnitChain, Vec<UnitChain>), InterpreterError>
     + SupportsStageDispatch<DirectBodyBlocks, Vec<Block>, InterpreterError>
     + SupportsStageDispatch<BodyContentsQuery, BodyContents, InterpreterError>
     + SupportsStageDispatch<DiGraphWalkQuery, GraphWalkPlan, InterpreterError>
@@ -614,6 +691,7 @@ impl<S> StageQuery for S where
             BlockArgumentPredecessorStatements,
             InterpreterError,
         > + SupportsStageDispatch<GraphPortOwner, Statement, InterpreterError>
+        + SupportsStageDispatch<ValueUnits, (UnitChain, Vec<UnitChain>), InterpreterError>
         + SupportsStageDispatch<DirectBodyBlocks, Vec<Block>, InterpreterError>
         + SupportsStageDispatch<BodyContentsQuery, BodyContents, InterpreterError>
         + SupportsStageDispatch<DiGraphWalkQuery, GraphWalkPlan, InterpreterError>
@@ -751,6 +829,14 @@ pub(crate) fn graph_port_owner<S: StageQuery>(
     parent: PortParent,
 ) -> Result<Statement, InterpreterError> {
     dispatch(pipeline, stage, GraphPortOwner(parent))
+}
+
+pub(crate) fn value_units<S: StageQuery>(
+    pipeline: &Pipeline<S>,
+    stage: CompileStage,
+    value: SSAValue,
+) -> Result<(UnitChain, Vec<UnitChain>), InterpreterError> {
+    dispatch(pipeline, stage, ValueUnits(value))
 }
 
 pub(crate) fn digraph_walk_plan<S: StageQuery>(

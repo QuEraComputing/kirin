@@ -1,27 +1,19 @@
-//! The owner-summary fixpoint framework.
+//! The worklist fixpoint framework.
 //!
 //! [`StandardFixpointInterpreter`] wraps any [`Interp`](crate::Interp) and drives
-//! it to an owner-summary fixpoint: one work item per summary owner, intra-owner
-//! traversal on the shared frame stack, inter-owner convergence via a pluggable
-//! [`SummaryDependencyIndex`]. The wrapped interpreter stays the single source of
-//! value/error/effect/semantics; a [`FixpointProfile`] adds only the owner-summary
-//! types (owner key, summary, frame, completion).
+//! it to a fixpoint over a worklist of work items: each item is walked on the
+//! shared frame stack, and a [`WorkAnalysis`] builds its entry frame and handles
+//! its completion. The wrapped interpreter stays the single source of
+//! value/error/effect/semantics; a [`FixpointProfile`] adds only the work item,
+//! frame and completion types.
 
 mod delegates;
-mod deps;
 mod driver;
 mod profile;
 mod runner;
 mod solver;
 mod traits;
 
-#[cfg(test)]
-mod tests;
-
-pub use deps::{
-    ExplicitSummaryDeps, OwnerSummaryDeps, SummaryDependencies, SummaryDependency,
-    SummaryDependencyIndex,
-};
 pub use driver::StandardFixpointInterpreter;
 pub use profile::FixpointProfile;
-pub use traits::{OwnerAnalysis, Summary, SummaryEffect, WorkItem};
+pub use traits::WorkAnalysis;

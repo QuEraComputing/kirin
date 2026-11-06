@@ -64,7 +64,7 @@ where
         .map(|result| interp.fact(*result))
         .collect::<Result<Product<_>, _>>()?;
     if result_values.iter().all(|fact| *fact == I::Value::bottom()) {
-        return Ok(interp.effect());
+        return Ok(SparseBackwardEffect::Next);
     }
     Ok(SparseBackwardEffect::Call(CallEffect {
         callee,
@@ -167,7 +167,7 @@ where
 {
     fn interpret(&self, interp: &mut I) -> Result<I::Effect, I::Error> {
         interp.declare_return(&self.values)?;
-        Ok(interp.effect())
+        Ok(SparseBackwardEffect::Next)
     }
 }
 

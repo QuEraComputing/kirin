@@ -76,8 +76,6 @@
 //!   **not** inherit [`CallServices`] or [`CFGQueries`], because an abstract
 //!   engine summarizes calls rather than entering them.
 
-use std::hash::Hash;
-
 use kirin_ir::{Block, CFG, CompileStage, Product, SSAValue, Statement};
 
 use crate::{
@@ -420,8 +418,9 @@ impl<T> ForwardFrameEngine for T where
 /// it to expose activation allocation, activation cleanup, and
 /// `resolve_callee`/`discover_body` would be demanding a call convention it
 /// never performs. `cfg_entry` is likewise absent: the forward abstract engine
-/// reaches a callable body's entry block through [`Owner`](crate::Owner) seeding
-/// in the fixpoint driver, not by asking a frame to enter a CFG. A frame that
+/// reaches a callable body's entry unit through the fixpoint driver, which
+/// turns it into an `(EnvIndex, Body)` work item, not by asking a frame to
+/// enter a CFG. A frame that
 /// *does* want either capability can name it in addition — see the
 /// abstract-body-traversal follow-up.
 ///
@@ -432,17 +431,13 @@ impl<T> ForwardFrameEngine for T where
 ///
 /// The interprocedural protocol stays **atomic in the engine**: `summarize_call`
 /// performs the whole call-summarization step (resolve, key, join arguments into
-/// the callee entry summary, record the caller — *including same-key
-/// self-recursion* — and read the current return summary or `bottom`), so a
+/// the callee entry, record the caller — *including same-key self-recursion* —
+/// and read the callee's current return or `bottom`), so a
 /// custom frame cannot reorder it and break soundness. Frames only decide
 /// *traversal*: which frame to step next.
 pub trait ForwardDataflowFrameEngine:
     Env<Anchor = SSAValue> + StatementDispatch + BlockQueries + DiGraphQueries
 {
-    /// The key under which function entry/return summaries are tracked
-    /// (the analysis [`CallContext::Key`](crate::CallContext::Key)).
-    type SummaryKey: Clone + Eq + Hash;
-
     /// Combine `incoming` into `current` at a merge point via the analysis
     /// [`WideningStrategy`](crate::WideningStrategy) (join vs. widen by `visits`).
     fn analysis_merge(
@@ -454,10 +449,6 @@ pub trait ForwardDataflowFrameEngine:
 
     /// Fold a `Return` product into the function-evaluation return accumulator.
     fn contribute_return(&mut self, values: Product<Self::Value>) -> Result<(), Self::Error>;
-
-    /// The summary key of the function currently being evaluated (the caller, for
-    /// recording call dependencies — including same-key recursion).
-    fn current_function_key(&self) -> Option<Self::SummaryKey>;
 
     /// Summarize a call atomically (the engine's interprocedural protocol):
     /// resolve, key, join arguments into the callee entry, record the caller

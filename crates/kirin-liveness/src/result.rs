@@ -1,7 +1,7 @@
 //! The classic liveness result: dense per-point live sets.
 
 use kirin_interpreter::{
-    DenseBackwardInterpreter, FactStore, InterpreterError, LinkTarget, ProgramPoint, Scoped,
+    DenseBackwardInterpreter, FactStore, InterpreterError, LinkTarget, ProgramPoint,
 };
 use kirin_ir::StageMeta;
 
@@ -15,7 +15,7 @@ use crate::live::LiveSet;
 #[derive(Clone, Debug)]
 pub struct DenseLivenessResult {
     root: LinkTarget,
-    facts: FactStore<Scoped<LinkTarget, ProgramPoint>, LiveSet>,
+    facts: FactStore<ProgramPoint, LiveSet>,
 }
 
 impl DenseLivenessResult {
@@ -38,8 +38,8 @@ impl DenseLivenessResult {
         self.root
     }
 
-    /// The liveness fact recorded at `point`.
-    pub fn point_facts(&self, point: Scoped<LinkTarget, ProgramPoint>) -> Option<&LiveSet> {
+    /// The liveness fact recorded at `point` of the analyzed callable.
+    pub fn point_facts(&self, point: ProgramPoint) -> Option<&LiveSet> {
         self.facts.get(point)
     }
 }
