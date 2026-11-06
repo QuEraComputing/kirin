@@ -1721,6 +1721,16 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         stmt: Statement,
     ) -> Result<(), RewriteError>;
 
+    // `IRMap`: old -> new values, blocks and statements of a clone; values can
+    // be mapped beforehand with `map_value`.
+    pub fn clone_statement(
+        &mut self,
+        stmt: Statement,
+        map: &mut IRMap,
+    ) -> Result<Statement, RewriteError>;
+
+    pub fn clone_cfg(&mut self, source: CFG, map: &mut IRMap) -> Result<CFG, RewriteError>;
+
     pub fn replace_statement(
         &mut self,
         stmt: Statement,
@@ -1812,8 +1822,10 @@ stage remains valid.
 | `replace_all_uses_except_stmt` / `_stmts` | `replace_uses_if` keeping the operands of the given statement(s); uses nested in their bodies are still replaced. | as `replace_uses_if` | the excepted statements must be live |
 | `erase_statement` | Tombstone the statement, unlink it from its block list (or remove its graph node and the edges touching it, or drop an `UnGraph` edge statement from the member map), drop its operand uses, tombstone its (unused) result values. Statement-owned blocks, `Cfg`s, `DiGraph`s, and `UnGraph`s nested in it are tombstoned with it. Erasing a terminator clears the block's terminator and removes its outgoing edges, leaving the block unterminated. | `ErasedStatement` (covers the nested bodies; no CFG or graph events), then `ChangedTerminator` for a terminator, `ChangedDiGraphTopology` for a `DiGraph` member, or `ChangedUnGraphTopology` for an `UnGraph` member | parented by a block or graph; no live result uses (a `DiGraph` yield is a use, and so is a node reading an edge statement's wire) |
 | `new_result` | Allocate a typed result value for a statement not created yet; its arena slot stays empty (not live) until `create` binds it. | none | a value its `Rewriter` never binds is tombstoned when the `Rewriter` is dropped (`run_pass` drops it before verifying) |
-| `create` | Allocate `definition` as a statement at an `InsertionPoint`, bind its results, add operand uses; return the new id. `Before`/`After` splice it adjacent to an anchor in a block body (`Before` a terminator appends to the end of the chain). `Terminator` makes it the terminator of a block that has none and adds predecessor entries. `DiGraph` adds a member and node with an edge from each member producer of an operand. `UnGraph` adds an edge statement if the definition is one, otherwise a node whose wire operands become endpoints (a wire with two endpoints is an edge). | `InsertedStatement`, then `ChangedTerminator`, `ChangedDiGraphTopology` or `ChangedUnGraphTopology` for those points | operands live; results distinct, unbound `new_result` values; for `Before`/`After` and graphs a non-terminator with no successors; for `Terminator` a result-less terminator with live successors; an `UnGraph` edge statement has no operands; a wire may exceed two endpoints (reported by `verify_derived`; it then has no edge) |
-| `insert` | Place a detached statement (one this `Rewriter` made but has not placed, such as a copy) at an `InsertionPoint`, as `create` does. | as `create` | the statement is detached and belongs to this `Rewriter`; it fits the point as for `create`. Detached statements never inserted are tombstoned when the `Rewriter` is dropped |
+| `create` | Allocate `definition` as a statement at an `InsertionPoint`, bind its results, add operand uses, and adopt the bodies it names; return the new id. `Before`/`After` splice it adjacent to an anchor in a block body (`Before` a terminator appends to the end of the chain). `Terminator` makes it the terminator of a block that has none and adds predecessor entries. `DiGraph` adds a member and node with an edge from each member producer of an operand. `UnGraph` adds an edge statement if the definition is one, otherwise a node whose wire operands become endpoints (a wire with two endpoints is an edge). | `InsertedStatement`, then `ChangedTerminator`, `ChangedDiGraphTopology` or `ChangedUnGraphTopology` for those points | operands live; results distinct, unbound `new_result` values; for `Before`/`After` and graphs a non-terminator with no successors; for `Terminator` a result-less terminator with live successors; an `UnGraph` edge statement has no operands; a wire may exceed two endpoints (reported by `verify_derived`; it then has no edge) |
+| `insert` | Place a detached statement (one this `Rewriter` made but has not placed, such as a copy) at an `InsertionPoint`, as `create` does. | as `create` | the statement is detached and belongs to this `Rewriter`; it fits the point as for `create`; none of its bodies encloses the point. Detached statements never inserted are tombstoned when the `Rewriter` is dropped |
+| `clone_statement` | Deep-copy a non-terminator with everything nested in it, with fresh ids, and return the copy detached. Operands and branch targets inside the copy are mapped through the `IRMap`; values from outside keep pointing at the original unless mapped; a block argument already mapped is not copied. Results are always copied; names are not. | none | live, not a terminator; no `DiGraph` or `UnGraph` body at any depth (until graph bodies are supported); the values it reads from the map are live |
+| `clone_cfg` | Deep-copy a `Cfg` with everything nested in it and return the copy detached (owned by no statement). Place it with `splice_cfg_after`, or give it to a new statement with `create`. A copy still detached when the `Rewriter` is dropped, including one emptied by a splice, is tombstoned. Mapping as for `clone_statement`. | none | live `Cfg`; no graph body at any depth; the values it reads from the map are live |
 | `move_before` / `move_after` | Unlink a statement and link it adjacent to `anchor`, in any block body; id, results, uses and nested bodies are unchanged. | `MovedStatement` | both are block-parented; the moved statement is not a terminator; only `move_before` may anchor on the terminator, which appends to the end of the chain; the anchor is not nested in the moved statement; moving next to itself is a no-op |
 | `splice_block_before` / `splice_block_after` | Move every statement of `source` but its terminator, in order, adjacent to `anchor` in any block body; redirect `source`'s arguments to `arg_replacements`. `source` keeps its arguments and terminator and is not erased. | the `replace_all_uses` events, `SplicedBlock` | the anchor is block-parented, not in `source` and not nested in its statements; only `splice_block_before` may anchor on the terminator, which appends to the end of the chain; exact argument arity; replacements must be live and may be `source`'s own arguments |
 | `replace_yield` | Rewrite one `DiGraph` yield slot; move its yield use `old → new`. Topology is unchanged. | `ChangedDiGraphYields` (none if slot unchanged) | live graph and value, index in range |
@@ -2017,11 +2029,12 @@ axis — hence the column.
 | `ResultArityMismatch { stmt, expected, found }` | guard | replacement changes the result count, orphaning/inventing result SSA values | `replace_statement` |
 | `TerminatorKindMismatch(stmt)` | guard | replacement changes terminator-ness, desyncing the block's terminator cache | `replace_statement` |
 | `EdgeRoleMismatch(stmt)` | guard | the replacement of an `UnGraph` member changes `is_edge()`; nodes and edge statements are stored differently | `replace_statement` |
-| `UnknownBody(body)` | liveness | a body the replacement gains does not resolve to a live body | `replace_statement` |
-| `BodyOwnedElsewhere(body)` | guard | a body the replacement gains already belongs to another statement or, for a block, to a CFG | `replace_statement` |
-| `BodyListedTwice(body)` | guard | the replacement names the same body in two fields | `replace_statement` |
-| `BodyEnclosesOwner(body)` | guard | the replacement names a body the statement is nested in, which would make it its own ancestor | `replace_statement` |
+| `UnknownBody(body)` | liveness | a body the definition names (and the statement gains) does not resolve to a live body | `create`, `replace_statement` |
+| `BodyOwnedElsewhere(body)` | guard | a body the definition names (and the statement gains) already belongs to another statement or, for a block, to a CFG | `create`, `replace_statement` |
+| `BodyListedTwice(body)` | guard | the definition names the same body in two fields | `create`, `replace_statement` |
+| `BodyEnclosesOwner(body)` | guard | a body the statement owns, or would own, encloses the statement's place, which would make it its own ancestor | `create`, `insert`, `replace_statement` |
 | `MovedIntoItself { stmt, anchor }` | guard | the anchor is nested in the moved statement, which would make it its own ancestor | `move_before`, `move_after` |
+| `CopyOfGraphBody(owner)` | guard | a clone would include a `DiGraph` or `UnGraph` body, owned by `owner`; not supported yet | `clone_statement`, `clone_cfg` |
 | `CfgSplicedIntoItself { source, anchor }` | guard | the anchor block is in `source` or nested in one of its blocks, which would place `source`'s blocks inside themselves | `splice_cfg_after` |
 | `SplicedIntoItself { source, anchor }` | guard | the anchor is in `source` or nested in one of its statements, which would place a spliced statement next to or inside itself | `splice_block_before`, `splice_block_after` |
 

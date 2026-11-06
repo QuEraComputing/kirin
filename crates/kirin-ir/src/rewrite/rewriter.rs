@@ -236,17 +236,18 @@ pub enum RewriteError {
     /// edge statement. Nodes and edge statements are stored differently, so
     /// the replacement must keep the original's role.
     EdgeRoleMismatch(Statement),
-    /// A `replace_statement` definition names a body that does not resolve to
-    /// a live body in this stage.
+    /// A `create` or `replace_statement` definition names a body that does not
+    /// resolve to a live body in this stage.
     UnknownBody(Body),
-    /// A `replace_statement` definition names a body that belongs to another
-    /// statement or, for a block, to a CFG. A body has one owner; detach it
-    /// from the other one first.
+    /// A `create` or `replace_statement` definition names a body that belongs
+    /// to another statement or, for a block, to a CFG. A body has one owner;
+    /// detach it from the other one first.
     BodyOwnedElsewhere(Body),
-    /// A `replace_statement` definition names the same body in two fields.
+    /// A `create` or `replace_statement` definition names the same body in two
+    /// fields.
     BodyListedTwice(Body),
-    /// A `replace_statement` definition names a body the statement itself is
-    /// nested in, which would make the statement its own ancestor.
+    /// A `create` or `replace_statement` definition names a body the statement
+    /// itself would be nested in, which would make it its own ancestor.
     BodyEnclosesOwner(Body),
     /// `move_before`/`move_after` was given an anchor nested in the moved
     /// statement's own bodies, which would make the statement its own
@@ -260,6 +261,9 @@ pub enum RewriteError {
     /// `source` or nested in one of its statements, which would place a
     /// spliced statement next to or inside itself.
     SplicedIntoItself { source: Block, anchor: Statement },
+    /// A copy would include a `DiGraph` or `UnGraph` body, owned by this
+    /// statement; copying graph bodies is not supported yet.
+    CopyOfGraphBody(Statement),
     /// `splice_cfg_after` was given an anchor block in `source` or nested in
     /// one of its blocks, which would place `source`'s blocks inside
     /// themselves.
@@ -426,6 +430,9 @@ impl fmt::Display for RewriteError {
             RewriteError::InsertedIntoItself(stmt) => {
                 write!(f, "{stmt:?} would be inserted into its own body")
             }
+            RewriteError::CopyOfGraphBody(owner) => {
+                write!(f, "cannot copy the graph body of {owner:?}")
+            }
             RewriteError::SplicedIntoItself { source, anchor } => {
                 write!(
                     f,
@@ -526,6 +533,10 @@ pub struct Rewriter<'a, L: Dialect> {
     /// Detached statements, with no parent, not inserted yet. They are
     /// tombstoned if never inserted.
     pub(super) detached: FxHashSet<Statement>,
+    /// Detached CFGs, such as copies, owned by no statement yet. They are
+    /// tombstoned if never adopted, including when emptied by
+    /// [`Rewriter::splice_cfg_after`].
+    pub(super) detached_cfgs: FxHashSet<CFG>,
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -535,6 +546,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             events: Vec::new(),
             unbound_ssa_results: FxHashMap::default(),
             detached: FxHashSet::default(),
+            detached_cfgs: FxHashSet::default(),
         }
     }
 

@@ -14,6 +14,7 @@ use crate::{
     UnGraph, Use,
 };
 
+use crate::rewrite::bodies::bodies_of;
 use crate::rewrite::rewriter::{
     MutationEvent, RewriteError, Rewriter, Side, add_predecessor, add_use,
 };
@@ -83,6 +84,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// [`InsertionPoint`]); if it does not, the error is
     /// [`RewriteError::CannotInsert`], naming `insertion_pt` and the reason.
     ///
+    /// The new statement owns the bodies `definition` names, such as a CFG from
+    /// [`Rewriter::clone_cfg`]. Each must be live, owned by nothing
+    /// ([`RewriteError::BodyOwnedElsewhere`]), named once
+    /// ([`RewriteError::BodyListedTwice`]), and must not enclose `insertion_pt`
+    /// ([`RewriteError::BodyEnclosesOwner`]).
+    ///
     /// Rejects, leaving the stage untouched, if a check fails. Records
     /// [`MutationEvent::InsertedStatement`], then for a terminator
     /// [`MutationEvent::ChangedTerminator`] and for a graph member
@@ -94,8 +101,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         definition: L,
     ) -> Result<Statement, RewriteError> {
         let placement = self.check_insertion_pt(insertion_pt, &definition)?;
+        self.check_can_adopt_bodies_at(&definition, insertion_pt)?;
+        let bodies = bodies_of(&definition);
         let stmt = self.build_statement(definition)?;
         self.place(stmt, placement);
+        for body in bodies {
+            self.adopt_body(body, stmt);
+        }
         Ok(stmt)
     }
 

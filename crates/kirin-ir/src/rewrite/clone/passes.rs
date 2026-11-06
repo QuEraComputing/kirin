@@ -1,0 +1,362 @@
+use std::collections::HashSet;
+
+use smallvec::SmallVec;
+
+use crate::arena::{GetInfo, GetInfoMut};
+use crate::node::CFGInfo;
+use crate::node::linked_list::{LinkedList, LinkedListNode};
+use crate::{
+    Block, BlockInfo, BlockParent, Body, CFG, Dialect, SSAValue, Statement, StatementInfo,
+    StatementParent, Successor, Use,
+};
+
+use super::IRMap;
+use crate::rewrite::bodies::bodies_of;
+use crate::rewrite::rewriter::{RewriteError, Rewriter, add_predecessor, add_use};
+
+/// Deep copies. A copy takes two passes over the original: the first
+/// allocates every CFG, block, block argument and result the copy needs,
+/// recording them in the [`IRMap`]; the second copies the statements, whose
+/// operands and branch targets may name any of them, since a block may branch
+/// to, or read a value from, a block listed after it.
+impl<'a, L: Dialect> Rewriter<'a, L> {
+    /// Copy `stmt` with everything nested in it, giving the copy fresh ids, and
+    /// return the copy, detached: it has no parent until
+    /// [`Rewriter::insert`] places it.
+    ///
+    /// Every operand and branch target inside the copy is mapped through
+    /// `map`. An operand reading a value from outside the copy keeps reading it
+    /// unless `map` gives a replacement; a block argument that `map` already
+    /// gives a value for is not copied, and the copy reads that value. Results
+    /// are always copied. Names are not copied. Afterwards `map` holds every
+    /// value, block and statement the copy made.
+    ///
+    /// Rejects, leaving the stage untouched, if `stmt` is unknown, is a
+    /// terminator ([`RewriteError::UnexpectedTerminator`]: it could not be
+    /// inserted), or holds a `DiGraph` or `UnGraph` body at any depth
+    /// ([`RewriteError::CopyOfGraphBody`]), or if the copy would read a value
+    /// from `map` that is not live ([`RewriteError::UnknownValue`]). Records no
+    /// event: nothing reachable changes until the insert.
+    pub fn clone_statement(
+        &mut self,
+        stmt: Statement,
+        map: &mut IRMap,
+    ) -> Result<Statement, RewriteError> {
+        if self.live_statement(stmt)?.definition.is_terminator() {
+            return Err(RewriteError::UnexpectedTerminator);
+        }
+        self.check_copyable_statement(stmt, map)?;
+
+        self.reserve_statement(stmt, map);
+        let mut copied = Vec::new();
+        let copy = self.fill_statement(stmt, None, map, &mut copied);
+        self.record_operand_uses(&copied);
+        self.detached.insert(copy);
+        Ok(copy)
+    }
+
+    /// Copy `source` with everything nested in it, giving the copy fresh ids,
+    /// and return the copy, detached: no statement owns it.
+    ///
+    /// Place its blocks with [`Rewriter::splice_cfg_after`], or make it the
+    /// body of a new statement with [`Rewriter::create`]. A copy still
+    /// detached when the `Rewriter` is dropped, including one a splice left
+    /// empty, is tombstoned. Values are mapped as for
+    /// [`Rewriter::clone_statement`]: in particular, mapping the arguments of
+    /// `source`'s entry block gives a copy whose entry block has none.
+    ///
+    /// Rejects, leaving the stage untouched, if `source` is unknown
+    /// ([`RewriteError::UnknownCfg`]), holds a `DiGraph` or `UnGraph` body at
+    /// any depth ([`RewriteError::CopyOfGraphBody`]), or if the copy would
+    /// read a value from `map` that is not live
+    /// ([`RewriteError::UnknownValue`]). Records no event.
+    pub fn clone_cfg(&mut self, source: CFG, map: &mut IRMap) -> Result<CFG, RewriteError> {
+        if source.get_info(self.stage).is_none() {
+            return Err(RewriteError::UnknownCfg(source));
+        }
+        for block in self.cfg_blocks(source) {
+            self.check_copyable_block(block, map)?;
+        }
+
+        let copy = self.reserve_cfg(source, map);
+        let mut copied = Vec::new();
+        self.fill_body(Body::CFG(source), map, &mut copied);
+        self.record_operand_uses(&copied);
+        self.detached_cfgs.insert(copy);
+        Ok(copy)
+    }
+
+    /// Reject `stmt` if a graph body is nested in it at any depth, or if a
+    /// value `map` gives in place of one of its operands, or of an operand
+    /// nested in it, is not live: the copy would read it.
+    fn check_copyable_statement(&self, stmt: Statement, map: &IRMap) -> Result<(), RewriteError> {
+        let definition = &stmt.expect_info(self.stage).definition;
+        for &operand in definition.arguments() {
+            if let Some(replacement) = map.value(operand)
+                && replacement.get_info(self.stage).is_none()
+            {
+                return Err(RewriteError::UnknownValue(replacement));
+            }
+        }
+        for body in bodies_of(definition) {
+            match body {
+                Body::Block(block) => self.check_copyable_block(block, map)?,
+                Body::CFG(cfg) => {
+                    for block in self.cfg_blocks(cfg) {
+                        self.check_copyable_block(block, map)?;
+                    }
+                }
+                Body::DiGraph(_) | Body::UnGraph(_) => {
+                    return Err(RewriteError::CopyOfGraphBody(stmt));
+                }
+            }
+        }
+        Ok(())
+    }
+
+    fn check_copyable_block(&self, block: Block, map: &IRMap) -> Result<(), RewriteError> {
+        for stmt in self.block_statements(block) {
+            self.check_copyable_statement(stmt, map)?;
+        }
+        Ok(())
+    }
+
+    /// First pass for `stmt`: allocate its results, unbound, and its bodies.
+    fn reserve_statement(&mut self, stmt: Statement, map: &mut IRMap) {
+        let definition = &stmt.expect_info(self.stage).definition;
+        let results: Vec<SSAValue> = definition.results().map(|&r| r.into()).collect();
+        let bodies = bodies_of(definition);
+        for result in results {
+            let ty = result.expect_info(self.stage).ty().clone();
+            let copy = self.stage.ssas.alloc(None);
+            self.unbound_ssa_results.insert(copy, ty);
+            map.map_value(result, copy);
+        }
+        for body in bodies {
+            match body {
+                Body::Block(block) => {
+                    self.reserve_block(block, None, map);
+                }
+                Body::CFG(cfg) => {
+                    self.reserve_cfg(cfg, map);
+                }
+                Body::DiGraph(_) | Body::UnGraph(_) => {
+                    unreachable!("graph bodies are rejected before copying")
+                }
+            }
+        }
+    }
+
+    /// First pass for `cfg`: allocate a CFG with no parent and its blocks.
+    fn reserve_cfg(&mut self, cfg: CFG, map: &mut IRMap) -> CFG {
+        let copy = self
+            .stage
+            .nodes
+            .cfgs
+            .alloc_with_id(|id| CFGInfo::builder().id(id).blocks(LinkedList::new()).new());
+        map.map_cfg(cfg, copy);
+        for block in self.cfg_blocks(cfg) {
+            let block_copy = self.reserve_block(block, Some(BlockParent::CFG(copy)), map);
+            self.push_block(copy, block_copy);
+        }
+        copy
+    }
+
+    /// First pass for `block`: allocate an empty block under `parent` with the
+    /// arguments `map` does not already give values for, then reserve its
+    /// statements.
+    fn reserve_block(
+        &mut self,
+        block: Block,
+        parent: Option<BlockParent>,
+        map: &mut IRMap,
+    ) -> Block {
+        let copy = self.stage.nodes.blocks.alloc_with_id(|id| {
+            BlockInfo::builder()
+                .maybe_parent(parent)
+                .node(LinkedListNode::new(id))
+                .arguments(Vec::new())
+                .predecessors(SmallVec::new())
+                .new()
+        });
+        let arguments: Vec<SSAValue> = block
+            .expect_info(self.stage)
+            .arguments
+            .iter()
+            .map(|&arg| arg.into())
+            .collect();
+        let mut copied_arguments = Vec::new();
+        for argument in arguments {
+            if map.value(argument).is_some() {
+                continue;
+            }
+            let ty = argument.expect_info(self.stage).ty().clone();
+            let copied = self.alloc_block_argument(copy, copied_arguments.len(), ty);
+            map.map_value(argument, copied);
+            copied_arguments.push(copied);
+        }
+        if let Some(info) = copy.get_info_mut(self.stage) {
+            info.arguments = copied_arguments;
+        }
+        map.map_block(block, copy);
+        for stmt in self.block_statements(block) {
+            self.reserve_statement(stmt, map);
+        }
+        copy
+    }
+
+    /// Second pass for `stmt`: allocate its copy under `parent` with every id
+    /// mapped, then copy its bodies' contents. Every statement copied is
+    /// pushed onto `copied`, for its operand uses to be recorded once all
+    /// results are bound.
+    fn fill_statement(
+        &mut self,
+        stmt: Statement,
+        parent: Option<StatementParent>,
+        map: &mut IRMap,
+        copied: &mut Vec<Statement>,
+    ) -> Statement {
+        let original = stmt.expect_info(self.stage).definition.clone();
+        let mut definition = original.clone();
+        for operand in definition.arguments_mut() {
+            *operand = map.lookup_or_original(*operand);
+        }
+        let mut results = Vec::new();
+        for result in definition.results_mut() {
+            let copy = map.value(*result).expect("results are reserved first");
+            *result = copy.into();
+            results.push(copy);
+        }
+        for successor in definition.successors_mut() {
+            let target = successor.target();
+            *successor = Successor::from_block(map.block(target).unwrap_or(target));
+        }
+        for block in definition.blocks_mut() {
+            *block = map.block(*block).expect("bodies are reserved first");
+        }
+        for cfg in definition.cfgs_mut() {
+            *cfg = map.cfg(*cfg).expect("bodies are reserved first");
+        }
+        let bodies = bodies_of(&definition);
+
+        let copy = self
+            .stage
+            .statement_arena_mut()
+            .alloc_with_id(|id| StatementInfo {
+                node: LinkedListNode::new(id),
+                parent,
+                definition,
+            });
+        self.bind_results(copy, results);
+        map.map_statement(stmt, copy);
+        copied.push(copy);
+        // The copy owns the copied bodies, reserved empty by the first pass.
+        for body in bodies {
+            self.adopt_body(body, copy);
+        }
+        // Walk the original bodies to fill those copies, found through `map`.
+        for body in bodies_of(&original) {
+            self.fill_body(body, map, copied);
+        }
+        copy
+    }
+
+    /// Second pass for the original `body`: fill its copy's blocks.
+    fn fill_body(&mut self, body: Body, map: &mut IRMap, copied: &mut Vec<Statement>) {
+        match body {
+            Body::Block(block) => self.fill_block(block, map, copied),
+            Body::CFG(cfg) => {
+                for block in self.cfg_blocks(cfg) {
+                    self.fill_block(block, map, copied);
+                }
+            }
+            Body::DiGraph(_) | Body::UnGraph(_) => {
+                unreachable!("graph bodies are rejected before copying")
+            }
+        }
+    }
+
+    /// Second pass for the original `block`: copy its statements into its copy
+    /// in order, then its terminator, recording the terminator's edges.
+    fn fill_block(&mut self, block: Block, map: &mut IRMap, copied: &mut Vec<Statement>) {
+        let copy = map.block(block).expect("blocks are reserved first");
+        let (head, terminator) = {
+            let info = block.expect_info(self.stage);
+            (info.statements.head, info.terminator)
+        };
+        let mut prev = None;
+        for stmt in self.chain_from(head) {
+            let stmt_copy =
+                self.fill_statement(stmt, Some(StatementParent::Block(copy)), map, copied);
+            self.link(LinkedList::single(stmt_copy), copy, prev, None);
+            prev = Some(stmt_copy);
+        }
+        let Some(terminator) = terminator else {
+            return;
+        };
+        let terminator_copy =
+            self.fill_statement(terminator, Some(StatementParent::Block(copy)), map, copied);
+        let targets: HashSet<Block> = terminator_copy
+            .expect_info(self.stage)
+            .definition
+            .successors()
+            .map(|successor| successor.target())
+            .collect();
+        for target in targets {
+            add_predecessor(self.stage, target, copy);
+        }
+        if let Some(info) = copy.get_info_mut(self.stage) {
+            info.terminator = Some(terminator_copy);
+        }
+    }
+
+    /// Record the operand uses of every statement in `copied`.
+    fn record_operand_uses(&mut self, copied: &[Statement]) {
+        for &stmt in copied {
+            let operands: Vec<SSAValue> = stmt
+                .expect_info(self.stage)
+                .definition
+                .arguments()
+                .copied()
+                .collect();
+            for (index, operand) in operands.into_iter().enumerate() {
+                add_use(self.stage, operand, Use::StatementOperand { stmt, index });
+            }
+        }
+    }
+
+    /// Append the unlinked `block` to the end of `cfg`'s block list.
+    fn push_block(&mut self, cfg: CFG, block: Block) {
+        let tail = cfg.expect_info(self.stage).blocks.tail;
+        match tail {
+            Some(tail) => {
+                if let Some(info) = tail.get_info_mut(self.stage) {
+                    info.node.next = Some(block);
+                }
+            }
+            None => {
+                if let Some(info) = cfg.get_info_mut(self.stage) {
+                    info.blocks.head = Some(block);
+                }
+            }
+        }
+        if let Some(info) = block.get_info_mut(self.stage) {
+            info.node.prev = tail;
+        }
+        if let Some(info) = cfg.get_info_mut(self.stage) {
+            info.blocks.tail = Some(block);
+            info.blocks.len += 1;
+        }
+    }
+
+    /// `cfg`'s blocks, in order.
+    fn cfg_blocks(&self, cfg: CFG) -> Vec<Block> {
+        let mut blocks = Vec::new();
+        let mut current = cfg.get_info(self.stage).and_then(|info| info.blocks.head);
+        while let Some(block) = current {
+            blocks.push(block);
+            current = block.get_info(self.stage).and_then(|info| info.node.next);
+        }
+        blocks
+    }
+}
