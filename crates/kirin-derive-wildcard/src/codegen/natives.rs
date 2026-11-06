@@ -83,7 +83,8 @@ impl RuleCodegen {
     ///
     /// The wrapper passes the function the pass's `&mut Rewriter<L>` first.
     /// A `?` call's function returns an `ActionOutcome`: an `Option` or a
-    /// `Result`. Both `None` and `Err` fail the run.
+    /// `Result`. Both `None` and `Err` fail the run. The call computing the
+    /// body's walk result returns a `WalkResult`.
     fn action(&self, stmt: StmtId) -> TokenStream {
         let krate = &self.args.crate_path;
         let span = self.native_span(stmt);
@@ -100,12 +101,17 @@ impl RuleCodegen {
             Self::with_span(quote!(#krate::ActionOutcome::into_action_result), span);
         let unwrap = fallible
             .then(|| quote_spanned! {span=> let #result = #into_action_result(#checked)?; });
+        let walk_result = self
+            .model
+            .is_walk_result_call(stmt)
+            .then(|| quote_spanned! {span=> let #result: #krate::WalkResult = #checked; });
         let values = self.native_values(stmt);
         let args = Self::native_args();
         quote! {
             .action_at(#statement, |#rewriter, #args: &[#krate::NativeValue]| {
                 let #result = #call;
                 #unwrap
+                #walk_result
                 ::core::result::Result::Ok(#values)
             })
         }

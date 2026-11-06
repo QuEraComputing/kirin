@@ -24,6 +24,9 @@ pub struct CheckedRule<L: Dialect> {
     actions: Vec<Step<ActionFn<L>>>,
     /// Whether the rewrite body erases the root.
     erases_root: bool,
+    /// The rewrite body's terminator, saying how the driver goes on walking.
+    /// `None` advances.
+    walk_result: Option<Statement>,
 }
 
 /// A statement of a pattern or rewrite body, in the order the driver runs
@@ -52,6 +55,10 @@ impl<L: Dialect> CheckedRule<L> {
 
     pub(crate) fn actions(&self) -> &[Step<ActionFn<L>>] {
         &self.actions
+    }
+
+    pub(crate) fn walk_result(&self) -> Option<Statement> {
+        self.walk_result
     }
 
     /// Whether the rule erases its root, the statement the driver is
@@ -209,12 +216,38 @@ impl<L: Dialect> CheckedRule<L> {
             }
         }
 
+        // The body ends in a walk result, if any; a `walk_result` reads what a
+        // native call of the body computed.
+        let walk_result = rewrite.body().terminator(stage);
+        if let Some(terminator) = walk_result {
+            match terminator.expect_info(stage).definition() {
+                PatternLanguage::Wildcard(
+                    PatternStatement::Advance(_)
+                    | PatternStatement::Skip(_)
+                    | PatternStatement::Interrupt(_),
+                ) => {}
+                PatternLanguage::Wildcard(PatternStatement::WalkResultOf(walk)) => {
+                    // Only a `native_call` becomes a `Step::Native`.
+                    let computed = producer(stage, walk.value()).is_some_and(|p| {
+                        actions
+                            .iter()
+                            .any(|step| matches!(step, Step::Native { stmt, .. } if *stmt == p))
+                    });
+                    if !computed {
+                        return Err(error(RuleErrorKind::WalkResultWithoutNativeCall));
+                    }
+                }
+                _ => return Err(error(RuleErrorKind::UnexpectedTerminator)),
+            }
+        }
+
         Ok(Self {
             name,
             root,
             checks,
             actions,
             erases_root,
+            walk_result,
         })
     }
 }

@@ -20,4 +20,4 @@ mod statement;
 mod verify;
 
 pub(crate) use rule::RuleModel;
-pub(crate) use statement::{Binding, StmtId, StmtKind, Unpack, Use, ValueId};
+pub(crate) use statement::{Binding, StmtId, StmtKind, Unpack, Use, ValueId, WalkResult};

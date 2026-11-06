@@ -55,6 +55,11 @@ pub enum RuleErrorKind {
     /// A `native_call` in the rewrite body named this has two action
     /// functions attached.
     TwoActions(String),
+    /// The rewrite body ends in a terminator that is not a walk result.
+    UnexpectedTerminator,
+    /// The rewrite body's `walk_result` reads a value no `native_call` of
+    /// the rewrite body computed.
+    WalkResultWithoutNativeCall,
 }
 
 impl RuleError {
@@ -131,6 +136,14 @@ impl fmt::Display for RuleError {
             RuleErrorKind::TwoActions(name) => {
                 write!(f, "a call of `{name}` has two action functions attached")
             }
+            RuleErrorKind::UnexpectedTerminator => write!(
+                f,
+                "the rewrite body ends in a terminator that is not `advance`, `skip`, `interrupt` or `walk_result`"
+            ),
+            RuleErrorKind::WalkResultWithoutNativeCall => write!(
+                f,
+                "the `walk_result` does not read a value a `native_call` of the rewrite body computed"
+            ),
         }
     }
 }

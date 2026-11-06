@@ -1,4 +1,6 @@
-use super::error::{SpecializeError, StagedFunctionConflictKind, StagedFunctionError};
+use super::error::{
+    DuplicateSpecialization, SpecializeError, StagedFunctionConflictKind, StagedFunctionError,
+};
 use super::stage_info::BuilderStageInfo;
 
 use crate::Dialect;
@@ -269,6 +271,9 @@ impl<L: Dialect> BuilderStageInfo<L> {
         backedges: Option<Vec<SpecializedFunction>>,
     ) -> Result<SpecializedFunction, SpecializeError<L>> {
         let staged_function_info = &mut self.staged_functions[func];
+        if staged_function_info.is_invalidated() {
+            return Err(SpecializeError::InvalidatedStagedFunction(func));
+        }
 
         let signature = signature.unwrap_or(staged_function_info.signature.clone());
 
@@ -280,13 +285,13 @@ impl<L: Dialect> BuilderStageInfo<L> {
             .collect();
 
         if !conflicting.is_empty() {
-            return Err(SpecializeError {
+            return Err(SpecializeError::Duplicate(DuplicateSpecialization {
                 staged_function: func,
                 signature,
                 conflicting,
                 definition,
                 backedges,
-            });
+            }));
         }
 
         let id = SpecializedFunction(func, staged_function_info.specializations.len());
