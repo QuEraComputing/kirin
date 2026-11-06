@@ -1,103 +1,10 @@
 use crate::arena::{GetInfo, GetInfoMut};
-use crate::builder::ungraph::UnGraphRole;
-use crate::{Dialect, SSAValue, Statement, StatementParent, UnGraph, UnGraphInfo};
+use crate::{Dialect, SSAValue, Statement, UnGraph, UnGraphInfo};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter};
 
-/// Adding `UnGraph` members.
+/// Erasing and tombstoning `UnGraph` members.
 impl<'a, L: Dialect> Rewriter<'a, L> {
-    /// Add `definition` to `graph` as a new node.
-    ///
-    /// `definition` must not be an edge statement (see
-    /// [`Rewriter::insert_ungraph_edge`]), and must be a non-terminator with no
-    /// successors. Every operand must be live, and every result a fresh
-    /// [`Rewriter::new_result`] value. Each operand that is a wire of `graph`
-    /// (an edge statement's result or a boundary port) becomes an endpoint of
-    /// that wire; a wire read by two node slots is an edge between those
-    /// nodes. Other operands are ordinary uses.
-    ///
-    /// A wire may end up with more than two endpoints. That is invalid IR,
-    /// left for [`verify_derived`](crate::verify_derived) to report; such a
-    /// wire has no edge.
-    ///
-    /// Rejects, leaving the stage untouched, if `graph` is unknown or a check
-    /// above fails. Records
-    /// [`MutationEvent::InsertedStatement`] then
-    /// [`MutationEvent::ChangedUnGraphTopology`].
-    pub fn insert_ungraph_node(
-        &mut self,
-        graph: UnGraph,
-        definition: L,
-    ) -> Result<Statement, RewriteError> {
-        self.live_ungraph(graph)?;
-        Self::check_ungraph_member(&definition, UnGraphRole::Node)?;
-        let (results, operands) = self.prepare_insert(&definition)?;
-
-        let wires = self.snapshot_wires(graph, operands.iter().copied());
-
-        let stmt = self.alloc_statement(
-            definition,
-            StatementParent::UnGraph(graph),
-            None,
-            None,
-            results,
-            &operands,
-        );
-        graph
-            .get_info_mut(self.stage)
-            .expect("graph is live in this stage")
-            .add_node(stmt);
-        self.resync_wires(graph, wires);
-
-        self.events.push(MutationEvent::InsertedStatement { stmt });
-        self.events
-            .push(MutationEvent::ChangedUnGraphTopology { graph });
-        Ok(stmt)
-    }
-
-    /// Add `definition` to `graph` as a new edge statement, whose results are
-    /// new wires.
-    ///
-    /// `definition` must be an edge statement, not a terminator, with no
-    /// successors and no operands (a wire only connects the nodes that read
-    /// it); every result must be a fresh [`Rewriter::new_result`]
-    /// value. The new wires have no endpoints yet, so the petgraph gains no
-    /// edge until nodes read them.
-    ///
-    /// Rejects, leaving the stage untouched, if `graph` is unknown or a check
-    /// above fails. Records [`MutationEvent::InsertedStatement`] then
-    /// [`MutationEvent::ChangedUnGraphTopology`].
-    pub fn insert_ungraph_edge(
-        &mut self,
-        graph: UnGraph,
-        definition: L,
-    ) -> Result<Statement, RewriteError> {
-        self.live_ungraph(graph)?;
-        Self::check_ungraph_member(&definition, UnGraphRole::Edge)?;
-        if definition.arguments().next().is_some() {
-            return Err(RewriteError::EdgeStatementWithOperands);
-        }
-        let (results, operands) = self.prepare_insert(&definition)?;
-
-        let stmt = self.alloc_statement(
-            definition,
-            StatementParent::UnGraph(graph),
-            None,
-            None,
-            results,
-            &operands,
-        );
-        graph
-            .get_info_mut(self.stage)
-            .expect("graph is live in this stage")
-            .add_edge_member(stmt);
-
-        self.events.push(MutationEvent::InsertedStatement { stmt });
-        self.events
-            .push(MutationEvent::ChangedUnGraphTopology { graph });
-        Ok(stmt)
-    }
-
     /// The `UnGraph` arm of [`Rewriter::erase_statement`]: `stmt` is a live
     /// node or edge statement of `graph`.
     pub(in crate::rewrite) fn erase_ungraph_member(
@@ -173,23 +80,5 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .get_info(self.stage)
             .map(|item| &**item)
             .ok_or(RewriteError::UnknownUnGraph(graph))
-    }
-
-    /// Check that `definition` can be an `UnGraph` member in `role`: an edge
-    /// statement exactly when `role` is [`UnGraphRole::Edge`], and a
-    /// non-terminator with no successors.
-    fn check_ungraph_member(definition: &L, role: UnGraphRole) -> Result<(), RewriteError> {
-        match (role, definition.is_edge()) {
-            (UnGraphRole::Node, true) => return Err(RewriteError::UnexpectedEdgeStatement),
-            (UnGraphRole::Edge, false) => return Err(RewriteError::ExpectedEdgeStatement),
-            _ => {}
-        }
-        if definition.is_terminator() {
-            return Err(RewriteError::UnexpectedTerminator);
-        }
-        if definition.successors().next().is_some() {
-            return Err(RewriteError::NonTerminatorWithSuccessors);
-        }
-        Ok(())
     }
 }

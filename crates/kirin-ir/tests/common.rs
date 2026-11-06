@@ -49,8 +49,8 @@ impl Placeholder for TestType {
 /// - `Isolated`: no operands, no results (ungraph isolated node)
 /// - `Branch(target)`: one-successor control-flow terminator
 /// - `CondBranch(a, b)`: two-successor control-flow terminator
-/// - `Invoke(r)`: a terminator defining a result, which `insert_terminator`
-///   rejects
+/// - `Invoke(r)`: a terminator defining a result, which an
+///   `InsertionPoint::Terminator` rejects
 /// - `Fork(target)`: a non-terminator carrying a successor, which is invalid
 ///   IR; exists to test that verification reports it
 /// - `Jump(target, args)`: one-successor terminator forwarding `args` to the
