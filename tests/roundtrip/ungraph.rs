@@ -214,7 +214,10 @@ fn test_ungraph_wire_inserted_after_its_reader_roundtrips() {
     let mut rw = kirin::ir::Rewriter::new(stage);
     let res = rw.new_result(SimpleType::Any);
     let wire = rw
-        .insert_ungraph_edge(ug, UngraphTestLanguage::Wire(Wire { res }))
+        .create(
+            InsertionPoint::UnGraph(ug),
+            UngraphTestLanguage::Wire(Wire { res }),
+        )
         .unwrap();
     rw.replace_operand(reader, 1, res).unwrap();
     drop(rw);

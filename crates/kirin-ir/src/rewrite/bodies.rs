@@ -13,11 +13,10 @@ impl<L: Dialect> Rewriter<'_, L> {
     /// Create an empty block with arguments of `arg_types`, owned by nothing.
     ///
     /// The block is meant to become a statement's body, such as a branch of
-    /// an `scf.if`: fill it, then name it in a definition passed to an insert
-    /// (such as [`Rewriter::insert_before`]) or to
-    /// [`Rewriter::replace_statement`], which makes the statement its parent.
-    /// Statements can be added to it like any block, starting with its
-    /// terminator ([`Rewriter::insert_terminator`]).
+    /// an `scf.if`: fill it, then name it in a definition passed to
+    /// [`Rewriter::create`] or [`Rewriter::replace_statement`], which makes the
+    /// statement its parent. Statements can be added to it like any block,
+    /// starting with its terminator ([`InsertionPoint::Terminator`]).
     ///
     /// Until the block is attached or erased, its statements count as uses of
     /// the values they read: such a value cannot be erased, dead-code

@@ -241,7 +241,7 @@ fn erase_block_allows_self_loop() {
     let mut stage = stage.finalize().unwrap();
     // The builder cannot name `lp` before creating it, so close the loop here.
     Rewriter::new(&mut stage)
-        .insert_terminator(lp, br(lp))
+        .create(InsertionPoint::Terminator(lp), br(lp))
         .unwrap();
     assert_eq!(preds(&stage, lp), HashSet::from([lp]));
 
@@ -453,7 +453,7 @@ fn split_block_moves_suffix_and_leaves_original_unterminated() {
 
     // Closing the first half with a branch, as a caller would, wires the edge.
     Rewriter::new(&mut stage)
-        .insert_terminator(entry, br(tail))
+        .create(InsertionPoint::Terminator(entry), br(tail))
         .unwrap();
     assert_eq!(preds(&stage, tail), HashSet::from([entry]));
     verify_derived(&stage).unwrap();
@@ -555,8 +555,8 @@ fn insert_terminator_wires_operands_and_edges() {
     let (jump, events) = {
         let mut rw = Rewriter::new(&mut stage);
         let jump = rw
-            .insert_terminator(
-                entry,
+            .create(
+                InsertionPoint::Terminator(entry),
                 BuilderDialect::Jump(Successor::from_block(target), vec![a]),
             )
             .unwrap();
@@ -596,7 +596,7 @@ fn insert_terminator_works_in_statement_owned_body() {
 
     let mut stage = stage.finalize().unwrap();
     let ret = Rewriter::new(&mut stage)
-        .insert_terminator(body, BuilderDialect::Return)
+        .create(InsertionPoint::Terminator(body), BuilderDialect::Return)
         .unwrap();
 
     assert_eq!(body.terminator(&stage), Some(ret));
@@ -619,32 +619,41 @@ fn insert_terminator_rejects_without_mutating() {
 
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
-        rw.insert_terminator(terminated, BuilderDialect::Return),
+        rw.create(
+            InsertionPoint::Terminator(terminated),
+            BuilderDialect::Return
+        ),
         Err(RewriteError::BlockHasTerminator(terminated))
     );
     assert_eq!(
-        rw.insert_terminator(open, BuilderDialect::Nop),
+        rw.create(InsertionPoint::Terminator(open), BuilderDialect::Nop),
         Err(RewriteError::ExpectedTerminator)
     );
     // Even a fresh result is rejected: nothing can follow a terminator to use it.
     let result = rw.new_result(TestType::I32);
     assert_eq!(
-        rw.insert_terminator(open, BuilderDialect::Invoke(result)),
+        rw.create(
+            InsertionPoint::Terminator(open),
+            BuilderDialect::Invoke(result)
+        ),
         Err(RewriteError::CannotInsertTerminatorWithResults)
     );
     assert_eq!(
-        rw.insert_terminator(open, br(dead_block)),
+        rw.create(InsertionPoint::Terminator(open), br(dead_block)),
         Err(RewriteError::UnknownBlock(dead_block))
     );
     assert_eq!(
-        rw.insert_terminator(
-            open,
+        rw.create(
+            InsertionPoint::Terminator(open),
             BuilderDialect::Jump(Successor::from_block(terminated), vec![dead_value]),
         ),
         Err(RewriteError::UnknownValue(dead_value))
     );
     assert_eq!(
-        rw.insert_terminator(dead_block, BuilderDialect::Return),
+        rw.create(
+            InsertionPoint::Terminator(dead_block),
+            BuilderDialect::Return
+        ),
         Err(RewriteError::UnknownBlock(dead_block))
     );
 
@@ -893,7 +902,7 @@ fn merge_blocks_rejects_self_looping_succ() {
     let mut stage = stage.finalize().unwrap();
     // The builder cannot name `succ` before creating it, so close the loop here.
     Rewriter::new(&mut stage)
-        .insert_terminator(succ, br(succ))
+        .create(InsertionPoint::Terminator(succ), br(succ))
         .unwrap();
     let succ_br = succ.terminator(&stage).unwrap();
 
