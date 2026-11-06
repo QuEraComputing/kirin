@@ -204,10 +204,11 @@ is one call at an insertion point:
 
 ```rust
 let s = rewriter.create(InsertionPoint::Before(anchor), definition)?;  // build + place
-let mut map = IrMap::default();                                       // MLIR's IRMapping
+let mut map = IRMap::default();                                       // MLIR's IRMapping
 let copy = rewriter.clone_statement(stmt, &mut map)?;                 // detached deep copy
 rewriter.insert(InsertionPoint::After(anchor), copy)?;                // place a detached statement
-let blocks = rewriter.clone_cfg_after(source, anchor_block, &mut map)?;   // like Region::cloneInto
+let body = rewriter.clone_cfg(source, &mut map)?;                     // detached CFG copy
+rewriter.splice_cfg_after(body, anchor_block)?;                       // or `create` a statement owning it
 ```
 
 - **`InsertionPoint`** says where a statement goes: `Before(stmt)`,
@@ -228,22 +229,31 @@ let blocks = rewriter.clone_cfg_after(source, anchor_block, &mut map)?;   // lik
   from outside keeps pointing at the original unless `map` was pre-seeded.
   Terminators are not cloned, since a detached terminator could not be
   inserted into a statement chain. Records no event.
-- **`clone_cfg_after`** copies a CFG's blocks into place after
-  `anchor_block`, as MLIR's `Region::cloneInto` does (a region cannot be
-  detached). Rejects an `anchor_block` inside `source`. Records
-  `ChangedBlockList` for the destination.
+- **`clone_cfg`** makes a detached copy of a CFG, owned by no statement,
+  consistent with `clone_statement`. Its blocks are placed with
+  `splice_cfg_after`, or the whole copy becomes the body of a new statement:
+  `create` adopts the unowned bodies its definition names (`BodyOwnedElsewhere`,
+  `BodyListedTwice`, `BodyEnclosesOwner` otherwise, as for
+  `replace_statement`). A copy still detached when the `Rewriter` is dropped,
+  including one a splice emptied, is tombstoned. Records no event.
+- **Copies are made in two passes**: the first allocates every CFG, block,
+  block argument and result, the second copies the statements, since a block
+  may branch to, or read a value from, a block listed after it.
+- **`insert` rejects placing a copy inside its own bodies**
+  (`BodyEnclosesOwner`).
 - **A block argument already in `map` is not copied.** Its uses inside the copy
   read the mapped value. Pre-seeding the callee entry block's arguments with a
   call's operands gives a copied entry block with no arguments, ready to
   splice into the call's block (step 7).
 - Names are not copied; symbols are.
-- `map` afterwards holds old → new for every value and block copied, so the
-  caller can find the copied `ret`s.
+- `map` afterwards holds old → new for every value, block and statement
+  copied, so the caller can find the copied `ret`s. Only values can be mapped
+  beforehand.
 
 Split in two:
 
-- **6a**: `InsertionPoint` with `create` / `insert`, then `IrMap`,
-  `clone_statement` and `clone_cfg_after` over block and CFG bodies. A
+- **6a**: `InsertionPoint` with `create` / `insert`, then `IRMap`,
+  `clone_statement` and `clone_cfg` over block and CFG bodies. A
   statement owning a `DiGraph` or `UnGraph` body is rejected
   (`CopyOfGraphBody`).
 - **6b**: graph bodies. A copied graph gets new ports, copied members and

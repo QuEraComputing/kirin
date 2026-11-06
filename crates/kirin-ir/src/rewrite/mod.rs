@@ -21,6 +21,7 @@
 
 mod bodies;
 pub(crate) mod cfg;
+mod clone;
 pub(crate) mod digraph;
 mod insert;
 mod moves;
@@ -33,6 +34,7 @@ pub(crate) mod rewriter;
 pub(crate) mod ungraph;
 pub mod walk;
 
+pub use clone::IRMap;
 pub use insert::InsertionPoint;
 pub use quarantine::{QuarantineCause, Quarantined};
 pub use rewriter::{MutationEvent, RewriteError, Rewriter};
