@@ -1000,7 +1000,8 @@ becomes executable work, translating the closed `Body` vocabulary into a unit:
 edge arguments) merge into a unit's parameters through the analysis policy —
 join, then widen by visits — and schedule the unit on first reach or when a
 parameter rose. A rising SSA fact reruns, through the IR's use list, the
-innermost reached unit around each use outside its defining unit. A graph is one unit because a single dependency-ordered pass is
+innermost reached unit around each use outside its defining unit. A graph is one
+unit because a single dependency-ordered pass is
 *exact* for a DAG — no intra-graph widening is needed, and convergence pressure
 comes only from entry widening when a new call site raises the graph's ports. On
 completion a graph has no successor edges; its declared yields become the
@@ -1024,8 +1025,8 @@ StatementDispatch + BlockQueries + DiGraphQueries` —
 extend `CallServices`: `AbstractCallFrame`'s single engine requirement is
 `summarize_call`, so summarizing a call needs no call convention at all. Nor
 `CFGQueries`, since the entry unit of a callable body arrives via the
-driver's `contribute_call_entry` rather than `cfg_entry`. The interprocedural protocol stays **atomic in
-the engine**:
+driver's `contribute_call_entry` rather than `cfg_entry`. The interprocedural
+protocol stays **atomic in the engine**:
 `summarize_call` performs resolve → key → join-into-callee-entry → record-caller
 (*including same-key recursion*) → read-return-summary in one step, so a custom
 frame chooses *what to traverse* but cannot reorder the summary protocol and
