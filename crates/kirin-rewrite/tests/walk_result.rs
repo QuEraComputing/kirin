@@ -1,4 +1,4 @@
-//! A rewrite body's walk result: how [`RuleSet::add`] checks it, and how
+//! A rewrite body's walk result: how [`RuleSet::add_pattern_rule`] checks it, and how
 //! the driver acts on it.
 
 use kirin::prelude::*;
