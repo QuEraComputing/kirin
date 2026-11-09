@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Callable, Hashable
+from typing import Any, Callable, Hashable
 from collections import deque
 from dataclasses import dataclass
 
@@ -51,7 +51,8 @@ class _Identity:
 
 def _immutable(value: object) -> bool:
     """Whether `value` and everything it contains can be bound as a constant."""
-    pending, seen = [value], set()
+    pending: list[Any] = [value]
+    seen: set[int] = set()
     while pending:
         item = pending.pop()
         if id(item) in seen:
@@ -60,6 +61,7 @@ def _immutable(value: object) -> bool:
         if type(item) in _SCALARS:
             continue
         if type(item) in (tuple, frozenset, IList):
+            # Exact types: a subclass may add mutable state.
             pending.extend(item)
         elif not isinstance(item, ir.Data) or isinstance(item, ir.PyAttr):
             return False
@@ -105,7 +107,10 @@ class Specialize(Pass):
     Map, ForEach, Foldl, Foldr, and Scan operations with a statically known
     length are expanded to expose callback calls when at least one element
     is constant with a supported specialization key.
-    A zero budget disables specialization.
+    A zero specialization budget disables the pass. ``max_unroll_iterations``
+    bounds the total callback iterations expanded across all visited methods
+    in one run (default 64). Operations that exceed the remaining budget stay
+    rolled; zero disables unrolling without disabling call specialization.
 
     Calls share a specialization when their bound arguments are the same
     objects, so object identity is preserved: two equal but distinct Python
@@ -129,9 +134,13 @@ class Specialize(Pass):
     max_specializations: int = 32
     extra_rules: tuple[Callable[[SpecializationFactory], RewriteRule], ...] = ()
 
+    max_unroll_iterations: int = 64
+
     def __post_init__(self):
         if self.max_specializations < 0:
             raise ValueError("max_specializations must be nonnegative")
+        if self.max_unroll_iterations < 0:
+            raise ValueError("max_unroll_iterations must be nonnegative")
 
     def unsafe_run(self, mt: ir.Method) -> RewriteResult:
         # Working state belongs to one invocation, even when the pass is reused.
@@ -142,6 +151,7 @@ class Specialize(Pass):
         self.seen: set[ir.Method] = set()
         self.names: set[str | None] = set()
         self.ordinal = 0
+        self.unroll_remaining = self.max_unroll_iterations
         self.closure_cache: dict[tuple, tuple[func.Lambda, tuple[int, ...]]] = {}
         self.closure_counts: dict[func.Lambda, int] = {}
         self.closures: list[func.Lambda] = []
@@ -199,6 +209,19 @@ class Specialize(Pass):
             )
         return False
 
+    def _unroll(self, stmt: Map | ForEach | Foldl | Foldr | Scan, rule: Unroll):
+        if not (
+            self.unroll_remaining > 0
+            and (length := rule._get_collection_len(stmt.collection)) is not None
+            and 0 <= length <= self.unroll_remaining
+            and self._has_specializable_element(stmt.collection)
+        ):
+            return RewriteResult()
+        result = rule.rewrite(stmt)
+        if result.has_done_something:
+            self.unroll_remaining -= length
+        return result
+
     def _run(self, root: ir.Method) -> RewriteResult:
         self._discover(root)
         self.pending.append(root)
@@ -223,8 +246,7 @@ class Specialize(Pass):
                 for stmt in tuple(mt.code.walk()):
                     if not isinstance(stmt, rolled_ilist):
                         continue
-                    if self._has_specializable_element(stmt.collection):
-                        result = unroll.rewrite(stmt).join(result)
+                    result = self._unroll(stmt, unroll).join(result)
             frame = self._analyze(mt)
             result = Walk(WrapConst(frame)).rewrite(mt.code).join(result)
             for stmt in mt.code.walk():

@@ -43,7 +43,7 @@ def test_map_nested_callback_specialization(capsys):
     assert output.index("parity = 0") < output.index("parity = 1")
 
 
-def test_map_unroll_above_former_length_limit(capsys):
+def test_map_unroll_at_default_budget_reuses_specialization(capsys):
     values = ilist.IList([7] * 64)
 
     @kernel
@@ -235,3 +235,52 @@ def test_unroll_preserves_results_and_effect_order(operation, capsys):
     else:
         assert actual == expected
     assert capsys.readouterr().out == expected_output
+
+
+@pytest.mark.parametrize("budget, unrolled", [(3, False), (4, True)])
+def test_unroll_budget_preserves_execution(budget, unrolled, capsys):
+    @kernel
+    def visit(x: int):
+        debug.info("element", x)
+        return x + 1
+
+    @kernel
+    def root(a: int):
+        return ilist.map(visit, [1, a, a, a])
+
+    expected = list(root(7))
+    expected_output = capsys.readouterr().out
+    Specialize(root.dialects, max_unroll_iterations=budget, no_raise=False)(root)
+    assert capsys.readouterr().out == ""
+    # An operation longer than the remaining budget stays rolled.
+    assert any(isinstance(s, ilist.Map) for s in root.code.walk()) != unrolled
+    assert list(root(7)) == expected
+    assert capsys.readouterr().out == expected_output
+    with pytest.raises(ValueError, match="max_unroll_iterations"):
+        Specialize(root.dialects, max_unroll_iterations=-1)
+
+
+def test_unroll_budget_shared_between_methods_and_reset():
+    @kernel
+    def visit(x: int):
+        debug.info("element", x)
+        return x
+
+    @kernel
+    def first(a: int):
+        return ilist.map(visit, [1, a, a])
+
+    @kernel
+    def second(a: int):
+        return ilist.map(visit, [2, a, a])
+
+    @kernel
+    def root(a: int):
+        return first(a), second(a)
+
+    specialize = Specialize(root.dialects, max_unroll_iterations=3, no_raise=False)
+    specialize(root)
+    assert not any(isinstance(s, ilist.Map) for s in first.code.walk())
+    assert any(isinstance(s, ilist.Map) for s in second.code.walk())
+    specialize(root)
+    assert not any(isinstance(s, ilist.Map) for s in second.code.walk())
