@@ -942,3 +942,33 @@ fn replace_uses_if_moves_only_the_selected_reader_to_the_new_wire() {
     assert_topology(&stage, ug);
     verify_derived(&stage).unwrap();
 }
+
+#[test]
+fn an_edge_statement_inserted_after_its_readers_connects_them() {
+    let Fixture {
+        mut stage,
+        ug,
+        w_stmt,
+        w,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    // A detached copy of the edge statement `w_stmt`, whose wire is already
+    // usable.
+    let mut map = IRMap::default();
+    let w2_stmt = rw.clone_statement(w_stmt, &mut map).unwrap();
+    let w2 = map.value(w).unwrap();
+    // Two nodes reading the new wire, placed before its edge statement.
+    let a = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w2))
+        .unwrap();
+    let b = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w2))
+        .unwrap();
+    assert!(edges(rw.stage(), ug).is_empty());
+
+    // Placing the edge statement makes the wire an edge between them.
+    rw.insert(InsertionPoint::UnGraph(ug), w2_stmt).unwrap();
+    assert_eq!(edges(rw.stage(), ug), HashMap::from([(w2, pair(a, b))]));
+    verify_derived(rw.stage()).unwrap();
+}
