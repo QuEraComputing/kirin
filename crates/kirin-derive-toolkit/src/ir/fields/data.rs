@@ -41,9 +41,9 @@ impl FieldCategory {
 #[derive(Debug)]
 #[allow(clippy::large_enum_variant)]
 pub enum FieldData<L: Layout> {
-    // The SSA input value. The ssa_type is None when the field does not have
-    // #[kirin(type=...)]. This results in not verifying the input type. Does not
-    // default to T::Placeholder.
+    /// The SSA input value. The `ssa_type` is `None` when the field does not have
+    /// `#[kirin(type = ...)]`. This results in not verifying the input type. Does not
+    /// default to `T::Placeholder`.
     Argument {
         ssa_type: Option<syn::Expr>,
     },

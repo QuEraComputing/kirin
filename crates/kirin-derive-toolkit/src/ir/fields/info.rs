@@ -99,7 +99,7 @@ impl<L: Layout> FieldInfo<L> {
     }
 
     /// Return the SSA type expression for `Argument` or `Result` fields.
-    // An argument without #[kirin(type=...)] returns None
+    /// An argument without `#[kirin(type = ...)]` returns `None`.
     pub fn ssa_type(&self) -> Option<&syn::Expr> {
         match &self.data {
             FieldData::Argument { ssa_type } => ssa_type.as_ref(),
