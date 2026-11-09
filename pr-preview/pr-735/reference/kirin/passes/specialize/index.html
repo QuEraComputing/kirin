@@ -43,56 +43,56 @@
                   return '';
                 }
               });
-            </script> <p>Specialize statically reachable func methods on supported constants.</p> <p>Each invocation starts from one method and owns a fresh cache. Generic methods retain their signatures; visited bodies may be folded. Known lambda-backed methods retain their bound closure fields. A call to a local lambda whose captures are still dynamic uses a clone of the lambda statement, created next to it with the same captures and the constant arguments bound; the clone's body is analyzed with the captures' facts. A closure shares its body with the lambda statement that created it, so it is cloned before that body is rewritten, even when no argument binds. Map, ForEach, Foldl, Foldr, and Scan operations with a statically known length are expanded to expose callback calls when at least one element is constant with a supported specialization key. A zero budget disables specialization.</p> <p>DSLs extend the bindable set by registering <a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Data</span>
+            </script> <p>Specialize statically reachable func methods on supported constants.</p> <p>Each invocation starts from one method and owns a fresh cache. Generic methods retain their signatures; visited bodies may be folded. Known lambda-backed methods retain their bound closure fields. A call to a local lambda whose captures are still dynamic uses a clone of the lambda statement, created next to it with the same captures and the constant arguments bound; the clone's body is analyzed with the captures' facts. A closure shares its body with the lambda statement that created it, so it is cloned before that body is rewritten, even when no argument binds. Map, ForEach, Foldl, Foldr, and Scan operations with a statically known length are expanded to expose callback calls when at least one element is constant with a supported specialization key. A zero budget disables specialization.</p> <p>Calls share a specialization when their bound arguments are the same objects, so object identity is preserved: two equal but distinct Python objects, such as two captured <code>float("1.25")</code> values, get separate specializations, as do two equal literals in kernel source, which lower to separate objects. DSLs extend the bindable set by registering <a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Data</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span>' href=../../ir/attrs/data/#kirin.ir.attrs.data.Data><code>ir.Data</code></a> attributes with structural <code>__hash__</code> / <code>__eq__</code>. Builtin Python values in <a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">PyAttr</span>
+  </span>' href=../../ir/attrs/data/#kirin.ir.attrs.data.Data><code>ir.Data</code></a> attributes, which are compile-time values keyed by their own <code>__hash__</code> / <code>__eq__</code>; their identity is not preserved. Builtin Python values in <a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">PyAttr</span>
 
 
   <span class="doc doc-labels">
       <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
-  </span>' href=../../ir/attrs/py/#kirin.ir.attrs.py.PyAttr><code>ir.PyAttr</code></a> stay on the careful whitelist.</p> <p><code>extra_rules</code> supplies rewrite-rule factories for DSL-specific callsites. Each factory receives <code>materialize</code> and is instantiated once per pass run. Rules run after constant hinting alongside <code>SpecializeInvoke</code>. They map operands to callee argument facts and retarget their own statements using the returned method and retained argument indices. Materialization shares this pass's cache, budget, and queue; created variants are processed normally. Custom callsites that are not rewritten are not traversed by this hook.</p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.passes.specialize.Specialize.materialize class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">materialize</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>materialize</span><span class=p>(</span>
+  </span>' href=../../ir/attrs/py/#kirin.ir.attrs.py.PyAttr><code>ir.PyAttr</code></a> stay on the careful whitelist of immutable types.</p> <p><code>extra_rules</code> supplies rewrite-rule factories for DSL-specific callsites. Each factory receives <code>materialize</code> and is instantiated once per pass run. Rules run after constant hinting alongside <code>SpecializeInvoke</code>. They map operands to callee argument facts and retarget their own statements using the returned method and retained argument indices. Materialization shares this pass's cache, budget, and queue; created variants are processed normally. Custom callsites that are not rewritten are not traversed by this hook.</p> <div class="doc doc-children"> <div class="doc doc-object doc-function"> <h3 id=kirin.passes.specialize.Specialize.materialize class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">materialize</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>materialize</span><span class=p>(</span>
     <span class=n>original</span><span class=p>:</span> <span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Result</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>int</span><span class=p>,</span> <span class=o>...</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Reuse a specialization or create and schedule one within the budget.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>238</span>
-<span class=normal>239</span>
-<span class=normal>240</span>
-<span class=normal>241</span>
-<span class=normal>242</span>
-<span class=normal>243</span>
-<span class=normal>244</span>
-<span class=normal>245</span>
-<span class=normal>246</span>
-<span class=normal>247</span>
-<span class=normal>248</span>
-<span class=normal>249</span>
-<span class=normal>250</span>
-<span class=normal>251</span>
-<span class=normal>252</span>
-<span class=normal>253</span>
-<span class=normal>254</span>
-<span class=normal>255</span>
-<span class=normal>256</span>
-<span class=normal>257</span>
-<span class=normal>258</span>
-<span class=normal>259</span>
-<span class=normal>260</span>
-<span class=normal>261</span>
-<span class=normal>262</span>
-<span class=normal>263</span>
-<span class=normal>264</span>
-<span class=normal>265</span>
-<span class=normal>266</span>
-<span class=normal>267</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Reuse a specialization or create and schedule one within the budget.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>267</span>
 <span class=normal>268</span>
 <span class=normal>269</span>
 <span class=normal>270</span>
 <span class=normal>271</span>
 <span class=normal>272</span>
 <span class=normal>273</span>
-<span class=normal>274</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>materialize</span><span class=p>(</span>
+<span class=normal>274</span>
+<span class=normal>275</span>
+<span class=normal>276</span>
+<span class=normal>277</span>
+<span class=normal>278</span>
+<span class=normal>279</span>
+<span class=normal>280</span>
+<span class=normal>281</span>
+<span class=normal>282</span>
+<span class=normal>283</span>
+<span class=normal>284</span>
+<span class=normal>285</span>
+<span class=normal>286</span>
+<span class=normal>287</span>
+<span class=normal>288</span>
+<span class=normal>289</span>
+<span class=normal>290</span>
+<span class=normal>291</span>
+<span class=normal>292</span>
+<span class=normal>293</span>
+<span class=normal>294</span>
+<span class=normal>295</span>
+<span class=normal>296</span>
+<span class=normal>297</span>
+<span class=normal>298</span>
+<span class=normal>299</span>
+<span class=normal>300</span>
+<span class=normal>301</span>
+<span class=normal>302</span>
+<span class=normal>303</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>materialize</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>original</span><span class=p>:</span> <span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>Result</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>ir</span><span class=o>.</span><span class=n>Method</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>int</span><span class=p>,</span> <span class=o>...</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Reuse a specialization or create and schedule one within the budget.&quot;&quot;&quot;</span>
@@ -132,36 +132,7 @@
 </code></pre></div></td></tr></table></div> </details> </div> </div> <div class="doc doc-object doc-function"> <h3 id=kirin.passes.specialize.Specialize.materialize_closure class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-method"></code> <span class="doc doc-object-name doc-function-name">materialize_closure</span> </h3> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>materialize_closure</span><span class=p>(</span>
     <span class=n>lam</span><span class=p>:</span> <span class=n>Lambda</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>Result</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>func</span><span class=o>.</span><span class=n>Lambda</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>int</span><span class=p>,</span> <span class=o>...</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Reuse or create a clone of a local closure with constant arguments.</p> <p>The clone is a lambda statement next to <code>lam</code> with the same captures, so a capture known only at run time stays a capture.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>301</span>
-<span class=normal>302</span>
-<span class=normal>303</span>
-<span class=normal>304</span>
-<span class=normal>305</span>
-<span class=normal>306</span>
-<span class=normal>307</span>
-<span class=normal>308</span>
-<span class=normal>309</span>
-<span class=normal>310</span>
-<span class=normal>311</span>
-<span class=normal>312</span>
-<span class=normal>313</span>
-<span class=normal>314</span>
-<span class=normal>315</span>
-<span class=normal>316</span>
-<span class=normal>317</span>
-<span class=normal>318</span>
-<span class=normal>319</span>
-<span class=normal>320</span>
-<span class=normal>321</span>
-<span class=normal>322</span>
-<span class=normal>323</span>
-<span class=normal>324</span>
-<span class=normal>325</span>
-<span class=normal>326</span>
-<span class=normal>327</span>
-<span class=normal>328</span>
-<span class=normal>329</span>
-<span class=normal>330</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Reuse or create a clone of a local closure with constant arguments.</p> <p>The clone is a lambda statement next to <code>lam</code> with the same captures, so a capture known only at run time stays a capture.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>330</span>
 <span class=normal>331</span>
 <span class=normal>332</span>
 <span class=normal>333</span>
@@ -170,7 +141,36 @@
 <span class=normal>336</span>
 <span class=normal>337</span>
 <span class=normal>338</span>
-<span class=normal>339</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>materialize_closure</span><span class=p>(</span>
+<span class=normal>339</span>
+<span class=normal>340</span>
+<span class=normal>341</span>
+<span class=normal>342</span>
+<span class=normal>343</span>
+<span class=normal>344</span>
+<span class=normal>345</span>
+<span class=normal>346</span>
+<span class=normal>347</span>
+<span class=normal>348</span>
+<span class=normal>349</span>
+<span class=normal>350</span>
+<span class=normal>351</span>
+<span class=normal>352</span>
+<span class=normal>353</span>
+<span class=normal>354</span>
+<span class=normal>355</span>
+<span class=normal>356</span>
+<span class=normal>357</span>
+<span class=normal>358</span>
+<span class=normal>359</span>
+<span class=normal>360</span>
+<span class=normal>361</span>
+<span class=normal>362</span>
+<span class=normal>363</span>
+<span class=normal>364</span>
+<span class=normal>365</span>
+<span class=normal>366</span>
+<span class=normal>367</span>
+<span class=normal>368</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>materialize_closure</span><span class=p>(</span>
     <span class=bp>self</span><span class=p>,</span> <span class=n>lam</span><span class=p>:</span> <span class=n>func</span><span class=o>.</span><span class=n>Lambda</span><span class=p>,</span> <span class=n>args</span><span class=p>:</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>const</span><span class=o>.</span><span class=n>Result</span><span class=p>,</span> <span class=o>...</span><span class=p>]</span>
 <span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span><span class=p>[</span><span class=n>func</span><span class=o>.</span><span class=n>Lambda</span><span class=p>,</span> <span class=nb>tuple</span><span class=p>[</span><span class=nb>int</span><span class=p>,</span> <span class=o>...</span><span class=p>]]</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
 <span class=w>    </span><span class=sd>&quot;&quot;&quot;Reuse or create a clone of a local closure with constant arguments.</span>
@@ -209,72 +209,53 @@
     <span class=bp>self</span><span class=o>.</span><span class=n>closure_cache</span><span class=p>[</span><span class=n>key</span><span class=p>]</span> <span class=o>=</span> <span class=p>(</span><span class=n>clone</span><span class=p>,</span> <span class=n>retained</span><span class=p>)</span>
     <span class=bp>self</span><span class=o>.</span><span class=n>closures</span><span class=o>.</span><span class=n>append</span><span class=p>(</span><span class=n>clone</span><span class=p>)</span>
     <span class=k>return</span> <span class=n>clone</span><span class=p>,</span> <span class=n>retained</span>
-</code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-function"> <h2 id=kirin.passes.specialize.constant_key class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code> <span class="doc doc-object-name doc-function-name">constant_key</span> </h2> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>constant_key</span><span class=p>(</span><span class=n>value</span><span class=p>:</span> <span class=nb>object</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span> <span class=o>|</span> <span class=kc>None</span>
-</code></pre></div> <div class="doc doc-contents "> <p>Build a structural specialization key, or <code>None</code> if dynamic. The key is a tuple of the value's type and its contents, recursively.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>34</span>
-<span class=normal>35</span>
-<span class=normal>36</span>
-<span class=normal>37</span>
-<span class=normal>38</span>
-<span class=normal>39</span>
-<span class=normal>40</span>
-<span class=normal>41</span>
-<span class=normal>42</span>
-<span class=normal>43</span>
-<span class=normal>44</span>
-<span class=normal>45</span>
-<span class=normal>46</span>
-<span class=normal>47</span>
-<span class=normal>48</span>
-<span class=normal>49</span>
-<span class=normal>50</span>
-<span class=normal>51</span>
-<span class=normal>52</span>
-<span class=normal>53</span>
-<span class=normal>54</span>
-<span class=normal>55</span>
-<span class=normal>56</span>
-<span class=normal>57</span>
-<span class=normal>58</span>
-<span class=normal>59</span>
-<span class=normal>60</span>
-<span class=normal>61</span>
-<span class=normal>62</span>
-<span class=normal>63</span>
-<span class=normal>64</span>
-<span class=normal>65</span>
-<span class=normal>66</span>
-<span class=normal>67</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>constant_key</span><span class=p>(</span><span class=n>value</span><span class=p>:</span> <span class=nb>object</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=nb>tuple</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
-<span class=w>    </span><span class=sd>&quot;&quot;&quot;Build a structural specialization key, or ``None`` if dynamic.</span>
-<span class=sd>    The key is a tuple of the value&#39;s type and its contents, recursively.</span>
+</code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> <div class="doc doc-object doc-function"> <h2 id=kirin.passes.specialize.constant_key class="doc doc-heading"> <code class="doc-symbol doc-symbol-heading doc-symbol-function"></code> <span class="doc doc-object-name doc-function-name">constant_key</span> </h2> <div class="doc-signature highlight"><pre><span></span><code><span class=nf>constant_key</span><span class=p>(</span><span class=n>value</span><span class=p>:</span> <span class=nb>object</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Hashable</span> <span class=o>|</span> <span class=kc>None</span>
+</code></pre></div> <div class="doc doc-contents "> <p>Build a specialization key, or <code>None</code> if the value stays a parameter.</p> <p>Only immutable values bind: builtin scalars, ranges, tuples, frozensets and ILists of them, and <a class="autorefs autorefs-internal" title='<code class="doc-symbol doc-symbol-heading doc-symbol-class"></code>            <span class="doc doc-object-name doc-class-name">Data</span>
+
+
+  <span class="doc doc-labels">
+      <small class="doc doc-label doc-label-dataclass"><code>dataclass</code></small>
+  </span>' href=../../ir/attrs/data/#kirin.ir.attrs.data.Data><code>ir.Data</code></a> attributes.</p> <p>A Python value is keyed by identity, so a specialization made for one object is reused only for that object, and <code>is</code> and <code>id</code> give the results they give without specialization. Equal but distinct objects, including two equal literals, get separate specializations. An <code>ir.Data</code> attribute, an explicit compile-time value, is keyed by its own <code>__eq__</code> and <code>__hash__</code>; an IList by its element type and the identity of its elements.</p> <details class=mkdocstrings-source> <summary>Source code in <code>src/kirin/passes/specialize.py</code></summary> <div class=highlight><table class=highlighttable><tr><td class=linenos><div class=linenodiv><pre><span></span><span class=normal>69</span>
+<span class=normal>70</span>
+<span class=normal>71</span>
+<span class=normal>72</span>
+<span class=normal>73</span>
+<span class=normal>74</span>
+<span class=normal>75</span>
+<span class=normal>76</span>
+<span class=normal>77</span>
+<span class=normal>78</span>
+<span class=normal>79</span>
+<span class=normal>80</span>
+<span class=normal>81</span>
+<span class=normal>82</span>
+<span class=normal>83</span>
+<span class=normal>84</span>
+<span class=normal>85</span>
+<span class=normal>86</span>
+<span class=normal>87</span>
+<span class=normal>88</span>
+<span class=normal>89</span>
+<span class=normal>90</span></pre></div></td><td class=code><div><pre><span></span><code><span class=k>def</span><span class=w> </span><span class=nf>constant_key</span><span class=p>(</span><span class=n>value</span><span class=p>:</span> <span class=nb>object</span><span class=p>)</span> <span class=o>-&gt;</span> <span class=n>Hashable</span> <span class=o>|</span> <span class=kc>None</span><span class=p>:</span>
+<span class=w>    </span><span class=sd>&quot;&quot;&quot;Build a specialization key, or ``None`` if the value stays a parameter.</span>
+
+<span class=sd>    Only immutable values bind: builtin scalars, ranges, tuples, frozensets</span>
+<span class=sd>    and ILists of them, and [`ir.Data`][kirin.ir.Data] attributes.</span>
+
+<span class=sd>    A Python value is keyed by identity, so a specialization made for one</span>
+<span class=sd>    object is reused only for that object, and `is` and `id` give the results</span>
+<span class=sd>    they give without specialization. Equal but distinct objects, including</span>
+<span class=sd>    two equal literals, get separate specializations. An `ir.Data` attribute, an</span>
+<span class=sd>    explicit compile-time value, is keyed by its own `__eq__` and `__hash__`;</span>
+<span class=sd>    an IList by its element type and the identity of its elements.</span>
 <span class=sd>    &quot;&quot;&quot;</span>
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>value</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>PyAttr</span><span class=p>):</span>
-        <span class=k>return</span> <span class=n>constant_key</span><span class=p>(</span><span class=n>value</span><span class=o>.</span><span class=n>data</span><span class=p>)</span>
+        <span class=n>value</span> <span class=o>=</span> <span class=n>value</span><span class=o>.</span><span class=n>data</span>
+    <span class=k>if</span> <span class=ow>not</span> <span class=n>_immutable</span><span class=p>(</span><span class=n>value</span><span class=p>):</span>
+        <span class=k>return</span> <span class=kc>None</span>
+    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=n>IList</span><span class=p>:</span>
+        <span class=k>return</span> <span class=p>(</span><span class=n>IList</span><span class=p>,</span> <span class=n>_Identity</span><span class=p>(</span><span class=n>value</span><span class=o>.</span><span class=n>elem</span><span class=p>),</span> <span class=nb>tuple</span><span class=p>(</span><span class=nb>map</span><span class=p>(</span><span class=n>_Identity</span><span class=p>,</span> <span class=n>value</span><span class=p>)))</span>
     <span class=k>if</span> <span class=nb>isinstance</span><span class=p>(</span><span class=n>value</span><span class=p>,</span> <span class=n>ir</span><span class=o>.</span><span class=n>Data</span><span class=p>):</span>
-        <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=n>IList</span><span class=p>:</span>
-            <span class=n>items</span> <span class=o>=</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>constant_key</span><span class=p>(</span><span class=n>item</span><span class=p>)</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>value</span><span class=p>)</span>
-            <span class=k>if</span> <span class=nb>any</span><span class=p>(</span><span class=n>item</span> <span class=ow>is</span> <span class=kc>None</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>items</span><span class=p>):</span>
-                <span class=k>return</span> <span class=kc>None</span>
-            <span class=k>return</span> <span class=p>(</span><span class=n>IList</span><span class=p>,</span> <span class=nb>id</span><span class=p>(</span><span class=n>value</span><span class=o>.</span><span class=n>elem</span><span class=p>),</span> <span class=n>items</span><span class=p>)</span>
         <span class=k>return</span> <span class=p>(</span><span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>),</span> <span class=n>value</span><span class=p>)</span>
-
-    <span class=n>kind</span> <span class=o>=</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span>
-    <span class=k>if</span> <span class=n>kind</span> <span class=ow>in</span> <span class=p>(</span><span class=nb>type</span><span class=p>(</span><span class=kc>None</span><span class=p>),</span> <span class=nb>bool</span><span class=p>,</span> <span class=nb>int</span><span class=p>,</span> <span class=nb>str</span><span class=p>,</span> <span class=nb>bytes</span><span class=p>):</span>
-        <span class=k>return</span> <span class=p>(</span><span class=n>kind</span><span class=p>,</span> <span class=n>value</span><span class=p>)</span>
-    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>float</span><span class=p>:</span>
-        <span class=k>return</span> <span class=p>(</span><span class=nb>float</span><span class=p>,</span> <span class=n>struct</span><span class=o>.</span><span class=n>pack</span><span class=p>(</span><span class=s2>&quot;!d&quot;</span><span class=p>,</span> <span class=n>value</span><span class=p>))</span>
-    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>complex</span><span class=p>:</span>
-        <span class=k>return</span> <span class=p>(</span><span class=nb>complex</span><span class=p>,</span> <span class=n>struct</span><span class=o>.</span><span class=n>pack</span><span class=p>(</span><span class=s2>&quot;!dd&quot;</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>real</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>imag</span><span class=p>))</span>
-    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>range</span><span class=p>:</span>
-        <span class=k>return</span> <span class=p>(</span><span class=nb>range</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>start</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>stop</span><span class=p>,</span> <span class=n>value</span><span class=o>.</span><span class=n>step</span><span class=p>)</span>
-    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>tuple</span><span class=p>:</span>
-        <span class=n>items</span> <span class=o>=</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>constant_key</span><span class=p>(</span><span class=n>item</span><span class=p>)</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>value</span><span class=p>)</span>
-        <span class=k>if</span> <span class=nb>any</span><span class=p>(</span><span class=n>item</span> <span class=ow>is</span> <span class=kc>None</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>items</span><span class=p>):</span>
-            <span class=k>return</span> <span class=kc>None</span>
-        <span class=k>return</span> <span class=p>(</span><span class=nb>tuple</span><span class=p>,</span> <span class=n>items</span><span class=p>)</span>
-    <span class=k>if</span> <span class=nb>type</span><span class=p>(</span><span class=n>value</span><span class=p>)</span> <span class=ow>is</span> <span class=nb>frozenset</span><span class=p>:</span>
-        <span class=n>items</span> <span class=o>=</span> <span class=nb>tuple</span><span class=p>(</span><span class=n>constant_key</span><span class=p>(</span><span class=n>item</span><span class=p>)</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>value</span><span class=p>)</span>
-        <span class=k>if</span> <span class=nb>any</span><span class=p>(</span><span class=n>item</span> <span class=ow>is</span> <span class=kc>None</span> <span class=k>for</span> <span class=n>item</span> <span class=ow>in</span> <span class=n>items</span><span class=p>):</span>
-            <span class=k>return</span> <span class=kc>None</span>
-        <span class=k>return</span> <span class=p>(</span><span class=nb>frozenset</span><span class=p>,</span> <span class=nb>frozenset</span><span class=p>(</span><span class=n>items</span><span class=p>))</span>
-    <span class=k>return</span> <span class=kc>None</span>
+    <span class=k>return</span> <span class=n>_Identity</span><span class=p>(</span><span class=n>value</span><span class=p>)</span>
 </code></pre></div></td></tr></table></div> </details> </div> </div> </div> </div> </div> </article> </div> <script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script> </div> <button type=button class="md-top md-icon" data-md-component=top hidden> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"/></svg> Back to top </button> </main> <footer class=md-footer> <nav class="md-footer__inner md-grid" aria-label=Footer> <a href=../post_inference/ class="md-footer__link md-footer__link--prev" aria-label="Previous: Post inference"> <div class="md-footer__button md-icon"> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"/></svg> </div> <div class=md-footer__title> <span class=md-footer__direction> Previous </span> <div class=md-ellipsis> Post inference </div> </div> </a> <a href=../typeinfer/ class="md-footer__link md-footer__link--next" aria-label="Next: Typeinfer"> <div class=md-footer__title> <span class=md-footer__direction> Next </span> <div class=md-ellipsis> Typeinfer </div> </div> <div class="md-footer__button md-icon"> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M4 11v2h12l-5.5 5.5 1.42 1.42L19.84 12l-7.92-7.92L10.5 5.5 16 11z"/></svg> </div> </a> </nav> <div class="md-footer-meta md-typeset"> <div class="md-footer-meta__inner md-grid"> <div class=md-copyright> <div class=md-copyright__highlight> Copyright &copy; 2024 Kirin contributors </div> Made with <a href=https://squidfunk.github.io/mkdocs-material/ target=_blank rel=noopener> Material for MkDocs </a> </div> <div class=md-social> <a href=https://x.com/QueraComputing target=_blank rel=noopener title=x.com class=md-social__link> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 24 24"><path d="M14.234 10.162 22.977 0h-2.072l-7.591 8.824L7.251 0H.258l9.168 13.343L.258 24H2.33l8.016-9.318L16.749 24h6.993zm-2.837 3.299-.929-1.329L3.076 1.56h3.182l5.965 8.532.929 1.329 7.754 11.09h-3.182z"/></svg> </a> <a href=https://www.linkedin.com/company/quera-computing-inc/ target=_blank rel=noopener title=www.linkedin.com class=md-social__link> <svg xmlns=http://www.w3.org/2000/svg viewbox="0 0 448 512"><!-- Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M416 32H31.9C14.3 32 0 46.5 0 64.3v383.4C0 465.5 14.3 480 31.9 480H416c17.6 0 32-14.5 32-32.3V64.3c0-17.8-14.4-32.3-32-32.3M135.4 416H69V202.2h66.5V416zM102.2 96a38.5 38.5 0 1 1 0 77 38.5 38.5 0 1 1 0-77m282.1 320h-66.4V312c0-24.8-.5-56.7-34.5-56.7-34.6 0-39.9 27-39.9 54.9V416h-66.4V202.2h63.7v29.2h.9c8.9-16.8 30.6-34.5 62.9-34.5 67.2 0 79.7 44.3 79.7 101.9z"/></svg> </a> </div> </div> </div> </footer> </div> <div class=md-dialog data-md-component=dialog> <div class="md-dialog__inner md-typeset"></div> </div> <script id=__config type=application/json>{"annotate": null, "base": "../../../..", "features": ["announce.dismiss", "content.action.view", "content.action.edit", "content.code.annotate", "content.code.copy", "content.tooltips", "navigation.indexes", "navigation.sections", "navigation.tabs", "navigation.top", "navigation.tracking", "navigation.footer", "search.highlight", "search.suggest", "toc.follow"], "search": "../../../../assets/javascripts/workers/search.2c215733.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"provider": "mike"}}</script> <script src=../../../../assets/javascripts/bundle.d7400e89.min.js></script> <script src=../../../../scripts/katex.js></script> <script src=https://unpkg.com/katex@0/dist/katex.min.js></script> <script src=https://unpkg.com/katex@0/dist/contrib/auto-render.min.js></script> </body> </html>
