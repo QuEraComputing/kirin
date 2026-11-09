@@ -47,7 +47,7 @@ ids and must map every operand, which costs O(size of what is copied).
 | `inlineBlockBefore(source, dest, before, args)` | `merge_blocks` (end of block, same CFG only) | step 4 |
 | `inlineRegionBefore(region, parent, before)` | none | step 5 |
 | `Operation::clone`, `Region::cloneInto` with `IRMapping` | none | step 6 |
-| `inlineCall` + `DialectInlinerInterface` | none | step 7 (attempt) |
+| `inlineCall` + `DialectInlinerInterface` | none | step 7 |
 | `replaceUsesWithIf`, `replaceAllUsesExcept` | `replace_all_uses` only | step 1 |
 | `Operation::isBeforeInBlock` | none | not in this plan (dominance comes later) |
 | `Value::setType` | none | not in this plan |
@@ -262,25 +262,55 @@ Split in two:
 
 Cost: O(size of what is copied).
 
-### 7. Inline a call (attempt)
+### 7. Inline calls
 
-An inliner in `kirin-function`, which knows its own call and `ret` ops, built
-from steps 4–6 and the existing `kirin-ir` operations. It takes a closure that
-builds the branch op, since `kirin-function` doesn't know which branch op a
-language uses. It inlines `CallSpecialized` calls within the same stage; the
-other call kinds first need resolving to a specialization. For a call `c` in block `B`:
+```rust
+inline_calls(rewriter, cfg, |target, args| /* the language's branch */)?;
+```
 
-1. `split_block` after `c`. The continuation block `C` gets the rest of `B`.
-2. Copy the callee's CFG between `B` and `C`, mapping its entry arguments to
-   `c`'s operands (step 6). For the callee's last use, splice instead (step 5).
-3. Splice the copied entry block into `B` (step 4), or branch to it.
-4. Replace each copied `ret v` with a branch to `C` passing `v`.
-5. Give `C` one argument per result of `c`, redirect `c`'s results to them, and
-   erase `c`.
+A utility in `kirin-function`, which knows its own call and `ret` ops, built
+from steps 4–6 and the existing `kirin-ir` operations. Only `inline_calls` is
+public: it owns the order calls are inlined in, which is what keeps the total
+cost linear (below).
 
-Cost per call: O(statements after `c` in `B`) for the split, plus O(callee
-size) for the copy. Inlining a block's calls from last to first makes the
-splits cost O(block size) in total, since each statement moves at most once.
+- **Recognizing the ops.** A language implements `FunctionOps<T>`
+  (`as_call`, `as_return`), matching its own variants however deep it wraps
+  `Call` and `Return`.
+- **The branch op** comes from a closure, since `kirin-function` doesn't know
+  which branch op a language uses.
+- **What is inlined:** one level, every `CallSpecialized` for the current
+  stage in the blocks of `cfg`; it returns how many. The calls the inlined
+  code brings in are left as calls, for another run. Other call kinds, calls
+  for another stage, and calls nested in statements' bodies are left as they
+  are. Being one level, it terminates on recursive calls too; inlining
+  everything is the caller's job, best done callees before callers.
+- **Errors:** an eligible call that cannot be inlined stops the utility with an
+  `InlineError` (`UnknownCallee`, `CalleeBodyNotCfg`,
+  `ArgumentCountMismatch`, `ReturnCountMismatch`), checked before that call is
+  edited. Calls inlined before it
+  stay inlined.
+- **No last-use move:** the callee is always copied, never moved.
+
+For a call `c` in block `B`, with the callee's entry arguments mapped to `c`'s
+operands:
+
+- **Single-block callee ending in `ret`:** copy its statements in front of `c`,
+  replace `c`'s results with the returned values, erase `c`. No split.
+- **Any other callee:** split `B` after `c` (the second half `C` gets one
+  argument per result of `c`, which replace them), splice a copy of the
+  callee's CFG between `B` and `C`, end `B` with a branch to the copied entry
+  block, replace each copied `ret v` with a branch to `C` passing `v`, erase
+  `c`.
+
+**Cost.** A split costs one write per statement it moves, for the moved
+statement's parent block. Each block is walked from its last statement to its
+first, so a split only moves statements after `c`, which the walk has already
+passed and no earlier split moved: every statement moves at most once, and a
+run is linear in the size of its result. Inlining from first to last instead
+would move the rest of a block once per call, which is quadratic when
+inlining leaves most of a program in one block. Inlining everything takes one
+run per function if callees go before their callers; rerunning on one body
+until nothing is left costs one linear run per level of call depth.
 
 ### 8. Docs
 
