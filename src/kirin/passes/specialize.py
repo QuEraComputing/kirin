@@ -173,7 +173,7 @@ class Specialize(Pass):
                     pending.append(stmt.value.data)
 
     def _analyze(self, mt: ir.Method) -> const.Frame:
-        analysis = const.Propagate(mt.dialects)
+        analysis = const.Propagate(mt.dialects, cache_calls=True)
         if self.no_raise:
             frame, _ = analysis.run_no_raise(mt)
         else:
@@ -377,7 +377,7 @@ class Specialize(Pass):
         """
         captured = tuple(_fact(value) for value in clone.captured)
         inputs = tuple(const.Unknown() for _ in clone.signature.inputs)
-        analysis = const.Propagate(dialects)
+        analysis = const.Propagate(dialects, cache_calls=True)
         try:
             with analysis.eval_context():
                 frame, _ = analysis.call(
