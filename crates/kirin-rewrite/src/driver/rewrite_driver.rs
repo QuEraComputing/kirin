@@ -40,11 +40,15 @@ impl std::ops::AddAssign for RewriteSummary {
 /// A rule's rewrite body may end in a walk result steering the sweep (see
 /// [`kirin_wildcard`]): `skip` leaves the statements nested in the
 /// statement being visited unwalked, and `interrupt` ends the sweep there.
-/// An interrupted sweep counts like any other: if the run changed nothing,
-/// it ends, without visiting the statements after the interrupt again. Since
-/// a rule's root never owns bodies yet (see
+/// Since a rule's root never owns bodies yet (see
 /// [`RuleErrorKind::OpWithBodies`](crate::RuleErrorKind::OpWithBodies)),
 /// `skip` has no effect so far.
+///
+/// An interrupted sweep counts like any other: if the run changed nothing,
+/// it ends, without visiting the statements after the interrupt again. So a
+/// rule should only `interrupt` after an application that edited the IR;
+/// otherwise the run reports convergence although no rule in the set has
+/// been tried on those statements. The driver does not check this.
 ///
 /// Rules that keep undoing each other never reach a fixpoint. As a safety
 /// net, a run still changing after [`max_sweeps`](Self::max_sweeps) sweeps
