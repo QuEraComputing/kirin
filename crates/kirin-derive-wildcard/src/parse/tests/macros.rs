@@ -102,7 +102,7 @@ fn parse_rewrite_reads_the_root_and_body() {
         .unwrap();
 
     let model = parser.model;
-    let StmtKind::Rewrite { root, body } = &model.statement(rewrite).kind else {
+    let StmtKind::Rewrite { root, body, .. } = &model.statement(rewrite).kind else {
         panic!("expected a rewrite");
     };
     // The root is the op defining `r`.
@@ -160,7 +160,7 @@ fn parse_rewrite_statement_accepts_a_lone_erase_of_an_op_without_results() {
         .unwrap();
 
     let model = parser.model;
-    let StmtKind::Rewrite { root, body } = &model.statement(rewrite).kind else {
+    let StmtKind::Rewrite { root, body, .. } = &model.statement(rewrite).kind else {
         panic!("expected a rewrite");
     };
     assert_eq!(*root, sink);
@@ -206,7 +206,7 @@ fn parse_rewrite_statement_expands_a_lone_action_into_a_rewrite() {
         .unwrap();
 
     let model = parser.model;
-    let StmtKind::Rewrite { root, body } = &model.statement(rewrite).kind else {
+    let StmtKind::Rewrite { root, body, .. } = &model.statement(rewrite).kind else {
         panic!("expected a rewrite");
     };
     let [action] = body.as_slice() else {

@@ -61,6 +61,10 @@ pub enum DriverError {
     ConstraintNotBool { rule: String },
     /// A `replace` redirected to or from a value that is not an SSA value.
     NotAnSsaValue { rule: String },
+    /// A `walk_result` read a value that is not a
+    /// [`WalkResult`](kirin_ir::walk::WalkResult). `#[rewrite_rule]` rejects
+    /// this at compile time, so only a rule built by hand can fail with it.
+    NotAWalkResult { rule: String },
     /// Rule `rule` erases its root, the statement being visited, which an
     /// `order` walk does not allow. Nothing was edited.
     ErasesRoot { rule: String, order: &'static str },
@@ -183,6 +187,12 @@ impl fmt::Display for DriverError {
                 write!(
                     f,
                     "rule `{rule}`: a replace names a value that is not an SSA value"
+                )
+            }
+            DriverError::NotAWalkResult { rule } => {
+                write!(
+                    f,
+                    "rule `{rule}`: a walk result reads a value that is not a walk result"
                 )
             }
             DriverError::ErasesRoot { rule, order } => write!(

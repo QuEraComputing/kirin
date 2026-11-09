@@ -1,0 +1,5 @@
+error: `skip!()` can only be the last expression of the body of `rewrite!`, without a semicolon
+  --> tests/compile-fail/walk_result_with_semicolon.rs:16:9
+   |
+16 |         skip!();
+   |         ^^^^^^^

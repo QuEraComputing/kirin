@@ -3,21 +3,25 @@
 /// These consume the error returned by [`BuilderStageInfo::specialize`] or
 /// [`BuilderStageInfo::staged_function`] when a duplicate is detected, invalidate the
 /// conflicting entries, and register the new definition.
-use super::error::{SpecializeError, StagedFunctionError};
+use super::error::{DuplicateSpecialization, StagedFunctionError};
 
 use crate::node::*;
 use crate::{BuilderStageInfo, Dialect};
 
 impl<L: Dialect> BuilderStageInfo<L> {
-    /// Redefine a specialization by consuming a [`SpecializeError`].
+    /// Redefine a specialization by consuming the [`DuplicateSpecialization`]
+    /// from [`SpecializeError::Duplicate`](super::error::SpecializeError::Duplicate).
     ///
     /// Invalidates all conflicting specializations identified in the error
     /// and registers the new specialization. Returns the new
     /// [`SpecializedFunction`] ID.
     ///
-    /// Callers should inspect the [`SpecializeError::conflicting`] backedges
+    /// Callers should inspect the [`DuplicateSpecialization::conflicting`] backedges
     /// to determine what needs recompilation.
-    pub fn redefine_specialization(&mut self, error: SpecializeError<L>) -> SpecializedFunction {
+    pub fn redefine_specialization(
+        &mut self,
+        error: DuplicateSpecialization<L>,
+    ) -> SpecializedFunction {
         let staged_function_info = &mut self.staged_functions[error.staged_function];
 
         // Invalidate all conflicting specializations

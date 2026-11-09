@@ -311,6 +311,21 @@ mod tests {
         insta::assert_snapshot!(generate_parser_code(input));
     }
 
+    /// A struct whose only field is defaulted parses no fields, but its AST
+    /// still has named fields, so the parser must build it with braces.
+    #[test]
+    fn test_struct_without_parsed_fields_parser() {
+        let input: syn::DeriveInput = syn::parse_quote! {
+            #[kirin(terminator, type = SimpleType)]
+            #[chumsky(crate = kirin_chumsky, format = "$skip")]
+            struct Skip {
+                #[kirin(default)]
+                marker: std::marker::PhantomData<SimpleType>,
+            }
+        };
+        insta::assert_snapshot!(generate_parser_code(input));
+    }
+
     #[test]
     fn test_keyword_enum_parser() {
         let input: syn::DeriveInput = syn::parse_quote! {

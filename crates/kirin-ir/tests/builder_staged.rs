@@ -109,12 +109,14 @@ fn specialize_success_and_duplicate_error() {
         .expect("first specialize should succeed");
 
     let definition2 = stage.statement().definition(BuilderDialect::Return).new();
-    let err = stage
+    let Err(SpecializeError::Duplicate(err)) = stage
         .specialize()
         .staged_func(sf)
         .definition(definition2)
         .new()
-        .expect_err("duplicate signature should fail");
+    else {
+        panic!("duplicate signature should fail");
+    };
 
     assert_eq!(err.conflicting.len(), 1);
 }
@@ -133,12 +135,14 @@ fn redefine_specialization_invalidates_and_registers() {
         .unwrap();
 
     let definition2 = stage.statement().definition(BuilderDialect::Return).new();
-    let err = stage
+    let Err(SpecializeError::Duplicate(err)) = stage
         .specialize()
         .staged_func(sf)
         .definition(definition2)
         .new()
-        .expect_err("duplicate");
+    else {
+        panic!("duplicate");
+    };
 
     let spec2 = stage.redefine_specialization(err);
 
@@ -157,6 +161,13 @@ fn redefine_staged_function_invalidates_and_registers() {
     let mut stage = new_stage();
 
     let sf1 = stage.staged_function().name(foo).new().unwrap();
+    let definition = stage.statement().definition(BuilderDialect::Return).new();
+    let spec1 = stage
+        .specialize()
+        .staged_func(sf1)
+        .definition(definition)
+        .new()
+        .unwrap();
 
     let err = stage
         .staged_function()
@@ -169,9 +180,40 @@ fn redefine_staged_function_invalidates_and_registers() {
     let stage = stage.finalize().unwrap();
     let old_info = sf1.get_info(&stage).unwrap();
     assert!(old_info.is_invalidated());
+    // The old function's specializations go with it.
+    assert!(spec1.get_info(&stage).unwrap().is_invalidated());
 
     let new_info = sf2.get_info(&stage).unwrap();
     assert!(!new_info.is_invalidated());
+}
+
+#[test]
+fn specialize_rejects_an_invalidated_staged_function() {
+    let mut gs: InternTable<String, GlobalSymbol> = InternTable::default();
+    let foo = gs.intern("foo".to_string());
+    let mut stage = new_stage();
+
+    let sf1 = stage.staged_function().name(foo).new().unwrap();
+    let err = stage
+        .staged_function()
+        .name(foo)
+        .new()
+        .expect_err("duplicate signature");
+    stage.redefine_staged_function(err);
+
+    let definition = stage.statement().definition(BuilderDialect::Return).new();
+    let result = stage
+        .specialize()
+        .staged_func(sf1)
+        .definition(definition)
+        .new();
+    assert!(matches!(
+        result,
+        Err(SpecializeError::InvalidatedStagedFunction(sf)) if sf == sf1
+    ));
+
+    let stage = stage.finalize().unwrap();
+    assert!(sf1.get_info(&stage).unwrap().specializations().is_empty());
 }
 
 // --- StagedFunctionInfo::all_matching tests ---
@@ -225,12 +267,14 @@ fn staged_function_all_matching_excludes_invalidated() {
 
     // Invalidate spec1 by redefining
     let definition2 = stage.statement().definition(BuilderDialect::Return).new();
-    let err = stage
+    let Err(SpecializeError::Duplicate(err)) = stage
         .specialize()
         .staged_func(sf)
         .definition(definition2)
         .new()
-        .expect_err("duplicate");
+    else {
+        panic!("duplicate");
+    };
     let _spec2 = stage.redefine_specialization(err);
 
     let stage = stage.finalize().unwrap();

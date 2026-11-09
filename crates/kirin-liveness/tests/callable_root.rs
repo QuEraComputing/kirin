@@ -87,12 +87,14 @@ fn redefine(
     definition: Statement,
 ) -> SpecializedFunction {
     pipeline.stage_mut(stage).unwrap().with_builder(|b| {
-        let conflict = b
+        let Err(SpecializeError::Duplicate(conflict)) = b
             .specialize()
             .staged_func(specialization.id().0)
             .definition(definition)
             .new()
-            .expect_err("the existing specialization holds this signature");
+        else {
+            panic!("the existing specialization holds this signature");
+        };
         b.redefine_specialization(conflict)
     })
 }

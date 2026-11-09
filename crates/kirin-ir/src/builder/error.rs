@@ -72,14 +72,38 @@ pub enum StagedFunctionConflictKind {
     SignatureMismatchUnderSingleInterface,
 }
 
-/// Error returned when [`crate::StageInfo::specialize`] detects an existing non-invalidated
-/// specialization with the same signature.
+/// Error returned by [`crate::StageInfo::specialize`].
+#[derive(Debug)]
+pub enum SpecializeError<L: Dialect> {
+    /// A non-invalidated specialization already has the signature. It can be
+    /// replaced through [`crate::StageInfo::redefine_specialization`].
+    Duplicate(DuplicateSpecialization<L>),
+    /// The staged function has been invalidated by a redefinition, so it
+    /// takes no new specializations.
+    InvalidatedStagedFunction(StagedFunction),
+}
+
+impl<L: Dialect> std::fmt::Display for SpecializeError<L> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            SpecializeError::Duplicate(e) => e.fmt(f),
+            SpecializeError::InvalidatedStagedFunction(func) => {
+                write!(f, "cannot specialize invalidated staged function: {func:?}")
+            }
+        }
+    }
+}
+
+impl<L: Dialect> std::error::Error for SpecializeError<L> {}
+
+/// An existing non-invalidated specialization with the same signature, found
+/// by [`crate::StageInfo::specialize`].
 ///
 /// The caller can either propagate this error or consume it via
 /// [`crate::StageInfo::redefine_specialization`] to intentionally invalidate the old
 /// specialization and register the new one.
 #[derive(Debug)]
-pub struct SpecializeError<L: Dialect> {
+pub struct DuplicateSpecialization<L: Dialect> {
     /// The staged function being specialized.
     pub staged_function: StagedFunction,
     /// The signature that conflicted.
@@ -92,7 +116,7 @@ pub struct SpecializeError<L: Dialect> {
     pub backedges: Option<Vec<SpecializedFunction>>,
 }
 
-impl<L: Dialect> std::fmt::Display for SpecializeError<L> {
+impl<L: Dialect> std::fmt::Display for DuplicateSpecialization<L> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -102,7 +126,7 @@ impl<L: Dialect> std::fmt::Display for SpecializeError<L> {
     }
 }
 
-impl<L: Dialect> std::error::Error for SpecializeError<L> {}
+impl<L: Dialect> std::error::Error for DuplicateSpecialization<L> {}
 
 /// Error returned when [`crate::StageInfo::staged_function`] detects an existing
 /// non-invalidated staged function with the same name.
