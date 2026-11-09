@@ -2044,13 +2044,13 @@ The immediate `MutationEvent` vocabulary recorded by these methods is
 `ChangedOperands`, `ReplacedUses`, `InsertedStatement`, `ErasedStatement`,
 `ReplacedStatement`, `ChangedBlockList { cfg }`, `ChangedCfg { cfg }`,
 `ChangedTerminator { block }`, `ChangedDiGraphTopology { graph }`,
-`ChangedDiGraphYields { graph }`, `ChangedBodyNesting { owner }`,
-`MovedStatement { stmt }`, `SplicedBlock { source, dest }`, and
-`SplicedCfg { source, dest }`. `ErasedStatement` also covers everything nested
-in the erased statement; no separate CFG or graph events are recorded for those
-bodies. The remaining documented event kinds (`UnGraph` and result-type events)
-grow in as
-the corresponding mutation capability lands (see
+`ChangedDiGraphYields { graph }`, `ChangedUnGraphTopology { graph }`,
+`ChangedBodyNesting { owner }`, `MovedStatement { stmt }`,
+`SplicedBlock { source, dest }`, and `SplicedCfg { source, dest }`.
+`ErasedStatement` also covers everything nested in the erased statement; no
+separate CFG or graph events are recorded for those bodies. The remaining
+documented event kind (`ChangedResultTypes`) grows in as the corresponding
+mutation capability lands (see
 [Gap 3](#gap-3--mutationevent-vocabulary-vs-implementation)).
 
 The design requirement is that all rewrite mutation flows through this object so
@@ -3073,21 +3073,21 @@ implement the derive and its matching/remapping bodies.
 ### Gap 3 — MutationEvent vocabulary vs implementation — RESOLVED DELIVERY RULE
 
 The documented `MutationEvent` enum lists the full target vocabulary; the
-implementation currently emits **thirteen** — `ChangedOperands`,
-`ReplacedUses`, `InsertedStatement`, `ErasedStatement`, `ReplacedStatement`,
-`ChangedBlockList`, `ChangedCfg`, `ChangedTerminator`,
-`ChangedDiGraphTopology`, `ChangedDiGraphYields`, `ChangedUnGraphTopology`,
-`ChangedBodyNesting`, `MovedStatement` — covering operand and yield
+implementation currently emits **fifteen** — `ChangedOperands`, `ReplacedUses`,
+`InsertedStatement`, `ErasedStatement`, `ReplacedStatement`, `ChangedBlockList`,
+`ChangedCfg`, `ChangedTerminator`, `ChangedDiGraphTopology`,
+`ChangedDiGraphYields`, `ChangedUnGraphTopology`, `ChangedBodyNesting`,
+`MovedStatement`, `SplicedBlock`, `SplicedCfg` — covering operand and yield
 rewriting, block-body statement and terminator surgery
-(erase/insert/replace/move), `Cfg` block-list surgery, `DiGraph` and
-`UnGraph` member surgery, and body changes through `replace_statement`. The
-remaining documented variants (result-type events) are not emitted because that
-surgery is not yet implemented, so an analysis-invalidation policy written against them would
-subscribe to events that never fire. Resolution: keep growing the enum in
-lockstep with mutation capability (CFG/graph events as that surgery lands in
-M1; M6/M7 are matching-only), keep drop-all-on-mutation invalidation until
-granular events have real clients, and mark the documented variants
-implemented-vs-planned.
+(erase/insert/replace/move/splice), `Cfg` block-list surgery including splicing
+a whole `Cfg`, `DiGraph` and `UnGraph` member surgery, and body changes through
+`replace_statement`. The remaining documented variants (result-type events) are
+not emitted because that surgery is not yet implemented, so an
+analysis-invalidation policy written against them would subscribe to events that
+never fire. Resolution: keep growing the enum in lockstep with mutation
+capability (CFG/graph events as that surgery lands in M1; M6/M7 are
+matching-only), keep drop-all-on-mutation invalidation until granular events
+have real clients, and mark the documented variants implemented-vs-planned.
 
 ### Gap 4 — Native-rule stateful lifecycle — RESOLVED
 
