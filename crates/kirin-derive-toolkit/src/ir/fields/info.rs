@@ -11,7 +11,7 @@ use super::{Collection, FieldCategory, FieldData};
 ///
 /// ```ignore
 /// match field.category() {
-///     FieldCategory::Argument => { /* field.ssa_type() is Some */ }
+///     FieldCategory::Argument => { /* field.ssa_type() is Some only if annotated */ }
 ///     FieldCategory::Value => { /* field.value_type() is Some */ }
 ///     _ => {}
 /// }
@@ -99,9 +99,11 @@ impl<L: Layout> FieldInfo<L> {
     }
 
     /// Return the SSA type expression for `Argument` or `Result` fields.
+    // An argument without #[kirin(type=...)] returns None
     pub fn ssa_type(&self) -> Option<&syn::Expr> {
         match &self.data {
-            FieldData::Argument { ssa_type } | FieldData::Result { ssa_type, .. } => Some(ssa_type),
+            FieldData::Argument { ssa_type } => ssa_type.as_ref(),
+            FieldData::Result { ssa_type, .. } => Some(ssa_type),
             _ => None,
         }
     }
@@ -160,7 +162,7 @@ mod tests {
             ident: name.map(|n| syn::Ident::new(n, Span::call_site())),
             collection: Collection::Single,
             data: FieldData::Argument {
-                ssa_type: syn::parse_quote!(Placeholder::placeholder()),
+                ssa_type: Some(syn::parse_quote!(Placeholder::placeholder())),
             },
         }
     }
@@ -222,12 +224,7 @@ mod tests {
     #[test]
     fn kind_name_all_categories() {
         let cases: Vec<(FieldData<StandardLayout>, &str)> = vec![
-            (
-                FieldData::Argument {
-                    ssa_type: syn::parse_quote!(()),
-                },
-                "argument",
-            ),
+            (FieldData::Argument { ssa_type: None }, "argument"),
             (
                 FieldData::Result {
                     ssa_type: syn::parse_quote!(()),
@@ -315,6 +312,13 @@ mod tests {
     fn ssa_type_on_argument() {
         let f = make_argument_field(0, Some("x"));
         assert!(f.ssa_type().is_some());
+    }
+
+    #[test]
+    fn ssa_type_on_unannotated_argument() {
+        let mut f = make_argument_field(0, Some("x"));
+        f.data = FieldData::Argument { ssa_type: None };
+        assert!(f.ssa_type().is_none());
     }
 
     #[test]
