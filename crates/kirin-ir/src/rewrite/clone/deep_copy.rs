@@ -41,16 +41,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Every operand and branch target inside the copy is mapped through
     /// `map`. An operand reading a value from outside the copy keeps reading it
-    /// unless `map` gives a replacement; a block argument that `map` already
-    /// gives a value for is not copied, and the copy reads that value. Results
-    /// are always copied. Names are not copied. Afterwards `map` holds every
-    /// value, block and statement the copy made.
+    /// unless `map` gives a replacement. Results and block arguments are always
+    /// copied, overwriting their entries in `map`. Names are not copied.
+    /// Afterwards `map` holds every value, block and statement the copy made.
     ///
     /// Rejects, leaving the stage untouched, if `stmt` is unknown, is a
     /// terminator ([`RewriteError::UnexpectedTerminator`]: it could not be
-    /// inserted), or if the copy would read a value from `map` that is not
-    /// live ([`RewriteError::UnknownValue`]). Records no event: nothing
-    /// reachable changes until the insert.
+    /// inserted), or if `map` replaces a value from outside the copy with one
+    /// that is not live ([`RewriteError::UnknownValue`]). Records no event:
+    /// nothing reachable changes until the insert.
     pub fn clone_statement(
         &mut self,
         stmt: Statement,
@@ -59,7 +58,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if self.live_statement(stmt)?.definition.is_terminator() {
             return Err(RewriteError::UnexpectedTerminator);
         }
-        self.check_replacements_live(stmt, map)?;
+        let mut defined: HashSet<SSAValue> = {
+            let definition = &stmt.expect_info(self.stage).definition;
+            definition.results().map(|&result| result.into()).collect()
+        };
+        for body in bodies_of(&stmt.expect_info(self.stage).definition) {
+            self.collect_defined(body, &mut defined);
+        }
+        self.check_replacements_live(stmt, map, &defined)?;
 
         self.reserve_statement(stmt, map);
         let mut copied = Copied::default();
@@ -77,19 +83,20 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// detached when the `Rewriter` is dropped, including one a splice left
     /// empty, is tombstoned, leaving any reader of the values in its blocks
     /// dangling (see [`Rewriter::insert`]). Values are mapped as for
-    /// [`Rewriter::clone_statement`]: in particular, mapping the arguments of
-    /// `source`'s entry block gives a copy whose entry block has none.
+    /// [`Rewriter::clone_statement`].
     ///
     /// Rejects, leaving the stage untouched, if `source` is unknown
-    /// ([`RewriteError::UnknownCfg`]), or if the copy would read a value from
-    /// `map` that is not live ([`RewriteError::UnknownValue`]). Records no
-    /// event.
+    /// ([`RewriteError::UnknownCfg`]), or if `map` replaces a value from
+    /// outside the copy with one that is not live
+    /// ([`RewriteError::UnknownValue`]). Records no event.
     pub fn clone_cfg(&mut self, source: CFG, map: &mut IRMap) -> Result<CFG, RewriteError> {
         if source.get_info(self.stage).is_none() {
             return Err(RewriteError::UnknownCfg(source));
         }
+        let mut defined = HashSet::new();
+        self.collect_defined(Body::CFG(source), &mut defined);
         for stmt in self.body_statements(Body::CFG(source)) {
-            self.check_replacements_live(stmt, map)?;
+            self.check_replacements_live(stmt, map, &defined)?;
         }
 
         let copy = self.reserve_cfg(source, map);
@@ -100,12 +107,52 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(copy)
     }
 
+    /// Add every value defined in `body` or nested in it to `defined`: block
+    /// arguments, graph ports and results.
+    fn collect_defined(&self, body: Body, defined: &mut HashSet<SSAValue>) {
+        match body {
+            Body::Block(block) => {
+                let arguments = block.expect_info(self.stage).arguments();
+                defined.extend(arguments.iter().map(|&argument| SSAValue::from(argument)));
+            }
+            Body::CFG(cfg) => {
+                for block in self.cfg_blocks(cfg) {
+                    let arguments = block.expect_info(self.stage).arguments();
+                    defined.extend(arguments.iter().map(|&argument| SSAValue::from(argument)));
+                }
+            }
+            Body::DiGraph(graph) => {
+                let ports = graph.expect_info(self.stage).ports();
+                defined.extend(ports.iter().map(|&port| SSAValue::from(port)));
+            }
+            Body::UnGraph(graph) => {
+                let ports = graph.expect_info(self.stage).ports();
+                defined.extend(ports.iter().map(|&port| SSAValue::from(port)));
+            }
+        }
+        for stmt in self.body_statements(body) {
+            let definition = &stmt.expect_info(self.stage).definition;
+            defined.extend(definition.results().map(|&result| SSAValue::from(result)));
+            for nested in bodies_of(definition) {
+                self.collect_defined(nested, defined);
+            }
+        }
+    }
+
     /// Reject `stmt` if the copy would read a value from `map` that is not
-    /// live, in `stmt` or anything nested in it.
-    fn check_replacements_live(&self, stmt: Statement, map: &IRMap) -> Result<(), RewriteError> {
+    /// live, in `stmt` or anything nested in it. The values in `defined`,
+    /// which the copy defines, are skipped: copying overwrites their entries
+    /// in `map` before anything reads them.
+    fn check_replacements_live(
+        &self,
+        stmt: Statement,
+        map: &IRMap,
+        defined: &HashSet<SSAValue>,
+    ) -> Result<(), RewriteError> {
         let definition = &stmt.expect_info(self.stage).definition;
         for &operand in definition.arguments() {
-            if let Some(replacement) = map.value(operand)
+            if !defined.contains(&operand)
+                && let Some(replacement) = map.value(operand)
                 && replacement.get_info(self.stage).is_none()
             {
                 return Err(RewriteError::UnknownValue(replacement));
@@ -114,7 +161,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // A `DiGraph`'s yields are read too.
         for &graph in definition.digraphs() {
             for &value in graph.expect_info(self.stage).yields() {
-                if let Some(replacement) = map.value(value)
+                if !defined.contains(&value)
+                    && let Some(replacement) = map.value(value)
                     && replacement.get_info(self.stage).is_none()
                 {
                     return Err(RewriteError::UnknownValue(replacement));
@@ -123,7 +171,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         for body in bodies_of(definition) {
             for nested in self.body_statements(body) {
-                self.check_replacements_live(nested, map)?;
+                self.check_replacements_live(nested, map, defined)?;
             }
         }
         Ok(())
@@ -225,9 +273,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         copies
     }
 
-    /// First pass for `block`: allocate an empty block under `parent` with the
-    /// arguments `map` does not already give values for, then reserve its
-    /// statements.
+    /// First pass for `block`: allocate an empty block under `parent` with
+    /// copies of its arguments, then reserve its statements.
     fn reserve_block(
         &mut self,
         block: Block,
@@ -248,13 +295,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .iter()
             .map(|&arg| arg.into())
             .collect();
-        let mut copied_arguments = Vec::new();
-        for argument in arguments {
-            if map.value(argument).is_some() {
-                continue;
-            }
+        let mut copied_arguments = Vec::with_capacity(arguments.len());
+        for (index, argument) in arguments.into_iter().enumerate() {
             let ty = argument.expect_info(self.stage).ty().clone();
-            let copied = self.alloc_block_argument(copy, copied_arguments.len(), ty);
+            let copied = self.alloc_block_argument(copy, index, ty);
             map.map_value(argument, copied);
             copied_arguments.push(copied);
         }
