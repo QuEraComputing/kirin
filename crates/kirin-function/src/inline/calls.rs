@@ -19,6 +19,9 @@ use super::{FunctionOps, InlineError};
 /// another run to inline. Calls of another kind, to another stage, or nested
 /// in statements' bodies are left as they are too.
 ///
+/// It is the caller's responsibility to ensure there is no recursion, self or
+/// mutual, among the calls inlined.
+///
 /// Each block is walked from its last statement to its first, so a split only
 /// moves statements after the call, which no earlier split moved: a run is
 /// linear in `cfg`'s size plus the size of the callees it copies. Running this
