@@ -210,11 +210,12 @@ class Specialize(Pass):
         return False
 
     def _unroll(self, stmt: Map | ForEach | Foldl | Foldr | Scan, rule: Unroll):
-        if not (
-            self.unroll_remaining > 0
-            and (length := rule._get_collection_len(stmt.collection)) is not None
-            and 0 <= length <= self.unroll_remaining
-            and self._has_specializable_element(stmt.collection)
+        if (
+            self.unroll_remaining <= 0
+            or (length := rule._get_collection_len(stmt.collection)) is None
+            or length < 0
+            or length > self.unroll_remaining
+            or not self._has_specializable_element(stmt.collection)
         ):
             return RewriteResult()
         result = rule.rewrite(stmt)
