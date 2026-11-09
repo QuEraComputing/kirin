@@ -195,7 +195,7 @@ def test_generic_recursion_keeps_original():
         pytest.param(range(3), range(3), False, id="range-reuse"),
         pytest.param((1, (2, 3)), (1, (2, 3)), True, id="nested-tuple"),
         pytest.param(frozenset((1, 2)), frozenset((2, 1)), False, id="frozenset-order"),
-        pytest.param(IList([1, (2, 3)]), IList([1, (2, 3)]), True, id="ilist-reuse"),
+        pytest.param(IList([1, (2, 3)]), IList([1, (2, 3)]), False, id="ilist-reuse"),
         pytest.param((1, 2), IList([1, 2]), False, id="tuple-ilist"),
     ],
 )

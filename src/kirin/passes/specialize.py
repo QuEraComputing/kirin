@@ -77,17 +77,16 @@ def constant_key(value: object) -> Hashable | None:
     A Python value is keyed by identity, so a specialization made for one
     object is reused only for that object, and `is` and `id` give the results
     they give without specialization. Equal but distinct objects, including
-    two equal literals, get separate specializations. An `ir.Data` attribute, an
-    explicit compile-time value, is keyed by its own `__eq__` and `__hash__`;
-    an IList by its element type and the identity of its elements.
+    two equal literals, get separate specializations. An IList is a Python
+    container and is keyed by identity like a tuple. Any other `ir.Data`
+    attribute, an explicit compile-time value, is keyed by its own `__eq__`
+    and `__hash__`.
     """
     if isinstance(value, ir.PyAttr):
         value = value.data
     if not _immutable(value):
         return None
-    if type(value) is IList:
-        return (IList, _Identity(value.elem), tuple(map(_Identity, value)))
-    if isinstance(value, ir.Data):
+    if isinstance(value, ir.Data) and type(value) is not IList:
         return (type(value), value)
     return _Identity(value)
 
