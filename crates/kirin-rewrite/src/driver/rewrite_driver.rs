@@ -45,6 +45,12 @@ impl std::ops::AddAssign for RewriteSummary {
 /// [`RuleErrorKind::OpWithBodies`](crate::RuleErrorKind::OpWithBodies)),
 /// `skip` from a pattern rule has no effect so far.
 ///
+/// An interrupted sweep counts like any other: if the run changed nothing,
+/// it ends, without visiting the statements after the interrupt again. So a
+/// rule should only `interrupt` after an application that edited the IR;
+/// otherwise the run reports convergence although no rule in the set has
+/// been tried on those statements. The driver does not check this.
+///
 /// A [`StatementRule`] is tried at every statement the sweep visits, in its
 /// place in the rule list, and steers the sweep with the walk result it
 /// returns. It counts as applied when it edits the IR. Each sweep, the
@@ -68,12 +74,6 @@ impl std::ops::AddAssign for RewriteSummary {
 /// `else` arm after its `then` arm, then leaves the statement's nested
 /// statements unwalked. An `interrupt` ends the sweep at once, leaving the
 /// remaining blocks unrun.
-///
-/// An interrupted sweep counts like any other: if the run changed nothing,
-/// it ends, without visiting the statements after the interrupt again. So a
-/// rule should only `interrupt` after an application that edited the IR;
-/// otherwise the run reports convergence although no rule in the set has
-/// been tried on those statements. The driver does not check this.
 ///
 /// Rules that keep undoing each other never reach a fixpoint. As a safety
 /// net, a run still changing after [`max_sweeps`](Self::max_sweeps) sweeps
