@@ -17,6 +17,8 @@ mod namespaced_language;
 mod scalar_function_language;
 #[cfg(feature = "simple-language")]
 mod simple_language;
+#[cfg(feature = "simple-language")]
+mod typed_operand_language;
 #[cfg(feature = "ungraph-language")]
 mod ungraph_language;
 
@@ -36,6 +38,8 @@ pub use namespaced_language::NamespacedLanguage;
 pub use scalar_function_language::ScalarFunctionLanguage;
 #[cfg(feature = "simple-language")]
 pub use simple_language::SimpleLanguage;
+#[cfg(feature = "simple-language")]
+pub use typed_operand_language::TypedOperandLanguage;
 #[cfg(feature = "ungraph-language")]
 pub use ungraph_language::{
     UngraphCompound, UngraphEdge, UngraphLanguage, UngraphNodeA, UngraphNodeB,
