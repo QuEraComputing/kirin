@@ -2,8 +2,7 @@
 
 from __future__ import annotations
 
-import struct
-from typing import Callable
+from typing import Callable, Hashable
 from collections import deque
 from dataclasses import dataclass
 
@@ -31,40 +30,64 @@ def _fact(value: ir.SSAValue) -> const.Result:
     return hint if isinstance(hint, const.Result) else const.Unknown()
 
 
-def constant_key(value: object) -> tuple | None:
-    """Build a structural specialization key, or ``None`` if dynamic.
-    The key is a tuple of the value's type and its contents, recursively.
+_SCALARS = (type(None), bool, int, float, complex, str, bytes, range)
+
+
+class _Identity:
+    """Hash and compare an object by identity, keeping it alive so that its
+    id cannot be reused while a key holds it."""
+
+    __slots__ = ("obj",)
+
+    def __init__(self, obj: object):
+        self.obj = obj
+
+    def __hash__(self) -> int:
+        return id(self.obj)
+
+    def __eq__(self, other: object) -> bool:
+        return isinstance(other, _Identity) and self.obj is other.obj
+
+
+def _immutable(value: object) -> bool:
+    """Whether `value` and everything it contains can be bound as a constant."""
+    pending, seen = [value], set()
+    while pending:
+        item = pending.pop()
+        if id(item) in seen:
+            continue
+        seen.add(id(item))
+        if type(item) in _SCALARS:
+            continue
+        if type(item) in (tuple, frozenset, IList):
+            pending.extend(item)
+        elif not isinstance(item, ir.Data) or isinstance(item, ir.PyAttr):
+            return False
+    return True
+
+
+def constant_key(value: object) -> Hashable | None:
+    """Build a specialization key, or ``None`` if the value stays a parameter.
+
+    Only immutable values bind: builtin scalars, ranges, tuples, frozensets
+    and ILists of them, and [`ir.Data`][kirin.ir.Data] attributes.
+
+    A Python value is keyed by identity, so a specialization made for one
+    object is reused only for that object, and `is` and `id` give the results
+    they give without specialization. Equal but distinct objects, including
+    two equal literals, get separate specializations. An `ir.Data` attribute, an
+    explicit compile-time value, is keyed by its own `__eq__` and `__hash__`;
+    an IList by its element type and the identity of its elements.
     """
     if isinstance(value, ir.PyAttr):
-        return constant_key(value.data)
+        value = value.data
+    if not _immutable(value):
+        return None
+    if type(value) is IList:
+        return (IList, _Identity(value.elem), tuple(map(_Identity, value)))
     if isinstance(value, ir.Data):
-        if type(value) is IList:
-            items = tuple(constant_key(item) for item in value)
-            if any(item is None for item in items):
-                return None
-            return (IList, id(value.elem), items)
         return (type(value), value)
-
-    kind = type(value)
-    if kind in (type(None), bool, int, str, bytes):
-        return (kind, value)
-    if type(value) is float:
-        return (float, struct.pack("!d", value))
-    if type(value) is complex:
-        return (complex, struct.pack("!dd", value.real, value.imag))
-    if type(value) is range:
-        return (range, value.start, value.stop, value.step)
-    if type(value) is tuple:
-        items = tuple(constant_key(item) for item in value)
-        if any(item is None for item in items):
-            return None
-        return (tuple, items)
-    if type(value) is frozenset:
-        items = tuple(constant_key(item) for item in value)
-        if any(item is None for item in items):
-            return None
-        return (frozenset, frozenset(items))
-    return None
+    return _Identity(value)
 
 
 @dataclass
@@ -84,9 +107,15 @@ class Specialize(Pass):
     is constant with a supported specialization key.
     A zero budget disables specialization.
 
-    DSLs extend the bindable set by registering [`ir.Data`][kirin.ir.Data]
-    attributes with structural ``__hash__`` / ``__eq__``. Builtin Python
-    values in [`ir.PyAttr`][kirin.ir.PyAttr] stay on the careful whitelist.
+    Calls share a specialization when their bound arguments are the same
+    objects, so object identity is preserved: two equal but distinct Python
+    objects, such as two captured `float("1.25")` values, get separate
+    specializations, as do two equal literals in kernel source, which lower
+    to separate objects. DSLs extend the bindable set by registering
+    [`ir.Data`][kirin.ir.Data] attributes, which are compile-time values
+    keyed by their own ``__hash__`` / ``__eq__``; their identity is not
+    preserved. Builtin Python values in [`ir.PyAttr`][kirin.ir.PyAttr] stay
+    on the careful whitelist of immutable types.
 
     ``extra_rules`` supplies rewrite-rule factories for DSL-specific callsites.
     Each factory receives ``materialize`` and is instantiated once per pass run.
