@@ -35,7 +35,9 @@ struct Copied {
 impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Copy `stmt` with everything nested in it, giving the copy fresh ids, and
     /// return the copy, detached: it has no parent until
-    /// [`Rewriter::insert`] places it.
+    /// [`Rewriter::insert`] places it. Its results can be read before then,
+    /// but a copy never placed leaves their readers dangling (see
+    /// [`Rewriter::insert`]).
     ///
     /// Every operand and branch target inside the copy is mapped through
     /// `map`. An operand reading a value from outside the copy keeps reading it
@@ -73,7 +75,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Place its blocks with [`Rewriter::splice_cfg_after`], or make it the
     /// body of a new statement with [`Rewriter::create`]. A copy still
     /// detached when the `Rewriter` is dropped, including one a splice left
-    /// empty, is tombstoned. Values are mapped as for
+    /// empty, is tombstoned, leaving any reader of the values in its blocks
+    /// dangling (see [`Rewriter::insert`]). Values are mapped as for
     /// [`Rewriter::clone_statement`]: in particular, mapping the arguments of
     /// `source`'s entry block gives a copy whose entry block has none.
     ///
