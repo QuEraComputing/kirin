@@ -7,7 +7,10 @@ import tomlkit
 from packaging.version import Version
 
 # check if repo is dirty
-if subprocess.run(["git", "diff", "--quiet"]).returncode != 0:
+if (
+    subprocess.run(["git", "diff", "--quiet"]).returncode != 0
+    or subprocess.run(["git", "diff", "--cached", "--quiet"]).returncode != 0
+):
     logging.error("Repo is dirty")
     exit(1)
 
@@ -18,6 +21,9 @@ args = parser.parse_args()
 root_dir = os.path.dirname(os.path.dirname(__file__))
 toml_path = os.path.join(root_dir, "pyproject.toml")
 dist_dir = os.path.join(root_dir, "dist")
+lock_path = os.path.join(root_dir, "uv.lock")
+with open(lock_path, "rb") as f:
+    original_lock = f.read()
 
 with open(toml_path, "r") as f:
     data = tomlkit.parse(f.read())
@@ -50,6 +56,9 @@ def fail_and_reset(msg):
     data["project"]["version"] = str(v)
     with open(toml_path, "w") as f:
         tomlkit.dump(data, f)
+    with open(lock_path, "wb") as f:
+        f.write(original_lock)
+    subprocess.run(["git", "reset", "--", "pyproject.toml", "uv.lock"], cwd=root_dir)
     exit(1)
 
 
@@ -57,21 +66,30 @@ def fail_and_reset(msg):
 # directly output git error msg
 
 commited = False
-if modified:
-    print("git add project.toml")
-    if subprocess.run(["git", "add", "pyproject.toml"]).returncode != 0:
-        fail_and_reset("Failed to add pyproject.toml")
+print("uv lock")
+if subprocess.run(["uv", "lock"], cwd=root_dir).returncode != 0:
+    fail_and_reset("Failed to update uv.lock")
 
-if modified:
-    if subprocess.run(["git", "add", "pyproject.toml"]).returncode != 0:
-        fail_and_reset("Failed to add pyproject.toml")
-
-    print(f"git commit -m 'Bump version to {new_v}'")
+if (
+    modified
+    or subprocess.run(
+        ["git", "diff", "--quiet", "--", "uv.lock"], cwd=root_dir
+    ).returncode
+    != 0
+):
+    print("git add pyproject.toml uv.lock")
     if (
-        subprocess.run(["git", "commit", "-m", f"Bump version to {new_v}"]).returncode
+        subprocess.run(
+            ["git", "add", "pyproject.toml", "uv.lock"], cwd=root_dir
+        ).returncode
         != 0
     ):
-        fail_and_reset("Failed to commit version bump")
+        fail_and_reset("Failed to stage version and lockfile")
+
+    message = f"chore(release): prepare version {new_v}"
+    print(f"git commit -m '{message}'")
+    if subprocess.run(["git", "commit", "-m", message], cwd=root_dir).returncode != 0:
+        fail_and_reset("Failed to commit version and lockfile")
 
 
 def fail_and_revert(msg):
