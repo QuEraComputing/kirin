@@ -253,12 +253,12 @@ rewriter.splice_cfg_after(body, anchor_block)?;                       // or `cre
 Split in two:
 
 - **6a**: `InsertionPoint` with `create` / `insert`, then `IRMap`,
-  `clone_statement` and `clone_cfg` over block and CFG bodies. A
-  statement owning a `DiGraph` or `UnGraph` body is rejected
-  (`CopyOfGraphBody`).
-- **6b**: graph bodies. A copied graph gets new ports, copied members and
-  yields, and its topology is rebuilt from the copied operands with the
-  helpers `create` uses at `DiGraph` / `UnGraph` points.
+  `clone_statement` and `clone_cfg` over block and CFG bodies.
+- **6b**: graph bodies. A copied graph gets new ports, copied members (each a
+  node or an edge statement, as in the original) and yields. Once the copied
+  operand uses are recorded, its topology is built from them with the helpers
+  `create` uses at `DiGraph` / `UnGraph` points: an edge from each member
+  producer for a `DiGraph`, and each wire synced for an `UnGraph`.
 
 Cost: O(size of what is copied).
 
