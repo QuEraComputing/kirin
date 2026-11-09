@@ -261,6 +261,26 @@ fn statement_id_name(info: &StatementInfo) -> syn::Ident {
     format_ident!("{}_statement_id", name, span = info.name.span())
 }
 
+fn build_fn_arg_type_checks(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
+    info.fields
+        .iter()
+        .filter(|field| {
+            field.category() == FieldCategory::Argument
+                && matches!(field.collection, Collection::Single)
+        })
+        .filter_map(|field| {
+            let expected = field.ssa_type()?;
+            let name = field.name_ident(info.name.span());
+            let label = format!("{}::{}", info.name, field);
+            Some(quote! {
+                if let Some(actual) = stage.ssa_arena().get(#name).and_then(|i|i.ty()) {
+                    let expected = Lang::Type::from(#expected);
+                    assert!(*actual == expected, "{}: expected operand of type {:?}, got {:?}", #label, expected, actual);
+                }
+            })
+        }).collect()
+}
+
 fn build_fn_body(
     info: &StatementInfo,
     input: &InputMeta,
@@ -269,6 +289,7 @@ fn build_fn_body(
 ) -> proc_macro2::TokenStream {
     let statement_id = statement_id_name(info);
     let let_inputs = build_fn_let_inputs(info, &input.ir_type);
+    let arg_type_checks = build_fn_arg_type_checks(info);
     let let_results = let_name_eq_result_value(info, result_name_map, crate_path);
 
     let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
@@ -306,6 +327,7 @@ fn build_fn_body(
     quote! {{
         let #statement_id = stage.statement_arena().next_id();
         #(#let_inputs)*
+        #(#arg_type_checks)*
         #let_results
 
         stage
