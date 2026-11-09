@@ -2,10 +2,11 @@
 
 mod common;
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
-use common::{BuilderDialect, TestType, make_compute, make_split, new_stage};
+use common::{BuilderDialect, TestType, make_compute, make_split, make_wire, new_stage};
 use kirin_ir::*;
+use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
 fn uses_set(stage: &StageInfo<BuilderDialect>, value: impl Into<SSAValue>) -> HashSet<Use> {
     let value: SSAValue = value.into();
@@ -335,20 +336,7 @@ fn a_cloned_cfg_spliced_away_is_tombstoned_with_the_rewriter() {
 fn clones_reject_without_mutating() {
     let mut stage = new_stage();
     let ret = stage.statement().definition(BuilderDialect::Return).new();
-    let member = stage.statement().definition(BuilderDialect::Nop).new();
-    let dg = stage.digraph().node(member).new();
-    let graph_owner = stage
-        .statement()
-        .definition(BuilderDialect::OwnDiGraph(dg))
-        .new();
-    // A graph body nested one level down.
-    let inner = stage.block().stmt(graph_owner).new();
-    let empty = stage.block().new();
-    let outer = stage
-        .statement()
-        .definition(BuilderDialect::OwnBlocks(inner, empty))
-        .new();
-    let _entry = stage.block().stmt(outer).terminator(ret).new();
+    let _entry = stage.block().terminator(ret).new();
     let mut stage = stage.finalize().unwrap();
     let sizes = |stage: &StageInfo<BuilderDialect>| {
         (
@@ -370,10 +358,6 @@ fn clones_reject_without_mutating() {
     assert_eq!(
         rw.clone_statement(ret, &mut map),
         Err(RewriteError::UnexpectedTerminator)
-    );
-    assert_eq!(
-        rw.clone_statement(outer, &mut map),
-        Err(RewriteError::CopyOfGraphBody(graph_owner))
     );
     assert_eq!(
         rw.clone_cfg(dead_cfg, &mut map),
@@ -439,4 +423,214 @@ fn a_clone_rejects_a_dead_replacement_only_if_it_reads_it() {
     let mut map = IRMap::default();
     map.map_value(dead, dead);
     rw.clone_statement(owner, &mut map).unwrap();
+}
+
+/// A `DiGraph`'s petgraph edges, as `(producer, consumer, value)`.
+fn digraph_edges(
+    stage: &StageInfo<BuilderDialect>,
+    graph: DiGraph,
+) -> HashSet<(Statement, Statement, SSAValue)> {
+    let petgraph = graph.expect_info(stage).graph();
+    petgraph
+        .edge_references()
+        .map(|edge| {
+            (
+                petgraph[edge.source()],
+                petgraph[edge.target()],
+                *edge.weight(),
+            )
+        })
+        .collect()
+}
+
+/// An `UnGraph`'s petgraph edges: each wire with its two endpoints.
+fn ungraph_edges(
+    stage: &StageInfo<BuilderDialect>,
+    graph: UnGraph,
+) -> HashMap<SSAValue, HashSet<Statement>> {
+    let petgraph = graph.expect_info(stage).graph();
+    petgraph
+        .edge_references()
+        .map(|edge| {
+            let ends = HashSet::from([petgraph[edge.source()], petgraph[edge.target()]]);
+            (*edge.weight(), ends)
+        })
+        .collect()
+}
+
+#[test]
+fn clone_statement_copies_a_digraph_with_ports_edges_and_yields() {
+    // entry: %x, _ = split
+    //        owner = own_digraph dg(%port) { p: %rp = compute %x; q: add %rp, %port; yield %rp }
+    let mut stage = new_stage();
+    let (split, x, _) = make_split(&mut stage);
+    let (p, rp) = make_compute(&mut stage, x);
+    let dg = stage
+        .digraph()
+        .port(TestType::I32)
+        .node(p)
+        .yield_value(rp)
+        .new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnDiGraph(dg))
+        .new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let entry = stage.block().stmt(split).stmt(owner).terminator(ret).new();
+    let mut stage = stage.finalize().unwrap();
+    let port = SSAValue::from(dg.expect_info(&stage).ports()[0]);
+
+    let mut rw = Rewriter::new(&mut stage);
+    let q = rw
+        .create(InsertionPoint::DiGraph(dg), BuilderDialect::Add(rp, port))
+        .unwrap();
+    let mut map = IRMap::default();
+    let copy = rw.clone_statement(owner, &mut map).unwrap();
+    rw.insert(InsertionPoint::After(owner), copy).unwrap();
+    assert_eq!(order(rw.stage(), entry), [split, owner, copy]);
+
+    let BuilderDialect::OwnDiGraph(dg2) = *definition(rw.stage(), copy) else {
+        panic!("the copy owns a DiGraph");
+    };
+    assert_ne!(dg2, dg);
+    let info = dg2.expect_info(rw.stage());
+    // Fresh ports, members, edges and yields; `%x` from outside is shared.
+    let port2 = SSAValue::from(info.ports()[0]);
+    assert_eq!(map.value(port), Some(port2));
+    assert_eq!(
+        *port2.expect_info(rw.stage()).kind(),
+        SSAKind::Port(PortParent::DiGraph(dg2), 0)
+    );
+    let (p2, q2, rp2) = (
+        map.statement(p).unwrap(),
+        map.statement(q).unwrap(),
+        map.value(rp).unwrap(),
+    );
+    assert_eq!(
+        info.members().map(|(stmt, _)| stmt).collect::<Vec<_>>(),
+        [p2, q2]
+    );
+    assert_eq!(*definition(rw.stage(), q2), BuilderDialect::Add(rp2, port2));
+    assert_eq!(info.yields(), [rp2]);
+    assert_eq!(
+        digraph_edges(rw.stage(), dg2),
+        HashSet::from([(p2, q2, rp2)])
+    );
+    assert_eq!(
+        uses_set(rw.stage(), rp2),
+        HashSet::from([
+            so(q2, 0),
+            Use::DiGraphYield {
+                graph: dg2,
+                index: 0
+            }
+        ])
+    );
+    assert!(uses_set(rw.stage(), x).contains(&so(p2, 0)));
+    drop(rw);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn clone_statement_copies_an_ungraph_with_its_wires() {
+    // entry: owner = own_ungraph ug(%b) { w = wire; a = gate w, %b; c = use w }; ret
+    let mut stage = new_stage();
+    let (w_stmt, w) = make_wire(&mut stage);
+    let ug = stage.ungraph().port(TestType::Qubit).edge(w_stmt).new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnUnGraph(ug))
+        .new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let _entry = stage.block().stmt(owner).terminator(ret).new();
+    let mut stage = stage.finalize().unwrap();
+    let boundary = SSAValue::from(ug.expect_info(&stage).edge_ports()[0]);
+
+    let mut rw = Rewriter::new(&mut stage);
+    let a = rw
+        .create(
+            InsertionPoint::UnGraph(ug),
+            BuilderDialect::Gate(w, boundary),
+        )
+        .unwrap();
+    let c = rw
+        .create(InsertionPoint::UnGraph(ug), BuilderDialect::Use(w))
+        .unwrap();
+    let mut map = IRMap::default();
+    let copy = rw.clone_statement(owner, &mut map).unwrap();
+    rw.insert(InsertionPoint::After(owner), copy).unwrap();
+
+    let BuilderDialect::OwnUnGraph(ug2) = *definition(rw.stage(), copy) else {
+        panic!("the copy owns an UnGraph");
+    };
+    let (w2_stmt, w2, a2, c2) = (
+        map.statement(w_stmt).unwrap(),
+        map.value(w).unwrap(),
+        map.statement(a).unwrap(),
+        map.statement(c).unwrap(),
+    );
+    let info = ug2.expect_info(rw.stage());
+    assert_eq!(
+        info.members()
+            .map(|(stmt, member)| (stmt, member.role()))
+            .collect::<Vec<_>>(),
+        [
+            (w2_stmt, MemberRole::Edge),
+            (a2, MemberRole::Node),
+            (c2, MemberRole::Node)
+        ]
+    );
+    // The copied wire connects the copied nodes; the copied boundary port has
+    // one reader, so no edge.
+    let boundary2 = map.value(boundary).unwrap();
+    assert_eq!(
+        *definition(rw.stage(), a2),
+        BuilderDialect::Gate(w2, boundary2)
+    );
+    assert_eq!(
+        ungraph_edges(rw.stage(), ug2),
+        HashMap::from([(w2, HashSet::from([a2, c2]))])
+    );
+    drop(rw);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn clone_statement_copies_a_graph_nested_in_a_block() {
+    // entry: outer = own_blocks { inner: owner = own_digraph { nop } } { }; ret
+    let mut stage = new_stage();
+    let member = stage.statement().definition(BuilderDialect::Nop).new();
+    let dg = stage.digraph().node(member).new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnDiGraph(dg))
+        .new();
+    let inner = stage.block().stmt(owner).new();
+    let empty = stage.block().new();
+    let outer = stage
+        .statement()
+        .definition(BuilderDialect::OwnBlocks(inner, empty))
+        .new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let _entry = stage.block().stmt(outer).terminator(ret).new();
+    let mut stage = stage.finalize().unwrap();
+
+    let mut rw = Rewriter::new(&mut stage);
+    let mut map = IRMap::default();
+    let copy = rw.clone_statement(outer, &mut map).unwrap();
+    rw.insert(InsertionPoint::After(outer), copy).unwrap();
+    let owner2 = map.statement(owner).unwrap();
+    let BuilderDialect::OwnDiGraph(dg2) = *definition(rw.stage(), owner2) else {
+        panic!("the copied owner owns a DiGraph");
+    };
+    assert_ne!(dg2, dg);
+    assert_eq!(
+        dg2.expect_info(rw.stage())
+            .members()
+            .map(|(stmt, _)| stmt)
+            .collect::<Vec<_>>(),
+        [map.statement(member).unwrap()]
+    );
+    drop(rw);
+    verify_derived(&stage).unwrap();
 }

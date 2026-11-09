@@ -1,6 +1,6 @@
 use rustc_hash::FxHashMap;
 
-use crate::{Block, CFG, SSAValue, Statement};
+use crate::{Block, CFG, DiGraph, SSAValue, Statement, UnGraph};
 
 /// What a copy maps each original id to, like MLIR's `IRMapping`.
 ///
@@ -21,6 +21,8 @@ pub struct IRMap {
     blocks: FxHashMap<Block, Block>,
     statements: FxHashMap<Statement, Statement>,
     cfgs: FxHashMap<CFG, CFG>,
+    digraphs: FxHashMap<DiGraph, DiGraph>,
+    ungraphs: FxHashMap<UnGraph, UnGraph>,
 }
 
 impl IRMap {
@@ -63,5 +65,21 @@ impl IRMap {
 
     pub(super) fn cfg(&self, old: CFG) -> Option<CFG> {
         self.cfgs.get(&old).copied()
+    }
+
+    pub(super) fn map_digraph(&mut self, old: DiGraph, new: DiGraph) {
+        self.digraphs.insert(old, new);
+    }
+
+    pub(super) fn digraph(&self, old: DiGraph) -> Option<DiGraph> {
+        self.digraphs.get(&old).copied()
+    }
+
+    pub(super) fn map_ungraph(&mut self, old: UnGraph, new: UnGraph) {
+        self.ungraphs.insert(old, new);
+    }
+
+    pub(super) fn ungraph(&self, old: UnGraph) -> Option<UnGraph> {
+        self.ungraphs.get(&old).copied()
     }
 }

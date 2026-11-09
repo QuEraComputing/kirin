@@ -2,23 +2,36 @@ use std::collections::HashSet;
 
 use smallvec::SmallVec;
 
-use crate::arena::{GetInfo, GetInfoMut};
-use crate::node::CFGInfo;
+use crate::arena::{GetInfo, GetInfoMut, Id};
 use crate::node::linked_list::{LinkedList, LinkedListNode};
+use crate::node::{CFGInfo, GraphMember, Port, PortParent};
 use crate::{
-    Block, BlockInfo, BlockParent, Body, CFG, Dialect, SSAValue, Statement, StatementInfo,
-    StatementParent, Successor, Use,
+    Block, BlockInfo, BlockParent, Body, CFG, DiGraph, DiGraphInfo, Dialect, SSAInfo, SSAKind,
+    SSAValue, Statement, StatementInfo, StatementParent, Successor, UnGraph, UnGraphInfo, Use,
 };
 
 use super::IRMap;
 use crate::rewrite::bodies::bodies_of;
 use crate::rewrite::rewriter::{RewriteError, Rewriter, add_predecessor, add_use};
 
+/// What the second walk of a copy made, for the last step to finish: the
+/// copied statements, whose operand uses are recorded once every result is
+/// bound, and the copied graphs, whose topology follows those uses.
+#[derive(Default)]
+struct Copied {
+    statements: Vec<Statement>,
+    /// Each original `DiGraph` with its copy, whose yields are set last.
+    digraphs: Vec<(DiGraph, DiGraph)>,
+    ungraphs: Vec<UnGraph>,
+}
+
 /// Deep copies. A copy takes two passes over the original: the first
-/// allocates every CFG, block, block argument and result the copy needs,
-/// recording them in the [`IRMap`]; the second copies the statements, whose
-/// operands and branch targets may name any of them, since a block may branch
-/// to, or read a value from, a block listed after it.
+/// allocates every CFG, graph, block, block argument, port and result the copy
+/// needs, recording them in the [`IRMap`]; the second copies the statements,
+/// whose operands and branch targets may name any of them, since a block may
+/// branch to, or read a value from, a block listed after it. Last, the copied
+/// statements' operand uses are recorded, and the copied graphs' topology is
+/// built from them.
 impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Copy `stmt` with everything nested in it, giving the copy fresh ids, and
     /// return the copy, detached: it has no parent until
@@ -33,10 +46,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Rejects, leaving the stage untouched, if `stmt` is unknown, is a
     /// terminator ([`RewriteError::UnexpectedTerminator`]: it could not be
-    /// inserted), or holds a `DiGraph` or `UnGraph` body at any depth
-    /// ([`RewriteError::CopyOfGraphBody`]), or if the copy would read a value
-    /// from `map` that is not live ([`RewriteError::UnknownValue`]). Records no
-    /// event: nothing reachable changes until the insert.
+    /// inserted), or if the copy would read a value from `map` that is not
+    /// live ([`RewriteError::UnknownValue`]). Records no event: nothing
+    /// reachable changes until the insert.
     pub fn clone_statement(
         &mut self,
         stmt: Statement,
@@ -45,12 +57,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if self.live_statement(stmt)?.definition.is_terminator() {
             return Err(RewriteError::UnexpectedTerminator);
         }
-        self.check_copyable_statement(stmt, map)?;
+        self.check_replacements_live(stmt, map)?;
 
         self.reserve_statement(stmt, map);
-        let mut copied = Vec::new();
+        let mut copied = Copied::default();
         let copy = self.fill_statement(stmt, None, map, &mut copied);
-        self.record_operand_uses(&copied);
+        self.finish_copy(copied, map);
         self.detached.insert(copy);
         Ok(copy)
     }
@@ -66,30 +78,28 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// `source`'s entry block gives a copy whose entry block has none.
     ///
     /// Rejects, leaving the stage untouched, if `source` is unknown
-    /// ([`RewriteError::UnknownCfg`]), holds a `DiGraph` or `UnGraph` body at
-    /// any depth ([`RewriteError::CopyOfGraphBody`]), or if the copy would
-    /// read a value from `map` that is not live
-    /// ([`RewriteError::UnknownValue`]). Records no event.
+    /// ([`RewriteError::UnknownCfg`]), or if the copy would read a value from
+    /// `map` that is not live ([`RewriteError::UnknownValue`]). Records no
+    /// event.
     pub fn clone_cfg(&mut self, source: CFG, map: &mut IRMap) -> Result<CFG, RewriteError> {
         if source.get_info(self.stage).is_none() {
             return Err(RewriteError::UnknownCfg(source));
         }
-        for block in self.cfg_blocks(source) {
-            self.check_copyable_block(block, map)?;
+        for stmt in self.body_statements(Body::CFG(source)) {
+            self.check_replacements_live(stmt, map)?;
         }
 
         let copy = self.reserve_cfg(source, map);
-        let mut copied = Vec::new();
+        let mut copied = Copied::default();
         self.fill_body(Body::CFG(source), map, &mut copied);
-        self.record_operand_uses(&copied);
+        self.finish_copy(copied, map);
         self.detached_cfgs.insert(copy);
         Ok(copy)
     }
 
-    /// Reject `stmt` if a graph body is nested in it at any depth, or if a
-    /// value `map` gives in place of one of its operands, or of an operand
-    /// nested in it, is not live: the copy would read it.
-    fn check_copyable_statement(&self, stmt: Statement, map: &IRMap) -> Result<(), RewriteError> {
+    /// Reject `stmt` if the copy would read a value from `map` that is not
+    /// live, in `stmt` or anything nested in it.
+    fn check_replacements_live(&self, stmt: Statement, map: &IRMap) -> Result<(), RewriteError> {
         let definition = &stmt.expect_info(self.stage).definition;
         for &operand in definition.arguments() {
             if let Some(replacement) = map.value(operand)
@@ -98,25 +108,20 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 return Err(RewriteError::UnknownValue(replacement));
             }
         }
-        for body in bodies_of(definition) {
-            match body {
-                Body::Block(block) => self.check_copyable_block(block, map)?,
-                Body::CFG(cfg) => {
-                    for block in self.cfg_blocks(cfg) {
-                        self.check_copyable_block(block, map)?;
-                    }
-                }
-                Body::DiGraph(_) | Body::UnGraph(_) => {
-                    return Err(RewriteError::CopyOfGraphBody(stmt));
+        // A `DiGraph`'s yields are read too.
+        for &graph in definition.digraphs() {
+            for &value in graph.expect_info(self.stage).yields() {
+                if let Some(replacement) = map.value(value)
+                    && replacement.get_info(self.stage).is_none()
+                {
+                    return Err(RewriteError::UnknownValue(replacement));
                 }
             }
         }
-        Ok(())
-    }
-
-    fn check_copyable_block(&self, block: Block, map: &IRMap) -> Result<(), RewriteError> {
-        for stmt in self.block_statements(block) {
-            self.check_copyable_statement(stmt, map)?;
+        for body in bodies_of(definition) {
+            for nested in self.body_statements(body) {
+                self.check_replacements_live(nested, map)?;
+            }
         }
         Ok(())
     }
@@ -140,9 +145,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 Body::CFG(cfg) => {
                     self.reserve_cfg(cfg, map);
                 }
-                Body::DiGraph(_) | Body::UnGraph(_) => {
-                    unreachable!("graph bodies are rejected before copying")
-                }
+                Body::DiGraph(graph) => self.reserve_digraph(graph, map),
+                Body::UnGraph(graph) => self.reserve_ungraph(graph, map),
             }
         }
     }
@@ -160,6 +164,62 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             self.push_block(copy, block_copy);
         }
         copy
+    }
+
+    /// First pass for `graph`: allocate a graph with no parent, no members and
+    /// copies of its ports, then reserve its members.
+    fn reserve_digraph(&mut self, graph: DiGraph, map: &mut IRMap) {
+        let (ports, edge_count) = {
+            let info = graph.expect_info(self.stage);
+            (info.ports().to_vec(), info.edge_count())
+        };
+        let copy = self.stage.nodes.digraphs.alloc_with_id(|id| {
+            DiGraphInfo::from_parts(id, None, None, Vec::new(), edge_count, Vec::new())
+        });
+        let ports = self.copy_ports(&ports, PortParent::DiGraph(copy), map);
+        if let Some(info) = copy.get_info_mut(self.stage) {
+            info.ports = ports;
+        }
+        map.map_digraph(graph, copy);
+        for stmt in self.body_statements(Body::DiGraph(graph)) {
+            self.reserve_statement(stmt, map);
+        }
+    }
+
+    /// First pass for `graph`, as for a `DiGraph`.
+    fn reserve_ungraph(&mut self, graph: UnGraph, map: &mut IRMap) {
+        let (ports, edge_count) = {
+            let info = graph.expect_info(self.stage);
+            (info.ports().to_vec(), info.edge_count())
+        };
+        let copy =
+            self.stage.nodes.ungraphs.alloc_with_id(|id| {
+                UnGraphInfo::from_parts(id, None, None, Vec::new(), edge_count)
+            });
+        let ports = self.copy_ports(&ports, PortParent::UnGraph(copy), map);
+        if let Some(info) = copy.get_info_mut(self.stage) {
+            info.ports = ports;
+        }
+        map.map_ungraph(graph, copy);
+        for stmt in self.body_statements(Body::UnGraph(graph)) {
+            self.reserve_statement(stmt, map);
+        }
+    }
+
+    /// Allocate a copy of each of `ports`, in order, as ports of `parent`.
+    fn copy_ports(&mut self, ports: &[Port], parent: PortParent, map: &mut IRMap) -> Vec<Port> {
+        let mut copies = Vec::with_capacity(ports.len());
+        for (index, &port) in ports.iter().enumerate() {
+            let port = SSAValue::from(port);
+            let ty = port.expect_info(self.stage).ty().clone();
+            let copy = self
+                .stage
+                .ssas
+                .alloc_with_id(|id| Some(SSAInfo::new(id, None, ty, SSAKind::Port(parent, index))));
+            map.map_value(port, copy);
+            copies.push(Port::from(Id::from(copy)));
+        }
+        copies
     }
 
     /// First pass for `block`: allocate an empty block under `parent` with the
@@ -214,7 +274,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         stmt: Statement,
         parent: Option<StatementParent>,
         map: &mut IRMap,
-        copied: &mut Vec<Statement>,
+        copied: &mut Copied,
     ) -> Statement {
         let original = stmt.expect_info(self.stage).definition.clone();
         let mut definition = original.clone();
@@ -237,6 +297,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for cfg in definition.cfgs_mut() {
             *cfg = map.cfg(*cfg).expect("bodies are reserved first");
         }
+        for graph in definition.digraphs_mut() {
+            *graph = map.digraph(*graph).expect("bodies are reserved first");
+        }
+        for graph in definition.ungraphs_mut() {
+            *graph = map.ungraph(*graph).expect("bodies are reserved first");
+        }
         let bodies = bodies_of(&definition);
 
         let copy = self
@@ -249,7 +315,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             });
         self.bind_results(copy, results);
         map.map_statement(stmt, copy);
-        copied.push(copy);
+        copied.statements.push(copy);
         // The copy owns the copied bodies, reserved empty by the first pass.
         for body in bodies {
             self.adopt_body(body, copy);
@@ -261,8 +327,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         copy
     }
 
-    /// Second pass for the original `body`: fill its copy's blocks.
-    fn fill_body(&mut self, body: Body, map: &mut IRMap, copied: &mut Vec<Statement>) {
+    /// Second pass for the original `body`: fill its copy.
+    fn fill_body(&mut self, body: Body, map: &mut IRMap, copied: &mut Copied) {
         match body {
             Body::Block(block) => self.fill_block(block, map, copied),
             Body::CFG(cfg) => {
@@ -270,15 +336,47 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     self.fill_block(block, map, copied);
                 }
             }
-            Body::DiGraph(_) | Body::UnGraph(_) => {
-                unreachable!("graph bodies are rejected before copying")
+            Body::DiGraph(graph) => {
+                let copy = map.digraph(graph).expect("graphs are reserved first");
+                for stmt in self.body_statements(body) {
+                    let stmt_copy = self.fill_statement(
+                        stmt,
+                        Some(StatementParent::DiGraph(copy)),
+                        map,
+                        copied,
+                    );
+                    if let Some(info) = copy.get_info_mut(self.stage) {
+                        info.add_node(stmt_copy);
+                    }
+                }
+                copied.digraphs.push((graph, copy));
+            }
+            Body::UnGraph(graph) => {
+                let copy = map.ungraph(graph).expect("graphs are reserved first");
+                let members: Vec<(Statement, GraphMember)> =
+                    graph.expect_info(self.stage).members().collect();
+                for (stmt, member) in members {
+                    let stmt_copy = self.fill_statement(
+                        stmt,
+                        Some(StatementParent::UnGraph(copy)),
+                        map,
+                        copied,
+                    );
+                    if let Some(info) = copy.get_info_mut(self.stage) {
+                        match member {
+                            GraphMember::Node(_) => info.add_node(stmt_copy),
+                            GraphMember::Edge => info.add_edge_member(stmt_copy),
+                        };
+                    }
+                }
+                copied.ungraphs.push(copy);
             }
         }
     }
 
     /// Second pass for the original `block`: copy its statements into its copy
     /// in order, then its terminator, recording the terminator's edges.
-    fn fill_block(&mut self, block: Block, map: &mut IRMap, copied: &mut Vec<Statement>) {
+    fn fill_block(&mut self, block: Block, map: &mut IRMap, copied: &mut Copied) {
         let copy = map.block(block).expect("blocks are reserved first");
         let (head, terminator) = {
             let info = block.expect_info(self.stage);
@@ -310,9 +408,54 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
     }
 
-    /// Record the operand uses of every statement in `copied`.
-    fn record_operand_uses(&mut self, copied: &[Statement]) {
-        for &stmt in copied {
+    /// Last step of a copy: build each copied graph's topology and record the
+    /// operand uses of every statement copied, now that every result is
+    /// bound.
+    fn finish_copy(&mut self, copied: Copied, map: &IRMap) {
+        // `DiGraph`s: for each operand of a member that is another member's
+        // result, add an edge from that member. This reads only the operands,
+        // so it does not need the uses yet. Then copy the yields, mapping them
+        // like operands, and record their uses.
+        for (graph, copy) in copied.digraphs {
+            for node in self.body_statements(Body::DiGraph(copy)) {
+                let operands: Vec<SSAValue> = node
+                    .expect_info(self.stage)
+                    .definition
+                    .arguments()
+                    .copied()
+                    .collect();
+                for operand in operands {
+                    self.add_operand_edge(copy, node, operand);
+                }
+            }
+            let yields: Vec<SSAValue> = graph
+                .expect_info(self.stage)
+                .yields()
+                .iter()
+                .map(|&value| map.lookup_or_original(value))
+                .collect();
+            for (index, &value) in yields.iter().enumerate() {
+                add_use(self.stage, value, Use::DiGraphYield { graph: copy, index });
+            }
+            if let Some(info) = copy.get_info_mut(self.stage) {
+                info.extra.yields = yields;
+            }
+        }
+
+        // `UnGraph`s: an edge is a wire read by two node slots, found from the
+        // recorded uses. So snapshot each copied graph's wires, record the
+        // operand uses, then resync the wires to add the edges.
+        let wires: Vec<_> = copied
+            .ungraphs
+            .iter()
+            .map(|&graph| {
+                (
+                    graph,
+                    self.snapshot_wires(graph, self.wire_candidates(graph)),
+                )
+            })
+            .collect();
+        for &stmt in &copied.statements {
             let operands: Vec<SSAValue> = stmt
                 .expect_info(self.stage)
                 .definition
@@ -323,6 +466,24 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 add_use(self.stage, operand, Use::StatementOperand { stmt, index });
             }
         }
+        for (graph, wires) in wires {
+            self.resync_wires(graph, wires);
+        }
+    }
+
+    /// The values that may be wires of `graph`: its edge statements' results
+    /// and its ports. `snapshot_wires` keeps only the wires among them.
+    fn wire_candidates(&self, graph: UnGraph) -> Vec<SSAValue> {
+        let info = graph.expect_info(self.stage);
+        let ports = info.ports().iter().map(|&port| SSAValue::from(port));
+        let results = info.edge_statements().flat_map(|stmt| {
+            stmt.expect_info(self.stage)
+                .definition
+                .results()
+                .map(|&result| SSAValue::from(result))
+                .collect::<Vec<_>>()
+        });
+        ports.chain(results).collect()
     }
 
     /// Append the unlinked `block` to the end of `cfg`'s block list.
@@ -346,6 +507,30 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if let Some(info) = cfg.get_info_mut(self.stage) {
             info.blocks.tail = Some(block);
             info.blocks.len += 1;
+        }
+    }
+
+    /// The statements directly in `body`: a block's chain then its
+    /// terminator, every block's in order for a CFG, and a graph's members in
+    /// member order.
+    fn body_statements(&self, body: Body) -> Vec<Statement> {
+        match body {
+            Body::Block(block) => self.block_statements(block),
+            Body::CFG(cfg) => self
+                .cfg_blocks(cfg)
+                .into_iter()
+                .flat_map(|block| self.block_statements(block))
+                .collect(),
+            Body::DiGraph(graph) => graph
+                .expect_info(self.stage)
+                .members()
+                .map(|(stmt, _)| stmt)
+                .collect(),
+            Body::UnGraph(graph) => graph
+                .expect_info(self.stage)
+                .members()
+                .map(|(stmt, _)| stmt)
+                .collect(),
         }
     }
 
