@@ -11,8 +11,9 @@ use super::{FunctionOps, InlineError};
 /// copied in front of the call, and the call's results are replaced by the
 /// returned values. Any other callee is copied as blocks: the call's block is split
 /// after the call, the copied blocks go in between and are entered with a
-/// branch, each copied return becomes a branch to the second half with the
-/// returned values, and that half takes the call's results as its arguments.
+/// branch passing the call's arguments, each copied return becomes a branch to
+/// the second half with the returned values, and that half takes the call's
+/// results as its arguments.
 /// `branch` builds the language's branch to a block with arguments.
 ///
 /// One level: the calls the inlined code brings in are left as calls, for
@@ -117,16 +118,16 @@ where
         }
     }
     let in_place = blocks.len() == 1 && returns.len() == 1;
-    // The callee reads the call's arguments where it read its own.
     let mut map = IRMap::default();
-    for (&arg, &value) in entry_args.iter().zip(&call.args) {
-        map.map_value(arg, value);
-    }
 
     // A callee that is one block ending in a return needs no new blocks: copy
-    // its statements in front of the call, replace the call's results with
-    // the returned values, mapped like the copied operands, and erase the call.
+    // its statements in front of the call, reading the call's arguments where
+    // they read the callee's, replace the call's results with the returned
+    // values, mapped like the copied operands, and erase the call.
     if in_place {
+        for (&arg, &value) in entry_args.iter().zip(&call.args) {
+            map.map_value(arg, value);
+        }
         let chain: Vec<Statement> = entry.statements(stage).collect();
         let returned: Vec<SSAValue> = returns[0]
             .expect_info(stage)
@@ -164,8 +165,8 @@ where
     }
 
     // Copy the callee's blocks between the call's block and its second half,
-    // branch from the call's block to the copied entry, and turn each copied
-    // return into a branch to the second half.
+    // branch from the call's block to the copied entry with the call's
+    // arguments, and turn each copied return into a branch to the second half.
     let copy = rewriter.clone_cfg(callee, &mut map)?;
     rewriter.splice_cfg_after(copy, caller_block)?;
     let entry_copy = map
@@ -173,7 +174,7 @@ where
         .expect("the copy has the callee's entry block");
     rewriter.create(
         InsertionPoint::Terminator(caller_block),
-        branch(entry_copy, Vec::new()),
+        branch(entry_copy, call.args),
     )?;
     for ret in returns {
         let ret_copy = map

@@ -222,8 +222,8 @@ fn a_multi_block_callee_is_inlined_between_the_halves_of_the_block() {
     assert_eq!(inline_calls(&mut rw, body, branch), Ok(1));
     drop(rw);
 
-    // ^g(%x, %y): br ^e'
-    // ^e': cond_br %x then=^t'(%x) else=^f'(%y)
+    // ^g(%x, %y): br ^e'(%x, %y)
+    // ^e'(%p, %q): cond_br %p then=^t'(%p) else=^f'(%q)
     // ^t'(%a): br ^c(%a)     ^f'(%b): br ^c(%b)
     // ^c(%r): %d = add %r, %r; ret %d
     let blocks: Vec<Block> = body.blocks(&stage).collect();
@@ -234,13 +234,13 @@ fn a_multi_block_callee_is_inlined_between_the_halves_of_the_block() {
     assert!(g.statements(&stage).next().is_none());
     assert_eq!(
         *definition(&stage, g.terminator(&stage).unwrap()),
-        branch(e, vec![])
+        branch(e, vec![x, y])
     );
-    assert!(e.expect_info(&stage).arguments().is_empty());
+    let (p, q) = (arg(&stage, e, 0), arg(&stage, e, 1));
     assert!(matches!(
         definition(&stage, e.terminator(&stage).unwrap()),
         TestLang::Cf(ControlFlow::ConditionalBranch { condition, true_args, false_args, .. })
-            if *condition == x && *true_args == [x] && *false_args == [y]
+            if *condition == p && *true_args == [p] && *false_args == [q]
     ));
     for block in [t, f] {
         assert_eq!(
@@ -261,6 +261,94 @@ fn a_multi_block_callee_is_inlined_between_the_halves_of_the_block() {
         .copied()
         .collect();
     assert_eq!(preds, HashSet::from([t, f]));
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn a_callee_whose_entry_is_a_loop_header_keeps_its_entry_arguments() {
+    // fn @l(%n) { ^e(%i): %j = add %i, %i; cond_br %j then=^b(%j) else=^x(%j);
+    // ^b(%k): br ^e(%k); ^x(%r): ret %r }
+    let mut b = Builder::default();
+    let r = b.block_argument().index(0);
+    let ret_r = Return::<ArithType>::new(&mut b, vec![r]);
+    let exit = b.block().argument(ArithType::I64).terminator(ret_r).new();
+    // `^b`'s branch back to `^e` is created below, once `^e` exists.
+    let back = b.block().argument(ArithType::I64).new();
+    let i = b.block_argument().index(0);
+    let add = Arith::<ArithType>::op_add(&mut b, i, i);
+    let j: SSAValue = add.result.into();
+    let cond_br = b
+        .statement()
+        .definition(TestLang::Cf(ControlFlow::ConditionalBranch {
+            condition: j,
+            true_target: Successor::from_block(back),
+            true_args: vec![j],
+            false_target: Successor::from_block(exit),
+            false_args: vec![j],
+        }))
+        .new();
+    let entry = b
+        .block()
+        .argument(ArithType::I64)
+        .stmt(add)
+        .terminator(cond_br)
+        .new();
+    let l_body = b
+        .cfg()
+        .add_block(entry)
+        .add_block(back)
+        .add_block(exit)
+        .new();
+    let l = define(&mut b, l_body, 1);
+    // ^g(%x): %c = call @l(%x); ret %c
+    let x = b.block_argument().index(0);
+    let call = Call::<ArithType>::build(&mut b)
+        .specialized(l)
+        .args(vec![x])
+        .results(1)
+        .insert();
+    let ret = Return::<ArithType>::new(&mut b, vec![call.results[0].into()]);
+    let g = b
+        .block()
+        .argument(ArithType::I64)
+        .stmt(call)
+        .terminator(ret)
+        .new();
+    let body = b.cfg().add_block(g).new();
+    define(&mut b, body, 1);
+    let mut stage = b.finalize().unwrap();
+    let x = arg(&stage, g, 0);
+
+    let mut rw = Rewriter::new(&mut stage);
+    let k = arg(rw.stage(), back, 0);
+    rw.create(InsertionPoint::Terminator(back), branch(entry, vec![k]))
+        .unwrap();
+    assert_eq!(inline_calls(&mut rw, body, branch), Ok(1));
+    drop(rw);
+
+    // ^g(%x): br ^e'(%x)
+    // ^e'(%i'): %j' = add %i', %i'; cond_br %j' then=^b'(%j') else=^x'(%j')
+    // ^b'(%k'): br ^e'(%k')     ^x'(%r'): br ^c(%r')
+    // ^c(%c'): ret %c'
+    let blocks: Vec<Block> = body.blocks(&stage).collect();
+    let [_, e2, b2, _, _] = blocks[..] else {
+        panic!("expected five blocks, found {}", blocks.len());
+    };
+    assert_eq!(
+        *definition(&stage, g.terminator(&stage).unwrap()),
+        branch(e2, vec![x])
+    );
+    assert_eq!(
+        *definition(&stage, b2.terminator(&stage).unwrap()),
+        branch(e2, vec![arg(&stage, b2, 0)])
+    );
+    let preds: HashSet<Block> = e2
+        .expect_info(&stage)
+        .predecessors()
+        .iter()
+        .copied()
+        .collect();
+    assert_eq!(preds, HashSet::from([g, b2]));
     verify_derived(&stage).unwrap();
 }
 

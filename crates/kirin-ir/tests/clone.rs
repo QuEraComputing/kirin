@@ -312,15 +312,15 @@ fn a_cloned_cfg_spliced_away_is_tombstoned_with_the_rewriter() {
 
     let copy = {
         let mut rw = Rewriter::new(&mut stage);
-        // The callee's entry argument reads the caller's `%w`, so the copied
-        // entry block has no arguments.
+        // Mapping the callee's entry argument has no effect: it is copied.
         let mut map = IRMap::default();
         map.map_value(a, w);
         let copy = rw.clone_cfg(callee, &mut map).unwrap();
         let e2 = map.block(e).unwrap();
-        assert!(e2.expect_info(rw.stage()).arguments().is_empty());
+        let a2: SSAValue = e2.expect_info(rw.stage()).arguments()[0].into();
+        assert_eq!(map.value(a), Some(a2));
         let use_a2 = map.statement(use_a).unwrap();
-        assert_eq!(*definition(rw.stage(), use_a2), BuilderDialect::Use(w));
+        assert_eq!(*definition(rw.stage(), use_a2), BuilderDialect::Use(a2));
 
         rw.splice_cfg_after(copy, k).unwrap();
         assert_eq!(caller.blocks(rw.stage()).collect::<Vec<_>>(), [k, e2]);
@@ -364,6 +364,64 @@ fn clones_reject_without_mutating() {
     );
     assert!(rw.events().is_empty());
     assert_eq!(sizes(rw.stage()), before);
+}
+
+#[test]
+fn a_clone_copies_every_block_argument_and_can_reuse_its_map() {
+    // ^entry(%x): jump ^next(%x); ^next(%a): use %a; ret
+    let mut stage = new_stage();
+    let (split, z, _) = make_split(&mut stage);
+    let a = stage.block_argument().index(0);
+    let use_a = stage.statement().definition(BuilderDialect::Use(a)).new();
+    let next_ret = stage.statement().definition(BuilderDialect::Return).new();
+    let next = stage
+        .block()
+        .argument(TestType::I32)
+        .stmt(use_a)
+        .terminator(next_ret)
+        .new();
+    let x = stage.block_argument().index(0);
+    let jump = stage
+        .statement()
+        .definition(BuilderDialect::Jump(Successor::from_block(next), vec![x]))
+        .new();
+    let entry = stage.block().argument(TestType::I32).terminator(jump).new();
+    let body = stage.cfg().add_block(entry).add_block(next).new();
+    let owner = stage
+        .statement()
+        .definition(BuilderDialect::OwnCFG(body))
+        .new();
+    let ret = stage.statement().definition(BuilderDialect::Return).new();
+    let host = stage.block().stmt(split).stmt(owner).terminator(ret).new();
+    let mut stage = stage.finalize().unwrap();
+    let a: SSAValue = next.expect_info(&stage).arguments()[0].into();
+
+    let mut rw = Rewriter::new(&mut stage);
+    // Mapping `%a` has no effect: `^next`'s copy keeps its argument, which
+    // the copied jump still passes.
+    let mut map = IRMap::default();
+    map.map_value(a, z);
+    let mut copy = || {
+        let copy = rw.clone_cfg(body, &mut map).unwrap();
+        let [entry2, next2] = [entry, next].map(|block| map.block(block).unwrap());
+        let x2: SSAValue = entry2.expect_info(rw.stage()).arguments()[0].into();
+        let a2: SSAValue = next2.expect_info(rw.stage()).arguments()[0].into();
+        let jump2 = map.statement(jump).unwrap();
+        assert_eq!(
+            *definition(rw.stage(), jump2),
+            BuilderDialect::Jump(Successor::from_block(next2), vec![x2])
+        );
+        let use_a2 = map.statement(use_a).unwrap();
+        assert_eq!(*definition(rw.stage(), use_a2), BuilderDialect::Use(a2));
+        rw.create(InsertionPoint::After(owner), BuilderDialect::OwnCFG(copy))
+            .unwrap()
+    };
+    // A second copy with the same map is independent of the first.
+    let first = copy();
+    let second = copy();
+    drop(rw);
+    assert_eq!(order(&stage, host)[1..], [owner, second, first]);
+    verify_derived(&stage).unwrap();
 }
 
 #[test]
@@ -422,6 +480,82 @@ fn a_clone_rejects_a_dead_replacement_only_if_it_reads_it() {
     let mut map = IRMap::default();
     map.map_value(dead, dead);
     rw.clone_statement(owner, &mut map).unwrap();
+}
+
+#[test]
+fn a_clone_reuses_a_map_whose_earlier_copy_is_gone() {
+    let IfLike {
+        mut stage,
+        x,
+        t,
+        use_t,
+        owner,
+        ..
+    } = if_like();
+    let mut map = IRMap::default();
+    // The first copy is tombstoned with its rewriter, so `map` takes `%t` to
+    // a dead value.
+    let first_t = {
+        let mut rw = Rewriter::new(&mut stage);
+        rw.clone_statement(owner, &mut map).unwrap();
+        map.value(t).unwrap()
+    };
+    assert!(first_t.get_info(&stage).is_none());
+
+    // The copy defines `%t` again, so the dead entry is never read.
+    let mut rw = Rewriter::new(&mut stage);
+    let copy = rw.clone_statement(owner, &mut map).unwrap();
+    let t2 = map.value(t).unwrap();
+    assert_ne!(t2, first_t);
+    let use_t2 = map.statement(use_t).unwrap();
+    assert_eq!(*definition(rw.stage(), use_t2), BuilderDialect::Use(t2));
+    assert_eq!(map.value(x), None);
+    rw.insert(InsertionPoint::After(owner), copy).unwrap();
+    drop(rw);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn a_clone_of_a_clone_reads_its_own_values() {
+    let IfLike {
+        mut stage,
+        entry,
+        x,
+        t,
+        compute,
+        use_t,
+        owner,
+        ..
+    } = if_like();
+    let mut rw = Rewriter::new(&mut stage);
+    let mut map = IRMap::default();
+    let first = rw.clone_statement(owner, &mut map).unwrap();
+    rw.insert(InsertionPoint::After(owner), first).unwrap();
+    let (t1, compute1, use_t1) = (
+        map.value(t).unwrap(),
+        map.statement(compute).unwrap(),
+        map.statement(use_t).unwrap(),
+    );
+
+    let second = rw.clone_statement(first, &mut map).unwrap();
+    rw.insert(InsertionPoint::After(first), second).unwrap();
+    // The first copy's entries are left as they were; the second copy's are
+    // keyed by the first copy's values.
+    assert_eq!(map.value(t), Some(t1));
+    let (t2, compute2, use_t2) = (
+        map.value(t1).unwrap(),
+        map.statement(compute1).unwrap(),
+        map.statement(use_t1).unwrap(),
+    );
+    assert_ne!(t2, t1);
+    assert_eq!(*definition(rw.stage(), use_t2), BuilderDialect::Use(t2));
+    assert_eq!(
+        *definition(rw.stage(), compute2),
+        BuilderDialect::Compute(x, t2.into())
+    );
+    drop(rw);
+    assert_eq!(order(&stage, entry)[1..], [owner, first, second]);
+    verify_derived(&stage).unwrap();
 }
 
 /// A `DiGraph`'s petgraph edges, as `(producer, consumer, value)`.

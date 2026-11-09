@@ -6,15 +6,13 @@ use crate::{Block, CFG, DiGraph, SSAValue, Statement, UnGraph};
 ///
 /// [`Rewriter::clone_statement`](crate::Rewriter::clone_statement) and
 /// [`Rewriter::clone_cfg`](crate::Rewriter::clone_cfg) record every value,
-/// block and statement they copy. Before a copy, values can be mapped with
-/// [`IRMap::map_value`]: an operand inside the copy that reads a mapped value
-/// reads its replacement instead, and a block argument that is mapped is not
-/// copied. Operands reading other values from outside the copy keep reading
-/// the original.
+/// block and statement they copy. Before a copy, [`IRMap::map_value`] can
+/// replace a value the copy reads from outside; other outside values are read
+/// as they are. Results and block arguments are always copied, overwriting
+/// their entries.
 ///
-/// A map keeps what each copy records, so reusing it makes the next copy read
-/// the previous copy's values, and skip the block arguments the previous copy
-/// made.
+/// A reused map keeps earlier entries: a statement copied after another reads
+/// the other's copied results.
 #[derive(Clone, Debug, Default)]
 pub struct IRMap {
     values: FxHashMap<SSAValue, SSAValue>,
@@ -26,7 +24,8 @@ pub struct IRMap {
 }
 
 impl IRMap {
-    /// Make the next copies read `new` wherever they would read `old`.
+    /// Make the next copies read `new` in place of `old`, a value from outside
+    /// them.
     pub fn map_value(&mut self, old: impl Into<SSAValue>, new: impl Into<SSAValue>) {
         self.values.insert(old.into(), new.into());
     }
