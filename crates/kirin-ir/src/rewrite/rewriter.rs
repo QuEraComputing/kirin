@@ -249,9 +249,6 @@ pub enum RewriteError {
     /// `source` or nested in one of its statements, which would place a
     /// spliced statement next to or inside itself.
     SplicedIntoItself { source: Block, anchor: Statement },
-    /// A copy would include a `DiGraph` or `UnGraph` body, owned by this
-    /// statement; copying graph bodies is not supported yet.
-    CopyOfGraphBody(Statement),
     /// `splice_cfg_after` was given an anchor block in `source` or nested in
     /// one of its blocks, which would place `source`'s blocks inside
     /// themselves.
@@ -408,9 +405,6 @@ impl fmt::Display for RewriteError {
                     f,
                     "cannot move {stmt:?} next to {anchor:?}, which is nested in it"
                 )
-            }
-            RewriteError::CopyOfGraphBody(owner) => {
-                write!(f, "cannot copy the graph body of {owner:?}")
             }
             RewriteError::SplicedIntoItself { source, anchor } => {
                 write!(
