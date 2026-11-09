@@ -1711,11 +1711,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     // DiGraph(DiGraph), UnGraph(UnGraph).
     pub fn create(
         &mut self,
-        point: InsertionPoint,
+        insertion_pt: InsertionPoint,
         definition: L,
     ) -> Result<Statement, RewriteError>;
 
-    pub fn insert(&mut self, point: InsertionPoint, stmt: Statement) -> Result<(), RewriteError>;
+    pub fn insert(
+        &mut self,
+        insertion_pt: InsertionPoint,
+        stmt: Statement,
+    ) -> Result<(), RewriteError>;
 
     // `IRMap`: old -> new values, blocks and statements of a clone; values can
     // be mapped beforehand with `map_value`.

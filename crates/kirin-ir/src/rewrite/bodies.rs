@@ -41,13 +41,13 @@ impl<L: Dialect> Rewriter<'_, L> {
         }
     }
 
-    /// Check that a new statement at `point` can adopt every body its
+    /// Check that a new statement at `insertion_pt` can adopt every body its
     /// `definition` names: each is live, named once, owned by nothing, and does
-    /// not enclose `point`.
+    /// not enclose `insertion_pt`.
     pub(super) fn check_can_adopt_bodies_at(
         &self,
         definition: &L,
-        point: InsertionPoint,
+        insertion_pt: InsertionPoint,
     ) -> Result<(), RewriteError> {
         let bodies = bodies_of(definition);
         for (index, &body) in bodies.iter().enumerate() {
@@ -57,16 +57,20 @@ impl<L: Dialect> Rewriter<'_, L> {
             if self.body_owner(body)?.is_some() {
                 return Err(RewriteError::BodyOwnedElsewhere(body));
             }
-            if self.body_encloses_point(body, point) {
+            if self.body_encloses_insertion_pt(body, insertion_pt) {
                 return Err(RewriteError::BodyEnclosesOwner(body));
             }
         }
         Ok(())
     }
 
-    /// Whether a statement placed at `point` would be nested in `body`.
-    pub(super) fn body_encloses_point(&self, body: Body, point: InsertionPoint) -> bool {
-        let owner = match point {
+    /// Whether a statement placed at `insertion_pt` would be nested in `body`.
+    pub(super) fn body_encloses_insertion_pt(
+        &self,
+        body: Body,
+        insertion_pt: InsertionPoint,
+    ) -> bool {
+        let owner = match insertion_pt {
             InsertionPoint::Before(anchor) | InsertionPoint::After(anchor) => {
                 return self.body_encloses(body, anchor);
             }

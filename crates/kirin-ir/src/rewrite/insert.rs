@@ -69,18 +69,18 @@ enum Placement {
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
-    /// Create a statement from `definition` at `point`, returning its id.
+    /// Create a statement from `definition` at `insertion_pt`, returning its id.
     ///
     /// Every operand must be live ([`RewriteError::UnknownValue`]) and every
     /// result a fresh [`Rewriter::new_result`] value
     /// ([`RewriteError::ResultNotFresh`]), which becomes a result of the new
-    /// statement. The statement must also fit `point` (see
+    /// statement. The statement must also fit `insertion_pt` (see
     /// [`InsertionPoint`]).
     ///
     /// The new statement owns the bodies `definition` names, such as a CFG from
     /// [`Rewriter::clone_cfg`]. Each must be live, owned by nothing
     /// ([`RewriteError::BodyOwnedElsewhere`]), named once
-    /// ([`RewriteError::BodyListedTwice`]), and must not enclose `point`
+    /// ([`RewriteError::BodyListedTwice`]), and must not enclose `insertion_pt`
     /// ([`RewriteError::BodyEnclosesOwner`]).
     ///
     /// Rejects, leaving the stage untouched, if a check fails. Records
@@ -90,11 +90,11 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// [`MutationEvent::ChangedUnGraphTopology`].
     pub fn create(
         &mut self,
-        point: InsertionPoint,
+        insertion_pt: InsertionPoint,
         definition: L,
     ) -> Result<Statement, RewriteError> {
-        let placement = self.check_point(point, &definition)?;
-        self.check_can_adopt_bodies_at(&definition, point)?;
+        let placement = self.check_insertion_pt(insertion_pt, &definition)?;
+        self.check_can_adopt_bodies_at(&definition, insertion_pt)?;
         let bodies = bodies_of(&definition);
         let stmt = self.build_statement(definition)?;
         self.place(stmt, placement);
@@ -104,27 +104,31 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(stmt)
     }
 
-    /// Insert the detached `stmt` at `point`.
+    /// Insert the detached `stmt` at `insertion_pt`.
     ///
     /// A detached statement is one this `Rewriter` made but has not placed,
-    /// such as a copy; it has no parent yet. It must fit `point` as for
+    /// such as a copy; it has no parent yet. It must fit `insertion_pt` as for
     /// [`Rewriter::create`].
     ///
     /// Rejects, leaving the stage untouched, if `stmt` is unknown, is not a
     /// detached statement of this `Rewriter` ([`RewriteError::NotDetached`]),
-    /// does not fit `point`, or owns a body that encloses `point`
+    /// does not fit `insertion_pt`, or owns a body that encloses `insertion_pt`
     /// ([`RewriteError::BodyEnclosesOwner`]). Records the events of
     /// [`Rewriter::create`].
-    pub fn insert(&mut self, point: InsertionPoint, stmt: Statement) -> Result<(), RewriteError> {
+    pub fn insert(
+        &mut self,
+        insertion_pt: InsertionPoint,
+        stmt: Statement,
+    ) -> Result<(), RewriteError> {
         let item = self.live_statement(stmt)?;
         if !self.detached.contains(&stmt) {
             return Err(RewriteError::NotDetached(stmt));
         }
-        let placement = self.check_point(point, &item.definition)?;
+        let placement = self.check_insertion_pt(insertion_pt, &item.definition)?;
         // `stmt` already owns its bodies; placing it inside one of them would
         // make it its own ancestor.
         for body in bodies_of(&item.definition) {
-            if self.body_encloses_point(body, point) {
+            if self.body_encloses_insertion_pt(body, insertion_pt) {
                 return Err(RewriteError::BodyEnclosesOwner(body));
             }
         }
@@ -132,10 +136,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(())
     }
 
-    /// Check that a statement with `definition` fits `point`.
-    fn check_point(
+    /// Check that a statement with `definition` fits `insertion_pt`.
+    fn check_insertion_pt(
         &self,
-        point: InsertionPoint,
+        insertion_pt: InsertionPoint,
         definition: &L,
     ) -> Result<Placement, RewriteError> {
         // Block chains and graphs take only non-terminators, which never carry
@@ -149,9 +153,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 Ok(())
             }
         };
-        match point {
+        match insertion_pt {
             InsertionPoint::Before(anchor) | InsertionPoint::After(anchor) => {
-                let after = matches!(point, InsertionPoint::After(_));
+                let after = matches!(insertion_pt, InsertionPoint::After(_));
                 let (block, prev, next) = self.slot_at(anchor, after)?;
                 check_non_terminator()?;
                 Ok(Placement::Chain { block, prev, next })
