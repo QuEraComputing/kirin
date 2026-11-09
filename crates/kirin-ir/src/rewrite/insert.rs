@@ -138,7 +138,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // `stmt` already owns its bodies; placing it inside one of them would
         // make it its own ancestor.
         for body in bodies_of(&item.definition) {
-            if self.body_encloses_point(body, insertion_pt) {
+            if self.body_encloses_insertion_pt(body, insertion_pt) {
                 return Err(RewriteError::BodyEnclosesOwner(body));
             }
         }
