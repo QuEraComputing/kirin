@@ -213,33 +213,31 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         Ok(applied)
     }
 
-    /// Run every rule at `stmt`, adding to `applied` each application that
-    /// edited the IR. Returns how the walk goes on: `Skip` if any rule
-    /// skipped, `Interrupt` as soon as one interrupts.
+    /// Try `sweep_rules` at `stmt`, in order, adding to `applied` each
+    /// application that edited the IR, and return how the walk goes on.
+    ///
+    /// After a `skip`, the remaining rules still run at `stmt`, and the
+    /// result is `Skip`. An `interrupt` stops trying rules at once. A rule
+    /// erasing `stmt` ends the visit, since no later rule can see it.
     fn visit(
         &self,
-        sweep_rules: &mut [SweepRule<'_, L>],
+        sweep_rules: &mut [SweepRule<'r, L>],
         rewriter: &mut Rewriter<'_, L>,
         stmt: Statement,
         applied: &mut usize,
     ) -> Result<WalkResult, DriverError> {
-        let mut skip = false;
+        let mut walk_result = WalkResult::Advance;
         for rule in sweep_rules {
             match rule.apply(self.rules, rewriter, stmt, applied)? {
                 WalkResult::Advance => {}
-                WalkResult::Skip => skip = true,
+                WalkResult::Skip => walk_result = WalkResult::Skip,
                 WalkResult::Interrupt => return Ok(WalkResult::Interrupt),
             }
-            // The rule erased the statement, so no later rule can see it.
             if stmt.get_info(rewriter.stage()).is_none() {
                 break;
             }
         }
-        Ok(if skip {
-            WalkResult::Skip
-        } else {
-            WalkResult::Advance
-        })
+        Ok(walk_result)
     }
 }
 
