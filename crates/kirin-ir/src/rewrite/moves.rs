@@ -9,12 +9,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// body.
     ///
     /// The statement keeps its id, results, uses and nested bodies; only its
-    /// place changes. As with [`Rewriter::insert_before`], `anchor` may be a
-    /// block's terminator: `stmt` then goes to the end of that block's
+    /// place changes. As with
+    /// [`InsertionPoint::Before`](crate::InsertionPoint::Before), `anchor` may
+    /// be a block's terminator: `stmt` then goes to the end of that block's
     /// statement chain. Moving a statement before itself does nothing.
     ///
-    /// Not checked, as with [`Rewriter::insert_before`]: that every use of
-    /// `stmt`'s results still comes after it.
+    /// Not checked, as with [`Rewriter::create`]: that every use of `stmt`'s
+    /// results still comes after it.
     ///
     /// Rejects, leaving the stage untouched, if `stmt` or `anchor` is unknown
     /// or not in a block body ([`RewriteError::NotInBlockBody`]), if `stmt` is

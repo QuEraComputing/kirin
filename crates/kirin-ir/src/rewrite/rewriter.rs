@@ -25,39 +25,38 @@
 //! Scope is operand/yield rewriting (including bulk result redirection through
 //! [`Rewriter::replace_results`], and selective redirection through
 //! [`Rewriter::replace_uses_if`] and
-//! [`Rewriter::replace_all_uses_except_stmt`]), block-body statement surgery
-//! ([`Rewriter::erase_statement`], [`Rewriter::insert_before`],
-//! [`Rewriter::insert_after`], [`Rewriter::replace_statement`],
-//! [`Rewriter::insert_terminator`], [`Rewriter::move_before`],
-//! [`Rewriter::move_after`]), `CFG`
-//! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
-//! merge blocks, [`Rewriter::retarget_successor`], and block-argument insertion
-//! and erasure), `DiGraph` node surgery in the sibling `digraph` module
-//! ([`Rewriter::insert_node`], [`Rewriter::replace_yield`]), and `UnGraph`
-//! surgery in the sibling `ungraph` module ([`Rewriter::insert_ungraph_node`],
-//! [`Rewriter::insert_ungraph_edge`]); graph members are erased through
-//! [`Rewriter::erase_statement`]. The rewriter **maintains** all four derived mirrors
-//! incrementally on every edit — [`SSAInfo::uses`](crate::SSAInfo),
+//! [`Rewriter::replace_all_uses_except_stmt`]), creating statements at an
+//! [`InsertionPoint`](crate::InsertionPoint) in a block body or a graph
+//! ([`Rewriter::create`], [`Rewriter::insert`]), block-body statement surgery
+//! ([`Rewriter::erase_statement`], [`Rewriter::replace_statement`],
+//! [`Rewriter::move_before`], [`Rewriter::move_after`]), `CFG` block-list
+//! surgery in the sibling `cfg` module (append/insert/erase/split/merge
+//! blocks, [`Rewriter::retarget_successor`], and block-argument insertion and
+//! erasure), `DiGraph` yield editing in the sibling `digraph` module
+//! ([`Rewriter::replace_yield`]), and `UnGraph` topology in the sibling
+//! `ungraph` module; graph members are erased through
+//! [`Rewriter::erase_statement`]. The rewriter **maintains** all four derived
+//! mirrors incrementally on every edit — [`SSAInfo::uses`](crate::SSAInfo),
 //! [`BlockInfo::predecessors`](crate::BlockInfo), the block-body summary
 //! (`BlockInfo::statements`/`terminator`), and the CFG chain summary
 //! (`CFGInfo::blocks`) — so they stay valid without a rebuild — and keeps each
-//! graph's petgraph topology in step with member insertion and erasure and
-//! with operand edits on its members. Deferred to later slices: full
-//! cross-block dominance/visibility preflight. Inserted
-//! statements define results through values pre-allocated with
-//! [`Rewriter::new_result`].
+//! graph's petgraph topology in step with member insertion and erasure and with
+//! operand edits on its members. Deferred to later slices: full cross-block
+//! dominance/visibility preflight. Inserted statements define results through
+//! values pre-allocated with [`Rewriter::new_result`].
 //!
 //! # Graph bodies
 //!
-//! Operand edits keep each graph's petgraph in step: on a `DiGraph` member
-//! they move the slot's edge, and on an `UnGraph` node they resync the wires
-//! the slot leaves and joins. An `UnGraph` wire may be read by more than two
-//! node slots mid-pass; such a wire has no edge, and
+//! Operand edits keep each graph's petgraph in step: on a `DiGraph` member they
+//! move the slot's edge, and on an `UnGraph` node they resync the wires the
+//! slot leaves and joins. An `UnGraph` wire may be read by more than two node
+//! slots mid-pass; such a wire has no edge, and
 //! [`verify_derived`](crate::verify_derived) reports it as
-//! [`Finding::UnGraphDegreeExceeded`](crate::Finding). The block `insert_*`
-//! methods reject graph members with [`RewriteError::NotInBlockBody`]; graph
-//! members are added with [`Rewriter::insert_node`],
-//! [`Rewriter::insert_ungraph_node`], and [`Rewriter::insert_ungraph_edge`].
+//! [`Finding::UnGraphDegreeExceeded`](crate::Finding). A graph member cannot be
+//! an anchor for a block-body insertion point
+//! ([`RewriteError::NotInBlockBody`]); graph members are added with
+//! [`InsertionPoint::DiGraph`](crate::InsertionPoint::DiGraph) and
+//! [`InsertionPoint::UnGraph`](crate::InsertionPoint::UnGraph).
 //!
 //! Because value rewrites are index-driven (they consult and update
 //! `SSAInfo::uses` rather than scanning), correctness depends on the use index
@@ -81,7 +80,7 @@ use std::collections::HashSet;
 use std::fmt;
 
 use indexmap::{IndexMap, IndexSet};
-use rustc_hash::{FxBuildHasher, FxHashMap};
+use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
 use crate::arena::{GetInfo, GetInfoMut};
 use smallvec::SmallVec;
@@ -170,28 +169,37 @@ pub enum RewriteError {
     /// The statement defines results that are still used elsewhere, so erasing it
     /// would leave dangling uses. Replace those uses first.
     StatementResultsInUse(Statement),
-    /// Nothing can follow a block's terminator, so `insert_after` cannot anchor
-    /// on one. (`insert_before` can: it appends to the end of the chain.)
+    /// Nothing can follow a block's terminator, so
+    /// [`InsertionPoint::After`](crate::InsertionPoint::After) and `move_after`
+    /// cannot anchor on one. (`Before` can: it means the end of the chain.)
     AnchorIsTerminator(Statement),
-    /// The inserted definition, or the moved statement, is a terminator where
-    /// a non-terminator is required: `insert_before`/`insert_after` and
-    /// `move_before`/`move_after` do not splice terminators into a block's
-    /// statement list (use [`Rewriter::insert_terminator`] on a block that has
-    /// none), and a `DiGraph` has no terminators for `insert_node` to add. The
-    /// counterpart of [`RewriteError::ExpectedTerminator`].
+    /// The inserted or moved statement is a terminator where a non-terminator
+    /// is required: [`InsertionPoint::Before`](crate::InsertionPoint::Before) /
+    /// [`After`](crate::InsertionPoint::After) and `move_before`/`move_after`
+    /// do not splice terminators into a block's statement list (use
+    /// [`InsertionPoint::Terminator`](crate::InsertionPoint::Terminator) on a
+    /// block that has none), and graphs have no terminators. The counterpart of
+    /// [`RewriteError::ExpectedTerminator`].
     UnexpectedTerminator,
+    /// [`Rewriter::insert`] was given a statement that is not a detached
+    /// statement of this `Rewriter`: one already in the IR, or already
+    /// inserted.
+    NotDetached(Statement),
     /// The inserted or replacement definition is a non-terminator that carries
     /// successors. Only a block's terminator may transfer control, so such a
     /// statement would add edges the predecessor mirror does not count.
     NonTerminatorWithSuccessors,
-    /// `insert_terminator` was given a block that already has a terminator.
+    /// [`InsertionPoint::Terminator`](crate::InsertionPoint::Terminator) names
+    /// a block that already has a terminator.
     BlockHasTerminator(Block),
-    /// The definition passed to `insert_terminator` declares results; a
-    /// terminator ends its block, so nothing could use them.
+    /// A statement for
+    /// [`InsertionPoint::Terminator`](crate::InsertionPoint::Terminator)
+    /// declares results; a terminator ends its block, so nothing could use
+    /// them.
     CannotInsertTerminatorWithResults,
-    /// A result slot of the inserted definition holds a value that is not a
-    /// fresh [`Rewriter::new_result`] of this `Rewriter`: it is an existing or
-    /// already bound value, or it fills two slots.
+    /// A result slot of the definition passed to [`Rewriter::create`] holds a
+    /// value that is not a fresh [`Rewriter::new_result`] of this `Rewriter`:
+    /// it is an existing or already bound value, or it fills two slots.
     ResultNotFresh(SSAValue),
     /// A result list did not line up one-for-one with the statement's results:
     /// a `replace_statement` definition changed the result count (which would
@@ -213,12 +221,6 @@ pub enum RewriteError {
     YieldIndexOutOfRange { graph: DiGraph, index: usize },
     /// The `UnGraph` ID does not resolve to a live `UnGraph` in this stage.
     UnknownUnGraph(UnGraph),
-    /// `insert_ungraph_node` was given an edge statement; add those with
-    /// [`Rewriter::insert_ungraph_edge`].
-    UnexpectedEdgeStatement,
-    /// `insert_ungraph_edge` was given a statement that is not an edge
-    /// statement; add nodes with [`Rewriter::insert_ungraph_node`].
-    ExpectedEdgeStatement,
     /// An inserted edge statement has operands. A wire only connects the nodes
     /// that read it; it consumes no values.
     EdgeStatementWithOperands,
@@ -257,7 +259,9 @@ pub enum RewriteError {
     CfgMismatch { block: Block, expected: CFG },
     /// `merge_blocks` was asked to merge a block into itself.
     CannotMergeBlockIntoItself(Block),
-    /// The definition passed to `insert_terminator` is not a terminator.
+    /// A statement for
+    /// [`InsertionPoint::Terminator`](crate::InsertionPoint::Terminator) is not
+    /// a terminator.
     ExpectedTerminator,
     /// A list of values did not line up one-for-one with a block's arguments.
     BlockArgumentArityMismatch {
@@ -322,10 +326,16 @@ impl fmt::Display for RewriteError {
             RewriteError::AnchorIsTerminator(stmt) => {
                 write!(f, "cannot insert after terminator {stmt:?}")
             }
+            RewriteError::NotDetached(stmt) => {
+                write!(
+                    f,
+                    "{stmt:?} is not a detached statement built by this rewriter"
+                )
+            }
             RewriteError::UnexpectedTerminator => {
                 write!(
                     f,
-                    "expected a non-terminator: terminators are only inserted with insert_terminator, and are not moved"
+                    "expected a non-terminator: terminators are only inserted as a block's terminator, and are not moved"
                 )
             }
             RewriteError::BlockHasTerminator(block) => {
@@ -364,18 +374,6 @@ impl fmt::Display for RewriteError {
             }
             RewriteError::UnknownUnGraph(graph) => {
                 write!(f, "UnGraph {graph} is not a live UnGraph in this stage")
-            }
-            RewriteError::UnexpectedEdgeStatement => {
-                write!(
-                    f,
-                    "expected a node: edge statements are inserted with insert_ungraph_edge"
-                )
-            }
-            RewriteError::ExpectedEdgeStatement => {
-                write!(
-                    f,
-                    "expected an edge statement: nodes are inserted with insert_ungraph_node"
-                )
             }
             RewriteError::EdgeStatementWithOperands => {
                 write!(f, "an edge statement cannot have operands")
@@ -504,6 +502,9 @@ pub struct Rewriter<'a, L: Dialect> {
     /// Values from [`Rewriter::new_result`] not yet bound to a statement, with
     /// their types. Their arena slots stay empty until bound.
     pub(super) unbound_ssa_results: FxHashMap<SSAValue, L::Type>,
+    /// Detached statements, with no parent, not inserted yet. They are
+    /// tombstoned if never inserted.
+    pub(super) detached: FxHashSet<Statement>,
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -512,6 +513,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             stage,
             events: Vec::new(),
             unbound_ssa_results: FxHashMap::default(),
+            detached: FxHashSet::default(),
         }
     }
 
@@ -943,9 +945,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
     /// Erase `stmt`: tombstone it, remove it from its block, drop its operand
     /// uses from the def-use index, and tombstone its result values. Erasing a
-    /// block's terminator clears the block's terminator,
-    /// removes its outgoing edges from the predecessor mirror, and leaves the
-    /// block unterminated (see [`Rewriter::insert_terminator`]).
+    /// block's terminator clears the block's terminator, removes its outgoing
+    /// edges from the predecessor mirror, and leaves the block unterminated
+    /// (see [`InsertionPoint::Terminator`](crate::InsertionPoint::Terminator)).
     /// Statement-owned blocks, `CFG`s, `DiGraph`s, and `UnGraph`s nested inside
     /// `stmt` are tombstoned with it, recursively.
     ///
@@ -1129,35 +1131,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
     }
 
-    /// Insert `definition` as a new statement immediately before `anchor`.
-    ///
-    /// Shares [`Rewriter::insert_after`]'s preconditions, except that `anchor`
-    /// may be the block's terminator: the new statement is then appended to the
-    /// end of the block's statement chain.
-    pub fn insert_before(
-        &mut self,
-        anchor: Statement,
-        definition: L,
-    ) -> Result<Statement, RewriteError> {
-        self.insert_relative(anchor, definition, false)
-    }
-
-    /// Insert `definition` as a new statement immediately after `anchor`.
-    ///
-    /// `anchor` must be a live, non-terminator statement owned by a block body,
-    /// and `definition` must be a non-terminator with no successors. Every
-    /// operand must be live, and every result a fresh [`Rewriter::new_result`]
-    /// value, which becomes a result of the new statement. On success the new
-    /// statement is spliced into the block, its operand uses are recorded, and
-    /// [`MutationEvent::InsertedStatement`] is emitted; the new id is returned.
-    pub fn insert_after(
-        &mut self,
-        anchor: Statement,
-        definition: L,
-    ) -> Result<Statement, RewriteError> {
-        self.insert_relative(anchor, definition, true)
-    }
-
     /// Where a statement goes when placed before (`after == false`) or after
     /// `anchor`: its block, and the chain statements that will sit directly
     /// before and after it (`None` at either end of the chain).
@@ -1275,97 +1248,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             info.node.prev = None;
             info.node.next = None;
         }
-    }
-
-    fn insert_relative(
-        &mut self,
-        anchor: Statement,
-        definition: L,
-        after: bool,
-    ) -> Result<Statement, RewriteError> {
-        let (block, prev, next) = self.slot_at(anchor, after)?;
-
-        if definition.is_terminator() {
-            return Err(RewriteError::UnexpectedTerminator);
-        }
-        if definition.successors().next().is_some() {
-            return Err(RewriteError::NonTerminatorWithSuccessors);
-        }
-        let (results, operands) = self.prepare_insert(&definition)?;
-        let new_stmt = self.alloc_statement(
-            definition,
-            StatementParent::Block(block),
-            prev,
-            next,
-            results,
-            &operands,
-        );
-
-        self.link_into_block(new_stmt, block, prev, next);
-
-        // Predecessor mirror does not need to be updated since we rejected terminators earlier.
-        self.events
-            .push(MutationEvent::InsertedStatement { stmt: new_stmt });
-        Ok(new_stmt)
-    }
-
-    /// Insert `definition` as the terminator of `block`, which must have none
-    /// (for example the first half left by [`Rewriter::split_block`]).
-    ///
-    /// The block may be in a `CFG` or a statement-owned body. Operand uses and
-    /// the predecessor mirror are updated for the new statement's operands and
-    /// successors, and the block's terminator pointer is set.
-    ///
-    /// Rejects, leaving the stage untouched, if `block` is unknown or already
-    /// has a terminator, or if `definition` is not a terminator, declares
-    /// results, or names a dead operand or successor.
-    ///
-    /// Records [`MutationEvent::InsertedStatement`] then
-    /// [`MutationEvent::ChangedTerminator`].
-    pub fn insert_terminator(
-        &mut self,
-        block: Block,
-        definition: L,
-    ) -> Result<Statement, RewriteError> {
-        {
-            let info = self.live_block(block)?;
-            if info.terminator.is_some() {
-                return Err(RewriteError::BlockHasTerminator(block));
-            }
-        }
-        if !definition.is_terminator() {
-            return Err(RewriteError::ExpectedTerminator);
-        }
-        if definition.results().next().is_some() {
-            return Err(RewriteError::CannotInsertTerminatorWithResults);
-        }
-        let (results, operands) = self.prepare_insert(&definition)?;
-        let targets: HashSet<Block> = definition.successors().map(|s| s.target()).collect();
-        for &target in &targets {
-            self.live_block(target)?;
-        }
-
-        let new_stmt = self.alloc_statement(
-            definition,
-            StatementParent::Block(block),
-            None,
-            None,
-            results,
-            &operands,
-        );
-        // Only terminators carry successors and the block had none, so every
-        // target gains exactly one entry for `block`.
-        for target in targets {
-            add_predecessor(self.stage, target, block);
-        }
-        if let Some(info) = block.get_info_mut(self.stage) {
-            info.terminator = Some(new_stmt);
-        }
-
-        self.events
-            .push(MutationEvent::InsertedStatement { stmt: new_stmt });
-        self.events.push(MutationEvent::ChangedTerminator { block });
-        Ok(new_stmt)
     }
 
     /// Swap `stmt`'s definition for `definition` in place, keeping the same
