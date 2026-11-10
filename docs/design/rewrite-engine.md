@@ -1274,10 +1274,10 @@ repeat:                                    # a sweep; at most max_sweeps
         for rule in rules_for(stmt.root_op):
             if rule applies:
                 apply rewrite in place through Rewriter
+        fail after max_rewrites_per_sweep rewrites; stop the sweep on interrupt
         for each statement a mutation event names as changed/replaced/inserted:
             enqueue its owner, its producers, it, and its users
             (one already waiting keeps its place)
-        stop the sweep on interrupt; fail after max_rewrites_per_sweep rewrites
     erase dead code
 until a sweep records no mutation event
 derive expected mirrors and compare them with installed mirrors
@@ -1287,9 +1287,9 @@ return StageInfo on success; quarantine it on any failure
 This is how `RewriteDriver` runs, except that it does not index rules by root
 operation yet. The worklist follows chains of edits, such as a fold whose
 result another rule folds, within one sweep. Edits the worklist does not
-follow, such as erasures and CFG edits, are seen by the
-next sweep, which starts from every statement again; correctness never
-depends on the worklist being complete.
+follow, such as erasures and CFG edits, are seen by the next sweep, which
+starts from every statement again; correctness never depends on the worklist
+being complete.
 
 ### Equality Saturation
 
