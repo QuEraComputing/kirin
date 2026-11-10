@@ -67,19 +67,6 @@ pub(super) fn next_sibling<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) ->
     }
 }
 
-/// The statement owning the body `stmt` is in, or `None` for a top-level or
-/// dead statement.
-pub(super) fn parent<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Option<Statement> {
-    match stmt.get_info(stage)?.parent? {
-        StatementParent::Block(block) => match block.get_info(stage)?.parent()? {
-            BlockParent::CFG(cfg) => cfg.get_info(stage)?.parent,
-            BlockParent::Statement(owner) => Some(owner),
-        },
-        StatementParent::DiGraph(graph) => graph.get_info(stage)?.parent(),
-        StatementParent::UnGraph(graph) => graph.get_info(stage)?.parent(),
-    }
-}
-
 /// Whether `stmt` is live and owns any body, empty or not.
 pub(super) fn owns_bodies<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> bool {
     stmt.get_info(stage).is_some_and(|info| {
