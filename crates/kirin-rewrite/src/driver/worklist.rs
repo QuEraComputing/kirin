@@ -3,7 +3,7 @@ use std::collections::{HashSet, VecDeque};
 use kirin_ir::walk::WalkOrder;
 use kirin_ir::{Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, Statement, Use};
 
-/// The statements a driver run still has to visit, in order.
+/// The statements a driver sweep still has to visit, in order.
 ///
 /// A statement is in the worklist at most once: pushing one already waiting
 /// does nothing, so it keeps its place. Once popped, it can be pushed again.
