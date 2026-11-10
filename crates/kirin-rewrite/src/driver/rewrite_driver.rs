@@ -193,23 +193,40 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         let mut sweep_rules: Vec<SweepRule<'_, L>> =
             self.rules.rules().iter().map(SweepRule::new).collect();
         while let Some(stmt) = cursor.next(rewriter.stage())? {
-            let mut skip = false;
-            for rule in &mut sweep_rules {
-                match rule.apply(self.rules, rewriter, stmt, &mut applied)? {
-                    WalkResult::Advance => {}
-                    WalkResult::Skip => skip = true,
-                    WalkResult::Interrupt => return Ok(applied),
-                }
-                // The rule erased the statement, so no later rule can see it.
-                if stmt.get_info(rewriter.stage()).is_none() {
-                    break;
-                }
-            }
-            if skip {
-                cursor.skip();
+            match self.visit(&mut sweep_rules, rewriter, stmt, &mut applied)? {
+                WalkResult::Advance => {}
+                WalkResult::Skip => cursor.skip(),
+                WalkResult::Interrupt => return Ok(applied),
             }
         }
         Ok(applied)
+    }
+
+    /// Try `sweep_rules` at `stmt`, in order, adding to `applied` each
+    /// application that edited the IR, and return how the walk goes on.
+    ///
+    /// After a `skip`, the remaining rules still run at `stmt`, and the
+    /// result is `Skip`. An `interrupt` stops trying rules at once. A rule
+    /// erasing `stmt` ends the visit, since no later rule can see it.
+    fn visit(
+        &self,
+        sweep_rules: &mut [SweepRule<'r, L>],
+        rewriter: &mut Rewriter<'_, L>,
+        stmt: Statement,
+        applied: &mut usize,
+    ) -> Result<WalkResult, DriverError> {
+        let mut walk_result = WalkResult::Advance;
+        for rule in sweep_rules {
+            match rule.apply(self.rules, rewriter, stmt, applied)? {
+                WalkResult::Advance => {}
+                WalkResult::Skip => walk_result = WalkResult::Skip,
+                WalkResult::Interrupt => return Ok(WalkResult::Interrupt),
+            }
+            if stmt.get_info(rewriter.stage()).is_none() {
+                break;
+            }
+        }
+        Ok(walk_result)
     }
 }
 
