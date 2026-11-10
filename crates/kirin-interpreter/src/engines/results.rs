@@ -71,7 +71,7 @@ pub trait AnalysisResults {
 
     /// The join of the fact at `anchor` over `callable`'s contexts. `None`
     /// means absent in all of them.
-    fn joined(&self, callable: LinkTarget, anchor: Self::Anchor) -> Option<Self::Value> {
+    fn joined_fact(&self, callable: LinkTarget, anchor: Self::Anchor) -> Option<Self::Value> {
         self.contexts_of(callable)
             .filter_map(|context| self.fact(context, anchor.clone()))
             .cloned()

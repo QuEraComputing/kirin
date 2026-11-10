@@ -663,7 +663,7 @@ pub trait AnalysisResults {
     // per callable (provided)
     fn callables(&self) -> impl Iterator<Item = LinkTarget>;
     fn contexts_of(&self, LinkTarget) -> impl Iterator<Item = &Self::Context>;
-    fn joined(&self, LinkTarget, Self::Anchor) -> Option<Self::Value>;
+    fn joined_fact(&self, LinkTarget, Self::Anchor) -> Option<Self::Value>;
     fn joined_facts(&self, LinkTarget) -> FactStore<Self::Anchor, Self::Value>;
     fn joined_response(&self, LinkTarget) -> Option<Product<Self::Value>>;
 }

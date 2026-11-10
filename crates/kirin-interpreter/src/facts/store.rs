@@ -7,7 +7,6 @@
 //! scope where needed. Engines decide what absence means and when facts must
 //! join.
 
-use kirin_ir::SSAValue;
 use rustc_hash::FxHashMap;
 
 use super::anchor::LatticeAnchor;
@@ -81,15 +80,10 @@ impl<A: LatticeAnchor, F> FactStore<A, F> {
     }
 }
 
-/// A sparse store keyed by SSA values, for sparse-shaped analyses
-/// ([`SparseForwardShape`](crate::SparseForwardShape) /
-/// [`SparseBackwardShape`](crate::SparseBackwardShape)).
-pub type SparseStore<F> = FactStore<SSAValue, F>;
-
 #[cfg(test)]
 mod tests {
     use crate::ProgramPoint;
-    use kirin_ir::{Block, Id, Statement, TestSSAValue};
+    use kirin_ir::{Block, Id, SSAValue, Statement, TestSSAValue};
 
     use super::*;
 
@@ -99,7 +93,7 @@ mod tests {
 
     #[test]
     fn fact_store_get_set() {
-        let mut store: SparseStore<u32> = FactStore::new();
+        let mut store: FactStore<SSAValue, u32> = FactStore::new();
         assert!(store.is_empty());
         assert_eq!(store.get(ssa(1)), None);
 
