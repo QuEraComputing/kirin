@@ -86,12 +86,12 @@ impl Placement {
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
-    /// Create a statement from `definition` at `point`, returning its id.
+    /// Create a statement from `definition` at `insertion_pt`, returning its id.
     ///
     /// Every operand must be live ([`RewriteError::UnknownValue`]) and every
     /// result a fresh [`Rewriter::new_result`] value
     /// ([`RewriteError::ResultNotFresh`]), which becomes a result of the new
-    /// statement. The statement must also fit `point` (see
+    /// statement. The statement must also fit `insertion_pt` (see
     /// [`InsertionPoint`]).
     ///
     /// The new statement becomes the parent of every body `definition` names,
@@ -99,49 +99,54 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// ([`RewriteError::UnknownBody`]), owned by nothing
     /// ([`RewriteError::BodyOwnedElsewhere`]; a block in a `CFG` counts as
     /// owned), named once ([`RewriteError::BodyListedTwice`]), and must not
-    /// contain the block or graph `point` is in, which would make the
+    /// contain the block or graph `insertion_pt` is in, which would make the
     /// statement its own ancestor ([`RewriteError::BodyEnclosesOwner`]).
     ///
     /// Rejects, leaving the stage untouched, if a check fails. Records
-    /// [`MutationEvent::InsertedStatement`] (covering the adopted bodies), then for a terminator
-    /// [`MutationEvent::ChangedTerminator`] and for a graph member
-    /// [`MutationEvent::ChangedDiGraphTopology`] or
+    /// [`MutationEvent::InsertedStatement`] (covering the adopted bodies),
+    /// then for a terminator [`MutationEvent::ChangedTerminator`] and for a
+    /// graph member [`MutationEvent::ChangedDiGraphTopology`] or
     /// [`MutationEvent::ChangedUnGraphTopology`].
     pub fn create(
         &mut self,
-        point: InsertionPoint,
+        insertion_pt: InsertionPoint,
         definition: L,
     ) -> Result<Statement, RewriteError> {
-        let placement = self.check_point(point, &definition)?;
+        let placement = self.check_insertion_pt(insertion_pt, &definition)?;
         self.check_new_bodies(&bodies_of(&definition), &[], placement.parent())?;
         let stmt = self.build_statement(definition)?;
         self.place(stmt, placement);
         Ok(stmt)
     }
 
-    /// Insert the detached `stmt` at `point`.
+    /// Insert the detached `stmt` at `insertion_pt`.
     ///
     /// A detached statement is one this `Rewriter` made but has not placed,
-    /// such as a copy; it has no parent yet. It must fit `point` as for
+    /// such as a copy; it has no parent yet. It must fit `insertion_pt` as for
     /// [`Rewriter::create`].
     ///
     /// Rejects, leaving the stage untouched, if `stmt` is unknown, is not a
     /// detached statement of this `Rewriter` ([`RewriteError::NotDetached`]),
-    /// or does not fit `point`. Records the events of [`Rewriter::create`].
-    pub fn insert(&mut self, point: InsertionPoint, stmt: Statement) -> Result<(), RewriteError> {
+    /// or does not fit `insertion_pt`. Records the events of
+    /// [`Rewriter::create`].
+    pub fn insert(
+        &mut self,
+        insertion_pt: InsertionPoint,
+        stmt: Statement,
+    ) -> Result<(), RewriteError> {
         let item = self.live_statement(stmt)?;
         if !self.detached.contains(&stmt) {
             return Err(RewriteError::NotDetached(stmt));
         }
-        let placement = self.check_point(point, &item.definition)?;
+        let placement = self.check_insertion_pt(insertion_pt, &item.definition)?;
         self.place(stmt, placement);
         Ok(())
     }
 
-    /// Check that a statement with `definition` fits `point`.
-    fn check_point(
+    /// Check that a statement with `definition` fits `insertion_pt`.
+    fn check_insertion_pt(
         &self,
-        point: InsertionPoint,
+        insertion_pt: InsertionPoint,
         definition: &L,
     ) -> Result<Placement, RewriteError> {
         // Block chains and graphs take only non-terminators, which never carry
@@ -155,9 +160,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 Ok(())
             }
         };
-        match point {
+        match insertion_pt {
             InsertionPoint::Before(anchor) | InsertionPoint::After(anchor) => {
-                let side = match point {
+                let side = match insertion_pt {
                     InsertionPoint::After(_) => Side::After,
                     _ => Side::Before,
                 };
