@@ -177,7 +177,7 @@ impl<L: Dialect> Rewriter<'_, L> {
             if outer == stmt {
                 return true;
             }
-            current = tree::parent(self.stage, outer);
+            current = outer.owner(self.stage);
         }
         false
     }

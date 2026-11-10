@@ -106,6 +106,19 @@ impl Statement {
         &self.expect_info(stage).parent
     }
 
+    /// The statement owning the body this statement is in, or `None` for a
+    /// top-level or dead statement.
+    pub fn owner<L: Dialect>(&self, stage: &crate::StageInfo<L>) -> Option<Statement> {
+        match self.get_info(stage)?.parent? {
+            StatementParent::Block(block) => match block.get_info(stage)?.parent()? {
+                crate::BlockParent::CFG(cfg) => cfg.get_info(stage)?.parent,
+                crate::BlockParent::Statement(owner) => Some(owner),
+            },
+            StatementParent::DiGraph(graph) => graph.get_info(stage)?.parent(),
+            StatementParent::UnGraph(graph) => graph.get_info(stage)?.parent(),
+        }
+    }
+
     /// The next link in the parent block's non-terminator chain.
     ///
     /// `None` after the last non-terminator, even when a terminator follows.
