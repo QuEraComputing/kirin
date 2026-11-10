@@ -174,8 +174,8 @@ fn run<O: WalkOrder>(
     )
 }
 
-/// Each fold changes the next `neg`, which is still waiting, so one sweep
-/// folds the whole chain in every order, and a second finds nothing.
+/// Each fold changes the next `neg`, which is still in the queue, so one
+/// sweep folds the whole chain in every order, and a second finds nothing.
 #[test]
 fn a_chain_of_folds_finishes_in_one_sweep_in_every_order() {
     fn check<O: WalkOrder>(order: &str) {
@@ -230,4 +230,58 @@ fn a_sweep_rewriting_without_end_fails_the_run() {
         })
     );
     assert_eq!(status, StageStatus::Poisoned);
+}
+
+/// [`FOUR_NEGS`] after `run_at` on `%b` alone: `%b`'s fold changes `%c`,
+/// which is not under `%b`, so `%d`, which would fold now, is left as is.
+const FOLDED_AT_B: &str = "stage @arith fn @f(i64) -> i64;
+specialize @arith fn @f(i64) -> i64 cfg {
+  ^entry(%x: i64) {
+    %a = neg %x -> i64;
+    %b = neg %a -> i64;
+    %c = neg %x -> i64;
+    %d = neg %c -> i64;
+    ret %d;
+  }
+}
+";
+
+/// An edit under the root names statements outside it, here `%c`, its owner
+/// and its user `%d`: none of them is visited.
+#[test]
+fn run_at_visits_only_the_tree_under_its_root() {
+    let visits: Visits = Rc::default();
+    let mut rules = RuleSet::build(|stage| vec![double_neg(stage)]).unwrap();
+    let counting = Rc::clone(&visits);
+    rules.add_statement_rule("count_visits", move || CountVisits::new(&counting));
+    let driver = RewriteDriver::new(&rules);
+
+    let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
+    pipeline.parse(FOUR_NEGS).expect("the program parses");
+    let stage = pipeline.stage_by_name("arith").expect("the stage exists");
+    let mut b = None;
+    pipeline
+        .run_pass(stage, |rewriter| {
+            let root = rewriter
+                .stage()
+                .staged_function_arena()
+                .iter()
+                .flat_map(|function| function.specializations())
+                .map(|specialization| *specialization.definition())
+                .next()
+                .expect("the program has a function");
+            let [_, _, stmt, ..] = PreOrder::schedule(rewriter.stage(), root)[..] else {
+                panic!("the function has statements");
+            };
+            b = Some(stmt);
+            driver.run_at(rewriter, stmt)
+        })
+        .expect("the pass succeeds");
+
+    assert_eq!(pipeline.sprint(), printed(FOLDED_AT_B));
+    let b = b.expect("the pass ran");
+    for sweep in visits.borrow().iter() {
+        assert_eq!(sweep.keys().copied().collect::<Vec<_>>(), vec![b]);
+        assert_eq!(sweep[&b], 1);
+    }
 }

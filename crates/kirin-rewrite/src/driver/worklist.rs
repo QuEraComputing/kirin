@@ -1,15 +1,28 @@
-use std::collections::{HashSet, VecDeque};
+use std::collections::{HashMap, VecDeque};
 
 use kirin_ir::walk::WalkOrder;
 use kirin_ir::{Dialect, GetInfo, MutationEvent, SSAKind, SSAValue, StageInfo, Statement, Use};
 
 /// The statements a driver sweep still has to visit, in order.
 ///
-/// A statement is in the worklist at most once: pushing one already waiting
-/// does nothing, so it keeps its place. Once popped, it can be pushed again.
+/// Only statements under the sweep's root are ever added: those of the walk
+/// it starts from, and those inserted under one of them. A statement is in
+/// the queue at most once: pushing one already in it does nothing, so it
+/// keeps its place. Once popped, it can be pushed again.
 pub(super) struct Worklist {
     queue: VecDeque<Statement>,
-    waiting: HashSet<Statement>,
+    /// The statements under the root, each with its status.
+    scope: HashMap<Statement, Status>,
+}
+
+/// Whether a statement under the root is in the worklist's queue.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum Status {
+    /// In the queue, to be visited.
+    InQueue,
+    /// Not in the queue: visited already, or inserted under the root and
+    /// not added yet.
+    VisitedOrInserted,
 }
 
 impl Worklist {
@@ -18,20 +31,24 @@ impl Worklist {
     /// while it is taken.
     pub(super) fn seeded<O: WalkOrder, L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Self {
         let queue: VecDeque<Statement> = O::schedule(stage, root).into();
-        let waiting = queue.iter().copied().collect();
-        Self { queue, waiting }
+        let scope = queue.iter().map(|&stmt| (stmt, Status::InQueue)).collect();
+        Self { queue, scope }
     }
 
     /// The next statement to visit, or `None` once the worklist is empty.
     pub(super) fn pop(&mut self) -> Option<Statement> {
         let stmt = self.queue.pop_front()?;
-        self.waiting.remove(&stmt);
+        self.scope.insert(stmt, Status::VisitedOrInserted);
         Some(stmt)
     }
 
-    /// Add `stmt` at the back, unless it is already waiting.
+    /// Add `stmt` at the back of the queue, unless it is already in it or is
+    /// not under the root.
     pub(super) fn push(&mut self, stmt: Statement) {
-        if self.waiting.insert(stmt) {
+        if let Some(status) = self.scope.get_mut(&stmt)
+            && *status == Status::VisitedOrInserted
+        {
+            *status = Status::InQueue;
             self.queue.push_back(stmt);
         }
     }
@@ -39,8 +56,8 @@ impl Worklist {
     /// Add the statements `events` may have given a new match: for each
     /// statement an event names as changed, replaced or inserted, its owner,
     /// the producers of its operands, the statement itself and the users of
-    /// its results. Other events add nothing; the next sweep visits what
-    /// they changed.
+    /// its results, those of them under the root. Other events add nothing;
+    /// the next sweep visits what they changed.
     pub(super) fn push_affected<L: Dialect>(
         &mut self,
         stage: &StageInfo<L>,
@@ -48,11 +65,23 @@ impl Worklist {
     ) {
         for event in events {
             match *event {
+                MutationEvent::InsertedStatement { stmt } => {
+                    self.adopt(stage, stmt);
+                    self.push_neighbors(stage, stmt);
+                }
                 MutationEvent::ChangedOperands { stmt }
-                | MutationEvent::ReplacedStatement { stmt }
-                | MutationEvent::InsertedStatement { stmt } => self.push_neighbors(stage, stmt),
+                | MutationEvent::ReplacedStatement { stmt } => self.push_neighbors(stage, stmt),
                 _ => {}
             }
+        }
+    }
+
+    /// Count the inserted `stmt` under the root if its owner is.
+    fn adopt<L: Dialect>(&mut self, stage: &StageInfo<L>, stmt: Statement) {
+        if let Some(owner) = stmt.owner(stage)
+            && self.scope.contains_key(&owner)
+        {
+            self.scope.entry(stmt).or_insert(Status::VisitedOrInserted);
         }
     }
 
