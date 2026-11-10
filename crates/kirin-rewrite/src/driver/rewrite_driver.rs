@@ -40,11 +40,12 @@ impl std::ops::AddAssign for RewriteSummary {
 /// [`MutationEvent`](kirin_ir::MutationEvent)s add to the worklist the
 /// statements they may have given a new match: for each statement changed,
 /// replaced or inserted, its owner, the producers of its operands, the
-/// statement itself and the users of its results. A statement still waiting
-/// keeps its place, so it is visited once, after the edit; one already
-/// visited goes to the back. Other edits, such as erasing a statement or
-/// changing a `CFG`, add nothing: the next sweep, which starts from every
-/// statement again, sees them.
+/// statement itself and the users of its results. Only statements under the
+/// root are added, so a run never leaves its root's tree. A statement still
+/// in the queue keeps its place, so it is visited once, after the edit; one
+/// already visited goes to the back. Other edits, such as erasing a
+/// statement or changing a `CFG`, add nothing: the next sweep, which starts
+/// from every statement again, sees them.
 ///
 /// When the worklist is empty, the sweep erases the dead code under the
 /// root. The run ends after the first sweep that records no

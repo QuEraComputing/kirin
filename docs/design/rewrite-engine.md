@@ -1276,8 +1276,8 @@ repeat:                                    # a sweep; at most max_sweeps
                 apply rewrite in place through Rewriter
         fail after max_rewrites_per_sweep rewrites; stop the sweep on interrupt
         for each statement a mutation event names as changed/replaced/inserted:
-            enqueue its owner, its producers, it, and its users
-            (one already waiting keeps its place)
+            enqueue its owner, its producers, it, and its users, whichever
+            are under the root (ones already in the queue keep their place)
     erase dead code
 until a sweep records no mutation event
 derive expected mirrors and compare them with installed mirrors
