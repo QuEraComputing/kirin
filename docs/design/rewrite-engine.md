@@ -1711,11 +1711,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     // DiGraph(DiGraph), UnGraph(UnGraph).
     pub fn create(
         &mut self,
-        point: InsertionPoint,
+        insertion_pt: InsertionPoint,
         definition: L,
     ) -> Result<Statement, RewriteError>;
 
-    pub fn insert(&mut self, point: InsertionPoint, stmt: Statement) -> Result<(), RewriteError>;
+    pub fn insert(
+        &mut self,
+        insertion_pt: InsertionPoint,
+        stmt: Statement,
+    ) -> Result<(), RewriteError>;
 
     pub fn replace_statement(
         &mut self,
