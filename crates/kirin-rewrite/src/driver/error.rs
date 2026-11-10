@@ -1,6 +1,5 @@
 use std::fmt;
 
-use kirin_ir::walk::WalkError;
 use kirin_ir::{RewriteError, Statement};
 use kirin_wildcard::{NativeError, NativeFailure};
 
@@ -65,15 +64,13 @@ pub enum DriverError {
     /// [`WalkResult`](kirin_ir::walk::WalkResult). `#[rewrite_rule]` rejects
     /// this at compile time, so only a rule built by hand can fail with it.
     NotAWalkResult { rule: String },
-    /// Rule `rule` erases its root, the statement being visited, which an
-    /// `order` walk does not allow. Nothing was edited.
-    ErasesRoot { rule: String, order: &'static str },
     /// The tree under `root` was still changing after `sweeps` sweeps, the
     /// driver's limit: the rules most likely keep undoing each other.
     BudgetExhausted { root: Statement, sweeps: usize },
-    /// An edit broke the walk's contract, such as a native action erasing the
-    /// statement being visited.
-    Walk(WalkError),
+    /// One sweep of the tree under `root` made `rewrites` rewrites, more
+    /// than the driver's limit: the rules most likely keep undoing each
+    /// other.
+    RewritesExhausted { root: Statement, rewrites: usize },
     /// The dead-code cleanup could not erase `stmt`.
     DeadCode {
         stmt: Statement,
@@ -114,12 +111,6 @@ impl DriverError {
                 stmt,
             },
         }
-    }
-}
-
-impl From<WalkError> for DriverError {
-    fn from(error: WalkError) -> Self {
-        DriverError::Walk(error)
     }
 }
 
@@ -195,16 +186,16 @@ impl fmt::Display for DriverError {
                     "rule `{rule}`: a walk result reads a value that is not a walk result"
                 )
             }
-            DriverError::ErasesRoot { rule, order } => write!(
-                f,
-                "rule `{rule}` erases its root, the statement being visited, which a `{order}` walk does not allow; run it in an order that does, such as `ReverseBFS`"
-            ),
             DriverError::BudgetExhausted { root, sweeps } => write!(
                 f,
                 "the IR under {root:?} was still changing after {sweeps} sweeps; \
                  the rules may never reach a fixpoint"
             ),
-            DriverError::Walk(error) => write!(f, "the walk failed: {error}"),
+            DriverError::RewritesExhausted { root, rewrites } => write!(
+                f,
+                "one sweep of the IR under {root:?} made {rewrites} rewrites; \
+                 the rules may never reach a fixpoint"
+            ),
             DriverError::DeadCode { stmt, error } => {
                 write!(f, "dead-code elimination could not erase {stmt:?}: {error}")
             }
