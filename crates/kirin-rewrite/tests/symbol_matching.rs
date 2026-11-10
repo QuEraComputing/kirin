@@ -5,7 +5,6 @@ use std::{cell::Cell, rc::Rc};
 use kirin::prelude::*;
 use kirin_arith::ArithType;
 use kirin_function::Call;
-use kirin_ir::walk::PostOrder;
 use kirin_rewrite::{PatternRule, RewriteDriver, RuleSet};
 use kirin_test_languages::GraphFunctionLanguage as L;
 use kirin_wildcard::{NativeCall, Pattern, PatternLanguage, Rewrite};
@@ -50,7 +49,7 @@ fn matches_call(symbols: &[&str], target: usize) -> usize {
         .new();
     let mut stage = builder.finalize().unwrap();
     RewriteDriver::new(&rules)
-        .run_at::<PostOrder>(&mut Rewriter::new(&mut stage), root)
+        .run_at(&mut Rewriter::new(&mut stage), root)
         .unwrap();
     matches.get()
 }
