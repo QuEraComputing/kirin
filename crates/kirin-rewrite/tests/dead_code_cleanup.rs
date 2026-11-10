@@ -3,7 +3,6 @@
 
 use kirin::prelude::*;
 use kirin_arith::Arith;
-use kirin_ir::walk::PostOrder;
 use kirin_rewrite::{RewriteDriver, RewriteSummary, RuleSet};
 use kirin_test_languages::GraphFunctionLanguage as L;
 use kirin_wildcard::rewrite_rule;
@@ -42,7 +41,7 @@ fn rewrite(rules: &RuleSet<L>, input: &str) -> (String, RewriteSummary) {
     let (mut pipeline, stage) = parse(input);
     let driver = RewriteDriver::new(rules);
     let summary = pipeline
-        .run_pass(stage, |rewriter| driver.run::<PostOrder>(rewriter))
+        .run_pass(stage, |rewriter| driver.run(rewriter))
         .expect("the pass succeeds");
     (pipeline.sprint(), summary)
 }

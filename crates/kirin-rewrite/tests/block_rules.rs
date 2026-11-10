@@ -323,10 +323,10 @@ fn run<O: WalkOrder>(
     let mut pipeline: Pipeline<StageInfo<L>> = Pipeline::new();
     pipeline.parse(input).expect("the program parses");
     let stage = pipeline.stage_by_name("arith").expect("the stage exists");
-    let driver = RewriteDriver::new(rules);
+    let driver = RewriteDriver::new(rules).walk_order::<O>();
     let mut outcome = None;
     let _ = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<O>(rewriter);
+        let result = driver.run(rewriter);
         outcome = Some(result.clone());
         result
     });
@@ -345,8 +345,9 @@ fn a_block_rule_is_fresh_for_each_block() {
     assert_eq!(output, printed(TWO_BLOCKS_MERGED));
     assert_eq!(summary.sweeps, 2);
     assert_eq!(summary.applied, 2);
-    // Two blocks, in each of two sweeps.
-    assert_eq!(built.get(), 4);
+    // Two blocks in the first sweep, again when the merges add the
+    // function, their owner, back to the worklist, and two in the second sweep.
+    assert_eq!(built.get(), 6);
 }
 
 /// `[S, B]`: pruning the arms first erases `%t0`, so dedup keeps `%t1`.
@@ -392,10 +393,11 @@ fn a_statement_rule_erasing_an_if_first_leaves_block_rules_no_arms() {
     assert_eq!(built.get(), 4);
 }
 
-/// A `skip` from one block still runs the rule on the remaining sibling blocks,
-/// leaves the nested statements unwalked; an `interrupt` stops at once.
+/// A `skip` from a block rule has no effect: the driver's walk is a
+/// snapshot, so the nested statements are still visited. An `interrupt`
+/// stops at once.
 #[test]
-fn a_block_rules_walk_result_steers_the_sweep() {
+fn a_block_rules_interrupt_ends_the_sweep_and_skip_does_nothing() {
     let built = Rc::new(Cell::new(0));
     let visited = Rc::new(Cell::new(0));
     let steering = |walk_result: WalkResult| {
@@ -411,9 +413,10 @@ fn a_block_rules_walk_result_steers_the_sweep() {
     };
 
     run::<PreOrder>(&steering(WalkResult::Skip), TWO_BLOCKS).unwrap();
-    // Both of the function's blocks; only the function is visited.
+    // Both of the function's blocks; the function and its ten statements
+    // are visited.
     assert_eq!(built.get(), 2);
-    assert_eq!(visited.get(), 1);
+    assert_eq!(visited.get(), 11);
 
     built.set(0);
     visited.set(0);
@@ -437,6 +440,8 @@ fn a_block_erased_by_an_earlier_copy_is_skipped() {
     let (output, summary) = run::<PreOrder>(&rules, TWO_BLOCKS).unwrap();
     assert_eq!(output, printed(ONE_BLOCK));
     assert_eq!(summary.sweeps, 2);
-    // `^entry` in each of two sweeps; `^next` is gone when its turn comes.
-    assert_eq!(built.get(), 2);
+    // `^entry` in the first sweep, again when the merge adds the function,
+    // its owner, back to the worklist, and in the second; `^next` is gone
+    // when its turn comes.
+    assert_eq!(built.get(), 3);
 }

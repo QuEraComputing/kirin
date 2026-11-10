@@ -1267,18 +1267,29 @@ More precise:
 
 ```text
 move StageInfo into run_pass; drop cached analyses
-worklist = all statements
-while worklist not empty:
-    stmt = worklist.pop()
-    for rule in rules_for(stmt.root_op):
-        if rule applies:
-            apply rewrite in place through Rewriter
-            enqueue affected producers/users/neighbors from mutation events
+repeat:                                    # a sweep; at most max_sweeps
+    worklist = all statements, in walk order (a snapshot)
+    while worklist not empty:
+        stmt = worklist.pop()
+        for rule in rules_for(stmt.root_op):
+            if rule applies:
+                apply rewrite in place through Rewriter
+        for each statement a mutation event names as changed/replaced/inserted:
+            enqueue its owner, its producers, it, and its users
+            (one already waiting keeps its place)
+        stop the sweep on interrupt; fail after max_rewrites_per_sweep rewrites
+    erase dead code
+until a sweep records no mutation event
 derive expected mirrors and compare them with installed mirrors
 return StageInfo on success; quarantine it on any failure
 ```
 
-This avoids whole-program rescans when only a small area changed.
+This is how `RewriteDriver` runs, except that it does not index rules by root
+operation yet. The worklist follows chains of edits, such as a fold whose
+result another rule folds, within one sweep. Edits the worklist does not
+follow, such as erasures and CFG edits, are seen by the
+next sweep, which starts from every statement again; correctness never
+depends on the worklist being complete.
 
 ### Equality Saturation
 
@@ -2412,9 +2423,10 @@ driver; a native implementation is not required to be ported or deleted after
 wildcard matching lands.
 
 `RuleSet` stores a recipe (factory) per native rule. A statement rule gets a
-fresh instance each sweep and is handed every visited statement; a block rule
-gets a fresh instance for each block a visited statement owns and walks that
-block itself. State never outlives a sweep, or a block for a block rule.
+fresh instance each sweep and is handed every visited statement, possibly
+more than once; a block rule gets a fresh instance for each block a visited
+statement owns and walks that block itself. State never outlives a sweep, or
+a block for a block rule.
 
 ### `RuleSet`
 
@@ -2835,35 +2847,31 @@ policy.
   fresh rule instances per sweep for a statement rule, per block for a block
   rule.
 - [x] Give statement-scoped rules candidates from the driver; invoke a block
-  rule once per block in each sweep. The rule walks its block itself, and the
-  driver does not check its edits. Do not retain state across sweeps, blocks,
-  functions, or runs.
+  rule on each block of a statement each time the driver visits it. The rule
+  walks its block itself, and the driver does not check its edits. Do not
+  retain state across sweeps, blocks, functions, or runs.
 - [x] Exercise the state lifecycle with a test-only rule; do not add a
   disposable production rule that will be deleted when declarative matching
   lands.
 - [x] Ensure dead ids in worklists are skipped.
 - [x] Treat fixpoint-budget exhaustion as a pass error rather than silent
-  incomplete success. The limit defaults to 10,000 sweeps, far above what a
-  terminating rule set needs, so it only catches rules that never reach a
-  fixpoint. A single sweep has no limit.
+  incomplete success. The limits default to 10,000 sweeps and 10,000 rewrites
+  in one sweep, far above what a terminating rule set needs, so they only
+  catch rules that never reach a fixpoint.
 
 **Landed ahead of the native path: a declarative-rule driver.** The walk and
 fixpoint items above landed with a driver for `#[rewrite_rule]` patterns
 rather than native rules; the native items landed after it, in the same
 sweeps. The traversal orders and their edit contract are documented in
 `kirin_ir::walk`, and the rule set and driver in `kirin_rewrite`. In short:
-walks may edit a visited statement's siblings and nested statements, but must
-not erase it or any of its ancestors. Each sweep tries every rule in order at
-each visited statement, then runs a dead-code cleanup, and the fixpoint ends
-at the first sweep recording no `MutationEvent`. Decisions to revisit in
-later milestones:
+each sweep fills a worklist with every statement under the root, in a walk
+order taken as a snapshot (`PreOrder` unless the driver is given another),
+and pops them one at a time, trying every rule in order at each. After each
+statement, the `MutationEvent`s of its edits add back the statements they may
+have given a new match (see Mutation-aware Worklist). When the worklist is
+empty, the sweep runs a dead-code cleanup, and the fixpoint ends at the first
+sweep recording no `MutationEvent`. Decisions to revisit in later milestones:
 
-- A rule may erase its root, the statement being visited, only in a walk
-  order that allows it (`WalkOrder::ALLOWS_ERASING_VISITED`: the reverse BFS
-  orders). A run in another order fails with `DriverError::ErasesRoot`
-  before editing anything. A rule's other erase targets are producers of the
-  root, never nested in or around it, so they meet the walk contract in
-  every order. Native actions are checked by the walk as it runs.
 - `UnGraph`s are not cleaned, by design: their nodes consume wires but are not
   consumed, so there is no "unused" to test.
 - Until the `RewriteDialect` derive (M4) exists, op matching clones the
@@ -3065,13 +3073,13 @@ implemented-vs-planned.
 **Decision:** `RuleSet` owns immutable configuration or native-rule factories;
 the driver constructs fresh native state for each sweep, and for a block rule
 for each block. Statement-scoped rules receive candidates from the driver's
-traversal. Block rules are invoked once per block in each sweep and walk their
-block themselves. No native state is reused across sweeps, blocks, functions,
-or driver runs. A block-local algorithm such as CSE therefore runs inside the
-driver's repeated sweeps with a fresh table each time, not with one persistent
-table. Explicit `begin_scope` / `end_scope` hooks are unnecessary in v1; add
-them only if a concrete client cannot be expressed by factory construction
-plus one scoped invocation.
+traversal. Block rules are invoked on each block of a statement each time the
+driver visits it, and walk their block themselves. No native state is reused
+across sweeps, blocks, functions, or driver runs. A block-local algorithm such
+as CSE therefore runs inside the driver's repeated sweeps with a fresh table
+each time, not with one persistent table. Explicit `begin_scope` / `end_scope`
+hooks are unnecessary in v1; add them only if a concrete client cannot be
+expressed by factory construction plus one scoped invocation.
 
 ---
 

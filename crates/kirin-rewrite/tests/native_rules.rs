@@ -4,7 +4,7 @@
 use kirin::prelude::*;
 use kirin_arith::Arith;
 use kirin_ir::SSAKind;
-use kirin_ir::walk::{PreOrder, WalkResult};
+use kirin_ir::walk::WalkResult;
 use kirin_rewrite::{
     DriverError, PatternRule, RewriteDriver, RewriteSummary, RuleSet, StatementRule,
 };
@@ -131,7 +131,7 @@ fn run(rules: &RuleSet<L>) -> Result<(String, RewriteSummary), DriverError> {
     let driver = RewriteDriver::new(rules);
     let mut outcome = None;
     let _ = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PreOrder>(rewriter);
+        let result = driver.run(rewriter);
         outcome = Some(result.clone());
         result
     });

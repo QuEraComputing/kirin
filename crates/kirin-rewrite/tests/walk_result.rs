@@ -3,7 +3,7 @@
 
 use kirin::prelude::*;
 use kirin_arith::{Arith, ArithType};
-use kirin_ir::walk::{PreOrder, WalkResult};
+use kirin_ir::walk::WalkResult;
 use kirin_ir::{BuilderSSAKind, Placeholder};
 use kirin_rewrite::{
     DriverError, NativeValue, PatternRule, RewriteDriver, RewriteSummary, RuleErrorKind, RuleSet,
@@ -281,7 +281,7 @@ fn run(rules: &RuleSet<L>) -> Result<(String, RewriteSummary), DriverError> {
     let driver = RewriteDriver::new(rules);
     let mut outcome = None;
     let _ = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PreOrder>(rewriter);
+        let result = driver.run(rewriter);
         outcome = Some(result.clone());
         result
     });
@@ -342,9 +342,9 @@ fn an_interrupted_sweep_that_changed_nothing_ends_the_run() {
     assert_eq!(summary.applied, 0);
 }
 
-/// A rule's root owns no bodies yet, so there is nothing to skip.
+/// The driver's walk is a snapshot, so `skip` has no effect.
 #[test]
-fn skip_does_not_change_the_run_yet() {
+fn skip_does_not_change_the_run() {
     let advancing = run(&rules(double_neg)).unwrap();
     let skipping = run(&rules(double_neg_then_skip)).unwrap();
     assert_eq!(skipping, advancing);

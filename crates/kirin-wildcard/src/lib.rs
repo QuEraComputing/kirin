@@ -67,6 +67,8 @@
 //! A replacement body may end in one walk terminator (`advance`, `skip`,
 //! `interrupt` or `walk_result`), saying how the driver goes on walking once
 //! the rewrite has run. A body without one advances.
+//! `kirin-rewrite`'s fixpoint driver walks a snapshot of the IR, so it
+//! ignores `skip`.
 //!
 //! This crate only defines the rule data: the patterns, and in a
 //! [`PatternRule`] the native functions a pattern calls. It does not match

@@ -1,14 +1,17 @@
-use kirin_ir::walk::{WalkCursor, WalkOrder, WalkResult};
+use std::marker::PhantomData;
+
+use kirin_ir::walk::{PreOrder, WalkOrder, WalkResult};
 use kirin_ir::{Block, Dialect, GetInfo, Rewriter, StageInfo, Statement};
 
-use super::{DriverError, Match};
+use super::{DriverError, Match, Worklist};
 use crate::rule::{NativeRule, Rule};
 use crate::{BlockRule, CheckedRule, RuleSet, StatementRule};
 
 /// What a driver run did.
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RewriteSummary {
-    /// Walks over the IR, including the last one, which changed nothing.
+    /// Sweeps, each starting from every statement under the root, including
+    /// the last one, which changed nothing.
     pub sweeps: usize,
     /// Rule applications that edited the IR.
     pub applied: usize,
@@ -26,11 +29,25 @@ impl std::ops::AddAssign for RewriteSummary {
 
 /// Applies a [`RuleSet`] to IR until nothing changes.
 ///
-/// A run is a fixpoint of sweeps. A sweep walks the tree under a root in a
-/// [`WalkOrder`] chosen per call, such as
-/// [`PostOrder`](kirin_ir::walk::PostOrder), trying every rule in order at
-/// each statement and applying each that matches. It then erases the dead
-/// code under the root. The run ends after the first sweep that records no
+/// A run is a fixpoint of sweeps. A sweep fills a worklist with the
+/// statements under a root, in the walk order `O`:
+/// [`PreOrder`](kirin_ir::walk::PreOrder) unless set with
+/// [`walk_order`](Self::walk_order). The walk is a snapshot taken before any
+/// rule runs. The sweep pops the statements one at a time, trying every rule
+/// in order at each and applying each that matches.
+///
+/// After each statement, the edits its rules recorded as
+/// [`MutationEvent`](kirin_ir::MutationEvent)s add to the worklist the
+/// statements they may have given a new match: for each statement changed,
+/// replaced or inserted, its owner, the producers of its operands, the
+/// statement itself and the users of its results. A statement still waiting
+/// keeps its place, so it is visited once, after the edit; one already
+/// visited goes to the back. Other edits, such as erasing a statement or
+/// changing a `CFG`, add nothing: the next sweep, which starts from every
+/// statement again, sees them.
+///
+/// When the worklist is empty, the sweep erases the dead code under the
+/// root. The run ends after the first sweep that records no
 /// [`MutationEvent`](kirin_ir::MutationEvent); a rule that matches but edits
 /// nothing does not count as a change.
 ///
@@ -38,12 +55,11 @@ impl std::ops::AddAssign for RewriteSummary {
 /// match by name through the pattern and program symbol tables, never by
 /// their stage-local ids.
 ///
-/// A rule's rewrite body may end in a walk result steering the sweep (see
-/// [`kirin_wildcard`]): `skip` leaves the statements nested in the
-/// statement being visited unwalked, and `interrupt` ends the sweep there.
-/// Since a pattern's root never owns bodies yet (see
-/// [`RuleErrorKind::OpWithBodies`](crate::RuleErrorKind::OpWithBodies)),
-/// `skip` from a pattern rule has no effect so far.
+/// A rule's rewrite body may end in a walk result (see [`kirin_wildcard`]).
+/// `interrupt` ends the sweep there, leaving the rest of the worklist
+/// unvisited. `skip` has no effect: the sweep's walk is a snapshot, so it
+/// cannot leave a statement's nested statements out. In an ordinary walk
+/// (see [`kirin_ir::walk`]) it does.
 ///
 /// An interrupted sweep counts like any other: if the run changed nothing,
 /// it ends, without visiting the statements after the interrupt again. So a
@@ -51,62 +67,76 @@ impl std::ops::AddAssign for RewriteSummary {
 /// otherwise the run reports convergence although no rule in the set has
 /// been tried on those statements. The driver does not check this.
 ///
+/// Any rule may erase the statement being visited, including a pattern rule
+/// erasing its root. The rules after it are not tried there.
+///
 /// A [`StatementRule`] is tried at every statement the sweep visits, in its
-/// place in the rule list, and steers the sweep with the walk result it
-/// returns. It counts as applied when it edits the IR. Each sweep, the
-/// driver builds a fresh copy of the rule with the recipe given to
-/// [`RuleSet::add_statement_rule`]. Since its edits can't be known before the
-/// run, one erasing the statement being visited in an order that does not
-/// allow it fails the run with [`DriverError::Walk`].
+/// place in the rule list. It counts as applied when it edits the IR. Each
+/// sweep, the driver builds a fresh copy of the rule with the recipe given
+/// to [`RuleSet::add_statement_rule`]. The copy may be handed a statement
+/// more than once in a sweep, when an edit adds it to the worklist again
+/// after its visit.
 ///
 /// A [`BlockRule`] runs, in its place in the rule list, on each block the
 /// visited statement owns: its `Block`s, then the blocks of its `CFG`s.
 /// Graph bodies are not handed to it. The blocks are listed when its turn
 /// comes, so it sees the edits of the rules before it at that statement. A
-/// block is therefore handed to it this sweep only if it is under its owner
-/// when the walk visits the owner: one created or moved under a statement
-/// the walk has already passed waits for the next sweep, which the edit
-/// causes. A listed block an earlier copy erased or merged away is skipped.
-/// For every block, the driver builds a fresh copy of the rule with the
-/// recipe given to [`RuleSet::add_block_rule`], and each block whose run
-/// edits the IR counts as one application. A `skip` from one block still
-/// runs the rule on the statement's remaining blocks, such as an `scf.if`'s
-/// `else` arm after its `then` arm, then leaves the statement's nested
-/// statements unwalked. An `interrupt` ends the sweep at once, leaving the
-/// remaining blocks unrun.
+/// statement visited again, such as the owner of a block an insert changed,
+/// hands its blocks to the rule again. A listed block an earlier copy erased
+/// or merged away is skipped. For every block, the driver builds a fresh
+/// copy of the rule with the recipe given to [`RuleSet::add_block_rule`],
+/// and each block whose run edits the IR counts as one application. An
+/// `interrupt` ends the sweep at once, leaving the remaining blocks unrun.
 ///
-/// Rules that keep undoing each other never reach a fixpoint. As a safety
-/// net, a run still changing after [`max_sweeps`](Self::max_sweeps) sweeps
+/// Rules that keep undoing each other never reach a fixpoint. As safety
+/// nets, a run still changing after [`max_sweeps`](Self::max_sweeps) sweeps
 /// ([`DEFAULT_MAX_SWEEPS`](Self::DEFAULT_MAX_SWEEPS) unless set) fails with
-/// [`DriverError::BudgetExhausted`] instead of hanging. The limit is meant to
-/// be far above what a terminating rule set needs, never a way to stop a
-/// run early. A single sweep has no limit.
-///
-/// A rule erasing its root erases the statement being visited, which only
-/// some walk orders allow (see [`kirin_ir::walk`]). A run in another order
-/// fails with [`DriverError::ErasesRoot`] before editing anything. Native
-/// actions can edit anything, so they are checked by the walk as it runs: one
-/// breaking the walk's contract fails the run with [`DriverError::Walk`].
+/// [`DriverError::BudgetExhausted`], and a sweep making more than
+/// [`max_rewrites_per_sweep`](Self::max_rewrites_per_sweep) rewrites
+/// ([`DEFAULT_MAX_REWRITES_PER_SWEEP`](Self::DEFAULT_MAX_REWRITES_PER_SWEEP)
+/// unless set) fails with [`DriverError::RewritesExhausted`], instead of
+/// hanging. The limits are meant to be far above what a terminating rule
+/// set needs, never a way to stop a run early.
 ///
 /// The driver edits through the [`Rewriter`] a pass is given, so it runs
 /// inside [`Pipeline::run_pass`](kirin_ir::Pipeline::run_pass):
 ///
 /// ```ignore
-/// pipeline.run_pass(stage, |rewriter| driver.run::<PostOrder>(rewriter))?;
+/// pipeline.run_pass(stage, |rewriter| driver.run(rewriter))?;
 /// ```
-pub struct RewriteDriver<'r, L: Dialect> {
+pub struct RewriteDriver<'r, L: Dialect, O: WalkOrder = PreOrder> {
     rules: &'r RuleSet<L>,
     max_sweeps: usize,
+    max_rewrites_per_sweep: usize,
+    order: PhantomData<O>,
 }
 
 impl<'r, L: Dialect> RewriteDriver<'r, L> {
-    /// The sweep limit of a new driver.
-    pub const DEFAULT_MAX_SWEEPS: usize = 10_000;
-
+    /// A driver applying `rules` in [`PreOrder`], with the default limits.
     pub fn new(rules: &'r RuleSet<L>) -> Self {
         Self {
             rules,
             max_sweeps: Self::DEFAULT_MAX_SWEEPS,
+            max_rewrites_per_sweep: Self::DEFAULT_MAX_REWRITES_PER_SWEEP,
+            order: PhantomData,
+        }
+    }
+}
+
+impl<'r, L: Dialect, O: WalkOrder> RewriteDriver<'r, L, O> {
+    /// The sweep limit of a new driver.
+    pub const DEFAULT_MAX_SWEEPS: usize = 10_000;
+
+    /// The limit on rewrites in one sweep of a new driver.
+    pub const DEFAULT_MAX_REWRITES_PER_SWEEP: usize = 10_000;
+
+    /// Fill each sweep's worklist in the walk order `P` instead.
+    pub fn walk_order<P: WalkOrder>(self) -> RewriteDriver<'r, L, P> {
+        RewriteDriver {
+            rules: self.rules,
+            max_sweeps: self.max_sweeps,
+            max_rewrites_per_sweep: self.max_rewrites_per_sweep,
+            order: PhantomData,
         }
     }
 
@@ -116,12 +146,16 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         self
     }
 
+    /// Fail a run whose sweep makes more than `max_rewrites_per_sweep`
+    /// rewrites.
+    pub fn max_rewrites_per_sweep(mut self, max_rewrites_per_sweep: usize) -> Self {
+        self.max_rewrites_per_sweep = max_rewrites_per_sweep;
+        self
+    }
+
     /// Run on every function in the stage: the definition of each live
     /// specialization, each to its own fixpoint, in turn.
-    pub fn run<O: WalkOrder>(
-        &self,
-        rewriter: &mut Rewriter<'_, L>,
-    ) -> Result<RewriteSummary, DriverError> {
+    pub fn run(&self, rewriter: &mut Rewriter<'_, L>) -> Result<RewriteSummary, DriverError> {
         let roots: Vec<Statement> = rewriter
             .stage()
             .staged_function_arena()
@@ -132,34 +166,20 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
             .collect();
         let mut summary = RewriteSummary::default();
         for root in roots {
-            summary += self.run_at::<O>(rewriter, root)?;
+            summary += self.run_at(rewriter, root)?;
         }
         Ok(summary)
     }
 
     /// Run on the tree under `root` until a sweep changes nothing.
-    pub fn run_at<O: WalkOrder>(
+    pub fn run_at(
         &self,
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<RewriteSummary, DriverError> {
-        if !O::ALLOWS_ERASING_VISITED
-            && let Some(rule) = self
-                .rules
-                .rules()
-                .iter()
-                .filter_map(Rule::as_pattern)
-                .find(|rule| rule.erases_root())
-        {
-            let order = std::any::type_name::<O>();
-            return Err(DriverError::ErasesRoot {
-                rule: rule.name().to_string(),
-                order: order.rsplit("::").next().unwrap_or(order),
-            });
-        }
         let mut summary = RewriteSummary::default();
         while summary.sweeps < self.max_sweeps {
-            let applied = self.sweep::<O>(rewriter, root)?;
+            let applied = self.sweep(rewriter, root)?;
             let erased = Self::clean_up_dead_code(rewriter, root)?;
             summary += RewriteSummary {
                 sweeps: 1,
@@ -176,28 +196,34 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         })
     }
 
-    /// Walk the tree under `root` once, applying every rule that matches
-    /// and every native rule. Returns how many applications edited the IR.
+    /// Visit the statements under `root` from a worklist until it is empty,
+    /// applying every rule that matches and every native rule, and adding
+    /// what each visit's edits may affect. Returns how many applications
+    /// edited the IR.
     ///
-    /// Each applied rule's walk result steers the walk: after a `skip`, the
-    /// remaining rules still run at the statement, then its nested
-    /// statements are skipped; an `interrupt` stops trying rules and ends
-    /// the sweep.
-    fn sweep<O: WalkOrder>(
-        &self,
-        rewriter: &mut Rewriter<'_, L>,
-        root: Statement,
-    ) -> Result<usize, DriverError> {
+    /// An `interrupt` ends the sweep; a `skip` has no effect.
+    fn sweep(&self, rewriter: &mut Rewriter<'_, L>, root: Statement) -> Result<usize, DriverError> {
         let mut applied = 0;
-        let mut cursor = O::start(rewriter.stage(), root);
+        let mut worklist = Worklist::seeded::<O, L>(rewriter.stage(), root);
         let mut sweep_rules: Vec<SweepRule<'_, L>> =
             self.rules.rules().iter().map(SweepRule::new).collect();
-        while let Some(stmt) = cursor.next(rewriter.stage())? {
-            match self.visit(&mut sweep_rules, rewriter, stmt, &mut applied)? {
-                WalkResult::Advance => {}
-                WalkResult::Skip => cursor.skip(),
-                WalkResult::Interrupt => return Ok(applied),
+        while let Some(stmt) = worklist.pop() {
+            // An earlier visit erased it.
+            if stmt.get_info(rewriter.stage()).is_none() {
+                continue;
             }
+            let num_prior_events = rewriter.events().len();
+            let walk_result = self.visit(&mut sweep_rules, rewriter, stmt, &mut applied)?;
+            if applied > self.max_rewrites_per_sweep {
+                return Err(DriverError::RewritesExhausted {
+                    root,
+                    rewrites: applied,
+                });
+            }
+            if walk_result == WalkResult::Interrupt {
+                break;
+            }
+            worklist.push_affected(rewriter.stage(), &rewriter.events()[num_prior_events..]);
         }
         Ok(applied)
     }
