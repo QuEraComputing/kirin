@@ -467,3 +467,29 @@ fn test_dialect_derive_enum_mixed_callable_body_and_wraps() {
     };
     insta::assert_snapshot!(generate_dialect_code(input));
 }
+
+#[test]
+fn operand_resolution_bound_only_for_checked_fields() {
+    for field in [
+        syn::parse_quote!(input: SSAValue),
+        syn::parse_quote!(#[kirin(type = T::placeholder())] input: Vec<SSAValue>),
+        syn::parse_quote!(#[kirin(type = T::placeholder())] input: Option<SSAValue>),
+    ] {
+        let field: syn::Field = field;
+        let input = syn::parse_quote! {
+            #[kirin(type = T, builders)]
+            struct Op { #field }
+        };
+        assert!(!generate_dialect_code(input).contains("TypeResolution"));
+    }
+    let input = syn::parse_quote! {
+        #[kirin(type = T, builders, crate = custom_ir)]
+        struct Op {
+            #[kirin(type = T::placeholder())]
+            input: SSAValue,
+        }
+    };
+    let code = generate_dialect_code(input);
+    assert!(code.contains("Lang::Type: custom_ir::TypeResolution"));
+    assert!(code.contains("custom_ir::TypeResolution::is_resolved"));
+}

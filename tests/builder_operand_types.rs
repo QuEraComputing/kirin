@@ -43,3 +43,32 @@ fn rejects_operand_against_field_computed_type() {
     let input = typed(&mut stage, SimpleType::I64);
     L::op_cast(&mut stage, input, SimpleType::F32);
 }
+
+#[test]
+fn accepts_unresolved_actual_type() {
+    let mut stage = BuilderStageInfo::<L>::default();
+    let input = typed(&mut stage, SimpleType::Bottom);
+    L::op_cast(&mut stage, input, SimpleType::I64);
+}
+
+#[test]
+fn accepts_unresolved_expected_type() {
+    let mut stage = BuilderStageInfo::<L>::default();
+    let input = typed(&mut stage, SimpleType::I64);
+    L::op_cast(&mut stage, input, SimpleType::Bottom);
+}
+
+#[test]
+fn accepts_both_types_unresolved() {
+    let mut stage = BuilderStageInfo::<L>::default();
+    let input = typed(&mut stage, SimpleType::Bottom);
+    L::op_cast(&mut stage, input, SimpleType::Bottom);
+}
+
+#[test]
+#[should_panic(expected = "Cast::input: expected operand of type I64, got Any")]
+fn resolved_top_type_is_still_checked() {
+    let mut stage = BuilderStageInfo::<L>::default();
+    let input = typed(&mut stage, SimpleType::Any);
+    L::op_cast(&mut stage, input, SimpleType::I64);
+}

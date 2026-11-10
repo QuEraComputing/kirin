@@ -261,7 +261,10 @@ fn statement_id_name(info: &StatementInfo) -> syn::Ident {
     format_ident!("{}_statement_id", name, span = info.name.span())
 }
 
-fn build_fn_arg_type_checks(info: &StatementInfo) -> Vec<proc_macro2::TokenStream> {
+fn build_fn_arg_type_checks(
+    info: &StatementInfo,
+    crate_path: &syn::Path,
+) -> Vec<proc_macro2::TokenStream> {
     info.fields
         .iter()
         .filter(|field| {
@@ -273,9 +276,13 @@ fn build_fn_arg_type_checks(info: &StatementInfo) -> Vec<proc_macro2::TokenStrea
             let name = field.name_ident(info.name.span());
             let label = format!("{}::{}", info.name, field);
             Some(quote! {
-                if let Some(actual) = stage.ssa_arena().get(#name).and_then(|i|i.ty()) {
-                    let expected = Lang::Type::from(#expected);
-                    assert!(*actual == expected, "{}: expected operand of type {:?}, got {:?}", #label, expected, actual);
+                if let Some(__actual) = stage.ssa_arena().get(#name).and_then(|i| i.ty()) {
+                    if #crate_path::TypeResolution::is_resolved(__actual) {
+                        let __expected = Lang::Type::from(#expected);
+                        if #crate_path::TypeResolution::is_resolved(&__expected) {
+                            assert!(*__actual == __expected, "{}: expected operand of type {:?}, got {:?}", #label, __expected, __actual);
+                        }
+                    }
                 }
             })
         }).collect()
@@ -289,7 +296,7 @@ fn build_fn_body(
 ) -> proc_macro2::TokenStream {
     let statement_id = statement_id_name(info);
     let let_inputs = build_fn_let_inputs(info, &input.ir_type);
-    let arg_type_checks = build_fn_arg_type_checks(info);
+    let arg_type_checks = build_fn_arg_type_checks(info, crate_path);
     let let_results = let_name_eq_result_value(info, result_name_map, crate_path);
 
     let is_tuple = info.fields.iter().all(|f| f.ident.is_none());
@@ -463,6 +470,16 @@ pub(super) fn build_fn_for_statement(
     let body = build_fn_body(info, input, &result_name_map, crate_path);
     let self_ty = quote! { #name #ty_generics };
 
+    let resolution_bound = if info.fields.iter().any(|field| {
+        field.category() == FieldCategory::Argument
+            && matches!(field.collection, Collection::Single)
+            && field.ssa_type().is_some()
+    }) {
+        quote! { , Lang::Type: #crate_path::TypeResolution }
+    } else {
+        quote! {}
+    };
+
     let needs_placeholder_bound = info.fields.iter().any(|f| f.is_auto_placeholder());
 
     let placeholder_bound = if needs_placeholder_bound {
@@ -479,6 +496,7 @@ pub(super) fn build_fn_for_statement(
             Lang: #crate_path::Dialect + ::core::convert::From<#self_ty>,
             Lang::Type: From<#ir_type>
             #placeholder_bound
+            #resolution_bound
         {
             let stage = stage.as_build_stage();
             #body
