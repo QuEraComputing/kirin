@@ -37,14 +37,17 @@ pub enum InsertionPoint {
     /// A new member and node of the `DiGraph`. The statement must be a
     /// non-terminator with no successors. Each operand slot reading a result
     /// of another member gets an edge from that member; operands from outside
-    /// the graph get none.
+    /// the graph get none. A detached statement's results may already be read
+    /// by members; each such slot gets an edge from the new node.
     DiGraph(DiGraph),
     /// A new member of the `UnGraph`: an edge statement if the definition is
     /// one ([`IsEdge`](crate::IsEdge)), a node otherwise. Neither may be a
     /// terminator or carry successors, and an edge statement has no operands
     /// ([`RewriteError::EdgeStatementWithOperands`]): its results are new
     /// wires. Each operand of a node that is a wire of the graph becomes an
-    /// endpoint of that wire, and a wire read by two node slots is an edge. A
+    /// endpoint of that wire, and a wire read by two node slots is an edge,
+    /// including the wires of a detached edge statement that nodes already
+    /// read. A
     /// wire may end up with more than two endpoints; that is invalid IR, left
     /// for [`verify_derived`](crate::verify_derived) to report, and such a
     /// wire has no edge.
@@ -97,6 +100,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// A detached statement is one this `Rewriter` made but has not placed,
     /// such as a copy; it has no parent yet. It must fit `insertion_pt` as for
     /// [`Rewriter::create`].
+    ///
+    /// A detached statement's results can be read before it is placed, but
+    /// one never placed is tombstoned when the `Rewriter` is dropped, leaving
+    /// the statements reading its results with dangling operands.
+    /// [`verify_derived`](crate::verify_derived) reports them, so
+    /// [`Pipeline::run_pass`](crate::Pipeline::run_pass) quarantines the
+    /// stage.
     ///
     /// Rejects, leaving the stage untouched, if `stmt` is unknown, is not a
     /// detached statement of this `Rewriter` ([`RewriteError::NotDetached`]),
@@ -221,6 +231,30 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 for operand in operands {
                     self.add_operand_edge(graph, stmt, operand);
                 }
+                // A detached statement's results are usable before it is
+                // placed, so members may already read them: add an edge to
+                // each of their slots. `stmt`'s own slots got theirs above.
+                for result in self.results_of(stmt) {
+                    let consumers: Vec<Statement> = result
+                        .expect_info(self.stage)
+                        .uses()
+                        .iter()
+                        .filter_map(|site| match *site {
+                            Use::StatementOperand { stmt: consumer, .. } if consumer != stmt => {
+                                Some(consumer)
+                            }
+                            _ => None,
+                        })
+                        .collect();
+                    let info = graph
+                        .get_info_mut(self.stage)
+                        .expect("graph is live in this stage");
+                    for consumer in consumers {
+                        if info.node_idx_of(consumer).is_some() {
+                            info.add_edge(stmt, consumer, result);
+                        }
+                    }
+                }
                 self.events
                     .push(MutationEvent::ChangedDiGraphTopology { graph });
             }
@@ -242,10 +276,28 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     .get_info_mut(self.stage)
                     .expect("graph is live in this stage")
                     .add_edge_member(stmt);
+                // A detached statement's results are usable before it is
+                // placed, so nodes may already read its wires: resync each
+                // from no endpoints, making a wire with two an edge.
+                let wires = self
+                    .results_of(stmt)
+                    .into_iter()
+                    .map(|wire| (wire, Default::default()))
+                    .collect();
+                self.resync_wires(graph, wires);
                 self.events
                     .push(MutationEvent::ChangedUnGraphTopology { graph });
             }
         }
+    }
+
+    /// `stmt`'s results, in order.
+    fn results_of(&self, stmt: Statement) -> Vec<SSAValue> {
+        stmt.expect_info(self.stage)
+            .definition
+            .results()
+            .map(|&result| result.into())
+            .collect()
     }
 
     /// Build `definition` as a detached statement: it has no parent and no
