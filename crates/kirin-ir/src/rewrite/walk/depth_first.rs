@@ -33,7 +33,7 @@ pub struct PostOrderCursor {
 
 impl WalkOrder for PreOrder {
     type Cursor = PreOrderCursor;
-    const ALLOWS_ERASING_VISITED: bool = false;
+    const ALLOWS_DISPLACING_VISITED: bool = false;
 
     fn start<L: Dialect>(_stage: &StageInfo<L>, root: Statement) -> Self::Cursor {
         PreOrderCursor {
@@ -46,7 +46,7 @@ impl WalkOrder for PreOrder {
 
 impl WalkOrder for PostOrder {
     type Cursor = PostOrderCursor;
-    const ALLOWS_ERASING_VISITED: bool = false;
+    const ALLOWS_DISPLACING_VISITED: bool = false;
 
     fn start<L: Dialect>(_stage: &StageInfo<L>, root: Statement) -> Self::Cursor {
         PostOrderCursor {

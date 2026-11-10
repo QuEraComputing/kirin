@@ -6,7 +6,7 @@ mod common;
 
 use std::collections::HashMap;
 
-use common::{BuilderDialect, TestType, make_split, make_wire, new_stage};
+use common::{BuilderDialect, EventCursor, TestType, make_split, make_wire, new_stage};
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
@@ -162,7 +162,7 @@ fn insert_ungraph_node_connects_the_readers_of_a_wire() {
     let d = rw
         .insert_ungraph_node(ug, BuilderDialect::Gate(boundary, capture))
         .unwrap();
-    let events = rw.drain_events();
+    let events = rw.events().to_vec();
     drop(rw);
 
     let topology = MutationEvent::ChangedUnGraphTopology { graph: ug };
@@ -236,7 +236,7 @@ fn insert_ungraph_edge_adds_a_wire_nodes_can_read() {
     let n2 = rw
         .insert_ungraph_node(ug, BuilderDialect::Use(r.into()))
         .unwrap();
-    let events = rw.drain_events();
+    let events = rw.events().to_vec();
     drop(rw);
 
     let topology = MutationEvent::ChangedUnGraphTopology { graph: ug };
@@ -327,6 +327,7 @@ fn ungraph_inserts_reject_without_mutating() {
 
 #[test]
 fn erase_ungraph_node_drops_its_edges_and_frees_the_wire() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -338,12 +339,12 @@ fn erase_ungraph_node_drops_its_edges_and_frees_the_wire() {
     let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
 
     // `a` is not the last node, so the last one moves into its slot.
     rw.erase_statement(a).unwrap();
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![
             MutationEvent::ErasedStatement { stmt: a },
             MutationEvent::ChangedUnGraphTopology { graph: ug },
@@ -367,6 +368,7 @@ fn erase_ungraph_node_drops_its_edges_and_frees_the_wire() {
 
 #[test]
 fn erase_ungraph_node_with_used_results_is_rejected() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -381,13 +383,13 @@ fn erase_ungraph_node_with_used_results_is_rejected() {
     let _reader = rw
         .insert_ungraph_node(ug, BuilderDialect::Use(r.into()))
         .unwrap();
-    rw.drain_events();
+    log.advance(&rw);
 
     assert_eq!(
         rw.erase_statement(n),
         Err(RewriteError::StatementResultsInUse(n))
     );
-    assert!(rw.events().is_empty());
+    assert!(log.read_and_advance(&rw).is_empty());
     drop(rw);
 
     assert!(n.get_info(&stage).is_some());
@@ -396,6 +398,7 @@ fn erase_ungraph_node_with_used_results_is_rejected() {
 
 #[test]
 fn erase_edge_statement_once_no_node_reads_its_wire() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -406,7 +409,7 @@ fn erase_edge_statement_once_no_node_reads_its_wire() {
     } = fixture();
     let mut rw = Rewriter::new(&mut stage);
     let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
 
     // A node still reads the wire.
     assert_eq!(
@@ -414,10 +417,10 @@ fn erase_edge_statement_once_no_node_reads_its_wire() {
         Err(RewriteError::StatementResultsInUse(w_stmt))
     );
     rw.erase_statement(a).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
     rw.erase_statement(w_stmt).unwrap();
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![
             MutationEvent::ErasedStatement { stmt: w_stmt },
             MutationEvent::ChangedUnGraphTopology { graph: ug },
@@ -472,7 +475,7 @@ fn erase_statement_tombstones_owned_ungraph() {
         let mut rw = Rewriter::new(&mut stage);
         rw.erase_statement(owner).unwrap();
         assert_eq!(
-            rw.drain_events(),
+            rw.events().to_vec(),
             vec![MutationEvent::ErasedStatement { stmt: owner }]
         );
     }
@@ -492,6 +495,7 @@ fn erase_statement_tombstones_owned_ungraph() {
 
 #[test]
 fn replace_operand_swaps_endpoints_through_an_over_full_wire() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -505,7 +509,7 @@ fn replace_operand_swaps_endpoints_through_an_over_full_wire() {
     let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
     let d = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
     let topology = MutationEvent::ChangedUnGraphTopology { graph: ug };
 
     // Moving b onto v first leaves v with three readers: no edge, and invalid
@@ -522,14 +526,14 @@ fn replace_operand_swaps_endpoints_through_an_over_full_wire() {
         }]
     );
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![MutationEvent::ChangedOperands { stmt: b }, topology]
     );
 
     // Moving d onto w completes it: w joins a — d, v joins c — b.
     rw.replace_operand(d, 0, w).unwrap();
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![MutationEvent::ChangedOperands { stmt: d }, topology]
     );
     drop(rw);
@@ -544,6 +548,7 @@ fn replace_operand_swaps_endpoints_through_an_over_full_wire() {
 
 #[test]
 fn replace_operand_off_a_wire_drops_its_edge() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -554,13 +559,13 @@ fn replace_operand_off_a_wire_drops_its_edge() {
     let mut rw = Rewriter::new(&mut stage);
     let _a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
 
     // A capture is not a wire: b leaves w, so w's edge goes.
     rw.replace_operand(b, 0, capture).unwrap();
     assert!(edges(rw.stage(), ug).is_empty());
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![
             MutationEvent::ChangedOperands { stmt: b },
             MutationEvent::ChangedUnGraphTopology { graph: ug },
@@ -572,10 +577,10 @@ fn replace_operand_off_a_wire_drops_its_edge() {
     let r = rw.new_result(TestType::I32);
     rw.insert_ungraph_node(ug, BuilderDialect::Compute(capture, r))
         .unwrap();
-    rw.drain_events();
+    log.advance(&rw);
     rw.replace_operand(b, 0, r).unwrap();
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![MutationEvent::ChangedOperands { stmt: b }]
     );
     drop(rw);
@@ -586,6 +591,7 @@ fn replace_operand_off_a_wire_drops_its_edge() {
 
 #[test]
 fn replace_all_uses_moves_every_reader_to_the_new_wire() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -596,13 +602,13 @@ fn replace_all_uses_moves_every_reader_to_the_new_wire() {
     let mut rw = Rewriter::new(&mut stage);
     let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
 
     // One reader each: merging w into v gives v exactly two.
     assert_eq!(rw.replace_all_uses(w, v), Ok(1));
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(a, c))]));
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![
             MutationEvent::ChangedOperands { stmt: a },
             MutationEvent::ChangedUnGraphTopology { graph: ug },
@@ -630,6 +636,7 @@ fn replace_all_uses_moves_every_reader_to_the_new_wire() {
 
 #[test]
 fn replace_results_redirects_an_edge_statements_readers() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -641,7 +648,7 @@ fn replace_results_redirects_an_edge_statements_readers() {
     let mut rw = Rewriter::new(&mut stage);
     let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
 
     // w's readers move to v, so the edge now carries v, and w_stmt is free
     // to go.
@@ -672,7 +679,7 @@ fn replace_all_uses_across_two_ungraphs() {
     let mut stage = stage.finalize().unwrap();
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(rw.replace_all_uses(x, w1), Ok(2));
-    let events = rw.drain_events();
+    let events = rw.events().to_vec();
     drop(rw);
 
     // In ug1, `b` joins `w1`; in ug2, `w1` is not a wire, so nothing changes.
@@ -692,6 +699,7 @@ fn replace_all_uses_across_two_ungraphs() {
 
 #[test]
 fn replace_statement_on_ungraph_node_moves_its_wires() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -703,13 +711,13 @@ fn replace_statement_on_ungraph_node_moves_its_wires() {
     let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
 
     // b now reads v instead of w: w loses its edge, v gains one.
     rw.replace_statement(b, BuilderDialect::Use(v)).unwrap();
     assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(b, c))]));
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![
             MutationEvent::ReplacedStatement { stmt: b },
             MutationEvent::ChangedUnGraphTopology { graph: ug },
@@ -719,7 +727,7 @@ fn replace_statement_on_ungraph_node_moves_its_wires() {
     // The same operands again change no topology.
     rw.replace_statement(b, BuilderDialect::Use(v)).unwrap();
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![MutationEvent::ReplacedStatement { stmt: b }]
     );
     drop(rw);
@@ -731,6 +739,7 @@ fn replace_statement_on_ungraph_node_moves_its_wires() {
 
 #[test]
 fn replace_statement_on_edge_statement_keeps_its_wire() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -742,7 +751,7 @@ fn replace_statement_on_edge_statement_keeps_its_wire() {
     let mut rw = Rewriter::new(&mut stage);
     let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
     let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
-    rw.drain_events();
+    log.advance(&rw);
 
     // The result slot is overwritten with the statement's own result, so `w`
     // stays the wire and keeps its readers.
@@ -750,7 +759,7 @@ fn replace_statement_on_edge_statement_keeps_its_wire() {
     rw.replace_statement(w_stmt, BuilderDialect::Wire(placeholder))
         .unwrap();
     assert_eq!(
-        rw.drain_events(),
+        log.read_and_advance(&rw),
         vec![MutationEvent::ReplacedStatement { stmt: w_stmt }]
     );
     drop(rw);
@@ -770,6 +779,7 @@ fn replace_statement_on_edge_statement_keeps_its_wire() {
 
 #[test]
 fn replace_statement_on_ungraph_member_rejects_role_changes() {
+    let mut log = EventCursor::default();
     let Fixture {
         mut stage,
         ug,
@@ -782,7 +792,7 @@ fn replace_statement_on_ungraph_member_rejects_role_changes() {
     let node = rw
         .insert_ungraph_node(ug, BuilderDialect::Compute(capture, r))
         .unwrap();
-    rw.drain_events();
+    log.advance(&rw);
     let placeholder = ResultValue::from(TestSSAValue(0));
 
     // A node cannot become an edge statement, nor the reverse.
@@ -804,13 +814,50 @@ fn replace_statement_on_ungraph_member_rejects_role_changes() {
         rw.replace_statement(node, BuilderDialect::Invoke(placeholder)),
         Err(RewriteError::TerminatorKindMismatch(node))
     );
-    assert!(rw.events().is_empty());
+    assert!(log.read_and_advance(&rw).is_empty());
     drop(rw);
 
     assert_eq!(
         *node.definition(&stage),
         BuilderDialect::Compute(capture, r)
     );
+    assert_topology(&stage, ug);
+    verify_derived(&stage).unwrap();
+}
+
+#[test]
+fn replace_uses_if_moves_only_the_selected_reader_to_the_new_wire() {
+    let mut log = EventCursor::default();
+    let Fixture {
+        mut stage,
+        ug,
+        w,
+        v,
+        ..
+    } = fixture();
+    let mut rw = Rewriter::new(&mut stage);
+    let a = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let b = rw.insert_ungraph_node(ug, BuilderDialect::Use(w)).unwrap();
+    let c = rw.insert_ungraph_node(ug, BuilderDialect::Use(v)).unwrap();
+    assert_eq!(edges(rw.stage(), ug), HashMap::from([(w, pair(a, b))]));
+    log.advance(&rw);
+
+    // Only `a` moves: `w` keeps one reader and loses its edge, and `v` gains
+    // one, joining `c`.
+    let only_a =
+        |_: &StageInfo<BuilderDialect>, site| site == Use::StatementOperand { stmt: a, index: 0 };
+    assert_eq!(rw.replace_uses_if(w, v, only_a), Ok(1));
+    assert_eq!(edges(rw.stage(), ug), HashMap::from([(v, pair(a, c))]));
+    assert_eq!(
+        log.read_and_advance(&rw),
+        vec![
+            MutationEvent::ChangedOperands { stmt: a },
+            MutationEvent::ChangedUnGraphTopology { graph: ug },
+        ]
+    );
+    drop(rw);
+
+    assert_eq!(*b.definition(&stage), BuilderDialect::Use(w));
     assert_topology(&stage, ug);
     verify_derived(&stage).unwrap();
 }
