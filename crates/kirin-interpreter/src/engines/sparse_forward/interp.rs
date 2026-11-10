@@ -36,18 +36,18 @@ use std::hash::Hash;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CFG, CompileStage, HasBottom, Pipeline, Product, SSAValue, SpecializedFunction,
-    StageMeta, Statement, Symbol, Widen,
+    Block, CFG, CompileStage, HasBottom, Pipeline, Product, SSAValue, StageMeta, Statement, Symbol,
+    Widen,
 };
 
 use crate::core::query;
 use crate::{
     AbstractBlockFrame, AbstractCompletion, AbstractDiGraphFrame, AbstractInterpreter,
-    BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee, DiGraphQueries, Env,
-    EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine, ForwardEval, Frame, Interp,
-    InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker, SSABinding,
-    SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery, StandardAbstractFrame,
-    StandardFixpointInterpreter, StatementDispatch, WorkAnalysis,
+    AnalysisResults, Analyzed, BlockQueries, Body, CFGQueries, CallEffect, CallServices, Callee,
+    DiGraphQueries, Env, EnvIndex, EnvStore, FixpointProfile, ForwardDataflowFrameEngine,
+    ForwardEval, Frame, Interp, InterpDispatch, InterpLocation, InterpreterError, LinkTarget,
+    Linker, SSABinding, SameStageLinker, SparseForwardEffect, SparseForwardSemantic, StageQuery,
+    StandardAbstractFrame, StandardFixpointInterpreter, StatementDispatch, WorkAnalysis,
 };
 
 // ===========================================================================
@@ -122,7 +122,8 @@ where
 /// One selected function context: what it analyzes, what it returns, and who
 /// reads the return.
 struct ForwardContext<V> {
-    stage: CompileStage,
+    /// The callable this context analyzes.
+    target: LinkTarget,
     /// The unit a call enters: the CFG's entry block, a block body, or a graph.
     entry: Body,
     /// The join of every reached return; `None` means no return reached yet,
@@ -759,7 +760,7 @@ where
             self.inner_mut().contexts.insert(
                 env,
                 ForwardContext {
-                    stage: target.stage,
+                    target,
                     entry,
                     ret: None,
                     callers: Vec::new(),
@@ -777,7 +778,7 @@ where
     /// changed.
     fn merge_entry(&mut self, work: ForwardWork, args: Product<V>) -> Result<(), E> {
         let (env, body) = work;
-        let stage = self.inner().context(env)?.stage;
+        let stage = self.inner().context(env)?.target.stage;
         let params = self.inner().entry_params(stage, body)?;
         if params.len() != args.len() {
             return Err(E::from(match body {
@@ -858,7 +859,7 @@ where
     fn wake_changed(&mut self) -> Result<(), E> {
         let mut woken = HashSet::new();
         for (env, value) in std::mem::take(&mut self.inner_mut().changed) {
-            let stage = self.inner().context(env)?.stage;
+            let stage = self.inner().context(env)?.target.stage;
             let (def, uses) = query::value_units(self.inner().pipeline(), stage, value)?;
             let def = self.inner().reached(env, &def);
             for units in uses {
@@ -922,7 +923,7 @@ where
         interp: &mut ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
         &(env, body): &ForwardWork,
     ) -> Result<F, E> {
-        let stage = interp.inner().context(env)?.stage;
+        let stage = interp.inner().context(env)?.target.stage;
         let args: Product<V> = interp
             .inner()
             .entry_params(stage, body)?
@@ -985,17 +986,15 @@ where
 /// Traversal is owned by the total frame type `F`; context keying and merge/widen
 /// behavior are owned by the policy `P`.
 ///
-/// `analyze` consumes the engine and hands it back only on success, so a
-/// failed analysis can never be resumed: build a new engine instead.
-/// Successful analyses accumulate facts, so a request whose policy key
-/// matches an earlier context returns the join with the earlier requests
-/// (for every repeated callee under [`ContextInsensitive`]) and can depend on
-/// query order. Use a fresh engine for an isolated answer.
+/// `analyze` consumes the engine and returns the converged [`Analyzed`]
+/// state, read through [`AnalysisResults`]. Each analysis is fresh: analyzing
+/// another root takes another engine.
 ///
 /// ```ignore
-/// let analysis = SparseForwardInterpreter::<Stage, ConstPropValue<MyConst>, MyError>::new(&pipeline)
-///     .with_linker(CrossStageLinker);
-/// let (result, analysis) = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
+/// let analyzed = SparseForwardInterpreter::<Stage, ConstPropValue<MyConst>, MyError>::new(&pipeline)
+///     .with_linker(CrossStageLinker)
+///     .analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
+/// let result = analyzed.response(analyzed.root());
 /// ```
 pub struct SparseForwardInterpreter<
     'ir,
@@ -1013,6 +1012,8 @@ pub struct SparseForwardInterpreter<
     Sem: SparseForwardSemantic,
 {
     driver: ForwardDriver<'ir, S, V, E, Lk, P, F, Sem>,
+    /// The analyzed root's context key, set by `analyze`.
+    root: Option<P::Key>,
 }
 
 impl<'ir, S: StageMeta, V, E, P, F, Sem>
@@ -1026,6 +1027,7 @@ where
     pub fn new(pipeline: &'ir Pipeline<S>) -> Self {
         Self {
             driver: StandardFixpointInterpreter::new(SparseForwardTransfer::new(pipeline), ()),
+            root: None,
         }
     }
 }
@@ -1046,6 +1048,7 @@ where
         let transfer = self.driver.into_inner().with_linker(linker);
         SparseForwardInterpreter {
             driver: StandardFixpointInterpreter::new(transfer, ()),
+            root: None,
         }
     }
 
@@ -1063,6 +1066,7 @@ where
         let transfer = self.driver.into_inner().with_analysis(analysis);
         SparseForwardInterpreter {
             driver: StandardFixpointInterpreter::new(transfer, ()),
+            root: None,
         }
     }
 
@@ -1072,11 +1076,19 @@ where
         let transfer = self.driver.into_inner().with_policy(analysis);
         Self {
             driver: StandardFixpointInterpreter::new(transfer, ()),
+            root: None,
         }
     }
 
     pub fn pipeline(&self) -> &'ir Pipeline<S> {
         self.driver.inner().pipeline()
+    }
+
+    /// A selected context's environment and metadata.
+    fn selected(&self, key: &P::Key) -> Option<(EnvIndex, &ForwardContext<V>)> {
+        let transfer = self.driver.inner();
+        let env = transfer.env.context_env(key)?;
+        Some((env, transfer.contexts.get(&env)?))
     }
 }
 
@@ -1093,22 +1105,6 @@ where
         self.driver.inner_mut().analysis.widen_after = joins;
         self
     }
-
-    /// The joined return of an analyzed function (context-insensitive keying
-    /// only); `None` if it was never analyzed or never returned.
-    pub fn return_summary(
-        &self,
-        stage: CompileStage,
-        function: SpecializedFunction,
-    ) -> Option<Product<V>> {
-        let target = LinkTarget {
-            stage,
-            specialization: function,
-        };
-        let transfer = self.driver.inner();
-        let env = transfer.env.context_env(&target)?;
-        transfer.context(env).ok()?.ret.clone()
-    }
 }
 
 impl<'ir, S, V, E, Lk, P, F, Sem> SparseForwardInterpreter<'ir, S, V, E, Lk, P, F, Sem>
@@ -1123,14 +1119,14 @@ where
         + From<AbstractBlockFrame<V, E>>
         + From<AbstractDiGraphFrame<V, E>>,
 {
-    /// Resolve `stage`/`function` by name and analyze. Returns the function's
-    /// inferred return product at the fixpoint (empty if it never returns).
+    /// Resolve `stage`/`function` by name and analyze. See
+    /// [`analyze`](Self::analyze).
     pub fn analyze_by_name(
         self,
         stage_name: &str,
         function_name: &str,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<(Product<V>, Self), E> {
+    ) -> Result<Analyzed<Self>, E> {
         let stage = self
             .driver
             .inner()
@@ -1148,40 +1144,97 @@ where
 
     /// Resolve a stage-local `symbol` through the linker and analyze the
     /// selected callable. This is the convenience form of
-    /// [`analyze`](Self::analyze) with [`Callee::Named`], and returns its
-    /// inferred return product at the fixpoint.
+    /// [`analyze`](Self::analyze) with [`Callee::Named`].
     pub fn analyze_by_symbol(
         self,
         stage: CompileStage,
         symbol: Symbol,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<(Product<V>, Self), E> {
+    ) -> Result<Analyzed<Self>, E> {
         self.analyze(stage, symbol.into(), args)
     }
 
     /// Run the fixpoint from a single entry. Seeds the entry function's entry unit
-    /// and drains the worklist. Returns the engine on success; an error drops
-    /// it.
+    /// and drains the worklist. The inferred return product is the root's
+    /// [`response`](AnalysisResults::response) (`None` if it never returns);
+    /// an error drops the engine.
     pub fn analyze(
         mut self,
         stage: CompileStage,
         callee: Callee,
         args: impl IntoIterator<Item = V>,
-    ) -> Result<(Product<V>, Self), E> {
+    ) -> Result<Analyzed<Self>, E> {
         let args: Product<V> = args.into_iter().collect();
         let env = self.driver.contribute_call_entry(stage, &callee, args)?;
         self.driver.wake_changed()?;
         let mut analysis = SparseForwardWorkAnalysis::new();
         self.driver.drain_worklist(&mut analysis)?;
 
-        let ret = self
+        let root = self
             .driver
             .inner()
-            .context(env)?
-            .ret
-            .clone()
-            .unwrap_or_default();
-        Ok((ret, self))
+            .env
+            .contexts()
+            .find(|(_, index)| *index == env)
+            .map(|(key, _)| key.clone())
+            .ok_or_else(|| E::from(UNSELECTED))?;
+        self.root = Some(root);
+        Ok(Analyzed { engine: self })
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, F, Sem> AnalysisResults
+    for Analyzed<SparseForwardInterpreter<'ir, S, V, E, Lk, P, F, Sem>>
+where
+    S: StageMeta,
+    V: Clone + Widen,
+    E: From<InterpreterError>,
+    P: CallContext<V>,
+    Sem: SparseForwardSemantic,
+{
+    type Context = P::Key;
+    type Anchor = SSAValue;
+    type Value = V;
+
+    fn root(&self) -> &P::Key {
+        self.engine
+            .root
+            .as_ref()
+            .expect("`analyze` sets the root before building `Analyzed`")
+    }
+
+    /// The selected function contexts.
+    fn contexts(&self) -> impl Iterator<Item = &P::Key> {
+        let transfer = self.engine.driver.inner();
+        transfer
+            .env
+            .contexts()
+            .filter(|(_, env)| transfer.contexts.contains_key(env))
+            .map(|(key, _)| key)
+    }
+
+    fn callable_of(&self, context: &P::Key) -> Option<LinkTarget> {
+        Some(self.engine.selected(context)?.1.target)
+    }
+
+    fn fact(&self, context: &P::Key, value: SSAValue) -> Option<&V> {
+        let (env, _) = self.engine.selected(context)?;
+        let transfer = self.engine.driver.inner();
+        transfer.env.environment(env).ok()?.get(value)
+    }
+
+    fn facts(&self, context: &P::Key) -> impl Iterator<Item = (SSAValue, &V)> {
+        let transfer = self.engine.driver.inner();
+        self.engine
+            .selected(context)
+            .and_then(|(env, _)| transfer.env.environment(env).ok())
+            .into_iter()
+            .flat_map(|facts| facts.iter())
+    }
+
+    /// The join of every reached return; `None` if no return was reached.
+    fn response(&self, context: &P::Key) -> Option<Product<V>> {
+        self.engine.selected(context)?.1.ret.clone()
     }
 }
 

@@ -63,17 +63,11 @@ use kirin_ir::{
 use super::DemandFrame;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, Body, CallEffect, Callee, ContextInsensitive, EnvIndex, EnvStore,
-    FixpointProfile, Interp, InterpDispatch, InterpLocation, InterpreterError, LinkTarget, Linker,
-    SameStageLinker, SparseBackwardSemantic, SparseStore, StageQuery, StandardFixpointInterpreter,
-    StrongDemand, TerminatorArgs, WorkAnalysis,
+    AbstractInterpreter, AnalysisResults, Analyzed, Body, CallEffect, Callee, ContextInsensitive,
+    EnvIndex, EnvStore, FixpointProfile, Interp, InterpDispatch, InterpLocation, InterpreterError,
+    LinkTarget, Linker, SameStageLinker, SparseBackwardSemantic, StageQuery,
+    StandardFixpointInterpreter, StrongDemand, TerminatorArgs, WorkAnalysis,
 };
-
-/// A resolved `(stage, body)` pair: the structure one callable context
-/// analyzes.
-///
-/// Arena ids are per-stage, so the stage is part of the scope.
-pub type BodyScope = (CompileStage, Body);
 
 // ===========================================================================
 // Pluggable analysis seams (policy `P`)
@@ -227,11 +221,10 @@ where
 // Callable contexts, work items, and the driver
 // ===========================================================================
 
-/// One callable context: its body, declared return operands, and requested
-/// output facts. SSA facts live in its environment; parameters come from the IR.
+/// One callable context: its callable, declared return operands, and
+/// requested output facts. SSA facts live in its environment; parameters come from the IR.
 pub struct CallableContext<V> {
     pub(super) target: LinkTarget,
-    pub(super) body: Body,
     /// `outputs[i]` holds operand `i` of each declared return site; `None`
     /// until a return rule declares one.
     pub(super) outputs: Option<Vec<Vec<SSAValue>>>,
@@ -239,10 +232,9 @@ pub struct CallableContext<V> {
 }
 
 impl<V: Clone + Lattice> CallableContext<V> {
-    pub(super) fn new(target: LinkTarget, body: Body) -> Self {
+    pub(super) fn new(target: LinkTarget) -> Self {
         Self {
             target,
-            body,
             outputs: None,
             requested: None,
         }
@@ -679,7 +671,7 @@ where
         let (body, _) = self.inner().callable_entry(target)?;
         self.inner_mut()
             .contexts
-            .insert(env, CallableContext::new(target, body));
+            .insert(env, CallableContext::new(target));
         let stage = target.stage;
 
         let mut bodies = VecDeque::from([body]);
@@ -829,20 +821,15 @@ where
 /// context the [`DemandContext`] policy `P` selects (default: one context per
 /// resolved [`LinkTarget`](crate::LinkTarget)).
 ///
-/// `analyze` consumes the engine and hands it back only on success, so a
-/// failed analysis can never be resumed: build a new engine instead.
-/// Successful analyses accumulate: discovered contexts and their facts are
-/// reused, so shared callees are analyzed once. Facts only rise, so a request
-/// whose policy key matches an earlier context returns the join with the
-/// earlier requests — never less demanded than a fresh engine, possibly more,
-/// and dependent on query order. That happens for every repeated callee under
-/// [`ContextInsensitive`], and under a bounded policy once its fallback
-/// context is shared. Use a fresh engine for an isolated answer.
+/// `analyze` consumes the engine and returns the converged [`Analyzed`]
+/// state, read through [`AnalysisResults`]. Each analysis is fresh: analyzing
+/// another root takes another engine.
 ///
 /// ```ignore
-/// let analysis = SparseBackwardInterpreter::<Stage, Demand>::new(&pipeline);
-/// let (params, analysis) = analysis.analyze(stage, callee, [Demand::Live])?;
-/// let demanded = analysis.is_demanded(analysis.root().unwrap(), value);
+/// let analyzed = SparseBackwardInterpreter::<Stage, Demand>::new(&pipeline)
+///     .analyze(stage, callee, [Demand::Live])?;
+/// let params = analyzed.response(analyzed.root());
+/// let demanded = analyzed.is_demanded(analyzed.root(), value);
 /// ```
 pub struct SparseBackwardInterpreter<
     'ir,
@@ -917,78 +904,6 @@ where
     pub fn pipeline(&self) -> &'ir Pipeline<S> {
         self.driver.inner().pipeline()
     }
-
-    /// The root of the most recent analysis; detailed facts remain available
-    /// through context queries.
-    pub fn root(&self) -> Option<&P::Key> {
-        self.root.as_ref()
-    }
-
-    /// The discovered callable contexts, in no particular order.
-    pub fn contexts(&self) -> impl Iterator<Item = &P::Key> {
-        let transfer = self.driver.inner();
-        transfer
-            .env
-            .contexts()
-            .filter(|(_, env)| transfer.contexts.contains_key(env))
-            .map(|(key, _)| key)
-    }
-
-    /// The `(target stage, callable body)` a discovered context analyzes.
-    pub fn scope(&self, context: &P::Key) -> Option<BodyScope> {
-        let transfer = self.driver.inner();
-        let context = transfer.contexts.get(&transfer.discovered(context)?)?;
-        Some((context.target.stage, context.body))
-    }
-
-    /// The converged demand fact for `value` in `context`.
-    pub fn fact(&self, context: &P::Key, value: impl Into<SSAValue>) -> Option<&V> {
-        let transfer = self.driver.inner();
-        let env = transfer.discovered(context)?;
-        transfer.env.environment(env).ok()?.get(value.into())
-    }
-
-    /// The joined demand on operand `index` of every return site of `context`.
-    pub fn result_value(&self, context: &P::Key, index: usize) -> Option<V> {
-        let transfer = self.driver.inner();
-        let env = transfer.discovered(context)?;
-        let operands = transfer.contexts.get(&env)?.outputs.as_ref()?.get(index)?;
-        operands
-            .iter()
-            .filter_map(|operand| self.fact(context, *operand))
-            .cloned()
-            .reduce(|joined, fact| joined.join(&fact))
-    }
-
-    /// All converged `(value, fact)` pairs in `context`, reading only that
-    /// context's environment.
-    pub fn facts<'a>(&'a self, context: &'a P::Key) -> impl Iterator<Item = (SSAValue, &'a V)> {
-        let transfer = self.driver.inner();
-        transfer
-            .discovered(context)
-            .and_then(|env| transfer.env.environment(env).ok())
-            .into_iter()
-            .flat_map(|facts| facts.iter())
-    }
-
-    /// The converged value facts in `context` as a [`SparseStore`] (the
-    /// sparse per-SSA-value fact view; absent = bottom).
-    pub fn fact_store(&self, context: &P::Key) -> SparseStore<V> {
-        let mut store = SparseStore::new();
-        for (value, fact) in self.facts(context) {
-            store.set(value, fact.clone());
-        }
-        store
-    }
-
-    /// `true` iff `value` carries a non-bottom demand fact in `context`.
-    pub fn is_demanded(&self, context: &P::Key, value: impl Into<SSAValue>) -> bool
-    where
-        V: HasBottom,
-    {
-        self.fact(context, value)
-            .is_some_and(|fact| *fact != V::bottom())
-    }
 }
 
 impl<'ir, S, V, E, Lk, P, Sem> SparseBackwardInterpreter<'ir, S, V, E, Lk, P, Sem>
@@ -1007,7 +922,7 @@ where
         stage_name: &str,
         function_name: &str,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<(Product<V>, Self), E> {
+    ) -> Result<Analyzed<Self>, E> {
         let stage = self
             .pipeline()
             .stage_by_name(stage_name)
@@ -1026,28 +941,26 @@ where
         stage: CompileStage,
         symbol: Symbol,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<(Product<V>, Self), E> {
+    ) -> Result<Analyzed<Self>, E> {
         self.analyze(stage, symbol.into(), result_values)
     }
 
-    /// Infer one fact per entry parameter, in parameter order, from output
-    /// lattice values. Supply exactly one lattice value per result.
+    /// Infer one fact per entry parameter from output lattice values. Supply
+    /// exactly one lattice value per result.
     ///
     /// Enqueue each new context's statements, retain the supplied output facts
     /// for its return rules, then drain the shared fixpoint worklist. Bottom
     /// output facts still allow intrinsic roots to contribute parameter facts.
-    /// Facts join with prior requests if the context policy reuses a key.
-    /// Returns the engine on success, so detailed context facts remain
-    /// accessible through [`Self::root`], [`Self::contexts`], and
-    /// [`Self::fact`]; an error drops it.
+    /// The parameter facts are the root's
+    /// [`response`](AnalysisResults::response); an error drops the engine.
     pub fn analyze(
         mut self,
         stage: CompileStage,
         callee: Callee,
         result_values: impl IntoIterator<Item = V>,
-    ) -> Result<(Product<V>, Self), E> {
+    ) -> Result<Analyzed<Self>, E> {
         let outputs: Product<V> = result_values.into_iter().collect();
-        let (target, root, env) = self
+        let (_, root, _) = self
             .driver
             .inner_mut()
             .submit_call(stage, &callee, outputs)?;
@@ -1055,9 +968,88 @@ where
         self.driver.wake_changed()?;
         self.driver
             .drain_worklist(&mut SparseBackwardWorkAnalysis)?;
-        let params = self.driver.inner().entry_params(target)?;
-        let facts = self.driver.inner().param_facts(env, &params)?;
         self.root = Some(root);
-        Ok((facts, self))
+        Ok(Analyzed { engine: self })
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, Sem> AnalysisResults
+    for Analyzed<SparseBackwardInterpreter<'ir, S, V, E, Lk, P, Sem>>
+where
+    S: StageMeta + StageQuery + InterpDispatch<SparseBackwardTransfer<'ir, S, V, E, Lk, P, Sem>>,
+    V: Clone + PartialEq + Lattice + HasBottom,
+    E: From<InterpreterError>,
+    Lk: Linker<S>,
+    P: DemandContext<V>,
+    Sem: SparseBackwardSemantic,
+{
+    type Context = P::Key;
+    type Anchor = SSAValue;
+    type Value = V;
+
+    fn root(&self) -> &P::Key {
+        self.engine
+            .root
+            .as_ref()
+            .expect("`analyze` sets the root before building `Analyzed`")
+    }
+
+    /// The discovered callable contexts.
+    fn contexts(&self) -> impl Iterator<Item = &P::Key> {
+        let transfer = self.engine.driver.inner();
+        transfer
+            .env
+            .contexts()
+            .filter(|(_, env)| transfer.contexts.contains_key(env))
+            .map(|(key, _)| key)
+    }
+
+    fn callable_of(&self, context: &P::Key) -> Option<LinkTarget> {
+        let transfer = self.engine.driver.inner();
+        let env = transfer.discovered(context)?;
+        Some(transfer.contexts.get(&env)?.target)
+    }
+
+    fn fact(&self, context: &P::Key, value: SSAValue) -> Option<&V> {
+        let transfer = self.engine.driver.inner();
+        let env = transfer.discovered(context)?;
+        transfer.env.environment(env).ok()?.get(value)
+    }
+
+    fn facts(&self, context: &P::Key) -> impl Iterator<Item = (SSAValue, &V)> {
+        let transfer = self.engine.driver.inner();
+        transfer
+            .discovered(context)
+            .and_then(|env| transfer.env.environment(env).ok())
+            .into_iter()
+            .flat_map(|facts| facts.iter())
+    }
+
+    /// The demand on each entry parameter, in parameter order.
+    fn response(&self, context: &P::Key) -> Option<Product<V>> {
+        let transfer = self.engine.driver.inner();
+        let env = transfer.discovered(context)?;
+        let target = transfer.contexts.get(&env)?.target;
+        let params = transfer.entry_params(target).ok()?;
+        transfer.param_facts(env, &params).ok()
+    }
+}
+
+impl<'ir, S, V, E, Lk, P, Sem> Analyzed<SparseBackwardInterpreter<'ir, S, V, E, Lk, P, Sem>>
+where
+    S: StageMeta,
+    V: Clone + PartialEq + Lattice + HasBottom,
+    E: From<InterpreterError>,
+    P: DemandContext<V>,
+    Sem: SparseBackwardSemantic,
+{
+    /// `true` iff `value` carries a non-bottom demand fact in `context`.
+    pub fn is_demanded(&self, context: &P::Key, value: impl Into<SSAValue>) -> bool {
+        let transfer = self.engine.driver.inner();
+        transfer
+            .discovered(context)
+            .and_then(|env| transfer.env.environment(env).ok())
+            .and_then(|facts| facts.get(value.into()))
+            .is_some_and(|fact| *fact != V::bottom())
     }
 }

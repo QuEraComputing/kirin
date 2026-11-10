@@ -1,5 +1,6 @@
 use kirin::prelude::*;
 use kirin_demand::{Demand, DemandAnalysis};
+use kirin_interpreter::AnalysisResults;
 use kirin_test_languages::GraphFunctionLanguage;
 
 #[test]
@@ -31,9 +32,10 @@ specialize @test fn @second(i64, i64, i64) -> i64 cfg {{
         );
         let mut pipeline: Pipeline<StageInfo<GraphFunctionLanguage>> = Pipeline::new();
         ParsePipelineText::parse(&mut pipeline, &source).unwrap();
-        let (inputs, analysis) = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&pipeline)
+        let analysis = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&pipeline)
             .analyze_by_name("test", "second", [Demand::Live])
             .unwrap();
+        let inputs = analysis.response(analysis.root()).unwrap();
         assert_eq!(
             inputs.as_slice(),
             &[Demand::Live, Demand::Dead, Demand::Live]

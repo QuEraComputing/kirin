@@ -5,7 +5,7 @@ mod stage;
 use clap::{Parser, Subcommand};
 use kirin::prelude::*;
 use kirin::pretty::PipelinePrintExt;
-use kirin_interpreter::ProgramPoint;
+use kirin_interpreter::{AnalysisResults, ProgramPoint};
 
 use stage::Stage;
 
@@ -122,9 +122,17 @@ fn run_program(
 
     if demand {
         let result = interpreter::analyze_demand(&pipeline, stage_name, func_name)?;
-        let demanded = result.demanded().iter().copied();
+        let root = result.root();
+        let stage = result
+            .callable_of(root)
+            .ok_or_else(|| anyhow::anyhow!("demand root was not reached"))?
+            .stage;
+        let demanded = result
+            .facts(root)
+            .filter(|(_, fact)| fact.is_live())
+            .map(|(value, _)| value);
         let demanded = match pipeline
-            .stage(result.root_scope().0)
+            .stage(stage)
             .ok_or_else(|| anyhow::anyhow!("resolved stage is missing"))?
         {
             Stage::Source(info) => value_set(info, demanded),
@@ -177,10 +185,10 @@ fn run_program(
 fn print_block_liveness<L: Dialect>(
     info: &StageInfo<L>,
     cfg: CFG,
-    dense: &kirin_liveness::DenseLivenessResult,
+    dense: &impl AnalysisResults<Anchor = ProgramPoint, Value = kirin_liveness::LiveSet>,
 ) {
     for block in cfg.blocks(info) {
-        let point = |item| dense.point_facts(item);
+        let point = |item| dense.fact(dense.root(), item);
         let (Some(live_in), Some(live_out)) = (
             point(ProgramPoint::BlockEntry(block)),
             point(ProgramPoint::BlockExit(block)),

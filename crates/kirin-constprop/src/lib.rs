@@ -15,9 +15,12 @@
 //! use kirin_constprop::{ConstProp, ConstPropValue};
 //! use kirin_interpreter::engine::CrossStageLinker;
 //!
-//! let analysis = ConstProp::<Stage, MyConst, MyError>::new(&pipeline)
-//!     .with_linker(CrossStageLinker);
-//! let (result, analysis) = analysis.analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
+//! use kirin_interpreter::engine::AnalysisResults;
+//!
+//! let analyzed = ConstProp::<Stage, MyConst, MyError>::new(&pipeline)
+//!     .with_linker(CrossStageLinker)
+//!     .analyze_by_name("source", "abs", [ConstPropValue::Const(value)])?;
+//! let result = analyzed.response(analyzed.root());
 //! ```
 
 mod context;
