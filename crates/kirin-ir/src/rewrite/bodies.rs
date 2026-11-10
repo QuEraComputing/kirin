@@ -1,10 +1,12 @@
-//! Bodies owned by a statement, for [`Rewriter::replace_statement`] and
-//! statement erasure.
+//! Bodies owned by a statement, for [`Rewriter::create`],
+//! [`Rewriter::replace_statement`] and statement erasure.
 
 use smallvec::SmallVec;
 
 use crate::arena::{GetInfo, GetInfoMut};
-use crate::{BlockParent, Body, Dialect, RewriteError, Rewriter, Statement, StatementParent};
+use crate::{
+    BlockParent, Body, Dialect, InsertionPoint, RewriteError, Rewriter, Statement, StatementParent,
+};
 
 impl<L: Dialect> Rewriter<'_, L> {
     /// Tombstone `body` and everything nested in it.
@@ -37,6 +39,72 @@ impl<L: Dialect> Rewriter<'_, L> {
             None if self.body_encloses(body, owner) => Err(RewriteError::BodyEnclosesOwner(body)),
             None => Ok(()),
         }
+    }
+
+    /// Check that a new statement at `insertion_pt` can adopt every body its
+    /// `definition` names: each is live, named once, owned by nothing, and does
+    /// not enclose `insertion_pt`.
+    pub(super) fn check_can_adopt_bodies_at(
+        &self,
+        definition: &L,
+        insertion_pt: InsertionPoint,
+    ) -> Result<(), RewriteError> {
+        let bodies = bodies_of(definition);
+        for (index, &body) in bodies.iter().enumerate() {
+            if bodies[..index].contains(&body) {
+                return Err(RewriteError::BodyListedTwice(body));
+            }
+            if self.body_owner(body)?.is_some() {
+                return Err(RewriteError::BodyOwnedElsewhere(body));
+            }
+            if self.body_encloses_insertion_pt(body, insertion_pt) {
+                return Err(RewriteError::BodyEnclosesOwner(body));
+            }
+        }
+        Ok(())
+    }
+
+    /// Whether a statement placed at `insertion_pt` would be nested in `body`.
+    pub(super) fn body_encloses_insertion_pt(
+        &self,
+        body: Body,
+        insertion_pt: InsertionPoint,
+    ) -> bool {
+        let owner = match insertion_pt {
+            InsertionPoint::Before(anchor) | InsertionPoint::After(anchor) => {
+                return self.body_encloses(body, anchor);
+            }
+            InsertionPoint::Terminator(block) => {
+                if body == Body::Block(block) {
+                    return true;
+                }
+                match block.get_info(self.stage).and_then(|item| item.parent) {
+                    Some(BlockParent::CFG(cfg)) => {
+                        if body == Body::CFG(cfg) {
+                            return true;
+                        }
+                        cfg.get_info(self.stage).and_then(|item| item.parent)
+                    }
+                    Some(BlockParent::Statement(owner)) => Some(owner),
+                    None => None,
+                }
+            }
+            InsertionPoint::DiGraph(graph) => {
+                if body == Body::DiGraph(graph) {
+                    return true;
+                }
+                graph.get_info(self.stage).and_then(|item| item.parent())
+            }
+            InsertionPoint::UnGraph(graph) => {
+                if body == Body::UnGraph(graph) {
+                    return true;
+                }
+                graph.get_info(self.stage).and_then(|item| item.parent())
+            }
+        };
+        // The arms above checked the point's own container. Past it, walk up
+        // every ancestor of the statement that owns the container.
+        owner.is_some_and(|owner| self.body_encloses(body, owner))
     }
 
     /// The statement owning `body`, or `None` if nothing does. A block in a
@@ -97,7 +165,7 @@ impl<L: Dialect> Rewriter<'_, L> {
         false
     }
 
-    /// Make `owner` the parent of `body`.
+    /// Make `owner` the parent of `body`, which is no longer detached.
     pub(super) fn adopt_body(&mut self, body: Body, owner: Statement) {
         match body {
             Body::Block(block) => {
@@ -106,6 +174,7 @@ impl<L: Dialect> Rewriter<'_, L> {
                 }
             }
             Body::CFG(cfg) => {
+                self.detached_cfgs.remove(&cfg);
                 if let Some(item) = cfg.get_info_mut(self.stage) {
                     item.parent = Some(owner);
                 }

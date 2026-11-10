@@ -29,10 +29,14 @@
 //! [`InsertionPoint`](crate::InsertionPoint) in a block body or a graph
 //! ([`Rewriter::create`], [`Rewriter::insert`]), block-body statement surgery
 //! ([`Rewriter::erase_statement`], [`Rewriter::replace_statement`],
-//! [`Rewriter::move_before`], [`Rewriter::move_after`]), `CFG` block-list
-//! surgery in the sibling `cfg` module (append/insert/erase/split/merge
-//! blocks, [`Rewriter::retarget_successor`], and block-argument insertion and
-//! erasure), `DiGraph` yield editing in the sibling `digraph` module
+//! [`Rewriter::move_before`], [`Rewriter::move_after`],
+//! [`Rewriter::splice_block_before`], [`Rewriter::splice_block_after`]), `CFG`
+//! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
+//! merge blocks, [`Rewriter::splice_cfg_after`],
+//! [`Rewriter::retarget_successor`], and block-argument insertion and
+//! erasure), deep copies through [`Rewriter::clone_statement`] and
+//! [`Rewriter::clone_cfg`], mapped through an [`IRMap`](crate::IRMap),
+//! `DiGraph` yield editing in the sibling `digraph` module
 //! ([`Rewriter::replace_yield`]), and `UnGraph` topology in the sibling
 //! `ungraph` module; graph members are erased through
 //! [`Rewriter::erase_statement`]. The rewriter **maintains** all four derived
@@ -228,17 +232,18 @@ pub enum RewriteError {
     /// edge statement. Nodes and edge statements are stored differently, so
     /// the replacement must keep the original's role.
     EdgeRoleMismatch(Statement),
-    /// A `replace_statement` definition names a body that does not resolve to
-    /// a live body in this stage.
+    /// A `create` or `replace_statement` definition names a body that does not
+    /// resolve to a live body in this stage.
     UnknownBody(Body),
-    /// A `replace_statement` definition names a body that belongs to another
-    /// statement or, for a block, to a CFG. A body has one owner; detach it
-    /// from the other one first.
+    /// A `create` or `replace_statement` definition names a body that belongs
+    /// to another statement or, for a block, to a CFG. A body has one owner;
+    /// detach it from the other one first.
     BodyOwnedElsewhere(Body),
-    /// A `replace_statement` definition names the same body in two fields.
+    /// A `create` or `replace_statement` definition names the same body in two
+    /// fields.
     BodyListedTwice(Body),
-    /// A `replace_statement` definition names a body the statement itself is
-    /// nested in, which would make the statement its own ancestor.
+    /// A `create` or `replace_statement` definition names a body the statement
+    /// itself would be nested in, which would make it its own ancestor.
     BodyEnclosesOwner(Body),
     /// `move_before`/`move_after` was given an anchor nested in the moved
     /// statement's own bodies, which would make the statement its own
@@ -505,6 +510,10 @@ pub struct Rewriter<'a, L: Dialect> {
     /// Detached statements, with no parent, not inserted yet. They are
     /// tombstoned if never inserted.
     pub(super) detached: FxHashSet<Statement>,
+    /// Detached CFGs, such as copies, owned by no statement yet. They are
+    /// tombstoned if never adopted, including when emptied by
+    /// [`Rewriter::splice_cfg_after`].
+    pub(super) detached_cfgs: FxHashSet<CFG>,
 }
 
 impl<'a, L: Dialect> Rewriter<'a, L> {
@@ -514,6 +523,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             events: Vec::new(),
             unbound_ssa_results: FxHashMap::default(),
             detached: FxHashSet::default(),
+            detached_cfgs: FxHashSet::default(),
         }
     }
 

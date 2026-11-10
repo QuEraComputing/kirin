@@ -13,6 +13,7 @@ use crate::{
     Block, DiGraph, Dialect, SSAValue, Statement, StatementInfo, StatementParent, UnGraph, Use,
 };
 
+use crate::rewrite::bodies::bodies_of;
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, add_predecessor, add_use};
 
 /// Where [`Rewriter::create`] or [`Rewriter::insert`] places a statement.
@@ -79,6 +80,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// statement. The statement must also fit `insertion_pt` (see
     /// [`InsertionPoint`]).
     ///
+    /// The new statement owns the bodies `definition` names, such as a CFG from
+    /// [`Rewriter::clone_cfg`]. Each must be live, owned by nothing
+    /// ([`RewriteError::BodyOwnedElsewhere`]), named once
+    /// ([`RewriteError::BodyListedTwice`]), and must not enclose `insertion_pt`
+    /// ([`RewriteError::BodyEnclosesOwner`]).
+    ///
     /// Rejects, leaving the stage untouched, if a check fails. Records
     /// [`MutationEvent::InsertedStatement`], then for a terminator
     /// [`MutationEvent::ChangedTerminator`] and for a graph member
@@ -90,8 +97,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         definition: L,
     ) -> Result<Statement, RewriteError> {
         let placement = self.check_insertion_pt(insertion_pt, &definition)?;
+        self.check_can_adopt_bodies_at(&definition, insertion_pt)?;
+        let bodies = bodies_of(&definition);
         let stmt = self.build_statement(definition)?;
         self.place(stmt, placement);
+        for body in bodies {
+            self.adopt_body(body, stmt);
+        }
         Ok(stmt)
     }
 
@@ -110,7 +122,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Rejects, leaving the stage untouched, if `stmt` is unknown, is not a
     /// detached statement of this `Rewriter` ([`RewriteError::NotDetached`]),
-    /// or does not fit `insertion_pt`. Records the events of
+    /// does not fit `insertion_pt`, or owns a body that encloses `insertion_pt`
+    /// ([`RewriteError::BodyEnclosesOwner`]). Records the events of
     /// [`Rewriter::create`].
     pub fn insert(
         &mut self,
@@ -122,6 +135,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             return Err(RewriteError::NotDetached(stmt));
         }
         let placement = self.check_insertion_pt(insertion_pt, &item.definition)?;
+        // `stmt` already owns its bodies; placing it inside one of them would
+        // make it its own ancestor.
+        for body in bodies_of(&item.definition) {
+            if self.body_encloses_insertion_pt(body, insertion_pt) {
+                return Err(RewriteError::BodyEnclosesOwner(body));
+            }
+        }
         self.place(stmt, placement);
         Ok(())
     }

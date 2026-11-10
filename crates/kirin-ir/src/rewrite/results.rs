@@ -9,7 +9,7 @@
 //! it is gone each result slot is either bound or a real tombstone. It also
 //! tombstones every detached statement it never inserted.
 
-use crate::{Dialect, ResultValue, SSAInfo, SSAKind, SSAValue, Statement};
+use crate::{Body, Dialect, ResultValue, SSAInfo, SSAKind, SSAValue, Statement};
 
 use crate::rewrite::rewriter::{RewriteError, Rewriter};
 
@@ -62,12 +62,16 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
 impl<'a, L: Dialect> Drop for Rewriter<'a, L> {
     /// Tombstone every detached statement no [`insert`](Rewriter::insert)
-    /// placed, with its results and operand uses, and every
+    /// placed, with its results and operand uses, every detached CFG no
+    /// statement adopted, and every
     /// [`new_result`](Rewriter::new_result) value no statement bound, so
     /// nothing detached or empty outlives the `Rewriter`.
     fn drop(&mut self) {
         for stmt in std::mem::take(&mut self.detached) {
             self.tombstone_statement(stmt, None);
+        }
+        for cfg in std::mem::take(&mut self.detached_cfgs) {
+            self.tombstone_body(Body::CFG(cfg));
         }
         for (value, _) in self.unbound_ssa_results.drain() {
             let _ = self.stage.ssas.delete(value);
