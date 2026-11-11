@@ -7,6 +7,6 @@ pub(crate) mod interp;
 
 pub use frames::DemandFrame;
 pub use interp::{
-    BodyScope, DemandContext, DemandInterp, SparseBackwardDriver, SparseBackwardEffect,
-    SparseBackwardInterp, SparseBackwardInterpreter, SparseBackwardProfile, SparseBackwardTransfer,
+    DemandContext, DemandInterp, SparseBackwardDriver, SparseBackwardEffect, SparseBackwardInterp,
+    SparseBackwardInterpreter, SparseBackwardProfile, SparseBackwardTransfer,
 };

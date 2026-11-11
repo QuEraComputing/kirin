@@ -36,11 +36,11 @@ use kirin_constant::Constant;
 use kirin_constprop::{ConstPropContext, ConstPropValue};
 use kirin_function::Lexical;
 use kirin_interpreter::{
-    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame, BlockFrame,
-    Body, CFGFrame, CallFrame, CallRequest, Callee, Completion, ConcreteInterpreter,
-    ConcreteInterpreterCore, ContextInsensitive, DefaultCallBodyTraversal, DiGraphFrame, Frame,
-    FrameEffect, FrameEngine, Interpretable, InterpreterError, SameStageLinker,
-    SparseForwardInterpreter, expect_single,
+    AbstractBlockFrame, AbstractCallFrame, AbstractCompletion, AbstractDiGraphFrame,
+    AnalysisResults, BlockFrame, Body, CFGFrame, CallFrame, CallRequest, Callee, Completion,
+    ConcreteInterpreter, ConcreteInterpreterCore, ContextInsensitive, DefaultCallBodyTraversal,
+    DiGraphFrame, Frame, FrameEffect, FrameEngine, Interpretable, InterpreterError,
+    SameStageLinker, SparseForwardInterpreter, expect_single,
 };
 use kirin_scf::{ScfForFrame, ScfIfFrame, StructuredControlFlow};
 use kirin_test_languages::GraphFunctionLanguage;
@@ -700,8 +700,8 @@ fn analyze(
 ) -> Result<TestValue, TestError> {
     let analysis: AbstractEngine<'_> =
         SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
-    let (ret, _) = analysis.analyze_by_name("test", function, args.iter().cloned())?;
-    expect_single(ret)
+    let analyzed = analysis.analyze_by_name("test", function, args.iter().cloned())?;
+    expect_single(analyzed.response(analyzed.root()).unwrap_or_default())
 }
 
 type InsensitiveEngine<'ir> = SparseForwardInterpreter<
@@ -724,8 +724,8 @@ fn analyze_insensitive(
 ) -> Result<TestValue, TestError> {
     let analysis: InsensitiveEngine<'_> =
         SparseForwardInterpreter::new(pipeline).with_linker(SameStageLinker);
-    let (ret, _) = analysis.analyze_by_name("test", function, args.iter().cloned())?;
-    expect_single(ret)
+    let analyzed = analysis.analyze_by_name("test", function, args.iter().cloned())?;
+    expect_single(analyzed.response(analyzed.root()).unwrap_or_default())
 }
 
 #[test]
@@ -762,28 +762,23 @@ fn sparse_forward_symbol_entry_matches_name_and_direct_callee() {
     let args = || [ConstPropValue::Const(2), ConstPropValue::Const(3)];
 
     let by_name: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
-    let by_name = expect_single::<TestValue, TestError>(
-        by_name.analyze_by_name("test", "gadd", args()).unwrap().0,
-    )
-    .unwrap();
+    let by_name = by_name.analyze_by_name("test", "gadd", args()).unwrap();
+    let by_name =
+        expect_single::<TestValue, TestError>(by_name.response(by_name.root()).unwrap()).unwrap();
 
     let by_symbol: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
-    let by_symbol = expect_single::<TestValue, TestError>(
-        by_symbol
-            .analyze_by_symbol(stage, symbol, args())
-            .unwrap()
-            .0,
-    )
-    .unwrap();
+    let by_symbol = by_symbol.analyze_by_symbol(stage, symbol, args()).unwrap();
+    let by_symbol =
+        expect_single::<TestValue, TestError>(by_symbol.response(by_symbol.root()).unwrap())
+            .unwrap();
 
     let by_callee: AbstractEngine<'_> = SparseForwardInterpreter::new(&pipeline);
-    let by_callee = expect_single::<TestValue, TestError>(
-        by_callee
-            .analyze(stage, Callee::Named(symbol), args())
-            .unwrap()
-            .0,
-    )
-    .unwrap();
+    let by_callee = by_callee
+        .analyze(stage, Callee::Named(symbol), args())
+        .unwrap();
+    let by_callee =
+        expect_single::<TestValue, TestError>(by_callee.response(by_callee.root()).unwrap())
+            .unwrap();
 
     assert_eq!(by_name, ConstPropValue::Const(5));
     assert_eq!(by_symbol, by_name);

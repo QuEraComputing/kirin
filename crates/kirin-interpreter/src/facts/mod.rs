@@ -6,4 +6,4 @@ pub(crate) mod anchor;
 pub(crate) mod store;
 
 pub use anchor::{LatticeAnchor, ProgramPoint};
-pub use store::{FactStore, SparseStore};
+pub use store::FactStore;

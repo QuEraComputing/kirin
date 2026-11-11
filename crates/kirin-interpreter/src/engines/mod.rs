@@ -7,3 +7,7 @@ pub(crate) mod concrete;
 pub(crate) mod dense_backward;
 pub(crate) mod sparse_backward;
 pub(crate) mod sparse_forward;
+
+mod results;
+
+pub use results::{AnalysisResults, Analyzed};

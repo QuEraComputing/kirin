@@ -197,6 +197,16 @@ where
         self.context_indices.get(key).copied()
     }
 
+    /// The context key `index` is registered under: the reverse of
+    /// [`context_env`](Self::context_env). `None` for an unkeyed or dead
+    /// environment.
+    pub fn key(&self, index: EnvIndex) -> Option<&K> {
+        self.environments
+            .get(index)
+            .and_then(|slot| (**slot).as_ref())
+            .and_then(|environment| environment.key.as_ref())
+    }
+
     /// The environment registered under `key`, allocating and registering one on
     /// first use.
     ///

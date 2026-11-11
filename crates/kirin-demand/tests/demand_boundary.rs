@@ -1,8 +1,8 @@
 //! Backward boundary packets and context-specific inspection.
 use kirin::prelude::*;
 use kirin_demand::OutputDemandContext;
-use kirin_demand::{Demand, DemandAnalysis, DemandResult};
-use kirin_interpreter::InterpreterError;
+use kirin_demand::{Demand, DemandAnalysis};
+use kirin_interpreter::{AnalysisResults, InterpreterError};
 use kirin_test_languages::GraphFunctionLanguage;
 
 type TestStage = StageInfo<GraphFunctionLanguage>;
@@ -57,55 +57,55 @@ fn pipeline() -> Pipeline<TestStage> {
 #[test]
 fn output_product_returns_parameter_facts_and_preserves_context_queries() {
     let pipeline = pipeline();
-    let analysis = DemandAnalysis::<TestStage>::new(&pipeline);
     let outputs: Product<_> = [Demand::Live, Demand::Dead, Demand::Live]
         .into_iter()
         .collect();
-    let (inputs, analysis) = analysis.analyze_by_name("test", "main", outputs).unwrap();
+    let first = DemandAnalysis::<TestStage>::new(&pipeline)
+        .analyze_by_name("test", "main", outputs)
+        .unwrap();
     assert_eq!(
-        inputs.as_slice(),
+        first.response(first.root()).unwrap().as_slice(),
         &[Demand::Dead, Demand::Live, Demand::Live]
     );
-    let first = analysis.root().unwrap().clone();
-    let details = DemandResult::from_engine(&analysis).unwrap();
-    assert_eq!(details.root(), &first);
     assert!(
-        details.contexts().count() >= 2,
+        first.contexts().count() >= 2,
         "callee facts remain queryable"
     );
 
     let outputs: Product<_> = [Demand::Dead, Demand::Live, Demand::Dead]
         .into_iter()
         .collect();
-    let (inputs, analysis) = analysis.analyze_by_name("test", "main", outputs).unwrap();
+    let second = DemandAnalysis::<TestStage>::new(&pipeline)
+        .analyze_by_name("test", "main", outputs)
+        .unwrap();
     assert_eq!(
-        inputs.as_slice(),
+        second.response(second.root()).unwrap().as_slice(),
         &[Demand::Live, Demand::Dead, Demand::Dead]
     );
-    assert_ne!(analysis.root(), Some(&first));
-    assert_eq!(analysis.result_value(&first, 0), Some(Demand::Live));
+    assert_ne!(second.root(), first.root());
 }
 
 #[test]
 fn result_values_preserve_control_roots() {
     let pipeline = pipeline();
-    let (inputs, _) = DemandAnalysis::<TestStage>::new(&pipeline)
+    let analyzed = DemandAnalysis::<TestStage>::new(&pipeline)
         .analyze_by_name("test", "branch", [Demand::Dead])
         .unwrap();
-    assert_eq!(inputs.as_slice(), &[Demand::Dead, Demand::Live]);
+    assert_eq!(
+        analyzed.response(analyzed.root()).unwrap().as_slice(),
+        &[Demand::Dead, Demand::Live]
+    );
 }
 
 #[test]
 fn root_arity_errors_are_reported() {
     let pipeline = pipeline();
-    let (_, analysis) = DemandAnalysis::<TestStage>::new(&pipeline)
-        .with_policy(OutputDemandContext::with_budget(0))
-        .analyze_by_name("test", "main", [Demand::Live, Demand::Live, Demand::Live])
-        .unwrap();
-    assert!(analysis.root().is_some());
     let wrong: Product<Demand> = Product::new();
     assert_eq!(
-        analysis.analyze_by_name("test", "branch", wrong).err(),
+        DemandAnalysis::<TestStage>::new(&pipeline)
+            .with_policy(OutputDemandContext::with_budget(0))
+            .analyze_by_name("test", "branch", wrong)
+            .err(),
         Some(InterpreterError::ProductArityMismatch {
             expected: 1,
             actual: 0
@@ -116,14 +116,15 @@ fn root_arity_errors_are_reported() {
 #[test]
 fn call_sites_map_one_callee_parameter_to_different_arguments() {
     let pipeline = pipeline();
-    let mut analysis = DemandAnalysis::<TestStage>::new(&pipeline);
     for (outputs, inputs) in [
         ([Demand::Live, Demand::Live], [Demand::Live, Demand::Live]),
         ([Demand::Live, Demand::Dead], [Demand::Dead, Demand::Live]),
         ([Demand::Dead, Demand::Live], [Demand::Live, Demand::Dead]),
     ] {
-        let (actual, next) = analysis.analyze_by_name("test", "swap", outputs).unwrap();
-        analysis = next;
+        let analyzed = DemandAnalysis::<TestStage>::new(&pipeline)
+            .analyze_by_name("test", "swap", outputs)
+            .unwrap();
+        let actual = analyzed.response(analyzed.root()).unwrap();
         assert_eq!(actual.as_slice(), &inputs, "outputs {outputs:?}");
     }
 }

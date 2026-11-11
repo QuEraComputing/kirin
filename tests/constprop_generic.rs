@@ -1,6 +1,6 @@
 use kirin::prelude::*;
 use kirin_constprop::{ConstProp, ConstPropValue};
-use kirin_interpreter::{InterpreterError, expect_single};
+use kirin_interpreter::{AnalysisResults, InterpreterError, expect_single};
 use kirin_test_languages::ScalarFunctionLanguage;
 
 #[test]
@@ -21,13 +21,14 @@ specialize @test fn @add(i32, i32) -> i32 cfg {
     .unwrap();
 
     let analysis = ConstProp::<_, i32, InterpreterError>::new(&pipeline);
-    let (result, _) = analysis
+    let analyzed = analysis
         .analyze_by_name(
             "test",
             "add",
             [ConstPropValue::Const(2), ConstPropValue::Const(3)],
         )
         .unwrap();
+    let result = analyzed.response(analyzed.root()).unwrap();
     assert_eq!(
         expect_single::<_, InterpreterError>(result).unwrap(),
         ConstPropValue::Const(5)

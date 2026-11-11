@@ -564,7 +564,7 @@ space; a key naming two targets is an error. Facts live in the transfer's
 `EnvStore::join`; the driver holds only the worklist and the call-boundary
 callers. Selecting a context allocates
 its environment at once, so a caller can register on its parameters before the
-deferred discovery scan runs. The per-context metadata (target, body, and the
+deferred discovery scan runs. The per-context metadata (target and the
 return operands per output) lives on the transfer, keyed by `EnvIndex`.
 Each context also retains joined output requests so return rules visited later
 receive them. SSA facts remain in `EnvStore`; entry parameters come from the IR.
@@ -615,14 +615,12 @@ these initial visits, including return declarations and calls. Fact raises
 join immediately; later changes schedule dependents through the table above.
 Thus a call may observe demand from an earlier initial visit without depending
 on block storage order.
-The public backward `analyze` methods return `Product<V>` parameter facts in
-entry-parameter order, dual to forward analysis's returned output facts. `root()`
-exposes the most recent successful root context separately; `contexts()` and
-`fact()` retain detailed per-context inspection. `kirin_demand::analyze_demand`
-collects these details into `DemandResult`, while `DemandAnalysis::analyze`
-returns boundary facts directly. The two-point fact type is `Demand::{Dead, Live}`.
-Exact products are checked against discovered return arity; all-bottom products
-still seed intrinsic roots. Reused context keys accumulate facts monotonically.
+The public backward `analyze` methods return the converged `Analyzed` state
+(see [Reading results](#reading-results--analyzed-and-analysisresults)). The
+root's `response` is the `Product<V>` of parameter facts in entry-parameter
+order, dual to forward analysis's return product. The two-point fact type is
+`Demand::{Dead, Live}`. Exact products are checked against discovered return
+arity; all-bottom products still seed intrinsic roots.
 
 Roots of an analysis are the supplied result lattice values, selected positionally,
 plus the control roots.
@@ -635,14 +633,86 @@ Arity errors, resolution errors, and unsupported (graph) callee bodies are
 errors, never opaque fallbacks. There is no opaque-call policy. Indirect calls
 and closures are unsupported: like their forward rules, the `Lambda`/`Bind`
 demand rules return errors.
-Facts accumulate across successful `analyze` calls on one engine, so shared
-callees are discovered and solved once; `with_linker` and `with_policy` reset
-the analysis state. Because facts only rise, a request whose policy key
-matches an earlier context returns the join with the earlier requests: never
-less demanded than a fresh engine, possibly more, and dependent on query
-order. That happens for every repeated callee under `ContextInsensitive`, and
-under `OutputDemandContext` once a callable's budget falls back to `Shared`.
-An error consumes the engine, so a failed discovery is never reused.
+Each `analyze` is one fresh analysis: it consumes the engine, and the
+`Analyzed` state it returns cannot run again. Within that analysis shared
+callees are discovered and solved once, and a request whose policy key matches
+an earlier context of the same analysis joins into it. An error drops the
+engine, so a failed discovery is never reused.
+
+### Reading results — `Analyzed` and `AnalysisResults`
+
+Every abstract engine's `analyze` consumes the engine and returns
+`Analyzed<Engine>`: the converged state of exactly one analysis. It has no
+`analyze` of its own, so it always has one root and never mixes two runs.
+All three engines implement one read-only trait on it:
+
+```rust
+pub trait AnalysisResults {
+    type Context;                 // sparse engines: the policy key; liveness: LinkTarget
+    type Anchor: LatticeAnchor;   // SSAValue or ProgramPoint
+    type Value: Lattice + Clone;
+
+    // per context (required)
+    fn root(&self) -> &Self::Context;
+    fn contexts(&self) -> impl Iterator<Item = &Self::Context>;
+    fn callable_of(&self, &Self::Context) -> Option<LinkTarget>;
+    fn fact(&self, &Self::Context, Self::Anchor) -> Option<&Self::Value>;
+    fn facts(&self, &Self::Context) -> impl Iterator<Item = (Self::Anchor, &Self::Value)>;
+    fn response(&self, &Self::Context) -> Option<Product<Self::Value>>;
+
+    // per callable (provided)
+    fn callables(&self) -> impl Iterator<Item = LinkTarget>;
+    fn contexts_of(&self, LinkTarget) -> impl Iterator<Item = &Self::Context>;
+    fn joined_fact(&self, LinkTarget, Self::Anchor) -> Option<Self::Value>;
+    fn joined_facts(&self, LinkTarget) -> FactStore<Self::Anchor, Self::Value>;
+    fn joined_response(&self, LinkTarget) -> Option<Product<Self::Value>>;
+}
+```
+
+A **context** is one analyzed copy of a callable under specific boundary
+facts. Facts are read at two levels: per context, and per callable (the join
+over the callable's contexts). The **root** is the context `analyze` was asked
+for. It is a handle, read like any other context; it exists because the
+root's callable can have other contexts (recursion).
+
+| | Constprop | Demand | Liveness |
+|---|---|---|---|
+| `Context` | `CallContext::Key` | `DemandContext::Key` | `LinkTarget` |
+| `contexts()` | selected contexts | discovered contexts | the root |
+| `callable_of` | recorded target | recorded target | the context itself |
+| `fact` / `facts` | the context's environment | the context's environment | the root's environment |
+| `response` | joined return; `None` if no `ret` was reached | entry-parameter facts | `None` (calls are not followed) |
+
+`callable_of` is identity (which callable); `facts` is data (what was
+concluded). With `LinkTarget::body`, `callable_of` leads from a context to its
+IR.
+
+The **response** is what a context answers its caller. A callable's inputs
+each have one SSA value, its parameter; its outputs do not, because output `i`
+is fed by operand `i` of every return site. So constprop's return is context
+metadata, not an anchored fact, and it cannot be derived from operand facts:
+it joins only the *reached* return sites, and it distinguishes "never
+returned" (`None`) from "returned nothing" (an empty product). Demand is the
+mirror image: its response sits on the parameters, which are SSA values.
+
+Per-callable answers are computed on request from the per-context
+environments and are never stored. They join the contexts **reached from the
+root**: they claim nothing about callers the analysis did not visit, and
+whether that is safe for a rewrite is the client's decision.
+
+`Analyzed` stores one thing beside the engine: an index from each reached
+callable to its contexts' environments, built once when `analyze` finishes.
+The sparse engines' `contexts_of` reads it and maps each environment back to
+its context through `EnvStore::key`, so a per-callable query visits only that
+callable's contexts. Liveness has one context and keeps the provided scan.
+
+Every per-context query is keyed by context, so a context is a query key and
+`response`/`facts` its value. That keeps the API compatible with a later
+query-based (memoized, incremental) engine, which this is not.
+
+The analysis crates add no result types: `kirin-constprop`, `kirin-demand`
+and `kirin-liveness` export a lattice, a policy, and an engine alias
+(`ConstProp`, `DemandAnalysis`, `DenseLiveness`).
 
 ### Engine internals: stage dispatch and IR queries
 
@@ -1166,8 +1236,8 @@ and terminating on unknown inputs (both fold to `Top`). Runnable as
     points, nested structured-block boundaries) joins into that environment,
     so a block's `BlockEntry` always equals its first statement's `Before`.
     A rise of a block's `BlockEntry` reruns the predecessors that read it.
-    Queries take a bare `ProgramPoint` (the callable is the one `analyze`
-    returned); scf owns dense frames (arm-join, loop fixpoint). Classic liveness consumes finalized IR
+    Results are read through `AnalysisResults` with the analyzed
+    `LinkTarget` as the only context; scf owns dense frames (arm-join, loop fixpoint). Classic liveness consumes finalized IR
     directly and does not require a sparse-demand pre-pass.
   The two analyses live in separate crates (`kirin-demand`, `kirin-liveness`)
   that do not depend on each other. Filtering a dense set by demand drops

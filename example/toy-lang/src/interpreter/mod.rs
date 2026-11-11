@@ -20,13 +20,13 @@ use std::hash::Hash;
 
 use kirin::prelude::{CFG, CompileStage, Pipeline};
 use kirin_constprop::{ConstPropContext, ConstPropValue};
-use kirin_demand::DemandResult;
+use kirin_demand::DemandAnalysis;
 use kirin_interpreter::engine::{
-    ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker, SparseForwardInterpreter,
-    expect_single,
+    AnalysisResults, Analyzed, ConcreteInterpreterCore, CrossStageLinker, Linker, SameStageLinker,
+    SparseForwardInterpreter, expect_single,
 };
 use kirin_interpreter::{Body, Callee, InterpDispatch, InterpreterError, SparseForwardTransfer};
-use kirin_liveness::{DenseLiveness, DenseLivenessResult, LiveSet};
+use kirin_liveness::{DenseLiveness, LiveSet};
 use kirin_scf::ForLoopValue;
 
 use crate::stage::Stage;
@@ -159,50 +159,49 @@ where
     >,
 {
     let analysis: ToyConstProp<'_, C> = ToyConstProp::new(pipeline).with_linker(CrossStageLinker);
-    let (ret, _) = analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?;
-    expect_single(ret)
+    let analyzed = analysis.analyze_by_name(stage_name, function_name, args.iter().cloned())?;
+    // A function that never returns has no response: no value to report.
+    expect_single(analyzed.response(analyzed.root()).unwrap_or_default())
 }
 
 /// Run classic per-point liveness (dense backward — regalloc-grade
 /// block-boundary and per-statement sets) over `function_name`'s body at
 /// `stage_name`. Consumes the finalized IR directly; strong demand
-/// ([`kirin_demand::analyze_demand`]) is an independent analysis and is
-/// not involved.
+/// ([`analyze_demand`]) is an independent analysis and is not involved.
 ///
 /// Stage-pinned: a `function_name` with no live specialization at `stage_name`
 /// is an error, not a cue to analyze some other stage's body.
-pub fn analyze_classic_liveness(
-    pipeline: &Pipeline<Stage>,
+pub fn analyze_classic_liveness<'ir>(
+    pipeline: &'ir Pipeline<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<(CompileStage, CFG, DenseLivenessResult), InterpreterError> {
-    let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-    let (root, analysis) = analysis.analyze_by_name(stage_name, function_name)?;
-    let result = DenseLivenessResult::from_engine(&analysis, root);
+) -> Result<(CompileStage, CFG, Analyzed<ToyDenseLiveness<'ir>>), InterpreterError> {
+    let analysis: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(pipeline);
+    let analyzed = analysis.analyze_by_name(stage_name, function_name)?;
+    let root = *analyzed.root();
     let Body::CFG(cfg) = root.body(pipeline)? else {
         return Err(InterpreterError::Custom(
             "classic liveness target is not a CFG function",
         ));
     };
-    Ok((root.stage, cfg, result))
+    Ok((root.stage, cfg, analyzed))
 }
 
 /// Run strong liveness (sparse backward demand) over `function_name`'s body
 /// at `stage_name`. Independent of [`analyze_classic_liveness`], and
 /// stage-pinned in the same way.
-pub fn analyze_demand(
-    pipeline: &Pipeline<Stage>,
+pub fn analyze_demand<'ir>(
+    pipeline: &'ir Pipeline<Stage>,
     stage_name: &str,
     function_name: &str,
-) -> Result<DemandResult, InterpreterError> {
+) -> Result<Analyzed<DemandAnalysis<'ir, Stage>>, InterpreterError> {
     let stage = pipeline
         .stage_by_name(stage_name)
         .ok_or_else(|| InterpreterError::MissingStageName(stage_name.into()))?;
     let function = pipeline
         .lookup_function_by_name(function_name)
         .ok_or_else(|| InterpreterError::MissingFunctionName(function_name.into()))?;
-    kirin_demand::analyze_demand(
-        pipeline,
+    DemandAnalysis::<_>::new(pipeline).analyze(
         stage,
         Callee::Function(function),
         [kirin_demand::Demand::Live],

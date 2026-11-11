@@ -50,7 +50,7 @@ use std::collections::HashMap;
 use std::marker::PhantomData;
 
 use kirin_ir::{
-    Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, SSAValue,
+    Block, CompileStage, HasArguments, HasBottom, HasResults, Lattice, Pipeline, Product, SSAValue,
     StageMeta, Statement, Symbol,
 };
 
@@ -58,10 +58,10 @@ use super::frames::DenseBlockFrame;
 use crate::Body;
 use crate::core::query;
 use crate::{
-    AbstractInterpreter, BlockQueries, Callee, ClassicLiveness, DenseBackwardSemantic, EnvIndex,
-    EnvStore, FactStore, FixpointProfile, Frame, Interp, InterpDispatch, InterpLocation,
-    InterpreterError, LinkTarget, Linker, ProgramPoint, SameStageLinker, StageQuery,
-    StandardFixpointInterpreter, StatementDispatch, TerminatorArgs, WorkAnalysis,
+    AbstractInterpreter, AnalysisResults, Analyzed, BlockQueries, Callee, ClassicLiveness,
+    DenseBackwardSemantic, EnvIndex, EnvStore, FixpointProfile, Frame, Interp, InterpDispatch,
+    InterpLocation, InterpreterError, LinkTarget, Linker, ProgramPoint, SameStageLinker,
+    StageQuery, StandardFixpointInterpreter, StatementDispatch, TerminatorArgs, WorkAnalysis,
 };
 
 // ===========================================================================
@@ -647,9 +647,9 @@ where
 /// Dense backward liveness engine (classic per-program-point liveness).
 ///
 /// ```ignore
-/// let analysis = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline);
-/// let (_target, analysis) = analysis.analyze(stage, callee)?;
-/// let live_in = analysis.point_facts(ProgramPoint::BlockEntry(block));
+/// let analyzed = DenseBackwardInterpreter::<Stage, LiveSet>::new(&pipeline)
+///     .analyze(stage, callee)?;
+/// let live_in = analyzed.fact(analyzed.root(), ProgramPoint::BlockEntry(block));
 /// ```
 pub struct DenseBackwardInterpreter<
     'ir,
@@ -708,24 +708,6 @@ where
     pub fn pipeline(&self) -> &'ir Pipeline<S> {
         self.driver.inner().pipeline()
     }
-
-    /// The converged fact at a program point of the analyzed callable.
-    pub fn point_facts(&self, point: ProgramPoint) -> Option<&V> {
-        let transfer = self.driver.inner();
-        let (_, env) = transfer.root().ok()?;
-        transfer.env.environment(env).ok()?.get(point)
-    }
-
-    /// Snapshot every program-point fact of the analyzed callable.
-    pub fn facts(&self) -> FactStore<ProgramPoint, V> {
-        let transfer = self.driver.inner();
-        transfer
-            .root()
-            .ok()
-            .and_then(|(_, env)| transfer.env.environment(env).ok())
-            .cloned()
-            .unwrap_or_default()
-    }
 }
 
 impl<'ir, S, V, E, F, Lk, Sem> DenseBackwardInterpreter<'ir, S, V, E, F, Lk, Sem>
@@ -755,7 +737,7 @@ where
         self,
         stage_name: &str,
         function_name: &str,
-    ) -> Result<(LinkTarget, Self), E> {
+    ) -> Result<Analyzed<Self>, E> {
         let stage = self
             .driver
             .inner()
@@ -776,7 +758,7 @@ where
         self,
         stage: CompileStage,
         symbol: Symbol,
-    ) -> Result<(LinkTarget, Self), E> {
+    ) -> Result<Analyzed<Self>, E> {
         self.analyze(stage, symbol.into())
     }
 
@@ -784,9 +766,9 @@ where
     /// and drain the block worklist. Dependencies are discovered from
     /// terminator edges; unsupported graph roots fail before solving.
     ///
-    /// Each call solves from fresh state. It consumes the engine and returns
-    /// it on success, like the other analysis engines; an error drops it.
-    pub fn analyze(mut self, stage: CompileStage, callee: Callee) -> Result<(LinkTarget, Self), E> {
+    /// It consumes the engine and returns the converged [`Analyzed`] state,
+    /// like the other analysis engines; an error drops the engine.
+    pub fn analyze(mut self, stage: CompileStage, callee: Callee) -> Result<Analyzed<Self>, E> {
         let pipeline = self.driver.inner().pipeline();
         let target = self.linker.resolve(pipeline, stage, &callee)?;
         let body = target.body(pipeline)?;
@@ -800,6 +782,60 @@ where
         let work = blocks.into_iter().map(|block| (env, Body::Block(block)));
         self.driver
             .solve_many(&mut DenseBackwardWorkAnalysis, work)?;
-        Ok((target, self))
+        Ok(Analyzed::new(self, [(target, env)]))
+    }
+}
+
+/// One callable, one context: the context is the analyzed [`LinkTarget`],
+/// and there is no response because calls are not followed.
+impl<'ir, S, V, E, F, Lk, Sem> AnalysisResults
+    for Analyzed<DenseBackwardInterpreter<'ir, S, V, E, F, Lk, Sem>>
+where
+    S: StageMeta,
+    V: Clone + PartialEq + Lattice,
+    E: From<InterpreterError>,
+    Sem: DenseBackwardSemantic,
+{
+    type Context = LinkTarget;
+    type Anchor = ProgramPoint;
+    type Value = V;
+
+    fn root(&self) -> &LinkTarget {
+        let (target, _) = self
+            .engine
+            .driver
+            .inner()
+            .root
+            .as_ref()
+            .expect("`analyze` sets the root before building `Analyzed`");
+        target
+    }
+
+    fn contexts(&self) -> impl Iterator<Item = &LinkTarget> {
+        std::iter::once(self.root())
+    }
+
+    fn callable_of(&self, context: &LinkTarget) -> Option<LinkTarget> {
+        (context == self.root()).then_some(*context)
+    }
+
+    fn fact(&self, context: &LinkTarget, point: ProgramPoint) -> Option<&V> {
+        let transfer = self.engine.driver.inner();
+        let env = transfer.env.context_env(context)?;
+        transfer.env.environment(env).ok()?.get(point)
+    }
+
+    fn facts(&self, context: &LinkTarget) -> impl Iterator<Item = (ProgramPoint, &V)> {
+        let transfer = self.engine.driver.inner();
+        transfer
+            .env
+            .context_env(context)
+            .and_then(|env| transfer.env.environment(env).ok())
+            .into_iter()
+            .flat_map(|facts| facts.iter())
+    }
+
+    fn response(&self, _context: &LinkTarget) -> Option<Product<V>> {
+        None
     }
 }

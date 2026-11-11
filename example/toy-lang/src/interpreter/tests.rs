@@ -580,7 +580,7 @@ fn constprop_lowered_unknown_cf_branch_joins_matching_returns() {
 /// Analysis-author surface for a custom abstract policy budget.
 mod advanced {
     use kirin_constprop::ConstPropContext;
-    use kirin_interpreter::{SameStageLinker, engine::expect_single};
+    use kirin_interpreter::{AnalysisResults, SameStageLinker, engine::expect_single};
 
     use super::{ConstProp, build_pipeline};
 
@@ -598,9 +598,10 @@ mod advanced {
         let analysis = crate::interpreter::ToyConstProp::new(&pipeline)
             .with_policy(ConstPropContext::with_budget(2))
             .with_linker(SameStageLinker);
-        let (ret, _) = analysis
+        let analyzed = analysis
             .analyze_by_name("source", "factorial", [ConstProp::Const(5)])
             .unwrap();
+        let ret = analyzed.response(analyzed.root()).unwrap();
         let result = expect_single::<ConstProp, ToyError>(ret).unwrap();
         assert_eq!(result, ConstProp::Top);
     }
@@ -621,9 +622,9 @@ mod demand {
         ParsePipelineText, Pipeline, SSAValue, Statement,
     };
     use kirin_arith::{Arith, ArithValue};
-    use kirin_demand::analyze_demand;
+    use kirin_demand::DemandAnalysis;
     use kirin_function::Lexical;
-    use kirin_interpreter::{Body, BodyScope, Callee};
+    use kirin_interpreter::{AnalysisResults, Body, Callee, LinkTarget};
 
     use crate::language::HighLevel;
     use crate::stage::Stage;
@@ -645,12 +646,12 @@ mod demand {
     }
 
     /// Extract a CFG only after the interpreter has resolved the callable and
-    /// reported the target scope it actually analyzed.
-    pub(super) fn cfg_scope(scope: BodyScope) -> (CompileStage, CFG) {
-        let (stage, Body::CFG(cfg)) = scope else {
-            panic!("expected analysis root to resolve to a CFG, got {scope:?}");
+    /// reported the target it actually analyzed.
+    pub(super) fn cfg_scope(pipeline: &Pipeline<Stage>, target: LinkTarget) -> (CompileStage, CFG) {
+        let Ok(Body::CFG(cfg)) = target.body(pipeline) else {
+            panic!("expected analysis root to resolve to a CFG, got {target:?}");
         };
-        (stage, cfg)
+        (target.stage, cfg)
     }
 
     /// The parameters of the CFG's entry block.
@@ -783,14 +784,11 @@ specialize @source fn @if_body(i64) -> i64 cfg {
     fn scf_if_body_demand_follows_result_demand() {
         let pipeline = parse(IF_BODY_DEMAND);
         let (caller_stage, callee) = source_root(&pipeline, "if_body");
-        let result = analyze_demand(
-            &pipeline,
-            caller_stage,
-            callee,
-            [kirin_demand::Demand::Live],
-        )
-        .expect("analysis succeeds");
-        let (_, cfg) = cfg_scope(result.root_scope());
+        let result = DemandAnalysis::<_>::new(&pipeline)
+            .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
+            .expect("analysis succeeds");
+        let root = result.callable_of(result.root()).expect("root is reached");
+        let (_, cfg) = cfg_scope(&pipeline, root);
 
         let cond = entry_params(&pipeline, cfg)[0];
         let if_result = find_value(&pipeline, cfg, |definition| match definition {
@@ -798,18 +796,24 @@ specialize @source fn @if_body(i64) -> i64 cfg {
             _ => None,
         });
 
-        assert!(result.is_demanded(if_result), "ret demands the if result");
-        assert!(result.is_demanded(cond), "condition is a control root");
         assert!(
-            result.is_demanded(constant_result(&pipeline, cfg, 1)),
+            result.is_demanded(result.root(), if_result),
+            "ret demands the if result"
+        );
+        assert!(
+            result.is_demanded(result.root(), cond),
+            "condition is a control root"
+        );
+        assert!(
+            result.is_demanded(result.root(), constant_result(&pipeline, cfg, 1)),
             "then-arm yield operand feeds the demanded result"
         );
         assert!(
-            result.is_demanded(constant_result(&pipeline, cfg, 2)),
+            result.is_demanded(result.root(), constant_result(&pipeline, cfg, 2)),
             "else-arm yield operand feeds the demanded result"
         );
         assert!(
-            !result.is_demanded(constant_result(&pipeline, cfg, 9)),
+            !result.is_demanded(result.root(), constant_result(&pipeline, cfg, 9)),
             "a dead constant inside a body stays dead"
         );
     }
@@ -839,14 +843,11 @@ specialize @source fn @if_dead(i64) -> i64 cfg {
     fn scf_if_dead_result_keeps_only_condition() {
         let pipeline = parse(IF_DEAD_RESULT);
         let (caller_stage, callee) = source_root(&pipeline, "if_dead");
-        let result = analyze_demand(
-            &pipeline,
-            caller_stage,
-            callee,
-            [kirin_demand::Demand::Live],
-        )
-        .expect("analysis succeeds");
-        let (_, cfg) = cfg_scope(result.root_scope());
+        let result = DemandAnalysis::<_>::new(&pipeline)
+            .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
+            .expect("analysis succeeds");
+        let root = result.callable_of(result.root()).expect("root is reached");
+        let (_, cfg) = cfg_scope(&pipeline, root);
 
         let cond = entry_params(&pipeline, cfg)[0];
         let if_result = find_value(&pipeline, cfg, |definition| match definition {
@@ -854,11 +855,14 @@ specialize @source fn @if_dead(i64) -> i64 cfg {
             _ => None,
         });
 
-        assert!(result.is_demanded(cond), "condition is a control root");
-        assert!(result.is_demanded(constant_result(&pipeline, cfg, 0)));
-        assert!(!result.is_demanded(if_result));
-        assert!(!result.is_demanded(constant_result(&pipeline, cfg, 1)));
-        assert!(!result.is_demanded(constant_result(&pipeline, cfg, 2)));
+        assert!(
+            result.is_demanded(result.root(), cond),
+            "condition is a control root"
+        );
+        assert!(result.is_demanded(result.root(), constant_result(&pipeline, cfg, 0)));
+        assert!(!result.is_demanded(result.root(), if_result));
+        assert!(!result.is_demanded(result.root(), constant_result(&pipeline, cfg, 1)));
+        assert!(!result.is_demanded(result.root(), constant_result(&pipeline, cfg, 2)));
     }
 
     pub(super) const FOR_CARRIED_DEMAND: &str = r#"
@@ -886,14 +890,11 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
     fn scf_for_loop_carried_demand_converges() {
         let pipeline = parse(FOR_CARRIED_DEMAND);
         let (caller_stage, callee) = source_root(&pipeline, "loop_sum");
-        let result = analyze_demand(
-            &pipeline,
-            caller_stage,
-            callee,
-            [kirin_demand::Demand::Live],
-        )
-        .expect("analysis succeeds");
-        let (_, cfg) = cfg_scope(result.root_scope());
+        let result = DemandAnalysis::<_>::new(&pipeline)
+            .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
+            .expect("analysis succeeds");
+        let root = result.callable_of(result.root()).expect("root is reached");
+        let (_, cfg) = cfg_scope(&pipeline, root);
 
         let params = entry_params(&pipeline, cfg);
         let (lo, hi, step) = (params[0], params[1], params[2]);
@@ -922,20 +923,27 @@ specialize @source fn @loop_sum(i64, i64, i64) -> i64 cfg {
         };
 
         assert!(
-            result.is_demanded(constant_result(&pipeline, cfg, 0)),
+            result.is_demanded(result.root(), constant_result(&pipeline, cfg, 0)),
             "init"
         );
         assert!(
-            result.is_demanded(constant_result(&pipeline, cfg, 1)),
+            result.is_demanded(result.root(), constant_result(&pipeline, cfg, 1)),
             "one"
         );
-        assert!(result.is_demanded(next), "yield slot");
-        assert!(result.is_demanded(carried), "carried param feeds the add");
+        assert!(result.is_demanded(result.root(), next), "yield slot");
         assert!(
-            !result.is_demanded(induction),
+            result.is_demanded(result.root(), carried),
+            "carried param feeds the add"
+        );
+        assert!(
+            !result.is_demanded(result.root(), induction),
             "the unused induction variable stays dead"
         );
-        assert!(result.is_demanded(lo) && result.is_demanded(hi) && result.is_demanded(step));
+        assert!(
+            result.is_demanded(result.root(), lo)
+                && result.is_demanded(result.root(), hi)
+                && result.is_demanded(result.root(), step)
+        );
     }
 
     const FOR_DEAD_RESULT: &str = r#"
@@ -961,14 +969,11 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
     fn scf_for_dead_result_keeps_only_bounds() {
         let pipeline = parse(FOR_DEAD_RESULT);
         let (caller_stage, callee) = source_root(&pipeline, "loop_dead");
-        let result = analyze_demand(
-            &pipeline,
-            caller_stage,
-            callee,
-            [kirin_demand::Demand::Live],
-        )
-        .expect("analysis succeeds");
-        let (_, cfg) = cfg_scope(result.root_scope());
+        let result = DemandAnalysis::<_>::new(&pipeline)
+            .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
+            .expect("analysis succeeds");
+        let root = result.callable_of(result.root()).expect("root is reached");
+        let (_, cfg) = cfg_scope(&pipeline, root);
 
         let params = entry_params(&pipeline, cfg);
         let next = find_value(&pipeline, cfg, |definition| match definition {
@@ -976,19 +981,22 @@ specialize @source fn @loop_dead(i64, i64, i64) -> i64 cfg {
             _ => None,
         });
 
-        assert!(result.is_demanded(params[0]), "bounds are control roots");
-        assert!(result.is_demanded(params[1]));
-        assert!(result.is_demanded(params[2]));
-        assert!(result.is_demanded(constant_result(&pipeline, cfg, 7)));
         assert!(
-            !result.is_demanded(constant_result(&pipeline, cfg, 0)),
+            result.is_demanded(result.root(), params[0]),
+            "bounds are control roots"
+        );
+        assert!(result.is_demanded(result.root(), params[1]));
+        assert!(result.is_demanded(result.root(), params[2]));
+        assert!(result.is_demanded(result.root(), constant_result(&pipeline, cfg, 7)));
+        assert!(
+            !result.is_demanded(result.root(), constant_result(&pipeline, cfg, 0)),
             "init dead"
         );
         assert!(
-            !result.is_demanded(constant_result(&pipeline, cfg, 1)),
+            !result.is_demanded(result.root(), constant_result(&pipeline, cfg, 1)),
             "body interior dead"
         );
-        assert!(!result.is_demanded(next), "yield slot dead");
+        assert!(!result.is_demanded(result.root(), next), "yield slot dead");
     }
 
     const CALL_PURITY: &str = r#"
@@ -1019,14 +1027,11 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
     fn ignored_call_does_not_demand_arguments() {
         let pipeline = parse(CALL_PURITY);
         let (caller_stage, callee) = source_root(&pipeline, "main");
-        let result = analyze_demand(
-            &pipeline,
-            caller_stage,
-            callee,
-            [kirin_demand::Demand::Live],
-        )
-        .expect("analysis succeeds");
-        let (_, cfg) = cfg_scope(result.root_scope());
+        let result = DemandAnalysis::<_>::new(&pipeline)
+            .analyze(caller_stage, callee, [kirin_demand::Demand::Live])
+            .expect("analysis succeeds");
+        let root = result.callable_of(result.root()).expect("root is reached");
+        let (_, cfg) = cfg_scope(&pipeline, root);
 
         let params = entry_params(&pipeline, cfg);
         let (x, y) = (params[0], params[1]);
@@ -1041,11 +1046,20 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
             _ => None,
         });
 
-        assert!(!result.is_demanded(x), "an ignored call demands nothing");
-        assert!(result.is_demanded(constant_result(&pipeline, cfg, 0)));
-        assert!(!result.is_demanded(unused), "the call result is unused");
-        assert!(!result.is_demanded(y), "pure add with dead result");
-        assert!(!result.is_demanded(deadsum));
+        assert!(
+            !result.is_demanded(result.root(), x),
+            "an ignored call demands nothing"
+        );
+        assert!(result.is_demanded(result.root(), constant_result(&pipeline, cfg, 0)));
+        assert!(
+            !result.is_demanded(result.root(), unused),
+            "the call result is unused"
+        );
+        assert!(
+            !result.is_demanded(result.root(), y),
+            "pure add with dead result"
+        );
+        assert!(!result.is_demanded(result.root(), deadsum));
     }
 }
 
@@ -1059,8 +1073,8 @@ specialize @source fn @main(i64, i64) -> i64 cfg {
 mod dense {
     use kirin::prelude::{CFG, CompileStage, Pipeline, SSAValue};
     use kirin_arith::{Arith, ArithValue};
-    use kirin_interpreter::{Body, Callee, ProgramPoint};
-    use kirin_liveness::{DenseLivenessResult, LiveSet};
+    use kirin_interpreter::{AnalysisResults, Analyzed, Body, Callee, ProgramPoint};
+    use kirin_liveness::LiveSet;
     use kirin_scf::StructuredControlFlow;
 
     use super::demand::{FOR_CARRIED_DEMAND, IF_DEAD_RESULT};
@@ -1073,19 +1087,20 @@ mod dense {
 
     /// Run classic dense liveness with the toy total frame, returning the
     /// analyzed root's CFG alongside the result.
-    fn analyze_dense_toy(
-        pipeline: &Pipeline<Stage>,
+    fn analyze_dense_toy<'ir>(
+        pipeline: &'ir Pipeline<Stage>,
         caller_stage: CompileStage,
         callee: Callee,
-    ) -> (DenseLivenessResult, CFG) {
-        let engine: ToyDenseLiveness<'_> = ToyDenseLiveness::new(pipeline);
-        let (root, engine) = engine
+    ) -> (Analyzed<ToyDenseLiveness<'ir>>, CFG) {
+        let engine: ToyDenseLiveness<'_> = ToyDenseLiveness::<_>::new(pipeline);
+        let analyzed = engine
             .analyze(caller_stage, callee)
             .expect("analysis succeeds");
+        let root = *analyzed.root();
         let Body::CFG(cfg) = root.body(pipeline).expect("analyzed root has a body") else {
             panic!("expected analysis root to resolve to a CFG, got {root:?}");
         };
-        (DenseLivenessResult::from_engine(&engine, root), cfg)
+        (analyzed, cfg)
     }
 
     fn live_set(values: &[SSAValue]) -> LiveSet {
@@ -1112,11 +1127,11 @@ mod dense {
         // Classic: after `%a = constant 1`, %a is live (the yield uses it)
         // and %cond flows through the arm; before it, %a is killed.
         assert_eq!(
-            dense.point_facts(ProgramPoint::After(a_const)),
+            dense.fact(dense.root(), ProgramPoint::After(a_const)),
             Some(&live_set(&[cond, a]))
         );
         assert_eq!(
-            dense.point_facts(ProgramPoint::Before(a_const)),
+            dense.fact(dense.root(), ProgramPoint::Before(a_const)),
             Some(&live_set(&[cond]))
         );
 
@@ -1126,7 +1141,7 @@ mod dense {
             matches!(definition, HighLevel::Structured(_))
         });
         assert_eq!(
-            dense.point_facts(ProgramPoint::Before(if_stmt)),
+            dense.fact(dense.root(), ProgramPoint::Before(if_stmt)),
             Some(&live_set(&[cond]))
         );
 
@@ -1135,11 +1150,11 @@ mod dense {
             _ => None,
         });
         assert_eq!(
-            dense.point_facts(ProgramPoint::BlockEntry(then_block)),
+            dense.fact(dense.root(), ProgramPoint::BlockEntry(then_block)),
             Some(&live_set(&[cond]))
         );
         assert_eq!(
-            dense.point_facts(ProgramPoint::BlockExit(then_block)),
+            dense.fact(dense.root(), ProgramPoint::BlockExit(then_block)),
             Some(&live_set(&[cond]))
         );
     }
@@ -1184,11 +1199,11 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
         // After the if only its result matters; before it, the then-arm
         // contributed %x, the else-arm %y, and the rule genned %cond.
         assert_eq!(
-            dense.point_facts(ProgramPoint::After(if_stmt)),
+            dense.fact(dense.root(), ProgramPoint::After(if_stmt)),
             Some(&live_set(&[r]))
         );
         assert_eq!(
-            dense.point_facts(ProgramPoint::Before(if_stmt)),
+            dense.fact(dense.root(), ProgramPoint::Before(if_stmt)),
             Some(&live_set(&[cond, x, y]))
         );
     }
@@ -1229,11 +1244,11 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
 
         // Around the loop.
         assert_eq!(
-            dense.point_facts(ProgramPoint::After(for_stmt)),
+            dense.fact(dense.root(), ProgramPoint::After(for_stmt)),
             Some(&live_set(&[sum]))
         );
         assert_eq!(
-            dense.point_facts(ProgramPoint::Before(for_stmt)),
+            dense.fact(dense.root(), ProgramPoint::Before(for_stmt)),
             Some(&live_set(&[lo, hi, step, init]))
         );
 
@@ -1241,11 +1256,11 @@ specialize @source fn @if_arms(i64, i64, i64) -> i64 cfg {
         // constant are live before the add; the yield slot is live after it
         // (it feeds the next iteration through the carry).
         assert_eq!(
-            dense.point_facts(ProgramPoint::Before(add_stmt)),
+            dense.fact(dense.root(), ProgramPoint::Before(add_stmt)),
             Some(&live_set(&[lo, hi, step, init, acc, one]))
         );
         assert_eq!(
-            dense.point_facts(ProgramPoint::After(add_stmt)),
+            dense.fact(dense.root(), ProgramPoint::After(add_stmt)),
             Some(&live_set(&[lo, hi, step, init, next]))
         );
     }

@@ -1,6 +1,6 @@
 use kirin::prelude::*;
 use kirin_demand::{Demand, DemandAnalysis};
-use kirin_interpreter::{Body, Callee, Linker, SameStageLinker};
+use kirin_interpreter::{AnalysisResults, Body, Callee, Linker, SameStageLinker};
 use kirin_test_languages::GraphFunctionLanguage;
 
 #[test]
@@ -48,13 +48,14 @@ specialize @test fn @identity(i64) -> i64 cfg {{
             .replace_operand(branch, 0, result)
             .unwrap();
 
-        let (inputs, analysis) = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&pipeline)
+        let analysis = DemandAnalysis::<StageInfo<GraphFunctionLanguage>>::new(&pipeline)
             .analyze(stage, callee, [Demand::Dead])
             .unwrap();
+        let inputs = analysis.response(analysis.root()).unwrap();
         assert_eq!(inputs.as_slice(), &[Demand::Live, Demand::Dead]);
         assert_eq!(analysis.contexts().count(), 2);
         assert_eq!(
-            analysis.fact(analysis.root().unwrap(), result),
+            analysis.fact(analysis.root(), result.into()),
             Some(&Demand::Live)
         );
     }

@@ -4,7 +4,8 @@
 use kirin::prelude::*;
 use kirin_demand::{Demand, DemandAnalysis};
 use kirin_interpreter::{
-    Body, Callee, CrossStageLinker, InterpreterError, LinkTarget, Linker, SameStageLinker,
+    AnalysisResults, Body, Callee, CrossStageLinker, InterpreterError, LinkTarget, Linker,
+    SameStageLinker,
 };
 use kirin_liveness::DenseLiveness;
 use kirin_test_languages::GraphFunctionLanguage;
@@ -131,17 +132,17 @@ fn every_callee_variant_uses_the_same_backward_root_protocol() {
     let (stage, callees) = all_callee_variants(&pipeline);
 
     for callee in callees {
-        let (_, demand) = DemandAnalysis::<TestStage>::new(&pipeline)
+        let demand = DemandAnalysis::<TestStage>::new(&pipeline)
             .analyze(stage, callee, [Demand::Live])
             .expect("demand succeeds");
-        let root = demand.root().unwrap();
-        let demand_scope = demand.scope(root).expect("root context is selected");
-        assert!(matches!(demand_scope, (_, Body::Block(_))));
+        let root = demand.root();
+        let demand_target = demand.callable_of(root).expect("root context is selected");
+        assert!(matches!(demand_target.body(&pipeline), Ok(Body::Block(_))));
 
-        let (dense_root, _) = DenseLiveness::<TestStage>::new(&pipeline)
+        let dense = DenseLiveness::<TestStage>::new(&pipeline)
             .analyze(stage, callee)
             .expect("dense succeeds");
-        assert_eq!(dense_root, root.0);
+        assert_eq!(*dense.root(), root.0);
     }
 }
 
@@ -206,30 +207,23 @@ fn cross_stage_linking_discovers_the_body_at_the_target_stage() {
         Err(InterpreterError::MissingSpecialization(_))
     ));
 
-    let (_, demand) = DemandAnalysis::<TestStage>::new(&pipeline)
+    let demand = DemandAnalysis::<TestStage>::new(&pipeline)
         .with_linker(CrossStageLinker)
         .analyze(source, callee, [Demand::Live])
         .expect("cross-stage demand succeeds");
-    let root = demand.root().unwrap();
+    let root = demand.root();
     assert_eq!(
         root.0.stage, lowered,
         "the root context is the resolved target"
     );
-    let demand_scope = demand.scope(root).expect("root context is selected");
-    let (dense_root, dense) = DenseLiveness::<TestStage>::new(&pipeline)
+    let demand_target = demand.callable_of(root).expect("root context is selected");
+    let dense = DenseLiveness::<TestStage>::new(&pipeline)
         .with_linker(CrossStageLinker)
         .analyze(source, callee)
         .expect("cross-stage dense succeeds");
-    assert_eq!(demand_scope.0, lowered);
-    assert!(matches!(demand_scope.1, Body::Block(_)));
-    assert_eq!(dense_root, root.0);
-
-    // Dense analysis rebuilds solver state between roots; configuration state
-    // must survive that reset.
-    let (again, _) = dense
-        .analyze(source, callee)
-        .expect("custom linker survives dense reset");
-    assert_eq!(again, dense_root);
+    assert_eq!(demand_target.stage, lowered);
+    assert!(matches!(demand_target.body(&pipeline), Ok(Body::Block(_))));
+    assert_eq!(*dense.root(), root.0);
 }
 
 #[derive(Clone, Copy)]
@@ -297,17 +291,17 @@ fn specialized_handles_are_validated_before_accepting_a_candidate_stage() {
             .unwrap(),
         target
     );
-    let (_, demand) = DemandAnalysis::<TestStage>::new(&pipeline)
+    let demand = DemandAnalysis::<TestStage>::new(&pipeline)
         .with_linker(CrossStageLinker)
         .analyze(source, callee, [Demand::Live])
         .unwrap();
-    let (dense, _) = DenseLiveness::<TestStage>::new(&pipeline)
+    let dense = DenseLiveness::<TestStage>::new(&pipeline)
         .with_linker(CrossStageLinker)
         .analyze(source, callee)
         .unwrap();
-    let root = demand.root().unwrap();
+    let root = demand.root();
     assert_eq!(root.0, target);
-    assert_eq!(dense, root.0);
+    assert_eq!(*dense.root(), root.0);
 }
 
 #[test]
