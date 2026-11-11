@@ -9,5 +9,8 @@ kirin-ir = { workspace = true }
 serde = { workspace = true, optional = true }
 thiserror = { workspace = true }
 
+[dev-dependencies]
+kirin-test-utils = { workspace = true, features = ["types"] }
+
 [features]
 serde = ["dep:serde", "kirin-ir/serde"]
