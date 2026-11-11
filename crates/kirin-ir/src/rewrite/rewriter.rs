@@ -84,6 +84,7 @@ use indexmap::{IndexMap, IndexSet};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::arena::{GetInfo, GetInfoMut};
+use crate::node::linked_list::LinkedList;
 use smallvec::SmallVec;
 
 use super::bodies::bodies_of;
@@ -1011,7 +1012,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 remove_predecessor(self.stage, target, block);
             }
         } else {
-            self.unlink_from_block(stmt, block);
+            self.unlink(stmt, block);
         }
 
         // Drop the def-use edges this statement contributed, erase the bodies
@@ -1190,93 +1191,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
     }
 
-    /// Link the live, unlinked `stmt` into `block`'s chain between `prev` and
-    /// `next` (the block head or tail when one is `None`), making `block` its
-    /// parent.
-    pub(super) fn link_into_block(
-        &mut self,
-        stmt: Statement,
-        block: Block,
-        prev: Option<Statement>,
-        next: Option<Statement>,
-    ) {
-        if let Some(info) = stmt.get_info_mut(self.stage) {
-            info.parent = Some(StatementParent::Block(block));
-            info.node.prev = prev;
-            info.node.next = next;
-        }
-        match prev {
-            Some(p) => {
-                if let Some(info) = p.get_info_mut(self.stage) {
-                    info.node.next = Some(stmt);
-                }
-            }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.head = Some(stmt);
-                }
-            }
-        }
-        match next {
-            Some(n) => {
-                if let Some(info) = n.get_info_mut(self.stage) {
-                    info.node.prev = Some(stmt);
-                }
-            }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.tail = Some(stmt);
-                }
-            }
-        }
-        if let Some(block_info) = block.get_info_mut(self.stage) {
-            block_info.statements.len += 1;
-        }
-    }
-
-    /// Unlink the non-terminator `stmt` from `block`'s chain, fixing its
-    /// neighbours (or the block head/tail at an end) and clearing its own
-    /// links. Its parent is left for the caller.
-    pub(super) fn unlink_from_block(&mut self, stmt: Statement, block: Block) {
-        let Some(node) = stmt.get_info(self.stage).map(|item| item.node) else {
-            return;
-        };
-        let (prev, next) = (node.prev, node.next);
-        match prev {
-            Some(p) => {
-                if let Some(info) = p.get_info_mut(self.stage) {
-                    info.node.next = next;
-                }
-            }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.head = next;
-                }
-            }
-        }
-        match next {
-            Some(n) => {
-                if let Some(info) = n.get_info_mut(self.stage) {
-                    info.node.prev = prev;
-                }
-            }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.tail = prev;
-                }
-            }
-        }
-        if let Some(block_info) = block.get_info_mut(self.stage)
-            && block_info.statements.len > 0
-        {
-            block_info.statements.len -= 1;
-        }
-        if let Some(info) = stmt.get_info_mut(self.stage) {
-            info.node.prev = None;
-            info.node.next = None;
-        }
-    }
-
     fn insert_relative(
         &mut self,
         anchor: Statement,
@@ -1301,7 +1215,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             &operands,
         );
 
-        self.link_into_block(new_stmt, block, prev, next);
+        self.link(LinkedList::single(new_stmt), block, prev, next);
 
         // Predecessor mirror does not need to be updated since we rejected terminators earlier.
         self.events

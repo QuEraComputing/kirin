@@ -90,7 +90,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             None => (LinkedList::new(), None),
         };
         let pred_tail = pred.expect_info(self.stage).statements.tail;
-        self.link_chain(succ_chain, pred, pred_tail, None);
+        self.link(succ_chain, pred, pred_tail, None);
         if let Some(terminator) = succ_terminator
             && let Some(info) = terminator.get_info_mut(self.stage)
         {
@@ -102,7 +102,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
         // succ is now empty: tombstoning it only removes the block and its
         // (already redirected) arguments.
-        self.unlink_block(cfg, succ);
+        self.unlink(succ, cfg);
         self.tombstone_block(succ);
 
         let pred_successors_after = self.block_successors(pred);

@@ -48,7 +48,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             None => LinkedList::new(),
         };
         let next = anchor.expect_info(self.stage).node.next;
-        self.link_blocks(chain, dest, Some(anchor), next);
+        self.link(chain, dest, Some(anchor), next);
 
         self.events
             .push(MutationEvent::ChangedBlockList { cfg: source });
@@ -56,61 +56,5 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .push(MutationEvent::ChangedBlockList { cfg: dest });
         self.events.push(MutationEvent::SplicedCfg { source, dest });
         Ok(())
-    }
-
-    /// Link `chain`, a whole block chain already taken out of its CFG, into
-    /// `cfg` between `prev` and `next` (the list head or tail when one is
-    /// `None`), making `cfg` the parent of each block.
-    fn link_blocks(
-        &mut self,
-        chain: LinkedList<Block>,
-        cfg: CFG,
-        prev: Option<Block>,
-        next: Option<Block>,
-    ) {
-        let (Some(head), Some(tail)) = (chain.head, chain.tail) else {
-            return;
-        };
-        let mut current = Some(head);
-        while let Some(block) = current {
-            let Some(info) = block.get_info_mut(self.stage) else {
-                break;
-            };
-            info.parent = Some(BlockParent::CFG(cfg));
-            current = info.node.next;
-        }
-        if let Some(info) = head.get_info_mut(self.stage) {
-            info.node.prev = prev;
-        }
-        if let Some(info) = tail.get_info_mut(self.stage) {
-            info.node.next = next;
-        }
-        match prev {
-            Some(p) => {
-                if let Some(info) = p.get_info_mut(self.stage) {
-                    info.node.next = Some(head);
-                }
-            }
-            None => {
-                if let Some(info) = cfg.get_info_mut(self.stage) {
-                    info.blocks.head = Some(head);
-                }
-            }
-        }
-        match next {
-            Some(n) => {
-                if let Some(info) = n.get_info_mut(self.stage) {
-                    info.node.prev = Some(tail);
-                }
-            }
-            None => {
-                if let Some(info) = cfg.get_info_mut(self.stage) {
-                    info.blocks.tail = Some(tail);
-                }
-            }
-        }
-        if let Some(info) = cfg.get_info_mut(self.stage) {
-            info.blocks.len += chain.len;
-        }
     }
 }

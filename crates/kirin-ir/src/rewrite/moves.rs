@@ -72,12 +72,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             owner = tree::parent(self.stage, current);
         }
 
-        self.unlink_from_block(stmt, block);
+        self.unlink(stmt, block);
         let (block, prev, next) = self
             .slot_at(anchor, after)
             .expect("the anchor was checked above and moving `stmt` does not touch it");
         debug_assert!(stmt.get_info(self.stage).is_some());
-        self.link_into_block(stmt, block, prev, next);
+        self.link(LinkedList::single(stmt), block, prev, next);
         self.events.push(MutationEvent::MovedStatement { stmt });
         Ok(())
     }
@@ -176,65 +176,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             Some(info) => std::mem::take(&mut info.statements),
             None => LinkedList::new(),
         };
-        self.link_chain(chain, dest, prev, next);
+        self.link(chain, dest, prev, next);
         self.events
             .push(MutationEvent::SplicedBlock { source, dest });
         Ok(())
-    }
-
-    /// Link `chain`, a whole statement chain already taken out of its block,
-    /// into `block` between `prev` and `next` (the block head or tail when one
-    /// is `None`), making `block` the parent of each statement.
-    pub(super) fn link_chain(
-        &mut self,
-        chain: LinkedList<Statement>,
-        block: Block,
-        prev: Option<Statement>,
-        next: Option<Statement>,
-    ) {
-        let (Some(head), Some(tail)) = (chain.head, chain.tail) else {
-            return;
-        };
-        let mut current = Some(head);
-        while let Some(stmt) = current {
-            let Some(info) = stmt.get_info_mut(self.stage) else {
-                break;
-            };
-            info.parent = Some(StatementParent::Block(block));
-            current = info.node.next;
-        }
-        if let Some(info) = head.get_info_mut(self.stage) {
-            info.node.prev = prev;
-        }
-        if let Some(info) = tail.get_info_mut(self.stage) {
-            info.node.next = next;
-        }
-        match prev {
-            Some(p) => {
-                if let Some(info) = p.get_info_mut(self.stage) {
-                    info.node.next = Some(head);
-                }
-            }
-            None => {
-                if let Some(info) = block.get_info_mut(self.stage) {
-                    info.statements.head = Some(head);
-                }
-            }
-        }
-        match next {
-            Some(n) => {
-                if let Some(info) = n.get_info_mut(self.stage) {
-                    info.node.prev = Some(tail);
-                }
-            }
-            None => {
-                if let Some(info) = block.get_info_mut(self.stage) {
-                    info.statements.tail = Some(tail);
-                }
-            }
-        }
-        if let Some(info) = block.get_info_mut(self.stage) {
-            info.statements.len += chain.len;
-        }
     }
 }
