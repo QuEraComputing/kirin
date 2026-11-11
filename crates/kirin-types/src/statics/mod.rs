@@ -1,6 +1,7 @@
 //! Statics: sorts, static constructors, and static terms.
 
 mod check;
+mod reduce;
 mod subst;
 mod term;
 
