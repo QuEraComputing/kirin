@@ -11,7 +11,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// The statement keeps its id, results, uses and nested bodies; only its
     /// place changes. As with [`Rewriter::insert_before`], `anchor` may be a
     /// block's terminator: `stmt` then goes to the end of that block's
-    /// statement chain. Moving a statement before itself does nothing.
+    /// statement chain. Moving a statement to where it already is (before
+    /// itself, or before the statement that already follows it) does nothing
+    /// and records no event.
     ///
     /// Not checked, as with [`Rewriter::insert_before`]: that every use of
     /// `stmt`'s results still comes after it.
@@ -54,8 +56,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         };
         // Checks the anchor; the place itself is read again once `stmt` is
         // unlinked, since `stmt` may be one of its neighbours.
-        self.slot_at(anchor, after)?;
-        if stmt == anchor {
+        let (_, prev, next) = self.slot_at(anchor, after)?;
+        // `stmt` already borders the place (this includes `stmt == anchor`),
+        // so unlinking it and linking it back would put it where it is.
+        if prev == Some(stmt) || next == Some(stmt) {
             return Ok(());
         }
         // Walk up the statements whose bodies enclose `anchor`. If `stmt` is

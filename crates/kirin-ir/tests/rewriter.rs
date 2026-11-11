@@ -1558,11 +1558,15 @@ fn moving_a_statement_next_to_itself_does_nothing() {
         q,
         r,
         owner,
+        ret,
         ..
     } = move_fixture();
     let mut rewriter = Rewriter::new(&mut stage);
     rewriter.move_before(q, q).unwrap();
     rewriter.move_after(q, q).unwrap();
+    rewriter.move_before(p, q).unwrap();
+    rewriter.move_after(r, q).unwrap();
+    rewriter.move_before(owner, ret).unwrap();
     assert!(rewriter.events().is_empty());
     assert_eq!(order(rewriter.stage(), entry), [p, q, r, owner]);
 }
