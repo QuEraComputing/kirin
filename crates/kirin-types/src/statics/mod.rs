@@ -1,6 +1,7 @@
 //! Statics: sorts, static constructors, and static terms.
 
 mod check;
+mod subst;
 mod term;
 
 pub use term::{

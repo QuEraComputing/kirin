@@ -231,3 +231,71 @@ impl<S: IndexSort, C: PartialEq> Statics<S, C> {
         }
     }
 }
+
+impl<S: IndexSort, C: Clone> Statics<S, C> {
+    /// Maps `term` and its children nodes with function `f`. Traversal of
+    /// the nodes is done bottom-up, such that a node's children are mapped
+    /// before the node itself.
+    /// The function `f` is called with the following arguments:
+    ///  * `self`: the `Statics` object to allocate any new terms.
+    ///  * `term`: the original version of the current node being visited.
+    ///    This is the same `term` as is `map_term`'s arguments
+    ///  * `&rebuilt`: the version of the current node but with the children
+    ///    already mapped by `f`.
+    ///  * `depth`: The current depth from the starting node.
+    pub(super) fn map_term<E>(
+        &mut self,
+        term: StaticTermId,
+        depth: usize,
+        f: &impl Fn(
+            &mut Self,
+            StaticTermId,
+            &StaticTerm<S, C>,
+            usize,
+        ) -> Result<Option<StaticTermId>, E>,
+    ) -> Result<StaticTermId, E> {
+        use StaticTerm::*;
+        let mut changed = false;
+        let mut map = |statics: &mut Self, child: StaticTermId, depth: usize| {
+            let mapped = statics.map_term(child, depth, f)?;
+            changed |= mapped != child;
+            Ok(mapped)
+        };
+        // Recursively apply `map_term` to the `term`'s children.
+        // We take a copy of the node, so the recursive `&mut self` calls don't
+        // overlap its borrow.
+        let rebuilt = match (*self.terms[term]).clone() {
+            leaf @ (Bound(_) | Free(_) | Lit(_)) => leaf,
+            Constructor(c, args) => Constructor(
+                c,
+                args.into_iter()
+                    .map(|arg| map(self, arg, depth))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Product(args) => Product(
+                args.into_iter()
+                    .map(|arg| map(self, arg, depth))
+                    .collect::<Result<_, _>>()?,
+            ),
+            Function(args, result) => {
+                let args = args
+                    .into_iter()
+                    .map(|arg| map(self, arg, depth))
+                    .collect::<Result<_, _>>()?;
+                Function(args, map(self, result, depth)?)
+            }
+            Guard(p, t) => Guard(map(self, p, depth)?, map(self, t, depth)?),
+            Assert(p, t) => Assert(map(self, p, depth)?, map(self, t, depth)?),
+            Forall(sort, body) => Forall(sort, map(self, body, depth + 1)?),
+            Exists(sort, body) => Exists(sort, map(self, body, depth + 1)?),
+        };
+
+        // Apply `f` to the node and return any changes made to the current node
+        if let Some(replacement) = f(self, term, &rebuilt, depth)? {
+            return Ok(replacement);
+        }
+
+        // If any changes were made to the children, return the rebuilt node
+        Ok(if changed { self.alloc(rebuilt) } else { term })
+    }
+}
