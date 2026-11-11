@@ -138,10 +138,11 @@ pub enum StaticTerm<S: IndexSort, C> {
     ///  - `Bound(i)`, a de Bruijn index: references the `i`-th innermost
     ///    binder around the variable, e.g. `Bound(0)` is the innermost.
     ///    Binders are [`StaticTerm::Forall`]/[`StaticTerm::Exists`] and the
-    ///    quantifiers of a [`crate::dynamics::DynSig`].
+    ///    quantifiers of a [`TypeSig`](crate::TypeSig).
     Bound(usize),
     ///  - `Free(x)`, a variable whose sort is recorded in [`Statics::vars`],
-    ///    introduced by the dynamics' static binders or by whoever builds the term.
+    ///    introduced by the type checker when it opens a binder, or by
+    ///    whoever builds the term.
     Free(StaticVarId),
     /// A literal value: a `bool`, or a value of a dialect's base sort.
     Lit(SortValue<S::T>),
@@ -217,6 +218,7 @@ impl<S: IndexSort, C: PartialEq> Statics<S, C> {
             return true;
         }
         match (&*self.terms[a], &*self.terms[b]) {
+            (Unit, Unit) => true,
             (Bound(i), Bound(j)) => i == j,
             (Free(x), Free(y)) => x == y,
             (Lit(x), Lit(y)) => x == y,
