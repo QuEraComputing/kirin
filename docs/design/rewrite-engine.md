@@ -133,8 +133,8 @@ flowchart TB
   %% ---- callout note shapes (dotted, no-arrow connectors) ----
   nDeps["💭 dependencies point upward only — core IR never<br/>depends on rules/scheduling, so layers stay swappable"]:::note
   nRW["💭 Rewriter is the restricted in-place mutation capability;<br/>every successful action maintains the installed mirrors,<br/>but it does not prove whole-IR validity after every action"]:::note
-  nPASS["💭 one pass owns one stage; plans are ordered commands.<br/>Final independent derivation + comparison gates success;<br/>failure quarantines the owned stage"]:::note
-  nEV["💭 a changed bit is enough for v1 fixpoints;<br/>structured events may drive an immediate worklist"]:::note
+  nPASS["💭 one pass owns one stage; each match runs its rewrite<br/>as ordered Rewriter calls, then requeues neighbors.<br/>Final independent derivation + comparison gates success;<br/>failure quarantines the owned stage"]:::note
+  nEV["💭 the fixpoint ends at the first sweep recording no mutation event;<br/>those events also drive the worklist"]:::note
   nFut["💭 today's rules are trusted; structural match alone<br/>decides applicability. Proofs/SMT are deferred"]:::note
   nOwn["💭 future external verification may enforce STRUCTURAL validity;<br/>rule authors own SEMANTIC correctness (proofs deferred)"]:::note
 
@@ -175,7 +175,7 @@ flowchart TB
   ACT --> RW["Rewriter (kirin-ir)<br/>execute in place · maintain installed mirrors"]
   RW -->|mutates| IRIN
   RW -->|records| EV["RewriteChange / MutationEvent"]
-  EV --> DRV["RewriteDriver worklist<br/>re-enqueue changed stmts"]
+  EV --> DRV["RewriteDriver worklist<br/>re-enqueue changed stmts and neighbors"]
   DRV -->|next round| M
   DRV -->|pass done| DER["Derive expected mirrors<br/>from authoritative IR"]
   DER --> CMP["Compare with installed mirrors<br/>never repair"]
@@ -232,7 +232,7 @@ sequenceDiagram
   IR-->>RW: slots updated
   RW->>IR: update installed mirrors · record ReplacedUses
   RW-->>D: Ok(count)
-  D->>D: enqueue users of %r for next round
+  D->>D: push owner, producers, users of each rewritten stmt
   Note over D: pass reaches fixpoint
   D->>IR: derive expected mirrors from authoritative IR
   D->>IR: compare expected with installed mirrors
@@ -338,8 +338,8 @@ Concrete analyses may integrate through registered keys or traits. Do not make
 | **rewrite-pass contract** | A pass owns the stage exclusively, preserves operational coherence and mirrors after every successful action, and returns it only after derived verification succeeds. |
 | **rewrite pass** | One ownership-scoped mutation run. Success returns the same stage by value; any error or panic returns a diagnostic-only quarantined stage. |
 | **quarantined stage** | A non-`Clone`, non-`Default` owner of failed `StageInfo` plus cause and mutation events. It exposes diagnostic rendering but no `Deref`, `GetInfo`, or safe extraction. |
-| **rewrite plan** | An ordered command program applied to the current stage. It is not a transaction, rollback boundary, or proof of validity. |
-| **mutation event** | A structured summary of an edit, such as `ErasedStatement`, `ReplacedUses`, or `ChangedCfg`; v1 may consume it immediately for worklist scheduling. |
+| **worklist** | The queue of statements a driver sweep still has to visit. After every match and rewrite, the driver pushes the owner, the operand producers, and the result users of each statement the rewrite changed, replaced, or inserted, so a new match they now have is found in the same sweep. Example: folding `%y = arith.add %c1, %c2` into a constant pushes the users of `%y`, which may now fold too. |
+| **mutation event** | A structured summary of an edit, such as `ErasedStatement`, `ReplacedUses`, or `ChangedCfg`; the driver reads the events of each rewrite to decide what to push onto the worklist. |
 | **tombstone** | A deleted arena slot retained until a later compaction pass. |
 | **IdMap** | The old-id to new-id map returned by arena compaction/GC. |
 | **Use** | An element of the def-use index (`SSAInfo::uses`): `StatementOperand { stmt, index }` or `DiGraphYield { graph, index }`. |
@@ -357,8 +357,9 @@ that merely forbids it:
 - no `Interpretable`/stage dispatch for wildcard ops means patterns cannot run;
 - no `Identifier`, `GetInfo`, raw-id conversions, or forwarded `Display` on
   `PatternRef` means pattern ids cannot index or masquerade as concrete ids;
-- no `PatternValue` in an executable plan means unresolved wildcards cannot
-  reach mutation;
+- no `Rewriter` method accepting a `PatternValue` means unresolved wildcards
+  cannot reach mutation: the rewrite body resolves each pattern value through
+  the match before passing it on;
 - no repair method on finalized `StageInfo` means verification cannot launder a
   missed mirror update.
 
@@ -980,7 +981,7 @@ the rule stays inspectable data:
   the predicate name and its arguments; the driver resolves the body through a
   `ConstraintRegistry`.
 - **replacement compute function** `log2(?c)` — a registered function evaluated
-  during replacement planning that produces `?k`'s constant payload. Same
+  while the rewrite body runs, producing `?k`'s constant payload. Same
   registry idea, applied to *building* a value rather than *deciding*
   applicability.
 
@@ -1000,76 +1001,84 @@ intent stay inspectable; only the predicate body is native.
 
 ### Ordered Replacement Actions
 
-Rust `Vec<T>` preserves insertion order and iteration order. Therefore the
-replacement partition lowers to an ordered `Vec<RewriteAction<L>>`. For
-example, "replace all uses" must be interpreted
-before "erase the now-unused statement" when that is the declared order.
+A rule's rewrite body is an ordered list of steps. Right after a match, the
+driver runs them in that order against the in-place stage through
+`kirin_ir::Rewriter`. Order matters: "replace all uses" must run before "erase
+the now-unused statement" when that is the declared order, because erasing a
+statement whose results still have uses fails.
 
-The `kirin-rewrite` planner evaluates these actions in order against the
-in-place stage through `kirin_ir::Rewriter`. Rule construction proves every
-precondition determined by the rule's kinds and action order. The pattern (and,
-later, explicit constraints) must establish applicability; the engine does not
-build a projected per-match state to compensate for an underspecified rule. A
-native rule retains the direct fallible path and accepts quarantine as the cost
-of a late mistake.
+There is no intermediate plan between the match and the IR: each step is one
+`Rewriter` call. Today a step is one of:
 
-#### `RewritePlan` and plan-local handles
+- `replace ?old with ?new`, which calls `replace_all_uses`;
+- `erase ?op`, which calls `erase_statement` on a matched op;
+- `native_call`, a registered Rust function given `&mut Rewriter` and the
+  step's arguments; the values it returns are bound to the step's results, so
+  later steps can read them.
 
-```rust,ignore
-pub struct RewritePlan<L: Dialect> {
-    actions: Vec<RewriteAction<L>>,
-}
+The body ends in a walk result (`advance`, `skip`, `interrupt`, or
+`walk_result`) telling the driver how to go on walking.
 
-pub enum RewriteAction<L: Dialect> {
-    // M1 reference-only subset, after every PatternRef has been resolved.
-    ReplaceOperands { edits: Vec<(StatementRef, usize, ValueRef)> },
-    ReplaceAllUses { old: ValueRef, new: ValueRef },
-    ReplaceResults { stmt: StatementRef, replacements: Vec<ValueRef> },
-    EraseStatement { stmt: StatementRef },
+Rule construction (`CheckedRule::new`) proves every precondition determined by
+the rule's kinds and step order. The pattern (and, later, explicit constraints)
+must establish applicability; the engine does not build a projected per-match
+state to compensate for an underspecified rule. A native rule retains the
+direct fallible path and accepts quarantine as the cost of a late mistake.
 
-    // M4 construction subset. `definition` is an ordinary typed L value;
-    // generated remapping installs Existing/Local operand and result refs.
-    InsertBefore { anchor: StatementRef, definition: L, operands: Vec<ValueRef> },
-    InsertAfter { anchor: StatementRef, definition: L, operands: Vec<ValueRef> },
-    ReplaceStatement { stmt: StatementRef, definition: L, operands: Vec<ValueRef> },
-}
+#### From match to worklist
 
-pub enum StatementRef { Existing(Statement), Local(LocalStatement) }
-pub enum ValueRef { Existing(SSAValue), Local(LocalValue) }
+For every statement the driver pops from the worklist, it tries each rule in
+order:
+
+```text
+match the rule's pattern at stmt
+    no match -> try the next rule
+run the rewrite body's steps in order through Rewriter,
+resolving each pattern value a step reads through the match's bindings
+    each step records mutation events
+for each statement the events name as changed, replaced, or inserted:
+    push its parent statement (owner), the producers of its operands,
+    the statement itself, and the users of its results onto the worklist,
+    whichever of them are under the run's root
 ```
 
-`RewritePlan` and its existing/local handles live in `kirin-rewrite`, not
-`kirin-ir`. `LocalStatement` / `LocalValue` are plan-relative positions for
-entities that do not exist before execution; they are not wrappers around arena
-ids. Pattern ids use the distinct `PatternRef<I>` newtype in `kirin-wildcard`,
+Example: `add_zero` matches `%r = arith.add %x, %zero` and replaces `%r` with
+`%x`. Every user of `%r` now reads `%x`, so each records `ChangedOperands`.
+The driver pushes those users (they may now match another rule), the producer
+of `%x` (it has new users), and their parent statement. A statement already in
+the queue keeps its place; one visited earlier in the sweep is visited again.
+Edits that push nothing, such as erasures and CFG edits, are seen by the next
+sweep, which starts from every statement again (see
+[Mutation-aware Worklist](#mutation-aware-worklist)).
+
+Pattern ids use the distinct `PatternRef<I>` newtype in `kirin-wildcard`,
 with current aliases `PatternStatement` and `PatternValue`. `PatternRef` has
 resolution methods pinned to `StageInfo<PatternLanguage<L>>` and deliberately
-implements neither `Identifier`, `GetInfo`, raw-id conversions, nor `Display`.
+implements neither `Identifier`, `GetInfo`, raw-id conversions, nor `Display`,
+so only the match's concrete ids reach `Rewriter`.
 
 The LHS and RHS share one frozen rule arena. The LHS is the transitive producer
 closure of the rule root; the RHS is an ordered side partition of statements in
-that same arena. At lowering time, `SSAKind::Result(producer, _)` plus the
-partition determines whether each RHS operand is bound by the match or produced
-by an earlier action. Planning resolves every `PatternRef` before the first
-mutation, so the executable plan contains only `Existing` and `Local` refs.
-No separate erased template or foreign-id convention is introduced.
+that same arena. `SSAKind::Result(producer, _)` plus the partition determines
+whether each RHS operand is bound by the match or produced by an earlier step.
+A statement a step inserts gets its arena id at once, so later steps refer to
+it by that concrete id; no step-local handle is needed. No separate erased
+template or foreign-id convention is introduced.
 
-Coordinated operand edits are one atomic action. This is required for UnGraph
+Coordinated operand edits are one `Rewriter` call. This is required for UnGraph
 endpoint swaps: no sequence of single-slot edits can preserve the binary
 endpoint limit when both edges begin full. `replace_operand` is the one-edit
 case and `replace_all_uses` preflights and applies its complete edit set as one
 operation.
 
-A plan is **not** an independent clone, a rollback boundary, a proof of
+A rewrite body is **not** an independent clone, a rollback boundary, a proof of
 whole-stage validity, or an externally published event batch. "Rule did not
-match" and every resolvable reference failure must be decided before any action
-executes. Rule construction rejects an erase whose results are neither
+match" and every resolvable reference failure must be decided before the first
+step runs. Rule construction rejects an erase whose results are neither
 redirected earlier nor protected by an explicit exclusivity constraint; cleanup
-that is merely opportunistic belongs to DCE. Once mutation starts, any action
+that is merely opportunistic belongs to DCE. Once mutation starts, any step
 error quarantines the owned stage, and the driver never falls through to another
 rule against partially edited IR.
-
-The reference-only plan is tracked under [M1: Mutation Layer](#m1-mutation-layer).
 
 ---
 
@@ -1091,7 +1100,7 @@ auditing every existing rewrite rule.
 
 For v1:
 
-1. Rewrites report a changed bit and may report mutation events.
+1. Every rewrite records mutation events through `Rewriter`.
 2. The first mutation drops every cached whole-stage analysis.
 3. New whole-stage analyses run only at a later pass boundary.
 
@@ -1124,10 +1133,9 @@ that this event vocabulary belongs to mutation, not to any one analysis.
 Mutation events describe edits already made in place. They are not externally
 published commit records in v1. A failed pass quarantines the owned stage; its
 event stream may be retained inside the diagnostic object but is never
-published as a successful commit record. Mutation events are not required for the first scheduling
-baseline: a Kirin-python-style fixpoint can use a single `changed` bit and rerun
-a complete walk until no rule changes the IR. Events remain useful for naming
-affected statements and bodies for a smaller worklist and better diagnostics.
+published as a successful commit record. The driver relies on these events
+twice: each rewrite's events decide which statements go back on the worklist,
+and the fixpoint ends at the first sweep that records none.
 
 The first `AnalysisManager` must not attempt fine-grained event-to-analysis
 mapping. Its safe policy is:
@@ -1627,11 +1635,12 @@ Any future proof-aware path must discharge obligations before the first
 in-place action:
 
 ```text
-match -> proposed RewritePlan + obligations -> prove/accept -> apply via Rewriter
+match + obligations -> prove/accept -> run the rewrite body via Rewriter
+      -> push the owner, producers, and users of each rewritten statement
 ```
 
 An unproved obligation is a non-match or proof failure, not a partially applied
-plan that needs rollback.
+rewrite that needs rollback.
 
 ### In-place pass boundary
 
@@ -1640,7 +1649,9 @@ One rewrite pass owns and mutates one `StageInfo`:
 ```text
 owned StageInfo
   -> move into run_pass; drop cached analyses
-  -> ordered in-place rule/plan actions through Rewriter
+  -> for each statement popped from the worklist, for each rule that matches:
+       run its rewrite body in place through Rewriter, then push the owner,
+       producers, and users of each rewritten statement onto the worklist
   -> independently derive expected mirrors and compare them
   -> return StageInfo on success, or Quarantined<StageInfo<L>> on failure
 ```
@@ -2073,7 +2084,9 @@ individual action:
    - drop cached whole-stage analyses.
 
 2. Rewrite
-   - execute ordered actions in place through Rewriter;
+   - after each match, run the rule's rewrite body in place through
+     Rewriter, then push the owner, producers, and users of each statement
+     it changed, replaced, or inserted onto the worklist;
    - keep referential/traversal invariants;
    - allow whole-IR type, dominance, CFG, and dialect validity to be
      temporarily false;
@@ -2087,8 +2100,8 @@ individual action:
      and event log.
 ```
 
-`RewritePlan` is an ordered command program evaluated inside step 2. It is not
-a stage clone, transaction, or rollback boundary. V1 aborts the whole pass and
+A rule's rewrite body runs inside step 2, one `Rewriter` call per step, right
+after its match. It is not a stage clone, transaction, or rollback boundary. V1 aborts the whole pass and
 quarantines its owned stage on an action error after mutation. A caller that
 needs recoverable failure may explicitly clone the stage before `run_pass`.
 
@@ -2366,10 +2379,6 @@ kirin-wildcard
     Diff
 
 kirin-rewrite
-  plan
-    RewritePlan
-    LocalStatement
-    LocalValue
   matcher
     WildcardMatcher
   rule
@@ -2717,11 +2726,8 @@ legality, and dialect validity remains a separate future subsystem.
 This machinery is an M1 exit criterion, not a dependency that prevents the
 remaining action methods from landing independently.
 
-**Plans and remaining general primitives:**
+**Remaining general primitives:**
 
-- [ ] Add `RewritePlan`'s reference-only M1 subset in `kirin-rewrite`, with
-  `Existing`/`Local` handles. Pattern-qualified references remain in
-  `kirin-wildcard` and must be resolved before execution.
 - [x] Add exact-arity `replace_results`, used by CSE and other multi-result
   replacement algorithms before erasing the old statement.
 
@@ -2927,7 +2933,9 @@ This provides a Kirin-python-equivalent baseline over Kirin-rust.
 - Parse/print basic rewrite rules.
 - Match single-statement patterns.
 - Index by root op.
-- Lower the replacement partition into an ordered action plan.
+- Run the replacement partition's steps in order through `Rewriter` right
+  after each match, then push the owner, producers, and users of each
+  rewritten statement onto the worklist.
 - Generate a CSE-specific typed equality/hash projection covering operation
   kind, typed value fields, operands, and result signature; exclude result ids
   and explicitly non-semantic location/debug metadata.
