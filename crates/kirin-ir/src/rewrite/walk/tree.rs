@@ -64,6 +64,9 @@ pub(super) fn next_sibling<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) ->
             }
             first_in_bodies_after(stage, info.parent()?, Some(Body::UnGraph(graph)))
         }
+        // A module member is top-level: a walk never leaves one member for
+        // the next.
+        StatementParent::Module(_) => None,
     }
 }
 
@@ -77,6 +80,7 @@ pub(super) fn parent<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Optio
         },
         StatementParent::DiGraph(graph) => graph.get_info(stage)?.parent(),
         StatementParent::UnGraph(graph) => graph.get_info(stage)?.parent(),
+        StatementParent::Module(_) => None,
     }
 }
 

@@ -300,6 +300,18 @@ pub struct StatementIter<'a, L: Dialect> {
     stage: &'a crate::StageInfo<L>,
 }
 
+impl<'a, L: Dialect> StatementIter<'a, L> {
+    /// Iterate the statements chained in `list`.
+    pub(crate) fn over(list: LinkedList<Statement>, stage: &'a crate::StageInfo<L>) -> Self {
+        Self {
+            head: list.head,
+            tail: list.tail,
+            len: list.len,
+            stage,
+        }
+    }
+}
+
 impl<'a, L: Dialect> Iterator for StatementIter<'a, L> {
     type Item = Statement;
 

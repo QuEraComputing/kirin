@@ -1448,6 +1448,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 }
                 return;
             }
+            StatementParent::Module(_) => {
+                // A module member has no block edges or graph topology; its
+                // place in the module and the specializations naming it stand.
+                self.push_replaced(stmt, bodies_changed);
+                return;
+            }
         };
 
         // Update the predecessor mirror. Only terminators are expected to have successors.

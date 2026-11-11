@@ -158,7 +158,9 @@ pub(super) fn visited_block<L: Dialect>(
     let stmt = next.filter(|&stmt| stmt != root)?;
     match stmt.get_info(stage)?.parent? {
         StatementParent::Block(block) => Some(block),
-        StatementParent::DiGraph(_) | StatementParent::UnGraph(_) => None,
+        StatementParent::DiGraph(_) | StatementParent::UnGraph(_) | StatementParent::Module(_) => {
+            None
+        }
     }
 }
 
