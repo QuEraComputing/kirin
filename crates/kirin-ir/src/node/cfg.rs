@@ -1,4 +1,4 @@
-use crate::arena::{GetInfo, GetInfoMut, Id, Item};
+use crate::arena::{GetInfo, GetInfoMut, Item};
 use crate::{Dialect, identifier};
 
 use super::block::Block;
