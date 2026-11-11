@@ -1,6 +1,6 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedList;
-use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter};
+use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, Side};
 use crate::rewrite::walk::tree;
 use crate::{Block, Dialect, SSAValue, Statement, StatementParent};
 
@@ -27,7 +27,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Records [`MutationEvent::MovedStatement`]. A walk visiting `stmt`
     /// reports the move (see [`crate::walk`]).
     pub fn move_before(&mut self, stmt: Statement, anchor: Statement) -> Result<(), RewriteError> {
-        self.move_relative(stmt, anchor, false)
+        self.move_relative(stmt, anchor, Side::Before)
     }
 
     /// Move `stmt` to immediately after `anchor`, which may be in any block
@@ -36,14 +36,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// As [`Rewriter::move_before`], except that `anchor` must not be a
     /// terminator ([`RewriteError::AnchorIsTerminator`]): nothing follows one.
     pub fn move_after(&mut self, stmt: Statement, anchor: Statement) -> Result<(), RewriteError> {
-        self.move_relative(stmt, anchor, true)
+        self.move_relative(stmt, anchor, Side::After)
     }
 
     fn move_relative(
         &mut self,
         stmt: Statement,
         anchor: Statement,
-        after: bool,
+        side: Side,
     ) -> Result<(), RewriteError> {
         let block = {
             let item = self.live_statement(stmt)?;
@@ -57,7 +57,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         };
         // Checks the anchor; the place itself is read again once `stmt` is
         // unlinked, since `stmt` may be one of its neighbours.
-        let (_, prev, next) = self.slot_at(anchor, after)?;
+        let (_, prev, next) = self.slot_at(anchor, side)?;
         // `stmt` already borders the place (this includes `stmt == anchor`),
         // so unlinking it and linking it back would put it where it is.
         if prev == Some(stmt) || next == Some(stmt) {
@@ -75,7 +75,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
         self.unlink(stmt, block);
         let (block, prev, next) = self
-            .slot_at(anchor, after)
+            .slot_at(anchor, side)
             .expect("the anchor was checked above and moving `stmt` does not touch it");
         debug_assert!(stmt.get_info(self.stage).is_some());
         self.link(LinkedList::single(stmt), block, prev, next);
@@ -112,7 +112,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         anchor: Statement,
         arg_replacements: &[SSAValue],
     ) -> Result<(), RewriteError> {
-        self.splice_relative(source, anchor, arg_replacements, false)
+        self.splice_relative(source, anchor, arg_replacements, Side::Before)
     }
 
     /// Move every statement of `source`, except its terminator, to
@@ -127,7 +127,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         anchor: Statement,
         arg_replacements: &[SSAValue],
     ) -> Result<(), RewriteError> {
-        self.splice_relative(source, anchor, arg_replacements, true)
+        self.splice_relative(source, anchor, arg_replacements, Side::After)
     }
 
     fn splice_relative(
@@ -135,7 +135,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         source: Block,
         anchor: Statement,
         arg_replacements: &[SSAValue],
-        after: bool,
+        side: Side,
     ) -> Result<(), RewriteError> {
         let args: Vec<SSAValue> = self
             .live_block(source)?
@@ -143,7 +143,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .iter()
             .map(|&arg| arg.into())
             .collect();
-        let (dest, prev, next) = self.slot_at(anchor, after)?;
+        let (dest, prev, next) = self.slot_at(anchor, side)?;
         // Check `anchor` and every statement whose body encloses it. If one
         // of them is a statement of the block `source`, it would be spliced
         // next to or inside itself.

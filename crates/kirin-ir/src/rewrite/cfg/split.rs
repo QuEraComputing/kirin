@@ -1,4 +1,3 @@
-use crate::arena::GetInfoMut;
 use crate::node::linked_list::LinkedList;
 use crate::{Block, Dialect, Statement, StatementParent};
 
@@ -48,17 +47,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         // after the original.
         let new_block = self.create_block(cfg, Some(block), next_block, []);
         self.link(moved, new_block, None, None);
-        if let Some(terminator) = terminator
-            && let Some(info) = terminator.get_info_mut(self.stage)
-        {
-            info.parent = Some(StatementParent::Block(new_block));
-        }
-        if let Some(info) = new_block.get_info_mut(self.stage) {
-            info.terminator = terminator;
-        }
-        if let Some(info) = block.get_info_mut(self.stage) {
-            info.terminator = None;
-        }
+        self.set_terminator(new_block, terminator);
+        self.set_terminator(block, None);
 
         // The moved edges now leave from the new block; whatever stays in the
         // original block keeps its edges.

@@ -895,6 +895,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 continue;
             };
             let uses = info.uses_mut();
+            // `sites` is a subset of `uses`, so equal lengths mean every use was selected.
             if sites.len() == uses.len() {
                 uses.clear();
             } else if !sites.is_empty() {
@@ -1140,7 +1141,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         anchor: Statement,
         definition: L,
     ) -> Result<Statement, RewriteError> {
-        self.insert_relative(anchor, definition, false)
+        self.insert_relative(anchor, definition, Side::Before)
     }
 
     /// Insert `definition` as a new statement immediately after `anchor`.
@@ -1156,12 +1157,12 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         anchor: Statement,
         definition: L,
     ) -> Result<Statement, RewriteError> {
-        self.insert_relative(anchor, definition, true)
+        self.insert_relative(anchor, definition, Side::After)
     }
 
-    /// Where a statement goes when placed before (`after == false`) or after
-    /// `anchor`: its block, and the chain statements that will sit directly
-    /// before and after it (`None` at either end of the chain).
+    /// Where a statement goes when placed on `side` of `anchor`: its block,
+    /// and the chain statements that will sit directly before and after it
+    /// (`None` at either end of the chain).
     ///
     /// The terminator sits outside the chain, so a place before it is the end
     /// of the chain, and nothing can follow it ([`RewriteError::AnchorIsTerminator`]).
@@ -1169,35 +1170,36 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     pub(super) fn slot_at(
         &self,
         anchor: Statement,
-        after: bool,
+        side: Side,
     ) -> Result<(Block, Option<Statement>, Option<Statement>), RewriteError> {
         let item = self.live_statement(anchor)?;
         let block = match item.parent {
             Some(StatementParent::Block(block)) => block,
             _ => return Err(RewriteError::NotInBlockBody(anchor)),
         };
-        match (item.definition.is_terminator(), after) {
-            (true, true) => Err(RewriteError::AnchorIsTerminator(anchor)),
-            (true, false) => {
+        let (prev, next) = match (item.definition.is_terminator(), side) {
+            (true, Side::After) => return Err(RewriteError::AnchorIsTerminator(anchor)),
+            (true, Side::Before) => {
                 let tail = block
                     .get_info(self.stage)
                     .and_then(|b| b.statements.tail().copied());
                 // The tail ends the chain, so the statement becomes the tail.
                 debug_assert!(tail.is_none_or(|t| t.next(self.stage).is_none()));
-                Ok((block, tail, None))
+                (tail, None)
             }
-            (false, true) => Ok((block, Some(anchor), item.node.next)),
-            (false, false) => Ok((block, item.node.prev, Some(anchor))),
-        }
+            (false, Side::After) => (Some(anchor), item.node.next),
+            (false, Side::Before) => (item.node.prev, Some(anchor)),
+        };
+        Ok((block, prev, next))
     }
 
     fn insert_relative(
         &mut self,
         anchor: Statement,
         definition: L,
-        after: bool,
+        side: Side,
     ) -> Result<Statement, RewriteError> {
-        let (block, prev, next) = self.slot_at(anchor, after)?;
+        let (block, prev, next) = self.slot_at(anchor, side)?;
 
         if definition.is_terminator() {
             return Err(RewriteError::UnexpectedTerminator);
@@ -1575,6 +1577,13 @@ impl<L: Dialect> Rewriter<'_, L> {
                 .push(MutationEvent::ChangedBodyNesting { owner: stmt });
         }
     }
+}
+
+/// Which side of an anchor statement an edit places a statement on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Side {
+    Before,
+    After,
 }
 
 /// Old-state snapshot taken by [`Rewriter::prepare_replacement`].

@@ -68,7 +68,9 @@ pub trait WalkOrder: CursorOrder {
             let seen = rewriter.events().len();
             let place = VisitedPlace::of(rewriter.stage(), stmt);
             let result = visit(rewriter, stmt);
-            check_not_moved_since::<Self, L>(rewriter, stmt, place, seen)?;
+            if !Self::ALLOWS_ERASING_OR_MOVING_VISITED {
+                check_not_moved_since(rewriter, stmt, place, seen)?;
+            }
             // `None` on `Advance` and `Skip`, the final status on `Interrupt`.
             if let Some(status) = result.steer(&mut cursor) {
                 // The cursor checks erases and merges of the visited
@@ -83,21 +85,16 @@ pub trait WalkOrder: CursorOrder {
 }
 
 /// Fail with [`WalkError::VisitedMoved`] if an event recorded since the first
-/// `seen` events of `rewriter` moved `visited`, in an order `O` that does not
-/// allow it ([`WalkOrder::ALLOWS_ERASING_OR_MOVING_VISITED`]): a move of
-/// `visited` itself, or a splice of the block or CFG it was in at `place`
+/// `seen` events of `rewriter` moved `visited`: a move of `visited` itself, or a splice of the block or CFG it was in at `place`
 /// that took it along. A splice that left it behind, such as the terminator
 /// of a spliced block, or one that moved nothing, is not a move.
 /// Panics if `rewriter` has recorded fewer than `seen` events.
-fn check_not_moved_since<O: WalkOrder + ?Sized, L: Dialect>(
+fn check_not_moved_since<L: Dialect>(
     rewriter: &Rewriter<'_, L>,
     visited: Statement,
     place: VisitedPlace,
     seen: usize,
 ) -> Result<(), WalkError> {
-    if O::ALLOWS_ERASING_OR_MOVING_VISITED {
-        return Ok(());
-    }
     // Where `visited` is now. An erased one has no place; the cursor
     // reports its erasure.
     let now = || {

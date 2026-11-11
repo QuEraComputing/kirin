@@ -1,6 +1,6 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedList;
-use crate::{Block, Dialect, SSAValue, StatementParent};
+use crate::{Block, Dialect, SSAValue};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, remove_predecessor};
 
@@ -91,14 +91,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         };
         let pred_tail = pred.expect_info(self.stage).statements.tail;
         self.link(succ_chain, pred, pred_tail, None);
-        if let Some(terminator) = succ_terminator
-            && let Some(info) = terminator.get_info_mut(self.stage)
-        {
-            info.parent = Some(StatementParent::Block(pred));
-        }
-        if let Some(info) = pred.get_info_mut(self.stage) {
-            info.terminator = succ_terminator;
-        }
+        self.set_terminator(pred, succ_terminator);
 
         // succ is now empty: tombstoning it only removes the block and its
         // (already redirected) arguments.

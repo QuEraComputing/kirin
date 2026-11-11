@@ -24,6 +24,19 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
     }
 
+    /// Make `terminator` the terminator of `block`, with `block` as its
+    /// parent, or leave `block` with none.
+    pub(super) fn set_terminator(&mut self, block: Block, terminator: Option<Statement>) {
+        if let Some(terminator) = terminator
+            && let Some(info) = terminator.get_info_mut(self.stage)
+        {
+            info.parent = Some(StatementParent::Block(block));
+        }
+        if let Some(info) = block.get_info_mut(self.stage) {
+            info.terminator = terminator;
+        }
+    }
+
     /// The statement chain starting at `head`, following `next` links.
     pub(super) fn chain_from(&self, head: Option<Statement>) -> Vec<Statement> {
         let mut out = Vec::new();
