@@ -34,4 +34,13 @@ pub enum SortError<B> {
         expected: Sort<B>,
         found: Sort<B>,
     },
+    #[error(
+        "`{shown}` evaluates to a value of sort `{found}`, but its signature's result is `{expected}`"
+    )]
+    EvalSort {
+        term: StaticTermId,
+        shown: String,
+        expected: Sort<B>,
+        found: Sort<B>,
+    },
 }
