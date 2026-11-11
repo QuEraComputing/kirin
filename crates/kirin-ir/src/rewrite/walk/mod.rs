@@ -77,7 +77,8 @@
 //! - splicing its block's statements elsewhere with
 //!   [`Rewriter::splice_block_before`](crate::Rewriter::splice_block_before)
 //!   or [`Rewriter::splice_block_after`](crate::Rewriter::splice_block_after),
-//!   reported the same way;
+//!   reported the same way (a splice leaves the block's terminator behind, so
+//!   it is allowed while visiting the terminator);
 //! - splicing the blocks of its CFG into another CFG with
 //!   [`Rewriter::splice_cfg_after`](crate::Rewriter::splice_cfg_after),
 //!   reported the same way;

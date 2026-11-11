@@ -85,7 +85,9 @@ pub trait WalkOrder: CursorOrder {
 /// Fail with [`WalkError::VisitedMoved`] if an event recorded since the first
 /// `seen` events of `rewriter` moved `visited`, in an order `O` that does not
 /// allow it ([`WalkOrder::ALLOWS_ERASING_OR_MOVING_VISITED`]): a move of
-/// `visited` itself, or a splice of the block or CFG it was in at `place`.
+/// `visited` itself, or a splice of the block or CFG it was in at `place`
+/// that took it along. A splice that left it behind, such as the terminator
+/// of a spliced block, or one that moved nothing, is not a move.
 /// Panics if `rewriter` has recorded fewer than `seen` events.
 fn check_not_moved_since<O: WalkOrder + ?Sized, L: Dialect>(
     rewriter: &Rewriter<'_, L>,
@@ -96,10 +98,21 @@ fn check_not_moved_since<O: WalkOrder + ?Sized, L: Dialect>(
     if O::ALLOWS_ERASING_OR_MOVING_VISITED {
         return Ok(());
     }
+    // Where `visited` is now. An erased one has no place; the cursor
+    // reports its erasure.
+    let now = || {
+        visited
+            .get_info(rewriter.stage())
+            .map(|_| VisitedPlace::of(rewriter.stage(), visited))
+    };
     let moved = rewriter.events()[seen..].iter().any(|event| match *event {
         MutationEvent::MovedStatement { stmt } => stmt == visited,
-        MutationEvent::SplicedBlock { source, .. } => place.block == Some(source),
-        MutationEvent::SplicedCfg { source, .. } => place.cfg == Some(source),
+        MutationEvent::SplicedBlock { source, .. } => {
+            place.block == Some(source) && now().is_some_and(|now| now.block != place.block)
+        }
+        MutationEvent::SplicedCfg { source, .. } => {
+            place.cfg == Some(source) && now().is_some_and(|now| now.cfg != place.cfg)
+        }
         _ => false,
     });
     if moved {
@@ -110,9 +123,9 @@ fn check_not_moved_since<O: WalkOrder + ?Sized, L: Dialect>(
 }
 
 /// Where a visited statement was when its visit started: its block, and that
-/// block's CFG. [`check_not_moved_since`] compares splices against it, since
-/// a splice changes both: afterwards, a statement spliced into a block, or a
-/// block spliced into a CFG, cannot be told from one that was there already.
+/// block's CFG. [`check_not_moved_since`] needs it for splices: it names the
+/// splices that could have moved the statement, and comparing it with where
+/// the statement is afterwards tells whether one did.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 struct VisitedPlace {
     block: Option<Block>,

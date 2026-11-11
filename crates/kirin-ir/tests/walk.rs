@@ -881,6 +881,50 @@ fn splicing_the_visited_statements_block_breaks_link_following_walks() {
     }
 }
 
+/// Walks `O` over [`tree`] and, while visiting `then_ret`, splices the `then`
+/// block's statements before `owner`. `then_ret` is that block's terminator,
+/// so the splice does not move it.
+///
+/// If `empty_first` is true, the block's statements are spliced away once
+/// before the walk, so the splice during the walk moves nothing.
+///
+/// Returns the walk's schedule taken before the walk starts, and what the
+/// walk returned: the statements it visited, or its error.
+fn splice_then_arm_while_visiting_its_terminator<O: WalkOrder>(
+    empty_first: bool,
+) -> (Vec<Statement>, Result<Vec<Statement>, WalkError>) {
+    let mut t = tree();
+    let (then_ret, owner) = (t.then_ret, t.owner);
+    let then_block = block_of(&t.stage, then_ret);
+    if empty_first {
+        Rewriter::new(&mut t.stage)
+            .splice_block_before(then_block, owner, &[])
+            .unwrap();
+    }
+    let schedule = O::schedule(&t.stage, t.root);
+    let result = walk_editing::<O>(&mut t.stage, t.root, |rewriter, stmt| {
+        if stmt == then_ret {
+            rewriter
+                .splice_block_before(then_block, owner, &[])
+                .unwrap();
+        }
+    });
+    (schedule, result)
+}
+
+#[test]
+fn splicing_the_visited_terminators_block_keeps_the_walk() {
+    for empty_first in [false, true] {
+        for (schedule, result) in [
+            splice_then_arm_while_visiting_its_terminator::<PreOrder>(empty_first),
+            splice_then_arm_while_visiting_its_terminator::<PostOrder>(empty_first),
+            splice_then_arm_while_visiting_its_terminator::<BFS>(empty_first),
+        ] {
+            assert_eq!(result.unwrap(), schedule);
+        }
+    }
+}
+
 #[test]
 fn reverse_bfs_orders_go_on_after_the_visited_statements_block_is_spliced() {
     let t = tree();
