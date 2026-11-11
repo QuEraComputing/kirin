@@ -56,7 +56,7 @@ macro_rules! identifier {
         $(#[$attr])*
         #[derive(Clone, Copy, Hash, PartialEq, Eq)]
         #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-        pub struct $name(pub(crate) Id);
+        pub struct $name(pub(crate) $crate::Id);
 
         // Name(id) instead of the default Name(Id(id))
         impl std::fmt::Debug for $name {
@@ -65,18 +65,18 @@ macro_rules! identifier {
             }
         }
 
-        impl From<Id> for $name {
-            fn from(value: Id) -> Self {
+        impl From<$crate::Id> for $name {
+            fn from(value: $crate::Id) -> Self {
                 Self(value)
             }
         }
 
-        impl From<$name> for Id {
+        impl From<$name> for $crate::Id {
             fn from(value: $name) -> Self {
                 value.0
             }
         }
 
-        impl $crate::arena::Identifier for $name {}
+        impl $crate::Identifier for $name {}
     };
 }

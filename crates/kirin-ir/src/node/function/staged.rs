@@ -1,5 +1,5 @@
 use crate::Product;
-use crate::arena::{GetInfo, GetInfoMut, Id, Item};
+use crate::arena::{GetInfo, GetInfoMut, Item};
 use crate::identifier;
 use crate::language::Dialect;
 use crate::signature::{HasSignature, Signature, SignatureCmp, SignatureSemantics};
