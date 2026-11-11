@@ -1,59 +1,10 @@
 use crate::arena::{GetInfo, GetInfoMut};
-use crate::{DiGraph, DiGraphInfo, Dialect, SSAValue, Statement, StatementParent, Use};
+use crate::{DiGraph, DiGraphInfo, Dialect, SSAValue, Statement, Use};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, add_use, remove_use};
 
-/// Adding, erasing, and tombstoning `DiGraph` members, and editing yields.
+/// Erasing and tombstoning `DiGraph` members, and editing yields.
 impl<'a, L: Dialect> Rewriter<'a, L> {
-    /// Add `definition` to `graph` as a new member statement and node.
-    ///
-    /// `definition` must be a non-terminator (a `DiGraph` has none) with no
-    /// successors (only a terminator may transfer control). Every
-    /// operand must be live, and every result a fresh
-    /// [`Rewriter::new_result`] value, which becomes a result of the new
-    /// statement. Each operand slot reading a result of another member gets an
-    /// edge from that member; operands from outside the graph get none.
-    ///
-    /// Rejects, leaving the stage untouched, if `graph` is unknown, or
-    /// `definition` is a terminator or fails the operand/result checks.
-    /// Records [`MutationEvent::InsertedStatement`] then
-    /// [`MutationEvent::ChangedDiGraphTopology`].
-    pub fn insert_node(
-        &mut self,
-        graph: DiGraph,
-        definition: L,
-    ) -> Result<Statement, RewriteError> {
-        self.live_digraph(graph)?;
-        if definition.is_terminator() {
-            return Err(RewriteError::UnexpectedTerminator);
-        }
-        if definition.successors().next().is_some() {
-            return Err(RewriteError::NonTerminatorWithSuccessors);
-        }
-        let (results, operands) = self.prepare_insert(&definition)?;
-
-        let stmt = self.alloc_statement(
-            definition,
-            StatementParent::DiGraph(graph),
-            None,
-            None,
-            results,
-            &operands,
-        );
-        graph
-            .get_info_mut(self.stage)
-            .expect("graph is live in this stage")
-            .add_node(stmt);
-        for &operand in &operands {
-            self.add_operand_edge(graph, stmt, operand);
-        }
-
-        self.events.push(MutationEvent::InsertedStatement { stmt });
-        self.events
-            .push(MutationEvent::ChangedDiGraphTopology { graph });
-        Ok(stmt)
-    }
-
     /// The `DiGraph` arm of [`Rewriter::erase_statement`]: `stmt` is a live
     /// member of `graph`.
     pub(in crate::rewrite) fn erase_digraph_member(

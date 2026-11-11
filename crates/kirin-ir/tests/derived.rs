@@ -360,7 +360,7 @@ fn insert_before_keeps_the_use_index_in_step() {
     let inserted = {
         let mut rewriter = Rewriter::new(&mut f.stage);
         rewriter
-            .insert_before(f.consumer, BuilderDialect::Use(y))
+            .create(InsertionPoint::Before(f.consumer), BuilderDialect::Use(y))
             .unwrap()
     };
 
@@ -380,7 +380,7 @@ fn insert_after_keeps_the_use_index_in_step() {
     let inserted = {
         let mut rewriter = Rewriter::new(&mut f.stage);
         rewriter
-            .insert_after(f.add, BuilderDialect::Use(y))
+            .create(InsertionPoint::After(f.add), BuilderDialect::Use(y))
             .unwrap()
     };
 
@@ -415,10 +415,11 @@ fn replace_statement_keeps_the_use_index_in_step() {
 // ---------------------------------------------------------------------------
 // Predecessors mirror
 //
-// `replace_statement` is the only method that can change a control-flow edge.
-// The operand-rewriting methods write through `arguments_mut()`, which yields
-// `&mut SSAValue` and so cannot reach a `Successor`; `erase_statement` rejects
-// terminators, and the `insert_*` methods never insert one.
+// These tests cover `replace_statement`, which rewrites a terminator's edges in
+// place. The operand-rewriting methods write through `arguments_mut()`, which
+// yields `&mut SSAValue` and so cannot reach a `Successor`. The other edge
+// edits (erasing a terminator, `InsertionPoint::Terminator`,
+// `retarget_successor`, merging blocks) are tested in `rewriter_cfg.rs`.
 // ---------------------------------------------------------------------------
 
 #[test]
@@ -680,7 +681,7 @@ fn insert_before_keeps_the_block_body_in_step() {
     let inserted = {
         let mut rewriter = Rewriter::new(&mut f.stage);
         rewriter
-            .insert_before(f.first, BuilderDialect::Nop)
+            .create(InsertionPoint::Before(f.first), BuilderDialect::Nop)
             .unwrap()
     };
 
@@ -697,7 +698,9 @@ fn insert_after_keeps_the_block_body_in_step() {
 
     let inserted = {
         let mut rewriter = Rewriter::new(&mut f.stage);
-        rewriter.insert_after(f.last, BuilderDialect::Nop).unwrap()
+        rewriter
+            .create(InsertionPoint::After(f.last), BuilderDialect::Nop)
+            .unwrap()
     };
 
     assert_eq!(
@@ -714,7 +717,7 @@ fn insert_before_the_terminator_keeps_the_block_body_in_step() {
     let inserted = {
         let mut rewriter = Rewriter::new(&mut f.stage);
         rewriter
-            .insert_before(f.terminator, BuilderDialect::Nop)
+            .create(InsertionPoint::Before(f.terminator), BuilderDialect::Nop)
             .unwrap()
     };
 
@@ -736,7 +739,7 @@ fn insert_after_the_terminator_leaves_the_block_body_intact() {
         let mut rewriter = Rewriter::new(&mut f.stage);
         // Nothing can follow a terminator.
         assert_eq!(
-            rewriter.insert_after(f.terminator, BuilderDialect::Nop),
+            rewriter.create(InsertionPoint::After(f.terminator), BuilderDialect::Nop),
             Err(RewriteError::AnchorIsTerminator(f.terminator))
         );
     }

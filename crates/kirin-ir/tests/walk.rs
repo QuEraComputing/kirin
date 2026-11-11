@@ -245,7 +245,7 @@ fn pre_order_walks_children_inserted_while_visiting() {
         if stmt == owner {
             inserted = Some(
                 rewriter
-                    .insert_before(then_ret, BuilderDialect::Nop)
+                    .create(InsertionPoint::Before(then_ret), BuilderDialect::Nop)
                     .unwrap(),
             );
         }
@@ -267,7 +267,11 @@ fn post_order_walks_siblings_inserted_after_the_visited_statement() {
     let mut inserted = None;
     let visited = walk_editing::<PostOrder>(&mut t.stage, t.root, |rewriter, stmt| {
         if stmt == a {
-            inserted = Some(rewriter.insert_after(a, BuilderDialect::Nop).unwrap());
+            inserted = Some(
+                rewriter
+                    .create(InsertionPoint::After(a), BuilderDialect::Nop)
+                    .unwrap(),
+            );
         }
     })
     .unwrap();
@@ -281,7 +285,9 @@ fn visits_with_insert_after_a<O: WalkOrder>() -> usize {
     let a = t.a;
     walk_editing::<O>(&mut t.stage, t.root, |rewriter, stmt| {
         if stmt == a {
-            rewriter.insert_after(a, BuilderDialect::Nop).unwrap();
+            rewriter
+                .create(InsertionPoint::After(a), BuilderDialect::Nop)
+                .unwrap();
         }
     })
     .unwrap()
@@ -329,12 +335,24 @@ fn bfs_walks_statements_inserted_at_the_current_level_and_below() {
     let visited = walk_editing::<BFS>(&mut stage, root, |rewriter, stmt| {
         if stmt == a {
             // Ahead of the cursor at the current level, and one level down.
-            n = Some(rewriter.insert_after(b, BuilderDialect::Nop).unwrap());
-            z = Some(rewriter.insert_after(x, BuilderDialect::Nop).unwrap());
+            n = Some(
+                rewriter
+                    .create(InsertionPoint::After(b), BuilderDialect::Nop)
+                    .unwrap(),
+            );
+            z = Some(
+                rewriter
+                    .create(InsertionPoint::After(x), BuilderDialect::Nop)
+                    .unwrap(),
+            );
         }
         if stmt == y {
             // At a level that is already finished.
-            h = Some(rewriter.insert_after(a, BuilderDialect::Nop).unwrap());
+            h = Some(
+                rewriter
+                    .create(InsertionPoint::After(a), BuilderDialect::Nop)
+                    .unwrap(),
+            );
         }
     })
     .unwrap();
@@ -606,7 +624,7 @@ fn skip_after_inserting<O: WalkOrder>() -> (Tree, Statement, Vec<Statement>) {
         }
         inserted = Some(
             rewriter
-                .insert_before(then_ret, BuilderDialect::Nop)
+                .create(InsertionPoint::Before(then_ret), BuilderDialect::Nop)
                 .unwrap(),
         );
         WalkResult::Skip
