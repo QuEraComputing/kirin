@@ -16,7 +16,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// for the caller to branch to.
     ///
     /// Rejects, leaving the stage untouched, if `source` is unknown
-    /// ([`RewriteError::UnknownCfg`]), if `anchor` is unknown or not in a CFG
+    /// ([`RewriteError::UnknownCfg`]), if `anchor` is unknown
+    /// ([`RewriteError::UnknownBlock`]) or not in a CFG
     /// ([`RewriteError::NotInCfgBody`]), or if `anchor` is in `source` or
     /// nested in one of its blocks ([`RewriteError::CfgSplicedIntoItself`]).
     ///

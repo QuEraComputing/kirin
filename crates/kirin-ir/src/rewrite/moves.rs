@@ -19,9 +19,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// `stmt`'s results still comes after it.
     ///
     /// Rejects, leaving the stage untouched, if `stmt` or `anchor` is unknown
-    /// or not in a block body ([`RewriteError::NotInBlockBody`]), if `stmt` is
-    /// a terminator ([`RewriteError::UnexpectedTerminator`]), or if `anchor` is
-    /// nested in `stmt`'s own bodies ([`RewriteError::MovedIntoItself`]).
+    /// ([`RewriteError::UnknownStatement`]) or not in a block body
+    /// ([`RewriteError::NotInBlockBody`]), if `stmt` is a terminator
+    /// ([`RewriteError::UnexpectedTerminator`]), or if `anchor` is nested in
+    /// `stmt`'s own bodies ([`RewriteError::MovedIntoItself`]).
     ///
     /// Records [`MutationEvent::MovedStatement`]. A walk visiting `stmt`
     /// reports the move (see [`crate::walk`]).
@@ -93,13 +94,14 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// means at the end of that block's statement chain. A replacement may be
     /// one of `source`'s own arguments.
     ///
-    /// Rejects, leaving the stage untouched, if `source` or `anchor` is
-    /// unknown, if `anchor` is not in a block body
+    /// Rejects, leaving the stage untouched, if `source` is unknown
+    /// ([`RewriteError::UnknownBlock`]), if `anchor` is unknown
+    /// ([`RewriteError::UnknownStatement`]) or not in a block body
     /// ([`RewriteError::NotInBlockBody`]), if `anchor` is in `source` or
     /// nested in one of its statements ([`RewriteError::SplicedIntoItself`]),
     /// if the replacement count differs from `source`'s argument count
     /// ([`RewriteError::BlockArgumentArityMismatch`]), or if a replacement is
-    /// not live.
+    /// not live ([`RewriteError::UnknownValue`]).
     ///
     /// Records the [`Rewriter::replace_all_uses`] events for the argument
     /// redirection, then [`MutationEvent::SplicedBlock`]. A walk visiting a
