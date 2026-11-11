@@ -8,6 +8,9 @@ pub mod parser;
 #[cfg(feature = "roundtrip")]
 pub mod roundtrip;
 
+#[cfg(feature = "types")]
+pub mod types;
+
 pub use kirin_test_types::UnitType;
 pub use rustfmt::{rustfmt, rustfmt_display};
 pub use ssa::new_test_ssa;
