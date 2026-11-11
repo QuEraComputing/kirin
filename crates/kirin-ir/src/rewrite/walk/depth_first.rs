@@ -3,7 +3,7 @@
 use super::order::{CursorOrder, Position, WalkCursor};
 use super::tree::{first_child, next_sibling, parent};
 use super::{WalkError, WalkOrder};
-use crate::{Block, Dialect, GetInfo, StageInfo, Statement, StatementParent};
+use crate::{Dialect, GetInfo, StageInfo, Statement};
 
 /// Depth-first, each statement before the statements nested in it.
 #[derive(Clone, Copy, Debug, Default)]
@@ -18,8 +18,6 @@ pub struct PostOrder;
 pub(crate) struct PreOrderCursor {
     root: Statement,
     position: Position,
-    /// The block the visited statement was in when visited.
-    visited_block: Option<Block>,
 }
 
 /// A [`PostOrder`] walk in progress.
@@ -27,8 +25,6 @@ pub(crate) struct PreOrderCursor {
 pub(crate) struct PostOrderCursor {
     root: Statement,
     position: Position,
-    /// The block the visited statement was in when visited.
-    visited_block: Option<Block>,
 }
 
 impl WalkOrder for PreOrder {
@@ -42,7 +38,6 @@ impl CursorOrder for PreOrder {
         PreOrderCursor {
             root,
             position: Position::Start,
-            visited_block: None,
         }
     }
 }
@@ -58,14 +53,12 @@ impl CursorOrder for PostOrder {
         PostOrderCursor {
             root,
             position: Position::Start,
-            visited_block: None,
         }
     }
 }
 
 impl WalkCursor for PreOrderCursor {
-    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError> {
-        self.check_visited(stage)?;
+    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Option<Statement> {
         let next = match self.position {
             Position::Start => live(stage, self.root),
             Position::At(visited) => {
@@ -77,12 +70,16 @@ impl WalkCursor for PreOrderCursor {
             Position::Done => None,
         };
         self.position = next.map_or(Position::Done, Position::At);
-        self.visited_block = visited_block(stage, next);
-        Ok(next)
+        next
     }
 
-    fn check_visited<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError> {
-        check_in_place(stage, self.position, self.visited_block)
+    fn check_erasure<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError> {
+        match self.position.visited() {
+            Some(visited) if visited.get_info(stage).is_none() => {
+                Err(WalkError::VisitedErased(visited))
+            }
+            _ => Ok(()),
+        }
     }
 
     fn skip(&mut self) {
@@ -91,8 +88,7 @@ impl WalkCursor for PreOrderCursor {
 }
 
 impl WalkCursor for PostOrderCursor {
-    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError> {
-        self.check_visited(stage)?;
+    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Option<Statement> {
         let next = match self.position {
             Position::Start => live(stage, self.root).map(|root| deepest_first(stage, root)),
             // Never `Skipped`: `skip` does nothing in this order.
@@ -108,12 +104,16 @@ impl WalkCursor for PostOrderCursor {
             Position::Done => None,
         };
         self.position = next.map_or(Position::Done, Position::At);
-        self.visited_block = visited_block(stage, next);
-        Ok(next)
+        next
     }
 
-    fn check_visited<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError> {
-        check_in_place(stage, self.position, self.visited_block)
+    fn check_erasure<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError> {
+        match self.position.visited() {
+            Some(visited) if visited.get_info(stage).is_none() => {
+                Err(WalkError::VisitedErased(visited))
+            }
+            _ => Ok(()),
+        }
     }
 
     /// Nothing to skip: the children were visited before the statement.
@@ -123,54 +123,6 @@ impl WalkCursor for PostOrderCursor {
 /// `stmt` if it is live.
 pub(super) fn live<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Option<Statement> {
     stmt.get_info(stage).map(|_| stmt)
-}
-
-/// Fail if the statement just visited was erased.
-fn check_live<L: Dialect>(stage: &StageInfo<L>, visited: Statement) -> Result<(), WalkError> {
-    live(stage, visited)
-        .map(|_| ())
-        .ok_or(WalkError::VisitedErased(visited))
-}
-
-/// Fail if the statement the cursor is at was erased, or moved by merging
-/// `block`, the block it was in when visited, into another block. Nothing to
-/// check before the first step or after the last.
-fn check_in_place<L: Dialect>(
-    stage: &StageInfo<L>,
-    position: Position,
-    block: Option<Block>,
-) -> Result<(), WalkError> {
-    let Some(visited) = position.visited() else {
-        return Ok(());
-    };
-    check_live(stage, visited)?;
-    check_not_moved(stage, visited, block)
-}
-
-/// Fail if the live statement just visited left `block`, the block it was
-/// in when visited, because `block` was merged into another block. Only a
-/// merge erases a block and keeps its statements, and splitting a block
-/// keeps the original live, so a split passes.
-pub(super) fn check_not_moved<L: Dialect>(
-    stage: &StageInfo<L>,
-    visited: Statement,
-    block: Option<Block>,
-) -> Result<(), WalkError> {
-    match block {
-        Some(block) if block.get_info(stage).is_none() => Err(WalkError::VisitedMoved(visited)),
-        _ => Ok(()),
-    }
-}
-
-/// The block `next` is in, for [`check_not_moved`] at the next step.
-pub(super) fn visited_block<L: Dialect>(
-    stage: &StageInfo<L>,
-    next: Option<Statement>,
-) -> Option<Block> {
-    match next?.get_info(stage)?.parent? {
-        StatementParent::Block(block) => Some(block),
-        StatementParent::DiGraph(_) | StatementParent::UnGraph(_) => None,
-    }
 }
 
 /// The first statement after `stmt`'s subtree within `root`'s: the next

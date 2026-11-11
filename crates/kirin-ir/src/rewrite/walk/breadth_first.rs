@@ -7,11 +7,11 @@
 
 use std::collections::VecDeque;
 
-use super::depth_first::{check_not_moved, live, visited_block};
+use super::depth_first::live;
 use super::order::{CursorOrder, Position, WalkCursor};
 use super::tree::{append_children, first_child, next_sibling, owns_bodies};
 use super::{WalkError, WalkOrder};
-use crate::{Block, Dialect, GetInfo, StageInfo, Statement};
+use crate::{Dialect, GetInfo, StageInfo, Statement};
 
 /// Breadth-first by nesting depth: the root, then every statement nested
 /// directly in it, then every statement nested two levels down, and so on.
@@ -60,8 +60,6 @@ pub(crate) struct BFSCursor {
     /// its own parent is at the front, so every parent of one level is queued
     /// before any of the next.
     parents: VecDeque<Statement>,
-    /// The block the visited statement was in when visited.
-    visited_block: Option<Block>,
 }
 
 /// A [`ReverseBFS`] or [`KeepOrderReverseBFS`] walk in progress: the order
@@ -90,20 +88,18 @@ impl CursorOrder for BFS {
             root,
             position: Position::Start,
             parents: VecDeque::new(),
-            visited_block: None,
         }
     }
 }
 
 impl WalkCursor for BFSCursor {
-    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError> {
-        self.check_visited(stage)?;
+    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Option<Statement> {
         let next = match self.position {
             Position::Start => live(stage, self.root),
             Position::At(visited) | Position::Skipped(visited) => {
-                // Erased with an ancestor, which `check_visited` allowed.
+                // Erased with an ancestor, which `check_erasure` allowed.
                 if visited.get_info(stage).is_none() {
-                    return Ok(self.after_parent_erased(stage));
+                    return self.after_parent_erased(stage);
                 }
                 // Queue it as a parent for the next level, whose statements
                 // are its children. Statements without bodies have none,
@@ -131,24 +127,19 @@ impl WalkCursor for BFSCursor {
             Position::Done => None,
         };
         self.position = next.map_or(Position::Done, Position::At);
-        self.visited_block = visited_block(stage, next);
-        Ok(next)
+        next
     }
 
-    /// A live visited statement must still be in its block: merging that
-    /// block into another moves it, and the walk would go on from its new
-    /// place. Moves and splices leave its block alive, so only
-    /// [`WalkOrder::walk_mut`](super::WalkOrder::walk_mut) catches them.
-    ///
-    /// An erased one is allowed only if erased together with an ancestor,
-    /// which kills the front parent: its remaining children are then dead
-    /// too. Erasing it alone would leave its siblings live but unreachable.
-    fn check_visited<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError> {
+    /// An erased visited statement is allowed only if erased together with
+    /// an ancestor, which kills the front parent: its remaining children are
+    /// then dead too. Erasing it alone would leave its siblings live but
+    /// unreachable.
+    fn check_erasure<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError> {
         let Some(visited) = self.position.visited() else {
             return Ok(());
         };
         if visited.get_info(stage).is_some() {
-            return check_not_moved(stage, visited, self.visited_block);
+            return Ok(());
         }
         let parent_erased = visited != self.root
             && self
@@ -176,7 +167,6 @@ impl BFSCursor {
         // drops them.
         let next = self.first_child_of_next_parent(stage);
         self.position = next.map_or(Position::Done, Position::At);
-        self.visited_block = visited_block(stage, next);
         next
     }
 
@@ -245,21 +235,21 @@ impl BuiltOrderCursor {
 }
 
 impl WalkCursor for BuiltOrderCursor {
-    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError> {
+    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Option<Statement> {
         // Return the next statement still live, skipping any erased since the
         // order was built.
         while let Some(&stmt) = self.ordered_nodes.get(self.next) {
             self.next += 1;
             if stmt.get_info(stage).is_some() {
-                return Ok(Some(stmt));
+                return Some(stmt);
             }
         }
-        Ok(None)
+        None
     }
 
     /// Nothing to check: the order was built at the start, so a visit may
     /// erase or move the visited statement.
-    fn check_visited<L: Dialect>(&self, _stage: &StageInfo<L>) -> Result<(), WalkError> {
+    fn check_erasure<L: Dialect>(&self, _stage: &StageInfo<L>) -> Result<(), WalkError> {
         Ok(())
     }
 
