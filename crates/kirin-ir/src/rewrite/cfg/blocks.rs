@@ -70,7 +70,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         self.check_no_outside_predecessors(block, &[block])?;
         self.check_no_outside_uses(block)?;
 
-        self.unlink_block(cfg, block);
+        self.unlink(block, cfg);
         self.tombstone_block(block);
 
         self.events.push(MutationEvent::ChangedBlockList { cfg });

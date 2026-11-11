@@ -3,7 +3,7 @@ use std::collections::HashSet;
 use smallvec::SmallVec;
 
 use crate::arena::{GetInfo, GetInfoMut};
-use crate::node::linked_list::LinkedListNode;
+use crate::node::linked_list::{LinkedList, LinkedListNode};
 use crate::{
     Block, BlockArgument, BlockInfo, BlockParent, CFG, Dialect, SSAInfo, SSAKind, SSAValue,
     Statement, StatementParent, Use,
@@ -21,6 +21,19 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         match self.live_block(block)?.parent {
             Some(BlockParent::CFG(cfg)) => Ok(cfg),
             _ => Err(RewriteError::NotInCfgBody(block)),
+        }
+    }
+
+    /// Make `terminator` the terminator of `block`, with `block` as its
+    /// parent, or leave `block` with none.
+    pub(super) fn set_terminator(&mut self, block: Block, terminator: Option<Statement>) {
+        if let Some(terminator) = terminator
+            && let Some(info) = terminator.get_info_mut(self.stage)
+        {
+            info.parent = Some(StatementParent::Block(block));
+        }
+        if let Some(info) = block.get_info_mut(self.stage) {
+            info.terminator = terminator;
         }
     }
 
@@ -203,11 +216,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         let block = self.stage.nodes.blocks.alloc_with_id(|id| {
             BlockInfo::builder()
                 .parent(BlockParent::CFG(cfg))
-                .node(LinkedListNode {
-                    ptr: id,
-                    next,
-                    prev,
-                })
+                .node(LinkedListNode::new(id))
                 .arguments(Vec::new())
                 .predecessors(SmallVec::new())
                 .new()
@@ -221,72 +230,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             info.arguments = args;
         }
 
-        match prev {
-            Some(p) => {
-                if let Some(info) = p.get_info_mut(self.stage) {
-                    info.node.next = Some(block);
-                }
-            }
-            None => {
-                if let Some(info) = cfg.get_info_mut(self.stage) {
-                    info.blocks.head = Some(block);
-                }
-            }
-        }
-        match next {
-            Some(n) => {
-                if let Some(info) = n.get_info_mut(self.stage) {
-                    info.node.prev = Some(block);
-                }
-            }
-            None => {
-                if let Some(info) = cfg.get_info_mut(self.stage) {
-                    info.blocks.tail = Some(block);
-                }
-            }
-        }
-        if let Some(info) = cfg.get_info_mut(self.stage) {
-            info.blocks.len += 1;
-        }
+        self.link(LinkedList::single(block), cfg, prev, next);
 
         self.events.push(MutationEvent::ChangedBlockList { cfg });
         block
-    }
-
-    /// Unlink `block` from `cfg`'s block list, clearing its own links.
-    pub(super) fn unlink_block(&mut self, cfg: CFG, block: Block) {
-        let node = block.expect_info(self.stage).node;
-        let (prev, next) = (node.prev, node.next);
-        match prev {
-            Some(p) => {
-                if let Some(info) = p.get_info_mut(self.stage) {
-                    info.node.next = next;
-                }
-            }
-            None => {
-                if let Some(info) = cfg.get_info_mut(self.stage) {
-                    info.blocks.head = next;
-                }
-            }
-        }
-        match next {
-            Some(n) => {
-                if let Some(info) = n.get_info_mut(self.stage) {
-                    info.node.prev = prev;
-                }
-            }
-            None => {
-                if let Some(info) = cfg.get_info_mut(self.stage) {
-                    info.blocks.tail = prev;
-                }
-            }
-        }
-        if let Some(info) = cfg.get_info_mut(self.stage) {
-            info.blocks.len -= 1;
-        }
-        if let Some(info) = block.get_info_mut(self.stage) {
-            info.node.prev = None;
-            info.node.next = None;
-        }
     }
 }

@@ -7,16 +7,34 @@
 
 use std::collections::VecDeque;
 
-use super::depth_first::{check_not_moved, live, visited_block};
-use super::order::Position;
+use super::depth_first::live;
+use super::order::{CursorOrder, Position, WalkCursor};
 use super::tree::{append_children, first_child, next_sibling, owns_bodies};
-use super::{WalkCursor, WalkError, WalkOrder};
-use crate::{Block, Dialect, GetInfo, StageInfo, Statement};
+use super::{WalkError, WalkOrder};
+use crate::{Dialect, GetInfo, StageInfo, Statement};
 
 /// Breadth-first by nesting depth: the root, then every statement nested
 /// directly in it, then every statement nested two levels down, and so on.
 /// Each level is in program order.
-/// See [`BFSCursor`] for how edits affect discovery during a walk.
+///
+/// When the walk moves on from a visited statement, it queues that statement
+/// as a parent for the next level only if it owns bodies and was not skipped.
+/// At the next level, it walks each queued parent's bodies in turn, reading
+/// their current links. Inserts ahead of the walk in those bodies are
+/// visited.
+///
+/// The walk does not revisit bodies it has passed or reconsider statements
+/// it did not queue as parents. For example, if a leaf gains a body after the
+/// walk has moved on from it, that body and its descendants are not visited.
+/// Likewise, a subtree inserted behind the walk is not discovered, even if
+/// its descendants lie at depths the walk has not reached. Such edits are
+/// allowed by the walk contract; visiting them requires another walk.
+///
+/// A visit may erase an ancestor of the visited statement, and with it the
+/// visited statement and its siblings: the walk goes on with the next queued
+/// parent outside the erased subtree. Erasing the visited statement alone is
+/// an error, because its siblings are still live but can no longer be
+/// reached.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct BFS;
 
@@ -32,28 +50,9 @@ pub struct ReverseBFS;
 #[derive(Clone, Copy, Debug, Default)]
 pub struct KeepOrderReverseBFS;
 
-/// A [`BFS`] walk in progress.
-///
-/// When the cursor moves on from a visited statement, it queues that statement
-/// as a parent for the next level only if it owns bodies and was not skipped.
-/// At the next level, the cursor walks each queued parent's bodies in turn,
-/// reading their current links. Inserts ahead of the cursor in those bodies
-/// are visited.
-///
-/// The cursor does not revisit bodies it has passed or reconsider statements
-/// it did not queue as parents. For example, if a leaf gains a body after the
-/// cursor has moved on from it, that body and its descendants are not visited.
-/// Likewise, a subtree inserted behind the cursor is not discovered, even if
-/// its descendants lie at depths the walk has not reached. Such edits are
-/// allowed by the walk contract; visiting them requires another walk.
-///
-/// A visit may erase an ancestor of the visited statement, and with it the
-/// visited statement and its siblings: the walk goes on with the next queued
-/// parent outside the erased subtree. Erasing the visited statement alone is
-/// an error, because its siblings are still live but can no longer be
-/// reached.
+/// A [`BFS`] walk in progress; see [`BFS`] for how edits affect discovery.
 #[derive(Clone, Debug)]
-pub struct BFSCursor {
+pub(crate) struct BFSCursor {
     root: Statement,
     position: Position,
     /// The visited statements that own bodies, oldest first. The front is the
@@ -61,8 +60,6 @@ pub struct BFSCursor {
     /// its own parent is at the front, so every parent of one level is queued
     /// before any of the next.
     parents: VecDeque<Statement>,
-    /// The block the visited statement was in when visited.
-    visited_block: Option<Block>,
 }
 
 /// A [`ReverseBFS`] or [`KeepOrderReverseBFS`] walk in progress: the order
@@ -73,35 +70,37 @@ pub struct BFSCursor {
 /// visited statement and its ancestors: the cursor never reads the visited
 /// statement's links, so a visit may erase them.
 #[derive(Clone, Debug)]
-pub struct BuiltOrderCursor {
+pub(crate) struct BuiltOrderCursor {
     ordered_nodes: Vec<Statement>,
     /// The index of the next statement to consider.
     next: usize,
 }
 
 impl WalkOrder for BFS {
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool = false;
+}
+
+impl CursorOrder for BFS {
     type Cursor = BFSCursor;
-    const ALLOWS_ERASING_VISITED: bool = false;
 
     fn start<L: Dialect>(_stage: &StageInfo<L>, root: Statement) -> Self::Cursor {
         BFSCursor {
             root,
             position: Position::Start,
             parents: VecDeque::new(),
-            visited_block: None,
         }
     }
 }
 
 impl WalkCursor for BFSCursor {
-    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError> {
+    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Option<Statement> {
         let next = match self.position {
             Position::Start => live(stage, self.root),
             Position::At(visited) | Position::Skipped(visited) => {
+                // Erased with an ancestor, which `check_erasure` allowed.
                 if visited.get_info(stage).is_none() {
-                    return self.after_erased(stage, visited);
+                    return self.after_parent_erased(stage);
                 }
-                check_not_moved(stage, visited, self.visited_block)?;
                 // Queue it as a parent for the next level, whose statements
                 // are its children. Statements without bodies have none,
                 // and a skipped statement's are not walked.
@@ -128,8 +127,30 @@ impl WalkCursor for BFSCursor {
             Position::Done => None,
         };
         self.position = next.map_or(Position::Done, Position::At);
-        self.visited_block = visited_block(stage, self.root, next);
-        Ok(next)
+        next
+    }
+
+    /// An erased visited statement is allowed only if erased together with
+    /// an ancestor, which kills the front parent: its remaining children are
+    /// then dead too. Erasing it alone would leave its siblings live but
+    /// unreachable.
+    fn check_erasure<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError> {
+        let Some(visited) = self.position.visited() else {
+            return Ok(());
+        };
+        if visited.get_info(stage).is_some() {
+            return Ok(());
+        }
+        let parent_erased = visited != self.root
+            && self
+                .parents
+                .front()
+                .is_some_and(|&parent| parent.get_info(stage).is_none());
+        if parent_erased {
+            Ok(())
+        } else {
+            Err(WalkError::VisitedErased(visited))
+        }
     }
 
     fn skip(&mut self) {
@@ -138,29 +159,15 @@ impl WalkCursor for BFSCursor {
 }
 
 impl BFSCursor {
-    /// The next statement after the visit erased `visited`. Allowed only if
-    /// it erased an ancestor too, killing the front parent: its remaining
-    /// children are then dead, and the walk goes on with the next live
-    /// parent's.
-    fn after_erased<L: Dialect>(
-        &mut self,
-        stage: &StageInfo<L>,
-        visited: Statement,
-    ) -> Result<Option<Statement>, WalkError> {
-        let parent_erased = visited != self.root
-            && self
-                .parents
-                .front()
-                .is_some_and(|&parent| parent.get_info(stage).is_none());
-        if !parent_erased {
-            return Err(WalkError::VisitedErased(visited));
-        }
+    /// The next statement after the visit erased the visited statement with
+    /// its front parent: the walk goes on with the next live parent's
+    /// children.
+    fn after_parent_erased<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Option<Statement> {
         // Dead parents, the front one included, have no children, so this
         // drops them.
         let next = self.first_child_of_next_parent(stage);
         self.position = next.map_or(Position::Done, Position::At);
-        self.visited_block = visited_block(stage, self.root, next);
-        Ok(next)
+        next
     }
 
     /// The first child of the front parent or a later one, dropping parents
@@ -182,8 +189,11 @@ impl BFSCursor {
 }
 
 impl WalkOrder for ReverseBFS {
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool = true;
+}
+
+impl CursorOrder for ReverseBFS {
     type Cursor = BuiltOrderCursor;
-    const ALLOWS_ERASING_VISITED: bool = true;
 
     fn start<L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Self::Cursor {
         let mut ordered_nodes = breadth_first(stage, root, |_| {});
@@ -193,8 +203,11 @@ impl WalkOrder for ReverseBFS {
 }
 
 impl WalkOrder for KeepOrderReverseBFS {
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool = true;
+}
+
+impl CursorOrder for KeepOrderReverseBFS {
     type Cursor = BuiltOrderCursor;
-    const ALLOWS_ERASING_VISITED: bool = true;
 
     fn start<L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Self::Cursor {
         let mut level_starts = Vec::new();
@@ -222,16 +235,22 @@ impl BuiltOrderCursor {
 }
 
 impl WalkCursor for BuiltOrderCursor {
-    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError> {
+    fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Option<Statement> {
         // Return the next statement still live, skipping any erased since the
         // order was built.
         while let Some(&stmt) = self.ordered_nodes.get(self.next) {
             self.next += 1;
             if stmt.get_info(stage).is_some() {
-                return Ok(Some(stmt));
+                return Some(stmt);
             }
         }
-        Ok(None)
+        None
+    }
+
+    /// Nothing to check: the order was built at the start, so a visit may
+    /// erase or move the visited statement.
+    fn check_erasure<L: Dialect>(&self, _stage: &StageInfo<L>) -> Result<(), WalkError> {
+        Ok(())
     }
 
     /// Nothing to skip: the order visits a statement after the statements

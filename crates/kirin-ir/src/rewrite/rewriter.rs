@@ -23,10 +23,13 @@
 //! applied are available for diagnosis only.
 //!
 //! Scope is operand/yield rewriting (including bulk result redirection through
-//! [`Rewriter::replace_results`]), block-body statement surgery
+//! [`Rewriter::replace_results`], and selective redirection through
+//! [`Rewriter::replace_uses_if`] and
+//! [`Rewriter::replace_all_uses_except_stmt`]), block-body statement surgery
 //! ([`Rewriter::erase_statement`], [`Rewriter::insert_before`],
 //! [`Rewriter::insert_after`], [`Rewriter::replace_statement`],
-//! [`Rewriter::insert_terminator`]), `CFG`
+//! [`Rewriter::insert_terminator`], [`Rewriter::move_before`],
+//! [`Rewriter::move_after`]), `CFG`
 //! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
 //! merge blocks, [`Rewriter::retarget_successor`], and block-argument insertion
 //! and erasure), `DiGraph` node surgery in the sibling `digraph` module
@@ -81,6 +84,7 @@ use indexmap::{IndexMap, IndexSet};
 use rustc_hash::{FxBuildHasher, FxHashMap};
 
 use crate::arena::{GetInfo, GetInfoMut};
+use crate::node::linked_list::LinkedList;
 use smallvec::SmallVec;
 
 use super::bodies::bodies_of;
@@ -137,6 +141,16 @@ pub enum MutationEvent {
     /// the bodies it dropped were tombstoned with everything nested in them,
     /// and the bodies it gained now have `owner` as their parent.
     ChangedBodyNesting { owner: Statement },
+    /// `stmt` was moved to another place in a block body, keeping its id,
+    /// results, uses and nested bodies.
+    MovedStatement { stmt: Statement },
+    /// Every statement of `source`, except its terminator, was moved into
+    /// `dest`, keeping their ids, results, uses and nested bodies.
+    SplicedBlock { source: Block, dest: Block },
+    /// Every block of `source` was moved into `dest`, keeping their ids,
+    /// arguments, statements and edges. Recorded after the
+    /// [`MutationEvent::ChangedBlockList`] of both CFGs.
+    SplicedCfg { source: CFG, dest: CFG },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -160,11 +174,12 @@ pub enum RewriteError {
     /// Nothing can follow a block's terminator, so `insert_after` cannot anchor
     /// on one. (`insert_before` can: it appends to the end of the chain.)
     AnchorIsTerminator(Statement),
-    /// The inserted definition is a terminator where a non-terminator is
-    /// required: `insert_before`/`insert_after` do not splice terminators into
-    /// a block's statement list (use [`Rewriter::insert_terminator`] on a block
-    /// that has none), and a `DiGraph` has no terminators for `insert_node` to
-    /// add. The counterpart of [`RewriteError::ExpectedTerminator`].
+    /// The inserted definition, or the moved statement, is a terminator where
+    /// a non-terminator is required: `insert_before`/`insert_after` and
+    /// `move_before`/`move_after` do not splice terminators into a block's
+    /// statement list (use [`Rewriter::insert_terminator`] on a block that has
+    /// none), and a `DiGraph` has no terminators for `insert_node` to add. The
+    /// counterpart of [`RewriteError::ExpectedTerminator`].
     UnexpectedTerminator,
     /// The inserted or replacement definition is a non-terminator that carries
     /// successors. Only a block's terminator may transfer control, so such a
@@ -224,6 +239,18 @@ pub enum RewriteError {
     /// A `replace_statement` definition names a body the statement itself is
     /// nested in, which would make the statement its own ancestor.
     BodyEnclosesOwner(Body),
+    /// `move_before`/`move_after` was given an anchor nested in the moved
+    /// statement's own bodies, which would make the statement its own
+    /// ancestor.
+    MovedIntoItself { stmt: Statement, anchor: Statement },
+    /// `splice_block_before`/`splice_block_after` was given an anchor in
+    /// `source` or nested in one of its statements, which would place a
+    /// spliced statement next to or inside itself.
+    SplicedIntoItself { source: Block, anchor: Statement },
+    /// `splice_cfg_after` was given an anchor block in `source` or nested in
+    /// one of its blocks, which would place `source`'s blocks inside
+    /// themselves.
+    CfgSplicedIntoItself { source: CFG, anchor: Block },
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -299,7 +326,7 @@ impl fmt::Display for RewriteError {
             RewriteError::UnexpectedTerminator => {
                 write!(
                     f,
-                    "expected a non-terminator: terminators are only inserted with insert_terminator"
+                    "expected a non-terminator: terminators are only inserted with insert_terminator, and are not moved"
                 )
             }
             RewriteError::BlockHasTerminator(block) => {
@@ -373,6 +400,24 @@ impl fmt::Display for RewriteError {
                 write!(
                     f,
                     "the replacement names body {body:?}, which encloses the statement"
+                )
+            }
+            RewriteError::MovedIntoItself { stmt, anchor } => {
+                write!(
+                    f,
+                    "cannot move {stmt:?} next to {anchor:?}, which is nested in it"
+                )
+            }
+            RewriteError::SplicedIntoItself { source, anchor } => {
+                write!(
+                    f,
+                    "cannot splice {source:?} next to {anchor:?}, which is in it"
+                )
+            }
+            RewriteError::CfgSplicedIntoItself { source, anchor } => {
+                write!(
+                    f,
+                    "cannot splice {source:?} after {anchor:?}, which is in it"
                 )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
@@ -481,8 +526,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         &self.events
     }
 
-    /// Take all recorded events, leaving the log empty.
-    pub fn drain_events(&mut self) -> Vec<MutationEvent> {
+    /// End the rewrite and return every event it recorded, in application
+    /// order. The log only grows while the `Rewriter` lives, so a position in
+    /// [`events`](Self::events) stays valid until then.
+    pub fn into_events(mut self) -> Vec<MutationEvent> {
         std::mem::take(&mut self.events)
     }
 
@@ -601,6 +648,75 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(self.redirect_uses(&[(old, new)]))
     }
 
+    /// Replace the uses of `old` that `select` accepts with `new`, returning
+    /// the number of use slots rewritten. Replacing a value with itself is a
+    /// no-op returning `Ok(0)`.
+    ///
+    /// `select` is called with the stage and each use site of `old` (a
+    /// statement operand or a `DiGraph` yield slot), all before anything is
+    /// written, so it sees the stage unchanged and can look up the using
+    /// statement, e.g. its parent block. The sites it rejects stay uses of
+    /// `old`. Otherwise this is [`Rewriter::replace_all_uses`] restricted to
+    /// the selected sites.
+    ///
+    /// Rejects, leaving the stage untouched, if `old` or `new` is unknown.
+    /// Records the events of [`Rewriter::replace_all_uses`] for the rewritten
+    /// slots, except that [`MutationEvent::ReplacedUses`] is recorded only if
+    /// `select` accepted every use, since it promises that every use of `old`
+    /// moved.
+    pub fn replace_uses_if(
+        &mut self,
+        old: impl Into<SSAValue>,
+        new: impl Into<SSAValue>,
+        select: impl FnMut(&StageInfo<L>, Use) -> bool,
+    ) -> Result<usize, RewriteError> {
+        let old: SSAValue = old.into();
+        let new: SSAValue = new.into();
+        if old.get_info(self.stage).is_none() {
+            return Err(RewriteError::UnknownValue(old));
+        }
+        if new.get_info(self.stage).is_none() {
+            return Err(RewriteError::UnknownValue(new));
+        }
+        if old == new {
+            return Ok(0);
+        }
+        Ok(self.redirect_uses_where(&[(old, new)], select))
+    }
+
+    /// Replace every use of `old` with `new` except `except`'s own operands,
+    /// returning the number of use slots rewritten.
+    ///
+    /// Only `except`'s operands are kept: uses by statements nested in its
+    /// bodies are replaced (for those, use [`Rewriter::replace_uses_if`]).
+    /// Rejects, leaving the stage untouched, if `old`, `new` or `except` is
+    /// unknown. Records the events of [`Rewriter::replace_uses_if`].
+    pub fn replace_all_uses_except_stmt(
+        &mut self,
+        old: impl Into<SSAValue>,
+        new: impl Into<SSAValue>,
+        except: Statement,
+    ) -> Result<usize, RewriteError> {
+        self.replace_all_uses_except_stmts(old, new, &[except])
+    }
+
+    /// [`Rewriter::replace_all_uses_except_stmt`] keeping the operands of every
+    /// statement in `except`.
+    pub fn replace_all_uses_except_stmts(
+        &mut self,
+        old: impl Into<SSAValue>,
+        new: impl Into<SSAValue>,
+        except: &[Statement],
+    ) -> Result<usize, RewriteError> {
+        for &stmt in except {
+            self.live_statement(stmt)?;
+        }
+        self.replace_uses_if(old, new, |_, site| match site {
+            Use::StatementOperand { stmt, .. } => !except.contains(&stmt),
+            Use::DiGraphYield { .. } => true,
+        })
+    }
+
     /// Redirect **every** result of `stmt` at once, one replacement per result
     /// in result order, exact arity required.
     ///
@@ -667,14 +783,28 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// *to* it. A sequential loop would instead let a later pair carry away the
     /// sites an earlier one just moved.
     pub(super) fn redirect_uses(&mut self, pairs: &[(SSAValue, SSAValue)]) -> usize {
-        // Snapshot the use sites so we can mutate the arenas while walking them
-        // (the borrows of the `old` infos end here).
+        self.redirect_uses_where(pairs, |_, _| true)
+    }
+
+    /// [`Rewriter::redirect_uses`], rewriting only the use sites `select`
+    /// accepts. `select` sees every site before anything is written. The
+    /// sites it rejects stay uses of `old`.
+    fn redirect_uses_where(
+        &mut self,
+        pairs: &[(SSAValue, SSAValue)],
+        mut select: impl FnMut(&StageInfo<L>, Use) -> bool,
+    ) -> usize {
+        // Snapshot the selected use sites so we can mutate the arenas while
+        // walking them (the borrows of the `old` infos end here).
         let sites: Vec<Vec<Use>> = pairs
             .iter()
             .map(|(old, _)| {
                 old.get_info(self.stage)
                     .map(|info| info.uses().to_vec())
                     .unwrap_or_default()
+                    .into_iter()
+                    .filter(|&site| select(self.stage, site))
+                    .collect()
             })
             .collect();
 
@@ -754,13 +884,25 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
         // Transfer the use records in two phases: drop every moved list before
         // installing any of them, so a value appearing on both sides of the
-        // substitution keeps only the sites redirected to it.
-        for (&(old, _), moved) in pairs.iter().zip(&moved) {
-            if !moved.is_empty()
-                && let Some(info) = old.get_info_mut(self.stage)
-            {
-                info.uses_mut().clear();
+        // substitution keeps only the sites redirected to it. A selected site
+        // that no longer applied was stale, and is dropped too. Whether `old`
+        // is left with no uses is read here, before any replacement gains its
+        // sites: a value can be both.
+        let mut emptied: Vec<bool> = Vec::with_capacity(pairs.len());
+        for (&(old, _), sites) in pairs.iter().zip(&sites) {
+            let Some(info) = old.get_info_mut(self.stage) else {
+                emptied.push(false);
+                continue;
+            };
+            let uses = info.uses_mut();
+            // `sites` is a subset of `uses`, so equal lengths mean every use was selected.
+            if sites.len() == uses.len() {
+                uses.clear();
+            } else if !sites.is_empty() {
+                let sites: HashSet<Use> = sites.iter().copied().collect();
+                uses.retain(|site| !sites.contains(site));
             }
+            emptied.push(uses.is_empty());
         }
         for (&(_, new), moved) in pairs.iter().zip(&moved) {
             if !moved.is_empty()
@@ -791,8 +933,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             self.events
                 .push(MutationEvent::ChangedDiGraphYields { graph });
         }
-        for (&(old, new), moved) in pairs.iter().zip(&moved) {
-            if !moved.is_empty() {
+        // `ReplacedUses` promises every use of `old` moved; a partial
+        // redirection is covered by the events above only.
+        for ((&(old, new), moved), &emptied) in pairs.iter().zip(&moved).zip(&emptied) {
+            if !moved.is_empty() && emptied {
                 self.events.push(MutationEvent::ReplacedUses { old, new });
             }
         }
@@ -832,7 +976,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 _ => {}
             }
         }
-        let (block, prev, next, operands, results, successors, is_terminator) = {
+        let (block, operands, results, successors, is_terminator) = {
             let item = self.live_statement(stmt)?;
             let block = match item.parent {
                 Some(StatementParent::Block(block)) => block,
@@ -840,8 +984,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             };
             (
                 block,
-                item.node.prev,
-                item.node.next,
                 item.definition
                     .arguments()
                     .copied()
@@ -871,37 +1013,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 remove_predecessor(self.stage, target, block);
             }
         } else {
-            // Unlink from the block's statement linked list (fix neighbours, or
-            // the block head/tail when the statement is at an end).
-            match prev {
-                Some(p) => {
-                    if let Some(info) = p.get_info_mut(self.stage) {
-                        info.node.next = next;
-                    }
-                }
-                None => {
-                    if let Some(block_info) = block.get_info_mut(self.stage) {
-                        block_info.statements.head = next;
-                    }
-                }
-            }
-            match next {
-                Some(n) => {
-                    if let Some(info) = n.get_info_mut(self.stage) {
-                        info.node.prev = prev;
-                    }
-                }
-                None => {
-                    if let Some(block_info) = block.get_info_mut(self.stage) {
-                        block_info.statements.tail = prev;
-                    }
-                }
-            }
-            if let Some(block_info) = block.get_info_mut(self.stage)
-                && block_info.statements.len > 0
-            {
-                block_info.statements.len -= 1;
-            }
+            self.unlink(stmt, block);
         }
 
         // Drop the def-use edges this statement contributed, erase the bodies
@@ -1029,7 +1141,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         anchor: Statement,
         definition: L,
     ) -> Result<Statement, RewriteError> {
-        self.insert_relative(anchor, definition, false)
+        self.insert_relative(anchor, definition, Side::Before)
     }
 
     /// Insert `definition` as a new statement immediately after `anchor`.
@@ -1045,40 +1157,49 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         anchor: Statement,
         definition: L,
     ) -> Result<Statement, RewriteError> {
-        self.insert_relative(anchor, definition, true)
+        self.insert_relative(anchor, definition, Side::After)
+    }
+
+    /// Where a statement goes when placed on `side` of `anchor`: its block,
+    /// and the chain statements that will sit directly before and after it
+    /// (`None` at either end of the chain).
+    ///
+    /// The terminator sits outside the chain, so a place before it is the end
+    /// of the chain, and nothing can follow it ([`RewriteError::AnchorIsTerminator`]).
+    /// Rejects an unknown `anchor` or one not in a block body.
+    pub(super) fn slot_at(
+        &self,
+        anchor: Statement,
+        side: Side,
+    ) -> Result<(Block, Option<Statement>, Option<Statement>), RewriteError> {
+        let item = self.live_statement(anchor)?;
+        let block = match item.parent {
+            Some(StatementParent::Block(block)) => block,
+            _ => return Err(RewriteError::NotInBlockBody(anchor)),
+        };
+        let (prev, next) = match (item.definition.is_terminator(), side) {
+            (true, Side::After) => return Err(RewriteError::AnchorIsTerminator(anchor)),
+            (true, Side::Before) => {
+                let tail = block
+                    .get_info(self.stage)
+                    .and_then(|b| b.statements.tail().copied());
+                // The tail ends the chain, so the statement becomes the tail.
+                debug_assert!(tail.is_none_or(|t| t.next(self.stage).is_none()));
+                (tail, None)
+            }
+            (false, Side::After) => (Some(anchor), item.node.next),
+            (false, Side::Before) => (item.node.prev, Some(anchor)),
+        };
+        Ok((block, prev, next))
     }
 
     fn insert_relative(
         &mut self,
         anchor: Statement,
         definition: L,
-        after: bool,
+        side: Side,
     ) -> Result<Statement, RewriteError> {
-        let (block, prev, next) = {
-            let item = self.live_statement(anchor)?;
-            let block = match item.parent {
-                Some(StatementParent::Block(block)) => block,
-                _ => return Err(RewriteError::NotInBlockBody(anchor)),
-            };
-            match (item.definition.is_terminator(), after) {
-                // Nothing can follow a terminator.
-                (true, true) => return Err(RewriteError::AnchorIsTerminator(anchor)),
-                // The terminator sits outside the chain, so inserting before it
-                // appends to the end of the chain
-                (true, false) => {
-                    let tail = block
-                        .get_info(self.stage)
-                        .and_then(|b| b.statements.tail().copied());
-
-                    // The tail ends the chain, so the new statement becomes the tail.
-                    debug_assert!(tail.is_none_or(|t| t.next(self.stage).is_none()));
-
-                    (block, tail, None)
-                }
-                (false, true) => (block, Some(anchor), item.node.next),
-                (false, false) => (block, item.node.prev, Some(anchor)),
-            }
-        };
+        let (block, prev, next) = self.slot_at(anchor, side)?;
 
         if definition.is_terminator() {
             return Err(RewriteError::UnexpectedTerminator);
@@ -1096,34 +1217,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             &operands,
         );
 
-        // Wire neighbours (or the block head/tail when inserting at an end).
-        match prev {
-            Some(p) => {
-                if let Some(info) = p.get_info_mut(self.stage) {
-                    info.node.next = Some(new_stmt);
-                }
-            }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.head = Some(new_stmt);
-                }
-            }
-        }
-        match next {
-            Some(n) => {
-                if let Some(info) = n.get_info_mut(self.stage) {
-                    info.node.prev = Some(new_stmt);
-                }
-            }
-            None => {
-                if let Some(block_info) = block.get_info_mut(self.stage) {
-                    block_info.statements.tail = Some(new_stmt);
-                }
-            }
-        }
-        if let Some(block_info) = block.get_info_mut(self.stage) {
-            block_info.statements.len += 1;
-        }
+        self.link(LinkedList::single(new_stmt), block, prev, next);
 
         // Predecessor mirror does not need to be updated since we rejected terminators earlier.
         self.events
@@ -1483,6 +1577,13 @@ impl<L: Dialect> Rewriter<'_, L> {
                 .push(MutationEvent::ChangedBodyNesting { owner: stmt });
         }
     }
+}
+
+/// Which side of an anchor statement an edit places a statement on.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(super) enum Side {
+    Before,
+    After,
 }
 
 /// Old-state snapshot taken by [`Rewriter::prepare_replacement`].

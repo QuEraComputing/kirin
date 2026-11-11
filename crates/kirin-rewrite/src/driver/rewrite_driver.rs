@@ -1,4 +1,4 @@
-use kirin_ir::walk::{WalkCursor, WalkOrder, WalkResult};
+use kirin_ir::walk::{WalkOrder, WalkResult};
 use kirin_ir::{Dialect, GetInfo, Rewriter, Statement};
 
 use super::{DriverError, Match};
@@ -118,7 +118,7 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<RewriteSummary, DriverError> {
-        if !O::ALLOWS_ERASING_VISITED
+        if !O::ALLOWS_ERASING_OR_MOVING_VISITED
             && let Some(rule) = self.rules.rules().iter().find(|rule| rule.erases_root())
         {
             let order = std::any::type_name::<O>();
@@ -153,38 +153,70 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
     /// remaining rules still run at the statement, then its nested
     /// statements are skipped; an `interrupt` stops trying rules and ends
     /// the sweep.
+    ///
+    /// The sweep is a [`WalkOrder::walk_mut`], so it checks the walk's
+    /// contract like any other walk. A rule failing at a statement interrupts
+    /// it, and that failure is reported before any broken contract.
     fn sweep<O: WalkOrder>(
         &self,
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<usize, DriverError> {
         let mut applied = 0;
-        let mut cursor = O::start(rewriter.stage(), root);
-        while let Some(stmt) = cursor.next(rewriter.stage())? {
-            let mut skip = false;
-            for rule in self.rules.rules() {
-                let Some(found) = Match::find(self.rules, rule, rewriter.stage(), stmt)? else {
-                    continue;
-                };
-                let before = rewriter.events().len();
-                let walk_result = found.apply(self.rules, rule, rewriter, stmt)?;
-                if rewriter.events().len() > before {
-                    applied += 1;
+        let mut failure = None;
+        let walked = O::walk_mut(rewriter, root, |rewriter, stmt| {
+            match self.visit(rewriter, stmt) {
+                Ok((edits, walk_result)) => {
+                    applied += edits;
+                    walk_result
                 }
-                match walk_result {
-                    WalkResult::Advance => {}
-                    WalkResult::Skip => skip = true,
-                    WalkResult::Interrupt => return Ok(applied),
-                }
-                // The rule erased the statement, so no later rule can match it.
-                if stmt.get_info(rewriter.stage()).is_none() {
-                    break;
+                Err(error) => {
+                    failure = Some(error);
+                    WalkResult::Interrupt
                 }
             }
-            if skip {
-                cursor.skip();
+        });
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        walked?;
+        Ok(applied)
+    }
+
+    /// Try every rule at `stmt`, applying each that matches. Returns how many
+    /// applications edited the IR, and how the walk goes on: `Skip` if any
+    /// applied rule skipped, `Interrupt` as soon as one interrupts.
+    fn visit(
+        &self,
+        rewriter: &mut Rewriter<'_, L>,
+        stmt: Statement,
+    ) -> Result<(usize, WalkResult), DriverError> {
+        let mut applied = 0;
+        let mut skip = false;
+        for rule in self.rules.rules() {
+            let Some(found) = Match::find(self.rules, rule, rewriter.stage(), stmt)? else {
+                continue;
+            };
+            let before = rewriter.events().len();
+            let walk_result = found.apply(self.rules, rule, rewriter, stmt)?;
+            if rewriter.events().len() > before {
+                applied += 1;
+            }
+            match walk_result {
+                WalkResult::Advance => {}
+                WalkResult::Skip => skip = true,
+                WalkResult::Interrupt => return Ok((applied, WalkResult::Interrupt)),
+            }
+            // The rule erased the statement, so no later rule can match it.
+            if stmt.get_info(rewriter.stage()).is_none() {
+                break;
             }
         }
-        Ok(applied)
+        let walk_result = if skip {
+            WalkResult::Skip
+        } else {
+            WalkResult::Advance
+        };
+        Ok((applied, walk_result))
     }
 }

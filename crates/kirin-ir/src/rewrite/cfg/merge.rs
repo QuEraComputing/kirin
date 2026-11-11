@@ -1,6 +1,6 @@
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::LinkedList;
-use crate::{Block, Dialect, SSAValue, StatementParent};
+use crate::{Block, Dialect, SSAValue};
 
 use crate::rewrite::rewriter::{MutationEvent, RewriteError, Rewriter, remove_predecessor};
 
@@ -85,48 +85,17 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         self.redirect_uses(&pairs);
 
         // Move succ's chain and terminator onto the end of pred.
-        let (succ_chain, succ_terminator) = {
-            let info = succ.expect_info(self.stage);
-            (info.statements, info.terminator)
+        let (succ_chain, succ_terminator) = match succ.get_info_mut(self.stage) {
+            Some(info) => (std::mem::take(&mut info.statements), info.terminator.take()),
+            None => (LinkedList::new(), None),
         };
-        let moved = self.chain_from(succ_chain.head);
-        for &stmt in moved.iter().chain(succ_terminator.iter()) {
-            if let Some(info) = stmt.get_info_mut(self.stage) {
-                info.parent = Some(StatementParent::Block(pred));
-            }
-        }
-        if let Some(succ_head) = succ_chain.head {
-            match pred.expect_info(self.stage).statements.tail {
-                Some(tail) => {
-                    if let Some(info) = tail.get_info_mut(self.stage) {
-                        info.node.next = Some(succ_head);
-                    }
-                    if let Some(info) = succ_head.get_info_mut(self.stage) {
-                        info.node.prev = Some(tail);
-                    }
-                }
-                None => {
-                    if let Some(info) = pred.get_info_mut(self.stage) {
-                        info.statements.head = Some(succ_head);
-                    }
-                }
-            }
-            if let Some(info) = pred.get_info_mut(self.stage) {
-                info.statements.tail = succ_chain.tail;
-            }
-        }
-        if let Some(info) = pred.get_info_mut(self.stage) {
-            info.statements.len += succ_chain.len;
-            info.terminator = succ_terminator;
-        }
-        if let Some(info) = succ.get_info_mut(self.stage) {
-            info.statements = LinkedList::new();
-            info.terminator = None;
-        }
+        let pred_tail = pred.expect_info(self.stage).statements.tail;
+        self.link(succ_chain, pred, pred_tail, None);
+        self.set_terminator(pred, succ_terminator);
 
         // succ is now empty: tombstoning it only removes the block and its
         // (already redirected) arguments.
-        self.unlink_block(cfg, succ);
+        self.unlink(succ, cfg);
         self.tombstone_block(succ);
 
         let pred_successors_after = self.block_successors(pred);
