@@ -2,6 +2,7 @@ use crate::arena::Arena;
 use crate::node::cfg::CFGInfo;
 use crate::node::digraph::{DiGraph, DiGraphInfo};
 use crate::node::function::CompileStage;
+use crate::node::module::{Module, ModuleInfo};
 use crate::node::ungraph::{UnGraph, UnGraphInfo};
 use crate::{Dialect, InternTable, node::*};
 
@@ -35,6 +36,8 @@ pub struct Arenas<L: Dialect> {
     pub(crate) statements: Arena<Statement, StatementInfo<L>>,
     pub(crate) digraphs: Arena<DiGraph, DiGraphInfo<L>>,
     pub(crate) ungraphs: Arena<UnGraph, UnGraphInfo<L>>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub(crate) modules: Arena<Module, ModuleInfo>,
     pub(crate) symbols: InternTable<String, Symbol>,
 }
 
@@ -53,6 +56,7 @@ where
             statements: Arena::default(),
             digraphs: Arena::default(),
             ungraphs: Arena::default(),
+            modules: Arena::default(),
             symbols: InternTable::default(),
         }
     }
@@ -74,6 +78,7 @@ where
             statements: self.statements.clone(),
             digraphs: self.digraphs.clone(),
             ungraphs: self.ungraphs.clone(),
+            modules: self.modules.clone(),
             symbols: self.symbols.clone(),
         }
     }
@@ -148,6 +153,11 @@ impl<L: Dialect> Arenas<L> {
     /// Get a reference to the directed graph arena.
     pub fn digraph_arena(&self) -> &Arena<DiGraph, DiGraphInfo<L>> {
         &self.digraphs
+    }
+
+    /// Get a reference to the modules arena.
+    pub fn module_arena(&self) -> &Arena<Module, ModuleInfo> {
+        &self.modules
     }
 
     /// Get a reference to the undirected graph arena.

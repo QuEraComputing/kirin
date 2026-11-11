@@ -88,6 +88,8 @@ impl<L: Dialect> Rewriter<'_, L> {
                     }
                     graph.get_info(self.stage).and_then(|item| item.parent())
                 }
+                // A module is not a body and no statement owns it.
+                StatementParent::Module(_) => None,
             };
             let Some(owner) = owner else {
                 return false;

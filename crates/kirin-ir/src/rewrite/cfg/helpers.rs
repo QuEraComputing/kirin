@@ -164,7 +164,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 Some(StatementParent::UnGraph(graph)) => {
                     graph.get_info(self.stage).and_then(|g| g.parent())
                 }
-                None => None,
+                Some(StatementParent::Module(_)) | None => None,
             };
         }
         false

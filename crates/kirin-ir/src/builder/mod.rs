@@ -26,6 +26,7 @@ mod context;
 pub mod digraph;
 pub mod error;
 mod graph_common;
+mod module;
 mod redefine;
 mod stage_info;
 mod staged;
