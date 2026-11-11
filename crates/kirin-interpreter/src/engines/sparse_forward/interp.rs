@@ -1170,16 +1170,19 @@ where
         let mut analysis = SparseForwardWorkAnalysis::new();
         self.driver.drain_worklist(&mut analysis)?;
 
-        let root = self
-            .driver
-            .inner()
+        let transfer = self.driver.inner();
+        let root = transfer
             .env
-            .contexts()
-            .find(|(_, index)| *index == env)
-            .map(|(key, _)| key.clone())
+            .key(env)
+            .cloned()
             .ok_or_else(|| E::from(UNSELECTED))?;
+        let contexts: Vec<_> = transfer
+            .contexts
+            .iter()
+            .map(|(env, context)| (context.target, *env))
+            .collect();
         self.root = Some(root);
-        Ok(Analyzed { engine: self })
+        Ok(Analyzed::new(self, contexts))
     }
 }
 
@@ -1215,6 +1218,12 @@ where
 
     fn callable_of(&self, context: &P::Key) -> Option<LinkTarget> {
         Some(self.engine.selected(context)?.1.target)
+    }
+
+    fn contexts_of(&self, callable: LinkTarget) -> impl Iterator<Item = &P::Key> {
+        let transfer = self.engine.driver.inner();
+        self.envs_of(callable)
+            .filter_map(|env| transfer.env.key(env))
     }
 
     fn fact(&self, context: &P::Key, value: SSAValue) -> Option<&V> {

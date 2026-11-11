@@ -2,11 +2,11 @@
 //! engine's `analyze` returns, and [`AnalysisResults`] is the one read-only
 //! view all three engines implement on it.
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use kirin_ir::{Lattice, Product};
 
-use crate::{FactStore, LatticeAnchor, LinkTarget};
+use crate::{EnvIndex, FactStore, LatticeAnchor, LinkTarget};
 
 /// A converged analysis: the state of engine `I` after one `analyze` call.
 ///
@@ -15,6 +15,36 @@ use crate::{FactStore, LatticeAnchor, LinkTarget};
 /// [`AnalysisResults`].
 pub struct Analyzed<I> {
     pub(crate) engine: I,
+    /// The environments of each reached callable's contexts. Built once:
+    /// the analysis cannot run again, so it never goes stale.
+    pub(crate) by_callable: HashMap<LinkTarget, Vec<EnvIndex>>,
+}
+
+impl<I> Analyzed<I> {
+    /// Wrap a converged `engine`, indexing its `contexts` (each reached
+    /// context's callable and environment) by callable.
+    pub(crate) fn new(
+        engine: I,
+        contexts: impl IntoIterator<Item = (LinkTarget, EnvIndex)>,
+    ) -> Self {
+        let mut by_callable: HashMap<LinkTarget, Vec<EnvIndex>> = HashMap::new();
+        for (callable, env) in contexts {
+            by_callable.entry(callable).or_default().push(env);
+        }
+        Self {
+            engine,
+            by_callable,
+        }
+    }
+
+    /// The environments of `callable`'s contexts; empty if it was not reached.
+    pub(crate) fn envs_of(&self, callable: LinkTarget) -> impl Iterator<Item = EnvIndex> {
+        self.by_callable
+            .get(&callable)
+            .into_iter()
+            .flatten()
+            .copied()
+    }
 }
 
 /// The read-only view of a converged analysis.

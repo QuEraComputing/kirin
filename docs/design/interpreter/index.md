@@ -700,6 +700,12 @@ environments and are never stored. They join the contexts **reached from the
 root**: they claim nothing about callers the analysis did not visit, and
 whether that is safe for a rewrite is the client's decision.
 
+`Analyzed` stores one thing beside the engine: an index from each reached
+callable to its contexts' environments, built once when `analyze` finishes.
+The sparse engines' `contexts_of` reads it and maps each environment back to
+its context through `EnvStore::key`, so a per-callable query visits only that
+callable's contexts. Liveness has one context and keeps the provided scan.
+
 Every per-context query is keyed by context, so a context is a query key and
 `response`/`facts` its value. That keeps the API compatible with a later
 query-based (memoized, incremental) engine, which this is not.

@@ -782,7 +782,7 @@ where
         let work = blocks.into_iter().map(|block| (env, Body::Block(block)));
         self.driver
             .solve_many(&mut DenseBackwardWorkAnalysis, work)?;
-        Ok(Analyzed { engine: self })
+        Ok(Analyzed::new(self, [(target, env)]))
     }
 }
 

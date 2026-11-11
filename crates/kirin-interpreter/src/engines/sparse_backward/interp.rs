@@ -968,8 +968,15 @@ where
         self.driver.wake_changed()?;
         self.driver
             .drain_worklist(&mut SparseBackwardWorkAnalysis)?;
+        let contexts: Vec<_> = self
+            .driver
+            .inner()
+            .contexts
+            .iter()
+            .map(|(env, context)| (context.target, *env))
+            .collect();
         self.root = Some(root);
-        Ok(Analyzed { engine: self })
+        Ok(Analyzed::new(self, contexts))
     }
 }
 
@@ -1008,6 +1015,12 @@ where
         let transfer = self.engine.driver.inner();
         let env = transfer.discovered(context)?;
         Some(transfer.contexts.get(&env)?.target)
+    }
+
+    fn contexts_of(&self, callable: LinkTarget) -> impl Iterator<Item = &P::Key> {
+        let transfer = self.engine.driver.inner();
+        self.envs_of(callable)
+            .filter_map(|env| transfer.env.key(env))
     }
 
     fn fact(&self, context: &P::Key, value: SSAValue) -> Option<&V> {
