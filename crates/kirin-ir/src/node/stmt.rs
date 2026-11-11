@@ -4,6 +4,7 @@ use crate::{Dialect, node::linked_list::LinkedListNode};
 
 use super::block::Block;
 use super::digraph::DiGraph;
+use super::module::Module;
 use super::ungraph::UnGraph;
 
 identifier! {
@@ -17,6 +18,8 @@ pub enum StatementParent {
     Block(Block),
     DiGraph(DiGraph),
     UnGraph(UnGraph),
+    /// A top-level statement, such as a function definition, in a module.
+    Module(Module),
 }
 
 /// Produces Block(id) instead of Block(Block(id))
@@ -26,6 +29,7 @@ impl std::fmt::Debug for StatementParent {
             StatementParent::Block(block) => write!(f, "{block:?}"),
             StatementParent::DiGraph(digraph) => write!(f, "{digraph:?}"),
             StatementParent::UnGraph(ungraph) => write!(f, "{ungraph:?}"),
+            StatementParent::Module(module) => write!(f, "{module:?}"),
         }
     }
 }

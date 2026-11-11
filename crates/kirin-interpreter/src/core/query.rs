@@ -502,6 +502,8 @@ fn units<L: Dialect>(info: &StageInfo<L>, mut parent: Option<StatementParent>) -
             StatementParent::UnGraph(graph) => {
                 graph.get_info(info).and_then(|graph| graph.parent())
             }
+            // A module is a container, not an analysis unit.
+            StatementParent::Module(_) => None,
         };
         parent = owner.and_then(|owner| *owner.parent(info));
     }
