@@ -126,6 +126,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// links. Its parent is left for the caller.
     pub(super) fn unlink<T: ListItem<L>>(&mut self, item: T, owner: T::Owner) {
         let Some(info) = item.get_info_mut(self.stage) else {
+            debug_assert!(false, "unlinking an item that is not live");
             return;
         };
         let node = T::node(info);
@@ -158,6 +159,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         if let Some(info) = owner.get_info_mut(self.stage) {
             let list = T::list(info);
+            debug_assert!(list.len > 0, "unlinking from an empty list");
             list.len = list.len.saturating_sub(1);
         }
     }

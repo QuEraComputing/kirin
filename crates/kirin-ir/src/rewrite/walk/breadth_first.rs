@@ -8,8 +8,7 @@
 use std::collections::VecDeque;
 
 use super::depth_first::{check_not_moved, live, visited_block};
-use super::order::Position;
-use super::order::{CursorOrder, WalkCursor};
+use super::order::{CursorOrder, Position, WalkCursor};
 use super::tree::{append_children, first_child, next_sibling, owns_bodies};
 use super::{WalkError, WalkOrder};
 use crate::{Block, Dialect, GetInfo, StageInfo, Statement};

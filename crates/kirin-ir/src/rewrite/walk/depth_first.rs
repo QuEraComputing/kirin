@@ -1,7 +1,6 @@
 //! Depth-first orders, walked through the IR's own links in O(1) extra space.
 
-use super::order::Position;
-use super::order::{CursorOrder, WalkCursor};
+use super::order::{CursorOrder, Position, WalkCursor};
 use super::tree::{first_child, next_sibling, parent};
 use super::{WalkError, WalkOrder};
 use crate::{Block, Dialect, GetInfo, StageInfo, Statement, StatementParent};
@@ -83,10 +82,7 @@ impl WalkCursor for PreOrderCursor {
     }
 
     fn check_visited<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError> {
-        match self.position.visited() {
-            Some(visited) => check_in_place(stage, visited, self.visited_block),
-            None => Ok(()),
-        }
+        check_in_place(stage, self.position, self.visited_block)
     }
 
     fn skip(&mut self) {
@@ -117,10 +113,7 @@ impl WalkCursor for PostOrderCursor {
     }
 
     fn check_visited<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError> {
-        match self.position.visited() {
-            Some(visited) => check_in_place(stage, visited, self.visited_block),
-            None => Ok(()),
-        }
+        check_in_place(stage, self.position, self.visited_block)
     }
 
     /// Nothing to skip: the children were visited before the statement.
@@ -139,13 +132,17 @@ fn check_live<L: Dialect>(stage: &StageInfo<L>, visited: Statement) -> Result<()
         .ok_or(WalkError::VisitedErased(visited))
 }
 
-/// Fail if the statement just visited was erased, or moved by merging
-/// `block`, the block it was in when visited, into another block.
+/// Fail if the statement the cursor is at was erased, or moved by merging
+/// `block`, the block it was in when visited, into another block. Nothing to
+/// check before the first step or after the last.
 fn check_in_place<L: Dialect>(
     stage: &StageInfo<L>,
-    visited: Statement,
+    position: Position,
     block: Option<Block>,
 ) -> Result<(), WalkError> {
+    let Some(visited) = position.visited() else {
+        return Ok(());
+    };
     check_live(stage, visited)?;
     check_not_moved(stage, visited, block)
 }

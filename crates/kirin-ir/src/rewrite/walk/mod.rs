@@ -40,9 +40,9 @@
 //!
 //! - [`WalkResult::Advance`] goes on to the next statement.
 //! - [`WalkResult::Skip`] goes on without walking the statements nested in
-//!   this one. [`PreOrder`] steps past them and
-//!   [`BFS`] never queues them. The other orders have already visited them,
-//!   so there it is the same as `Advance`.
+//!   this one. [`PreOrder`] steps past them and [`BFS`] never queues them.
+//!   The other orders have already visited them, so there it is the same as
+//!   `Advance`.
 //! - [`WalkResult::Interrupt`] ends the walk, which reports
 //!   [`WalkStatus::Interrupted`]. Edits already made stay.
 //!
