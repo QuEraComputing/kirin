@@ -2886,8 +2886,8 @@ sweep recording no `MutationEvent`. Decisions to revisit in later
 milestones:
 
 - A rule may erase its root, the statement being visited, only in a walk
-  order that allows it (`WalkOrder::ALLOWS_DISPLACING_VISITED`: the reverse BFS
-  orders). A run in another order fails with `DriverError::ErasesRoot`
+  order that allows it (`WalkOrder::ALLOWS_ERASING_OR_MOVING_VISITED`: the
+  reverse BFS orders). A run in another order fails with `DriverError::ErasesRoot`
   before editing anything. A rule's other erase targets are producers of the
   root, never nested in or around it, so they meet the walk contract in
   every order. Native actions are checked by the walk as it runs.

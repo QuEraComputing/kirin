@@ -12,8 +12,8 @@
 //! id order. Rewrites whose result depends on visit order therefore depend
 //! on these orders across blocks and graph members.
 //!
-//! A walk is a [`WalkCursor`] stepped one statement at a time, so the IR can
-//! be edited at each statement before the walk moves on:
+//! A walk visits one statement at a time, so the IR can be edited at each
+//! statement before the walk moves on:
 //!
 //! - [`PreOrder`] and [`PostOrder`] follow the IR's own links in O(1) extra
 //!   space, reading them at every step, so they visit statements inserted
@@ -27,7 +27,7 @@
 //!   as their bodies are walked. Inserts ahead of the cursor in those
 //!   bodies are visited; edits to bodies already passed, or to statements
 //!   not queued as parents, may be missed together with their descendants,
-//!   even at depths the walk has not reached. See [`BFSCursor`] for details.
+//!   even at depths the walk has not reached. See [`BFS`] for details.
 //! - [`ReverseBFS`] (each level right to left) and [`KeepOrderReverseBFS`]
 //!   (each level left to right) build their order when the walk starts, in
 //!   O(n). Statements inserted later are not visited; statements erased
@@ -40,14 +40,11 @@
 //!
 //! - [`WalkResult::Advance`] goes on to the next statement.
 //! - [`WalkResult::Skip`] goes on without walking the statements nested in
-//!   this one, through [`WalkCursor::skip`]. [`PreOrder`] steps past them and
+//!   this one. [`PreOrder`] steps past them and
 //!   [`BFS`] never queues them. The other orders have already visited them,
 //!   so there it is the same as `Advance`.
 //! - [`WalkResult::Interrupt`] ends the walk, which reports
 //!   [`WalkStatus::Interrupted`]. Edits already made stay.
-//!
-//! A cursor driven by hand gets the same control: calling
-//! [`WalkCursor::skip`] skips, and no longer calling `next` interrupts.
 //!
 //! # Contract
 //!
@@ -76,8 +73,7 @@
 //!   block as `succ`), reported as [`WalkError::VisitedMoved`];
 //! - moving it with [`Rewriter::move_before`](crate::Rewriter::move_before)
 //!   or [`Rewriter::move_after`](crate::Rewriter::move_after), reported as
-//!   [`WalkError::VisitedMoved`] by [`WalkOrder::walk_mut`] (a loop driving a
-//!   cursor by hand checks with [`WalkOrder::check_not_moved_since`]);
+//!   [`WalkError::VisitedMoved`];
 //! - splicing its block's statements elsewhere with
 //!   [`Rewriter::splice_block_before`](crate::Rewriter::splice_block_before)
 //!   or [`Rewriter::splice_block_after`](crate::Rewriter::splice_block_after),
@@ -99,14 +95,19 @@
 //! visited in this walk. Discovery follows each order's rules above; nesting
 //! depth alone does not determine whether an insertion is ahead of the cursor.
 //!
-//! The cursor reports an erase or merge of the visited statement that its
-//! order does not allow as a [`WalkError`] on its next step.
+//! These limits hold for the root like any other visited statement, and
+//! whatever the visit returns: an edit that breaks them fails the walk even
+//! if the visit interrupts it.
+//!
+//! [`WalkOrder::walk_mut`] reports an edit breaking these limits as a
+//! [`WalkError`] once the visit returns. [`WalkOrder::walk`] cannot edit, so
+//! it cannot fail.
 
 mod breadth_first;
 mod depth_first;
 mod order;
 pub(crate) mod tree;
 
-pub use breadth_first::{BFS, BFSCursor, BuiltOrderCursor, KeepOrderReverseBFS, ReverseBFS};
-pub use depth_first::{PostOrder, PostOrderCursor, PreOrder, PreOrderCursor};
-pub use order::{VisitedPlace, WalkCursor, WalkError, WalkOrder, WalkResult, WalkStatus};
+pub use breadth_first::{BFS, KeepOrderReverseBFS, ReverseBFS};
+pub use depth_first::{PostOrder, PreOrder};
+pub use order::{WalkError, WalkOrder, WalkResult, WalkStatus};

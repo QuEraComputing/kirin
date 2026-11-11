@@ -13,19 +13,17 @@ use crate::{
 /// [`ReverseBFS`](super::ReverseBFS) and
 /// [`KeepOrderReverseBFS`](super::KeepOrderReverseBFS), so a driver selects
 /// its order as a type parameter.
-pub trait WalkOrder {
-    /// The cursor walking this order.
-    type Cursor: WalkCursor;
-
+#[expect(
+    private_bounds,
+    reason = "`CursorOrder` is crate-private so other crates cannot step a cursor by hand: \
+              that would skip `walk_mut`'s check that the visited statement was not moved"
+)]
+pub trait WalkOrder: CursorOrder {
     /// Whether an edit may erase or move the statement being visited (see
     /// the [contract](super#contract)). Only the reverse BFS orders allow it:
     /// they build their order at the start, while the others find the next
     /// statement through the visited one.
-    const ALLOWS_DISPLACING_VISITED: bool;
-
-    /// A cursor at the start of the walk of the tree under `root`, `root`
-    /// included.
-    fn start<L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Self::Cursor;
+    const ALLOWS_ERASING_OR_MOVING_VISITED: bool;
 
     /// Every statement of the walk under `root`, in order, for a walk that
     /// edits nothing. Empty if `root` is not live.
@@ -57,9 +55,9 @@ pub trait WalkOrder {
 
     /// [`walk`](Self::walk) with a `visit` that may edit through `rewriter`,
     /// within the walk's contract (see the [module docs](super)). Fails if
-    /// `visit` erases the statement it is visiting where the order does not
-    /// allow it, or moves it where the order does not allow it (see
-    /// [`check_not_moved_since`](Self::check_not_moved_since)).
+    /// `visit` erases or moves the statement it is visiting where the order
+    /// does not allow it, whatever `visit` returns: an interrupted walk is
+    /// checked too.
     fn walk_mut<'r, L: Dialect>(
         rewriter: &mut Rewriter<'r, L>,
         root: Statement,
@@ -70,62 +68,60 @@ pub trait WalkOrder {
             let seen = rewriter.events().len();
             let place = VisitedPlace::of(rewriter.stage(), stmt);
             let result = visit(rewriter, stmt);
-            Self::check_not_moved_since(rewriter, stmt, place, seen)?;
+            check_not_moved_since::<Self, L>(rewriter, stmt, place, seen)?;
+            // `None` on `Advance` and `Skip`, the final status on `Interrupt`.
             if let Some(status) = result.steer(&mut cursor) {
+                // The cursor checks erases and merges of the visited
+                // statement only when it steps; the walk ends here, so check
+                // them now.
+                cursor.check_visited(rewriter.stage())?;
                 return Ok(status);
             }
         }
         Ok(WalkStatus::Completed)
     }
+}
 
-    /// Fail with [`WalkError::VisitedMoved`] if an event recorded since the
-    /// first `seen` events of `rewriter` moved `visited`, in an order that
-    /// does not allow it
-    /// ([`ALLOWS_DISPLACING_VISITED`](Self::ALLOWS_DISPLACING_VISITED)):
-    /// a move of `visited` itself, or a splice of the block or CFG it was in
-    /// at `place`. Panics if `rewriter` has recorded fewer than `seen` events.
-    ///
-    /// [`walk_mut`](Self::walk_mut) calls this after each visit. A loop driving
-    /// a cursor by hand calls it too: note `rewriter.events().len()` and
-    /// [`VisitedPlace::of`] before editing at a statement, and check before
-    /// the next [`WalkCursor::next`].
-    fn check_not_moved_since<L: Dialect>(
-        rewriter: &Rewriter<'_, L>,
-        visited: Statement,
-        place: VisitedPlace,
-        seen: usize,
-    ) -> Result<(), WalkError> {
-        if Self::ALLOWS_DISPLACING_VISITED {
-            return Ok(());
-        }
-        let moved = rewriter.events()[seen..].iter().any(|event| match *event {
-            MutationEvent::MovedStatement { stmt } => stmt == visited,
-            MutationEvent::SplicedBlock { source, .. } => place.block == Some(source),
-            MutationEvent::SplicedCfg { source, .. } => place.cfg == Some(source),
-            _ => false,
-        });
-        if moved {
-            Err(WalkError::VisitedMoved(visited))
-        } else {
-            Ok(())
-        }
+/// Fail with [`WalkError::VisitedMoved`] if an event recorded since the first
+/// `seen` events of `rewriter` moved `visited`, in an order `O` that does not
+/// allow it ([`WalkOrder::ALLOWS_ERASING_OR_MOVING_VISITED`]): a move of
+/// `visited` itself, or a splice of the block or CFG it was in at `place`.
+/// Panics if `rewriter` has recorded fewer than `seen` events.
+fn check_not_moved_since<O: WalkOrder + ?Sized, L: Dialect>(
+    rewriter: &Rewriter<'_, L>,
+    visited: Statement,
+    place: VisitedPlace,
+    seen: usize,
+) -> Result<(), WalkError> {
+    if O::ALLOWS_ERASING_OR_MOVING_VISITED {
+        return Ok(());
+    }
+    let moved = rewriter.events()[seen..].iter().any(|event| match *event {
+        MutationEvent::MovedStatement { stmt } => stmt == visited,
+        MutationEvent::SplicedBlock { source, .. } => place.block == Some(source),
+        MutationEvent::SplicedCfg { source, .. } => place.cfg == Some(source),
+        _ => false,
+    });
+    if moved {
+        Err(WalkError::VisitedMoved(visited))
+    } else {
+        Ok(())
     }
 }
 
 /// Where a visited statement was when its visit started: its block, and that
-/// block's CFG. [`WalkOrder::check_not_moved_since`] compares splices against
-/// it, since a splice changes both: afterwards, a statement spliced into a
-/// block, or a block spliced into a CFG, cannot be told from one that was
-/// there already.
+/// block's CFG. [`check_not_moved_since`] compares splices against it, since
+/// a splice changes both: afterwards, a statement spliced into a block, or a
+/// block spliced into a CFG, cannot be told from one that was there already.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct VisitedPlace {
+struct VisitedPlace {
     block: Option<Block>,
     cfg: Option<CFG>,
 }
 
 impl VisitedPlace {
     /// Where `stmt` is now in `stage`.
-    pub fn of<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Self {
+    fn of<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Self {
         let block = match stmt.get_info(stage).and_then(|info| info.parent) {
             Some(StatementParent::Block(block)) => Some(block),
             _ => None,
@@ -144,8 +140,11 @@ pub enum WalkResult {
     /// Go on to the next statement.
     #[default]
     Advance,
-    /// Go on, without walking the statements nested in this one. See
-    /// [`WalkCursor::skip`] for the orders where this has an effect.
+    /// Go on, without walking the statements nested in this one. Has no
+    /// effect in an order that visits a statement after the statements
+    /// nested in it ([`PostOrder`](super::PostOrder),
+    /// [`ReverseBFS`](super::ReverseBFS),
+    /// [`KeepOrderReverseBFS`](super::KeepOrderReverseBFS)).
     Skip,
     /// End the walk.
     Interrupt,
@@ -174,9 +173,24 @@ pub enum WalkStatus {
     Interrupted,
 }
 
+/// The cursor an order walks with, and how to start one at a root.
+///
+/// Crate-private, so that outside this crate a walk is only
+/// [`WalkOrder::walk`], [`WalkOrder::walk_mut`] or [`WalkOrder::schedule`]:
+/// an editing walk then always goes through `walk_mut`, which checks the
+/// whole contract, while a cursor stepped by hand would miss moves.
+pub(crate) trait CursorOrder {
+    /// The cursor walking this order.
+    type Cursor: WalkCursor;
+
+    /// A cursor at the start of the walk of the tree under `root`, `root`
+    /// included.
+    fn start<L: Dialect>(stage: &StageInfo<L>, root: Statement) -> Self::Cursor;
+}
+
 /// A position in a walk. It holds only ids, so the IR can be edited between
 /// steps.
-pub trait WalkCursor {
+pub(crate) trait WalkCursor {
     /// The next statement to visit, or `None` once the walk is done.
     ///
     /// The IR may be edited between calls within the walk's contract (see
@@ -184,6 +198,12 @@ pub trait WalkCursor {
     /// previous call has since been erased where the order does not allow
     /// it, or moved by merging its block into another.
     fn next<L: Dialect>(&mut self, stage: &StageInfo<L>) -> Result<Option<Statement>, WalkError>;
+
+    /// Fail if the statement returned by the previous [`next`](Self::next)
+    /// has since been erased where the order does not allow it, or moved by
+    /// merging its block into another. Only reads; the cursor does not move.
+    /// [`next`](Self::next) runs this check first.
+    fn check_visited<L: Dialect>(&self, stage: &StageInfo<L>) -> Result<(), WalkError>;
 
     /// Do not walk the statements nested in the statement the previous
     /// [`next`](Self::next) returned, including any added while visiting it.
@@ -210,8 +230,7 @@ pub enum WalkError {
     /// [`Rewriter::splice_block_before`](crate::Rewriter::splice_block_before) /
     /// [`Rewriter::splice_block_after`](crate::Rewriter::splice_block_after),
     /// or by splicing its CFG with
-    /// [`Rewriter::splice_cfg_after`](crate::Rewriter::splice_cfg_after) (see
-    /// [`WalkOrder::check_not_moved_since`]).
+    /// [`Rewriter::splice_cfg_after`](crate::Rewriter::splice_cfg_after).
     VisitedMoved(Statement),
 }
 
@@ -247,6 +266,14 @@ pub(super) enum Position {
 }
 
 impl Position {
+    /// The statement the cursor is at, if any.
+    pub(super) fn visited(self) -> Option<Statement> {
+        match self {
+            Position::At(stmt) | Position::Skipped(stmt) => Some(stmt),
+            Position::Start | Position::Done => None,
+        }
+    }
+
     /// Mark the statement the cursor is at as skipped; nothing to mark
     /// before the first statement or past the last.
     pub(super) fn skip(&mut self) {
