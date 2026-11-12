@@ -2039,7 +2039,8 @@ axis — hence the column.
 | `UnknownBody(body)` | liveness | a body the definition names (and the statement gains) does not resolve to a live body | `create`, `replace_statement` |
 | `BodyOwnedElsewhere(body)` | guard | a body the definition names (and the statement gains) already belongs to another statement or, for a block, to a CFG | `create`, `replace_statement` |
 | `BodyListedTwice(body)` | guard | the definition names the same body in two fields | `create`, `replace_statement` |
-| `BodyEnclosesOwner(body)` | guard | a body the statement owns, or would own, encloses the statement's place, which would make it its own ancestor | `create`, `insert`, `replace_statement` |
+| `BodyEnclosesOwner(body)` | guard | a body the statement owns, or would own, encloses the statement's place, which would make it its own ancestor | `create`, `replace_statement` |
+| `InsertedIntoItself(stmt)` | guard | the insertion point is nested in one of the detached statement's own bodies, which would make it its own ancestor; wrapped in `CannotInsert` | `insert` |
 | `MovedIntoItself { stmt, anchor }` | guard | the anchor is nested in the moved statement, which would make it its own ancestor | `move_before`, `move_after` |
 | `CfgSplicedIntoItself { source, anchor }` | guard | the anchor block is in `source` or nested in one of its blocks, which would place `source`'s blocks inside themselves | `splice_cfg_after` |
 | `SplicedIntoItself { source, anchor }` | guard | the anchor is in `source` or nested in one of its statements, which would place a spliced statement next to or inside itself | `splice_block_before`, `splice_block_after` |
