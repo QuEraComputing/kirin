@@ -95,7 +95,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// result a fresh [`Rewriter::new_result`] value
     /// ([`RewriteError::ResultNotFresh`]), which becomes a result of the new
     /// statement. The statement must also fit `insertion_pt` (see
-    /// [`InsertionPoint`]).
+    /// [`InsertionPoint`]); if it does not, the error is
+    /// [`RewriteError::CannotInsert`], naming `insertion_pt` and the reason.
     ///
     /// The new statement becomes the parent of every body `definition` names,
     /// such as blocks from [`Rewriter::new_block`]. Each must be live
@@ -153,8 +154,24 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         Ok(())
     }
 
-    /// Check that a statement with `definition` fits `insertion_pt`.
+    /// Check that a statement with `definition` fits `insertion_pt`. A
+    /// rejection is wrapped in [`RewriteError::CannotInsert`], naming
+    /// `insertion_pt`.
     fn check_insertion_pt(
+        &self,
+        insertion_pt: InsertionPoint,
+        definition: &L,
+    ) -> Result<Placement, RewriteError> {
+        self.placement_at(insertion_pt, definition)
+            .map_err(|reason| RewriteError::CannotInsert {
+                insertion_pt,
+                reason: Box::new(reason),
+            })
+    }
+
+    /// Where a statement with `definition` goes at `insertion_pt`, or why it
+    /// does not fit there.
+    fn placement_at(
         &self,
         insertion_pt: InsertionPoint,
         definition: &L,

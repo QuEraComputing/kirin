@@ -6,7 +6,9 @@ mod common;
 
 use std::collections::{HashMap, HashSet};
 
-use common::{BuilderDialect, EventCursor, TestType, make_compute, make_split, new_stage};
+use common::{
+    BuilderDialect, EventCursor, TestType, cannot_insert, make_compute, make_split, new_stage,
+};
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
@@ -142,18 +144,27 @@ fn insert_node_rejects_without_mutating() {
     let fresh = rw.new_result(TestType::I32);
     assert_eq!(
         rw.create(InsertionPoint::DiGraph(dead_graph), BuilderDialect::Nop),
-        Err(RewriteError::UnknownDiGraph(dead_graph))
+        Err(cannot_insert(
+            InsertionPoint::DiGraph(dead_graph),
+            RewriteError::UnknownDiGraph(dead_graph)
+        ))
     );
     assert_eq!(
         rw.create(InsertionPoint::DiGraph(dg), BuilderDialect::Return),
-        Err(RewriteError::UnexpectedTerminator)
+        Err(cannot_insert(
+            InsertionPoint::DiGraph(dg),
+            RewriteError::UnexpectedTerminator
+        ))
     );
     assert_eq!(
         rw.create(
             InsertionPoint::DiGraph(dg),
             BuilderDialect::Fork(Successor::from_block(outer))
         ),
-        Err(RewriteError::NonTerminatorWithSuccessors)
+        Err(cannot_insert(
+            InsertionPoint::DiGraph(dg),
+            RewriteError::NonTerminatorWithSuccessors
+        ))
     );
     assert_eq!(
         rw.create(

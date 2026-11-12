@@ -417,3 +417,13 @@ impl EventCursor {
         events
     }
 }
+
+/// The error [`Rewriter::create`] and [`Rewriter::insert`] return when a
+/// statement cannot go at `insertion_pt`, for `reason`.
+#[allow(dead_code)]
+pub fn cannot_insert(insertion_pt: InsertionPoint, reason: RewriteError) -> RewriteError {
+    RewriteError::CannotInsert {
+        insertion_pt,
+        reason: Box::new(reason),
+    }
+}
