@@ -64,14 +64,10 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         if prev == Some(stmt) || next == Some(stmt) {
             return Ok(());
         }
-        // Walk up the statements whose bodies enclose `anchor`. If `stmt` is
-        // one of them, the move would put `stmt` inside its own body.
-        let mut owner = tree::parent(self.stage, anchor);
-        while let Some(current) = owner {
-            if current == stmt {
-                return Err(RewriteError::MovedIntoItself { stmt, anchor });
-            }
-            owner = tree::parent(self.stage, current);
+        // If `stmt` encloses `anchor`, the move would put `stmt` inside its
+        // own body.
+        if self.encloses(stmt, tree::parent(self.stage, anchor)) {
+            return Err(RewriteError::MovedIntoItself { stmt, anchor });
         }
 
         self.unlink(stmt, block);
