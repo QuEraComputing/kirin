@@ -5,7 +5,9 @@ mod common;
 
 use std::collections::HashSet;
 
-use common::{BuilderDialect, EventCursor, TestType, make_split, make_wire, new_stage};
+use common::{
+    BuilderDialect, EventCursor, TestType, cannot_insert, make_split, make_wire, new_stage,
+};
 use kirin_ir::*;
 
 /// The def-use set of `value` (order-agnostic; `SSAInfo::uses` is a bag).
@@ -508,7 +510,10 @@ fn insert_before_and_after_splice_and_maintain_index() {
     let mut rw = Rewriter::new(&mut stage);
     assert_eq!(
         rw.create(InsertionPoint::After(ret), BuilderDialect::Nop),
-        Err(RewriteError::AnchorIsTerminator(ret))
+        Err(cannot_insert(
+            InsertionPoint::After(ret),
+            RewriteError::AnchorIsTerminator(ret)
+        ))
     );
     let not_fresh = ResultValue::from(TestSSAValue(0));
     assert_eq!(
@@ -517,7 +522,10 @@ fn insert_before_and_after_splice_and_maintain_index() {
     );
     assert_eq!(
         rw.create(InsertionPoint::Before(s0), BuilderDialect::Return),
-        Err(RewriteError::UnexpectedTerminator)
+        Err(cannot_insert(
+            InsertionPoint::Before(s0),
+            RewriteError::UnexpectedTerminator
+        ))
     );
     // Only a terminator may carry successors.
     assert_eq!(
@@ -525,7 +533,10 @@ fn insert_before_and_after_splice_and_maintain_index() {
             InsertionPoint::After(s0),
             BuilderDialect::Fork(Successor::from_block(block))
         ),
-        Err(RewriteError::NonTerminatorWithSuccessors)
+        Err(cannot_insert(
+            InsertionPoint::After(s0),
+            RewriteError::NonTerminatorWithSuccessors
+        ))
     );
     let bogus = SSAValue::from(TestSSAValue(9999));
     assert_eq!(

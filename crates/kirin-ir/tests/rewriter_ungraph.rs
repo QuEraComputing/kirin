@@ -6,7 +6,9 @@ mod common;
 
 use std::collections::HashMap;
 
-use common::{BuilderDialect, EventCursor, TestType, make_split, make_wire, new_stage};
+use common::{
+    BuilderDialect, EventCursor, TestType, cannot_insert, make_split, make_wire, new_stage,
+};
 use kirin_ir::*;
 use petgraph::visit::{EdgeRef, IntoEdgeReferences};
 
@@ -294,25 +296,37 @@ fn ungraph_inserts_reject_without_mutating() {
                 InsertionPoint::UnGraph(dead_graph),
                 BuilderDialect::Isolated,
             ),
-            RewriteError::UnknownUnGraph(dead_graph),
+            cannot_insert(
+                InsertionPoint::UnGraph(dead_graph),
+                RewriteError::UnknownUnGraph(dead_graph),
+            ),
         ),
         (
             rw.create(
                 InsertionPoint::UnGraph(dead_graph),
                 BuilderDialect::Wire(fresh),
             ),
-            RewriteError::UnknownUnGraph(dead_graph),
+            cannot_insert(
+                InsertionPoint::UnGraph(dead_graph),
+                RewriteError::UnknownUnGraph(dead_graph),
+            ),
         ),
         (
             rw.create(InsertionPoint::UnGraph(ug), BuilderDialect::Return),
-            RewriteError::UnexpectedTerminator,
+            cannot_insert(
+                InsertionPoint::UnGraph(ug),
+                RewriteError::UnexpectedTerminator,
+            ),
         ),
         (
             rw.create(
                 InsertionPoint::UnGraph(ug),
                 BuilderDialect::Fork(Successor::from_block(dead_block)),
             ),
-            RewriteError::NonTerminatorWithSuccessors,
+            cannot_insert(
+                InsertionPoint::UnGraph(ug),
+                RewriteError::NonTerminatorWithSuccessors,
+            ),
         ),
         (
             rw.create(
@@ -326,7 +340,10 @@ fn ungraph_inserts_reject_without_mutating() {
                 InsertionPoint::UnGraph(ug),
                 BuilderDialect::ParamWire(w, fresh),
             ),
-            RewriteError::EdgeStatementWithOperands,
+            cannot_insert(
+                InsertionPoint::UnGraph(ug),
+                RewriteError::EdgeStatementWithOperands,
+            ),
         ),
         (
             rw.create(
