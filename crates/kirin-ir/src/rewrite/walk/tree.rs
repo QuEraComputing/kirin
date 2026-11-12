@@ -81,7 +81,7 @@ pub(crate) fn parent<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Optio
 }
 
 /// Whether `stmt` is live and owns any body, empty or not.
-pub(super) fn owns_bodies<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> bool {
+pub(crate) fn owns_bodies<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> bool {
     stmt.get_info(stage).is_some_and(|info| {
         let definition = info.definition();
         definition.blocks().next().is_some()

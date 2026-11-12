@@ -1,9 +1,11 @@
-//! Bodies owned by a statement, for [`Rewriter::replace_statement`] and
-//! statement erasure.
+//! Bodies owned by a statement, for [`Rewriter::replace_statement`],
+//! statement erasure, and the checks that keep a statement out of its own
+//! bodies.
 
 use smallvec::SmallVec;
 
 use crate::arena::{GetInfo, GetInfoMut};
+use crate::rewrite::walk::tree;
 use crate::{BlockParent, Body, Dialect, RewriteError, Rewriter, Statement, StatementParent};
 
 impl<L: Dialect> Rewriter<'_, L> {
@@ -93,6 +95,26 @@ impl<L: Dialect> Rewriter<'_, L> {
                 return false;
             };
             current = owner;
+        }
+        false
+    }
+
+    /// Whether `stmt` is `owner` or encloses it, at any depth. `owner` is the
+    /// statement whose body holds a place, so `true` means placing `stmt`
+    /// there would make it its own ancestor.
+    ///
+    /// Only a statement owning a body can enclose anything, so for the many
+    /// that own none this skips the walk up from `owner`.
+    pub(super) fn encloses(&self, stmt: Statement, owner: Option<Statement>) -> bool {
+        if !tree::owns_bodies(self.stage, stmt) {
+            return false;
+        }
+        let mut current = owner;
+        while let Some(outer) = current {
+            if outer == stmt {
+                return true;
+            }
+            current = tree::parent(self.stage, outer);
         }
         false
     }

@@ -23,6 +23,8 @@ mod bodies;
 pub(crate) mod cfg;
 pub(crate) mod digraph;
 mod insert;
+#[cfg(test)]
+mod insert_tests;
 mod list;
 mod moves;
 pub(crate) mod pass;

@@ -10,12 +10,14 @@ use std::collections::HashSet;
 use crate::arena::{GetInfo, GetInfoMut};
 use crate::node::linked_list::{LinkedList, LinkedListNode};
 use crate::{
-    Block, DiGraph, Dialect, SSAValue, Statement, StatementInfo, StatementParent, UnGraph, Use,
+    Block, BlockParent, DiGraph, Dialect, SSAValue, Statement, StatementInfo, StatementParent,
+    UnGraph, Use,
 };
 
 use crate::rewrite::rewriter::{
     MutationEvent, RewriteError, Rewriter, Side, add_predecessor, add_use,
 };
+use crate::rewrite::walk::tree;
 
 /// Where [`Rewriter::create`] or [`Rewriter::insert`] places a statement.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -113,7 +115,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     ///
     /// Rejects, leaving the stage untouched, if `stmt` is unknown, is not a
     /// detached statement of this `Rewriter` ([`RewriteError::NotDetached`]),
-    /// or does not fit `insertion_pt`. Records the events of
+    /// or does not fit `insertion_pt`. `insertion_pt` must not be nested in
+    /// `stmt`'s own bodies ([`RewriteError::InsertedIntoItself`], wrapped in
+    /// [`RewriteError::CannotInsert`]). Records the events of
     /// [`Rewriter::create`].
     pub fn insert(
         &mut self,
@@ -125,8 +129,30 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             return Err(RewriteError::NotDetached(stmt));
         }
         let placement = self.check_insertion_pt(insertion_pt, &item.definition)?;
+        if self.encloses(stmt, self.insertion_pt_owner(insertion_pt)) {
+            return Err(RewriteError::CannotInsert {
+                insertion_pt,
+                reason: Box::new(RewriteError::InsertedIntoItself(stmt)),
+            });
+        }
         self.place(stmt, placement);
         Ok(())
+    }
+
+    /// The statement whose body holds `insertion_pt`, or `None` at the top
+    /// level. `insertion_pt` has passed [`Rewriter::check_insertion_pt`].
+    fn insertion_pt_owner(&self, insertion_pt: InsertionPoint) -> Option<Statement> {
+        match insertion_pt {
+            InsertionPoint::Before(anchor) | InsertionPoint::After(anchor) => {
+                tree::parent(self.stage, anchor)
+            }
+            InsertionPoint::Terminator(block) => match block.get_info(self.stage)?.parent()? {
+                BlockParent::CFG(cfg) => cfg.get_info(self.stage)?.parent,
+                BlockParent::Statement(owner) => Some(owner),
+            },
+            InsertionPoint::DiGraph(graph) => graph.get_info(self.stage)?.parent(),
+            InsertionPoint::UnGraph(graph) => graph.get_info(self.stage)?.parent(),
+        }
     }
 
     /// Check that a statement with `definition` fits `insertion_pt`. A

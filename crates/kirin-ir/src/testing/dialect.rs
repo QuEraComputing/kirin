@@ -3,7 +3,8 @@
 //! Deliberately smaller than `tests/common.rs`'s `BuilderDialect`: it carries
 //! only what the in-crate tests need — operands, so values have uses, and a
 //! terminator, so blocks have a body to summarize, and a result-producing op
-//! and an edge op, so graph mirrors have edges to forge. Successors and bodies
+//! and an edge op, so graph mirrors have edges to forge, and one op owning a
+//! block, so a statement can enclose others. Successors and the other bodies
 //! are covered by the integration tests, which reach the same code through the
 //! public API.
 
@@ -42,6 +43,7 @@ impl Placeholder for TestType {
 /// - `Return`: a terminator
 /// - `Def(r)`: one result, so a `DiGraph` member can feed another
 /// - `Wire(r)`: an edge statement, whose result is an `UnGraph` wire
+/// - `Region(b)`: owns the block `b`, so it encloses `b`'s statements
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub(crate) enum TestLang {
     Nop,
@@ -50,6 +52,7 @@ pub(crate) enum TestLang {
     Return,
     Def(ResultValue),
     Wire(ResultValue),
+    Region(Block),
 }
 
 impl<'a> HasArguments<'a> for TestLang {
@@ -120,21 +123,29 @@ impl<'a> HasResultsMut<'a> for TestLang {
     }
 }
 
+impl<'a> HasBlocks<'a> for TestLang {
+    type Iter = std::option::IntoIter<&'a Block>;
+    fn blocks(&'a self) -> Self::Iter {
+        match self {
+            TestLang::Region(b) => Some(b).into_iter(),
+            _ => None.into_iter(),
+        }
+    }
+}
+
+impl<'a> HasBlocksMut<'a> for TestLang {
+    type IterMut = std::option::IntoIter<&'a mut Block>;
+    fn blocks_mut(&'a mut self) -> Self::IterMut {
+        match self {
+            TestLang::Region(b) => Some(b).into_iter(),
+            _ => None.into_iter(),
+        }
+    }
+}
+
 /// The remaining `Dialect` supertraits, none of which this dialect exercises.
 macro_rules! empty_impls {
     ($ty:ty) => {
-        impl<'a> HasBlocks<'a> for $ty {
-            type Iter = std::iter::Empty<&'a Block>;
-            fn blocks(&'a self) -> Self::Iter {
-                std::iter::empty()
-            }
-        }
-        impl<'a> HasBlocksMut<'a> for $ty {
-            type IterMut = std::iter::Empty<&'a mut Block>;
-            fn blocks_mut(&'a mut self) -> Self::IterMut {
-                std::iter::empty()
-            }
-        }
         impl<'a> HasCFG<'a> for $ty {
             type Iter = std::iter::Empty<&'a CFG>;
             fn cfgs(&'a self) -> Self::Iter {

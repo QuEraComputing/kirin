@@ -252,6 +252,10 @@ pub enum RewriteError {
     /// statement's own bodies, which would make the statement its own
     /// ancestor.
     MovedIntoItself { stmt: Statement, anchor: Statement },
+    /// [`Rewriter::insert`] was given an insertion point nested in the
+    /// statement's own bodies, which would make the statement its own
+    /// ancestor.
+    InsertedIntoItself(Statement),
     /// `splice_block_before`/`splice_block_after` was given an anchor in
     /// `source` or nested in one of its statements, which would place a
     /// spliced statement next to or inside itself.
@@ -418,6 +422,9 @@ impl fmt::Display for RewriteError {
                     f,
                     "cannot move {stmt:?} next to {anchor:?}, which is nested in it"
                 )
+            }
+            RewriteError::InsertedIntoItself(stmt) => {
+                write!(f, "{stmt:?} would be inserted into its own body")
             }
             RewriteError::SplicedIntoItself { source, anchor } => {
                 write!(
