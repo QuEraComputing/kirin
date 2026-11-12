@@ -492,3 +492,22 @@ come in `kirin-interpreter`, as the three impls collapse into one.
 **Tests.** The existing tests reading through `AnalysisResults` must pass
 unchanged. One new test analyzes, edits the pipeline, then reads the result,
 which compiles only if the result no longer borrows the pipeline.
+
+## Open question: results per stage or per pipeline
+
+Is "which stage" part of an analysis itself, or part of how its result is
+looked up?
+
+- **Part of the lookup (this design).** The cache key is the stage and the
+  analysis, and `run`, `get` and `get_cached` take a stage. The same
+  analysis type has a separate result for each stage. But a root at one
+  stage can reach callables at others through cross-stage calls, so "the
+  result for stage X" may hold facts about other stages too.
+- **Part of the analysis.** An analysis is a value naming its roots, each at
+  its stage, e.g. `register(ConstPropFacts { roots })`, as an LLVM analysis
+  is a constructed object with a `run` method. There is one result per
+  analysis type for the whole pipeline; `run`, `get` and `get_cached` take
+  no stage, and the separate `Input` type goes away. Two results of one
+  analysis, such as one per stage, need two types.
+
+Invalidation is the same either way: any edit drops every result.
