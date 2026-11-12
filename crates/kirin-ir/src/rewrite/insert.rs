@@ -235,12 +235,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
     /// Place the detached `stmt` as `placement` says, and record the events.
     fn place(&mut self, stmt: Statement, placement: Placement) {
         self.detached.remove(&stmt);
-        let operands: Vec<SSAValue> = stmt
-            .expect_info(self.stage)
-            .definition
-            .arguments()
-            .copied()
-            .collect();
         let parent = placement.parent();
         if let Some(info) = stmt.get_info_mut(self.stage) {
             info.parent = Some(parent);
@@ -267,7 +261,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     .get_info_mut(self.stage)
                     .expect("graph is live in this stage")
                     .add_node(stmt);
-                for operand in operands {
+                for operand in self.operands_of(stmt) {
                     self.add_operand_edge(graph, stmt, operand);
                 }
                 // A detached statement's results are usable before it is
@@ -301,7 +295,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 // `stmt` already uses its operands, but endpoints only count
                 // graph nodes, so the snapshot does not see it until it is
                 // added.
-                let wires = self.snapshot_wires(graph, operands);
+                let wires = self.snapshot_wires(graph, self.operands_of(stmt));
                 graph
                     .get_info_mut(self.stage)
                     .expect("graph is live in this stage")
@@ -328,6 +322,15 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                     .push(MutationEvent::ChangedUnGraphTopology { graph });
             }
         }
+    }
+
+    /// `stmt`'s operands, in order.
+    fn operands_of(&self, stmt: Statement) -> Vec<SSAValue> {
+        stmt.expect_info(self.stage)
+            .definition
+            .arguments()
+            .copied()
+            .collect()
     }
 
     /// `stmt`'s results, in order.
