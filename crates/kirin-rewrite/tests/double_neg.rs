@@ -360,7 +360,7 @@ fn run_error(rules: &RuleSet<L>, input: &str) -> Option<DriverError> {
     let driver = RewriteDriver::new(rules);
     let mut failure = None;
     let _ = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PostOrder>(rewriter);
+        let result = driver.run(rewriter);
         failure = result.clone().err();
         result
     });
@@ -517,9 +517,9 @@ fn parse(input: &str) -> (Pipeline<StageInfo<L>>, CompileStage) {
 /// Run `rules` over `input` in order `O`, returning the printed result.
 fn rewrite<O: WalkOrder>(rules: &RuleSet<L>, input: &str) -> (String, RewriteSummary) {
     let (mut pipeline, stage) = parse(input);
-    let driver = RewriteDriver::new(rules);
+    let driver = RewriteDriver::new(rules).walk_order::<O>();
     let summary = pipeline
-        .run_pass(stage, |rewriter| driver.run::<O>(rewriter))
+        .run_pass(stage, |rewriter| driver.run(rewriter))
         .expect("the pass succeeds");
     (pipeline.sprint(), summary)
 }
@@ -601,7 +601,7 @@ fn the_fixpoint_ends_with_a_sweep_that_changes_nothing() {
         "    %a = neg %x -> i64;\n    %b = neg %a -> i64;\n    %c = neg %b -> i64;",
         "%c",
     );
-    let (_, summary) = rewrite::<PostOrder>(&neg_rules(), &input);
+    let (_, summary) = rewrite::<PreOrder>(&neg_rules(), &input);
     assert_eq!(
         summary,
         RewriteSummary {
@@ -615,7 +615,7 @@ fn the_fixpoint_ends_with_a_sweep_that_changes_nothing() {
 #[test]
 fn a_program_without_matches_is_left_alone() {
     let input = program("    %a = neg %x -> i64;\n    %b = add %a, %x -> i64;", "%b");
-    let (output, summary) = rewrite::<PostOrder>(&neg_rules(), &input);
+    let (output, summary) = rewrite::<PreOrder>(&neg_rules(), &input);
     assert_eq!(output, printed(&input));
     assert_eq!(
         summary,
@@ -639,7 +639,7 @@ fn every_function_in_the_stage_is_rewritten() {
                     stage @arith fn @g(i64) -> i64;\n\
                     specialize @arith fn @f(i64) -> i64 cfg {\n  ^entry(%x: i64) {\n    ret %x;\n  }\n}\n\
                     specialize @arith fn @g(i64) -> i64 cfg {\n  ^entry(%y: i64) {\n    ret %y;\n  }\n}\n";
-    let (output, summary) = rewrite::<PostOrder>(&neg_rules(), input);
+    let (output, summary) = rewrite::<PreOrder>(&neg_rules(), input);
     assert_eq!(output, printed(expected));
     assert_eq!(
         (summary.applied, summary.erased),
@@ -675,7 +675,7 @@ fn a_redefined_function_is_not_rewritten() {
     let rules = neg_rules();
     let driver = RewriteDriver::new(&rules);
     let summary = pipeline
-        .run_pass(stage, |rewriter| driver.run::<PostOrder>(rewriter))
+        .run_pass(stage, |rewriter| driver.run(rewriter))
         .expect("the pass succeeds");
     assert_eq!((summary.applied, summary.erased), (0, 0));
 }
@@ -761,7 +761,7 @@ fn a_native_check_returning_err_fails_the_run() {
 
     let mut failure = None;
     let result = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PostOrder>(rewriter);
+        let result = driver.run(rewriter);
         failure = result.clone().err();
         result
     });
@@ -792,7 +792,7 @@ fn a_constraint_with_try_applies_on_ok_true_and_fails_the_run_on_err() {
     let driver = RewriteDriver::new(&rules);
     let mut failure = None;
     let result = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PostOrder>(rewriter);
+        let result = driver.run(rewriter);
         failure = result.clone().err();
         result
     });
@@ -945,7 +945,7 @@ fn a_constraint_on_a_non_bool_fails_the_run() {
 
     let mut failure = None;
     let result = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PostOrder>(rewriter);
+        let result = driver.run(rewriter);
         failure = result.clone().err();
         result
     });
@@ -968,7 +968,7 @@ fn a_native_argument_of_the_wrong_type_fails_the_run() {
 
     let mut failure = None;
     let result = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PostOrder>(rewriter);
+        let result = driver.run(rewriter);
         failure = result.clone().err();
         result
     });
@@ -1025,43 +1025,13 @@ fn a_native_call_with_two_functions_rejects_the_rule() {
     );
 }
 
-/// The reverse BFS orders allow erasing the statement being visited.
+/// The driver visits statements from a worklist, so a rule may erase the
+/// statement being visited in every order.
 #[test]
-fn a_rule_erasing_its_root_runs_in_the_reverse_bfs_orders() {
+fn a_rule_erasing_its_root_runs_in_every_order() {
     let rules = RuleSet::build(|stage| vec![double_neg_erasing_root(stage)]).unwrap();
     let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
-    let expected = printed(&program("", "%x"));
-    assert_eq!(rewrite::<ReverseBFS>(&rules, &input).0, expected);
-    assert_eq!(rewrite::<KeepOrderReverseBFS>(&rules, &input).0, expected);
-}
-
-/// The other orders forbid erasing the statement being visited, so the run
-/// fails before editing anything.
-#[test]
-fn a_rule_erasing_its_root_fails_in_the_other_orders() {
-    let rules = RuleSet::build(|stage| vec![double_neg_erasing_root(stage)]).unwrap();
-    let input = program("    %a = neg %x -> i64;\n    %b = neg %a -> i64;", "%b");
-    let (mut pipeline, stage) = parse(&input);
-    let driver = RewriteDriver::new(&rules);
-
-    let mut failure = None;
-    let mut edits = None;
-    let result = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PostOrder>(rewriter);
-        failure = result.clone().err();
-        edits = Some(rewriter.events().len());
-        result
-    });
-
-    assert!(result.is_err());
-    assert_eq!(
-        failure,
-        Some(DriverError::ErasesRoot {
-            rule: "double_neg_erasing_root".to_string(),
-            order: "PostOrder",
-        })
-    );
-    assert_eq!(edits, Some(0));
+    assert_rewrites(&rules, &input, &program("", "%x"));
 }
 
 #[test]
@@ -1077,7 +1047,7 @@ fn a_failed_rewrite_quarantines_the_stage() {
 
     let mut failure = None;
     let result = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PostOrder>(rewriter);
+        let result = driver.run(rewriter);
         failure = result.clone().err();
         result
     });
@@ -1102,7 +1072,7 @@ fn running_out_of_sweeps_quarantines_the_stage() {
 
     let mut failure = None;
     let result = pipeline.run_pass(stage, |rewriter| {
-        let result = driver.run::<PostOrder>(rewriter);
+        let result = driver.run(rewriter);
         failure = result.clone().err();
         result
     });

@@ -7,9 +7,12 @@ use kirin_ir::{Block, Dialect, RewriteError, Rewriter, Statement};
 /// Add one with [`RuleSet::add_statement_rule`](crate::RuleSet::add_statement_rule),
 /// which takes a recipe building the rule. The driver builds a fresh rule
 /// every sweep, so anything the rule stores is gone by the next sweep.
+/// Within a sweep, the rule may be handed the same statement more than once,
+/// when an edit adds it back to the driver's worklist, and anything it
+/// stored about the IR may have changed in between.
 pub trait StatementRule<L: Dialect> {
     /// Try the rule at `stmt`, editing through `rewriter`, and say how the
-    /// driver goes on walking.
+    /// driver goes on: `Interrupt` ends the sweep. The driver ignores `Skip`.
     fn apply(
         &mut self,
         rewriter: &mut Rewriter<'_, L>,
@@ -32,8 +35,7 @@ pub trait StatementRule<L: Dialect> {
 /// skips a block that no longer exists when its turn comes.
 pub trait BlockRule<L: Dialect> {
     /// Run the rule over `block`, editing through `rewriter`, and say how the
-    /// driver goes on walking: `Skip` leaves the statements nested in the
-    /// statement owning the block unwalked.
+    /// driver goes on: `Interrupt` ends the sweep. The driver ignores `Skip`.
     fn apply(
         &mut self,
         rewriter: &mut Rewriter<'_, L>,
