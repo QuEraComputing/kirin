@@ -6,7 +6,7 @@ mod common;
 
 use std::collections::HashSet;
 
-use common::{BuilderDialect, EventCursor, TestType, make_split, new_stage};
+use common::{BuilderDialect, EventCursor, TestType, cannot_insert, make_split, new_stage};
 use kirin_ir::*;
 
 /// The def-use set of `value` (order-agnostic; `SSAInfo::uses` is a bag).
@@ -623,11 +623,17 @@ fn insert_terminator_rejects_without_mutating() {
             InsertionPoint::Terminator(terminated),
             BuilderDialect::Return
         ),
-        Err(RewriteError::BlockHasTerminator(terminated))
+        Err(cannot_insert(
+            InsertionPoint::Terminator(terminated),
+            RewriteError::BlockHasTerminator(terminated)
+        ))
     );
     assert_eq!(
         rw.create(InsertionPoint::Terminator(open), BuilderDialect::Nop),
-        Err(RewriteError::ExpectedTerminator)
+        Err(cannot_insert(
+            InsertionPoint::Terminator(open),
+            RewriteError::ExpectedTerminator
+        ))
     );
     // Even a fresh result is rejected: nothing can follow a terminator to use it.
     let result = rw.new_result(TestType::I32);
@@ -636,11 +642,17 @@ fn insert_terminator_rejects_without_mutating() {
             InsertionPoint::Terminator(open),
             BuilderDialect::Invoke(result)
         ),
-        Err(RewriteError::CannotInsertTerminatorWithResults)
+        Err(cannot_insert(
+            InsertionPoint::Terminator(open),
+            RewriteError::CannotInsertTerminatorWithResults
+        ))
     );
     assert_eq!(
         rw.create(InsertionPoint::Terminator(open), br(dead_block)),
-        Err(RewriteError::UnknownBlock(dead_block))
+        Err(cannot_insert(
+            InsertionPoint::Terminator(open),
+            RewriteError::UnknownBlock(dead_block)
+        ))
     );
     assert_eq!(
         rw.create(
@@ -654,7 +666,10 @@ fn insert_terminator_rejects_without_mutating() {
             InsertionPoint::Terminator(dead_block),
             BuilderDialect::Return
         ),
-        Err(RewriteError::UnknownBlock(dead_block))
+        Err(cannot_insert(
+            InsertionPoint::Terminator(dead_block),
+            RewriteError::UnknownBlock(dead_block)
+        ))
     );
 
     assert!(rw.events().is_empty());
