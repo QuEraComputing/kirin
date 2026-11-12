@@ -20,7 +20,7 @@ mod common;
 
 use std::collections::HashSet;
 
-use common::{BuilderDialect, TestType, make_split, new_stage};
+use common::{BuilderDialect, TestType, cannot_insert, make_split, new_stage};
 use kirin_ir::*;
 
 /// The def-use set of `value` (order-agnostic; `SSAInfo::uses` is a bag).
@@ -740,7 +740,10 @@ fn insert_after_the_terminator_leaves_the_block_body_intact() {
         // Nothing can follow a terminator.
         assert_eq!(
             rewriter.create(InsertionPoint::After(f.terminator), BuilderDialect::Nop),
-            Err(RewriteError::AnchorIsTerminator(f.terminator))
+            Err(cannot_insert(
+                InsertionPoint::After(f.terminator),
+                RewriteError::AnchorIsTerminator(f.terminator)
+            ))
         );
     }
 

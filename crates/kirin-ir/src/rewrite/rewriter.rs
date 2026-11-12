@@ -82,6 +82,7 @@ use std::fmt;
 use indexmap::{IndexMap, IndexSet};
 use rustc_hash::{FxBuildHasher, FxHashMap, FxHashSet};
 
+use crate::InsertionPoint;
 use crate::arena::{GetInfo, GetInfoMut};
 use smallvec::SmallVec;
 
@@ -152,8 +153,15 @@ pub enum MutationEvent {
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub enum RewriteError {
+    /// [`Rewriter::create`] or [`Rewriter::insert`] could not place a
+    /// statement at `insertion_pt`, for `reason`: the anchor, block or graph
+    /// it names is not a valid place, or the statement does not fit there.
+    CannotInsert {
+        insertion_pt: InsertionPoint,
+        reason: Box<RewriteError>,
+    },
     /// The statement ID does not resolve to a live statement in this stage.
     UnknownStatement(Statement),
     /// The SSA value ID does not resolve to a live value in this stage.
@@ -301,6 +309,12 @@ impl fmt::Display for RewriteError {
                     f,
                     "statement {stmt:?} is not a live statement in this stage"
                 )
+            }
+            RewriteError::CannotInsert {
+                insertion_pt,
+                reason,
+            } => {
+                write!(f, "cannot insert at {insertion_pt:?}: {reason}")
             }
             RewriteError::UnknownValue(value) => {
                 write!(f, "SSA value {value} is not a live value in this stage")
