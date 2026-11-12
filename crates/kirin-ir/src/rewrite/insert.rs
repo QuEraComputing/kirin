@@ -51,10 +51,9 @@ pub enum InsertionPoint {
     /// wires. Each operand of a node that is a wire of the graph becomes an
     /// endpoint of that wire, and a wire read by two node slots is an edge,
     /// including the wires of a detached edge statement that nodes already
-    /// read. A
-    /// wire may end up with more than two endpoints; that is invalid IR, left
-    /// for [`verify_derived`](crate::verify_derived) to report, and such a
-    /// wire has no edge.
+    /// read. A wire may end up with more than two endpoints; that is invalid
+    /// IR, left for [`verify_derived`](crate::verify_derived) to report, and
+    /// such a wire has no edge.
     UnGraph(UnGraph),
 }
 
