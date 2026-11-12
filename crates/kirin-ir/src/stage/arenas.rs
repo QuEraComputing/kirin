@@ -160,6 +160,14 @@ impl<L: Dialect> Arenas<L> {
         &self.modules
     }
 
+    /// The stage's module named `name`, if any.
+    pub fn module_by_name(&self, name: GlobalSymbol) -> Option<Module> {
+        self.modules
+            .iter()
+            .find(|info| info.name == Some(name))
+            .map(|info| info.id)
+    }
+
     /// Get a reference to the undirected graph arena.
     pub fn ungraph_arena(&self) -> &Arena<UnGraph, UnGraphInfo<L>> {
         &self.ungraphs

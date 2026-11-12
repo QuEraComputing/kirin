@@ -4,6 +4,7 @@ use crate::arena::{Arena, Id, Item};
 use crate::builder::error::{PipelineError, PipelineStagedError};
 use crate::intern::InternTable;
 use crate::language::Dialect;
+use crate::node::Module;
 use crate::node::function::{
     CompileStage, Function, FunctionInfo, SpecializedFunction, SpecializedFunctionInfo,
     StagedFunction,
@@ -291,6 +292,22 @@ impl<S> Pipeline<S> {
         let func = self.function_by_name(sym)?;
         let info = self.function_info(func)?;
         info.staged_function(stage)
+    }
+
+    /// Resolve a module name at a given stage to its [`Module`].
+    ///
+    /// Module names are pipeline-global, so one name identifies the
+    /// corresponding module at every stage that has one.
+    ///
+    /// Returns `None` if the name is unknown, the stage is missing or holds a
+    /// different dialect, or the stage has no module with that name.
+    pub fn resolve_module<L: Dialect>(&self, name: &str, stage: CompileStage) -> Option<Module>
+    where
+        S: HasStageInfo<L>,
+    {
+        let sym = self.lookup_symbol(name)?;
+        let info = HasStageInfo::<L>::try_stage_info(self.stage(stage)?)?;
+        info.module_by_name(sym)
     }
 
     /// Resolve a stage-local [`Symbol`] to a pipeline-level [`Function`].
