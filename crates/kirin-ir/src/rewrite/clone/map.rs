@@ -46,7 +46,7 @@ impl IRMap {
     }
 
     /// `value`'s replacement, or `value` itself if it has none.
-    pub(super) fn lookup_or_original(&self, value: SSAValue) -> SSAValue {
+    pub fn lookup_or_original(&self, value: SSAValue) -> SSAValue {
         self.value(value).unwrap_or(value)
     }
 

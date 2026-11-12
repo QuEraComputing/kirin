@@ -190,9 +190,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
         for body in bodies {
             match body {
-                Body::Block(block) => {
-                    self.reserve_block(block, None, map);
-                }
+                Body::Block(block) => self.reserve_block(block, None, map),
                 Body::CFG(cfg) => {
                     self.reserve_cfg(cfg, map);
                 }
@@ -202,7 +200,8 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         }
     }
 
-    /// First pass for `cfg`: allocate a CFG with no parent and its blocks.
+    /// First pass for `cfg`: allocate a CFG with no parent and its blocks,
+    /// unlinked. The second pass links them in order.
     fn reserve_cfg(&mut self, cfg: CFG, map: &mut IRMap) -> CFG {
         let copy = self
             .stage
@@ -211,8 +210,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             .alloc_with_id(|id| CFGInfo::builder().id(id).blocks(LinkedList::new()).new());
         map.map_cfg(cfg, copy);
         for block in self.cfg_blocks(cfg) {
-            let block_copy = self.reserve_block(block, Some(BlockParent::CFG(copy)), map);
-            self.push_block(copy, block_copy);
+            self.reserve_block(block, Some(BlockParent::CFG(copy)), map);
         }
         copy
     }
@@ -275,12 +273,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
 
     /// First pass for `block`: allocate an empty block under `parent` with
     /// copies of its arguments, then reserve its statements.
-    fn reserve_block(
-        &mut self,
-        block: Block,
-        parent: Option<BlockParent>,
-        map: &mut IRMap,
-    ) -> Block {
+    fn reserve_block(&mut self, block: Block, parent: Option<BlockParent>, map: &mut IRMap) {
         let copy = self.stage.nodes.blocks.alloc_with_id(|id| {
             BlockInfo::builder()
                 .maybe_parent(parent)
@@ -309,7 +302,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         for stmt in self.block_statements(block) {
             self.reserve_statement(stmt, map);
         }
-        copy
     }
 
     /// Second pass for `stmt`: allocate its copy under `parent` with every id
@@ -323,8 +315,9 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         map: &mut IRMap,
         copied: &mut Copied,
     ) -> Statement {
-        let original = stmt.expect_info(self.stage).definition.clone();
-        let mut definition = original.clone();
+        let mut definition = stmt.expect_info(self.stage).definition.clone();
+        // Taken before the ids are mapped: the original bodies, to fill.
+        let original_bodies = bodies_of(&definition);
         for operand in definition.arguments_mut() {
             *operand = map.lookup_or_original(*operand);
         }
@@ -368,7 +361,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
             self.adopt_body(body, copy);
         }
         // Walk the original bodies to fill those copies, found through `map`.
-        for body in bodies_of(&original) {
+        for body in original_bodies {
             self.fill_body(body, map, copied);
         }
         copy
@@ -379,8 +372,13 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
         match body {
             Body::Block(block) => self.fill_block(block, map, copied),
             Body::CFG(cfg) => {
+                let copy = map.cfg(cfg).expect("CFGs are reserved first");
+                let mut tail = None;
                 for block in self.cfg_blocks(cfg) {
                     self.fill_block(block, map, copied);
+                    let block_copy = map.block(block).expect("blocks are reserved first");
+                    self.link(LinkedList::single(block_copy), copy, tail, None);
+                    tail = Some(block_copy);
                 }
             }
             Body::DiGraph(graph) => {
@@ -531,30 +529,6 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 .collect::<Vec<_>>()
         });
         ports.chain(results).collect()
-    }
-
-    /// Append the unlinked `block` to the end of `cfg`'s block list.
-    fn push_block(&mut self, cfg: CFG, block: Block) {
-        let tail = cfg.expect_info(self.stage).blocks.tail;
-        match tail {
-            Some(tail) => {
-                if let Some(info) = tail.get_info_mut(self.stage) {
-                    info.node.next = Some(block);
-                }
-            }
-            None => {
-                if let Some(info) = cfg.get_info_mut(self.stage) {
-                    info.blocks.head = Some(block);
-                }
-            }
-        }
-        if let Some(info) = block.get_info_mut(self.stage) {
-            info.node.prev = tail;
-        }
-        if let Some(info) = cfg.get_info_mut(self.stage) {
-            info.blocks.tail = Some(block);
-            info.blocks.len += 1;
-        }
     }
 
     /// The statements directly in `body`: a block's chain then its

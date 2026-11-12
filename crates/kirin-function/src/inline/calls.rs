@@ -140,7 +140,7 @@ where
             rewriter.insert(InsertionPoint::Before(stmt), copy)?;
         }
         for (result, value) in call.results.into_iter().zip(returned) {
-            rewriter.replace_all_uses(result, map.value(value).unwrap_or(value))?;
+            rewriter.replace_all_uses(result, map.lookup_or_original(value))?;
         }
         rewriter.erase_statement(stmt)?;
         return Ok(());
