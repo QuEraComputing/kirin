@@ -217,9 +217,7 @@ impl<L: Layout> Statement<L> {
                 ident,
                 collection,
                 data: FieldData::Argument {
-                    ssa_type: kirin_opts
-                        .ssa_ty
-                        .unwrap_or_else(|| syn::parse_quote! { () }),
+                    ssa_type: kirin_opts.ssa_ty,
                 },
             });
         }
