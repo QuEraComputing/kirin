@@ -1,6 +1,5 @@
 use indexmap::IndexMap;
 
-use crate::arena::Id;
 use crate::identifier;
 
 use super::compile_stage::CompileStage;

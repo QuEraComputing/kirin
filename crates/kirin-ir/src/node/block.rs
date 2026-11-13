@@ -2,7 +2,7 @@ use smallvec::SmallVec;
 
 use crate::{
     Dialect, Symbol,
-    arena::{GetInfo, GetInfoMut, Id, Item},
+    arena::{GetInfo, GetInfoMut, Item},
     identifier,
 };
 
