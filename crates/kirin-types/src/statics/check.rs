@@ -48,6 +48,7 @@ impl<B: IndexSort, C: StaticSig<B>> Statics<B, C> {
                 }
                 Ok(sig.result)
             }
+            StaticTerm::Unit => Ok(Sort::Type),
             StaticTerm::Product(components) => {
                 if components.len() < 2 {
                     return Err(SortError::ShortProduct {
