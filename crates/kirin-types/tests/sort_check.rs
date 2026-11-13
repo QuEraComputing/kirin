@@ -336,3 +336,16 @@ fn mentions_finds_free_variables_under_binders() {
     let unrelated = f.term(StaticTerm::Guard(other, token));
     assert!(!f.statics.mentions(unrelated, var));
 }
+
+#[test]
+fn unit_is_a_type_equal_to_any_other_unit() {
+    let mut f = Fixture::new();
+    let (unit, other) = (f.term(StaticTerm::Unit), f.term(StaticTerm::Unit));
+    assert_eq!(f.check(unit), Ok(ty()));
+    assert_eq!(f.statics.display(unit, 0).to_string(), "unit");
+    // two separately allocated units are the same type
+    assert_ne!(unit, other);
+    assert!(f.statics.term_eq(unit, other));
+    let token = f.token();
+    assert!(!f.statics.term_eq(unit, token));
+}

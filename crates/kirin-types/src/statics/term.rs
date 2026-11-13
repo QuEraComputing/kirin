@@ -147,6 +147,8 @@ pub enum StaticTerm<S: IndexSort, C> {
     Lit(SortValue<S::T>),
     /// A dialect's signature applied to its arguments.
     Constructor(C, Vec<StaticTermId>),
+    /// The unit type for runtime values
+    Unit,
     /// `T_1 * … * T_n` with `n ≥ 2`, of sort `type`.
     Product(Vec<StaticTermId>),
     /// `(T_1, …, T_n) → T`, of sort `type`.
@@ -192,7 +194,7 @@ impl<S: IndexSort, C> Statics<S, C> {
         use StaticTerm::*;
         match &*self.terms[term] {
             Free(x) => *x == var,
-            Bound(_) | Lit(_) => false,
+            Unit | Bound(_) | Lit(_) => false,
             Constructor(_, args) | Product(args) => args.iter().any(|a| self.mentions(*a, var)),
             Function(args, result) => args.iter().chain([result]).any(|a| self.mentions(*a, var)),
             Guard(p, t) | Assert(p, t) => self.mentions(*p, var) || self.mentions(*t, var),
@@ -265,7 +267,7 @@ impl<S: IndexSort, C: Clone> Statics<S, C> {
         // We take a copy of the node, so the recursive `&mut self` calls don't
         // overlap its borrow.
         let rebuilt = match (*self.terms[term]).clone() {
-            leaf @ (Bound(_) | Free(_) | Lit(_)) => leaf,
+            leaf @ (Unit | Bound(_) | Free(_) | Lit(_)) => leaf,
             Constructor(c, args) => Constructor(
                 c,
                 args.into_iter()

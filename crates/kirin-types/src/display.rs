@@ -100,6 +100,7 @@ impl<B: IndexSort, C: Display> Display for TermDisplay<'_, B, C> {
                 self.list(f, args, ", ")?;
                 f.write_str(")")?;
             }
+            StaticTerm::Unit => write!(f, "unit")?,
             StaticTerm::Product(components) => {
                 f.write_str("(")?;
                 self.list(f, components, " * ")?;
