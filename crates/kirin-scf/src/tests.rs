@@ -1,6 +1,6 @@
 use kirin::ir::{
-    HasArguments, HasBlocks, HasCFG, HasResults, HasSuccessors, IsConstant, IsPure, IsSpeculatable,
-    IsTerminator, TestSSAValue,
+    BuilderSSAKind, BuilderStageInfo, GetInfo, HasArguments, HasBlocks, HasCFG, HasResults,
+    HasSuccessors, IsConstant, IsPure, IsSpeculatable, IsTerminator, TestSSAValue,
 };
 use kirin_test_types::UnitType;
 
@@ -108,6 +108,24 @@ fn yield_clone_eq() {
 fn yield_debug() {
     let dbg = format!("{:?}", make_yield());
     assert!(dbg.contains("Yield"), "debug should contain 'Yield': {dbg}");
+}
+
+// --- Builder ---
+
+#[test]
+fn yield_builder_creates_terminator() {
+    let mut stage = BuilderStageInfo::<StructuredControlFlow<UnitType>>::default();
+    let block = stage.block().new();
+    let value = stage
+        .ssa()
+        .ty(UnitType)
+        .kind(BuilderSSAKind::BlockArgument(block, 0))
+        .new();
+    let id = Yield::<UnitType>::new(&mut stage, vec![value]).id;
+    let stage = stage.finalize().unwrap();
+    let scf = id.expect_info(&stage).definition();
+    assert!(scf.is_terminator());
+    assert_eq!(scf.arguments().copied().collect::<Vec<_>>(), [value]);
 }
 
 // --- StructuredControlFlow wraps delegation: Yield variant ---
