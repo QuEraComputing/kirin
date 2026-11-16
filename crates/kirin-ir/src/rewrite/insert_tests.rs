@@ -1,7 +1,8 @@
 //! [`Rewriter::insert`] rejects a place nested in the statement's own bodies.
 //!
-//! In-crate because it needs a detached statement that owns a body, which no
-//! public API makes yet.
+//! In-crate so it can build the detached statement directly and choose how
+//! deeply its bodies nest. `tests/clone.rs` covers the same rejection for a
+//! statement copied with [`Rewriter::clone_statement`].
 
 use crate::arena::GetInfo;
 use crate::testing::dialect::{TestLang, new_stage};
