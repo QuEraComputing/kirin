@@ -8,6 +8,7 @@ mod composite;
 mod constant;
 mod digraph;
 mod function;
+mod module;
 mod namespace;
 mod scf;
 mod tuple;
