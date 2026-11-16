@@ -1,3 +1,4 @@
+from typing import Any, Callable
 from dataclasses import field, dataclass
 
 from kirin import ir, types
@@ -284,13 +285,19 @@ class Serializer:
             },
         )
 
-    def serialize_frozenset(self, value: frozenset) -> SerializationUnit:
+    def serialize_frozenset(
+        self, value: frozenset, *, key: Callable[[Any], Any] | None = None
+    ) -> SerializationUnit:
+        # NOTE: frozenset iteration order can depend on hash randomization
+        # (e.g. for str-hashed elements), so callers that need deterministic
+        # output across processes should pass a `key` to sort the elements.
+        elements = value if key is None else sorted(value, key=key)
         return SerializationUnit(
             kind="frozenset",
             module_name=frozenset.__module__,
             class_name=frozenset.__name__,
             data={
-                "value": [self.serialize(x) for x in value],
+                "value": [self.serialize(x) for x in elements],
             },
         )
 
@@ -445,6 +452,10 @@ class Serializer:
             module_name=ir.DialectGroup.__module__,
             class_name=ir.DialectGroup.__name__,
             data={
-                "data": self.serialize_frozenset(group.data),
+                # NOTE: sort by name so the output does not depend on
+                # PYTHONHASHSEED (`Dialect.__hash__` hashes its name).
+                "data": self.serialize_frozenset(
+                    group.data, key=lambda dialect: dialect.name
+                ),
             },
         )
