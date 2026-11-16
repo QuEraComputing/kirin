@@ -28,7 +28,8 @@
 //! [`Rewriter::replace_all_uses_except_stmt`]), block-body statement surgery
 //! ([`Rewriter::erase_statement`], [`Rewriter::insert_before`],
 //! [`Rewriter::insert_after`], [`Rewriter::replace_statement`],
-//! [`Rewriter::insert_terminator`]), `CFG`
+//! [`Rewriter::insert_terminator`], [`Rewriter::move_before`],
+//! [`Rewriter::move_after`]), `CFG`
 //! block-list surgery in the sibling `cfg` module (append/insert/erase/split/
 //! merge blocks, [`Rewriter::retarget_successor`], and block-argument insertion
 //! and erasure), `DiGraph` node surgery in the sibling `digraph` module
@@ -158,6 +159,16 @@ pub enum MutationEvent {
     /// the bodies it dropped were tombstoned with everything nested in them,
     /// and the bodies it gained now have `owner` as their parent.
     ChangedBodyNesting { owner: Statement },
+    /// `stmt` was moved to another place in a block body, keeping its id,
+    /// results, uses and nested bodies.
+    MovedStatement { stmt: Statement },
+    /// Every statement of `source`, except its terminator, was moved into
+    /// `dest`, keeping their ids, results, uses and nested bodies.
+    SplicedBlock { source: Block, dest: Block },
+    /// Every block of `source` was moved into `dest`, keeping their ids,
+    /// arguments, statements and edges. Recorded after the
+    /// [`MutationEvent::ChangedBlockList`] of both CFGs.
+    SplicedCfg { source: CFG, dest: CFG },
 }
 
 /// An illegal mutation rejected by a [`Rewriter`].
@@ -181,11 +192,12 @@ pub enum RewriteError {
     /// Nothing can follow a block's terminator, so `insert_after` cannot anchor
     /// on one. (`insert_before` can: it appends to the end of the chain.)
     AnchorIsTerminator(Statement),
-    /// The inserted definition is a terminator where a non-terminator is
-    /// required: `insert_before`/`insert_after` do not splice terminators into
-    /// a block's statement list (use [`Rewriter::insert_terminator`] on a block
-    /// that has none), and a `DiGraph` has no terminators for `insert_node` to
-    /// add. The counterpart of [`RewriteError::ExpectedTerminator`].
+    /// The inserted definition, or the moved statement, is a terminator where
+    /// a non-terminator is required: `insert_before`/`insert_after` and
+    /// `move_before`/`move_after` do not splice terminators into a block's
+    /// statement list (use [`Rewriter::insert_terminator`] on a block that has
+    /// none), and a `DiGraph` has no terminators for `insert_node` to add. The
+    /// counterpart of [`RewriteError::ExpectedTerminator`].
     UnexpectedTerminator,
     /// The inserted or replacement definition is a non-terminator that carries
     /// successors. Only a block's terminator may transfer control, so such a
@@ -247,6 +259,18 @@ pub enum RewriteError {
     /// that contains the statement (for an insert, the block or graph it is
     /// inserted into), which would make the statement its own ancestor.
     BodyEnclosesOwner(Body),
+    /// `move_before`/`move_after` was given an anchor nested in the moved
+    /// statement's own bodies, which would make the statement its own
+    /// ancestor.
+    MovedIntoItself { stmt: Statement, anchor: Statement },
+    /// `splice_block_before`/`splice_block_after` was given an anchor in
+    /// `source` or nested in one of its statements, which would place a
+    /// spliced statement next to or inside itself.
+    SplicedIntoItself { source: Block, anchor: Statement },
+    /// `splice_cfg_after` was given an anchor block in `source` or nested in
+    /// one of its blocks, which would place `source`'s blocks inside
+    /// themselves.
+    CfgSplicedIntoItself { source: CFG, anchor: Block },
     /// The block is not part of a CFG's block list (it is a statement-owned
     /// single-block body, or detached), so block-list surgery cannot apply.
     NotInCfgBody(Block),
@@ -322,7 +346,7 @@ impl fmt::Display for RewriteError {
             RewriteError::UnexpectedTerminator => {
                 write!(
                     f,
-                    "expected a non-terminator: terminators are only inserted with insert_terminator"
+                    "expected a non-terminator: terminators are only inserted with insert_terminator, and are not moved"
                 )
             }
             RewriteError::BlockHasTerminator(block) => {
@@ -396,6 +420,24 @@ impl fmt::Display for RewriteError {
                 write!(
                     f,
                     "the definition names body {body:?}, which encloses the statement"
+                )
+            }
+            RewriteError::MovedIntoItself { stmt, anchor } => {
+                write!(
+                    f,
+                    "cannot move {stmt:?} next to {anchor:?}, which is nested in it"
+                )
+            }
+            RewriteError::SplicedIntoItself { source, anchor } => {
+                write!(
+                    f,
+                    "cannot splice {source:?} next to {anchor:?}, which is in it"
+                )
+            }
+            RewriteError::CfgSplicedIntoItself { source, anchor } => {
+                write!(
+                    f,
+                    "cannot splice {source:?} after {anchor:?}, which is in it"
                 )
             }
             RewriteError::YieldIndexOutOfRange { graph, index } => {
@@ -879,6 +921,7 @@ impl<'a, L: Dialect> Rewriter<'a, L> {
                 continue;
             };
             let uses = info.uses_mut();
+            // `sites` is a subset of `uses`, so equal lengths mean every use was selected.
             if sites.len() == uses.len() {
                 uses.clear();
             } else if !sites.is_empty() {

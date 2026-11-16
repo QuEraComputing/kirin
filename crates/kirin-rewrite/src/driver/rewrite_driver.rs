@@ -56,9 +56,9 @@ impl std::ops::AddAssign for RewriteSummary {
 /// returns. It counts as applied when it edits the IR. Each sweep, the
 /// driver builds a fresh copy of the rule with the recipe given to
 /// [`RuleSet::add_statement_rule`]. Since its edits can't be known before the
-/// run, one erasing the statement being visited in an order that does not
-/// allow it fails the run with [`DriverError::Walk`], even if it then
-/// interrupts the sweep.
+/// run, one erasing or moving the statement being visited in an order that
+/// does not allow it fails the run with [`DriverError::Walk`], even if it
+/// then interrupts the sweep.
 ///
 /// A [`BlockRule`] runs, in its place in the rule list, on each block the
 /// visited statement owns: its `Block`s, then the blocks of its `CFG`s.
@@ -144,7 +144,7 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<RewriteSummary, DriverError> {
-        if !O::ALLOWS_ERASING_VISITED
+        if !O::ALLOWS_ERASING_OR_MOVING_VISITED
             && let Some(rule) = self
                 .rules
                 .rules()

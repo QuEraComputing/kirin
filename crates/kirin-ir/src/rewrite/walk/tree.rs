@@ -69,7 +69,7 @@ pub(super) fn next_sibling<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) ->
 
 /// The statement owning the body `stmt` is in, or `None` for a top-level or
 /// dead statement.
-pub(super) fn parent<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Option<Statement> {
+pub(crate) fn parent<L: Dialect>(stage: &StageInfo<L>, stmt: Statement) -> Option<Statement> {
     match stmt.get_info(stage)?.parent? {
         StatementParent::Block(block) => match block.get_info(stage)?.parent()? {
             BlockParent::CFG(cfg) => cfg.get_info(stage)?.parent,
