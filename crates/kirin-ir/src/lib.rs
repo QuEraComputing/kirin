@@ -29,7 +29,7 @@ pub use builder::error::{
     StagedFunctionConflictKind, StagedFunctionError,
 };
 pub use builder::{AsBuildStage, BuilderStageInfo, FinalizeError};
-pub use comptime::{CompileTimeValue, Placeholder, Typeof};
+pub use comptime::{CompileTimeValue, Placeholder, TypeResolution, Typeof};
 pub use derived::{
     BlockBody, ChainDefect, ChainFinding, DanglingParent, DeriveError, Finding, Mismatch,
     VerifyError, verify_derived,
@@ -73,7 +73,7 @@ pub mod prelude {
     };
     pub use crate::{
         CompileTimeValue, HasProduct, Placeholder, Product, Project, ProjectError, TryProject,
-        TryProjectTo, Typeof,
+        TryProjectTo, TypeResolution, Typeof,
     };
 }
 

@@ -13,6 +13,13 @@ pub enum SimpleType {
     Bottom,
 }
 
+impl kirin_ir::TypeResolution for SimpleType {
+    fn is_resolved(&self) -> bool {
+        // Bottom is unresolved; Any is resolved.
+        !matches!(self, Self::Bottom)
+    }
+}
+
 impl Lattice for SimpleType {
     fn is_subseteq(&self, other: &Self) -> bool {
         self == other || matches!(other, SimpleType::Any) || matches!(self, SimpleType::Bottom)

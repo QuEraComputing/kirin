@@ -624,7 +624,7 @@ mod tests {
             ident: Some(syn::Ident::new(name, proc_macro2::Span::call_site())),
             collection: Collection::Single,
             data: FieldData::Argument {
-                ssa_type: syn::parse_quote!(Placeholder::placeholder()),
+                ssa_type: Some(syn::parse_quote!(Placeholder::placeholder())),
             },
         }
     }

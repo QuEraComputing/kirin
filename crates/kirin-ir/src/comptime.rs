@@ -46,6 +46,14 @@ pub trait Placeholder: CompileTimeValue {
     fn placeholder() -> Self;
 }
 
+/// Whether a type is ready for equality checks in builders.
+///
+/// Return false for unknown types or unresolved components.
+/// Skipped checks are not retried after inference.
+pub trait TypeResolution {
+    fn is_resolved(&self) -> bool;
+}
+
 pub trait Typeof<Ty> {
     fn type_of(&self) -> Ty;
 }

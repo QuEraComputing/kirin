@@ -77,6 +77,10 @@ pub struct KirinFieldOptions {
     #[darling(default)]
     pub into: bool,
     pub default: Option<DefaultValue>,
+    /// SSA type expression. On a `ResultValue` it sets the result's type; on an
+    /// `SSAValue` the generated builder asserts the operand has this type.
+    /// Fields named in the expression are moved, so a non-`Copy` field must
+    /// be written as `field.clone()`.
     #[darling(rename = "type")]
     pub ssa_ty: Option<syn::Expr>,
 }
