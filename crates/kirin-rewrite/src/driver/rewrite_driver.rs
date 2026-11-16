@@ -1,4 +1,4 @@
-use kirin_ir::walk::{WalkCursor, WalkOrder, WalkResult};
+use kirin_ir::walk::{WalkOrder, WalkResult};
 use kirin_ir::{Block, Dialect, GetInfo, Rewriter, StageInfo, Statement};
 
 use super::{DriverError, Match};
@@ -57,7 +57,8 @@ impl std::ops::AddAssign for RewriteSummary {
 /// driver builds a fresh copy of the rule with the recipe given to
 /// [`RuleSet::add_statement_rule`]. Since its edits can't be known before the
 /// run, one erasing the statement being visited in an order that does not
-/// allow it fails the run with [`DriverError::Walk`].
+/// allow it fails the run with [`DriverError::Walk`], even if it then
+/// interrupts the sweep.
 ///
 /// A [`BlockRule`] runs, in its place in the rule list, on each block the
 /// visited statement owns: its `Block`s, then the blocks of its `CFG`s.
@@ -183,33 +184,62 @@ impl<'r, L: Dialect> RewriteDriver<'r, L> {
     /// remaining rules still run at the statement, then its nested
     /// statements are skipped; an `interrupt` stops trying rules and ends
     /// the sweep.
+    ///
+    /// The sweep is a [`WalkOrder::walk_mut`], so it checks the walk's
+    /// contract like any other walk. A rule failing at a statement interrupts
+    /// it, and that failure is reported before any broken contract.
     fn sweep<O: WalkOrder>(
         &self,
         rewriter: &mut Rewriter<'_, L>,
         root: Statement,
     ) -> Result<usize, DriverError> {
         let mut applied = 0;
-        let mut cursor = O::start(rewriter.stage(), root);
         let mut sweep_rules: Vec<SweepRule<'_, L>> =
             self.rules.rules().iter().map(SweepRule::new).collect();
-        while let Some(stmt) = cursor.next(rewriter.stage())? {
-            let mut skip = false;
-            for rule in &mut sweep_rules {
-                match rule.apply(self.rules, rewriter, stmt, &mut applied)? {
-                    WalkResult::Advance => {}
-                    WalkResult::Skip => skip = true,
-                    WalkResult::Interrupt => return Ok(applied),
-                }
-                // The rule erased the statement, so no later rule can see it.
-                if stmt.get_info(rewriter.stage()).is_none() {
-                    break;
+        let mut failure = None;
+        let walked = O::walk_mut(rewriter, root, |rewriter, stmt| {
+            match self.visit(&mut sweep_rules, rewriter, stmt, &mut applied) {
+                Ok(walk_result) => walk_result,
+                Err(error) => {
+                    failure = Some(error);
+                    WalkResult::Interrupt
                 }
             }
-            if skip {
-                cursor.skip();
+        });
+        if let Some(error) = failure {
+            return Err(error);
+        }
+        walked?;
+        Ok(applied)
+    }
+
+    /// Run every rule at `stmt`, adding to `applied` each application that
+    /// edited the IR. Returns how the walk goes on: `Skip` if any rule
+    /// skipped, `Interrupt` as soon as one interrupts.
+    fn visit(
+        &self,
+        sweep_rules: &mut [SweepRule<'_, L>],
+        rewriter: &mut Rewriter<'_, L>,
+        stmt: Statement,
+        applied: &mut usize,
+    ) -> Result<WalkResult, DriverError> {
+        let mut skip = false;
+        for rule in sweep_rules {
+            match rule.apply(self.rules, rewriter, stmt, applied)? {
+                WalkResult::Advance => {}
+                WalkResult::Skip => skip = true,
+                WalkResult::Interrupt => return Ok(WalkResult::Interrupt),
+            }
+            // The rule erased the statement, so no later rule can see it.
+            if stmt.get_info(rewriter.stage()).is_none() {
+                break;
             }
         }
-        Ok(applied)
+        Ok(if skip {
+            WalkResult::Skip
+        } else {
+            WalkResult::Advance
+        })
     }
 }
 
