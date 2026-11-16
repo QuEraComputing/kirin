@@ -396,3 +396,24 @@ pub fn make_compute(
 pub fn new_stage() -> BuilderStageInfo<BuilderDialect> {
     BuilderStageInfo::default()
 }
+
+/// A position in a [`Rewriter`]'s event log, for checking each edit's events
+/// in turn.
+#[allow(dead_code)]
+#[derive(Default)]
+pub struct EventCursor(usize);
+
+#[allow(dead_code)]
+impl EventCursor {
+    /// Move past every event recorded so far.
+    pub fn advance<L: Dialect>(&mut self, rw: &Rewriter<'_, L>) {
+        self.0 = rw.events().len();
+    }
+
+    /// The events recorded since the cursor's position, moving past them.
+    pub fn read_and_advance<L: Dialect>(&mut self, rw: &Rewriter<'_, L>) -> Vec<MutationEvent> {
+        let events = rw.events()[self.0..].to_vec();
+        self.advance(rw);
+        events
+    }
+}
